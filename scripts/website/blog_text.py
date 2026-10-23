@@ -79,6 +79,9 @@ def read_post(path):
         return split_front_matter(fh.read())
 
 
+_FENCE_ATTRS_RE = re.compile(r"^(\s*(?:```|~~~)[\w+-]*)[ \t]*\{[^}\n]*\}[ \t]*$", re.M)
+
+
 def body_to_html(body):
     """Render a post's Markdown to HTML for grammar checks.
 
@@ -91,6 +94,10 @@ def body_to_html(body):
     import markdown  # lazy: only render paths need it
 
     _fm, body, _start = split_front_matter(body)
+    # Hugo accepts attributes after a fence's language (```java {class="x"}),
+    # which python-markdown does not recognize as a fence at all; the block
+    # would then be checked as prose. Drop the attributes before rendering.
+    body = _FENCE_ATTRS_RE.sub(r"\1", body)
     return markdown.markdown(
         strip_shortcodes(author_body(body)),
         extensions=["fenced_code", "tables"],

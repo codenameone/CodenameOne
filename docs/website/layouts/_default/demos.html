@@ -10,5 +10,30 @@
 
   {{ partial "cn1-flagship-samples.html" (dict "compact" false) }}
 
+  <section class="cn1-flagship">
+    <div class="cn1-flagship__intro">
+      <p class="cn1-demos-eyebrow">Showcase applications</p>
+      <h2>Desktop-class apps in Java</h2>
+      <p>Larger applications built with Codename One that show how far one Java code base goes on the desktop, the web and mobile.</p>
+    </div>
+    <div class="cn1-flagship__grid">
+      <article class="cn1-flagship-card">
+        <a class="cn1-flagship-card__shots" href="/blog/rewrite-everything-in-java-not-rust/">
+          <img src="/demos/wordprocessor-iphone.jpg" alt="The word processor on an iPhone" loading="lazy">
+          <img src="/demos/wordprocessor-android.jpg" alt="The word processor on Android" loading="lazy">
+        </a>
+        <div class="cn1-flagship-card__body">
+          <p class="cn1-flagship-card__kind">Word processor</p>
+          <h3><a href="/blog/rewrite-everything-in-java-not-rust/">CN1 Word Processor</a></h3>
+          <p>A full word processor with a ribbon, styles, tables, track changes, proofing and export to Word, PDF and more. One Java project runs on macOS, Windows, Linux, the browser, iOS and Android.</p>
+          <div class="cn1-demo-card__actions">
+            <a class="cn1-demo-pill" href="/blog/rewrite-everything-in-java-not-rust/">Read the story</a>
+            <a class="cn1-demo-pill cn1-demo-pill--ghost" href="https://github.com/shai-almog/cn1-wordprocessor" target="_blank" rel="noopener">Source</a>
+          </div>
+        </div>
+      </article>
+    </div>
+  </section>
+
 </div>
 {{- end -}}
