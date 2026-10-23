@@ -337,6 +337,11 @@ class DrmVideoView extends VideoView {
         MediaDrm.KeyRequest req = mp.getKeyRequest(null, initData, "video/mp4",
                 MediaDrm.KEY_TYPE_STREAMING, null);
         byte[] response = post(drm.getLicenseUrl(), req.getData(), drm.getLicenseHeaders());
+        if (released.get() || playerRef.get() != mp) {
+            // The view was closed while the license was in flight; this player is
+            // being released and must not go on preparing against a dead surface.
+            throw new IllegalStateException("The player was closed during license acquisition");
+        }
         mp.provideKeyResponse(null, response);
     }
 

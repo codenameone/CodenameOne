@@ -126,9 +126,10 @@ forwards the device's challenge to the vendor and passes the answer back:
 reel.drm.widevine.url=https://license.example.com/widevine
 reel.drm.widevine.header=Authorization: Bearer ...
 reel.drm.fairplay.url=https://license.example.com/fairplay
-reel.drm.fairplay.certificate=/path/to/fairplay.cer
+reel.drm.fairplay.certificate=https://license.example.com/fairplay.cer
 ----
 
+The FairPlay certificate is a URL the device downloads, not a file on the server.
 A device then gets the strongest scheme it supports that the server can
 license, and a device that can play none is told so before playback starts.
 The app also blocks screenshots while protected video is on screen, and draws

@@ -148,6 +148,11 @@ public final class DrmConfig {
     ///
     /// this configuration, for chaining
     public DrmConfig addLicenseHeader(String name, String value) {
+        if (name == null || value == null || hasLineBreak(name) || hasLineBreak(value)) {
+            // Ports pass headers to native code as line separated pairs, so a line
+            // break would silently shift every header after it.
+            throw new IllegalArgumentException("Header names and values must be non-null and free of line breaks");
+        }
         licenseHeaders.put(name, value);
         return this;
     }
@@ -159,5 +164,8 @@ public final class DrmConfig {
     /// a copy of the headers, keyed by name
     public Map<String, String> getLicenseHeaders() {
         return new HashMap<String, String>(licenseHeaders);
+    }
+    private static boolean hasLineBreak(String s) {
+        return s.indexOf('\n') >= 0 || s.indexOf('\r') >= 0;
     }
 }

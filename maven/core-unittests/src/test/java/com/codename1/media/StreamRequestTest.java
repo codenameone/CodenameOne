@@ -57,15 +57,19 @@ class StreamRequestTest extends UITestBase {
     }
 
     @FormTest
-    void defaultImplementationSupportsNoDrmScheme() {
+    void defaultImplementationSupportsOnlyAes128() {
+        // AES-128 HLS only needs the key URL in the playlist, which any HLS player reads.
         for (DrmScheme s : DrmScheme.values()) {
-            assertFalse(MediaManager.isDrmSupported(s), s.name());
+            assertEquals(s == DrmScheme.AES_128, MediaManager.isDrmSupported(s), s.name());
         }
-        StreamRequest req = new StreamRequest("https://example.com/v.mpd")
+        StreamRequest req = new StreamRequest("https://example.com/v.m3u8")
                 .setDrm(new DrmConfig(DrmScheme.WIDEVINE, "https://example.com/license"));
         assertFalse(req.isSupported());
         IOException e = assertThrows(IOException.class, req::create);
         assertTrue(e.getMessage().contains("WIDEVINE"));
+        assertThrows(IllegalArgumentException.class,
+                () -> new DrmConfig(DrmScheme.CLEARKEY, "https://example.com/license").addLicenseHeader("X", "a\nb"));
+        assertThrows(IllegalArgumentException.class, () -> req.addHeader("X\r", "v"));
     }
 
     @FormTest

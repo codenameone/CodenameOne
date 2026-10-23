@@ -5789,7 +5789,9 @@ public abstract class CodenameOneImplementation {
     ///
     /// true when the scheme is supported
     public boolean isDrmSupported(com.codename1.media.DrmScheme scheme) {
-        return false;
+        // AES-128 HLS needs nothing beyond a player that reads the key URL in the
+        // playlist, which is what the default createStreamingMedia hands it to.
+        return scheme == com.codename1.media.DrmScheme.AES_128;
     }
 
     /// Answers whether the platform player can attach HTTP headers to the manifest

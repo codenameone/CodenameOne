@@ -23856,7 +23856,12 @@ API_AVAILABLE(ios(10.3), tvos(10.2))
                 [self fail:keyRequest reason:@"the key request produced no SPC"];
                 return;
             }
-            NSMutableURLRequest* req = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:self.licenseUrl]];
+            NSURL* licenseURL = [NSURL URLWithString:self.licenseUrl];
+            if (licenseURL == nil) {
+                [self fail:keyRequest reason:@"the license URL is not a valid URL"];
+                return;
+            }
+            NSMutableURLRequest* req = [NSMutableURLRequest requestWithURL:licenseURL];
             req.HTTPMethod = @"POST";
             req.HTTPBody = spc;
             [req setValue:@"application/octet-stream" forHTTPHeaderField:@"Content-Type"];

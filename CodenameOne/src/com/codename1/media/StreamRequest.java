@@ -29,7 +29,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
-/// Describes an adaptive (HLS or DASH) or progressive video stream, optionally
+/// Describes an adaptive (HLS) or progressive video stream, optionally
 /// protected by DRM, and creates the platform player for it.
 ///
 /// ```java
@@ -70,7 +70,7 @@ public final class StreamRequest {
     ///
     /// #### Parameters
     ///
-    /// - `url`: the HLS (`.m3u8`) or DASH (`.mpd`) manifest, or a progressive file
+    /// - `url`: the HLS (`.m3u8`) manifest, or a progressive file
     public StreamRequest(String url) {
         if (url == null || url.length() == 0) {
             throw new IllegalArgumentException("url is required");
@@ -171,6 +171,11 @@ public final class StreamRequest {
     ///
     /// this request, for chaining
     public StreamRequest addHeader(String name, String value) {
+        if (name == null || value == null || hasLineBreak(name) || hasLineBreak(value)) {
+            // Ports pass headers to native code as line separated pairs, so a line
+            // break would silently shift every header after it.
+            throw new IllegalArgumentException("Header names and values must be non-null and free of line breaks");
+        }
         headers.put(name, value);
         return this;
     }
@@ -241,5 +246,8 @@ public final class StreamRequest {
             }
         }, "StreamRequest").start();
         return out;
+    }
+    private static boolean hasLineBreak(String s) {
+        return s.indexOf('\n') >= 0 || s.indexOf('\r') >= 0;
     }
 }
