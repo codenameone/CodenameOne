@@ -974,18 +974,26 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardString___R_java_lang_St
 #endif
 }
 
+#if !TARGET_OS_OSX && !TARGET_OS_WATCH && !TARGET_OS_TV
+/// The options the next setClipboardContent publishes with, armed by restrictClipboard; nil
+/// when that publish is an ordinary one. They have to go out on the SAME setItems call as the
+/// content: publishing first and restricting after left a window in which Universal Clipboard
+/// could already have synced a sensitive clip to the user's other devices.
+static NSDictionary* cn1PendingClipboardOptions = nil;
+#endif
+
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_restrictClipboard___int_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT expireSeconds) {
 #if !TARGET_OS_OSX && !TARGET_OS_WATCH && !TARGET_OS_TV
     POOL_BEGIN();
-    UIPasteboard *pasteboard = [UIPasteboard generalPasteboard];
-    NSArray *items = pasteboard.items;
     NSMutableDictionary *options = [NSMutableDictionary dictionary];
     options[UIPasteboardOptionLocalOnly] = @YES;
     if (expireSeconds > 0) {
         options[UIPasteboardOptionExpirationDate] = [NSDate dateWithTimeIntervalSinceNow:expireSeconds];
     }
-    // Written again with the options: they belong to a setItems call, not to the items.
-    [pasteboard setItems:items options:options];
+#if !__has_feature(objc_arc)
+    [cn1PendingClipboardOptions release];
+#endif
+    cn1PendingClipboardOptions = [options copy];
     POOL_END();
     return expireSeconds > 0 ? JAVA_TRUE : JAVA_FALSE;
 #else
@@ -1435,7 +1443,16 @@ void com_codename1_impl_ios_IOSNative_setClipboardContent___java_lang_String_jav
     // Whatever the alternatives were not able to ride on, which is the whole payload when
     // the content named no files at all.
     if ([item count] > 0) [items addObject:item];
-    [UIPasteboard generalPasteboard].items = items;
+    if (cn1PendingClipboardOptions != nil) {
+        // Local only and expiring from the first moment the clip exists; see restrictClipboard.
+        [[UIPasteboard generalPasteboard] setItems:items options:cn1PendingClipboardOptions];
+#if !__has_feature(objc_arc)
+        [cn1PendingClipboardOptions release];
+#endif
+        cn1PendingClipboardOptions = nil;
+    } else {
+        [UIPasteboard generalPasteboard].items = items;
+    }
     [cn1PendingClipboardExtras removeAllObjects];
     POOL_END();
 #endif

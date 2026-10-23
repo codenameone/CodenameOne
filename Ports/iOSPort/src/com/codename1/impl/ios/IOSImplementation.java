@@ -10667,6 +10667,14 @@ public class IOSImplementation extends CodenameOneImplementation {
                     nativeInstance.addClipboardRepresentation(offered[iter], bytes);
                 }
             }
+            // Armed BEFORE the publish so the clip goes out local only and expiring on the
+            // very same pasteboard write; restricting it afterwards left a window in which
+            // Universal Clipboard could sync a sensitive value to the user's other devices.
+            if(content.isSensitive() || content.getClearAfter() > 0) {
+                // Rounded up, so a short time still expires rather than meaning "never".
+                clipboardExpires = nativeInstance.restrictClipboard(content.getClearAfter() <= 0 ? 0
+                        : (content.getClearAfter() + 999) / 1000);
+            }
             nativeInstance.setClipboardContent(
                     clipboardText(content, com.codename1.ui.ClipboardContent.MIME_TEXT),
                     clipboardText(content, com.codename1.ui.ClipboardContent.MIME_HTML),
@@ -10675,11 +10683,6 @@ public class IOSImplementation extends CodenameOneImplementation {
                     clipboardText(content, com.codename1.ui.ClipboardContent.MIME_ASCIIDOC),
                     clipboardImageBytes(content),
                     clipboardFileUris(content));
-            if(content.isSensitive() || content.getClearAfter() > 0) {
-                // Rounded up, so a short time still expires rather than meaning "never".
-                clipboardExpires = nativeInstance.restrictClipboard(content.getClearAfter() <= 0 ? 0
-                        : (content.getClearAfter() + 999) / 1000);
-            }
             super.copyToClipboard(obj);
             return;
         }

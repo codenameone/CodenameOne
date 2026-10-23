@@ -377,9 +377,10 @@ public class IOSNative {
     native void addClipboardRepresentation(String mimeType, byte[] value);
     native void setClipboardContent(String plain, String html, String rtf, String markdown, String asciidoc, byte[] image, String fileUris);
     native String getClipboardContent(String mimeType);
-    /// Republishes what is on the pasteboard local only (no Universal Clipboard) and, when
-    /// `expireSeconds` is above zero, set to expire after that many seconds. False where the
-    /// pasteboard has no such options (macOS), so the content stays as it was published.
+    /// Makes the NEXT setClipboardContent publish local only (no Universal Clipboard) and, when
+    /// `expireSeconds` is above zero, set to expire after that many seconds; the options go out
+    /// on the same pasteboard write as the content. False where the pasteboard has no such
+    /// options (macOS), so the content is published as it is.
     native boolean restrictClipboard(int expireSeconds);
 
     /// How many representations the system pasteboard is offering, so they can be read by
