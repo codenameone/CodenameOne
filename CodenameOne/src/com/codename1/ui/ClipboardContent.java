@@ -91,7 +91,11 @@ public class ClipboardContent {
     /// and later a background application cannot read the clipboard, so it cannot tell whether
     /// the clip is still this content; the clear then waits until the application returns to
     /// the foreground and runs only if the clipboard still holds this content. Until then the
-    /// content can outlive the time given here.
+    /// content can outlive the time given here. Outside iOS the pending clear lives only in
+    /// the running process: if the application is killed before it runs, nothing clears the
+    /// content. An application that must not leave it behind records a digest of what it copied
+    /// (never the text) and, at its next start, clears the clipboard if it still holds content
+    /// with that digest.
     ///
     /// #### Parameters
     ///

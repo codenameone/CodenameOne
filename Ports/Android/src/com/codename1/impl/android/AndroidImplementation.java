@@ -11064,6 +11064,38 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// Called when the activity resumes: the listener missed every change made while this
     /// application was in the background, and now the description is readable again. A clear
     /// deferred while in the background runs here, once the clip is proven still ours.
+    /// Called when the activity gains window focus. On Android 10 and later the clipboard
+    /// can be read only by the focused application, and focus arrives after onResume, so the
+    /// check made there can answer "unknown" and leave a deferred clear pending. This retries
+    /// it once the description is readable. The change counter is not reset here: focus can
+    /// return without a resume (a dialog or the notification shade), while the listener kept
+    /// running.
+    static void verifyClipOwnershipOnFocus(Context context) {
+        if (android.os.Build.VERSION.SDK_INT < 24 || context == null) {
+            return;
+        }
+        retryPendingClipClear(context);
+    }
+
+    private static void retryPendingClipClear(Context context) {
+        try {
+            ClipboardContent pending;
+            synchronized (STAGED_CLIP_FILES) {
+                pending = pendingClipClear;
+            }
+            if (pending == null) {
+                return;
+            }
+            android.content.ClipboardManager clipboard = (android.content.ClipboardManager)
+                    context.getSystemService(Context.CLIPBOARD_SERVICE);
+            if (clipboard != null && verifyClipOwnership(clipboard) == CLIP_OURS) {
+                clearOwnedClip(clipboard, pending);
+            }
+        } catch (Throwable t) {
+            com.codename1.io.Log.e(t);
+        }
+    }
+
     static void verifyClipOwnershipOnResume(Context context) {
         if (android.os.Build.VERSION.SDK_INT < 24 || context == null) {
             return;

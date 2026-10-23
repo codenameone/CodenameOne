@@ -134,6 +134,14 @@ public class CodenameOneActivity extends Activity {
     }
 
     @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) {
+            AndroidImplementation.verifyClipOwnershipOnFocus(this);
+        }
+    }
+
+    @Override
     protected void onResume() {
         super.onResume();
         AndroidImplementation.setActivity(this);
