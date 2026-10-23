@@ -79,7 +79,7 @@ public final class PlayerForm {
     private Media media;
     private Media ad;
     private UITimer ticker;
-    private long lastBeat;
+    private java.util.Timer heart;
     private boolean closed;
     private final Set<String> shown = new HashSet<String>();
     private final List<AdBreakDto> pendingBreaks = new ArrayList<AdBreakDto>();
@@ -141,6 +141,12 @@ public final class PlayerForm {
     }
 
     private void play(PlaybackDto p) {
+        if (closed) {
+            // The viewer left while the session was being opened: end it
+            // rather than leave it holding one of the plan's streams.
+            Api.playback().stop(new StopDto(p.sessionId(), 0, false), Net.to(ok -> { }, (code, message) -> { }));
+            return;
+        }
         session = p;
         shown.clear();
         pendingBreaks.clear();
@@ -226,16 +232,37 @@ public final class PlayerForm {
             status.setText("");
             form.revalidate();
             m.play();
-            lastBeat = System.currentTimeMillis();
             ticker = UITimer.timer(500, true, form, this::tick);
+            startHeartbeat();
         })).except(err -> CN.callSerially(() -> {
             Ui.say(Lang.tr("This video cannot play here: {0}", String.valueOf(err.getMessage())));
             close(false);
         }));
     }
 
-    /// Twice a second: ad breaks and interactions due at this position, and
-    /// the heartbeat when it is time.
+    /// The heartbeat runs on its own timer, not the form's: a UITimer stops
+    /// while another form is showing, and the chapters list and the quiz and
+    /// poll dialogs are other forms. A session that goes quiet that long is
+    /// ended by the server as abandoned.
+    private void startHeartbeat() {
+        long every = Math.max(5, session.heartbeatSeconds()) * 1000L;
+        heart = new java.util.Timer();
+        heart.schedule(new java.util.TimerTask() {
+            @Override
+            public void run() {
+                CN.callSerially(() -> {
+                    if (closed || media == null) {
+                        return;
+                    }
+                    // During an ad, and while an overlay waits for an answer,
+                    // the main video is paused; the beat says so.
+                    beat(media.getTime() / 1000, ad != null || !media.isPlaying());
+                });
+            }
+        }, every, every);
+    }
+
+    /// Twice a second: ad breaks and interactions due at this position.
     private void tick() {
         if (media == null || closed || ad != null) {
             return;
@@ -261,11 +288,6 @@ public final class PlayerForm {
                     return;
                 }
             }
-        }
-        long now = System.currentTimeMillis();
-        if (now - lastBeat >= session.heartbeatSeconds() * 1000L) {
-            lastBeat = now;
-            beat(position, !media.isPlaying());
         }
     }
 
@@ -356,6 +378,9 @@ public final class PlayerForm {
         if (ticker != null) {
             ticker.cancel();
         }
+        if (heart != null) {
+            heart.cancel();
+        }
         int position = media == null ? 0 : media.getTime() / 1000;
         if (media != null) {
             media.cleanup();
@@ -393,12 +418,42 @@ public final class PlayerForm {
         StreamRequest req = new StreamRequest(file)
                 .setDrm(drm("CLEARKEY", "/license/clearkey", null, Downloads.token(d.id()), null));
         final Form form = Ui.form(d.titleName(), "OfflinePlayer");
-        Ui.back(form, from);
+        // The same protections as streaming: no screenshots while it shows,
+        // and the account's mark over the picture.
+        final Media[] playing = new Media[1];
+        final boolean[] gone = new boolean[1];
+        final Runnable leave = () -> {
+            if (gone[0]) {
+                return;
+            }
+            gone[0] = true;
+            if (playing[0] != null) {
+                playing[0].cleanup();
+            }
+            Display.getInstance().setProperty("DisableScreenshots", "false");
+            from.showBack();
+        };
+        Ui.back(form, leave);
+        com.codenameone.examples.reel.api.AccountDto who = com.codenameone.examples.reel.net.Session.user();
+        Label mark = new Label(who == null || who.username() == null ? "" : who.username(), "RlWatermark");
+        mark.setName("watermark");
+        form.add(BorderLayout.SOUTH, mark);
+        Display.getInstance().setProperty("DisableScreenshots", "true");
         form.show();
+        req.setOnCompletion(() -> CN.callSerially(leave));
         req.createAsync().ready(m -> CN.callSerially(() -> {
+            if (gone[0]) {
+                // Left before the player was ready.
+                m.cleanup();
+                return;
+            }
+            playing[0] = m;
             form.add(BorderLayout.CENTER, m.getVideoComponent());
             form.revalidate();
             m.play();
-        })).except(err -> CN.callSerially(() -> Ui.say(String.valueOf(err.getMessage()))));
+        })).except(err -> CN.callSerially(() -> {
+            Ui.say(String.valueOf(err.getMessage()));
+            leave.run();
+        }));
     }
 }

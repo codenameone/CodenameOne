@@ -26,6 +26,7 @@ import com.codename1.ui.layouts.BorderLayout;
 import com.codenameone.examples.reel.api.CertificateDto;
 import com.codenameone.examples.reel.api.CourseProgressDto;
 import com.codenameone.examples.reel.api.DownloadDto;
+import java.util.List;
 import com.codenameone.examples.reel.api.HistoryEntryDto;
 import com.codenameone.examples.reel.net.Account;
 import com.codenameone.examples.reel.net.Api;
@@ -91,27 +92,50 @@ public final class LibraryForm {
         }, Ui::fail));
     }
 
+    /// Drawn from what this device keeps, so it works offline; the server's
+    /// list then drops what it no longer licenses (revoked from another
+    /// device, or expired).
     private static void loadDownloads(final Form form, final Container page, final Container into) {
+        showDownloads(form, page, into);
         Api.library().downloads(Device.id(), Net.to(list -> {
-            into.removeAll();
-            if (list == null || list.isEmpty()) {
-                return;
+            java.util.Set<String> live = new java.util.HashSet<String>();
+            if (list != null) {
+                for (int iter = 0; iter < list.size(); iter++) {
+                    live.add(list.get(iter).id());
+                }
             }
+            List<DownloadDto> local = Downloads.list();
+            for (int iter = 0; iter < local.size(); iter++) {
+                if (!live.contains(local.get(iter).id())) {
+                    Downloads.forget(local.get(iter).id());
+                }
+            }
+            showDownloads(form, page, into);
+        }, (code, message) -> { }));
+    }
+
+    private static void showDownloads(final Form form, final Container page, final Container into) {
+        into.removeAll();
+        List<DownloadDto> list = Downloads.list();
+        if (!list.isEmpty()) {
             Ui.section(into, "Downloads");
-            for (int iter = 0; iter < list.size(); iter++) {
-                final DownloadDto d = list.get(iter);
-                boolean ready = Downloads.have(d.id());
-                String state = ready ? Lang.tr("Until {0}", Ui.day(d.licenseExpiresAt())) : Lang.tr("Downloading");
-                Container row = Ui.row(ready ? FontImage.MATERIAL_OFFLINE_PIN : FontImage.MATERIAL_DOWNLOADING,
-                        d.titleName(), state, Ui.flat(FontImage.MATERIAL_DELETE_OUTLINE, "deleteDownload-" + iter,
-                                e -> Api.library().deleteDownload(d.id(), Net.to(ok -> {
-                                    Downloads.forget(d.id());
-                                    load(form, page);
-                                }, Ui::fail))));
-                into.add(ready ? Ui.tap(row, "playDownload-" + iter, e -> PlayerForm.offline(form, d)) : row);
-            }
-            page.revalidate();
-        }, Ui::fail));
+        }
+        for (int iter = 0; iter < list.size(); iter++) {
+            final DownloadDto d = list.get(iter);
+            boolean ready = Downloads.have(d.id());
+            String state = ready ? Lang.tr("Until {0}", Ui.day(d.licenseExpiresAt())) : Lang.tr("Downloading");
+            Container row = Ui.row(ready ? FontImage.MATERIAL_OFFLINE_PIN : FontImage.MATERIAL_DOWNLOADING,
+                    d.titleName(), state, Ui.flat(FontImage.MATERIAL_DELETE_OUTLINE, "deleteDownload-" + iter,
+                            e -> {
+                                // The file goes now; the license is returned
+                                // when the server can be reached.
+                                Downloads.forget(d.id());
+                                Api.library().deleteDownload(d.id(), Net.to(ok -> { }, (code, message) -> { }));
+                                showDownloads(form, page, into);
+                            }));
+            into.add(ready ? Ui.tap(row, "playDownload-" + iter, e -> PlayerForm.offline(form, d)) : row);
+        }
+        page.revalidate();
     }
 
     /// Course progress and certificates.

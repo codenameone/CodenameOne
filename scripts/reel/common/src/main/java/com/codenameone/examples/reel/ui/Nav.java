@@ -32,6 +32,7 @@ import com.codenameone.examples.reel.net.Device;
 import com.codenameone.examples.reel.net.Session;
 import com.codenameone.examples.reel.notify.Notifications;
 import com.codenameone.examples.reel.studio.StudioForm;
+import com.codenameone.examples.reel.viewer.Downloads;
 import com.codenameone.examples.reel.viewer.HomeForm;
 import com.codenameone.examples.reel.viewer.ProfilesForm;
 
@@ -211,6 +212,9 @@ public final class Nav {
     }
 
     private static void leave(final String reason, boolean forgetDevice) {
+        // Downloads are licensed to this account on this device; the next
+        // person to sign in must not find them.
+        Downloads.forgetAll();
         homeForm = null;
         homeMode = "";
         Device.setProfileKey("");
@@ -228,6 +232,10 @@ public final class Nav {
     /// Points the app at another server, which ends the session with this one.
     public static void changeServer(final String url) {
         Runnable switchOver = () -> {
+            if (!AppConfig.sameServer(url, Session.serverUrl())) {
+                // Their licenses belong to the server being left.
+                Downloads.forgetAll();
+            }
             AppConfig.setServerUrl(url);
             Session.start(AppConfig.serverUrl());
             launch();

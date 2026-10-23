@@ -62,12 +62,29 @@ final class AdPlayer {
             return;
         }
         final AdDto ad = ads.get(index);
-        final Runnable after = () -> next(player, ads, index + 1, then);
+        // The end of an ad can arrive twice -- the viewer skips as the clip
+        // completes -- and each arrival would move on to the next ad, once
+        // more each time. The first one wins, and stops the countdown.
+        final boolean[] done = new boolean[1];
+        final UITimer[] count = {null};
+        final Runnable nextAd = () -> next(player, ads, index + 1, then);
+        final Runnable after = () -> {
+            if (done[0]) {
+                return;
+            }
+            done[0] = true;
+            if (count[0] != null) {
+                count[0].cancel();
+            }
+            finish(player, nextAd);
+        };
         new StreamRequest(Art.url(ad.mediaUrl())).setOnCompletion(() -> CN.callSerially(() -> {
-            event(player, ad, "complete");
-            finish(player, after);
+            if (!done[0]) {
+                event(player, ad, "complete");
+            }
+            after.run();
         })).createAsync().ready(m -> CN.callSerially(() -> {
-            if (player.closed()) {
+            if (player.closed() || done[0]) {
                 m.cleanup();
                 return;
             }
@@ -96,7 +113,6 @@ final class AdPlayer {
             m.play();
             event(player, ad, "impression");
             final long started = System.currentTimeMillis();
-            final UITimer[] count = {null};
             count[0] = UITimer.timer(500, true, player.form(), () -> {
                 int left = ad.skippableAfterSeconds() - (int) ((System.currentTimeMillis() - started) / 1000);
                 if (ad.skippableAfterSeconds() <= 0) {
@@ -112,9 +128,10 @@ final class AdPlayer {
                 }
             });
             skip.addActionListener(e -> {
-                count[0].cancel();
-                event(player, ad, "skip");
-                finish(player, after);
+                if (!done[0]) {
+                    event(player, ad, "skip");
+                }
+                after.run();
             });
         })).except(err -> CN.callSerially(after));
     }

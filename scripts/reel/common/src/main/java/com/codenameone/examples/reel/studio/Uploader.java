@@ -63,45 +63,58 @@ public final class Uploader {
         long offset = u.receivedBytes();
         int size = Math.max(1, u.chunkBytes());
         int tries = 0;
-        while (offset < total) {
-            byte[] piece;
-            try {
-                piece = read(path, offset, (int) Math.min(size, total - offset));
-            } catch (IOException e) {
-                fail(progress, "Could not read the file");
-                return;
-            }
-            Chunk c = new Chunk(Session.serverUrl() + "/api/studio/uploads/" + u.id() + "?offset=" + offset, piece);
-            NetworkManager.getInstance().addToQueueAndWait(c);
-            if (c.getResponseCode() == 200) {
-                offset += piece.length;
-                tries = 0;
-                final long sent = offset;
-                CN.callSerially(() -> progress.progress(sent, total));
-            } else if (c.getResponseCode() == 409 && tries < 3) {
-                // Out of step with the server: ask where it is and go on from there.
-                tries++;
-                final long[] at = {-1};
-                final String[] err = {null};
-                Object lock = new Object();
-                Api.studio().upload(u.id(), Net.to(fresh -> at[0] = fresh.receivedBytes(),
-                        (code, message) -> err[0] = message));
-                long until = System.currentTimeMillis() + 15000;
-                while (at[0] < 0 && err[0] == null && System.currentTimeMillis() < until) {
-                    Util.sleep(100);
-                }
-                if (at[0] < 0) {
-                    fail(progress, err[0] == null ? "The server did not answer" : err[0]);
+        // One stream for the whole file, read forward piece by piece; it is
+        // reopened only when the server sends us back to an earlier offset.
+        // Reopening it for every piece reread the file from the start each
+        // time, which is quadratic in the file's size.
+        InputStream in = null;
+        long streamAt = 0;
+        try {
+            while (offset < total) {
+                byte[] piece;
+                try {
+                    if (in == null || streamAt > offset) {
+                        Util.cleanup(in);
+                        in = FileSystemStorage.getInstance().openInputStream(path);
+                        streamAt = 0;
+                    }
+                    skip(in, offset - streamAt);
+                    streamAt = offset;
+                    piece = read(in, (int) Math.min(size, total - offset));
+                    streamAt += piece.length;
+                } catch (IOException e) {
+                    fail(progress, "Could not read the file");
                     return;
                 }
-                offset = at[0];
-            } else if (c.getResponseCode() >= 500 && tries < 3) {
-                tries++;
-                Util.sleep(1000 * tries);
-            } else {
-                fail(progress, c.getResponseErrorMessage() == null ? "Upload failed" : c.getResponseErrorMessage());
-                return;
+                Chunk c = new Chunk(Session.serverUrl() + "/api/studio/uploads/" + u.id() + "?offset=" + offset, piece);
+                NetworkManager.getInstance().addToQueueAndWait(c);
+                int code = c.getResponseCode();
+                if (code == 200) {
+                    offset += piece.length;
+                    tries = 0;
+                    final long sent = offset;
+                    CN.callSerially(() -> progress.progress(sent, total));
+                } else if (code == 409 && tries < 3) {
+                    // Out of step with the server: ask where it is and go on from there.
+                    tries++;
+                    long at = receivedBytes(u.id());
+                    if (at < 0) {
+                        fail(progress, "The server did not answer");
+                        return;
+                    }
+                    offset = at;
+                } else if ((code <= 0 || code >= 500) && tries < 3) {
+                    // No answer at all (a dropped connection, a timeout) is
+                    // the case a resumable upload exists for.
+                    tries++;
+                    Util.sleep(1000 * tries);
+                } else {
+                    fail(progress, c.getResponseErrorMessage() == null ? "Upload failed" : c.getResponseErrorMessage());
+                    return;
+                }
             }
+        } finally {
+            Util.cleanup(in);
         }
         CN.callSerially(() -> {
             Telemetry.uploaded();
@@ -109,34 +122,51 @@ public final class Uploader {
         });
     }
 
+    /// Where the server is in the upload, asked on this thread, or -1.
+    private static long receivedBytes(String id) {
+        ConnectionRequest r = new ConnectionRequest(Session.serverUrl() + "/api/studio/uploads/" + id, false);
+        r.setFailSilently(true);
+        r.setReadResponseForErrors(false);
+        NetworkManager.getInstance().addToQueueAndWait(r);
+        if (r.getResponseCode() != 200 || r.getResponseData() == null) {
+            return -1;
+        }
+        try {
+            java.util.Map<String, Object> m = new com.codename1.io.JSONParser().parseJSON(
+                    new java.io.InputStreamReader(new java.io.ByteArrayInputStream(r.getResponseData()), "UTF-8"));
+            Object v = m.get("receivedBytes");
+            return v instanceof Number ? ((Number) v).longValue() : -1;
+        } catch (IOException e) {
+            return -1;
+        }
+    }
+
     private static void fail(final Progress progress, final String message) {
         CN.callSerially(() -> progress.failed(message));
     }
 
-    private static byte[] read(String path, long offset, int length) throws IOException {
-        InputStream in = FileSystemStorage.getInstance().openInputStream(path);
-        try {
-            long skipped = 0;
-            while (skipped < offset) {
-                long n = in.skip(offset - skipped);
-                if (n <= 0) {
-                    throw new IOException("short file");
-                }
-                skipped += n;
+    private static void skip(InputStream in, long count) throws IOException {
+        long skipped = 0;
+        while (skipped < count) {
+            long n = in.skip(count - skipped);
+            if (n <= 0) {
+                throw new IOException("short file");
             }
-            byte[] out = new byte[length];
-            int at = 0;
-            while (at < length) {
-                int n = in.read(out, at, length - at);
-                if (n < 0) {
-                    throw new IOException("short file");
-                }
-                at += n;
-            }
-            return out;
-        } finally {
-            Util.cleanup(in);
+            skipped += n;
         }
+    }
+
+    private static byte[] read(InputStream in, int length) throws IOException {
+        byte[] out = new byte[length];
+        int at = 0;
+        while (at < length) {
+            int n = in.read(out, at, length - at);
+            if (n < 0) {
+                throw new IOException("short file");
+            }
+            at += n;
+        }
+        return out;
     }
 
     /// One piece, as the body of a PUT.
