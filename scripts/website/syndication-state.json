@@ -2948,6 +2948,11 @@
         "status": "submitted",
         "published": false,
         "syndicated_at": "2026-10-23T00:01:51+00:00"
+      },
+      "devto": {
+        "id": 4906902,
+        "url": "https://dev.to/codenameone/create-an-uber-clone-in-1-minute-421",
+        "syndicated_at": "2026-10-23T17:52:24+00:00"
       }
     }
   }
