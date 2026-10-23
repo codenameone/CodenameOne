@@ -115,7 +115,7 @@
  },
  "translator": {
   "all": {
-   "memory": 0.399,
+   "memory": 0.468,
    "runs": 1,
    "time": 0.658,
    "tolerance": {

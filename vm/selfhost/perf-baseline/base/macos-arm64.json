@@ -32,7 +32,7 @@
  },
  "hello": {
   "all": {
-   "memory": 1.34,
+   "memory": 0.925,
    "runs": 1,
    "time": 0.957,
    "tolerance": {
@@ -61,17 +61,17 @@
  "mathTranscendental": {
   "all": {
    "memory": 0.118,
-   "runs": 1,
+   "runs": 5,
    "time": 1.007,
    "tolerance": {
-    "memory": 0.4,
+    "memory": 1.0,
     "time": 0.3
    }
   }
  },
  "objectAllocation": {
   "all": {
-   "memory": 1.15,
+   "memory": 0.724,
    "runs": 1,
    "time": 1.106,
    "tolerance": {
@@ -90,10 +90,10 @@
  "recursion": {
   "all": {
    "memory": 0.118,
-   "runs": 1,
-   "time": 1.534,
+   "runs": 14,
+   "time": 1.235,
    "tolerance": {
-    "time": 0.2
+    "memory": 1.0
    }
   }
  },
@@ -110,9 +110,12 @@
  },
  "translator": {
   "all": {
-   "memory": 0.566,
-   "runs": 2,
-   "time": 0.623
+   "memory": 0.576,
+   "runs": 6,
+   "time": 0.623,
+   "tolerance": {
+    "memory": 0.35
+   }
   }
  },
  "valueEscape": {

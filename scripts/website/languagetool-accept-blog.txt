@@ -135,3 +135,5 @@ retrolambda
 
 # Ride-hailing sample application.
 \bWayline\b
+# Rust GUI toolkit named in the Java vs Rust comparison.
+\begui\b

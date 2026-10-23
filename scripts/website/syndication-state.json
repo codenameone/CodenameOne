@@ -2924,6 +2924,30 @@
         "id": 4898963,
         "url": "https://dev.to/codenameone/smaller-simpler-maven-projects-4ca5",
         "syndicated_at": "2026-10-22T17:57:55+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/@Codename_One/smaller-simpler-maven-projects-e772b8922acc?postPublishedType=initial",
+        "syndicated_at": "2026-10-22T19:01:13+00:00"
+      }
+    },
+    "create-an-uber-clone-in-1-minute": {
+      "hashnode": {
+        "url": "https://debugagent.com/create-an-uber-clone-in-1-minute",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6adaa38c28179156a5cec360",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-10-23T00:01:07+00:00"
+      },
+      "foojay": {
+        "id": 148,
+        "url": "https://github.com/foojayio/website/pull/148",
+        "pull_request_url": "https://github.com/foojayio/website/pull/148",
+        "status": "submitted",
+        "published": false,
+        "syndicated_at": "2026-10-23T00:01:51+00:00"
       }
     }
   }

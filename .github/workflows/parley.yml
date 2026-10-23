@@ -42,6 +42,11 @@ on:
       - 'CodenameOne/src/com/codename1/call/**'
       - 'CodenameOne/src/com/codename1/webrtc/**'
       - 'Ports/JavaSE/src/com/codename1/impl/javase/webrtc/**'
+      # The iOS side of WebRTC: the bridge and the builder that decides how
+      # it compiles (it needs -fobjc-arc for the framework's __weak headers).
+      # The iOS job is the only place a WebRTC app is compiled for a device.
+      - 'Ports/iOSPort/nativeSources/CN1WebRTC.m'
+      - 'maven/build-engine/src/main/java/com/codename1/builders/IPhoneBuilder.java'
       - 'CodenameOne/src/com/codename1/io/oidc/**'
       - 'CodenameOne/src/com/codename1/io/rest/**'
       # The REST client maps its responses through the mapper registry.
