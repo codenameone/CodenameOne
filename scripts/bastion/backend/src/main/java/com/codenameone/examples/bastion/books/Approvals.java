@@ -41,6 +41,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 /// Maker-checker for the two things an administrator can do to money: a
 /// manual adjustment of a customer account and the reversal of an entry.
@@ -213,6 +214,13 @@ public class Approvals {
         return dto(rows.get(0));
     }
 
+    /// Test seam, null in production: runs between reading the maker's 24h
+    /// total and acting on it, so a test can hold that window open long
+    /// enough for concurrent requests to overlap. Without it the race is a few
+    /// microseconds wide and a missing lock still passes on PostgreSQL.
+    public static final AtomicReference<Runnable> AFTER_RECENT_TOTAL =
+            new AtomicReference<Runnable>();
+
     /// Serializes one maker's requests: a no-op write of the maker's profile
     /// row, like `ProfileRepository.hold` for password changes, locks it until
     /// the transaction ends on SQLite, PostgreSQL and MySQL alike. Without it
@@ -243,6 +251,10 @@ public class Approvals {
                 "SELECT COALESCE(SUM(usd_cents), 0) AS t FROM approval WHERE maker = ? "
                 + "AND status = ? AND checker = ? AND created_at > ?", new Object[] {maker,
                     EXECUTED, "", Long.valueOf(now - Books.DAY)}), "t"));
+        Runnable pause = AFTER_RECENT_TOTAL.get();
+        if (pause != null) {
+            pause.run();
+        }
         // Subtracted, not added: a value saturates at Long.MAX_VALUE.
         boolean waits = !known || unpriced || usd > threshold - recent;
         db.execute("INSERT INTO approval (id, kind, status, maker, checker, account_id, entry_id, "

@@ -650,8 +650,13 @@ public final class ConsoleForm {
             Container debits = new Container(BoxLayout.y(), "BnTDebit");
             Container credits = new Container(BoxLayout.y(), "BnTCredit");
             boolean debitNormal = "DEBIT".equals(t.normalBalance());
-            Container opening = tLine(Lang.tr("Opening balance"),
-                    Amounts.format(Math.abs(t.openingBalance()), t.asset()), "BnTLineTotal");
+            // The magnitude, taken from the formatted string: Math.abs(Long.MIN_VALUE) is
+            // still negative.
+            String openingAmount = Amounts.format(t.openingBalance(), t.asset());
+            if (openingAmount.startsWith("-")) {
+                openingAmount = openingAmount.substring(1);
+            }
+            Container opening = tLine(Lang.tr("Opening balance"), openingAmount, "BnTLineTotal");
             (debitNormal ? debits : credits).add(opening);
             for (LedgerLineDto line : t.debits()) {
                 debits.add(tLine(when(line.at()) + "  " + shortId(line.entryId()),

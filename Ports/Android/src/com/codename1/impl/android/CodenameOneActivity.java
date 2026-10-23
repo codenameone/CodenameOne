@@ -138,6 +138,7 @@ public class CodenameOneActivity extends Activity {
         super.onResume();
         AndroidImplementation.setActivity(this);
         AndroidNativeUtil.onResume();
+        AndroidImplementation.verifyClipOwnershipOnResume(this);
         com.codename1.ui.Display.getInstance().nativeThemeSettingsChanged();
         if (isBillingEnabled() && getBillingSupport() != null) {
             billingSupport.consumeAndAcknowlegePurchases();

@@ -126,6 +126,7 @@ public class BigDecimal {
         return out;
     }
 
+    /// Rounds to the nearest integer, a tie going away from zero (HALF_UP): 2.5 is 3 and -2.5 is -3.
     public BigInteger round() {
         BigInteger out = new BigInteger(peer.toBigInteger());
         BigDecimal outD = new BigDecimal(out, 0);

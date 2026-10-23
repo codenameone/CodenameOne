@@ -10910,9 +10910,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             clip = ClipData.newPlainText("Codename One", "");
                         }
                         markClip(clip, (ClipboardContent) obj, sdk);
+                        takeClipOwnership((ClipboardContent) obj, clip, sdk);
                     } else {
                         // Nothing of ours is staged for a plain text clip.
                         clip = ClipData.newPlainText("Codename One", obj.toString());
+                        // A later copy of ours replaces whatever a pending clear was waiting for.
+                        synchronized (STAGED_CLIP_FILES) {
+                            clipOwner = null;
+                            clipOwnerToken = null;
+                        }
                     }
                     watchPrimaryClip(clipboard);
                     // Pinned for the length of the call, held only if it returns. setPrimaryClip
@@ -10949,6 +10955,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// (reading it shows the "pasted from" notice on Android 12 and newer).
     private static final String EXTRA_CN1_CLEAR_AFTER = "com.codename1.clipboard.clearAfter";
 
+    /// Ours, naming the one copy a clip came from, so a clear can tell its own clip from a later
+    /// copy of ours or another application's when the description is readable.
+    private static final String EXTRA_CN1_CLIP_TOKEN = "com.codename1.clipboard.token";
+
+    /// The content whose clip is on the clipboard now, as far as this process knows, and the
+    /// token stamped into that clip. Ownership is per copy: a scheduled clear only acts when its
+    /// own content is still the owner, so a second copy is never wiped by the first one's timer.
+    ///
+    /// The description cannot be the evidence on its own: from Android 10 a background
+    /// application reads null from `getPrimaryClipDescription`, which is exactly when a timed
+    /// clear fires. So ownership is kept here, dropped by the clip-changed listener (delivered
+    /// only while focused) and re-checked against the description on resume and whenever the
+    /// description is readable.
+    private static ClipboardContent clipOwner;
+    private static String clipOwnerToken;
+    private static long clipTokenCounter;
+
     private static void markClip(ClipData clip, ClipboardContent content, int sdk) {
         if (sdk < 24 || (!content.isSensitive() && content.getClearAfter() <= 0)) {
             return;
@@ -10963,8 +10986,75 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         clip.getDescription().setExtras(extras);
     }
 
+    /// Records `content` as the owner of the clip about to be published. Below API 24 there is
+    /// nowhere to stamp a token and no listener to trust, so nothing is owned and nothing is
+    /// cleared there.
+    private static void takeClipOwnership(ClipboardContent content, ClipData clip, int sdk) {
+        synchronized (STAGED_CLIP_FILES) {
+            clipOwner = null;
+            clipOwnerToken = null;
+            if (sdk < 24 || content.getClearAfter() <= 0) {
+                return;
+            }
+            clipTokenCounter++;
+            String token = System.currentTimeMillis() + "-" + clipTokenCounter;
+            PersistableBundle extras = clip.getDescription().getExtras();
+            if (extras == null) {
+                extras = new PersistableBundle();
+            }
+            extras.putString(EXTRA_CN1_CLIP_TOKEN, token);
+            clip.getDescription().setExtras(extras);
+            clipOwner = content;
+            clipOwnerToken = token;
+        }
+    }
+
+    /// Drops ownership when the clipboard, read while it can be, holds something other than
+    /// the owned clip. A null description says nothing (background, or no clip yet) and keeps it.
+    private static void verifyClipOwnership(android.content.ClipboardManager clipboard) {
+        synchronized (STAGED_CLIP_FILES) {
+            if (clipOwnerToken == null) {
+                return;
+            }
+        }
+        android.content.ClipDescription description;
+        try {
+            description = clipboard.getPrimaryClipDescription();
+        } catch (Throwable t) {
+            return;
+        }
+        if (description == null) {
+            return;
+        }
+        PersistableBundle extras = description.getExtras();
+        String token = extras == null ? null : extras.getString(EXTRA_CN1_CLIP_TOKEN);
+        synchronized (STAGED_CLIP_FILES) {
+            if (clipOwnerToken != null && !clipOwnerToken.equals(token)) {
+                clipOwner = null;
+                clipOwnerToken = null;
+            }
+        }
+    }
+
+    /// Called when the activity resumes: the listener missed every change made while this
+    /// application was in the background, and now the description is readable again.
+    static void verifyClipOwnershipOnResume(Context context) {
+        if (android.os.Build.VERSION.SDK_INT < 24 || context == null) {
+            return;
+        }
+        try {
+            android.content.ClipboardManager clipboard = (android.content.ClipboardManager)
+                    context.getSystemService(Context.CLIPBOARD_SERVICE);
+            if (clipboard != null) {
+                verifyClipOwnership(clipboard);
+            }
+        } catch (Throwable t) {
+            com.codename1.io.Log.e(t);
+        }
+    }
+
     @Override
-    public void clearClipboardContent(ClipboardContent content) {
+    public void clearClipboardContent(final ClipboardContent content) {
         if (getActivity() == null) {
             return;
         }
@@ -10972,9 +11062,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             @Override
             public void run() {
                 if (android.os.Build.VERSION.SDK_INT < 24) {
-                    // No extras to recognise the clip by: an empty clip replaces it, as on the
-                    // other ports.
-                    copyToClipboard(new ClipboardContent());
+                    // No token and no ownership below API 24, so nothing proves the clip is
+                    // still ours; clearing blind could wipe another application's copy.
                     return;
                 }
                 android.content.ClipboardManager clipboard = (android.content.ClipboardManager)
@@ -10982,12 +11071,31 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 if (clipboard == null) {
                     return;
                 }
-                android.content.ClipDescription description = clipboard.getPrimaryClipDescription();
-                PersistableBundle extras = description == null ? null : description.getExtras();
-                // Only our own clip: another application may have copied over it meanwhile.
-                // An empty clip rather than clearPrimaryClip (API 28), which the platform jar this
-                // port compiles against does not have.
-                if (extras != null && extras.containsKey(EXTRA_CN1_CLEAR_AFTER)) {
+                verifyClipOwnership(clipboard);
+                synchronized (STAGED_CLIP_FILES) {
+                    if (content == null || clipOwner != content) {
+                        // A later copy (ours or another application's) replaced it.
+                        return;
+                    }
+                    clipOwner = null;
+                    clipOwnerToken = null;
+                }
+                // Our own replacement, not another application's copy.
+                synchronized (STAGED_CLIP_FILES) {
+                    expectedClipChanges++;
+                }
+                boolean cleared = false;
+                if (android.os.Build.VERSION.SDK_INT >= 28) {
+                    try {
+                        // Reflective: the platform jar this port compiles against predates
+                        // clearPrimaryClip (API 28).
+                        clipboard.getClass().getMethod("clearPrimaryClip").invoke(clipboard);
+                        cleared = true;
+                    } catch (Throwable t) {
+                        cleared = false;
+                    }
+                }
+                if (!cleared) {
                     clipboard.setPrimaryClip(ClipData.newPlainText("", ""));
                 }
             }
@@ -12223,7 +12331,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         }
                     }
                     // A clip somebody else published replaced ours, so what ours was carrying
-                    // is nobody's to paste any more.
+                    // is nobody's to paste any more, and a pending clear must not wipe theirs.
+                    synchronized (STAGED_CLIP_FILES) {
+                        clipOwner = null;
+                        clipOwnerToken = null;
+                    }
                     clipboardHolds(0);
                 }
             });
