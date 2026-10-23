@@ -116,7 +116,7 @@ class RequestSignerTest {
     }
 
     static UserDto user(String name) {
-        return new UserDto(name, name, true, false, false, 0, 0L);
+        return new UserDto(name, name, true, false, false, 0, 0L, false);
     }
 
     @Test

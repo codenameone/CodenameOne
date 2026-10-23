@@ -151,6 +151,56 @@ public final class LiveE2e {
         alice.expect("POST", withdraw, there, thereKey,
                 alice.signature("POST", withdraw, there, thereKey), 409);
         check(alice.balance(aliceWallet) == 100000L, "and nothing left the wallet");
+
+        step("the books balance, and staff reads are on the record");
+        String demo = "bastion-demo-password";
+        Customer auditor = new Customer("auditor@bastion.example", demo);
+        Customer admin = new Customer("admin@bastion.example", demo);
+        Customer admin2 = new Customer("admin2@bastion.example", demo);
+        check(Boolean.TRUE.equals(auditor.json(auditor.call("GET", "/api/books/trial-balance",
+                null, null, null), 200).get("balanced")), "debits equal credits in every asset");
+        check(Boolean.TRUE.equals(auditor.json(auditor.call("GET", "/api/books/balance-sheet",
+                null, null, null), 200).get("balanced")), "assets = liabilities + equity");
+        check(Boolean.TRUE.equals(auditor.json(auditor.call("GET", "/api/books/reconciliation",
+                null, null, null), 200).get("clean")), "sub-ledgers reconcile to control");
+        Map chain = auditor.json(auditor.call("GET", "/api/audit/chain", null, null, null), 200);
+        check(Boolean.TRUE.equals(chain.get("intact")), "the audit chain holds: " + chain);
+        Map evidence = auditor.json(auditor.call("GET",
+                "/api/audit/evidence/journal?format=csv", null, null, null), 200);
+        check(String.valueOf(evidence.get("content")).startsWith("entry_id,")
+                && String.valueOf(evidence.get("sha256")).length() == 64,
+                "the journal exports as CSV with its digest");
+        check(auditor.call("POST", "/api/admin/adjustments", "{\"accountId\":\"" + checking
+                + "\",\"amount\":1,\"memo\":\"\",\"password\":\"" + demo + "\"}", id(),
+                null).statusCode() == 403, "an auditor cannot move money");
+        check(alice.call("GET", "/api/books/trial-balance", null, null, null).statusCode() == 403,
+                "a customer cannot read the books");
+        check(auditor.call("GET", "/api/audit/access-log", null, null, null).body()
+                .contains("auditor@bastion.example"), "the auditor's reads are in the access log");
+
+        step("a large adjustment takes two administrators");
+        String adjust = "{\"accountId\":\"" + checking + "\",\"amount\":500000,"
+                + "\"memo\":\"goodwill\",\"password\":\"" + demo + "\"}";
+        Map pendingAdj = admin.json(admin.call("POST", "/api/admin/adjustments", adjust, id(),
+                null), 200);
+        check("PENDING".equals(pendingAdj.get("status")), "it waits: " + pendingAdj);
+        String approve = "/api/admin/approvals/" + pendingAdj.get("id") + "/approve";
+        String decision = "{\"password\":\"" + demo + "\",\"reason\":\"ok\"}";
+        check(admin.call("POST", approve, decision, null, null).statusCode() == 403,
+                "its maker cannot approve it");
+        long before = alice.balance(checking);
+        check("EXECUTED".equals(admin2.json(admin2.call("POST", approve, decision, null, null),
+                200).get("status")), "a second administrator can");
+        check(alice.balance(checking) == before + 500000, "and the money moved once");
+
+        step("chart data");
+        List candles = (List) new Json(alice.call("GET",
+                "/api/exchange/markets/BTC-USD/candles?interval=3600000&limit=200", null, null,
+                null).body()).value();
+        check(candles.size() > 24, "the demo history draws candles: " + candles.size());
+        List history = (List) new Json(alice.call("GET", "/api/accounts/" + checking
+                + "/balance-history?days=30", null, null, null).body()).value();
+        check(history.size() == 30, "thirty days of balance history");
     }
 
     private static String order(String side, long price, long quantity) {
@@ -166,8 +216,19 @@ public final class LiveE2e {
         String secret;
         KeyPair key;
         String device;
+        final String pw;
+
+        /// An account the server already has -- the demo staff -- signed in.
+        Customer(String existing, String password) throws Exception {
+            email = existing;
+            pw = password;
+            String session = password();
+            check(session != null, email + " signs in with the password");
+            token = tokens(session);
+        }
 
         Customer(String name) throws Exception {
+            pw = PASSWORD;
             email = name + "-" + id().substring(0, 10) + "@bastion.example";
             HttpResponse<String> made = send(post("/api/account/register",
                     "{\"email\":\"" + email + "\",\"password\":\"" + PASSWORD
@@ -182,7 +243,7 @@ public final class LiveE2e {
         /// Signs in with the password form; the session cookie, or null.
         String password() throws Exception {
             HttpResponse<String> r = send(form("/login", null, "username", email,
-                    "password", PASSWORD));
+                    "password", pw));
             return r.statusCode() == 200 || r.statusCode() == 302 ? cookie(r, null) : null;
         }
 

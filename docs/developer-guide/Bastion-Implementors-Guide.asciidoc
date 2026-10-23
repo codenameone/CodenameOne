@@ -76,6 +76,36 @@ image::img/bastion-trade-entry.svg["The five postings of one trade: the buyer's 
 
 `ledger/IsolationCheck.java` refuses to start the server on MySQL at its default REPEATABLE READ isolation. The ledger, the audit chain and the order book each serialize their writers on one row and then read what the previous writer committed, and REPEATABLE READ answers those reads from an older snapshot. Run MySQL at READ COMMITTED (`transaction-isolation = READ-COMMITTED` in its configuration). PostgreSQL runs at READ COMMITTED by default, and SQLite serializes every writer.
 
+=== The accounting model
+
+The ledger stores one signed number per posting. Read as accounting, a positive amount is a credit and a negative one a debit, so an entry that sums to zero is an entry whose debits equal its credits. A customer's deposit is money the bank owes, so customer accounts are liabilities; the cash that came in is an asset. `books/Chart.java` maps every account kind to its place in the chart of accounts, in code, so no row can put a customer's deposit among the bank's assets:
+
+[cols="1,3,1,1,2",options="header"]
+|===
+|Code |Account |Class |Normal balance |Kind
+|1000 |Cash and reserves |Asset |Debit |`SYS_CASH`
+|1100 |Digital assets in custody |Asset |Debit |`SYS_CHAIN`
+|2000 |Customer deposits, checking |Liability |Credit |`CHECKING`
+|2010 |Customer deposits, savings |Liability |Credit |`SAVINGS`
+|2100 |Customer digital asset custody |Liability |Credit |`WALLET`
+|2200 |Order escrow |Liability |Credit |`HOLD`
+|3000 |Paid-in capital |Equity |Credit |`SYS_EQUITY`
+|3100 |Retained earnings |Equity |Credit |`SYS_RETAINED`
+|4000 |Fee and trading revenue |Revenue |Credit |`SYS_FEES`
+|5000 |Interest expense |Expense |Debit |`SYS_INTEREST`
+|5100 |Operational adjustments |Expense |Debit |`SYS_ADJUST`
+|9999 |Suspense |Asset |Debit |any kind the chart doesn't know, shown rather than hidden
+|===
+
+`books/Books.java` derives every report from the postings: the journal, the general ledger of one code, an account's T-account, the trial balance, the balance sheet (with the period's earnings as line 3900 until a close moves them to retained earnings) and the income statement. Each total is per asset and also valued in dollars at the index price.
+
+* *Period close.* Closing a period posts one closing entry per asset that moves revenue and expense into retained earnings, and records the close. From then on the ledger refuses any entry dated inside a closed period, so a closed period's statements never change.
+* *Reversals.* A posted entry is never edited. A reversal posts the opposite entry, and an entry can be reversed once; closing entries and reversals themselves can't be.
+* *Reconciliation.* Each control account (customer deposits, escrow, custody) is compared with the sum of the accounts beneath it, every journal entry with zero, and every stored balance with the sum of its postings. Each difference is reported as a break naming the account and the amounts.
+* *Roles.* An `AUDITOR` reads the books and the audit trail and can change nothing; an `ADMIN` operates. Every staff read is appended to the audit chain as `STAFF_READ` before it's answered, and `/api/audit/access-log` lists them.
+* *Four eyes.* A manual adjustment or a reversal worth more than `bastion.approval.threshold-usd-cents` waits as a pending approval until a second administrator approves it; the maker can't approve their own request. Every change also asks for the administrator's password again.
+* *Evidence.* `/api/audit/evidence/{name}` exports the journal, the trial balance or the audit chain as CSV or JSON, with a SHA-256 digest that is itself recorded on the chain. The chain report names the first row whose link is broken.
+
 === The audit chain
 
 image::img/bastion-audit-chain.svg["Three audit rows, each holding the hash of the row before it, and the audit_head row pointing at the last; the hash covers length-prefixed fields",scaledwidth=95%]
@@ -172,6 +202,8 @@ The server reads these at start-up. A system property of the same name wins, the
 |`bastion.crypto.limit.per-withdrawal`, `bastion.crypto.limit.daily` |1000000, 2000000 |Coin withdrawal limits, in dollar cents at the index price.
 |`bastion.exchange.taker-fee-bps` |20 |The taker fee in basis points.
 |`bastion.markets` |BTC-USD and ETH-USD |The markets, as `id:base:quote:lot:index` entries.
+|`bastion.approval.threshold-usd-cents` |100000 |Adjustments and reversals worth more than this, in dollar cents, need a second administrator.
+|`bastion.demo.history-days` |42 |Days of demo history the development profile posts; above 35 the first four weeks are closed.
 |`bastion.market-maker.enabled` |`true` (development only) |The random-walk market maker.
 |===
 
@@ -207,6 +239,16 @@ Every endpoint but registration and sign-in needs a bearer token. *Signed* marks
 |`GET /api/exchange/trades` |The customer's trades. |
 |`GET`, `POST`, `DELETE /api/crypto/addresses[/{id}]` |The coin address allow-list. |Adding and removing: signed
 |`POST /api/accounts/{id}/crypto-withdraw` |Sends coins to an allowed address. |Signed, idempotent
+|`GET /api/accounts/{id}/balance-history?days`, `GET /api/insights/cashflow?asset&days`, `GET /api/insights/allocation` |Chart data over the customer's own accounts. |
+|`GET /api/exchange/markets/{id}/candles?interval&limit` |Price candles from the trade tape. |
+|`GET /api/books/chart`, `.../journal`, `.../journal/{id}`, `.../ledger?code&asset`, `.../accounts/{id}/t-account` |The chart of accounts, the journal, the general ledger and a T-account. |Administrator or auditor, audited
+|`GET /api/books/trial-balance?asOf`, `.../balance-sheet?asOf`, `.../income-statement?from&to` |The statements, per asset and in dollars. |Administrator or auditor, audited
+|`GET /api/books/reconciliation`, `.../periods`, `.../volume?days` |Reconciliation breaks, closed periods, trading volume. |Administrator or auditor
+|`GET /api/audit/chain`, `.../events?after&limit`, `.../trail?subject`, `.../access-log` |The chain report, the events, one entity's trail, and the staff reads. |Administrator or auditor
+|`GET /api/audit/evidence/{name}?format&asOf` |Exports `journal`, `trial-balance` or `audit-chain` as `csv` or `json`. |Administrator or auditor, audited
+|`POST /api/admin/periods/close` |Closes the books through a time. |Administrator, password
+|`POST /api/admin/adjustments`, `POST /api/admin/journal/{id}/reverse` |A manual adjustment or a reversal. |Administrator, password, idempotent; a second administrator above the threshold
+|`GET /api/admin/approvals`, `POST .../{id}/approve`, `.../{id}/reject` |The pending approvals and the second administrator's decision. |Administrator, password, not the maker
 |`GET /api/admin/audit/verify`, `GET /api/admin/ledger/verify` |The administrator's checks. |Administrator
 |===
 

@@ -40,6 +40,15 @@ public final class AccountKinds {
     /// The blockchain, simulated: coins withdrawn to an outside address go
     /// here, as fiat withdrawn goes to SYS_CASH.
     public static final String SYS_CHAIN = "SYS_CHAIN";
+    /// The bank's own capital: what its owners paid in.
+    public static final String SYS_EQUITY = "SYS_EQUITY";
+    /// Profit kept from closed periods; period close moves revenue and
+    /// expense here.
+    public static final String SYS_RETAINED = "SYS_RETAINED";
+    /// Interest the bank pays on savings.
+    public static final String SYS_INTEREST = "SYS_INTEREST";
+    /// Goodwill credits and corrections an administrator posts.
+    public static final String SYS_ADJUST = "SYS_ADJUST";
 
     private AccountKinds() {
     }

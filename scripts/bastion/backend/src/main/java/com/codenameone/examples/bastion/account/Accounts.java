@@ -113,21 +113,21 @@ public class Accounts {
             // directory of customers.
             throw Refused.with(409, "e-mail-already-has-account", "That e-mail already has an account");
         }
-        create(username, request.password(), name, false, System.currentTimeMillis());
+        create(username, request.password(), name, Roles.CUSTOMER, System.currentTimeMillis());
         LedgerAccount checking = ledger.open(username, FIRST_ASSET, AccountKinds.CHECKING,
                 "Checking");
         audit.append(username, "REGISTERED", username, "opened " + checking.getId());
         return describe(username);
     }
 
-    /// Makes the sign-in and the profile. A customer, or with `admin` an
-    /// administrator and nothing else: staff do not bank on their admin
-    /// account.
+    /// Makes the sign-in and the profile, holding exactly one of the
+    /// [Roles]: staff do not bank on their staff account, and an auditor
+    /// is never also an administrator.
     @Transactional(rollbackFor = Exception.class)
-    void create(String username, String password, String displayName, boolean admin,
+    void create(String username, String password, String displayName, String role,
             long openedAt) throws IOException {
         users.createUser(User.withUsername(username).password(encoder.encode(password))
-                .roles(admin ? Roles.ADMIN : Roles.CUSTOMER).build());
+                .roles(role).build());
         Profile profile = new Profile();
         profile.setUsername(username);
         profile.setDisplayName(displayName);
@@ -148,15 +148,17 @@ public class Accounts {
         UserDetails signIn = users.loadUserByUsername(username);
         boolean customer = false;
         boolean admin = false;
+        boolean auditor = false;
         Iterator<? extends GrantedAuthority> it = signIn.getAuthorities().iterator();
         while (it.hasNext()) {
             String held = it.next().getAuthority();
             customer |= ("ROLE_" + Roles.CUSTOMER).equals(held);
             admin |= ("ROLE_" + Roles.ADMIN).equals(held);
+            auditor |= ("ROLE_" + Roles.AUDITOR).equals(held);
         }
         boolean second = totp.isEnabled(username);
         return new UserDto(username, profile.getDisplayName(), customer, admin, second,
-                second ? recoveryCodes.remaining(username) : 0, profile.getCreatedAt());
+                second ? recoveryCodes.remaining(username) : 0, profile.getCreatedAt(), auditor);
     }
 
     public UserDto changePassword(String username, String current, String replacement)

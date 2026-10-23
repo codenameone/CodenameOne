@@ -22,6 +22,7 @@ import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codenameone.examples.bastion.Caller;
 import com.codenameone.examples.bastion.Ids;
+import com.codenameone.examples.bastion.api.ChainReportDto;
 import com.codenameone.examples.bastion.domain.AuditEvent;
 import com.codenameone.examples.bastion.domain.AuditHead;
 import com.codenameone.examples.bastion.repository.AuditEventRepository;
@@ -91,7 +92,18 @@ public class Audit {
     /// it: rows appended while the walk runs are past the head it compares
     /// against, and are checked on the next run.
     public List<String> verify() throws IOException {
+        return report().problems();
+    }
+
+    /// [#verify] with what an auditor needs to act on it: how many links
+    /// were checked, the head, and the FIRST link that does not hold (0 when
+    /// none). Everything after a broken link is suspect -- its hash was
+    /// computed from a predecessor that is no longer what was written -- so
+    /// the first break is where an investigation starts.
+    public ChainReportDto report() throws IOException {
         List<String> problems = new ArrayList<String>();
+        long firstBroken = 0;
+        long checked = 0;
         AuditHead tail = tail();
         long end = tail == null ? Long.MAX_VALUE : tail.getSeq();
         String prev = GENESIS;
@@ -106,6 +118,8 @@ public class Audit {
                     more = false;
                     break;
                 }
+                checked++;
+                int before = problems.size();
                 if (e.getSeq() != expected) {
                     problems.add("missing #" + expected + " before #" + e.getSeq());
                 }
@@ -115,6 +129,9 @@ public class Audit {
                 if (!hash(e).equals(e.getHash())) {
                     problems.add("#" + e.getSeq() + " was changed after it was written");
                 }
+                if (firstBroken == 0 && problems.size() > before) {
+                    firstBroken = e.getSeq() != expected ? expected : e.getSeq();
+                }
                 prev = e.getHash();
                 expected = e.getSeq() + 1;
                 after = e.getSeq();
@@ -123,8 +140,25 @@ public class Audit {
         if (tail != null && (tail.getSeq() != expected - 1 || !tail.getHash().equals(prev))) {
             problems.add("the head says #" + tail.getSeq() + " but the chain ends at #"
                     + (expected - 1));
+            if (firstBroken == 0) {
+                firstBroken = expected;
+            }
         }
-        return problems;
+        return new ChainReportDto(problems.isEmpty(), checked, tail == null ? 0L : tail.getSeq(),
+                tail == null ? GENESIS : tail.getHash(), firstBroken, problems);
+    }
+
+    /// Links after `after`, oldest first, at most `limit`.
+    @Transactional(readOnly = true)
+    public List<AuditEvent> after(long after, int limit) throws IOException {
+        List<AuditEvent> page = events.findTop500BySeqGreaterThanOrderBySeqAsc(after);
+        return page.size() <= limit ? page : new ArrayList<AuditEvent>(page.subList(0, limit));
+    }
+
+    /// The hash an event should carry, for exports that let an auditor
+    /// recompute the chain offline.
+    public static String expectedHash(AuditEvent e) throws IOException {
+        return hash(e);
     }
 
     @Transactional(readOnly = true)

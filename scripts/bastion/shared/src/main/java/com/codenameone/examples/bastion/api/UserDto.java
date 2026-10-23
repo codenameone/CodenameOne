@@ -34,5 +34,6 @@ public record UserDto(
         boolean admin,
         boolean totpEnabled,
         int recoveryCodesLeft,
-        long createdAt) {
+        long createdAt,
+        boolean auditor) {
 }

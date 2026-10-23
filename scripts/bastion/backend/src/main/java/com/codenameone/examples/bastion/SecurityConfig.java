@@ -455,6 +455,10 @@ public class SecurityConfig {
                     .requestMatchers(AntPathRequestMatcher.antMatcher("POST",
                             "/api/account/register")).permitAll()
                     .requestMatchers("/api/admin/**").hasRole(Roles.ADMIN)
+                    // Segregation of duties: the books and the audit trail
+                    // are read by staff of either kind; only ADMIN operates.
+                    .requestMatchers("/api/books/**", "/api/audit/**")
+                            .hasAnyRole(Roles.ADMIN, Roles.AUDITOR)
                     .anyRequest().authenticated())
             .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(decoder)
                     .jwtAuthenticationConverter(roles)));

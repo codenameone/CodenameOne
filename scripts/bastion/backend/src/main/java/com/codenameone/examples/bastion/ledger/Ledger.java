@@ -191,6 +191,96 @@ public class Ledger {
     @Transactional(rollbackFor = Exception.class)
     public JournalEntry post(String idempotencyKey, String kind, String initiator, String memo,
             List<Leg> legs) throws IOException {
+        return post(idempotencyKey, kind, initiator, memo, legs, System.currentTimeMillis(),
+                false);
+    }
+
+    /// [#post] dated `at` instead of now: for the demo's history and for
+    /// accruals. A date at or before the end of the last closed period is
+    /// refused -- a closed period is final, and a correction to it is posted
+    /// in the open period, as a reversal or an adjustment.
+    @Transactional(rollbackFor = Exception.class)
+    public JournalEntry postAt(String idempotencyKey, String kind, String initiator, String memo,
+            List<Leg> legs, long at) throws IOException {
+        return post(idempotencyKey, kind, initiator, memo, legs, at, false);
+    }
+
+    /// The end of the newest closed period, or 0 when none is closed.
+    @Transactional(readOnly = true)
+    public long closedThrough() throws IOException {
+        List rows = db.query("SELECT MAX(closed_through) AS t FROM period_close", new Object[0]);
+        if (rows == null || rows.isEmpty() || !(rows.get(0) instanceof Map)) {
+            return 0L;
+        }
+        return number(((Map) rows.get(0)).get("t"));
+    }
+
+    /// Reverses entry `entryId`: posts its mirror image now, in the open
+    /// period, and records the pair. An entry is reversed at most once (the
+    /// `reversal` table's key decides, so two reversals racing cannot both
+    /// commit), and neither a reversal nor a closing entry is reversed --
+    /// the first would be undone by reversing it again in the other
+    /// direction, the second belongs to a closed period. A reversal that would
+    /// overdraw a customer is refused like any other movement.
+    @Transactional(rollbackFor = Exception.class)
+    public JournalEntry reverse(String idempotencyKey, String entryId, String initiator,
+            String memo) throws IOException {
+        JournalEntry original = entryId == null ? null : entries.findById(entryId);
+        if (original == null) {
+            throw Refused.with(404, "no-such-entry", "No such journal entry");
+        }
+        if (REVERSAL.equals(original.getKind()) || CLOSING.equals(original.getKind())) {
+            throw Refused.with(409, "entry-cannot-reversed", "That entry cannot be reversed");
+        }
+        List<Leg> legs = new ArrayList<Leg>();
+        for (Posting p : postings.findByEntryId(entryId)) {
+            legs.add(new Leg(p.getAccountId(), -p.getAmount()));
+        }
+        String earlier = reversedBy(entryId);
+        if (earlier != null) {
+            // The same request retried is answered with its reversal; any
+            // other is a second reversal of one entry.
+            JournalEntry retried = entries.findFirstByIdempotencyKey(idempotencyKey);
+            if (retried != null && retried.getId().equals(earlier)) {
+                return retried;
+            }
+            throw Refused.with(409, "entry-already-reversed", "That entry was already reversed");
+        }
+        JournalEntry entry = post(idempotencyKey, REVERSAL, initiator,
+                "Reversal of " + entryId + (memo == null || memo.length() == 0 ? "" : ": " + memo),
+                legs, System.currentTimeMillis(), false);
+        db.execute("INSERT INTO reversal (entry_id, reversed_by, at) VALUES (?, ?, ?)",
+                new Object[] {entryId, entry.getId(), Long.valueOf(entry.getCreatedAt())});
+        return entry;
+    }
+
+    /// The entry that reversed `entryId`, or null.
+    @Transactional(readOnly = true)
+    public String reversedBy(String entryId) throws IOException {
+        List rows = db.query("SELECT reversed_by AS r FROM reversal WHERE entry_id = ?",
+                new Object[] {entryId});
+        if (rows == null || rows.isEmpty() || !(rows.get(0) instanceof Map)) {
+            return null;
+        }
+        Object r = ((Map) rows.get(0)).get("r");
+        return r == null ? null : String.valueOf(r);
+    }
+
+    /// Journal kinds the books treat specially.
+    public static final String REVERSAL = "REVERSAL";
+    public static final String CLOSING = "CLOSING";
+
+    /// Posts a closing entry dated at the end of the period being closed,
+    /// which the closed-period rule would otherwise refuse. Only period close
+    /// calls this, in the transaction that records the close.
+    @Transactional(rollbackFor = Exception.class)
+    public JournalEntry postClosing(String idempotencyKey, String initiator, String memo,
+            List<Leg> legs, long at) throws IOException {
+        return post(idempotencyKey, CLOSING, initiator, memo, legs, at, true);
+    }
+
+    private JournalEntry post(String idempotencyKey, String kind, String initiator, String memo,
+            List<Leg> legs, long at, boolean closing) throws IOException {
         if (idempotencyKey == null || idempotencyKey.length() < 16
                 || idempotencyKey.length() > 80) {
             // 16 characters at least: a key a client can collide with by
@@ -207,6 +297,10 @@ public class Ledger {
                 throw Refused.with(422, "idempotency-key-reused", "That Idempotency-Key was already used for a different request");
             }
             return earlier;
+        }
+
+        if (!closing && at <= closedThrough()) {
+            throw Refused.with(409, "period-closed", "That date is in a closed period");
         }
 
         Map<String, Long> perAsset = new HashMap<String, Long>();
@@ -237,7 +331,7 @@ public class Ledger {
             }
         }
 
-        long now = System.currentTimeMillis();
+        long now = at;
         JournalEntry entry = new JournalEntry();
         entry.setId(Ids.next());
         entry.setIdempotencyKey(idempotencyKey);
@@ -323,7 +417,7 @@ public class Ledger {
         return problems;
     }
 
-    private static long number(Object value) {
+    static long number(Object value) {
         if (value instanceof Number) {
             return ((Number) value).longValue();
         }

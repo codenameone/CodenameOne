@@ -159,7 +159,7 @@ public class Markets {
     }
 
     /// 10 to the asset's decimals: the ledger units in one whole unit.
-    static long scale(Asset asset) {
+    public static long scale(Asset asset) {
         long s = 1;
         for (int i = 0; i < asset.getDecimals(); i++) {
             s = multiplyExact(s, 10L);
