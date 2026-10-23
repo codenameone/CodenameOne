@@ -109,6 +109,19 @@ public class Devices {
         return row == null || row.getRevokedAt() == 0L;
     }
 
+    /// Whether a download's device is still signed in. Stricter than
+    /// [#usable]: a row that is gone was pushed out by newer sign-ins (or was
+    /// a signed-out row they replaced), and must not bring a revoked device's
+    /// downloads back to life.
+    @Transactional(readOnly = true)
+    public boolean signedIn(String username, String id) {
+        if (id == null || id.length() == 0) {
+            return false;
+        }
+        Device row = devices.findFirstByIdAndUsername(id, username);
+        return row != null && row.getRevokedAt() == 0L;
+    }
+
     @Transactional(readOnly = true)
     public List<DeviceDto> list(String username) {
         List<Device> rows = devices.findByUsernameOrderByLastSeenAtDesc(username);

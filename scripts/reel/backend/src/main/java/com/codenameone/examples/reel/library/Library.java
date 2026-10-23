@@ -223,7 +223,7 @@ public class Library {
     public DownloadDto download(String username, String titleId, String deviceId, String episodeId,
             String profileId) throws IOException {
         settings.require(Features.DOWNLOADS);
-        if (deviceId == null || deviceId.length() == 0 || !devices.usable(username, deviceId)) {
+        if (deviceId == null || deviceId.length() == 0 || !devices.signedIn(username, deviceId)) {
             throw new ResponseStatusException(400, "Downloads need a signed-in device");
         }
         Title t = published(titleId);

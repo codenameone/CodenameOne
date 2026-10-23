@@ -23,6 +23,7 @@ import com.codename1.backend.annotations.Autowired;
 import com.codename1.backend.test.BackendTest;
 import com.codename1.backend.test.MockMvc;
 import com.codenameone.examples.reel.account.Accounts;
+import com.codenameone.examples.reel.account.DemoAccounts;
 import com.codenameone.examples.reel.playback.Licenses;
 import org.junit.jupiter.api.Test;
 
@@ -45,6 +46,78 @@ class RedTeamTest {
     private Accounts accounts;
     @Autowired
     private Licenses licenses;
+
+    /// Impressions per campaign id, as the admin console reports them.
+    private Map<String, Number> impressions() throws Exception {
+        List<?> all = (List<?>) Json.parse(mvc.perform(People.asAdmin(get("/api/admin/campaigns"),
+                DemoAccounts.ADMIN)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        Map<String, Number> out = new java.util.HashMap<String, Number>();
+        for (Object o : all) {
+            Map<?, ?> c = (Map<?, ?>) o;
+            out.put((String) c.get("id"), (Number) c.get("impressions"));
+        }
+        return out;
+    }
+
+    private Map<?, ?> start(String user, String title, String device) throws Exception {
+        return Json.parseObject(mvc.perform(People.asViewer(post("/api/playback/start"), user)
+                .contentType("application/json").content("{\"titleId\":\"" + title + "\",\"deviceId\":\""
+                        + device + "\",\"schemes\":[\"AES_128\"]}"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+    }
+
+    private void adEvent(String user, Object session, String campaign) throws Exception {
+        mvc.perform(People.asViewer(post("/api/ads/event"), user).contentType("application/json")
+                .content("{\"sessionId\":\"" + session + "\",\"adId\":\"x\",\"campaignId\":\"" + campaign
+                        + "\",\"event\":\"impression\"}")).andExpect(status().isOk());
+    }
+
+    @Test
+    void onlyACampaignTheSessionWasServedSpendsBudget() throws Exception {
+        String user = People.viewer(accounts, "adforger");
+        Map<?, ?> p = start(user, "big-buck-bunny", "forger-phone");
+        Object session = p.get("sessionId");
+        String breakId = (String) ((Map<?, ?>) ((List<?>) p.get("adBreaks")).get(0)).get("id");
+        Map<String, Number> before = impressions();
+        for (String id : before.keySet()) {
+            adEvent(user, session, id);
+        }
+        assertEquals(before, impressions());
+        List<?> served = (List<?>) Json.parse(mvc.perform(People.asViewer(get("/api/ads/" + breakId
+                + "?session=" + session), user)).andExpect(status().isOk()).andReturn().getResponse()
+                .getContentAsString());
+        String campaign = (String) ((Map<?, ?>) served.get(0)).get("campaignId");
+        adEvent(user, session, campaign);
+        assertEquals(before.get(campaign).intValue() + 1, impressions().get(campaign).intValue());
+    }
+
+    @Test
+    void aTitleTakenDownEndsTheStreamsPlayingIt() throws Exception {
+        String user = People.viewer(accounts, "lateviewer");
+        Map<?, ?> p = start(user, "big-buck-bunny", "late-tv");
+        mvc.perform(People.asCreator(post("/api/studio/titles/big-buck-bunny/unpublish"), DemoAccounts.CREATOR))
+                .andExpect(status().isOk());
+        try {
+            Map<?, ?> reply = Json.parseObject(mvc.perform(People.asViewer(post("/api/playback/heartbeat"), user)
+                    .contentType("application/json").content("{\"sessionId\":\"" + p.get("sessionId")
+                            + "\",\"positionSeconds\":10}")).andExpect(status().isOk()).andReturn()
+                    .getResponse().getContentAsString());
+            assertEquals(Boolean.FALSE, reply.get("ok"));
+        } finally {
+            mvc.perform(People.asCreator(post("/api/studio/titles/big-buck-bunny/submit"), DemoAccounts.CREATOR))
+                    .andExpect(status().isOk());
+            String queue = mvc.perform(People.asModerator(get("/api/moderation/queue"), DemoAccounts.MODERATOR))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+            for (Object o : (List<?>) Json.parse(queue)) {
+                Map<?, ?> item = (Map<?, ?>) o;
+                if ("big-buck-bunny".equals(item.get("subjectId")) && "TITLE".equals(item.get("kind"))) {
+                    mvc.perform(People.asModerator(post("/api/moderation/items/" + item.get("id")),
+                            DemoAccounts.MODERATOR).contentType("application/json")
+                            .content("{\"action\":\"APPROVE\",\"note\":\"back\"}")).andExpect(status().isOk());
+                }
+            }
+        }
+    }
 
     @Test
     void aPinIsCheckedOnEveryCallNotOnlyThePicker() throws Exception {

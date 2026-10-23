@@ -257,6 +257,15 @@ public class Playbacks {
         if (session.getEndedAt() > 0) {
             return new HeartbeatReplyDto(false, reason(session.getEndedReason()), expires);
         }
+        // What allowed the session to start is checked again at every beat: a
+        // rental that ran out, a plan that lapsed or a title taken down ends
+        // the stream within a heartbeat, not when the media token expires.
+        String lost = lost(username, session.getTitleId(), Roles.isStaff());
+        if (lost != null) {
+            end(session, lost, now);
+            sessions.save(session);
+            return new HeartbeatReplyDto(false, reason(lost), expires);
+        }
         session.setLastHeartbeatAt(now);
         session.setPositionSeconds(Math.max(0, beat.positionSeconds()));
         sessions.save(session);
@@ -285,8 +294,8 @@ public class Playbacks {
 
     /// The ads of one break of a session. A creative that is a packaged Reel
     /// video gets a media token of its own, tied to the same session.
-    @Transactional(readOnly = true)
-    public List<AdDto> adsFor(String username, String sessionId, String breakId) {
+    @Transactional(rollbackFor = IOException.class)
+    public List<AdDto> adsFor(String username, String sessionId, String breakId) throws IOException {
         Playback session = owned(username, sessionId);
         List<AdDto> out = new ArrayList<AdDto>();
         if (breakId == null || !breakId.startsWith(session.getId() + "~") || session.getEndedAt() > 0
@@ -304,6 +313,7 @@ public class Playbacks {
             String video = creative.substring(Ads.VIDEO.length());
             media = "/media/" + tokens.media("s", session.getId(), video, 720, 3600L) + "/" + video + "/master.m3u8";
         }
+        ads.served(username, session.getId(), campaign.getId());
         out.add(Ads.dto(campaign, media, breakId));
         return out;
     }
@@ -378,8 +388,13 @@ public class Playbacks {
     public boolean isLive(MediaTokens.Grant grant) {
         if (grant.isDownload()) {
             Download d = downloads.findById(grant.owner);
+            // A download is held to what a new stream would be: the device
+            // still signed in, the title still published and still in the
+            // plan or a rental. Staff review titles by streaming them, so only
+            // the creator's own downloads skip the plan.
             return d != null && d.getLicenseExpiresAt() > System.currentTimeMillis()
-                    && devices.usable(d.getUsername(), d.getDeviceId());
+                    && devices.signedIn(d.getUsername(), d.getDeviceId())
+                    && lost(d.getUsername(), d.getTitleId(), false) == null;
         }
         Playback p = sessions.findById(grant.owner);
         return p != null && p.getEndedAt() == 0;
@@ -473,7 +488,24 @@ public class Playbacks {
         return p;
     }
 
+    /// Why the user may no longer play the title, as an end reason, or null
+    /// while they still may.
+    private String lost(String username, String titleId, boolean staff) {
+        Title title = titles.findById(titleId);
+        boolean own = staff || (title != null && username.equals(title.getCreator()));
+        if (title == null || (!Kinds.PUBLISHED.equals(title.getStatus()) && !own)) {
+            return "REMOVED";
+        }
+        return entitlements.access(username, title, own).allowed ? null : "NOT_ENTITLED";
+    }
+
     private static String reason(String code) {
+        if ("REMOVED".equals(code)) {
+            return "This title is no longer available";
+        }
+        if ("NOT_ENTITLED".equals(code)) {
+            return "Your plan or rental no longer covers this title";
+        }
         if ("SIGNED_OUT".equals(code)) {
             return "This device was signed out";
         }

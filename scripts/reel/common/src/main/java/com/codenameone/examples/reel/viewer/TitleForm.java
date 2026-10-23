@@ -18,6 +18,8 @@
  */
 package com.codenameone.examples.reel.viewer;
 
+import com.codename1.media.DrmScheme;
+import com.codename1.media.MediaManager;
 import com.codename1.ui.Button;
 import com.codename1.ui.Container;
 import com.codename1.ui.FontImage;
@@ -111,7 +113,10 @@ public final class TitleForm {
         Container actions = new Container(new FlowLayout());
         actions.add(Ui.action(t.inMyList() ? FontImage.MATERIAL_CHECK : FontImage.MATERIAL_ADD, "My list",
                 "myList", e -> toggleList(form, page, t)));
-        if (t.downloadable() && Account.enabled(Features.DOWNLOADS)) {
+        // Every download is ClearKey CENC; a device without ClearKey (iOS)
+        // could fetch the file but never play it.
+        if (t.downloadable() && Account.enabled(Features.DOWNLOADS)
+                && MediaManager.isDrmSupported(DrmScheme.CLEARKEY)) {
             actions.add(Ui.action(FontImage.MATERIAL_DOWNLOAD, "Download", "download", e -> download(t)));
         }
         if (Account.enabled(Features.REPORTS)) {

@@ -53,6 +53,9 @@ public class Ads {
     public static final String CLICK = "click";
     public static final String SKIP = "skip";
     public static final String COMPLETE = "complete";
+    /// Written by the server when it hands a campaign to a session, never
+    /// accepted from the player: the other events count only against it.
+    public static final String SERVED = "served";
     /// A mid-roll every this many seconds of a long title.
     public static final int MIDROLL_EVERY = 600;
     /// Prefix of a creative URL that names a packaged Reel video instead of an
@@ -132,22 +135,38 @@ public class Ads {
         if (campaigns.findById(event.campaignId()) == null) {
             throw new ResponseStatusException(404, "No such campaign");
         }
-        if (events.countBySessionIdAndCampaignIdAndEvent(event.sessionId(), event.campaignId(), kind) > 0) {
+        // Only a campaign this session was actually served can be reported,
+        // or a viewer could post impressions for every campaign and spend any
+        // advertiser's budget.
+        if (events.countBySessionIdAndCampaignIdAndEvent(event.sessionId(), event.campaignId(), SERVED) == 0
+                || events.countBySessionIdAndCampaignIdAndEvent(event.sessionId(), event.campaignId(), kind) > 0) {
             return;
         }
-        AdEvent row = new AdEvent();
-        row.setId(Ids.next());
-        row.setCampaignId(event.campaignId());
-        row.setSessionId(event.sessionId());
-        row.setUsername(username);
-        row.setEvent(kind);
-        row.setCreatedAt(System.currentTimeMillis());
-        events.insert(row);
+        insert(username, event.sessionId(), event.campaignId(), kind);
         if (IMPRESSION.equals(kind)) {
             campaigns.impression(event.campaignId());
         } else if (CLICK.equals(kind)) {
             campaigns.click(event.campaignId());
         }
+    }
+
+    /// Notes that a session was handed a campaign, once.
+    @Transactional(rollbackFor = IOException.class)
+    public void served(String username, String sessionId, String campaignId) throws IOException {
+        if (events.countBySessionIdAndCampaignIdAndEvent(sessionId, campaignId, SERVED) == 0) {
+            insert(username, sessionId, campaignId, SERVED);
+        }
+    }
+
+    private void insert(String username, String sessionId, String campaignId, String kind) throws IOException {
+        AdEvent row = new AdEvent();
+        row.setId(Ids.next());
+        row.setCampaignId(campaignId);
+        row.setSessionId(sessionId);
+        row.setUsername(username);
+        row.setEvent(kind);
+        row.setCreatedAt(System.currentTimeMillis());
+        events.insert(row);
     }
 
     public static AdDto dto(AdCampaign c, String mediaUrl, String breakId) {
