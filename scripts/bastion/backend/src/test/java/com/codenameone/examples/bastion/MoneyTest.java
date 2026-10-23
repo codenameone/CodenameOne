@@ -545,7 +545,11 @@ class MoneyTest {
                 + "\",\"platform\":\"and\",\"rooted\":false,\"attested\":true,"
                 + "\"integrityToken\":\"t\"}";
         assertEquals(403, c.send(json("/api/devices", noPassword)).getStatus());
-        // A fresh passkey sign-in needs none.
+        // A passkey the authenticator did not verify the user for (`hwk` with
+        // no `user`) proves only that the key was present: still the password.
+        c.token = aged(c.token, 1, java.util.Arrays.asList("hwk"));
+        assertEquals(403, c.send(json("/api/devices", noPassword)).getStatus());
+        // A fresh, user-verified passkey sign-in needs none.
         c.token = aged(c.token, 1, java.util.Arrays.asList("hwk", "user", "mfa"));
         assertEquals(200, c.send(json("/api/devices", noPassword)).getStatus());
     }

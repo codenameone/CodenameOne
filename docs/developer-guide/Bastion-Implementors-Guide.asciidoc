@@ -9,15 +9,14 @@ The server runs on the development profile with an in-memory database:
 
 [source,bash]
 ----
-cd scripts/bastion
-CN1_PROFILE=dev backend/server.sh run
+include::../demos/common/src/main/snippets/developer-guide/bastion.sh[tag=bastion-sh-impl-1,indent=0]
 ----
 
 The app runs in the simulator from another terminal:
 
 [source,bash]
 ----
-mvn verify -Psimulator -DskipTests -Dcodename1.platform=javase
+include::../demos/common/src/main/snippets/developer-guide/bastion.sh[tag=bastion-sh-impl-2,indent=0]
 ----
 
 `backend/server.sh run --native` runs the same server compiled to a native binary, and `--web` also builds the app for the browser and serves it from the server at `/`.
@@ -42,7 +41,7 @@ image::img/bastion-sign-in-flow.svg["A sequence between the app and the server: 
 
 The server is its own OAuth 2 authorization server (`SecurityConfig.java`). The app (`net/Session.java`) posts the password, answers the `/login/mfa` step when the account has an authenticator app, and then runs the authorization-code flow with PKCE. A passkey replaces the first three steps with a WebAuthn assertion. In a browser the app runs the same steps from the page, with the browser's own session cookie, and reads its code from `/signin/code` on the server it came from.
 
-Access tokens last five minutes and refresh tokens twelve hours, rotating on every use. Each access token carries an `amr` claim saying how the sign-in was made: `pwd`, `otp` and `mfa`, or `hwk` for a passkey. `money/Devices.java` reads it: a device key is registered only within ten minutes of a sign-in, and also needs the password when the account has no authenticator app and the sign-in wasn't a passkey. `account/SecondFactor.java` holds adding an authenticator app to the same rule, stricter: after a password-only sign-in both the start and the confirmation carry the password as well as being within those ten minutes, so a stolen token can't enrol the thief's app however fresh it is.
+Access tokens last five minutes and refresh tokens twelve hours, rotating on every use. Each access token carries an `amr` claim saying how the sign-in was made: `pwd`, `otp` and `mfa`, or `hwk` for a passkey. `money/Devices.java` reads it: a device key is registered only within ten minutes of a sign-in, and also needs the password unless the sign-in used a second factor or a passkey the authenticator verified the user for (`hwk` together with `user`); `hwk` alone proves only that the key was present. `account/SecondFactor.java` holds adding an authenticator app to the same rule, stricter: after a password-only sign-in both the start and the confirmation carry the password as well as being within those ten minutes, so a stolen token can't enrol the thief's app however fresh it is.
 
 === A signed payment
 
@@ -237,21 +236,7 @@ Out of scope for the sample: a compromised server or database host, an attacker 
 
 [source,bash]
 ----
-cd scripts/bastion
-# The server's tests on the JVM, then compiled to a native binary
-mvn -Dcodename1.platform=backend -pl shared,backend test -Dcn1.backend.compiledTests=true
-# The same tests on PostgreSQL or MySQL
-CN1_TEST_DATABASE_URL="postgres://user:password@localhost:5432/db?sslmode=disable" \
-  ../ci/sample-server-tests-on-database.sh .
-# The app's own tests, which run headless as part of the build
-mvn -Dcodename1.platform=javase -Djava.awt.headless=true package
-# A running server, driven over HTTP the way the app drives it
-./run-e2e.sh
-./run-e2e.sh --native
-# The app in a headless browser, served by the server
-./run-web-e2e.sh
-# The same, then every screen in the user's guide, into docs/developer-guide/img
-./run-web-e2e.sh --guide
+include::../demos/common/src/main/snippets/developer-guide/bastion.sh[tag=bastion-sh-impl-3,indent=0]
 ----
 
 The server's tests cover the ledger's invariants under concurrent transfers and trades, idempotency, sign-in with each factor, the access rules of every endpoint, signing and replay, the device policy, limits and cooling-off, the matching engine and its rounding, and the audit chain's detection of a changed row. `run-e2e.sh` registers two customers, enrols an authenticator and signs in with it, registers device keys, makes a signed payment and checks that the unsigned and replayed copies are refused, fills an order between the two, and checks that a withdrawal is refused until its address is allowed and cooled off. `run-web-e2e.sh` does it in a headless browser, through the app's own screens: it opens an account, turns on the authenticator app, creates a passkey, signs in again with the password and a code, moves money between two accounts, then signs in with the passkey alone and registers the browser as a device without the password. With `--guide` it runs the server on the development profile with the device policy off, then signs in as the demo customer and the administrator and photographs each screen; run it after changing a screen so the user's guide stays true.

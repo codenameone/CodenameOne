@@ -69,8 +69,8 @@ public class SecondFactor {
     /// the account and lock the customer out. Every caller's sign-in must be
     /// fresh (as for a device), however it was made: a strong sign-in hours
     /// old is a session somebody may have walked away from. A sign-in made
-    /// with a second factor or a passkey (`amr` holding `mfa`, `otp` or
-    /// `hwk`) then skips only the password. A password-only one must also
+    /// with a second factor or a user-verified passkey (`amr` holding `mfa`,
+    /// `otp`, or `hwk` together with `user`) then skips only the password. A password-only one must also
     /// carry the password: freshness alone would let a token stolen in its
     /// first minutes enrol, which is exactly the window a phishing proxy
     /// works in. A wrong password counts toward the lockout.
@@ -81,7 +81,9 @@ public class SecondFactor {
             throw Refused.with(403, "sign-in-first", "Sign in first");
         }
         java.util.List<String> how = Caller.authMethods();
-        if (how.contains("mfa") || how.contains("otp") || how.contains("hwk")) {
+        // As in Devices: a passkey counts only when the user was verified.
+        if (how.contains("mfa") || how.contains("otp")
+                || (how.contains("hwk") && how.contains("user"))) {
             return;
         }
         guard.recheck(username, password, encoder, "TOTP_REFUSED",

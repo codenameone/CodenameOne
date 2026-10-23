@@ -65,8 +65,10 @@ import java.util.List;
 ///    app now, since the app may have been enrolled with the very token being
 ///    used; a wrong one counts toward the sign-in lockout like any other. The token says how
 ///    its sign-in was made ([Caller#authMethods], the `amr` claim): a sign-in
-///    with a passkey (`hwk`) already proved possession of a key bound to this
-///    site, so it is not asked for a password it may not even have.
+///    with a user-verified passkey (`hwk` together with `user`) already proved
+///    possession of a key bound to this site and the person holding it, so it
+///    is not asked for a password it may not even have. `hwk` alone does not
+///    count: a key that was merely present proves nothing about who used it.
 ///
 /// Every registration and every refusal is audited, and the customer's
 /// device list shows every key.
@@ -117,9 +119,12 @@ public class Devices {
         // The token's own record of how its sign-in was made decides, never
         // whether the account has an authenticator app *now*: a thief with a
         // fresh password-only token could enrol an app of their own and then
-        // pass as "second factor". Only an `otp`/`mfa`/`hwk` sign-in is spared
-        // the password.
-        boolean strong = how.contains("hwk") || how.contains("mfa") || how.contains("otp");
+        // pass as "second factor". Only an `otp`/`mfa` sign-in, or a passkey
+        // one the authenticator verified the user for (`hwk` with `user`), is
+        // spared the password: `hwk` alone is a key that was merely present,
+        // which proves possession of the device and nothing about who holds it.
+        boolean strong = how.contains("mfa") || how.contains("otp")
+                || (how.contains("hwk") && how.contains("user"));
         if (!strong) {
             guard.recheck(owner, request.password(), encoder, "DEVICE_REFUSED",
                     "enter-password-add-device-turn",
