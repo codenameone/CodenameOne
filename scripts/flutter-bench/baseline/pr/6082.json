@@ -1,0 +1,20 @@
+{
+ "pr": 6082,
+ "rebaseline": {
+  "javascript": {
+   "gallery": {
+    "code_bytes": {
+     "from": {
+      "tolerance": {
+       "value": 0.005
+      },
+      "value": 13418004
+     },
+     "reason": "JavaScript Flutter bench has not built since #6055 (java.util.regex absent on ParparVM); master's nightly size predates #6055's Dart runtime. This PR restores the build; the +0.59% is that runtime. DateTime is parsed by hand, no regex engine added.",
+     "runs": 1,
+     "value": 13497605
+    }
+   }
+  }
+ }
+}

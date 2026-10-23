@@ -108,7 +108,7 @@ final class FileDialogSupport {
         d.placeButtonCommands(new Command[]{cancel, open});
         Command picked = d.showAtPosition(2, 2, 2, 2, true);
         String[] paths = tree.getSelectedPaths();
-        if (picked == open && paths.length > 0) {
+        if (picked == open && paths.length > 0) { //NOPMD CompareObjectsWithEquals
             deliver(new FileDialogResult(request, paths, -1, null), callback);
         } else {
             deliver(FileDialogResult.cancelled(request), callback);
