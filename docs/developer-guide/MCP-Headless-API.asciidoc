@@ -124,21 +124,16 @@ By default Android chooses between resize and pan for each field, the same way t
 
 *Recording.* `sim_record_start` records the screen to MP4, MOV, WebM or an animated GIF, either the screen alone or inside the device skin. Frames are taken on a fixed clock, so the video plays back in real time even while the screen is still. The options cover the frame rate and scale, the touch indicator style, a click sound mixed into the audio track at every tap, and the audio source. By default the recording carries what the application plays: sound effects, game sounds, music and video soundtracks, taken from the simulator's own audio output so nothing else playing on the computer gets in. `audio` can also be `microphone`, `app_and_microphone` for narration over the application's sound, or `none`. `sim_record_caption` overlays a caption on the video for a few seconds, and `sim_record_stop` finishes the file and returns its path and length. *Simulate > Start Recording* offers the same options in a dialog. Recording needs `ffmpeg`. Without it, the recorder writes numbered PNG frames and says so in its result.
 
-A typical script:
+A typical script calls these tools in order:
 
-[source,text]
-----
-sim_keyboard_set      {"mode": "auto"}
-sim_record_start      {"path": "/tmp/signup.mp4", "tapSound": true}
-sim_record_caption    {"text": "Sign up in one step"}
-sim_tap               {"nodeId": 11}
-sim_keyboard_type     {"text": "ada@example.com"}
-sim_keyboard_key      {"key": "next"}
-sim_keyboard_type     {"text": "42"}
-sim_keyboard_key      {"key": "done"}
-sim_wait              {"ms": 800}
-sim_record_stop       {}
-----
+. `sim_keyboard_set` with `{"mode": "auto"}` to use the skin's keyboard.
+. `sim_record_start` with `{"path": "/tmp/signup.mp4", "tapSound": true}`.
+. `sim_record_caption` with `{"text": "Sign up in one step"}`.
+. `sim_tap` with the `nodeId` of the email field, found with `ui_find`.
+. `sim_keyboard_type` with `{"text": "ada@example.com"}`, then `sim_keyboard_key` with `{"key": "next"}`.
+. `sim_keyboard_type` with `{"text": "42"}`, then `sim_keyboard_key` with `{"key": "done"}`.
+. `sim_wait` with `{"ms": 800}` to let the last frame settle.
+. `sim_record_stop`, which returns the file's path and length.
 
 `sim_rotate` switches between portrait and landscape, and `sim_keyboard_state` reports whether the keyboard is showing, its height, the layout, and the screen size the application currently sees.
 
