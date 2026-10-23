@@ -23812,6 +23812,7 @@ static dispatch_queue_t cn1FairPlayQueue(void) {
     return q;
 }
 
+API_AVAILABLE(ios(10.3), tvos(10.2))
 @interface CN1FairPlayKeyDelegate : NSObject <AVContentKeySessionDelegate>
 @property (nonatomic, retain) NSString* certificateUrl;
 @property (nonatomic, retain) NSString* licenseUrl;
@@ -23899,14 +23900,14 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isFairPlaySupported___R_boolean(CN
 #if TARGET_OS_SIMULATOR
     return JAVA_FALSE;
 #else
-    return useAVKit() ? JAVA_TRUE : JAVA_FALSE;
+    if (@available(iOS 10.3, tvOS 10.2, *)) {
+        return useAVKit() ? JAVA_TRUE : JAVA_FALSE;
+    }
+    return JAVA_FALSE;
 #endif
 }
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_createFairPlayVideoComponent___java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String_int_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT url, JAVA_OBJECT certificateUrl, JAVA_OBJECT licenseUrl, JAVA_OBJECT contentId, JAVA_OBJECT licenseHeaders, JAVA_INT onCompletionCallbackId) {
-    if (!useAVKit()) {
-        return 0;
-    }
+static JAVA_LONG cn1CreateFairPlayVideo(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT url, JAVA_OBJECT certificateUrl, JAVA_OBJECT licenseUrl, JAVA_OBJECT contentId, JAVA_OBJECT licenseHeaders, JAVA_INT onCompletionCallbackId) API_AVAILABLE(ios(10.3), tvos(10.2)) {
     NSString* sUrl = toNSString(CN1_THREAD_STATE_PASS_ARG url);
     NSString* sCert = certificateUrl == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG certificateUrl);
     NSString* sLicense = toNSString(CN1_THREAD_STATE_PASS_ARG licenseUrl);
@@ -23951,6 +23952,17 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createFairPlayVideoComponent___java_l
         POOL_END();
     });
     return (JAVA_LONG)((BRIDGE_CAST void*)moviePlayerInstance);
+}
+
+JAVA_LONG com_codename1_impl_ios_IOSNative_createFairPlayVideoComponent___java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String_int_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT url, JAVA_OBJECT certificateUrl, JAVA_OBJECT licenseUrl, JAVA_OBJECT contentId, JAVA_OBJECT licenseHeaders, JAVA_INT onCompletionCallbackId) {
+    if (!useAVKit()) {
+        return 0;
+    }
+    if (@available(iOS 10.3, tvOS 10.2, *)) {
+        return cn1CreateFairPlayVideo(CN1_THREAD_STATE_PASS_ARG url, certificateUrl, licenseUrl, contentId,
+                licenseHeaders, onCompletionCallbackId);
+    }
+    return 0;
 }
 #else
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isFairPlaySupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {

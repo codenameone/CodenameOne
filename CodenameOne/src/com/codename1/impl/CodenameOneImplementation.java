@@ -5767,6 +5767,9 @@ public abstract class CodenameOneImplementation {
         if (drm != null && drm.getScheme() != com.codename1.media.DrmScheme.AES_128) {
             throw new IOException(drm.getScheme() + " is not supported on this platform");
         }
+        if (!request.getHeaders().isEmpty() && !isStreamHeadersSupported()) {
+            throw new IOException("Stream request headers are not supported on this platform");
+        }
         Media m = createMedia(request.getUrl(), true, request.getOnCompletion());
         if (m != null && request.getStartPosition() > 0) {
             m.setTime(request.getStartPosition());

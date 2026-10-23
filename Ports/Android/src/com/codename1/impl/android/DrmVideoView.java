@@ -46,7 +46,10 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 /// A video view that plays a CENC-protected stream (Widevine or ClearKey) through
@@ -64,9 +67,10 @@ import java.util.concurrent.atomic.AtomicReference;
 /// `NetworkOnMainThreadException`. Listener callbacks are reposted to the main
 /// thread, where `VideoView` would have delivered them.
 ///
-/// The framework player plays progressive and fragmented MP4 here, not DASH, so
-/// the stream is one rendition with no adaptive bitrate; an application that needs
-/// adaptive DASH with Widevine on Android uses a Media3 based player instead.
+/// The framework player has no DASH extractor: it plays CENC progressive or
+/// fragmented MP4 and HLS with fMP4 segments. `AndroidImplementation` refuses an
+/// `.mpd` URL up front rather than failing in prepare; an application that needs
+/// DASH with Widevine on Android uses a Media3 based player instead.
 class DrmVideoView extends VideoView {
     static final UUID WIDEVINE_UUID = new UUID(0xEDEF8BA979D64ACEL, 0xA3C827DCD51D21EDL);
     static final UUID CLEARKEY_UUID = new UUID(0xE2719D58A985B3C9L, 0x781AB030AF78D30EL);
@@ -74,8 +78,8 @@ class DrmVideoView extends VideoView {
     private final Uri uri;
     private final Map<String, String> headers;
     private final DrmConfig drm;
-    private final int startPosition;
     private final Handler main = new Handler(Looper.getMainLooper());
+    // One looper thread for the life of the view; quit by stopPlayback.
     private HandlerThread playerThread;
     private Handler playerHandler;
     // Written on the player thread and read on the main thread (and the reverse
@@ -84,6 +88,12 @@ class DrmVideoView extends VideoView {
     private final AtomicBoolean prepared = new AtomicBoolean();
     private final AtomicBoolean startWhenPrepared = new AtomicBoolean();
     private final AtomicBoolean released = new AtomicBoolean();
+    // A seek asked for before the player was prepared, or the position the
+    // player had reached when its surface went away; -1 for none. VideoView
+    // keeps the same thing in mSeekWhenPrepared.
+    private final AtomicInteger pendingSeek = new AtomicInteger(-1);
+    private final AtomicInteger videoWidth = new AtomicInteger();
+    private final AtomicInteger videoHeight = new AtomicInteger();
     private MediaController controller;
     private MediaPlayer.OnCompletionListener completionListener;
     private MediaPlayer.OnErrorListener errorListener;
@@ -93,7 +103,14 @@ class DrmVideoView extends VideoView {
         this.uri = uri;
         this.headers = headers;
         this.drm = drm;
-        this.startPosition = startPosition;
+        if (startPosition > 0) {
+            pendingSeek.set(startPosition);
+        }
+        // The player lives exactly as long as the surface, as VideoView's does:
+        // a view that is removed without cleanup() still lets go of its decoder
+        // and its DRM session (a scarce resource with hardware-backed Widevine)
+        // when its surface is destroyed, and a reparented view reopens where it
+        // was. Re-attaching means a new license request, which is cheap.
         getHolder().addCallback(new SurfaceHolder.Callback() {
             @Override
             public void surfaceCreated(final SurfaceHolder holder) {
@@ -106,14 +123,7 @@ class DrmVideoView extends VideoView {
 
             @Override
             public void surfaceDestroyed(SurfaceHolder holder) {
-                final MediaPlayer p = playerRef.get();
-                if (p != null) {
-                    try {
-                        p.setDisplay(null);
-                    } catch (Throwable ignore) {
-                        // the player may already be released
-                    }
-                }
+                closePlayer(true);
             }
         });
     }
@@ -146,27 +156,67 @@ class DrmVideoView extends VideoView {
         if (released.get()) {
             return;
         }
-        if (playerRef.get() != null) {
-            playerHandler.post(new Runnable() {
-                @Override
-                public void run() {
-                    MediaPlayer p = playerRef.get();
-                    if (p != null) {
-                        p.setDisplay(holder);
-                    }
-                }
-            });
-            return;
+        if (playerThread == null) {
+            playerThread = new HandlerThread("CN1DrmVideo");
+            playerThread.start();
+            playerHandler = new Handler(playerThread.getLooper());
         }
-        playerThread = new HandlerThread("CN1DrmVideo");
-        playerThread.start();
-        playerHandler = new Handler(playerThread.getLooper());
         playerHandler.post(new Runnable() {
             @Override
             public void run() {
-                createPlayer(holder);
+                if (!released.get() && playerRef.get() == null) {
+                    createPlayer(holder);
+                }
             }
         });
+    }
+
+    /// Releases the player on its own thread. From surfaceDestroyed this waits
+    /// (briefly) for that to finish, because the surface must not be used once
+    /// the callback returns.
+    private void closePlayer(boolean wait) {
+        if (playerHandler == null) {
+            return;
+        }
+        final CountDownLatch done = new CountDownLatch(1);
+        playerHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    MediaPlayer p = playerRef.getAndSet(null);
+                    if (p != null) {
+                        if (prepared.get() && pendingSeek.get() < 0) {
+                            try {
+                                pendingSeek.set(p.getCurrentPosition());
+                            } catch (IllegalStateException ignore) {
+                                // the position is lost with the player
+                            }
+                        }
+                        try {
+                            p.setDisplay(null);
+                            if (Build.VERSION.SDK_INT >= 26) {
+                                p.releaseDrm();
+                            }
+                        } catch (Throwable ignore) {
+                            // no DRM session was opened
+                        }
+                        p.release();
+                    }
+                    prepared.set(false);
+                } finally {
+                    done.countDown();
+                }
+            }
+        });
+        if (wait) {
+            try {
+                if (!done.await(1, TimeUnit.SECONDS)) {
+                    com.codename1.io.Log.p("DrmVideoView: the player did not release its surface within 1s");
+                }
+            } catch (InterruptedException ignore) {
+                Thread.currentThread().interrupt();
+            }
+        }
     }
 
     private void createPlayer(SurfaceHolder holder) {
@@ -186,12 +236,29 @@ class DrmVideoView extends VideoView {
                     }
                 }
             });
+            p.setOnVideoSizeChangedListener(new MediaPlayer.OnVideoSizeChangedListener() {
+                @Override
+                public void onVideoSizeChanged(MediaPlayer mp, final int width, final int height) {
+                    videoWidth.set(width);
+                    videoHeight.set(height);
+                    main.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (width > 0 && height > 0) {
+                                getHolder().setFixedSize(width, height);
+                            }
+                            requestLayout();
+                        }
+                    });
+                }
+            });
             p.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
                 @Override
                 public void onPrepared(MediaPlayer mp) {
                     prepared.set(true);
-                    if (startPosition > 0) {
-                        mp.seekTo(startPosition);
+                    int seek = pendingSeek.getAndSet(-1);
+                    if (seek > 0) {
+                        mp.seekTo(seek);
                     }
                     if (startWhenPrepared.get()) {
                         mp.start();
@@ -209,6 +276,7 @@ class DrmVideoView extends VideoView {
             p.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
                 @Override
                 public void onCompletion(final MediaPlayer mp) {
+                    startWhenPrepared.set(false);
                     main.post(new Runnable() {
                         @Override
                         public void run() {
@@ -232,6 +300,24 @@ class DrmVideoView extends VideoView {
             com.codename1.io.Log.e(t);
             postError(MediaPlayer.MEDIA_ERROR_UNKNOWN, MediaPlayer.MEDIA_ERROR_IO);
         }
+    }
+
+    @Override
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        // VideoView sizes itself from its own player's video size, which is
+        // never set here; keep the aspect ratio of ours instead.
+        int vw = videoWidth.get();
+        int vh = videoHeight.get();
+        int width = getDefaultSize(vw, widthMeasureSpec);
+        int height = getDefaultSize(vh, heightMeasureSpec);
+        if (vw > 0 && vh > 0) {
+            if (vw * height > width * vh) {
+                height = width * vh / vw;
+            } else if (vw * height < width * vh) {
+                width = height * vw / vh;
+            }
+        }
+        setMeasuredDimension(width, height);
     }
 
     private void acquireLicense(MediaPlayer mp, MediaPlayer.DrmInfo info) throws Exception {
@@ -376,24 +462,15 @@ class DrmVideoView extends VideoView {
     @Override
     public void stopPlayback() {
         released.set(true);
-        onPlayer(new Runnable() {
-            @Override
-            public void run() {
-                MediaPlayer p = playerRef.getAndSet(null);
-                if (p != null) {
-                    try {
-                        if (Build.VERSION.SDK_INT >= 26) {
-                            p.releaseDrm();
-                        }
-                    } catch (Throwable ignore) {
-                        // no DRM session was opened
-                    }
-                    p.release();
+        closePlayer(false);
+        if (playerHandler != null) {
+            playerHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    playerThread.quitSafely();
                 }
-                prepared.set(false);
-                playerThread.quitSafely();
-            }
-        });
+            });
+        }
     }
 
     @Override
@@ -452,12 +529,17 @@ class DrmVideoView extends VideoView {
 
     @Override
     public void seekTo(final int msec) {
+        if (!prepared.get()) {
+            pendingSeek.set(msec);
+        }
         onPlayer(new Runnable() {
             @Override
             public void run() {
                 MediaPlayer p = playerRef.get();
                 if (p != null && prepared.get()) {
                     p.seekTo(msec);
+                } else {
+                    pendingSeek.set(msec);
                 }
             }
         });

@@ -4795,6 +4795,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (cenc && !DrmVideoView.isSupported(drm.getScheme())) {
             throw new IOException(drm.getScheme() + " is not supported on this device");
         }
+        if (cenc && request.getUrl().toLowerCase(java.util.Locale.ROOT).indexOf(".mpd") > -1) {
+            // The framework MediaPlayer has no DASH extractor; failing here names
+            // the reason instead of a generic prepare error later.
+            throw new IOException("DASH is not supported by the framework player; serve HLS (fMP4) or MP4");
+        }
         final java.util.Map<String, String> headers = request.getHeaders();
         final Uri videoUri = Uri.parse(request.getUrl());
         final AndroidImplementation.Video[] video = new AndroidImplementation.Video[1];

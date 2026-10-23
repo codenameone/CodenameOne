@@ -7230,6 +7230,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         // Set for a FairPlay stream: getVideoComponent creates the player through
         // the content key session instead of a plain URL.
         private com.codename1.media.DrmConfig fairPlay;
+        private int pendingTime = -1;
         
         
         
@@ -7447,6 +7448,10 @@ public class IOSImplementation extends CodenameOneImplementation {
                 } else {
                     nativeInstance.setAudioTime(moviePlayerPeer, time);
                 }
+            } else if(isVideo) {
+                // The video peer is created lazily by getVideoComponent; a resume
+                // position set before that is applied once the peer exists.
+                pendingTime = time;
             }
         }
 
@@ -7517,6 +7522,10 @@ public class IOSImplementation extends CodenameOneImplementation {
             }
             if (prepareToPlay && isVideo && !isPlaying()) {
                 prepare();
+            }
+            if (moviePlayerPeer != 0 && pendingTime > 0) {
+                nativeInstance.setMediaTimeMS(moviePlayerPeer, pendingTime);
+                pendingTime = -1;
             }
             return component;
         }
