@@ -25,6 +25,7 @@ import com.codename1.backend.annotations.Scheduled;
 import com.codename1.backend.annotations.Transactional;
 import com.codename1.backend.annotations.Value;
 import com.codenameone.examples.bastion.Ids;
+import com.codenameone.examples.bastion.account.DemoAccounts;
 import com.codenameone.examples.bastion.api.NewOrderDto;
 import com.codenameone.examples.bastion.domain.Asset;
 import com.codenameone.examples.bastion.domain.LedgerAccount;
@@ -70,8 +71,11 @@ public class MarketMaker {
     // compiled server's class library has (java.security does not exist there).
     private final Random random = new Random();
 
+    /// `demo` is taken only so that it is built, and its history seeded,
+    /// before this starts: that history funds the maker at its first day,
+    /// and a float posted again today would be a day's volume of a million.
     public MarketMaker(Exchange exchange, Markets markets, Ledger ledger,
-            TradeOrderRepository orders, Config config,
+            TradeOrderRepository orders, Config config, DemoAccounts demo,
             @Value("${bastion.market-maker.enabled:true}") String enabled) {
         this.exchange = exchange;
         this.markets = markets;
@@ -156,6 +160,9 @@ public class MarketMaker {
         }
         if (account == null) {
             account = ledger.open(OWNER, asset, kind, "market maker");
+        } else if (account.getBalance() > 0) {
+            // Funded already: by the demo history, or by an earlier start.
+            return;
         }
         Asset a = ledger.asset(asset);
         long amount = "FIAT".equals(a.getKind()) ? 100000000L : 100L * Markets.scale(a);

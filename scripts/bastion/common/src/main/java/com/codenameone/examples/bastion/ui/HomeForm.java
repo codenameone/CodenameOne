@@ -53,11 +53,19 @@ public final class HomeForm {
     private HomeForm() {
     }
 
+    /// The greeting uses the first name: a full name does not fit a phone's
+    /// title line.
+    private static String firstName(String name) {
+        String trimmed = name.trim();
+        int space = trimmed.indexOf(' ');
+        return space > 0 ? trimmed.substring(0, space) : trimmed;
+    }
+
     public static void show() {
         UserDto user = Session.user();
         Form form = Nav.form("Bastion", null);
         String name = user == null ? null : user.displayName();
-        form.add(Ui.title(name == null ? Lang.tr("Welcome") : Lang.tr("Hello, {0}", name)));
+        form.add(Ui.title(name == null ? Lang.tr("Welcome") : Lang.tr("Hello, {0}", firstName(name))));
         final Container content = new Container(BoxLayout.y());
         form.add(content);
         Ui.show(form, true);
@@ -181,8 +189,8 @@ public final class HomeForm {
     private static void sumHistory(final List<String> ids, final int at, final long[] days,
             final double[] total, final Container history) {
         if (at == ids.size()) {
-            history.add(Ui.section("Dollar balance, 30 days"));
-            history.add(Charts.line("balance-chart", days, total));
+            history.add(Ui.section("Cash in dollar accounts, 30 days"));
+            history.add(Charts.line("balance-chart", days, total, "$"));
             if (history.getComponentForm() != null) {
                 history.getComponentForm().revalidate();
             }

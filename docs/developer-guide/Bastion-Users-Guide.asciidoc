@@ -68,7 +68,7 @@ image::img/bastion-lock.png["The lock screen: Bastion is locked, a PIN field, an
 
 === The dashboard
 
-The dashboard shows the total of every account in dollars, at the exchange's current prices, the dollar balance over the last 30 days, how the money is spread across currencies and coins, and each account with its balance. Until the device has a payment key, a banner above says so and offers to register it; registering asks for the password again, because only a recent sign-in may add a key.
+The dashboard shows the total of every account in dollars, at the exchange's current prices, the cash in dollar accounts over the last 30 days, how the money is spread across currencies and coins, and each account with its balance. Until the device has a payment key, a banner above says so and offers to register it; registering asks for the password again, because only a recent sign-in may add a key.
 
 image::img/bastion-dashboard-unregistered.png["The dashboard with a banner saying this device can't sign payments yet and a Register this device button",scaledwidth=40%]
 
@@ -163,11 +163,11 @@ image::img/bastion-settings.png["The settings screen with the unlock options, th
 
 === The back office
 
-Staff sign in like customers and land on the console: *Administration* for an administrator, *Audit* for an auditor. On a wide window, a desktop or a tablet on its side, the sections are a sidebar beside the page and the tables use the width; on a phone the sections are a picker over one column, and a wide table scrolls sideways.
+Staff sign in like customers and land on the console: *Administration* for an administrator, *Audit* for an auditor. On a wide window, a desktop or a tablet on its side, the sections are a sidebar beside the page and the tables use the width; on a phone the sections are a picker over one column, and a wide table scrolls sideways. A customer's statement on a phone keeps three columns instead: the date, the amount signed in or out, and the running balance.
 
 image::img/bastion-console-overview.png["The administration console on a desktop: a sidebar of sections, tiles for the trial balance, reconciliation, audit chain and approvals, volume charts and the two integrity checks",scaledwidth=95%]
 
-The *Overview* shows whether the trial balance balances, whether reconciliation found breaks, whether the audit chain is intact and how many requests wait for approval, with the dollar volume and the number of journal entries a day. An administrator also runs the two checks, recomputed from the stored rows each time:
+The *Overview* shows whether the trial balance balances, whether reconciliation found breaks, whether the audit chain is intact and how many requests wait for approval, with the dollar volume and the number of journal entries a day. Order holds and their releases are left out of both: they move a customer's own money into escrow and back, and no value changes hands. An administrator also runs the two checks, recomputed from the stored rows each time:
 
 * *Verify the audit log*: every security and money event is a link in a hash chain, and the check reports any row that was changed, removed or inserted out of order.
 * *Verify the ledger*: every entry sums to zero in each currency, and every balance equals the sum of its postings.
@@ -180,7 +180,7 @@ image::img/bastion-console-entry.png["One journal entry: when it was posted, its
 
 The *General ledger* lists the lines of one account code in one currency with a running balance, and shows the account as a T-account, debits on one side and credits on the other, between its opening and closing balances.
 
-image::img/bastion-console-t-account.png["A T-account for cash and reserves in dollars: debits on the left, credits on the right, totals under each and the closing balance",scaledwidth=95%]
+image::img/bastion-console-t-account.png["A T-account for customer deposits in dollars: debits on the left, credits on the right, totals under each and the closing balance",scaledwidth=95%]
 
 The statements follow from the same postings. The *Trial balance* lists the debit or credit balance of every account code and currency, with totals that must agree. The *Balance sheet* shows assets, liabilities and equity, and that the first equals the sum of the other two. The *Income statement* shows revenue and expenses for the period and the net income, all valued in dollars as well as in their own currency.
 
@@ -200,7 +200,7 @@ image::img/bastion-console-periods.png["The period close section listing closed 
 
 Changes need two administrators. An administrator can ask for an adjustment to a customer account or for an entry to be reversed; above the approval threshold it waits in *Approvals* until a second administrator approves or rejects it. Every change asks for the administrator's password again.
 
-image::img/bastion-console-approvals.png["The approvals queue with a pending reversal highlighted, its maker, memo and status",scaledwidth=95%]
+image::img/bastion-console-approvals.png["The approvals queue with a pending adjustment highlighted, its maker, memo and status",scaledwidth=95%]
 
 image::img/bastion-console-approve.png["The decision dialog: the request, a reason, the password and Approve, Reject and Cancel buttons",scaledwidth=95%]
 

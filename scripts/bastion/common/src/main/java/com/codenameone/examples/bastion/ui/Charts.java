@@ -69,12 +69,24 @@ public final class Charts {
         }
     };
 
+    private static void money(XYMultipleSeriesRenderer renderer, final String prefix) {
+        if (prefix == null || prefix.length() == 0) {
+            return;
+        }
+        renderer.setYLabelFormat(new NumberFormat() {
+            @Override
+            public String format(double value) {
+                return value < 0 ? "-" + prefix + compact(-value) : prefix + compact(value);
+            }
+        }, 0);
+    }
+
     static String compact(double value) {
         double size = Math.abs(value);
         if (size >= 1000000) {
             return trim(value / 1000000) + "M";
         }
-        if (size >= 10000) {
+        if (size >= 1000) {
             return trim(value / 1000) + "k";
         }
         if (size >= 100 || value == Math.floor(value)) {
@@ -112,6 +124,12 @@ public final class Charts {
     ///
     /// @param name what a test finds the chart by
     public static Component line(String name, long[] days, double[] values) {
+        return line(name, days, values, "");
+    }
+
+    /// The same line, its axis written as money: `prefix` is the currency
+    /// sign, as in $8k.
+    public static Component line(String name, long[] days, double[] values, String prefix) {
         XYMultipleSeriesDataset data = new XYMultipleSeriesDataset();
         XYSeries series = new XYSeries("");
         for (int iter = 0; iter < values.length; iter++) {
@@ -130,6 +148,7 @@ public final class Charts {
         renderer.addSeriesRenderer(one);
         dayLabels(renderer, days);
         range(renderer, values, values, false);
+        money(renderer, prefix);
         return box(name, new ChartComponent(new LineChart(data, renderer)));
     }
 
@@ -159,6 +178,19 @@ public final class Charts {
 
     /// Bars of `values`, one series, in `uiid`'s colour.
     public static Component bars(String name, long[] days, double[] values, String uiid) {
+        return bars(name, days, values, uiid, "");
+    }
+
+    /// Bars with a money axis; see [#line(String, long\[\], double\[\], String)].
+    public static Component bars(String name, long[] days, double[] values, String uiid,
+            String prefix) {
+        return bars(name, days, values, uiid, prefix, 0.6f);
+    }
+
+    /// Bars `scale` times the standard chart height (a strip under the
+    /// candles is 0.6, a panel of its own is taller).
+    public static Component bars(String name, long[] days, double[] values, String uiid,
+            String prefix, float scale) {
         XYMultipleSeriesDataset data = new XYMultipleSeriesDataset();
         XYSeries series = new XYSeries("");
         for (int iter = 0; iter < values.length; iter++) {
@@ -170,8 +202,9 @@ public final class Charts {
         renderer.setBarSpacing(0.25);
         dayLabels(renderer, days);
         range(renderer, values, values, true);
+        money(renderer, prefix);
         return box(name, new ChartComponent(new BarChart(data, renderer, BarChart.Type.DEFAULT)),
-                0.6f);
+                scale);
     }
 
     /// Candles: a body from the open to the close, rising in `BnChartIn`'s
@@ -312,7 +345,10 @@ public final class Charts {
         renderer.setYLabelsAlign(Component.RIGHT);
         renderer.setYLabelsPadding(CN.convertToPixels(1f));
         int m = CN.convertToPixels(1f);
-        renderer.setMargins(new int[] {m * 2, CN.convertToPixels(11f), m * 3, m * 5});
+        // The library already keeps room under the axis for its labels (and an
+        // axis title this chart has none of): no bottom margin on top of it.
+        renderer.setAxisTitleTextSize(0);
+        renderer.setMargins(new int[] {m * 2, CN.convertToPixels(11f), 0, m * 5});
         renderer.setPointSize(0);
         renderer.setYLabelFormat(COMPACT, 0);
         return renderer;

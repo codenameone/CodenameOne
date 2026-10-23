@@ -21,6 +21,7 @@ package com.codenameone.examples.bastion.ui;
 import com.codename1.io.FileSystemStorage;
 import com.codename1.io.Util;
 import com.codename1.l10n.SimpleDateFormat;
+import com.codename1.components.SpanLabel;
 import com.codename1.ui.Button;
 import com.codename1.ui.CN;
 import com.codename1.ui.Command;
@@ -133,8 +134,8 @@ public final class ConsoleForm {
             side = new Container(BoxLayout.y(), "BnSide");
             side.setScrollableY(true);
             side.setName("console-sections");
-            Label brand = new Label(Lang.tr(admin ? "Administration" : "Audit"), "BnSideBrand");
-            side.add(brand);
+            // The title bar already names the console; the sidebar starts
+            // with the sections.
             if (!admin) {
                 side.add(new Label(Lang.tr("Read-only"), "BnBadgeWarn"));
             }
@@ -363,9 +364,9 @@ public final class ConsoleForm {
         }
         charts.removeAll();
         charts.add(panel("Dollar volume, 30 days", Charts.bars("volume-chart", at, volume,
-                "BnChartLine")));
+                "BnChartLine", "$", 1.5f)));
         charts.add(panel("Journal entries a day", Charts.bars("entries-chart", at, count,
-                "BnChartIn")));
+                "BnChartIn", "", 1.5f)));
         charts.revalidate();
         form.revalidate();
     }
@@ -395,7 +396,14 @@ public final class ConsoleForm {
     private void verified(Container box, VerificationDto v, String good) {
         box.removeAll();
         if (v.intact()) {
-            box.add(Ui.row(Lang.tr(good), null, Lang.tr("Intact"), "BnBadgeGood", null));
+            // The sentence wraps; a row's title would cut it off.
+            Container line = new Container(new BorderLayout(), "BnRow");
+            SpanLabel says = new SpanLabel(Lang.tr(good));
+            says.setTextUIID("BnRowTitle");
+            line.add(BorderLayout.CENTER, says);
+            line.add(BorderLayout.EAST, BorderLayout.centerCenter(
+                    new Label(Lang.tr("Intact"), "BnBadgeGood")));
+            box.add(line);
         } else {
             box.add(Ui.row(Lang.tr("Problems found"), null, String.valueOf(v.problems().size()),
                     "BnBadgeBad", null));

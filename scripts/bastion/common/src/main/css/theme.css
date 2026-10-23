@@ -775,10 +775,10 @@ BnTile {
     margin: 0.8mm;
 }
 
-BnTileValue { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 4mm; padding: 0; margin: 0; }
-BnTileValueGood { color: var(--success); background-color: transparent; font-family: "native:MainBold"; font-size: 4mm; padding: 0; margin: 0; }
-BnTileValueBad { color: var(--danger); background-color: transparent; font-family: "native:MainBold"; font-size: 4mm; padding: 0; margin: 0; }
-BnTileValueWarn { color: var(--warning); background-color: transparent; font-family: "native:MainBold"; font-size: 4mm; padding: 0; margin: 0; }
+BnTileValue { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 3.2mm; padding: 0; margin: 0; }
+BnTileValueGood { color: var(--success); background-color: transparent; font-family: "native:MainBold"; font-size: 3.2mm; padding: 0; margin: 0; }
+BnTileValueBad { color: var(--danger); background-color: transparent; font-family: "native:MainBold"; font-size: 3.2mm; padding: 0; margin: 0; }
+BnTileValueWarn { color: var(--warning); background-color: transparent; font-family: "native:MainBold"; font-size: 3.2mm; padding: 0; margin: 0; }
 BnTileLabel { color: var(--text-muted); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.3mm; padding: 0.6mm 0 0 0; margin: 0; }
 
 BnTable {
@@ -835,6 +835,7 @@ BnCellHead { color: var(--text-muted); background-color: transparent; font-famil
 BnCellHeadNum { color: var(--text-muted); background-color: transparent; font-family: "native:MainBold"; font-size: 2.1mm; text-align: right; padding: 0 1mm 0 1mm; margin: 0; }
 BnCell { color: var(--text); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.3mm; padding: 0 1mm 0 1mm; margin: 0; }
 BnCellNum { color: var(--text); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.3mm; text-align: right; padding: 0 1mm 0 1mm; margin: 0; }
+BnCellNumOut { color: var(--danger); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.3mm; text-align: right; padding: 0 1mm 0 1mm; margin: 0; }
 BnCellMuted { color: var(--text-muted); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.3mm; padding: 0.6mm 1mm 0.6mm 1mm; margin: 0; }
 
 BnFact { background-color: transparent; padding: 1mm 1mm 1mm 0; margin: 0; }
@@ -979,4 +980,5 @@ BnAmountNegative {
     BnTFoot { border-top: 2px solid var(--text-dark); }
     BnCode { color: var(--text-dark); background-color: var(--surface-alt-dark); }
     BnAmountNegative { color: var(--danger-dark); }
+    BnCellNumOut { color: var(--danger-dark); }
 }

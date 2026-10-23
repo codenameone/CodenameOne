@@ -51,6 +51,12 @@ public final class Table {
     /// @param weights each column's share of the width
     /// @param numeric which columns hold numbers (aligned to the end)
     public Table(String[] headers, int[] weights, boolean[] numeric) {
+        this(headers, weights, numeric, false);
+    }
+
+    /// @param fit true for a table whose columns were chosen to fit the
+    ///     window: it never scrolls sideways
+    public Table(String[] headers, int[] weights, boolean[] numeric, boolean fit) {
         this.headers = headers;
         this.weights = weights;
         this.numeric = numeric;
@@ -64,7 +70,7 @@ public final class Table {
                     numeric[iter] ? "BnCellHeadNum" : "BnCellHead"));
         }
         final int least = CN.convertToPixels(MM_PER_WEIGHT * total);
-        final boolean scrolls = least > CN.getDisplayWidth() - CN.convertToPixels(8f);
+        final boolean scrolls = !fit && least > CN.getDisplayWidth() - CN.convertToPixels(8f);
         // The width is set in calcPreferredSize, never with setPreferredW,
         // which would freeze the height at the header's while rows arrive.
         Container body = new Container(BoxLayout.y(), "BnTable") {

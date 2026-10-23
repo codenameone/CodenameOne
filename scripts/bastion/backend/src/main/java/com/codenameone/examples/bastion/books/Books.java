@@ -444,8 +444,15 @@ public class Books {
         long start = today - (days - 1) * DAY;
         Map<String, long[]> buckets = new TreeMap<String, long[]>();
         Map<String, String> lastEntry = new LinkedHashMap<String, String>();
-        for (Map r : rows("SELECT entry_id, asset, amount, created_at FROM posting "
-                + "WHERE created_at >= ? AND amount > 0 ORDER BY entry_id",
+        // An order hold and its release move a customer's own money into and
+        // out of escrow: no value changes hands. The market maker requotes
+        // every few seconds, so counting them buried every real day of
+        // activity under the last one; only entries between parties count.
+        for (Map r : rows("SELECT p.entry_id AS entry_id, p.asset AS asset, p.amount AS amount, "
+                + "p.created_at AS created_at FROM posting p "
+                + "JOIN journal_entry e ON e.id = p.entry_id "
+                + "WHERE p.created_at >= ? AND p.amount > 0 "
+                + "AND e.kind <> 'ORDER_HOLD' AND e.kind <> 'ORDER_RELEASE' ORDER BY p.entry_id",
                 new Object[] {Long.valueOf(start)})) {
             long d = day(num(r, "created_at"));
             String asset = str(r, "asset");

@@ -565,6 +565,8 @@ async function guideTour() {
   await press('Request adjustment');
   await waitFor('the request', stepSeconds, async () =>
       requests.some(r => /POST \/api\/admin\/adjust/.test(r)));
+  // Let the "Sent for approval" notice go before the next screenshot.
+  await page.waitForTimeout(4000);
   await settled();
   await press('Show as a T-account');
   await waitFor('the T-account', stepSeconds, textOnScreen(/Total debits/));

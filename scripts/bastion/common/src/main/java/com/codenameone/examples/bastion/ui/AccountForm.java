@@ -19,6 +19,7 @@
 package com.codenameone.examples.bastion.ui;
 
 import com.codename1.ui.Button;
+import com.codename1.ui.CN;
 import com.codename1.ui.Command;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
@@ -165,7 +166,8 @@ public final class AccountForm {
                 values[iter] = points.get(iter).balance() / scale;
             }
             box.addComponent(0, Ui.section("Balance, 30 days"));
-            box.addComponent(1, Charts.line("account-balance-chart", days, values));
+            box.addComponent(1, Charts.line("account-balance-chart", days, values,
+                    Assets.REPORTING.equals(account.asset()) ? "$" : ""));
             refresh(box);
         }, (status, message) -> { }));
         Api.insights().cashflow(account.asset(), "14", Net.to((List<CashflowDayDto> flows) -> {
@@ -234,26 +236,42 @@ public final class AccountForm {
                 out -= posting.amount();
             }
         }
-        Table table = new Table(new String[] {"Date", "Description", "Money in", "Money out",
-            "Balance"}, new int[] {3, 4, 3, 3, 3},
-                new boolean[] {false, false, true, true, true});
         String asset = account.asset();
-        table.add(new String[] {"", Lang.tr("Opening balance"), "", "",
+        // A phone has room for three columns: the amount is signed rather
+        // than split into money in and money out, and the description goes
+        // (each row is a posting to this account, in or out).
+        boolean narrow = CN.getDisplayWidth() < CN.convertToPixels(120f);
+        Table table = narrow
+                ? new Table(new String[] {"Date", "Amount", "Balance"}, new int[] {3, 2, 2},
+                        new boolean[] {false, true, true}, true)
+                : new Table(new String[] {"Date", "Description", "Money in", "Money out",
+                    "Balance"}, new int[] {3, 4, 3, 3, 3},
+                        new boolean[] {false, false, true, true, true});
+        table.add(narrow ? new String[] {Lang.tr("Opening balance"), "",
+            Amounts.format(opening, asset)} : new String[] {"", Lang.tr("Opening balance"), "", "",
             Amounts.format(opening, asset)}, "BnTableTotal", null, null);
         long running = opening;
         for (int iter = postings.size() - 1; iter >= 0; iter--) {
             PostingDto posting = postings.get(iter);
             running += posting.amount();
             boolean credit = posting.amount() > 0;
+            if (narrow) {
+                table.add(new String[] {Ui.when(posting.createdAt()),
+                    (credit ? "+" : "") + Amounts.format(posting.amount(), asset),
+                    Amounts.format(running, asset)}, "BnTableRow",
+                        new String[] {null, credit ? null : "BnCellNumOut", null}, null);
+                continue;
+            }
             table.add(new String[] {Ui.when(posting.createdAt()),
                 Lang.tr(credit ? "Money in" : "Money out"),
                 credit ? Amounts.format(posting.amount(), asset) : "",
                 credit ? "" : Amounts.format(-posting.amount(), asset),
                 Amounts.format(running, asset)}, null);
         }
-        table.add(new String[] {"", Lang.tr("Closing balance"), Amounts.format(in, asset),
-            Amounts.format(out, asset), Amounts.format(account.balance(), asset)},
-                "BnTableTotal", null, null);
+        table.add(narrow ? new String[] {Lang.tr("Closing balance"), "",
+            Amounts.format(account.balance(), asset)} : new String[] {"", Lang.tr("Closing balance"),
+            Amounts.format(in, asset), Amounts.format(out, asset),
+            Amounts.format(account.balance(), asset)}, "BnTableTotal", null, null);
         form.add(table.component());
         Ui.show(form, true);
     }

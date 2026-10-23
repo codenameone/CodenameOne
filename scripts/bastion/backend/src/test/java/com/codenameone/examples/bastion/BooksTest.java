@@ -35,6 +35,7 @@ import com.codenameone.examples.bastion.api.JournalLegDto;
 import com.codenameone.examples.bastion.api.ReconciliationDto;
 import com.codenameone.examples.bastion.api.TrialBalanceDto;
 import com.codenameone.examples.bastion.api.TrialBalanceLineDto;
+import com.codenameone.examples.bastion.api.VolumeDayDto;
 import com.codenameone.examples.bastion.audit.Audit;
 import com.codenameone.examples.bastion.books.Books;
 import com.codenameone.examples.bastion.domain.AuditEvent;
@@ -166,6 +167,33 @@ class BooksTest {
                     new Object[] {alice.getId()});
         }
         assertTrue(books.reconcile().clean());
+    }
+
+    @Test
+    void escrowMovesAreNotVolume() throws Exception {
+        LedgerAccount alice = funded("books-v1", 5000);
+        LedgerAccount hold = ledger.open("books-v1", "USD", AccountKinds.HOLD, "Hold");
+        long before = todayEntries();
+        ledger.post(key(), "ORDER_HOLD", "books-v1", "BTC-USD BUY", Arrays.asList(
+                new Leg(alice.getId(), -700), new Leg(hold.getId(), 700)));
+        ledger.post(key(), "ORDER_RELEASE", "books-v1", "BTC-USD BUY", Arrays.asList(
+                new Leg(hold.getId(), -700), new Leg(alice.getId(), 700)));
+        assertEquals(before, todayEntries());
+        LedgerAccount cash = ledger.system("USD", AccountKinds.SYS_CASH);
+        ledger.post(key(), "DEPOSIT", "books-v1", "real", Arrays.asList(
+                new Leg(cash.getId(), -10), new Leg(alice.getId(), 10)));
+        assertEquals(before + 1, todayEntries());
+    }
+
+    private long todayEntries() throws Exception {
+        long count = 0;
+        List<VolumeDayDto> days = books.volume(1);
+        for (VolumeDayDto d : days) {
+            if ("USD".equals(d.asset())) {
+                count += d.entries();
+            }
+        }
+        return count;
     }
 
     @Test

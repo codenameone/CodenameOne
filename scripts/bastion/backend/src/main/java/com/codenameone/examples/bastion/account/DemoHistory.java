@@ -153,7 +153,9 @@ final class DemoHistory {
             }
             for (int i = 0; i < tape.size(); i++) {
                 Market m = tape.get(i);
-                int count = 10 + random.nextInt(10);
+                // The last two days trade densely, so that every hour of the
+                // exchange's 24-hour candles has an open, a close and a range.
+                int count = d >= days - 2 ? 140 + random.nextInt(40) : 10 + random.nextInt(10);
                 for (int t = 0; t < count; t++) {
                     // A mean-reverting random walk around the index price.
                     long index = m.getIndexPrice();
