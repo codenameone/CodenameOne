@@ -443,12 +443,13 @@ public class Initializr extends Lifecycle {
         ButtonGroup group = new ButtonGroup();
         Template[] languages = fullStack
                 ? new Template[] {Template.BAREBONES, Template.KOTLIN, Template.WAYLINE, Template.SAVOR,
-                    Template.SKIRMISH, Template.PARLEY}
+                    Template.SKIRMISH, Template.PARLEY, Template.REEL}
                 : new Template[] {Template.BAREBONES, Template.KOTLIN};
         String[] labels = fullStack
                 ? new String[] {"Empty app, Java", "Empty app, Kotlin", "Ride-hailing app with its server, Java",
                     "Food delivery app with its server, Java",
-                    "Card battle game with its server, Java", "Messaging app with its server, Java"}
+                    "Card battle game with its server, Java", "Messaging app with its server, Java",
+                    "Video streaming service with its server, Java"}
                 : new String[] {"Java", "Kotlin"};
         for (int i = 0; i < languages.length; i++) {
             final Template template = languages[i];
@@ -1180,6 +1181,7 @@ public class Initializr extends Lifecycle {
                 + "Package  " + safePackage + "\n"
                 + (template == Template.SKIRMISH ? "Template CARD-BATTLE GAME + SERVER\n"
                 : template == Template.PARLEY ? "Template MESSAGING APP + SERVER\n"
+                : template == Template.REEL ? "Template VIDEO STREAMING + SERVER\n"
                 : template == Template.SAVOR ? "Template FOOD-DELIVERY APP + SERVER\n"
                         : template.isFullStack() ? "Template RIDE-HAILING APP + SERVER\n" : "")
                 + "Language " + (template.IS_KOTLIN ? "KOTLIN" : "JAVA") + "\n"

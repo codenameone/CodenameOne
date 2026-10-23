@@ -374,6 +374,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                                         String packageName, String mainClassName, String label) throws IOException {
         boolean rides = template == Template.WAYLINE;
         boolean game = template == Template.SKIRMISH;
+        boolean video = template == Template.REEL;
         String name = template.SOURCE_MAIN_CLASS;
         String upper = template.name();
         String lower = GeneratorModel.toLowerCaseInvariant(name);
@@ -388,12 +389,13 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         // project once got the ride-hailing accounts and chapters.
         String readme = getText(entries, "README.md");
         boolean chat = template == Template.PARLEY;
-        assertContains(readme, game ? "card battler" : rides ? "ride-hailing app" : chat ? "messaging app" : "food-delivery app",
+        assertContains(readme, game ? "card battler" : rides ? "ride-hailing app" : chat ? "messaging app"
+                : video ? "video streaming service" : "food-delivery app",
                 label + "README names the app");
         if (!game) {
-            assertContains(readme, (rides ? "`rider@" : chat ? "`alice@" : "`customer@") + artifact + ".example`",
+            assertContains(readme, (rides ? "`rider@" : chat ? "`alice@" : video ? "`viewer@" : "`customer@") + artifact + ".example`",
                     label + "README lists the template's own demo accounts");
-            assertFalse(readme.indexOf(rides || chat ? "courier@" : "rider@") >= 0,
+            assertFalse(readme.indexOf(rides || chat || video ? "courier@" : "rider@") >= 0,
                     label + "README carries no other template's accounts");
             assertFalse(chat && readme.indexOf("rider@") >= 0, label + "README carries no ride-hailing accounts");
         }
@@ -414,15 +416,15 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertContains(getText(entries, "backend/pom.xml"), "<goal>generate-annotation-stubs</goal>",
                 label + "the server generates its half of the contract");
 
-        assertContains(getText(entries, "shared/src/main/java/" + packagePath + (game ? "/api/AccountApi.java" : rides ? "/api/RiderApi.java" : chat ? "/api/MessageApi.java" : "/api/OrderApi.java")),
+        assertContains(getText(entries, "shared/src/main/java/" + packagePath + (game ? "/api/AccountApi.java" : rides ? "/api/RiderApi.java" : chat ? "/api/MessageApi.java" : video ? "/api/CatalogApi.java" : "/api/OrderApi.java")),
                 "package " + packageName + ".api;", label + "the contract moves to the project's package");
         assertContains(getText(entries, "backend/src/main/java/" + packagePath + "/SecurityConfig.java"),
                 "package " + packageName + ";", label + "the server moves to the project's package");
         assertNotNull(entries.get("backend/src/main/resources/db/migration/" + (game ? "V1__game.sql" : "V1__accounts.sql")),
                 label + "the server keeps its migrations");
-        assertNotNull(entries.get("backend/src/test/java/" + packagePath + (game ? "/GameSocketTest.java" : rides ? "/RideFlowTest.java" : chat ? "/MessagingTest.java" : "/OrderFlowTest.java")),
+        assertNotNull(entries.get("backend/src/test/java/" + packagePath + (game ? "/GameSocketTest.java" : rides ? "/RideFlowTest.java" : chat ? "/MessagingTest.java" : video ? "/PlaybackTest.java" : "/OrderFlowTest.java")),
                 label + "the server keeps its tests");
-        assertNotNull(entries.get("common/src/main/java/" + packagePath + (game ? "/ui/HomeForm.java" : rides ? "/rider/RiderForm.java" : chat ? "/ui/ChatForm.java" : "/customer/CustomerForm.java")),
+        assertNotNull(entries.get("common/src/main/java/" + packagePath + (game ? "/ui/HomeForm.java" : rides ? "/rider/RiderForm.java" : chat ? "/ui/ChatForm.java" : video ? "/ui/WelcomeForm.java" : "/customer/CustomerForm.java")),
                 label + "the app's screens move to the project's package");
         if (!game) {
             assertNotNull(entries.get("common/src/main/l10n/Bundle.properties"), label + "the app keeps its bundle");

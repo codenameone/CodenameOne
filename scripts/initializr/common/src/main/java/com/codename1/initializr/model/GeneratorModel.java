@@ -92,11 +92,17 @@ public class GeneratorModel {
     /// The messaging template's `--brand`, held to its theme.css the same way.
     public static final int PARLEY_BRAND = 0x0a7d6b;
 
+    /// The streaming template's `--brand`, held to its theme.css the same way.
+    public static final int REEL_BRAND = 0xd93a42;
+
     /// The brand colour `template` ships with: the one its icon is painted with
     /// when the developer keeps the template's own scheme.
     public static int brandOf(Template template) {
         if (template == Template.PARLEY) {
             return PARLEY_BRAND;
+        }
+        if (template == Template.REEL) {
+            return REEL_BRAND;
         }
         return template == Template.SAVOR ? SAVOR_BRAND
                 : template == Template.SKIRMISH ? SKIRMISH_BRAND : FULL_STACK_BRAND;
@@ -1989,9 +1995,13 @@ public class GeneratorModel {
         } else if (template.isFullStack()) {
             boolean food = template == Template.SAVOR;
             boolean chat = template == Template.PARLEY;
+            boolean video = template == Template.REEL;
             String lower = toLowerCaseInvariant(appName);
             out.append("## The app and its server\n\n")
-                    .append(chat
+                    .append(video
+                            ? "This project is a working video streaming service: a viewer, a creator studio, "
+                            + "moderation and an admin console in one "
+                            : chat
                             ? "This project is a working messaging app: chats, groups, media, calls and an admin "
                             + "console in one "
                             : food
@@ -2001,7 +2011,11 @@ public class GeneratorModel {
                     .append("app, chosen by the role of whoever signs in, and the server they talk to.\n\n")
                     .append("- `shared/` is the contract: the REST interfaces and the objects they carry. The app's ")
                     .append("client and the server's dispatcher are both generated from it, so the two cannot drift.\n")
-                    .append(chat
+                    .append(video
+                            ? "- `backend/` is the server: accounts and profiles, the catalog, playback and "
+                            + "licences, subscriptions and payments, uploads, moderation, the live channel and "
+                            + "the database migrations.\n"
+                            : chat
                             ? "- `backend/` is the server: accounts and devices, contacts, conversations and "
                             + "messages, media, calls, the live channel and the database migrations.\n"
                             : food
@@ -2019,7 +2033,11 @@ public class GeneratorModel {
                     .append("with `mvnw.cmd`, or use a Unix shell such as Git Bash or WSL.\n\n")
                     .append("On the `dev` profile the server creates demonstration accounts, all with the ")
                     .append("password `").append(lower).append("-demo`: ")
-                    .append(chat
+                    .append(video
+                            ? "`viewer@" + lower + ".example`, `viewer2@" + lower + ".example`, `creator@" + lower
+                            + ".example`, who uploads the catalog, `moderator@" + lower + ".example`, `admin@"
+                            + lower + ".example` and `viewer3@" + lower + ".example`, who has been flagged "
+                            : chat
                             ? "`alice@" + lower + ".example`, `bob@" + lower + ".example`, `carol@" + lower
                             + ".example` and `dan@" + lower + ".example`, who already share chats and a group, "
                             + "`admin@" + lower + ".example`, who sees the console, and `mallory@" + lower
@@ -2030,7 +2048,7 @@ public class GeneratorModel {
                             + ".example` and `applicant@" + lower + ".example`, who has applied to deliver "
                             : "`rider@" + lower + ".example`, `driver@" + lower + ".example`, `admin@" + lower
                             + ".example` and `applicant@" + lower + ".example`, who has applied to drive ")
-                    .append(chat ? "for the admin to act on. " : "and waits for the admin's decision. ")
+                    .append(chat || video ? "for the admin to act on. " : "and waits for the admin's decision. ")
                     .append("Verification codes are written to the server's log until an SMS provider is ")
                     .append(chat
                             ? "configured. Calls use a public STUN server until the server is given a TURN "
