@@ -13,16 +13,14 @@ The server runs on the JVM with an in-memory database and demo accounts, with no
 
 [source,bash]
 ----
-cd scripts/bastion
-CN1_PROFILE=dev backend/server.sh run
+include::../demos/common/src/main/snippets/developer-guide/bastion.sh[tag=bastion-sh-users-1,indent=0]
 ----
 
 The app then runs in the simulator from another terminal:
 
 [source,bash]
 ----
-cd scripts/bastion
-mvn verify -Psimulator -DskipTests -Dcodename1.platform=javase
+include::../demos/common/src/main/snippets/developer-guide/bastion.sh[tag=bastion-sh-users-2,indent=0]
 ----
 
 `CN1_PROFILE=dev backend/server.sh run --web` also builds the app for the browser and serves it at the server's own address, `http://localhost:8080/`. The screenshots in this chapter come from that browser build, at a phone's width.
