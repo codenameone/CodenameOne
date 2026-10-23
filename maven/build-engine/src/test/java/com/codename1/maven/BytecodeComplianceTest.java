@@ -137,6 +137,30 @@ class BytecodeComplianceTest {
     }
 
     @Test
+    void classesTheProcessorIsAboutToRegenerateAreNotChecked(@TempDir Path tempDir) throws Exception {
+        // bytecode-compliance runs before process-annotations, so a generated class
+        // left by the previous build is stale and replaced moments later.
+        Path outputDir = tempDir.resolve("classes");
+        Files.createDirectories(outputDir);
+        writeClass(outputDir, "app/StaleMapper", "forbidden/Api", "m", "()V");
+        Files.write(AnnotationProcessing.generatedList(outputDir.toFile()).toPath(),
+                "app/StaleMapper\n"
+                        .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        Path runtimeDir = tempDir.resolve("runtime");
+        Files.createDirectories(runtimeDir);
+        writeJavaLangObject(runtimeDir);
+
+        BytecodeCompliance mojo = new BytecodeCompliance(TestProjectHost.empty());
+        java.lang.reflect.Method load = BytecodeCompliance.class.getDeclaredMethod("regeneratedClasses", java.io.File.class);
+        load.setAccessible(true);
+        java.lang.reflect.Field f = BytecodeCompliance.class.getDeclaredField("regenerated");
+        f.setAccessible(true);
+        f.set(mojo, load.invoke(null, outputDir.toFile()));
+        Map<String, ?> runtimeIndex = buildClassIndex(mojo, Collections.singletonList(runtimeDir.toFile()));
+        assertEquals(0, scanProjectClasses(mojo, outputDir, runtimeIndex, Collections.<String, Object>emptyMap()).size());
+    }
+
+    @Test
     void allowsMethodReferenceWhenPresentInAllowedApiIndex(@TempDir Path tempDir) throws Exception {
         Path outputDir = tempDir.resolve("classes");
         Path allowedDir = tempDir.resolve("allowed");

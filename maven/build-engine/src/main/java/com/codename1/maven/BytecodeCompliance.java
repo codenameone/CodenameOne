@@ -328,6 +328,7 @@ public class BytecodeCompliance {
         beforeCheck();
 
         File outputDir = new File(host.outputDirectory().getPath());
+        regenerated = regeneratedClasses(outputDir);
         if (!outputDir.isDirectory()) {
             writeComplianceSuccess("No output classes found for compliance check in " + outputDir.getAbsolutePath(), 0);
             return;
@@ -1090,12 +1091,41 @@ public class BytecodeCompliance {
         return sort == Type.OBJECT || sort == Type.ARRAY;
     }
 
+    /// Class files under the output that the annotation processors wrote on
+    /// the last build and will write again after this check
+    /// ([AnnotationProcessing#generatedList(File)]). A clean build checks none
+    /// of them, as they do not exist yet; an incremental one used to check
+    /// last build's copies, and fail on a stale mapper that still called the
+    /// old constructor of a shared record that has since changed.
+    private Set<String> regenerated = Collections.emptySet();
+
+    private static Set<String> regeneratedClasses(File outputDir) {
+        File list = AnnotationProcessing.generatedList(outputDir);
+        if (!list.isFile()) {
+            return Collections.emptySet();
+        }
+        Set<String> out = new HashSet<String>();
+        try {
+            for (String line : FileUtils.readLines(list, "UTF-8")) {
+                String name = line.trim();
+                if (name.length() > 0) {
+                    out.add(new File(outputDir, name + ".class").getAbsolutePath());
+                }
+            }
+        } catch (IOException unreadable) {
+            return Collections.emptySet();
+        }
+        return out;
+    }
+
     private void collectClassFiles(File file, List<File> out) {
         if (file == null || !file.exists()) {
             return;
         }
         if (file.isFile() && file.getName().endsWith(".class")) {
-            out.add(file);
+            if (!regenerated.contains(file.getAbsolutePath())) {
+                out.add(file);
+            }
             return;
         }
         if (file.isDirectory()) {
