@@ -60,6 +60,7 @@ const note = line => fs.appendFileSync(logFile, line + '\n');
 const say = line => { console.log('[bastion-web] ' + line); note('# ' + line); };
 
 const origin = new URL(url).origin;
+let serverDate = null;      // the last Date header the server sent
 const requests = [];       // "200 POST /login", in order
 const problems = [];       // anything that must not happen
 const sockets = [];        // { url, frames: [...] }
@@ -123,6 +124,11 @@ page.on('response', response => {
   }
   const line = `${response.status()} ${response.request().method()} ${at.pathname}`;
   requests.push(line);
+  // The server's clock, to show skew when a code is refused.
+  const date = response.headers()['date'];
+  if (date) {
+    serverDate = { date, seen: Date.now() };
+  }
   // The query says where a list was asked for; it holds no secrets (a token
   // travels in a header).
   note('NET ' + line + (at.pathname.startsWith('/api/') ? at.search : ''));
@@ -288,6 +294,71 @@ function totp(secret, step) {
   return String((mac.readUInt32BE(at) & 0x7fffffff) % 1000000).padStart(6, '0');
 }
 const step = () => Math.floor(Date.now() / 30000);
+
+/// 20 random bytes, as TotpService makes them: 32 base32 characters.
+const SECRET_LENGTH = 32;
+const validSecret = s => typeof s === 'string' && s.length === SECRET_LENGTH
+    && /^[A-Z2-7]+$/.test(s);
+
+/// What a refused code needs to explain itself, never the secret: its length
+/// and a hash prefix (to tell two scrapes apart), the steps on both clocks
+/// and the requests the code went out with.
+async function codeDiagnostics(where, secret, usedStep) {
+  const fingerprint = crypto.createHash('sha256').update(secret).digest('hex').slice(0, 8);
+  let server = 'unknown';
+  try {
+    const head = await fetch(url, { method: 'HEAD' });
+    const date = head.headers.get('date');
+    if (date) {
+      const skew = Date.parse(date) - Date.now();
+      server = `${date} (skew ~${Math.round(skew / 1000)}s, 1s resolution)`;
+    }
+  } catch (e) {
+    server = serverDate ? `${serverDate.date} (seen ${Date.now() - serverDate.seen}ms ago)`
+        : 'unreachable: ' + e;
+  }
+  say(`code refused at ${where}: test step ${usedStep}, step now ${step()}, `
+      + `ms into step ${Date.now() % 30000}, secret length ${secret.length} `
+      + `fingerprint ${fingerprint}, server time ${server}`);
+  say('last requests: ' + requests.slice(-12).join(', '));
+}
+
+/// The key on screen, re-read until it is a whole, valid secret: a label
+/// caught mid-layout or a different text matching the grouping is not one.
+async function scrapeSecret() {
+  let last = '';
+  const secret = await waitFor('a valid authenticator key', stepSeconds, async () => {
+    const texts = (await components()).map(c => (c.label || c.text || '').trim());
+    for (const text of texts) {
+      if (/^[A-Z2-7]{4}( [A-Z2-7]{1,4})+$/.test(text)) {
+        last = text.replace(/\s/g, '');
+        if (validSecret(last)) {
+          return last;
+        }
+      }
+    }
+    return null;
+  }).catch(e => {
+    throw new Error(`${e.message}; last candidate had ${last.length} characters`);
+  });
+  return secret;
+}
+
+/// Waits for the dashboard after a code, explaining a refusal if one shows.
+async function dashboardAfterCode(where, secret, usedStep) {
+  try {
+    await waitFor('the dashboard', stepSeconds, async () => {
+      const text = await screenText();
+      if (/not right|not the one your app shows/.test(text)) {
+        throw new Error('the code was refused');
+      }
+      return /Total balance/.test(text);
+    });
+  } catch (e) {
+    await codeDiagnostics(where, secret, usedStep);
+    throw e;
+  }
+}
 
 /// Fails on the dialog the app shows for an error nothing handled.
 async function noErrorDialog() {
@@ -646,14 +717,22 @@ try {
         /Confirm it is you/.test(await screenText()));
     await typeInto(0, password, 'password');
     await press('Continue');
-    const shown = await waitFor('the authenticator key', stepSeconds, async () =>
-        (await components()).map(c => c.label || c.text || '')
-            .find(text => /^[A-Z2-7]{4}( [A-Z2-7]{1,4})+$/.test(text.trim())));
-    const secret = shown.replace(/\s/g, '');
+    const secret = await scrapeSecret();
     await page.screenshot({ path: path.join(out, '2-authenticator.png') });
     const confirmedAt = step();
     await typeInto(0, totp(secret, confirmedAt), 'any');
     await press('Turn on');
+    try {
+      await waitFor('the recovery codes', stepSeconds, async () => {
+        if (/not the one your app shows/.test(await screenText())) {
+          throw new Error('the enrolment code was refused');
+        }
+        return button('I have saved them')();
+      });
+    } catch (e) {
+      await codeDiagnostics('enrolment', secret, confirmedAt);
+      throw e;
+    }
     await press('I have saved them');
     say('turned the authenticator app on');
     // A passkey, made in the browser with the session the sign-in kept.
@@ -686,13 +765,13 @@ try {
     await waitFor('the code screen', stepSeconds, button('Continue'));
     // The step the code was confirmed in is used up; wait for the next one.
     await waitFor('a new code', 35, async () => step() > confirmedAt);
-    await typeInto(0, totp(secret, step()), 'any');
+    const signInStep = step();
+    await typeInto(0, totp(secret, signInStep), 'any');
     await page.mouse.click(210, 8);
     await settled();
     await page.screenshot({ path: path.join(out, '3-code.png') });
     await press('Continue');
-    await waitFor('the dashboard', stepSeconds, async () =>
-        /Total balance/.test(await screenText()));
+    await dashboardAfterCode('sign-in', secret, signInStep);
     await noErrorDialog();
     await page.screenshot({ path: path.join(out, '3-home.png') });
     say('signed in with the password and a code');

@@ -34,6 +34,7 @@ import com.codenameone.examples.bastion.ledger.AccountKinds;
 import com.codenameone.examples.bastion.ledger.Leg;
 import com.codenameone.examples.bastion.ledger.Ledger;
 import com.codenameone.examples.bastion.repository.LedgerAccountRepository;
+import com.codenameone.examples.bastion.repository.ProfileRepository;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -64,16 +65,18 @@ public class Approvals {
     private final Books books;
     private final Audit audit;
     private final LedgerAccountRepository accounts;
+    private final ProfileRepository profiles;
     private final long threshold;
 
     public Approvals(DataSource db, Ledger ledger, Books books, Audit audit,
-            LedgerAccountRepository accounts,
+            LedgerAccountRepository accounts, ProfileRepository profiles,
             @Value("${bastion.approval.threshold-usd-cents:100000}") String threshold) {
         this.db = db;
         this.ledger = ledger;
         this.books = books;
         this.audit = audit;
         this.accounts = accounts;
+        this.profiles = profiles;
         this.threshold = Long.parseLong(threshold.trim());
     }
 
@@ -84,6 +87,7 @@ public class Approvals {
     @Transactional(rollbackFor = Exception.class)
     public ApprovalDto adjust(String maker, String idempotencyKey, String accountId, long amount,
             String memo) throws IOException {
+        boolean known = holdMaker(maker);
         String key = Ledger.clientKey(maker, idempotencyKey);
         LedgerAccount account = accountId == null ? null : accounts.findById(accountId);
         // Customer money only, and never an order's escrow: the bank's own
@@ -104,13 +108,14 @@ public class Approvals {
             return earlier;
         }
         long usd = books.priced(account.getAsset(), amount < 0 ? -amount : amount);
-        return create(ADJUSTMENT, maker, accountId, "", account.getAsset(), amount, usd,
+        return create(known, ADJUSTMENT, maker, accountId, "", account.getAsset(), amount, usd,
                 clip(memo), key);
     }
 
     @Transactional(rollbackFor = Exception.class)
     public ApprovalDto reverse(String maker, String idempotencyKey, String entryId, String memo)
             throws IOException {
+        boolean known = holdMaker(maker);
         String key = Ledger.clientKey(maker, idempotencyKey);
         JournalEntryDto entry = books.entry(entryId);
         if (Ledger.REVERSAL.equals(entry.kind()) || Ledger.CLOSING.equals(entry.kind())) {
@@ -137,7 +142,7 @@ public class Approvals {
                 asset = asset.length() == 0 ? leg.asset() : asset;
             }
         }
-        return create(REVERSAL, maker, "", entryId, asset, 0L, usd, clip(memo), key);
+        return create(known, REVERSAL, maker, "", entryId, asset, 0L, usd, clip(memo), key);
     }
 
     /// Not transactional on purpose: a maker approving their own request is
@@ -208,8 +213,21 @@ public class Approvals {
         return dto(rows.get(0));
     }
 
-    private ApprovalDto create(String kind, String maker, String accountId, String entryId,
-            String asset, long amount, long usd, String memo, String key) throws IOException {
+    /// Serializes one maker's requests: a no-op write of the maker's profile
+    /// row, like `ProfileRepository.hold` for password changes, locks it until
+    /// the transaction ends on SQLite, PostgreSQL and MySQL alike. Without it
+    /// N concurrent requests just under the threshold all read the same 24h
+    /// total and all post without a checker. Taken before the idempotency
+    /// lookup too, so two retries of one key cannot both insert.
+    /// Answers false when the maker has no profile, so nothing was locked;
+    /// [create] then fails closed and the request waits for a checker.
+    private boolean holdMaker(String maker) {
+        return maker != null && profiles.hold(maker) > 0;
+    }
+
+    private ApprovalDto create(boolean known, String kind, String maker, String accountId,
+            String entryId, String asset, long amount, long usd, String memo, String key)
+            throws IOException {
         String id = Ids.next();
         long now = System.currentTimeMillis();
         // Fail closed: a request that cannot be valued is not known to be
@@ -226,7 +244,7 @@ public class Approvals {
                 + "AND status = ? AND checker = ? AND created_at > ?", new Object[] {maker,
                     EXECUTED, "", Long.valueOf(now - Books.DAY)}), "t"));
         // Subtracted, not added: a value saturates at Long.MAX_VALUE.
-        boolean waits = unpriced || usd > threshold - recent;
+        boolean waits = !known || unpriced || usd > threshold - recent;
         db.execute("INSERT INTO approval (id, kind, status, maker, checker, account_id, entry_id, "
                 + "asset, amount, usd_cents, memo, request_key, result_entry, created_at, "
                 + "decided_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -235,7 +253,8 @@ public class Approvals {
                     Long.valueOf(now), Long.valueOf(waits ? 0L : now)});
         ApprovalDto a = get(id);
         if (waits) {
-            audit.append(maker, kind + "_REQUESTED", id, describe(a) + (unpriced ? ", unpriced"
+            audit.append(maker, kind + "_REQUESTED", id, describe(a) + (!known ? ", maker has no profile"
+                    : unpriced ? ", unpriced"
                     : recent > 0 ? ", " + recent + " USD cents posted without a checker in 24h"
                     : "") + ", waits for a second administrator");
             return a;

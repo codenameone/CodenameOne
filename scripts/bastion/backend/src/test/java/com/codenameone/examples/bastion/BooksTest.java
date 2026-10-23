@@ -52,6 +52,7 @@ import com.codenameone.examples.bastion.ledger.Ledger;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -93,6 +94,13 @@ class BooksTest {
         ledger.post(key(), "DEPOSIT", owner, "seed", Arrays.asList(
                 new Leg(cash.getId(), -cents), new Leg(account.getId(), cents)));
         return account;
+    }
+
+    /// A maker is an account with a profile; one without waits for a checker.
+    private String maker(String username) throws Exception {
+        db.execute("INSERT INTO profile (username, display_name, created_at) VALUES (?, ?, ?)",
+                new Object[] {username, username, Long.valueOf(System.currentTimeMillis())});
+        return username;
     }
 
     private long balance(LedgerAccount a) throws Exception {
@@ -365,7 +373,7 @@ class BooksTest {
         LedgerAccount coin = ledger.open("books-u1", "TSTU", AccountKinds.WALLET, "Coins");
         // No market prices TSTU: the request cannot be valued, so it is not
         // known to be small, and waits.
-        ApprovalDto a = approvals.adjust("books-admin-u", key(), coin.getId(), 1L, "unpriced");
+        ApprovalDto a = approvals.adjust(maker("books-admin-u"), key(), coin.getId(), 1L, "unpriced");
         assertEquals(Approvals.PENDING, a.status());
         List<Map> rows = books.rows("SELECT detail FROM audit_event WHERE subject = ?",
                 new Object[] {a.id()});
@@ -376,15 +384,57 @@ class BooksTest {
     void splittingAnAdjustmentUnderTheThresholdStillNeedsAChecker() throws Exception {
         LedgerAccount target = funded("books-s1", 100);
         long under = approvals.threshold() - 1;
+        String admin = maker("books-admin-s");
         int executed = 0;
         for (int i = 0; i < 10; i++) {
-            ApprovalDto a = approvals.adjust("books-admin-s", key(), target.getId(), under,
+            ApprovalDto a = approvals.adjust(admin, key(), target.getId(), under,
                     "split " + i);
             executed += Approvals.EXECUTED.equals(a.status()) ? 1 : 0;
         }
         // The first fits the threshold; the rest add up past it in 24 hours.
         assertEquals(1, executed);
         assertEquals(100 + under, balance(target));
+    }
+
+    @Test
+    void concurrentSplitAdjustmentsStillNeedAChecker() throws Exception {
+        final LedgerAccount target = funded("books-c1", 100);
+        final long under = approvals.threshold() - 1;
+        final String admin = maker("books-admin-c");
+        final AtomicInteger executed = new AtomicInteger();
+        final AtomicInteger answered = new AtomicInteger();
+        Runnable[] calls = new Runnable[8];
+        for (int iter = 0; iter < calls.length; iter++) {
+            final int n = iter;
+            calls[iter] = () -> {
+                try {
+                    ApprovalDto a = approvals.adjust(admin, key(), target.getId(), under,
+                            "race " + n);
+                    answered.incrementAndGet();
+                    if (Approvals.EXECUTED.equals(a.status())) {
+                        executed.incrementAndGet();
+                    }
+                } catch (Exception busy) {
+                    // A busy database rolls the request back: nothing posted,
+                    // which the balance below confirms.
+                }
+            };
+        }
+        Race.together(calls);
+        // Each one read the 24h total under the maker's lock, so at most one
+        // threshold's worth posted without a checker.
+        assertTrue(answered.get() > 0, "no request was answered");
+        assertTrue(executed.get() <= 1, executed.get() + " posted without a checker");
+        assertEquals(100 + under * executed.get(), balance(target));
+        assertEquals(executed.get(), books.rows("SELECT id FROM approval WHERE maker = ? "
+                + "AND status = ?", new Object[] {admin, Approvals.EXECUTED}).size());
+    }
+
+    @Test
+    void aMakerWithNoProfileWaitsForAChecker() throws Exception {
+        LedgerAccount target = funded("books-n1", 100);
+        ApprovalDto a = approvals.adjust("books-admin-none", key(), target.getId(), 1L, "x");
+        assertEquals(Approvals.PENDING, a.status());
     }
 
     @Test
