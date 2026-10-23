@@ -416,9 +416,22 @@ public final class ClassRelocator {
     /// What an earlier build copied from this runtime and this one did not
     /// -- a class a newer version of the runtime no longer has -- is
     /// removed: see [#runtimeRecord].
+    ///
+    /// `jar` may also be the runtime module's classes directory: what a
+    /// reactor build resolves the dependency to before the jar is packaged
+    /// (`mvn test` over several modules).
     public int extractRuntime(File jar, File classesDir) throws IOException {
         int count = 0;
         Map<String, String> copied = new TreeMap<String, String>();
+        if (jar.isDirectory()) {
+            Map<String, File> entries = new TreeMap<String, File>();
+            listEntries(jar, "", entries);
+            for (Map.Entry<String, File> e : entries.entrySet()) {
+                count += copyEntry(jar, classesDir, e.getKey(), Files.readAllBytes(e.getValue().toPath()), copied);
+            }
+            forgetStale(jar, classesDir, copied);
+            return count;
+        }
         ZipFile zip = new ZipFile(jar);
         try {
             Enumeration<? extends ZipEntry> en = zip.entries();
@@ -428,26 +441,58 @@ public final class ClassRelocator {
                 if (e.isDirectory() || name.startsWith("META-INF/") || generated.contains(name)) {
                     continue;
                 }
-                byte[] data = read(zip.getInputStream(e));
-                String path = name;
-                if (name.endsWith(".class")) {
-                    String cls = name.substring(0, name.length() - ".class".length());
-                    path = map(cls) + ".class";
-                    data = remap(data);
-                    count++;
-                }
-                // Resource tables and assets are compared byte for byte
-                // too: a rebuilt table routinely keeps its length while
-                // its contents change, and a length check alone kept the
-                // previous runtime's copy.
-                writeIfDifferent(inside(classesDir, jar, new File(classesDir, path), name), data);
-                copied.put(path, checksum(data));
+                count += copyEntry(jar, classesDir, name, read(zip.getInputStream(e)), copied);
             }
         } finally {
             zip.close();
         }
         forgetStale(jar, classesDir, copied);
         return count;
+    }
+
+    /// Copies one runtime entry, relocated if it is a class; answers 1 for a
+    /// class and 0 for anything else.
+    private int copyEntry(File jar, File classesDir, String name, byte[] data, Map<String, String> copied)
+            throws IOException {
+        String path = name;
+        int count = 0;
+        if (name.endsWith(".class")) {
+            String cls = name.substring(0, name.length() - ".class".length());
+            path = map(cls) + ".class";
+            data = remap(data);
+            count = 1;
+        }
+        // Resource tables and assets are compared byte for byte too: a
+        // rebuilt table routinely keeps its length while its contents change,
+        // and a length check alone kept the previous runtime's copy.
+        writeIfDifferent(inside(classesDir, jar, new File(classesDir, path), name), data);
+        copied.put(path, checksum(data));
+        return count;
+    }
+
+    /// What a runtime module compiles but leaves out of its jar: the
+    /// desktop runtime compiles against a copy of the class library's
+    /// `com.codename1.impl.JdkHost`, and its pom excludes `com/codename1/impl/**`
+    /// from the jar. Its classes directory still holds the copy.
+    private static final String UNPACKAGED_PREFIX = "com/codename1/impl/";
+
+    /// Every file under `dir` by its entry name, skipping what a jar's
+    /// extraction skips and what the module's jar leaves out.
+    private void listEntries(File dir, String prefix, Map<String, File> out) {
+        File[] files = dir.listFiles();
+        if (files == null) {
+            return;
+        }
+        for (File f : files) {
+            String name = prefix + f.getName();
+            if (f.isDirectory()) {
+                if (!(prefix.length() == 0 && "META-INF".equals(f.getName()))) {
+                    listEntries(f, name + "/", out);
+                }
+            } else if (!generated.contains(name) && !name.startsWith(UNPACKAGED_PREFIX)) {
+                out.put(name, f);
+            }
+        }
     }
 
     /// Where the list of what [#extractRuntime] copied into `classesDir` is
@@ -488,7 +533,15 @@ public final class ClassRelocator {
 
     /// What names a runtime from one build to the next: its jar's file name
     /// without the version, which is what changes when the runtime does.
+    /// A classes directory is named by its path: every module's is `classes`.
     static String runtimeKey(File jar) {
+        if (jar.isDirectory()) {
+            try {
+                return jar.getCanonicalPath();
+            } catch (IOException e) {
+                return jar.getAbsolutePath();
+            }
+        }
         String name = jar.getName();
         if (name.endsWith(".jar")) {
             name = name.substring(0, name.length() - ".jar".length());

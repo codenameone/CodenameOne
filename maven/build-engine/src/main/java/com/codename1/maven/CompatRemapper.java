@@ -372,8 +372,13 @@ public final class CompatRemapper {
             }
             File f = new File(source.getLocation().toURI());
             // Only the module's own jar: a build that bundled it into a
-            // larger one would extract everything else with it.
-            return f.isFile() && f.getName().startsWith(CompatLayers.DESKTOP_RUNTIME + "-") ? f : null;
+            // larger one would extract everything else with it. Or the
+            // module's classes directory, which is what a reactor build that
+            // stops before packaging (`mvn test`) puts on the class path.
+            if (f.isFile()) {
+                return f.getName().startsWith(CompatLayers.DESKTOP_RUNTIME + "-") ? f : null;
+            }
+            return f.isDirectory() && new File(f, "com/codename1/desktopcompat/shared/ResourceNames.class").isFile() ? f : null;
         } catch (java.net.URISyntaxException e) {
             return null;
         } catch (SecurityException e) {
