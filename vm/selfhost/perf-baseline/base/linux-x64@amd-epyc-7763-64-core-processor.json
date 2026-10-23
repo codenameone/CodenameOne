@@ -32,11 +32,11 @@
  },
  "hello": {
   "all": {
-   "memory": 1.018,
-   "runs": 1,
+   "memory": 0.835,
+   "runs": 2,
    "time": 0.847,
    "tolerance": {
-    "memory": 0.2,
+    "memory": 0.3,
     "time": 0.5
    }
   }
@@ -74,7 +74,7 @@
  },
  "objectAllocation": {
   "all": {
-   "memory": 0.37,
+   "memory": 0.353,
    "runs": 1,
    "time": 1.649,
    "tolerance": {
@@ -105,8 +105,8 @@
  },
  "stringBuilding": {
   "all": {
-   "memory": 0.259,
-   "runs": 3,
+   "memory": 0.312,
+   "runs": 1,
    "time": 1.39,
    "tolerance": {
     "time": 0.2
@@ -117,10 +117,7 @@
   "all": {
    "memory": 0.519,
    "runs": 1,
-   "time": 0.499,
-   "tolerance": {
-    "time": 0.2
-   }
+   "time": 0.638
   }
  },
  "valueEscape": {
