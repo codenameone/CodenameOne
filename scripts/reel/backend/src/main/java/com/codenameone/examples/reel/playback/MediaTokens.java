@@ -44,6 +44,8 @@ import java.io.IOException;
 public class MediaTokens {
     public static final String MEDIA = "reel-media";
     public static final String LICENSE = "reel-license";
+    public static final String PROFILE = "reel-profile";
+    public static final long PROFILE_SECONDS = 12L * 3600L;
     /// How long a streaming token lives. Longer than any title; a session that
     /// ends sooner is refused by the origin's session check, not by expiry.
     public static final long STREAM_SECONDS = 6L * 3600L;
@@ -89,6 +91,18 @@ public class MediaTokens {
 
     public String license(String kind, String owner, String videoId, long ttlSeconds) {
         return tokens.create(LICENSE, subject(kind, owner, videoId, 0), ttlSeconds);
+    }
+
+    /// The key [com.codenameone.examples.reel.account.Households#unlock] hands
+    /// out: proof the PIN of one profile was given, good for half a day.
+    public String profile(String username, String profileId) {
+        return tokens.create(PROFILE, username + "\n" + profileId, PROFILE_SECONDS);
+    }
+
+    /// Whether `token` is a live profile key for this account and profile.
+    public boolean verifyProfile(String token, String username, String profileId) {
+        String subject = token == null || token.length() == 0 ? null : tokens.verify(PROFILE, token);
+        return subject != null && subject.equals(username + "\n" + profileId);
     }
 
     /// The grant a media token carries, or null for one that is forged,

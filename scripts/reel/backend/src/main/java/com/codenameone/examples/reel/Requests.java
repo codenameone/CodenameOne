@@ -31,6 +31,7 @@ public final class Requests {
     public static final String DEVICE = "X-Reel-Device";
     public static final String DEVICE_NAME = "X-Reel-Device-Name";
     public static final String PLATFORM = "X-Reel-Platform";
+    public static final String PROFILE_KEY = "X-Reel-Profile-Key";
 
     private Requests() {
     }

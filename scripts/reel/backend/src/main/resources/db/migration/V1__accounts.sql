@@ -53,7 +53,8 @@ CREATE TABLE device (
     last_country VARCHAR(8) NOT NULL,
     last_seen_at BIGINT NOT NULL,
     created_at BIGINT NOT NULL,
-    revoked_at BIGINT NOT NULL
+    revoked_at BIGINT NOT NULL,
+    grant_id VARCHAR(190) NOT NULL
 );
 CREATE INDEX device_username ON device (username);
 

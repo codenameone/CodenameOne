@@ -194,6 +194,12 @@ public class Playbacks {
         }
         List<String> wanted = request.schemes() == null ? new ArrayList<String>() : request.schemes();
         String scheme = licenses.choose(wanted, Rows.split(video.getSchemes()));
+        if (!Licenses.AES_128.equals(scheme) && !Licenses.FAIRPLAY.equals(scheme)
+                && Licenses.cencHeight(video.getRenditions()) > maxHeight) {
+            // cenc.mp4 is a single quality above this viewer's cap; the HLS
+            // ladder can be filtered down to it.
+            scheme = Licenses.AES_128;
+        }
 
         Playback session = new Playback();
         session.setId(Ids.next());
@@ -321,7 +327,9 @@ public class Playbacks {
         }
     }
 
-    /// Ends every stream of an account (suspension, closing it).
+    /// Ends every stream of an account (suspension, sharing enforcement) and
+    /// withdraws its offline licenses: a download is a stream that outlives
+    /// the session, and must not outlive the reason the sessions ended.
     @Transactional
     public int endAll(String username, String reason) {
         List<Playback> live = sessions.findByUsernameAndEndedAt(username, 0L);
@@ -329,6 +337,7 @@ public class Playbacks {
         for (int iter = 0; iter < live.size(); iter++) {
             end(live.get(iter), reason, now);
         }
+        downloads.deleteByUsername(username);
         return live.size();
     }
 
@@ -369,7 +378,8 @@ public class Playbacks {
     public boolean isLive(MediaTokens.Grant grant) {
         if (grant.isDownload()) {
             Download d = downloads.findById(grant.owner);
-            return d != null && d.getLicenseExpiresAt() > System.currentTimeMillis();
+            return d != null && d.getLicenseExpiresAt() > System.currentTimeMillis()
+                    && devices.usable(d.getUsername(), d.getDeviceId());
         }
         Playback p = sessions.findById(grant.owner);
         return p != null && p.getEndedAt() == 0;

@@ -76,8 +76,8 @@ public class LibraryEndpoint implements LibraryApiServer {
     }
 
     @Override
-    public DownloadDto download(String titleId, String device, String episode) throws Exception {
-        return library.download(Caller.name(), titleId, device, episode);
+    public DownloadDto download(String titleId, String device, String episode, String profile) throws Exception {
+        return library.download(Caller.name(), titleId, device, episode, profile);
     }
 
     @Override

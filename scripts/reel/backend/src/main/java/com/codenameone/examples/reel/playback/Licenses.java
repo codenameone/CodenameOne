@@ -22,6 +22,7 @@ import com.codename1.backend.Base64Url;
 import com.codename1.backend.Json;
 import com.codename1.backend.annotations.Transactional;
 import com.codenameone.examples.reel.Ids;
+import com.codenameone.examples.reel.Rows;
 import com.codenameone.examples.reel.api.Features;
 import com.codenameone.examples.reel.domain.VideoKey;
 import com.codenameone.examples.reel.repository.VideoKeyRepository;
@@ -64,6 +65,28 @@ public final class Licenses {
         this.fairplay = fairplay;
     }
 
+    /// The height `cenc.mp4` is encoded at: the packager writes it from the
+    /// middle of its ladder sorted tallest first (`PackageJob`), whatever
+    /// order `renditions` lists them in. 0 when none are recorded, and above
+    /// every cap when one cannot be read, so a bad row fails closed.
+    public static int cencHeight(String renditions) {
+        List<String> listed = Rows.split(renditions);
+        int[] ladder = new int[listed.size()];
+        for (int iter = 0; iter < ladder.length; iter++) {
+            try {
+                ladder[iter] = Integer.parseInt(listed.get(iter).trim());
+            } catch (NumberFormatException e) {
+                return Integer.MAX_VALUE;
+            }
+        }
+        if (ladder.length == 0) {
+            return 0;
+        }
+        java.util.Arrays.sort(ladder);
+        // Ascending now; the packager's index size/2 counts from the tallest.
+        return ladder[ladder.length - 1 - ladder.length / 2];
+    }
+
     /// The scheme to serve: the first of `wanted` (the device's, strongest
     /// first) that the video was packaged for and this server can license.
     /// AES-128 when nothing matches, since every HLS player has it.
@@ -72,10 +95,10 @@ public final class Licenses {
         if (wanted != null) {
             for (int iter = 0; iter < wanted.size(); iter++) {
                 String scheme = wanted.get(iter);
-                if (WIDEVINE.equals(scheme) && hardware && widevine != null && packaged.contains(CLEARKEY)) {
+                if (WIDEVINE.equals(scheme) && hardware && widevine != null && packaged.contains(WIDEVINE)) {
                     return WIDEVINE;
                 }
-                if (FAIRPLAY.equals(scheme) && hardware && fairplay != null && packaged.contains(AES_128)) {
+                if (FAIRPLAY.equals(scheme) && hardware && fairplay != null && packaged.contains(FAIRPLAY)) {
                     return FAIRPLAY;
                 }
                 if (CLEARKEY.equals(scheme) && packaged.contains(CLEARKEY)) {

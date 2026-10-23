@@ -34,7 +34,9 @@ import com.codenameone.examples.reel.api.RentDto;
 import com.codenameone.examples.reel.api.RentalDto;
 import com.codenameone.examples.reel.api.SubscribeDto;
 import com.codenameone.examples.reel.api.SubscriptionDto;
+import com.codenameone.examples.reel.Kinds;
 import com.codenameone.examples.reel.domain.Coupon;
+import com.codenameone.examples.reel.domain.CouponRedemption;
 import com.codenameone.examples.reel.domain.Invoice;
 import com.codenameone.examples.reel.domain.Plan;
 import com.codenameone.examples.reel.domain.Rental;
@@ -42,6 +44,7 @@ import com.codenameone.examples.reel.domain.Subscription;
 import com.codenameone.examples.reel.domain.Title;
 import com.codenameone.examples.reel.pay.PaymentDeclinedException;
 import com.codenameone.examples.reel.pay.Payments;
+import com.codenameone.examples.reel.repository.CouponRedemptionRepository;
 import com.codenameone.examples.reel.repository.CouponRepository;
 import com.codenameone.examples.reel.repository.InvoiceRepository;
 import com.codenameone.examples.reel.repository.PlanRepository;
@@ -73,6 +76,9 @@ public class Billing {
     public static final String MONTH = "MONTH";
     public static final String YEAR = "YEAR";
     public static final int MAX_ATTEMPTS = 3;
+    /// How long after a declined renewal the card is tried again. Three
+    /// tries a day apart fit inside [Entitlements#GRACE_MILLIS].
+    public static final long RETRY_MILLIS = 86400000L;
     public static final long DAY = 86400000L;
     /// How long a rental plays once paid for.
     public static final long RENTAL_MILLIS = 2L * DAY;
@@ -85,6 +91,7 @@ public class Billing {
     private final SubscriptionRepository subscriptions;
     private final PlanRepository plans;
     private final CouponRepository coupons;
+    private final CouponRedemptionRepository redemptions;
     private final InvoiceRepository invoices;
     private final RentalRepository rentals;
     private final TitleRepository titles;
@@ -93,11 +100,13 @@ public class Billing {
     private final boolean trustReceipts;
 
     public Billing(SubscriptionRepository subscriptions, PlanRepository plans, CouponRepository coupons,
+            CouponRedemptionRepository redemptions,
             InvoiceRepository invoices, RentalRepository rentals, TitleRepository titles, Payments payments,
             Settings settings, @Value("${reel.billing.trust-store-receipts:false}") String trustReceipts) {
         this.subscriptions = subscriptions;
         this.plans = plans;
         this.coupons = coupons;
+        this.redemptions = redemptions;
         this.invoices = invoices;
         this.rentals = rentals;
         this.titles = titles;
@@ -193,6 +202,9 @@ public class Billing {
             if (why != null) {
                 throw new ResponseStatusException(400, why);
             }
+            if (redemptions.findById(CouponRedemption.key(coupon.getCode(), username)) != null) {
+                throw new ResponseStatusException(400, "You have already used this coupon");
+            }
         }
         String method = payments.choose(username, wanted.paymentMethodId())[0];
         if (Payments.CASH.equals(method) && plan.getPriceCents() > 0) {
@@ -218,6 +230,10 @@ public class Billing {
         if (coupon != null) {
             coupon.setRedemptions(coupon.getRedemptions() + 1);
             coupons.save(coupon);
+            CouponRedemption used = new CouponRedemption();
+            used.setId(CouponRedemption.key(coupon.getCode(), username));
+            used.setRedeemedAt(now);
+            redemptions.insert(used);
         }
         if (trial) {
             sub.setStatus(Entitlements.TRIALING);
@@ -340,6 +356,10 @@ public class Billing {
         if (Entitlements.CANCELED.equals(status) || Entitlements.NONE.equals(status)) {
             return;
         }
+        if (Entitlements.PAST_DUE.equals(status) && now < sub.getNextRetryAt()
+                && now <= sub.getPeriodEndsAt() + Entitlements.GRACE_MILLIS) {
+            return;
+        }
         if (sub.isCancelAtPeriodEnd() || sub.getStore().length() > 0) {
             // A store subscription renews in the store, which tells us with a
             // new receipt; without one the period simply ends.
@@ -372,6 +392,7 @@ public class Billing {
                 return;
             }
             sub.setStatus(Entitlements.PAST_DUE);
+            sub.setNextRetryAt(now + RETRY_MILLIS);
         }
         sub.setUpdatedAt(now);
         subscriptions.save(sub);
@@ -390,7 +411,8 @@ public class Billing {
     public RentalDto rent(String username, RentDto wanted) throws IOException {
         settings.require(Features.RENTALS);
         Title title = wanted == null || wanted.titleId() == null ? null : titles.findById(wanted.titleId());
-        if (title == null || !Entitlements.RENTAL.equals(title.getAccess())) {
+        if (title == null || !Entitlements.RENTAL.equals(title.getAccess())
+                || !Kinds.PUBLISHED.equals(title.getStatus())) {
             throw new ResponseStatusException(404, "This title is not for rent");
         }
         long now = System.currentTimeMillis();

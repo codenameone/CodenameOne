@@ -371,6 +371,10 @@ public class SecurityConfig {
                     new InMemoryRateLimiter(60, 60))
             // Every playback start mints tokens and may raise a sharing alert;
             // a person starts a few a minute at most.
+            // Profile PINs are four digits.
+            .rateLimit("/api/profiles/*/unlock",
+                    RateLimitKeys.firstOf(RateLimitKeys.principal(), RateLimitKeys.clientAddress()),
+                    new InMemoryRateLimiter(10, 900))
             .rateLimit("/api/playback/start",
                     RateLimitKeys.firstOf(RateLimitKeys.principal(), RateLimitKeys.clientAddress()),
                     new InMemoryRateLimiter(30, 60))

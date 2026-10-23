@@ -59,6 +59,9 @@ public class Subscription {
     @Column(nullable = false)
     private int failedAttempts;
 
+    @Column(nullable = false)
+    private long nextRetryAt;
+
     @Column(nullable = false, type = "VARCHAR(16)")
     private String store = "";
 
@@ -181,5 +184,13 @@ public class Subscription {
 
     public void setUpdatedAt(long updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public long getNextRetryAt() {
+        return nextRetryAt;
+    }
+
+    public void setNextRetryAt(long nextRetryAt) {
+        this.nextRetryAt = nextRetryAt;
     }
 }

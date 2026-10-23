@@ -100,6 +100,25 @@ public class Reviews {
         this.classifier = classifier;
     }
 
+    /// Sends a published title back through review after a change a viewer
+    /// would see (its text, a new or re-packaged video, chapters, questions):
+    /// approval covered what was approved, not whatever the title holds
+    /// later. An admin's own edit is trusted. Other states need nothing: a
+    /// draft is reviewed when it is submitted.
+    public void changed(Title title, boolean trusted) throws IOException {
+        if (title != null && Kinds.PUBLISHED.equals(title.getStatus()) && !trusted) {
+            title.setStatus(Kinds.IN_REVIEW);
+            titles.save(title);
+            submitted(title);
+        }
+    }
+
+    /// Closes the open submissions of a title its creator took back, so a
+    /// moderator working an old queue cannot republish it.
+    public void withdrawn(String titleId, String by) {
+        closeOthers(titleId, TITLE, by, DISMISS, System.currentTimeMillis());
+    }
+
     /// Queues a submitted title, with what the text checks found.
     @Transactional(rollbackFor = IOException.class)
     public void submitted(Title title) throws IOException {
@@ -237,8 +256,20 @@ public class Reviews {
         String note = cut(decision == null ? null : decision.note(), 500);
         long now = System.currentTimeMillis();
         String kind = item.getKind();
+        if ((TITLE.equals(kind) || APPEAL.equals(kind)) && DISMISS.equals(action)) {
+            // Closing a stale item changes nothing about the title.
+            items.save(close(item, action, by, note, now));
+            return dto(item);
+        }
         if (TITLE.equals(kind) || APPEAL.equals(kind)) {
             Title title = title(item.getSubjectId());
+            // The title may have moved on since this item was queued (taken
+            // back, removed after a report); deciding it then would undo that.
+            boolean current = TITLE.equals(kind) ? Kinds.IN_REVIEW.equals(title.getStatus())
+                    : Kinds.REJECTED.equals(title.getStatus()) || Kinds.REMOVED.equals(title.getStatus());
+            if (!current) {
+                throw new ResponseStatusException(409, "The title is " + title.getStatus() + " now; dismiss this item");
+            }
             if (APPROVE.equals(action)) {
                 if (hasBlockedVideo(title.getId())) {
                     throw new ResponseStatusException(409, "Clear the blocked video first");
@@ -285,14 +316,18 @@ public class Reviews {
                 throw new ResponseStatusException(400, "Approve or reject");
             }
         }
-        // Closed either way; the decision column says which way.
+        items.save(close(item, action, by, note, now));
+        return dto(item);
+    }
+
+    // Closed either way; the decision column says which way.
+    private static ModerationItem close(ModerationItem item, String action, String by, String note, long now) {
         item.setStatus(DISMISS.equals(action) ? Kinds.DISMISSED : Kinds.UPHELD);
         item.setDecision(action);
         item.setDecidedBy(by);
         item.setNote(note);
         item.setDecidedAt(now);
-        items.save(item);
-        return dto(item);
+        return item;
     }
 
     // ---------------------------------------------------------- blocklist
@@ -405,7 +440,7 @@ public class Reviews {
         for (int iter = 0; iter < open.size(); iter++) {
             ModerationItem m = open.get(iter);
             if (kind.equals(m.getKind())) {
-                m.setStatus(Kinds.UPHELD);
+                m.setStatus(DISMISS.equals(action) ? Kinds.DISMISSED : Kinds.UPHELD);
                 m.setDecision(action);
                 m.setDecidedBy(by);
                 m.setDecidedAt(now);

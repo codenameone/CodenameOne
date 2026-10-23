@@ -220,13 +220,17 @@ public class Library {
     /// Starts or renews a download. Renewing an existing download of the same
     /// video on the same device issues a fresh token for it.
     @Transactional(rollbackFor = IOException.class)
-    public DownloadDto download(String username, String titleId, String deviceId, String episodeId)
-            throws IOException {
+    public DownloadDto download(String username, String titleId, String deviceId, String episodeId,
+            String profileId) throws IOException {
         settings.require(Features.DOWNLOADS);
         if (deviceId == null || deviceId.length() == 0 || !devices.usable(username, deviceId)) {
             throw new ResponseStatusException(400, "Downloads need a signed-in device");
         }
         Title t = published(titleId);
+        Household profile = households.resolve(username, profileId);
+        if (!Households.allows(profile, t.getRating())) {
+            throw new ResponseStatusException(403, "Not available on this profile");
+        }
         boolean staff = Roles.isStaff() || t.getCreator().equals(username);
         Entitlements.Access access = entitlements.access(username, t, staff);
         if (!access.allowed) {
@@ -246,6 +250,10 @@ public class Library {
             if (mine.get(iter).getVideoId().equals(v.getId())) {
                 row = mine.get(iter);
             }
+        }
+        int maxHeight = Entitlements.maxHeight(staff ? "1080" : entitlements.allowance(username).maxQuality);
+        if (Licenses.cencHeight(v.getRenditions()) > maxHeight) {
+            throw new ResponseStatusException(403, "This title's download is above your plan's quality");
         }
         boolean fresh = row == null;
         if (fresh) {
@@ -268,7 +276,6 @@ public class Library {
         } else {
             downloads.save(row);
         }
-        int maxHeight = Entitlements.maxHeight(staff ? "1080" : entitlements.allowance(username).maxQuality);
         String media = tokens.media("d", row.getId(), v.getId(), maxHeight, ttl);
         String license = tokens.license("d", row.getId(), v.getId(), ttl);
         return dto(row, "/media/" + media + "/" + v.getId() + "/cenc.mp4", license);

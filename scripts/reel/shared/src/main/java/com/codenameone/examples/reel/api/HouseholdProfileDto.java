@@ -21,6 +21,9 @@ package com.codenameone.examples.reel.api;
 import com.codename1.annotations.Mapped;
 
 /// A viewer inside an account: its own list, history, recommendations and rating limit.
+///
+/// `key` is set only by an unlock: the app sends it back as `X-Reel-Profile-Key`
+/// with every request made as a PIN-protected profile, and with profile edits.
 @Mapped
 public record HouseholdProfileDto(
         String id,
@@ -29,5 +32,6 @@ public record HouseholdProfileDto(
         boolean kids,
         String maxRating,
         boolean pinProtected,
-        String language) {
+        String language,
+        String key) {
 }

@@ -60,10 +60,11 @@ public interface LibraryApi {
     @GET("/api/library/downloads")
     void downloads(@Query("device") String device, OnComplete<Response<List<DownloadDto>>> callback);
 
-    /// Licenses a title for offline play on this device. Answers 403 when the plan has no downloads.
+    /// Licenses a title for offline play on this device, for a profile whose
+    /// rating limit allows it. Answers 402 when the plan has no downloads.
     @POST("/api/library/downloads/{titleId}")
     void download(@Path("titleId") String titleId, @Query("device") String device, @Query("episode") String episode,
-            OnComplete<Response<DownloadDto>> callback);
+            @Query("profile") String profile, OnComplete<Response<DownloadDto>> callback);
 
     @DELETE("/api/library/downloads/{id}")
     void deleteDownload(@Path("id") String id, OnComplete<Response<String>> callback);

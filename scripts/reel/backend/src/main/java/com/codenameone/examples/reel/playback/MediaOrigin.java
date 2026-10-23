@@ -18,6 +18,8 @@
  */
 package com.codenameone.examples.reel.playback;
 
+import com.codenameone.examples.reel.domain.Video;
+import com.codenameone.examples.reel.repository.VideoRepository;
 import com.codename1.backend.HttpServer;
 import com.codename1.backend.StaticFiles;
 import com.codename1.backend.annotations.GetMapping;
@@ -58,9 +60,11 @@ public class MediaOrigin {
     private final MediaTokens tokens;
     private final Licenses licenses;
     private final Playbacks playbacks;
+    private final VideoRepository videos;
 
     public MediaOrigin(@Value("${reel.media.dir:media}") String root, MediaTokens tokens, Licenses licenses,
-            Playbacks playbacks) {
+            Playbacks playbacks, VideoRepository videos) {
+        this.videos = videos;
         this.root = root;
         this.tokens = tokens;
         this.licenses = licenses;
@@ -86,6 +90,10 @@ public class MediaOrigin {
             return new HttpServer.Response(200, "application/octet-stream", key, noStore());
         }
         int height = renditionHeight(file);
+        if ("cenc.mp4".equals(file)) {
+            // One file at one quality, so the cap is all or nothing.
+            height = Licenses.cencHeight(renditions(video));
+        }
         if (height < 0) {
             return HttpServer.Response.text(404, "not found");
         }
@@ -113,6 +121,11 @@ public class MediaOrigin {
         }
         HttpServer.Response out = new StaticFiles(root, "/art", "none", "public, max-age=86400").handle(request);
         return out == null ? HttpServer.Response.text(404, "not found") : out;
+    }
+
+    private String renditions(String videoId) throws java.io.IOException {
+        Video v = videos.findById(videoId);
+        return v == null ? "" : v.getRenditions();
     }
 
     /// The height a served file belongs to: 0 for files every quality shares,

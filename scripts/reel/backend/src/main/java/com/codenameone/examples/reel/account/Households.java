@@ -23,10 +23,12 @@ import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codename1.backend.security.crypto.PasswordEncoder;
 import com.codenameone.examples.reel.Ids;
+import com.codenameone.examples.reel.Requests;
 import com.codenameone.examples.reel.api.Features;
 import com.codenameone.examples.reel.api.HouseholdProfileDto;
 import com.codenameone.examples.reel.api.ProfileEditDto;
 import com.codenameone.examples.reel.domain.Household;
+import com.codenameone.examples.reel.playback.MediaTokens;
 import com.codenameone.examples.reel.repository.HouseholdRepository;
 import com.codenameone.examples.reel.settings.Settings;
 
@@ -51,8 +53,10 @@ public class Households {
     private final HouseholdRepository rows;
     private final PasswordEncoder encoder;
     private final Settings settings;
+    private final MediaTokens tokens;
 
-    public Households(HouseholdRepository rows, PasswordEncoder encoder, Settings settings) {
+    public Households(HouseholdRepository rows, PasswordEncoder encoder, Settings settings, MediaTokens tokens) {
+        this.tokens = tokens;
         this.rows = rows;
         this.encoder = encoder;
         this.settings = settings;
@@ -69,9 +73,20 @@ public class Households {
     }
 
     /// The profile `id` of the account, or its first when `id` is empty. Answers
-    /// 404 for a profile that is not the account's.
+    /// 404 for a profile that is not the account's, and 403 for a PIN-protected
+    /// one the request carries no key for: the PIN is checked here, on every
+    /// call, never only on the app's profile picker.
     @Transactional(rollbackFor = IOException.class)
     public Household resolve(String username, String id) throws IOException {
+        Household row = owned(username, id);
+        if (row.getPinHash().length() > 0
+                && !tokens.verifyProfile(Requests.header(Requests.PROFILE_KEY), username, row.getId())) {
+            throw new ResponseStatusException(403, "Enter this profile's PIN first");
+        }
+        return row;
+    }
+
+    private Household owned(String username, String id) throws IOException {
         List<Household> all = ensure(username, "");
         if (id == null || id.length() == 0) {
             return all.get(0);
@@ -84,9 +99,34 @@ public class Households {
         throw new ResponseStatusException(404, "No such profile");
     }
 
+    /// Profile edits change the PINs and rating limits themselves, so once any
+    /// grown-up profile has a PIN they need the key of an unlocked grown-up
+    /// profile. Without one there is no parental control to get around.
+    private void requireAdult(String username) throws IOException {
+        List<Household> all = ensure(username, "");
+        boolean guarded = false;
+        String key = Requests.header(Requests.PROFILE_KEY);
+        for (int iter = 0; iter < all.size(); iter++) {
+            Household h = all.get(iter);
+            if (h.isKids()) {
+                continue;
+            }
+            if (h.getPinHash().length() > 0) {
+                guarded = true;
+            }
+            if (tokens.verifyProfile(key, username, h.getId())) {
+                return;
+            }
+        }
+        if (guarded) {
+            throw new ResponseStatusException(403, "Unlock a grown-up profile to change profiles");
+        }
+    }
+
     @Transactional(rollbackFor = IOException.class)
     public HouseholdProfileDto create(String username, ProfileEditDto wanted) throws IOException {
         settings.require(Features.PROFILES);
+        requireAdult(username);
         List<Household> all = ensure(username, "");
         if (all.size() >= MAX_PROFILES) {
             throw new ResponseStatusException(409, "An account has at most " + MAX_PROFILES + " profiles");
@@ -102,7 +142,8 @@ public class Households {
 
     @Transactional(rollbackFor = IOException.class)
     public HouseholdProfileDto update(String username, String id, ProfileEditDto wanted) throws IOException {
-        Household row = resolve(username, id);
+        requireAdult(username);
+        Household row = owned(username, id);
         apply(row, wanted);
         rows.save(row);
         return dto(row);
@@ -110,22 +151,28 @@ public class Households {
 
     @Transactional(rollbackFor = IOException.class)
     public void delete(String username, String id) throws IOException {
+        requireAdult(username);
         List<Household> all = ensure(username, "");
-        Household row = resolve(username, id);
+        Household row = owned(username, id);
         if (all.size() == 1) {
             throw new ResponseStatusException(409, "An account keeps at least one profile");
         }
         rows.deleteById(row.getId());
     }
 
-    /// Checks a profile's PIN. A profile without one unlocks with anything.
+    /// Checks a profile's PIN and answers the profile with its key. A profile
+    /// without one unlocks with anything. Guessing is rate limited per account
+    /// in [com.codenameone.examples.reel.SecurityConfig]: four digits are ten
+    /// thousand tries.
     @Transactional(rollbackFor = IOException.class)
     public HouseholdProfileDto unlock(String username, String id, String pin) throws IOException {
-        Household row = resolve(username, id);
+        Household row = owned(username, id);
         if (row.getPinHash().length() > 0 && (pin == null || !encoder.matches(pin, row.getPinHash()))) {
             throw new ResponseStatusException(403, "That PIN is not right");
         }
-        return dto(row);
+        HouseholdProfileDto d = dto(row);
+        return new HouseholdProfileDto(d.id(), d.name(), d.avatar(), d.kids(), d.maxRating(), d.pinProtected(),
+                d.language(), tokens.profile(username, row.getId()));
     }
 
     /// Whether a profile may see a title of this rating.
@@ -222,6 +269,6 @@ public class Households {
 
     public static HouseholdProfileDto dto(Household row) {
         return new HouseholdProfileDto(row.getId(), row.getName(), row.getAvatar(), row.isKids(),
-                row.getMaxRating(), row.getPinHash().length() > 0, row.getLanguage());
+                row.getMaxRating(), row.getPinHash().length() > 0, row.getLanguage(), null);
     }
 }

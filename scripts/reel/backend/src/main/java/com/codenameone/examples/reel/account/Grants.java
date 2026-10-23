@@ -61,6 +61,14 @@ public class Grants {
         end(username, "");
     }
 
+    /// Ends one sign-in, by the grant id [#current()] answered when it was
+    /// made. Its refresh token goes with it.
+    public void endGrant(String id) throws IOException {
+        if (id != null && id.length() > 0) {
+            authorizations.remove(id);
+        }
+    }
+
     private void end(String username, String kept) throws IOException {
         // The table is the authorization server's, which offers a grant by its
         // id and no list of an account's: this reads the ids and leaves the
@@ -79,7 +87,7 @@ public class Grants {
     /// The id of the grant the request's token was issued under, or empty for
     /// a request that carried no such token. The server writes the grant's id
     /// before the first dot of the token's own.
-    private static String current() {
+    public static String current() {
         Authentication who = SecurityContextHolder.getContext().getAuthentication();
         if (!(who instanceof JwtAuthenticationToken)) {
             return "";

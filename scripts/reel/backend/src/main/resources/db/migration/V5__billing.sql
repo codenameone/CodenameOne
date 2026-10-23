@@ -35,9 +35,16 @@ CREATE TABLE subscription (
     failed_attempts INTEGER NOT NULL,
     store VARCHAR(16) NOT NULL,
     store_ref VARCHAR(190) NOT NULL,
-    updated_at BIGINT NOT NULL
+    updated_at BIGINT NOT NULL,
+    next_retry_at BIGINT NOT NULL
 );
 CREATE INDEX subscription_status_period_ends_at ON subscription (status, period_ends_at);
+
+-- That an account used a coupon: id is code:username.
+CREATE TABLE coupon_redemption (
+    id VARCHAR(230) NOT NULL PRIMARY KEY,
+    redeemed_at BIGINT NOT NULL
+);
 
 -- A percent off for a number of billing periods.
 CREATE TABLE coupon (

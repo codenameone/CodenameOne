@@ -53,6 +53,9 @@ public class Device {
     @Column(nullable = false)
     private long revokedAt;
 
+    @Column(nullable = false, type = "VARCHAR(190)")
+    private String grantId = "";
+
     public Device() {
     }
 
@@ -126,5 +129,13 @@ public class Device {
 
     public void setRevokedAt(long revokedAt) {
         this.revokedAt = revokedAt;
+    }
+
+    public String getGrantId() {
+        return grantId;
+    }
+
+    public void setGrantId(String grantId) {
+        this.grantId = grantId;
     }
 }

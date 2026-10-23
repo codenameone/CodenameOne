@@ -39,13 +39,15 @@ import java.util.List;
 /// password.
 @Component
 public class Devices {
+    private final Grants grants;
     /// More than this and the oldest is forgotten, so a script making up ids
     /// cannot grow the table without end.
     private static final int MAX_DEVICES = 20;
 
     private final DeviceRepository devices;
 
-    public Devices(DeviceRepository devices) {
+    public Devices(DeviceRepository devices, Grants grants) {
+        this.grants = grants;
         this.devices = devices;
     }
 
@@ -71,14 +73,18 @@ public class Devices {
             row.setUsername(username);
             row.setCreatedAt(now);
             fill(row, now);
+            row.setGrantId(Grants.current());
             devices.insert(row);
             return;
         }
         if (row.getRevokedAt() > 0L) {
             throw new ResponseStatusException(401, "This device was signed out");
         }
-        if (now - row.getLastSeenAt() > 60000L || !Requests.ip().equals(row.getLastIp())) {
+        String grant = Grants.current();
+        if (now - row.getLastSeenAt() > 60000L || !Requests.ip().equals(row.getLastIp())
+                || !grant.equals(row.getGrantId())) {
             fill(row, now);
+            row.setGrantId(grant);
             devices.save(row);
         }
     }
@@ -124,10 +130,12 @@ public class Devices {
             if (row.getRevokedAt() == 0L) {
                 row.setRevokedAt(now);
                 devices.save(row);
+                grants.endGrant(row.getGrantId());
             }
         }
     }
 
+    @Transactional(rollbackFor = IOException.class)
     public void signOut(String username, String id) throws IOException {
         Device row = id == null ? null : devices.findFirstByIdAndUsername(id, username);
         if (row == null) {
@@ -135,6 +143,10 @@ public class Devices {
         }
         row.setRevokedAt(System.currentTimeMillis());
         devices.save(row);
+        // The device id is the app's own claim; what really signs the device
+        // out is ending the sign-in it last used, so its refresh token stops
+        // working and its access token runs out within minutes.
+        grants.endGrant(row.getGrantId());
     }
 
     private void makeRoom(String username) {

@@ -226,6 +226,10 @@ public class Jobs {
             video.setError("Held for review: frames match the blocklist");
         }
         videos.save(video);
+        // A new or re-packaged video of a published title is new footage
+        // nobody approved. The worker carries no user, so even an admin's
+        // upload is looked at.
+        reviews.changed(title, false);
         if (title != null && title.getPosterUrl().length() == 0 && !Kinds.TRAILER.equals(video.getRole())) {
             title.setPosterUrl("/art/" + video.getId() + "/poster.jpg");
             title.setBackdropUrl("/art/" + video.getId() + "/poster.jpg");

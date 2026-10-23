@@ -118,6 +118,10 @@ public class Studio {
 
     /// Who may use the studio: creators and admins, and everyone when open
     /// uploads are on (the video platform preset).
+    private static boolean trusted() {
+        return Caller.hasRole(Roles.ADMIN);
+    }
+
     public void requireCreator() {
         if (!Caller.hasRole(Roles.CREATOR) && !Caller.hasRole(Roles.ADMIN)
                 && !settings.enabled(Features.OPEN_UPLOADS)) {
@@ -156,13 +160,8 @@ public class Studio {
     public StudioTitleDto update(String username, String id, StudioTitleEditDto wanted) throws IOException {
         Title t = own(username, id);
         apply(t, wanted);
-        if (Kinds.PUBLISHED.equals(t.getStatus()) && !Caller.hasRole(Roles.ADMIN)) {
-            t.setStatus(Kinds.IN_REVIEW);
-            titles.save(t);
-            reviews.submitted(t);
-        } else {
-            titles.save(t);
-        }
+        titles.save(t);
+        reviews.changed(t, trusted());
         return dto(t, true);
     }
 
@@ -195,6 +194,7 @@ public class Studio {
         }
         t.setStatus(Kinds.DRAFT);
         titles.save(t);
+        reviews.withdrawn(t.getId(), username);
         return dto(t, true);
     }
 
@@ -228,14 +228,17 @@ public class Studio {
         key.setIvHex(Ids.hex(Crypto.randomBytes(16)));
         key.setCreatedAt(now);
         keys.insert(key);
+        reviews.changed(t, trusted());
         return video(v, true);
     }
 
     @Transactional(rollbackFor = IOException.class)
     public StudioVideoDto updateVideo(String username, String id, StudioVideoEditDto wanted) throws IOException {
         Video v = ownVideo(username, id);
-        applyVideo(v, wanted, titles.findById(v.getTitleId()));
+        Title t = titles.findById(v.getTitleId());
+        applyVideo(v, wanted, t);
         videos.save(v);
+        reviews.changed(t, trusted());
         return video(v, true);
     }
 
@@ -274,6 +277,7 @@ public class Studio {
             row.setTitle(name.length() > 120 ? name.substring(0, 120) : name);
             chapters.insert(row);
         }
+        reviews.changed(titles.findById(v.getTitleId()), trusted());
         return video(v, true);
     }
 
@@ -302,6 +306,7 @@ public class Studio {
         for (int iter = 0; iter < rows.size(); iter++) {
             interactions.insert(rows.get(iter));
         }
+        reviews.changed(titles.findById(v.getTitleId()), trusted());
         return video(v, true);
     }
 
