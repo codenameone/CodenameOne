@@ -67,7 +67,7 @@ public final class DateTime {
 
     /// Dart's own grammar for DateTime.parse: an ISO 8601 date, an optional time
     /// after `T` or a space, an optional fraction, and an optional `Z` or offset.
-    private static final java.util.regex.Pattern ISO = java.util.regex.Pattern.compile(
+    private static final com.codename1.util.regex.Pattern ISO = com.codename1.util.regex.Pattern.compile(
             "^([+-]?\\d{4,6})-?(\\d\\d)-?(\\d\\d)(?:[ T](\\d\\d)(?::?(\\d\\d)(?::?(\\d\\d)(?:[.,](\\d+))?)?)?"
             + "( ?[zZ]| ?([-+])(\\d\\d)(?::?(\\d\\d))?)?)?$");
 
@@ -84,7 +84,7 @@ public final class DateTime {
         if (formattedString == null) {
             return null;
         }
-        java.util.regex.Matcher m = ISO.matcher(formattedString);
+        com.codename1.util.regex.Matcher m = ISO.matcher(formattedString);
         if (!m.matches()) {
             return null;
         }
