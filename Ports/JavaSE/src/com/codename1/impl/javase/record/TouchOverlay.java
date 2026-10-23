@@ -122,7 +122,13 @@ public final class TouchOverlay {
     }
 
     public synchronized void pressed(int x, int y) {
-        active = new Touch(x, y, System.currentTimeMillis());
+        long now = System.currentTimeMillis();
+        if (active != null && active.up < 0) {
+            // The release went elsewhere (a popup menu took it); without this
+            // the touch would stay down, and visible, forever.
+            active.up = now;
+        }
+        active = new Touch(x, y, now);
         touches.add(active);
         prune(active.down);
     }

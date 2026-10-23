@@ -86,7 +86,8 @@ final class SimulatorMcpTools {
                                 }
                             }
                         });
-                        port.saveKeyboardPreferences();
+                        // Not persisted: a scripted session must not change what the
+                        // next interactive simulator starts with.
                         return keyboardState();
                     }
                 }));
@@ -117,7 +118,7 @@ final class SimulatorMcpTools {
                         if (text == null) {
                             throw new IllegalArgumentException("text is required");
                         }
-                        long delay = num(a, "perKeyDelayMs", 90);
+                        long delay = clamp(num(a, "perKeyDelayMs", 90), 0, 2000);
                         final KeyboardController kc = requireEditing();
                         for (int i = 0; i < text.length(); i++) {
                             final String ch = text.substring(i, i + 1);
@@ -170,7 +171,7 @@ final class SimulatorMcpTools {
                         Map<String, Object> a = parse(argumentsJson);
                         int[] p = point(a, "x", "y", "nodeId");
                         port.dispatchSimulatedPointer(MouseEvent.MOUSE_PRESSED, p[0], p[1]);
-                        Thread.sleep(Math.max(0, num(a, "holdMs", 60)));
+                        Thread.sleep(clamp(num(a, "holdMs", 60), 0, MAX_GESTURE_MS));
                         port.dispatchSimulatedPointer(MouseEvent.MOUSE_RELEASED, p[0], p[1]);
                         return ok("x", p[0], "y", p[1]);
                     }
@@ -188,11 +189,11 @@ final class SimulatorMcpTools {
                 new ToolHandler() {
                     public String invoke(String argumentsJson) throws Exception {
                         Map<String, Object> a = parse(argumentsJson);
-                        int x1 = (int) num(a, "x1", -1);
-                        int y1 = (int) num(a, "y1", -1);
-                        int x2 = (int) num(a, "x2", -1);
-                        int y2 = (int) num(a, "y2", -1);
-                        long duration = Math.max(16, num(a, "durationMs", 300));
+                        int x1 = (int) required(a, "x1");
+                        int y1 = (int) required(a, "y1");
+                        int x2 = (int) required(a, "x2");
+                        int y2 = (int) required(a, "y2");
+                        long duration = clamp(num(a, "durationMs", 300), 16, MAX_GESTURE_MS);
                         int steps = (int) Math.max(2, duration / 16);
                         port.dispatchSimulatedPointer(MouseEvent.MOUSE_PRESSED, x1, y1);
                         for (int i = 1; i <= steps; i++) {
@@ -254,7 +255,6 @@ final class SimulatorMcpTools {
                         }
                         if (a.get("live") != null) {
                             t.setLiveVisible(RecordingOptions.bool(a.get("live")));
-                            port.saveKeyboardPreferences();
                         }
                         Map<String, Object> out = new LinkedHashMap<String, Object>();
                         out.put("style", t.getStyle().name());
@@ -270,8 +270,9 @@ final class SimulatorMcpTools {
                         + "or gif. frame: screen (the device screen only) or skin (inside the device "
                         + "frame). fps (default 30), scale (default 1). touches: none, dot or ripple "
                         + "(default ripple), touchTrail, touchColor, touchRadius. tapSound: mix a "
-                        + "click into the audio track at every tap. audio: none or microphone. The "
-                        + "application's own audio output is not captured. maxSeconds stops a "
+                        + "click into the audio track at every tap. audio: app (default; what the "
+                        + "application plays - sound effects, game sounds, music), microphone, "
+                        + "app_and_microphone (for narration) or none. maxSeconds stops a "
                         + "forgotten recording (default 600). path defaults to "
                         + "~/CodenameOneRecordings. Needs ffmpeg; without it PNG frames are written.",
                 "{\"type\":\"object\",\"properties\":{"
@@ -282,7 +283,7 @@ final class SimulatorMcpTools {
                         + "\"touches\":{\"type\":\"string\",\"enum\":[\"none\",\"dot\",\"ripple\"]},"
                         + "\"touchTrail\":{\"type\":\"boolean\"},\"touchColor\":{\"type\":\"string\"},"
                         + "\"touchRadius\":{\"type\":\"integer\"},\"tapSound\":{\"type\":\"boolean\"},"
-                        + "\"audio\":{\"type\":\"string\",\"enum\":[\"none\",\"microphone\"]},"
+                        + "\"audio\":{\"type\":\"string\",\"enum\":[\"app\",\"microphone\",\"app_and_microphone\",\"none\"]},"
                         + "\"maxSeconds\":{\"type\":\"integer\"}}}",
                 new ToolHandler() {
                     public String invoke(String argumentsJson) throws Exception {
@@ -309,8 +310,25 @@ final class SimulatorMcpTools {
                 "{\"type\":\"object\",\"properties\":{}}",
                 new ToolHandler() {
                     public String invoke(String argumentsJson) throws IOException {
-                        SimulatorRecorder.Result r = port.getSimulatorRecorder().stop();
+                        SimulatorRecorder rec = port.getSimulatorRecorder();
+                        SimulatorRecorder.Result r;
+                        boolean auto = false;
+                        if (rec.isRecording()) {
+                            r = rec.stop();
+                        } else if (rec.getLastError() != null) {
+                            // It already ended on its own, with an error.
+                            throw rec.getLastError();
+                        } else if (rec.getLastResult() != null) {
+                            // It already stopped at maxSeconds; report that file.
+                            r = rec.getLastResult();
+                            auto = true;
+                        } else {
+                            throw new IllegalStateException("Not recording");
+                        }
                         Map<String, Object> out = new LinkedHashMap<String, Object>();
+                        if (auto) {
+                            out.put("autoStopped", Boolean.TRUE);
+                        }
                         out.put("path", r.file.getAbsolutePath());
                         out.put("durationMs", Long.valueOf(r.durationMs));
                         out.put("frames", Integer.valueOf(r.frames));
@@ -337,6 +355,19 @@ final class SimulatorMcpTools {
                         }
                         out.put("elapsedMs", Long.valueOf(rec.elapsed()));
                         out.put("frames", Integer.valueOf(rec.getFrameCount()));
+                        if (!rec.isRecording()) {
+                            // A recording that ended by itself (time limit or a
+                            // failure) is reported here so it is never lost.
+                            if (rec.getLastResult() != null) {
+                                out.put("lastFile", rec.getLastResult().file.getAbsolutePath());
+                                if (rec.getLastResult().note != null) {
+                                    out.put("note", rec.getLastResult().note);
+                                }
+                            }
+                            if (rec.getLastError() != null) {
+                                out.put("error", String.valueOf(rec.getLastError().getMessage()));
+                            }
+                        }
                         return JSONParser.toJson(out);
                     }
                 }));
@@ -465,6 +496,21 @@ final class SimulatorMcpTools {
     private static String str(Map<String, Object> a, String key) {
         Object v = a.get(key);
         return v == null ? null : v.toString();
+    }
+
+    /// Upper bound for one tap or drag, so a typo cannot hold the MCP worker for hours.
+    private static final long MAX_GESTURE_MS = 30000;
+
+    private static long clamp(long v, long min, long max) {
+        return Math.max(min, Math.min(max, v));
+    }
+
+    private static long required(Map<String, Object> a, String key) {
+        Object v = a.get(key);
+        if (v instanceof Number) {
+            return ((Number) v).longValue();
+        }
+        throw new IllegalArgumentException("Missing number: " + key);
     }
 
     private static long num(Map<String, Object> a, String key, long def) {

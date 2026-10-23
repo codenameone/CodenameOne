@@ -42,8 +42,22 @@ public final class RecordingOptions {
     public enum Audio {
         /// No audio track, unless tap sounds are on.
         NONE,
+        /// What the application plays: sound effects, game sounds, music and
+        /// video soundtracks, captured where the simulator hands them to the
+        /// sound card, so nothing else on the computer is recorded.
+        APP,
         /// The default microphone, through javax.sound.
-        MICROPHONE
+        MICROPHONE,
+        /// The application's audio mixed with the microphone, for narration.
+        APP_AND_MICROPHONE;
+
+        boolean includesApp() {
+            return this == APP || this == APP_AND_MICROPHONE;
+        }
+
+        boolean includesMicrophone() {
+            return this == MICROPHONE || this == APP_AND_MICROPHONE;
+        }
     }
 
     private String path;
@@ -56,7 +70,7 @@ public final class RecordingOptions {
     private int touchColor = 0x80808080;
     private int touchRadius = 22;
     private boolean tapSound;
-    private Audio audio = Audio.NONE;
+    private Audio audio = Audio.APP;
     private int maxSeconds = 600;
 
     public String getPath() {

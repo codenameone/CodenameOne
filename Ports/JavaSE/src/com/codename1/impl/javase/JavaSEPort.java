@@ -5059,7 +5059,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
                 keyboardGesture = false;
                 if (windowId == 0) {
-                    if (simulatorPointerPressed(x, y)) {
+                    // Only the primary button is a touch; a right-click opens a
+                    // popup that takes the release, which would leave it down.
+                    if (javax.swing.SwingUtilities.isLeftMouseButton(e) && simulatorPointerPressed(x, y)) {
                         keyboardGesture = true;
                         return;
                     }
@@ -6213,6 +6215,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             platformName = props.getProperty("platformName", "se");
             if (keyboardController != null) {
+                dismissSimulatedKeyboard();
                 keyboardController.setSkinPlatform(platformName);
             }
             platformOverrides = props.getProperty("overrideNames", "").split(",");
@@ -6493,6 +6496,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     private void setPortrait(boolean portraitValue) {
         if (portrait != portraitValue) {
             portrait = portraitValue;
+            dismissSimulatedKeyboard();
             Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
             pref.putBoolean("Portrait", portrait);
             updateFrameUI();
@@ -12656,6 +12660,23 @@ public class JavaSEPort extends CodenameOneImplementation {
         return super.getInvisibleAreaUnderVKB();
     }
 
+    /// Drops the simulated keyboard when the screen it was sized for goes away
+    /// (rotation, a new skin). Its height, the resize inset and the pan offset were
+    /// all measured against the old screen. The inset is cleared at once so the
+    /// new layout is measured without it; the rest is undone on the EDT.
+    private void dismissSimulatedKeyboard() {
+        final com.codename1.impl.javase.vkb.KeyboardController kc = keyboardController;
+        if (kc == null || !kc.isShowing()) {
+            return;
+        }
+        simulatorResizeInset = 0;
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                kc.hideNow();
+            }
+        });
+    }
+
     int simulatorPanOffset() {
         com.codename1.impl.javase.vkb.KeyboardController kc = keyboardController;
         return kc == null ? 0 : kc.getPanOffset();
@@ -12715,6 +12736,15 @@ public class JavaSEPort extends CodenameOneImplementation {
         canvas.repaint();
     }
 
+    /// Whether the window needs another frame without the application painting:
+    /// only while something moves. A keyboard that is simply up is redrawn by the
+    /// application's own repaints and needs no timer.
+    private boolean overlaysMoving() {
+        com.codename1.impl.javase.vkb.KeyboardController kc = keyboardController;
+        boolean kb = kc != null && kc.isAnimating();
+        return kb || (touchOverlay.isLiveVisible() && touchOverlay.hasVisibleTouches());
+    }
+
     private boolean overlaysActive(boolean forRecording) {
         com.codename1.impl.javase.vkb.KeyboardController kc = keyboardController;
         boolean kb = kc != null && (kc.isShowing() || kc.isAnimating());
@@ -12768,7 +12798,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             touchOverlay.paint(g, scale, 0);
         }
         g.dispose();
-        if (!forRecording && active && canvas != null && !overlayRepaintPending) {
+        if (!forRecording && canvas != null && !overlayRepaintPending && overlaysMoving()) {
             overlayRepaintPending = true;
             // Another frame shortly, so the animation and the fade progress even
             // when the application paints nothing.
@@ -12996,6 +13026,8 @@ public class JavaSEPort extends CodenameOneImplementation {
         final com.codename1.impl.javase.vkb.KeyboardController kc = getKeyboardController();
         JMenu vkbMenu = new JMenu("Virtual Keyboard");
         javax.swing.ButtonGroup modes = new javax.swing.ButtonGroup();
+        final java.util.List<javax.swing.JRadioButtonMenuItem> modeItems = new java.util.ArrayList<javax.swing.JRadioButtonMenuItem>();
+        final java.util.List<javax.swing.JRadioButtonMenuItem> softItems = new java.util.ArrayList<javax.swing.JRadioButtonMenuItem>();
         String[] modeLabels = {"Off", "Skin Platform", "iOS", "Android"};
         com.codename1.impl.javase.vkb.KeyboardController.Mode[] modeValues = com.codename1.impl.javase.vkb.KeyboardController.Mode.values();
         for (int i = 0; i < modeValues.length; i++) {
@@ -13012,6 +13044,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             });
             modes.add(item);
+            modeItems.add(item);
             vkbMenu.add(item);
         }
         vkbMenu.addSeparator();
@@ -13023,13 +13056,31 @@ public class JavaSEPort extends CodenameOneImplementation {
             javax.swing.JRadioButtonMenuItem item = new javax.swing.JRadioButtonMenuItem(softLabels[i], kc.getSoftInput() == v);
             item.addActionListener(new ActionListener() {
                 public void actionPerformed(ActionEvent e) {
-                    kc.setSoftInput(v);
-                    saveKeyboardPreferences();
+                    Display.getInstance().callSerially(new Runnable() {
+                        public void run() {
+                            kc.setSoftInput(v);
+                            saveKeyboardPreferences();
+                        }
+                    });
                 }
             });
             soft.add(item);
+            softItems.add(item);
             vkbMenu.add(item);
         }
+        // MCP can change the mode while the menu is closed; show what is current.
+        vkbMenu.addMenuListener(new javax.swing.event.MenuListener() {
+            public void menuSelected(javax.swing.event.MenuEvent e) {
+                modeItems.get(kc.getMode().ordinal()).setSelected(true);
+                softItems.get(kc.getSoftInput().ordinal()).setSelected(true);
+            }
+
+            public void menuDeselected(javax.swing.event.MenuEvent e) {
+            }
+
+            public void menuCanceled(javax.swing.event.MenuEvent e) {
+            }
+        });
         simulateMenu.add(vkbMenu);
 
         final JCheckBoxMenuItem showTouches = new JCheckBoxMenuItem("Show Touches", touchOverlay.isLiveVisible());
@@ -13071,6 +13122,20 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         });
         simulateMenu.add(record);
+        // A recording started over MCP, or stopped at its time limit, changes the
+        // state behind the label's back.
+        simulateMenu.addMenuListener(new javax.swing.event.MenuListener() {
+            public void menuSelected(javax.swing.event.MenuEvent e) {
+                record.setText(getSimulatorRecorder().isRecording() ? "Stop Recording" : "Start Recording");
+                showTouches.setSelected(touchOverlay.isLiveVisible());
+            }
+
+            public void menuDeselected(javax.swing.event.MenuEvent e) {
+            }
+
+            public void menuCanceled(javax.swing.event.MenuEvent e) {
+            }
+        });
     }
 
     /// The recording settings, asked for when a recording is started from the menu.
@@ -13079,7 +13144,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         javax.swing.JComboBox format = new javax.swing.JComboBox(new String[]{"mp4", "mov", "webm", "gif"});
         javax.swing.JComboBox frame = new javax.swing.JComboBox(new String[]{"Screen", "Device Skin"});
         javax.swing.JComboBox touches = new javax.swing.JComboBox(new String[]{"Ripple", "Dot", "None"});
-        javax.swing.JComboBox audio = new javax.swing.JComboBox(new String[]{"None", "Microphone"});
+        javax.swing.JComboBox audio = new javax.swing.JComboBox(new String[]{"App Audio", "App Audio and Microphone", "Microphone", "None"});
         javax.swing.JCheckBox tapSound = new javax.swing.JCheckBox("Tap sounds");
         javax.swing.JSpinner fps = new javax.swing.JSpinner(new javax.swing.SpinnerNumberModel(30, 1, 120, 1));
         JPanel p = new JPanel(new java.awt.GridLayout(0, 2, 6, 6));
@@ -13107,8 +13172,12 @@ public class JavaSEPort extends CodenameOneImplementation {
                 com.codename1.impl.javase.record.TouchOverlay.Style.DOT,
                 com.codename1.impl.javase.record.TouchOverlay.Style.NONE};
         o.setTouches(styles[touches.getSelectedIndex()]);
-        o.setAudio(audio.getSelectedIndex() == 1 ? com.codename1.impl.javase.record.RecordingOptions.Audio.MICROPHONE
-                : com.codename1.impl.javase.record.RecordingOptions.Audio.NONE);
+        com.codename1.impl.javase.record.RecordingOptions.Audio[] sources = {
+                com.codename1.impl.javase.record.RecordingOptions.Audio.APP,
+                com.codename1.impl.javase.record.RecordingOptions.Audio.APP_AND_MICROPHONE,
+                com.codename1.impl.javase.record.RecordingOptions.Audio.MICROPHONE,
+                com.codename1.impl.javase.record.RecordingOptions.Audio.NONE};
+        o.setAudio(sources[audio.getSelectedIndex()]);
         o.setTapSound(tapSound.isSelected());
         o.setFps(((Number) fps.getValue()).intValue());
         return o;

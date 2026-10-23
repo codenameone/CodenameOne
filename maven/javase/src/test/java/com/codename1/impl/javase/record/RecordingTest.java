@@ -187,4 +187,61 @@ class RecordingTest {
         }
         assertTrue(drawnLow);
     }
+
+    @Test
+    void autoStopAtTheLimitKeepsTheResult(@org.junit.jupiter.api.io.TempDir java.io.File dir) throws Exception {
+        SimulatorRecorder rec = new SimulatorRecorder(new SimulatorRecorder.FrameSource() {
+            public BufferedImage captureFrame(RecordingOptions.Frame frame) {
+                return new BufferedImage(40, 30, BufferedImage.TYPE_INT_ARGB);
+            }
+        });
+        RecordingOptions o = new RecordingOptions();
+        o.setPath(new java.io.File(dir, "auto.mp4").getAbsolutePath());
+        o.setFps(10);
+        o.setMaxSeconds(1);
+        rec.start(o);
+        long deadline = System.currentTimeMillis() + 20000;
+        while ((rec.isRecording() || (rec.getLastResult() == null && rec.getLastError() == null))
+                && System.currentTimeMillis() < deadline) {
+            Thread.sleep(50);
+        }
+        assertFalse(rec.isRecording());
+        assertEquals(null, rec.getLastError());
+        assertTrue(rec.getLastResult().file.exists());
+        assertThrows(IllegalStateException.class, rec::stop);
+        // A new recording may start once the previous one is finished.
+        o.setPath(new java.io.File(dir, "again.mp4").getAbsolutePath());
+        rec.start(o);
+        assertTrue(rec.isRecording());
+        assertTrue(rec.stop().file.exists());
+    }
+
+    @Test
+    void appAudioIsTheDefaultAndMixedOnTheTimeline() {
+        assertEquals(RecordingOptions.Audio.APP, new RecordingOptions().getAudio());
+        Map<String, Object> args = new HashMap<String, Object>();
+        args.put("audio", "app_and_microphone");
+        RecordingOptions o = new RecordingOptions();
+        o.apply(args);
+        assertEquals(RecordingOptions.Audio.APP_AND_MICROPHONE, o.getAudio());
+
+        AppAudioTap tap = new AppAudioTap(1000);
+        // 100 stereo frames of a constant 1000 at t=1500ms (sample 22050)...
+        byte[] pcm = new byte[400];
+        for (int i = 0; i < 200; i++) {
+            pcm[i * 2] = (byte) (1000 & 0xff);
+            pcm[i * 2 + 1] = (byte) (1000 >> 8);
+        }
+        Object source = new Object();
+        tap.add(source, pcm, 0, pcm.length, 1f, 1500);
+        // ...and a second write right after lands contiguously, not at the clock.
+        tap.add(source, pcm, 0, pcm.length, 0.5f, 1500);
+        short[] out = new short[44100];
+        tap.mixInto(out);
+        assertEquals(0, out[22049]);
+        assertEquals(1000, out[22050]);
+        assertEquals(1000, out[22149]);
+        assertEquals(500, out[22150]);
+        assertEquals(0, out[22250]);
+    }
 }

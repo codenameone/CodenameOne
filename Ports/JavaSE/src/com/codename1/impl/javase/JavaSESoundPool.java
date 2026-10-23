@@ -148,6 +148,7 @@ class JavaSESoundPool implements com.codename1.media.CompletionAwareSoundPoolPee
                 out[i * 2] = (byte) (sample & 0xff);
                 out[i * 2 + 1] = (byte) ((sample >> 8) & 0xff);
             }
+            com.codename1.impl.javase.record.AppAudioTap.write(this, out, 0, out.length, 1f);
             line.write(out, 0, out.length);
         }
     }

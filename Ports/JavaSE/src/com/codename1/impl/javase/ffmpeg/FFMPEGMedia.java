@@ -454,6 +454,7 @@ public final class FFMPEGMedia {
                         audioLine.start();
                         int len;
                         while (!stopRequested && (len = input.read(buffer)) > 0) {
+                            com.codename1.impl.javase.record.AppAudioTap.write(this, buffer, 0, len, volume / 100f);
                             audioLine.write(buffer, 0, len);
                         }
                     } catch (Exception ex) {

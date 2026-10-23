@@ -119,9 +119,27 @@ public final class SimulatorRecorder {
     private ByteArrayOutputStream micData;
     private Thread micThread;
     private BufferedImage scaled;
+    private AppAudioTap appAudio;
+    /// True from the moment a stop begins until the file is finished; a new
+    /// recording cannot start over a writer that is still being closed.
+    private boolean stopping;
+    private final Object stopLock = new Object();
+    private Result lastResult;
+    private IOException lastError;
 
     public SimulatorRecorder(FrameSource source) {
         this.source = source;
+    }
+
+    /// The outcome of the most recent finished recording, or null. Set by every
+    /// stop, including the automatic one at the time limit or after a failure.
+    public synchronized Result getLastResult() {
+        return lastResult;
+    }
+
+    /// The error that ended the most recent recording, or null.
+    public synchronized IOException getLastError() {
+        return lastError;
     }
 
     public synchronized boolean isRecording() {
@@ -147,9 +165,11 @@ public final class SimulatorRecorder {
 
     /// Starts recording. Throws [IllegalStateException] when already recording.
     public synchronized void start(RecordingOptions opts) throws IOException {
-        if (running) {
+        if (running || stopping) {
             throw new IllegalStateException("Already recording to " + output);
         }
+        lastResult = null;
+        lastError = null;
         options = opts;
         output = opts.resolveOutput().getAbsoluteFile();
         File parent = output.getParentFile();
@@ -183,7 +203,9 @@ public final class SimulatorRecorder {
             if (opts.hasAudioTrack()) {
                 b.sampleRate(SAMPLE_RATE).audioChannels(1);
             }
-            writer = b.build();
+            // Straight to the ffmpeg writer: the builder's build() looks the
+            // VideoIO up through Display, which a recorder does not need.
+            writer = new FFMPEGVideoIO().createWriter(b);
         } else {
             pngDir = new File(output.getPath() + ".frames");
             if (!pngDir.isDirectory() && !pngDir.mkdirs()) {
@@ -192,10 +214,35 @@ public final class SimulatorRecorder {
             note = "ffmpeg was not found, so frames were written as PNG files to " + pngDir
                     + ". Install ffmpeg (or set -Dffmpeg.dir) to record video.";
         }
-        if (opts.getAudio() == RecordingOptions.Audio.MICROPHONE && opts.hasAudioTrack() && writer != null) {
+        if (opts.getAudio().includesMicrophone() && opts.hasAudioTrack() && writer != null) {
             startMicrophone();
         }
         startTime = System.currentTimeMillis();
+        appAudio = null;
+        if (opts.getAudio().includesApp() && opts.hasAudioTrack() && writer != null) {
+            appAudio = new AppAudioTap(startTime);
+            AppAudioTap.setActive(appAudio);
+        }
+        // The frame already captured is frame 0, written here: a recording
+        // stopped before the capture thread runs still has a video stream, and
+        // muxing audio onto a video with no frames fails.
+        compose(first, 0);
+        try {
+            writeFrame(0);
+        } catch (IOException e) {
+            AppAudioTap.setActive(null);
+            appAudio = null;
+            if (mic != null) {
+                mic.stop();
+                mic.close();
+                mic = null;
+            }
+            if (writer != null) {
+                writer.close();
+                writer = null;
+            }
+            throw e;
+        }
         running = true;
         thread = new Thread(new Runnable() {
             public void run() {
@@ -234,17 +281,7 @@ public final class SimulatorRecorder {
             while (isRecording()) {
                 long now = System.currentTimeMillis() - startTime;
                 if (now >= maxMs) {
-                    new Thread(new Runnable() {
-                        public void run() {
-                            try {
-                                stop();
-                            } catch (IOException e) {
-                                synchronized (SimulatorRecorder.this) {
-                                    failure = e;
-                                }
-                            }
-                        }
-                    }, "SimulatorRecorderAutoStop").start();
+                    autoStop();
                     return;
                 }
                 BufferedImage img = source.captureFrame(options.getFrame());
@@ -268,9 +305,27 @@ public final class SimulatorRecorder {
         } catch (IOException e) {
             synchronized (this) {
                 failure = e;
-                running = false;
             }
+            // Close ffmpeg and the microphone now; nobody may ever call stop().
+            autoStop();
         }
+    }
+
+    /// Finishes the recording from a thread of its own (stop() joins the capture
+    /// thread, so the capture thread cannot run it). The outcome is kept in
+    /// getLastResult()/getLastError().
+    private void autoStop() {
+        new Thread(new Runnable() {
+            public void run() {
+                try {
+                    stop();
+                } catch (IOException e) {
+                    // recorded in lastError by stop()
+                } catch (IllegalStateException e) {
+                    // already stopped by someone else
+                }
+            }
+        }, "SimulatorRecorderAutoStop").start();
     }
 
     private void compose(BufferedImage img, long now) {
@@ -382,21 +437,55 @@ public final class SimulatorRecorder {
     /// Stops recording and finishes the file. Throws when encoding failed at any
     /// point during the recording.
     public Result stop() throws IOException {
-        Thread t;
-        synchronized (this) {
-            if (!running && thread == null) {
-                throw new IllegalStateException("Not recording");
+        synchronized (stopLock) {
+            Thread t;
+            synchronized (this) {
+                if (!running && thread == null) {
+                    throw new IllegalStateException("Not recording");
+                }
+                running = false;
+                stopping = true;
+                t = thread;
+                thread = null;
             }
-            running = false;
-            t = thread;
-            thread = null;
-        }
-        if (t != null && t != Thread.currentThread()) {
+            Result r = null;
+            IOException err = null;
             try {
-                t.join(5000);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
+                // No timeout: the writer below must never be closed while the
+                // capture thread may still be writing a frame into it.
+                if (t != null && t != Thread.currentThread()) {
+                    boolean interrupted = false;
+                    while (t.isAlive()) {
+                        try {
+                            t.join();
+                        } catch (InterruptedException e) {
+                            interrupted = true;
+                        }
+                    }
+                    if (interrupted) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+                r = finish();
+                return r;
+            } catch (IOException e) {
+                err = e;
+                throw e;
+            } finally {
+                synchronized (this) {
+                    stopping = false;
+                    lastResult = r;
+                    lastError = err;
+                }
             }
+        }
+    }
+
+    private Result finish() throws IOException {
+        AppAudioTap app = appAudio;
+        if (app != null) {
+            AppAudioTap.setActive(null);
+            appAudio = null;
         }
         long duration = (long) frameCount * 1000L / options.getFps();
         byte[] micBytes = null;
@@ -427,6 +516,9 @@ public final class SimulatorRecorder {
                         tapCopy = new ArrayList<Long>(taps);
                     }
                     short[] pcm = buildAudio(duration, micBytes, options.isTapSound() ? tapCopy : new ArrayList<Long>());
+                    if (app != null) {
+                        app.mixInto(pcm);
+                    }
                     writer.writeAudio(pcm, SAMPLE_RATE, 1, 0);
                 }
             } finally {
