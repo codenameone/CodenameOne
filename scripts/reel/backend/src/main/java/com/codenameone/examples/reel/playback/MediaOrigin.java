@@ -66,6 +66,10 @@ public class MediaOrigin {
             Playbacks playbacks, VideoRepository videos) {
         this.videos = videos;
         this.root = root;
+        // A server with no packaged media yet (a fresh install, the test profile)
+        // must answer 404 for art and segments, not fail every request on a
+        // document root that does not exist.
+        new File(root).mkdirs();
         this.tokens = tokens;
         this.licenses = licenses;
         this.playbacks = playbacks;

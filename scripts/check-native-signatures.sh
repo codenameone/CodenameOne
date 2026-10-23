@@ -56,7 +56,11 @@ if [[ -d "$REPO_ROOT/vm/backend/impl/parparvm" ]] && command -v javac >/dev/null
   mkdir -p "$REPO_ROOT/$backend_build"
   # Plus the core classes the backend shares (@SharedWithBackend), which live in
   # CodenameOne/src rather than under vm/backend.
+  # And the class library's JdkHost, which ClassLibraryHost extends: it exists only
+  # in vm/JavaAPI, not in the JDK this compiles against (maven/backend-parparvm
+  # copies it in the same way).
   if { find "$REPO_ROOT/vm/backend/src" "$REPO_ROOT/vm/backend/impl/parparvm" -name '*.java' -print \
+       && echo "$REPO_ROOT/vm/JavaAPI/src/com/codename1/impl/JdkHost.java" \
        && "$REPO_ROOT/vm/backend/shared-sources.sh"; } \
        | tr '\n' '\0' | xargs -0 javac -nowarn -d "$REPO_ROOT/$backend_build" >/dev/null 2>&1; then
     BACKEND_CLASSES="$backend_build"

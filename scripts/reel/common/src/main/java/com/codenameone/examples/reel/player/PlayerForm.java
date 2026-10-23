@@ -111,6 +111,7 @@ public final class PlayerForm {
     /// The schemes this device can play, strongest first: hardware DRM, then
     /// ClearKey, then AES-128 HLS, which every player has.
     public static List<String> schemes() {
+        // tag::reel-schemes[]
         List<String> out = new ArrayList<String>();
         DrmScheme[] order = {DrmScheme.WIDEVINE, DrmScheme.FAIRPLAY, DrmScheme.CLEARKEY, DrmScheme.AES_128};
         for (int iter = 0; iter < order.length; iter++) {
@@ -118,6 +119,7 @@ public final class PlayerForm {
                 out.add(order[iter].name());
             }
         }
+        // end::reel-schemes[]
         if (!out.contains(DrmScheme.AES_128.name())) {
             out.add(DrmScheme.AES_128.name());
         }
@@ -190,6 +192,7 @@ public final class PlayerForm {
         if (closed) {
             return;
         }
+        // tag::reel-stream[]
         StreamRequest req = new StreamRequest(Art.url(session.manifestUrl()))
                 .setStartPosition(session.resumeSeconds() * 1000)
                 .setOnCompletion(() -> CN.callSerially(() -> close(true)));
@@ -199,6 +202,7 @@ public final class PlayerForm {
             req.setDrm(drm);
         }
         open(req);
+        // end::reel-stream[]
     }
 
     static DrmConfig drm(String scheme, String licenseUrl, String certificateUrl, String token, String contentId) {

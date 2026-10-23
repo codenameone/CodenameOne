@@ -306,8 +306,16 @@ try {
   await page.screenshot({ path: path.join(out, '5-signed-out.png') });
   say('signed out: the welcome screen is back');
 
-  // 7. The admin, who lands in the console.
+  // 7. The admin. Staff open watching like everyone else; the console is one
+  //    entry away in the menu, under "Switch to".
   await signInAs(admin);
+  await settled();
+  const adminMenu = await waitFor('the menu button as the admin', stepSeconds, async () =>
+      (await components()).filter(c => c.role === 'button' && c.y < 140 && c.width < 120
+          && c.width > 20).sort((a, b) => a.x - b.x)[0]);
+  await click(adminMenu);
+  await settled();
+  await click(await waitFor('Administration in the menu', stepSeconds, button('Administration')));
   await waitFor('the admin console', stepSeconds, async () => {
     const text = await screenText();
     // A caption goes onto two lines where its tile is narrow.
