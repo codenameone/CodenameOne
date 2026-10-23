@@ -11064,6 +11064,34 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// Called when the activity resumes: the listener missed every change made while this
     /// application was in the background, and now the description is readable again. A clear
     /// deferred while in the background runs here, once the clip is proven still ours.
+    static void verifyClipOwnershipOnResume(Context context) {
+        if (android.os.Build.VERSION.SDK_INT < 24 || context == null) {
+            return;
+        }
+        synchronized (STAGED_CLIP_FILES) {
+            // The listener is delivered only while focused, so a change counted while in the
+            // background (ours or a failed publish) may never have been consumed. A stale count
+            // would swallow the next foreign copy and keep a clip that is no longer ours owned.
+            expectedClipChanges = 0;
+        }
+        try {
+            android.content.ClipboardManager clipboard = (android.content.ClipboardManager)
+                    context.getSystemService(Context.CLIPBOARD_SERVICE);
+            if (clipboard == null) {
+                return;
+            }
+            ClipboardContent pending;
+            synchronized (STAGED_CLIP_FILES) {
+                pending = pendingClipClear;
+            }
+            if (verifyClipOwnership(clipboard) == CLIP_OURS && pending != null) {
+                clearOwnedClip(clipboard, pending);
+            }
+        } catch (Throwable t) {
+            com.codename1.io.Log.e(t);
+        }
+    }
+
     /// Called when the activity gains window focus. On Android 10 and later the clipboard
     /// can be read only by the focused application, and focus arrives after onResume, so the
     /// check made there can answer "unknown" and leave a deferred clear pending. This retries
@@ -11089,34 +11117,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             android.content.ClipboardManager clipboard = (android.content.ClipboardManager)
                     context.getSystemService(Context.CLIPBOARD_SERVICE);
             if (clipboard != null && verifyClipOwnership(clipboard) == CLIP_OURS) {
-                clearOwnedClip(clipboard, pending);
-            }
-        } catch (Throwable t) {
-            com.codename1.io.Log.e(t);
-        }
-    }
-
-    static void verifyClipOwnershipOnResume(Context context) {
-        if (android.os.Build.VERSION.SDK_INT < 24 || context == null) {
-            return;
-        }
-        synchronized (STAGED_CLIP_FILES) {
-            // The listener is delivered only while focused, so a change counted while in the
-            // background (ours or a failed publish) may never have been consumed. A stale count
-            // would swallow the next foreign copy and keep a clip that is no longer ours owned.
-            expectedClipChanges = 0;
-        }
-        try {
-            android.content.ClipboardManager clipboard = (android.content.ClipboardManager)
-                    context.getSystemService(Context.CLIPBOARD_SERVICE);
-            if (clipboard == null) {
-                return;
-            }
-            ClipboardContent pending;
-            synchronized (STAGED_CLIP_FILES) {
-                pending = pendingClipClear;
-            }
-            if (verifyClipOwnership(clipboard) == CLIP_OURS && pending != null) {
                 clearOwnedClip(clipboard, pending);
             }
         } catch (Throwable t) {

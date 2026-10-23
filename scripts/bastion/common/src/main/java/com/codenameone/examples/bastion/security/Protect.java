@@ -20,7 +20,8 @@ package com.codenameone.examples.bastion.security;
 
 import com.codename1.io.Preferences;
 import com.codename1.security.DeviceIntegrity;
-import com.codename1.security.Hash;
+import com.codename1.security.Hmac;
+import com.codename1.security.SecureRandom;
 import com.codename1.security.TapjackingPolicy;
 import com.codename1.security.shield.ShieldSignal;
 import com.codename1.security.shield.ShieldSignals;
@@ -43,27 +44,37 @@ import com.codenameone.examples.bastion.AppConfig;
 /// - **Clipboard**: an account number, address or authenticator key the user
 ///   copies is wiped from the clipboard after
 ///   [AppConfig#CLIPBOARD_CLEAR_MILLIS], whether or not the app is in the
-///   foreground (the background is not a trigger: that would need a read), and at the next start if the app was killed first -- unless
-///   something else was copied in the meantime. The clip is marked sensitive
+///   foreground (the background is not a trigger: that would need a read),
+///   and when the app next shows a screen if the clear could not run in time
+///   -- unless something else was copied in the meantime. The clip is marked sensitive
 ///   ([ClipboardContent#setSensitive(boolean)]): Android 13 and newer keep it
 ///   out of the clipboard preview and the keyboard's suggestions, and iOS
 ///   keeps it off Universal Clipboard and lets the pasteboard expire it even
 ///   if the app is killed first.
 public final class Protect {
+    /// The leftover check's verdicts ([#decide]).
+    static final int KEEP = 0;
+    static final int CLEAR = 1;
+    static final int FORGET = 2;
+
+    private static final String LEFT = "bastion.clipboard.left";
+    private static final String KEY_ACCOUNT = "bastion.clipboard.key";
     private static boolean secure;
-    private static String copied;
 
     private Protect() {
     }
 
     public static void install() {
-        clearLeftover();
         DeviceIntegrity.setTapjackingProtection(TapjackingPolicy.BLOCK);
         if (DeviceIntegrity.isHideOverlayWindowsSupported()) {
             DeviceIntegrity.setHideOverlayWindows(true);
         }
         DeviceIntegrity.addTapjackingListener(evt ->
                 ShieldSignals.add(ShieldSignal.TAPJACK, 2, "a touch through an overlay was blocked"));
+        // Not now: runApp has not shown a form yet, and Android 10+ answers
+        // a clipboard read with null until a window of ours has focus. The
+        // first screen() call and every resume look again.
+        CN.callSerially(Protect::checkLeftover);
     }
 
     /// Called as each form shows: `sensitive` forms block screenshots.
@@ -71,6 +82,10 @@ public final class Protect {
         if (sensitive != secure) {
             secure = sensitive;
             DeviceIntegrity.setSecureScreen(sensitive);
+        }
+        if (Preferences.get(LEFT, "").length() > 0) {
+            // After the show, so the window has focus by the time it reads.
+            CN.callSerially(Protect::checkLeftover);
         }
     }
 
@@ -84,22 +99,34 @@ public final class Protect {
                 .setData(ClipboardContent.MIME_TEXT, text)
                 .setSensitive(true)
                 .setClearAfter((int) AppConfig.CLIPBOARD_CLEAR_MILLIS));
-        copied = text;
-        // A digest, never the text: what a killed app left on the clipboard
-        // is recognised at the next start without keeping it anywhere.
-        Preferences.set(LEFT, digest(text));
-        // The content clears itself (setClearAfter, or the pasteboard's own
-        // expiry on iOS): one mechanism writes the clipboard when the time is
-        // up, never two racing each other. This timer only forgets the
-        // digest, and never touches the clipboard. CN.setTimeout, not a
-        // UITimer: a UITimer runs only while the form it is bound to is
-        // showing, and the user moves on after copying.
-        CN.setTimeout((int) AppConfig.CLIPBOARD_CLEAR_MILLIS, () -> {
-            if (text.equals(copied)) {
-                copied = null;
-                Preferences.delete(LEFT);
-            }
-        });
+        if (isIos()) {
+            // The pasteboard expires a sensitive clip itself, even in a
+            // killed app; reading it back later would only show the paste
+            // banner.
+            return;
+        }
+        // A keyed digest, never the text: what was left on the clipboard is
+        // recognised later without keeping it anywhere, and an account
+        // number has too few possible values for a plain hash to hide it.
+        byte[] key = digestKey();
+        if (key == null) {
+            return;
+        }
+        long due = System.currentTimeMillis() + AppConfig.CLIPBOARD_CLEAR_MILLIS;
+        Preferences.set(LEFT, due + ":" + digest(key, text));
+        // The content clears itself (setClearAfter): one mechanism writes the
+        // clipboard when the time is up, never two racing each other. The
+        // digest stays until a read says the clip is gone or was replaced,
+        // because the port defers a clear that falls due in the background
+        // and a process killed meanwhile never runs it. This timer only
+        // looks; CN.setTimeout, not a UITimer, which runs only while its
+        // form is showing.
+        CN.setTimeout((int) AppConfig.CLIPBOARD_CLEAR_MILLIS + 1000, Protect::checkLeftover);
+    }
+
+    /// The app came back to the foreground.
+    public static void resumed() {
+        CN.callSerially(Protect::checkLeftover);
     }
 
     /// The app went to the background. Nothing is read or written here:
@@ -108,23 +135,59 @@ public final class Protect {
     /// reading could wipe what the user copied in another app since. The
     /// clip's own clear (setClearAfter, which clears only while nothing newer
     /// was copied, and the pasteboard expiry on iOS) keeps running, and the
-    /// digest left by copy() lets the next start clear it if the app is
+    /// digest left by copy() lets the next look clear it if the app is
     /// killed first.
     public static void paused() {
         // Deliberately empty; kept so the lifecycle call site documents it.
     }
 
-    /// At start: the clip a killed app could not clear, if it is still there.
-    static void clearLeftover() {
+    /// A copy whose clear may not have run: cleared if it is still there.
+    static void checkLeftover() {
         String left = Preferences.get(LEFT, "");
         if (left.length() == 0) {
             return;
         }
+        if (isIos()) {
+            Preferences.delete(LEFT);
+            return;
+        }
+        if (!due(left, System.currentTimeMillis())) {
+            return;
+        }
+        byte[] key = digestKey();
         String now = clipText();
-        if (now != null && left.equals(digest(now))) {
+        int verdict = key == null ? FORGET : decide(left, now == null ? null : digest(key, now));
+        if (verdict == CLEAR) {
             Display.getInstance().copyToClipboard("");
         }
-        Preferences.delete(LEFT);
+        if (verdict != KEEP) {
+            Preferences.delete(LEFT);
+        }
+    }
+
+    /// Whether the clear recorded in `left` has fallen due by `now`.
+    static boolean due(String left, long now) {
+        int colon = left.indexOf(':');
+        if (colon <= 0) {
+            return true;
+        }
+        try {
+            return now >= Long.parseLong(left.substring(0, colon));
+        } catch (NumberFormatException bad) {
+            return true;
+        }
+    }
+
+    /// What to do with the record `left` given the digest of the clipboard
+    /// now (null when the read answered nothing, which on Android 10+ means
+    /// "not allowed yet", not "empty"): keep it for the next look, clear the
+    /// clipboard, or forget it because something else was copied since.
+    static int decide(String left, String nowDigest) {
+        if (nowDigest == null) {
+            return KEEP;
+        }
+        String stored = left.substring(left.indexOf(':') + 1);
+        return stored.equals(nowDigest) ? CLEAR : FORGET;
     }
 
     /// The text on the clipboard, whichever form the port answers it in.
@@ -136,13 +199,26 @@ public final class Protect {
         return now instanceof String ? (String) now : null;
     }
 
-    static String digest(String text) {
+    /// The HMAC key, made once and kept in secure storage, never in
+    /// Preferences beside the digest; null if secure storage refuses it.
+    static byte[] digestKey() {
+        String stored = Keys.storage().get(KEY_ACCOUNT);
+        if (stored != null && stored.length() > 0) {
+            return Base64.decode(stored.getBytes());
+        }
+        byte[] made = SecureRandom.bytes(32);
+        return Keys.storage().set(KEY_ACCOUNT, Base64.encodeNoNewline(made)) ? made : null;
+    }
+
+    static String digest(byte[] key, String text) {
         try {
-            return Base64.encodeUrlSafe(Hash.sha256(text.getBytes("UTF-8")));
+            return Base64.encodeUrlSafe(Hmac.sha256(key, text.getBytes("UTF-8")));
         } catch (java.io.UnsupportedEncodingException impossible) {
             return "";
         }
     }
 
-    private static final String LEFT = "bastion.clipboard.left";
+    private static boolean isIos() {
+        return "ios".equals(CN.getPlatformName());
+    }
 }

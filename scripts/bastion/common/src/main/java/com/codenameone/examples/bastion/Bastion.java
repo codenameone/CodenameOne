@@ -114,6 +114,7 @@ public class Bastion extends Lifecycle {
     public void start() {
         super.start();
         Lock.resumed();
+        Protect.resumed();
     }
 
     @Override
