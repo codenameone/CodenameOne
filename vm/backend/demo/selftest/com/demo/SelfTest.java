@@ -223,6 +223,7 @@ public class SelfTest {
         foreignBuffer();
         fairness();
         web();
+        messageDigest();
         clientTls();
         rotatedCaBundlesAreReRead();
         futures();
@@ -439,6 +440,33 @@ public class SelfTest {
         overridesSet.remove();
         retry.remove();
         removesDuringInitialization.remove();
+    }
+
+    /// `java.security.MessageDigest` through the class library. On ParparVM it
+    /// resolves digests through the host `Backend` installs; with none installed
+    /// every algorithm threw `NoSuchAlgorithmException`. This program uses the
+    /// runtime's pieces directly and never touches `Backend`, so it initializes
+    /// that class first, as every real server's generated main does.
+    private static void messageDigest() throws Exception {
+        com.codename1.backend.Backend.builder();
+        String[][] vectors = {
+            {"MD5", "900150983cd24fb0d6963f7d28e17f72"},
+            {"SHA-1", "a9993e364706816aba3e25717850c26c9cd0d89d"},
+            {"SHA-256", "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"},
+            {"SHA-384", "cb00753f45a35e8bb5a03d699ac65007272c32ab0eded1631a8b605a43ff5bed"
+                    + "8086072ba1e7cc2358baeca134c825a7"},
+            {"SHA-512", "ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a"
+                    + "2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f"},
+        };
+        for(int iter = 0 ; iter < vectors.length ; iter++) {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance(vectors[iter][0]);
+            // Incremental: two updates, then digest() resets for a second use.
+            md.update(bytes("a"));
+            md.update(bytes("bc"));
+            check("MessageDigest " + vectors[iter][0], vectors[iter][1], hex(md.digest()));
+            check("MessageDigest " + vectors[iter][0] + " after reset", vectors[iter][1],
+                    hex(md.digest(bytes("abc"))));
+        }
     }
 
     private static void crypto() throws Exception {
