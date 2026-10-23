@@ -19,7 +19,6 @@
 package com.codenameone.examples.bastion.ui;
 
 import com.codename1.components.SpanLabel;
-import com.codename1.ui.Button;
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
@@ -36,7 +35,7 @@ public final class SecurityCenterForm {
     }
 
     public static void show(final Runnable back) {
-        Form form = Ui.form("Security Center");
+        Form form = Ui.form("Security Center", back);
         form.add(Ui.muted(Lang.tr("What protects your account on this device. "
                 + "Nothing here is decoration: each line is read from the app as it runs.")));
         List<SecurityStatus.Item> items = SecurityStatus.items();
@@ -48,9 +47,6 @@ public final class SecurityCenterForm {
             }
             form.add(row(item));
         }
-        Button done = Ui.secondary("Back");
-        done.addActionListener(evt -> back.run());
-        form.add(done);
         Ui.show(form, false);
     }
 

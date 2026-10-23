@@ -21,6 +21,9 @@ package com.codenameone.examples.bastion.net;
 import com.codename1.io.rest.RestClients;
 import com.codenameone.examples.bastion.api.AccountApi;
 import com.codenameone.examples.bastion.api.AdminApi;
+import com.codenameone.examples.bastion.api.AuditApi;
+import com.codenameone.examples.bastion.api.BooksApi;
+import com.codenameone.examples.bastion.api.InsightsApi;
 import com.codenameone.examples.bastion.api.BankingApi;
 import com.codenameone.examples.bastion.api.ExchangeApi;
 
@@ -31,6 +34,9 @@ public final class Api {
     private static BankingApi banking;
     private static ExchangeApi exchange;
     private static AdminApi admin;
+    private static BooksApi books;
+    private static AuditApi audit;
+    private static InsightsApi insights;
 
     private Api() {
     }
@@ -40,6 +46,9 @@ public final class Api {
         banking = RestClients.create(BankingApi.class, baseUrl);
         exchange = RestClients.create(ExchangeApi.class, baseUrl);
         admin = RestClients.create(AdminApi.class, baseUrl);
+        books = RestClients.create(BooksApi.class, baseUrl);
+        audit = RestClients.create(AuditApi.class, baseUrl);
+        insights = RestClients.create(InsightsApi.class, baseUrl);
     }
 
     public static AccountApi account() {
@@ -56,5 +65,20 @@ public final class Api {
 
     public static AdminApi admin() {
         return admin;
+    }
+
+    /// The bank's own books; staff only (admin or auditor).
+    public static BooksApi books() {
+        return books;
+    }
+
+    /// The audit log, read by staff; staff only.
+    public static AuditApi audit() {
+        return audit;
+    }
+
+    /// Charts of a customer's own money, and market candles.
+    public static InsightsApi insights() {
+        return insights;
     }
 }

@@ -28,6 +28,7 @@ import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.util.UITimer;
 import com.codenameone.examples.bastion.api.BookDto;
+import com.codenameone.examples.bastion.api.CandleDto;
 import com.codenameone.examples.bastion.api.LevelDto;
 import com.codenameone.examples.bastion.api.MarketDto;
 import com.codenameone.examples.bastion.api.NewOrderDto;
@@ -78,6 +79,9 @@ public final class MarketForm {
         Container hero = new Container(BoxLayout.y(), "BnHero");
         hero.addAll(new Label(Lang.tr("Last price"), "BnHeroLabel"), ticker, spread);
         form.add(hero);
+        final Container chart = new Container(BoxLayout.y());
+        form.add(chart);
+        candles(market, chart);
         final Container book = new Container(BoxLayout.y());
         final Container orders = new Container(BoxLayout.y());
         form.add(Ui.section("Order book"));
@@ -105,6 +109,42 @@ public final class MarketForm {
         Api.exchange().book(market.id(), Net.to((BookDto b) -> fillBook(book, b, market), quiet));
         Api.exchange().openOrders(Net.to((List<OrderDto> open) -> fillOrders(orders, open, market,
                 () -> refresh(market, ticker, spread, book, orders)), quiet));
+    }
+
+    /// The last day in hourly candles, with the volume traded each hour
+    /// under them. Loaded once: the candles move by the hour, the book above
+    /// by the second.
+    private static void candles(final MarketDto market, final Container box) {
+        Api.insights().candles(market.id(), null, "24", Net.to((List<CandleDto> list) -> {
+            if (list.size() < 2) {
+                return;
+            }
+            double q = Amounts.pow10(Assets.decimals(market.quote()));
+            double b = Amounts.pow10(Assets.decimals(market.base()));
+            int n = list.size();
+            long[] starts = new long[n];
+            double[] open = new double[n];
+            double[] high = new double[n];
+            double[] low = new double[n];
+            double[] close = new double[n];
+            double[] volume = new double[n];
+            for (int iter = 0; iter < n; iter++) {
+                CandleDto c = list.get(iter);
+                starts[iter] = c.start();
+                open[iter] = c.open() / q;
+                high[iter] = c.high() / q;
+                low[iter] = c.low() / q;
+                close[iter] = c.close() / q;
+                volume[iter] = c.volume() / b;
+            }
+            box.add(Ui.section("Price, 24 hours"));
+            box.add(Charts.candles("price-chart", starts, open, high, low, close));
+            box.add(new Label(Lang.tr("Volume ({0})", market.base()), "BnChartCaption"));
+            box.add(Charts.bars("volume-chart", starts, volume, "BnChartGrid"));
+            if (box.getComponentForm() != null) {
+                box.getComponentForm().revalidate();
+            }
+        }, (status, message) -> { }));
     }
 
     private static String price(long units, MarketDto market) {

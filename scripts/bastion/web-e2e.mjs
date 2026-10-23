@@ -79,14 +79,15 @@ let authenticator;
 /// before. It has a platform authenticator -- Chromium's virtual one, through
 /// the DevTools protocol -- holding whatever passkeys the last one held, the
 /// way a phone keeps its passkeys while the browser forgets its session.
-async function newPage() {
+async function newPage(options = {}) {
   let passkeys = [];
   if (page) {
     passkeys = (await cdp.send('WebAuthn.getCredentials', { authenticatorId: authenticator }))
         .credentials;
     await page.context().close();
   }
-  const context = await browser.newContext({ viewport: { width: 420, height: 860 } });
+  const context = await browser.newContext({ viewport: options.viewport || { width: 420, height: 860 },
+    colorScheme: options.colorScheme || 'light' });
   page = await context.newPage();
   cdp = await context.newCDPSession(page);
   await cdp.send('WebAuthn.enable');
@@ -182,6 +183,21 @@ async function fields() {
 }
 
 async function click(component) {
+  // Below the fold (the dashboard's charts push the account list down):
+  // wheel the form until the component is on screen, then aim again.
+  const size = page.viewportSize();
+  for (let turn = 0; turn < 12
+      && (component.y + component.height > size.height || component.y < 0); turn++) {
+    const name = component.label || component.text;
+    const below = component.y + component.height - size.height + 80;
+    await page.mouse.move(size.width * 0.6, size.height / 2);
+    await page.mouse.wheel(0, component.y < 0 ? Math.max(-size.height * 0.6, component.y - 120)
+        : Math.min(size.height * 0.6, below));
+    await settled();
+    const again = (await components()).find(c => (c.label || c.text) === name);
+    if (!again) break;
+    component = again;
+  }
   await page.mouse.click(component.x + component.width / 2, component.y + component.height / 2);
 }
 
@@ -307,7 +323,14 @@ async function menu(label) {
     }
     await click(open);
     await settled();
-    const item = await button(label)();
+    // The menu slides in; give its commands a moment to reach the tree.
+    let item = null;
+    for (let wait = 0; wait < 10 && !item; wait++) {
+      item = await button(label)();
+      if (!item) {
+        await page.waitForTimeout(300);
+      }
+    }
     if (item) {
       await click(item);
       await settled();
@@ -325,6 +348,42 @@ async function shot(name) {
 }
 
 const textOnScreen = pattern => async () => pattern.test(await screenText());
+
+/// The back arrow of a pushed screen: the only button at the start of its
+/// title bar.
+async function back() {
+  await settled();
+  const arrow = (await components()).filter(c => c.role === 'button' && c.y < 70 && c.x < 130)
+      .sort((x, y) => x.x - y.x)[0];
+  if (!arrow) {
+    throw new Error('no back arrow on screen');
+  }
+  await click(arrow);
+  await settled();
+}
+
+/// Something on screen whose text matches, inside the viewport.
+const visible = (pattern, top = 60) => async () => {
+  const height = page.viewportSize().height;
+  return (await components()).find(c => pattern.test(c.label || c.text || '')
+      && c.y > top && c.y + c.height < height && c.height < 200);
+};
+
+async function scroll(dy) {
+  const size = page.viewportSize();
+  await page.mouse.move(size.width * 0.6, size.height / 2);
+  await page.mouse.wheel(0, dy);
+  await settled();
+}
+
+async function signInStaff(who, viewport) {
+  await newPage({ viewport });
+  await page.goto(url, { waitUntil: 'load' });
+  await waitFor('the sign-in form', startSeconds, button('Sign in'));
+  await typeInto(0, who, 'email');
+  await typeInto(1, 'bastion-demo-password', 'password');
+  await press('Sign in');
+}
 
 /// The screens the guides show, on the development profile's demo accounts:
 /// BASTION_WEB_TOUR names the directory the pictures go to.
@@ -351,13 +410,40 @@ async function guideTour() {
   await waitFor('the device to be registered', stepSeconds, async () =>
       requests.includes('200 POST /api/devices'));
   await settled();
+  await waitFor('the dashboard charts', stepSeconds, textOnScreen(/Where your money is/));
+  await page.waitForTimeout(1500);
   await shot('bastion-dashboard');
+  // The Initializr's preview of the template: the dashboard at the size of
+  // the other templates' previews.
+  await page.setViewportSize({ width: 562, height: 1217 });
+  await page.waitForTimeout(2500);
+  await settled();
+  await page.screenshot({ path: path.join(out, 'bastion-preview.png') });
+  await page.setViewportSize({ width: 420, height: 860 });
+  await page.waitForTimeout(1500);
+  await settled();
 
   const checking = await waitFor('the checking account', stepSeconds, async () =>
       (await components()).find(c => /Checking/.test(c.label || c.text || '') && c.height < 200));
   await click(checking);
   await waitFor('the history', stepSeconds, textOnScreen(/Money in/));
+  await waitFor('the charts', stepSeconds, async () =>
+      requests.some(r => /200 GET \/api\/insights\/cashflow/.test(r)));
+  await page.waitForTimeout(1500);
   await shot('bastion-account-history');
+  await press('Statement');
+  await waitFor('the statement', stepSeconds, textOnScreen(/Opening balance/));
+  await shot('bastion-statement');
+  await back();
+  await waitFor('the account', stepSeconds, textOnScreen(/Order a card/));
+  await page.screenshot({ path: path.join(out, 'after-statement.png') });
+  await scroll(1500);
+  await click(await waitFor('a history row', stepSeconds, visible(/^Money in$/)));
+  await waitFor('the transaction', stepSeconds, textOnScreen(/Balance after/));
+  await shot('bastion-transaction');
+  await back();
+  await waitFor('the account', stepSeconds, textOnScreen(/Order a card/));
+  await scroll(-6000);
   await press('Order a card');
   await waitFor('the card', stepSeconds, async () => requests.some(r => /POST \/api\/accounts\/.*\/card/.test(r)));
   await waitFor('the cards screen', stepSeconds, textOnScreen(/Daily limit/));
@@ -428,17 +514,92 @@ async function guideTour() {
   await page.waitForTimeout(1500);
   await shot('bastion-lock');
 
-  await newPage();
+  // The customer's dashboard in dark mode.
+  await newPage({ colorScheme: 'dark' });
   await page.goto(url, { waitUntil: 'load' });
   await waitFor('the sign-in form', startSeconds, button('Sign in'));
-  await typeInto(0, 'admin@bastion.example', 'email');
+  await typeInto(0, 'customer2@bastion.example', 'email');
   await typeInto(1, 'bastion-demo-password', 'password');
   await press('Sign in');
-  // An administrator lands on the administration screen.
+  await waitFor('the dashboard', stepSeconds, textOnScreen(/Total balance/));
+  await waitFor('the allocation', stepSeconds, textOnScreen(/Where your money is/));
+  await page.waitForTimeout(1500);
+  await shot('bastion-dashboard-dark');
+
+  // The back office, on a desktop-sized window.
+  const desk = { width: 1440, height: 900 };
+  await signInStaff('admin@bastion.example', desk);
+  await waitFor('the console', stepSeconds, textOnScreen(/Awaiting approval/));
+  await waitFor('the volume charts', stepSeconds, async () =>
+      requests.some(r => /200 GET \/api\/books\/volume/.test(r)));
   await press('Verify the audit log');
   await press('Verify the ledger');
   await waitFor('the verification', stepSeconds, textOnScreen(/Intact|Problems found/));
-  await shot('bastion-admin-verify');
+  await page.waitForTimeout(1500);
+  await shot('bastion-console-overview');
+  await press('Journal');
+  await waitFor('the journal', stepSeconds, textOnScreen(/Tap an entry/));
+  await shot('bastion-console-journal');
+  await click(await waitFor('an entry', stepSeconds, visible(/^Order hold/, 150)));
+  await waitFor('the entry', stepSeconds, textOnScreen(/Journal entry/));
+  await shot('bastion-console-entry');
+  for (const [section, pattern, name] of [
+    ['Trial balance', /Class/, 'bastion-console-trial-balance'],
+    ['Balance sheet', /Total assets/, 'bastion-console-balance-sheet'],
+    ['Income statement', /Net income/, 'bastion-console-income-statement'],
+    ['Reconciliation', /Subledger/, 'bastion-console-reconciliation'],
+    ['Period close', /Closed through/, 'bastion-console-periods'],
+    ['Audit chain', /Links checked/, 'bastion-console-audit-chain']]) {
+    await press(section);
+    await waitFor(section, stepSeconds, textOnScreen(pattern));
+    await page.waitForTimeout(500);
+    await shot(name);
+  }
+  await press('General ledger');
+  // Maker: an adjustment over the four-eyes threshold waits for a second
+  // administrator.
+  await press('Raise an adjustment');
+  await typeInto(0, '1500.00', 'any');
+  await typeInto(1, 'Goodwill credit, case 4471', 'any');
+  await typeInto(2, 'bastion-demo-password', 'password');
+  await press('Request adjustment');
+  await waitFor('the request', stepSeconds, async () =>
+      requests.some(r => /POST \/api\/admin\/adjust/.test(r)));
+  await settled();
+  await press('Show as a T-account');
+  await waitFor('the T-account', stepSeconds, textOnScreen(/Total debits/));
+  await shot('bastion-console-t-account');
+  await press('Evidence');
+  await click(await waitFor('the CSV button', stepSeconds, button('CSV')));
+  await waitFor('the evidence', stepSeconds, textOnScreen(/Saved/));
+  await shot('bastion-console-evidence');
+
+  // Checker: a second administrator decides.
+  await signInStaff('admin2@bastion.example', desk);
+  await waitFor('the console', stepSeconds, textOnScreen(/Awaiting approval/));
+  await press('Approvals');
+  await waitFor('the queue', stepSeconds, textOnScreen(/Maker-checker/));
+  await shot('bastion-console-approvals');
+  await click(await waitFor('the pending reversal', stepSeconds, visible(/^Pending$/, 150)));
+  await typeInto(0, 'Checked against the customer file', 'any');
+  await typeInto(1, 'bastion-demo-password', 'password');
+  await shot('bastion-console-approve');
+  await press('Approve');
+  await waitFor('the approval', stepSeconds, async () =>
+      requests.some(r => /200 POST \/api\/admin\/approvals\/.*\/approve/.test(r)));
+
+  // The auditor reads everything and changes nothing.
+  await signInStaff('auditor@bastion.example', desk);
+  await waitFor('the console', stepSeconds, textOnScreen(/Read-only/));
+  await press('Access log');
+  await waitFor('the access log', stepSeconds, textOnScreen(/Staff member/));
+  await page.waitForTimeout(500);
+  await shot('bastion-console-auditor');
+  // And on a phone the same console is one column.
+  await signInStaff('auditor@bastion.example', undefined);
+  await waitFor('the console', stepSeconds, textOnScreen(/Read-only/));
+  await page.waitForTimeout(1500);
+  await shot('bastion-console-phone');
 }
 
 let failed = null;

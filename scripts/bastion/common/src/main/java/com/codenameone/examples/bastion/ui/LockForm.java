@@ -19,7 +19,7 @@
 package com.codenameone.examples.bastion.ui;
 
 import com.codename1.ui.Button;
-import com.codename1.ui.Form;
+import com.codename1.ui.Container;
 import com.codename1.ui.Label;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
@@ -38,8 +38,7 @@ public final class LockForm {
     /// `signInAgain` is the way out when there is no biometric or PIN to ask
     /// for, or the user would rather.
     public static void show(final Runnable signInAgain) {
-        Form form = Ui.form("Locked");
-        form.add(Ui.title("Bastion is locked"));
+        Container form = Ui.landing("Locked", "Bastion is locked", null);
         final Label error = Ui.error();
         form.add(error);
         if (biometric()) {
@@ -73,7 +72,7 @@ public final class LockForm {
         form.add(again);
         // Locked screens are sensitive too: the last frame before the lock
         // must not survive in the recent-apps list.
-        Ui.showLockScreen(form);
+        Ui.showLockScreen(form.getComponentForm());
         if (biometric()) {
             ask(signInAgain, error);
         }

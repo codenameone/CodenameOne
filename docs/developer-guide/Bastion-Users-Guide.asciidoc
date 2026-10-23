@@ -68,15 +68,27 @@ image::img/bastion-lock.png["The lock screen: Bastion is locked, a PIN field, an
 
 === The dashboard
 
-The dashboard shows the total of every account in dollars, at the exchange's current prices, and lists each account with its balance. Until the device has a payment key, a banner above says so and offers to register it; registering asks for the password again, because only a recent sign-in may add a key.
+The dashboard shows the total of every account in dollars, at the exchange's current prices, the dollar balance over the last 30 days, how the money is spread across currencies and coins, and each account with its balance. Until the device has a payment key, a banner above says so and offers to register it; registering asks for the password again, because only a recent sign-in may add a key.
 
 image::img/bastion-dashboard-unregistered.png["The dashboard with a banner saying this device can't sign payments yet and a Register this device button",scaledwidth=40%]
 
 image::img/bastion-dashboard.png["The dashboard with the total balance, buttons to move money, pay someone and trade, and the checking account",scaledwidth=40%]
 
-Tapping an account opens it: its balance, what can be done with it, and its history, every posting newest first, with what it was for.
+Screens reached from the menu are top-level and have the menu button; a screen opened from another one has a back arrow instead. No screen has both.
 
-image::img/bastion-account-history.png["A checking account with buttons to move, add and withdraw money and to order a card, and its history",scaledwidth=40%]
+Tapping an account opens it: its balance, what can be done with it, a chart of the balance over 30 days, the money in and out each day, and its history, every posting newest first.
+
+image::img/bastion-account-history.png["A checking account with buttons to move, add and withdraw money and to order a card, a balance line chart and bars of money in and out",scaledwidth=40%]
+
+Tapping a line of the history shows that posting in full: the side of the entry it's (a credit to the account or a debit from it), the balance it left and the ledger entry it belongs to. *Statement* lists every posting oldest first with the running balance between an opening and a closing balance, the way a bank statement does.
+
+image::img/bastion-transaction.png["One posting: money in, the amount, the side of the entry, the balance after it and the ledger entry reference",scaledwidth=40%]
+
+image::img/bastion-statement.png["A statement table with date, description, money in, money out and balance columns between an opening and a closing balance",scaledwidth=40%]
+
+The app follows the device's dark mode, charts included:
+
+image::img/bastion-dashboard-dark.png["The dashboard in dark mode with the balance chart and the allocation ring",scaledwidth=40%]
 
 Balances, card numbers and codes are on *sensitive screens*. On Android those screens can't be captured or recorded, and the recent-apps list shows them blank; on iOS the app switcher shows a cover instead of the screen.
 
@@ -114,9 +126,9 @@ image::img/bastion-cards.png["The cards screen with a card, its masked number, i
 
 image::img/bastion-exchange.png["The exchange screen listing the BTC/USD and ETH/USD markets with their prices",scaledwidth=40%]
 
-image::img/bastion-order-book.png["The BTC/USD market: the last price, the bid and ask, the order book in red and green, and the order ticket",scaledwidth=40%]
+image::img/bastion-order-book.png["The BTC/USD market: the last price, the bid and ask, hourly candles with the volume under them, and the order book",scaledwidth=40%]
 
-A market opens its order book, its recent trades and a ticket:
+A market opens the last day in hourly candles, a rising hour in green and a falling one in red over its high-low range, the volume traded each hour, its order book and a ticket:
 
 * A *limit order* names a price and a quantity, and rests on the book until another order meets it, or until it's cancelled.
 * A *market order* takes what the book offers now, up to a budget for a buy or a quantity for a sell.
@@ -145,17 +157,65 @@ It's honest by design. A protection the simulator or a browser can't provide, su
 
 === Settings
 
-*Settings* turns biometric unlock on and off, sets, changes or removes the unlock PIN, turns on the authenticator app and makes new recovery codes, lists and removes passkeys and adds new ones, shows this device's payment key, and chooses the language: English, Spanish, French, German or Hebrew, which lays the app out right to left.
+*Settings* turns biometric unlock on and off, sets, changes or removes the unlock PIN, turns on the authenticator app and makes new recovery codes, lists and removes passkeys and adds new ones, shows this device's payment key, and chooses the language: English, Spanish, French, German or Hebrew, which lays the app out right to left. Tables mirror, so the debit side of a T-account is on the right as a Hebrew ledger writes it; charts keep time running left to right.
 
 image::img/bastion-settings.png["The settings screen with the unlock options, the authenticator app, passkeys, this device's payment key and the languages",scaledwidth=40%]
 
-=== The administrator
+=== The back office
 
-An administrator signs in like a customer and lands on *Administration*. It runs the two checks a bank's auditors ask for, recomputed from the stored rows each time:
+Staff sign in like customers and land on the console: *Administration* for an administrator, *Audit* for an auditor. On a wide window, a desktop or a tablet on its side, the sections are a sidebar beside the page and the tables use the width; on a phone the sections are a picker over one column, and a wide table scrolls sideways.
+
+image::img/bastion-console-overview.png["The administration console on a desktop: a sidebar of sections, tiles for the trial balance, reconciliation, audit chain and approvals, volume charts and the two integrity checks",scaledwidth=95%]
+
+The *Overview* shows whether the trial balance balances, whether reconciliation found breaks, whether the audit chain is intact and how many requests wait for approval, with the dollar volume and the number of journal entries a day. An administrator also runs the two checks, recomputed from the stored rows each time:
 
 * *Verify the audit log*: every security and money event is a link in a hash chain, and the check reports any row that was changed, removed or inserted out of order.
 * *Verify the ledger*: every entry sums to zero in each currency, and every balance equals the sum of its postings.
 
-image::img/bastion-admin-verify.png["The administration screen after both checks: the audit chain is intact and every entry balances",scaledwidth=40%]
+The *Journal* lists every entry with its debit (Dr) and credit (Cr) legs, credits indented under the debits. Tapping an entry shows it in full, with a total per currency that proves its debits equal its credits, the entry it reverses or the one that reversed it, and its audit trail.
+
+image::img/bastion-console-journal.png["The journal: each entry's date, reference, type and memo over its legs, with debit and credit columns",scaledwidth=95%]
+
+image::img/bastion-console-entry.png["One journal entry: when it was posted, its type, who initiated it, its legs with codes, owners and debit and credit amounts, a total per currency and a Balanced badge",scaledwidth=95%]
+
+The *General ledger* lists the lines of one account code in one currency with a running balance, and shows the account as a T-account, debits on one side and credits on the other, between its opening and closing balances.
+
+image::img/bastion-console-t-account.png["A T-account for cash and reserves in dollars: debits on the left, credits on the right, totals under each and the closing balance",scaledwidth=95%]
+
+The statements follow from the same postings. The *Trial balance* lists the debit or credit balance of every account code and currency, with totals that must agree. The *Balance sheet* shows assets, liabilities and equity, and that the first equals the sum of the other two. The *Income statement* shows revenue and expenses for the period and the net income, all valued in dollars as well as in their own currency.
+
+image::img/bastion-console-trial-balance.png["The trial balance: code, account, class, asset, debit and credit columns with a total per currency and a Balanced badge",scaledwidth=95%]
+
+image::img/bastion-console-balance-sheet.png["The balance sheet with sections for assets, liabilities and equity, each line in its own currency and in dollars",scaledwidth=95%]
+
+image::img/bastion-console-income-statement.png["The income statement with revenue and expenses and the net income in dollars",scaledwidth=95%]
+
+*Reconciliation* compares each control account with the sum of its subledger. A difference is a break, and its row is red.
+
+image::img/bastion-console-reconciliation.png["Reconciliation: each control account's balance against its subledger with the difference, and the list of breaks",scaledwidth=95%]
+
+*Period close* lists the closed periods. Closing one moves revenue and expense into retained earnings and locks every entry up to its date, so its statements never change again.
+
+image::img/bastion-console-periods.png["The period close section listing closed periods with who closed them and when, and a button to close the books",scaledwidth=95%]
+
+Changes need two administrators. An administrator can ask for an adjustment to a customer account or for an entry to be reversed; above the approval threshold it waits in *Approvals* until a second administrator approves or rejects it. Every change asks for the administrator's password again.
+
+image::img/bastion-console-approvals.png["The approvals queue with a pending reversal highlighted, its maker, memo and status",scaledwidth=95%]
+
+image::img/bastion-console-approve.png["The decision dialog: the request, a reason, the password and Approve, Reject and Cancel buttons",scaledwidth=95%]
+
+*Audit chain* reports how many links were checked and the head of the chain, and lists the latest events with their hashes; if a link is broken, the first broken row is red. *Audit trail* lists every event that names one entry, account or person, and *Access log* lists every time staff read the books.
+
+image::img/bastion-console-audit-chain.png["The audit chain: an Intact badge, the number of links checked, the head hash and the latest events with their previous and own hashes",scaledwidth=95%]
+
+*Evidence* exports the journal, the trial balance or the audit chain as CSV or JSON for an external auditor. The file is saved, a browser downloads it, and the screen shows who made it, when, and its SHA-256 digest so the copy can be checked later.
+
+image::img/bastion-console-evidence.png["The evidence section after a CSV export: the file name, who made it and when, its SHA-256 digest and the first lines",scaledwidth=95%]
+
+An auditor sees the same console marked *Read-only*, without the approvals queue and without any button that changes something. The server refuses those changes to an auditor whatever the app shows.
+
+image::img/bastion-console-auditor.png["The audit console marked read-only, showing the access log of staff reads",scaledwidth=95%]
+
+image::img/bastion-console-phone.png["The audit console on a phone: a section picker over a single column",scaledwidth=40%]
 
 No request can make an administrator. Outside the development profile, the one administrator account comes from the server's environment when it starts.

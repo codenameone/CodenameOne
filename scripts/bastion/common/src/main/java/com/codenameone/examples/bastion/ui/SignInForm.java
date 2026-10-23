@@ -19,7 +19,7 @@
 package com.codenameone.examples.bastion.ui;
 
 import com.codename1.ui.Button;
-import com.codename1.ui.Form;
+import com.codename1.ui.Container;
 import com.codename1.ui.Label;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
@@ -32,9 +32,8 @@ public final class SignInForm {
     }
 
     public static void show(final Runnable signedIn) {
-        Form form = Ui.form("Sign in");
-        form.add(Ui.title("Bastion"));
-        form.add(Ui.muted(Lang.tr("Your bank, locked down.")));
+        Container form = Ui.landing("Sign in", "Bastion", "Your bank, locked down.");
+        form.add(new Label(Lang.tr("Sign in"), "BnLandingHeading"));
         final TextField email = Ui.field("E-mail", TextArea.EMAILADDR);
         final TextField password = Ui.field("Password", TextArea.PASSWORD);
         final Label error = Ui.error();
@@ -62,12 +61,11 @@ public final class SignInForm {
         Button join = Ui.secondary("Open an account");
         join.addActionListener(evt -> OnboardingForm.show(() -> show(signedIn), signedIn));
         form.add(join);
-        Ui.show(form, false);
+        Ui.show(form.getComponentForm(), false);
     }
 
     private static void codeStep(final Session.Pending pending, final Runnable signedIn) {
-        Form form = Ui.form("Verification");
-        form.add(Ui.title("Enter your code"));
+        Container form = Ui.landing("Verification", "Enter your code", null);
         form.add(Ui.muted(Lang.tr("Open your authenticator app and enter the six-digit code, "
                 + "or one of your recovery codes.")));
         final TextField code = Ui.field("Code", TextArea.NUMERIC);
@@ -82,6 +80,6 @@ public final class SignInForm {
                 Ui.showError(error, Lang.tr(message));
             });
         });
-        Ui.show(form, true);
+        Ui.show(form.getComponentForm(), true);
     }
 }

@@ -104,7 +104,17 @@ The ledger stores one signed number per posting. Read as accounting, a positive 
 * *Reconciliation.* Each control account (customer deposits, escrow, custody) is compared with the sum of the accounts beneath it, every journal entry with zero, and every stored balance with the sum of its postings. Each difference is reported as a break naming the account and the amounts.
 * *Roles.* An `AUDITOR` reads the books and the audit trail and can change nothing; an `ADMIN` operates. Every staff read is appended to the audit chain as `STAFF_READ` before it's answered, and `/api/audit/access-log` lists them.
 * *Four eyes.* A manual adjustment or a reversal worth more than `bastion.approval.threshold-usd-cents` waits as a pending approval until a second administrator approves it; the maker can't approve their own request. Every change also asks for the administrator's password again.
-* *Evidence.* `/api/audit/evidence/{name}` exports the journal, the trial balance or the audit chain as CSV or JSON, with a SHA-256 digest that is itself recorded on the chain. The chain report names the first row whose link is broken.
+* *Evidence.* `/api/audit/evidence/{name}` exports the journal, the trial balance or the audit chain as CSV or JSON, with a SHA-256 digest that's itself recorded on the chain. The chain report names the first row whose link is broken.
+
+=== Charts, tables and the console
+
+The app's screens are in `common/src/main/java/.../ui`. Three classes carry the data views:
+
+* `Charts.java` draws every chart with `com.codename1.charts`: a filled line for a balance, paired bars for money in and out, a doughnut for the allocation, and candles for a market, made of a range bar from the low to the high under a body from the open to the close. Colors come from the foreground of `BnChart*` styles in `theme.css`, so dark mode and a re-skin reach the charts too.
+* `Table.java` is a table of weighted columns over `TableLayout`, with numbers aligned to the end of their column. It mirrors in Hebrew, and on a phone a table wider than the screen scrolls sideways inside itself.
+* `ConsoleForm.java` is the staff console. A window at least 165 mm wide gets a sidebar; anything narrower gets a section picker. Its buttons follow the roles: an auditor gets no action at all and an administrator's changes send the password with each request and a fresh `Idempotency-Key` with each adjustment or reversal. The server enforces both; the console only stops offering what would be refused.
+
+`Nav.form` keeps one way out of every screen: a screen reached from the menu has the menu button, a screen pushed from another has a back arrow, never both. The sign-in, code and lock screens have no title bar; `Ui.landing` gives them the brand band as a header instead.
 
 === The audit chain
 

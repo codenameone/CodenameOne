@@ -27,6 +27,7 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
+import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.animations.Transition;
@@ -161,7 +162,34 @@ public final class Ui {
         return new Label(" ", "BnSpacer");
     }
 
-    /// A form with a back arrow that runs `back`, and the app's menu.
+    /// A screen of the signed-out app -- sign in, the code step, the lock --
+    /// with no title bar: the brand band across the top is its header, as
+    /// the front door of a bank app usually is. Answers the column the
+    /// screen's fields go in; the form is its `getComponentForm()`.
+    public static Container landing(String title, String heading, String subtitle) {
+        Form form = new Form(Lang.tr(title), new BorderLayout());
+        form.setUIID("BnForm");
+        form.getToolbar().hideToolbar();
+        Container band = new Container(BoxLayout.y(), "BnBrandBand");
+        band.setSafeArea(true);
+        Label logo = new Label("", "BnBrandLogo");
+        FontImage.setMaterialIcon(logo, FontImage.MATERIAL_SHIELD, 9f);
+        band.add(logo);
+        band.add(new Label(Lang.tr(heading), "BnBrandTitle"));
+        if (subtitle != null) {
+            SpanLabel line = new SpanLabel(Lang.tr(subtitle));
+            line.setTextUIID("BnBrandText");
+            band.add(line);
+        }
+        Container column = new Container(BoxLayout.y(), "BnPage");
+        column.setScrollableY(true);
+        form.add(BorderLayout.NORTH, band);
+        form.add(BorderLayout.CENTER, column);
+        return column;
+    }
+
+    /// A form with a back arrow that runs `back`. Whether it also has the
+    /// menu is [Nav#form]'s question; the answer there is "never both".
     public static Form form(String title, final Runnable back) {
         Form form = form(title);
         if (back != null) {

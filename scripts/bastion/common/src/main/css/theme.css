@@ -533,6 +533,343 @@ BnMenuHeader {
     background-color: transparent;
 }
 
+/* --------------------------------------------------------------- title bar */
+
+/* The strip the clock and the battery are drawn over: the colour of the
+   title bar under it, so the two read as one band. */
+StatusBar {
+    background-color: var(--surface);
+    padding: 0;
+    margin: 0;
+}
+
+Toolbar {
+    background-color: var(--surface);
+    border-bottom: 1px solid var(--line);
+    padding: 1.2mm 1mm 1.2mm 1mm;
+    margin: 0;
+}
+
+Title {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 3.6mm;
+    text-align: center;
+    padding: 1.4mm 1mm 1.4mm 1mm;
+    margin: 0;
+    background-color: transparent;
+}
+
+TitleCommand {
+    color: var(--text);
+    font-size: 3.4mm;
+    padding: 1.4mm 2mm 1.4mm 2mm;
+    margin: 0;
+    background-color: transparent;
+}
+
+BackCommand {
+    color: var(--text);
+    padding: 1.4mm 2mm 1.4mm 2mm;
+    margin: 0;
+    background-color: transparent;
+}
+
+SideNavigationPanel {
+    background-color: var(--surface);
+    padding: 0;
+    margin: 0;
+}
+
+SideCommand {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2.9mm;
+    padding: 2.6mm 4mm 2.6mm 4mm;
+    margin: 0;
+    border-bottom: 1px solid var(--line);
+}
+
+/* The front door: sign in, the code step and the lock have no title bar;
+   this band is their header. */
+BnBrandBand {
+    background-color: var(--brand);
+    padding: 9mm 5mm 6mm 5mm;
+    margin: 0;
+}
+
+BnBrandLogo {
+    color: var(--brand-contrast);
+    background-color: transparent;
+    padding: 0 0 2mm 0;
+    margin: 0;
+}
+
+BnBrandTitle {
+    color: var(--brand-contrast);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 7mm;
+    padding: 0;
+    margin: 0;
+}
+
+BnBrandText {
+    color: var(--brand-contrast);
+    background-color: transparent;
+    font-family: "native:MainLight";
+    font-size: 3mm;
+    padding: 0.6mm 0 0 0;
+    margin: 0;
+}
+
+BnLandingHeading {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 4mm;
+    padding: 2mm 0 2mm 0;
+    margin: 0;
+}
+
+/* ------------------------------------------------------------------ charts */
+
+/* Charts take their colours from the foreground of these styles. */
+BnChartLine { color: var(--brand); background-color: transparent; }
+BnChartIn { color: var(--success); background-color: transparent; }
+BnChartOut { color: var(--danger); background-color: transparent; }
+BnChartGrid { color: #c3c9d5; background-color: transparent; }
+BnChartText { color: var(--text-muted); background-color: transparent; }
+BnChartSlice1 { color: var(--brand); background-color: transparent; }
+BnChartSlice2 { color: #f2a900; background-color: transparent; }
+BnChartSlice3 { color: #6c4bd8; background-color: transparent; }
+BnChartSlice4 { color: #12a17a; background-color: transparent; }
+BnChartSlice5 { color: #e0557a; background-color: transparent; }
+
+BnChart {
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+}
+
+BnChartBox {
+    background-color: var(--surface-alt);
+    border-radius: var(--radius);
+    padding: 1.6mm;
+    margin: 0.8mm 0 1.2mm 0;
+}
+
+BnChartCaption {
+    color: var(--text-muted);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2.2mm;
+    padding: 1mm 0 0 0.3mm;
+    margin: 0;
+}
+
+BnSwatch {
+    background-color: var(--brand);
+    border-radius: 0.6mm;
+    font-size: 1.6mm;
+    padding: 0.6mm 1.4mm 0.6mm 1.4mm;
+    margin: 1.4mm 1.4mm 1.4mm 1.4mm;
+}
+
+BnLegend {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2.5mm;
+    padding: 0.8mm 2mm 0.8mm 0;
+    margin: 0;
+}
+
+BnLegendValue {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 2.5mm;
+    padding: 0.8mm 0 0.8mm 1mm;
+    margin: 0;
+}
+
+/* ----------------------------------------------------------------- console */
+
+BnSide {
+    background-color: var(--surface-alt);
+    border-right: 1px solid var(--line);
+    padding: 3mm 2mm 3mm 2mm;
+    margin: 0;
+}
+
+BnSideBrand {
+    color: var(--brand);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 3.6mm;
+    padding: 1mm 2mm 3mm 2mm;
+    margin: 0;
+}
+
+BnSideItem {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2.6mm;
+    text-align: left;
+    border-radius: var(--radius);
+    padding: 1.8mm 2.6mm 1.8mm 2mm;
+    margin: 0.2mm 0 0.2mm 0;
+}
+
+BnSideItemOn {
+    color: var(--brand-contrast);
+    background-color: var(--brand);
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+    text-align: left;
+    border-radius: var(--radius);
+    padding: 1.8mm 2.6mm 1.8mm 2mm;
+    margin: 0.2mm 0 0.2mm 0;
+}
+
+BnConsolePage {
+    background-color: var(--surface);
+    padding: 3mm 5mm 5mm 5mm;
+    margin: 0;
+}
+
+BnConsoleTitle {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 5mm;
+    padding: 1mm 0 2mm 0;
+    margin: 0;
+}
+
+BnSubTitle {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 3.4mm;
+    padding: 2mm 0 1mm 0;
+    margin: 0;
+}
+
+BnPanelTitle {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+    padding: 0 0 1mm 0;
+    margin: 0;
+}
+
+BnTile {
+    background-color: var(--surface-alt);
+    border-radius: var(--radius);
+    padding: 2.6mm 3mm 2.6mm 3mm;
+    margin: 0.8mm;
+}
+
+BnTileValue { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 4mm; padding: 0; margin: 0; }
+BnTileValueGood { color: var(--success); background-color: transparent; font-family: "native:MainBold"; font-size: 4mm; padding: 0; margin: 0; }
+BnTileValueBad { color: var(--danger); background-color: transparent; font-family: "native:MainBold"; font-size: 4mm; padding: 0; margin: 0; }
+BnTileValueWarn { color: var(--warning); background-color: transparent; font-family: "native:MainBold"; font-size: 4mm; padding: 0; margin: 0; }
+BnTileLabel { color: var(--text-muted); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.3mm; padding: 0.6mm 0 0 0; margin: 0; }
+
+BnTable {
+    background-color: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 0;
+    margin: 1mm 0 2mm 0;
+}
+
+BnTableHead {
+    background-color: var(--surface-alt);
+    border-bottom: 1px solid var(--line);
+    padding: 1.4mm 1.4mm 1.4mm 1.4mm;
+    margin: 0;
+}
+
+BnTableRow {
+    background-color: transparent;
+    border-bottom: 1px solid var(--line);
+    padding: 1.2mm 1.4mm 1.2mm 1.4mm;
+    margin: 0;
+}
+
+BnTableGroup {
+    background-color: var(--surface-alt);
+    border-bottom: 1px solid var(--line);
+    padding: 1.2mm 1.4mm 1.2mm 1.4mm;
+    margin: 0;
+}
+
+BnTableTotal {
+    background-color: var(--surface-alt);
+    border-top: 2px solid var(--text-muted);
+    padding: 1.4mm 1.4mm 1.4mm 1.4mm;
+    margin: 0;
+}
+
+BnTableRowBad {
+    background-color: var(--danger-tint);
+    border-bottom: 1px solid var(--line);
+    padding: 1.2mm 1.4mm 1.2mm 1.4mm;
+    margin: 0;
+}
+
+BnTableRowWarn {
+    background-color: var(--warning-tint);
+    border-bottom: 1px solid var(--line);
+    padding: 1.2mm 1.4mm 1.2mm 1.4mm;
+    margin: 0;
+}
+
+BnCellHead { color: var(--text-muted); background-color: transparent; font-family: "native:MainBold"; font-size: 2.1mm; padding: 0 1mm 0 1mm; margin: 0; }
+BnCellHeadNum { color: var(--text-muted); background-color: transparent; font-family: "native:MainBold"; font-size: 2.1mm; text-align: right; padding: 0 1mm 0 1mm; margin: 0; }
+BnCell { color: var(--text); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.3mm; padding: 0 1mm 0 1mm; margin: 0; }
+BnCellNum { color: var(--text); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.3mm; text-align: right; padding: 0 1mm 0 1mm; margin: 0; }
+BnCellMuted { color: var(--text-muted); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.3mm; padding: 0.6mm 1mm 0.6mm 1mm; margin: 0; }
+
+BnFact { background-color: transparent; padding: 1mm 1mm 1mm 0; margin: 0; }
+BnFactLabel { color: var(--text-muted); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.1mm; padding: 0; margin: 0; }
+BnFactValue { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 2.6mm; padding: 0.3mm 0 0 0; margin: 0; }
+
+/* A T-account: debits on the left of the T, credits on the right (mirrored
+   in Hebrew, where the debit side is the right). */
+BnTHead { background-color: transparent; border-bottom: 2px solid var(--text); padding: 0; margin: 2mm 0 0 0; }
+BnTSide { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 2.6mm; text-align: center; padding: 1mm; margin: 0; }
+BnTDebit { background-color: transparent; border-right: 2px solid var(--text); padding: 1mm 1.4mm 1mm 0; margin: 0; }
+BnTCredit { background-color: transparent; padding: 1mm 0 1mm 1.4mm; margin: 0; }
+BnTLine { background-color: transparent; padding: 0.6mm 0 0.6mm 0; margin: 0; }
+BnTLineTotal { background-color: var(--surface-alt); padding: 0.8mm 0 0.8mm 0; margin: 0; }
+BnTFoot { background-color: transparent; border-top: 2px solid var(--text); padding: 0; margin: 0 0 2mm 0; }
+
+BnCode {
+    color: var(--text);
+    background-color: var(--surface-alt);
+    font-family: "native:MainRegular";
+    font-size: 2.1mm;
+    border-radius: var(--radius);
+    padding: 2mm;
+    margin: 1mm 0 1mm 0;
+}
+
+BnAmountNegative {
+    color: var(--danger);
+    font-family: "native:MainBold";
+    font-size: 2.9mm;
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+}
+
 /* --------------------------------------------------------------- dark mode */
 
 @media (prefers-color-scheme: dark) {
@@ -585,4 +922,61 @@ BnMenuHeader {
     BnRuleMet { color: var(--success-dark); }
     BnSecret { color: var(--text-dark); }
     BnMenuHeader { color: var(--text-dark); }
+    StatusBar { background-color: var(--surface-dark); }
+    Toolbar { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
+    Title { color: var(--text-dark); }
+    TitleCommand { color: var(--text-dark); }
+    BackCommand { color: var(--text-dark); }
+    SideNavigationPanel { background-color: var(--surface-dark); }
+    SideCommand { color: var(--text-dark); border-bottom: 1px solid var(--line-dark); }
+    BnBrandBand { background-color: var(--brand-contrast-dark); }
+    BnBrandLogo { color: var(--brand-dark); }
+    BnBrandTitle { color: var(--text-dark); }
+    BnBrandText { color: var(--text-muted-dark); }
+    BnLandingHeading { color: var(--text-dark); }
+    BnChartLine { color: var(--brand-dark); }
+    BnChartIn { color: var(--success-dark); }
+    BnChartOut { color: var(--danger-dark); }
+    BnChartGrid { color: #3a4256; }
+    BnChartText { color: var(--text-muted-dark); }
+    BnChartSlice1 { color: var(--brand-dark); }
+    BnChartBox { background-color: var(--surface-alt-dark); }
+    BnChartCaption { color: var(--text-muted-dark); }
+    BnLegend { color: var(--text-dark); }
+    BnLegendValue { color: var(--text-dark); }
+    BnSide { background-color: var(--surface-alt-dark); border-right: 1px solid var(--line-dark); }
+    BnSideBrand { color: var(--brand-dark); }
+    BnSideItem { color: var(--text-dark); }
+    BnSideItemOn { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
+    BnConsolePage { background-color: var(--surface-dark); }
+    BnConsoleTitle { color: var(--text-dark); }
+    BnSubTitle { color: var(--text-dark); }
+    BnPanelTitle { color: var(--text-dark); }
+    BnTile { background-color: var(--surface-alt-dark); }
+    BnTileValue { color: var(--text-dark); }
+    BnTileValueGood { color: var(--success-dark); }
+    BnTileValueBad { color: var(--danger-dark); }
+    BnTileValueWarn { color: var(--warning-dark); }
+    BnTileLabel { color: var(--text-muted-dark); }
+    BnTable { background-color: var(--surface-dark); border: 1px solid var(--line-dark); }
+    BnTableHead { background-color: var(--surface-alt-dark); border-bottom: 1px solid var(--line-dark); }
+    BnTableRow { border-bottom: 1px solid var(--line-dark); }
+    BnTableGroup { background-color: var(--surface-alt-dark); border-bottom: 1px solid var(--line-dark); }
+    BnTableTotal { background-color: var(--surface-alt-dark); border-top: 2px solid var(--text-muted-dark); }
+    BnTableRowBad { background-color: var(--danger-tint-dark); border-bottom: 1px solid var(--line-dark); }
+    BnTableRowWarn { background-color: var(--warning-tint-dark); border-bottom: 1px solid var(--line-dark); }
+    BnCellHead { color: var(--text-muted-dark); }
+    BnCellHeadNum { color: var(--text-muted-dark); }
+    BnCell { color: var(--text-dark); }
+    BnCellNum { color: var(--text-dark); }
+    BnCellMuted { color: var(--text-muted-dark); }
+    BnFactLabel { color: var(--text-muted-dark); }
+    BnFactValue { color: var(--text-dark); }
+    BnTHead { border-bottom: 2px solid var(--text-dark); }
+    BnTSide { color: var(--text-dark); }
+    BnTDebit { border-right: 2px solid var(--text-dark); }
+    BnTLineTotal { background-color: var(--surface-alt-dark); }
+    BnTFoot { border-top: 2px solid var(--text-dark); }
+    BnCode { color: var(--text-dark); background-color: var(--surface-alt-dark); }
+    BnAmountNegative { color: var(--danger-dark); }
 }

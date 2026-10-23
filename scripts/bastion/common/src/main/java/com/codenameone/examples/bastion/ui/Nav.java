@@ -56,30 +56,35 @@ public final class Nav {
         bar.addMaterialCommandToSideMenu(Lang.tr("Move money"), FontImage.MATERIAL_SWAP_HORIZ,
                 evt -> TransferForm.show(null, false, Nav::home));
         bar.addMaterialCommandToSideMenu(Lang.tr("Payees"), FontImage.MATERIAL_PEOPLE,
-                evt -> PayeesForm.show(Nav::home));
+                evt -> PayeesForm.show(null));
         bar.addMaterialCommandToSideMenu(Lang.tr("Cards"), FontImage.MATERIAL_CREDIT_CARD,
-                evt -> CardsForm.show(Nav::home));
+                evt -> CardsForm.show(null));
         bar.addMaterialCommandToSideMenu(Lang.tr("Exchange"), FontImage.MATERIAL_SHOW_CHART,
-                evt -> ExchangeForm.show(Nav::home));
+                evt -> ExchangeForm.show(null));
         bar.addMaterialCommandToSideMenu(Lang.tr("Send crypto"), FontImage.MATERIAL_CALL_MADE,
                 evt -> WithdrawForm.show(null, Nav::home));
         bar.addMaterialCommandToSideMenu(Lang.tr("Security Center"), FontImage.MATERIAL_SECURITY,
                 evt -> SecurityCenterForm.show(Nav::home));
         bar.addMaterialCommandToSideMenu(Lang.tr("Settings"), FontImage.MATERIAL_SETTINGS,
-                evt -> SettingsForm.show(Nav::home));
-        if (user != null && user.admin()) {
-            bar.addMaterialCommandToSideMenu(Lang.tr("Administration"),
-                    FontImage.MATERIAL_ADMIN_PANEL_SETTINGS, evt -> AdminForm.show(Nav::home));
+                evt -> SettingsForm.show(null));
+        if (staff(user)) {
+            bar.addMaterialCommandToSideMenu(Lang.tr(user.admin() ? "Administration" : "Audit"),
+                    FontImage.MATERIAL_ADMIN_PANEL_SETTINGS, evt -> ConsoleForm.show());
         }
         bar.addMaterialCommandToSideMenu(Lang.tr("Sign out"), FontImage.MATERIAL_LOGOUT,
                 evt -> signOut());
     }
 
-    /// The dashboard; for an admin with no customer accounts, administration.
+    /// Whether `user` works for the bank: an administrator or an auditor.
+    public static boolean staff(UserDto user) {
+        return user != null && (user.admin() || user.auditor());
+    }
+
+    /// The dashboard; for staff with no customer accounts, the console.
     public static void home() {
         UserDto user = Session.user();
-        if (user != null && !user.customer() && user.admin()) {
-            AdminForm.show(null);
+        if (user != null && !user.customer() && staff(user)) {
+            ConsoleForm.show();
         } else {
             HomeForm.show();
         }
@@ -89,11 +94,16 @@ public final class Nav {
         Session.signOut(signedOut);
     }
 
-    /// A form of the signed-in app: a back arrow to `back` (or none, for the
-    /// dashboard) and the menu.
+    /// A form of the signed-in app. There is one way out of a screen, never
+    /// two: a screen reached from the menu (`back` null) is a top-level
+    /// screen and has the menu button; a screen pushed from another one has
+    /// a back arrow to `back`, and no menu. A back arrow beside a menu
+    /// button leaves the user guessing which of them is "up".
     public static Form form(String title, Runnable back) {
         Form form = Ui.form(title, back);
-        menu(form);
+        if (back == null) {
+            menu(form);
+        }
         return form;
     }
 }

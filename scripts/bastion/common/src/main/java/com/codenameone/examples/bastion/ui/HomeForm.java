@@ -29,6 +29,8 @@ import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.spinner.Picker;
 import com.codenameone.examples.bastion.api.AccountDto;
+import com.codenameone.examples.bastion.api.AllocationDto;
+import com.codenameone.examples.bastion.api.BalancePointDto;
 import com.codenameone.examples.bastion.api.MarketDto;
 import com.codenameone.examples.bastion.api.OpenAccountDto;
 import com.codenameone.examples.bastion.api.UserDto;
@@ -111,6 +113,11 @@ public final class HomeForm {
         trade.addActionListener(evt -> ExchangeForm.show(HomeForm::show));
         content.add(Ui.across(move, pay, trade));
 
+        Container insights = new Container(BoxLayout.y());
+        insights.setName("insights");
+        content.add(insights);
+        insights(insights, accounts);
+
         content.add(Ui.section("Accounts"));
         if (accounts.isEmpty()) {
             content.add(Ui.empty("You have no accounts yet."));
@@ -127,6 +134,69 @@ public final class HomeForm {
         open.addActionListener(evt -> openAccount(content));
         content.add(open);
         content.revalidate();
+    }
+
+    /// The dollar balance over the last 30 days, the sum of every dollar
+    /// account's end-of-day balance, and how the money is spread across
+    /// assets. Both are extras: when either cannot load, the screen goes on
+    /// without it.
+    private static void insights(final Container box, List<AccountDto> accounts) {
+        final List<String> dollars = new ArrayList<String>();
+        for (AccountDto account : accounts) {
+            if (Assets.REPORTING.equals(account.asset())) {
+                dollars.add(account.id());
+            }
+        }
+        final Container history = new Container(BoxLayout.y());
+        final Container allocation = new Container(BoxLayout.y());
+        box.addAll(history, allocation);
+        if (!dollars.isEmpty()) {
+            sumHistory(dollars, 0, null, null, history);
+        }
+        Api.insights().allocation(Net.to((List<AllocationDto> parts) -> {
+            long held = 0;
+            for (AllocationDto part : parts) {
+                held += Math.max(part.usdCents(), 0);
+            }
+            // Nothing held yet: a ring of no slices says nothing.
+            if (held <= 0) {
+                return;
+            }
+            String[] labels = new String[parts.size()];
+            double[] values = new double[labels.length];
+            String[] shares = new String[labels.length];
+            for (int iter = 0; iter < labels.length; iter++) {
+                AllocationDto part = parts.get(iter);
+                labels[iter] = part.asset();
+                values[iter] = Math.max(part.usdCents(), 0) / 100.0;
+                shares[iter] = (part.basisPoints() / 100) + "." + (part.basisPoints() % 100 / 10)
+                        + "%";
+            }
+            allocation.add(Ui.section("Where your money is"));
+            allocation.add(Charts.donut("allocation-chart", labels, values, shares));
+            box.getComponentForm().revalidate();
+        }, (status, message) -> { }));
+    }
+
+    private static void sumHistory(final List<String> ids, final int at, final long[] days,
+            final double[] total, final Container history) {
+        if (at == ids.size()) {
+            history.add(Ui.section("Dollar balance, 30 days"));
+            history.add(Charts.line("balance-chart", days, total));
+            if (history.getComponentForm() != null) {
+                history.getComponentForm().revalidate();
+            }
+            return;
+        }
+        Api.insights().balanceHistory(ids.get(at), "30", Net.to((List<BalancePointDto> points) -> {
+            long[] d = days == null ? new long[points.size()] : days;
+            double[] t = total == null ? new double[points.size()] : total;
+            for (int iter = 0; iter < Math.min(points.size(), d.length); iter++) {
+                d[iter] = points.get(iter).day();
+                t[iter] += points.get(iter).balance() / 100.0;
+            }
+            sumHistory(ids, at + 1, d, t, history);
+        }, (status, message) -> { }));
     }
 
     /// The price of one whole `base` in `quote` units, or 0 when no market

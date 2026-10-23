@@ -7,7 +7,7 @@ images: ["/developer-guide/img/bastion-dashboard.png"]
 ShowToc: true
 ---
 
-Bastion is a complete, full-stack virtual bank in Java. Customers open accounts in several currencies and coins, move money between their own accounts and to other people, order and freeze cards, and trade bitcoin and ether on an order book; an administrator verifies the ledger and the audit log. Every security measure it takes is listed with its real state in the app's Security Center. Use it to build your own banking, wallet or exchange app with Codename One.
+Bastion is a complete, full-stack virtual bank in Java. Customers open accounts in several currencies and coins, move money between their own accounts and to other people, order and freeze cards, and trade bitcoin and ether on an order book; staff run the bank's books from a desktop console: journal, general ledger, trial balance, balance sheet, income statement, reconciliation, period close, four-eyes approvals and the audit chain. Every security measure it takes is listed with its real state in the app's Security Center. Use it to build your own banking, wallet or exchange app with Codename One.
 
 **[Generate your project](/initializr/)** · **[Read the user's guide](/developer-guide/bastion-users-guide/)** · **[Browse the source](https://github.com/codenameone/CodenameOne/tree/master/scripts/bastion)**
 
@@ -19,16 +19,18 @@ In the Initializr, choose the **Bastion** banking template, set your application
 | --- | --- |
 | Customer | Open an account with an authenticator app and a passkey, see balances and history, move money and pay others, manage payees, order and freeze cards, trade on the exchange, send coins to an allow-listed address |
 | Security | Sign-in with PKCE and a second factor or a passkey, payments signed by a key on the device, an app lock with biometrics or a PIN, secure screens, certificate pinning and a Security Center that reports each protection honestly |
-| Administration | Verify that the ledger balances and that the hash-chained audit log is intact |
+| Back office | A desktop console for administrators and read-only auditors: the journal with debit and credit legs, T-accounts, the trial balance, balance sheet and income statement, reconciliation with breaks highlighted, period close, maker-checker approvals, audit chain verification, staff access log and evidence export |
 | Java backend | An authorization server, a double-entry ledger with idempotent transfers, limits and cooling-off periods, an order-matching engine and the audit chain |
 | Shared code | API contracts, data classes and the signed-request format shared between the client and server |
 
-The same client project targets iOS, Android, desktop and the web, and the server runs on SQLite, PostgreSQL, MySQL and MariaDB.
+The same client project targets iOS, Android, desktop and the web, and the server runs on SQLite, PostgreSQL, MySQL, and MariaDB.
 
 ![Bastion dashboard](/developer-guide/img/bastion-dashboard.png)
 ![Bastion order book](/developer-guide/img/bastion-order-book.png)
 ![Bastion Security Center](/developer-guide/img/bastion-security-center.png)
+![Bastion back-office console](/developer-guide/img/bastion-console-overview.png)
 ![Bastion payment confirmation](/developer-guide/img/bastion-transfer-confirm.png)
+![Bastion journal](/developer-guide/img/bastion-console-journal.png)
 
 ## From first run to customization
 

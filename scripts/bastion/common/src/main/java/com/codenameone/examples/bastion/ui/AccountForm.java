@@ -27,6 +27,8 @@ import com.codename1.ui.Label;
 import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codenameone.examples.bastion.api.AccountDto;
+import com.codenameone.examples.bastion.api.BalancePointDto;
+import com.codenameone.examples.bastion.api.CashflowDayDto;
 import com.codenameone.examples.bastion.api.CardDto;
 import com.codenameone.examples.bastion.api.CashDto;
 import com.codenameone.examples.bastion.api.PostingDto;
@@ -80,7 +82,14 @@ public final class AccountForm {
     private static void fill(final Container content, final AccountDto account,
             List<PostingDto> postings, final Runnable back) {
         content.removeAll();
-        final Runnable again = () -> load(account.id(), content, back);
+        // Coming back from a screen that may have moved money shows this form
+        // again, reloaded; the drill-downs only read, so they show it as it was.
+        final Form self = content.getComponentForm();
+        final Runnable stay = () -> Ui.show(self, true);
+        final Runnable again = () -> {
+            stay.run();
+            load(account.id(), content, back);
+        };
         Container hero = new Container(BoxLayout.y(), "BnHero");
         hero.add(new Label(account.name(), "BnHeroLabel"));
         hero.add(new Label(Amounts.format(account.balance(), account.asset()), "BnHeroAmount"));
@@ -113,17 +122,140 @@ public final class AccountForm {
             content.add(card);
         }
 
-        content.add(Ui.section("History"));
+        final Container charts = new Container(BoxLayout.y());
+        content.add(charts);
+        charts(charts, account);
+
+        Container head = new Container(new com.codename1.ui.layouts.BorderLayout());
+        head.add(com.codename1.ui.layouts.BorderLayout.CENTER, Ui.section("History"));
+        if (!postings.isEmpty()) {
+            Button statement = new Button(Lang.tr("Statement"), "BnLink");
+            statement.addActionListener(evt -> statement(account, postings, stay));
+            head.add(com.codename1.ui.layouts.BorderLayout.EAST, statement);
+        }
+        content.add(head);
         if (postings.isEmpty()) {
             content.add(Ui.empty("Nothing has moved in this account yet."));
         }
-        for (PostingDto posting : postings) {
+        long balance = account.balance();
+        for (final PostingDto posting : postings) {
             boolean in = posting.amount() > 0;
             String amount = (in ? "+" : "") + Amounts.format(posting.amount(), posting.asset());
+            final long after = balance;
+            balance -= posting.amount();
             content.add(Ui.row(Lang.tr(in ? "Money in" : "Money out"), Ui.when(posting.createdAt()),
-                    amount, in ? "BnAmountIn" : "BnAmountOut", null));
+                    amount, in ? "BnAmountIn" : "BnAmountOut",
+                    () -> detail(account, posting, after, stay)));
         }
         content.revalidate();
+    }
+
+    /// The balance over 30 days and the money in and out each day, drawn
+    /// once their answers arrive; the screen does not wait for them.
+    private static void charts(final Container box, final AccountDto account) {
+        final double scale = Amounts.pow10(Assets.decimals(account.asset()));
+        Api.insights().balanceHistory(account.id(), "30", Net.to((List<BalancePointDto> points) -> {
+            if (points.size() < 2) {
+                return;
+            }
+            long[] days = new long[points.size()];
+            double[] values = new double[days.length];
+            for (int iter = 0; iter < days.length; iter++) {
+                days[iter] = points.get(iter).day();
+                values[iter] = points.get(iter).balance() / scale;
+            }
+            box.addComponent(0, Ui.section("Balance, 30 days"));
+            box.addComponent(1, Charts.line("account-balance-chart", days, values));
+            refresh(box);
+        }, (status, message) -> { }));
+        Api.insights().cashflow(account.asset(), "14", Net.to((List<CashflowDayDto> flows) -> {
+            if (flows.isEmpty()) {
+                return;
+            }
+            long[] days = new long[flows.size()];
+            double[] in = new double[days.length];
+            double[] out = new double[days.length];
+            for (int iter = 0; iter < days.length; iter++) {
+                days[iter] = flows.get(iter).day();
+                in[iter] = flows.get(iter).inflow() / scale;
+                out[iter] = Math.abs(flows.get(iter).outflow()) / scale;
+            }
+            box.add(Ui.section("Money in and out, 14 days"));
+            box.add(Charts.inOut("cashflow-chart", days, in, out));
+            refresh(box);
+        }, (status, message) -> { }));
+    }
+
+    private static void refresh(Container box) {
+        if (box.getComponentForm() != null) {
+            box.getComponentForm().revalidate();
+        }
+    }
+
+    /// One line of the history in full: the account's side of a ledger entry,
+    /// with the balance it left.
+    private static void detail(final AccountDto account, PostingDto posting, long after,
+            final Runnable back) {
+        Form form = Nav.form("Transaction", back);
+        boolean in = posting.amount() > 0;
+        Container hero = new Container(BoxLayout.y(), "BnHero");
+        hero.add(new Label(Lang.tr(in ? "Money in" : "Money out"), "BnHeroLabel"));
+        hero.add(new Label((in ? "+" : "") + Amounts.format(posting.amount(), posting.asset()),
+                "BnHeroAmount"));
+        hero.add(new Label(Ui.when(posting.createdAt()), "BnHeroNote"));
+        form.add(hero);
+        form.add(Ui.row(Lang.tr("Account"), account.name(), account.asset(), "BnRowValueMuted",
+                null));
+        form.add(Ui.row(Lang.tr("Side"), Lang.tr(in ? "Credit to your account"
+                : "Debit from your account"), in ? "Cr" : "Dr", "BnRowValueMono", null));
+        form.add(Ui.row(Lang.tr("Balance after"), null, Amounts.format(after, posting.asset()),
+                "BnRowValue", null));
+        form.add(Ui.row(Lang.tr("Ledger entry"), posting.entryId(), null, null, null));
+        form.add(Ui.row(Lang.tr("Posting"), posting.id(), null, null, null));
+        form.add(Ui.muted(Lang.tr("The other side of this entry is in the bank's books; every "
+                + "entry's debits equal its credits.")));
+        Ui.show(form, true);
+    }
+
+    /// A statement: every posting oldest first with the running balance, the
+    /// way a bank statement lists them.
+    private static void statement(final AccountDto account, List<PostingDto> postings,
+            final Runnable back) {
+        Form form = Nav.form("Statement", back);
+        form.add(new Label(account.name() + " - " + account.asset(), "BnTitle"));
+        long opening = account.balance();
+        long in = 0;
+        long out = 0;
+        for (PostingDto posting : postings) {
+            opening -= posting.amount();
+            if (posting.amount() > 0) {
+                in += posting.amount();
+            } else {
+                out -= posting.amount();
+            }
+        }
+        Table table = new Table(new String[] {"Date", "Description", "Money in", "Money out",
+            "Balance"}, new int[] {3, 4, 3, 3, 3},
+                new boolean[] {false, false, true, true, true});
+        String asset = account.asset();
+        table.add(new String[] {"", Lang.tr("Opening balance"), "", "",
+            Amounts.format(opening, asset)}, "BnTableTotal", null, null);
+        long running = opening;
+        for (int iter = postings.size() - 1; iter >= 0; iter--) {
+            PostingDto posting = postings.get(iter);
+            running += posting.amount();
+            boolean credit = posting.amount() > 0;
+            table.add(new String[] {Ui.when(posting.createdAt()),
+                Lang.tr(credit ? "Money in" : "Money out"),
+                credit ? Amounts.format(posting.amount(), asset) : "",
+                credit ? "" : Amounts.format(-posting.amount(), asset),
+                Amounts.format(running, asset)}, null);
+        }
+        table.add(new String[] {"", Lang.tr("Closing balance"), Amounts.format(in, asset),
+            Amounts.format(out, asset), Amounts.format(account.balance(), asset)},
+                "BnTableTotal", null, null);
+        form.add(table.component());
+        Ui.show(form, true);
     }
 
     /// Cash in or out at the counter -- the sample's stand-in for a card top-up
