@@ -214,7 +214,22 @@ async function typeInto(index, text, type) {
     await page.waitForTimeout(500);
     return editing();
   });
-  await page.keyboard.type(text, { delay: 10 });
+  // Checked, not assumed: on a slow runner a keystroke that lands while the
+  // port is still attaching its input was seen to arrive twice (a 7-digit
+  // "six-digit code"). Select what is there and type it again until the field
+  // holds exactly the text.
+  for (let attempt = 0; ; attempt++) {
+    await page.keyboard.type(text, { delay: 10 });
+    const value = await page.evaluate(() => document.activeElement && document.activeElement.value);
+    if (value === text || value === undefined || value === null || attempt >= 2) {
+      break;
+    }
+    // Erased key by key: select() does not apply to a number input.
+    await page.keyboard.press('End');
+    for (let i = 0; i < String(value).length; i++) {
+      await page.keyboard.press('Backspace');
+    }
+  }
 }
 
 /// Fills in the sign-in form, which is the first screen, and sends it.
