@@ -43,8 +43,9 @@ import java.util.Map;
 /// only; reading is recorded.
 @Component
 public class AuditTrailEndpoint implements AuditApiServer {
-    /// How far back an evidence export of the journal reaches, newest first.
-    static final int EXPORT_ENTRIES = 5000;
+    /// Journal entries read per page of an export. The export itself has no
+    /// cap: its digest goes on the chain as the whole journal, so it must be.
+    static final int EXPORT_PAGE = 200;
 
     private final Audit audit;
     private final Books books;
@@ -104,22 +105,32 @@ public class AuditTrailEndpoint implements AuditApiServer {
         long at = BooksEndpoint.to(asOf);
         List<Map<String, Object>> rows = new ArrayList<Map<String, Object>>();
         if ("journal".equals(name)) {
-            for (JournalEntryDto e : books.journal(0L, at, EXPORT_ENTRIES)) {
-                for (JournalLegDto leg : e.legs()) {
-                    Map<String, Object> r = new LinkedHashMap<String, Object>();
-                    r.put("entry_id", e.id());
-                    r.put("posted_at", Staff.iso(e.at()));
-                    r.put("kind", e.kind());
-                    r.put("initiator", e.initiator());
-                    r.put("memo", e.memo());
-                    r.put("reverses", e.reverses());
-                    r.put("account_id", leg.accountId());
-                    r.put("code", leg.code());
-                    r.put("account", leg.accountName());
-                    r.put("asset", leg.asset());
-                    r.put("debit", Long.valueOf(leg.debit()));
-                    r.put("credit", Long.valueOf(leg.credit()));
-                    rows.add(r);
+            long afterAt = -1L;
+            String afterId = "";
+            while (true) {
+                List<JournalEntryDto> page = books.journalAfter(afterAt, afterId, at, EXPORT_PAGE);
+                for (JournalEntryDto e : page) {
+                    afterAt = e.at();
+                    afterId = e.id();
+                    for (JournalLegDto leg : e.legs()) {
+                        Map<String, Object> r = new LinkedHashMap<String, Object>();
+                        r.put("entry_id", e.id());
+                        r.put("posted_at", Staff.iso(e.at()));
+                        r.put("kind", e.kind());
+                        r.put("initiator", e.initiator());
+                        r.put("memo", e.memo());
+                        r.put("reverses", e.reverses());
+                        r.put("account_id", leg.accountId());
+                        r.put("code", leg.code());
+                        r.put("account", leg.accountName());
+                        r.put("asset", leg.asset());
+                        r.put("debit", Long.valueOf(leg.debit()));
+                        r.put("credit", Long.valueOf(leg.credit()));
+                        rows.add(r);
+                    }
+                }
+                if (page.size() < EXPORT_PAGE) {
+                    break;
                 }
             }
         } else if ("trial-balance".equals(name)) {
@@ -191,10 +202,11 @@ public class AuditTrailEndpoint implements AuditApiServer {
     }
 
     /// RFC 4180: a field with a comma, quote or line break is quoted, quotes
-    /// doubled. A field starting with `=`, `+`, `-` or `@` is prefixed with
-    /// a quote so a spreadsheet does not run it as a formula (CSV injection);
-    /// memos and names are customer text.
-    static String csv(List<Map<String, Object>> rows) {
+    /// doubled. A field starting with `=`, `+`, `-`, `@`, a tab or a carriage
+    /// return is prefixed with a quote so a spreadsheet does not run it as a
+    /// formula (CSV injection, OWASP's list); memos and names are customer
+    /// text.
+    public static String csv(List<Map<String, Object>> rows) {
         StringBuilder b = new StringBuilder();
         if (rows.isEmpty()) {
             return "";
@@ -211,7 +223,8 @@ public class AuditTrailEndpoint implements AuditApiServer {
                 b.append(first ? "" : ",");
                 first = false;
                 String s = v == null ? "" : String.valueOf(v);
-                if (!(v instanceof Number) && s.length() > 0 && "=+-@".indexOf(s.charAt(0)) >= 0) {
+                if (!(v instanceof Number) && s.length() > 0
+                        && "=+-@\t\r".indexOf(s.charAt(0)) >= 0) {
                     s = "'" + s;
                 }
                 if (s.indexOf(',') >= 0 || s.indexOf('"') >= 0 || s.indexOf('\n') >= 0

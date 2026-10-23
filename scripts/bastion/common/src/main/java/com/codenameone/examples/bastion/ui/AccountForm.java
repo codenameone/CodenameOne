@@ -247,7 +247,8 @@ public final class AccountForm {
                 : new Table(new String[] {"Date", "Description", "Money in", "Money out",
                     "Balance"}, new int[] {3, 4, 3, 3, 3},
                         new boolean[] {false, false, true, true, true});
-        table.add(narrow ? new String[] {Lang.tr("Opening balance"), "",
+        // "Opening balance" does not fit a phone's date column.
+        table.add(narrow ? new String[] {Lang.tr("Opening"), "",
             Amounts.format(opening, asset)} : new String[] {"", Lang.tr("Opening balance"), "", "",
             Amounts.format(opening, asset)}, "BnTableTotal", null, null);
         long running = opening;
@@ -268,7 +269,7 @@ public final class AccountForm {
                 credit ? "" : Amounts.format(-posting.amount(), asset),
                 Amounts.format(running, asset)}, null);
         }
-        table.add(narrow ? new String[] {Lang.tr("Closing balance"), "",
+        table.add(narrow ? new String[] {Lang.tr("Closing"), "",
             Amounts.format(account.balance(), asset)} : new String[] {"", Lang.tr("Closing balance"),
             Amounts.format(in, asset), Amounts.format(out, asset),
             Amounts.format(account.balance(), asset)}, "BnTableTotal", null, null);

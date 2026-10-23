@@ -24,7 +24,9 @@ import java.util.List;
 
 /// One account as a T: its debits on the left, credits on the right, between
 /// the balance brought forward at `from` and the balance carried at `to`
-/// (both on the normal side).
+/// (both on the normal side). The sides list at most the latest 2000
+/// postings and `truncated` says when there were more; the totals and the
+/// balances cover every posting in the window.
 @Mapped
 public record TAccountDto(
         String accountId,
@@ -40,5 +42,6 @@ public record TAccountDto(
         List<LedgerLineDto> credits,
         long totalDebits,
         long totalCredits,
-        long closingBalance) {
+        long closingBalance,
+        boolean truncated) {
 }

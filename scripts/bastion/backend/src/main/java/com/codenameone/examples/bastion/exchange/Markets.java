@@ -129,6 +129,15 @@ public class Markets {
         }
     }
 
+    /// Whether [#value] can price `asset` in `quote`. Asked first where an
+    /// unpriced asset must not fail the caller's transaction: [#value]'s
+    /// refusal marks it rollback-only even when it is caught.
+    @Transactional(readOnly = true)
+    public boolean hasPrice(String asset, String quote) throws IOException {
+        return asset.equals(quote)
+                || !markets.findByBaseAndQuoteOrderByIdAsc(asset, quote).isEmpty();
+    }
+
     /// What `amount` ledger units of `asset` are worth in `quote` ledger
     /// units at the index price, **rounded up**: a limit valued here may be
     /// reached a cent early, never passed a cent late. An asset with no

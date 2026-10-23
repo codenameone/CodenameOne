@@ -103,7 +103,7 @@ public class Approvals {
             }
             return earlier;
         }
-        long usd = books.usd(account.getAsset(), amount < 0 ? -amount : amount);
+        long usd = books.priced(account.getAsset(), amount < 0 ? -amount : amount);
         return create(ADJUSTMENT, maker, accountId, "", account.getAsset(), amount, usd,
                 clip(memo), key);
     }
@@ -127,25 +127,41 @@ public class Approvals {
             return earlier;
         }
         // Valued as everything it moves: the debits of every asset.
+        // One unpriced leg makes the whole request unpriced (UNPRICED).
         long usd = 0;
         String asset = "";
         for (JournalLegDto leg : entry.legs()) {
             if (leg.debit() > 0) {
-                usd += books.usd(leg.asset(), leg.debit());
+                long v = books.priced(leg.asset(), leg.debit());
+                usd = v == Books.UNPRICED || usd == Books.UNPRICED ? Books.UNPRICED : usd + v;
                 asset = asset.length() == 0 ? leg.asset() : asset;
             }
         }
         return create(REVERSAL, maker, "", entryId, asset, 0L, usd, clip(memo), key);
     }
 
-    @Transactional(rollbackFor = Exception.class)
+    /// Not transactional on purpose: a maker approving their own request is
+    /// refused here, before the approval's transaction opens, so the
+    /// `APPROVAL_REFUSED` row commits in a transaction of its own instead of
+    /// being rolled back by the refusal that follows it.
     public ApprovalDto approve(String checker, String id) throws IOException {
+        ApprovalDto a = get(id);
+        if (PENDING.equals(a.status()) && a.maker().equals(checker)) {
+            audit.append(checker, "APPROVAL_REFUSED", id, "maker cannot approve own request");
+            throw Refused.with(403, "four-eyes-second-administrator", "A second administrator must approve this");
+        }
+        return approveAsChecker(checker, id);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    ApprovalDto approveAsChecker(String checker, String id) throws IOException {
         ApprovalDto a = get(id);
         if (!PENDING.equals(a.status())) {
             throw Refused.with(409, "approval-not-pending", "That request is no longer waiting for approval");
         }
         if (a.maker().equals(checker)) {
-            audit.append(checker, "APPROVAL_REFUSED", id, "maker cannot approve own request");
+            // Only reachable when the maker changed between the two reads,
+            // which cannot happen; kept so this method stands on its own.
             throw Refused.with(403, "four-eyes-second-administrator", "A second administrator must approve this");
         }
         long now = System.currentTimeMillis();
@@ -195,8 +211,22 @@ public class Approvals {
     private ApprovalDto create(String kind, String maker, String accountId, String entryId,
             String asset, long amount, long usd, String memo, String key) throws IOException {
         String id = Ids.next();
-        boolean waits = usd > threshold;
         long now = System.currentTimeMillis();
+        // Fail closed: a request that cannot be valued is not known to be
+        // small, so it waits for a second administrator.
+        boolean unpriced = usd == Books.UNPRICED;
+        if (unpriced) {
+            usd = 0L;
+        }
+        // Splitting one large change into many just under the threshold
+        // posts nothing alone: what this maker posted without a checker in
+        // the last 24 hours counts towards this request.
+        long recent = unpriced ? 0L : Books.number(Books.first(books.rows(
+                "SELECT COALESCE(SUM(usd_cents), 0) AS t FROM approval WHERE maker = ? "
+                + "AND status = ? AND checker = ? AND created_at > ?", new Object[] {maker,
+                    EXECUTED, "", Long.valueOf(now - Books.DAY)}), "t"));
+        // Subtracted, not added: a value saturates at Long.MAX_VALUE.
+        boolean waits = unpriced || usd > threshold - recent;
         db.execute("INSERT INTO approval (id, kind, status, maker, checker, account_id, entry_id, "
                 + "asset, amount, usd_cents, memo, request_key, result_entry, created_at, "
                 + "decided_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -205,14 +235,15 @@ public class Approvals {
                     Long.valueOf(now), Long.valueOf(waits ? 0L : now)});
         ApprovalDto a = get(id);
         if (waits) {
-            audit.append(maker, kind + "_REQUESTED", id, describe(a) + ", waits for a second "
-                    + "administrator");
+            audit.append(maker, kind + "_REQUESTED", id, describe(a) + (unpriced ? ", unpriced"
+                    : recent > 0 ? ", " + recent + " USD cents posted without a checker in 24h"
+                    : "") + ", waits for a second administrator");
             return a;
         }
         String entry = execute(a);
         db.execute("UPDATE approval SET result_entry = ? WHERE id = ?", new Object[] {entry, id});
         audit.append(maker, kind + "_POSTED", id, describe(a) + ", within the "
-                + threshold + " USD cent threshold, entry " + entry);
+                + threshold + " USD cent threshold (" + recent + " earlier in 24h), entry " + entry);
         return get(id);
     }
 

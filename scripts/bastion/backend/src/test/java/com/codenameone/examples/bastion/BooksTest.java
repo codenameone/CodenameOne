@@ -32,11 +32,16 @@ import com.codenameone.examples.bastion.api.BreakDto;
 import com.codenameone.examples.bastion.api.ChainReportDto;
 import com.codenameone.examples.bastion.api.JournalEntryDto;
 import com.codenameone.examples.bastion.api.JournalLegDto;
+import com.codenameone.examples.bastion.api.LedgerLineDto;
 import com.codenameone.examples.bastion.api.ReconciliationDto;
 import com.codenameone.examples.bastion.api.TrialBalanceDto;
 import com.codenameone.examples.bastion.api.TrialBalanceLineDto;
 import com.codenameone.examples.bastion.api.VolumeDayDto;
 import com.codenameone.examples.bastion.audit.Audit;
+import com.codenameone.examples.bastion.api.ApprovalDto;
+import com.codenameone.examples.bastion.api.TAccountDto;
+import com.codenameone.examples.bastion.books.Approvals;
+import com.codenameone.examples.bastion.books.AuditTrailEndpoint;
 import com.codenameone.examples.bastion.books.Books;
 import com.codenameone.examples.bastion.domain.AuditEvent;
 import com.codenameone.examples.bastion.domain.JournalEntry;
@@ -47,6 +52,8 @@ import com.codenameone.examples.bastion.ledger.Ledger;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -73,6 +80,8 @@ class BooksTest {
     private DataSource db;
     @Autowired
     private MockMvc mvc;
+    @Autowired
+    private Approvals approvals;
 
     private static String key() {
         return "test-" + TestKeys.random();
@@ -308,6 +317,9 @@ class BooksTest {
 
         assertEquals(403, send(admin, json(approve, decision)).getStatus());
         assertEquals(100, balance(target));
+        // The refusal is on the record: it is not rolled back with the request.
+        assertEquals(1, books.rows("SELECT seq FROM audit_event WHERE action = ? AND subject = ?",
+                new Object[] {"APPROVAL_REFUSED", approval.get("id")}).size());
 
         MockResponse approved = send(second, json(approve, decision));
         assertEquals(200, approved.getStatus(), approved.getContentAsString());
@@ -344,5 +356,91 @@ class BooksTest {
         MockResponse allocation = send(customer, get("/api/insights/allocation"));
         assertEquals(200, allocation.getStatus(), allocation.getContentAsString());
         assertEquals(404, send(customer, get("/api/accounts/nope/balance-history")).getStatus());
+    }
+
+    @Test
+    void anUnpricedAdjustmentWaitsForASecondAdministrator() throws Exception {
+        db.execute("INSERT INTO asset (code, name, kind, decimals, enabled) VALUES "
+                + "('TSTU', 'Unpriced test coin', 'CRYPTO', 8, 1)", new Object[0]);
+        LedgerAccount coin = ledger.open("books-u1", "TSTU", AccountKinds.WALLET, "Coins");
+        // No market prices TSTU: the request cannot be valued, so it is not
+        // known to be small, and waits.
+        ApprovalDto a = approvals.adjust("books-admin-u", key(), coin.getId(), 1L, "unpriced");
+        assertEquals(Approvals.PENDING, a.status());
+        List<Map> rows = books.rows("SELECT detail FROM audit_event WHERE subject = ?",
+                new Object[] {a.id()});
+        assertTrue(String.valueOf(rows).contains("unpriced"), String.valueOf(rows));
+    }
+
+    @Test
+    void splittingAnAdjustmentUnderTheThresholdStillNeedsAChecker() throws Exception {
+        LedgerAccount target = funded("books-s1", 100);
+        long under = approvals.threshold() - 1;
+        int executed = 0;
+        for (int i = 0; i < 10; i++) {
+            ApprovalDto a = approvals.adjust("books-admin-s", key(), target.getId(), under,
+                    "split " + i);
+            executed += Approvals.EXECUTED.equals(a.status()) ? 1 : 0;
+        }
+        // The first fits the threshold; the rest add up past it in 24 hours.
+        assertEquals(1, executed);
+        assertEquals(100 + under, balance(target));
+    }
+
+    @Test
+    void aLongTAccountListsTheLatestAndTotalsEverything() throws Exception {
+        LedgerAccount many = funded("books-t1", 0 + 1);
+        LedgerAccount cash = ledger.system("USD", AccountKinds.SYS_CASH);
+        int extra = Books.LEDGER_LINES + 5;
+        for (int i = 0; i < extra; i++) {
+            ledger.post(key(), "DEPOSIT", "books-t1", "drip", Arrays.asList(
+                    new Leg(cash.getId(), -1), new Leg(many.getId(), 1)));
+        }
+        TAccountDto t = books.tAccount(many.getId(), 0L, System.currentTimeMillis());
+        assertTrue(t.truncated());
+        assertEquals(Books.LEDGER_LINES, t.debits().size() + t.credits().size());
+        assertEquals(1L + extra, t.totalCredits());
+        assertEquals(balance(many), t.closingBalance());
+        List<LedgerLineDto> credits = t.credits();
+        assertEquals(balance(many), credits.get(credits.size() - 1).balance());
+    }
+
+    @Test
+    void theJournalEvidenceHoldsEveryEntry() throws Exception {
+        String admin = SignIn.token(mvc, DemoAccounts.ADMIN, DemoAccounts.PASSWORD);
+        long before = System.currentTimeMillis();
+        MockResponse r = send(admin, get("/api/audit/evidence/journal?format=json&asOf="
+                + before));
+        assertEquals(200, r.getStatus(), r.getContentAsString());
+        String content = (String) Json.parseObject(r.getContentAsString()).get("content");
+        HashSet<Object> ids = new HashSet<Object>();
+        for (Object row : (List) Json.parse(content)) {
+            ids.add(((Map) row).get("entry_id"));
+        }
+        long expected = ((Number) books.rows("SELECT COUNT(*) AS n FROM journal_entry "
+                + "WHERE created_at <= ?", new Object[] {Long.valueOf(before)}).get(0)
+                .get("n")).longValue();
+        assertEquals(expected, ids.size());
+    }
+
+    @Test
+    void csvCellsThatASpreadsheetWouldRunAreQuoted() {
+        Map<String, Object> row = new LinkedHashMap<String, Object>();
+        row.put("a", "\tcmd");
+        row.put("b", "\r=1");
+        row.put("c", "plain");
+        String out = AuditTrailEndpoint.csv(Arrays.asList(row));
+        assertTrue(out.contains("'\tcmd"), out);
+        assertTrue(out.contains("\"'\r=1\""), out);
+        assertTrue(out.contains(",plain"), out);
+    }
+
+    @Test
+    void readingTheClosedPeriodsIsOnTheRecord() throws Exception {
+        String auditor = SignIn.token(mvc, DemoAccounts.AUDITOR, DemoAccounts.PASSWORD);
+        assertEquals(200, send(auditor, get("/api/books/periods")).getStatus());
+        assertFalse(books.rows("SELECT seq FROM audit_event WHERE action = ? AND subject = ? "
+                + "AND actor = ?", new Object[] {"STAFF_READ", "periods", DemoAccounts.AUDITOR})
+                .isEmpty());
     }
 }

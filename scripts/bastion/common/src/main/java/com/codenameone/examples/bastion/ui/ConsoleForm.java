@@ -50,6 +50,7 @@ import com.codenameone.examples.bastion.api.ClosePeriodDto;
 import com.codenameone.examples.bastion.api.ControlDto;
 import com.codenameone.examples.bastion.api.DecisionDto;
 import com.codenameone.examples.bastion.api.EvidenceDto;
+import com.codenameone.examples.bastion.api.GeneralLedgerDto;
 import com.codenameone.examples.bastion.api.IncomeStatementDto;
 import com.codenameone.examples.bastion.api.JournalEntryDto;
 import com.codenameone.examples.bastion.api.JournalLegDto;
@@ -353,8 +354,12 @@ public final class ConsoleForm {
         }
         for (VolumeDayDto d : days) {
             int i = dayList.indexOf(Long.valueOf(d.day()));
-            count[i] += d.entries();
-            total += d.entries();
+            // A trade moves two assets and is in both rows; the day's
+            // distinct count is on each of them, so it is read, not summed.
+            if (count[i] == 0) {
+                count[i] = d.dayEntries();
+                total += d.dayEntries();
+            }
             if (Assets.REPORTING.equals(d.asset())) {
                 volume[i] += d.volume() / 100.0;
             }
@@ -522,25 +527,34 @@ public final class ConsoleForm {
         TextField password = password();
         Command go = new Command(Lang.tr("Request reversal"));
         if (Dialog.show(Lang.tr("Reverse entry {0}", shortId(e.id())),
-                BoxLayout.encloseY(Ui.muted(Lang.tr("A second administrator must approve it.")),
+                BoxLayout.encloseY(Ui.muted(Lang.tr("Above the approval threshold, a second administrator must approve it.")),
                         memo, password), go, new Command(Lang.tr("Cancel"))) != go) {
             return;
         }
         Api.admin().reverse(e.id(), RequestSigner.idempotencyKey(),
                 new ReversalRequestDto(memo.getText(), password.getText()),
                 Net.to((ApprovalDto a) -> {
-                    Ui.toast("Sent for approval.");
+                    toastFor(a);
                     entry(body, e.id());
                 }, (s, m) -> Dialog.show(Lang.tr("Not done"), Lang.tr(m), Lang.tr("OK"), null)));
+    }
+
+    /// Within the threshold a request posts at once; above it, it waits.
+    private static void toastFor(ApprovalDto a) {
+        Ui.toast("EXECUTED".equals(a.status()) ? "Posted." : "Sent for approval.");
     }
 
     // ------------------------------------------------------- general ledger
 
     private static final int LEDGER_ROWS = 60;
+    /// The server lists at most 2000 postings; its totals cover them all.
+    private static final String TRUNCATED =
+            "Only the latest {0} postings are listed; the totals and balances cover them all.";
 
     private void ledger(final Container body, final String code, final String asset) {
         Api.books().chart(Net.to((List<ChartAccountDto> chart) -> Api.books().generalLedger(code,
-                asset, null, null, Net.to((List<LedgerLineDto> lines) -> {
+                asset, null, null, Net.to((GeneralLedgerDto gl) -> {
+                    List<LedgerLineDto> lines = gl.lines();
                     body.removeAll();
                     String[] ids = new String[chart.size()];
                     String[] names = new String[chart.size()];
@@ -569,6 +583,10 @@ public final class ConsoleForm {
                     // A busy control account has thousands of postings; the
                     // page shows the latest, which is where a reviewer starts.
                     int first = Math.max(0, lines.size() - LEDGER_ROWS);
+                    if (gl.truncated()) {
+                        table.note(Lang.tr(TRUNCATED,
+                                String.valueOf(lines.size())));
+                    }
                     if (first > 0) {
                         table.note(Lang.tr("Showing the latest {0} of {1} postings.",
                                 String.valueOf(LEDGER_ROWS), String.valueOf(lines.size())));
@@ -620,6 +638,10 @@ public final class ConsoleForm {
             body.add(new Label(t.code() + " " + t.name() + " (" + t.asset() + ")", "BnSubTitle"));
             body.add(Ui.muted(Lang.tr("{0} account, normal balance {1}.",
                     className(t.accountClass()), side(t.normalBalance()))));
+            if (t.truncated()) {
+                body.add(Ui.muted(Lang.tr(TRUNCATED,
+                        String.valueOf(t.debits().size() + t.credits().size()))));
+            }
             Container head = new Container(new GridLayout(1, 2), "BnTHead");
             head.add(new Label(Lang.tr("Debit (Dr)"), "BnTSide"));
             head.add(new Label(Lang.tr("Credit (Cr)"), "BnTSide"));
@@ -667,7 +689,7 @@ public final class ConsoleForm {
         TextField password = password();
         Command go = new Command(Lang.tr("Request adjustment"));
         if (Dialog.show(Lang.tr("Adjustment"), BoxLayout.encloseY(
-                Ui.muted(Lang.tr("A second administrator must approve it.")), amount, memo,
+                Ui.muted(Lang.tr("Above the approval threshold, a second administrator must approve it.")), amount, memo,
                 password), go, new Command(Lang.tr("Cancel"))) != go) {
             return;
         }
@@ -680,7 +702,7 @@ public final class ConsoleForm {
         }
         Api.admin().adjust(RequestSigner.idempotencyKey(), new AdjustmentDto(accountId,
                 negative ? -units : units, memo.getText(), password.getText()),
-                Net.to((ApprovalDto a) -> Ui.toast("Sent for approval."),
+                Net.to((ApprovalDto a) -> toastFor(a),
                         (s, m) -> Dialog.show(Lang.tr("Not done"), Lang.tr(m), Lang.tr("OK"),
                                 null)));
     }

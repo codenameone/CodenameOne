@@ -52,10 +52,12 @@ public interface BooksApi {
     void entry(@Path("id") String id, OnComplete<Response<JournalEntryDto>> callback);
 
     /// The general ledger of one chart code in one asset: every posting to
-    /// every account under the code, oldest first, with the running balance.
+    /// every account under the code, oldest first, with the running balance
+    /// (the latest 2000; see [GeneralLedgerDto#truncated]).
     @GET("/api/books/ledger")
     void generalLedger(@Query("code") String code, @Query("asset") String asset,
-            @Query("from") String from, @Query("to") String to, OnComplete<Response<List<LedgerLineDto>>> callback);
+            @Query("from") String from, @Query("to") String to,
+            OnComplete<Response<GeneralLedgerDto>> callback);
 
     /// One ledger account as a T-account.
     @GET("/api/books/accounts/{id}/t-account")

@@ -26,6 +26,7 @@ import com.codenameone.examples.bastion.api.AssetTotalDto;
 import com.codenameone.examples.bastion.api.BalanceSheetDto;
 import com.codenameone.examples.bastion.api.BreakDto;
 import com.codenameone.examples.bastion.api.ControlDto;
+import com.codenameone.examples.bastion.api.GeneralLedgerDto;
 import com.codenameone.examples.bastion.api.IncomeStatementDto;
 import com.codenameone.examples.bastion.api.JournalEntryDto;
 import com.codenameone.examples.bastion.api.JournalLegDto;
@@ -51,9 +52,11 @@ import com.codenameone.examples.bastion.repository.LedgerAccountRepository;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 
 /// The accounting reports over the ledger, and period close.
@@ -97,6 +100,19 @@ public class Books {
         List<Map> heads = rows("SELECT id, created_at, kind, initiator, memo FROM journal_entry "
                 + "WHERE created_at >= ? AND created_at <= ? ORDER BY created_at DESC, id DESC "
                 + "LIMIT " + limit, new Object[] {Long.valueOf(from), Long.valueOf(to)});
+        return withLegs(heads);
+    }
+
+    /// Up to `limit` entries posted at or before `to`, oldest first, after
+    /// the entry at (`afterAt`, `afterId`) -- a keyset page, so an export can
+    /// walk the whole journal; start with `-1` and `""`.
+    @Transactional(readOnly = true)
+    public List<JournalEntryDto> journalAfter(long afterAt, String afterId, long to, int limit)
+            throws IOException {
+        List<Map> heads = rows("SELECT id, created_at, kind, initiator, memo FROM journal_entry "
+                + "WHERE created_at <= ? AND (created_at > ? OR (created_at = ? AND id > ?)) "
+                + "ORDER BY created_at ASC, id ASC LIMIT " + limit, new Object[] {
+                    Long.valueOf(to), Long.valueOf(afterAt), Long.valueOf(afterAt), afterId});
         return withLegs(heads);
     }
 
@@ -157,28 +173,32 @@ public class Books {
 
     // ------------------------------------------------------- ledgers, T-account
 
+    /// The most postings a ledger or T-account lists; the totals and the
+    /// balances are summed in SQL over the whole window regardless.
+    public static final int LEDGER_LINES = 2000;
+
+    private static final String LINE_COLUMNS = "SELECT p.entry_id AS entry_id, "
+            + "p.account_id AS account_id, p.amount AS amount, p.created_at AS created_at, "
+            + "a.kind AS kind, a.asset AS asset, a.owner AS owner, e.kind AS ekind, "
+            + "e.memo AS memo FROM posting p JOIN ledger_account a ON a.id = p.account_id "
+            + "JOIN journal_entry e ON e.id = p.entry_id ";
+
     /// Every posting under chart `code` in `asset` between `from` and `to`,
     /// with the running balance on the code's normal side, starting from the
-    /// balance brought forward at `from`. At most 2000 lines.
+    /// balance brought forward at `from`. Lists the latest [#LEDGER_LINES].
     @Transactional(readOnly = true)
-    public List<LedgerLineDto> generalLedger(String code, String asset, long from, long to)
+    public GeneralLedgerDto generalLedger(String code, String asset, long from, long to)
             throws IOException {
         String kind = Chart.kindOf(code);
         if (kind == null) {
             throw Refused.with(404, "no-such-account", "No such account");
         }
         ledger.asset(asset);
-        long opening = number(first(rows("SELECT COALESCE(SUM(p.amount), 0) AS t FROM posting p "
-                + "JOIN ledger_account a ON a.id = p.account_id WHERE a.kind = ? AND a.asset = ? "
-                + "AND p.created_at < ?", new Object[] {kind, asset, Long.valueOf(from)}), "t"));
-        return lines(rows("SELECT p.entry_id AS entry_id, p.account_id AS account_id, "
-                + "p.amount AS amount, p.created_at AS created_at, a.kind AS kind, "
-                + "a.asset AS asset, a.owner AS owner, e.kind AS ekind, e.memo AS memo "
-                + "FROM posting p JOIN ledger_account a ON a.id = p.account_id "
-                + "JOIN journal_entry e ON e.id = p.entry_id WHERE a.kind = ? AND a.asset = ? "
-                + "AND p.created_at >= ? AND p.created_at <= ? ORDER BY p.created_at ASC, p.id ASC "
-                + "LIMIT 2000", new Object[] {kind, asset, Long.valueOf(from), Long.valueOf(to)}),
-                kind, opening);
+        Window w = window("FROM posting p JOIN ledger_account a ON a.id = p.account_id "
+                + "WHERE a.kind = ? AND a.asset = ?", new Object[] {kind, asset}, from, to, kind);
+        return new GeneralLedgerDto(code, asset, from, to, Chart.normal(kind, w.opening),
+                w.lines, w.debits, w.credits, Chart.normal(kind, w.opening - w.debits + w.credits),
+                w.truncated);
     }
 
     @Transactional(readOnly = true)
@@ -188,36 +208,65 @@ public class Books {
             throw Refused.with(404, "no-such-account", "No such account");
         }
         String kind = account.getKind();
-        long opening = number(first(rows("SELECT COALESCE(SUM(amount), 0) AS t FROM posting "
-                + "WHERE account_id = ? AND created_at < ?",
-                new Object[] {accountId, Long.valueOf(from)}), "t"));
-        List<LedgerLineDto> all = lines(rows("SELECT p.entry_id AS entry_id, "
-                + "p.account_id AS account_id, p.amount AS amount, p.created_at AS created_at, "
-                + "a.kind AS kind, a.asset AS asset, a.owner AS owner, e.kind AS ekind, "
-                + "e.memo AS memo FROM posting p JOIN ledger_account a ON a.id = p.account_id "
-                + "JOIN journal_entry e ON e.id = p.entry_id WHERE p.account_id = ? "
-                + "AND p.created_at >= ? AND p.created_at <= ? ORDER BY p.created_at ASC, p.id ASC "
-                + "LIMIT 2000", new Object[] {accountId, Long.valueOf(from), Long.valueOf(to)}),
-                kind, opening);
+        Window w = window("FROM posting p JOIN ledger_account a ON a.id = p.account_id "
+                + "WHERE p.account_id = ?", new Object[] {accountId}, from, to, kind);
         List<LedgerLineDto> debits = new ArrayList<LedgerLineDto>();
         List<LedgerLineDto> credits = new ArrayList<LedgerLineDto>();
-        long dr = 0;
-        long cr = 0;
-        long closing = Chart.normal(kind, opening);
-        for (LedgerLineDto line : all) {
+        for (LedgerLineDto line : w.lines) {
             if (line.debit() > 0) {
                 debits.add(line);
-                dr += line.debit();
             } else {
                 credits.add(line);
-                cr += line.credit();
             }
-            closing = line.balance();
         }
         String cls = Chart.classOf(kind);
         return new TAccountDto(accountId, Chart.code(kind), Chart.name(kind) + " - "
                 + account.getName(), cls, Chart.normalOf(cls), account.getAsset(), from, to,
-                Chart.normal(kind, opening), debits, credits, dr, cr, closing);
+                Chart.normal(kind, w.opening), debits, credits, w.debits, w.credits,
+                Chart.normal(kind, w.opening - w.debits + w.credits), w.truncated);
+    }
+
+    /// The postings matched by `where` (over `p` and `a`) in a window: the
+    /// net brought forward, the window's debit and credit totals -- summed in
+    /// SQL, so they are true however many postings there are -- and the
+    /// latest [#LEDGER_LINES] as lines, oldest first, whose running balance
+    /// is counted back from the true closing balance.
+    private Window window(String where, Object[] params, long from, long to, String kind)
+            throws IOException {
+        Window w = new Window();
+        w.opening = number(first(rows("SELECT COALESCE(SUM(p.amount), 0) AS t " + where
+                + " AND p.created_at < ?", concat(params, new Object[] {Long.valueOf(from)})),
+                "t"));
+        Object[] range = concat(params, new Object[] {Long.valueOf(from), Long.valueOf(to)});
+        Map sums = first(rows("SELECT COALESCE(SUM(CASE WHEN p.amount < 0 THEN -p.amount "
+                + "ELSE 0 END), 0) AS dr, COALESCE(SUM(CASE WHEN p.amount > 0 THEN p.amount "
+                + "ELSE 0 END), 0) AS cr, COUNT(*) AS n " + where
+                + " AND p.created_at >= ? AND p.created_at <= ?", range));
+        w.debits = number(sums == null ? null : sums.get("dr"));
+        w.credits = number(sums == null ? null : sums.get("cr"));
+        w.truncated = number(sums == null ? null : sums.get("n")) > LEDGER_LINES;
+        String filter = where.substring(where.indexOf("WHERE"));
+        List<Map> newest = rows(LINE_COLUMNS + filter + " AND p.created_at >= ? "
+                + "AND p.created_at <= ? ORDER BY p.created_at DESC, p.id DESC LIMIT "
+                + LEDGER_LINES, range);
+        List<Map> ascending = new ArrayList<Map>();
+        long listed = 0;
+        for (int i = newest.size() - 1; i >= 0; i--) {
+            ascending.add(newest.get(i));
+            listed += num(newest.get(i), "amount");
+        }
+        // A posting's amount is signed credit-positive (Chart.debit).
+        long closingNet = w.opening - w.debits + w.credits;
+        w.lines = lines(ascending, kind, closingNet - listed);
+        return w;
+    }
+
+    private static final class Window {
+        long opening;
+        long debits;
+        long credits;
+        boolean truncated;
+        List<LedgerLineDto> lines;
     }
 
     private static List<LedgerLineDto> lines(List<Map> rows, String kind, long openingNet) {
@@ -444,6 +493,7 @@ public class Books {
         long start = today - (days - 1) * DAY;
         Map<String, long[]> buckets = new TreeMap<String, long[]>();
         Map<String, String> lastEntry = new LinkedHashMap<String, String>();
+        Map<Long, Set<String>> perDay = new TreeMap<Long, Set<String>>();
         // An order hold and its release move a customer's own money into and
         // out of escrow: no value changes hands. The market maker requotes
         // every few seconds, so counting them buried every real day of
@@ -463,6 +513,12 @@ public class Books {
                 buckets.put(key, b);
             }
             String entry = str(r, "entry_id");
+            Set<String> seen = perDay.get(Long.valueOf(d));
+            if (seen == null) {
+                seen = new HashSet<String>();
+                perDay.put(Long.valueOf(d), seen);
+            }
+            seen.add(entry);
             if (!entry.equals(lastEntry.get(key))) {
                 b[0]++;
                 lastEntry.put(key, entry);
@@ -473,8 +529,9 @@ public class Books {
         for (Map.Entry<String, long[]> b : buckets.entrySet()) {
             String key = b.getKey();
             int bar = key.indexOf('|');
-            out.add(new VolumeDayDto(Long.parseLong(key.substring(0, bar)),
-                    key.substring(bar + 1), (int) b.getValue()[0], b.getValue()[1]));
+            Long d = Long.valueOf(key.substring(0, bar));
+            out.add(new VolumeDayDto(d.longValue(), key.substring(bar + 1),
+                    (int) b.getValue()[0], perDay.get(d).size(), b.getValue()[1]));
         }
         return out;
     }
@@ -578,19 +635,33 @@ public class Books {
 
     // --------------------------------------------------------------- helpers
 
+    /// What [#priced] answers for an asset with no USD price.
+    public static final long UNPRICED = -1L;
+
+    /// `amount` (not negative) of `asset` in US cents at the index price, or
+    /// [#UNPRICED] when it has none. For decisions -- maker-checker -- where
+    /// [#usd]'s zero for an unpriced asset would read as "small".
+    public long priced(String asset, long amount) throws IOException {
+        if (amount == 0) {
+            return 0L;
+        }
+        // Asked first: a refusal from usdValue would doom the transaction.
+        return money.hasUsdPrice(asset) ? money.usdValue(asset, amount) : UNPRICED;
+    }
+
     /// `amount` of `asset` in US cents at the index price, keeping its sign.
+    /// For display only: an unpriced asset shows as zero.
     public long usd(String asset, long amount) throws IOException {
         if (amount == 0) {
             return 0L;
         }
-        long v;
-        try {
-            v = money.usdValue(asset, amount < 0 ? -amount : amount);
-        } catch (RuntimeException unpriced) {
-            // An asset with no market has no USD value to show; the line in
-            // its own units is still exact.
+        // An asset with no market has no USD value to show; the line in its
+        // own units is still exact. Asked, not caught: a refusal from
+        // usdValue would mark the reading transaction rollback-only.
+        if (!money.hasUsdPrice(asset)) {
             return 0L;
         }
+        long v = money.usdValue(asset, amount < 0 ? -amount : amount);
         return amount < 0 ? -v : v;
     }
 
@@ -656,7 +727,7 @@ public class Books {
         return rows.isEmpty() ? new LinkedHashMap() : rows.get(0);
     }
 
-    private static Object first(List<Map> rows, String key) {
+    static Object first(List<Map> rows, String key) {
         return first(rows).get(key);
     }
 

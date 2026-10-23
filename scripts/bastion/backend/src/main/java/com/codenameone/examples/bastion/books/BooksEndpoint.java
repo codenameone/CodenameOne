@@ -23,9 +23,9 @@ import com.codenameone.examples.bastion.Refused;
 import com.codenameone.examples.bastion.api.BalanceSheetDto;
 import com.codenameone.examples.bastion.api.BooksApiServer;
 import com.codenameone.examples.bastion.api.ChartAccountDto;
+import com.codenameone.examples.bastion.api.GeneralLedgerDto;
 import com.codenameone.examples.bastion.api.IncomeStatementDto;
 import com.codenameone.examples.bastion.api.JournalEntryDto;
-import com.codenameone.examples.bastion.api.LedgerLineDto;
 import com.codenameone.examples.bastion.api.PeriodDto;
 import com.codenameone.examples.bastion.api.ReconciliationDto;
 import com.codenameone.examples.bastion.api.TAccountDto;
@@ -70,7 +70,7 @@ public class BooksEndpoint implements BooksApiServer {
     }
 
     @Override
-    public List<LedgerLineDto> generalLedger(String code, String asset, String from, String to)
+    public GeneralLedgerDto generalLedger(String code, String asset, String from, String to)
             throws Exception {
         long f = from(from);
         long t = to(to);
@@ -120,7 +120,7 @@ public class BooksEndpoint implements BooksApiServer {
 
     @Override
     public List<PeriodDto> periods() throws Exception {
-        Staff.name();
+        Staff.read(audit, "periods", "closed periods");
         return books.periods();
     }
 

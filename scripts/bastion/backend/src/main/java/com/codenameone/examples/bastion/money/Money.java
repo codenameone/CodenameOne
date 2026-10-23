@@ -177,6 +177,12 @@ public class Money {
         return scaled / 10000L + (scaled % 10000L > 0 ? 1L : 0L);
     }
 
+    /// Whether [#usdValue] can value `asset`, answered without refusing.
+    @Transactional(readOnly = true)
+    public boolean hasUsdPrice(String asset) throws IOException {
+        return "USD".equals(asset) || fxBps.containsKey(asset) || markets.hasPrice(asset, "USD");
+    }
+
     /// `amount` ledger units of any asset in USD cents, rounded up: a fiat
     /// currency at its configured rate, a coin at its index price.
     public long usdValue(String asset, long amount) throws IOException {
