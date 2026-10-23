@@ -22,11 +22,6 @@ import com.codename1.components.SpanLabel;
 import com.codename1.io.FileSystemStorage;
 import com.codename1.io.oidc.OidcTokens;
 import com.codename1.io.oidc.TokenStore;
-import com.codename1.maps.LatLng;
-import com.codename1.maps.MapView;
-import com.codename1.maps.vector.BundledTileSource;
-import com.codename1.maps.vector.TileCallback;
-import com.codename1.maps.vector.TileSource;
 import com.codename1.testing.AbstractTest;
 import com.codename1.ui.Button;
 import com.codename1.ui.CN;
@@ -34,46 +29,28 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
-import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.TextArea;
-import com.codename1.ui.spinner.Picker;
 import com.codename1.ui.util.ImageIO;
 import com.codename1.util.AsyncResource;
-import com.codenameone.examples.reel.live.LiveChannel;
-import com.codenameone.examples.reel.map.Locator;
-import com.codenameone.examples.reel.map.Maps;
-import com.codenameone.examples.reel.map.Routes;
 import com.codenameone.examples.reel.net.Session;
 import com.codenameone.examples.reel.ui.Lang;
 import com.codenameone.examples.reel.ui.Look;
 import com.codenameone.examples.reel.ui.Nav;
-import com.codenameone.examples.reel.ui.Photos;
 
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.List;
-import java.util.Map;
 
 /// What the end-to-end tests share. Each of them drives the real app, through
 /// its real screens, against a real server -- the one `run-e2e.sh` starts on the
-/// `test` profile, which has the four demo accounts, a geocoder that knows ten
-/// places and a text-message sender that hands the code back.
-///
-/// Three things are pinned so that a run is the same wherever it happens: the
-/// map draws from tiles bundled with the tests, a route is the straight line,
-/// and the device stands at a fixed point. None of it touches the server.
+/// `test` profile, which has the demo accounts and the demo catalog.
 public abstract class E2e extends AbstractTest {
     public static final String PASSWORD = "reel-demo";
-    public static final String CUSTOMER = "customer@reel.example";
-    public static final String COURIER = "courier@reel.example";
+    public static final String VIEWER = "viewer@reel.example";
+    public static final String CREATOR = "creator@reel.example";
+    public static final String MODERATOR = "moderator@reel.example";
     public static final String ADMIN = "admin@reel.example";
-    public static final String MERCHANT = "merchant@reel.example";
-    /// Where the device stands: the middle of the bundled tiles.
-    public static final LatLng HERE = new LatLng(37.8080, -122.4120);
 
     protected interface Check {
         boolean ok();
@@ -89,23 +66,9 @@ public abstract class E2e extends AbstractTest {
         return 180000;
     }
 
-    /// Whether this run of the tests is the one in a desktop window.
-    ///
-    /// `run-e2e.sh` runs the tests twice: on the simulator's phone, and then
-    /// with the simulator as a desktop, where the app is a window an admin
-    /// works in. A test belongs to one of the two -- see [#desktop()] -- and
-    /// passes without doing anything in the other.
-    static boolean desktopRun() {
-        return "true".equals(System.getProperty("reel.e2e.desktop"));
-    }
-
-    /// Whether this test is one for the desktop window. The phone's are not.
-    protected boolean desktop() {
-        return false;
-    }
-
-    private boolean mine() {
-        return desktop() == desktopRun();
+    /// The mode the app opens in once signed in; one the account may use.
+    protected String mode() {
+        return Nav.VIEWER;
     }
 
     /// The test itself.
@@ -113,68 +76,35 @@ public abstract class E2e extends AbstractTest {
 
     @Override
     public final boolean runTest() throws Exception {
-        if (!mine()) {
-            log("Not a test for " + (desktopRun() ? "the desktop" : "the phone") + "; skipped");
-            return true;
-        }
         return run();
     }
 
     @Override
     public void prepare() {
-        if (!mine()) {
-            return;
-        }
-        Session.useStore(new MemoryStore());
-        Maps.useTiles(new Tiles());
-        Routes.useStraightLines(true);
-        Locator.pin(HERE);
         onEdt(() -> {
-            LiveChannel.stop();
+            Session.useStore(new MemoryStore());
             // The tests read the screens in English, whatever the machine
             // they run on speaks.
             Prefs.setLanguage("en");
             Prefs.setTheme(Prefs.THEME_LIGHT);
             // Answered, with a no: no test is stopped by the question a first
-            // sign-in is asked, and none reports how it used the app. The
-            // test of the reports gives its own answers.
+            // sign-in is asked.
             Telemetry.allow(false);
             Look.apply();
             Lang.apply();
             Session.start(AppConfig.serverUrl());
-            AppConfig.setMode(Nav.CUSTOMER);
+            AppConfig.setMode(mode());
             Nav.launch();
         });
         waitForForm("Welcome");
-        quiet();
-    }
-
-    /// Puts the server back where a test expects to find it: nobody onboarding,
-    /// and the customer with no delivery under way. The tests share one server, and
-    /// without this a test that failed half way would fail the ones after it
-    /// for a reason that has nothing to do with them.
-    private void quiet() {
-        Actor.signIn(COURIER).online(false, 0, 0);
-        Actor customer = Actor.signIn(CUSTOMER);
-        String id = Actor.text(customer.get("/api/deliveries/active"), "id");
-        if (id.length() > 0) {
-            customer.post("/api/deliveries/" + id + "/cancel", null);
-        }
-        Photos.useSource(null);
     }
 
     @Override
     public void cleanup() {
-        if (!mine()) {
-            return;
-        }
-        onEdt(() -> {
-            LiveChannel.stop();
-            Session.start(AppConfig.serverUrl());
-        });
+        onEdt(() -> Session.start(AppConfig.serverUrl()));
     }
 
-    // ------------------------------------------------------------- onboarding
+    // ---------------------------------------------------------------- driving
 
     protected void onEdt(Runnable work) {
         CN.callSeriallyAndWait(work);
@@ -263,13 +193,22 @@ public abstract class E2e extends AbstractTest {
                 name + " to read \"" + expected + "\" (it reads \"" + text(name) + "\")");
     }
 
-    /// Signs in through the app's own screens.
-    protected void signIn(String email, String homeForm) {
+    /// Signs in through the app's own screens, and picks the first profile
+    /// when the account asks who is watching.
+    protected void signIn(String email, final String homeForm) {
         click("signIn");
         waitForForm("SignIn");
         type("email", email);
         type("password", PASSWORD);
         click("submit");
+        until(() -> {
+            Form current = Display.getInstance().getCurrent();
+            return current != null && (homeForm.equals(current.getName()) || "Profiles".equals(current.getName()));
+        }, 30000, "the " + homeForm + " screen");
+        Form current = Display.getInstance().getCurrent();
+        if ("Profiles".equals(current.getName())) {
+            click("profile-0");
+        }
         waitForForm(homeForm);
     }
 
@@ -307,119 +246,8 @@ public abstract class E2e extends AbstractTest {
         waitForForm("Welcome");
     }
 
-    /// Sets the date field called `name`. A test cannot turn the wheels of
-    /// the platform's date picker, which is not part of the app.
-    protected void date(final String name, final int year, final int month, final int day) {
-        until(() -> findByName(name) instanceof Picker, 20000, "a date called " + name);
-        onEdt(() -> {
-            Calendar calendar = Calendar.getInstance();
-            calendar.set(Calendar.YEAR, year);
-            calendar.set(Calendar.MONTH, month - 1);
-            calendar.set(Calendar.DAY_OF_MONTH, day);
-            ((Picker) findByName(name)).setDate(calendar.getTime());
-        });
-    }
-
-    /// The restaurant the demo merchant runs, and where its kitchen is.
-    protected static final String KITCHEN = "r-ember";
-    protected static final LatLng KITCHEN_AT = new LatLng(37.7952, -122.3934);
-
-    /// The first dish of the demo kitchen's menu that is on sale and has
-    /// nothing to choose, read from the server: dish ids are made at seeding.
-    protected static String dish(Actor customer) {
-        Map<String, Object> restaurant = customer.get("/api/restaurants/" + KITCHEN + "?lat="
-                + HERE.getLatitude() + "&lng=" + HERE.getLongitude());
-        Object menu = restaurant.get("menu");
-        for (Object section : menu instanceof List ? (List<?>) menu : new ArrayList<Object>()) {
-            Object dishes = section instanceof Map ? ((Map<?, ?>) section).get("dishes") : null;
-            for (Object dish : dishes instanceof List ? (List<?>) dishes : new ArrayList<Object>()) {
-                if (!(dish instanceof Map)) {
-                    continue;
-                }
-                Map<?, ?> found = (Map<?, ?>) dish;
-                Object options = found.get("options");
-                // The parser reads a JSON boolean as the string "true".
-                if ("true".equals(String.valueOf(found.get("available")))
-                        && (!(options instanceof List) || ((List<?>) options).isEmpty())) {
-                    return String.valueOf(found.get("id"));
-                }
-            }
-        }
-        throw new IllegalStateException("the demo kitchen has no plain dish on sale");
-    }
-
-    /// Puts a dish from the demo kitchen in the cart and opens the checkout,
-    /// as far as the server's price for it, which is where a test chooses
-    /// what to do next.
-    protected void cart() {
-        String dish = dish(Actor.signIn(CUSTOMER));
-        reveal("restaurant-" + KITCHEN);
-        click("restaurant-" + KITCHEN);
-        waitForForm("restaurant");
-        reveal("dish-" + dish);
-        click("dish-" + dish);
-        waitForForm("dish");
-        click("add-to-order");
-        waitForForm("restaurant");
-        click("restaurant-cart");
-        waitForForm("checkout");
-        // Enabled, not just showing a total: the button keeps the last total
-        // while a new quote is on its way, and cannot be used until it is in.
-        until(() -> text("place").indexOf("$") >= 0 && findByName("place").isEnabled(), 20000,
-                "the order to be priced");
-    }
-
-    /// The id of the order the customer has on its way.
-    protected static String placed(Actor customer) {
-        List<Object> active = customer.list("/api/orders/active");
-        return active.isEmpty() || !(active.get(0) instanceof Map) ? null
-                : Actor.text((Map<String, Object>) active.get(0), "id");
-    }
-
-    /// Waits for a delivery to be offered to `courier` and returns its id.
-    protected String offered(final Actor courier) {
-        final String[] id = new String[1];
-        until(() -> {
-            Map<String, Object> delivery = courier.get("/api/courier/active");
-            if ("OFFERED".equals(Actor.text(delivery, "state"))) {
-                id[0] = Actor.text(delivery, "id");
-            }
-            return id[0] != null;
-        }, 30000, "the offer to reach the courier");
-        return id[0];
-    }
-
-    /// A picture for the app to take as a photograph: the tests have neither
-    /// a camera nor a gallery. It is drawn rather than read from a file so
-    /// that it is the same picture wherever the tests run.
-    protected static Image photograph() {
-        Image picture = Image.createImage(640, 400, 0xffe9edf2);
-        Graphics g = picture.getGraphics();
-        g.setColor(0x2f6fed);
-        g.fillRect(0, 0, 640, 70);
-        g.setColor(0xb8c2cf);
-        g.fillRect(40, 110, 150, 190);
-        g.setColor(0x8795a7);
-        for (int line = 0; line < 5; line++) {
-            g.fillRect(230, 120 + line * 38, line % 2 == 0 ? 340 : 250, 16);
-        }
-        return picture;
-    }
-
     // -------------------------------------------------------- screenshots
 
-    /// Captures the screen as `name`.png and holds it against the golden of
-    /// the same name.
-    ///
-    /// `reel.shots.dir` is where the capture goes; without it nothing is
-    /// captured, which is a run from an IDE. `reel.goldens.dir` is where
-    /// the goldens are. A capture with no golden passes -- that is how a new
-    /// one is made: run, look at it, copy it over.
-    ///
-    /// The comparison is loose on purpose: a pixel counts as different only
-    /// when it is far off, and a capture fails only when a twentieth of it is.
-    /// Text is drawn a little differently from one machine to the next, and
-    /// this is here to notice a screen that changed, not a glyph.
     /// Saves the screen as `name`.png in the captures, and answers it; null
     /// when the run keeps no captures.
     private Image capture(String name) throws java.io.IOException {
@@ -440,6 +268,18 @@ public abstract class E2e extends AbstractTest {
         return captured[0];
     }
 
+    /// Captures the screen as `name`.png and holds it against the golden of
+    /// the same name.
+    ///
+    /// `reel.shots.dir` is where the capture goes; without it nothing is
+    /// captured, which is a run from an IDE. `reel.goldens.dir` is where
+    /// the goldens are. A capture with no golden passes -- that is how a new
+    /// one is made: run, look at it, copy it over.
+    ///
+    /// The comparison is loose on purpose: a pixel counts as different only
+    /// when it is far off, and a capture fails only when a twentieth of it is.
+    /// Text is drawn a little differently from one machine to the next, and
+    /// this is here to notice a screen that changed, not a glyph.
     protected void shot(String name) {
         String out = fileUrl(System.getProperty("reel.shots.dir"));
         if (out == null) {
@@ -494,69 +334,9 @@ public abstract class E2e extends AbstractTest {
                 || Math.abs((a & 0xff) - (b & 0xff)) > 60;
     }
 
-    /// Waits for the screen to stop moving: transitions over, the map drawn.
+    /// Waits for the screen to stop moving: transitions over.
     private void settle() {
         waitFor(1500);
-        until(() -> {
-            Component map = findByName("map");
-            return !(map instanceof MapView) || ((MapView) map).isMapReady();
-        }, 20000, "the map");
-        waitFor(500);
-    }
-
-    /// The map of the neighbourhood the tests happen in, read from the test
-    /// resources, so that a run draws the same streets with no network.
-    ///
-    /// A tile outside the bundled area is answered with an empty one. A tile
-    /// that fails is asked for again and is never drawn, and the map then
-    /// never reports itself ready -- which a test waiting to take a capture
-    /// would read as a map that is still loading.
-    static final class Tiles implements TileSource {
-        private static final byte[] EMPTY = new byte[0];
-        // At the root of the resources: a Codename One resource has no
-        // directory, and the simulator refuses a path that names one.
-        private final TileSource bundled =
-                new BundledTileSource("/mt_{z}_{x}_{y}.mvt", true, 13, 13);
-
-        @Override
-        public boolean isVector() {
-            return true;
-        }
-
-        @Override
-        public int getTileSize() {
-            return 256;
-        }
-
-        @Override
-        public int getMinZoom() {
-            return 13;
-        }
-
-        @Override
-        public int getMaxZoom() {
-            return 13;
-        }
-
-        @Override
-        public String getAttribution() {
-            return "(c) OpenStreetMap contributors";
-        }
-
-        @Override
-        public void fetchTile(int z, int x, int y, final TileCallback callback) {
-            bundled.fetchTile(z, x, y, new TileCallback() {
-                @Override
-                public void tileLoaded(int tz, int tx, int ty, byte[] data) {
-                    callback.tileLoaded(tz, tx, ty, data);
-                }
-
-                @Override
-                public void tileFailed(int tz, int tx, int ty) {
-                    callback.tileLoaded(tz, tx, ty, EMPTY);
-                }
-            });
-        }
     }
 
     /// Tokens kept for the length of the run and nowhere else.

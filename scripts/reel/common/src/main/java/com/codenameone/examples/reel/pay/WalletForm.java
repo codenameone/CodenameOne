@@ -35,13 +35,14 @@ import com.codenameone.examples.reel.ui.Lang;
 import com.codenameone.examples.reel.ui.Ui;
 import java.util.List;
 
-/// The ways the customer can pay: their cards, and cash, which is always there.
+/// The ways the viewer can pay: their cards, and "no card", which is always
+/// there and pays only for what is free or bought through the app store.
 ///
 /// The list is the server's. A card is added by the payment provider and what
 /// comes back is a brand and four digits; the number itself is never kept by
 /// this app, and by the server only long enough to hand it over.
 ///
-/// The same screen answers "which of these, for this delivery?": opened with
+/// The same screen answers "which of these, for this purchase?": opened with
 /// [#pick], a tap on a method chooses it and goes back.
 public final class WalletForm {
     public interface Picked {
@@ -63,7 +64,7 @@ public final class WalletForm {
         Container page = Ui.page();
         page.add(Ui.text(picked == null
                 ? "Tap a card to make it the one that pays unless you say otherwise."
-                : "Choose how to pay for this delivery.", "SvMuted"));
+                : "Choose the card that pays for this.", "SvMuted"));
         list.setName("methods");
         page.add(list);
         page.add(Ui.secondary("Add a card", "addCard",
@@ -81,7 +82,7 @@ public final class WalletForm {
         wallet.load();
     }
 
-    /// The wallet, to choose from for one delivery.
+    /// The wallet, to choose from for one purchase.
     ///
     /// @param chosen the id of the method the delivery has now
     public static void pick(Form previous, String chosen, Picked picked) {
@@ -93,7 +94,7 @@ public final class WalletForm {
     /// The name of a method, as a customer would say it.
     public static String label(PaymentMethodDto method) {
         if (method == null || "cash".equals(method.kind())) {
-            return Lang.tr("Cash");
+            return Lang.tr("No card");
         }
         return method.label() == null || method.label().length() == 0
                 ? method.brand() + " " + method.last4() : method.label();
@@ -117,7 +118,7 @@ public final class WalletForm {
             row.add(BorderLayout.WEST, FlowLayout.encloseCenterMiddle(icon));
             Container lines = new Container(BoxLayout.y());
             lines.add(Ui.plain(label(method), "SvRowTitle"));
-            lines.add(Ui.plain(cash ? Lang.tr("Pay the courier directly")
+            lines.add(Ui.plain(cash ? Lang.tr("Free plans and store purchases only")
                     : Lang.tr("Expires {0}", expiry(method)), "SvRowDetail"));
             row.add(BorderLayout.CENTER, lines);
             Container end = new Container(new FlowLayout(Label.RIGHT, Label.CENTER));

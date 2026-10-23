@@ -103,7 +103,11 @@ case "$command" in
     serve_web
     main="$(tr -d '\r\n' < "$APP/backend/target/classes/META-INF/cn1-backend-main")"
     log "running $main on port $port"
-    PORT="$port" exec java -cp "$APP/backend/target/classes:$APP/backend/target/server-lib/*" "$main"
+    # The JDK the build used, not whichever java is first on the PATH: the
+    # classes are Java 17, and an older java there fails every request.
+    JAVA="java"
+    if [ -n "${JAVA_HOME:-}" ] && [ -x "$JAVA_HOME/bin/java" ]; then JAVA="$JAVA_HOME/bin/java"; fi
+    PORT="$port" exec "$JAVA" -cp "$APP/backend/target/classes:$APP/backend/target/server-lib/*" "$main"
     ;;
   *)
     log "unknown command $command (build, run, web)"

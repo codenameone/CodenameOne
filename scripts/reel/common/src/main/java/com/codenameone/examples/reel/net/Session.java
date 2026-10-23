@@ -252,8 +252,8 @@ public final class Session {
     /// Signs in with an e-mail address and password.
     /// An e-mail address the way the server names its account: trimmed, with
     /// its ASCII letters in lower case (`Accounts.email` on the server). Signing
-    /// in as `Courier@Reel.example` must reach, and record its mode under, the
-    /// same account as `courier@reel.example`. Folded by hand: `toLowerCase()`
+    /// in as `Viewer@Reel.example` must reach, and record its mode under, the
+    /// same account as `viewer@reel.example`. Folded by hand: `toLowerCase()`
     /// follows the device locale, and under Turkish the `I` would not fold to `i`.
     public static String accountName(String email) {
         if (email == null) {

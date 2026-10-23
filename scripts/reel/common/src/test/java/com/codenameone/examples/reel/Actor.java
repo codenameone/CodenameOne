@@ -30,8 +30,9 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
-/// The other person in a test. The app on screen is one user; a delivery needs
-/// two, so the second one acts through the API directly, with their own token.
+/// The other person in a test. The app on screen is one user; a test that
+/// needs a second one (or wants to check what the app did) acts through the
+/// API directly, with their own token.
 ///
 /// Their requests opt out of the app's authorizer, which would otherwise put
 /// the on-screen user's token on anything sent to `/api`.
@@ -102,7 +103,7 @@ final class Actor {
         return send("POST", path, json == null ? "{}" : json);
     }
 
-    private Map<String, Object> send(String method, String path, String json) {
+    Map<String, Object> send(String method, String path, String json) {
         ConnectionRequest request = new ConnectionRequest();
         request.setUrl(AppConfig.serverUrl() + path);
         request.setHttpMethod(method);
@@ -136,12 +137,6 @@ final class Actor {
         Object root = get(path).get("root");
         return root instanceof java.util.List ? (java.util.List<Object>) root
                 : new java.util.ArrayList<Object>();
-    }
-
-    /// A courier's position report.
-    Map<String, Object> online(boolean online, double lat, double lng) {
-        return post("/api/courier/status", "{\"online\":" + online + ",\"lat\":" + lat
-                + ",\"lng\":" + lng + ",\"heading\":0}");
     }
 
     static String text(Map<String, Object> json, String key) {

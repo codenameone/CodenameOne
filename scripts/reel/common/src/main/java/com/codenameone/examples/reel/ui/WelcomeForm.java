@@ -39,10 +39,10 @@ public final class WelcomeForm {
         hero.setUIID("SvHero");
         hero.setSafeArea(true);
         Label icon = new Label("", "SvHeroIcon");
-        Ui.icon(icon, FontImage.MATERIAL_RESTAURANT_MENU, 10f);
+        Ui.icon(icon, FontImage.MATERIAL_MOVIE, 10f);
         hero.add(icon);
         hero.add(Ui.label("Reel", "SvHeroTitle"));
-        hero.add(Ui.text("Good food from places nearby, brought to your door.", "SvHeroText"));
+        hero.add(Ui.text("Films, series and courses, on every screen you own.", "SvHeroText"));
 
         Container actions = Ui.page();
         actions.setScrollableY(false);

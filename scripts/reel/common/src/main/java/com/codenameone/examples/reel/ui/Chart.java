@@ -27,7 +27,7 @@ import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 
-/// A row of bars: deliveries a day, takings a day, requests by the hour.
+/// A row of bars: sign-ups a day, minutes watched a day, revenue a day.
 ///
 /// Drawn here, in a few lines, because that is all a bar chart is and because
 /// it then takes its colours from `theme.css` like everything else: the bars

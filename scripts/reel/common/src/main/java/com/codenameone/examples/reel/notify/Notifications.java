@@ -32,13 +32,13 @@ import com.codenameone.examples.reel.net.Net;
 import com.codenameone.examples.reel.net.Session;
 import com.codenameone.examples.reel.ui.Nav;
 
-/// Push notifications: the delivery news that reaches a phone in a pocket.
+/// Push notifications: new episodes, and news about the account, on a phone in a pocket.
 ///
 /// The phone registers with the platform's push service once, and the token
 /// it gets is handed to the Reel server for whoever is signed in. Signing
 /// out takes it back, so the next person to use the phone is not told about
-/// the last one's deliveries. The server decides what to send and when; see the
-/// server's `DeliveryPushes`.
+/// the last one's account. The server decides what to send and when; see the
+/// server's `Notifier`.
 ///
 /// Only on a phone (Android and iOS) and only with [AppConfig#PUSH_APP_KEY]
 /// set. The simulator has no push service to register with, and a browser
