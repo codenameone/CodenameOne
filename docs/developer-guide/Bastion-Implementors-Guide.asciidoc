@@ -111,7 +111,7 @@ The ledger stores one signed number per posting. Read as accounting, a positive 
 
 The app's screens are in `common/src/main/java/.../ui`. Three classes carry the data views:
 
-* `Charts.java` draws every chart with `com.codename1.charts`: a filled line for a balance, paired bars for money in and out, a doughnut for the allocation, and candles for a market, made of a range bar from the low to the high under a body from the open to the close. Colors come from the foreground of `BnChart*` styles in `theme.css`, so dark mode and a re-skin reach the charts too.
+* `Charts.java` draws every chart with `com.codename1.charts`: a filled line for a balance, paired bars for money in and out, a doughnut for the allocation, and candles for a market, made of a range bar from the low to the high under a body from the open to the close. Colors come from the foreground of the `BnChartLine`, `BnChartIn` and `BnChartOut` styles in `theme.css`, so dark mode and a re-skin reach the charts too.
 * `Table.java` is a table of weighted columns over `TableLayout`, with numbers aligned to the end of their column. It mirrors in Hebrew, and on a phone a table wider than the screen scrolls sideways inside itself.
 * `ConsoleForm.java` is the staff console. A window at least 165 mm wide gets a sidebar; anything narrower gets a section picker. Its buttons follow the roles: an auditor gets no action at all and an administrator's changes send the password with each request and a fresh `Idempotency-Key` with each adjustment or reversal. The server enforces both; the console only stops offering what would be refused.
 
