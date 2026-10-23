@@ -204,7 +204,10 @@ public final class SettingsForm {
         TextField password = new TextField("", Lang.tr("Password"), 20, TextArea.PASSWORD);
         password.setUIID("BnField");
         Command ok = new Command(Lang.tr("Continue"));
-        if (Dialog.show(Lang.tr("Confirm it is you"), password, ok,
+        if (Dialog.show(Lang.tr("Confirm it is you"),
+                    // Enclosed, or the dialog stretches the one-line field to its
+                    // whole body.
+                    com.codename1.ui.layouts.BoxLayout.encloseY(password), ok,
                 new Command(Lang.tr("Cancel"))) != ok) {
             return;
         }
@@ -225,7 +228,10 @@ public final class SettingsForm {
         TextField password = new TextField("", Lang.tr("Password"), 20, TextArea.PASSWORD);
         password.setUIID("BnField");
         Command ok = new Command(Lang.tr("Continue"));
-        if (Dialog.show(Lang.tr("Confirm it is you"), password, ok,
+        if (Dialog.show(Lang.tr("Confirm it is you"),
+                    // Enclosed, or the dialog stretches the one-line field to its
+                    // whole body.
+                    com.codename1.ui.layouts.BoxLayout.encloseY(password), ok,
                 new Command(Lang.tr("Cancel"))) != ok) {
             return;
         }

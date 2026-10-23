@@ -179,12 +179,17 @@ public final class OnboardingForm {
         // put somebody else's app on the account (SecondFactor on the server).
         // Asked once here and sent with both calls, then dropped.
         String password = null;
+        // Matches SecondFactor on the server: a passkey counts only when the
+        // authenticator verified the user (`hwk` with `user`).
         if (!Session.signedInWith("mfa") && !Session.signedInWith("otp")
-                && !Session.signedInWith("hwk")) {
+                && !(Session.signedInWith("hwk") && Session.signedInWith("user"))) {
             TextField field = new TextField("", Lang.tr("Password"), 20, TextArea.PASSWORD);
             field.setUIID("BnField");
             Command ok = new Command(Lang.tr("Continue"));
-            if (Dialog.show(Lang.tr("Confirm it is you"), field, ok,
+            if (Dialog.show(Lang.tr("Confirm it is you"),
+                    // Enclosed, or the dialog stretches the one-line field to its
+                    // whole body.
+                    com.codename1.ui.layouts.BoxLayout.encloseY(field), ok,
                     new Command(Lang.tr("Cancel"))) != ok) {
                 skipped.run();
                 return;

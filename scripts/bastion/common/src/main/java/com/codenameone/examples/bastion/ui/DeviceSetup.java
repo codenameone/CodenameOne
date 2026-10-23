@@ -56,13 +56,19 @@ public final class DeviceSetup {
             return;
         }
         String password = null;
-        // A passkey sign-in already proved a key bound to this site; the
-        // server does not ask it for a password (see Devices on the server).
-        if (!user.totpEnabled() && !Session.signedInWith("hwk")) {
+        // The same rule as Devices on the server, which reads the token's own
+        // record of the sign-in, never whether an app is on the account now: a
+        // code sign-in (`otp`/`mfa`) or a user-verified passkey (`hwk` with
+        // `user`) is not asked for the password; anything else is.
+        if (!Session.signedInWith("mfa") && !Session.signedInWith("otp")
+                && !(Session.signedInWith("hwk") && Session.signedInWith("user"))) {
             TextField field = new TextField("", Lang.tr("Password"), 20, TextArea.PASSWORD);
             field.setUIID("BnField");
             Command ok = new Command(Lang.tr("Continue"));
-            if (Dialog.show(Lang.tr("Confirm it is you"), field, ok,
+            if (Dialog.show(Lang.tr("Confirm it is you"),
+                    // Enclosed, or the dialog stretches the one-line field to its
+                    // whole body.
+                    com.codename1.ui.layouts.BoxLayout.encloseY(field), ok,
                     new Command(Lang.tr("Cancel"))) != ok) {
                 return;
             }
