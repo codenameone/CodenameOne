@@ -220,7 +220,7 @@ public final class SimulatorRecorder {
         startTime = System.currentTimeMillis();
         appAudio = null;
         if (opts.getAudio().includesApp() && opts.hasAudioTrack() && writer != null) {
-            appAudio = new AppAudioTap(startTime);
+            appAudio = new AppAudioTap(startTime, opts.getMaxSeconds() * 1000L);
             AppAudioTap.setActive(appAudio);
         }
         // The frame already captured is frame 0, written here: a recording

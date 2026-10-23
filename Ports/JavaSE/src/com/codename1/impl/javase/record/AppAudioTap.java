@@ -41,12 +41,14 @@ public final class AppAudioTap {
     private static AppAudioTap active;
 
     private final long startMs;
+    private final long maxFrames;
     private float[] mix = new float[SAMPLE_RATE * 10];
     private int length;
     private final Map<Object, Long> cursors = new HashMap<Object, Long>();
 
-    AppAudioTap(long startMs) {
+    AppAudioTap(long startMs, long maxMs) {
         this.startMs = startMs;
+        this.maxFrames = maxMs * SAMPLE_RATE / 1000L;
     }
 
     static synchronized void setActive(AppAudioTap tap) {
@@ -58,12 +60,16 @@ public final class AppAudioTap {
     }
 
     /// Hands played audio to the recording, when one is capturing app audio.
-    /// `pcm` is 44.1 kHz, 16-bit little-endian stereo; `gain` is the volume the
-    /// source plays it at (1 for full). Cheap and does nothing when not recording.
-    public static void write(Object source, byte[] pcm, int off, int len, float gain) {
+    /// `pcm` must be 44.1 kHz, 16-bit little-endian stereo: a caller with another
+    /// format converts first. `gain` is the volume the source plays it at (1 for
+    /// full). `queuedFrames` is what the source's line still holds ahead of these
+    /// bytes, so they are placed when they will be heard rather than when they
+    /// were queued. Cheap and does nothing when not recording.
+    public static void write(Object source, byte[] pcm, int off, int len, float gain, int queuedFrames) {
         AppAudioTap t = current();
         if (t != null) {
-            t.add(source, pcm, off, len, gain, System.currentTimeMillis());
+            long heard = System.currentTimeMillis() + Math.max(0, queuedFrames) * 1000L / SAMPLE_RATE;
+            t.add(source, pcm, off, len, gain, heard);
         }
     }
 
@@ -76,7 +82,12 @@ public final class AppAudioTap {
         Long c = cursors.get(source);
         long at = c == null || c.longValue() < now ? now : c.longValue();
         cursors.put(source, Long.valueOf(at + frames));
-        int end = (int) Math.min(Integer.MAX_VALUE - 1, at + frames);
+        // Nothing past the recording's time limit is ever used, which also bounds
+        // the buffer.
+        int end = (int) Math.min(maxFrames, at + frames);
+        if (end <= at) {
+            return;
+        }
         if (end > mix.length) {
             float[] grown = new float[Math.max(end, mix.length * 2)];
             System.arraycopy(mix, 0, grown, 0, length);

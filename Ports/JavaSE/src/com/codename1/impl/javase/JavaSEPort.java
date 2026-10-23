@@ -13098,8 +13098,22 @@ public class JavaSEPort extends CodenameOneImplementation {
             public void actionPerformed(ActionEvent e) {
                 com.codename1.impl.javase.record.SimulatorRecorder rec = getSimulatorRecorder();
                 try {
-                    if (rec.isRecording()) {
-                        com.codename1.impl.javase.record.SimulatorRecorder.Result r = rec.stop();
+                    if (rec.isRecording() || "Stop Recording".equals(record.getText())) {
+                        com.codename1.impl.javase.record.SimulatorRecorder.Result r;
+                        try {
+                            r = rec.stop();
+                        } catch (IllegalStateException alreadyStopped) {
+                            // It stopped by itself (time limit or a failure) since the
+                            // menu was drawn; report that recording instead.
+                            record.setText("Start Recording");
+                            if (rec.getLastError() != null) {
+                                throw rec.getLastError();
+                            }
+                            r = rec.getLastResult();
+                            if (r == null) {
+                                return;
+                            }
+                        }
                         record.setText("Start Recording");
                         String msg = "Saved " + r.file.getAbsolutePath() + " (" + (r.durationMs / 1000) + "s)";
                         if (r.note != null) {

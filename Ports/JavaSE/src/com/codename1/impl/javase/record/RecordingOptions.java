@@ -179,7 +179,8 @@ public final class RecordingOptions {
 
     /// A safety stop, so a recording an agent forgot to stop does not fill the disk.
     public void setMaxSeconds(int maxSeconds) {
-        this.maxSeconds = Math.max(1, maxSeconds);
+        // An hour at most: the app audio is mixed in memory until the end.
+        this.maxSeconds = Math.max(1, Math.min(3600, maxSeconds));
     }
 
     /// True when the output gets an audio track.

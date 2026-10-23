@@ -225,7 +225,7 @@ class RecordingTest {
         o.apply(args);
         assertEquals(RecordingOptions.Audio.APP_AND_MICROPHONE, o.getAudio());
 
-        AppAudioTap tap = new AppAudioTap(1000);
+        AppAudioTap tap = new AppAudioTap(1000, 60000);
         // 100 stereo frames of a constant 1000 at t=1500ms (sample 22050)...
         byte[] pcm = new byte[400];
         for (int i = 0; i < 200; i++) {
