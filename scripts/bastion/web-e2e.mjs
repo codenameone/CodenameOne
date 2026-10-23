@@ -242,6 +242,10 @@ async function typeInto(index, text, type) {
   // holds exactly the text.
   for (let attempt = 0; ; attempt++) {
     await page.keyboard.type(text, { delay: 10 });
+    // The doubled keystroke can also land a moment AFTER typing ends (CI saw
+    // "25.000" committed while an immediate read-back held "25.00"), so let
+    // the input settle before trusting what it holds.
+    await page.waitForTimeout(400);
     const value = await page.evaluate(() => document.activeElement && document.activeElement.value);
     if (value === text || value === undefined || value === null || attempt >= 2) {
       break;
