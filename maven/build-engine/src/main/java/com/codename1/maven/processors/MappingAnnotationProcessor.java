@@ -298,11 +298,18 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
     /// Returns a full Java statement (terminated with `;`) that writes
     /// `rhsExpr` into the field for the runtime instance `o`. Records
     /// can't mutate after construction, so we accumulate in a local of
-    /// the form `_name` for later canonical-constructor invocation;
+    /// the form `__name` for later canonical-constructor invocation;
     /// JavaBeans POJOs route through `o.setName(rhsExpr)`; plain POJOs
     /// assign the field directly.
+    /// The local a record component is gathered in before the constructor
+    /// call. Two underscores: the generated code's own locals (`_kids`, `_i`,
+    /// `_e`, ...) take one, so a component named `kids` cannot redeclare one.
+    private static String recordLocal(MappedField f) {
+        return "__" + f.name;
+    }
+
     private static String writeStmt(MappedField f, boolean isRecord, String rhsExpr) {
-        if (isRecord) return "_" + f.name + " = " + rhsExpr + ";";
+        if (isRecord) return recordLocal(f) + " = " + rhsExpr + ";";
         if (f.useAccessor) return "o." + f.setterName + "(" + rhsExpr + ");";
         return "o." + f.name + " = " + rhsExpr + ";";
     }
@@ -434,8 +441,8 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
                 .append(" fromMap(java.util.Map<String, Object> m) {\n");
         if (isRecord) {
             for (MappedField f : mc.fields) {
-                sb.append("        ").append(fieldType(f)).append(" _")
-                        .append(f.name).append(" = ").append(defaultLiteral(f.kind)).append(";\n");
+                sb.append("        ").append(fieldType(f)).append(" ")
+                        .append(recordLocal(f)).append(" = ").append(defaultLiteral(f.kind)).append(";\n");
             }
             sb.append("        if (m == null) return ");
             appendRecordCtorCall(sb, mc);
@@ -473,8 +480,8 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
                 .append(" readXml(com.codename1.xml.Element root) {\n");
         if (isRecord) {
             for (MappedField f : mc.fields) {
-                sb.append("        ").append(fieldType(f)).append(" _")
-                        .append(f.name).append(" = ").append(defaultLiteral(f.kind)).append(";\n");
+                sb.append("        ").append(fieldType(f)).append(" ")
+                        .append(recordLocal(f)).append(" = ").append(defaultLiteral(f.kind)).append(";\n");
             }
             sb.append("        if (root == null) return ");
             appendRecordCtorCall(sb, mc);
@@ -524,7 +531,7 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
         boolean first = true;
         for (MappedField f : mc.fields) {
             if (!first) sb.append(", ");
-            sb.append("_").append(f.name);
+            sb.append(recordLocal(f));
             first = false;
         }
         sb.append(")");
