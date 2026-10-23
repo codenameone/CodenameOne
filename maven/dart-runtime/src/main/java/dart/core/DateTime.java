@@ -66,15 +66,128 @@ public final class DateTime {
     }
 
     /// Dart's own grammar for DateTime.parse: an ISO 8601 date, an optional time
-    /// after `T` or a space, an optional fraction, and an optional `Z` or offset.
+    /// after `T` or a space, an optional fraction, and an optional `Z` or offset --
+    /// as a regular expression,
+    /// `^([+-]?\d{4,6})-?(\d\d)-?(\d\d)(?:[ T](\d\d)(?::?(\d\d)(?::?(\d\d)(?:[.,](\d+))?)?)?( ?[zZ]| ?([-+])(\d\d)(?::?(\d\d))?)?)?$`.
     ///
-    /// The framework's engine, never `java.util.regex`: no ParparVM target has
-    /// that package, and nothing relocates it in an ordinary application, so
-    /// naming it here failed every native build of a Flutter app on a missing
-    /// `java_util_regex_Pattern.h`.
-    private static final com.codename1.util.regex.Pattern ISO = com.codename1.util.regex.Pattern.compile(
-            "^([+-]?\\d{4,6})-?(\\d\\d)-?(\\d\\d)(?:[ T](\\d\\d)(?::?(\\d\\d)(?::?(\\d\\d)(?:[.,](\\d+))?)?)?"
-            + "( ?[zZ]| ?([-+])(\\d\\d)(?::?(\\d\\d))?)?)?$");
+    /// Matched by hand rather than with a regex engine: `java.util.regex` does not
+    /// exist on ParparVM, and `com.codename1.util.regex` would add its whole engine
+    /// to every Flutter app for one date format. Answers the expression's eleven
+    /// groups (index 0 unused, an unmatched group null), or null for no match.
+    /// `DateTimeIsoGrammarTest` holds it to the expression above.
+    static String[] isoGroups(String s) {
+        // Only the year's length needs backtracking: \d{4,6} is greedy and the
+        // month may follow it with no separator. Everything after the year is
+        // deterministic -- every optional part starts with a character nothing
+        // else could consume at that point.
+        int start = s.length() > 0 && (s.charAt(0) == '+' || s.charAt(0) == '-') ? 1 : 0;
+        for (int len = 6; len >= 4; len--) {
+            String[] g = isoAfterYear(s, start, len);
+            if (g != null) {
+                return g;
+            }
+        }
+        return null;
+    }
+
+    private static String[] isoAfterYear(String s, int start, int yearDigits) {
+        int n = s.length();
+        int i = start + yearDigits;
+        if (!digits(s, start, yearDigits)) {
+            return null;
+        }
+        String[] g = new String[12];
+        g[1] = s.substring(0, i);
+        if (i < n && s.charAt(i) == '-') {
+            i++;
+        }
+        if (!digits(s, i, 2)) {
+            return null;
+        }
+        g[2] = s.substring(i, i + 2);
+        i += 2;
+        if (i < n && s.charAt(i) == '-') {
+            i++;
+        }
+        if (!digits(s, i, 2)) {
+            return null;
+        }
+        g[3] = s.substring(i, i + 2);
+        i += 2;
+        if (i == n) {
+            return g;
+        }
+        char sep = s.charAt(i);
+        if ((sep != ' ' && sep != 'T') || !digits(s, i + 1, 2)) {
+            return null;
+        }
+        g[4] = s.substring(i + 1, i + 3);
+        i += 3;
+        int at = colonDigits(s, i);
+        if (at >= 0) {
+            g[5] = s.substring(at - 2, at);
+            i = at;
+            at = colonDigits(s, i);
+            if (at >= 0) {
+                g[6] = s.substring(at - 2, at);
+                i = at;
+                if (i < n && (s.charAt(i) == '.' || s.charAt(i) == ',') && digits(s, i + 1, 1)) {
+                    int e = i + 1;
+                    while (e < n && isDigit(s.charAt(e))) {
+                        e++;
+                    }
+                    g[7] = s.substring(i + 1, e);
+                    i = e;
+                }
+            }
+        }
+        if (i == n) {
+            return g;
+        }
+        int z = i;
+        if (s.charAt(i) == ' ') {
+            i++;
+        }
+        if (i < n && (s.charAt(i) == 'z' || s.charAt(i) == 'Z')) {
+            g[8] = s.substring(z, i + 1);
+            return i + 1 == n ? g : null;
+        }
+        if (i >= n || (s.charAt(i) != '+' && s.charAt(i) != '-') || !digits(s, i + 1, 2)) {
+            return null;
+        }
+        g[9] = s.substring(i, i + 1);
+        g[10] = s.substring(i + 1, i + 3);
+        int e = colonDigits(s, i + 3);
+        if (e >= 0) {
+            g[11] = s.substring(e - 2, e);
+        } else {
+            e = i + 3;
+        }
+        g[8] = s.substring(z, e);
+        return e == n ? g : null;
+    }
+
+    /// `:?(\d\d)` at `i`: the index after it, or -1.
+    private static int colonDigits(String s, int i) {
+        int j = i < s.length() && s.charAt(i) == ':' ? i + 1 : i;
+        return digits(s, j, 2) ? j + 2 : -1;
+    }
+
+    private static boolean digits(String s, int from, int count) {
+        if (from + count > s.length()) {
+            return false;
+        }
+        for (int k = from; k < from + count; k++) {
+            if (!isDigit(s.charAt(k))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean isDigit(char c) {
+        return c >= '0' && c <= '9';
+    }
 
     /// `DateTime.parse`: a value with a `Z` or an offset is UTC, anything else local.
     public static DateTime parse(String formattedString) {
@@ -89,19 +202,19 @@ public final class DateTime {
         if (formattedString == null) {
             return null;
         }
-        com.codename1.util.regex.Matcher m = ISO.matcher(formattedString);
-        if (!m.matches()) {
+        String[] g = isoGroups(formattedString);
+        if (g == null) {
             return null;
         }
-        long year = Long.parseLong(m.group(1).startsWith("+") ? m.group(1).substring(1) : m.group(1));
-        long month = Long.parseLong(m.group(2));
-        long day = Long.parseLong(m.group(3));
-        long hour = num(m.group(4));
-        long minute = num(m.group(5));
-        long second = num(m.group(6));
+        long year = Long.parseLong(g[1].startsWith("+") ? g[1].substring(1) : g[1]);
+        long month = Long.parseLong(g[2]);
+        long day = Long.parseLong(g[3]);
+        long hour = num(g[4]);
+        long minute = num(g[5]);
+        long second = num(g[6]);
         long milli = 0;
         long micro = 0;
-        String frac = m.group(7);
+        String frac = g[7];
         if (frac != null) {
             String six = (frac + "000000").substring(0, 6);
             long all = Long.parseLong(six);
@@ -113,13 +226,13 @@ public final class DateTime {
         // A well-formed date outside DateTime's range is still unparseable: tryParse
         // answers null (and parse a FormatException), never the constructor's error.
         try {
-            if (m.group(8) == null) {
+            if (g[8] == null) {
                 return new DateTime(year, month, day, hour, minute, second, milli, micro);
             }
             DateTime u = utc(year, month, day, hour, minute, second, milli, micro);
-            if (m.group(9) != null) {
-                long offset = num(m.group(10)) * 60 + num(m.group(11));
-                long sign = m.group(9).equals("-") ? -1 : 1;
+            if (g[9] != null) {
+                long offset = num(g[10]) * 60 + num(g[11]);
+                long sign = g[9].equals("-") ? -1 : 1;
                 long at = u.epochMicros - sign * offset * 60000000L;
                 checkMicrosRange(at);
                 return new DateTime(at, true);

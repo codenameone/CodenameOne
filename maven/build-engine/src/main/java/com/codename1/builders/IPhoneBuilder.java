@@ -7673,9 +7673,16 @@ public class IPhoneBuilder extends Executor {
 
                     }
 
+                    // CN1WebRTC.m compiles under either memory model, but the
+                    // WebRTC framework headers it imports declare __weak
+                    // properties, which clang rejects in a file built with
+                    // ARC off ("cannot create __weak reference in file using
+                    // manual reference counting") -- so every WebRTC app
+                    // failed to compile until it was given -fobjc-arc too.
                     String arcPhaseFixScript =
                             usesCn1Vision || usesCn1Language || usesCn1Inference
-                            ? "    arc_sources = ['CN1Vision.m', 'CN1Language.m', 'CN1Inference.m']\n"
+                                    || usesWebRtc
+                            ? "    arc_sources = ['CN1Vision.m', 'CN1Language.m', 'CN1Inference.m', 'CN1WebRTC.m']\n"
                             + "    main_target.source_build_phase.files.each do |bf|\n"
                             + "      ref = bf.file_ref\n"
                             + "      name = ref && File.basename(ref.path || ref.name || '')\n"
