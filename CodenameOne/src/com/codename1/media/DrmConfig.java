@@ -34,6 +34,7 @@ import java.util.Map;
 /// party that interprets either:
 ///
 /// ```java
+/// String playbackToken = "token-from-your-server";
 /// DrmConfig drm = new DrmConfig(DrmScheme.WIDEVINE, "https://example.com/license/widevine")
 ///         .addLicenseHeader("Authorization", "Bearer " + playbackToken);
 /// ```

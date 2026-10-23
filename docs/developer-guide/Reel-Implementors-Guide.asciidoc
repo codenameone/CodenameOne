@@ -80,11 +80,20 @@ framework's streaming API:
 
 [source,java]
 ----
+String manifestUrl = "https://reel.example.com/media/42/master.m3u8";
+String licenseUrl = "https://reel.example.com/api/license/clearkey";
+String licenseToken = "token-from-playback-start";
+int resumeSeconds = 90;
+Form player = new Form("Player", new BorderLayout());
 StreamRequest req = new StreamRequest(manifestUrl)
         .setStartPosition(resumeSeconds * 1000)
         .setDrm(new DrmConfig(DrmScheme.CLEARKEY, licenseUrl)
                 .addLicenseHeader("X-Reel-License", licenseToken));
-req.createAsync().ready(media -> ...);
+req.createAsync().ready(media -> {
+    player.add(BorderLayout.CENTER, media.getVideoComponent());
+    player.revalidate();
+});
+player.show();
 ----
 
 While the title plays, the app reports a heartbeat. A session whose heartbeats

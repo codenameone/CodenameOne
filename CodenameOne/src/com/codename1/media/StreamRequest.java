@@ -33,15 +33,22 @@ import java.util.Map;
 /// protected by DRM, and creates the platform player for it.
 ///
 /// ```java
+/// String manifestUrl = "https://example.com/video/master.m3u8";
+/// String licenseUrl = "https://example.com/license/widevine";
+/// String token = "token-from-your-server";
 /// StreamRequest req = new StreamRequest(manifestUrl)
 ///         .setDrm(new DrmConfig(DrmScheme.WIDEVINE, licenseUrl)
 ///                 .addLicenseHeader("Authorization", "Bearer " + token))
-///         .setStartPosition(resumeAtMillis);
+///         .setStartPosition(30000);
 /// if (!req.isSupported()) {
 ///     // ask the server for a scheme this device can play
 /// }
-/// Media video = req.create();
-/// form.add(BorderLayout.CENTER, video.getVideoComponent());
+/// Form form = new Form("Player", new BorderLayout());
+/// req.createAsync().ready(video -> {
+///     form.add(BorderLayout.CENTER, video.getVideoComponent());
+///     form.revalidate();
+/// });
+/// form.show();
 /// ```
 ///
 /// The player is the platform's own (AVPlayer on Apple platforms, the framework
