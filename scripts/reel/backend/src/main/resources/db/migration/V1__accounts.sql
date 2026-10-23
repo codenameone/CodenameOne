@@ -72,6 +72,8 @@ CREATE TABLE push_device (
     provider VARCHAR(16) NOT NULL,
     token VARCHAR(1024) NOT NULL,
     platform VARCHAR(32) NOT NULL,
+    new_episodes SMALLINT NOT NULL,
+    account_events SMALLINT NOT NULL,
     updated_at BIGINT NOT NULL
 );
 CREATE INDEX push_device_username ON push_device (username);

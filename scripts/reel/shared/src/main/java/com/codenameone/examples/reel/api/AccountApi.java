@@ -63,6 +63,10 @@ public interface AccountApi {
     @POST("/api/me/push")
     void registerPush(@Body PushDeviceDto device, OnComplete<Response<String>> callback);
 
+    /// Stops notifications to this phone for the account, before signing out.
+    @POST("/api/me/push/remove")
+    void unregisterPush(@Body PushDeviceDto device, OnComplete<Response<String>> callback);
+
     @GET("/api/profiles")
     void profiles(OnComplete<Response<List<HouseholdProfileDto>>> callback);
 

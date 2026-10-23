@@ -23,6 +23,7 @@ import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codenameone.examples.reel.Requests;
 import com.codenameone.examples.reel.api.DeviceDto;
+import com.codenameone.examples.reel.push.Notifier;
 import com.codenameone.examples.reel.domain.Device;
 import com.codenameone.examples.reel.repository.DeviceRepository;
 
@@ -45,10 +46,12 @@ public class Devices {
     private static final int MAX_DEVICES = 20;
 
     private final DeviceRepository devices;
+    private final Notifier notifier;
 
-    public Devices(DeviceRepository devices, Grants grants) {
+    public Devices(DeviceRepository devices, Grants grants, Notifier notifier) {
         this.grants = grants;
         this.devices = devices;
+        this.notifier = notifier;
     }
 
     /// Records that the calling device was used. Answers 401 for a device its
@@ -68,6 +71,9 @@ public class Devices {
                 devices.deleteById(id);
             }
             makeRoom(username);
+            // The account's other devices hear of a new one: a sign-in the
+            // owner did not make is the first sign of a shared password.
+            boolean known = !devices.findByUsernameOrderByLastSeenAtDesc(username).isEmpty();
             row = new Device();
             row.setId(id);
             row.setUsername(username);
@@ -75,6 +81,10 @@ public class Devices {
             fill(row, now);
             row.setGrantId(Grants.current());
             devices.insert(row);
+            if (known) {
+                notifier.account(username, "New sign-in", "Reel was opened on " + row.getName()
+                        + ". If it was not you, change your password.", null);
+            }
             return;
         }
         if (row.getRevokedAt() > 0L) {

@@ -31,6 +31,7 @@ import com.codenameone.examples.reel.api.Features;
 import com.codenameone.examples.reel.api.ModerationDecisionDto;
 import com.codenameone.examples.reel.api.ModerationItemDto;
 import com.codenameone.examples.reel.api.ReportDto;
+import com.codenameone.examples.reel.push.Notifier;
 import com.codenameone.examples.reel.domain.BlockedItem;
 import com.codenameone.examples.reel.domain.FrameHash;
 import com.codenameone.examples.reel.domain.ModerationItem;
@@ -86,10 +87,11 @@ public class Reviews {
     private final Moderation history;
     private final Settings settings;
     private final ContentClassifier classifier;
+    private final Notifier notifier;
 
     public Reviews(ModerationItemRepository items, BlockedItemRepository blocked, FrameHashRepository frames,
             TitleRepository titles, VideoRepository videos, Moderation history, Settings settings,
-            ContentClassifier classifier) {
+            ContentClassifier classifier, Notifier notifier) {
         this.items = items;
         this.blocked = blocked;
         this.frames = frames;
@@ -98,6 +100,7 @@ public class Reviews {
         this.history = history;
         this.settings = settings;
         this.classifier = classifier;
+        this.notifier = notifier;
     }
 
     /// Sends a published title back through review after a change a viewer
@@ -281,6 +284,8 @@ public class Reviews {
                 }
                 history.record(title.getCreator(), by, APPEAL.equals(kind) ? Moderation.RESTORE : Moderation.APPROVE,
                         title.getName());
+                notifier.released(title);
+                notifier.account(title.getCreator(), title.getName(), "Approved and live", title.getId());
             } else if (REJECT.equals(action)) {
                 if (note.length() == 0) {
                     throw new ResponseStatusException(400, "Tell the creator why");
@@ -290,6 +295,7 @@ public class Reviews {
                 }
                 title.setModerationNote(note);
                 history.record(title.getCreator(), by, Moderation.REJECT, title.getName() + ": " + note);
+                notifier.account(title.getCreator(), title.getName(), "Changes needed: " + note, title.getId());
             } else {
                 throw new ResponseStatusException(400, "Approve or reject");
             }
@@ -301,6 +307,8 @@ public class Reviews {
                 title.setModerationNote(note.length() > 0 ? note : item.getReason());
                 titles.save(title);
                 history.record(title.getCreator(), by, Moderation.TAKEDOWN, title.getName() + ": " + item.getReason());
+                notifier.account(title.getCreator(), title.getName(), "Removed: " + title.getModerationNote(),
+                        title.getId());
                 closeOthers(item.getSubjectId(), REPORT, by, action, now);
             } else if (!DISMISS.equals(action)) {
                 throw new ResponseStatusException(400, "Remove the title or dismiss the report");

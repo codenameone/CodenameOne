@@ -46,6 +46,12 @@ public class PushDevice {
     private String platform = "";
 
     @Column(nullable = false)
+    private boolean newEpisodes;
+
+    @Column(nullable = false)
+    private boolean accountEvents;
+
+    @Column(nullable = false)
     private long updatedAt;
 
     public PushDevice() {
@@ -97,5 +103,21 @@ public class PushDevice {
 
     public void setUpdatedAt(long updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public boolean isNewEpisodes() {
+        return newEpisodes;
+    }
+
+    public void setNewEpisodes(boolean newEpisodes) {
+        this.newEpisodes = newEpisodes;
+    }
+
+    public boolean isAccountEvents() {
+        return accountEvents;
+    }
+
+    public void setAccountEvents(boolean accountEvents) {
+        this.accountEvents = accountEvents;
     }
 }

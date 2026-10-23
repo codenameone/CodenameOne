@@ -32,4 +32,6 @@ public interface ListEntryRepository extends CrudRepository<ListEntry, String> {
     List<ListEntry> findByProfileIdOrderByAddedAtDesc(String profileId);
 
     ListEntry findFirstByProfileIdAndTitleId(String profileId, String titleId);
+
+    List<ListEntry> findByTitleId(String titleId);
 }

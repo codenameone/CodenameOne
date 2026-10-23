@@ -102,7 +102,8 @@ public class PushDevices {
         } else {
             fill(row, username, device, now);
         }
-        return new PushDeviceDto(target.getProvider(), target.getToken(), row.getPlatform());
+        return new PushDeviceDto(target.getProvider(), target.getToken(), row.getPlatform(),
+                row.isNewEpisodes(), row.isAccountEvents());
     }
 
     /// Removes `username`'s devices heard from longest ago until one more fits
@@ -126,13 +127,28 @@ public class PushDevices {
     public PushDeviceDto unregister(String username, PushDeviceDto device) throws IOException {
         PushTarget target = target(device);
         devices.deleteByIdAndUsername(key(target), username);
-        return new PushDeviceDto(target.getProvider(), target.getToken(), "");
+        return new PushDeviceDto(target.getProvider(), target.getToken(), "", false, false);
     }
 
     /// Where to reach `username`: every device they registered.
     @Transactional(readOnly = true)
     public List<PushTarget> targets(String username) {
         return targetsOf(username);
+    }
+
+    /// The devices of `username` that asked for news of new releases
+    /// (`releases`) or of their account.
+    public List<PushTarget> targets(String username, boolean releases) {
+        List<PushTarget> out = new ArrayList<PushTarget>();
+        if (username == null || username.length() == 0) {
+            return out;
+        }
+        for (PushDevice each : devices.findByUsername(username)) {
+            if (releases ? each.isNewEpisodes() : each.isAccountEvents()) {
+                out.add(PushTarget.of(each.getProvider(), each.getToken()));
+            }
+        }
+        return out;
     }
 
     /// [#targets] for a caller already inside a transaction.
@@ -151,6 +167,8 @@ public class PushDevices {
     private static void fill(PushDevice row, String username, PushDeviceDto device, long now) {
         row.setUsername(username);
         row.setPlatform(Text.optional(device.platform(), 32, "the platform"));
+        row.setNewEpisodes(device.newEpisodes());
+        row.setAccountEvents(device.account());
         row.setUpdatedAt(now);
     }
 

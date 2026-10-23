@@ -111,6 +111,12 @@ public class AccountEndpoint implements AccountApiServer {
     }
 
     @Override
+    public String unregisterPush(PushDeviceDto device) throws Exception {
+        pushes.unregister(Caller.name(), device);
+        return "ok";
+    }
+
+    @Override
     public List<HouseholdProfileDto> profiles() throws Exception {
         String who = Caller.name();
         return households.list(who, accounts.displayName(who));

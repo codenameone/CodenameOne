@@ -33,6 +33,7 @@ CREATE TABLE title (
     age_restricted SMALLINT NOT NULL,
     created_at BIGINT NOT NULL,
     published_at BIGINT NOT NULL,
+    announced_videos INTEGER NOT NULL,
     rating_sum BIGINT NOT NULL,
     rating_count INTEGER NOT NULL,
     view_count BIGINT NOT NULL

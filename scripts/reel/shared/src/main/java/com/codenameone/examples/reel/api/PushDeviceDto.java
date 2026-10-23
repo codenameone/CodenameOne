@@ -25,6 +25,10 @@ import com.codename1.annotations.Mapped;
 /// `provider` is the push service the device's token belongs to -- `fcm`,
 /// `apns`, `huawei`, `wns` or `web` -- and `token` the token that service gave
 /// the app. `platform` is the device's platform name, for the record only.
+/// `newEpisodes` and `account` are what the viewer chose to be told on this
+/// device: new releases of titles on their list, and their account's own news
+/// (a sign-in, a failed payment, a moderation decision).
 @Mapped
-public record PushDeviceDto(String provider, String token, String platform) {
+public record PushDeviceDto(String provider, String token, String platform, boolean newEpisodes,
+        boolean account) {
 }

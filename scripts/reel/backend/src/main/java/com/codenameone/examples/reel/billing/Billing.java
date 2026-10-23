@@ -35,6 +35,7 @@ import com.codenameone.examples.reel.api.RentalDto;
 import com.codenameone.examples.reel.api.SubscribeDto;
 import com.codenameone.examples.reel.api.SubscriptionDto;
 import com.codenameone.examples.reel.Kinds;
+import com.codenameone.examples.reel.push.Notifier;
 import com.codenameone.examples.reel.domain.Coupon;
 import com.codenameone.examples.reel.domain.CouponRedemption;
 import com.codenameone.examples.reel.domain.Invoice;
@@ -98,11 +99,13 @@ public class Billing {
     private final Payments payments;
     private final Settings settings;
     private final boolean trustReceipts;
+    private final Notifier notifier;
 
     public Billing(SubscriptionRepository subscriptions, PlanRepository plans, CouponRepository coupons,
             CouponRedemptionRepository redemptions,
             InvoiceRepository invoices, RentalRepository rentals, TitleRepository titles, Payments payments,
-            Settings settings, @Value("${reel.billing.trust-store-receipts:false}") String trustReceipts) {
+            Settings settings, @Value("${reel.billing.trust-store-receipts:false}") String trustReceipts,
+            Notifier notifier) {
         this.subscriptions = subscriptions;
         this.plans = plans;
         this.coupons = coupons;
@@ -113,6 +116,7 @@ public class Billing {
         this.payments = payments;
         this.settings = settings;
         this.trustReceipts = "true".equalsIgnoreCase(trustReceipts.trim());
+        this.notifier = notifier;
     }
 
     // ------------------------------------------------------------ plans
@@ -393,6 +397,8 @@ public class Billing {
             }
             sub.setStatus(Entitlements.PAST_DUE);
             sub.setNextRetryAt(now + RETRY_MILLIS);
+            notifier.account(sub.getUsername(), "Payment failed",
+                    "We will try again tomorrow. Check your card in Settings to keep watching.", null);
         }
         sub.setUpdatedAt(now);
         subscriptions.save(sub);

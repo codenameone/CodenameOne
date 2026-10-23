@@ -89,6 +89,10 @@ public class Title {
     @Column(nullable = false)
     private long publishedAt;
 
+    /// How many of its videos the viewers following it have been told about.
+    @Column(nullable = false)
+    private int announcedVideos;
+
     @Column(nullable = false)
     private long ratingSum;
 
@@ -291,5 +295,13 @@ public class Title {
 
     public void setViewCount(long viewCount) {
         this.viewCount = viewCount;
+    }
+
+    public int getAnnouncedVideos() {
+        return announcedVideos;
+    }
+
+    public void setAnnouncedVideos(int announcedVideos) {
+        this.announcedVideos = announcedVideos;
     }
 }
