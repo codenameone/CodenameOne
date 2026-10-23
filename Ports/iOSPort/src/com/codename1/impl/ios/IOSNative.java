@@ -532,6 +532,10 @@ public class IOSNative {
     native long createVideoComponent(String url, int onCompletionCallbackId);
     native long createVideoComponent(byte[] video, int onCompletionCallbackId);
     native long createVideoComponentNSData(long video, int onCompletionCallbackId);
+    // FairPlay: licenseHeaders is name\nvalue\n pairs (null for none).
+    native long createFairPlayVideoComponent(String url, String certificateUrl, String licenseUrl,
+            String contentId, String licenseHeaders, int onCompletionCallbackId);
+    native boolean isFairPlaySupported();
     native long createNativeVideoComponent(String url, int onCompletionCallbackId);
     native long createNativeVideoComponent(byte[] video, int onCompletionCallbackId);
     native long createNativeVideoComponentNSData(long video, int onCompletionCallbackId);

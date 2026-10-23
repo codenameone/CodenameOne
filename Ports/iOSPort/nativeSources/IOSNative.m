@@ -23782,3 +23782,182 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getFoldRegion___int_1ARRAY_R_int(
     }
     return (JAVA_INT)kind;
 }
+
+// ---------------------------------------------------------------------------
+// FairPlay Streaming (com.codename1.media.StreamRequest with DrmScheme.FAIRPLAY).
+//
+// The asset is registered with an AVContentKeySession before the player item
+// exists, so the session -- not the player -- answers the playlist's skd:// key
+// tag. For each key request the delegate fetches the application certificate,
+// asks the request for the SPC, posts it to the license server with the caller's
+// headers and hands the CKC back. Both network calls run on NSURLSession's queue;
+// nothing here blocks the Java thread beyond creating the view.
+//
+// The session and its delegate are attached to the player with an associated
+// object, so they live exactly as long as the player the Java peer releases.
+// Only the AVKit iOS/tvOS path implements it: the macOS port and the watch have
+// no FairPlay client here, and the simulator has no FairPlay CDM at all.
+// ---------------------------------------------------------------------------
+#if defined(CN1_USE_AVKIT) && !TARGET_OS_OSX
+static char cn1FairPlaySessionKey;
+
+// One serial queue for every session's key callbacks, created once, so no
+// per-player queue has to be released by hand in the MRC build.
+static dispatch_queue_t cn1FairPlayQueue(void) {
+    static dispatch_queue_t q;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        q = dispatch_queue_create("com.codename1.fairplay", DISPATCH_QUEUE_SERIAL);
+    });
+    return q;
+}
+
+@interface CN1FairPlayKeyDelegate : NSObject <AVContentKeySessionDelegate>
+@property (nonatomic, retain) NSString* certificateUrl;
+@property (nonatomic, retain) NSString* licenseUrl;
+@property (nonatomic, retain) NSString* contentId;
+@property (nonatomic, retain) NSDictionary* licenseHeaders;
+@property (nonatomic, retain) AVContentKeySession* session;
+@end
+
+@implementation CN1FairPlayKeyDelegate
+
+- (void)fail:(AVContentKeyRequest*)keyRequest reason:(NSString*)reason {
+    NSLog(@"CN1 FairPlay: %@", reason);
+    [keyRequest processContentKeyResponseError:[NSError errorWithDomain:@"CN1FairPlay" code:-1
+            userInfo:@{NSLocalizedDescriptionKey: reason}]];
+}
+
+- (void)handleKeyRequest:(AVContentKeyRequest*)keyRequest {
+    NSString* cid = self.contentId;
+    id ident = keyRequest.identifier;
+    if (cid == nil && [ident isKindOfClass:[NSString class]]) {
+        NSString* s = (NSString*)ident;
+        NSURL* u = [NSURL URLWithString:s];
+        cid = u.host != nil ? u.host : [s stringByReplacingOccurrencesOfString:@"skd://" withString:@""];
+    }
+    if (cid == nil || self.certificateUrl == nil) {
+        [self fail:keyRequest reason:@"FairPlay needs a certificate URL and a content identifier"];
+        return;
+    }
+    NSData* cidData = [cid dataUsingEncoding:NSUTF8StringEncoding];
+    NSURLSession* http = [NSURLSession sharedSession];
+    NSURL* certUrl = [NSURL URLWithString:self.certificateUrl];
+    [[http dataTaskWithURL:certUrl completionHandler:^(NSData* cert, NSURLResponse* r, NSError* e) {
+        NSInteger certStatus = [r isKindOfClass:[NSHTTPURLResponse class]] ? ((NSHTTPURLResponse*)r).statusCode : 200;
+        if (cert == nil || certStatus < 200 || certStatus >= 300) {
+            [self fail:keyRequest reason:[NSString stringWithFormat:@"certificate request failed (%ld)", (long)certStatus]];
+            return;
+        }
+        [keyRequest makeStreamingContentKeyRequestDataForApp:cert contentIdentifier:cidData options:nil
+                completionHandler:^(NSData* spc, NSError* spcError) {
+            if (spc == nil) {
+                [self fail:keyRequest reason:@"the key request produced no SPC"];
+                return;
+            }
+            NSMutableURLRequest* req = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:self.licenseUrl]];
+            req.HTTPMethod = @"POST";
+            req.HTTPBody = spc;
+            [req setValue:@"application/octet-stream" forHTTPHeaderField:@"Content-Type"];
+            for (NSString* k in self.licenseHeaders) {
+                [req setValue:[self.licenseHeaders objectForKey:k] forHTTPHeaderField:k];
+            }
+            [[http dataTaskWithRequest:req completionHandler:^(NSData* ckc, NSURLResponse* lr, NSError* le) {
+                NSInteger status = [lr isKindOfClass:[NSHTTPURLResponse class]] ? ((NSHTTPURLResponse*)lr).statusCode : 0;
+                if (ckc == nil || status < 200 || status >= 300) {
+                    [self fail:keyRequest reason:[NSString stringWithFormat:@"license server answered %ld", (long)status]];
+                    return;
+                }
+                [keyRequest processContentKeyResponse:
+                        [AVContentKeyResponse contentKeyResponseWithFairPlayStreamingKeyResponseData:ckc]];
+            }] resume];
+        }];
+    }] resume];
+}
+
+- (void)contentKeySession:(AVContentKeySession*)session didProvideContentKeyRequest:(AVContentKeyRequest*)keyRequest {
+    [self handleKeyRequest:keyRequest];
+}
+
+- (void)contentKeySession:(AVContentKeySession*)session didProvideRenewingContentKeyRequest:(AVContentKeyRequest*)keyRequest {
+    [self handleKeyRequest:keyRequest];
+}
+
+#ifndef CN1_USE_ARC
+- (void)dealloc {
+    [_certificateUrl release];
+    [_licenseUrl release];
+    [_contentId release];
+    [_licenseHeaders release];
+    [_session release];
+    [super dealloc];
+}
+#endif
+@end
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isFairPlaySupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#if TARGET_OS_SIMULATOR
+    return JAVA_FALSE;
+#else
+    return useAVKit() ? JAVA_TRUE : JAVA_FALSE;
+#endif
+}
+
+JAVA_LONG com_codename1_impl_ios_IOSNative_createFairPlayVideoComponent___java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String_int_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT url, JAVA_OBJECT certificateUrl, JAVA_OBJECT licenseUrl, JAVA_OBJECT contentId, JAVA_OBJECT licenseHeaders, JAVA_INT onCompletionCallbackId) {
+    if (!useAVKit()) {
+        return 0;
+    }
+    NSString* sUrl = toNSString(CN1_THREAD_STATE_PASS_ARG url);
+    NSString* sCert = certificateUrl == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG certificateUrl);
+    NSString* sLicense = toNSString(CN1_THREAD_STATE_PASS_ARG licenseUrl);
+    NSString* sContent = contentId == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG contentId);
+    NSString* sHeaders = licenseHeaders == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG licenseHeaders);
+    __block AVPlayerViewController* moviePlayerInstance = nil;
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        // Headers arrive as name\nvalue\n pairs, which keeps the native signature
+        // free of arrays; header names and values cannot contain a newline.
+        NSMutableDictionary* headers = [NSMutableDictionary dictionary];
+        if (sHeaders != nil) {
+            NSArray* parts = [sHeaders componentsSeparatedByString:@"\n"];
+            for (NSUInteger i = 0; i + 1 < [parts count]; i += 2) {
+                [headers setObject:[parts objectAtIndex:i + 1] forKey:[parts objectAtIndex:i]];
+            }
+        }
+        CN1FairPlayKeyDelegate* delegate = [[CN1FairPlayKeyDelegate alloc] init];
+        delegate.certificateUrl = sCert;
+        delegate.licenseUrl = sLicense;
+        delegate.contentId = sContent;
+        delegate.licenseHeaders = headers;
+        AVContentKeySession* session = [AVContentKeySession contentKeySessionWithKeySystem:AVContentKeySystemFairPlayStreaming];
+        delegate.session = session;
+        [session setDelegate:delegate queue:cn1FairPlayQueue()];
+        AVURLAsset* asset = [AVURLAsset URLAssetWithURL:cn1URLForMediaString(sUrl) options:nil];
+        [session addContentKeyRecipient:asset];
+        AVPlayer* cn1Player = [[AVPlayer alloc] initWithPlayerItem:[AVPlayerItem playerItemWithAsset:asset]];
+        // The session holds its delegate weakly; the player holds the delegate,
+        // and the delegate the session, so all three go when the player does.
+        objc_setAssociatedObject(cn1Player, &cn1FairPlaySessionKey, delegate, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+#ifndef CN1_USE_ARC
+        [delegate release];
+#endif
+        moviePlayerInstance = [[AVPlayerViewController alloc] init];
+        moviePlayerInstance.player = cn1Player;
+#ifndef CN1_USE_ARC
+        [cn1Player release];
+#endif
+        registerVideoCallbackAV(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance.player, onCompletionCallbackId);
+        moviePlayerInstance.showsPlaybackControls = YES;
+        POOL_END();
+    });
+    return (JAVA_LONG)((BRIDGE_CAST void*)moviePlayerInstance);
+}
+#else
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isFairPlaySupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return JAVA_FALSE;
+}
+
+JAVA_LONG com_codename1_impl_ios_IOSNative_createFairPlayVideoComponent___java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String_int_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT url, JAVA_OBJECT certificateUrl, JAVA_OBJECT licenseUrl, JAVA_OBJECT contentId, JAVA_OBJECT licenseHeaders, JAVA_INT onCompletionCallbackId) {
+    return 0;
+}
+#endif

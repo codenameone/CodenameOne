@@ -7227,6 +7227,9 @@ public class IOSImplementation extends CodenameOneImplementation {
         private boolean embedNativeControls=true;
         private List<Runnable> completionHandlers;
         private boolean prepareToPlay;
+        // Set for a FairPlay stream: getVideoComponent creates the player through
+        // the content key session instead of a plain URL.
+        private com.codename1.media.DrmConfig fairPlay;
         
         
         
@@ -7484,7 +7487,17 @@ public class IOSImplementation extends CodenameOneImplementation {
         @Override
         public Component getVideoComponent() {
             if (component == null) {
-                if(uri != null) {
+                if(uri != null && fairPlay != null) {
+                    moviePlayerPeer = nativeInstance.createFairPlayVideoComponent(uri, fairPlay.getCertificateUrl(),
+                            fairPlay.getLicenseUrl(), fairPlay.getContentId(), encodeHeaders(fairPlay.getLicenseHeaders()),
+                            onCompletionCallbackId);
+                    if (moviePlayerPeer == 0) {
+                        fireMediaError(new MediaException(MediaErrorType.SrcNotSupported, "FairPlay is not supported on this device"));
+                        return null;
+                    }
+                    nativeInstance.setNativeVideoControlsEmbedded(moviePlayerPeer, embedNativeControls);
+                    component = PeerComponent.create(new long[] { nativeInstance.getVideoViewPeer(moviePlayerPeer) });
+                } else if(uri != null) {
                     moviePlayerPeer = nativeInstance.createVideoComponent(uri, onCompletionCallbackId);
                     nativeInstance.setNativeVideoControlsEmbedded(moviePlayerPeer, embedNativeControls);
                     component = PeerComponent.create(new long[] { nativeInstance.getVideoViewPeer(moviePlayerPeer) });
@@ -7580,6 +7593,43 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     public Media createMedia(String uri, boolean isVideo, Runnable onCompletion) throws IOException {
         return new IOSMedia(uri, isVideo, onCompletion);
+    }
+
+    @Override
+    public boolean isDrmSupported(com.codename1.media.DrmScheme scheme) {
+        if (scheme == com.codename1.media.DrmScheme.AES_128) {
+            // AVPlayer decrypts HLS #EXT-X-KEY METHOD=AES-128 by itself.
+            return true;
+        }
+        return scheme == com.codename1.media.DrmScheme.FAIRPLAY && nativeInstance.isFairPlaySupported();
+    }
+
+    @Override
+    public Media createStreamingMedia(com.codename1.media.StreamRequest request) throws IOException {
+        com.codename1.media.DrmConfig drm = request.getDrm();
+        if (drm == null || drm.getScheme() != com.codename1.media.DrmScheme.FAIRPLAY) {
+            return super.createStreamingMedia(request);
+        }
+        if (!nativeInstance.isFairPlaySupported()) {
+            throw new IOException("FairPlay is not supported on this device");
+        }
+        IOSMedia m = new IOSMedia(request.getUrl(), true, request.getOnCompletion());
+        m.fairPlay = drm;
+        if (request.getStartPosition() > 0) {
+            m.setTime(request.getStartPosition());
+        }
+        return m;
+    }
+
+    private static String encodeHeaders(java.util.Map<String, String> headers) {
+        if (headers == null || headers.isEmpty()) {
+            return null;
+        }
+        StringBuilder sb = new StringBuilder();
+        for (java.util.Map.Entry<String, String> e : headers.entrySet()) {
+            sb.append(e.getKey()).append('\n').append(e.getValue()).append('\n');
+        }
+        return sb.toString();
     }
 
     @Override
