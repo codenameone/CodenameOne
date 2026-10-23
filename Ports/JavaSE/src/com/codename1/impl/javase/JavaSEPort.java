@@ -4551,7 +4551,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
                 
                 if (isEnabled()) {
-                    g.drawImage(accessibilityFilteredImage(buffer),
+                    g.drawImage(composeSimulatorOverlays(accessibilityFilteredImage(buffer), false),
                             (int) ((getScreenCoordinates().getX() + x) * zoomLevel),
                             (int) ((getScreenCoordinates().getY() + y) * zoomLevel), this);
                 } else {
@@ -5003,6 +5003,21 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         Integer triggeredKeyCode;
         private boolean mouseDown;
+        /// Set while a gesture that started on the simulated keyboard is in progress;
+        /// none of it reaches the application.
+        private boolean keyboardGesture;
+
+        /// The inverse of [#scaleCoordinateX] and [#scaleCoordinateY]: where on this
+        /// canvas a screen coordinate is drawn. Used to send synthetic mouse events
+        /// through the same path a real click takes.
+        java.awt.Point screenToCanvas(int sx, int sy) {
+            Rectangle sc = getScreenCoordinates();
+            if (sc != null) {
+                return new java.awt.Point((int) Math.round((sx + sc.x + x) * zoomLevel / retinaScale),
+                        (int) Math.round((sy + sc.y + y) * zoomLevel / retinaScale));
+            }
+            return new java.awt.Point((int) Math.round(sx / canvasScale()), (int) Math.round(sy / canvasScale()));
+        }
         /// Set when a press lands on a skin cutout, so the drag and release
         /// that follow are swallowed with it.
         private boolean pointerOnCutout;
@@ -5041,6 +5056,16 @@ public class JavaSEPort extends CodenameOneImplementation {
                 if (pointerOnCutout) {
                     requestFocus();
                     return;
+                }
+                keyboardGesture = false;
+                if (windowId == 0) {
+                    if (simulatorPointerPressed(x, y)) {
+                        keyboardGesture = true;
+                        return;
+                    }
+                    // Android's pan mode draws the screen shifted up; a press lands
+                    // on what is drawn under it.
+                    y += simulatorPanOffset();
                 }
                 if (x >= 0 && x < surfaceWidth() && y >= 0 && y < surfaceHeight()) {
                     if (touchDevice) {
@@ -5109,6 +5134,15 @@ public class JavaSEPort extends CodenameOneImplementation {
             if ((e.getModifiers() & MouseEvent.BUTTON1_MASK) != 0 || (e.getModifiers() & MouseEvent.BUTTON3_MASK) != 0) {
                 int x = scaleCoordinateX(e.getX());
                 int y = scaleCoordinateY(e.getY());
+                if (windowId == 0) {
+                    boolean onKeyboard = keyboardGesture;
+                    keyboardGesture = false;
+                    simulatorPointerReleased(x, y, onKeyboard);
+                    if (onKeyboard) {
+                        return;
+                    }
+                    y += simulatorPanOffset();
+                }
                 if (mouseDown || (x >= 0 && x < surfaceWidth() && y >= 0 && y < surfaceHeight())) {
                     if (touchDevice) {
                         x = Math.min(surfaceWidth(), Math.max(0, x));
@@ -5176,6 +5210,13 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (!releaseLock && (e.getModifiers() & MouseEvent.BUTTON1_MASK) != 0) {
                 int x = scaleCoordinateX(e.getX());
                 int y = scaleCoordinateY(e.getY());
+                if (windowId == 0) {
+                    if (keyboardGesture) {
+                        return;
+                    }
+                    simulatorPointerDragged(x, y);
+                    y += simulatorPanOffset();
+                }
                 if (mouseDown || (x >= 0 && x < surfaceWidth() && y >= 0 && y < surfaceHeight())) {
                     if (touchDevice) {
                         x = Math.min(surfaceWidth(), Math.max(0, x));
@@ -6171,6 +6212,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                     portraitScreenCoordinates.height);
 
             platformName = props.getProperty("platformName", "se");
+            if (keyboardController != null) {
+                keyboardController.setSkinPlatform(platformName);
+            }
             platformOverrides = props.getProperty("overrideNames", "").split(",");
 
             // Native theme override: the simulator ships all shipped-with-
@@ -7482,6 +7526,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         // the toolbar buttons were introduced and the menu entry was
         // removed wholesale instead of gated behind appFrame == null.
         final JMenuItem rotateMenu = new JMenuItem("Rotate");
+        rotateMenuItem = rotateMenu;
         rotateMenu.setEnabled(!desktopSkin);
         rotateMenu.addActionListener(new ActionListener() {
             @Override
@@ -8925,6 +8970,8 @@ public class JavaSEPort extends CodenameOneImplementation {
         simulateMenu.add(purchaseMenu);
         simulateMenu.add(permFlag);
         simulateMenu.add(notificationBackgroundMenu);
+        simulateMenu.addSeparator();
+        addKeyboardAndRecordingMenus(simulateMenu);
 
         // Tools: developer tools, diagnostics and the build/storage helpers.
         toolsMenu.removeAll();
@@ -11458,6 +11505,10 @@ public class JavaSEPort extends CodenameOneImplementation {
         // com.codename1.mcp.MCP.
         MCPStdioTransport.register();
         MCPSocketTransport.register();
+        // The simulator's own tools (keyboard, real-path touches, recording) sit
+        // beside the core ui_* tools on the shared server.
+        getKeyboardController();
+        SimulatorMcpTools.register(this, com.codename1.mcp.MCP.getServer());
 
         // Optional headless auto-start of the loopback MCP socket server so an
         // agent (or CI) can drive and screenshot a running simulator without a
@@ -12070,7 +12121,8 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     private int getDisplayHeightImpl() {
         if (getScreenCoordinates() != null) {
-            return getScreenCoordinates().height;
+            // Android's resize mode: the window above the simulated keyboard.
+            return getScreenCoordinates().height - simulatorResizeInset;
         }
         int h = (int)(canvas.getHeight() * retinaScale);
         if (h < 10 && canvas.getParent() != null) {
@@ -12370,7 +12422,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         tf.addKeyListener(l);
         tf.addFocusListener(l);
-        if(simulateAndroidKeyboard) {
+        if(simulateAndroidKeyboard && (keyboardController == null || !keyboardController.isEnabled())) {
             java.util.Timer t = new java.util.Timer();
             TimerTask tt = new TimerTask() {
                 @Override
@@ -12533,6 +12585,534 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     private EditingInProgress editingInProgress;
     private Component currentlyEditingField;
+
+    // ---- Simulated virtual keyboard, touch indicators and screen recording ----
+
+    /// The native Swing editor of the edit in progress, which keys typed on the
+    /// simulated keyboard are delivered to. Set and cleared with editingInProgress.
+    private javax.swing.text.JTextComponent currentSwingEditor;
+    private com.codename1.impl.javase.vkb.KeyboardController keyboardController;
+    private final com.codename1.impl.javase.record.TouchOverlay touchOverlay = new com.codename1.impl.javase.record.TouchOverlay();
+    private com.codename1.impl.javase.record.SimulatorRecorder simulatorRecorder;
+    /// Pixels the keyboard takes off the display height in Android resize mode.
+    private int simulatorResizeInset;
+    private BufferedImage overlayFrame;
+    private boolean overlayRepaintPending;
+
+    private static final String PREF_VKB_MODE = "cn1.simulator.vkbMode";
+    private static final String PREF_VKB_SOFT_INPUT = "cn1.simulator.vkbSoftInput";
+    private static final String PREF_TOUCH_LIVE = "cn1.simulator.touchIndicatorsLive";
+
+    /// The keyboard controller, created on first use with the mode saved in the
+    /// simulator preferences.
+    public synchronized com.codename1.impl.javase.vkb.KeyboardController getKeyboardController() {
+        if (keyboardController == null) {
+            keyboardController = new com.codename1.impl.javase.vkb.KeyboardController(new SimulatedKeyboardHost());
+            keyboardController.setSkinPlatform(platformName);
+            Preferences p = Preferences.userNodeForPackage(JavaSEPort.class);
+            try {
+                keyboardController.setMode(com.codename1.impl.javase.vkb.KeyboardController.Mode.valueOf(
+                        p.get(PREF_VKB_MODE, "OFF")));
+                keyboardController.setSoftInput(com.codename1.impl.javase.vkb.KeyboardController.SoftInput.valueOf(
+                        p.get(PREF_VKB_SOFT_INPUT, "AUTO")));
+            } catch (IllegalArgumentException ignored) {
+                // A preference written by another version; keep the defaults.
+            }
+            touchOverlay.setLiveVisible(p.getBoolean(PREF_TOUCH_LIVE, false));
+        }
+        return keyboardController;
+    }
+
+    public com.codename1.impl.javase.record.TouchOverlay getTouchOverlay() {
+        return touchOverlay;
+    }
+
+    /// The screen recorder, created on first use.
+    public synchronized com.codename1.impl.javase.record.SimulatorRecorder getSimulatorRecorder() {
+        if (simulatorRecorder == null) {
+            simulatorRecorder = new com.codename1.impl.javase.record.SimulatorRecorder(
+                    new com.codename1.impl.javase.record.SimulatorRecorder.FrameSource() {
+                        public BufferedImage captureFrame(com.codename1.impl.javase.record.RecordingOptions.Frame frame) {
+                            return captureSimulatorFrame(frame);
+                        }
+                    });
+        }
+        return simulatorRecorder;
+    }
+
+    void saveKeyboardPreferences() {
+        Preferences p = Preferences.userNodeForPackage(JavaSEPort.class);
+        com.codename1.impl.javase.vkb.KeyboardController kc = getKeyboardController();
+        p.put(PREF_VKB_MODE, kc.getMode().name());
+        p.put(PREF_VKB_SOFT_INPUT, kc.getSoftInput().name());
+        p.putBoolean(PREF_TOUCH_LIVE, touchOverlay.isLiveVisible());
+    }
+
+    @Override
+    public int getInvisibleAreaUnderVKB() {
+        if (keyboardController != null) {
+            return keyboardController.invisibleAreaUnderKeyboard();
+        }
+        return super.getInvisibleAreaUnderVKB();
+    }
+
+    int simulatorPanOffset() {
+        com.codename1.impl.javase.vkb.KeyboardController kc = keyboardController;
+        return kc == null ? 0 : kc.getPanOffset();
+    }
+
+    /// Top of the simulated keyboard in screen pixels, or -1 when none is up.
+    private int simulatedKeyboardTop() {
+        com.codename1.impl.javase.vkb.KeyboardController kc = keyboardController;
+        Rectangle sc = getScreenCoordinates();
+        if (kc == null || !kc.isShowing() || sc == null) {
+            return -1;
+        }
+        return sc.height - kc.getHeight();
+    }
+
+    /// A press on the main canvas, in screen pixels. Feeds the touch indicators and
+    /// the tap sound, and answers true when the press is on the simulated keyboard,
+    /// which then owns the whole gesture.
+    boolean simulatorPointerPressed(int x, int y) {
+        touchOverlay.pressed(x, y);
+        com.codename1.impl.javase.record.SimulatorRecorder rec = simulatorRecorder;
+        if (rec != null) {
+            rec.tap();
+        }
+        requestOverlayRepaint();
+        int top = simulatedKeyboardTop();
+        if (top >= 0 && y >= top) {
+            keyboardController.pressAt(x, y - top);
+            return true;
+        }
+        return false;
+    }
+
+    void simulatorPointerDragged(int x, int y) {
+        touchOverlay.dragged(x, y);
+        requestOverlayRepaint();
+    }
+
+    void simulatorPointerReleased(int x, int y, boolean onKeyboard) {
+        touchOverlay.released(x, y);
+        requestOverlayRepaint();
+        if (onKeyboard && keyboardController != null) {
+            final com.codename1.impl.javase.vkb.KeyboardController kc = keyboardController;
+            Display.getInstance().callSerially(new Runnable() {
+                public void run() {
+                    kc.release();
+                }
+            });
+        }
+    }
+
+    /// Keeps the window repainting while the keyboard animates or a touch fades.
+    private void requestOverlayRepaint() {
+        if (canvas == null) {
+            return;
+        }
+        canvas.repaint();
+    }
+
+    private boolean overlaysActive(boolean forRecording) {
+        com.codename1.impl.javase.vkb.KeyboardController kc = keyboardController;
+        boolean kb = kc != null && (kc.isShowing() || kc.isAnimating());
+        boolean touches = (forRecording || touchOverlay.isLiveVisible()) && touchOverlay.hasVisibleTouches();
+        return kb || touches;
+    }
+
+    /// Draws the simulated keyboard and touch indicators over a screen image, in
+    /// buffer pixels. Returns the source untouched when there is nothing to draw
+    /// and the frame is for the window; a recording always gets a fresh copy, since
+    /// the buffer it came from keeps being painted into.
+    BufferedImage composeSimulatorOverlays(BufferedImage src, boolean forRecording) {
+        Rectangle sc = getScreenCoordinates();
+        boolean active = overlaysActive(forRecording);
+        if (sc == null || (!active && !forRecording)) {
+            return src;
+        }
+        BufferedImage out;
+        if (forRecording) {
+            out = new BufferedImage(src.getWidth(), src.getHeight(), BufferedImage.TYPE_INT_ARGB);
+        } else {
+            if (overlayFrame == null || overlayFrame.getWidth() != src.getWidth() || overlayFrame.getHeight() != src.getHeight()) {
+                overlayFrame = new BufferedImage(src.getWidth(), src.getHeight(), BufferedImage.TYPE_INT_RGB);
+            }
+            out = overlayFrame;
+        }
+        Graphics2D g = out.createGraphics();
+        double scale = src.getWidth() / (double) Math.max(1, sc.width);
+        int pan = (int) Math.round(simulatorPanOffset() * scale);
+        if (pan != 0) {
+            g.setColor(Color.BLACK);
+            g.fillRect(0, 0, out.getWidth(), out.getHeight());
+        }
+        g.drawImage(src, 0, -pan, null);
+        com.codename1.impl.javase.vkb.KeyboardController kc = keyboardController;
+        if (kc != null && (kc.isShowing() || kc.isAnimating())) {
+            int h = kc.getKeyboard().preferredHeight(sc.width, sc.height);
+            if (kc.isShowing()) {
+                h = kc.getHeight();
+            }
+            float frac = kc.visibleFraction();
+            if (frac > 0f) {
+                Graphics2D kg = (Graphics2D) g.create();
+                kg.translate(0, (int) Math.round((sc.height - h * frac) * scale));
+                kg.scale(scale, scale);
+                kc.getKeyboard().paint(kg, sc.width, h);
+                kg.dispose();
+            }
+        }
+        if (forRecording || touchOverlay.isLiveVisible()) {
+            touchOverlay.paint(g, scale, 0);
+        }
+        g.dispose();
+        if (!forRecording && active && canvas != null && !overlayRepaintPending) {
+            overlayRepaintPending = true;
+            // Another frame shortly, so the animation and the fade progress even
+            // when the application paints nothing.
+            javax.swing.Timer t = new javax.swing.Timer(16, new ActionListener() {
+                public void actionPerformed(ActionEvent e) {
+                    overlayRepaintPending = false;
+                    canvas.repaint();
+                }
+            });
+            t.setRepeats(false);
+            t.start();
+        }
+        return out;
+    }
+
+    /// A frame for the recorder: the screen with its overlays, and for
+    /// [com.codename1.impl.javase.record.RecordingOptions.Frame#SKIN] the device skin
+    /// around it, at the skin's own resolution.
+    BufferedImage captureSimulatorFrame(com.codename1.impl.javase.record.RecordingOptions.Frame frame) {
+        if (canvas == null) {
+            return null;
+        }
+        BufferedImage buf = canvas.buffer;
+        Rectangle sc = getScreenCoordinates();
+        if (buf == null) {
+            return null;
+        }
+        BufferedImage screen = composeSimulatorOverlays(accessibilityFilteredImage(buf), true);
+        if (sc == null) {
+            return screen;
+        }
+        if (frame == com.codename1.impl.javase.record.RecordingOptions.Frame.SKIN && getSkin() != null) {
+            BufferedImage skin = getSkin();
+            BufferedImage out = new BufferedImage(skin.getWidth(), skin.getHeight(), BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g = out.createGraphics();
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            g.drawImage(screen, sc.x, sc.y, sc.width, sc.height, null);
+            g.drawImage(skin, 0, 0, null);
+            g.dispose();
+            return out;
+        }
+        if (screen.getWidth() != sc.width) {
+            BufferedImage out = new BufferedImage(sc.width, sc.height, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g = out.createGraphics();
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            g.drawImage(screen, 0, 0, sc.width, sc.height, null);
+            g.dispose();
+            return out;
+        }
+        return screen;
+    }
+
+    /// Sends a press, drag or release at a screen coordinate through the canvas's
+    /// own mouse handling, exactly as a click would arrive: the touch indicators,
+    /// the tap sound, the simulated keyboard and the pan shift all see it. Blocks
+    /// until the AWT thread has handled it. `id` is a MouseEvent id.
+    public void dispatchSimulatedPointer(final int id, final int x, final int y) {
+        final C c = canvas;
+        if (c == null) {
+            throw new IllegalStateException("The simulator window is not up");
+        }
+        Runnable r = new Runnable() {
+            public void run() {
+                java.awt.Point p = c.screenToCanvas(x, y);
+                int mods = id == MouseEvent.MOUSE_RELEASED ? MouseEvent.BUTTON1_MASK
+                        : MouseEvent.BUTTON1_MASK | MouseEvent.BUTTON1_DOWN_MASK;
+                MouseEvent me = new MouseEvent(c, id, System.currentTimeMillis(), mods, p.x, p.y,
+                        id == MouseEvent.MOUSE_DRAGGED ? 0 : 1, false, MouseEvent.BUTTON1);
+                if (id == MouseEvent.MOUSE_PRESSED) {
+                    c.mousePressed(me);
+                } else if (id == MouseEvent.MOUSE_DRAGGED) {
+                    c.mouseDragged(me);
+                } else {
+                    c.mouseReleased(me);
+                }
+            }
+        };
+        if (EventQueue.isDispatchThread()) {
+            r.run();
+            return;
+        }
+        try {
+            EventQueue.invokeAndWait(r);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (java.lang.reflect.InvocationTargetException e) {
+            throw new RuntimeException(e.getCause());
+        }
+    }
+
+    /// The Device menu's Rotate item, kept so a programmatic rotation runs the
+    /// same action: setPortrait alone flips the flag without resizing the canvas
+    /// or telling the application its size changed.
+    private JMenuItem rotateMenuItem;
+
+    /// Rotates the simulated device, through the Rotate menu item's own action.
+    public void rotateSimulator(final boolean portraitValue) {
+        Runnable r = new Runnable() {
+            public void run() {
+                if (portrait == portraitValue) {
+                    return;
+                }
+                if (rotateMenuItem != null && rotateMenuItem.isEnabled()) {
+                    rotateMenuItem.doClick(0);
+                } else {
+                    throw new IllegalStateException("This skin cannot rotate");
+                }
+            }
+        };
+        if (EventQueue.isDispatchThread()) {
+            r.run();
+        } else {
+            try {
+                EventQueue.invokeAndWait(r);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            } catch (java.lang.reflect.InvocationTargetException e) {
+                throw new RuntimeException(e.getCause());
+            }
+        }
+    }
+
+    public boolean isSimulatorPortrait() {
+        return portrait;
+    }
+
+    /// Delivers the simulated keyboard's keys to the native editor and adjusts the
+    /// screen the application sees.
+    private final class SimulatedKeyboardHost implements com.codename1.impl.javase.vkb.KeyboardController.Host {
+        public int fullScreenWidth() {
+            Rectangle sc = getScreenCoordinates();
+            return sc == null ? getDisplayWidthImpl() : sc.width;
+        }
+
+        public int fullScreenHeight() {
+            Rectangle sc = getScreenCoordinates();
+            return sc == null ? getDisplayHeightImpl() : sc.height;
+        }
+
+        public boolean isTablet() {
+            return JavaSEPort.this.isTablet();
+        }
+
+        public void setResizeInset(int pixels) {
+            if (simulatorResizeInset == pixels) {
+                return;
+            }
+            simulatorResizeInset = pixels;
+            JavaSEPort.this.sizeChanged(getDisplayWidthImpl(), getDisplayHeightImpl());
+        }
+
+        public void setPanOffset(int pixels) {
+            requestOverlayRepaint();
+        }
+
+        public void repaintOverlay() {
+            requestOverlayRepaint();
+        }
+
+        private void onEditor(final EditorAction action) {
+            EventQueue.invokeLater(new Runnable() {
+                public void run() {
+                    javax.swing.text.JTextComponent ed = currentSwingEditor;
+                    if (ed != null) {
+                        action.run(ed);
+                    }
+                }
+            });
+        }
+
+        public void deliverText(final String text) {
+            onEditor(new EditorAction() {
+                public void run(javax.swing.text.JTextComponent ed) {
+                    ed.replaceSelection(text);
+                }
+            });
+        }
+
+        public void deliverBackspace() {
+            onEditor(new EditorAction() {
+                public void run(javax.swing.text.JTextComponent ed) {
+                    int start = ed.getSelectionStart();
+                    int end = ed.getSelectionEnd();
+                    try {
+                        if (end > start) {
+                            ed.getDocument().remove(start, end - start);
+                        } else if (start > 0) {
+                            ed.getDocument().remove(start - 1, 1);
+                        }
+                    } catch (javax.swing.text.BadLocationException e) {
+                        Log.e(e);
+                    }
+                }
+            });
+        }
+
+        public void deliverReturn() {
+            onEditor(new EditorAction() {
+                public void run(javax.swing.text.JTextComponent ed) {
+                    if (ed instanceof JTextField) {
+                        ((JTextField) ed).postActionEvent();
+                    } else {
+                        ed.replaceSelection("\n");
+                    }
+                }
+            });
+        }
+
+        public void deliverDone() {
+            EditingInProgress e = editingInProgress;
+            if (e != null) {
+                e.endEditing();
+            }
+        }
+    }
+
+    private interface EditorAction {
+        void run(javax.swing.text.JTextComponent editor);
+    }
+
+    /// Simulate menu entries for the simulated keyboard, touch indicators and
+    /// screen recording. Everything here is also reachable through the sim_* MCP
+    /// tools.
+    private void addKeyboardAndRecordingMenus(JMenu simulateMenu) {
+        final com.codename1.impl.javase.vkb.KeyboardController kc = getKeyboardController();
+        JMenu vkbMenu = new JMenu("Virtual Keyboard");
+        javax.swing.ButtonGroup modes = new javax.swing.ButtonGroup();
+        String[] modeLabels = {"Off", "Skin Platform", "iOS", "Android"};
+        com.codename1.impl.javase.vkb.KeyboardController.Mode[] modeValues = com.codename1.impl.javase.vkb.KeyboardController.Mode.values();
+        for (int i = 0; i < modeValues.length; i++) {
+            final com.codename1.impl.javase.vkb.KeyboardController.Mode m = modeValues[i];
+            final javax.swing.JRadioButtonMenuItem item = new javax.swing.JRadioButtonMenuItem(modeLabels[i], kc.getMode() == m);
+            item.addActionListener(new ActionListener() {
+                public void actionPerformed(ActionEvent e) {
+                    Display.getInstance().callSerially(new Runnable() {
+                        public void run() {
+                            kc.setMode(m);
+                            saveKeyboardPreferences();
+                        }
+                    });
+                }
+            });
+            modes.add(item);
+            vkbMenu.add(item);
+        }
+        vkbMenu.addSeparator();
+        javax.swing.ButtonGroup soft = new javax.swing.ButtonGroup();
+        String[] softLabels = {"Android: Like the Port", "Android: Resize", "Android: Pan"};
+        com.codename1.impl.javase.vkb.KeyboardController.SoftInput[] softValues = com.codename1.impl.javase.vkb.KeyboardController.SoftInput.values();
+        for (int i = 0; i < softValues.length; i++) {
+            final com.codename1.impl.javase.vkb.KeyboardController.SoftInput v = softValues[i];
+            javax.swing.JRadioButtonMenuItem item = new javax.swing.JRadioButtonMenuItem(softLabels[i], kc.getSoftInput() == v);
+            item.addActionListener(new ActionListener() {
+                public void actionPerformed(ActionEvent e) {
+                    kc.setSoftInput(v);
+                    saveKeyboardPreferences();
+                }
+            });
+            soft.add(item);
+            vkbMenu.add(item);
+        }
+        simulateMenu.add(vkbMenu);
+
+        final JCheckBoxMenuItem showTouches = new JCheckBoxMenuItem("Show Touches", touchOverlay.isLiveVisible());
+        showTouches.setToolTipText("Draw touch indicators in the simulator window; recordings show them either way");
+        showTouches.addItemListener(new ItemListener() {
+            public void itemStateChanged(ItemEvent e) {
+                touchOverlay.setLiveVisible(showTouches.isSelected());
+                saveKeyboardPreferences();
+            }
+        });
+        simulateMenu.add(showTouches);
+
+        final JMenuItem record = new JMenuItem("Start Recording");
+        record.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                com.codename1.impl.javase.record.SimulatorRecorder rec = getSimulatorRecorder();
+                try {
+                    if (rec.isRecording()) {
+                        com.codename1.impl.javase.record.SimulatorRecorder.Result r = rec.stop();
+                        record.setText("Start Recording");
+                        String msg = "Saved " + r.file.getAbsolutePath() + " (" + (r.durationMs / 1000) + "s)";
+                        if (r.note != null) {
+                            msg += "\n" + r.note;
+                        }
+                        JOptionPane.showMessageDialog(window, msg, "Recording", JOptionPane.INFORMATION_MESSAGE);
+                    } else {
+                        com.codename1.impl.javase.record.RecordingOptions o = showRecordingOptionsDialog();
+                        if (o == null) {
+                            return;
+                        }
+                        touchOverlay.setStyle(o.getTouches());
+                        rec.start(o);
+                        record.setText("Stop Recording");
+                    }
+                } catch (Exception ex) {
+                    Log.e(ex);
+                    JOptionPane.showMessageDialog(window, ex.getMessage(), "Recording", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        });
+        simulateMenu.add(record);
+    }
+
+    /// The recording settings, asked for when a recording is started from the menu.
+    /// Returns null when cancelled.
+    private com.codename1.impl.javase.record.RecordingOptions showRecordingOptionsDialog() {
+        javax.swing.JComboBox format = new javax.swing.JComboBox(new String[]{"mp4", "mov", "webm", "gif"});
+        javax.swing.JComboBox frame = new javax.swing.JComboBox(new String[]{"Screen", "Device Skin"});
+        javax.swing.JComboBox touches = new javax.swing.JComboBox(new String[]{"Ripple", "Dot", "None"});
+        javax.swing.JComboBox audio = new javax.swing.JComboBox(new String[]{"None", "Microphone"});
+        javax.swing.JCheckBox tapSound = new javax.swing.JCheckBox("Tap sounds");
+        javax.swing.JSpinner fps = new javax.swing.JSpinner(new javax.swing.SpinnerNumberModel(30, 1, 120, 1));
+        JPanel p = new JPanel(new java.awt.GridLayout(0, 2, 6, 6));
+        p.add(new JLabel("Format"));
+        p.add(format);
+        p.add(new JLabel("Frame"));
+        p.add(frame);
+        p.add(new JLabel("Touches"));
+        p.add(touches);
+        p.add(new JLabel("Audio"));
+        p.add(audio);
+        p.add(new JLabel("Frames per second"));
+        p.add(fps);
+        p.add(new JLabel(""));
+        p.add(tapSound);
+        if (JOptionPane.showConfirmDialog(window, p, "Record Simulator", JOptionPane.OK_CANCEL_OPTION) != JOptionPane.OK_OPTION) {
+            return null;
+        }
+        com.codename1.impl.javase.record.RecordingOptions o = new com.codename1.impl.javase.record.RecordingOptions();
+        o.setFormat((String) format.getSelectedItem());
+        o.setFrame(frame.getSelectedIndex() == 1 ? com.codename1.impl.javase.record.RecordingOptions.Frame.SKIN
+                : com.codename1.impl.javase.record.RecordingOptions.Frame.SCREEN);
+        com.codename1.impl.javase.record.TouchOverlay.Style[] styles = {
+                com.codename1.impl.javase.record.TouchOverlay.Style.RIPPLE,
+                com.codename1.impl.javase.record.TouchOverlay.Style.DOT,
+                com.codename1.impl.javase.record.TouchOverlay.Style.NONE};
+        o.setTouches(styles[touches.getSelectedIndex()]);
+        o.setAudio(audio.getSelectedIndex() == 1 ? com.codename1.impl.javase.record.RecordingOptions.Audio.MICROPHONE
+                : com.codename1.impl.javase.record.RecordingOptions.Audio.NONE);
+        o.setTapSound(tapSound.isSelected());
+        o.setFps(((Number) fps.getValue()).intValue());
+        return o;
+    }
     /// The TextCompatMode editor and the field it is editing, tracked only so a
     /// monitor-scale change can reposition it; cleared when that editor is removed.
     private java.awt.Component legacyEditor;
@@ -12604,7 +13184,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 Rectangle bounds;
                 if (getSkin() != null) {
                     bounds = new Rectangle((int) ((cmp.getAbsoluteX() + cmp.getScrollX() + getScreenCoordinates().x + canvas.x + marginLeft) * zoomLevel),
-                            (int) ((cmp.getAbsoluteY() + cmp.getScrollY() + getScreenCoordinates().y + canvas.y + marginTop) * zoomLevel),
+                            (int) ((cmp.getAbsoluteY() + cmp.getScrollY() + getScreenCoordinates().y + canvas.y + marginTop - simulatorPanOffset()) * zoomLevel),
                             (int) ((cmp.getWidth() - marginLeft - marginRight) * zoomLevel),
                             (int) ((cmp.getHeight() - marginTop - marginBottom) * zoomLevel));
 
@@ -12959,6 +13539,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
                 editingInProgress = null;
                 currentlyEditingField = null;
+                currentSwingEditor = null;
+                if (keyboardController != null) {
+                    keyboardController.editingEnded();
+                }
                 synchronized (this) {
                     notify();
                 }
@@ -13082,7 +13666,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         tf.addKeyListener(l);
         tf.addFocusListener(l);
-        if(simulateAndroidKeyboard) {
+        if(simulateAndroidKeyboard && (keyboardController == null || !keyboardController.isEnabled())) {
             java.util.Timer t = new java.util.Timer();
             TimerTask tt = new TimerTask() {
                 @Override
@@ -13110,6 +13694,10 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         editingInProgress = l;
         currentlyEditingField = cmp;
+        currentSwingEditor = tf;
+        if (keyboardController != null && keyboardController.isEnabled() && getScreenCoordinates() != null) {
+            keyboardController.editingStarted(cmp, constraint);
+        }
         new Thread(l).start();
     }
 
