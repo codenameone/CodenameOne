@@ -38,10 +38,10 @@ is_excluded() {
   local candidate="$1"
   # What Initializr puts into a generated project is the developer's, not
   # Codename One's GPLv2 + Classpath Exception source: these trees are released
-  # under MIT No Attribution (scripts/wayline/LICENSE, scripts/savor/LICENSE, scripts/skirmish/LICENSE, scripts/parley/LICENSE), and carry that header
+  # under MIT No Attribution (scripts/wayline/LICENSE, scripts/savor/LICENSE, scripts/skirmish/LICENSE, scripts/parley/LICENSE, scripts/reel/LICENSE), and carry that header
   # or none.
   case "$candidate" in
-    scripts/wayline/*|scripts/savor/*|scripts/skirmish/*|scripts/parley/*|maven/cn1app-archetype/src/main/resources/archetype-resources/*|scripts/initializr/common/src/main/resources/skill/*) return 0 ;;
+    scripts/wayline/*|scripts/savor/*|scripts/skirmish/*|scripts/parley/*|scripts/reel/*|maven/cn1app-archetype/src/main/resources/archetype-resources/*|scripts/initializr/common/src/main/resources/skill/*) return 0 ;;
   esac
   awk -F '\\|' -v candidate="$candidate" '
     /^[[:space:]]*(#|$)/ { next }

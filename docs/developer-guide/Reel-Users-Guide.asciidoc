@@ -1,0 +1,170 @@
+[[reel-users-guide]]
+== Reel: A streaming service from four sides
+
+Reel is a sample app with a server behind it. Viewers watch films, series and
+courses on a phone, a tablet, a desktop or in a browser, and pick up on one
+screen where they left off on another. Creators upload video and publish it.
+Moderators decide what gets published. An administrator runs the service. The
+app and the server are one Maven project, written in Java on both sides.
+
+This chapter is the user's guide: what each of them sees and can do.
+<<reel-implementors-guide>> is the other half. It explains how the project is
+built, how playback is protected and what to change to make the service yours.
+
+One app serves everyone. The server gives every account a set of roles, and the
+app opens on the screen that fits them.
+
+[cols="1,3"]
+|===
+| Role | What it adds
+
+| Viewer
+| Every account is a viewer. Browse and search the catalog, watch with ads or
+  without, keep a list, download for offline viewing, take courses, and manage
+  the household's profiles and the plan.
+
+| Creator
+| Upload video, describe it, add chapters, quizzes and polls, submit a title for
+  review and follow how it's watched.
+
+| Moderator
+| Approve or reject what creators submit, take down what was published, and
+  keep the blocklists that check every upload.
+
+| Admin
+| See the service in numbers and charts, manage accounts, plans, coupons and ad
+  campaigns, switch features on and off, and deal with account sharing.
+|===
+
+=== Trying it
+
+Start the server on its development profile and it creates a set of accounts,
+all with the password `reel-demo`, the plans, two ad campaigns and a catalog of
+the Blender open movies and a short course:
+
+[cols="2,3"]
+|===
+| `viewer@reel.example`, `viewer2@reel.example` | viewers
+| `viewer3@reel.example` | a viewer with an open account-sharing alert
+| `creator@reel.example` | owns the uploaded titles
+| `moderator@reel.example` | reviews what creators submit
+| `admin@reel.example` | runs the service
+|===
+
+`scripts/reel/README.adoc` has the two commands that start the server and the
+app, and the one that fetches the films. Without the films every screen works;
+the artwork and the picture are missing.
+
+=== Watching
+
+A viewer with more than one profile in the household is asked who is watching.
+A kids profile sees only titles rated for children, and a profile can be locked
+with a PIN.
+
+image::img/reel-viewer-home.png["The home screen with a featured title, its Play and More info buttons, and a row of recommendations under it",scaledwidth=40%]
+
+The home screen leads with one title and then rows: continue watching,
+recommendations based on what the profile watched, the list, and the catalog
+by genre. Search finds titles by name, synopsis, genre, and creator.
+
+image::img/reel-viewer-title.png["A title's page with its artwork, year, rating and length, genre chips, a Play button and buttons to add it to the list and to report it",scaledwidth=40%]
+
+A title's page shows its episodes or lessons, plays it from where the profile
+stopped, adds it to the list, rates it, downloads it and reports it. A title
+that's not in the plan offers the plan that has it, or a rental.
+
+The player is the platform's own. On a plan with ads, short ad breaks play
+before and during the title, and some can be skipped after a few seconds.
+Chapters jump through the title. A course pauses for a quiz or a poll and, where
+the course branches, moves on to the lesson the answer leads to. While a
+protected title plays, screenshots and screen recording are blocked where the
+device allows it, and a faint mark naming the account sits over the picture.
+
+A plan allows a number of screens at once. Starting one more ends with a
+message saying so, and an administrator, a suspension or a sign-out on another
+device can end a stream that's playing.
+
+=== Downloads
+
+On a plan with downloads, a title can be kept on the device. The file stays
+encrypted, and playing it asks the server for the key, so a download stops
+playing when its license runs out, when the device is signed out or when the
+account is suspended. The library lists downloads without a connection.
+Signing out removes them from the device.
+
+=== Plans, rentals and the wallet
+
+The development profile offers three plans: Basic with ads (one screen, HD),
+Standard (two screens in Full HD, downloads) and Premium (four screens, the best
+quality there is, downloads). A plan starts with a trial where the
+administrator gives one, a coupon takes money off, and the plan can be changed
+or cancelled at any time; a cancelled plan runs to the end of what was paid.
+Invoices are listed in the account.
+
+Cards are added in the wallet. On the development profile `4242 4242 4242 4242`
+is accepted, `4000 0000 0000 0002` is declined and nothing is charged. On a phone
+the plan can also be bought through the app store.
+
+=== Learning
+
+On a service with courses, a course is a title whose episodes are lessons.
+Progress is kept per lesson, the quizzes are marked, and a course that's
+finished earns a certificate the viewer can open from the learning screen.
+
+=== Creating
+
+image::img/reel-studio-title.png["The studio's page for a new draft title, with its status, a button to submit it for review and a prompt to add its first video",scaledwidth=40%]
+
+The studio lists the creator's titles with their status: draft, in review,
+published, changes needed or removed. A title has a name, a synopsis, genres,
+a rating and its videos. A video is uploaded in pieces, so a dropped connection
+costs one piece and not the file, and the server packages it into the protected
+formats the players need. Its chapters are lines of `m:ss Title`, and its
+quizzes, polls and branches are added at a time in the video.
+
+A finished title is submitted for review. A rejected one comes back with the
+moderator's note, and the creator can correct it and submit it again, or appeal.
+The analytics show views, minutes watched and where viewers stop, over the last
+thirty days.
+
+=== Moderating
+
+image::img/reel-moderation-queue.png["The moderation queue with filters for titles, videos, reports, appeals and blocklist matches, here with nothing waiting",scaledwidth=40%]
+
+The queue holds submitted titles, reports from viewers and appeals. Every upload
+is checked on arrival against the keyword blocklist and against the frames of
+video that were taken down before, and what matches is marked in the queue.
+A moderator approves a title, which publishes it and tells whoever follows the
+series, or rejects or removes it with a note the creator sees. Every decision
+is kept on the account's record.
+
+=== Administering
+
+image::img/reel-admin-dashboard.png["The admin dashboard with accounts, subscriptions, monthly revenue, streams now, minutes today and ad figures, and a chart of sign-ups under them",scaledwidth=40%]
+
+The dashboard shows the service at a glance: accounts, subscriptions and trials,
+monthly revenue, streams now, minutes watched today, titles, ad impressions and
+ad revenue, with thirty days of sign-ups, minutes, revenue and cancellations
+drawn as charts.
+
+image::img/reel-admin-user.png["An account's page in the admin console with its name, plan and dates, switches for its roles and the action to suspend it",scaledwidth=40%]
+
+An account's page grants and removes roles, suspends and reinstates the account
+with a reason, flags it, and lists its devices, its sessions, its sharing alerts
+and its invoices. *Watching now* lists every stream that's playing and ends
+one. Account sharing raises an alert when an account streams from more places
+than a household plausibly does; the administrator dismisses it or signs the
+account out everywhere.
+
+*Features* switches the service between three presets, a streaming service, a
+video platform and a training academy, and then turns single features on and
+off: subscriptions, rentals, ads, open uploads, interactive video,
+certificates, profiles, downloads, sharing detection, hardware DRM, the
+watermark and reports. The app follows on its next start, with no new build.
+*Branding* sets the name, the tagline, the logo and the colors.
+
+=== In a browser
+
+The server can host the app itself, so a browser opening the server's address
+gets Reel with nothing installed. A browser plays the protected video through
+its own media player, and offers neither downloads nor app-store purchases.

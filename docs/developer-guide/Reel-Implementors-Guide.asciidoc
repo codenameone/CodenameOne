@@ -1,0 +1,227 @@
+[[reel-implementors-guide]]
+== Reel: Building on the sample
+
+Reel is a streaming service, and most of what makes one is deciding who may
+play what, on which device, for how long, and then making it hard to play
+anywhere else. Reel keeps what it shares with
+<<wayline-implementors-guide,Wayline>>, <<savor-implementors-guide,Savor>> and
+<<parley-implementors-guide,Parley>>: the module layout, the accounts and
+sign-in, push notifications, the admin console and hosting the app in a
+browser. This chapter covers what streaming changes. For the parts the samples
+share, the Wayline chapter is true of Reel with the names swapped.
+
+=== Running it
+
+[source,bash]
+----
+cd scripts/reel
+tools/fetch-demo-media.sh --small      # once: download and package the films
+CN1_PROFILE=dev backend/server.sh run
+mvn verify -Psimulator -DskipTests -Dcodename1.platform=javase
+----
+
+`fetch-demo-media.sh` needs `ffmpeg`. It downloads the Blender open movies into
+`scripts/reel/sources`, packages each with fresh random keys into
+`scripts/reel/media` and writes `media/seed.json`, which a development server
+reads at start-up for every video's keys, length, and renditions. Neither
+directory is committed. Without them the server writes the catalog anyway, with
+keys of its own, so every screen works and only the picture is missing.
+
+=== The modules
+
+[cols="1,4"]
+|===
+| `shared`
+| The transfer objects and the `@RestClient` interfaces, one per area:
+  `AccountApi`, `CatalogApi`, `PlaybackApi`, `LibraryApi`, `BillingApi`,
+  `PaymentApi`, `StudioApi`, `ModerationApi`, `LearningApi`, `AdminApi`. The app
+  gets a generated client and the server a generated interface to implement,
+  so the two can't drift apart.
+
+| `common`
+| The app. `viewer` is the catalog, the title pages, the library and the plans;
+  `player` is playback, the ad breaks and the interactive overlays; `studio`,
+  `moderation` and `admin` are the other roles' screens; `net` holds the
+  session and the device identity; `notify` registers for push.
+
+| `backend`
+| The server. Each area is a package with its service, its controller and the
+  repositories beside it; the schema is the migrations in
+  `src/main/resources/db/migration`, and the server runs on SQLite, PostgreSQL,
+  MySQL and MariaDB.
+
+| `tools/packager`
+| A command line tool with no dependencies beyond `ffmpeg`: it packages a video,
+  seeds the demo catalog, and runs as the worker that packages uploads.
+|===
+
+=== Playback
+
+The app asks for a playback session with the title, the profile, the device and
+the DRM schemes the device supports, strongest first:
+
+[source,java]
+----
+List<String> schemes = new ArrayList<String>();
+DrmScheme[] order = {DrmScheme.WIDEVINE, DrmScheme.FAIRPLAY, DrmScheme.CLEARKEY, DrmScheme.AES_128};
+for (DrmScheme s : order) {
+    if (MediaManager.isDrmSupported(s)) {
+        schemes.add(s.name());
+    }
+}
+----
+
+The server (`Playbacks.start`) checks everything that decides whether the title
+may play: the profile's rating, the plan or a rental, the device, and how many
+streams the plan allows at once. It then answers a manifest URL and a license
+URL, each carrying a token signed for this session alone, the scheme it chose,
+the ad breaks, the chapters and the interactions. The app hands that to the
+framework's streaming API:
+
+[source,java]
+----
+StreamRequest req = new StreamRequest(manifestUrl)
+        .setStartPosition(resumeSeconds * 1000)
+        .setDrm(new DrmConfig(DrmScheme.CLEARKEY, licenseUrl)
+                .addLicenseHeader("X-Reel-License", licenseToken));
+req.createAsync().ready(media -> ...);
+----
+
+While the title plays, the app reports a heartbeat. A session whose heartbeats
+stop is swept, so a crashed app doesn't hold one of the plan's streams, and a
+session ended elsewhere (an admin, a suspension, a device signed out) is
+answered `ok=false` at the next heartbeat and the player closes. Each heartbeat
+also checks again that the title is published and that the plan or a rental
+still covers it, so a rental that runs out or a title that's taken down stops
+within one heartbeat. A download's license is held to the same checks. The heartbeat runs on its own timer rather than the form's, because the
+chapters list and the quiz dialogs are other forms and a form's timer stops
+while it's hidden.
+
+=== What protects the video, and from what
+
+Every video is packaged twice with one content key: an HLS AES-128 ladder and a
+CENC MP4 for ClearKey. The origin (`MediaOrigin`) checks the media token on
+every playlist, segment and key: a token names the session, the video and the
+tallest rendition the plan allows, and expires, so a URL copied out of the
+player is good for one video for a few hours. The license endpoints answer
+ClearKey and AES-128 from the key table, only for a valid license token.
+
+That stops casual copying of links and files. It doesn't stop a determined
+person with a debugger: AES-128 and ClearKey keys reach the device in the clear
+over TLS. That's what Widevine and FairPlay are for. Reel offers them when a
+license vendor is configured and the *hardware DRM* feature is on; the server
+forwards the device's challenge to the vendor and passes the answer back:
+
+[source,properties]
+----
+reel.drm.widevine.url=https://license.example.com/widevine
+reel.drm.widevine.header=Authorization: Bearer ...
+reel.drm.fairplay.url=https://license.example.com/fairplay
+reel.drm.fairplay.certificate=/path/to/fairplay.cer
+----
+
+A device then gets the strongest scheme it supports that the server can
+license, and a device that can play none is told so before playback starts.
+The app also blocks screenshots while protected video is on screen, and draws
+the account's name over the picture when the *watermark* feature is on.
+
+=== Uploads and packaging
+
+An upload starts with `POST /api/studio/uploads`, which answers the piece size,
+and continues with `PUT /api/studio/uploads/{id}?offset=N`, one piece at a time.
+A piece sent at the wrong offset is refused with 409 and the app asks where the
+server is; a dropped connection is retried. When the last byte arrives the
+server queues a packaging job.
+
+Packaging is a separate process so that the server never runs `ffmpeg`:
+
+[source,bash]
+----
+java -jar tools/packager/target/reel-packager-1.0-SNAPSHOT.jar \
+    worker --server https://reel.example.com --token "$REEL_WORKER_TOKEN"
+----
+
+The worker claims a job and is handed the source and the content key, which the
+server generated and keeps; it encodes the ladder and the CENC file with that
+key, uploads the outputs and reports. Run as many
+workers as there is video to package; each needs `reel.worker.token`.
+
+=== Moderation
+
+Every upload is checked as it's packaged. The keyword blocklist is matched
+against the title's words, and the frames of the new video, a perceptual hash
+every ten seconds, are compared with the frames of video that was taken down
+before, so a re-upload of removed content is marked in the queue even under a
+new name. `ContentClassifier` is the place to call an outside classifier.
+Nothing a creator submits is published until a moderator approves it; an
+administrator's own titles publish directly.
+
+=== Billing and ads
+
+Plans, trials, coupons, rentals and invoices are in `billing`. Payments go
+through `reel.payments.provider`: `simulated` on a development profile, or
+`stripe` with `REEL_PAYMENTS_STRIPE_SECRET` in the environment, where cards are
+added on Stripe's own page so a card number never reaches the app or the
+server. App-store purchases are refused unless
+`reel.billing.trust-store-receipts=true`, which grants the plan on the
+product the app reports without asking the store; a real service verifies the
+receipt with Apple or Google in `Billing.storePurchase` before granting. A renewal that fails puts the subscription past due and tells the
+viewer by push.
+
+`ads` decides where the breaks go and which campaign fills each when the break
+comes, so a campaign whose budget ran out meanwhile isn't shown. A campaign
+pays per thousand impressions, prefers titles in its genres and stops at its
+budget or its end date. The player reports impressions, skips, clicks and
+completions.
+
+=== Features and presets
+
+`settings.Settings` holds the feature switches the app reads at start-up, so an
+administrator reshapes the service without a release. The presets set them all
+at once:
+
+[cols="1,3"]
+|===
+| Streaming service | Subscriptions, rentals, ads, profiles, downloads, courses,
+  hardware DRM, sharing detection and reports; no uploads from strangers.
+| Video platform | Open uploads, ads, rentals, reports and interactive video.
+| Training academy | Subscriptions, interactive video, certificates, downloads,
+  sharing detection and the watermark.
+|===
+
+A feature that's off is hidden in the app and refused by the server, so
+switching one off is safe while apps are running.
+
+=== Tests
+
+[source,bash]
+----
+mvn -pl shared,backend -Dcodename1.platform=backend test
+mvn -pl shared,backend -Dcodename1.platform=backend test -Dcn1.backend.compiledTests=true
+./run-e2e.sh
+./run-web-e2e.sh
+./check-template.sh
+----
+
+The server's tests run on the JVM and again compiled to a native binary, which
+is how the server ships. `run-e2e.sh` starts a server and drives the app through
+its screens in the simulator as each role; `run-web-e2e.sh` does the same for the
+browser build in a headless browser. `.github/workflows/reel.yml` runs them all,
+the server tests on each database, and the Android and iOS builds.
+
+=== Making it yours
+
+* *Your catalog.* Replace `DemoData` with an import from your own library, and
+  run the packaging worker over your masters.
+* *Real DRM.* Contract a Widevine and FairPlay license service and set the
+  `reel.drm.*` settings; keep AES-128 for browsers and older devices.
+* *A CDN.* The media origin checks a token on every request. Put a CDN in front
+  of it with the token in the cache key, or move the check to the CDN's edge
+  with the same secret (`reel.media.secret`).
+* *Store receipts.* Verify App Store and Google Play receipts on the server
+  before turning on `reel.billing.trust-store-receipts`.
+* *Billing.* Point `reel.payments.provider` at Stripe, or implement the payment
+  provider interface for another processor.
+* *The look.* `common/src/main/css/theme.css` starts with the colors and the
+  corner radius; the admin console's *Branding* sets the name, the tagline and
+  the logo at run time.

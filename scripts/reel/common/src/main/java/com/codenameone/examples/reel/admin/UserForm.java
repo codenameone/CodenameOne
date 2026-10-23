@@ -65,8 +65,9 @@ final class UserForm {
         page.removeAll();
         Container facts = Ui.page();
         facts.add(Ui.fact("Name", u.name())).add(Ui.fact("Email", u.email()))
-                .add(Ui.fact("Plan", u.planCode() == null ? Lang.tr("None") : u.planCode()
-                        + (u.subscriptionStatus() == null ? "" : Ui.DOT + Lang.tr(u.subscriptionStatus()))))
+                .add(Ui.fact("Plan", u.planCode() == null || u.planCode().length() == 0 ? Lang.tr("None")
+                        : u.planCode() + (u.subscriptionStatus() == null ? ""
+                        : Ui.DOT + Lang.tr(u.subscriptionStatus()))))
                 .add(Ui.fact("Joined", Ui.day(u.createdAt())))
                 .add(Ui.fact("Last seen", u.lastSeenAt() == 0 ? "-" : Ui.when(u.lastSeenAt())));
         page.add(facts);

@@ -28,4 +28,7 @@ if [ ! -f "$JAR" ]; then
   "$MVN" -B -q -f "$HERE/packager/pom.xml" package -DskipTests
 fi
 
-exec java -jar "$JAR" seed --media "$APP/media" "$@"
+# The packager needs Java 17; prefer JAVA_HOME over whatever java is on PATH.
+JAVA=java
+if [ -n "${JAVA_HOME:-}" ] && [ -x "$JAVA_HOME/bin/java" ]; then JAVA="$JAVA_HOME/bin/java"; fi
+exec "$JAVA" -jar "$JAR" seed --media "$APP/media" "$@"
