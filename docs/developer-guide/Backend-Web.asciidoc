@@ -343,7 +343,7 @@ failure, unless something handles the exception first. A
 `ResponseStatusException` chooses its own status. For anything else, write a
 handler:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/advice/NotesWithHandler.java[tag=backend-web-exception-handler,indent=0]
 ----
@@ -352,7 +352,7 @@ A handler on a controller answers for that controller's routes. A
 `@ControllerAdvice` (or `@RestControllerAdvice`) bean holds handlers for every
 controller, and `basePackages` narrows it to some:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/advice/ApiErrors.java[tag=backend-web-controller-advice,indent=0]
 ----
@@ -378,11 +378,11 @@ The build decides which handler answers, in this order:
 Two kinds of failure skip every handler. An `Error` is never handled. A
 failure that belongs to security, `AccessDeniedException` or
 `AuthenticationException` and their subclasses (CSRF failures among them),
-goes straight back to the security chain, so a handler for `Exception` cannot
+goes straight back to the security chain, so a handler for `Exception` can't
 turn a 403 into a 200 by accident.
 
 Two handlers in one class for the same exception, a handler that takes an
-argument it cannot be given, or one returning a type it cannot send all fail the
+argument it can't be given, or one returning a type it can't send all fail the
 build, naming the method.
 
 [[backend-web-validation]]
@@ -393,14 +393,14 @@ looks like. Put `@Valid` on a `@RequestBody` or `@ModelAttribute` parameter to
 check the object's fields, and put a constraint directly on a `@RequestParam`,
 `@PathVariable` or `@RequestHeader`:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/advice/NewNote.java[tag=backend-web-validation-model,indent=0]
 ----
 
 The controller asks for the checks on its parameters:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/advice/ValidatedNotes.java[tag=backend-web-validation-controller,indent=0]
 ----
@@ -408,7 +408,7 @@ include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/a
 The constraints are `@NotNull`, `@NotBlank`, `@NotEmpty`, `@Size`, `@Min` and
 `@Max`. `@Valid` on a field descends into its value, or into each element of a
 collection or array. The build writes every check as code, so a constraint on a
-type that cannot carry it, such as `@Min` on a `String`, fails the build.
+type that can't carry it, such as `@Min` on a `String`, fails the build.
 
 The checks run after binding and before the method, so invalid input never
 reaches it. They throw a `ValidationException`, which a handler from the
@@ -426,15 +426,15 @@ and the method decides what to render.
 
 There is no `@Pattern`: the backend's class library has no regular
 expressions. Check such a value in the method and throw a `ValidationException`
-of your own; it is answered the same way.
+of your own; it's answered the same way.
 
 [[backend-web-interceptors]]
 ==== Around every request
 
 A bean implementing `HandlerInterceptor` runs around every controller method,
-for work that is not security: auditing, metrics, cleaning up after a request.
+for work that's not security: auditing, metrics, cleaning up after a request.
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/advice/Audit.java[tag=backend-web-interceptor,indent=0]
 ----
@@ -443,9 +443,9 @@ A request passes through these stages in order:
 
 . The security filter chain: authentication, CSRF and the URL rules. A request
   it refuses never reaches an interceptor.
-. Route selection. A request that matches no route is not intercepted.
+. Route selection. A request that matches no route isn't intercepted.
 . Each interceptor's `preHandle`, in `@Order` order. One that returns a
-  response answers with it, and the controller method does not run.
+  response answers with it, and the controller method doesn't run.
 . Binding, validation, and the method with its method security.
 . The exception handlers, when the stage before threw.
 . Each `postHandle`, in reverse order, when the method returned normally.
@@ -455,7 +455,7 @@ A request passes through these stages in order:
   failure nothing handled, which it receives as `failure`.
 
 Because interceptors run inside the security chain and never see the failures
-security owns, an interceptor cannot let through a request security refused.
+security owns, an interceptor can't let through a request security refused.
 
 [[backend-web-servlet-equivalents]]
 ==== Coming from Servlets and Spring MVC
