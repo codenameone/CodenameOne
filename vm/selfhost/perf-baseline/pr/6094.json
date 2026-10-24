@@ -1,0 +1,25 @@
+{
+ "pr": 6094,
+ "rebaseline": {
+  "macos-arm64": {
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.576,
+      "time": 0.623,
+      "tolerance": {
+       "memory": 0.35
+      }
+     },
+     "memory": 0.782,
+     "reason": "Nightly fold ab3505beb1 set translator all-cores RAM to 0.576 on macos-arm64; PRs with no vm/ changes measure 0.74 (#6081) and 0.79 (#6094), so the row was below the runner's normal spread",
+     "runs": 2,
+     "time": 0.623,
+     "tolerance": {
+      "memory": 0.35
+     }
+    }
+   }
+  }
+ }
+}
