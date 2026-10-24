@@ -29,6 +29,7 @@ import com.codenameone.examples.savor.geo.Geo;
 import com.codenameone.examples.savor.repository.ProfileRepository;
 import com.codenameone.examples.savor.repository.SavedAddressRepository;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -77,7 +78,7 @@ public class Addresses {
             row = new SavedAddress();
             row.setId(Ids.next());
             row.setUsername(username);
-            row.setCreatedAt(System.currentTimeMillis());
+            row.setCreatedAt(Instant.now());
         }
         row.setLabel(Text.required(form.label(), 40, "a name for the place"));
         row.setAddress(Text.required(form.address(), 255, "the address"));

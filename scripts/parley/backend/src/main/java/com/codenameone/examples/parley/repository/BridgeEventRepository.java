@@ -21,9 +21,10 @@ package com.codenameone.examples.parley.repository;
 import com.codename1.orm.repository.CrudRepository;
 import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.parley.domain.BridgeEvent;
+import java.time.Instant;
 
 /// Webhook events already posted.
 @Repository(entity = BridgeEvent.class, key = String.class)
 public interface BridgeEventRepository extends CrudRepository<BridgeEvent, String> {
-    int deleteByReceivedAtLessThan(long before);
+    int deleteByReceivedAtLessThan(Instant before);
 }

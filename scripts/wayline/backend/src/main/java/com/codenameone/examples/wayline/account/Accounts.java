@@ -43,6 +43,7 @@ import com.codenameone.examples.wayline.repository.ClosedAccountRepository;
 import com.codenameone.examples.wayline.repository.ProfileRepository;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -152,7 +153,7 @@ public class Accounts {
         // older app asks -- begins an application, and the role waits for an
         // admin to approve it.
         create(username, request.password(), displayName, phone, false, vehicle, plate, false,
-                false, gender, System.currentTimeMillis());
+                false, gender, Instant.now());
         if (request.driver() || request.wantsToDrive()) {
             applications.open(username, vehicle, plate);
         }
@@ -167,7 +168,7 @@ public class Accounts {
             boolean phoneVerified, String vehicle, String plate, boolean driver, boolean admin)
             throws IOException {
         create(username, password, displayName, phone, phoneVerified, vehicle, plate, driver,
-                admin, GENDERS[0], System.currentTimeMillis());
+                admin, GENDERS[0], Instant.now());
     }
 
     /// As the method above, for a caller that also knows the gender and when
@@ -177,7 +178,7 @@ public class Accounts {
     @Transactional(rollbackFor = IOException.class)
     void create(String username, String password, String displayName, String phone,
             boolean phoneVerified, String vehicle, String plate, boolean driver, boolean admin,
-            String gender, long openedAt) throws IOException {
+            String gender, Instant openedAt) throws IOException {
         users.createUser(User.withUsername(username).password(encoder.encode(password))
                 .roles(roles(driver, admin)).build());
         Profile profile = new Profile();
@@ -491,7 +492,7 @@ public class Accounts {
         if (!closed.existsById(hash)) {
             ClosedAccount row = new ClosedAccount();
             row.setUsernameHash(hash);
-            row.setClosedAt(System.currentTimeMillis());
+            row.setClosedAt(Instant.now());
             closed.insert(row);
         }
     }

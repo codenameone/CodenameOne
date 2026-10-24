@@ -24,6 +24,7 @@ import com.codename1.orm.repository.Param;
 import com.codename1.orm.repository.Query;
 import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.skirmish.domain.ForgeAsset;
+import java.time.Instant;
 import java.util.List;
 
 @Repository(entity = ForgeAsset.class, key = String.class)
@@ -31,5 +32,5 @@ public interface ForgeAssetRepository extends CrudRepository<ForgeAsset, String>
     @Query("select a from ForgeAsset a where a.status = :s order by a.createdAt asc, a.sha256 asc")
     List<ForgeAsset> inStatus(@Param("s") String status, PageRequest page);
 
-    long countByOwnerAndCreatedAtGreaterThan(String owner, long since);
+    long countByOwnerAndCreatedAtGreaterThan(String owner, Instant since);
 }

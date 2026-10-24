@@ -51,6 +51,7 @@ import com.codenameone.examples.parley.repository.MembershipRepository;
 import com.codenameone.examples.parley.repository.ProfileRepository;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -426,7 +427,7 @@ public class Conversations {
             for (int iter = 0; iter < rest.size(); iter++) {
                 Membership each = rest.get(iter);
                 if (heir == null || rank(each) > rank(heir)
-                        || rank(each) == rank(heir) && each.getJoinedAt() < heir.getJoinedAt()) {
+                        || rank(each) == rank(heir) && each.getJoinedAt().isBefore(heir.getJoinedAt())) {
                     heir = each;
                 }
             }
@@ -462,8 +463,8 @@ public class Conversations {
         link.setCode(Ids.next());
         link.setConversationId(id);
         link.setCreatedBy(username);
-        link.setCreatedAt(now);
-        link.setExpiresAt(now + INVITE_LIFE);
+        link.setCreatedAt(Instant.ofEpochMilli(now));
+        link.setExpiresAt(Instant.ofEpochMilli(now + INVITE_LIFE));
         invites.insert(link);
         return toDto(link, row, members.countByConversationId(id));
     }
@@ -496,8 +497,8 @@ public class Conversations {
 
     private InviteLink link(String code) {
         InviteLink link = code == null ? null : invites.findById(code);
-        if (link == null || link.getExpiresAt() > 0
-                && link.getExpiresAt() < System.currentTimeMillis()) {
+        if (link == null || link.getExpiresAt().isAfter(Instant.EPOCH)
+                && link.getExpiresAt().isBefore(Instant.now())) {
             throw new ResponseStatusException(404, "That invite link does not work any more");
         }
         return link;
@@ -519,12 +520,12 @@ public class Conversations {
             stored = new ConversationPhoto();
             stored.setConversationId(id);
             stored.setContentType(photo.contentType());
-            stored.setUpdatedAt(System.currentTimeMillis());
+            stored.setUpdatedAt(Instant.now());
             stored.setData(data);
             photos.insert(stored);
         } else {
             stored.setContentType(photo.contentType());
-            stored.setUpdatedAt(System.currentTimeMillis());
+            stored.setUpdatedAt(Instant.now());
             stored.setData(data);
         }
         row.setHasPhoto(true);
@@ -559,8 +560,8 @@ public class Conversations {
         row.setKind(kind);
         row.setTitle(title);
         row.setCreatedBy(by);
-        row.setCreatedAt(now);
-        row.setLastActivityAt(now);
+        row.setCreatedAt(Instant.ofEpochMilli(now));
+        row.setLastActivityAt(Instant.ofEpochMilli(now));
         // direct_key is unique, so it is what keeps two people to one direct
         // chat even when both start it at once: the second insert fails rather
         // than splitting their history. Every other conversation has a key of
@@ -575,7 +576,7 @@ public class Conversations {
         row.setConversationId(id);
         row.setUsername(username);
         row.setRole(role);
-        row.setJoinedAt(now);
+        row.setJoinedAt(Instant.ofEpochMilli(now));
         members.insert(row);
     }
 
@@ -683,11 +684,11 @@ public class Conversations {
         return new ConversationDto(row.getId(), row.getKind(), title, row.getAbout(), out,
                 mine.getRole(), mine.isMuted(), mine.isArchived(), mine.isPinned(),
                 row.getDisappearingSeconds(), row.isAdminsOnly(), bridge(row.getId()),
-                row.getLastActivityAt(), row.isHasPhoto());
+                row.getLastActivityAt().toEpochMilli(), row.isHasPhoto());
     }
 
     private static InviteDto toDto(InviteLink link, Conversation row, long count) {
         return new InviteDto(link.getCode(), row.getId(), row.getTitle(), (int) count,
-                link.getExpiresAt());
+                link.getExpiresAt().toEpochMilli());
     }
 }

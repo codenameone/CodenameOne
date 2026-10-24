@@ -26,6 +26,7 @@ import com.codenameone.examples.parley.domain.ModerationEvent;
 import com.codenameone.examples.parley.repository.ModerationEventRepository;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -58,8 +59,8 @@ public class Moderation {
         // came with it -- would otherwise be listed in either order. The later
         // one is stamped after the one before it, so the list is the order in
         // which things were done.
-        Long newest = events.newest(username);
-        long after = newest == null ? 0L : newest.longValue() + 1L;
+        Instant newest = events.newest(username);
+        long after = newest == null ? 0L : newest.toEpochMilli() + 1L;
         record(username, by, action, reason, Math.max(System.currentTimeMillis(), after));
     }
 
@@ -72,7 +73,7 @@ public class Moderation {
         ModerationEvent event = new ModerationEvent();
         event.setId(Ids.next());
         event.setUsername(username);
-        event.setCreatedAt(at);
+        event.setCreatedAt(Instant.ofEpochMilli(at));
         event.setActor(by);
         event.setAction(action);
         event.setReason(why.length() > 255 ? why.substring(0, 255) : why);
@@ -86,7 +87,7 @@ public class Moderation {
         List<ModerationEventDto> out = new ArrayList<ModerationEventDto>();
         for (int iter = 0; iter < rows.size(); iter++) {
             ModerationEvent row = rows.get(iter);
-            out.add(new ModerationEventDto(row.getCreatedAt(), row.getActor(), row.getAction(),
+            out.add(new ModerationEventDto(row.getCreatedAt().toEpochMilli(), row.getActor(), row.getAction(),
                     row.getReason()));
         }
         return out;

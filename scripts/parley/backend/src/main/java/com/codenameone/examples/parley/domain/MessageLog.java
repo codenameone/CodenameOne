@@ -21,6 +21,7 @@ package com.codenameone.examples.parley.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
+import java.time.Instant;
 
 /// That a message was sent: who, where and when, never what. It makes a
 /// retried send idempotent and feeds the admin's counts.
@@ -43,7 +44,7 @@ public class MessageLog {
     private String kind = "";
 
     @Column(nullable = false)
-    private long sentAt;
+    private Instant sentAt = Instant.EPOCH;
 
     public MessageLog() {
     }
@@ -88,11 +89,11 @@ public class MessageLog {
         this.kind = kind;
     }
 
-    public long getSentAt() {
+    public Instant getSentAt() {
         return sentAt;
     }
 
-    public void setSentAt(long sentAt) {
+    public void setSentAt(Instant sentAt) {
         this.sentAt = sentAt;
     }
 }

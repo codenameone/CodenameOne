@@ -35,6 +35,7 @@ import com.codenameone.examples.parley.repository.MembershipRepository;
 import com.codenameone.examples.parley.domain.Membership;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -176,8 +177,8 @@ public class Fanout {
         row.setKind(kind);
         row.setHeader(header == null ? "" : header);
         row.setPayload(payload);
-        row.setSentAt(sentAt);
-        row.setExpiresAt(expiresAt);
+        row.setSentAt(Instant.ofEpochMilli(sentAt));
+        row.setExpiresAt(Instant.ofEpochMilli(expiresAt));
         return row;
     }
 
@@ -194,8 +195,8 @@ public class Fanout {
             frame.put("kind", row.getKind());
             frame.put("header", row.getHeader());
             frame.put("ciphertext", Base64.encode(row.getPayload()));
-            frame.put("sentAt", Long.valueOf(row.getSentAt()));
-            frame.put("expiresAt", Long.valueOf(row.getExpiresAt()));
+            frame.put("sentAt", Long.valueOf(row.getSentAt().toEpochMilli()));
+            frame.put("expiresAt", Long.valueOf(row.getExpiresAt().toEpochMilli()));
             live.toDevice(row.getRecipientDevice(), frame);
         }
     }
@@ -203,6 +204,6 @@ public class Fanout {
     static EnvelopeDto toDto(Envelope row) {
         return new EnvelopeDto(row.getId(), row.getMessageId(), row.getConversationId(),
                 row.getSender(), row.getSenderDevice(), row.getKind(), row.getHeader(),
-                Base64.encode(row.getPayload()), row.getSentAt(), row.getExpiresAt());
+                Base64.encode(row.getPayload()), row.getSentAt().toEpochMilli(), row.getExpiresAt().toEpochMilli());
     }
 }

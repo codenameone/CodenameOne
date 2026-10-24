@@ -21,6 +21,7 @@ package com.codenameone.examples.skirmish.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
+import java.time.Instant;
 
 /// A player's account data beyond the sign-in record: rating, currencies, deck, cosmetics and moderation state.
 @Entity
@@ -66,16 +67,16 @@ public class Profile {
     private boolean muted;
 
     @Column(nullable = false)
-    private long suspendedUntil;
+    private Instant suspendedUntil = Instant.EPOCH;
 
     @Column(nullable = false)
     private boolean banned;
 
     @Column(nullable = false)
-    private long createdAt;
+    private Instant createdAt = Instant.EPOCH;
 
     @Column(nullable = false)
-    private long lastSeen;
+    private Instant lastSeen = Instant.EPOCH;
 
     @Column(nullable = false)
     private long adDay;
@@ -193,11 +194,11 @@ public class Profile {
         this.muted = muted;
     }
 
-    public long getSuspendedUntil() {
+    public Instant getSuspendedUntil() {
         return suspendedUntil;
     }
 
-    public void setSuspendedUntil(long suspendedUntil) {
+    public void setSuspendedUntil(Instant suspendedUntil) {
         this.suspendedUntil = suspendedUntil;
     }
 
@@ -209,19 +210,19 @@ public class Profile {
         this.banned = banned;
     }
 
-    public long getCreatedAt() {
+    public Instant getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(long createdAt) {
+    public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
     }
 
-    public long getLastSeen() {
+    public Instant getLastSeen() {
         return lastSeen;
     }
 
-    public void setLastSeen(long lastSeen) {
+    public void setLastSeen(Instant lastSeen) {
         this.lastSeen = lastSeen;
     }
 

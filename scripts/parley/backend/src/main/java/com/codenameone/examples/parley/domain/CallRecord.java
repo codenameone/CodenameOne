@@ -21,6 +21,7 @@ package com.codenameone.examples.parley.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
+import java.time.Instant;
 
 /// A voice or video call, from ringing to hang-up.
 @Entity
@@ -51,13 +52,13 @@ public class CallRecord {
     private String state = "";
 
     @Column(nullable = false)
-    private long startedAt;
+    private Instant startedAt = Instant.EPOCH;
 
     @Column(nullable = false)
-    private long answeredAt;
+    private Instant answeredAt = Instant.EPOCH;
 
     @Column(nullable = false)
-    private long endedAt;
+    private Instant endedAt = Instant.EPOCH;
 
     public CallRecord() {
     }
@@ -126,27 +127,27 @@ public class CallRecord {
         this.state = state;
     }
 
-    public long getStartedAt() {
+    public Instant getStartedAt() {
         return startedAt;
     }
 
-    public void setStartedAt(long startedAt) {
+    public void setStartedAt(Instant startedAt) {
         this.startedAt = startedAt;
     }
 
-    public long getAnsweredAt() {
+    public Instant getAnsweredAt() {
         return answeredAt;
     }
 
-    public void setAnsweredAt(long answeredAt) {
+    public void setAnsweredAt(Instant answeredAt) {
         this.answeredAt = answeredAt;
     }
 
-    public long getEndedAt() {
+    public Instant getEndedAt() {
         return endedAt;
     }
 
-    public void setEndedAt(long endedAt) {
+    public void setEndedAt(Instant endedAt) {
         this.endedAt = endedAt;
     }
 }

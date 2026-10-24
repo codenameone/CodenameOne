@@ -21,6 +21,7 @@ package com.codenameone.examples.wayline.repository;
 import com.codename1.orm.repository.CrudRepository;
 import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.wayline.domain.LiveTicket;
+import java.time.Instant;
 
 /// The tickets that open a live connection. Only the hash of a ticket is
 /// stored, and it is the row's key.
@@ -33,7 +34,7 @@ public interface LiveTicketRepository extends CrudRepository<LiveTicket, String>
     int deleteByTicketHash(String ticketHash);
 
     /// Deletes the tickets that went stale before `now`.
-    int deleteByExpiresAtLessThan(long now);
+    int deleteByExpiresAtLessThan(Instant now);
 
     int deleteByUsername(String username);
 }

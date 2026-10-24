@@ -53,6 +53,7 @@ import com.codenameone.examples.wayline.repository.RidePassedRepository;
 import com.codenameone.examples.wayline.repository.RideRepository;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -234,7 +235,7 @@ public class Rides {
         double seconds = fares.durationSeconds(request, meters);
         PricingDto pricing = fares.pricing();
         Fares.Price price = Fares.price(pricing, meters, seconds, product);
-        long now = System.currentTimeMillis();
+        Instant now = Instant.now();
         // The fare is fixed here, from the server's own arithmetic, and so is
         // the driver's share of it: a change of prices or of commission made
         // while the ride is under way is for the rides after it. The quote the
@@ -255,7 +256,7 @@ public class Rides {
         ride.setDurationSeconds(seconds);
         ride.setRequestedAt(now);
         ride.setUpdatedAt(now);
-        ride.setSearchUntil(now + searchMillis);
+        ride.setSearchUntil(now.plusMillis(searchMillis));
         ride.setPaymentStatus(Payments.PENDING);
         ride.setProduct(product);
         ride.setMethodId(method[0]);
@@ -412,8 +413,9 @@ public class Rides {
     /// became of such a ride is for a person to find in the processor's records.
     @Scheduled(fixedDelay = 60000, initialDelay = 30000, lock = "wayline-settlement")
     public void settleLeftBehind() throws IOException {
-        long now = System.currentTimeMillis();
-        List<Ride> unsettled = unsettled(now - RETRY_MILLIS, now - UNSETTLED_MILLIS);
+        Instant now = Instant.now();
+        List<Ride> unsettled = unsettled(now.minusMillis(RETRY_MILLIS),
+                now.minusMillis(UNSETTLED_MILLIS));
         Exception failed = null;
         for (int iter = 0; iter < unsettled.size(); iter++) {
             Ride ride = unsettled.get(iter);
@@ -434,7 +436,7 @@ public class Rides {
     }
 
     @Transactional(readOnly = true)
-    private List<Ride> unsettled(long after, long before) {
+    private List<Ride> unsettled(Instant after, Instant before) {
         return rides.unsettled(after, before, new PageRequest(0, 50));
     }
 
@@ -568,12 +570,12 @@ public class Rides {
         if (ride == null || RideState.REQUESTED != ride.getState()) {
             return null;
         }
-        long now = System.currentTimeMillis();
-        if (now > ride.getSearchUntil()) {
+        Instant now = Instant.now();
+        if (now.isAfter(ride.getSearchUntil())) {
             return tryMove(id, RideState.NO_DRIVERS, "", null, null, null)
                     ? new Change(id, RideState.NO_DRIVERS, ride.getRider(), "", "", null) : null;
         }
-        chosen[0] = matcher.pick(ride, now - ride.getRequestedAt());
+        chosen[0] = matcher.pick(ride, now.toEpochMilli() - ride.getRequestedAt().toEpochMilli());
         return null;
     }
 
@@ -603,11 +605,12 @@ public class Rides {
         if (ride == null || RideState.REQUESTED != ride.getState()) {
             return null;
         }
-        long now = System.currentTimeMillis();
-        if (!matcher.fits(ride, driver, now - ride.getRequestedAt())) {
+        Instant now = Instant.now();
+        if (!matcher.fits(ride, driver,
+                now.toEpochMilli() - ride.getRequestedAt().toEpochMilli())) {
             return null;
         }
-        return tryMove(id, RideState.OFFERED, "", null, driver, Long.valueOf(now + offerMillis))
+        return tryMove(id, RideState.OFFERED, "", null, driver, now.plusMillis(offerMillis))
                 ? new Change(id, RideState.OFFERED, ride.getRider(), driver, "", null) : null;
     }
     // end::wayline-ride-offer[]
@@ -622,7 +625,7 @@ public class Rides {
     @Scheduled(fixedDelay = 2000, initialDelay = 2000, lock = "wayline-matching")
     public void tick() throws IOException {
         Exception failed = null;
-        List<Ride> lapsed = lapsedOffers(System.currentTimeMillis());
+        List<Ride> lapsed = lapsedOffers(Instant.now());
         for (int iter = 0; iter < lapsed.size(); iter++) {
             Ride ride = lapsed.get(iter);
             try {
@@ -652,7 +655,7 @@ public class Rides {
     }
 
     @Transactional(readOnly = true)
-    private List<Ride> lapsedOffers(long now) throws IOException {
+    private List<Ride> lapsedOffers(Instant now) throws IOException {
         return rides.findByStateAndOfferExpiresAtLessThan(RideState.OFFERED, now);
     }
 
@@ -758,7 +761,7 @@ public class Rides {
 
     /// Moves a ride to `to`, or answers 409 when its state does not allow it.
     private void move(String id, RideState to, String actor, String ownerField, String newDriver,
-            Long newOfferExpiresAt) throws IOException {
+            Instant newOfferExpiresAt) throws IOException {
         if (!tryMove(id, to, actor, ownerField, newDriver, newOfferExpiresAt)) {
             Ride now = find(id);
             throw new ResponseStatusException(409, "That ride is "
@@ -781,15 +784,15 @@ public class Rides {
     /// @param newOfferExpiresAt when the offer this change makes lapses, or null
     // tag::wayline-ride-trymove[]
     private boolean tryMove(String id, RideState to, String actor, String ownerField,
-            String newDriver, Long newOfferExpiresAt) throws IOException {
+            String newDriver, Instant newOfferExpiresAt) throws IOException {
         RideState[] sources = RideStateMachine.sources(to);
         if (sources.length == 0) {
             return false;
         }
-        long now = System.currentTimeMillis();
+        Instant now = Instant.now();
         int moved;
         if (newOfferExpiresAt != null) {
-            moved = rides.offer(id, sources, to, now, newDriver, newOfferExpiresAt.longValue());
+            moved = rides.offer(id, sources, to, now, newDriver, newOfferExpiresAt);
         } else if (RIDER.equals(ownerField)) {
             moved = rides.moveAsRider(id, sources, to, now, actor);
         } else if (!DRIVER.equals(ownerField)) {
@@ -817,7 +820,7 @@ public class Rides {
         event.setRideId(id);
         event.setState(state);
         event.setActor(actor);
-        event.setCreatedAt(System.currentTimeMillis());
+        event.setCreatedAt(Instant.now());
         events.insert(event);
     }
 
@@ -957,7 +960,7 @@ public class Rides {
         }
         if (offered) {
             offerExpiresInSeconds = (int) Math.max(0L,
-                    (ride.getOfferExpiresAt() - System.currentTimeMillis()) / 1000L);
+                    (ride.getOfferExpiresAt().toEpochMilli() - System.currentTimeMillis()) / 1000L);
         }
         long fareCents = ride.getFareCents();
         long serviceFee = ride.getFeeCents();
@@ -985,8 +988,8 @@ public class Rides {
                 ride.getCurrency(),
                 ride.getDistanceMeters(),
                 ride.getDurationSeconds(),
-                ride.getRequestedAt(),
-                ride.getUpdatedAt(),
+                ride.getRequestedAt().toEpochMilli(),
+                ride.getUpdatedAt().toEpochMilli(),
                 ride.getStars(),
                 ride.getPaymentStatus(),
                 offerExpiresInSeconds,
