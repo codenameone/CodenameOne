@@ -7333,20 +7333,41 @@ void codenameOneGCSweep() {
         // 4 and 6 a virtual thread's resumer outside its host stack, 5 the thread could
         // not be stopped (stopErr says why), 7 stack pointer outside the stack, 8 no
         // registers, 9-10 the collector's own stack.
+        //
+        // Released FIRST: the naming below takes the critical section, and a thread
+        // parked on the collector while holding it would otherwise never let go.
+        cn1GcReleaseBlockedThreads();
         for(int __m = 0; __m < cn1GcRootMissCount && __m < CN1_GC_ROOT_MISS_MAX; __m++) {
             char __name[64];
             __name[0] = 0;
 #if defined(__APPLE__) || defined(__linux__)
-            // Safe here: every thread was released before the sweep decided to skip.
+            // Named only while the thread is provably alive. A thread the stop could
+            // not reach is very often one that is EXITING: markDeadThread takes it out
+            // of allThreads under the critical section and the pthread then ends, so
+            // by now the recorded handle may name a thread that no longer exists, and
+            // glibc's pthread_getname_np reads that thread's freed descriptor -- a
+            // SIGSEGV in the diagnostic itself, after the skip line and before any
+            // site line. Holding the critical section keeps a still-registered thread
+            // from finishing markDeadThread, so a handle found in allThreads stays
+            // valid for the call. Every thread was released before the sweep decided
+            // to skip, so none is frozen holding the lock pthread_getname_np takes.
             if(cn1GcRootMiss[__m].hasPthread) {
-                pthread_getname_np(cn1GcRootMiss[__m].pthread, __name, sizeof(__name));
+                lockCriticalSection();
+                for(int __k = 0; __k < NUMBER_OF_SUPPORTED_THREADS; __k++) {
+                    struct ThreadLocalData* __t = allThreads[__k];
+                    if(__t != 0 && __t->gcPthreadValid
+                            && pthread_equal(__t->gcPthread, cn1GcRootMiss[__m].pthread)) {
+                        pthread_getname_np(cn1GcRootMiss[__m].pthread, __name, sizeof(__name));
+                        break;
+                    }
+                }
+                unlockCriticalSection();
             }
 #endif
             fprintf(stderr, "CN1 GC:   site=%d thread=%ld lightweight=%d stopErr=%d name=%s\n",
                     cn1GcRootMiss[__m].site, cn1GcRootMiss[__m].threadId,
                     cn1GcRootMiss[__m].lightweight, cn1GcRootMiss[__m].stopError, __name);
         }
-        cn1GcReleaseBlockedThreads();
         return;
     }
     if(cn1GcPageIndexStale) {

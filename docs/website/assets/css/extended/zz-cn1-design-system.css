@@ -1767,3 +1767,22 @@ body.dark .cn1-footer-logo {
   .cn1-home-platforms .cn1-platform-grid li { padding: 16px; }
   .cn1-home-platforms .cn1-platform-grid strong { font-size: 17px; }
 }
+
+/* Complete application templates on the homepage. */
+.cn1-home-templates__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.cn1-home-template { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr); align-items: center; overflow: hidden; border: 1px solid var(--cn1-border); border-radius: var(--cn1-radius); background: var(--cn1-surface); }
+.cn1-home-template__screen { display: flex; align-items: center; justify-content: center; align-self: stretch; padding: 24px; background: linear-gradient(145deg, #202b4b, #293956); }
+.cn1-home-template__screen img { display: block; width: 100%; max-width: 210px; height: auto; border-radius: 12px; box-shadow: 0 10px 24px #0004; }
+.cn1-home-template__body { min-width: 0; padding: 24px; }
+.cn1-home-template__body h3 { margin: 6px 0 16px; font-size: 30px; }
+.cn1-home-template__body > p:not(.cn1-eyebrow) { color: var(--cn1-muted); line-height: 1.65; }
+.cn1-home-template__body > a { display: inline-block; margin-top: 18px; text-decoration: underline; text-underline-offset: 4px; }
+@media (max-width: 800px) {
+  .cn1-home-templates__grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 480px) {
+  .cn1-home-template { grid-template-columns: minmax(0, 0.7fr) minmax(0, 1fr); }
+  .cn1-home-template__screen { padding: 12px; }
+  .cn1-home-template__body { padding: 18px 14px; }
+  .cn1-home-template__body h3 { font-size: 26px; }
+}

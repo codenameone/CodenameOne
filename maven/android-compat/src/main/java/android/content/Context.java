@@ -189,12 +189,22 @@ public abstract class Context {
     // ------------------------------------------------------------ files
 
     /// The application's private directories live under the Codename One
-    /// application home, laid out like Android's data directory. `java.io.File`
-    /// here is the compatibility runtime's file class once the build has
-    /// relocated the code.
+    /// application home, laid out like Android's data directory.
     private static java.io.File appDir(String name) {
-        String home = com.codename1.io.FileSystemStorage.getInstance().getAppHomePath();
+        String home = appHome();
         return ensureDir(new java.io.File(home.endsWith("/") ? home + name : home + "/" + name));
+    }
+
+    /// The application home as a native path. `FileSystemStorage` answers a
+    /// `file:` URL, and `java.io.File` is the platform's own class: on
+    /// Android and the simulator that is the JDK's, which takes the URL as a
+    /// relative file name and fails to open anything under it.
+    private static String appHome() {
+        return nativePath(com.codename1.io.FileSystemStorage.getInstance().getAppHomePath());
+    }
+
+    private static String nativePath(String path) {
+        return com.codename1.io.FileSystemStorage.getInstance().toNativePath(path);
     }
 
     /// Creates `dir` when missing. Like Android's, the directory getters
@@ -207,7 +217,7 @@ public abstract class Context {
     }
 
     public java.io.File getDataDir() {
-        return new java.io.File(com.codename1.io.FileSystemStorage.getInstance().getAppHomePath());
+        return new java.io.File(appHome());
     }
 
     public java.io.File getFilesDir() {
@@ -227,7 +237,7 @@ public abstract class Context {
         if (fs.hasCachesDir()) {
             String caches = fs.getCachesDir();
             if (caches != null) {
-                return ensureDir(new java.io.File(caches));
+                return ensureDir(new java.io.File(nativePath(caches)));
             }
         }
         return appDir("cache");
@@ -295,14 +305,17 @@ public abstract class Context {
     /// Where a named database lives: the platform's database path when it
     /// exposes one, otherwise the `databases` directory Android would use.
     public java.io.File getDatabasePath(String name) {
-        if (name.startsWith("/") || name.startsWith("file:")) {
+        if (name.startsWith("/")) {
             return new java.io.File(name);
+        }
+        if (name.startsWith("file:")) {
+            return new java.io.File(nativePath(name));
         }
         try {
             if (com.codename1.db.Database.isCustomPathSupported()) {
                 String p = com.codename1.db.Database.getDatabasePath(name);
                 if (p != null) {
-                    return new java.io.File(p);
+                    return new java.io.File(nativePath(p));
                 }
             }
         } catch (IllegalArgumentException e) {

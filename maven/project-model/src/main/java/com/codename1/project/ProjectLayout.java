@@ -269,6 +269,17 @@ public final class ProjectLayout {
         return srcMain("android");
     }
 
+    /// A Swing or JavaFX application's sources (`java/`, `kotlin/`,
+    /// `resources/`), laid out like a desktop project's `src/main`; compiled
+    /// onto the Swing and JavaFX compatibility runtimes. The directory
+    /// existing is what enables those layers.
+    public File desktopSourceDir() {
+        if (isAnt()) {
+            return file(projectDir, "desktop-src");
+        }
+        return srcMain("desktop");
+    }
+
     /// The directory the Game Builder saves scenes to.
     public File gamesDir() {
         return new File(resourcesDir(), "games");

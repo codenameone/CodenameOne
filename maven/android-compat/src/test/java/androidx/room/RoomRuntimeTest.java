@@ -35,7 +35,7 @@ import androidx.lifecycle.Observer;
 import androidx.room.migration.Migration;
 import androidx.sqlite.db.SupportSQLiteDatabase;
 import com.codename1.androidcompat.runtime.RoomSupport;
-import com.codename1.androidcompat.testing.MainThreadRule;
+import com.codename1.compat.testing.MainThreadRule;
 
 import java.util.ArrayList;
 import java.util.Arrays;

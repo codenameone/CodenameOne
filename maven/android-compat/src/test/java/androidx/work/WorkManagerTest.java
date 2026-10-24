@@ -24,7 +24,7 @@ package androidx.work;
 
 import android.content.Context;
 import com.codename1.androidcompat.testing.AndroidTestSupport;
-import com.codename1.androidcompat.testing.MainThreadRule;
+import com.codename1.compat.testing.MainThreadRule;
 import com.codename1.io.Storage;
 import org.junit.After;
 import org.junit.Before;

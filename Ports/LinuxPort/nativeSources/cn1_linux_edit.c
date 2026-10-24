@@ -44,6 +44,8 @@ typedef struct {
     GtkTextBuffer* buffer;  /* GtkTextView buffer, or NULL for single-line */
     int singleLine;
     volatile int done;
+    /* How the edit ended when Tab ended it: 1 forwards, 2 backwards, else 0. */
+    volatile int tab;
     char* text;             /* latest committed/changed text (heap) */
     /* The window whose overlay hosts this editor, so teardown removes it from the
      * same place it was added. */
@@ -102,6 +104,28 @@ static gboolean cn1EditFocusOut(GtkWidget* w, GdkEvent* ev, gpointer data) {
     return FALSE;
 }
 
+/*
+ * Tab in a single-line field ends the edit and is reported, so the port hands the
+ * key to the form and the focus moves on. Left to GTK it moved GTK's own focus:
+ * the entry is the only focusable widget of the window, so the edit ended on the
+ * focus-out and the focus of the form stayed where it was -- the next field was
+ * out of the keyboard's reach.
+ */
+static gboolean cn1EditKeyPress(GtkWidget* w, GdkEventKey* ev, gpointer data) {
+    CN1Edit* e = (CN1Edit*) data;
+    (void) w;
+    if ((ev->state & (GDK_CONTROL_MASK | GDK_MOD1_MASK)) != 0) {
+        return FALSE;
+    }
+    if (ev->keyval == GDK_KEY_Tab || ev->keyval == GDK_KEY_KP_Tab || ev->keyval == GDK_KEY_ISO_Left_Tab) {
+        cn1EditCaptureText(e);
+        e->tab = (ev->keyval == GDK_KEY_ISO_Left_Tab || (ev->state & GDK_SHIFT_MASK) != 0) ? 2 : 1;
+        e->done = 1;
+        return TRUE;
+    }
+    return FALSE;
+}
+
 static void cn1EditApplyStyle(GtkWidget* w, CN1Font* font, int fg, int bg) {
     if (font && font->desc) {
         gtk_widget_override_font(w, font->desc);
@@ -143,6 +167,7 @@ static void cn1EditCreateOnMain(void* p) {
         cn1EditApplyStyle(e->entry, req->font, req->fg, req->bg);
         g_signal_connect(e->entry, "changed", G_CALLBACK(cn1EditChanged), e);
         g_signal_connect(e->entry, "activate", G_CALLBACK(cn1EditActivate), e);
+        g_signal_connect(e->entry, "key-press-event", G_CALLBACK(cn1EditKeyPress), e);
         g_signal_connect(e->entry, "focus-out-event", G_CALLBACK(cn1EditFocusOut), e);
     } else {
         /* Use the GtkTextView directly as the overlay widget rather than wrapping it
@@ -171,7 +196,15 @@ static void cn1EditCreateOnMain(void* p) {
     g_object_ref_sink(e->container);
 
     cn1LinuxOverlayAdd(req->slot, e->container, req->x, req->y, req->w, req->h);
-    gtk_widget_grab_focus(e->container);
+    if (e->entry) {
+        /* An entry given the focus selects all of its text, so the first key typed
+         * replaced what the field held. The caret goes after the text instead, as
+         * it does in the field the editor stands in for. */
+        gtk_entry_grab_focus_without_selecting(GTK_ENTRY(e->entry));
+        gtk_editable_set_position(GTK_EDITABLE(e->entry), -1);
+    } else {
+        gtk_widget_grab_focus(e->container);
+    }
     req->result = e;
 }
 
@@ -200,6 +233,11 @@ JAVA_LONG com_codename1_impl_linux_LinuxNative_editStringAt___int_int_int_int_ja
 JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_editIsDone___long_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_LONG peer) {
     CN1Edit* e = (CN1Edit*) (intptr_t) peer;
     return (e && e->done) ? JAVA_TRUE : JAVA_FALSE;
+}
+
+JAVA_INT com_codename1_impl_linux_LinuxNative_editTabbed___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG peer) {
+    CN1Edit* e = (CN1Edit*) (intptr_t) peer;
+    return e ? (JAVA_INT) e->tab : 0;
 }
 
 JAVA_OBJECT com_codename1_impl_linux_LinuxNative_editGetText___long_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG peer) {

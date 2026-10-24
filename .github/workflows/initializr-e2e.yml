@@ -1,0 +1,77 @@
+name: Initializr downloads (released framework)
+
+# What start.codenameone.com hands a developer, built and run the way they would:
+# against the release the Initializr pins, from an empty Maven repository, with
+# nothing from this checkout installed. Every other check of the templates builds
+# them against 8.0-SNAPSHOT, which is how a download that only worked on the
+# SNAPSHOT could pass CI. See scripts/initializr/e2e-shipped.sh.
+#
+# The version bump opened after each release (initializr-cn1-version-pr.yml)
+# touches scripts/initializr, so it runs this against the new release before it
+# merges. The nightly run adds --require-latest: a release the bump never reached
+# fails it, rather than the site quietly offering the previous one.
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/initializr-e2e.yml'
+      - 'scripts/initializr/**'
+      - 'scripts/tests/GenerateInitializr.java'
+      - 'scripts/tests/generate-initializr-fixtures.py'
+      - 'scripts/sync-initializr-template.py'
+      - 'scripts/wayline/common/src/test/**'
+      - 'scripts/savor/common/src/test/**'
+      - 'scripts/skirmish/common/src/test/**'
+      - 'scripts/parley/common/src/test/**'
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: initializr-e2e-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  download:
+    name: ${{ matrix.template }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        template: [BAREBONES, KOTLIN, WAYLINE, SAVOR, SKIRMISH, PARLEY]
+    steps:
+      - uses: actions/checkout@v6
+
+      # No cache: the point is a developer's first build, from an empty repository.
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Ensure a virtual display (xvfb) for the simulator
+        run: |
+          if ! command -v xvfb-run >/dev/null 2>&1; then
+            (timeout 300 sudo apt-get update && timeout 300 sudo apt-get install -y xvfb) || true
+          fi
+
+      - name: Build and run the download
+        run: |
+          args=()
+          if [ "${{ github.event_name }}" = "schedule" ]; then args+=(--require-latest); fi
+          scripts/initializr/e2e-shipped.sh "${args[@]}" "${{ matrix.template }}"
+
+      - name: Upload the logs and captures
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: initializr-e2e-${{ matrix.template }}
+          path: |
+            scripts/initializr/target/e2e-shipped/*.log
+            scripts/initializr/target/e2e-shipped/*-shots/**
+          if-no-files-found: warn
+          retention-days: 14

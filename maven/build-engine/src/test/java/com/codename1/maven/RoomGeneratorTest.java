@@ -306,8 +306,7 @@ public class RoomGeneratorTest {
         new AndroidRemapper(classes, jar, null, log).run();
         assertTrue(new File(classes, "app/AppDb_Impl.class").isFile());
         assertTrue(new File(classes, "app/NoteDao_Impl.class").isFile());
-        URLClassLoader loader = new URLClassLoader(new URL[] {classes.toURI().toURL()},
-                getClass().getClassLoader());
+        URLClassLoader loader = isolatedLoader(classes);
         try {
             Class<?> driver = loader.loadClass(AndroidRemapper.TARGET.replace('/', '.')
                     + "android.database.sqlite.RoomDriver");
@@ -440,5 +439,31 @@ public class RoomGeneratorTest {
     private static String coreJar() throws Exception {
         return new File(com.codename1.db.Database.class.getProtectionDomain().getCodeSource().getLocation().toURI())
                 .getAbsolutePath();
+    }
+
+    /// The relocated application with a Codename One of its own. Other tests
+    /// in this JVM install a headless Display, whose EDT would then deliver
+    /// the invalidations on another thread; the driver runs as an
+    /// application with no display does, where the main thread is its own.
+    private URLClassLoader isolatedLoader(File classes) throws Exception {
+        URL core = com.codename1.ui.Display.class.getProtectionDomain().getCodeSource().getLocation();
+        return new URLClassLoader(new URL[] {classes.toURI().toURL(), core}, getClass().getClassLoader()) {
+            @Override
+            protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+                if (!name.startsWith("com.codename1.")) {
+                    return super.loadClass(name, resolve);
+                }
+                synchronized (getClassLoadingLock(name)) {
+                    Class<?> c = findLoadedClass(name);
+                    if (c == null) {
+                        c = findClass(name);
+                    }
+                    if (resolve) {
+                        resolveClass(c);
+                    }
+                    return c;
+                }
+            }
+        };
     }
 }

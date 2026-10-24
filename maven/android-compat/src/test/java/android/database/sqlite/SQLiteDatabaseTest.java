@@ -39,7 +39,7 @@ import android.database.DatabaseUtils;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.codename1.androidcompat.testing.MainThreadRule;
+import com.codename1.compat.testing.MainThreadRule;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;

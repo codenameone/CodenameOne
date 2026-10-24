@@ -292,7 +292,7 @@ public class StringFormatTest extends BaseTest {
      * IllegalFormatPrecisionException on Android and UnknownFormatConversionException on
      * OpenJDK, for instance. Neither is Codename One's to change. The exact subtype
      * ParparVM raises is pinned against the JDK in
-     * vm/tests StringFormatIntegrationTest, which covers every port that runs Codename
+     * vm/tests BulkConformanceIntegrationTest (StringFormatChecks), which covers every port that runs Codename
      * One's own formatter; {@code javaSeType} is carried here only to make a failure
      * message say what Java SE does.</p>
      */

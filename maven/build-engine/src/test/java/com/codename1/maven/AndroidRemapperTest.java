@@ -519,7 +519,7 @@ public class AndroidRemapperTest {
         java.io.File javaApi = new java.io.File(root, "vm/JavaAPI/src");
         java.io.File runtime = new java.io.File(root, "maven/android-compat/src/main/java");
         org.junit.Assume.assumeTrue(cldc.isDirectory() && javaApi.isDirectory() && runtime.isDirectory());
-        for (String[] shim : AndroidRemapper.JDK_SHIMS) {
+        for (String[] shim : AndroidRemapper.ANDROID_JDK_SHIMS) {
             String outer = shim[0].indexOf('$') < 0 ? shim[0] : shim[0].substring(0, shim[0].indexOf('$'));
             boolean inBoth = new java.io.File(cldc, outer + ".java").isFile()
                     && new java.io.File(javaApi, outer + ".java").isFile();

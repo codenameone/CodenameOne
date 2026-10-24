@@ -24,7 +24,7 @@ package android.location;
 
 import android.content.Context;
 import com.codename1.androidcompat.testing.AndroidTestSupport;
-import com.codename1.androidcompat.testing.MainThreadRule;
+import com.codename1.compat.testing.MainThreadRule;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;

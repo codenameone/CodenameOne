@@ -23,7 +23,7 @@
 package android.hardware;
 
 import com.codename1.androidcompat.testing.AndroidTestSupport;
-import com.codename1.androidcompat.testing.MainThreadRule;
+import com.codename1.compat.testing.MainThreadRule;
 import com.codename1.sensors.MotionSensorManager;
 import org.junit.After;
 import org.junit.Before;

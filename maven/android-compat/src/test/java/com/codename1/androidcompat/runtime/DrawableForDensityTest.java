@@ -27,8 +27,8 @@ import android.graphics.drawable.Drawable;
 
 import com.codename1.android.rescompiler.ResourceCompiler;
 import com.codename1.androidcompat.testing.AndroidTestSupport;
-import com.codename1.androidcompat.testing.HeadlessImplementation;
-import com.codename1.androidcompat.testing.MainThreadRule;
+import com.codename1.compat.testing.HeadlessImplementation;
+import com.codename1.compat.testing.MainThreadRule;
 
 import org.junit.Rule;
 import org.junit.Test;

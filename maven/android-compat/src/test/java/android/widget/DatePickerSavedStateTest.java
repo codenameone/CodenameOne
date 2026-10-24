@@ -24,7 +24,7 @@ package android.widget;
 import android.os.Parcelable;
 import android.util.SparseArray;
 import com.codename1.androidcompat.testing.AndroidTestSupport;
-import com.codename1.androidcompat.testing.MainThreadRule;
+import com.codename1.compat.testing.MainThreadRule;
 import org.junit.Rule;
 import org.junit.Test;
 import static org.junit.Assert.*;
