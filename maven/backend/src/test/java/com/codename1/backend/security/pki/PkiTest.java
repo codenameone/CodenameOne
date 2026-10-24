@@ -316,12 +316,12 @@ class PkiTest {
             byte[] plain = random(length);
             Cipher jdk = Cipher.getInstance("AES/CBC/NoPadding");
             jdk.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(key, "AES"), new IvParameterSpec(iv));
-            byte[] sealed = Crypto.aesCbcBlocks(true, key, iv, plain);
+            byte[] sealed = Crypto.aesCbcEncryptBlocks(key, iv, plain);
             assertArrayEquals(jdk.doFinal(plain), sealed);
-            assertArrayEquals(plain, Crypto.aesCbcBlocks(false, key, iv, sealed));
+            assertArrayEquals(plain, Crypto.aesCbcDecryptBlocks(key, iv, sealed));
         }
-        assertThrows(IOException.class, () -> Crypto.aesCbcBlocks(false, key, iv, new byte[15]));
-        assertThrows(IOException.class, () -> Crypto.aesCbcBlocks(true, key, new byte[12],
+        assertThrows(IOException.class, () -> Crypto.aesCbcDecryptBlocks(key, iv, new byte[15]));
+        assertThrows(IOException.class, () -> Crypto.aesCbcEncryptBlocks(key, random(12),
                 new byte[16]));
     }
 

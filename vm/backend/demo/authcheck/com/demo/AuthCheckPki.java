@@ -229,11 +229,11 @@ final class AuthCheckPki {
         byte[] iv = AuthCheck.fromHex("000102030405060708090a0b0c0d0e0f");
         byte[] sealed = AuthCheck.fromHex("f58c4c04d6e5f1ba779eabfb5f7bfbd6");
         AuthCheck.check("pki.cbc.nist", "6bc1bee22e409f96e93d7e117393172a",
-                AuthCheck.hex(Crypto.aesCbcBlocks(false, key, iv, sealed)));
+                AuthCheck.hex(Crypto.aesCbcDecryptBlocks(key, iv, sealed)));
         byte[] fresh = Crypto.randomBytes(16);
-        byte[] round = Crypto.aesCbcBlocks(true, key, fresh, sealed);
+        byte[] round = Crypto.aesCbcEncryptBlocks(key, fresh, sealed);
         AuthCheck.check("pki.cbc.round", AuthCheck.hex(sealed),
-                AuthCheck.hex(Crypto.aesCbcBlocks(false, key, fresh, round)));
-        AuthCheck.value("pki.cbc.empty", Crypto.aesCbcBlocks(true, key, fresh, new byte[0]));
+                AuthCheck.hex(Crypto.aesCbcDecryptBlocks(key, fresh, round)));
+        AuthCheck.value("pki.cbc.empty", Crypto.aesCbcEncryptBlocks(key, fresh, new byte[0]));
     }
 }

@@ -342,7 +342,7 @@ public final class Pkcs12 {
         // Reached only after checkMac() has accepted the whole file, so the
         // padding verdict below says nothing an attacker could not already
         // compute: the ciphertext cannot be changed without failing the MAC.
-        byte[] out = Crypto.aesCbcBlocks(false, key, iv, sealed);
+        byte[] out = Crypto.aesCbcDecryptBlocks(key, iv, sealed);
         int pad = out[out.length - 1] & 0xff;
         boolean good = pad >= 1 && pad <= 16;
         for (int iter = 1 ; good && iter <= pad ; iter++) {
@@ -533,7 +533,7 @@ public final class Pkcs12 {
         for (int iter = plaintext.length ; iter < padded.length ; iter++) {
             padded[iter] = (byte) pad;
         }
-        byte[] sealed = Crypto.aesCbcBlocks(true, key, iv, padded);
+        byte[] sealed = Crypto.aesCbcEncryptBlocks(key, iv, padded);
         byte[] kdf = Asn1.sequence(Asn1.oid(PBKDF2), Asn1.sequence(Asn1.octets(salt),
                 Asn1.integer(ITERATIONS), Asn1.sequence(Asn1.oid(HMAC_SHA256), Asn1.nullValue())));
         byte[] scheme = Asn1.sequence(Asn1.oid(AES256_CBC), Asn1.octets(iv));

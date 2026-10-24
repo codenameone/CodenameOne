@@ -590,7 +590,7 @@ public final class Crypto {
         return 0;
     }
 
-    /// AES-CBC over whole blocks, with no padding.
+    /// Encrypts with AES-CBC over whole blocks, with no padding.
     ///
     /// This is the raw mode a format defined over CBC needs -- PKCS#12 and
     /// encrypted PKCS#8 -- and nothing more. CBC is not authenticated, so it is
@@ -600,16 +600,42 @@ public final class Crypto {
     /// verified the data's integrity some other way, as PKCS#12 does with its
     /// MAC. Seal new data with [#aesGcmEncrypt].
     ///
-    /// @param encrypt true to encrypt, false to decrypt
+    /// Encryption and decryption are two methods rather than one with a mode
+    /// flag, so the rule that matters -- an encrypting IV is random and never
+    /// repeated under one key -- applies to exactly the method it is about.
+    /// Decrypting takes whatever IV the data carries, a fixed test vector
+    /// included.
+    ///
     /// @param key 16, 24 or 32 bytes
-    /// @param iv 16 bytes; when encrypting, random and never repeated under one key
+    /// @param iv 16 bytes, random and never repeated under one key; use
+    /// [#randomBytes]
     /// @param blocks a whole number of 16 byte blocks
-    public static byte[] aesCbcBlocks(boolean encrypt, byte[] key, byte[] iv, byte[] blocks)
+    public static byte[] aesCbcEncryptBlocks(byte[] key, byte[] iv, byte[] blocks)
             throws IOException {
         checkCbc(key, iv, blocks);
         try {
             Cipher cipher = Cipher.getInstance("AES/CBC/NoPadding");
-            cipher.init(encrypt ? Cipher.ENCRYPT_MODE : Cipher.DECRYPT_MODE,
+            cipher.init(Cipher.ENCRYPT_MODE,
+                    new SecretKeySpec(key, "AES"), new IvParameterSpec(iv));
+            return cipher.doFinal(blocks);
+        } catch (GeneralSecurityException | RuntimeException err) {
+            throw new IOException("AES-CBC failed", err);
+        }
+    }
+
+    /// Decrypts AES-CBC over whole blocks, with no padding: the inverse of
+    /// [#aesCbcEncryptBlocks]. Nothing is unpadded or checked here; see that
+    /// method for why.
+    ///
+    /// @param key 16, 24 or 32 bytes
+    /// @param iv the 16 byte IV the data was encrypted under
+    /// @param blocks a whole number of 16 byte blocks
+    public static byte[] aesCbcDecryptBlocks(byte[] key, byte[] iv, byte[] blocks)
+            throws IOException {
+        checkCbc(key, iv, blocks);
+        try {
+            Cipher cipher = Cipher.getInstance("AES/CBC/NoPadding");
+            cipher.init(Cipher.DECRYPT_MODE,
                     new SecretKeySpec(key, "AES"), new IvParameterSpec(iv));
             return cipher.doFinal(blocks);
         } catch (GeneralSecurityException | RuntimeException err) {
