@@ -36,6 +36,7 @@ import com.codenameone.examples.skirmish.repository.PipelineHitRepository;
 import com.codenameone.examples.skirmish.repository.PipelineRepository;
 import com.codenameone.examples.skirmish.repository.ProfileRepository;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -108,7 +109,7 @@ public class Pipelines {
         for (Profile player : audience.filter(profiles.findAll())) {
             String key = p.getId() + ":" + player.getUsername();
             PipelineHit hit = last.get(player.getUsername());
-            if (hit != null && hit.getHitAt() > now - p.getCooldownDays() * Clock.DAY) {
+            if (hit != null && hit.getHitAt().toEpochMilli() > now - p.getCooldownDays() * Clock.DAY) {
                 continue;
             }
             if (GEMS.equals(p.getAction())) {
@@ -120,10 +121,10 @@ public class Pipelines {
                 hit.setId(key);
                 hit.setPipeline(p.getId());
                 hit.setUsername(player.getUsername());
-                hit.setHitAt(now);
+                hit.setHitAt(Instant.ofEpochMilli(now));
                 hits.insert(hit);
             } else {
-                hit.setHitAt(now);
+                hit.setHitAt(Instant.ofEpochMilli(now));
                 hits.save(hit);
             }
             due.add(player.getUsername());
@@ -135,7 +136,7 @@ public class Pipelines {
             pushes.broadcast(due, Ids.next(), p.getTitle(), p.getBody(), p.getScreen(), "pipeline-" + p.getName());
         }
         p.setReached(p.getReached() + due.size());
-        p.setLastRun(now);
+        p.setLastRun(Instant.ofEpochMilli(now));
         pipelines.save(p);
         return dto(p);
     }
@@ -239,7 +240,7 @@ public class Pipelines {
     private static PipelineDto dto(Pipeline p) {
         List<ConditionDto> c = Audience.decode(p.getConditions());
         return new PipelineDto(p.getId(), p.getName(), p.isEnabled(), c, p.getAction(), p.getTitle(), p.getBody(),
-                p.getScreen(), p.getAmount(), p.getCooldownDays(), p.getReached(), p.getLastRun());
+                p.getScreen(), p.getAmount(), p.getCooldownDays(), p.getReached(), p.getLastRun().toEpochMilli());
     }
 
     private void record(String admin, String action, String reason) throws IOException {
@@ -249,7 +250,7 @@ public class Pipelines {
         a.setUsername("promote");
         a.setAction(action);
         a.setReason(reason.length() > 255 ? reason.substring(0, 255) : reason);
-        a.setCreatedAt(Clock.now());
+        a.setCreatedAt(Instant.now());
         audit.insert(a);
     }
 }

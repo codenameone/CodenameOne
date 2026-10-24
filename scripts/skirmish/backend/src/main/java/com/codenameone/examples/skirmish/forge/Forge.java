@@ -65,6 +65,7 @@ import com.codenameone.examples.skirmish.rules.forge.PackCodec;
 import com.codenameone.examples.skirmish.rules.forge.Samples;
 import com.codenameone.examples.skirmish.rules.forge.Validator;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -140,7 +141,7 @@ public class Forge {
             p = new ForgePack();
             p.setId(official.id);
             p.setOwner(SYSTEM);
-            p.setCreatedAt(Clock.now());
+            p.setCreatedAt(Instant.now());
         } else if (!SYSTEM.equals(p.getOwner())) {
             return;
         }
@@ -226,7 +227,7 @@ public class Forge {
             p.setId(pack.id);
             p.setOwner(username);
             p.setStatus(DRAFT);
-            p.setCreatedAt(Clock.now());
+            p.setCreatedAt(Instant.now());
             fillDraft(p, pack, username);
             packs.insert(p);
         } else {
@@ -263,7 +264,7 @@ public class Forge {
         }
         // Versions are kept: a replay names the version it was played on.
         p.setStatus(DELETED);
-        p.setUpdatedAt(Clock.now());
+        p.setUpdatedAt(Instant.now());
         packs.save(p);
         return summary(p);
     }
@@ -368,7 +369,7 @@ public class Forge {
         if (a != null) {
             return asset(a, false);
         }
-        long since = Clock.now() - Clock.DAY;
+        Instant since = Instant.now().minusMillis(Clock.DAY);
         if (assets.countByOwnerAndCreatedAtGreaterThan(username, since) >= MAX_UPLOADS_PER_DAY) {
             throw new ResponseStatusException(429, "That is enough uploads for today");
         }
@@ -381,7 +382,7 @@ public class Forge {
         a.setStatus(PENDING);
         a.setAnimations(clip(join(animations), 2000));
         a.setData(file.data());
-        a.setCreatedAt(Clock.now());
+        a.setCreatedAt(Instant.now());
         assets.insert(a);
         return asset(a, false);
     }
@@ -448,7 +449,7 @@ public class Forge {
         row.setStars(Math.max(row.getStars(), won));
         int newStars = Math.max(0, won - row.getPaidStars());
         row.setPaidStars(row.getPaidStars() + newStars);
-        row.setUpdatedAt(Clock.now());
+        row.setUpdatedAt(Instant.now());
         stars.save(row);
         p.setPlays(p.getPlays() + 1);
         packs.save(p);
@@ -514,7 +515,7 @@ public class Forge {
         } else {
             throw new ResponseStatusException(400, "Unknown action");
         }
-        p.setUpdatedAt(Clock.now());
+        p.setUpdatedAt(Instant.now());
         packs.save(p);
         record(admin, id, "PACK_" + action, reason);
         return summary(p);
@@ -565,7 +566,7 @@ public class Forge {
         v.setVersion(version);
         v.setHash(hash);
         v.setContent(canonical);
-        v.setPublishedAt(Clock.now());
+        v.setPublishedAt(Instant.now());
         versions.insert(v);
         p.setVersion(version);
         p.setHash(hash);
@@ -578,7 +579,7 @@ public class Forge {
         if (!HIDDEN.equals(p.getStatus())) {
             p.setStatus(PUBLISHED);
         }
-        p.setUpdatedAt(Clock.now());
+        p.setUpdatedAt(Instant.now());
         if (insert) {
             packs.insert(p);
         } else {
@@ -659,7 +660,7 @@ public class Forge {
             p.setMissions(pack.missions.size());
             p.setCards(pack.cards.size());
         }
-        p.setUpdatedAt(Clock.now());
+        p.setUpdatedAt(Instant.now());
     }
 
     private static ContentPack parse(String content) {
@@ -717,7 +718,7 @@ public class Forge {
         a.setUsername(clip("pack:" + target, 190));
         a.setAction(clip(action, 24));
         a.setReason(clip(reason == null ? "" : reason, 255));
-        a.setCreatedAt(Clock.now());
+        a.setCreatedAt(Instant.now());
         audit.insert(a);
     }
 
@@ -737,7 +738,7 @@ public class Forge {
         int rating = p.getRatingCount() == 0 ? 0 : (p.getRatingSum() * 10 + p.getRatingCount() / 2) / p.getRatingCount();
         return new PackSummaryDto(p.getId(), p.getName(), p.getAuthor(), p.getOwner(), p.getDescription(),
                 p.getVersion(), p.getHash(), p.isOfficial(), p.getStatus(), p.getPlays(), rating,
-                p.getRatingCount(), p.getMissions(), p.getCards(), p.isPendingAssets(), p.getUpdatedAt());
+                p.getRatingCount(), p.getMissions(), p.getCards(), p.isPendingAssets(), p.getUpdatedAt().toEpochMilli());
     }
 
     private static AssetDto asset(ForgeAsset a, boolean withData) {
