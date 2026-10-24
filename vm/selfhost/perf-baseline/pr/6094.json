@@ -20,6 +20,26 @@
      }
     }
    }
+  },
+  "windows-x64@amd64-family-25-model-1-authenticamd": {
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.542,
+      "time": 0.605,
+      "tolerance": {
+       "time": 0.35
+      }
+     },
+     "memory": 0.542,
+     "reason": "Translator all-cores time on this runner measures 0.83x (#6094) and 0.90x (#6098, no vm/ changes either) against a 0.60x row; the row is below the runner's normal spread",
+     "runs": 1,
+     "time": 0.833,
+     "tolerance": {
+      "time": 0.35
+     }
+    }
+   }
   }
  }
 }
