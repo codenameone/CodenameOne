@@ -646,10 +646,38 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 "SameApp", "com.acme.same", mavenOptions(ProjectOptions.ProjectType.APP_WITH_BACKEND, false));
         for (String path : minimalWithBackend.keySet()) {
             if (!minimal.containsKey(path)) {
-                assertTrue(path.startsWith("backend/"), "From the gate App + backend adds only backend/: " + path);
+                // The module, and the shortcuts that start it.
+                assertTrue(path.startsWith("backend/") || "run-server.sh".equals(path)
+                                || "run-server.bat".equals(path)
+                                || ".idea/runConfigurations/Run_Server.xml".equals(path),
+                        "From the gate App + backend adds only backend/ and its shortcuts: " + path);
             }
         }
         assertNotNull(minimalWithBackend.get("backend/pom.xml"), "From the gate App + backend has the backend module");
+        assertNull(minimal.get("run-server.sh"), "An app with no server has no server shortcut");
+        assertContains(getText(minimalWithBackend, "run-server.sh"), GeneratorModel.SERVER_MAVEN_ARGS,
+                "run-server.sh starts the server through the reactor");
+        assertContains(getText(minimalWithBackend, "run-server.bat"), GeneratorModel.SERVER_MAVEN_ARGS,
+                "run-server.bat starts the server through the reactor");
+        // Every IDE hands each goal or argument entry to Maven as ONE argument,
+        // so a multi-word entry is a single unknown option and no goal runs.
+        String intellij = getText(minimalWithBackend, ".idea/runConfigurations/Run_Server.xml");
+        String[] words = GeneratorModel.tokens("-Dcn1.backend.jvmArgs=-Dcn1.profile=dev "
+                + GeneratorModel.SERVER_MAVEN_ARGS);
+        for (int i = 0; i < words.length; i++) {
+            assertContains(intellij, "<option value=\"" + words[i] + "\" />",
+                    "IntelliJ's Run Server passes " + words[i] + " as an argument of its own");
+        }
+        Map<String, byte[]> vscode = mavenEntries(LAYOUTS_VERSION, Template.BAREBONES, IDE.VS_CODE,
+                "SameApp", "com.acme.same", mavenOptions(ProjectOptions.ProjectType.APP_WITH_BACKEND, false));
+        assertContains(getText(vscode, ".vscode/tasks.json"), "\"-pl\", \"backend\", \"-am\"",
+                "VS Code's Run Server passes each argument as an element of its own");
+        Map<String, byte[]> netbeans = mavenEntries(LAYOUTS_VERSION, Template.BAREBONES, IDE.NETBEANS,
+                "SameApp", "com.acme.same", mavenOptions(ProjectOptions.ProjectType.APP_WITH_BACKEND, false));
+        assertContains(getText(netbeans, "nbactions.xml"), "<goal>-pl</goal>",
+                "NetBeans' Run Server builds only the server and what it needs");
+        assertContains(getText(minimalWithBackend, "README.md"), "./run-server.sh",
+                "the README starts the server with the launcher");
     }
 
     private static final String[] PLATFORM_DIRS = {"android/", "ios/", "javase/", "javascript/", "linux/", "win/"};

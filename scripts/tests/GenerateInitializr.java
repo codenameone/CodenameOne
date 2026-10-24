@@ -31,6 +31,30 @@ public class GenerateInitializr {
   java.lang.reflect.Field impl=Display.class.getDeclaredField("impl");
   impl.setAccessible(true); impl.set(null, new JavaSEPort());
   Files.createDirectories(Paths.get(args[0]));
+  if (args.length > 1 && "shipped".equals(args[1])) {
+   // What the site's Generate button downloads: the version the Initializr pins,
+   // the options the page starts with, and each template under its sample's own
+   // name and package, so the sample's tests compile in the download unchanged.
+   for (Template template : Template.values()) {
+    if (!GeneratorModel.isTemplateOffered(template)) {
+     // The page does not offer it at the pinned release; e2e-shipped.sh skips it.
+     Files.write(Paths.get(args[0],"SHIPPED-"+template.name()+".unoffered"),new byte[0]);
+     continue;
+    }
+    ProjectOptions options = new ProjectOptions(ProjectOptions.ThemeMode.LIGHT, ProjectOptions.Accent.DEFAULT,
+      true, false, ProjectOptions.PreviewLanguage.ENGLISH, ProjectOptions.JavaVersion.JAVA_17, "")
+      .withBuild(ProjectOptions.BuildTool.MAVEN, ProjectOptions.ProjectType.APP).withPlatformModules(false);
+    if (template.isFullStack()) {
+     options = options.forFullStack().withScheme(-1, true);
+    }
+    GeneratorModel model=GeneratorModel.create(IDE.INTELLIJ,template,template.SOURCE_MAIN_CLASS,
+      template.SOURCE_PACKAGE,options);
+    try(OutputStream out=Files.newOutputStream(Paths.get(args[0],"SHIPPED-"+template.name()+".zip"))) {
+     model.writeProjectZip(out);
+    }
+   }
+   System.exit(0);
+  }
   for (IDE ide : IDE.values()) {
    for (ProjectOptions.JavaVersion version : ProjectOptions.JavaVersion.values()) {
     ProjectOptions options = new ProjectOptions(ProjectOptions.ThemeMode.LIGHT,
