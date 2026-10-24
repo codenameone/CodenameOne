@@ -697,32 +697,12 @@ public class HeadlessImplementation extends CodenameOneImplementation {
     /// AES through the host JDK, the same contract the ports implement.
     @Override
     public byte[] aesEncrypt(String transformation, byte[] key, byte[] iv, byte[] aad, byte[] plaintext) {
-        return aes(javax.crypto.Cipher.ENCRYPT_MODE, transformation, key, iv, aad, plaintext);
+        return HeadlessAes.run(javax.crypto.Cipher.ENCRYPT_MODE, transformation, key, iv, aad, plaintext);
     }
 
     @Override
     public byte[] aesDecrypt(String transformation, byte[] key, byte[] iv, byte[] aad, byte[] ciphertext) {
-        return aes(javax.crypto.Cipher.DECRYPT_MODE, transformation, key, iv, aad, ciphertext);
-    }
-
-    private static byte[] aes(int mode, String transformation, byte[] key, byte[] iv, byte[] aad, byte[] data) {
-        try {
-            javax.crypto.Cipher c = javax.crypto.Cipher.getInstance(transformation);
-            javax.crypto.spec.SecretKeySpec k = new javax.crypto.spec.SecretKeySpec(key, "AES");
-            if (iv == null) {
-                c.init(mode, k);
-            } else if (transformation.indexOf("GCM") >= 0) {
-                c.init(mode, k, new javax.crypto.spec.GCMParameterSpec(128, iv));
-            } else {
-                c.init(mode, k, new javax.crypto.spec.IvParameterSpec(iv));
-            }
-            if (aad != null) {
-                c.updateAAD(aad);
-            }
-            return c.doFinal(data);
-        } catch (java.security.GeneralSecurityException e) {
-            throw new RuntimeException(e.getMessage(), e);
-        }
+        return HeadlessAes.run(javax.crypto.Cipher.DECRYPT_MODE, transformation, key, iv, aad, ciphertext);
     }
 
     private static final java.security.SecureRandom RANDOM = new java.security.SecureRandom();
