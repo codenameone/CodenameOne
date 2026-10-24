@@ -21,7 +21,6 @@ package com.codenameone.examples.savor.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
-import java.time.Instant;
 
 /// A restaurant on the service: listed once an admin approves it, and taking
 /// orders while it is open and its staff have not paused it.
@@ -86,10 +85,10 @@ public class Restaurant {
     private String reason = "";
 
     @Column(nullable = false)
-    private Instant createdAt = Instant.EPOCH;
+    private long createdAt;
 
     @Column(nullable = false)
-    private Instant updatedAt = Instant.EPOCH;
+    private long updatedAt;
 
     public Restaurant() {
     }
@@ -246,19 +245,19 @@ public class Restaurant {
         this.reason = reason;
     }
 
-    public Instant getCreatedAt() {
+    public long getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(Instant createdAt) {
+    public void setCreatedAt(long createdAt) {
         this.createdAt = createdAt;
     }
 
-    public Instant getUpdatedAt() {
+    public long getUpdatedAt() {
         return updatedAt;
     }
 
-    public void setUpdatedAt(Instant updatedAt) {
+    public void setUpdatedAt(long updatedAt) {
         this.updatedAt = updatedAt;
     }
 }

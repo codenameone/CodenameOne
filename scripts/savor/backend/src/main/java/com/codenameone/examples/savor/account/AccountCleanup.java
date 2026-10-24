@@ -39,7 +39,6 @@ import com.codenameone.examples.savor.repository.PushDeviceRepository;
 import com.codenameone.examples.savor.repository.DeliveryActivityRepository;
 import com.codenameone.examples.savor.repository.DeliveryRepository;
 
-import java.time.Instant;
 import java.util.List;
 
 /// What closing or restricting an account does to the rows other parts of the
@@ -206,7 +205,7 @@ public class AccountCleanup {
                     && staff.findByRestaurantId(restaurantId).size() < 2) {
                 restaurant.setStatus(Catalog.SUSPENDED);
                 restaurant.setReason("Its only merchant closed their account");
-                restaurant.setUpdatedAt(Instant.now());
+                restaurant.setUpdatedAt(System.currentTimeMillis());
             }
         }
         staff.deleteByUsername(username);

@@ -48,7 +48,6 @@ import com.codenameone.examples.wayline.repository.RideRepository;
 import com.codenameone.examples.wayline.ride.Fares;
 
 import java.io.IOException;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -111,16 +110,16 @@ public class Earnings {
         long monthStart = today - 29 * Days.MILLIS;
         long weekStart = today - 6 * Days.MILLIS;
         List<Ride> done = rides.findByDriverAndStateAndUpdatedAtGreaterThanEqual(driver,
-                RideState.COMPLETED, Instant.ofEpochMilli(monthStart));
+                RideState.COMPLETED, monthStart);
         // A card tip is on its ride from the moment it is asked for, and is
         // still there when the processor never answered. Only one whose charge
         // is on record is earned, here as in the balance: otherwise a day's
         // total would show money that cannot be cashed out.
         Set<String> charged = new HashSet<String>(
-                rides.tipChargedSince(driver, Instant.ofEpochMilli(monthStart)));
+                rides.tipChargedSince(driver, monthStart));
         for (int iter = 0; iter < done.size(); iter++) {
             Ride ride = done.get(iter);
-            long at = ride.getUpdatedAt().toEpochMilli();
+            long at = ride.getUpdatedAt();
             boolean tipped = "cash".equals(ride.getMethodId()) || charged.contains(ride.getId());
             // The fare likewise counts only once it is paid, as in the balance:
             // a card charge that failed, was refunded or has not come back is
@@ -193,7 +192,7 @@ public class Earnings {
         row.setDriver(driver);
         row.setAmountCents(amount);
         row.setStatus("paid");
-        row.setCreatedAt(Instant.now());
+        row.setCreatedAt(System.currentTimeMillis());
         row.setDestination(account.getBankName() + " ****" + account.getLast4());
         payouts.insert(row);
         return toDto(row);
@@ -292,6 +291,6 @@ public class Earnings {
 
     private static PayoutDto toDto(Payout row) {
         return new PayoutDto(row.getId(), row.getAmountCents(), row.getStatus(),
-                row.getCreatedAt().toEpochMilli(), row.getDestination());
+                row.getCreatedAt(), row.getDestination());
     }
 }

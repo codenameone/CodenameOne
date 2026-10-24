@@ -37,7 +37,6 @@ import com.codenameone.examples.savor.repository.CourierStateRepository;
 import com.codenameone.examples.savor.repository.DeliveryPassedRepository;
 
 import java.io.IOException;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -133,7 +132,7 @@ public class Matcher {
         double dLat = radiusMeters / Geo.METERS_PER_DEGREE;
         double shrink = Math.max(0.01d, Math.cos(Math.toRadians(lat)));
         double dLng = radiusMeters / (Geo.METERS_PER_DEGREE * shrink);
-        List<CourierState> boxed = couriers.freeInBox(Instant.now().minusMillis(FRESH_MILLIS),
+        List<CourierState> boxed = couriers.freeInBox(System.currentTimeMillis() - FRESH_MILLIS,
                 lat - dLat, lat + dLat, lng - dLng, lng + dLng, Applications.APPROVED, WITH_DELIVERY);
         List<CourierState> inReach = new ArrayList<CourierState>();
         List<String> names = new ArrayList<String>();

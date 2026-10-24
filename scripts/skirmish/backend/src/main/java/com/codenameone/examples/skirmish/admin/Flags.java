@@ -35,7 +35,6 @@ import com.codenameone.examples.skirmish.repository.FlagRepository;
 import com.codenameone.examples.skirmish.repository.MatchRecordRepository;
 import com.codenameone.examples.skirmish.repository.ProfileRepository;
 import java.io.IOException;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -116,7 +115,7 @@ public class Flags {
         f.setReason(reason);
         f.setMatchId(matchId);
         f.setReporter(reporter);
-        f.setCreatedAt(Instant.now());
+        f.setCreatedAt(Clock.now());
         f.setPending(true);
         flags.insert(f);
         Profile p = profiles.findById(username);
@@ -169,7 +168,7 @@ public class Flags {
 
     static FlagDto toDto(Flag f, Profile p) {
         return new FlagDto(f.getId(), f.getUsername(), p == null ? f.getUsername() : p.getDisplayName(),
-                f.getKind(), f.getReason(), f.getMatchId(), f.getReporter(), f.getCreatedAt().toEpochMilli(), f.isPending());
+                f.getKind(), f.getReason(), f.getMatchId(), f.getReporter(), f.getCreatedAt(), f.isPending());
     }
 }
 // end::skirmish-flags[]

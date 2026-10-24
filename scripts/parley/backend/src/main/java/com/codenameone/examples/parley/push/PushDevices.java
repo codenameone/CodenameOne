@@ -30,7 +30,6 @@ import com.codenameone.examples.parley.repository.ProfileRepository;
 import com.codenameone.examples.parley.repository.PushDeviceRepository;
 
 import java.io.IOException;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -116,7 +115,7 @@ public class PushDevices {
         while (held.size() >= MAX_PER_ACCOUNT) {
             PushDevice oldest = held.get(0);
             for (PushDevice each : held) {
-                if (each.getUpdatedAt().isBefore(oldest.getUpdatedAt())) {
+                if (each.getUpdatedAt() < oldest.getUpdatedAt()) {
                     oldest = each;
                 }
             }
@@ -169,7 +168,7 @@ public class PushDevices {
     private static void fill(PushDevice row, String username, PushDeviceDto device, long now) {
         row.setUsername(username);
         row.setPlatform(Text.optional(device.platform(), 32, "the platform"));
-        row.setUpdatedAt(Instant.ofEpochMilli(now));
+        row.setUpdatedAt(now);
     }
 
     /// The device as a target of the push service, which also spells its

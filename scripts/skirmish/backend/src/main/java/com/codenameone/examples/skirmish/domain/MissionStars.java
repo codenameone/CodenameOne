@@ -21,7 +21,6 @@ package com.codenameone.examples.skirmish.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
-import java.time.Instant;
 
 /// A player's best on one mission, and how many of those stars were paid for.
 @Entity
@@ -49,7 +48,7 @@ public class MissionStars {
     private int plays;
 
     @Column(nullable = false)
-    private Instant updatedAt = Instant.EPOCH;
+    private long updatedAt;
 
     public MissionStars() {
     }
@@ -110,11 +109,11 @@ public class MissionStars {
         this.plays = plays;
     }
 
-    public Instant getUpdatedAt() {
+    public long getUpdatedAt() {
         return updatedAt;
     }
 
-    public void setUpdatedAt(Instant updatedAt) {
+    public void setUpdatedAt(long updatedAt) {
         this.updatedAt = updatedAt;
     }
 }

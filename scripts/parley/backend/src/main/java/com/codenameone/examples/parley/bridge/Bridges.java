@@ -39,7 +39,6 @@ import com.codenameone.examples.parley.repository.BridgeLinkRepository;
 import com.codenameone.examples.parley.repository.MembershipRepository;
 
 import java.io.IOException;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -135,7 +134,7 @@ public class Bridges {
         link.setExternalChat(chat);
         link.setLabel(Text.optional(request.label(), 80, "the link's name"));
         link.setCreatedBy(username);
-        link.setCreatedAt(Instant.now());
+        link.setCreatedAt(System.currentTimeMillis());
         links.save(link);
         conversations.announce(row.getId(), "This conversation is now bridged to "
                 + name(bridge.network()) + ". Messages here are no longer end-to-end encrypted.");
@@ -175,8 +174,8 @@ public class Bridges {
                 return;
             }
             long now = System.currentTimeMillis();
-            events.deleteByReceivedAtLessThan(Instant.ofEpochMilli(now - EVENT_MEMORY_MILLIS));
-            events.insert(new BridgeEvent(key, Instant.ofEpochMilli(now)));
+            events.deleteByReceivedAtLessThan(now - EVENT_MEMORY_MILLIS);
+            events.insert(new BridgeEvent(key, now));
         }
         BridgeLink link = links.findByNetworkAndExternalChat(network, externalChat);
         if (link == null) {
@@ -233,6 +232,6 @@ public class Bridges {
 
     static BridgeLinkDto toDto(BridgeLink row) {
         return new BridgeLinkDto(row.getId(), row.getConversationId(), row.getNetwork(),
-                row.getExternalChat(), row.getLabel(), row.getCreatedAt().toEpochMilli());
+                row.getExternalChat(), row.getLabel(), row.getCreatedAt());
     }
 }

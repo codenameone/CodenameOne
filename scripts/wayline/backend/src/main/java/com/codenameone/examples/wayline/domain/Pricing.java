@@ -21,7 +21,6 @@ package com.codenameone.examples.wayline.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
-import java.time.Instant;
 
 /// The prices an admin set. One row, with the id 1, once they have set any.
 @Entity
@@ -58,7 +57,7 @@ public class Pricing {
     private double xl;
 
     @Column(nullable = false)
-    private Instant updatedAt = Instant.EPOCH;
+    private long updatedAt;
 
     @Column(nullable = false, type = "VARCHAR(190)")
     private String updatedBy = "";
@@ -146,11 +145,11 @@ public class Pricing {
         this.xl = xl;
     }
 
-    public Instant getUpdatedAt() {
+    public long getUpdatedAt() {
         return updatedAt;
     }
 
-    public void setUpdatedAt(Instant updatedAt) {
+    public void setUpdatedAt(long updatedAt) {
         this.updatedAt = updatedAt;
     }
 

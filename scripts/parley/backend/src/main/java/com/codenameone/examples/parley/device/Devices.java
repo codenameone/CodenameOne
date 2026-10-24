@@ -41,7 +41,6 @@ import com.codenameone.examples.parley.repository.OneTimePreKeyRepository;
 import com.codenameone.examples.parley.repository.ProfileRepository;
 
 import java.io.IOException;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -110,8 +109,8 @@ public class Devices {
         row.setSignedPreKeyId(signed.id());
         row.setSignedPreKey(signed.publicKey());
         row.setSignedPreKeySignature(signed.signature());
-        row.setCreatedAt(Instant.ofEpochMilli(now));
-        row.setLastSeenAt(Instant.ofEpochMilli(now));
+        row.setCreatedAt(now);
+        row.setLastSeenAt(now);
         devices.insert(row);
         store(row.getId(), request.oneTimePreKeys());
         return toDto(row);
@@ -198,8 +197,8 @@ public class Devices {
     @Transactional
     public void seen(String username, String device) {
         long now = System.currentTimeMillis();
-        devices.seen(device, Instant.ofEpochMilli(now));
-        profiles.seen(username, Instant.ofEpochMilli(now));
+        devices.seen(device, now);
+        profiles.seen(username, now);
     }
 
     /// The device, or a 404 when it is not the caller's: a device of somebody
@@ -297,7 +296,7 @@ public class Devices {
     }
 
     private static DeviceDto toDto(Device row) {
-        return new DeviceDto(row.getId(), row.getName(), row.getPlatform(), row.getCreatedAt().toEpochMilli(),
-                row.getLastSeenAt().toEpochMilli());
+        return new DeviceDto(row.getId(), row.getName(), row.getPlatform(), row.getCreatedAt(),
+                row.getLastSeenAt());
     }
 }

@@ -25,7 +25,6 @@ import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.wayline.api.RideState;
 import com.codenameone.examples.wayline.domain.RideEvent;
 
-import java.time.Instant;
 import java.util.List;
 
 /// What happened to each ride: one row for every state it came into.
@@ -43,5 +42,5 @@ public interface RideEventRepository extends CrudRepository<RideEvent, String> {
     /// rides are named by a nested query.
     @Query("select e.rideId, e.createdAt from RideEvent e where e.state = :state "
             + "and e.rideId in (select r.id from Ride r where r.requestedAt >= :since)")
-    List<Object[]> reached(@Param("since") Instant since, @Param("state") RideState state);
+    List<Object[]> reached(@Param("since") long since, @Param("state") RideState state);
 }

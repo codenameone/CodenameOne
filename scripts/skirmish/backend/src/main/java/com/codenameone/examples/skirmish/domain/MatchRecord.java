@@ -21,7 +21,6 @@ package com.codenameone.examples.skirmish.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
-import java.time.Instant;
 
 /// A finished match: who played, how it ended, and the replay that reproduces it.
 @Entity
@@ -61,7 +60,7 @@ public class MatchRecord {
     private int ticks;
 
     @Column(nullable = false)
-    private Instant endedAt = Instant.EPOCH;
+    private long endedAt;
 
     @Column(nullable = false, type = "VARCHAR(16)")
     private String rulesVersion = "";
@@ -160,11 +159,11 @@ public class MatchRecord {
         this.ticks = ticks;
     }
 
-    public Instant getEndedAt() {
+    public long getEndedAt() {
         return endedAt;
     }
 
-    public void setEndedAt(Instant endedAt) {
+    public void setEndedAt(long endedAt) {
         this.endedAt = endedAt;
     }
 

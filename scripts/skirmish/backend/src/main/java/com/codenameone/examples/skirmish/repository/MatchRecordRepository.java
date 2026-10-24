@@ -24,7 +24,6 @@ import com.codename1.orm.repository.Param;
 import com.codename1.orm.repository.Query;
 import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.skirmish.domain.MatchRecord;
-import java.time.Instant;
 import java.util.List;
 
 @Repository(entity = MatchRecord.class, key = String.class)
@@ -33,8 +32,8 @@ public interface MatchRecordRepository extends CrudRepository<MatchRecord, Strin
             + "order by m.endedAt desc, m.id asc")
     List<MatchRecord> of(@Param("u") String username, PageRequest page);
 
-    long countByEndedAtGreaterThan(Instant since);
+    long countByEndedAtGreaterThan(long since);
 
     @Query("select m from MatchRecord m where m.endedAt >= :since")
-    List<MatchRecord> since(@Param("since") Instant since);
+    List<MatchRecord> since(@Param("since") long since);
 }

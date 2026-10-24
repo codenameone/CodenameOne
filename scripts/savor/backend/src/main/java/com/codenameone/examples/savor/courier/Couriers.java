@@ -47,7 +47,6 @@ import com.codenameone.examples.savor.repository.DeliveryRepository;
 import com.codenameone.examples.savor.delivery.Matcher;
 
 import java.io.IOException;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -157,14 +156,14 @@ public class Couriers {
         // is, so the row read here stays managed and its change is written
         // either way; a statement marked clearAutomatically would detach it,
         // and a change made after that would be lost.
-        long since = state != null && state.isOnline() ? now - state.getLastSeen().toEpochMilli() : 0L;
+        long since = state != null && state.isOnline() ? now - state.getLastSeen() : 0L;
         boolean first = state == null;
         if (first) {
             state = new CourierState();
             state.setUsername(courier);
         }
         state.setOnline(status.online());
-        state.setLastSeen(Instant.ofEpochMilli(now));
+        state.setLastSeen(now);
         // Off line keeps the last position: there is none to report. A first
         // report stores whatever came with it.
         if (status.online() || first) {
@@ -283,10 +282,10 @@ public class Couriers {
         long now = System.currentTimeMillis();
         // The day's trips and the day's money from one query, so the header
         // that shows them together counts the deliveries that made the sum.
-        Object[] day = deliveries.paidTotalsSince(courier, Instant.ofEpochMilli(now - now % DAY_MILLIS));
+        Object[] day = deliveries.paidTotalsSince(courier, now - now % DAY_MILLIS);
         int todayCount = day == null ? 0 : (int) Rows.number(day[0]);
         long today = day == null ? 0L : Rows.number(day[1]);
-        long week = Rows.number(deliveries.paidSince(courier, Instant.ofEpochMilli(now - 7 * DAY_MILLIS)));
+        long week = Rows.number(deliveries.paidSince(courier, now - 7 * DAY_MILLIS));
         Object[] total = deliveries.paidTotals(courier);
         int count = total == null ? 0 : (int) Rows.number(total[0]);
         long all = total == null ? 0L : Rows.number(total[1]);
@@ -306,7 +305,7 @@ public class Couriers {
         double rating = 5d;
         long lastSeen = 0L;
         if (car != null) {
-            lastSeen = car.getLastSeen().toEpochMilli();
+            lastSeen = car.getLastSeen();
             // On line means said so and heard from lately; see Matcher.
             online = car.isOnline()
                     && System.currentTimeMillis() - lastSeen < Matcher.FRESH_MILLIS;

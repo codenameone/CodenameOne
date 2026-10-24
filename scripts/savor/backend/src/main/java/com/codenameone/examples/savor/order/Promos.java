@@ -25,7 +25,6 @@ import com.codename1.orm.repository.PageRequest;
 import com.codenameone.examples.savor.api.PromoDto;
 import com.codenameone.examples.savor.domain.Promo;
 import com.codenameone.examples.savor.repository.PromoRepository;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -78,7 +77,7 @@ public class Promos {
         if (unsaved) {
             row = new Promo();
             row.setCode(code);
-            row.setCreatedAt(Instant.now());
+            row.setCreatedAt(System.currentTimeMillis());
         }
         row.setPercentOff(form.percentOff());
         row.setAmountOffCents(form.amountOffCents());

@@ -21,7 +21,6 @@ package com.codenameone.examples.savor.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
-import java.time.Instant;
 
 /// One thing an admin did to an account, and why. Written once, never changed.
 @Entity
@@ -34,7 +33,7 @@ public class ModerationEvent {
     private String username = "";
 
     @Column(nullable = false)
-    private Instant createdAt = Instant.EPOCH;
+    private long createdAt;
 
     @Column(nullable = false, type = "VARCHAR(190)")
     private String actor = "";
@@ -64,11 +63,11 @@ public class ModerationEvent {
         this.username = username;
     }
 
-    public Instant getCreatedAt() {
+    public long getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(Instant createdAt) {
+    public void setCreatedAt(long createdAt) {
         this.createdAt = createdAt;
     }
 

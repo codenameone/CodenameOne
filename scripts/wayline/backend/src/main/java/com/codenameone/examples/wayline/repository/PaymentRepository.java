@@ -26,7 +26,6 @@ import com.codename1.orm.repository.Query;
 import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.wayline.domain.Payment;
 
-import java.time.Instant;
 import java.util.List;
 
 /// What each ride was charged, keyed by the ride.
@@ -46,5 +45,5 @@ public interface PaymentRepository extends CrudRepository<Payment, String> {
     @Query("update Payment p set p.status = :status, p.refundedAt = :at "
             + "where p.rideId = :id and p.status = 'REFUND_PENDING'")
     int endRefund(@Param("id") String rideId, @Param("status") String status,
-            @Param("at") Instant at);
+            @Param("at") long at);
 }

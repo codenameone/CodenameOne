@@ -24,7 +24,6 @@ import com.codename1.orm.repository.Param;
 import com.codename1.orm.repository.Query;
 import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.wayline.domain.PaymentSetup;
-import java.time.Instant;
 
 /// The card setups accounts began with the payment processor.
 @Repository(entity = PaymentSetup.class, key = String.class)
@@ -40,7 +39,7 @@ public interface PaymentSetupRepository extends CrudRepository<PaymentSetup, Str
     int claim(@Param("id") String id);
 
     /// How many setups an account began after `since` and has not finished.
-    long countByUsernameAndCompletedFalseAndCreatedAtGreaterThan(String username, Instant since);
+    long countByUsernameAndCompletedFalseAndCreatedAtGreaterThan(String username, long since);
 
     int deleteByUsername(String username);
 
@@ -48,5 +47,5 @@ public interface PaymentSetupRepository extends CrudRepository<PaymentSetup, Str
     int deleteByCompletedTrue();
 
     /// Deletes the setups begun before `before`, finished or not.
-    int deleteByCreatedAtLessThan(Instant before);
+    int deleteByCreatedAtLessThan(long before);
 }

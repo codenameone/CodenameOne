@@ -21,7 +21,6 @@ package com.codenameone.examples.wayline.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
-import java.time.Instant;
 
 /// A document an applicant uploaded, one of each kind. `data` is the file in
 /// Base64, which is text on every database.
@@ -42,7 +41,7 @@ public class DriverDocument {
     private String status = "";
 
     @Column(nullable = false)
-    private Instant uploadedAt = Instant.EPOCH;
+    private long uploadedAt;
 
     @Column(nullable = false)
     private String data = "";
@@ -82,11 +81,11 @@ public class DriverDocument {
         this.status = status;
     }
 
-    public Instant getUploadedAt() {
+    public long getUploadedAt() {
         return uploadedAt;
     }
 
-    public void setUploadedAt(Instant uploadedAt) {
+    public void setUploadedAt(long uploadedAt) {
         this.uploadedAt = uploadedAt;
     }
 

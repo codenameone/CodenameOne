@@ -21,7 +21,6 @@ package com.codenameone.examples.parley.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
-import java.time.Instant;
 
 /// An account's profile photo.
 @Entity
@@ -34,7 +33,7 @@ public class ProfilePhoto {
     private String contentType = "";
 
     @Column(nullable = false)
-    private Instant updatedAt = Instant.EPOCH;
+    private long updatedAt;
 
     @Column(nullable = false)
     private byte[] data = new byte[0];
@@ -58,11 +57,11 @@ public class ProfilePhoto {
         this.contentType = contentType;
     }
 
-    public Instant getUpdatedAt() {
+    public long getUpdatedAt() {
         return updatedAt;
     }
 
-    public void setUpdatedAt(Instant updatedAt) {
+    public void setUpdatedAt(long updatedAt) {
         this.updatedAt = updatedAt;
     }
 

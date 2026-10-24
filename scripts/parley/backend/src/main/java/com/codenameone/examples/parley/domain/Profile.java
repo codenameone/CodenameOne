@@ -21,7 +21,6 @@ package com.codenameone.examples.parley.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
-import java.time.Instant;
 
 /// An account's profile: who it is to the people it talks to.
 ///
@@ -49,10 +48,10 @@ public class Profile {
     private boolean hasPhoto;
 
     @Column(nullable = false)
-    private Instant createdAt = Instant.EPOCH;
+    private long createdAt;
 
     @Column(nullable = false)
-    private Instant lastSeenAt = Instant.EPOCH;
+    private long lastSeenAt;
 
     @Column(nullable = false, type = "VARCHAR(8)")
     private String language = "";
@@ -114,19 +113,19 @@ public class Profile {
         this.hasPhoto = hasPhoto;
     }
 
-    public Instant getCreatedAt() {
+    public long getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(Instant createdAt) {
+    public void setCreatedAt(long createdAt) {
         this.createdAt = createdAt;
     }
 
-    public Instant getLastSeenAt() {
+    public long getLastSeenAt() {
         return lastSeenAt;
     }
 
-    public void setLastSeenAt(Instant lastSeenAt) {
+    public void setLastSeenAt(long lastSeenAt) {
         this.lastSeenAt = lastSeenAt;
     }
 

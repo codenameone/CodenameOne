@@ -21,7 +21,6 @@ package com.codenameone.examples.parley.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
-import java.time.Instant;
 
 /// One device of an account, with the public keys it published. Private keys
 /// never leave the device; the server hands these out so others can open
@@ -54,10 +53,10 @@ public class Device {
     private String signedPreKeySignature = "";
 
     @Column(nullable = false)
-    private Instant createdAt = Instant.EPOCH;
+    private long createdAt;
 
     @Column(nullable = false)
-    private Instant lastSeenAt = Instant.EPOCH;
+    private long lastSeenAt;
 
     public Device() {
     }
@@ -126,19 +125,19 @@ public class Device {
         this.signedPreKeySignature = signedPreKeySignature;
     }
 
-    public Instant getCreatedAt() {
+    public long getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(Instant createdAt) {
+    public void setCreatedAt(long createdAt) {
         this.createdAt = createdAt;
     }
 
-    public Instant getLastSeenAt() {
+    public long getLastSeenAt() {
         return lastSeenAt;
     }
 
-    public void setLastSeenAt(Instant lastSeenAt) {
+    public void setLastSeenAt(long lastSeenAt) {
         this.lastSeenAt = lastSeenAt;
     }
 }

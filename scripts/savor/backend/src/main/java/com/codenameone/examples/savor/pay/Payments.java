@@ -48,7 +48,6 @@ import com.codenameone.examples.savor.repository.CustomerOrderRepository;
 import com.codenameone.examples.savor.repository.DeliveryRepository;
 
 import java.io.IOException;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -212,7 +211,7 @@ public class Payments {
     /// that are neither finished nor abandoned.
     private void refuseTooManySetups(String username) {
         if (setups.countByUsernameAndCompletedFalseAndCreatedAtGreaterThan(username,
-                Instant.now().minusMillis(SETUP_MILLIS)) >= MAX_OPEN_SETUPS) {
+                System.currentTimeMillis() - SETUP_MILLIS) >= MAX_OPEN_SETUPS) {
             throw new ResponseStatusException(429,
                     "Too many cards are being added. Finish one, or try again later");
         }
@@ -229,7 +228,7 @@ public class Payments {
     @Transactional
     public void sweepSetups() throws IOException {
         setups.deleteByCompletedTrue();
-        setups.deleteByCreatedAtLessThan(Instant.now().minusMillis(2L * SETUP_MILLIS));
+        setups.deleteByCreatedAtLessThan(System.currentTimeMillis() - 2L * SETUP_MILLIS);
     }
 
     /// Keeps the reference the processor made for a customer on first use, and
@@ -277,7 +276,7 @@ public class Payments {
         row.setId(id);
         row.setUsername(username);
         row.setReference(reference);
-        row.setCreatedAt(Instant.now());
+        row.setCreatedAt(System.currentTimeMillis());
         row.setCompleted(false);
         setups.insert(row);
     }
@@ -340,7 +339,7 @@ public class Payments {
         PaymentSetup setup = setupId == null || setupId.length() == 0 || setupId.length() > 32
                 ? null : setups.findFirstByIdAndUsername(setupId, username);
         if (setup == null || setup.isCompleted()
-                || setup.getCreatedAt().plusMillis(SETUP_MILLIS).isBefore(Instant.now())) {
+                || setup.getCreatedAt() < System.currentTimeMillis() - SETUP_MILLIS) {
             throw new ResponseStatusException(404, "No such card setup");
         }
         PaymentCustomer customer = customers.findById(username);
@@ -369,9 +368,8 @@ public class Payments {
         // Cards are listed in the order they were added, and two added in the
         // same millisecond would have no order: the later is stamped after
         // the one before it.
-        Instant newest = cards.newestAt(username);
-        Instant now = Instant.now();
-        Instant after = newest == null ? Instant.EPOCH : newest.plusMillis(1L);
+        Long newest = cards.newestAt(username);
+        long after = newest == null ? 0L : newest.longValue() + 1L;
         PaymentMethod row = new PaymentMethod();
         row.setId(id);
         row.setUsername(username);
@@ -381,7 +379,7 @@ public class Payments {
         row.setExpYear(card.expYear);
         row.setToken(card.token);
         row.setPreferred(first);
-        row.setCreatedAt(after.isAfter(now) ? after : now);
+        row.setCreatedAt(Math.max(System.currentTimeMillis(), after));
         cards.insert(row);
         return card(row);
     }
@@ -511,8 +509,8 @@ public class Payments {
         }
     }
 
-    private static Instant retriedSince() {
-        return Instant.now().minusMillis(RETRY_MILLIS);
+    private static long retriedSince() {
+        return System.currentTimeMillis() - RETRY_MILLIS;
     }
 
     // --------------------------------------------------------------- charges
@@ -593,7 +591,7 @@ public class Payments {
 
     @Transactional
     private void orderPaymentStatus(String id, String status) {
-        orders.paymentStatus(id, status, Instant.now());
+        orders.paymentStatus(id, status, System.currentTimeMillis());
     }
 
     /// Writes what came of a delivery's payment to the delivery and to its
@@ -602,7 +600,7 @@ public class Payments {
     /// caller's transaction.
     private void paymentStatus(String deliveryId, String status) {
         deliveries.paymentStatus(deliveryId, status);
-        orders.paymentStatus(deliveryId, status, Instant.now());
+        orders.paymentStatus(deliveryId, status, System.currentTimeMillis());
     }
 
     /// Settles a delivery that has just completed and returns [#PAID], [#FAILED],
@@ -677,7 +675,7 @@ public class Payments {
         row.setCurrency(currency);
         row.setStatus(status);
         row.setProviderRef(reference);
-        row.setCreatedAt(Instant.now());
+        row.setCreatedAt(System.currentTimeMillis());
         payments.insert(row);
     }
 
@@ -871,7 +869,7 @@ public class Payments {
     @Transactional
     private Delivery endRefund(String deliveryId, String outcome) {
         if (payments.endRefund(deliveryId, outcome,
-                REFUNDED.equals(outcome) ? Instant.now() : Instant.EPOCH) != 1) {
+                REFUNDED.equals(outcome) ? System.currentTimeMillis() : 0L) != 1) {
             return null;
         }
         paymentStatus(deliveryId, outcome);
@@ -993,7 +991,7 @@ public class Payments {
         payment.setRefundRef(cut(fare.reference, 64));
         payment.setTipRefundRef(tip == null ? "" : cut(tip.reference, 64));
         payment.setRefundReason(reason);
-        payment.setRefundedAt(pending ? Instant.EPOCH : Instant.now());
+        payment.setRefundedAt(pending ? 0L : System.currentTimeMillis());
     }
 
     /// Records a refund of the fare whose tip could not be refunded: the delivery
@@ -1006,7 +1004,7 @@ public class Payments {
         payment.setRefundRef(cut(fare.reference, 64));
         payment.setTipRefundRef("");
         payment.setRefundReason(reason);
-        payment.setRefundedAt(Instant.EPOCH);
+        payment.setRefundedAt(0L);
     }
 
     // -------------------------------------------------------------- receipts
@@ -1043,7 +1041,7 @@ public class Payments {
             throw new ResponseStatusException(404, "No such receipt");
         }
         Payment payment = payments.findById(deliveryId);
-        return receipt(delivery, payment == null ? 0L : payment.getCreatedAt().toEpochMilli(), admin,
+        return receipt(delivery, payment == null ? 0L : payment.getCreatedAt(), admin,
                 new HashMap<String, Profile>());
     }
 
@@ -1060,7 +1058,7 @@ public class Payments {
             List<Payment> rows = payments.findByDeliveryIdIn(ids);
             for (int iter = 0; iter < rows.size(); iter++) {
                 Payment payment = rows.get(iter);
-                paidAt.put(payment.getDeliveryId(), Long.valueOf(payment.getCreatedAt().toEpochMilli()));
+                paidAt.put(payment.getDeliveryId(), Long.valueOf(payment.getCreatedAt()));
             }
         }
         Map<String, Profile> couriers = new HashMap<String, Profile>();
@@ -1254,7 +1252,7 @@ public class Payments {
     /// A card tip left unknown counts too, with no time limit: see [#tip].
     /// Its retry charges the delivery's card under the same key, so with the card
     /// gone a tip that may have been charged would be cleared as refused.
-    private boolean awaitsCharge(String customer, String methodId, Instant since) {
+    private boolean awaitsCharge(String customer, String methodId, long since) {
         List<Delivery> tipped = deliveries.findByCustomerAndPaymentStatusAndTipCentsGreaterThan(customer, PAID,
                 0L);
         for (Delivery delivery : tipped) {

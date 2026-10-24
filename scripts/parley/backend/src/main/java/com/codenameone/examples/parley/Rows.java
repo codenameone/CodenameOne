@@ -18,7 +18,7 @@
  */
 package com.codenameone.examples.parley;
 
-import java.time.Instant;
+
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,17 +37,6 @@ public final class Rows {
     /// number.
     public static long number(Object value) {
         return value instanceof Number ? ((Number) value).longValue() : 0L;
-    }
-
-    /// A timestamp column as epoch milliseconds. Anything but an `Instant`
-    /// means the query selected something other than a timestamp, which is
-    /// a bug to see rather than a zero to chart.
-    public static long millis(Object value) {
-        if (value instanceof Instant) {
-            return ((Instant) value).toEpochMilli();
-        }
-        throw new IllegalStateException("Expected a java.time.Instant column but got "
-                + (value == null ? "null" : value.getClass().getName()));
     }
 
     /// A column as text; empty for null.

@@ -21,7 +21,6 @@ package com.codenameone.examples.savor.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
-import java.time.Instant;
 
 /// A place a customer has kept to be delivered to.
 @Entity
@@ -49,7 +48,7 @@ public class SavedAddress {
     private String note = "";
 
     @Column(nullable = false)
-    private Instant createdAt = Instant.EPOCH;
+    private long createdAt;
 
     public SavedAddress() {
     }
@@ -110,11 +109,11 @@ public class SavedAddress {
         this.note = note;
     }
 
-    public Instant getCreatedAt() {
+    public long getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(Instant createdAt) {
+    public void setCreatedAt(long createdAt) {
         this.createdAt = createdAt;
     }
 }

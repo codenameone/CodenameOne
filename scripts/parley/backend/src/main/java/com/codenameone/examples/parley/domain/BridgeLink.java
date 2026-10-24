@@ -21,7 +21,6 @@ package com.codenameone.examples.parley.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
-import java.time.Instant;
 
 /// A Parley conversation linked to a chat on Telegram or WhatsApp.
 @Entity
@@ -46,7 +45,7 @@ public class BridgeLink {
     private String createdBy = "";
 
     @Column(nullable = false)
-    private Instant createdAt = Instant.EPOCH;
+    private long createdAt;
 
     public BridgeLink() {
     }
@@ -99,11 +98,11 @@ public class BridgeLink {
         this.createdBy = createdBy;
     }
 
-    public Instant getCreatedAt() {
+    public long getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(Instant createdAt) {
+    public void setCreatedAt(long createdAt) {
         this.createdAt = createdAt;
     }
 }

@@ -28,7 +28,6 @@ import com.codenameone.examples.skirmish.domain.GameTicket;
 import com.codenameone.examples.skirmish.repository.GameTicketRepository;
 
 import java.io.IOException;
-import java.time.Instant;
 
 /// Tickets for the live channel.
 ///
@@ -59,7 +58,7 @@ public class GameTickets {
         GameTicket row = new GameTicket();
         row.setTicketHash(Ids.sha256(ticket));
         row.setUsername(username);
-        row.setExpiresAt(Instant.now().plusMillis(TICKET_SECONDS * 1000L));
+        row.setExpiresAt(System.currentTimeMillis() + TICKET_SECONDS * 1000L);
         tickets.insert(row);
         return new TicketDto(ticket, TICKET_SECONDS);
     }
@@ -79,11 +78,11 @@ public class GameTickets {
             return null;
         }
         String username = row.getUsername();
-        Instant expiresAt = row.getExpiresAt();
+        long expiresAt = row.getExpiresAt();
         // One delete statement: the count it answers is what says this
         // connection, and not another presenting the same ticket, used it.
         int removed = tickets.deleteByTicketHash(hash);
-        if (removed != 1 || expiresAt.isBefore(Instant.now())) {
+        if (removed != 1 || expiresAt < System.currentTimeMillis()) {
             return null;
         }
         return username;
@@ -93,7 +92,7 @@ public class GameTickets {
     @Scheduled(fixedDelay = 60000, initialDelay = 60000)
     @Transactional
     public void sweep() throws IOException {
-        tickets.deleteByExpiresAtLessThan(Instant.now());
+        tickets.deleteByExpiresAtLessThan(System.currentTimeMillis());
     }
 
     /// Forgets the tickets of an account that is being closed.

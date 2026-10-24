@@ -40,7 +40,6 @@ import com.codenameone.examples.wayline.ride.DemoRides;
 import com.codenameone.examples.wayline.ride.Fares;
 
 import java.io.IOException;
-import java.time.Instant;
 
 /// The accounts a server starts with.
 ///
@@ -170,7 +169,7 @@ public class DemoAccounts {
         profile.setFlagged(true);
         profile.setFlagReason(why);
         moderation.record(username, ADMIN, Moderation.FLAG, why,
-                Instant.now().minusMillis(daysAgo * Days.MILLIS));
+                System.currentTimeMillis() - daysAgo * Days.MILLIS);
     }
 
     /// An admin, or the plainest kind of account.
@@ -232,7 +231,7 @@ public class DemoAccounts {
     void approved(String username, String name, String product, String colour, String make,
             String model, String plate, int seats, boolean wheelchair, boolean pets, int daysAgo)
             throws IOException {
-        Instant handedIn = Instant.now().minusMillis((daysAgo + 1) * Days.MILLIS);
+        long handedIn = System.currentTimeMillis() - (daysAgo + 1) * Days.MILLIS;
         DriverApplication form = forms.findById(username);
         form.setLegalName(name);
         form.setDateOfBirth("1988-04-12");
@@ -292,13 +291,13 @@ public class DemoAccounts {
     @Transactional(rollbackFor = IOException.class)
     void handedIn(String username, int daysAgo) throws IOException {
         DriverApplication form = forms.findById(username);
-        form.setSubmittedAt(Instant.now().minusMillis(daysAgo * Days.MILLIS));
+        form.setSubmittedAt(System.currentTimeMillis() - daysAgo * Days.MILLIS);
     }
 
     /// When an account opened that many days ago was opened, so that the chart
     /// of new accounts is not one bar.
-    private static Instant opened(int daysAgo) {
-        return Instant.now().minusMillis(daysAgo * Days.MILLIS);
+    private static long opened(int daysAgo) {
+        return System.currentTimeMillis() - daysAgo * Days.MILLIS;
     }
 
     private static int year() {

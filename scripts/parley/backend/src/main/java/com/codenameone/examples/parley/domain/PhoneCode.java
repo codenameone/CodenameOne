@@ -21,7 +21,6 @@ package com.codenameone.examples.parley.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
-import java.time.Instant;
 
 /// The verification code an account was last sent, as its hash.
 @Entity
@@ -34,20 +33,20 @@ public class PhoneCode {
     private String codeHash = "";
 
     @Column(nullable = false)
-    private Instant expiresAt = Instant.EPOCH;
+    private long expiresAt;
 
     @Column(nullable = false)
     private int attempts;
 
     @Column(nullable = false)
-    private Instant sentAt = Instant.EPOCH;
+    private long sentAt;
 
     /// The code sent before this one, while it is still good, or empty.
     @Column(nullable = false, type = "VARCHAR(64)")
     private String previousHash = "";
 
     @Column(nullable = false)
-    private Instant previousExpiresAt = Instant.EPOCH;
+    private long previousExpiresAt;
 
     /// The guesses already taken at the code before, which keeps the budget
     /// it had rather than starting a new one when another code is sent.
@@ -73,11 +72,11 @@ public class PhoneCode {
         this.codeHash = codeHash;
     }
 
-    public Instant getExpiresAt() {
+    public long getExpiresAt() {
         return expiresAt;
     }
 
-    public void setExpiresAt(Instant expiresAt) {
+    public void setExpiresAt(long expiresAt) {
         this.expiresAt = expiresAt;
     }
 
@@ -89,11 +88,11 @@ public class PhoneCode {
         this.attempts = attempts;
     }
 
-    public Instant getSentAt() {
+    public long getSentAt() {
         return sentAt;
     }
 
-    public void setSentAt(Instant sentAt) {
+    public void setSentAt(long sentAt) {
         this.sentAt = sentAt;
     }
 
@@ -105,11 +104,11 @@ public class PhoneCode {
         this.previousHash = previousHash;
     }
 
-    public Instant getPreviousExpiresAt() {
+    public long getPreviousExpiresAt() {
         return previousExpiresAt;
     }
 
-    public void setPreviousExpiresAt(Instant previousExpiresAt) {
+    public void setPreviousExpiresAt(long previousExpiresAt) {
         this.previousExpiresAt = previousExpiresAt;
     }
 

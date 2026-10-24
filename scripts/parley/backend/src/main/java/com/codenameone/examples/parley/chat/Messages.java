@@ -49,7 +49,6 @@ import com.codenameone.examples.parley.repository.OneTimePreKeyRepository;
 import com.codenameone.examples.parley.repository.ProfileRepository;
 
 import java.io.IOException;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.HashMap;
@@ -152,7 +151,7 @@ public class Messages {
             logId = Ids.sha256(username + "/" + clientId);
             MessageLog seen = log.findById(logId);
             if (seen != null) {
-                return new SendResultDto(seen.getMessageId(), seen.getSentAt().toEpochMilli(),
+                return new SendResultDto(seen.getMessageId(), seen.getSentAt(),
                         new ArrayList<DeviceAddressDto>(), new ArrayList<DeviceAddressDto>());
             }
         }
@@ -237,7 +236,7 @@ public class Messages {
         fanout.deliver(batch, wake, group);
         if (MESSAGE.equals(kind)) {
             record(logId, messageId, id, username, kind, now);
-            conversationRows.touched(id, Instant.ofEpochMilli(now));
+            conversationRows.touched(id, now);
         }
         return new SendResultDto(messageId, now, missing, stale);
     }
@@ -259,7 +258,7 @@ public class Messages {
         String messageId = fanout.plain(row.getId(), username, message.senderDevice(), MESSAGE,
                 to, text, expiresAt, group);
         record(logId, messageId, row.getId(), username, kind, now);
-        conversationRows.touched(row.getId(), Instant.ofEpochMilli(now));
+        conversationRows.touched(row.getId(), now);
         Profile profile = profiles.findById(username);
         relays.posted(row.getId(), username, profile == null ? username : profile.getDisplayName(),
                 text);
@@ -279,7 +278,7 @@ public class Messages {
                 !Conversations.DIRECT.equals(row.getKind()));
         record(Ids.sha256(sender + "/" + messageId), messageId, conversationId, sender, MESSAGE,
                 now);
-        conversationRows.touched(conversationId, Instant.ofEpochMilli(now));
+        conversationRows.touched(conversationId, now);
         return messageId;
     }
 
@@ -315,10 +314,10 @@ public class Messages {
     @Transactional
     public void reap() {
         long now = System.currentTimeMillis();
-        envelopes.expire(Instant.ofEpochMilli(now), Instant.EPOCH);
-        envelopes.deleteBySentAtLessThan(Instant.ofEpochMilli(now - UNCLAIMED));
-        media.deleteByCreatedAtLessThan(Instant.ofEpochMilli(now - UNCLAIMED));
-        log.deleteBySentAtLessThan(Instant.ofEpochMilli(now - 90L * 24 * 60 * 60 * 1000));
+        envelopes.expire(now);
+        envelopes.deleteBySentAtLessThan(now - UNCLAIMED);
+        media.deleteByCreatedAtLessThan(now - UNCLAIMED);
+        log.deleteBySentAtLessThan(now - 90L * 24 * 60 * 60 * 1000);
     }
 
     private void record(String logId, String messageId, String conversationId, String sender,
@@ -332,7 +331,7 @@ public class Messages {
         row.setConversationId(conversationId);
         row.setSender(sender);
         row.setKind(kind);
-        row.setSentAt(Instant.ofEpochMilli(now));
+        row.setSentAt(now);
         log.insert(row);
     }
 

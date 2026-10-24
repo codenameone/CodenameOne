@@ -35,7 +35,6 @@ import com.codenameone.examples.skirmish.rules.Match;
 import com.codenameone.examples.skirmish.rules.RulesVersion;
 import com.codenameone.examples.skirmish.social.Referrals;
 import java.io.IOException;
-import java.time.Instant;
 
 /// Records a finished match: the replay, and what it did to each player.
 // tag::skirmish-results[]
@@ -135,7 +134,7 @@ public class Results {
             p.setTrophies(p.getTrophies() + trophies);
             p.setCoins(p.getCoins() + coins);
             p.setLeftStreak(room.forfeit == i ? p.getLeftStreak() + 1 : 0);
-            p.setLastSeen(Instant.now());
+            p.setLastSeen(Clock.now());
             progression.afterMatch(p, result == i, result == Match.DRAW, room.match.player(i).crowns(),
                     cards[i], spells[i]);
             profiles.save(p);
@@ -153,7 +152,7 @@ public class Results {
         m.setTrophies0(out[0].trophies);
         m.setTrophies1(out[1].trophies);
         m.setTicks(room.match.tick());
-        m.setEndedAt(Instant.now());
+        m.setEndedAt(Clock.now());
         m.setRulesVersion(RulesVersion.ID);
         m.setReplay(replay.encode());
         matches.insert(m);

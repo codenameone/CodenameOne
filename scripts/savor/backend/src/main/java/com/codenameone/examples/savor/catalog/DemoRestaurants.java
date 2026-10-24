@@ -42,7 +42,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.time.Instant;
 
 /// The restaurants a development server starts with: a dozen around San
 /// Francisco's waterfront, one per cuisine on the home screen's row, each with
@@ -267,8 +266,8 @@ public class DemoRestaurants {
             restaurant.setPhotoId(photoFor(RESTAURANT_PHOTOS, restaurant.getId(), restaurant.getId()));
             restaurant.setApplicant(iter == 0 ? merchant : "");
             restaurant.setReason("");
-            restaurant.setCreatedAt(Instant.ofEpochMilli(now - (60 - iter) * 86400000L));
-            restaurant.setUpdatedAt(Instant.ofEpochMilli(now));
+            restaurant.setCreatedAt(now - (60 - iter) * 86400000L);
+            restaurant.setUpdatedAt(now);
             restaurants.insert(restaurant);
             menu(restaurant.getId(), MENUS[iter]);
         }
@@ -292,8 +291,8 @@ public class DemoRestaurants {
         waiting.setPhotoId("");
         waiting.setApplicant("");
         waiting.setReason("");
-        waiting.setCreatedAt(Instant.ofEpochMilli(now - 2L * 86400000L));
-        waiting.setUpdatedAt(Instant.ofEpochMilli(now - 2L * 86400000L));
+        waiting.setCreatedAt(now - 2L * 86400000L);
+        waiting.setUpdatedAt(now - 2L * 86400000L);
         restaurants.insert(waiting);
 
         promo("WELCOME10", 10, 0L, 1500L, now);
@@ -372,7 +371,7 @@ public class DemoRestaurants {
         row.setRestaurantId(restaurantId);
         row.setContentType(type);
         row.setData(read(file));
-        row.setCreatedAt(Instant.now());
+        row.setCreatedAt(System.currentTimeMillis());
         photos.insert(row);
         return id;
     }
@@ -396,7 +395,7 @@ public class DemoRestaurants {
         promo.setAmountOffCents(amount);
         promo.setMinimumCents(minimum);
         promo.setActive(true);
-        promo.setCreatedAt(Instant.ofEpochMilli(now));
+        promo.setCreatedAt(now);
         promos.insert(promo);
     }
 

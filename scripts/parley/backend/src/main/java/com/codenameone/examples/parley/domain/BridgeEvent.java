@@ -21,7 +21,6 @@ package com.codenameone.examples.parley.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
-import java.time.Instant;
 
 /// A webhook event already posted, keyed by the network and its own id for
 /// the event. Telegram and WhatsApp retry a delivery whose answer they did
@@ -33,12 +32,12 @@ public class BridgeEvent {
     private String id = "";
 
     @Column(nullable = false)
-    private Instant receivedAt = Instant.EPOCH;
+    private long receivedAt;
 
     public BridgeEvent() {
     }
 
-    public BridgeEvent(String id, Instant receivedAt) {
+    public BridgeEvent(String id, long receivedAt) {
         this.id = id;
         this.receivedAt = receivedAt;
     }
@@ -51,11 +50,11 @@ public class BridgeEvent {
         this.id = id;
     }
 
-    public Instant getReceivedAt() {
+    public long getReceivedAt() {
         return receivedAt;
     }
 
-    public void setReceivedAt(Instant receivedAt) {
+    public void setReceivedAt(long receivedAt) {
         this.receivedAt = receivedAt;
     }
 }

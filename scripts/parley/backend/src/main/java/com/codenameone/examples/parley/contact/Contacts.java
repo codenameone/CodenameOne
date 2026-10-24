@@ -45,7 +45,6 @@ import com.codenameone.examples.parley.repository.ProfileRepository;
 import com.codenameone.examples.parley.repository.ReportRepository;
 
 import java.io.IOException;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -147,7 +146,7 @@ public class Contacts {
             row.setId(id);
             row.setBlocker(viewer);
             row.setBlocked(username);
-            row.setCreatedAt(Instant.now());
+            row.setCreatedAt(System.currentTimeMillis());
             blocks.insert(row);
         }
         return view(viewer, profile, peers(viewer));
@@ -186,7 +185,7 @@ public class Contacts {
         row.setConversationId(Text.optional(report.conversationId(), 32, "the conversation"));
         row.setReason(Text.required(report.reason(), 255, "why you are reporting them"));
         row.setEvidence(Text.optional(report.evidence(), 4000, "the messages you attach"));
-        row.setCreatedAt(Instant.now());
+        row.setCreatedAt(System.currentTimeMillis());
         row.setStatus("OPEN");
         reports.insert(row);
         java.util.Map<String, Object> frame = new java.util.LinkedHashMap<String, Object>();
@@ -218,7 +217,7 @@ public class Contacts {
 
     public static ReportViewDto toDto(Report row) {
         return new ReportViewDto(row.getId(), row.getReporter(), row.getSubject(),
-                row.getConversationId(), row.getReason(), row.getEvidence(), row.getCreatedAt().toEpochMilli(),
+                row.getConversationId(), row.getReason(), row.getEvidence(), row.getCreatedAt(),
                 row.getStatus());
     }
 
@@ -236,12 +235,12 @@ public class Contacts {
             row = new ProfilePhoto();
             row.setUsername(username);
             row.setContentType(photo.contentType());
-            row.setUpdatedAt(Instant.now());
+            row.setUpdatedAt(System.currentTimeMillis());
             row.setData(data);
             photos.insert(row);
         } else {
             row.setContentType(photo.contentType());
-            row.setUpdatedAt(Instant.now());
+            row.setUpdatedAt(System.currentTimeMillis());
             row.setData(data);
         }
         profile.setHasPhoto(true);
@@ -269,7 +268,7 @@ public class Contacts {
         boolean reciprocal = mine == null || !NOBODY.equals(mine.getLastSeen());
         if (reciprocal && allowed(viewer, profile,
                 theirs == null ? EVERYONE : theirs.getLastSeen(), peers)) {
-            lastSeen = live.online(username) ? -1L : profile.getLastSeenAt().toEpochMilli();
+            lastSeen = live.online(username) ? -1L : profile.getLastSeenAt();
         }
         boolean photo = profile.isHasPhoto()
                 && allowed(viewer, profile, photoSetting(username), peers);

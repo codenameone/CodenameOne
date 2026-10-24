@@ -21,7 +21,6 @@ package com.codenameone.examples.savor.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
-import java.time.Instant;
 
 /// The Live Activity a customer's phone shows a delivery in, while the delivery lasts.
 @Entity
@@ -39,12 +38,12 @@ public class DeliveryActivity {
 
     /// When the server last sent it a state, for spacing out the updates.
     @Column(nullable = false)
-    private Instant sentAt = Instant.EPOCH;
+    private long sentAt;
 
     /// When its delivery ended, 0 while the delivery lasts. An ended activity is kept
     /// until the phone has been told to end it.
     @Column(nullable = false)
-    private Instant endedAt = Instant.EPOCH;
+    private long endedAt;
 
     public DeliveryActivity() {
     }
@@ -73,19 +72,19 @@ public class DeliveryActivity {
         this.activityId = activityId;
     }
 
-    public Instant getSentAt() {
+    public long getSentAt() {
         return sentAt;
     }
 
-    public void setSentAt(Instant sentAt) {
+    public void setSentAt(long sentAt) {
         this.sentAt = sentAt;
     }
 
-    public Instant getEndedAt() {
+    public long getEndedAt() {
         return endedAt;
     }
 
-    public void setEndedAt(Instant endedAt) {
+    public void setEndedAt(long endedAt) {
         this.endedAt = endedAt;
     }
 }

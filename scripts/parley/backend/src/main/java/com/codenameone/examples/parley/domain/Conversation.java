@@ -21,7 +21,6 @@ package com.codenameone.examples.parley.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
-import java.time.Instant;
 
 /// A direct chat, a group or a channel.
 @Entity
@@ -52,10 +51,10 @@ public class Conversation {
     private String createdBy = "";
 
     @Column(nullable = false)
-    private Instant createdAt = Instant.EPOCH;
+    private long createdAt;
 
     @Column(nullable = false)
-    private Instant lastActivityAt = Instant.EPOCH;
+    private long lastActivityAt;
 
     @Column(nullable = false, type = "VARCHAR(400)")
     private String directKey = "";
@@ -127,19 +126,19 @@ public class Conversation {
         this.createdBy = createdBy;
     }
 
-    public Instant getCreatedAt() {
+    public long getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(Instant createdAt) {
+    public void setCreatedAt(long createdAt) {
         this.createdAt = createdAt;
     }
 
-    public Instant getLastActivityAt() {
+    public long getLastActivityAt() {
         return lastActivityAt;
     }
 
-    public void setLastActivityAt(Instant lastActivityAt) {
+    public void setLastActivityAt(long lastActivityAt) {
         this.lastActivityAt = lastActivityAt;
     }
 

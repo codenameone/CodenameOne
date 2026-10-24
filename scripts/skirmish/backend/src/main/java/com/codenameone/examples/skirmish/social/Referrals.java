@@ -37,7 +37,6 @@ import com.codenameone.examples.skirmish.repository.ProfileRepository;
 import com.codenameone.examples.skirmish.repository.ReferralCodeRepository;
 import com.codenameone.examples.skirmish.repository.ReferralRepository;
 import java.io.IOException;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -96,7 +95,7 @@ public class Referrals {
             ReferralCode c = new ReferralCode();
             c.setCode(code);
             c.setUsername(username);
-            c.setCreatedAt(Instant.now());
+            c.setCreatedAt(Clock.now());
             codes.insert(c);
         } else {
             code = mine.get(0).getCode();
@@ -126,7 +125,7 @@ public class Referrals {
             throw new ResponseStatusException(400, "You invited that player");
         }
         Profile p = profiles.findById(username);
-        if (p == null || p.getCreatedAt().isBefore(Instant.now().minusMillis(CLAIM_DAYS * Clock.DAY))) {
+        if (p == null || p.getCreatedAt() < Clock.now() - CLAIM_DAYS * Clock.DAY) {
             throw new ResponseStatusException(400, "Invites count for new players only");
         }
         Referral r = new Referral();
@@ -137,7 +136,7 @@ public class Referrals {
         r.setChannel(clip(claim.channel(), 40));
         r.setMatchType(clip(claim.match(), 20));
         r.setState(JOINED);
-        r.setJoinedAt(Instant.now());
+        r.setJoinedAt(Clock.now());
         referrals.insert(r);
         Profile from = profiles.findById(inviter);
         pushes.friendJoined(inviter, p.getDisplayName());
@@ -155,7 +154,7 @@ public class Referrals {
             return;
         }
         r.setState(PLAYED);
-        r.setPlayedAt(Instant.now());
+        r.setPlayedAt(Clock.now());
         boolean pay = referrals.countByInviterAndRewardedTrue(r.getInviter()) < MAX_REWARDED;
         r.setRewarded(pay);
         referrals.save(r);
@@ -174,7 +173,7 @@ public class Referrals {
             Profile p = profiles.findById(r.getInvitee());
             if (p != null) {
                 out.add(new FriendDto(p.getDisplayName(), p.getTrophies(), r.getState(), r.isRewarded(),
-                        r.getJoinedAt().toEpochMilli()));
+                        r.getJoinedAt()));
             }
         }
         return out;

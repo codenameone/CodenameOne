@@ -36,7 +36,6 @@ import com.codenameone.examples.skirmish.repository.ProfileRepository;
 import com.codenameone.examples.skirmish.rules.Deck;
 import com.codenameone.examples.skirmish.shop.Catalog;
 import java.io.IOException;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -92,8 +91,8 @@ public class Accounts {
         p.setDeck(Lists.join(Deck.starter()));
         p.setOwned(Catalog.DEFAULT_ARENA + "," + Catalog.DEFAULT_EMOTES);
         p.setArena(Catalog.DEFAULT_ARENA);
-        p.setCreatedAt(Instant.now());
-        p.setLastSeen(Instant.now());
+        p.setCreatedAt(Clock.now());
+        p.setLastSeen(Clock.now());
         profiles.insert(p);
     }
 

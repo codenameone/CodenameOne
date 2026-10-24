@@ -25,7 +25,6 @@ import com.codename1.orm.repository.Query;
 import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.wayline.domain.Profile;
 
-import java.time.Instant;
 import java.util.List;
 
 /// Profiles, keyed by the e-mail an account signs in with.
@@ -73,5 +72,5 @@ public interface ProfileRepository extends CrudRepository<Profile, String> {
 
     /// When each account made since `since` was made.
     @Query("select p.createdAt from Profile p where p.createdAt >= :since")
-    List<Instant> signUps(@Param("since") Instant since);
+    List<Long> signUps(@Param("since") long since);
 }

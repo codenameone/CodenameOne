@@ -45,7 +45,6 @@ import com.codenameone.examples.savor.repository.MenuSectionRepository;
 import com.codenameone.examples.savor.repository.PhotoRepository;
 import com.codenameone.examples.savor.repository.RestaurantRepository;
 import java.io.IOException;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -344,7 +343,7 @@ public class Catalog {
             Favorite row = new Favorite();
             row.setUsername(viewer);
             row.setRestaurantId(id);
-            row.setCreatedAt(Instant.now());
+            row.setCreatedAt(System.currentTimeMillis());
             favorites.insert(row);
         } else if (!keep && kept) {
             favorites.deleteById(key);

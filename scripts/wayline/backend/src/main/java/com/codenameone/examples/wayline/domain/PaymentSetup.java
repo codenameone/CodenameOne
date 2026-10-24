@@ -21,7 +21,6 @@ package com.codenameone.examples.wayline.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
-import java.time.Instant;
 
 /// A card being added on the provider's page, until the browser comes back.
 @Entity
@@ -37,7 +36,7 @@ public class PaymentSetup {
     private String reference = "";
 
     @Column(nullable = false)
-    private Instant createdAt = Instant.EPOCH;
+    private long createdAt;
 
     @Column(nullable = false)
     private boolean completed;
@@ -69,11 +68,11 @@ public class PaymentSetup {
         this.reference = reference;
     }
 
-    public Instant getCreatedAt() {
+    public long getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(Instant createdAt) {
+    public void setCreatedAt(long createdAt) {
         this.createdAt = createdAt;
     }
 

@@ -21,7 +21,6 @@ package com.codenameone.examples.wayline.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
-import java.time.Instant;
 
 /// A saved card: what the provider calls it and what to show for it. The
 /// number itself is never here.
@@ -53,7 +52,7 @@ public class PaymentMethod {
     private boolean preferred;
 
     @Column(nullable = false)
-    private Instant createdAt = Instant.EPOCH;
+    private long createdAt;
 
     public PaymentMethod() {
     }
@@ -122,11 +121,11 @@ public class PaymentMethod {
         this.preferred = preferred;
     }
 
-    public Instant getCreatedAt() {
+    public long getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(Instant createdAt) {
+    public void setCreatedAt(long createdAt) {
         this.createdAt = createdAt;
     }
 }

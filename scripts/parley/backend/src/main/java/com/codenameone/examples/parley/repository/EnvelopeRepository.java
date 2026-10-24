@@ -25,7 +25,6 @@ import com.codename1.orm.repository.Query;
 import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.parley.domain.Envelope;
 
-import java.time.Instant;
 import java.util.List;
 
 /// Envelopes waiting for their device.
@@ -46,9 +45,9 @@ public interface EnvelopeRepository extends CrudRepository<Envelope, String> {
 
     /// Removes what the disappearing timer has run out on.
     @Modifying
-    @Query("delete from Envelope e where e.expiresAt > :none and e.expiresAt <= :now")
-    int expire(@Param("now") Instant now, @Param("none") Instant none);
+    @Query("delete from Envelope e where e.expiresAt > 0 and e.expiresAt <= :now")
+    int expire(@Param("now") long now);
 
     /// Removes what nobody fetched for a month: the device is gone or lost.
-    int deleteBySentAtLessThan(Instant before);
+    int deleteBySentAtLessThan(long before);
 }

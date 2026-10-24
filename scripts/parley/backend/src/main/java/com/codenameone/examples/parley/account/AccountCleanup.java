@@ -38,7 +38,6 @@ import com.codenameone.examples.parley.repository.PushDeviceRepository;
 import com.codenameone.examples.parley.repository.ReportRepository;
 
 import java.io.IOException;
-import java.time.Instant;
 import java.util.List;
 
 /// What closing an account does to the rows other parts of the server keep
@@ -119,7 +118,7 @@ public class AccountCleanup {
         pushDevices.deleteByUsername(username);
         // The other side of a live call holds a line too, and nothing else
         // would ever free it once the call record is gone.
-        List<CallRecord> live = calls.liveOf(username, Instant.EPOCH);
+        List<CallRecord> live = calls.liveOf(username);
         for (int iter = 0; iter < live.size(); iter++) {
             lines.deleteByCallId(live.get(iter).getId());
         }

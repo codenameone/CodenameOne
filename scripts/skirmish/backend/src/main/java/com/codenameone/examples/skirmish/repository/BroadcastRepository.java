@@ -23,7 +23,6 @@ import com.codename1.orm.repository.PageRequest;
 import com.codename1.orm.repository.Query;
 import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.skirmish.domain.Broadcast;
-import java.time.Instant;
 import java.util.List;
 
 @Repository(entity = Broadcast.class, key = String.class)
@@ -31,5 +30,5 @@ public interface BroadcastRepository extends CrudRepository<Broadcast, String> {
     @Query("select b from Broadcast b order by b.sentAt desc, b.id asc")
     List<Broadcast> newest(PageRequest page);
 
-    long countBySentAtGreaterThan(Instant since);
+    long countBySentAtGreaterThan(long since);
 }

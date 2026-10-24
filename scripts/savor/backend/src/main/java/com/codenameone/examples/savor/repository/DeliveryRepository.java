@@ -27,7 +27,6 @@ import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.savor.api.DeliveryState;
 import com.codenameone.examples.savor.domain.Delivery;
 
-import java.time.Instant;
 import java.util.List;
 
 /// Deliveries.
@@ -71,11 +70,11 @@ public interface DeliveryRepository extends CrudRepository<Delivery, String> {
     /// `paymentStatus` and which ended after `since`, is to be charged to
     /// this method.
     boolean existsByCustomerAndStateAndPaymentStatusAndUpdatedAtGreaterThanAndMethodId(
-            String customer, DeliveryState state, String paymentStatus, Instant since, String methodId);
+            String customer, DeliveryState state, String paymentStatus, long since, String methodId);
 
     /// The same, to be charged to any method but `methodId`.
     boolean existsByCustomerAndStateAndPaymentStatusAndUpdatedAtGreaterThanAndMethodIdNot(
-            String customer, DeliveryState state, String paymentStatus, Instant since, String methodId);
+            String customer, DeliveryState state, String paymentStatus, long since, String methodId);
 
     /// A customer's deliveries whose payment is `paymentStatus` and that carry a tip.
     List<Delivery> findByCustomerAndPaymentStatusAndTipCentsGreaterThan(String customer,
@@ -100,16 +99,16 @@ public interface DeliveryRepository extends CrudRepository<Delivery, String> {
     List<Delivery> newest(PageRequest page);
 
     /// The deliveries in `state` whose offer ran out before `now`.
-    List<Delivery> findByStateAndOfferExpiresAtLessThan(DeliveryState state, Instant now);
+    List<Delivery> findByStateAndOfferExpiresAtLessThan(DeliveryState state, long now);
 
     /// The deliveries in `state`, the one that has waited longest first.
     List<Delivery> findByStateOrderByRequestedAtAsc(DeliveryState state);
 
     /// A courier's deliveries in `state` that changed at or after a time.
     List<Delivery> findByCourierAndStateAndUpdatedAtGreaterThanEqual(String courier,
-            DeliveryState state, Instant since);
+            DeliveryState state, long since);
 
-    long countByRequestedAtGreaterThanEqual(Instant since);
+    long countByRequestedAtGreaterThanEqual(long since);
 
     long countByStateIn(DeliveryState[] states);
 
@@ -127,14 +126,14 @@ public interface DeliveryRepository extends CrudRepository<Delivery, String> {
     @Query("update Delivery r set r.state = :to, r.updatedAt = :now "
             + "where r.id = :id and r.state in :from and r.customer = :customer")
     int moveAsCustomer(@Param("id") String id, @Param("from") DeliveryState[] from,
-            @Param("to") DeliveryState to, @Param("now") Instant now, @Param("customer") String customer);
+            @Param("to") DeliveryState to, @Param("now") long now, @Param("customer") String customer);
 
     /// Moves a delivery of `courier`'s from one of `from` to `to`.
     @Modifying(clearAutomatically = true)
     @Query("update Delivery r set r.state = :to, r.updatedAt = :now "
             + "where r.id = :id and r.state in :from and r.courier = :courier")
     int moveAsCourier(@Param("id") String id, @Param("from") DeliveryState[] from,
-            @Param("to") DeliveryState to, @Param("now") Instant now, @Param("courier") String courier);
+            @Param("to") DeliveryState to, @Param("now") long now, @Param("courier") String courier);
 
     // tag::savor-delivery-move[]
     /// Takes an offer made to `courier`: refused once the offer has lapsed, as
@@ -144,7 +143,7 @@ public interface DeliveryRepository extends CrudRepository<Delivery, String> {
             + "where r.id = :id and r.state in :from and r.courier = :courier "
             + "and r.offerExpiresAt >= :now")
     int takeOffer(@Param("id") String id, @Param("from") DeliveryState[] from,
-            @Param("to") DeliveryState to, @Param("now") Instant now, @Param("courier") String courier);
+            @Param("to") DeliveryState to, @Param("now") long now, @Param("courier") String courier);
     // end::savor-delivery-move[]
 
     /// Gives a delivery of `courier`'s back to be offered again, writing
@@ -153,7 +152,7 @@ public interface DeliveryRepository extends CrudRepository<Delivery, String> {
     @Query("update Delivery r set r.state = :to, r.updatedAt = :now, r.courier = :newCourier "
             + "where r.id = :id and r.state in :from and r.courier = :courier")
     int giveBack(@Param("id") String id, @Param("from") DeliveryState[] from,
-            @Param("to") DeliveryState to, @Param("now") Instant now, @Param("courier") String courier,
+            @Param("to") DeliveryState to, @Param("now") long now, @Param("courier") String courier,
             @Param("newCourier") String newCourier);
 
     /// Holds `customer`'s delivery while it is in one of `states`, answering 0 when
@@ -173,15 +172,15 @@ public interface DeliveryRepository extends CrudRepository<Delivery, String> {
     @Query("update Delivery r set r.state = :to, r.updatedAt = :now "
             + "where r.id = :id and r.state in :from")
     int moveByServer(@Param("id") String id, @Param("from") DeliveryState[] from,
-            @Param("to") DeliveryState to, @Param("now") Instant now);
+            @Param("to") DeliveryState to, @Param("now") long now);
 
     /// Offers a delivery to `courier` until `expiresAt`.
     @Modifying(clearAutomatically = true)
     @Query("update Delivery r set r.state = :to, r.updatedAt = :now, r.courier = :courier, "
             + "r.offerExpiresAt = :expiresAt where r.id = :id and r.state in :from")
     int offer(@Param("id") String id, @Param("from") DeliveryState[] from,
-            @Param("to") DeliveryState to, @Param("now") Instant now, @Param("courier") String courier,
-            @Param("expiresAt") Instant expiresAt);
+            @Param("to") DeliveryState to, @Param("now") long now, @Param("courier") String courier,
+            @Param("expiresAt") long expiresAt);
 
     // ----------------------------------------------------------- the rest
 
@@ -202,7 +201,7 @@ public interface DeliveryRepository extends CrudRepository<Delivery, String> {
     @Query("select r from Delivery r where r.state = 'COMPLETED' "
             + "and (r.paymentStatus = 'PENDING' or r.paymentStatus = 'AUTHORIZED') "
             + "and r.updatedAt < :before and r.updatedAt > :after order by r.updatedAt asc")
-    List<Delivery> unsettled(@Param("after") Instant after, @Param("before") Instant before,
+    List<Delivery> unsettled(@Param("after") long after, @Param("before") long before,
             PageRequest page);
 
     /// Records how the charge for a delivery came out. A statement of its own and
@@ -264,13 +263,13 @@ public interface DeliveryRepository extends CrudRepository<Delivery, String> {
     @Query("select count(r), coalesce(sum(r.courierCents), 0) from Delivery r "
             + "where r.courier = :courier and r.state = 'COMPLETED' and r.paymentStatus = 'PAID' "
             + "and r.updatedAt >= :since")
-    Object[] paidTotalsSince(@Param("courier") String courier, @Param("since") Instant since);
+    Object[] paidTotalsSince(@Param("courier") String courier, @Param("since") long since);
 
     /// What the courier's share of their completed, paid deliveries came to since
     /// a time.
     @Query("select coalesce(sum(r.courierCents), 0) from Delivery r where r.courier = :courier "
             + "and r.state = 'COMPLETED' and r.paymentStatus = 'PAID' and r.updatedAt >= :since")
-    Long paidSince(@Param("courier") String courier, @Param("since") Instant since);
+    Long paidSince(@Param("courier") String courier, @Param("since") long since);
 
     /// The courier's share of the fares of every delivery they completed and that
     /// was paid for -- in cash, or by a card whose charge came back. A charge
@@ -303,7 +302,7 @@ public interface DeliveryRepository extends CrudRepository<Delivery, String> {
     @Query("select r.id from Delivery r where r.courier = :courier and r.state = 'COMPLETED' "
             + "and r.updatedAt >= :since and r.methodId <> 'cash' and r.paymentStatus = 'PAID' "
             + "and r.id in (select p.deliveryId from Payment p where p.tipRef <> '')")
-    List<String> tipChargedSince(@Param("courier") String courier, @Param("since") Instant since);
+    List<String> tipChargedSince(@Param("courier") String courier, @Param("since") long since);
 
     /// What customers paid in fares for deliveries in `state` whose payment is `paid`.
     @Query("select coalesce(sum(r.fareCents), 0) from Delivery r "
@@ -313,17 +312,17 @@ public interface DeliveryRepository extends CrudRepository<Delivery, String> {
     /// The fares of the deliveries in `state` asked for since `since`, paid or not.
     @Query("select coalesce(sum(r.fareCents), 0) from Delivery r "
             + "where r.requestedAt >= :since and r.state = :state")
-    Long faresSince(@Param("since") Instant since, @Param("state") DeliveryState state);
+    Long faresSince(@Param("since") long since, @Param("state") DeliveryState state);
 
     /// The deliveries asked for since `since`, counted by state: `{state, count}`.
     @Query("select r.state, count(r) from Delivery r where r.requestedAt >= :since group by r.state")
-    List<Object[]> countByState(@Param("since") Instant since);
+    List<Object[]> countByState(@Param("since") long since);
 
     /// The deliveries in `state` asked for since `since`, counted by courier:
     /// `{courier, count}`.
     @Query("select r.courier, count(r) from Delivery r where r.requestedAt >= :since "
             + "and r.state = :state group by r.courier")
-    List<Object[]> countByCourier(@Param("since") Instant since, @Param("state") DeliveryState state);
+    List<Object[]> countByCourier(@Param("since") long since, @Param("state") DeliveryState state);
 
     /// One row for each delivery asked for since `since`: `{id, requestedAt,
     /// state, fareCents, paymentStatus}`.
@@ -336,7 +335,7 @@ public interface DeliveryRepository extends CrudRepository<Delivery, String> {
     /// word does not see those as one expression.
     @Query("select r.id, r.requestedAt, r.state, r.fareCents, r.paymentStatus from Delivery r "
             + "where r.requestedAt >= :since")
-    List<Object[]> timeline(@Param("since") Instant since);
+    List<Object[]> timeline(@Param("since") long since);
 
     /// What a customer paid for deliveries in `state` whose payment is `paid`:
     /// `{fares, fees, tips}`.

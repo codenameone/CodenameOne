@@ -21,7 +21,6 @@ package com.codenameone.examples.savor.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
-import java.time.Instant;
 
 /// A restaurant a customer keeps, keyed by `Identifier.of(username, restaurantId)`.
 @Entity
@@ -35,7 +34,7 @@ public class Favorite {
     private String restaurantId = "";
 
     @Column(nullable = false)
-    private Instant createdAt = Instant.EPOCH;
+    private long createdAt;
 
     public Favorite() {
     }
@@ -56,11 +55,11 @@ public class Favorite {
         this.restaurantId = restaurantId;
     }
 
-    public Instant getCreatedAt() {
+    public long getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(Instant createdAt) {
+    public void setCreatedAt(long createdAt) {
         this.createdAt = createdAt;
     }
 }

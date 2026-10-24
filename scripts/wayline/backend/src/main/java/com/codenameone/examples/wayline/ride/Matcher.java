@@ -36,7 +36,6 @@ import com.codenameone.examples.wayline.repository.ProfileRepository;
 import com.codenameone.examples.wayline.repository.RidePassedRepository;
 
 import java.io.IOException;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -146,7 +145,7 @@ public class Matcher {
         double dLat = radiusMeters / Geo.METERS_PER_DEGREE;
         double shrink = Math.max(0.01d, Math.cos(Math.toRadians(lat)));
         double dLng = radiusMeters / (Geo.METERS_PER_DEGREE * shrink);
-        List<DriverState> boxed = drivers.freeInBox(Instant.now().minusMillis(FRESH_MILLIS),
+        List<DriverState> boxed = drivers.freeInBox(System.currentTimeMillis() - FRESH_MILLIS,
                 lat - dLat, lat + dLat, lng - dLng, lng + dLng, Applications.APPROVED, WITH_RIDE);
         List<DriverState> inReach = new ArrayList<DriverState>();
         List<String> names = new ArrayList<String>();

@@ -55,7 +55,6 @@ import com.codenameone.examples.skirmish.shop.Shop;
 import com.codenameone.examples.skirmish.social.Insights;
 import com.codenameone.examples.skirmish.social.Pipelines;
 import com.codenameone.examples.skirmish.social.Promotion;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -97,7 +96,7 @@ public class AdminEndpoint implements AdminApiServer {
     @Override
     @Transactional(readOnly = true)
     public AdminStatsDto stats() throws Exception {
-        Instant today = Instant.ofEpochMilli(Clock.dayOf(Clock.now()));
+        long today = Clock.dayOf(Clock.now());
         int gems = 0;
         List<StorePurchase> sold = purchases.since(today);
         for (StorePurchase s : sold) {
@@ -105,7 +104,7 @@ public class AdminEndpoint implements AdminApiServer {
         }
         return new AdminStatsDto((int) profiles.count(), rooms.online(), rooms.live().size(),
                 (int) matches.countByEndedAtGreaterThan(today), (int) flags.pendingCount(),
-                (int) count(profiles.suspended(Instant.now())), sold.size(), gems);
+                (int) count(profiles.suspended(Clock.now())), sold.size(), gems);
     }
 
     @Override

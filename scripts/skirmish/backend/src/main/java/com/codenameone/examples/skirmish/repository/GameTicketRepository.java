@@ -21,7 +21,6 @@ package com.codenameone.examples.skirmish.repository;
 import com.codename1.orm.repository.CrudRepository;
 import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.skirmish.domain.GameTicket;
-import java.time.Instant;
 
 /// The tickets that open a live connection. Only the hash of a ticket is
 /// stored, and it is the row's key.
@@ -34,7 +33,7 @@ public interface GameTicketRepository extends CrudRepository<GameTicket, String>
     int deleteByTicketHash(String ticketHash);
 
     /// Deletes the tickets that went stale before `now`.
-    int deleteByExpiresAtLessThan(Instant now);
+    int deleteByExpiresAtLessThan(long now);
 
     int deleteByUsername(String username);
 }

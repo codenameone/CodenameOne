@@ -25,7 +25,6 @@ import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.savor.api.DeliveryState;
 import com.codenameone.examples.savor.domain.DeliveryEvent;
 
-import java.time.Instant;
 import java.util.List;
 
 /// What happened to each delivery: one row for every state it came into.
@@ -43,5 +42,5 @@ public interface DeliveryEventRepository extends CrudRepository<DeliveryEvent, S
     /// deliveries are named by a nested query.
     @Query("select e.deliveryId, e.createdAt from DeliveryEvent e where e.state = :state "
             + "and e.deliveryId in (select r.id from Delivery r where r.requestedAt >= :since)")
-    List<Object[]> reached(@Param("since") Instant since, @Param("state") DeliveryState state);
+    List<Object[]> reached(@Param("since") long since, @Param("state") DeliveryState state);
 }

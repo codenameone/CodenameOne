@@ -40,7 +40,6 @@ import com.codenameone.examples.savor.catalog.DemoRestaurants;
 import com.codenameone.examples.savor.order.DemoOrders;
 
 import java.io.IOException;
-import java.time.Instant;
 
 /// The accounts a server starts with.
 ///
@@ -171,7 +170,7 @@ public class DemoAccounts {
         profile.setFlagged(true);
         profile.setFlagReason(why);
         moderation.record(username, ADMIN, Moderation.FLAG, why,
-                Instant.now().minusMillis(daysAgo * Days.MILLIS));
+                System.currentTimeMillis() - daysAgo * Days.MILLIS);
     }
 
     /// An admin, or the plainest kind of account.
@@ -241,7 +240,7 @@ public class DemoAccounts {
         form.setVehicleYear(year() - 3);
         form.setVehicleColor(colour);
         form.setVehiclePlate(plate);
-        form.setSubmittedAt(Instant.ofEpochMilli(handedIn));
+        form.setSubmittedAt(handedIn);
         form.setReviewedBy(ADMIN);
         for (int iter = 0; iter < Applications.KINDS.length; iter++) {
             CourierDocument picture = new CourierDocument();
@@ -249,7 +248,7 @@ public class DemoAccounts {
             picture.setKind(Applications.KINDS[iter]);
             picture.setContentType("image/png");
             picture.setStatus("accepted");
-            picture.setUploadedAt(Instant.ofEpochMilli(handedIn));
+            picture.setUploadedAt(handedIn);
             picture.setData(PLACEHOLDER_PICTURE);
             documents.insert(picture);
         }
@@ -285,7 +284,7 @@ public class DemoAccounts {
     @Transactional(rollbackFor = IOException.class)
     void handedIn(String username, int daysAgo) throws IOException {
         CourierApplication form = forms.findById(username);
-        form.setSubmittedAt(Instant.ofEpochMilli(System.currentTimeMillis() - daysAgo * Days.MILLIS));
+        form.setSubmittedAt(System.currentTimeMillis() - daysAgo * Days.MILLIS);
     }
 
     /// When an account opened that many days ago was opened, so that the chart

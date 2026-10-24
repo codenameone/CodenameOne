@@ -48,7 +48,6 @@ import com.codenameone.examples.savor.order.Quotes;
 import com.codenameone.examples.savor.delivery.Matcher;
 
 import java.io.IOException;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -124,8 +123,8 @@ public class Statistics {
             }
         }
         int online = (int) cars.countByOnlineTrueAndLastSeenGreaterThanEqual(
-                Instant.ofEpochMilli(now - Matcher.FRESH_MILLIS));
-        int today = (int) orders.countByPlacedAtGreaterThanEqual(Instant.ofEpochMilli(Days.start(now)));
+                now - Matcher.FRESH_MILLIS);
+        int today = (int) orders.countByPlacedAtGreaterThanEqual(Days.start(now));
         int active = (int) orders.countByStateIn(ACTIVE);
         int done = (int) orders.countByStateIn(new OrderState[] {OrderState.DELIVERED});
         long revenue = Rows.number(orders.totals(OrderState.DELIVERED, PAID));
@@ -154,10 +153,10 @@ public class Statistics {
         long finished = 0L;
         long totalSum = 0L;
         long tookMillis = 0L;
-        List<Object[]> timeline = orders.timeline(Instant.ofEpochMilli(since));
+        List<Object[]> timeline = orders.timeline(since);
         for (int iter = 0; iter < timeline.size(); iter++) {
             Object[] order = timeline.get(iter);
-            long at = Rows.millis(order[1]);
+            long at = whole(order[1]);
             OrderState state = Rows.orderState(order[2]);
             byHour[(int) (at % Days.MILLIS / 3600000L)]++;
             if (state != null) {
@@ -169,7 +168,7 @@ public class Statistics {
                 delivered++;
                 finished++;
                 totalSum += whole(order[3]);
-                tookMillis += Math.max(0L, Rows.millis(order[5]) - at);
+                tookMillis += Math.max(0L, whole(order[5]) - at);
             } else if (ended(state)) {
                 finished++;
             }
@@ -187,7 +186,7 @@ public class Statistics {
             }
         }
         Map<String, int[]> completedBy = new HashMap<String, int[]>();
-        List<Object[]> perCourier = deliveries.countByCourier(Instant.ofEpochMilli(since), DeliveryState.COMPLETED);
+        List<Object[]> perCourier = deliveries.countByCourier(since, DeliveryState.COMPLETED);
         for (int iter = 0; iter < perCourier.size(); iter++) {
             completedBy.put(Rows.text(perCourier.get(iter)[0]),
                     new int[] {(int) whole(perCourier.get(iter)[1])});
@@ -204,7 +203,7 @@ public class Statistics {
             }
         }
         List<NameCountDto> byRestaurant = new ArrayList<NameCountDto>();
-        List<Object[]> kitchens = orders.countByRestaurant(Instant.ofEpochMilli(since));
+        List<Object[]> kitchens = orders.countByRestaurant(since);
         for (int iter = 0; iter < kitchens.size(); iter++) {
             // Counted by id, and named as the restaurant is called now: two
             // kitchens may share a name, and one may have been renamed.
@@ -221,9 +220,9 @@ public class Statistics {
         double completionRate = finished == 0L ? 0d
                 : Math.round(delivered * 100d / finished) / 100d;
 
-        List<Instant> signUps = profiles.signUps(Instant.ofEpochMilli(since));
+        List<Long> signUps = profiles.signUps(since);
         for (int iter = 0; iter < signUps.size(); iter++) {
-            int index = (int) ((signUps.get(iter).toEpochMilli() - since) / Days.MILLIS);
+            int index = (int) ((signUps.get(iter).longValue() - since) / Days.MILLIS);
             if (index >= 0 && index < span) {
                 dayNewUsers[index]++;
             }

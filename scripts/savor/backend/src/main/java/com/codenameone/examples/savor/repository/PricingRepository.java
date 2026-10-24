@@ -24,7 +24,6 @@ import com.codename1.orm.repository.Param;
 import com.codename1.orm.repository.Query;
 import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.savor.domain.Pricing;
-import java.time.Instant;
 
 /// The admin's prices: one row, whose key is [#ONLY]. A migration creates it,
 /// with an `updatedAt` of 0 while the prices are still the settings'.
@@ -48,5 +47,5 @@ public interface PricingRepository extends CrudRepository<Pricing, Integer> {
             @Param("surge") double surge, @Param("smallOrder") long smallOrder,
             @Param("smallOrderFee") long smallOrderFee, @Param("fee") double fee,
             @Param("tax") double tax, @Param("commission") double commission,
-            @Param("at") Instant at, @Param("by") String by);
+            @Param("at") long at, @Param("by") String by);
 }

@@ -47,7 +47,6 @@ import com.codenameone.examples.wayline.repository.RideRepository;
 import com.codenameone.examples.wayline.ride.Matcher;
 
 import java.io.IOException;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -148,7 +147,7 @@ public class Drivers {
         if (!status.online() && ride != null) {
             throw new ResponseStatusException(409, "Finish the ride before going off line");
         }
-        Instant now = Instant.now();
+        long now = System.currentTimeMillis();
         DriverState state = drivers.findById(driver);
         // The time since the last report was time on line, unless it was so
         // long ago that the app had plainly stopped reporting. It is counted
@@ -157,8 +156,7 @@ public class Drivers {
         // is, so the row read here stays managed and its change is written
         // either way; a statement marked clearAutomatically would detach it,
         // and a change made after that would be lost.
-        long since = state != null && state.isOnline()
-                ? now.toEpochMilli() - state.getLastSeen().toEpochMilli() : 0L;
+        long since = state != null && state.isOnline() ? now - state.getLastSeen() : 0L;
         boolean first = state == null;
         if (first) {
             state = new DriverState();
@@ -179,7 +177,7 @@ public class Drivers {
         if (since > 0L && since < Matcher.FRESH_MILLIS) {
             // Cut at midnight: a stretch on line across it belongs half to
             // each day, not all to the new one.
-            long[] days = Days.split(now.toEpochMilli() - since, now.toEpochMilli());
+            long[] days = Days.split(now - since, now);
             for (int iter = 0; iter < days.length; iter += 2) {
                 addHours(driver, days[iter], days[iter + 1]);
             }
@@ -284,11 +282,10 @@ public class Drivers {
         long now = System.currentTimeMillis();
         // The day's trips and the day's money from one query, so the header
         // that shows them together counts the rides that made the sum.
-        Object[] day = rides.paidTotalsSince(driver, Instant.ofEpochMilli(now - now % DAY_MILLIS));
+        Object[] day = rides.paidTotalsSince(driver, now - now % DAY_MILLIS);
         int todayCount = day == null ? 0 : (int) Rows.number(day[0]);
         long today = day == null ? 0L : Rows.number(day[1]);
-        long week = Rows.number(
-                rides.paidSince(driver, Instant.ofEpochMilli(now - 7 * DAY_MILLIS)));
+        long week = Rows.number(rides.paidSince(driver, now - 7 * DAY_MILLIS));
         Object[] total = rides.paidTotals(driver);
         int count = total == null ? 0 : (int) Rows.number(total[0]);
         long all = total == null ? 0L : Rows.number(total[1]);
@@ -312,7 +309,7 @@ public class Drivers {
         double rating = 5d;
         long lastSeen = 0L;
         if (car != null) {
-            lastSeen = car.getLastSeen().toEpochMilli();
+            lastSeen = car.getLastSeen();
             // On line means said so and heard from lately; see Matcher.
             online = car.isOnline()
                     && System.currentTimeMillis() - lastSeen < Matcher.FRESH_MILLIS;

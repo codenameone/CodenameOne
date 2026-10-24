@@ -21,7 +21,6 @@ package com.codenameone.examples.savor.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
-import java.time.Instant;
 
 /// What an order costs on top of its food, and what the service keeps of it.
 /// There is one row; see V6.
@@ -56,7 +55,7 @@ public class Pricing {
     private double commissionPercent;
 
     @Column(nullable = false)
-    private Instant updatedAt = Instant.EPOCH;
+    private long updatedAt;
 
     @Column(nullable = false, type = "VARCHAR(190)")
     private String updatedBy = "";
@@ -136,11 +135,11 @@ public class Pricing {
         this.commissionPercent = commissionPercent;
     }
 
-    public Instant getUpdatedAt() {
+    public long getUpdatedAt() {
         return updatedAt;
     }
 
-    public void setUpdatedAt(Instant updatedAt) {
+    public void setUpdatedAt(long updatedAt) {
         this.updatedAt = updatedAt;
     }
 

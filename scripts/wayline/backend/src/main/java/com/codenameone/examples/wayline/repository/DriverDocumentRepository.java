@@ -26,7 +26,6 @@ import com.codename1.orm.repository.Repository;
 import com.codename1.orm.session.Identifier;
 import com.codenameone.examples.wayline.domain.DriverDocument;
 
-import java.time.Instant;
 import java.util.List;
 
 /// The documents of applications to drive, keyed by
@@ -59,7 +58,7 @@ public interface DriverDocumentRepository extends CrudRepository<DriverDocument,
             + "d.uploadedAt = :at, d.data = :data where d.username = :username and d.kind = :kind")
     int replace(@Param("username") String username, @Param("kind") String kind,
             @Param("type") String contentType, @Param("status") String status,
-            @Param("at") Instant at, @Param("data") String data);
+            @Param("at") long at, @Param("data") String data);
 
     /// Sets the status of all of an account's documents.
     @Modifying(clearAutomatically = true)

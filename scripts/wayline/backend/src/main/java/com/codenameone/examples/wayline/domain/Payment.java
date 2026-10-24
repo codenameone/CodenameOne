@@ -21,7 +21,6 @@ package com.codenameone.examples.wayline.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
-import java.time.Instant;
 
 /// What a completed ride was charged, and what was given back.
 @Entity
@@ -43,7 +42,7 @@ public class Payment {
     private String providerRef = "";
 
     @Column(nullable = false)
-    private Instant createdAt = Instant.EPOCH;
+    private long createdAt;
 
     @Column(nullable = false, type = "VARCHAR(64)")
     private String tipRef = "";
@@ -58,7 +57,7 @@ public class Payment {
     private String refundReason = "";
 
     @Column(nullable = false)
-    private Instant refundedAt = Instant.EPOCH;
+    private long refundedAt;
 
     public Payment() {
     }
@@ -103,11 +102,11 @@ public class Payment {
         this.providerRef = providerRef;
     }
 
-    public Instant getCreatedAt() {
+    public long getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(Instant createdAt) {
+    public void setCreatedAt(long createdAt) {
         this.createdAt = createdAt;
     }
 
@@ -143,11 +142,11 @@ public class Payment {
         this.refundReason = refundReason;
     }
 
-    public Instant getRefundedAt() {
+    public long getRefundedAt() {
         return refundedAt;
     }
 
-    public void setRefundedAt(Instant refundedAt) {
+    public void setRefundedAt(long refundedAt) {
         this.refundedAt = refundedAt;
     }
 }

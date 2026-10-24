@@ -21,7 +21,6 @@ package com.codenameone.examples.wayline.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
-import java.time.Instant;
 
 /// What is left of an account that was closed: the hash of its e-mail, kept so
 /// that the address cannot be registered again.
@@ -32,7 +31,7 @@ public class ClosedAccount {
     private String usernameHash = "";
 
     @Column(nullable = false)
-    private Instant closedAt = Instant.EPOCH;
+    private long closedAt;
 
     public ClosedAccount() {
     }
@@ -45,11 +44,11 @@ public class ClosedAccount {
         this.usernameHash = usernameHash;
     }
 
-    public Instant getClosedAt() {
+    public long getClosedAt() {
         return closedAt;
     }
 
-    public void setClosedAt(Instant closedAt) {
+    public void setClosedAt(long closedAt) {
         this.closedAt = closedAt;
     }
 }

@@ -21,7 +21,6 @@ package com.codenameone.examples.parley.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
-import java.time.Instant;
 
 /// A ticket for one connection to the live channel, as its hash.
 @Entity
@@ -34,7 +33,7 @@ public class LiveTicket {
     private String username = "";
 
     @Column(nullable = false)
-    private Instant expiresAt = Instant.EPOCH;
+    private long expiresAt;
 
     public LiveTicket() {
     }
@@ -55,11 +54,11 @@ public class LiveTicket {
         this.username = username;
     }
 
-    public Instant getExpiresAt() {
+    public long getExpiresAt() {
         return expiresAt;
     }
 
-    public void setExpiresAt(Instant expiresAt) {
+    public void setExpiresAt(long expiresAt) {
         this.expiresAt = expiresAt;
     }
 }

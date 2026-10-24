@@ -23,7 +23,6 @@ import com.codename1.orm.repository.Param;
 import com.codename1.orm.repository.Query;
 import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.skirmish.domain.StorePurchase;
-import java.time.Instant;
 import java.util.List;
 
 @Repository(entity = StorePurchase.class, key = String.class)
@@ -32,5 +31,5 @@ public interface StorePurchaseRepository extends CrudRepository<StorePurchase, S
     List<StorePurchase> of(@Param("u") String username);
 
     @Query("select s from StorePurchase s where s.createdAt >= :since")
-    List<StorePurchase> since(@Param("since") Instant since);
+    List<StorePurchase> since(@Param("since") long since);
 }

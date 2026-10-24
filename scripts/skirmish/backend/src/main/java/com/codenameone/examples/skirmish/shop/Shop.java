@@ -33,7 +33,6 @@ import com.codenameone.examples.skirmish.domain.StorePurchase;
 import com.codenameone.examples.skirmish.repository.ProfileRepository;
 import com.codenameone.examples.skirmish.repository.StorePurchaseRepository;
 import java.io.IOException;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -137,7 +136,7 @@ public class Shop {
         row.setSku(item.sku());
         int gems = Catalog.gems(item);
         row.setGems(gems);
-        row.setCreatedAt(Instant.now());
+        row.setCreatedAt(Clock.now());
         purchases.insert(row);
         if (gems > 0) {
             p.setGems(p.getGems() + gems);

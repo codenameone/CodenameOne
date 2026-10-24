@@ -43,7 +43,6 @@ import com.codenameone.examples.savor.repository.ClosedAccountRepository;
 import com.codenameone.examples.savor.repository.ProfileRepository;
 
 import java.io.IOException;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -185,7 +184,7 @@ public class Accounts {
         profile.setPhoneVerified(phoneVerified);
         profile.setVehicle(vehicle);
         profile.setPlate(plate);
-        profile.setCreatedAt(Instant.ofEpochMilli(openedAt));
+        profile.setCreatedAt(openedAt);
         profiles.insert(profile);
         if (courier) {
             applications.grant(username, username);
@@ -518,7 +517,7 @@ public class Accounts {
         if (!closed.existsById(hash)) {
             ClosedAccount row = new ClosedAccount();
             row.setUsernameHash(hash);
-            row.setClosedAt(Instant.now());
+            row.setClosedAt(System.currentTimeMillis());
             closed.insert(row);
         }
     }

@@ -30,7 +30,6 @@ import com.codename1.orm.repository.PageRequest;
 import com.codename1.orm.session.Identifier;
 import com.codenameone.examples.savor.Days;
 import com.codenameone.examples.savor.Roles;
-import com.codenameone.examples.savor.Rows;
 import com.codenameone.examples.savor.Text;
 import com.codenameone.examples.savor.account.Moderation;
 import com.codenameone.examples.savor.api.DocumentContentDto;
@@ -45,7 +44,6 @@ import com.codenameone.examples.savor.repository.CourierDocumentRepository;
 import com.codenameone.examples.savor.repository.ProfileRepository;
 
 import java.io.IOException;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -246,13 +244,13 @@ public class Applications {
         long now = System.currentTimeMillis();
         // Replaced with a statement where there is one already, so the picture
         // it held is not read only to be overwritten.
-        if (documents.replace(username, kind, type, "uploaded", Instant.ofEpochMilli(now), data) == 0) {
+        if (documents.replace(username, kind, type, "uploaded", now, data) == 0) {
             CourierDocument document = new CourierDocument();
             document.setUsername(username);
             document.setKind(kind);
             document.setContentType(type);
             document.setStatus("uploaded");
-            document.setUploadedAt(Instant.ofEpochMilli(now));
+            document.setUploadedAt(now);
             document.setData(data);
             documents.insert(document);
         }
@@ -312,7 +310,7 @@ public class Applications {
             throw new ResponseStatusException(400, what.toString());
         }
         // Held to the status it was read in: handed in twice, it is handed in once.
-        applications.submit(username, was, PENDING, Instant.now());
+        applications.submit(username, was, PENDING, System.currentTimeMillis());
         return get(username);
     }
 
@@ -426,7 +424,7 @@ public class Applications {
             applications.insert(blank(username, APPROVED, "", ""));
             return;
         }
-        applications.approveUnlessApproved(username, APPROVED, Instant.now(), by);
+        applications.approveUnlessApproved(username, APPROVED, System.currentTimeMillis(), by);
     }
 
     /// Takes the approval back, when an admin withdraws the COURIER role. The
@@ -434,7 +432,7 @@ public class Applications {
     @Transactional
     public void withdraw(String by, String username) throws IOException {
         applications.move(username, APPROVED, REJECTED, "Onboarding was withdrawn by an admin",
-                Instant.now(), by);
+                System.currentTimeMillis(), by);
     }
 
     /// Everything kept about an account's application, for an account being
@@ -455,7 +453,7 @@ public class Applications {
         if (find(username) == null) {
             throw new ResponseStatusException(404, "No such application");
         }
-        if (applications.move(username, PENDING, to, reason, Instant.now(), by)
+        if (applications.move(username, PENDING, to, reason, System.currentTimeMillis(), by)
                 != 1) {
             throw new ResponseStatusException(409, "That application is not waiting for an answer");
         }
@@ -536,8 +534,8 @@ public class Applications {
         application.setStatus(status);
         application.setVehicleModel(vehicle.length() > 40 ? vehicle.substring(0, 40) : vehicle);
         application.setVehiclePlate(plate);
-        application.setCreatedAt(Instant.ofEpochMilli(now));
-        application.setReviewedAt(APPROVED.equals(status) ? Instant.ofEpochMilli(now) : Instant.EPOCH);
+        application.setCreatedAt(now);
+        application.setReviewedAt(APPROVED.equals(status) ? now : 0L);
         return application;
     }
 
@@ -568,7 +566,8 @@ public class Applications {
                 Object[] stored = documents.get(iter);
                 if (KINDS[kind].equals(stored[from])) {
                     status = (String) stored[from + 1];
-                    uploadedAt = Rows.millis(stored[from + 2]);
+                    Object at = stored[from + 2];
+                    uploadedAt = at instanceof Number ? ((Number) at).longValue() : 0L;
                 }
             }
             listed.add(new DocumentDto(KINDS[kind], status, uploadedAt));
@@ -582,7 +581,7 @@ public class Applications {
                 row.getDateOfBirth(), row.getLicenceNumber(), row.getLicenceExpiry(),
                 row.getVehicleMake(), row.getVehicleModel(), row.getVehicleYear(),
                 row.getVehicleColor(), row.getVehiclePlate(), listed,
-                row.getRejectionReason(), row.getSubmittedAt().toEpochMilli(), row.getReviewedAt().toEpochMilli(),
+                row.getRejectionReason(), row.getSubmittedAt(), row.getReviewedAt(),
                 row.getReviewedBy());
     }
 

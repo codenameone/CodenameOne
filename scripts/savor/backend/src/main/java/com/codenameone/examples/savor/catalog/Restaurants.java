@@ -56,7 +56,6 @@ import com.codenameone.examples.savor.repository.RestaurantRepository;
 import com.codenameone.examples.savor.repository.RestaurantStaffRepository;
 import com.codenameone.examples.savor.Days;
 import java.io.IOException;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -151,8 +150,8 @@ public class Restaurants {
         restaurant.setReason("");
         restaurant.setPhotoId("");
         long now = System.currentTimeMillis();
-        restaurant.setCreatedAt(Instant.ofEpochMilli(now));
-        restaurant.setUpdatedAt(Instant.ofEpochMilli(now));
+        restaurant.setCreatedAt(now);
+        restaurant.setUpdatedAt(now);
         fill(restaurant, form);
         restaurants.insert(restaurant);
         return catalog.detail(restaurant, username, 0d, 0d, true);
@@ -183,7 +182,7 @@ public class Restaurants {
         }
         PhotoDto saved = store(last.getId(), photo);
         last.setPhotoId(saved.id());
-        last.setUpdatedAt(Instant.now());
+        last.setUpdatedAt(System.currentTimeMillis());
         return saved;
     }
 
@@ -259,7 +258,7 @@ public class Restaurants {
         }
         restaurant.setStatus(Catalog.APPROVED);
         restaurant.setReason("");
-        restaurant.setUpdatedAt(Instant.now());
+        restaurant.setUpdatedAt(System.currentTimeMillis());
         if (!staff.existsById(Identifier.of(restaurant.getId(), applicant))) {
             RestaurantStaff row = new RestaurantStaff();
             row.setRestaurantId(restaurant.getId());
@@ -282,7 +281,7 @@ public class Restaurants {
         }
         restaurant.setStatus(Catalog.REJECTED);
         restaurant.setReason(Text.required(reason, 255, "why it is turned down"));
-        restaurant.setUpdatedAt(Instant.now());
+        restaurant.setUpdatedAt(System.currentTimeMillis());
         return catalog.detail(restaurant, null, 0d, 0d, true);
     }
 
@@ -307,7 +306,7 @@ public class Restaurants {
         }
         restaurant.setStatus(suspended ? Catalog.SUSPENDED : Catalog.APPROVED);
         restaurant.setReason(suspended ? Text.required(reason, 255, "why it is suspended") : "");
-        restaurant.setUpdatedAt(Instant.now());
+        restaurant.setUpdatedAt(System.currentTimeMillis());
         return catalog.detail(restaurant, null, 0d, 0d, true);
     }
 
@@ -351,7 +350,7 @@ public class Restaurants {
             ownPhoto(restaurant, form.photoId());
             restaurant.setPhotoId(form.photoId());
         }
-        restaurant.setUpdatedAt(Instant.now());
+        restaurant.setUpdatedAt(System.currentTimeMillis());
         return catalog.detail(restaurant, username, 0d, 0d, true);
     }
 
@@ -360,7 +359,7 @@ public class Restaurants {
     public RestaurantDto pause(String username, boolean paused) throws IOException {
         Restaurant restaurant = mine(username);
         restaurant.setPaused(paused);
-        restaurant.setUpdatedAt(Instant.now());
+        restaurant.setUpdatedAt(System.currentTimeMillis());
         return catalog.detail(restaurant, username, 0d, 0d, true);
     }
 
@@ -373,7 +372,7 @@ public class Restaurants {
         long today = Days.start(now);
         long week = today - 6L * Days.MILLIS;
         List<CustomerOrder> delivered = orders.findByRestaurantIdAndStateAndDeliveredAtGreaterThanEqual(
-                restaurant.getId(), OrderState.DELIVERED, Instant.ofEpochMilli(week));
+                restaurant.getId(), OrderState.DELIVERED, week);
         long count = 0L;
         long todayCents = 0L;
         long weekCents = 0L;
@@ -387,7 +386,7 @@ public class Restaurants {
             long earned = order.getSubtotalCents() - order.getDiscountCents()
                     - order.getCommissionCents();
             weekCents += earned;
-            if (order.getDeliveredAt().toEpochMilli() >= today) {
+            if (order.getDeliveredAt() >= today) {
                 todayCents += earned;
                 count++;
             }
@@ -607,7 +606,7 @@ public class Restaurants {
         row.setRestaurantId(restaurantId);
         row.setContentType(type);
         row.setData(bytes);
-        row.setCreatedAt(Instant.now());
+        row.setCreatedAt(System.currentTimeMillis());
         photos.insert(row);
         return new PhotoDto(row.getId(), type, "");
     }
@@ -625,14 +624,14 @@ public class Restaurants {
         for (int iter = 0; iter < menu.size(); iter++) {
             used.add(menu.get(iter).getPhotoId());
         }
-        Instant before = Instant.now().minusMillis(UNUSED_PHOTO_GRACE);
+        long before = System.currentTimeMillis() - UNUSED_PHOTO_GRACE;
         List<Object[]> stored = photos.stored(restaurantId);
         int remaining = 0;
         for (int iter = 0; iter < stored.size(); iter++) {
             Object id = stored.get(iter)[0];
             Object at = stored.get(iter)[1];
-            boolean aged = at instanceof Instant && ((Instant) at).isBefore(before);
-            if (id instanceof String && !used.contains(id) && aged) {
+            long createdAt = at instanceof Number ? ((Number) at).longValue() : Long.MAX_VALUE;
+            if (id instanceof String && !used.contains(id) && createdAt < before) {
                 photos.deleteById((String) id);
             } else {
                 remaining++;

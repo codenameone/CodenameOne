@@ -30,7 +30,6 @@ import com.codenameone.examples.wayline.geo.Geo;
 import com.codenameone.examples.wayline.repository.PricingRepository;
 
 import java.io.IOException;
-import java.time.Instant;
 
 /// What a ride costs.
 ///
@@ -89,7 +88,7 @@ public class Fares {
 
     private PricingDto toDto(Pricing row) {
         // The row a migration created and nobody has saved over yet.
-        if (row == null || Instant.EPOCH.equals(row.getUpdatedAt())) {
+        if (row == null || row.getUpdatedAt() == 0L) {
             return defaults;
         }
         // The currency is a setting and stays one. Rides already taken are in
@@ -122,7 +121,7 @@ public class Fares {
         if (prices.change(PricingRepository.ONLY.intValue(), wanted.baseFare(), wanted.perKm(),
                 wanted.perMinute(), wanted.minimumFare(), wanted.serviceFeePercent(),
                 wanted.commissionPercent(), wanted.surgeMultiplier(),
-                wanted.comfortMultiplier(), wanted.xlMultiplier(), Instant.now(),
+                wanted.comfortMultiplier(), wanted.xlMultiplier(), System.currentTimeMillis(),
                 by) == 0) {
             throw new IllegalStateException("The pricing row is missing; the V6 migration "
                     + "creates it");
