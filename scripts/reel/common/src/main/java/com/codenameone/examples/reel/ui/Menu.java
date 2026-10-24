@@ -49,6 +49,8 @@ public final class Menu {
     private final String mode;
     private final Container layer = new Container(new BorderLayout());
     private final Container places = new Container(BoxLayout.y());
+    /// The places again, as text and action, for a wide screen's bar.
+    private final java.util.List<Object[]> links = new java.util.ArrayList<Object[]>();
     private final Container panel;
 
     /// @param mode the mode `form` is the home of: `Nav.VIEWER` and the others
@@ -102,7 +104,13 @@ public final class Menu {
     /// @param name the button's name is `menu-` and this
     public Menu item(char icon, String text, String name, final Runnable go) {
         places.add(entry(icon, text, "menu-" + name, go));
+        links.add(new Object[] {text, name, go});
         return this;
+    }
+
+    /// The mode's places, each as `{text, name, Runnable}`, in the order added.
+    java.util.List<Object[]> links() {
+        return links;
     }
 
     public void open() {

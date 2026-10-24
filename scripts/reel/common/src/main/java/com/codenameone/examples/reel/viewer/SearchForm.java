@@ -30,6 +30,7 @@ import com.codenameone.examples.reel.api.TitleCardDto;
 import com.codenameone.examples.reel.net.Account;
 import com.codenameone.examples.reel.net.Api;
 import com.codenameone.examples.reel.net.Net;
+import com.codenameone.examples.reel.ui.Layouts;
 import com.codenameone.examples.reel.ui.Ui;
 import java.util.List;
 
@@ -101,7 +102,11 @@ public final class SearchForm {
     }
 
     static Container grid(Form form, List<TitleCardDto> titles) {
-        Container grid = new Container(new GridLayout(Math.max(1, titles.size() / 3 + 1), 3));
+        // As many landscape cards across as the screen holds: two on a phone,
+        // more on a tablet or a desktop window.
+        int across = Layouts.columns(Math.min(com.codename1.ui.CN.getDisplayWidth(), Layouts.column()),
+                Cards.width() + 2.4f, 6);
+        Container grid = new Container(new GridLayout(Math.max(1, (titles.size() + across - 1) / across), across));
         for (int iter = 0; iter < titles.size(); iter++) {
             grid.add(Cards.card(form, titles.get(iter)));
         }

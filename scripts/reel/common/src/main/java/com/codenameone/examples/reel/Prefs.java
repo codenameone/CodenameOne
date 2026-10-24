@@ -74,9 +74,11 @@ public final class Prefs {
         put(LANGUAGE, code);
     }
 
-    /// [#THEME_SYSTEM], [#THEME_LIGHT] or [#THEME_DARK].
+    /// [#THEME_SYSTEM], [#THEME_LIGHT] or [#THEME_DARK]. Dark until the user
+    /// chooses otherwise: a streaming service is watched with the lights down,
+    /// and its art is made to be seen on black.
     public static String theme() {
-        return text(THEME, THEME_SYSTEM);
+        return text(THEME, THEME_DARK);
     }
 
     public static void setTheme(String theme) {

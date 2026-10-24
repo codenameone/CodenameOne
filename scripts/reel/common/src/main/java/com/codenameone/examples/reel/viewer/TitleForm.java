@@ -43,7 +43,8 @@ import com.codenameone.examples.reel.net.Api;
 import com.codenameone.examples.reel.net.Device;
 import com.codenameone.examples.reel.net.Net;
 import com.codenameone.examples.reel.player.PlayerForm;
-import com.codenameone.examples.reel.ui.Art;
+import com.codenameone.examples.reel.ui.Backdrop;
+import com.codenameone.examples.reel.ui.Layouts;
 import com.codenameone.examples.reel.ui.Lang;
 import com.codenameone.examples.reel.ui.Ui;
 
@@ -61,7 +62,7 @@ public final class TitleForm {
     public static void show(final Form previous, final String id) {
         final Form form = Ui.form("", "Title");
         Ui.back(form, previous);
-        final Container page = Ui.list("titlePage");
+        final Container page = Ui.bleed("titlePage");
         form.add(BorderLayout.CENTER, page);
         form.show();
         load(form, page, id);
@@ -81,17 +82,29 @@ public final class TitleForm {
     private static void fill(final Form form, final Container page, final TitleDto t) {
         page.removeAll();
         form.setTitle(t.name());
-        Label art = new Label("", "RlHeroArt");
-        Art.load(art, t.backdropUrl() != null && t.backdropUrl().length() > 0 ? t.backdropUrl() : t.posterUrl(),
-                90f, 50f);
-        page.add(art);
-        Container info = Ui.page();
-        info.add(Ui.label(t.name(), "SvTitle"));
+        Backdrop art = new Backdrop(t.backdropUrl() != null && t.backdropUrl().length() > 0
+                ? t.backdropUrl() : t.posterUrl(), 1f, 0.6f);
+        Container over = new Container(BoxLayout.y());
+        over.setUIID("RlHeroInfo");
+        int side = Math.max(com.codename1.ui.CN.convertToPixels(Layouts.gutter()),
+                (com.codename1.ui.CN.getDisplayWidth() - Layouts.column()) / 2);
+        over.getAllStyles().setPaddingUnit(com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS);
+        over.getAllStyles().setPaddingLeft(side);
+        over.getAllStyles().setPaddingRight(side);
+        com.codename1.components.SpanLabel name = new com.codename1.components.SpanLabel(t.name());
+        name.setUIID("Container");
+        name.setTextUIID("RlHeroTitle");
+        over.add(name);
         String meta = t.year() + Ui.DOT + t.rating() + Ui.DOT + Ui.minutes(t.durationSeconds());
         if (t.ratingCount() > 0) {
             meta += Ui.DOT + Ui.tenths(t.averageRating()) + " / 5";
         }
-        info.add(Ui.label(meta, "SvMuted"));
+        over.add(Ui.label(meta, "RlHeroMeta"));
+        art.add(BorderLayout.SOUTH, over);
+        page.add(art);
+        Container info = Ui.page();
+        // The page scrolls; the column in it does not.
+        info.setScrollableY(false);
         if (t.genres() != null && !t.genres().isEmpty()) {
             Container chips = new Container(new FlowLayout());
             for (String g : t.genres()) {

@@ -1331,72 +1331,150 @@ SvBarTitle {
     margin: 0;
 }
 
+/* A wide screen's places, in the bar beside the service's name. */
+RlNav {
+    background-color: transparent;
+    padding: 0 0 0 4mm;
+    margin: 0;
+}
+
+RlNavLink {
+    color: var(--text-muted);
+    background-color: transparent;
+    font-size: 2.75mm;
+    padding: 1.6mm 2.4mm 1.6mm 2.4mm;
+    margin: 0;
+}
+
+RlNavLink.pressed {
+    color: var(--text);
+}
+
+RlNavPicked {
+    cn1-derive: RlNavLink;
+    color: var(--text);
+    font-family: "native:MainBold";
+}
+
 SvSearch {
     cn1-derive: SvField;
     margin: 2mm 3.6mm 2mm 3.6mm;
 }
 
-/* The featured title at the top of Home: its art, and its name over it. */
-RlHero {
-    background-color: var(--scrim);
-    padding: 0;
-    margin: 0 0 3mm 0;
-}
-
-RlHeroArt {
-    background-color: var(--scrim);
-    color: #6b6b74;
-    padding: 0;
+/* The home screen and a title's page run edge to edge: the backdrop is the
+   full width of the screen and the rows scroll out from under the edge. */
+RlHome {
+    background-color: var(--surface);
+    padding: 0 0 4mm 0;
     margin: 0;
 }
 
-/* The second of the hero's two buttons, held off the first. */
-RlHeroMore {
-    cn1-derive: SvSecondary;
-    margin: 1.6mm 0 0.8mm 2mm;
+/* The picture painted by Backdrop, which also paints its shade; the style
+   only has to stay out of the way. */
+RlBackdrop {
+    background-color: transparent;
+    padding: 0;
+    margin: 0 0 1mm 0;
 }
 
+/* What is laid over the backdrop, at its foot, where the shade has become the
+   page: so it takes the page's text colours, in either theme. */
 RlHeroInfo {
     background-color: transparent;
-    padding: 3mm 3.6mm 3mm 3.6mm;
+    padding: 0 3.6mm 2mm 3.6mm;
+    margin: 0;
+}
+
+RlHeroKicker {
+    color: var(--brand);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 2.1mm;
+    padding: 0 0 0.6mm 0;
     margin: 0;
 }
 
 RlHeroTitle {
-    color: #ffffff;
+    color: var(--text);
     background-color: transparent;
     font-family: "native:MainBold";
-    font-size: 5.2mm;
+    font-size: 7.4mm;
     padding: 0;
     margin: 0;
 }
 
 RlHeroMeta {
-    color: #e6e6e6;
+    color: var(--text-muted);
     background-color: transparent;
-    font-size: 2.5mm;
-    padding: 0.6mm 0 1.6mm 0;
+    font-size: 2.6mm;
+    padding: 0.8mm 0 1.2mm 0;
     margin: 0;
 }
 
-/* A row of posters, under its name. */
+/* Play is the one bright thing on the screen: the page's text colour as its
+   ground, the way a cinema's lights are the one thing you see. */
+RlHeroPlay {
+    color: var(--surface);
+    background-color: var(--text);
+    border-radius: var(--radius);
+    font-family: "native:MainBold";
+    font-size: 2.9mm;
+    text-align: center;
+    padding: 2.6mm 5mm 2.6mm 4mm;
+    margin: 1.6mm 0 0.8mm 0;
+}
+
+RlHeroPlay.pressed {
+    background-color: var(--text-muted);
+}
+
+RlHeroMore {
+    color: var(--text);
+    background-color: var(--surface-alt);
+    border-radius: var(--radius);
+    font-family: "native:MainBold";
+    font-size: 2.9mm;
+    text-align: center;
+    padding: 2.6mm 5mm 2.6mm 4mm;
+    margin: 1.6mm 0 0.8mm 2mm;
+}
+
+RlHeroMore.pressed {
+    background-color: var(--surface-press);
+}
+
+/* A row of titles, under its name. */
+RlRow {
+    background-color: transparent;
+    padding: 0;
+    margin: 0 0 2.4mm 0;
+}
+
 RlRowTitle {
     color: var(--text);
     background-color: transparent;
     font-family: "native:MainBold";
-    font-size: 3.2mm;
-    padding: 3mm 3.6mm 1.4mm 3.6mm;
+    font-size: 3.4mm;
+    padding: 2.4mm 3.6mm 1.6mm 3.6mm;
+    margin: 0;
+}
+
+RlStrip {
+    background-color: transparent;
+    padding: 0;
     margin: 0;
 }
 
 RlCard {
     background-color: transparent;
     padding: 0;
-    margin: 0 0 0 2.4mm;
+    margin: 0 2.4mm 0 0;
 }
 
-RlCard.pressed {
-    background-color: var(--surface-press);
+RlTile {
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
 }
 
 RlPoster {
@@ -1408,11 +1486,20 @@ RlPoster {
     margin: 0;
 }
 
+RlCardName {
+    color: var(--text-muted);
+    background-color: transparent;
+    font-size: 2.3mm;
+    padding: 1mm 0 0 0;
+    margin: 0;
+}
+
 RlCardBadge {
     color: var(--brand-contrast);
     background-color: var(--brand);
+    border-radius: 0.8mm;
     font-family: "native:MainBold";
-    font-size: 1.9mm;
+    font-size: 1.8mm;
     padding: 0.3mm 1.2mm 0.3mm 1.2mm;
     margin: 0;
 }
@@ -1422,7 +1509,7 @@ RlProgress {
     background-color: var(--line);
     color: var(--brand);
     padding: 0;
-    margin: 0.6mm 0 0 0;
+    margin: 0;
 }
 
 /* The player is black whatever the theme, as video is. */
@@ -1505,7 +1592,18 @@ RlProfileName {
     SvBar { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
     SvBarTitle { color: var(--text-dark); }
     RlRowTitle { color: var(--text-dark); }
-    RlCard.pressed { background-color: var(--surface-press-dark); }
+    RlHome { background-color: var(--surface-dark); }
+    RlNavLink { color: var(--text-muted-dark); }
+    RlNavLink.pressed { color: var(--text-dark); }
+    RlNavPicked { color: var(--text-dark); }
+    RlHeroKicker { color: var(--brand-dark); }
+    RlHeroTitle { color: var(--text-dark); }
+    RlHeroMeta { color: var(--text-muted-dark); }
+    RlHeroPlay { color: var(--surface-dark); background-color: var(--text-dark); }
+    RlHeroPlay.pressed { background-color: var(--text-muted-dark); }
+    RlHeroMore { color: var(--text-dark); background-color: var(--surface-press-dark); }
+    RlHeroMore.pressed { background-color: var(--line-strong-dark); }
+    RlCardName { color: var(--text-muted-dark); }
     RlPoster { background-color: var(--surface-alt-dark); color: var(--text-muted-dark); }
     RlCardBadge { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
     RlProgress { background-color: var(--line-dark); color: var(--brand-dark); }

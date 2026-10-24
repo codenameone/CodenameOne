@@ -20,6 +20,8 @@ package com.codenameone.examples.reel;
 
 import com.codename1.components.SpanLabel;
 import com.codename1.io.FileSystemStorage;
+import com.codename1.io.Log;
+import com.codename1.io.Storage;
 import com.codename1.io.oidc.OidcTokens;
 import com.codename1.io.oidc.TokenStore;
 import com.codename1.testing.AbstractTest;
@@ -81,12 +83,20 @@ public abstract class E2e extends AbstractTest {
 
     @Override
     public void prepare() {
+        if (Boolean.getBoolean("reel.e2e.desktop")) {
+            // The test runner opens the window before the app can say how big
+            // it wants it, so the desktop pass sets the size of a laptop
+            // screen itself, the same on every machine.
+            onEdt(() -> CN.setWindowSize(1440, 900));
+            settle();
+        }
         onEdt(() -> {
             Session.useStore(new MemoryStore());
             // The tests read the screens in English, whatever the machine
             // they run on speaks.
             Prefs.setLanguage("en");
-            Prefs.setTheme(Prefs.THEME_LIGHT);
+            Prefs.setTheme(Prefs.THEME_DARK);
+            forgetImages();
             // Answered, with a no: no test is stopped by the question a first
             // sign-in is asked.
             Telemetry.allow(false);
@@ -97,6 +107,33 @@ public abstract class E2e extends AbstractTest {
             Nav.launch();
         });
         waitForForm("Welcome");
+    }
+
+    /// Deletes the images an earlier run downloaded. The cache is keyed by URL
+    /// and a poster keeps its URL when the media is packaged again, so
+    /// without this a capture shows whatever the last run saw.
+    private static void forgetImages() {
+        // Where the platform has a caches directory the images are there,
+        // otherwise in Storage, under the same names.
+        for (String name : Storage.getInstance().listEntries()) {
+            if (name.startsWith("cn1_image_cache[")) {
+                Storage.getInstance().deleteStorageFile(name);
+            }
+        }
+        FileSystemStorage files = FileSystemStorage.getInstance();
+        if (!files.hasCachesDir()) {
+            return;
+        }
+        String dir = files.getCachesDir();
+        try {
+            for (String name : files.listFiles(dir)) {
+                if (name.startsWith("cn1_image_cache[")) {
+                    files.delete(dir + files.getFileSystemSeparator() + name);
+                }
+            }
+        } catch (java.io.IOException err) {
+            Log.e(err);
+        }
     }
 
     @Override
@@ -288,6 +325,10 @@ public abstract class E2e extends AbstractTest {
         settle();
         FileSystemStorage files = FileSystemStorage.getInstance();
         try {
+            if (Boolean.getBoolean("reel.e2e.desktop")) {
+                // The desktop pass captures the same screens; keep both.
+                name = name + "-desktop";
+            }
             Image[] captured = {capture(name)};
             String goldens = fileUrl(System.getProperty("reel.goldens.dir"));
             String golden = goldens == null ? "" : goldens + "/" + name + ".png";

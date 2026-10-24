@@ -52,7 +52,7 @@ import java.util.Map;
 public final class Layouts {
     /// A window at least this wide, in millimetres, is laid out side by side.
     /// A phone on its side is narrower; a tablet on its side is not.
-    private static final float WIDE_MM = 165f;
+    static final float WIDE_MM = 165f;
     /// The widest a column of text and controls is left to grow.
     private static final float COLUMN_MM = 150f;
 
@@ -82,6 +82,13 @@ public final class Layouts {
     /// Whether there is room to lay a screen out side by side.
     public static boolean wide() {
         return CN.getDisplayWidth() >= CN.convertToPixels(WIDE_MM);
+    }
+
+    /// The space kept clear at the left and right of what runs edge to edge
+    /// (the home screen's rows), in millimetres: more on a wide screen, where
+    /// a phone's margin looks cramped.
+    public static float gutter() {
+        return wide() ? 9f : 3.6f;
     }
 
     /// The widest a single column of content is drawn, in pixels.

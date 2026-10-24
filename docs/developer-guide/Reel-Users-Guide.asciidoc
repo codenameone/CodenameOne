@@ -67,11 +67,19 @@ The home screen leads with one title and then rows: continue watching,
 recommendations based on what the profile watched, the list, and the catalog
 by genre. Search finds titles by name, synopsis, genre, and creator.
 
+image::img/reel-viewer-home-desktop.png["The home screen in a desktop window: the featured title's artwork across the whole width, the sections of the app along the top bar, and rows of titles under the artwork",scaledwidth=90%]
+
+On a desktop or a tablet the sections of the app sit along the top bar, the
+featured title's text moves to the left of its artwork, and the rows show as
+many titles as the window has room for.
+
 image::img/reel-viewer-title.png["A title's page with its artwork, year, rating and length, genre chips, a Play button and buttons to add it to the list and to report it",scaledwidth=40%]
 
 A title's page shows its episodes or lessons, plays it from where the profile
 stopped, adds it to the list, rates it, downloads it and reports it. A title
 that's not in the plan offers the plan that has it, or a rental.
+
+image::img/reel-viewer-title-desktop.png["A title's page in a desktop window, its artwork across the top and its details in a centered column under the title",scaledwidth=90%]
 
 The player is the platform's own. On a plan with ads, short ad breaks play
 before and during the title, and some can be skipped after a few seconds.

@@ -188,12 +188,27 @@ public final class Ui {
                 both.add(bar).add(top);
                 form.add(BorderLayout.NORTH, both);
             }
-            Layouts.dress(bar);
+            if (!Nav.viewing()) {
+                Layouts.dress(bar);
+            }
             form.revalidate();
         });
     }
 
     /// A column of content with the page's margins, that scrolls when it has to.
+    /// A scrolling page that runs edge to edge, for a screen that leads with a
+    /// [Backdrop]: the home screen and a title's page. What goes in it keeps
+    /// to the gutter or the column itself.
+    public static Container bleed(String name) {
+        Container page = new Container(BoxLayout.y());
+        page.setUIID("RlHome");
+        page.setScrollableY(true);
+        page.setScrollVisible(false);
+        page.setName(name);
+        page.add(new Skeleton(5));
+        return page;
+    }
+
     public static Container page() {
         Container page = new Column();
         page.setUIID("SvPage");

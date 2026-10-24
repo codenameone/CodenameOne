@@ -31,7 +31,8 @@ import com.codenameone.examples.reel.api.TitleCardDto;
 import com.codenameone.examples.reel.net.Account;
 import com.codenameone.examples.reel.net.Api;
 import com.codenameone.examples.reel.net.Net;
-import com.codenameone.examples.reel.ui.Art;
+import com.codenameone.examples.reel.ui.Backdrop;
+import com.codenameone.examples.reel.ui.Layouts;
 import com.codenameone.examples.reel.ui.Nav;
 import com.codenameone.examples.reel.ui.SettingsForm;
 import com.codenameone.examples.reel.ui.Shell;
@@ -43,7 +44,7 @@ import com.codenameone.examples.reel.ui.Ui;
 /// plans are in the menu.
 public final class HomeForm implements Nav.Home {
     private final Shell shell = new Shell("Home", Nav.VIEWER);
-    private final Container page = Ui.list("home");
+    private final Container page = Ui.bleed("home");
 
     @Override
     public void start() {
@@ -100,23 +101,43 @@ public final class HomeForm implements Nav.Home {
     }
 
     private static Container hero(final Form form, final TitleCardDto t) {
-        Container hero = new Container(new BorderLayout());
-        hero.setUIID("RlHero");
-        Label art = new Label("", "RlHeroArt");
-        Art.load(art, t.backdropUrl() != null && t.backdropUrl().length() > 0 ? t.backdropUrl() : t.posterUrl(),
-                90f, 50f);
-        hero.add(BorderLayout.CENTER, art);
+        // Taller than the picture on a phone, where the title and buttons sit
+        // on its lower part; on a desktop it stops at two thirds of the window.
+        Backdrop hero = new Backdrop(t.backdropUrl() != null && t.backdropUrl().length() > 0
+                ? t.backdropUrl() : t.posterUrl(), Layouts.wide() ? 1f : 1.45f, Layouts.wide() ? 0.58f : 0.68f);
         Container info = new Container(BoxLayout.y());
         info.setUIID("RlHeroInfo");
-        info.add(Ui.label(t.name(), "RlHeroTitle"));
+        int side = com.codename1.ui.CN.convertToPixels(Layouts.gutter());
+        info.getAllStyles().setPaddingUnit(com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS);
+        info.getAllStyles().setPaddingLeft(side);
+        info.getAllStyles().setPaddingRight(side);
+        Label kicker = Ui.label("FEATURED", "RlHeroKicker");
+        info.add(kicker);
+        com.codename1.components.SpanLabel name = new com.codename1.components.SpanLabel(t.name());
+        name.setTextUIID("RlHeroTitle");
+        name.setUIID("Container");
+        info.add(name);
         info.add(Ui.label(t.year() + Ui.DOT + t.rating(), "RlHeroMeta"));
         Container buttons = new Container(BoxLayout.x());
-        buttons.add(Ui.primary("Play", "heroPlay", e -> TitleForm.play(form, t.id(), null)));
+        com.codename1.ui.Button play = Ui.primary("Play", "heroPlay", e -> TitleForm.play(form, t.id(), null));
+        play.setUIID("RlHeroPlay");
+        com.codename1.ui.FontImage.setMaterialIcon(play, com.codename1.ui.FontImage.MATERIAL_PLAY_ARROW);
+        buttons.add(play);
         com.codename1.ui.Button more = Ui.secondary("More info", "heroInfo", e -> TitleForm.show(form, t.id()));
         more.setUIID("RlHeroMore");
+        com.codename1.ui.FontImage.setMaterialIcon(more, com.codename1.ui.FontImage.MATERIAL_INFO_OUTLINE);
         buttons.add(more);
         info.add(buttons);
-        hero.add(BorderLayout.SOUTH, info);
+        if (Layouts.wide()) {
+            // Beside the picture rather than across it: a line of buttons as
+            // wide as a desktop window reads as a toolbar, not a title.
+            Container left = new Container(new BorderLayout());
+            left.add(BorderLayout.SOUTH, info);
+            info.setPreferredW(com.codename1.ui.CN.getDisplayWidth() * 45 / 100);
+            hero.add(BorderLayout.WEST, left);
+        } else {
+            hero.add(BorderLayout.SOUTH, info);
+        }
         return hero;
     }
 }

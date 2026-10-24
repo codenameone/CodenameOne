@@ -22,53 +22,81 @@ import com.codename1.ui.Button;
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
-import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.CN;
+import com.codename1.ui.layouts.LayeredLayout;
+import com.codename1.ui.plaf.Style;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codenameone.examples.reel.api.TitleCardDto;
 import com.codenameone.examples.reel.ui.Art;
+import com.codenameone.examples.reel.ui.Layouts;
 import com.codenameone.examples.reel.ui.Ui;
 import java.util.List;
 
-/// Title cards: a poster with what matters at a glance (progress, a badge,
-/// free or for rent), alone or in a row that scrolls sideways.
+/// Title cards: a landscape still of the title with what matters at a glance
+/// laid over it (a badge, how far the profile got) and its name under it, alone
+/// or in a row that scrolls sideways.
 public final class Cards {
-    public static final float POSTER_W = 26f;
-    public static final float POSTER_H = 39f;
-
     private Cards() {
+    }
+
+    /// The width of a card, in millimetres: larger on a wide screen, where a
+    /// row shows five or six of them, than on a phone, where it shows two and
+    /// the start of a third.
+    public static float width() {
+        return Layouts.wide() ? 58f : 40f;
     }
 
     /// One card; a tap opens the title.
     public static Container card(final Form from, final TitleCardDto t) {
-        Label poster = new Label(t.name(), "RlPoster");
-        Art.load(poster, t.posterUrl(), POSTER_W, POSTER_H);
-        Container box = new Container(new BorderLayout());
-        box.setUIID("RlCard");
-        box.add(BorderLayout.CENTER, poster);
-        Container under = new Container(BoxLayout.y());
-        if (t.progressPercent() > 0) {
-            under.add(new Progress(t.progressPercent()));
-        }
+        float w = width();
+        float h = w * 9f / 16f;
+        Label still = new Label("", "RlPoster");
+        Art.load(still, t.posterUrl(), w, h);
+        Container tile = new Container(new LayeredLayout());
+        tile.setUIID("RlTile");
+        tile.add(still);
         String badge = t.badge() != null && t.badge().length() > 0 ? t.badge()
                 : t.free() ? "Free" : t.rentable() ? "Rent" : null;
         if (badge != null) {
-            under.add(Ui.badge(badge, "RlCardBadge"));
+            Label b = Ui.badge(badge, "RlCardBadge");
+            tile.add(b);
+            ((LayeredLayout) tile.getLayout()).setInsets(b, "1mm auto auto 1mm");
         }
-        box.add(BorderLayout.SOUTH, under);
+        if (t.progressPercent() > 0) {
+            Progress bar = new Progress(t.progressPercent(), w);
+            tile.add(bar);
+            ((LayeredLayout) tile.getLayout()).setInsets(bar, "auto 0 0 0");
+        }
+        Container box = new Container(BoxLayout.y());
+        box.setUIID("RlCard");
+        box.add(tile);
+        Label name = Ui.label(t.name(), "RlCardName");
+        name.setPreferredW(CN.convertToPixels(w));
+        box.add(name);
         Button tap = new Button();
         tap.setUIID("Container");
         tap.setName("title-" + t.id());
         tap.addActionListener(e -> TitleForm.show(from, t.id()));
         box.setLeadComponent(tap);
-        box.add(BorderLayout.NORTH, tap);
+        box.add(tap);
         return box;
     }
 
-    /// A headed row of cards that scrolls sideways.
+    /// A headed row of cards that scrolls sideways, starting at the gutter and
+    /// running out under the right-hand edge.
     public static Container row(Form from, String id, String heading, List<TitleCardDto> titles) {
+        int side = CN.convertToPixels(Layouts.gutter());
         Container row = new Container(BoxLayout.y());
-        row.add(Ui.label(heading, "RlRowTitle"));
+        row.setUIID("RlRow");
+        Label title = Ui.label(heading, "RlRowTitle");
+        title.getAllStyles().setPaddingUnit(Style.UNIT_TYPE_PIXELS);
+        title.getAllStyles().setPaddingLeft(side);
+        row.add(title);
         Container strip = new Container(BoxLayout.x());
+        strip.setUIID("RlStrip");
+        strip.getAllStyles().setPaddingUnit(Style.UNIT_TYPE_PIXELS);
+        strip.getAllStyles().setPaddingLeft(side);
+        strip.getAllStyles().setPaddingRight(side);
         strip.setScrollableX(true);
         strip.setScrollVisible(false);
         strip.setName("row-" + id);
@@ -83,22 +111,30 @@ public final class Cards {
     public static final class Progress extends com.codename1.ui.Component {
         private final int percent;
 
-        public Progress(int percent) {
+        private final float widthMm;
+
+        public Progress(int percent, float widthMm) {
             this.percent = Math.max(0, Math.min(100, percent));
+            this.widthMm = widthMm;
             setUIID("RlProgress");
         }
 
         @Override
         public void paint(com.codename1.ui.Graphics g) {
             int w = getWidth() * percent / 100;
+            int alpha = g.getAlpha();
+            g.setColor(0);
+            g.setAlpha(150);
+            g.fillRect(getX(), getY(), getWidth(), getHeight());
+            g.setAlpha(alpha);
             g.setColor(getStyle().getFgColor());
             g.fillRect(getX(), getY(), w, getHeight());
         }
 
         @Override
         protected com.codename1.ui.geom.Dimension calcPreferredSize() {
-            return new com.codename1.ui.geom.Dimension(com.codename1.ui.CN.convertToPixels(POSTER_W),
-                    com.codename1.ui.CN.convertToPixels(0.8f));
+            return new com.codename1.ui.geom.Dimension(CN.convertToPixels(widthMm),
+                    CN.convertToPixels(0.7f));
         }
     }
 }

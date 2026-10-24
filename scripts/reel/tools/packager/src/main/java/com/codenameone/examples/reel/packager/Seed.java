@@ -40,7 +40,10 @@ import java.util.zip.ZipInputStream;
 
 /// Prepares the offline demo catalog: Blender films, generated lessons and ads.
 final class Seed {
-    private record Film(String code, String slug, String url) {
+    /// `posterSeconds` is a frame picked by hand for the poster: the packager's
+    /// default, a tenth of the way in, lands on the opening titles of every film,
+    /// and always does for a `--small` catalog, which keeps only the first minute.
+    private record Film(String code, String slug, String url, double posterSeconds) {
         String fileName() {
             String n = url.substring(url.lastIndexOf('/') + 1);
             return n.endsWith(".zip") ? n.substring(0, n.length() - 4) : n;
@@ -49,10 +52,10 @@ final class Seed {
 
     private static final String BLENDER = "https://download.blender.org/";
     private static final List<Film> FILMS = List.of(
-            new Film("bbb", "big-buck-bunny", BLENDER + "peach/bigbuckbunny_movies/big_buck_bunny_480p_h264.mov.zip"),
-            new Film("sintel", "sintel", BLENDER + "durian/movies/Sintel.2010.720p.mkv.zip"),
-            new Film("tos", "tears-of-steel", BLENDER + "demo/movies/ToS/tears_of_steel_720p.mov"),
-            new Film("ed", "elephants-dream", BLENDER + "ED/elephantsdream-480-h264-st-aac.mov"));
+            new Film("bbb", "big-buck-bunny", BLENDER + "peach/bigbuckbunny_movies/big_buck_bunny_480p_h264.mov.zip", 108),
+            new Film("sintel", "sintel", BLENDER + "durian/movies/Sintel.2010.720p.mkv.zip", 202),
+            new Film("tos", "tears-of-steel", BLENDER + "demo/movies/ToS/tears_of_steel_720p.mov", 308),
+            new Film("ed", "elephants-dream", BLENDER + "ED/elephantsdream-480-h264-st-aac.mov", 162));
 
     private static final String[] COLORS = {"0x1b3a5c", "0x3c1b5c", "0x1b5c3a"};
     private static final String[][] LESSONS = {
@@ -172,6 +175,17 @@ final class Seed {
             writeSeed(seedJson, slugs, entries);
         }
         writeSeed(seedJson, slugs, entries);
+        for (Film f : FILMS) {
+            Path source = sources.resolve(f.fileName());
+            Path dir = media.resolve(f.slug());
+            if (filmCodes.contains(f.code()) && Files.isRegularFile(source) && Files.isDirectory(dir)) {
+                // One frame from the full film, so it is cheap to redo on every run
+                // and a catalog packaged before the frame was chosen picks it up.
+                Ffmpeg.run(List.of("-ss", String.valueOf(f.posterSeconds()), "-i", source.toString(),
+                        "-frames:v", "1", "-vf", "scale=1280:-2", "-q:v", "3",
+                        dir.resolve("poster.jpg").toString()));
+            }
+        }
         System.out.println("seed.json lists " + entries.size() + " videos");
     }
 

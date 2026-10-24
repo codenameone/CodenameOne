@@ -92,36 +92,26 @@ set -e
 # passes untouched in the other (E2e.desktop()).
 #
 # The simulator is a desktop when its "desktopSkin" preference says so; there
-# is no switch for it on the command line. Java keeps preferences in files only
-# on Linux, where java.util.prefs.userRoot can point them at a directory of
-# this run's own -- so that is where this pass runs, which covers CI and a
-# container. Elsewhere it would mean rewriting the developer's own simulator
-# preferences, and it is skipped with a word.
-if [ "$STATUS" -eq 0 ] && [ "$(uname -s)" = "Linux" ]; then
+# is no switch for it on the command line. Rather than rewrite the developer's
+# own simulator preferences, this pass replaces Java's preference store for the
+# run with one in memory that says so (tools/e2e/DesktopSkinPreferences.java),
+# which works the same on every OS.
+if [ "$STATUS" -eq 0 ]; then
   PREFS="$HERE/target/e2e-desktop-prefs"
-  NODE="$PREFS/.java/.userPrefs/com/codename1/impl/javase"
   rm -rf "$PREFS"
-  mkdir -p "$NODE"
-  cat >"$NODE/prefs.xml" <<'XML'
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE map SYSTEM "http://java.sun.com/dtd/preferences.dtd">
-<map MAP_XML_VERSION="1.0">
-  <entry key="desktopSkin" value="true"/>
-</map>
-XML
+  mkdir -p "$PREFS"
+  javac -d "$PREFS" "$HERE/tools/e2e/DesktopSkinPreferences.java"
   echo "[reel-e2e] the desktop pass"
   # The last two are the project's own build hints, from
   # common/codenameone_settings.properties. A packaged desktop app is given
   # them by its launcher; a test run starts the simulator in
   # common/target/cn1-reports, from where it does not find the project's
   # settings, so it has to be told.
-  export JAVA_TOOL_OPTIONS="$JAVA_TOOL_OPTIONS -Dreel.e2e.desktop=true -Djava.util.prefs.userRoot=$PREFS -Dcodename1.arg.nativeTheme=native -Dcodename1.arg.desktop.titleBar=native"
+  export JAVA_TOOL_OPTIONS="$JAVA_TOOL_OPTIONS -Dreel.e2e.desktop=true -Xbootclasspath/a:$PREFS -Djava.util.prefs.PreferencesFactory=DesktopSkinPreferences -Dcodename1.arg.nativeTheme=native -Dcodename1.arg.desktop.titleBar=native"
   set +e
   ${RUNNER[@]+"${RUNNER[@]}"} "$MVN" -B -f "$HERE/pom.xml" -Dcodename1.platform=javase -Ptest verify
   STATUS=$?
   set -e
-elif [ "$STATUS" -eq 0 ]; then
-  echo "[reel-e2e] not on Linux: the desktop pass was skipped"
 fi
 
 if [ "$STATUS" -ne 0 ]; then

@@ -35,16 +35,20 @@ public final class Shell {
     private final Container body = new Container(new BorderLayout());
     private final Container actions = new Container(BoxLayout.x());
     private final com.codename1.ui.Label title = new com.codename1.ui.Label("", "SvBarTitle");
+    private final Container middle = new Container(new BorderLayout());
+    private final String mode;
 
     public Shell(String name, String mode) {
         form = Ui.home(name);
+        this.mode = mode;
         menu = new Menu(form, mode);
         Container bar = new Container(new BorderLayout());
         bar.setUIID("SvBar");
         bar.setSafeArea(true);
         bar.add(BorderLayout.WEST, menu.flatButton());
         title.setName("title");
-        bar.add(BorderLayout.CENTER, title);
+        middle.add(BorderLayout.WEST, title);
+        bar.add(BorderLayout.CENTER, middle);
         bar.add(BorderLayout.EAST, actions);
         Container frame = new Container(new BorderLayout());
         frame.add(BorderLayout.NORTH, bar);
@@ -75,7 +79,30 @@ public final class Shell {
     }
 
     /// Call once everything is added: the menu goes on top.
+    ///
+    /// On a wide screen a viewer also gets the places in the bar itself, the
+    /// way a streaming site on a desktop shows them: a menu behind a button is
+    /// a phone's answer to having no room, and a desktop window has room. The
+    /// menu stays, for the modes, Settings and signing out.
     public void done() {
+        if (Layouts.wide() && Nav.VIEWER.equals(mode)) {
+            Container nav = new Container(BoxLayout.x());
+            nav.setUIID("RlNav");
+            java.util.List<Object[]> links = menu.links();
+            for (int iter = 0; iter < links.size(); iter++) {
+                final Object[] link = links.get(iter);
+                Object go = link[2];
+                if (!(go instanceof Runnable)) {
+                    continue;
+                }
+                final Runnable run = (Runnable) go;
+                Button b = new Button(Lang.tr(String.valueOf(link[0])), iter == 0 ? "RlNavPicked" : "RlNavLink");
+                b.setName("nav-" + link[1]);
+                b.addActionListener(e -> run.run());
+                nav.add(b);
+            }
+            middle.add(BorderLayout.CENTER, nav);
+        }
         menu.install();
     }
 }

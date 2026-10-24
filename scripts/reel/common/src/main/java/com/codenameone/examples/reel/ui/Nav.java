@@ -19,7 +19,9 @@
 package com.codenameone.examples.reel.ui;
 
 import com.codename1.ui.Container;
+import com.codename1.ui.Display;
 import com.codename1.ui.Form;
+import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codenameone.examples.reel.AppConfig;
 import com.codenameone.examples.reel.Prefs;
@@ -85,6 +87,10 @@ public final class Nav {
         });
         Form starting = Ui.form("", "Starting");
         starting.getToolbar().hideToolbar();
+        // On a desktop the first form decides how big the window opens;
+        // without this it opens the size of a phone, and the catalog's wide
+        // layout is never seen until someone drags the corner.
+        starting.putClientProperty(Display.WINDOW_SIZE_HINT_PERCENT, new Dimension(80, 85));
         starting.show();
         Session.restore(Nav::enter, WelcomeForm::show, Nav::unreachable);
     }
@@ -156,6 +162,12 @@ public final class Nav {
     }
 
     /// Whether the account may enter `mode`.
+    /// Whether the app is in the viewer's mode: the catalog's own dark look,
+    /// which a desktop leaves alone, where the consoles take the platform's.
+    public static boolean viewing() {
+        return VIEWER.equals(homeMode);
+    }
+
     public static boolean allowed(AccountDto user, String mode) {
         if (VIEWER.equals(mode)) {
             return true;
