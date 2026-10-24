@@ -855,6 +855,16 @@ public final class ResourceCompiler {
                             continue;
                         }
                         m.activities.add(parseActivity(a, m.packageName, file));
+                    } else if (a.tag.equals("service")
+                            && !"false".equals(a.attr(RawNode.NS_KEY_ANDROID, "enabled"))) {
+                        // A service is only ever started by its class here: the
+                        // generated factory news it, and its intent filters
+                        // (other applications binding to it) have no meaning in
+                        // a single-application runtime.
+                        String name = a.attr(RawNode.NS_KEY_ANDROID, "name");
+                        if (name != null) {
+                            m.services.add(ManifestInfo.resolveClass(m.packageName, name));
+                        }
                     }
                 }
             }

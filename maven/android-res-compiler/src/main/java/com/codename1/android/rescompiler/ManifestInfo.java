@@ -105,6 +105,8 @@ public final class ManifestInfo {
     public Value appLabel;
     public Value appIcon;
     public final List<Activity> activities = new ArrayList<Activity>();
+    /// The fully qualified classes of the enabled `<service>` elements.
+    public final List<String> services = new ArrayList<String>();
     public final List<String> permissions = new ArrayList<String>();
 
     /// The `ActivityInfo.CONFIG_*` bit of each `android:configChanges` flag

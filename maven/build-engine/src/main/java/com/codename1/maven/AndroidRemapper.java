@@ -79,6 +79,8 @@ public final class AndroidRemapper {
     /// placeholder, the view model base it looks for, and the constructor
     /// argument types it passes.
     public static final String VIEW_MODEL_FACTORY = RUNTIME_TARGET + "ViewModelFactory";
+    /// The Room database factory the runtime ships as a placeholder.
+    public static final String ROOM_FACTORY = RUNTIME_TARGET + "RoomFactory";
     static final String VIEW_MODEL = TARGET + "androidx/lifecycle/ViewModel";
     static final String APPLICATION = TARGET + "android/app/Application";
     static final String SAVED_STATE_HANDLE = TARGET + "androidx/lifecycle/SavedStateHandle";
@@ -90,6 +92,14 @@ public final class AndroidRemapper {
     static final String[] VIEW_MODEL_CTORS = {
         "(L" + APPLICATION + ";L" + SAVED_STATE_HANDLE + ";)V", "(L" + SAVED_STATE_HANDLE + ";)V",
         "(L" + APPLICATION + ";)V", "()V"};
+
+    /// The generated replacement for the runtime's `WorkerInstantiator`
+    /// placeholder, the worker bases it looks for, and the one constructor
+    /// WorkManager's default factory calls.
+    public static final String WORKER_INSTANTIATOR = RUNTIME_TARGET + "WorkerInstantiator";
+    static final String[] WORKER_BASES = {TARGET + "androidx/work/ListenableWorker", TARGET + "androidx/work/Worker"};
+    static final String WORKER_CTOR = "(L" + TARGET + "android/content/Context;L" + TARGET
+            + "androidx/work/WorkerParameters;)V";
 
     /// JDK classes Android code uses that the Codename One runtime lacks,
     /// redirected to the compatibility runtime's implementations.
@@ -108,6 +118,35 @@ public final class AndroidRemapper {
         {"java/io/FilterInputStream", "com/codename1/androidcompat/jdk/FilterInputStream"},
         {"java/io/FilterOutputStream", "com/codename1/androidcompat/jdk/FilterOutputStream"},
         {"java/io/PrintWriter", "com/codename1/androidcompat/jdk/PrintWriter"},
+        // The JCA surface Android Keystore code uses. GeneralSecurityException,
+        // NoSuchAlgorithmException and SecureRandom are in the Codename One
+        // class library itself and are deliberately absent here.
+        {"java/security/Key", "com/codename1/androidcompat/jdk/Key"},
+        {"java/security/KeyStore", "com/codename1/androidcompat/jdk/KeyStore"},
+        {"java/security/KeyStore$LoadStoreParameter", "com/codename1/androidcompat/jdk/KeyStore$LoadStoreParameter"},
+        {"java/security/KeyStore$ProtectionParameter", "com/codename1/androidcompat/jdk/KeyStore$ProtectionParameter"},
+        {"java/security/KeyStore$Entry", "com/codename1/androidcompat/jdk/KeyStore$Entry"},
+        {"java/security/KeyStore$SecretKeyEntry", "com/codename1/androidcompat/jdk/KeyStore$SecretKeyEntry"},
+        {"java/security/KeyException", "com/codename1/androidcompat/jdk/KeyException"},
+        {"java/security/KeyStoreException", "com/codename1/androidcompat/jdk/KeyStoreException"},
+        {"java/security/InvalidKeyException", "com/codename1/androidcompat/jdk/InvalidKeyException"},
+        {"java/security/InvalidAlgorithmParameterException", "com/codename1/androidcompat/jdk/InvalidAlgorithmParameterException"},
+        {"java/security/NoSuchProviderException", "com/codename1/androidcompat/jdk/NoSuchProviderException"},
+        {"java/security/UnrecoverableEntryException", "com/codename1/androidcompat/jdk/UnrecoverableEntryException"},
+        {"java/security/UnrecoverableKeyException", "com/codename1/androidcompat/jdk/UnrecoverableKeyException"},
+        {"java/security/cert/CertificateException", "com/codename1/androidcompat/jdk/CertificateException"},
+        {"java/security/spec/AlgorithmParameterSpec", "com/codename1/androidcompat/jdk/AlgorithmParameterSpec"},
+        {"java/security/spec/KeySpec", "com/codename1/androidcompat/jdk/KeySpec"},
+        {"javax/crypto/Cipher", "com/codename1/androidcompat/jdk/Cipher"},
+        {"javax/crypto/KeyGenerator", "com/codename1/androidcompat/jdk/KeyGenerator"},
+        {"javax/crypto/SecretKey", "com/codename1/androidcompat/jdk/SecretKey"},
+        {"javax/crypto/NoSuchPaddingException", "com/codename1/androidcompat/jdk/NoSuchPaddingException"},
+        {"javax/crypto/BadPaddingException", "com/codename1/androidcompat/jdk/BadPaddingException"},
+        {"javax/crypto/AEADBadTagException", "com/codename1/androidcompat/jdk/AEADBadTagException"},
+        {"javax/crypto/IllegalBlockSizeException", "com/codename1/androidcompat/jdk/IllegalBlockSizeException"},
+        {"javax/crypto/spec/GCMParameterSpec", "com/codename1/androidcompat/jdk/GCMParameterSpec"},
+        {"javax/crypto/spec/IvParameterSpec", "com/codename1/androidcompat/jdk/IvParameterSpec"},
+        {"javax/crypto/spec/SecretKeySpec", "com/codename1/androidcompat/jdk/SecretKeySpec"},
         // Every Codename One stream, reader and writer is AutoCloseable, and
         // close() is the interface's only method, so code holding a Closeable
         // runs unchanged against it.
@@ -187,6 +226,11 @@ public final class AndroidRemapper {
 
     public void run() throws BuildException {
         try {
+            if (shipRuntime) {
+                // Room's implementations are generated as source naming the
+                // real androidx types, so before anything is relocated.
+                new RoomGenerator(classesDir, handlerDirs, compatJar, log).generate();
+            }
             List<String> appClasses = new ArrayList<String>();
             applicationClasses = appClasses;
             relocator.remapDirectory(classesDir, appClasses, log);
@@ -198,8 +242,16 @@ public final class AndroidRemapper {
             int handlers = writeOnClickDispatch(appClasses);
             int fragments = writeFragmentFactory();
             int viewModels = writeViewModelFactory();
+            int databases = writeRoomFactory();
+            if (databases > 0) {
+                log.info(databases + " Room database(s) buildable by Room.databaseBuilder");
+            }
             if (viewModels > 0) {
                 log.info(viewModels + " view model class(es) creatable by ViewModelProvider");
+            }
+            int workers = writeWorkerInstantiator();
+            if (workers > 0) {
+                log.info(workers + " worker class(es) creatable by WorkManager");
             }
             int jsMethods = writeJsInterfaceDispatch(appClasses);
             if (jsMethods > 0) {
@@ -572,6 +624,178 @@ public final class AndroidRemapper {
         out.getParentFile().mkdirs();
         ClassRelocator.write(out, cw.toByteArray());
         return models.size();
+    }
+
+    /// Replaces the runtime's `RoomFactory` with `create(String)` answering
+    /// `new Name_Impl()` for every `@Database` class -- what Room's
+    /// `Room.getGeneratedImplementation` finds by `Class.forName` on Android.
+    private int writeRoomFactory() throws IOException {
+        List<File> all = new ArrayList<File>();
+        ClassRelocator.collectClassFiles(classesDir, all);
+        for (File dir : handlerDirs) {
+            ClassRelocator.collectClassFiles(dir, all);
+        }
+        final List<String> dbs = new ArrayList<String>();
+        for (File f : all) {
+            ClassReader cr = new ClassReader(Files.readAllBytes(f.toPath()));
+            final String cls = cr.getClassName();
+            if (cls.startsWith(TARGET)) {
+                continue;
+            }
+            final boolean[] found = new boolean[1];
+            cr.accept(new ClassVisitor(Opcodes.ASM9) {
+                @Override
+                public org.objectweb.asm.AnnotationVisitor visitAnnotation(String desc, boolean visible) {
+                    if (desc.equals(RoomGenerator.DATABASE) || desc.equals(RoomGenerator.DATABASE_RELOCATED)) {
+                        found[0] = true;
+                    }
+                    return null;
+                }
+            }, ClassReader.SKIP_CODE);
+            if (found[0]) {
+                String impl = RoomGenerator.implName(cls);
+                if (!new File(classesDir, impl + ".class").isFile()) {
+                    throw new IOException("Room: " + cls.replace('/', '.') + " has no generated " + impl);
+                }
+                dbs.add(cls);
+            }
+        }
+        java.util.Collections.sort(dbs);
+        ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+        cw.visit(Opcodes.V1_5, Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL | Opcodes.ACC_SUPER, ROOM_FACTORY, null,
+                "java/lang/Object", null);
+        MethodVisitor ctor = cw.visitMethod(Opcodes.ACC_PRIVATE, "<init>", "()V", null, null);
+        ctor.visitCode();
+        ctor.visitVarInsn(Opcodes.ALOAD, 0);
+        ctor.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
+        ctor.visitInsn(Opcodes.RETURN);
+        ctor.visitMaxs(0, 0);
+        ctor.visitEnd();
+        MethodVisitor mv = cw.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "create",
+                "(Ljava/lang/String;)Ljava/lang/Object;", null, null);
+        mv.visitCode();
+        for (String cls : dbs) {
+            Label next = new Label();
+            String impl = RoomGenerator.implName(cls);
+            mv.visitLdcInsn(cls.replace('/', '.'));
+            mv.visitVarInsn(Opcodes.ALOAD, 0);
+            mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "equals", "(Ljava/lang/Object;)Z", false);
+            mv.visitJumpInsn(Opcodes.IFEQ, next);
+            mv.visitTypeInsn(Opcodes.NEW, impl);
+            mv.visitInsn(Opcodes.DUP);
+            mv.visitMethodInsn(Opcodes.INVOKESPECIAL, impl, "<init>", "()V", false);
+            mv.visitInsn(Opcodes.ARETURN);
+            mv.visitLabel(next);
+        }
+        mv.visitInsn(Opcodes.ACONST_NULL);
+        mv.visitInsn(Opcodes.ARETURN);
+        mv.visitMaxs(0, 0);
+        mv.visitEnd();
+        cw.visitEnd();
+        File out = new File(classesDir, ROOM_FACTORY + ".class");
+        out.getParentFile().mkdirs();
+        ClassRelocator.write(out, cw.toByteArray());
+        return dbs.size();
+    }
+
+    /// Writes `WorkerInstantiator.create(String, Object, Object)`: for every
+    /// public, concrete application class extending a worker base with a
+    /// public `(Context, WorkerParameters)` constructor, a name comparison and
+    /// `new` -- what WorkManager's default `WorkerFactory` does by reflection.
+    /// A worker with any other constructor needs a `WorkerFactory`, on
+    /// Android too.
+    private int writeWorkerInstantiator() throws IOException {
+        final Map<String, String> supers = new HashMap<String, String>();
+        List<File> all = new ArrayList<File>();
+        ClassRelocator.collectClassFiles(classesDir, all);
+        for (File dir : handlerDirs) {
+            ClassRelocator.collectClassFiles(dir, all);
+        }
+        List<String> candidates = new ArrayList<String>();
+        for (File f : all) {
+            ClassReader cr = new ClassReader(Files.readAllBytes(f.toPath()));
+            final String cls = relocator.map(cr.getClassName());
+            if (cr.getSuperName() != null) {
+                supers.put(cls, relocator.map(cr.getSuperName()));
+            }
+            int access = cr.getAccess();
+            if ((access & (Opcodes.ACC_INTERFACE | Opcodes.ACC_ABSTRACT)) != 0 || (access & Opcodes.ACC_PUBLIC) == 0
+                    || cls.startsWith(TARGET)) {
+                continue;
+            }
+            final boolean[] found = new boolean[1];
+            cr.accept(new ClassVisitor(Opcodes.ASM9) {
+                @Override
+                public MethodVisitor visitMethod(int acc, String name, String desc, String sig, String[] ex) {
+                    if (name.equals("<init>") && (acc & Opcodes.ACC_PUBLIC) != 0
+                            && WORKER_CTOR.equals(relocator.remapper().mapMethodDesc(desc))) {
+                        found[0] = true;
+                    }
+                    return null;
+                }
+            }, ClassReader.SKIP_CODE);
+            if (found[0]) {
+                candidates.add(cls);
+            }
+        }
+        List<String> workers = new ArrayList<String>();
+        for (String cls : candidates) {
+            for (String base : WORKER_BASES) {
+                if (extendsBase(cls, supers, base)) {
+                    workers.add(cls);
+                    break;
+                }
+            }
+        }
+        java.util.Collections.sort(workers);
+        String context = TARGET + "android/content/Context";
+        String params = TARGET + "androidx/work/WorkerParameters";
+        ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+        cw.visit(Opcodes.V1_5, Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL | Opcodes.ACC_SUPER, WORKER_INSTANTIATOR, null,
+                "java/lang/Object", null);
+        MethodVisitor ctor = cw.visitMethod(Opcodes.ACC_PRIVATE, "<init>", "()V", null, null);
+        ctor.visitCode();
+        ctor.visitVarInsn(Opcodes.ALOAD, 0);
+        ctor.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
+        ctor.visitInsn(Opcodes.RETURN);
+        ctor.visitMaxs(0, 0);
+        ctor.visitEnd();
+        MethodVisitor mv = cw.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "create",
+                "(Ljava/lang/String;Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;", null, null);
+        mv.visitCode();
+        for (String cls : workers) {
+            Label next = new Label();
+            mv.visitLdcInsn(cls.replace('/', '.'));
+            mv.visitVarInsn(Opcodes.ALOAD, 0);
+            mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "equals", "(Ljava/lang/Object;)Z", false);
+            mv.visitJumpInsn(Opcodes.IFEQ, next);
+            // instanceof guards rather than bare casts: ParparVM's CHECKCAST
+            // is unchecked, so a wrong argument must not reach the constructor.
+            mv.visitVarInsn(Opcodes.ALOAD, 1);
+            mv.visitTypeInsn(Opcodes.INSTANCEOF, context);
+            mv.visitJumpInsn(Opcodes.IFEQ, next);
+            mv.visitVarInsn(Opcodes.ALOAD, 2);
+            mv.visitTypeInsn(Opcodes.INSTANCEOF, params);
+            mv.visitJumpInsn(Opcodes.IFEQ, next);
+            mv.visitTypeInsn(Opcodes.NEW, cls);
+            mv.visitInsn(Opcodes.DUP);
+            mv.visitVarInsn(Opcodes.ALOAD, 1);
+            mv.visitTypeInsn(Opcodes.CHECKCAST, context);
+            mv.visitVarInsn(Opcodes.ALOAD, 2);
+            mv.visitTypeInsn(Opcodes.CHECKCAST, params);
+            mv.visitMethodInsn(Opcodes.INVOKESPECIAL, cls, "<init>", WORKER_CTOR, false);
+            mv.visitInsn(Opcodes.ARETURN);
+            mv.visitLabel(next);
+        }
+        mv.visitInsn(Opcodes.ACONST_NULL);
+        mv.visitInsn(Opcodes.ARETURN);
+        mv.visitMaxs(0, 0);
+        mv.visitEnd();
+        cw.visitEnd();
+        File out = new File(classesDir, WORKER_INSTANTIATOR + ".class");
+        out.getParentFile().mkdirs();
+        ClassRelocator.write(out, cw.toByteArray());
+        return workers.size();
     }
 
     private static boolean extendsBase(String cls, Map<String, String> supers, String base) {
