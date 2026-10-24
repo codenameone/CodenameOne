@@ -52,8 +52,10 @@ write a loaded value into it.
                      Java type (`String -> TEXT`, `int/long -> INTEGER`,
                      `float/double -> REAL`, `boolean -> INTEGER`,
                      `java.util.Date -> INTEGER` (epoch millis),
+                     `Instant`, `LocalDateTime -> INTEGER` (epoch millis),
+                     `LocalDate -> INTEGER` (epoch day),
                      `byte[] -> BLOB`).
-| `@Temporal`      | Stores a `java.util.Date` in a native date or time
+| `@Temporal`      | Stores a date or time field in a native date or time
                      column instead of epoch milliseconds. See
                      <<orm-native-dates>>.
 | `@Column(nullable=false)`| Adds `NOT NULL` to the column declaration.
@@ -454,7 +456,28 @@ represent exactly are rejected rather than converted. A value whose text carries
 a time-zone offset, such as one read from a PostgreSQL `timestamptz` column,
 reads as the instant it names.
 
-`@Temporal` applies to entity fields of type `java.util.Date`. It can't be
+`java.time.Instant`, `LocalDate`, and `LocalDateTime` fields map without an
+annotation, to the same portable integer columns:
+
+[cols="1,2,2", options="header"]
+|===
+| Field type      | Default column                          | With `@Temporal`
+| `Instant`       | epoch milliseconds, the same value a `Date` or a `long` of `System.currentTimeMillis()` holds | `TIMESTAMP`
+| `LocalDateTime` | milliseconds since `1970-01-01T00:00` of the wall clock, with no zone applied | `TIMESTAMP`, the wall clock as written
+| `LocalDate`     | days since `1970-01-01`                 | `DATE`
+|===
+
+Because an `Instant` stores the same number, changing a `long` or `Date` field of
+epoch milliseconds to an `Instant` reads the rows already in the table. Pass an
+`Instant`, `LocalDate`, or `LocalDateTime` as the query parameter for one of
+these fields, not a number. Precision is milliseconds, as for a `Date`; finer
+digits are dropped on write. A `LocalDate` takes only `@Temporal(TemporalType.DATE)`
+and the other two only `TIMESTAMP`. `LocalTime`, `OffsetDateTime`, and
+`ZonedDateTime` aren't mapped; store an `Instant` and keep the zone in its own
+field when it matters.
+
+`@Temporal` applies to entity fields of type `java.util.Date`, `Instant`,
+`LocalDate`, and `LocalDateTime`. It can't be
 combined with `@Convert`, used on an identifier or version, or applied to
 element-collection values. A field with `@Temporal` requires `openSession()`.
 An explicit `@Column(type)` on one must name a matching date type, such as

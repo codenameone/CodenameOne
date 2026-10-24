@@ -1,0 +1,45 @@
+{
+ "pr": 6094,
+ "rebaseline": {
+  "macos-arm64": {
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.576,
+      "time": 0.623,
+      "tolerance": {
+       "memory": 0.35
+      }
+     },
+     "memory": 0.782,
+     "reason": "Nightly fold ab3505beb1 set translator all-cores RAM to 0.576 on macos-arm64; PRs with no vm/ changes measure 0.74 (#6081) and 0.79 (#6094), so the row was below the runner's normal spread",
+     "runs": 2,
+     "time": 0.623,
+     "tolerance": {
+      "memory": 0.35
+     }
+    }
+   }
+  },
+  "windows-x64@amd64-family-25-model-1-authenticamd": {
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.542,
+      "time": 0.605,
+      "tolerance": {
+       "time": 0.35
+      }
+     },
+     "memory": 0.542,
+     "reason": "Translator all-cores time on this runner measures 0.83x (#6094) and 0.90x (#6098, no vm/ changes either) against a 0.60x row; the row is below the runner's normal spread",
+     "runs": 1,
+     "time": 0.833,
+     "tolerance": {
+      "time": 0.35
+     }
+    }
+   }
+  }
+ }
+}
