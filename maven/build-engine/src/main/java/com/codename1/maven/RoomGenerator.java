@@ -1283,6 +1283,16 @@ final class RoomGenerator {
                 s.append(quote(t)).append(", ");
             }
             s.append("};\n    }\n\n");
+            // What a migration must leave behind, checked after it runs.
+            s.append("    @Override\n    protected String[][] roomTableColumns() {\n        return new String[][] {\n");
+            for (Entity e : entities.values()) {
+                s.append("            {").append(quote(e.table));
+                for (Leaf l : e.leaves) {
+                    s.append(", ").append(quote(l.column));
+                }
+                s.append("},\n");
+            }
+            s.append("        };\n    }\n\n");
             s.append("    @Override\n    protected Object roomCreateTypeConverter(Class<?> c) {\n");
             for (String cls : converterClasses) {
                 ClassNode cn = app.get(cls);

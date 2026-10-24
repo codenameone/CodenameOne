@@ -140,6 +140,48 @@ public class LocationManagerTest {
         assertEquals(3, all.size());
     }
 
+    /// A listener removed by another listener's callback hears nothing more,
+    /// not even the fix being delivered when it was removed.
+    @Test
+    public void aListenerRemovedDuringDeliveryHearsNothing() {
+        final LocationManager lm = LocationManager.getInstance();
+        final List<Location> heardByB = new ArrayList<Location>();
+        final LocationListener b = new LocationListener() {
+            @Override
+            public void onLocationChanged(Location location) {
+                heardByB.add(location);
+            }
+        };
+        LocationListener a = new LocationListener() {
+            @Override
+            public void onLocationChanged(Location location) {
+                lm.removeUpdates(b);
+            }
+        };
+        lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, a);
+        lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, b);
+        MainThreadRule.drain();
+        fake.fix(32.0, 34.0);
+        MainThreadRule.drain();
+        assertEquals(0, heardByB.size());
+        lm.removeUpdates(a);
+        MainThreadRule.drain();
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void theExecutorOverloadRefusesAnUnknownProvider() {
+        LocationManager.getInstance().requestLocationUpdates("nope", 0, 0, new java.util.concurrent.Executor() {
+            @Override
+            public void execute(Runnable command) {
+                command.run();
+            }
+        }, new LocationListener() {
+            @Override
+            public void onLocationChanged(Location location) {
+            }
+        });
+    }
+
     @Test
     public void lastKnownLocationAndDistance() {
         fake.fix(0, 0);

@@ -227,7 +227,12 @@ public class RoomGeneratorTest {
             + "    }\n"
             + "    public static String run(String dir) {\n"
             + "        Context ctx = context(dir);\n"
-            + "        AppDb db = Room.databaseBuilder(ctx, AppDb.class, \"app.db\").allowMainThreadQueries().build();\n"
+            // Live queries run on the query executor, as in AndroidX; a direct
+            // one keeps every value in order on this thread.
+            + "        AppDb db = Room.databaseBuilder(ctx, AppDb.class, \"app.db\").allowMainThreadQueries()\n"
+            + "                .setQueryExecutor(new java.util.concurrent.Executor() {\n"
+            + "                    public void execute(Runnable r) { r.run(); }\n"
+            + "                }).build();\n"
             + "        NoteDao dao = db.notes();\n"
             + "        check(dao == db.notes(), \"dao is cached\");\n"
             + "        final List<Integer> sizes = new ArrayList<Integer>();\n"

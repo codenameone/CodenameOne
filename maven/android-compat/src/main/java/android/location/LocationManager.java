@@ -246,6 +246,9 @@ public class LocationManager {
         if (listener == null || executor == null) {
             throw new IllegalArgumentException("invalid null listener or executor");
         }
+        if (!hasProvider(provider)) {
+            throw new IllegalArgumentException("provider doesn't exist: " + provider);
+        }
         replace(new Registration(provider, minTimeMs, minDistanceM, listener, executor, null));
     }
 
@@ -260,7 +263,7 @@ public class LocationManager {
             public void run() {
                 for (int i = registrations.size() - 1; i >= 0; i--) {
                     if (registrations.get(i).listener == listener) {
-                        registrations.remove(i);
+                        registrations.remove(i).removed.set(true);
                     }
                 }
                 reconfigure();
@@ -316,7 +319,7 @@ public class LocationManager {
                 // Android replaces an existing registration of the same listener.
                 for (int i = registrations.size() - 1; i >= 0; i--) {
                     if (registrations.get(i).listener == r.listener) {
-                        registrations.remove(i);
+                        registrations.remove(i).removed.set(true);
                     }
                 }
                 registrations.add(r);
@@ -340,6 +343,7 @@ public class LocationManager {
             @Override
             public void run() {
                 registrations.remove(r);
+                r.removed.set(true);
                 reconfigure();
             }
         });
@@ -398,11 +402,17 @@ public class LocationManager {
         boolean removed = false;
         for (int i = 0; i < snapshot.length; i++) {
             Registration r = snapshot[i];
+            if (!registrations.contains(r)) {
+                // Removed by an earlier listener's callback in this pass.
+                continue;
+            }
             Location l = convert(fix, r.provider);
             if (!r.accepts(l)) {
                 continue;
             }
             if (r.oneShot) {
+                // Its one fix is the one dispatched below, so it is not
+                // flagged removed.
                 registrations.remove(r);
                 removed = true;
             }
@@ -417,6 +427,9 @@ public class LocationManager {
         Registration[] snapshot = registrations.toArray(new Registration[registrations.size()]);
         for (int i = 0; i < snapshot.length; i++) {
             final Registration r = snapshot[i];
+            if (!registrations.contains(r)) {
+                continue;
+            }
             if (r.listener == null) {
                 continue;
             }
@@ -455,6 +468,10 @@ public class LocationManager {
 
     /// One `requestLocationUpdates` (or one-shot request).
     static final class Registration {
+        /// Set when the registration is removed; a fix already posted to
+        /// its looper or executor is then dropped, so a removed listener
+        /// hears nothing more.
+        final java.util.concurrent.atomic.AtomicBoolean removed = new java.util.concurrent.atomic.AtomicBoolean();
         final String provider;
         final long minTime;
         final float minDistance;
@@ -506,6 +523,9 @@ public class LocationManager {
             run(new Runnable() {
                 @Override
                 public void run() {
+                    if (consumer == null && removed.get()) {
+                        return;
+                    }
                     if (consumer != null) {
                         consumer.accept(l);
                     } else if (l != null) {

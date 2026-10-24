@@ -288,4 +288,25 @@ public class AndroidKeyStoreTest {
         }
         return -1;
     }
+
+    /// A second encryption under the same GCM key and IV is refused until
+    /// the cipher is initialized again, which picks a fresh IV.
+    @Test
+    public void gcmCannotEncryptTwiceWithOneIv() throws Exception {
+        generate("lic", KeyProperties.BLOCK_MODE_GCM, KeyProperties.ENCRYPTION_PADDING_NONE);
+        SecretKey k = (SecretKey) loaded().getKey("lic", null);
+        Cipher c = Cipher.getInstance("AES/GCM/NoPadding");
+        c.init(Cipher.ENCRYPT_MODE, k);
+        byte[] iv = c.getIV();
+        c.doFinal(DATA);
+        try {
+            c.doFinal(DATA);
+            fail("a second GCM encryption reused the IV");
+        } catch (IllegalStateException expected) {
+            // as on Android
+        }
+        c.init(Cipher.ENCRYPT_MODE, k);
+        assertFalse(java.util.Arrays.equals(iv, c.getIV()));
+        assertEquals(DATA.length + 16, c.doFinal(DATA).length);
+    }
 }

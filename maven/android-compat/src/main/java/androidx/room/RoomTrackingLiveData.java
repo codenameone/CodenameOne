@@ -27,17 +27,57 @@ import com.codename1.androidcompat.runtime.MainThread;
 
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-/// The `LiveData` a DAO query returns. It recomputes on the thread that
-/// reports the change: on the main thread the value is set at once, from
-/// any other it is posted.
+/// The `LiveData` a DAO query returns, refreshed as AndroidX's is: an
+/// invalidation is noted on the main thread, the query runs on the
+/// database's query executor, and the value is posted back. One refresh
+/// runs at a time, and an invalidation that arrives while one runs makes it
+/// go round again, so the last value delivered is never older than the last
+/// write.
 final class RoomTrackingLiveData<T> extends LiveData<T> {
 
     private final RoomDatabase mDatabase;
     private final boolean mInTransaction;
     private final Callable<T> mCompute;
     private final InvalidationTracker.Observer mObserver;
+    private final AtomicBoolean mInvalid = new AtomicBoolean(true);
+    private final AtomicBoolean mComputing = new AtomicBoolean(false);
     private boolean mRegistered;
+
+    private final Runnable mRefresh = new Runnable() {
+        @Override
+        public void run() {
+            boolean computed;
+            do {
+                computed = false;
+                if (mComputing.compareAndSet(false, true)) {
+                    try {
+                        T value = null;
+                        while (mInvalid.compareAndSet(true, false)) {
+                            computed = true;
+                            value = compute();
+                        }
+                        if (computed) {
+                            postValue(value);
+                        }
+                    } finally {
+                        mComputing.set(false);
+                    }
+                }
+            } while (computed && mInvalid.get());
+        }
+    };
+
+    private final Runnable mInvalidated = new Runnable() {
+        @Override
+        public void run() {
+            boolean active = hasActiveObservers();
+            if (mInvalid.compareAndSet(false, true) && active) {
+                mDatabase.getQueryExecutor().execute(mRefresh);
+            }
+        }
+    };
 
     RoomTrackingLiveData(RoomDatabase database, String[] tables, boolean inTransaction, Callable<T> compute) {
         mDatabase = database;
@@ -46,8 +86,10 @@ final class RoomTrackingLiveData<T> extends LiveData<T> {
         mObserver = new InvalidationTracker.Observer(tables) {
             @Override
             public void onInvalidated(Set<String> changed) {
-                if (hasActiveObservers()) {
-                    refresh();
+                if (MainThread.isMainThread()) {
+                    mInvalidated.run();
+                } else {
+                    MainThread.post(mInvalidated);
                 }
             }
         };
@@ -59,7 +101,7 @@ final class RoomTrackingLiveData<T> extends LiveData<T> {
             mDatabase.getInvalidationTracker().addObserver(mObserver);
             mRegistered = true;
         }
-        refresh();
+        mDatabase.getQueryExecutor().execute(mRefresh);
     }
 
     @Override
@@ -67,26 +109,6 @@ final class RoomTrackingLiveData<T> extends LiveData<T> {
         if (mRegistered) {
             mDatabase.getInvalidationTracker().removeObserver(mObserver);
             mRegistered = false;
-        }
-    }
-
-    void refresh() {
-        boolean main = MainThread.isMainThread();
-        T value;
-        if (main) {
-            mDatabase.mLiveQueryDepth++;
-        }
-        try {
-            value = compute();
-        } finally {
-            if (main) {
-                mDatabase.mLiveQueryDepth--;
-            }
-        }
-        if (main) {
-            setValue(value);
-        } else {
-            postValue(value);
         }
     }
 

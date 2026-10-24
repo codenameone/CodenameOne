@@ -92,6 +92,12 @@ public class RoomRuntimeTest {
             return new String[] {"note"};
         }
 
+        @Override
+        protected String[][] roomTableColumns() {
+            return extraColumn == null ? new String[][] {{"note", "id", "title"}}
+                    : new String[][] {{"note", "id", "title", extraColumn}};
+        }
+
         long insert(String title) {
             long id = RoomSupport.insert(this, "INSERT INTO `note` (`title`) VALUES (?)", new Object[] {title});
             getInvalidationTracker().notifyTablesChanged("note");
@@ -158,6 +164,26 @@ public class RoomRuntimeTest {
         assertEquals(Arrays.asList("kept"), v2.titles());
         assertEquals(Arrays.asList("1-2"), ran);
         assertEquals(2, v2.getOpenHelper().getWritableDatabase().getVersion());
+    }
+
+    /// A migration that forgets a column the entity now has is refused, and
+    /// the database is not stamped with the new version.
+    @Test
+    public void migrationThatMissesAColumnIsRefused() {
+        open(1, null, builder()).insert("kept");
+        Migration forgetful = new Migration(1, 2) {
+            @Override
+            public void migrate(SupportSQLiteDatabase database) {
+            }
+        };
+        try {
+            open(2, "stars", builder().addMigrations(forgetful)).titles();
+            fail("a migration that left out `stars` was accepted");
+        } catch (IllegalStateException expected) {
+            assertTrue(expected.getMessage(), expected.getMessage().startsWith("Migration didn't properly handle: note"));
+            assertTrue(expected.getMessage(), expected.getMessage().contains("stars"));
+        }
+        assertEquals(Arrays.asList("kept"), open(1, null, builder()).titles());
     }
 
     @Test
@@ -243,7 +269,14 @@ public class RoomRuntimeTest {
 
     @Test
     public void liveQueryRefreshesOnWrite() {
-        final NotesDb db = open(1, null, builder());
+        // Queries run on the query executor and post their value, as in
+        // AndroidX; a direct executor and a drain make each step observable.
+        final NotesDb db = open(1, null, builder().setQueryExecutor(new java.util.concurrent.Executor() {
+            @Override
+            public void execute(Runnable command) {
+                command.run();
+            }
+        }));
         LiveData<List<String>> live = db.getInvalidationTracker().createLiveData(new String[] {"note"},
                 false, new Callable<List<String>>() {
                     @Override
@@ -259,10 +292,14 @@ public class RoomRuntimeTest {
             }
         };
         live.observeForever(obs);
+        MainThreadRule.drain();
         db.insert("one");
+        MainThreadRule.drain();
         db.insert("two");
+        MainThreadRule.drain();
         live.removeObserver(obs);
         db.insert("three");
+        MainThreadRule.drain();
         assertEquals(3, values.size());
         assertEquals(Arrays.asList("one", "two"), values.get(2));
     }

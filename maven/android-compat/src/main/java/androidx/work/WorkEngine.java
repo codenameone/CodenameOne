@@ -115,24 +115,39 @@ final class WorkEngine {
             // AndroidX's default pool is sized between two and four threads.
             executor = Executors.newFixedThreadPool(4);
         }
+        // Read now, on the caller's thread, and merged by the first engine
+        // operation on the main thread, whichever runs first: initialize may
+        // be called off the main thread, and an enqueue made on it meanwhile
+        // must neither overwrite the saved queue nor miss its unique work.
+        unmerged.set(WorkStore.load());
         onMain(new Runnable() {
             @Override
             public void run() {
-                List<WorkSpec> saved = WorkStore.load();
-                for (int i = 0; i < saved.size(); i++) {
-                    WorkSpec s = saved.get(i);
-                    if (specs.containsKey(s.id)) {
-                        continue;
-                    }
-                    if (s.state == WorkInfo.State.RUNNING) {
-                        // The process ended while it ran; Android runs it again.
-                        s.state = WorkInfo.State.ENQUEUED;
-                    }
-                    specs.put(s.id, s);
-                }
                 changed();
             }
         });
+    }
+
+    private final java.util.concurrent.atomic.AtomicReference<List<WorkSpec>> unmerged =
+            new java.util.concurrent.atomic.AtomicReference<List<WorkSpec>>();
+
+    /// Merges the work saved by an earlier run, once. Main thread.
+    void ensureLoaded() {
+        List<WorkSpec> saved = unmerged.getAndSet(null);
+        if (saved == null) {
+            return;
+        }
+        for (int i = 0; i < saved.size(); i++) {
+            WorkSpec s = saved.get(i);
+            if (specs.containsKey(s.id)) {
+                continue;
+            }
+            if (s.state == WorkInfo.State.RUNNING) {
+                // The process ended while it ran; Android runs it again.
+                s.state = WorkInfo.State.ENQUEUED;
+            }
+            specs.put(s.id, s);
+        }
     }
 
     boolean isInitialized() {
@@ -772,11 +787,23 @@ final class WorkEngine {
 
     // -------------------------------------------------------------- threads
 
-    static void onMain(Runnable r) {
+    /// Runs `r` on the main thread, after merging the saved work: every
+    /// engine operation goes through here.
+    static void onMain(final Runnable r) {
+        Runnable run = new Runnable() {
+            @Override
+            public void run() {
+                WorkEngine e = instance;
+                if (e != null) {
+                    e.ensureLoaded();
+                }
+                r.run();
+            }
+        };
         if (MainThread.isMainThread()) {
-            r.run();
+            run.run();
         } else {
-            MainThread.post(r);
+            MainThread.post(run);
         }
     }
 

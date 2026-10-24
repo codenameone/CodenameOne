@@ -94,6 +94,55 @@ public class ServiceLifecycleTest {
         assertEquals("[create, bind, unbind, destroy]", AndroidTestSupport.TestService.calls.toString());
     }
 
+    /// A stop in the same frame as its start stops the service; it used to
+    /// be judged before the start ran, answer false and leave it running.
+    @Test
+    public void startThenStopInOneFrame() {
+        context.startService(new Intent(context, AndroidTestSupport.TestService.class).putExtra("n", 1));
+        assertTrue(context.stopService(new Intent(context, AndroidTestSupport.TestService.class)));
+        MainThreadRule.drain();
+        assertFalse(ActiveServices.isRunning(AndroidTestSupport.TestService.class));
+        assertEquals("[create, start:1:1, destroy]", AndroidTestSupport.TestService.calls.toString());
+    }
+
+    /// An unbind in the same frame as its bind is accepted and nothing
+    /// connects; it used to throw "Service not registered".
+    @Test
+    public void bindThenUnbindInOneFrame() {
+        final boolean[] connected = new boolean[1];
+        ServiceConnection conn = new ServiceConnection() {
+            @Override
+            public void onServiceConnected(ComponentName name, IBinder service) {
+                connected[0] = true;
+            }
+
+            @Override
+            public void onServiceDisconnected(ComponentName name) {
+            }
+        };
+        assertTrue(context.bindService(new Intent(context, AndroidTestSupport.TestService.class), conn,
+                Context.BIND_AUTO_CREATE));
+        context.unbindService(conn);
+        MainThreadRule.drain();
+        assertFalse(connected[0]);
+        assertFalse(ActiveServices.isRunning(AndroidTestSupport.TestService.class));
+    }
+
+    /// stopSelf(startId) compares the id when the stop runs, in order with
+    /// the starts, so a start delivered first keeps the service running.
+    @Test
+    public void stopSelfForAnOlderStartKeepsANewerOne() {
+        context.startService(new Intent(context, AndroidTestSupport.TestService.class).putExtra("n", 1));
+        MainThreadRule.drain();
+        context.startService(new Intent(context, AndroidTestSupport.TestService.class).putExtra("n", 2));
+        AndroidTestSupport.TestService.last.stopSelf(1);
+        MainThreadRule.drain();
+        assertTrue(ActiveServices.isRunning(AndroidTestSupport.TestService.class));
+        assertTrue(context.stopService(new Intent(context, AndroidTestSupport.TestService.class)));
+        MainThreadRule.drain();
+        assertFalse(ActiveServices.isRunning(AndroidTestSupport.TestService.class));
+    }
+
     @Test
     public void anUndeclaredServiceDoesNotStart() {
         assertNull(context.startService(new Intent(context, Undeclared.class)));

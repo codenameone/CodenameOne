@@ -70,7 +70,6 @@ public abstract class RoomDatabase {
     /// change happened; they are exempt from the main-thread check, which
     /// is there for the application's own calls. Touched on the main thread
     /// only.
-    int mLiveQueryDepth;
 
     public RoomDatabase() {
     }
@@ -85,6 +84,12 @@ public abstract class RoomDatabase {
 
     /// The entity tables.
     protected abstract String[] roomTableNames();
+
+    /// Each entity table followed by its columns, which a migration must
+    /// leave in place; null skips the check.
+    protected String[][] roomTableColumns() {
+        return null;
+    }
 
     /// A new instance of a `@TypeConverters` class the application did not
     /// supply, or null for one it must (`@ProvidedTypeConverter`).
@@ -161,7 +166,7 @@ public abstract class RoomDatabase {
 
     /// Throws on the main thread unless `allowMainThreadQueries()` was set.
     public void assertNotMainThread() {
-        if (mAllowMainThreadQueries || mLiveQueryDepth > 0) {
+        if (mAllowMainThreadQueries) {
             return;
         }
         if (MainThread.isMainThread() && com.codename1.ui.Display.isInitialized()) {
@@ -320,6 +325,7 @@ public abstract class RoomDatabase {
             for (Migration m : path) {
                 m.migrate(db);
             }
+            validateSchema(db);
             writeIdentity(db);
             return;
         }
@@ -339,6 +345,37 @@ public abstract class RoomDatabase {
             }
         }
         createAllTables(db);
+    }
+
+    /// Room refuses a migration that left a table without the columns its
+    /// entity declares, rather than stamping the database valid and failing
+    /// at the first query. This compares column names; types, nullability and
+    /// indices are not checked.
+    private void validateSchema(SupportSQLiteDatabase db) {
+        String[][] expected = roomTableColumns();
+        if (expected == null) {
+            return;
+        }
+        for (String[] table : expected) {
+            java.util.Set<String> want = new java.util.TreeSet<String>();
+            for (int i = 1; i < table.length; i++) {
+                want.add(InvalidationTracker.asciiLower(table[i]));
+            }
+            java.util.Set<String> found = new java.util.TreeSet<String>();
+            Cursor c = db.query("PRAGMA table_info(`" + table[0] + "`)");
+            try {
+                int name = c.getColumnIndex("name");
+                while (c.moveToNext()) {
+                    found.add(InvalidationTracker.asciiLower(c.getString(name)));
+                }
+            } finally {
+                c.close();
+            }
+            if (!found.equals(want)) {
+                throw new IllegalStateException("Migration didn't properly handle: " + table[0]
+                        + ".\n Expected columns: " + want + "\n Found columns: " + found);
+            }
+        }
     }
 
     void checkIdentity(SupportSQLiteDatabase db) {

@@ -43,6 +43,7 @@ import java.util.Map;
 final class WorkStore {
 
     static final String FILE = "cn1compat-work.bin";
+    static final String TEMP = "cn1compat-work.bin.new";
     private static final int VERSION = 1;
 
     private static final int T_NULL = 0;
@@ -432,11 +433,18 @@ final class WorkStore {
             if (st.exists(FILE)) {
                 st.deleteStorageFile(FILE);
             }
+            if (st.exists(TEMP)) {
+                st.deleteStorageFile(TEMP);
+            }
             return;
         }
+        // Written whole to a second entry first, then made current, so a write
+        // cut short (the process killed, storage full) leaves the previous
+        // queue readable rather than a truncated file that loads as nothing.
         OutputStream os = null;
+        boolean written = false;
         try {
-            os = st.createOutputStream(FILE);
+            os = st.createOutputStream(TEMP);
             DataOutputStream out = new DataOutputStream(os);
             out.writeInt(VERSION);
             out.writeInt(specs.size());
@@ -444,24 +452,77 @@ final class WorkStore {
                 writeSpec(out, specs.get(i));
             }
             out.flush();
+            written = true;
         } catch (IOException e) {
             com.codename1.io.Log.e(e);
         } finally {
             close(os);
+        }
+        if (!written) {
+            return;
+        }
+        byte[] data = readAll(st, TEMP);
+        if (data == null) {
+            return;
+        }
+        OutputStream main = null;
+        try {
+            main = st.createOutputStream(FILE);
+            main.write(data);
+            main.flush();
+        } catch (IOException e) {
+            com.codename1.io.Log.e(e);
+            return;
+        } finally {
+            close(main);
+        }
+        st.deleteStorageFile(TEMP);
+    }
+
+    private static byte[] readAll(Storage st, String name) {
+        InputStream is = null;
+        try {
+            is = st.createInputStream(name);
+            if (is == null) {
+                return null;
+            }
+            java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
+            byte[] buf = new byte[4096];
+            int n;
+            while ((n = is.read(buf)) > 0) {
+                bo.write(buf, 0, n);
+            }
+            return bo.toByteArray();
+        } catch (IOException e) {
+            com.codename1.io.Log.e(e);
+            return null;
+        } finally {
+            close(is);
         }
     }
 
     /// The saved work, or none when nothing was saved or the file is from a
     /// format this runtime does not read.
     static List<WorkSpec> load() {
-        List<WorkSpec> out = new ArrayList<WorkSpec>();
         Storage st = Storage.getInstance();
-        if (!st.exists(FILE)) {
-            return out;
+        List<WorkSpec> main = loadFrom(st, FILE);
+        if (main == null && st.exists(TEMP)) {
+            // The copy into the main entry was cut short; the second entry
+            // was written whole before it began.
+            main = loadFrom(st, TEMP);
+        }
+        return main == null ? new ArrayList<WorkSpec>() : main;
+    }
+
+    /// The specs in `name`, or null when it is missing or unreadable.
+    private static List<WorkSpec> loadFrom(Storage st, String name) {
+        List<WorkSpec> out = new ArrayList<WorkSpec>();
+        if (!st.exists(name)) {
+            return null;
         }
         InputStream is = null;
         try {
-            is = st.createInputStream(FILE);
+            is = st.createInputStream(name);
             DataInputStream in = new DataInputStream(is);
             if (in.readInt() != VERSION) {
                 return out;
@@ -472,11 +533,11 @@ final class WorkStore {
             }
         } catch (IOException e) {
             com.codename1.io.Log.e(e);
-            out.clear();
+            return null;
         } catch (IllegalArgumentException e) {
             // An enum constant this runtime no longer has.
             com.codename1.io.Log.e(e);
-            out.clear();
+            return out;
         } finally {
             close(is);
         }

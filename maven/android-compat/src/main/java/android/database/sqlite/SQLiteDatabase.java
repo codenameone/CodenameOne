@@ -91,13 +91,15 @@ public final class SQLiteDatabase extends SQLiteClosable {
     /// The thread whose outermost transaction is open on the engine, or null.
     ///
     /// There is one engine connection, so a second thread cannot have a
-    /// transaction of its own beside it. Android would block that thread
-    /// until the first one ends; this runtime adds no locks (serializing
+    /// transaction of its own beside it. Android blocks that thread until the
+    /// first one ends, and Room code relies on it: two executor threads
+    /// writing at once is ordinary. This runtime adds no locks (serializing
     /// statements on the connection is the Codename One `Database`
-    /// implementation's job), so it refuses with
-    /// [SQLiteDatabaseLockedException] -- SQLite's own answer when a busy
-    /// wait runs out -- rather than silently folding the second thread's
-    /// work into the first one's transaction.
+    /// implementation's job), so the second thread busy-waits for the owner
+    /// to clear, as SQLite does under its busy timeout, and is refused with
+    /// [SQLiteDatabaseLockedException] -- SQLite's answer when that wait runs
+    /// out -- only after [#BUSY_TIMEOUT_MS]. Its work is never folded into the
+    /// first thread's transaction.
     ///
     /// An atomic rather than a lock: the outermost `beginTransaction` claims
     /// it with `compareAndSet(null, current)` before the engine's BEGIN, so
@@ -117,11 +119,52 @@ public final class SQLiteDatabase extends SQLiteClosable {
     /// no-lock reason as `beginTransaction` this refuses it with the same
     /// [SQLiteDatabaseLockedException].
     private void checkNotInOtherThreadsTransaction(String sql) {
-        Thread owner = mTransactionOwner.get();
-        if (owner != null && owner != Thread.currentThread()) {
+        if (!awaitNoForeignOwner()) {
             throw new SQLiteDatabaseLockedException("database is locked: another thread's transaction is open, "
                     + "while executing: " + sql);
         }
+    }
+
+    /// How long a thread waits for another thread's transaction to end, in
+    /// milliseconds; tests shorten it to observe the refusal.
+    static final java.util.concurrent.atomic.AtomicLong BUSY_TIMEOUT_MS =
+            new java.util.concurrent.atomic.AtomicLong(10000);
+
+    private boolean awaitNoForeignOwner() {
+        Thread current = Thread.currentThread();
+        long deadline = System.currentTimeMillis() + BUSY_TIMEOUT_MS.get();
+        while (true) {
+            Thread owner = mTransactionOwner.get();
+            if (owner == null || owner == current) {
+                return true;
+            }
+            if (!pause(deadline)) {
+                return false;
+            }
+        }
+    }
+
+    private boolean claimOwner(Thread current) {
+        long deadline = System.currentTimeMillis() + BUSY_TIMEOUT_MS.get();
+        while (!mTransactionOwner.compareAndSet(null, current)) {
+            if (!pause(deadline)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean pause(long deadline) {
+        if (System.currentTimeMillis() >= deadline) {
+            return false;
+        }
+        try {
+            Thread.sleep(2);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+        return true;
     }
 
     private static final class Transaction {
@@ -387,7 +430,7 @@ public final class SQLiteDatabase extends SQLiteClosable {
         }
         if (stack.isEmpty()) {
             Thread current = Thread.currentThread();
-            if (!mTransactionOwner.compareAndSet(null, current)) {
+            if (!claimOwner(current)) {
                 throw new SQLiteDatabaseLockedException("database is locked: another thread's transaction is open");
             }
             try {

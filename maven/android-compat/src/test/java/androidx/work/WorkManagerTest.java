@@ -74,6 +74,7 @@ public class WorkManagerTest {
         context = AndroidTestSupport.context();
         WorkManager.resetForTesting();
         Storage.getInstance().deleteStorageFile(WorkStore.FILE);
+        Storage.getInstance().deleteStorageFile(WorkStore.TEMP);
         RAN.clear();
     }
 
@@ -81,6 +82,7 @@ public class WorkManagerTest {
     public void tearDown() {
         WorkManager.resetForTesting();
         Storage.getInstance().deleteStorageFile(WorkStore.FILE);
+        Storage.getInstance().deleteStorageFile(WorkStore.TEMP);
     }
 
     private WorkManager manager() {
@@ -198,6 +200,69 @@ public class WorkManagerTest {
         assertEquals(later.getId(), infos.get(0).getId());
         assertEquals(WorkInfo.State.ENQUEUED, infos.get(0).getState());
         assertTrue(RAN.isEmpty());
+    }
+
+    /// A save cut short while the main entry was being replaced leaves it
+    /// truncated; the queue is read from the second entry, which was
+    /// written whole first, rather than lost.
+    @Test
+    public void aTruncatedSaveFallsBackToTheCompleteCopy() throws Exception {
+        WorkManager wm = manager();
+        OneTimeWorkRequest later = new OneTimeWorkRequest.Builder(Echo.class).addTag("persist")
+                .setInitialDelay(1, TimeUnit.HOURS).build();
+        wm.enqueue(later);
+        assertEquals(WorkInfo.State.ENQUEUED, state(wm, later));
+        WorkManager.resetForTesting();
+
+        Storage st = Storage.getInstance();
+        byte[] whole;
+        java.io.InputStream in = st.createInputStream(WorkStore.FILE);
+        java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
+        byte[] buf = new byte[512];
+        int n;
+        while ((n = in.read(buf)) > 0) {
+            bo.write(buf, 0, n);
+        }
+        in.close();
+        whole = bo.toByteArray();
+        java.io.OutputStream o = st.createOutputStream(WorkStore.TEMP);
+        o.write(whole);
+        o.close();
+        o = st.createOutputStream(WorkStore.FILE);
+        o.write(whole, 0, whole.length / 2);
+        o.close();
+        st.clearCache();
+
+        List<WorkInfo> infos = manager().getWorkInfosByTag("persist").get();
+        assertEquals(1, infos.size());
+        assertEquals(later.getId(), infos.get(0).getId());
+    }
+
+    /// Initialized off the main thread, the saved queue is merged before the
+    /// first enqueue made on the main thread, which used to save over it.
+    @Test
+    public void anEnqueueBeforeTheLoadDoesNotOverwriteTheSavedQueue() throws Exception {
+        WorkManager wm = manager();
+        OneTimeWorkRequest first = new OneTimeWorkRequest.Builder(Echo.class).addTag("persist")
+                .setInitialDelay(1, TimeUnit.HOURS).build();
+        wm.enqueue(first);
+        assertEquals(WorkInfo.State.ENQUEUED, state(wm, first));
+        WorkManager.resetForTesting();
+
+        final WorkManager[] off = new WorkManager[1];
+        Thread t = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                off[0] = manager();
+            }
+        });
+        t.start();
+        t.join();
+        OneTimeWorkRequest second = new OneTimeWorkRequest.Builder(Echo.class).addTag("persist")
+                .setInitialDelay(1, TimeUnit.HOURS).build();
+        off[0].enqueue(second);
+        List<WorkInfo> infos = off[0].getWorkInfosByTag("persist").get();
+        assertEquals(2, infos.size());
     }
 
     @Test

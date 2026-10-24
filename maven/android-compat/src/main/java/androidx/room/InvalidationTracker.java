@@ -24,6 +24,8 @@ package androidx.room;
 
 import androidx.lifecycle.LiveData;
 
+import com.codename1.androidcompat.runtime.MainThread;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -41,7 +43,10 @@ public class InvalidationTracker {
     private final RoomDatabase mDatabase;
     private final String[] mTableNames;
     private final List<Observer> mObservers = new ArrayList<Observer>();
-    private final Set<String> mPending = new HashSet<String>();
+    /// Tables written by the current thread and not yet reported. Per
+    /// thread because a transaction is: its writes are reported when that
+    /// thread's outermost transaction ends, never by another thread.
+    private final ThreadLocal<Set<String>> mPending = new ThreadLocal<Set<String>>();
 
     /// An observer of a set of tables, named case-insensitively.
     public abstract static class Observer {
@@ -80,6 +85,8 @@ public class InvalidationTracker {
         }
     }
 
+    /// Call on the main thread, as `LiveData` does from `onActive`; observers
+    /// are notified there.
     public void addObserver(Observer observer) {
         for (String t : observer.mTables) {
             if (!knows(t)) {
@@ -108,22 +115,49 @@ public class InvalidationTracker {
     /// Records that the named tables changed. Generated DAOs call it after
     /// every write.
     public void notifyTablesChanged(String... tables) {
+        Set<String> pending = mPending.get();
+        if (pending == null) {
+            pending = new HashSet<String>();
+            mPending.set(pending);
+        }
         for (String t : tables) {
-            mPending.add(asciiLower(t));
+            pending.add(asciiLower(t));
         }
         if (!mDatabase.inTransaction()) {
             flush();
         }
     }
 
+    /// Reports the current thread's pending tables. Observers are called on
+    /// the main thread, which is the only thread that changes the observer
+    /// list (LiveData registers from `onActive`), so a writer on a worker
+    /// thread posts the report instead of walking the list itself.
     void flush() {
-        if (mPending.isEmpty()) {
+        Set<String> pending = mPending.get();
+        if (pending == null || pending.isEmpty()) {
             return;
         }
-        Set<String> changed = new HashSet<String>(mPending);
-        mPending.clear();
+        final Set<String> changed = new HashSet<String>(pending);
+        pending.clear();
+        if (MainThread.isMainThread()) {
+            dispatch(changed);
+        } else {
+            MainThread.post(new Runnable() {
+                @Override
+                public void run() {
+                    dispatch(changed);
+                }
+            });
+        }
+    }
+
+    private void dispatch(Set<String> changed) {
         List<Observer> copy = new ArrayList<Observer>(mObservers);
         for (Observer o : copy) {
+            if (!mObservers.contains(o)) {
+                // Removed by an earlier observer's callback in this pass.
+                continue;
+            }
             Set<String> hit = null;
             for (String t : o.mTables) {
                 if (changed.contains(t)) {

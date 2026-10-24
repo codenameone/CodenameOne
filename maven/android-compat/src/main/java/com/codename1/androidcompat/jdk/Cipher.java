@@ -209,6 +209,7 @@ public class Cipher {
         this.opmode = opmode;
         this.key = material;
         this.iv = newIv;
+        gcmSpent = false;
         input.reset();
         aad.reset();
     }
@@ -247,7 +248,16 @@ public class Cipher {
         if (key == null) {
             throw new IllegalStateException("Cipher not initialized");
         }
+        if (gcmSpent) {
+            // A second GCM encryption under the same key and IV leaks the
+            // XOR of the plaintexts and lets an attacker forge tags; Android
+            // refuses it the same way.
+            throw new IllegalStateException("Cipher must be reinitialized after a GCM encryption");
+        }
     }
+
+    /// Set by a GCM encryption's doFinal; cleared by init.
+    private boolean gcmSpent;
 
     public final void updateAAD(byte[] src) {
         if (src == null) {
@@ -314,6 +324,7 @@ public class Cipher {
         }
         com.codename1.security.SecretKey k = new com.codename1.security.SecretKey("AES", key);
         if (opmode == ENCRYPT_MODE) {
+            gcmSpent = gcm;
             try {
                 return com.codename1.security.Cipher.aesEncrypt(coreTransformation, k, iv, ad, data);
             } catch (com.codename1.security.CryptoException e) {

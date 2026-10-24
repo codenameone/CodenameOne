@@ -77,6 +77,13 @@ public final class ActiveServices {
     private static final Map<Class<?>, Record> RUNNING = new LinkedHashMap<Class<?>, Record>();
     private static final Map<ServiceConnection, Record> BINDINGS = new LinkedHashMap<ServiceConnection, Record>();
 
+    // What the callers have asked for so far, kept at call time. The
+    // lifecycle runs later, on the main thread, so a stop or unbind made in
+    // the same frame as its start or bind is judged against these rather than
+    // against a service that is not created yet.
+    private static final java.util.Set<Class<?>> START_REQUESTED = new java.util.HashSet<Class<?>>();
+    private static final java.util.Set<ServiceConnection> BIND_REQUESTED = new java.util.HashSet<ServiceConnection>();
+
     // ------------------------------------------------------------ Context
 
     public static ComponentName startService(Context caller, final Intent intent) {
@@ -86,11 +93,13 @@ public final class ActiveServices {
         }
         final Intent copy = new Intent(intent);
         final ComponentName name = new ComponentName(caller, type);
+        START_REQUESTED.add(type);
         MainThread.post(new Runnable() {
             @Override
             public void run() {
                 Record r = ensureCreated(type, name);
                 if (r == null) {
+                    START_REQUESTED.remove(type);
                     return;
                 }
                 r.started = true;
@@ -105,8 +114,7 @@ public final class ActiveServices {
         if (type == null) {
             return false;
         }
-        Record r = RUNNING.get(type);
-        if (r == null || !r.started) {
+        if (!START_REQUESTED.remove(type)) {
             return false;
         }
         MainThread.post(new Runnable() {
@@ -139,9 +147,14 @@ public final class ActiveServices {
         }
         final Intent copy = new Intent(intent);
         final ComponentName name = new ComponentName(caller, type);
+        BIND_REQUESTED.add(conn);
         MainThread.post(new Runnable() {
             @Override
             public void run() {
+                if (!BIND_REQUESTED.contains(conn)) {
+                    // Unbound before it connected: Android delivers nothing.
+                    return;
+                }
                 Record r = ensureCreated(type, name);
                 if (r == null || BINDINGS.containsKey(conn)) {
                     return;
@@ -166,7 +179,7 @@ public final class ActiveServices {
     }
 
     public static void unbindService(Context caller, final ServiceConnection conn) {
-        if (!BINDINGS.containsKey(conn)) {
+        if (!BIND_REQUESTED.remove(conn)) {
             throw new IllegalArgumentException("Service not registered: " + conn);
         }
         MainThread.post(new Runnable() {
@@ -189,22 +202,24 @@ public final class ActiveServices {
 
     // ------------------------------------------------------------- Service
 
-    static boolean stopSelf(Service s, int startId) {
-        final Record r = recordOf(s);
-        if (r == null) {
-            return false;
-        }
-        if (startId >= 0 && startId != s.lastStartId()) {
-            return false;
-        }
+    /// May be called from the service's own worker thread (IntentService
+    /// does), so the start id is compared on the main thread, in order with
+    /// the starts: a start delivered between this call and the stop keeps the
+    /// service running, as on Android. The answer is the call-time view.
+    static boolean stopSelf(final Service s, final int startId) {
         MainThread.post(new Runnable() {
             @Override
             public void run() {
+                Record r = recordOf(s);
+                if (r == null || (startId >= 0 && startId != s.lastStartId())) {
+                    return;
+                }
                 r.started = false;
+                START_REQUESTED.remove(r.type);
                 destroyIfIdle(r);
             }
         });
-        return true;
+        return startId < 0 || startId == s.lastStartId();
     }
 
     static void startForeground(Service s, int id, Notification n) {

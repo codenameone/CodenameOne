@@ -331,6 +331,10 @@ public class SensorManager {
         Registration[] snapshot = registrations.toArray(new Registration[registrations.size()]);
         for (int i = 0; i < snapshot.length; i++) {
             Registration r = snapshot[i];
+            if (!registrations.contains(r)) {
+                // Unregistered by an earlier listener in this pass.
+                continue;
+            }
             int[] needs = sourcesOf(r.sensor.getType());
             if (!contains(needs, cn1Type)) {
                 continue;

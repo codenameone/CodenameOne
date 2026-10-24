@@ -338,11 +338,11 @@ the gallery and automated tests cover a subset of those behaviors.
   elements. Code that depends on serialization making a snapshot, creator-side
   validation, or restoring state after process death needs an explicit storage
   or copy implementation.
-* SQLite uses one Codename One database connection. A competing thread's
-  operations can throw `SQLiteDatabaseLockedException` while a transaction is
-  open; Android's connection-pool waiting behavior isn't implemented.
-  Serialize database work through one worker when sharing a database across
-  tasks. Full Android SQLite concurrency parity is outside this release's scope.
+* SQLite uses one Codename One database connection. While one thread's
+  transaction is open, another thread's statements wait for it to end, as on
+  Android, and throw `SQLiteDatabaseLockedException` after ten seconds.
+  Threads don't read concurrently: one thread's long transaction holds up every
+  other thread's queries.
 * Switching only a locale's script, such as `zh-Hans` to `zh-Hant` with the
   same region, updates resource selection but doesn't notify or recreate
   existing activities. Already-inflated text and layouts can retain the old

@@ -54,7 +54,9 @@ public abstract class Service extends ContextWrapper {
     public static final int STOP_FOREGROUND_LEGACY = 0;
 
     private Application application;
-    private int lastStartId;
+    // Read by stopSelfResult on the service's worker thread.
+    private final java.util.concurrent.atomic.AtomicInteger lastStartId =
+            new java.util.concurrent.atomic.AtomicInteger();
 
     public Service() {
         super(null);
@@ -146,10 +148,10 @@ public abstract class Service extends ContextWrapper {
     }
 
     int nextStartId() {
-        return ++lastStartId;
+        return lastStartId.incrementAndGet();
     }
 
     int lastStartId() {
-        return lastStartId;
+        return lastStartId.get();
     }
 }
