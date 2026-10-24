@@ -1574,11 +1574,11 @@ again. The first two are yours to call from a scheduled job.
 === Certificates, key stores and key agreement
 
 `com.codename1.backend.security.pki` reads and writes the files a server
-exchanges with certificate authorities and partners. It is plain Java over the
+exchanges with certificate authorities and partners. It's plain Java over the
 same primitives as the rest of the layer, so a local run and the native build
 give the same answers.
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/PkiSnippets.java[tag=backend-security-pki,indent=0]
 ----
@@ -1592,7 +1592,7 @@ SubjectPublicKeyInfo DER for a public one. `Crypto.sign`, `Crypto.verify` and
 defines it. That secret is key material, not a key: derive the key from it
 with a KDF such as HKDF.
 
-A `CertificateValidator` trusts only the anchors it is given. There is no
+A `CertificateValidator` trusts only the anchors it's given. There is no
 default trust store, so a server that accepts certificates from a partner
 trusts that partner's CA and no other. The validator builds a path from the
 leaf through the other certificates, which may come in any order, and checks:
@@ -1600,12 +1600,12 @@ leaf through the other certificates, which may come in any order, and checks:
 * every signature;
 * the validity periods, at the current time or the one `at` gives;
 * basic constraints, key usage and path length on every issuer;
-* that no critical extension is one it does not understand;
+* that no critical extension is one it doesn't understand;
 * the host name and extended key usage, when `forHost` or `forPurpose` asks
   for them.
 
 Host names match the subject alternative names only. The common name is never
-used, as RFC 9525 requires. The validator does not check revocation.
+used, as RFC 9525 requires. The validator doesn't check revocation.
 
 The algorithm profile is the same on every runtime:
 
@@ -1616,7 +1616,7 @@ The algorithm profile is the same on every runtime:
 |Signatures on certificates and requests
 |RSA with SHA-256, SHA-384 or SHA-512; RSASSA-PSS with SHA-256; ECDSA with
 P-256 and SHA-256, or P-384 and SHA-384
-|SHA-1, MD5, ECDSA with a digest that does not match its curve
+|SHA-1, MD5, ECDSA with a digest that doesn't match its curve
 
 |Keys
 |RSA from 2048 to 8192 bits; EC on P-256 and P-384
