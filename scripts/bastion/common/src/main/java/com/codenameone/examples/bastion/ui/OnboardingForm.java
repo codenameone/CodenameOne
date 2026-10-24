@@ -83,7 +83,7 @@ public final class OnboardingForm {
         final Label ruleLength = new Label("", "BnRule");
         final Label ruleMatch = new Label("", "BnRule");
         final Label ruleEmail = new Label("", "BnRule");
-        final Label error = Ui.error();
+        final SpanLabel error = Ui.error();
         final Button go = Ui.primary("Create account");
         final Runnable check = () -> {
             String[] problems = passwordProblems(password.getText(), repeat.getText(), email.getText());
@@ -232,7 +232,7 @@ public final class OnboardingForm {
         open.addActionListener(evt -> CN.execute(enrollment.otpauthUri()));
         content.add(Ui.across(copy, open));
         final TextField code = Ui.field("Six-digit code", TextArea.NUMERIC);
-        final Label error = Ui.error();
+        final SpanLabel error = Ui.error();
         final Button confirm = Ui.primary("Turn on");
         content.addAll(code, error, confirm);
         confirm.addActionListener(evt -> {
@@ -309,7 +309,7 @@ public final class OnboardingForm {
         form.add(Ui.muted(Lang.tr("A passkey is kept by your phone and unlocked by your face, "
                 + "fingerprint or screen lock. It cannot be phished, and replaces both the "
                 + "password and the code.")));
-        final Label error = Ui.error();
+        final SpanLabel error = Ui.error();
         final Button create = Ui.primary("Create a passkey");
         create.addActionListener(evt -> {
             create.setEnabled(false);
@@ -342,7 +342,7 @@ public final class OnboardingForm {
         form.add(Ui.muted(Lang.tr("Bastion locks itself when you leave it. With this on, the "
                 + "phone keeps the key to your session and payments where only your biometric "
                 + "releases it. The device passcode is never accepted.")));
-        final Label error = Ui.error();
+        final SpanLabel error = Ui.error();
         Button yes = Ui.primary("Use biometrics");
         yes.addActionListener(evt -> UnlockSetup.biometric(() -> pinStep(signedIn), error));
         Button no = Ui.secondary("Not now");
@@ -367,7 +367,7 @@ public final class OnboardingForm {
                 + "not use one: {0} to {1} digits, not your card PIN. {2} wrong tries in a row "
                 + "erase the keys on this device.", String.valueOf(Keys.MIN_PIN),
                 String.valueOf(Keys.MAX_PIN), String.valueOf(Keys.PIN_ATTEMPTS))));
-        final Label error = Ui.error();
+        final SpanLabel error = Ui.error();
         final UnlockSetup.PinFields fields = new UnlockSetup.PinFields();
         Button set = Ui.primary("Set PIN");
         set.addActionListener(evt -> fields.save(() -> deviceStep(signedIn), error));
@@ -394,7 +394,7 @@ public final class OnboardingForm {
         form.add(Ui.muted(Lang.tr("Bastion makes a key on this phone and gives the bank only its "
                 + "public half. Payments to other people and crypto withdrawals must carry its "
                 + "signature, so a stolen password alone cannot move your money.")));
-        final Label error = Ui.error();
+        final SpanLabel error = Ui.error();
         final Button register = Ui.primary("Register this device");
         register.addActionListener(evt -> {
             register.setEnabled(false);

@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bastion.ui;
 
+import com.codename1.components.SpanLabel;
 import com.codename1.ui.Label;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
@@ -30,7 +31,7 @@ public final class UnlockSetup {
 
     /// Stores the biometric copy of the app key; on Android the OS asks for
     /// the biometric to write it.
-    public static void biometric(final Runnable done, final Label error) {
+    public static void biometric(final Runnable done, final SpanLabel error) {
         Keys.enableBiometric(Lang.tr("Let your biometric unlock Bastion"), done,
                 why -> Ui.showError(error, Lang.tr(why)));
     }
@@ -47,7 +48,7 @@ public final class UnlockSetup {
         }
 
         /// Checks the two and stores the PIN copy of the app key.
-        public void save(final Runnable done, final Label error) {
+        public void save(final Runnable done, final SpanLabel error) {
             String typed = pin.getText();
             if (!typed.equals(again.getText())) {
                 Ui.showError(error, Lang.tr("The two PINs are not the same."));

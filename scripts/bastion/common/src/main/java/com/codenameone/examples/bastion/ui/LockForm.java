@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bastion.ui;
 
+import com.codename1.components.SpanLabel;
 import com.codename1.ui.Button;
 import com.codename1.ui.Container;
 import com.codename1.ui.Label;
@@ -39,7 +40,7 @@ public final class LockForm {
     /// for, or the user would rather.
     public static void show(final Runnable signInAgain) {
         Container form = Ui.landing("Locked", "Bastion is locked", null);
-        final Label error = Ui.error();
+        final SpanLabel error = Ui.error();
         form.add(error);
         if (biometric()) {
             Button unlock = Ui.primary("Unlock");
@@ -84,7 +85,7 @@ public final class LockForm {
         return Lock.biometricsAvailable() && Keys.biometricEnabled();
     }
 
-    private static void ask(final Runnable signInAgain, final Label error) {
+    private static void ask(final Runnable signInAgain, final SpanLabel error) {
         Lock.unlockWithBiometric(gone -> {
             if (gone != null && gone.booleanValue()) {
                 // The OS revoked that copy (a biometric was enrolled since):
@@ -102,7 +103,7 @@ public final class LockForm {
     /// until the vault answers. Two attempts in flight would read the same
     /// failure count, and each record one -- so a guesser typing fast got
     /// more than [Keys#PIN_ATTEMPTS] tries before the wipe.
-    static void tryPin(final TextField pin, final Button withPin, final Label error,
+    static void tryPin(final TextField pin, final Button withPin, final SpanLabel error,
             final Runnable signInAgain) {
         if (!pin.isEnabled()) {
             return;

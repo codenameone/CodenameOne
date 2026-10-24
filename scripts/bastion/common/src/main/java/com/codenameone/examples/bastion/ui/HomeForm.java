@@ -233,12 +233,12 @@ public final class HomeForm {
 
     private static Container deviceBanner(final Container content) {
         Container banner = new Container(BoxLayout.y(), "BnBanner");
-        banner.add(new Label(Lang.tr("This device cannot sign payments yet"), "BnBannerTitle"));
+        banner.add(Ui.wrapped(Lang.tr("This device cannot sign payments yet"), "BnBannerTitle"));
         SpanLabel why = new SpanLabel(Lang.tr("Payments to other people and crypto withdrawals "
                 + "need a key that lives only on this phone."));
         why.setTextUIID("BnBannerText");
         banner.add(why);
-        final Label error = Ui.error();
+        final SpanLabel error = Ui.error();
         Button register = Ui.primary("Register this device");
         register.addActionListener(evt -> DeviceSetup.register(() -> load(content),
                 (status, message) -> Ui.showError(error, Lang.tr(message))));

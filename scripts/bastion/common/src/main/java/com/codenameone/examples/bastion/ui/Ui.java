@@ -54,6 +54,8 @@ public final class Ui {
     public static Form form(String title) {
         Form form = new Form(Lang.tr(title), BoxLayout.y());
         form.setUIID("BnForm");
+        // A value marked selectable (Ui.copyable) can be selected and copied.
+        form.getTextSelection().setEnabled(true);
         form.getContentPane().setUIID("BnPage");
         form.setScrollableY(true);
         return form;
@@ -130,13 +132,22 @@ public final class Ui {
         return label;
     }
 
-    public static Label error() {
-        Label label = new Label("", "BnError");
+    /// An error or status line. It wraps rather than end in "...": a message
+    /// cut short is one the reader cannot act on.
+    public static SpanLabel error() {
+        SpanLabel label = wrapped("", "BnError");
         label.setVisible(false);
         return label;
     }
 
-    public static void showError(Label label, String message) {
+    /// A sentence in `uiid` that wraps over as many lines as it needs.
+    public static SpanLabel wrapped(String text, String uiid) {
+        SpanLabel label = new SpanLabel(text);
+        label.setTextUIID(uiid);
+        return label;
+    }
+
+    public static void showError(SpanLabel label, String message) {
         label.setText(message);
         label.setVisible(message != null && message.length() > 0);
         Form form = label.getComponentForm();
@@ -170,6 +181,8 @@ public final class Ui {
     public static Container landing(String title, String heading, String subtitle) {
         Form form = new Form(Lang.tr(title), new BorderLayout());
         form.setUIID("BnForm");
+        // A value marked selectable (Ui.copyable) can be selected and copied.
+        form.getTextSelection().setEnabled(true);
         form.getToolbar().hideToolbar();
         Container band = new Container(BoxLayout.y(), "BnBrandBand");
         band.setSafeArea(true);
@@ -354,19 +367,7 @@ public final class Ui {
         Container row = new Container(new BorderLayout(), "BnRow");
         Container text = new Container(BoxLayout.y());
         text.add(new Label(title, "BnRowTitle"));
-        SpanLabel shown = new SpanLabel(value == null ? "" : value) {
-            @Override
-            protected void initComponent() {
-                super.initComponent();
-                // Selection is switched on for a form that shows a value to
-                // copy, and only there: on a form with text fields it would
-                // take the pointer from them.
-                Form form = getComponentForm();
-                if (form != null) {
-                    form.getTextSelection().setEnabled(true);
-                }
-            }
-        };
+        SpanLabel shown = new SpanLabel(value == null ? "" : value);
         shown.setTextUIID("BnRowValueWrap");
         shown.setTextSelectionEnabled(true);
         text.add(shown);
@@ -543,7 +544,7 @@ public final class Ui {
 
     public static void failed(final Container content, String message, final Runnable retry) {
         content.removeAll();
-        Label error = error();
+        SpanLabel error = error();
         content.add(error);
         showError(error, Lang.tr(message));
         Button again = secondary("Try again");

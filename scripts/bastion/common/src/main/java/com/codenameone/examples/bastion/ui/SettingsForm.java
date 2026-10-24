@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bastion.ui;
 
+import com.codename1.components.SpanLabel;
 import com.codenameone.examples.bastion.security.RequestSigner;
 import com.codenameone.examples.bastion.api.PasskeyRemoveDto;
 import com.codename1.components.Switch;
@@ -55,7 +56,7 @@ public final class SettingsForm {
         if (Lock.biometricsAvailable()) {
             final Switch bio = new Switch();
             bio.setValue(Keys.biometricEnabled());
-            final Label bioError = Ui.error();
+            final SpanLabel bioError = Ui.error();
             bio.addActionListener(evt -> {
                 if (bio.isValue()) {
                     UnlockSetup.biometric(() -> show(back), bioError);
@@ -65,7 +66,7 @@ public final class SettingsForm {
                 }
             });
             Container row = new Container(new BorderLayout(), "BnRow");
-            row.add(BorderLayout.CENTER, new Label(Lang.tr("Unlock with fingerprint or face"),
+            row.add(BorderLayout.CENTER, Ui.wrapped(Lang.tr("Unlock with fingerprint or face"),
                     "BnRowTitle"));
             row.add(BorderLayout.EAST, bio);
             form.addAll(row, bioError);
@@ -128,7 +129,7 @@ public final class SettingsForm {
     /// Sets, changes or removes the unlock PIN.
     private static void pinDialog(final Runnable back) {
         final Dialog dialog = new Dialog(Lang.tr("Unlock PIN"), BoxLayout.y());
-        final Label error = Ui.error();
+        final SpanLabel error = Ui.error();
         final UnlockSetup.PinFields fields = new UnlockSetup.PinFields();
         Button save = Ui.primary(Keys.pinEnabled() ? "Change PIN" : "Set PIN");
         save.addActionListener(evt -> fields.save(() -> {

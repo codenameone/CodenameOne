@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bastion.ui;
 
+import com.codename1.components.SpanLabel;
 import com.codename1.ui.Button;
 import com.codename1.ui.Container;
 import com.codename1.ui.Label;
@@ -70,7 +71,7 @@ public final class SignInForm {
     public static void show(final Runnable signedIn) {
         Container form = Ui.landing("Sign in", "Bastion", "Your bank, locked down.");
         form.add(new Label(Lang.tr("Sign in"), "BnLandingHeading"));
-        final Label error = Ui.error();
+        final SpanLabel error = Ui.error();
         boolean passkeys = Session.passkeysSupported();
         boolean device = biometricSession();
         int best = strongest(passkeys, device);
@@ -124,7 +125,7 @@ public final class SignInForm {
         form.add(Ui.muted(Lang.tr("Open your authenticator app and enter the six-digit code, "
                 + "or one of your recovery codes.")));
         final TextField code = Ui.field("Code", TextArea.ANY);
-        final Label error = Ui.error();
+        final SpanLabel error = Ui.error();
         final Button go = Ui.primary("Continue");
         form.addAll(code, error, go);
         go.addActionListener(evt -> {

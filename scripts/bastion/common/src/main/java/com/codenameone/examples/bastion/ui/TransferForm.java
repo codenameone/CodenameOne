@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bastion.ui;
 
+import com.codename1.components.SpanLabel;
 import com.codename1.ui.Button;
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;
@@ -149,7 +150,7 @@ public final class TransferForm {
                 });
         final TextField amount = Ui.field("Amount", TextField.DECIMAL);
         final TextField memo = Ui.field("Note (optional)", TextField.ANY);
-        final Label error = Ui.error();
+        final SpanLabel error = Ui.error();
         final Button review = Ui.primary("Review");
         // The payment last tried and its key: pressing Send again for the
         // same payment -- after a timeout, say -- reuses the key, so the
@@ -218,7 +219,7 @@ public final class TransferForm {
 
     /// Sends `transfer`; `key` is the payment's idempotency key and stays the
     /// same for the retry that follows registering the device.
-    private static void send(final Button review, final Label error, final TransferDto transfer,
+    private static void send(final Button review, final SpanLabel error, final TransferDto transfer,
             final String toName, final String key, final Runnable back) {
         review.setEnabled(false);
         DeviceSetup.withDevice(failed -> Api.banking().transfer(key,

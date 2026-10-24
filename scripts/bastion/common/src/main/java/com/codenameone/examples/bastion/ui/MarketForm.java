@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bastion.ui;
 
+import com.codename1.components.SpanLabel;
 import com.codename1.ui.Button;
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;
@@ -242,7 +243,7 @@ public final class MarketForm {
             limit[0] = index == 0;
             layout.run();
         }));
-        final Label error = Ui.error();
+        final SpanLabel error = Ui.error();
         final Button place = Ui.primary("Place order");
         ticket.addAll(fields, error, place);
         final NewOrderDto[] tried = new NewOrderDto[1];
@@ -282,7 +283,7 @@ public final class MarketForm {
 
     /// The order the ticket describes, or null with the reason shown.
     static NewOrderDto order(MarketDto market, boolean buy, boolean limit, TextField price,
-            TextField quantity, TextField budget, Label error) {
+            TextField quantity, TextField budget, SpanLabel error) {
         String side = buy ? "BUY" : "SELL";
         if (!limit && buy) {
             long spend = Amounts.parse(budget.getText(), market.quote());

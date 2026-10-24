@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bastion.ui;
 
+import com.codename1.components.SpanLabel;
 import com.codename1.ui.Button;
 import com.codename1.ui.Command;
 import com.codename1.ui.Container;
@@ -162,7 +163,7 @@ public final class WithdrawForm {
         wallet.addActionListener(evt -> retarget.run());
         retarget.run();
         final TextField amount = Ui.field("Amount", TextField.DECIMAL);
-        final Label error = Ui.error();
+        final SpanLabel error = Ui.error();
         final Button send = Ui.primary("Review");
         panel.addAll(Ui.section("From"), wallet, Ui.section("To"), target, amount, error, send);
         final CryptoWithdrawalDto[] tried = new CryptoWithdrawalDto[1];
