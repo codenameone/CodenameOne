@@ -165,6 +165,23 @@ view class the Codename One Android runtime implements (android2cn1:E0201)`.
 * XML: `getResources().getXml()` returns a pull parser over the compiled
   resource, and `Xml.newPullParser()` and `Xml.newSerializer()` read and write
   XML text.
+* Room: entities, DAOs, type converters, `@Embedded`, upsert, `@RawQuery`,
+  `LiveData` queries and migrations. The build generates the `_Impl` classes
+  that the Room annotation processor would, so nothing is found by reflection.
+* WorkManager: one-time and periodic work, chains whose outputs merge into the
+  next worker's input, unique work, retry with backoff and `LiveData` status
+  queries. Pending work is saved and resumes on the next run.
+* Location and sensors: `LocationManager` with its listeners, last known and
+  current location, and `SensorManager` with the accelerometer, gyroscope,
+  magnetometer, gravity, rotation vector and orientation, including
+  `getRotationMatrix()` and `getOrientation()`.
+* Services declared in the manifest: started and bound services,
+  `IntentService`, and `startForeground()`, which runs as a Codename One
+  `ForegroundService`. Notifications and channels posted through
+  `NotificationManager` and `NotificationCompat` are shown as local
+  notifications.
+* The `AndroidKeyStore` with AES keys from `KeyGenerator` and
+  `KeyGenParameterSpec`, used through `Cipher` in GCM or CBC mode.
 
 === AndroidX
 
@@ -373,9 +390,32 @@ the gallery and automated tests cover a subset of those behaviors.
 * Gradle recompiles all Java sources in an imported Android project after a
   source edit, because relocation rewrites the compiler output. Unchanged
   builds still use Gradle's up-to-date checks.
-* Content providers, services, broadcast intents from the system and
-  notifications through `NotificationManager` aren't available; use the
-  corresponding Codename One APIs through native interfaces or directly.
+* Content providers and broadcast intents from the system aren't available;
+  use the corresponding Codename One APIs through native interfaces or
+  directly.
+* `AndroidKeyStore` keys aren't hardware backed or non-extractable. Their
+  material is kept in Codename One's `SecureStorage` without a prompt: the
+  keychain on iOS, and a key of the platform's own keystore on Android. A
+  port without a secure store keeps the material in the application's private
+  storage, which a rooted device or a backup can read.
+  `setUserAuthenticationRequired()` isn't enforced; for a key the user must
+  unlock, use `SecureStorage` with a reason, which prompts for biometrics.
+  GCM supports only 128-bit tags.
+* Room rejects `@Relation`, `suspend` DAO methods, `Flow`, RxJava and Paging
+  return types, `@AutoMigration`, `@DatabaseView` and full-text tables at
+  build time, naming the member. `createFromAsset()` fails when the database
+  is built.
+* A `ListenableWorker` subclass returns a `java.util.concurrent.Future`
+  rather than Guava's `ListenableFuture`; `Worker` subclasses are unaffected.
+  A network constraint is treated as met, and charging, idle, battery and
+  storage constraints are checked only where Codename One's `BackgroundWork`
+  supports them. Work saved by an earlier run resumes once the application
+  calls `WorkManager.getInstance()`.
+* A manifest that asks for location access gets the iOS location usage
+  descriptions, and with `ACCESS_BACKGROUND_LOCATION` or
+  `FOREGROUND_SERVICE_LOCATION` the `location` background mode, added to
+  `codenameone_settings.properties` when the project doesn't set them. Edit
+  the added text to change what the iOS permission prompt says.
 * `ViewModelProvider` creates view models without reflection: the build
   registers every public, concrete `ViewModel` class whose public constructor
   takes nothing, an `Application`, a `SavedStateHandle`, or an `Application`

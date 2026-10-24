@@ -1,0 +1,48 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package androidx.room;
+
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+/// A foreign key of an entity's table.
+///
+/// Kept in the class files: the Room step of the Android remap reads it there
+/// and writes the code AndroidX Room's annotation processor would.
+@Target({})
+@Retention(RetentionPolicy.CLASS)
+public @interface ForeignKey {
+    int NO_ACTION = 1;
+    int RESTRICT = 2;
+    int SET_NULL = 3;
+    int SET_DEFAULT = 4;
+    int CASCADE = 5;
+
+    Class<?> entity();
+    String[] parentColumns();
+    String[] childColumns();
+    int onDelete() default NO_ACTION;
+    int onUpdate() default NO_ACTION;
+    boolean deferred() default false;
+}

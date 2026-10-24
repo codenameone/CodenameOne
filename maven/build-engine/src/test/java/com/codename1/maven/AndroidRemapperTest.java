@@ -492,6 +492,48 @@ public class AndroidRemapperTest {
         assertTrue(r.toString(), r.contains("com/codename1/androidcompat/jdk/FileInputStream"));
     }
 
+    /// The Keystore surface goes to the shims, nested types included, while
+    /// the security classes the Codename One class library already has stay.
+    @Test
+    public void mapsKeystoreShimsAndLeavesLibraryClasses() {
+        assertEquals("com/codename1/androidcompat/jdk/KeyStore$SecretKeyEntry",
+                AndroidRemapper.map("java/security/KeyStore$SecretKeyEntry"));
+        assertEquals("com/codename1/androidcompat/jdk/AEADBadTagException",
+                AndroidRemapper.map("javax/crypto/AEADBadTagException"));
+        assertEquals("com/codename1/androidcompat/jdk/GCMParameterSpec",
+                AndroidRemapper.map("javax/crypto/spec/GCMParameterSpec"));
+        assertEquals("java/security/GeneralSecurityException",
+                AndroidRemapper.map("java/security/GeneralSecurityException"));
+        assertEquals("java/security/NoSuchAlgorithmException",
+                AndroidRemapper.map("java/security/NoSuchAlgorithmException"));
+        assertEquals("java/security/SecureRandom", AndroidRemapper.map("java/security/SecureRandom"));
+    }
+
+    /// A shim for a class both Codename One class libraries already define
+    /// would replace the real one; a shim target with no source would fail at
+    /// link time on the device. Both are checked against the tree.
+    @Test
+    public void everyJdkShimIsMissingFromTheLibraryAndPresentInTheRuntime() {
+        java.io.File root = new java.io.File("../..").getAbsoluteFile();
+        java.io.File cldc = new java.io.File(root, "Ports/CLDC11/src");
+        java.io.File javaApi = new java.io.File(root, "vm/JavaAPI/src");
+        java.io.File runtime = new java.io.File(root, "maven/android-compat/src/main/java");
+        org.junit.Assume.assumeTrue(cldc.isDirectory() && javaApi.isDirectory() && runtime.isDirectory());
+        for (String[] shim : AndroidRemapper.JDK_SHIMS) {
+            String outer = shim[0].indexOf('$') < 0 ? shim[0] : shim[0].substring(0, shim[0].indexOf('$'));
+            boolean inBoth = new java.io.File(cldc, outer + ".java").isFile()
+                    && new java.io.File(javaApi, outer + ".java").isFile();
+            // The java.io shims replace library classes on purpose (the
+            // library's lack the File constructors); the security ones never do.
+            boolean security = shim[0].startsWith("java/security/") || shim[0].startsWith("javax/crypto/");
+            assertTrue(shim[0] + " exists in both class libraries", !security || !inBoth);
+            if (shim[1].startsWith("com/codename1/androidcompat/jdk/")) {
+                String target = shim[1].indexOf('$') < 0 ? shim[1] : shim[1].substring(0, shim[1].indexOf('$'));
+                assertTrue(shim[1] + " has no source", new java.io.File(runtime, target + ".java").isFile());
+            }
+        }
+    }
+
     /// A public class `name` extending `superName` with public constructors
     /// of the given descriptors, each calling the superclass's `()V`.
     private static byte[] classWithCtors(String name, String superName, String... descs) {
@@ -508,6 +550,58 @@ public class AndroidRemapperTest {
         }
         cw.visitEnd();
         return cw.toByteArray();
+    }
+
+    @Test
+    public void generatesTheWorkerInstantiatorFromCompiledClasses() throws Exception {
+        File classes = tmp.newFolder("workerclasses");
+        new File(classes, "com/x").mkdirs();
+        String ctor = "(Landroid/content/Context;Landroidx/work/WorkerParameters;)V";
+        Files.write(new File(classes, "com/x/Sync.class").toPath(),
+                classWithCtors("com/x/Sync", "androidx/work/Worker", ctor, "()V"));
+        Files.write(new File(classes, "com/x/Direct.class").toPath(),
+                classWithCtors("com/x/Direct", "androidx/work/ListenableWorker", ctor));
+        Files.write(new File(classes, "com/x/Deeper.class").toPath(),
+                classWithCtors("com/x/Deeper", "com/x/Sync", ctor));
+        Files.write(new File(classes, "com/x/Injected.class").toPath(),
+                classWithCtors("com/x/Injected", "androidx/work/Worker", "()V"));
+        Files.write(new File(classes, "com/x/NotAWorker.class").toPath(),
+                classWithCtors("com/x/NotAWorker", "java/lang/Object", ctor));
+        File jar = tmp.newFile("codenameone-android-compat-work.jar");
+        ZipOutputStream z = new ZipOutputStream(new FileOutputStream(jar));
+        int pub = Opcodes.ACC_PUBLIC | Opcodes.ACC_SUPER;
+        for (String[] c : new String[][] {{"androidx/work/ListenableWorker", "java/lang/Object"},
+            {"androidx/work/Worker", "androidx/work/ListenableWorker"}, {"android/content/Context", "java/lang/Object"},
+            {"androidx/work/WorkerParameters", "java/lang/Object"}}) {
+            z.putNextEntry(new ZipEntry(c[0] + ".class"));
+            z.write(classWithCtor(c[0], c[1], pub, Opcodes.ACC_PUBLIC));
+            z.closeEntry();
+        }
+        z.close();
+
+        new AndroidRemapper(classes, jar, null, LOG).run();
+
+        java.net.URLClassLoader loader = new java.net.URLClassLoader(new java.net.URL[] {classes.toURI().toURL()},
+                null);
+        try {
+            Class<?> inst = loader.loadClass(AndroidRemapper.WORKER_INSTANTIATOR.replace('/', '.'));
+            java.lang.reflect.Method m = inst.getMethod("create", String.class, Object.class, Object.class);
+            Object context = loader.loadClass("com.codename1.androidcompat.android.content.Context").newInstance();
+            Object params = loader.loadClass("com.codename1.androidcompat.androidx.work.WorkerParameters")
+                    .newInstance();
+            for (String name : new String[] {"com.x.Sync", "com.x.Direct", "com.x.Deeper"}) {
+                Object o = m.invoke(null, name, context, params);
+                assertTrue(name, o != null && o.getClass().getName().equals(name));
+            }
+            // Wrong arguments are refused rather than cast.
+            assertEquals(null, m.invoke(null, "com.x.Sync", params, context));
+            assertEquals(null, m.invoke(null, "com.x.Sync", null, params));
+            for (String name : new String[] {"com.x.Injected", "com.x.NotAWorker", "nope"}) {
+                assertEquals(name, null, m.invoke(null, name, context, params));
+            }
+        } finally {
+            loader.close();
+        }
     }
 
     @Test

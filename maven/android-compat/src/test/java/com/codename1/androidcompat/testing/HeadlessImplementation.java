@@ -618,28 +618,118 @@ public class HeadlessImplementation extends CodenameOneImplementation {
         return null;
     }
 
+    /// Storage held in memory for the life of the test JVM, so code that
+    /// persists through com.codename1.io.Storage (the AndroidKeyStore) can be
+    /// read back by a fresh instance.
+    public static final java.util.Map<String, byte[]> STORAGE =
+            java.util.Collections.synchronizedMap(new java.util.TreeMap<String, byte[]>());
+
     @Override
     public void deleteStorageFile(java.lang.String a0) {
+        STORAGE.remove(a0);
     }
 
     @Override
-    public java.io.OutputStream createStorageOutputStream(java.lang.String a0) throws java.io.IOException {
-        return null;
+    public java.io.OutputStream createStorageOutputStream(final java.lang.String a0) throws java.io.IOException {
+        return new java.io.ByteArrayOutputStream() {
+            @Override
+            public void close() throws java.io.IOException {
+                super.close();
+                STORAGE.put(a0, toByteArray());
+            }
+        };
     }
 
     @Override
     public java.io.InputStream createStorageInputStream(java.lang.String a0) throws java.io.IOException {
-        return null;
+        byte[] b = STORAGE.get(a0);
+        if (b == null) {
+            throw new java.io.IOException("No storage entry " + a0);
+        }
+        return new java.io.ByteArrayInputStream(b);
     }
 
     @Override
     public boolean storageFileExists(java.lang.String a0) {
-        return false;
+        return STORAGE.containsKey(a0);
     }
 
     @Override
     public java.lang.String[] listStorageEntries() {
-        return null;
+        synchronized (STORAGE) {
+            return STORAGE.keySet().toArray(new String[0]);
+        }
+    }
+
+    /// The quiet half of SecureStorage, held in memory, for the tests that
+    /// install it with [#SECURE_STORAGE_ON]; otherwise the port has none, as on
+    /// a platform without a secure store.
+    public static final java.util.Map<String, String> SECURE = java.util.Collections.synchronizedMap(
+            new java.util.TreeMap<String, String>());
+
+    /// Whether [#getSecureStorage()] answers the in-memory store.
+    public static final java.util.concurrent.atomic.AtomicBoolean SECURE_STORAGE_ON =
+            new java.util.concurrent.atomic.AtomicBoolean();
+
+    private static final com.codename1.security.SecureStorage QUIET = new com.codename1.security.SecureStorage() {
+        @Override
+        public boolean set(String account, String value) {
+            SECURE.put(account, value);
+            return true;
+        }
+
+        @Override
+        public String get(String account) {
+            return SECURE.get(account);
+        }
+
+        @Override
+        public boolean remove(String account) {
+            return SECURE.remove(account) != null;
+        }
+    };
+
+    @Override
+    public com.codename1.security.SecureStorage getSecureStorage() {
+        return SECURE_STORAGE_ON.get() ? QUIET : null;
+    }
+
+    /// AES through the host JDK, the same contract the ports implement.
+    @Override
+    public byte[] aesEncrypt(String transformation, byte[] key, byte[] iv, byte[] aad, byte[] plaintext) {
+        return aes(javax.crypto.Cipher.ENCRYPT_MODE, transformation, key, iv, aad, plaintext);
+    }
+
+    @Override
+    public byte[] aesDecrypt(String transformation, byte[] key, byte[] iv, byte[] aad, byte[] ciphertext) {
+        return aes(javax.crypto.Cipher.DECRYPT_MODE, transformation, key, iv, aad, ciphertext);
+    }
+
+    private static byte[] aes(int mode, String transformation, byte[] key, byte[] iv, byte[] aad, byte[] data) {
+        try {
+            javax.crypto.Cipher c = javax.crypto.Cipher.getInstance(transformation);
+            javax.crypto.spec.SecretKeySpec k = new javax.crypto.spec.SecretKeySpec(key, "AES");
+            if (iv == null) {
+                c.init(mode, k);
+            } else if (transformation.indexOf("GCM") >= 0) {
+                c.init(mode, k, new javax.crypto.spec.GCMParameterSpec(128, iv));
+            } else {
+                c.init(mode, k, new javax.crypto.spec.IvParameterSpec(iv));
+            }
+            if (aad != null) {
+                c.updateAAD(aad);
+            }
+            return c.doFinal(data);
+        } catch (java.security.GeneralSecurityException e) {
+            throw new RuntimeException(e.getMessage(), e);
+        }
+    }
+
+    private static final java.security.SecureRandom RANDOM = new java.security.SecureRandom();
+
+    @Override
+    public void secureRandomBytes(byte[] out) {
+        RANDOM.nextBytes(out);
     }
 
     @Override

@@ -247,6 +247,7 @@ vm/JavaAPI/src/java/text/Format.java | Codename One contribution whose copyright
 vm/JavaAPI/src/java/text/ParseException.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
 vm/JavaAPI/src/java/text/SimpleDateFormat.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
 maven/build-engine/src/main/java/com/codename1/builders/util/JSONSanitizer.java | Adapted from the OWASP JSON Sanitizer (Apache-2.0), whose documentation it keeps verbatim
+maven/android-compat/src/main/java/android/hardware/SensorMath.java | Rewritten from the static methods of AOSP android.hardware.SensorManager, Apache-2.0, retaining its original notice; adapted to the Codename One runtime
 maven/android-compat/src/main/java/androidx/constraintlayout/core/ArrayLinkedVariables.java | Vendored AOSP androidx.constraintlayout (constraintlayout-core 1.0.4 sources, Google Maven), Apache-2.0, retaining its original notice; adapted to the Codename One runtime
 maven/android-compat/src/main/java/androidx/constraintlayout/core/ArrayRow.java | Vendored AOSP androidx.constraintlayout (constraintlayout-core 1.0.4 sources, Google Maven), Apache-2.0, retaining its original notice; adapted to the Codename One runtime
 maven/android-compat/src/main/java/androidx/constraintlayout/core/Cache.java | Vendored AOSP androidx.constraintlayout (constraintlayout-core 1.0.4 sources, Google Maven), Apache-2.0, retaining its original notice; adapted to the Codename One runtime
