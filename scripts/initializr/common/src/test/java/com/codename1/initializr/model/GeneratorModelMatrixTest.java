@@ -104,12 +104,13 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         validateMavenProjectTypeBeforeTheGate();
         validateMavenRefusals();
         validateFullStackTemplate();
+        validateReelGate();
         for (Template template : Template.values()) {
             for (ProjectOptions.ProjectType type : ProjectOptions.ProjectType.values()) {
                 if (template.isFullStack() && type == ProjectOptions.ProjectType.APP) {
                     // An app with its server is not offered without the server.
                     assertRefused(GeneratorModel.createForPluginVersion(IDE.INTELLIJ, template, "NoServer",
-                            "com.acme.noserver", mavenOptions(type, false), FULL_STACK_VERSION),
+                            "com.acme.noserver", mavenOptions(type, false), GeneratorModel.sinceFor(template)),
                             "an app and its server", template + " must refuse to leave its server out");
                     continue;
                 }
@@ -547,6 +548,18 @@ public class GeneratorModelMatrixTest extends AbstractTest {
     /// The version the full-stack combinations are generated for.
     private static final String FULL_STACK_VERSION = GeneratorModel.FULL_STACK_SINCE;
 
+    /// The streaming template needs a newer core than the other complete apps:
+    /// below its own gate it is refused, and the page does not list it.
+    private void validateReelGate() throws Exception {
+        assertFalse(GeneratorModel.isVersionAtLeast(FULL_STACK_VERSION, GeneratorModel.REEL_SINCE),
+                "Reel's gate is past the other complete apps'");
+        assertRefused(GeneratorModel.createForPluginVersion(IDE.INTELLIJ, Template.REEL, "OldReel",
+                "com.acme.oldreel", ProjectOptions.defaults().forFullStack(), FULL_STACK_VERSION),
+                GeneratorModel.REEL_SINCE, "Reel is not generated before its gate");
+        assertEqual(Boolean.valueOf(GeneratorModel.isVersionAtLeast(GeneratorModel.cn1PluginVersion(),
+                GeneratorModel.REEL_SINCE)), Boolean.valueOf(GeneratorModel.isTemplateOffered(Template.REEL)), "The page offers Reel from its gate on");
+    }
+
     private static ProjectOptions mavenOptions(ProjectOptions.ProjectType type, boolean allModules) {
         return ProjectOptions.defaults().withBuild(ProjectOptions.BuildTool.MAVEN, type).withPlatformModules(allModules);
     }
@@ -688,7 +701,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         String mainClassName = "Mvn" + template.ordinal() + type.ordinal() + (allModules ? 1 : 0) + ide.ordinal() + "App";
         String packageName = "com.acme.m" + template.ordinal() + ".t" + type.ordinal() + ".i" + ide.ordinal();
         String label = template + "/" + type + "/" + (allModules ? "full" : "minimal") + "/" + ide + ": ";
-        String version = template.isFullStack() ? FULL_STACK_VERSION : LAYOUTS_VERSION;
+        String version = template.isFullStack() ? GeneratorModel.sinceFor(template) : LAYOUTS_VERSION;
         byte[] zipData = mavenZip(version, template, ide, mainClassName, packageName,
                 mavenOptions(type, allModules));
         Map<String, byte[]> entries = readZipEntries(zipData);

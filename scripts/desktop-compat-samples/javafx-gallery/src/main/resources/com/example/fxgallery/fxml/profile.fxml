@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import com.example.fxgallery.control.StatusBadge?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.CheckBox?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.RadioButton?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.control.ToggleGroup?>
+<?import javafx.scene.layout.ColumnConstraints?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.example.fxgallery.fxml.ProfileController"
+      spacing="10" styleClass="profile" stylesheets="@../css/profile.css">
+    <padding>
+        <Insets top="12" right="12" bottom="12" left="12"/>
+    </padding>
+    <fx:define>
+        <ToggleGroup fx:id="planGroup"/>
+    </fx:define>
+
+    <Label text="%profile.title" styleClass="title"/>
+
+    <GridPane hgap="8" vgap="6">
+        <columnConstraints>
+            <ColumnConstraints minWidth="90" halignment="RIGHT"/>
+            <ColumnConstraints hgrow="ALWAYS"/>
+        </columnConstraints>
+        <Label text="%profile.name" GridPane.rowIndex="0" GridPane.columnIndex="0"/>
+        <TextField fx:id="nameField" promptText="%profile.name.prompt" GridPane.rowIndex="0" GridPane.columnIndex="1"/>
+        <Label text="%profile.role" GridPane.rowIndex="1" GridPane.columnIndex="0"/>
+        <ComboBox fx:id="roleBox" maxWidth="Infinity" GridPane.rowIndex="1" GridPane.columnIndex="1"/>
+        <Label text="%profile.plan" GridPane.rowIndex="2" GridPane.columnIndex="0"/>
+        <HBox spacing="12" GridPane.rowIndex="2" GridPane.columnIndex="1">
+            <RadioButton text="%profile.plan.free" toggleGroup="$planGroup" userData="free" selected="true"/>
+            <RadioButton text="%profile.plan.pro" toggleGroup="$planGroup" userData="pro"/>
+        </HBox>
+        <CheckBox fx:id="activeBox" text="%profile.active" GridPane.rowIndex="3" GridPane.columnIndex="1"/>
+    </GridPane>
+
+    <Separator/>
+    <fx:include fx:id="address" source="address.fxml"/>
+    <Separator/>
+
+    <HBox spacing="8" alignment="CENTER_LEFT">
+        <Button fx:id="greetButton" text="%profile.greet" onAction="#onGreet" defaultButton="true" styleClass="primary"/>
+        <Button text="%profile.reset" onAction="#onReset"/>
+        <StatusBadge fx:id="badge" text="%badge.ready" level="0" HBox.hgrow="ALWAYS"/>
+    </HBox>
+    <Label fx:id="greeting" wrapText="true" styleClass="greeting"/>
+</VBox>

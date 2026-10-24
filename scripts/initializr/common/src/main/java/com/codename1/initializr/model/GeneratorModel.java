@@ -82,10 +82,16 @@ public class GeneratorModel {
 
     /// The first release whose core has the protected-playback API the streaming
     /// template plays its titles through (`com.codename1.media.drm`). Before it the
-    /// template's app does not compile, so the page does not offer it; a download
-    /// generated directly for an older release still is, for the fixtures that
-    /// build the template against this tree.
+    /// template's app does not compile, so it is neither offered nor generated.
     static final String REEL_SINCE = "7.0.280";
+
+    /// The first release `template` can be generated for as a Maven project.
+    public static String sinceFor(Template template) {
+        if (template == Template.REEL) {
+            return REEL_SINCE;
+        }
+        return template.isFullStack() ? FULL_STACK_SINCE : MAVEN_LAYOUTS_SINCE;
+    }
 
     /// The brand colour of the full-stack template as it ships: the `--brand` its
     /// theme.css declares, which is what the UI paints the icon with when no other
@@ -120,10 +126,7 @@ public class GeneratorModel {
     /// Whether `template` can be generated at [CN1_PLUGIN_VERSION]: the UI offers
     /// only the templates this answers true for.
     public static boolean isTemplateOffered(Template template) {
-        if (template == Template.REEL && !isVersionAtLeast(CN1_PLUGIN_VERSION, REEL_SINCE)) {
-            return false;
-        }
-        return !template.isFullStack() || isVersionAtLeast(CN1_PLUGIN_VERSION, FULL_STACK_SINCE);
+        return !template.isFullStack() || isVersionAtLeast(CN1_PLUGIN_VERSION, sinceFor(template));
     }
 
     /// The plugin version a download is generated against.
@@ -989,6 +992,10 @@ public class GeneratorModel {
             if (!isVersionAtLeast(pluginVersion, FULL_STACK_SINCE)) {
                 throw new IOException("This template shares a contract module between the app and its server, "
                         + "which needs Codename One " + FULL_STACK_SINCE + " or newer.");
+            }
+            if (!isVersionAtLeast(pluginVersion, sinceFor(template))) {
+                throw new IOException("This template plays protected video, which needs Codename One "
+                        + sinceFor(template) + " or newer.");
             }
             if (options.projectType != ProjectOptions.ProjectType.APP_WITH_BACKEND) {
                 throw new IOException("This template is an app and its server; choose \""

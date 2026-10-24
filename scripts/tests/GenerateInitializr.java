@@ -95,7 +95,7 @@ public class GenerateInitializr {
      ProjectOptions options = ProjectOptions.defaults().forFullStack().withPlatformModules(full)
        .withScheme(0x0f766e, false).withIcon(new byte[] {(byte)0x89, 'P', 'N', 'G'});
      GeneratorModel model=GeneratorModel.createForPluginVersion(ide,template,"LauncherProbe",
-       "com.example.probe",options,GeneratorModel.FULL_STACK_SINCE);
+       "com.example.probe",options,GeneratorModel.sinceFor(template));
      try(OutputStream out=Files.newOutputStream(Paths.get(args[0],
        template.name()+"-"+(full ? "FULL" : "APP_WITH_BACKEND")+"-"+ide.name()+".zip"))) {
       model.writeProjectZip(out);
