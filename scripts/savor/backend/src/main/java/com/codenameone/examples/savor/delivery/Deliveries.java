@@ -56,6 +56,7 @@ import com.codenameone.examples.savor.repository.DeliveryPassedRepository;
 import com.codenameone.examples.savor.repository.DeliveryRepository;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -177,9 +178,9 @@ public class Deliveries {
         delivery.setMethodLabel(order.getMethodLabel());
         delivery.setPaymentStatus(order.getPaymentStatus());
         delivery.setNote(order.getNote());
-        delivery.setRequestedAt(now);
-        delivery.setUpdatedAt(now);
-        delivery.setSearchUntil(now + searchMillis);
+        delivery.setRequestedAt(Instant.ofEpochMilli(now));
+        delivery.setUpdatedAt(Instant.ofEpochMilli(now));
+        delivery.setSearchUntil(Instant.ofEpochMilli(now + searchMillis));
         deliveries.insert(delivery);
         event(order.getId(), DeliveryState.REQUESTED, "");
     }
@@ -279,7 +280,7 @@ public class Deliveries {
         Delivery delivery = owned(id, COURIER, courier);
         move(id, DeliveryState.COMPLETED, courier, COURIER, null, null);
         if (orders.deliver(id, OrderStateMachine.sources(OrderState.DELIVERED),
-                OrderState.DELIVERED, System.currentTimeMillis()) == 1) {
+                OrderState.DELIVERED, Instant.now()) == 1) {
             orderEvents.record(id, OrderState.DELIVERED, courier);
         }
         return delivery;
@@ -334,13 +335,13 @@ public class Deliveries {
 
     @Transactional(readOnly = true)
     private List<Delivery> unsettled(long after, long before) {
-        return deliveries.unsettled(after, before, new PageRequest(0, 50));
+        return deliveries.unsettled(Instant.ofEpochMilli(after), Instant.ofEpochMilli(before), new PageRequest(0, 50));
     }
 
     @Transactional
     private Change settled(String courier, String id, String status) throws IOException {
         deliveries.paymentStatus(id, status);
-        orders.paymentStatus(id, status, System.currentTimeMillis());
+        orders.paymentStatus(id, status, Instant.now());
         Delivery delivery = find(id);
         return new Change(id, delivery.getState(), delivery.getCustomer(), delivery.getCourier(), "",
                 toDto(delivery, courier, new HashMap<String, Profile>()));
@@ -359,7 +360,7 @@ public class Deliveries {
     private Change giveUp(String courier, String id) throws IOException {
         Delivery delivery = owned(id, COURIER, courier);
         if (deliveries.giveBack(id, TAKEN_NOT_STARTED, DeliveryState.REQUESTED,
-                System.currentTimeMillis(), courier, "") != 1) {
+                Instant.now(), courier, "") != 1) {
             throw new ResponseStatusException(409, "That delivery is "
                     + describe(find(id).getState()));
         }
@@ -394,7 +395,7 @@ public class Deliveries {
             // The courier has the food: the order is picked up in the same
             // transaction, and only once the kitchen said it is ready.
             if (orders.move(id, OrderStateMachine.sources(OrderState.PICKED_UP),
-                    OrderState.PICKED_UP, System.currentTimeMillis()) != 1) {
+                    OrderState.PICKED_UP, Instant.now()) != 1) {
                 throw new ResponseStatusException(409, "The kitchen has not marked it ready yet");
             }
             orderEvents.record(id, OrderState.PICKED_UP, courier);
@@ -494,17 +495,17 @@ public class Deliveries {
             return null;
         }
         long now = System.currentTimeMillis();
-        if (now > delivery.getSearchUntil()) {
+        if (now > delivery.getSearchUntil().toEpochMilli()) {
             if (!tryMove(id, DeliveryState.NO_COURIERS, "", null, null, null)) {
                 return null;
             }
             if (orders.end(id, OrderStateMachine.sources(OrderState.NO_COURIERS),
-                    OrderState.NO_COURIERS, "No courier was free to bring it", now) == 1) {
+                    OrderState.NO_COURIERS, "No courier was free to bring it", Instant.ofEpochMilli(now)) == 1) {
                 orderEvents.record(id, OrderState.NO_COURIERS, "");
             }
             return new Change(id, DeliveryState.NO_COURIERS, delivery.getCustomer(), "", "", null);
         }
-        chosen[0] = matcher.pick(delivery, now - delivery.getRequestedAt());
+        chosen[0] = matcher.pick(delivery, now - delivery.getRequestedAt().toEpochMilli());
         return null;
     }
 
@@ -535,7 +536,7 @@ public class Deliveries {
             return null;
         }
         long now = System.currentTimeMillis();
-        if (!matcher.fits(delivery, courier, now - delivery.getRequestedAt())) {
+        if (!matcher.fits(delivery, courier, now - delivery.getRequestedAt().toEpochMilli())) {
             return null;
         }
         return tryMove(id, DeliveryState.OFFERED, "", null, courier, Long.valueOf(now + offerMillis))
@@ -584,7 +585,7 @@ public class Deliveries {
 
     @Transactional(readOnly = true)
     private List<Delivery> lapsedOffers(long now) throws IOException {
-        return deliveries.findByStateAndOfferExpiresAtLessThan(DeliveryState.OFFERED, now);
+        return deliveries.findByStateAndOfferExpiresAtLessThan(DeliveryState.OFFERED, Instant.ofEpochMilli(now));
     }
 
     @Transactional(readOnly = true)
@@ -723,10 +724,11 @@ public class Deliveries {
         if (sources.length == 0) {
             return false;
         }
-        long now = System.currentTimeMillis();
+        Instant now = Instant.now();
         int moved;
         if (newOfferExpiresAt != null) {
-            moved = deliveries.offer(id, sources, to, now, newCourier, newOfferExpiresAt.longValue());
+            moved = deliveries.offer(id, sources, to, now, newCourier,
+                    Instant.ofEpochMilli(newOfferExpiresAt.longValue()));
         } else if (CUSTOMER.equals(ownerField)) {
             moved = deliveries.moveAsCustomer(id, sources, to, now, actor);
         } else if (!COURIER.equals(ownerField)) {
@@ -754,7 +756,7 @@ public class Deliveries {
         event.setDeliveryId(id);
         event.setState(state);
         event.setActor(actor);
-        event.setCreatedAt(System.currentTimeMillis());
+        event.setCreatedAt(Instant.now());
         events.insert(event);
     }
 
@@ -888,7 +890,7 @@ public class Deliveries {
         }
         if (offered) {
             offerExpiresInSeconds = (int) Math.max(0L,
-                    (delivery.getOfferExpiresAt() - System.currentTimeMillis()) / 1000L);
+                    (delivery.getOfferExpiresAt().toEpochMilli() - System.currentTimeMillis()) / 1000L);
         }
         long fareCents = delivery.getFareCents();
         long tip = delivery.getTipCents();
@@ -921,8 +923,8 @@ public class Deliveries {
                 delivery.getCurrency(),
                 delivery.getDistanceMeters(),
                 delivery.getDurationSeconds(),
-                delivery.getRequestedAt(),
-                delivery.getUpdatedAt(),
+                delivery.getRequestedAt().toEpochMilli(),
+                delivery.getUpdatedAt().toEpochMilli(),
                 delivery.getStars(),
                 delivery.getPaymentStatus(),
                 offerExpiresInSeconds,

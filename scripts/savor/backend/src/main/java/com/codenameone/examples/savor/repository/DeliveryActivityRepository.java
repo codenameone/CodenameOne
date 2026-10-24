@@ -26,6 +26,7 @@ import com.codename1.orm.repository.Query;
 import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.savor.domain.DeliveryActivity;
 
+import java.time.Instant;
 import java.util.List;
 
 /// The Live Activities customers follow their deliveries in, by delivery.
@@ -40,23 +41,27 @@ public interface DeliveryActivityRepository extends CrudRepository<DeliveryActiv
     @Modifying
     @Query("update DeliveryActivity a set a.sentAt = :now "
             + "where a.deliveryId = :deliveryId and a.sentAt < :before")
-    int claim(@Param("deliveryId") String deliveryId, @Param("now") long now,
-            @Param("before") long before);
+    int claim(@Param("deliveryId") String deliveryId, @Param("now") Instant now,
+            @Param("before") Instant before);
 
     /// Records that the delivery ended at `now`, unless that is already recorded.
+    /// `never` is [Instant#EPOCH], what an end not yet recorded holds; the
+    /// queries below take it for the same reason.
     @Modifying
     @Query("update DeliveryActivity a set a.endedAt = :now "
-            + "where a.deliveryId = :deliveryId and a.endedAt = 0")
-    int markEnded(@Param("deliveryId") String deliveryId, @Param("now") long now);
+            + "where a.deliveryId = :deliveryId and a.endedAt = :never")
+    int markEnded(@Param("deliveryId") String deliveryId, @Param("now") Instant now,
+            @Param("never") Instant never);
 
     /// The activities whose delivery ended before `before` and that are still
     /// here, because the phone was not told: oldest first.
-    @Query("select a from DeliveryActivity a where a.endedAt > 0 and a.endedAt < :before "
+    @Query("select a from DeliveryActivity a where a.endedAt > :never and a.endedAt < :before "
             + "order by a.endedAt")
-    List<DeliveryActivity> leftBehind(@Param("before") long before, PageRequest page);
+    List<DeliveryActivity> leftBehind(@Param("never") Instant never, @Param("before") Instant before,
+            PageRequest page);
 
     /// Forgets the activities whose delivery ended before `before`.
     @Modifying
-    @Query("delete from DeliveryActivity a where a.endedAt > 0 and a.endedAt < :before")
-    int dropEndedBefore(@Param("before") long before);
+    @Query("delete from DeliveryActivity a where a.endedAt > :never and a.endedAt < :before")
+    int dropEndedBefore(@Param("never") Instant never, @Param("before") Instant before);
 }

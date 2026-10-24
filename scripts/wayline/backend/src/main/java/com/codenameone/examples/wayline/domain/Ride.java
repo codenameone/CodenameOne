@@ -22,6 +22,7 @@ import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
 import com.codenameone.examples.wayline.api.RideState;
+import java.time.Instant;
 
 // tag::wayline-entity[]
 /// A ride, from the request to its end.
@@ -75,16 +76,16 @@ public class Ride {
     private double durationSeconds;
 
     @Column(nullable = false)
-    private long requestedAt;
+    private Instant requestedAt = Instant.EPOCH;
 
     @Column(nullable = false)
-    private long updatedAt;
+    private Instant updatedAt = Instant.EPOCH;
 
     @Column(nullable = false)
-    private long offerExpiresAt;
+    private Instant offerExpiresAt = Instant.EPOCH;
 
     @Column(nullable = false)
-    private long searchUntil;
+    private Instant searchUntil = Instant.EPOCH;
 
     @Column(nullable = false, type = "SMALLINT")
     private int stars;
@@ -251,35 +252,35 @@ public class Ride {
         this.durationSeconds = durationSeconds;
     }
 
-    public long getRequestedAt() {
+    public Instant getRequestedAt() {
         return requestedAt;
     }
 
-    public void setRequestedAt(long requestedAt) {
+    public void setRequestedAt(Instant requestedAt) {
         this.requestedAt = requestedAt;
     }
 
-    public long getUpdatedAt() {
+    public Instant getUpdatedAt() {
         return updatedAt;
     }
 
-    public void setUpdatedAt(long updatedAt) {
+    public void setUpdatedAt(Instant updatedAt) {
         this.updatedAt = updatedAt;
     }
 
-    public long getOfferExpiresAt() {
+    public Instant getOfferExpiresAt() {
         return offerExpiresAt;
     }
 
-    public void setOfferExpiresAt(long offerExpiresAt) {
+    public void setOfferExpiresAt(Instant offerExpiresAt) {
         this.offerExpiresAt = offerExpiresAt;
     }
 
-    public long getSearchUntil() {
+    public Instant getSearchUntil() {
         return searchUntil;
     }
 
-    public void setSearchUntil(long searchUntil) {
+    public void setSearchUntil(Instant searchUntil) {
         this.searchUntil = searchUntil;
     }
 

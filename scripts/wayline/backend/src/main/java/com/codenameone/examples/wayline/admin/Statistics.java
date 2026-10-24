@@ -44,6 +44,7 @@ import com.codenameone.examples.wayline.ride.Fares;
 import com.codenameone.examples.wayline.ride.Matcher;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -116,8 +117,9 @@ public class Statistics {
             }
         }
         int online = (int) cars.countByOnlineTrueAndLastSeenGreaterThanEqual(
-                now - Matcher.FRESH_MILLIS);
-        int today = (int) rides.countByRequestedAtGreaterThanEqual(Days.start(now));
+                Instant.ofEpochMilli(now - Matcher.FRESH_MILLIS));
+        int today = (int) rides.countByRequestedAtGreaterThanEqual(
+                Instant.ofEpochMilli(Days.start(now)));
         int active = (int) rides.countByStateIn(ACTIVE);
         int done = (int) rides.countByStateIn(new RideState[] {RideState.COMPLETED});
         long revenue = Rows.number(rides.fares(RideState.COMPLETED, PAID));
@@ -141,10 +143,11 @@ public class Statistics {
         int[] byHour = new int[24];
         // By day and by hour, counted here from one row per ride.
         Map<String, Long> requestedAt = new HashMap<String, Long>();
-        List<Object[]> timeline = rides.timeline(since);
+        Instant from = Instant.ofEpochMilli(since);
+        List<Object[]> timeline = rides.timeline(from);
         for (int iter = 0; iter < timeline.size(); iter++) {
             Object[] ride = timeline.get(iter);
-            long at = whole(ride[1]);
+            long at = millis(ride[1]);
             RideState state = Rows.state(ride[2]);
             requestedAt.put(Rows.text(ride[0]), Long.valueOf(at));
             int index = (int) ((at - since) / Days.MILLIS);
@@ -166,7 +169,7 @@ public class Statistics {
         int[] byState = new int[STATES.length];
         long completed = 0L;
         long finished = 0L;
-        List<Object[]> states = rides.countByState(since);
+        List<Object[]> states = rides.countByState(from);
         for (int iter = 0; iter < states.size(); iter++) {
             RideState state = Rows.state(states.get(iter)[0]);
             long count = whole(states.get(iter)[1]);
@@ -183,7 +186,7 @@ public class Statistics {
             }
         }
         int[] byProduct = new int[Fares.PRODUCTS.length];
-        List<Object[]> products = rides.countByProduct(since);
+        List<Object[]> products = rides.countByProduct(from);
         for (int iter = 0; iter < products.size(); iter++) {
             for (int p = 0; p < Fares.PRODUCTS.length; p++) {
                 if (Fares.PRODUCTS[p].equals(products.get(iter)[0])) {
@@ -192,12 +195,12 @@ public class Statistics {
             }
         }
         Map<String, int[]> completedBy = new HashMap<String, int[]>();
-        List<Object[]> perDriver = rides.countByDriver(since, RideState.COMPLETED);
+        List<Object[]> perDriver = rides.countByDriver(from, RideState.COMPLETED);
         for (int iter = 0; iter < perDriver.size(); iter++) {
             completedBy.put(Rows.text(perDriver.get(iter)[0]),
                     new int[] {(int) whole(perDriver.get(iter)[1])});
         }
-        long fareSum = Rows.number(rides.faresSince(since, RideState.COMPLETED));
+        long fareSum = Rows.number(rides.faresSince(from, RideState.COMPLETED));
         List<Integer> hours = new ArrayList<Integer>();
         for (int iter = 0; iter < byHour.length; iter++) {
             hours.add(Integer.valueOf(byHour[iter]));
@@ -219,9 +222,9 @@ public class Statistics {
         double completionRate = finished == 0L ? 0d
                 : Math.round(completed * 100d / finished) / 100d;
 
-        List<Long> signUps = profiles.signUps(since);
+        List<Instant> signUps = profiles.signUps(from);
         for (int iter = 0; iter < signUps.size(); iter++) {
-            int index = (int) ((signUps.get(iter).longValue() - since) / Days.MILLIS);
+            int index = (int) ((signUps.get(iter).toEpochMilli() - since) / Days.MILLIS);
             if (index >= 0 && index < span) {
                 dayNewUsers[index]++;
             }
@@ -235,13 +238,13 @@ public class Statistics {
 
         // How long a rider waited for a driver to take the ride: each time one
         // was accepted, set against when it was asked for.
-        List<Object[]> waits = events.reached(since, RideState.ACCEPTED);
+        List<Object[]> waits = events.reached(from, RideState.ACCEPTED);
         long waited = 0L;
         int answered = 0;
         for (int iter = 0; iter < waits.size(); iter++) {
             Long asked = requestedAt.get(Rows.text(waits.get(iter)[0]));
             if (asked != null) {
-                waited += Math.max(0L, whole(waits.get(iter)[1]) - asked.longValue());
+                waited += Math.max(0L, millis(waits.get(iter)[1]) - asked.longValue());
                 answered++;
             }
         }
@@ -295,6 +298,14 @@ public class Statistics {
     private static boolean cancelled(RideState state) {
         return RideState.CANCELLED_BY_RIDER == state || RideState.CANCELLED_BY_DRIVER == state
                 || RideState.CANCELLED_BY_ADMIN == state;
+    }
+
+    /// A time as a query answers it, in milliseconds since the epoch.
+    private static long millis(Object value) {
+        if (!(value instanceof Instant)) {
+            throw new IllegalStateException("Not a time: " + value);
+        }
+        return ((Instant) value).toEpochMilli();
     }
 
     /// A count or a sum as a query answers it.
