@@ -345,19 +345,7 @@ handler:
 
 [source,java]
 ----
-@RestController
-public class Notes {
-    @GetMapping("/notes/{id}")
-    public Note note(@PathVariable("id") long id) {
-        return repository.findById(id).orElseThrow(() -> new NoteMissing(id));
-    }
-
-    @ExceptionHandler(NoteMissing.class)
-    @ResponseStatus(404)
-    public Map missing(NoteMissing e) {
-        return Collections.singletonMap("error", e.getMessage());
-    }
-}
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/advice/NotesWithHandler.java[tag=backend-web-exception-handler,indent=0]
 ----
 
 A handler on a controller answers for that controller's routes. A
@@ -366,13 +354,7 @@ controller, and `basePackages` narrows it to some:
 
 [source,java]
 ----
-@RestControllerAdvice
-public class ApiErrors {
-    @ExceptionHandler(IllegalArgumentException.class)
-    public HttpServer.Response badInput(IllegalArgumentException e, HttpServer.Request request) {
-        return HttpServer.Response.text(400, e.getMessage()).header("X-Error", "input");
-    }
-}
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/advice/ApiErrors.java[tag=backend-web-controller-advice,indent=0]
 ----
 
 A handler takes, in any order, the exception, the `HttpServer.Request` and the
@@ -413,18 +395,14 @@ check the object's fields, and put a constraint directly on a `@RequestParam`,
 
 [source,java]
 ----
-public class NewNote {
-    @NotBlank @Size(max = 200) public String title;
-    @Min(1) @Max(5) public int priority;
-    @Valid public Address address;
-    @Valid public List<Tag> tags;
-}
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/advice/NewNote.java[tag=backend-web-validation-model,indent=0]
+----
 
-@PostMapping("/notes")
-public Note create(@Valid @RequestBody NewNote note) { ... }
+The controller asks for the checks on its parameters:
 
-@GetMapping("/notes")
-public List<Note> page(@RequestParam("page") @Min(1) int page) { ... }
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/advice/ValidatedNotes.java[tag=backend-web-validation-controller,indent=0]
 ----
 
 The constraints are `@NotNull`, `@NotBlank`, `@NotEmpty`, `@Size`, `@Min` and
@@ -438,9 +416,7 @@ previous section may answer. Unhandled, it answers 400:
 
 [source,json]
 ----
-{"status":400,"error":"Bad Request","errors":[
-  {"field":"title","code":"NotBlank","message":"must not be blank"},
-  {"field":"tags[1].name","code":"Size","message":"size must be between 1 and 20"}]}
+include::../demos/common/src/main/snippets/developer-guide/backend-web.txt[tag=backend-web-validation-errors,indent=0]
 ----
 
 Field paths are stable: they use the JSON property names, `[n]` for an
@@ -460,18 +436,7 @@ for work that is not security: auditing, metrics, cleaning up after a request.
 
 [source,java]
 ----
-@Component
-@Order(1)
-public class Audit implements HandlerInterceptor {
-    public HttpServer.Response preHandle(HttpServer.Request request, HandlerMethod handler) {
-        return null;                       // null proceeds; a Response answers instead
-    }
-
-    public void afterCompletion(HttpServer.Request request, HandlerMethod handler,
-                                HttpServer.Response response, Throwable failure) {
-        audit.record(handler.getPattern(), failure == null ? "ok" : failure.toString());
-    }
-}
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/advice/Audit.java[tag=backend-web-interceptor,indent=0]
 ----
 
 A request passes through these stages in order:
