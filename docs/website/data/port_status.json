@@ -573,8 +573,9 @@
       "id": "orientation",
       "category": "Input and lifecycle",
       "name": "Orientation locking",
-      "description": "Checks orientation changes and the rendered landscape state.",
+      "description": "Checks orientation changes, the rendered landscape state, and a rotation hidden by a native modal.",
       "tests": [
+        "NativeModalRotationTest",
         "OrientationLockScreenshotTest"
       ]
     },
@@ -911,6 +912,9 @@
     }
   ],
   "test_scopes": {
+    "NativeModalRotationTest": [
+      "ios-metal"
+    ],
     "SystemBackNavigationTest": [
       "android"
     ],
