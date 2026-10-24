@@ -49,7 +49,8 @@ public interface ProfileRepository extends CrudRepository<Profile, String> {
 
     /// The players a broadcast reaches, a page at a time. Banned players are
     /// never sent anything; `seenBefore` and `joinedAfter` narrow it to the
-    /// lapsed and the new (pass 0 and `Long.MAX_VALUE` to leave them out).
+    /// lapsed and the new (pass `Instant.ofEpochMilli(Long.MAX_VALUE)` and
+    /// `Instant.ofEpochMilli(Long.MIN_VALUE)` to leave them out).
     @Query("select p from Profile p where p.banned = false and p.lastSeen < :seen and p.createdAt > :joined "
             + "order by p.username asc")
     List<Profile> audience(@Param("seen") Instant seenBefore, @Param("joined") Instant joinedAfter, PageRequest page);

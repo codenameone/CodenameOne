@@ -1410,7 +1410,8 @@ public class OrmAnnotationProcessorTest {
         File classes=tmp.newFolder("javatime");Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
         sources.put("javatime.Event","package javatime; import com.codename1.annotations.*; import com.codename1.annotations.db.*; import java.time.*; "
             + "@Entity public class Event { @Id public long id; public Instant at; public LocalDate day; public LocalDateTime local; "
-            + "@Temporal(TemporalType.TIMESTAMP) public Instant nativeAt; @Temporal(TemporalType.DATE) public LocalDate nativeDay; @Temporal(TemporalType.TIMESTAMP) public LocalDateTime nativeLocal; public long rawAt; }");
+            + "@Temporal(TemporalType.TIMESTAMP) public Instant nativeAt; @Temporal(TemporalType.DATE) public LocalDate nativeDay; @Temporal(TemporalType.TIMESTAMP) public LocalDateTime nativeLocal; public long rawAt; @Embedded public Span span=new Span(); }");
+        sources.put("javatime.Span","package javatime; import com.codename1.annotations.db.*; import java.time.*; @Embeddable public class Span { public Instant until; }");
         JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
         ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());
         ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
@@ -1425,7 +1426,8 @@ public class OrmAnnotationProcessorTest {
                     for(java.time.Instant at:Arrays.asList(late,early)) {
                         Object e=type.newInstance();java.time.LocalDateTime local=java.time.LocalDateTime.ofInstant(at,java.time.ZoneOffset.UTC);
                         type.getField("at").set(e,at);type.getField("nativeAt").set(e,at);type.getField("day").set(e,local.toLocalDate());type.getField("nativeDay").set(e,local.toLocalDate());
-                        type.getField("local").set(e,local);type.getField("nativeLocal").set(e,local);type.getField("rawAt").setLong(e,at.toEpochMilli());session.persist(e);
+                        type.getField("local").set(e,local);type.getField("nativeLocal").set(e,local);type.getField("rawAt").setLong(e,at.toEpochMilli());
+                        Object span=type.getField("span").get(e);span.getClass().getField("until").set(span,at);session.persist(e);
                     }
                     Object empty=type.newInstance();session.persist(empty);session.commitTransaction();session.clear();
                     for(String field:Arrays.asList("at","nativeAt","day","nativeDay","local","nativeLocal")) {
@@ -1440,6 +1442,13 @@ public class OrmAnnotationProcessorTest {
                         Object after=session.createQuery("select e from Event e where e."+field+" > :v").setParameter("v",expected).first();
                         assertEquals(suffix+" "+field,type.getField(field).get(second),type.getField(field).get(after));
                     }
+                    java.util.List<?> spans=session.createQuery("select e from Event e where e.span.until < :v").setParameter("v",late).list();
+                    assertEquals(suffix,1,spans.size());
+                    Object loadedSpan=type.getField("span").get(spans.get(0));
+                    assertEquals(suffix,java.time.Instant.ofEpochMilli(early.toEpochMilli()),loadedSpan.getClass().getField("until").get(loadedSpan));
+                    // An aggregate of the field answers the field's type, not its storage.
+                    assertEquals(suffix,java.time.Instant.ofEpochMilli(late.toEpochMilli()),session.createQuery("select max(e.at) from Event e").first());
+                    assertEquals(suffix,java.time.LocalDate.of(1969,7,20),session.createQuery("select min(e.nativeDay) from Event e").first());
                     // The default Instant column is the epoch milliseconds a long holds.
                     assertEquals(1,session.createQuery("select e from Event e where e.rawAt = :v").setParameter("v",late.toEpochMilli()).list().size());
                     Object loadedEmpty=session.find(type,type.getField("id").get(empty));
@@ -1458,6 +1467,32 @@ public class OrmAnnotationProcessorTest {
             String errors=runProcessor(bad,Collections.<String>emptyList()).getErrors().toString();
             assertTrue(errors,errors.contains(c[1]));
         }
+    }
+
+    /// Where java.time cannot go, the build says so once, in its own words --
+    /// not as a relationship, and not as generated code that fails to compile.
+    @Test
+    public void javaTimeFieldsRejectUnsupportedPlacements() throws Exception {
+        String imports="package javatimeplace; import com.codename1.annotations.*; import com.codename1.annotations.db.*; import java.util.*; import java.time.*; ";
+        String[][] cases={
+            {"@Id(autoIncrement=false) public Instant at; public long other;","Identifier fields cannot be java.time values: at"},
+            {"@Id public long id; @Version public Instant at;","Version fields cannot be java.time values: at"},
+            {"@Id public long id; public final com.codename1.properties.Property<Instant,Entry> at=new com.codename1.properties.Property<Instant,Entry>(\"at\");","A Property of java.time.Instant is not supported"},
+            {"@Id(autoIncrement=false) @Temporal public Instant at; public long other;","Identifier and version fields cannot be @Temporal: at"},
+            {"@Id public long id; @Temporal(TemporalType.DATE) public Instant at;","@Temporal(DATE) does not hold a java.time.Instant: at"},
+            {"@Id public long id; @ElementCollection public List<Instant> at=new ArrayList<Instant>();","ElementCollection requires a supported scalar value: java.time.Instant"}};
+        for(String[] c:cases) {
+            File classes=tmp.newFolder();Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+            sources.put("javatimeplace.Entry",imports+"@Entity public class Entry { "+c[0]+" }");
+            JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+            String errors=runProcessor(classes,Collections.<String>emptyList()).getErrors().toString();
+            assertTrue(errors,errors.contains(c[1]));
+            assertFalse(errors,errors.contains("relationships are not yet supported"));
+        }
+        // A wall clock past what a long of milliseconds holds is refused, never wrapped.
+        org.junit.Assert.assertThrows(IllegalArgumentException.class,()->new com.codename1.impl.orm.JavaTimeConverter.LocalDateTimeMillis().toDatabase(java.time.LocalDateTime.MAX));
+        org.junit.Assert.assertThrows(IllegalArgumentException.class,()->new com.codename1.impl.orm.JavaTimeConverter.LocalDateTimeMillis().toDatabase(java.time.LocalDateTime.MIN));
+        org.junit.Assert.assertThrows(ArithmeticException.class,()->new com.codename1.impl.orm.JavaTimeConverter.InstantMillis().toDatabase(java.time.Instant.MAX));
     }
 
     @Test

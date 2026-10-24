@@ -508,13 +508,22 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                 // column, through a built-in converter: an Instant reads what a
                 // long or a Date of milliseconds wrote.
                 String javaTime=JAVA_TIME_TYPES.get(f.getDescriptor());
-                if(f.getAnnotation(ID_DESC)!=null || ec.embeddedId!=null && pf.fieldName.startsWith(ec.embeddedId+".")) ctx.error(cls,"Identifier fields cannot be java.time values: "+pf.fieldName);
-                else if(pf.version) ctx.error(cls,"Version fields cannot be java.time values: "+pf.fieldName);
+                if(f.getAnnotation(ID_DESC)!=null || ec.embeddedId!=null && pf.fieldName.startsWith(ec.embeddedId+".")) { ctx.error(cls,"Identifier fields cannot be java.time values: "+pf.fieldName);continue; }
+                else if(pf.version) { ctx.error(cls,"Version fields cannot be java.time values: "+pf.fieldName);continue; }
                 else {
                     pf.converter="com.codename1.impl.orm.JavaTimeConverter."+javaTime+("LocalDate".equals(javaTime)?"EpochDay":"Millis");
                     pf.domainType="java.time."+javaTime;
                     pf.kind=PropertyTypeKind.scalar("java.lang.Long");
                 }
+            }
+            // A java.time field with no converter by now was refused above; it
+            // must not go on to be reported again as a relationship.
+            if(pf.converter==null && JAVA_TIME_TYPES.containsKey(f.getDescriptor())) continue;
+            // A Property holds its value through generated accessors that know
+            // only the scalar types; a converter has no hook there.
+            if(pf.kind.kind==PropertyTypeKind.Kind.PROPERTY && pf.kind.elementBinaryName!=null && pf.kind.elementBinaryName.startsWith("java.time.")) {
+                ctx.error(cls,"A Property of "+pf.kind.elementBinaryName+" is not supported; declare a plain java.time field instead: "+pf.fieldName);
+                continue;
             }
             AnnotatedClass enumClass = pf.kind.kind == PropertyTypeKind.Kind.REFERENCE ? findType(pf.kind.binaryName,ctx) : null;
             if (pf.kind.kind == PropertyTypeKind.Kind.REFERENCE && enumClass != null && enumClass.isEnum())

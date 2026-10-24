@@ -39,7 +39,7 @@ import java.time.LocalTime;
 /// reads a column a `long createdAt` or a `Date` wrote, unchanged.
 ///
 /// `@Temporal` opts into a native column instead, through the same UTC ISO text
-/// [TemporalConverter] writes: `TIMESTAMP` for an Instant or a LocalDateTime,
+/// `TemporalConverter` writes: `TIMESTAMP` for an Instant or a LocalDateTime,
 /// `DATE` for a LocalDate.
 ///
 /// Precision is the millisecond, as for a Date: nanoseconds below it are dropped
@@ -147,8 +147,16 @@ public final class JavaTimeConverter {
         }
     }
 
+    /// Milliseconds of a wall clock, refusing what a long cannot hold: a
+    /// LocalDateTime reaches the year 999999999, and `LocalDateTime.MAX` as a
+    /// "no bound" value would otherwise wrap to a plausible wrong time. An
+    /// Instant needs no such check; its toEpochMilli throws by itself.
     static long millis(LocalDateTime value) {
-        return value.toLocalDate().toEpochDay() * DAY + value.toLocalTime().toNanoOfDay() / 1000000L;
+        long days = value.toLocalDate().toEpochDay();
+        if (days > Long.MAX_VALUE / DAY - 1 || days < Long.MIN_VALUE / DAY + 1) {
+            throw new IllegalArgumentException("A LocalDateTime does not fit in epoch milliseconds: " + value);
+        }
+        return days * DAY + value.toLocalTime().toNanoOfDay() / 1000000L;
     }
 
     static LocalDateTime wallClock(long millis) {
