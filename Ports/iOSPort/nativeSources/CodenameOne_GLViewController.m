@@ -3370,6 +3370,54 @@ static CodenameOne_GLViewController *sharedSingleton;
     screenSizeChanged(displayWidth, displayHeight);
 }
 
+#elif !TARGET_OS_OSX && !TARGET_OS_WATCH
+// Defined further down, beside the drawing code that reads it.
+extern bool lockDrawing;
+
+// viewWillTransitionToSize: is how an iPhone learns about a rotation, and it
+// is not delivered when the interface rotates while a full-screen modal that
+// supports only portrait covers this view -- the camera of
+// UIImagePickerController is one. The device is turned with the modal up, the
+// interface stays portrait, and when the modal is dismissed the view comes back
+// laid out landscape with no transition at all. Every form then drew at the
+// portrait size stretched across the landscape view until the next rotation
+// (issue #6080). Layout always runs with the real bounds, so any size the
+// transition callbacks did not publish is published here.
+//
+// Nothing to debounce, unlike Catalyst above: an iPhone view changes size on a
+// rotation or a split-screen resize, not continuously. In the usual case
+// viewWillTransitionToSize: has already published the new size and this
+// returns at the comparison. The keyboard moves this view's origin, never its
+// size, so it does not reach this either.
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+    // The same reason viewWillTransitionToSize: gives: iOS lays the view out
+    // at the opposite orientation for its background snapshot.
+    if (isAppSuspended || self.view == nil) {
+        return;
+    }
+    CGSize sz = self.view.bounds.size;
+    int newW = (int)(sz.width * scaleValue);
+    int newH = (int)(sz.height * scaleValue);
+    if (newW <= 0 || newH <= 0) {
+        return;
+    }
+    int dw = newW - displayWidth;
+    int dh = newH - displayHeight;
+    if (dw < 0) dw = -dw;
+    if (dh < 0) dh = -dh;
+    if (dw <= 1 && dh <= 1) {
+        return;
+    }
+    [[self renderingView] updateFrameBufferSize:newW h:newH];
+    [[self renderingView] deleteFramebuffer];
+    displayWidth = newW;
+    displayHeight = newH;
+    lockDrawing = NO;
+    screenSizeChanged(displayWidth, displayHeight);
+    repaintUI();
+}
+
 #endif
 
 #ifdef INCLUDE_MOPUB

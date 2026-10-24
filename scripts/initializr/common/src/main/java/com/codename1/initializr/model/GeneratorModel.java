@@ -37,13 +37,15 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import static com.codename1.ui.CN.*;
 
 public class GeneratorModel {
-    private static final String CN1_PLUGIN_VERSION = "7.0.278";
+    private static final String CN1_PLUGIN_VERSION = "7.0.279";
     /// Whether the Codename One Gradle plugin is published at [CN1_PLUGIN_VERSION].
     /// A Gradle download resolves the plugin by that version, so until a release
     /// carrying the plugin is what the initializr generates against, a Gradle
@@ -78,6 +80,18 @@ public class GeneratorModel {
     /// neither offered nor generated for a release before this one.
     static final String FULL_STACK_SINCE = "7.0.277";
 
+    /// The first release whose framework has what the banking template's app calls:
+    /// timed clipboard clearing, the P-256 key and signature API it signs requests
+    /// with, and the `BigDecimal` arithmetic its ledger rounds with. Against an
+    /// older release its download does not compile, so it is neither offered nor
+    /// generated there.
+    static final String BASTION_SINCE = "7.0.280";
+
+    /// The first release a template can be generated against.
+    static String templateSince(Template template) {
+        return template == Template.BASTION ? BASTION_SINCE : FULL_STACK_SINCE;
+    }
+
     /// The brand colour of the full-stack template as it ships: the `--brand` its
     /// theme.css declares, which is what the UI paints the icon with when no other
     /// colour is chosen. GeneratorModelMatrixTest holds the two together.
@@ -111,7 +125,7 @@ public class GeneratorModel {
     /// Whether `template` can be generated at [CN1_PLUGIN_VERSION]: the UI offers
     /// only the templates this answers true for.
     public static boolean isTemplateOffered(Template template) {
-        return !template.isFullStack() || isVersionAtLeast(CN1_PLUGIN_VERSION, FULL_STACK_SINCE);
+        return !template.isFullStack() || isVersionAtLeast(CN1_PLUGIN_VERSION, templateSince(template));
     }
 
     /// The plugin version a download is generated against.
@@ -722,6 +736,9 @@ public class GeneratorModel {
         copyZipEntriesToMap(template.SOURCE_ZIP, mergedEntries, ZipEntryType.TEMPLATE_SOURCE);
         addLocalizationEntries(mergedEntries);
         addLauncherTelemetry(mergedEntries);
+        if (includesBackendModule()) {
+            addServerLaunchers(mergedEntries);
+        }
         addCustomIcon(mergedEntries);
         applyColorScheme(mergedEntries);
         validateGeneratedPomCoordinates(mergedEntries);
@@ -974,6 +991,9 @@ public class GeneratorModel {
             if (!isVersionAtLeast(pluginVersion, FULL_STACK_SINCE)) {
                 throw new IOException("This template shares a contract module between the app and its server, "
                         + "which needs Codename One " + FULL_STACK_SINCE + " or newer.");
+            }
+            if (!isVersionAtLeast(pluginVersion, templateSince(template))) {
+                throw new IOException("This template needs Codename One " + templateSince(template) + " or newer.");
             }
             if (options.projectType != ProjectOptions.ProjectType.APP_WITH_BACKEND) {
                 throw new IOException("This template is an app and its server; choose \""
@@ -1984,9 +2004,11 @@ public class GeneratorModel {
         }
         if (mavenLayoutsEnabled() && includesBackendModule()) {
             out.append("## Backend\n\n")
-                    .append("`backend/` is the app's server. Run it with ")
-                    .append("`./mvnw -pl backend -Dcodename1.platform=backend cn1:backend` and package it as a native ")
-                    .append("binary with `./mvnw -pl backend -Dcodename1.platform=backend cn1:backend-package`.\n\n");
+                    .append("`backend/` is the app's server. Start it with `./run-server.sh` (`run-server.bat` on ")
+                    .append("Windows), or \"Run Server\" in your IDE, which runs ")
+                    .append("`./mvnw ").append(SERVER_MAVEN_ARGS).append("`. ")
+                    .append("Package it as a native binary with ")
+                    .append("`./mvnw -pl backend -am -Dcodename1.platform=backend package cn1:backend-package`.\n\n");
         }
         if (template == Template.SKIRMISH) {
             out.append("## The game and its server\n\n")
@@ -1998,8 +2020,10 @@ public class GeneratorModel {
                     .append("- `backend/` is the server.\n")
                     .append("- `common/` is the app.\n\n")
                     .append("Start the server, then, in a second terminal, the app:\n\n```\n")
-                    .append("CN1_PROFILE=dev backend/server.sh run\n")
+                    .append("./run-server.sh\n")
                     .append("./run.sh\n```\n\n")
+                    .append("On Windows: `run-server.bat`, then `run.bat`. Your IDE's run menu has both: ")
+                    .append("\"Run Server\" and the simulator.\n\n")
                     .append("`./mvnw -pl backend -am -Dcodename1.platform=backend test` runs the server's tests.\n\n");
         } else if (template == Template.BASTION) {
             appendBankSection(out, toLowerCaseInvariant(appName));
@@ -2030,10 +2054,13 @@ public class GeneratorModel {
                     .append("- `common/` is the app. `src/main/css/theme.css` opens with the colours and corner ")
                     .append("radius every screen takes its look from.\n\n")
                     .append("Start the server, then, in a second terminal, the app:\n\n```\n")
-                    .append("CN1_PROFILE=dev backend/server.sh run\n")
+                    .append("./run-server.sh\n")
                     .append("./run.sh\n```\n\n")
-                    .append("`server.sh` is a few lines of shell around Maven; on Windows run what it runs, ")
-                    .append("with `mvnw.cmd`, or use a Unix shell such as Git Bash or WSL.\n\n")
+                    .append("On Windows: `run-server.bat`, then `run.bat`. Your IDE's run menu has both: ")
+                    .append("\"Run Server\" and the simulator.\n\n")
+                    .append("`backend/server.sh` does more -- a native build, the browser version -- and is a few ")
+                    .append("lines of shell around Maven; on Windows run what it runs with `mvnw.cmd`, or use Git ")
+                    .append("Bash or WSL.\n\n")
                     .append("On the `dev` profile the server creates demonstration accounts, all with the ")
                     .append("password `").append(lower).append("-demo`: ")
                     .append(chat
@@ -2169,6 +2196,96 @@ public class GeneratorModel {
                 .append("Open the project folder in VS Code and make sure Java + Maven extensions are installed.\n\n");
     }
 
+    /// What starts the server of a Maven app with a `backend/` module, from the
+    /// project root. `-am` and `compile` build the reactor modules it depends on --
+    /// `shared`, for a full-stack template -- which `-pl backend` alone never does:
+    /// on a fresh download that failed resolving a `shared` jar nothing had built.
+    static final String SERVER_MAVEN_ARGS = "-pl backend -am -Dcodename1.platform=backend compile cn1:backend";
+
+    /// The profile a server started from the IDE or a launcher runs on: the one
+    /// with an in-memory database and demonstration accounts. The IDE entries set
+    /// it as a system property because none of the four can set an environment
+    /// variable portably; a system property wins over `CN1_PROFILE`, so a
+    /// developer who wants another profile from the IDE edits the entry, while
+    /// run-server.sh/.bat honour an exported `CN1_PROFILE`.
+    private static final String SERVER_PROFILE_ARG = "-Dcn1.backend.jvmArgs=-Dcn1.profile=dev";
+
+    /// The shortcuts that start the server: `run-server.sh` and `run-server.bat`
+    /// beside `run.sh`, and a "Run Server" entry in the IDE's own run menu. Before
+    /// these a download had no way to start its server short of reading the
+    /// README, and the command the README gave did not work.
+    private void addServerLaunchers(Map<String, byte[]> entries) throws IOException {
+        copySingleTextEntryToMap("run-server.sh", "#!/usr/bin/env sh\n"
+                + "# Starts the server in backend/ on http://localhost:8080 (PORT changes it).\n"
+                + "# CN1_PROFILE picks its settings; the default, dev, needs nothing installed.\n"
+                + "cd \"$(dirname \"$0\")\" || exit 1\n"
+                + "CN1_PROFILE=\"${CN1_PROFILE:-dev}\" exec ./mvnw -B " + SERVER_MAVEN_ARGS + " \"$@\"\n",
+                entries, ZipEntryType.COMMON);
+        copySingleTextEntryToMap("run-server.bat", "@echo off\r\n"
+                + "rem Starts the server in backend\\ on http://localhost:8080 (PORT changes it).\r\n"
+                + "rem CN1_PROFILE picks its settings; the default, dev, needs nothing installed.\r\n"
+                + "setlocal\r\n"
+                + "cd /d \"%~dp0\"\r\n"
+                + "if \"%CN1_PROFILE%\"==\"\" set CN1_PROFILE=dev\r\n"
+                + "call mvnw.cmd -B " + SERVER_MAVEN_ARGS + " %*\r\n",
+                entries, ZipEntryType.COMMON);
+        String label = "Run Server";
+        String args = SERVER_PROFILE_ARG + " " + SERVER_MAVEN_ARGS;
+        if (ide == IDE.INTELLIJ) {
+            copySingleTextEntryToMap(".idea/runConfigurations/Run_Server.xml",
+                    intellijMavenRunConfiguration(label, args), entries, ZipEntryType.COMMON);
+        } else if (ide == IDE.VS_CODE) {
+            copySingleTextEntryToMap(".vscode/tasks.json",
+                    vscodeTasks(new String[][] {{label, "-B " + args}}, "./mvnw", ".\\\\mvnw.cmd"),
+                    entries, ZipEntryType.COMMON);
+        } else if (ide == IDE.ECLIPSE) {
+            copySingleTextEntryToMap(appName + " - Run Server.launch", eclipseServerLaunch(), entries,
+                    ZipEntryType.COMMON);
+        } else if (ide == IDE.NETBEANS && entries.containsKey("nbactions.xml")) {
+            String actions = new String(entries.get("nbactions.xml"), "UTF-8");
+            int end = actions.lastIndexOf("</actions>");
+            if (end < 0) {
+                throw new IOException("Refusing to generate project: nbactions.xml has no </actions>");
+            }
+            String action = "    <action>\n"
+                    + "        <actionName>CUSTOM-Run Server</actionName>\n"
+                    + "        <displayName>Run Server</displayName>\n"
+                    // NetBeans passes goal tokens to Maven as they are, which is
+                    // how -pl and -am reach it: an action has no element for them.
+                    + "        <goals>\n"
+                    + "            <goal>-pl</goal>\n"
+                    + "            <goal>backend</goal>\n"
+                    + "            <goal>-am</goal>\n"
+                    + "            <goal>compile</goal>\n"
+                    + "            <goal>cn1:backend</goal>\n"
+                    + "        </goals>\n"
+                    + "        <properties>\n"
+                    + "            <codename1.platform>backend</codename1.platform>\n"
+                    + "            <cn1.backend.jvmArgs>-Dcn1.profile=dev</cn1.backend.jvmArgs>\n"
+                    + "        </properties>\n"
+                    + "    </action>\n";
+            entries.put("nbactions.xml", (actions.substring(0, end) + action + actions.substring(end))
+                    .getBytes("UTF-8"));
+        }
+    }
+
+    private String eclipseServerLaunch() {
+        return "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n"
+                + "<launchConfiguration type=\"org.eclipse.m2e.Maven2LaunchConfigurationType\">\n"
+                + "    <stringAttribute key=\"M2_GOALS\" value=\"-pl backend -am compile cn1:backend\"/>\n"
+                + "    <booleanAttribute key=\"M2_NON_RECURSIVE\" value=\"false\"/>\n"
+                + "    <booleanAttribute key=\"M2_OFFLINE\" value=\"false\"/>\n"
+                + "    <listAttribute key=\"M2_PROPERTIES\">\n"
+                + "        <listEntry value=\"codename1.platform=backend\"/>\n"
+                + "        <listEntry value=\"cn1.backend.jvmArgs=-Dcn1.profile=dev\"/>\n"
+                + "    </listAttribute>\n"
+                + "    <stringAttribute key=\"M2_RUNTIME\" value=\"EMBEDDED\"/>\n"
+                + "    <booleanAttribute key=\"M2_SKIP_TESTS\" value=\"true\"/>\n"
+                + "    <stringAttribute key=\"org.eclipse.jdt.launching.WORKING_DIRECTORY\" "
+                + "value=\"${project_loc:" + toLowerCaseInvariant(appName) + "}\"/>\n"
+                + "</launchConfiguration>\n";
+    }
+
     /// The goals a Maven backend-only project's IDE files offer, as {label, goal}.
     private static final String[][] MAVEN_BACKEND_GOALS = {
             {"Run Backend", "cn1:backend"},
@@ -2213,7 +2330,7 @@ public class GeneratorModel {
                 + "          </option>\n"
                 + "          <option name=\"goals\">\n"
                 + "            <list>\n"
-                + "              <option value=\"" + goal + "\" />\n"
+                + goalOptions(goal)
                 + "              <option value=\"-e\" />\n"
                 + "            </list>\n"
                 + "          </option>\n"
@@ -2231,7 +2348,42 @@ public class GeneratorModel {
                 + "</component>\n";
     }
 
-    /// A VS Code tasks.json running each {label, argument} through `command`.
+    /// One `<option>` per token: IntelliJ hands each entry of the goals list to
+    /// Maven as a single argument, so "-pl backend compile" in one entry would be
+    /// one unknown option, not three.
+    private static String goalOptions(String goals) {
+        StringBuilder out = new StringBuilder();
+        String[] tokens = tokens(goals);
+        for (int i = 0; i < tokens.length; i++) {
+            out.append("              <option value=\"").append(tokens[i]).append("\" />\n");
+        }
+        return out.toString();
+    }
+
+    /// The space separated words of `text`.
+    static String[] tokens(String text) {
+        List<String> out = new ArrayList<String>();
+        int start = 0;
+        int len = text.length();
+        while (start < len) {
+            while (start < len && text.charAt(start) == ' ') {
+                start++;
+            }
+            int end = start;
+            while (end < len && text.charAt(end) != ' ') {
+                end++;
+            }
+            if (end > start) {
+                out.add(text.substring(start, end));
+            }
+            start = end;
+        }
+        return out.toArray(new String[out.size()]);
+    }
+
+    /// A VS Code tasks.json running each {label, arguments} through `command`. A
+    /// shell task quotes an `args` element that holds a space, so each word is an
+    /// element of its own.
     private static String vscodeTasks(String[][] tasks, String command, String windowsCommand) {
         StringBuilder json = new StringBuilder();
         json.append("{\n  \"version\": \"2.0.0\",\n  \"tasks\": [\n");
@@ -2241,7 +2393,12 @@ public class GeneratorModel {
                     .append("      \"type\": \"shell\",\n")
                     .append("      \"command\": \"").append(command).append("\",\n")
                     .append("      \"windows\": { \"command\": \"").append(windowsCommand).append("\" },\n")
-                    .append("      \"args\": [\"").append(tasks[i][1]).append("\"],\n")
+                    .append("      \"args\": [");
+            String[] words = tokens(tasks[i][1]);
+            for (int w = 0; w < words.length; w++) {
+                json.append(w > 0 ? ", " : "").append('"').append(words[w]).append('"');
+            }
+            json.append("],\n")
                     .append("      \"problemMatcher\": []\n")
                     .append("    }").append(i + 1 < tasks.length ? "," : "").append('\n');
         }
