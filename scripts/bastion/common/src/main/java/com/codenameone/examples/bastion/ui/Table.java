@@ -46,6 +46,8 @@ public final class Table {
     private final boolean[] numeric;
     private final Container rows = new Container(BoxLayout.y());
     private final Container outer;
+    /// The same rows, for a printout of the page.
+    private final Printout.Section printable;
 
     /// @param headers the column names, translated here
     /// @param weights each column's share of the width
@@ -65,6 +67,11 @@ public final class Table {
             total += weights[iter];
         }
         Container head = line("BnTableHead");
+        String[] translated = new String[headers.length];
+        for (int iter = 0; iter < headers.length; iter++) {
+            translated[iter] = Lang.tr(headers[iter]);
+        }
+        printable = new Printout.Section(null, translated, weights, numeric);
         for (int iter = 0; iter < headers.length; iter++) {
             head.add(constraint(head, iter), cell(Lang.tr(headers[iter]),
                     numeric[iter] ? "BnCellHeadNum" : "BnCellHead"));
@@ -109,6 +116,11 @@ public final class Table {
     /// Adds a row in `uiid` (a highlighted row is `BnTableRowBad`); `cellUiids`
     /// may name a style per cell, or be null.
     public Container add(String[] cells, String uiid, String[] cellUiids, final Runnable tap) {
+        if ("BnTableTotal".equals(uiid)) {
+            printable.total(cells);
+        } else {
+            printable.row(cells);
+        }
         Container row = line(uiid);
         for (int iter = 0; iter < cells.length; iter++) {
             String style = cellUiids != null && cellUiids[iter] != null ? cellUiids[iter]
@@ -132,9 +144,15 @@ public final class Table {
 
     /// A row of quiet text across the whole table.
     public void note(String text) {
+        printable.note(text);
         Container row = new Container(new BorderLayout(), "BnTableRow");
         row.add(BorderLayout.CENTER, new Label(text, "BnCellMuted"));
         rows.add(row);
+    }
+
+    /// The table as it is printed ([Printout#add]).
+    public Printout.Section printable() {
+        return printable;
     }
 
     public int size() {

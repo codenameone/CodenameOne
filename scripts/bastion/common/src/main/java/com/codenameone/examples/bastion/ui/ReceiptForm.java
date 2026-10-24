@@ -73,7 +73,7 @@ public final class ReceiptForm {
         if (toName != null && toName.length() > 0) {
             // A name fits beside its label; an address wraps under it.
             form.add(toName.length() <= 24 ? Ui.row(Lang.tr("To"), null, toName, null, null)
-                    : Ui.fact(Lang.tr("To"), toName));
+                    : Ui.copyable(Lang.tr("To"), toName, false));
         }
         form.add(Ui.row(Lang.tr("Amount"), null, Amounts.format(receipt.amount(), asset), null,
                 null));
@@ -86,10 +86,15 @@ public final class ReceiptForm {
         if (receipt.memo() != null && receipt.memo().length() > 0) {
             form.add(Ui.fact(Lang.tr("Note"), memo(receipt.memo())));
         }
-        form.add(Ui.fact(Lang.tr("Reference"), receipt.entryId()));
+        form.add(Ui.copyable(Lang.tr("Reference"), receipt.entryId(), false));
+        // The account's name arrives below; the printout reads it when printed.
+        final String[] fromName = {""};
+        final String[] after = {""};
+        final String to = toName == null ? "" : toName;
+        Button print = Printout.button(() -> printout(receipt, fromName[0], to, after[0]));
         Button ok = Ui.primary("Done");
         ok.addActionListener(evt -> done.run());
-        form.add(ok);
+        form.add(print == null ? ok : Ui.across(print, ok));
         Ui.show(form, true);
         // The account it left and what that account holds now.
         Api.banking().accounts(Net.to((List<AccountDto> accounts) -> {
@@ -97,9 +102,32 @@ public final class ReceiptForm {
                 if (account.id().equals(receipt.fromAccountId())) {
                     setValue(from, account.name());
                     setValue(balance, Amounts.format(account.balance(), account.asset()));
+                    fromName[0] = account.name();
+                    after[0] = Amounts.format(account.balance(), account.asset());
                 }
             }
         }, (status, message) -> { }));
+    }
+
+    /// The receipt on paper.
+    static Printout printout(ReceiptDto receipt, String fromName, String toName,
+            String balanceAfter) {
+        String asset = receipt.asset();
+        Printout p = new Printout(Lang.tr("Receipt"), System.currentTimeMillis())
+                .fact(Lang.tr("Account"), fromName)
+                .fact(Lang.tr("Reference"), receipt.entryId())
+                .fact(Lang.tr("When"), Ui.when(receipt.createdAt()));
+        p.section(null, new String[] {Lang.tr("Date"), Lang.tr("Description"), Lang.tr("To"),
+            Lang.tr("Amount")}, new int[] {3, 5, 5, 3}, new boolean[] {false, false, false, true})
+                .row(Ui.when(receipt.createdAt()),
+                        receipt.memo() == null ? "" : memo(receipt.memo()), toName,
+                        Amounts.format(receipt.amount(), asset));
+        p.total(Lang.tr("Amount"), Amounts.format(receipt.amount(), asset))
+                .total(Lang.tr("Fee"), Amounts.format(0L, asset));
+        if (balanceAfter != null && balanceAfter.length() > 0) {
+            p.total(Lang.tr("Balance after"), balanceAfter);
+        }
+        return p;
     }
 
     /// Sets the value of a row made by [Ui#row].

@@ -42,7 +42,6 @@ import com.codenameone.examples.bastion.net.Net;
 import com.codenameone.examples.bastion.net.Session;
 import com.codenameone.examples.bastion.security.Keys;
 import com.codenameone.examples.bastion.security.Lock;
-import com.codenameone.examples.bastion.security.Protect;
 import java.util.List;
 
 /// A new customer, from nothing to a phone that signs their payments.
@@ -228,10 +227,7 @@ public final class OnboardingForm {
         content.add(Ui.section("Or enter this key"));
         content.add(Ui.keyGroups(group(enrollment.secret())));
         Button copy = Ui.secondary("Copy key");
-        copy.addActionListener(evt -> {
-            Protect.copy(enrollment.secret());
-            Ui.toast("Copied. The clipboard clears itself in a minute.");
-        });
+        copy.addActionListener(evt -> Ui.copy(enrollment.secret(), true));
         Button open = Ui.secondary("Open authenticator");
         open.addActionListener(evt -> CN.execute(enrollment.otpauthUri()));
         content.add(Ui.across(copy, open));
@@ -291,8 +287,7 @@ public final class OnboardingForm {
             for (String one : codes) {
                 all.append(one).append('\n');
             }
-            Protect.copy(all.toString());
-            Ui.toast("Copied. The clipboard clears itself in a minute.");
+            Ui.copy(all.toString(), true);
         });
         form.add(copy);
         Button saved = Ui.primary("I have saved them");

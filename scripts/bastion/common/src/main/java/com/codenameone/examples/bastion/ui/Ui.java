@@ -341,6 +341,64 @@ public final class Ui {
         return row;
     }
 
+    /// A value someone will want somewhere else -- a reference, an address, a
+    /// key, a hash: the label on a line of its own, the value wrapping in full
+    /// under it and selectable, and a copy button beside it.
+    ///
+    /// A `secret` (a key, a recovery code, an account or card number) is
+    /// copied through [Protect#copy], as a sensitive clip the platform keeps
+    /// out of its clipboard history and that clears itself after
+    /// `AppConfig.CLIPBOARD_CLEAR_MILLIS`; anything else is an ordinary copy.
+    /// Either way a toast says it was copied.
+    public static Container copyable(String title, final String value, final boolean secret) {
+        Container row = new Container(new BorderLayout(), "BnRow");
+        Container text = new Container(BoxLayout.y());
+        text.add(new Label(title, "BnRowTitle"));
+        SpanLabel shown = new SpanLabel(value == null ? "" : value) {
+            @Override
+            protected void initComponent() {
+                super.initComponent();
+                // Selection is switched on for a form that shows a value to
+                // copy, and only there: on a form with text fields it would
+                // take the pointer from them.
+                Form form = getComponentForm();
+                if (form != null) {
+                    form.getTextSelection().setEnabled(true);
+                }
+            }
+        };
+        shown.setTextUIID("BnRowValueWrap");
+        shown.setTextSelectionEnabled(true);
+        text.add(shown);
+        row.add(BorderLayout.CENTER, text);
+        row.add(BorderLayout.EAST, copyButton(title, value, secret));
+        return row;
+    }
+
+    /// The copy button of [#copyable], for a value shown some other way
+    /// (`keyGroups`, a QR code).
+    public static Button copyButton(String title, final String value, final boolean secret) {
+        Button copy = new Button("", "BnIconButton");
+        FontImage.setMaterialIcon(copy, FontImage.MATERIAL_CONTENT_COPY, 4f);
+        copy.setAccessibilityText(Lang.tr("Copy {0}", title));
+        copy.addActionListener(evt -> copy(value, secret));
+        return copy;
+    }
+
+    /// Copies `value` and says so; see [#copyable].
+    public static void copy(String value, boolean secret) {
+        if (value == null || value.length() == 0) {
+            return;
+        }
+        if (secret) {
+            Protect.copy(value);
+            toast("Copied. The clipboard clears itself in a minute.");
+        } else {
+            Display.getInstance().copyToClipboard(value);
+            toast("Copied");
+        }
+    }
+
     /// A screen at the end of a flow -- a receipt: no menu and no back arrow
     /// into the flow just finished, but a close button that runs `close`
     /// (the device's back button does the same).

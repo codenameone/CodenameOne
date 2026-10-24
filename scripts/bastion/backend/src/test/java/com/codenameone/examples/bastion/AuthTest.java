@@ -24,6 +24,10 @@ import com.codename1.backend.annotations.Autowired;
 import com.codename1.backend.test.BackendTest;
 import com.codename1.backend.test.MockMvc;
 import com.codename1.backend.test.MockResponse;
+import com.codename1.backend.security.webauthn.CredentialRecord;
+import com.codename1.backend.security.webauthn.PublicKeyCredentialUserEntity;
+import com.codename1.backend.security.webauthn.PublicKeyCredentialUserEntityRepository;
+import com.codename1.backend.security.webauthn.UserCredentialRepository;
 import com.codename1.security.Base32;
 import com.codename1.security.Hash;
 import com.codename1.security.Otp;
@@ -58,6 +62,10 @@ class AuthTest {
     private Audit audit;
     @Autowired
     private DataSource db;
+    @Autowired
+    private UserCredentialRepository passkeys;
+    @Autowired
+    private PublicKeyCredentialUserEntityRepository passkeyHolders;
 
     private MockResponse call(String method, String path, String token, String json)
             throws Exception {
@@ -253,5 +261,73 @@ class AuthTest {
         assertEquals(423, locked.getStatus());
         assertTrue(locked.getContentAsString().indexOf("account-locked") >= 0,
                 locked.getContentAsString());
+    }
+
+    /// Gives `user` a passkey the way a registration ceremony stores one; the
+    /// ceremony itself needs an authenticator, which a test does not have.
+    private void enrolPasskey(String user, byte id) {
+        PublicKeyCredentialUserEntity holder = passkeyHolders.findByUsername(user);
+        if (holder == null) {
+            holder = passkeyHolders.save(new PublicKeyCredentialUserEntity(user,
+                    new byte[] {id, 1, 2, 3, 4, 5, 6, 7}, "Test Person"));
+        }
+        assertTrue(passkeys.save(CredentialRecord.builder()
+                .credentialId(new byte[] {id, 9, 8, 7, 6, 5, 4, 3, 2, 1})
+                .userEntityUserId(holder.getId()).algorithm(-7).publicKey(new byte[] {1})
+                .uvInitialized(true).label("Test key").created(System.currentTimeMillis())
+                .build()));
+    }
+
+    @Test
+    void aPasskeyRetiresThePassword() throws Exception {
+        String user = SignIn.register(mvc, "auth-passkey-only@bastion.test", PASSWORD);
+        assertEquals(200, SignIn.password(mvc, user, PASSWORD).getStatus());
+        enrolPasskey(user, (byte) 41);
+        long refused = events(user, "SIGNIN_REFUSED");
+        MockResponse answer = SignIn.password(mvc, user, PASSWORD);
+        assertEquals(403, answer.getStatus());
+        assertTrue(answer.getContentAsString().indexOf("\"stronger\":\"passkey\"") >= 0,
+                answer.getContentAsString());
+        assertNull(answer.getCookie("CN1SESSION") == null ? null
+                : SignIn.code(mvc, answer.getCookie("CN1SESSION")), "no code without the passkey");
+        assertEquals(refused + 1, events(user, "SIGNIN_REFUSED"));
+        // Refused before the password is looked at: a wrong one is not counted.
+        assertEquals(403, SignIn.password(mvc, user, "not the password").getStatus());
+        assertFalse(audit.verify().size() > 0);
+    }
+
+    @Test
+    void aPasskeyAccountRecoversOnlyWithARecoveryCode() throws Exception {
+        String user = SignIn.register(mvc, "auth-passkey-recovery@bastion.test", PASSWORD);
+        String token = SignIn.token(mvc, user, PASSWORD);
+        String withPassword = "{\"password\":\"" + PASSWORD + "\"}";
+        String secret = (String) Json.parseObject(call("POST", "/api/account/mfa/totp", token,
+                withPassword).getContentAsString()).get("secret");
+        MockResponse confirmed = call("POST", "/api/account/mfa/totp/confirm", token,
+                "{\"code\":\"" + totp(secret, 0) + "\",\"password\":\"" + PASSWORD + "\"}");
+        assertEquals(200, confirmed.getStatus(), confirmed.getContentAsString());
+        List codes = (List) Json.parseObject(confirmed.getContentAsString()).get("codes");
+        enrolPasskey(user, (byte) 42);
+
+        // The password is still taken, on the way to the code step...
+        MockResponse first = SignIn.password(mvc, user, PASSWORD);
+        assertEquals(302, first.getStatus());
+        String pending = first.getCookie("CN1SESSION");
+        // ...where the authenticator app's code no longer signs in.
+        MockResponse app = mvc.perform(SignIn.formPost("/login/mfa", "code",
+                totp(secret, 30000)).cookie("CN1SESSION", pending)).andReturn().getResponse();
+        assertEquals(403, app.getStatus());
+        assertTrue(app.getContentAsString().indexOf("\"recovery\":true") >= 0,
+                app.getContentAsString());
+        assertNull(SignIn.code(mvc, pending), "an app code is not the passkey");
+        // A recovery code is the documented way back.
+        MockResponse recovered = mvc.perform(SignIn.formPost("/login/mfa", "code",
+                (String) codes.get(0)).cookie("CN1SESSION", pending)).andReturn().getResponse();
+        assertEquals(200, recovered.getStatus(), recovered.getContentAsString());
+        String session = recovered.getCookie("CN1SESSION");
+        assertTrue(SignIn.exchange(mvc, session != null ? session : pending)
+                .get("access_token") instanceof String);
+        assertEquals(1, events(user, "SIGNIN_REFUSED"));
+        assertFalse(audit.verify().size() > 0);
     }
 }

@@ -345,6 +345,10 @@ public final class Session {
         return AppConfig.asciiLower(email.trim());
     }
 
+    /// What a password sign-in to an account with a passkey is answered with.
+    static final String PASSKEY_REQUIRED = "This account signs in with its passkey. "
+            + "Use the passkey, or ask the bank to help you recover the account.";
+
     /// Signs in with a password. An account with an authenticator app is
     /// answered with `needsCode`, and [#submitCode] finishes it.
     public static void signIn(String email, String password, final Net.Ok<Pending> needsCode,
@@ -362,6 +366,10 @@ public final class Session {
                 failed.failed(429, "Too many attempts. Wait a minute and try again.");
             } else if (login.status == 423) {
                 failed.failed(423, "This account is locked for a while after too many attempts.");
+            } else if (login.status == 403) {
+                // The account has a passkey and no recovery codes to stand in
+                // for it (SignInGuard on the server).
+                failed.failed(403, PASSKEY_REQUIRED);
             } else if (web() ? login.status == 200 && !login.signedIn()
                     : login.session != null && login.status == 302 && login.location != null
                     && login.location.indexOf("/login/mfa") >= 0) {
@@ -390,6 +398,11 @@ public final class Session {
                 failed.failed(0, "Could not reach the server. Check your connection.");
             } else if (mfa.status == 429) {
                 failed.failed(429, "Too many attempts. Wait a minute and try again.");
+            } else if (mfa.status == 403) {
+                // A passkey account: the app's code is not enough, a recovery
+                // code is (SignInGuard#passkeyFirst on the server).
+                failed.failed(403, "This account signs in with its passkey. Without it, enter "
+                        + "one of your recovery codes.");
             } else if (mfa.status == 200 && (!web() || mfa.signedIn())) {
                 // A wrong code is a redirect back to the code page, which a
                 // browser follows to a 200 without `signedIn`.

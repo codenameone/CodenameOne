@@ -215,10 +215,29 @@ public final class AccountForm {
                 : "Debit from your account"), in ? "Cr" : "Dr", "BnRowValueMono", null));
         form.add(Ui.row(Lang.tr("Balance after"), null, Amounts.format(after, posting.asset()),
                 "BnRowValue", null));
-        form.add(Ui.row(Lang.tr("Ledger entry"), posting.entryId(), null, null, null));
-        form.add(Ui.row(Lang.tr("Posting"), posting.id(), null, null, null));
+        form.add(Ui.copyable(Lang.tr("Ledger entry"), posting.entryId(), false));
+        form.add(Ui.copyable(Lang.tr("Posting"), posting.id(), false));
+        form.add(Ui.copyable(Lang.tr("Account ID"), account.id(), true));
         form.add(Ui.muted(Lang.tr("The other side of this entry is in the bank's books; every "
                 + "entry's debits equal its credits.")));
+        final boolean credit = in;
+        Button print = Printout.button(() -> {
+            Printout p = new Printout(Lang.tr("Transaction"), System.currentTimeMillis())
+                    .fact(Lang.tr("Account"), account.name() + " (" + account.asset() + ")")
+                    .fact(Lang.tr("Ledger entry"), posting.entryId())
+                    .fact(Lang.tr("Posting"), posting.id());
+            p.section(null, new String[] {Lang.tr("Date"), Lang.tr("Description"),
+                Lang.tr("Category"), Lang.tr("Money in"), Lang.tr("Money out")},
+                    new int[] {3, 5, 3, 3, 3}, new boolean[] {false, false, false, true, true})
+                    .row(Ui.when(posting.createdAt()), describe(posting),
+                            category(posting.kind()),
+                            credit ? Amounts.format(posting.amount(), posting.asset()) : "",
+                            credit ? "" : Amounts.format(-posting.amount(), posting.asset()));
+            return p.total(Lang.tr("Balance after"), Amounts.format(after, posting.asset()));
+        });
+        if (print != null) {
+            form.add(print);
+        }
         Ui.show(form, true);
     }
 
@@ -285,6 +304,13 @@ public final class AccountForm {
             form.revalidate();
         };
         fill.run();
+        if (Printout.supported()) {
+            final long[] sums = {openingBalance, in, out};
+            final String when = period;
+            form.getToolbar().addMaterialCommandToRightBar("", FontImage.MATERIAL_PRINT,
+                    evt -> Printout.print(statementPrintout(account, postings, sums[0], sums[1],
+                            sums[2], when)));
+        }
         form.getToolbar().addMaterialCommandToRightBar("", FontImage.MATERIAL_VIEW_COLUMN,
                 evt -> {
                     if (chooseColumns()) {
@@ -301,6 +327,48 @@ public final class AccountForm {
             }
         });
         Ui.show(form, true);
+    }
+
+    /// The statement on paper: every column, whatever the window shows --
+    /// paper has the room, and a printed statement is read in full.
+    static Printout statementPrintout(AccountDto account, List<PostingDto> postings,
+            long opening, long in, long out, String period) {
+        String asset = account.asset();
+        Printout p = new Printout(Lang.tr("Statement"), System.currentTimeMillis())
+                .fact(Lang.tr("Account"), account.name() + " - "
+                        + HomeForm.kindName(account.kind()) + " - " + asset)
+                .fact(Lang.tr("Account ID"), account.id())
+                .fact(Lang.tr("Period"), period);
+        String[] headers = new String[COLUMNS.length - 1];
+        int[] weights = new int[headers.length];
+        boolean[] numeric = new boolean[headers.length];
+        int at = 0;
+        for (int iter = 0; iter < COLUMNS.length; iter++) {
+            if (!"amount".equals(COLUMNS[iter])) {
+                headers[at] = Lang.tr(COLUMN_NAMES[iter]);
+                weights[at] = COLUMN_WEIGHTS[iter];
+                numeric[at++] = COLUMN_NUMERIC[iter];
+            }
+        }
+        Printout.Section table = p.section(null, headers, weights, numeric);
+        long running = opening;
+        for (int iter = postings.size() - 1; iter >= 0; iter--) {
+            PostingDto posting = postings.get(iter);
+            running += posting.amount();
+            boolean credit = posting.amount() > 0;
+            table.row(Ui.when(posting.createdAt()), describe(posting), category(posting.kind()),
+                    shortReference(posting.entryId()),
+                    credit ? Amounts.format(posting.amount(), asset) : "",
+                    credit ? "" : Amounts.format(-posting.amount(), asset),
+                    Amounts.format(running, asset));
+        }
+        if (postings.isEmpty()) {
+            table.note(Lang.tr("No movements in this period."));
+        }
+        return p.total(Lang.tr("Opening balance"), Amounts.format(opening, asset))
+                .total(Lang.tr("Money in"), Amounts.format(in, asset))
+                .total(Lang.tr("Money out"), Amounts.format(out, asset))
+                .total(Lang.tr("Closing balance"), Amounts.format(account.balance(), asset));
     }
 
     private static Container fact(String label, String value) {

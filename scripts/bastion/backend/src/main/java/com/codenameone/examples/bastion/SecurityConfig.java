@@ -330,6 +330,9 @@ public class SecurityConfig {
             .addFilterBefore(audited(AntPathRequestMatcher.antMatcher("POST", "/login/mfa"),
                     302, "SIGNIN_FAILED", "totp", audit),
                     SecondFactorAuthenticationFilter.class)
+            // An account with a passkey finishes a password only with a
+            // recovery code ([SignInGuard#passkeyFirst]).
+            .addFilterBefore(guard.passkeyFirst(), SecondFactorAuthenticationFilter.class)
             // Passkeys belong to the domain in rpId, and a ceremony is
             // accepted only from the listed origins. The installed Android app
             // reports `android:apk-key-hash:<hash>` as its origin; a release
@@ -337,6 +340,11 @@ public class SecurityConfig {
             .webAuthn(passkeys -> passkeys
                     .rpId(rpId)
                     .rpName("Bastion")
+                    // Every passkey sign-in verifies the person -- a
+                    // fingerprint, a face, the device PIN -- so a passkey is
+                    // two factors in one and the strongest way in
+                    // (SignInGuard holds an account to it).
+                    .userVerification("required")
                     .allowedOrigins(split(origins))
                     .successHandler(guard.signedIn("passkey"))
                     .failureHandler(guard.refused("passkey")))

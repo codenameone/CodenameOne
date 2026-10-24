@@ -19,6 +19,7 @@
 package com.codenameone.examples.bastion.account;
 
 import com.codename1.backend.HttpServer;
+import com.codename1.backend.HttpSession;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codename1.backend.annotations.Value;
@@ -26,15 +27,22 @@ import com.codename1.backend.security.AntPathRequestMatcher;
 import com.codename1.backend.security.AuthenticationFailureHandler;
 import com.codename1.backend.security.AuthenticationSuccessHandler;
 import com.codename1.backend.security.RequestMatcher;
+import com.codename1.backend.security.SecondFactorAuthenticationFilter;
 import com.codename1.backend.security.SecurityFilter;
 import com.codename1.backend.security.core.userdetails.JdbcUserDetailsManager;
 import com.codename1.backend.security.crypto.PasswordEncoder;
+import com.codename1.backend.security.mfa.RecoveryCodeService;
+import com.codename1.backend.security.mfa.TotpService;
+import com.codename1.backend.security.webauthn.PublicKeyCredentialUserEntity;
+import com.codename1.backend.security.webauthn.PublicKeyCredentialUserEntityRepository;
+import com.codename1.backend.security.webauthn.UserCredentialRepository;
 import com.codenameone.examples.bastion.Refused;
 import com.codenameone.examples.bastion.audit.Audit;
 import com.codenameone.examples.bastion.domain.LoginFailure;
 import com.codenameone.examples.bastion.repository.LoginFailureRepository;
 
 import java.io.IOException;
+import java.util.Map;
 
 /// What happens around a sign-in: the audit record of each one, and the
 /// lockout after repeated wrong passwords.
@@ -57,26 +65,51 @@ import java.io.IOException;
 /// passwords -- a passkey still signs the customer in, and an attacker
 /// cannot lock that out. It also says, to whoever is guessing, that the
 /// account exists; registration says as much already.
+///
+/// ## The strongest factor an account has is the one it signs in with
+///
+/// An account is only as safe as the weakest way into it, so enrolling a
+/// stronger factor retires the weaker ones. With a passkey registered the
+/// password stops being a way in: `POST /login` is refused (403,
+/// `"stronger":"passkey"`) before the password is looked at, and the code
+/// step that follows a password takes a recovery code and nothing else -- a
+/// six-digit code from the authenticator app is refused the same way. That
+/// leaves one documented way back for a customer whose passkey is gone: their
+/// password and one of their recovery codes, each of which works once, and
+/// the sign-in is in the audit log as `password+totp` with the passkey still
+/// on the account. An account with a passkey and no authenticator app has no
+/// recovery codes, and its way back is the bank, which removes the passkey
+/// after checking who is asking. The refusal says the account has a passkey
+/// to anyone who knows its e-mail, the same trade the lockout makes.
 @Component
 public class SignInGuard {
     private static final RequestMatcher PASSWORD_SIGN_IN =
             AntPathRequestMatcher.antMatcher("POST", "/login");
+    private static final RequestMatcher SECOND_FACTOR =
+            AntPathRequestMatcher.antMatcher("POST", "/login/mfa");
 
     private final LoginFailureRepository failures;
     private final JdbcUserDetailsManager users;
     private final Audit audit;
+    private final UserCredentialRepository passkeys;
+    private final PublicKeyCredentialUserEntityRepository passkeyHolders;
+    private final TotpService totp;
     private final int attempts;
     private final long windowMillis;
     private final long lockMillis;
 
     public SignInGuard(LoginFailureRepository failures, JdbcUserDetailsManager users,
-            Audit audit,
+            Audit audit, UserCredentialRepository passkeys,
+            PublicKeyCredentialUserEntityRepository passkeyHolders, TotpService totp,
             @Value("${bastion.lockout.attempts:5}") int attempts,
             @Value("${bastion.lockout.window-seconds:900}") int windowSeconds,
             @Value("${bastion.lockout.seconds:900}") int lockSeconds) {
         this.failures = failures;
         this.users = users;
         this.audit = audit;
+        this.passkeys = passkeys;
+        this.passkeyHolders = passkeyHolders;
+        this.totp = totp;
         this.attempts = attempts;
         this.windowMillis = windowSeconds * 1000L;
         this.lockMillis = lockSeconds * 1000L;
@@ -107,9 +140,52 @@ public class SignInGuard {
                             "{\"signedIn\":false,\"locked\":true}".getBytes("UTF-8"))
                             .header("Cache-Control", "no-store");
                 }
+                // A passkey account takes a password only on the way to a
+                // recovery code, which needs an authenticator app behind it.
+                if (username.length() > 0 && hasPasskey(username) && !totp.isEnabled(username)) {
+                    audit.append(username, "SIGNIN_REFUSED", username,
+                            "password: the account has a passkey");
+                    return json(403, "{\"signedIn\":false,\"stronger\":\"passkey\"}");
+                }
             }
             return chain.doFilter(request);
         };
+    }
+
+    /// Runs before the second-factor filter: a password accepted for an account
+    /// with a passkey is finished only by a recovery code (see the class
+    /// comment). The pending sign-in is left as it is, so the recovery code
+    /// can still follow it.
+    public SecurityFilter passkeyFirst() {
+        return (request, chain) -> {
+            if (SECOND_FACTOR.matches(request)) {
+                HttpSession session = request.getSession(false);
+                Object pending = session == null ? null
+                        : session.getAttribute(SecondFactorAuthenticationFilter.PENDING);
+                Object name = pending instanceof Map ? ((Map) pending).get("name") : null;
+                String code;
+                try {
+                    code = request.param("code");
+                } catch (RuntimeException malformed) {
+                    code = null;
+                }
+                if (name instanceof String && hasPasskey((String) name)
+                        && !RecoveryCodeService.isCodeShaped(code)) {
+                    String username = Accounts.asciiLower((String) name);
+                    audit.append(username, "SIGNIN_REFUSED", username,
+                            "totp: the account has a passkey");
+                    return json(403, "{\"signedIn\":false,\"stronger\":\"passkey\","
+                            + "\"recovery\":true}");
+                }
+            }
+            return chain.doFilter(request);
+        };
+    }
+
+    /// Whether `username` has registered a passkey.
+    public boolean hasPasskey(String username) {
+        PublicKeyCredentialUserEntity holder = passkeyHolders.findByUsername(username);
+        return holder != null && !passkeys.findByUserId(holder.getId()).isEmpty();
     }
 
     /// Answers a completed sign-in -- a password with no second factor, a

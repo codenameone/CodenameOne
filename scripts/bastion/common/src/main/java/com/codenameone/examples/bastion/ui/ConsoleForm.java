@@ -465,6 +465,7 @@ public final class ConsoleForm {
             facts.add(fact("Reverses", e.reverses() == null ? "-" : shortId(e.reverses())));
             facts.add(fact("Reversed by", e.reversedBy() == null ? "-" : shortId(e.reversedBy())));
             body.add(facts);
+            body.add(Ui.copyable(Lang.tr("Entry id"), e.id(), false));
             Table legs = new Table(new String[] {"Code", "Account", "Owner", "Asset",
                 "Debit (Dr)", "Credit (Cr)"}, new int[] {2, 6, 4, 2, 3, 3},
                     new boolean[] {false, false, false, false, true, true});
@@ -493,6 +494,14 @@ public final class ConsoleForm {
             body.add(legs.component());
             body.add(FlowLayout.encloseIn(new Label(Lang.tr(balanced ? "Balanced" : "Out of balance"),
                     balanced ? "BnBadgeGood" : "BnBadgeBad")));
+            final Printout.Section legRows = legs.printable();
+            printButton(body, () -> new Printout(Lang.tr("Journal entry {0}", shortId(e.id())),
+                    System.currentTimeMillis())
+                    .fact(Lang.tr("Entry id"), e.id())
+                    .fact(Lang.tr("Posted"), when(e.at()))
+                    .fact(Lang.tr("Type"), kindName(e.kind()))
+                    .fact(Lang.tr("Memo"), e.memo())
+                    .add(legRows));
             if (admin && e.reversedBy() == null && !"REVERSAL".equals(e.kind())) {
                 Button reverse = Ui.secondary("Reverse this entry");
                 reverse.addActionListener(evt -> reverse(body, e));
@@ -606,6 +615,19 @@ public final class ConsoleForm {
                         table.note(Lang.tr("No postings to this account in this currency."));
                     }
                     body.add(table.component());
+                    final Printout.Section rows = table.printable();
+                    int named = Ui.indexOf(ids, code);
+                    final String accountName = named < 0 ? code : names[named];
+                    final String closing = lines.isEmpty() ? null
+                            : Amounts.format(lines.get(lines.size() - 1).balance(), asset);
+                    printButton(body, () -> {
+                        Printout p = new Printout(Lang.tr("General ledger"),
+                                System.currentTimeMillis())
+                                .fact(Lang.tr("Account"), accountName)
+                                .fact(Lang.tr("Currency"), asset)
+                                .add(rows);
+                        return closing == null ? p : p.total(Lang.tr("Closing balance"), closing);
+                    });
                     if (!lines.isEmpty()) {
                         final String accountId = lines.get(0).accountId();
                         Button t = Ui.secondary("Show as a T-account");
@@ -735,6 +757,13 @@ public final class ConsoleForm {
                         total.balanced() ? "BnTableTotal" : "BnTableRowBad", null, null);
             }
             body.add(table.component());
+            final Printout.Section rows = table.printable();
+            printButton(body, () -> new Printout(Lang.tr("Trial balance"),
+                    System.currentTimeMillis())
+                    .fact(Lang.tr("Books"), Lang.tr("All accounts"))
+                    .fact(Lang.tr("As of"), when(tb.asOf()))
+                    .fact(Lang.tr("Status"), Lang.tr(tb.balanced() ? "Balanced" : "Out of balance"))
+                    .add(rows));
             done(body);
         }, failed(body, () -> trialBalance(body))));
     }
@@ -748,7 +777,18 @@ public final class ConsoleForm {
                     new Label(Lang.tr("As of {0}", when(bs.asOf())), "BnCellMuted")));
             body.add(Ui.row(Lang.tr("Total assets"), Lang.tr("Valued in dollars"),
                     Amounts.format(bs.totalAssetsUsdCents(), "USD"), "BnRowValue", null));
-            statement(body, bs.lines(), bs.totals(), new String[] {"ASSETS", "LIABILITIES", "EQUITY"});
+            final List<Printout.Section> tables = statement(body, bs.lines(), bs.totals(),
+                    new String[] {"ASSETS", "LIABILITIES", "EQUITY"});
+            printButton(body, () -> {
+                Printout p = new Printout(Lang.tr("Balance sheet"), System.currentTimeMillis())
+                        .fact(Lang.tr("Books"), Lang.tr("All accounts"))
+                        .fact(Lang.tr("As of"), when(bs.asOf()));
+                for (Printout.Section s : tables) {
+                    p.add(s);
+                }
+                return p.total(Lang.tr("Total assets") + " (" + Lang.tr("Valued in dollars") + ")",
+                        Amounts.format(bs.totalAssetsUsdCents(), "USD"));
+            });
             done(body);
         }, failed(body, () -> balanceSheet(body))));
     }
@@ -761,13 +801,26 @@ public final class ConsoleForm {
             body.add(Ui.row(Lang.tr("Net income"), Lang.tr("Valued in dollars"),
                     Amounts.format(is.netIncomeUsdCents(), "USD"),
                     is.netIncomeUsdCents() >= 0 ? "BnAmountIn" : "BnAmountNegative", null));
-            statement(body, is.lines(), is.totals(), new String[] {"REVENUE", "EXPENSES"});
+            final List<Printout.Section> tables = statement(body, is.lines(), is.totals(),
+                    new String[] {"REVENUE", "EXPENSES"});
+            printButton(body, () -> {
+                Printout p = new Printout(Lang.tr("Income statement"), System.currentTimeMillis())
+                        .fact(Lang.tr("Books"), Lang.tr("All accounts"))
+                        .fact(Lang.tr("Period"), Lang.tr("{0} to {1}", when(is.from()),
+                                when(is.to())));
+                for (Printout.Section s : tables) {
+                    p.add(s);
+                }
+                return p.total(Lang.tr("Net income") + " (" + Lang.tr("Valued in dollars") + ")",
+                        Amounts.format(is.netIncomeUsdCents(), "USD"));
+            });
             done(body);
         }, failed(body, () -> incomeStatement(body))));
     }
 
-    private void statement(Container body, List<StatementLineDto> lines,
+    private List<Printout.Section> statement(Container body, List<StatementLineDto> lines,
             List<StatementTotalDto> totals, String[] sections) {
+        List<Printout.Section> printed = new ArrayList<Printout.Section>();
         for (String section : sections) {
             body.add(Ui.section(className(section)));
             Table table = new Table(new String[] {"Code", "Account", "Asset", "Amount",
@@ -791,7 +844,9 @@ public final class ConsoleForm {
                 table.note(Lang.tr("Nothing in this section."));
             }
             body.add(table.component());
+            printed.add(table.printable().caption(className(section)));
         }
+        return printed;
     }
 
     private void reconciliation(final Container body) {
@@ -931,17 +986,27 @@ public final class ConsoleForm {
                     facts.add(fact("Head", "#" + c.headSeq()));
                     facts.add(fact("Head hash", shortHash(c.headHash())));
                     body.add(facts);
+                    body.add(Ui.copyable(Lang.tr("Head hash"), c.headHash(), false));
                     for (String problem : c.problems()) {
                         body.add(Ui.row(Lang.tr("Problem"), problem, null, null, null));
                     }
                     body.add(Ui.muted(Lang.tr("Each event's hash covers its own fields and the "
                             + "hash before it, so changing any row breaks every link after it.")));
-                    events(body, events, c.intact() ? -1 : c.firstBrokenSeq());
+                    final Printout.Section rows = events(body, events,
+                            c.intact() ? -1 : c.firstBrokenSeq());
+                    printButton(body, () -> new Printout(Lang.tr("Audit chain"),
+                            System.currentTimeMillis())
+                            .fact(Lang.tr("Status"), c.intact() ? Lang.tr("Intact")
+                                    : Lang.tr("Broken at #{0}", String.valueOf(c.firstBrokenSeq())))
+                            .fact(Lang.tr("Links checked"), String.valueOf(c.checked()))
+                            .fact(Lang.tr("Head"), "#" + c.headSeq())
+                            .fact(Lang.tr("Head hash"), c.headHash())
+                            .add(rows));
                     done(body);
                 }, failed(body, () -> chain(body)))), failed(body, () -> chain(body))));
     }
 
-    private void events(Container body, List<AuditEventDto> events, long broken) {
+    private Printout.Section events(Container body, List<AuditEventDto> events, long broken) {
         Table table = new Table(new String[] {"#", "Time", "Actor", "Action", "Subject",
             "Previous hash", "Hash"}, new int[] {1, 3, 4, 4, 4, 3, 3},
                 new boolean[] {true, false, false, false, false, false, false});
@@ -954,6 +1019,7 @@ public final class ConsoleForm {
             table.note(Lang.tr("No events."));
         }
         body.add(table.component());
+        return table.printable();
     }
 
     private void trail(final Container body, final String subject) {
@@ -980,7 +1046,11 @@ public final class ConsoleForm {
         Ui.loading(results);
         Api.audit().trail(subject, Net.to((List<AuditEventDto> events) -> {
             results.removeAll();
-            events(results, events, -1);
+            final Printout.Section rows = events(results, events, -1);
+            printButton(results, () -> new Printout(Lang.tr("Audit trail"),
+                    System.currentTimeMillis())
+                    .fact(Lang.tr("Subject"), subject)
+                    .add(rows));
             done(results);
         }, failed(results, () -> loadTrail(results, subject))));
     }
@@ -1001,6 +1071,9 @@ public final class ConsoleForm {
                 table.note(Lang.tr("No events."));
             }
             body.add(table.component());
+            final Printout.Section rows = table.printable();
+            printButton(body, () -> new Printout(Lang.tr("Access log"), System.currentTimeMillis())
+                    .add(rows));
             done(body);
         }, failed(body, () -> accessLog(body))));
     }
@@ -1036,12 +1109,13 @@ public final class ConsoleForm {
             String file = e.name() + "." + e.format();
             result.add(Ui.row(file, Lang.tr("Made by {0}, {1}", e.generatedBy(),
                     when(e.generatedAt())), Lang.tr("Saved"), "BnBadgeGood", null));
-            result.add(fact("SHA-256", e.sha256()));
+            result.add(Ui.copyable("SHA-256", e.sha256(), false));
             TextArea preview = new TextArea(head(e.content()));
             preview.setEditable(false);
             preview.setUIID("BnCode");
             preview.setRows(8);
             result.add(preview);
+            printButton(result, () -> evidencePrintout(e));
             save(file, e.content());
             done(result);
         }, failed(result, () -> export(result, name, format))));
@@ -1064,6 +1138,37 @@ public final class ConsoleForm {
             Util.cleanup(out);
         }
         CN.execute(path);
+    }
+
+    /// An evidence export on paper: who made it, when, and its hash, then the
+    /// file itself line by line -- the hash is of the file, so the printed
+    /// copy can be checked against the saved one.
+    static Printout evidencePrintout(EvidenceDto e) {
+        Printout p = new Printout(Lang.tr("Evidence"), System.currentTimeMillis())
+                .fact(Lang.tr("File"), e.name() + "." + e.format())
+                .fact(Lang.tr("Made by"), e.generatedBy() + ", " + when(e.generatedAt()))
+                .fact("SHA-256", e.sha256());
+        Printout.Section file = p.section(null, new String[] {e.name() + "." + e.format()},
+                new int[] {1}, new boolean[] {false});
+        String content = e.content() == null ? "" : e.content();
+        int start = 0;
+        while (start < content.length()) {
+            int end = content.indexOf('\n', start);
+            if (end < 0) {
+                end = content.length();
+            }
+            file.row(content.substring(start, end));
+            start = end + 1;
+        }
+        return p;
+    }
+
+    /// Adds a print button under a report, where this platform can print.
+    private static void printButton(Container body, Printout.Source source) {
+        Button print = Printout.button(source);
+        if (print != null) {
+            body.add(FlowLayout.encloseIn(print));
+        }
     }
 
     private static String head(String content) {

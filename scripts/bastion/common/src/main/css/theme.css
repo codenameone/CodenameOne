@@ -463,6 +463,19 @@ BnMeterHigh { color: var(--danger); background-color: var(--surface-press); bord
 
 /* A fact whose value may be long (a reference): the label above, the value
    wrapping under it. */
+/* The copy button beside a value (Ui.copyable): an icon, no box. */
+BnIconButton {
+    color: var(--brand);
+    background-color: transparent;
+    padding: 1.6mm 1.6mm 1.6mm 1.6mm;
+    margin: 0 0 0 1mm;
+}
+
+BnIconButton.pressed {
+    background-color: var(--surface-press);
+    border-radius: var(--radius);
+}
+
 BnRowValueWrap {
     color: var(--text);
     font-family: "native:MainRegular";

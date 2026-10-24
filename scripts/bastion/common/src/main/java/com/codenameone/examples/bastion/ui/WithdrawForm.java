@@ -111,8 +111,13 @@ public final class WithdrawForm {
             boolean waiting = address.usableAt() > now;
             String detail = address.asset() + " - " + address.address()
                     + (waiting ? "\n" + Lang.tr("Usable from {0}", Ui.when(address.usableAt())) : "");
-            content.add(Ui.row(address.label(), detail, Lang.tr(waiting ? "Waiting" : "Ready"),
-                    waiting ? "BnBadgeWarn" : "BnBadgeGood", () -> remove(address, again)));
+            Container line = new Container(new com.codename1.ui.layouts.BorderLayout());
+            line.add(com.codename1.ui.layouts.BorderLayout.CENTER, Ui.row(address.label(), detail,
+                    Lang.tr(waiting ? "Waiting" : "Ready"), waiting ? "BnBadgeWarn" : "BnBadgeGood",
+                    () -> remove(address, again)));
+            line.add(com.codename1.ui.layouts.BorderLayout.EAST,
+                    Ui.copyButton(address.label(), address.address(), false));
+            content.add(line);
         }
         content.add(add);
         content.revalidate();

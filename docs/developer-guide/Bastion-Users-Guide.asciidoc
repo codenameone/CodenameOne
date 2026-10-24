@@ -56,9 +56,13 @@ A new account starts with a dollar checking account. Others, in euros or as coin
 
 === Signing in
 
-Signing in takes the e-mail and password, then a code from the authenticator app when the account has one. A passkey replaces both where one is set up. Five wrong passwords in a row lock the account for fifteen minutes; the lock is per account, so guessing from many places at once doesn't help.
+The sign-in screen offers the strongest way in the device has first. Where the device or browser supports passkeys, *Sign in with a passkey* is the main button: the passkey sheet asks for a fingerprint, a face or the device PIN, and that one step is both factors. On a phone that keeps a sign-in behind biometric unlock, *Unlock with fingerprint or face* comes next. The e-mail and password, then a code from the authenticator app when the account has one, are the last way in.
+
+Once an account has a passkey, the server holds it to the passkey. The password is refused, and the code step after it takes a recovery code and nothing else; a six-digit code from the authenticator app no longer signs in. That is the way back for a customer whose passkey is gone: the password and one of their recovery codes, each of which works once. An account with a passkey and no authenticator app has no recovery codes, so its way back is the bank. Five wrong passwords in a row lock the account for fifteen minutes; the lock is per account, so guessing from many places at once doesn't help.
 
 image::img/bastion-sign-in-code.png["The second step of signing in, asking for the six-digit code from the authenticator app",scaledwidth=40%]
+
+image::img/bastion-sign-in-passkey-required.png["The code step refusing an authenticator code because the account has a passkey, with a button to sign in with the passkey",scaledwidth=40%]
 
 === The lock
 
@@ -156,6 +160,10 @@ image::img/bastion-security-center.png["The Security Center listing network prot
 It's honest by design. A protection the simulator or a browser can't provide, such as a hardware keystore, says so. One that only a build from the Codename One build server applies, such as code hardening or Play Integrity, is marked *Cloud build* instead of claiming to be on. A development exemption in use, such as the unpinned connection to a server on this machine, is a *Warning*.
 
 === Settings
+
+Every value a customer may need somewhere else has a copy button beside it, and the value itself can be selected: a receipt's reference, a transaction's ledger entry and posting, an account and a card identifier, a coin address, a passkey's ID, this device's key ID, the authenticator key, and on the console an entry's ID and the audit and evidence hashes. Keys and account and card identifiers are copied as sensitive clips that clear themselves after a minute, the same as the authenticator key; a short message confirms each copy.
+
+Statements, receipts and transactions have a *Print* button, as do the console's reports: the general ledger, the trial balance, the balance sheet, the income statement, the audit chain, the audit trail, the access log and an evidence export. The printout has the bank's name, the report, the account and period it covers and when it was made, then the table, then the totals, and goes to the platform's print dialog. Where the platform can't print, there is no button.
 
 *Settings* turns biometric unlock on and off, sets, changes or removes the unlock PIN, turns on the authenticator app and makes new recovery codes, lists and removes passkeys and adds new ones, shows this device's payment key, and chooses the language: English, Spanish, French, German or Hebrew, which lays the app out right to left. Tables mirror, so the debit side of a T-account is on the right as a Hebrew ledger writes it; charts keep time running left to right.
 

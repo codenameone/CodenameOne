@@ -8,6 +8,7 @@
 // flow the app runs from the page (no Cookie header, the browser's own jar):
 // it opens an account, turns on the authenticator app with the key it is shown,
 // signs in again in a fresh browser with the password and a six-digit code,
+// which the server refuses because the account has a passkey, then with the passkey,
 // reaches the dashboard, adds money, opens a second account and moves money
 // between the two. BASTION_WEB_ACCOUNTS=0 stops after the sign-in form.
 // run-web-e2e.sh builds everything, starts the server and runs this; see there.
@@ -470,7 +471,8 @@ async function signInStaff(who, viewport) {
 async function guideTour() {
   fs.mkdirSync(tour, { recursive: true });
   for (const [from, to] of [['1-sign-in', 'bastion-sign-in'],
-    ['2-authenticator', 'bastion-totp-enrolment'], ['3-code', 'bastion-sign-in-code']]) {
+    ['2-authenticator', 'bastion-totp-enrolment'], ['3-code', 'bastion-sign-in-code'],
+    ['3-passkey-required', 'bastion-sign-in-passkey-required']]) {
     if (fs.existsSync(path.join(out, from + '.png'))) {
       fs.copyFileSync(path.join(out, from + '.png'), path.join(tour, to + '.png'));
     }
@@ -782,7 +784,10 @@ try {
     await noErrorDialog();
     say('onboarded');
 
-    // 4. A fresh browser: password, then the code the account now asks for.
+    // 4. A fresh browser: password, then the code the account asks for. The
+    // account has a passkey now, so the server holds it to the passkey: the
+    // app's code is refused (only a recovery code would stand in for the
+    // passkey), and the passkey on the same screen signs in.
     await newPage();
     await page.goto(url, { waitUntil: 'load' });
     await signInAs(email);
@@ -795,17 +800,22 @@ try {
     await settled();
     await page.screenshot({ path: path.join(out, '3-code.png') });
     await press('Continue');
-    await dashboardAfterCode('sign-in', secret, signInStep);
-    await noErrorDialog();
-    await page.screenshot({ path: path.join(out, '3-home.png') });
-    say('signed in with the password and a code');
-    for (const done of ['302 POST /login', '200 GET /login/mfa', '200 POST /login/mfa',
-      '302 GET /oauth2/authorize', '200 GET /signin/code',
-      '200 POST /oauth2/token']) {
+    await waitFor('the passkey refusal', stepSeconds, async () =>
+        /signs in with its passkey/.test(await screenText()));
+    await settled();
+    await page.screenshot({ path: path.join(out, '3-passkey-required.png') });
+    say('an authenticator code was refused for an account with a passkey');
+    for (const done of ['302 POST /login', '200 GET /login/mfa', '403 POST /login/mfa']) {
       if (!requests.includes(done)) {
         throw new Error('the sign-in did not go ' + done + ': ' + requests.join(', '));
       }
     }
+    await press('Sign in with a passkey');
+    await waitFor('the dashboard', stepSeconds, async () =>
+        /Total balance/.test(await screenText()));
+    await noErrorDialog();
+    await page.screenshot({ path: path.join(out, '3-home.png') });
+    say('signed in with the passkey instead');
 
     // 5. A second account, money in, and a move between the two.
     await press('Open an account');

@@ -116,6 +116,7 @@ public final class CardsForm {
                     null, null));
             content.add(Ui.row(Lang.tr("Expires"), null, CardFace.expiryOf(card.createdAt()), null,
                     null));
+            content.add(Ui.copyable(Lang.tr("Card ID"), card.id(), true));
             final Container used = new Container(BoxLayout.y(), "BnRow");
             content.add(used);
             final Container recent = new Container(BoxLayout.y());

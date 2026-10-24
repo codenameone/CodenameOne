@@ -100,6 +100,12 @@ public final class SettingsForm {
                 Lang.tr(device ? "On" : "Off"), device ? "BnBadgeGood" : "BnBadgeWarn",
                 device ? null : () -> DeviceSetup.register(() -> show(back),
                         (status, message) -> Ui.toast(message))));
+        if (device && com.codenameone.examples.bastion.security.DeviceKey.deviceId() != null) {
+            // What the server knows this device's key by: the id a support
+            // agent, or the Security Center on another device, names it with.
+            form.add(Ui.copyable(Lang.tr("Device key ID"),
+                    com.codenameone.examples.bastion.security.DeviceKey.deviceId(), false));
+        }
         form.add(Ui.section("Language"));
         String speaking = Lang.current();
         for (final String code : Lang.CODES) {
@@ -162,6 +168,7 @@ public final class SettingsForm {
                     ? Lang.tr("Passkey") : passkey.label();
             box.add(Ui.row(label, Lang.tr("Last used {0}", Ui.when(passkey.lastUsed())),
                     Lang.tr("Remove"), "BnBadgeWarn", () -> removePasskey(box, passkey, label)));
+            box.add(Ui.copyable(Lang.tr("Passkey ID"), passkey.id(), false));
         }
         if (Session.passkeysSupported()) {
             Button add = Ui.secondary("Add a passkey");
