@@ -4479,6 +4479,11 @@ static void cn1RefreshSupportedOrientations(void) {
         if (root.presentedViewController != nil) {
             return;
         }
+#if TARGET_OS_MACCATALYST
+        // A Mac window has no interface orientation to request, and the
+        // iOS geometry preferences are refused there.
+        return;
+#endif
         UIWindowScene *scene = root.view.window.windowScene;
         if (scene == nil) {
             return;
