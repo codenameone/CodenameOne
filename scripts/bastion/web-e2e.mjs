@@ -562,17 +562,10 @@ async function guideTour() {
   await menu('Exchange');
   await waitFor('the markets', stepSeconds, textOnScreen(/BTC/));
   await shot('bastion-exchange');
-  // The first tap after the side menu closes can land on the closing
-  // menu rather than the list (the Exchange item sits where the BTC row
-  // is); tap again, freshly aimed, until the market opens.
-  for (let tries = 0; tries < 4 && !/Last price/.test(await screenText()); tries++) {
-    const btc = await waitFor('the BTC market', stepSeconds, async () =>
-        (await components()).find(c => /^BTC \/ USD$/.test(c.label || c.text || '')
-            && c.height < 200));
-    await click(btc);
-    await page.waitForTimeout(2000);
-    await settled();
-  }
+  const btc = await waitFor('the BTC market', stepSeconds, async () =>
+      (await components()).find(c => /^BTC \/ USD$/.test(c.label || c.text || '')
+          && c.height < 200));
+  await click(btc);
   await waitFor('the order book', stepSeconds, textOnScreen(/Last price/));
   await page.waitForTimeout(3000);
   await shot('bastion-order-book');
