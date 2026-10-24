@@ -125,10 +125,14 @@ final class BackendBeans {
                     POST_CONSTRUCT, PRE_DESTROY, TRANSACTIONAL, ASYNC, SCHEDULED,
                     MANAGED_RESOURCE, MANAGED_ATTRIBUTE, MANAGED_OPERATION, TIMED, COUNTED,
                     MCP_TOOL, MVC_CONTROLLER, REST_CONTROLLER, WEBSOCKET_MAPPING, PRE_AUTHORIZE, SECURED,
-                    ROLES_ALLOWED, PERMIT_ALL, DENY_ALL)));
+                    ROLES_ALLOWED, PERMIT_ALL, DENY_ALL,
+                    BackendExceptionHandlers.CONTROLLER_ADVICE,
+                    BackendExceptionHandlers.REST_CONTROLLER_ADVICE)));
 
     private static final String[] STEREOTYPES = {COMPONENT, CONFIGURATION,
-            REST_CONTROLLER, MVC_CONTROLLER, WEBSOCKET_MAPPING};
+            REST_CONTROLLER, MVC_CONTROLLER, WEBSOCKET_MAPPING,
+            BackendExceptionHandlers.CONTROLLER_ADVICE,
+            BackendExceptionHandlers.REST_CONTROLLER_ADVICE};
 
     static final String CONFIG_TYPE = "com/codename1/backend/Config";
     static final String DATASOURCE_TYPE = "com/codename1/backend/DataSource";

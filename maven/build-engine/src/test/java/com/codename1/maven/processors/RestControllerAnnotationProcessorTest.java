@@ -2102,6 +2102,269 @@ public class RestControllerAnnotationProcessorTest {
         }
     }
 
+    // ------------------------------------------------ exception handlers (#5993)
+
+    private static final String HANDLED_SOURCE =
+            "package com.example;\n"
+            + "import com.codename1.backend.annotations.*;\n"
+            + "import com.codename1.backend.validation.*;\n"
+            + "import java.util.*;\n"
+            + "@RestController\n"
+            + "public class Notes {\n"
+            + "    public static class Addr { @NotBlank @Size(min=5, max=5) public String zip; }\n"
+            + "    public static class Item {\n"
+            + "        @NotBlank public String name;\n"
+            + "        @Min(1) @Max(9) public int count;\n"
+            + "        @Valid public Addr addr;\n"
+            + "        @Valid public List<Addr> more;\n"
+            + "    }\n"
+            + "    public final List<String> log = new ArrayList<String>();\n"
+            + "    @GetMapping(\"/iae\") public String iae() { throw new IllegalArgumentException(\"bad\"); }\n"
+            + "    @GetMapping(\"/nfe\") public String nfe() { throw new NumberFormatException(\"nan\"); }\n"
+            + "    @GetMapping(\"/io\") public String io() throws java.io.IOException {\n"
+            + "        throw new java.io.IOException(\"disk\");\n"
+            + "    }\n"
+            + "    @GetMapping(\"/denied\") public String denied() {\n"
+            + "        throw new com.codename1.backend.security.AccessDeniedException(\"no\");\n"
+            + "    }\n"
+            + "    @PostMapping(\"/items\") public Map create(@Valid @RequestBody Item item) {\n"
+            + "        log.add(\"created \" + item.name);\n"
+            + "        return Collections.singletonMap(\"name\", item.name);\n"
+            + "    }\n"
+            + "    @GetMapping(\"/page\") public String page(@RequestParam(\"n\") @Min(1) int n,\n"
+            + "            @RequestParam(value=\"q\", required=false) @Size(max=3) String q) {\n"
+            + "        return \"page \" + n;\n"
+            + "    }\n"
+            + "    @ExceptionHandler(IllegalArgumentException.class)\n"
+            + "    @ResponseStatus(422)\n"
+            + "    public Map onIae(IllegalArgumentException e) {\n"
+            + "        return Collections.singletonMap(\"error\", \"iae:\" + e.getMessage());\n"
+            + "    }\n"
+            + "    @ExceptionHandler\n"
+            + "    @ResponseStatus(409)\n"
+            + "    public String onSecurity(SecurityException e, com.codename1.backend.web.HandlerMethod h) {\n"
+            + "        return \"security:\" + h.getMethodName();\n"
+            + "    }\n"
+            + "}\n";
+
+    private static final String ADVICE_SOURCE =
+            "package com.example;\n"
+            + "import com.codename1.backend.annotations.*;\n"
+            + "import com.codename1.backend.HttpServer;\n"
+            + "@ControllerAdvice\n"
+            + "public class Other {\n"
+            + "    @ExceptionHandler({java.io.IOException.class, Exception.class})\n"
+            + "    public HttpServer.Response any(Exception e, HttpServer.Request request) {\n"
+            + "        return HttpServer.Response.text(503, \"advice:\" + e.getMessage())\n"
+            + "                .header(\"Retry-After\", \"5\");\n"
+            + "    }\n"
+            + "}\n";
+
+    /// A router for HANDLED_SOURCE with the given hooks, and the controller.
+    private Object[] handledRouter(File classes, com.codename1.backend.web.ControllerHooks hooks)
+            throws Exception {
+        ProcessorContext ctx = run(classes);
+        if (ctx.hasErrors()) {
+            fail("processor reported errors: " + ctx.getErrors());
+        }
+        URLClassLoader loader = new URLClassLoader(new URL[]{ classes.toURI().toURL() },
+                getClass().getClassLoader());
+        Class<?> controller = loader.loadClass("com.example.Notes");
+        Class<?> router = loader.loadClass("com.example.NotesRouter");
+        Object impl = controller.newInstance();
+        Object instance = router.getConstructor(controller,
+                com.codename1.backend.web.ControllerHooks.class).newInstance(impl, hooks);
+        return new Object[] {new Router(instance, router.getMethod("handle",
+                HttpServer.Request.class)), impl, loader};
+    }
+
+    @Test
+    public void controllerExceptionHandlersPickTheClosestType() throws Exception {
+        File classes = compile(HANDLED_SOURCE);
+        Router router = (Router) handledRouter(classes,
+                com.codename1.backend.web.ControllerHooks.none())[0];
+        Object iae = router.call("GET", "/iae", null);
+        assertEquals("the exact type wins over its superclass", 422, Router.statusOf(iae));
+        assertEquals("{\"error\":\"iae:bad\"}", Router.bodyOf(iae));
+        Object nfe = router.call("GET", "/nfe", null);
+        assertEquals("a subclass with no handler of its own goes to the closest one",
+                422, Router.statusOf(nfe));
+        assertEquals("{\"error\":\"iae:nan\"}", Router.bodyOf(nfe));
+        try {
+            router.call("GET", "/io", null);
+            fail("nothing handles an IOException here, so it must reach the server");
+        } catch (java.lang.reflect.InvocationTargetException err) {
+            assertTrue(err.getCause() instanceof java.io.IOException);
+        }
+    }
+
+    @Test
+    public void securityFailuresAreNeverOfferedToAHandler() throws Exception {
+        // onSecurity handles java.lang.SecurityException; AccessDeniedException
+        // is not one, but a global Exception handler would match it -- see
+        // globalAdviceAnswersWhatTheControllerDoesNot.
+        File classes = compile(HANDLED_SOURCE);
+        Router router = (Router) handledRouter(classes,
+                com.codename1.backend.web.ControllerHooks.none())[0];
+        try {
+            router.call("GET", "/denied", null);
+            fail("an AccessDeniedException must reach the security chain");
+        } catch (java.lang.reflect.InvocationTargetException err) {
+            assertTrue(err.getCause() instanceof com.codename1.backend.security.AccessDeniedException);
+        }
+    }
+
+    @Test
+    public void globalAdviceAnswersWhatTheControllerDoesNot() throws Exception {
+        File classes = tmp.newFolder();
+        Map<String, String> sources = new LinkedHashMap<String, String>();
+        sources.put("com.example.Notes", HANDLED_SOURCE);
+        sources.put("com.example.Other", ADVICE_SOURCE);
+        JavaSourceCompiler.compile(sources, classes, backendClasspath());
+        ProcessorContext ctx = run(classes);
+        assertFalse(String.valueOf(ctx.getErrors()), ctx.hasErrors());
+        URLClassLoader loader = new URLClassLoader(new URL[]{ classes.toURI().toURL() },
+                getClass().getClassLoader());
+        Class<?> advice = loader.loadClass("com.example.Other");
+        Object resolver = loader.loadClass("com.example.OtherCn1Advice")
+                .getConstructor(advice).newInstance(advice.newInstance());
+        com.codename1.backend.web.ControllerHooks hooks = new com.codename1.backend.web.ControllerHooks(
+                new com.codename1.backend.web.HandlerInterceptor[0],
+                new com.codename1.backend.web.ExceptionResolver[] {
+                    (com.codename1.backend.web.ExceptionResolver) resolver});
+        Router router = (Router) handledRouter(classes, hooks)[0];
+        Object io = router.call("GET", "/io", null);
+        assertEquals(503, Router.statusOf(io));
+        assertEquals("advice:disk", Router.bodyOf(io));
+        assertEquals("the controller's own handler still comes first",
+                422, Router.statusOf(router.call("GET", "/iae", null)));
+        try {
+            router.call("GET", "/denied", null);
+            fail("not even a global Exception handler sees a security failure");
+        } catch (java.lang.reflect.InvocationTargetException err) {
+            assertTrue(err.getCause() instanceof com.codename1.backend.security.AccessDeniedException);
+        }
+    }
+
+    @Test
+    public void validationRejectsBeforeTheMethodRuns() throws Exception {
+        File classes = compile(HANDLED_SOURCE);
+        Object[] built = handledRouter(classes, com.codename1.backend.web.ControllerHooks.none());
+        Router router = (Router) built[0];
+        List<?> log = (List<?>) built[1].getClass().getField("log").get(built[1]);
+        Object ok = router.call("POST", "/items",
+                "{\"name\":\"pen\",\"count\":2,\"addr\":{\"zip\":\"12345\"}}");
+        assertEquals(200, Router.statusOf(ok));
+        assertEquals(1, log.size());
+        Object bad = router.call("POST", "/items",
+                "{\"name\":\"  \",\"count\":0,\"addr\":{\"zip\":\"12\"},"
+                + "\"more\":[{\"zip\":\"12345\"},{\"zip\":\"\"}]}");
+        assertEquals(400, Router.statusOf(bad));
+        String body = Router.bodyOf(bad);
+        assertTrue(body, body.contains("\"field\":\"name\",\"code\":\"NotBlank\""));
+        assertTrue(body, body.contains("\"field\":\"count\",\"code\":\"Min\""));
+        assertTrue(body, body.contains("\"field\":\"addr.zip\",\"code\":\"Size\""));
+        assertTrue(body, body.contains("\"field\":\"more[1].zip\",\"code\":\"NotBlank\""));
+        assertFalse(body, body.contains("more[0]"));
+        assertEquals("the method never ran for invalid input", 1, log.size());
+
+        assertEquals("page 2", router.text("GET", "/page?n=2"));
+        Object low = router.call("GET", "/page?n=0&q=toolong", null);
+        assertEquals(400, Router.statusOf(low));
+        String lowBody = Router.bodyOf(low);
+        assertTrue(lowBody, lowBody.contains("\"field\":\"n\",\"code\":\"Min\""));
+        assertTrue(lowBody, lowBody.contains("\"field\":\"q\",\"code\":\"Size\""));
+    }
+
+    @Test
+    public void aConstraintTheTypeCannotCarryFailsTheBuild() throws Exception {
+        ProcessorContext ctx = run(compile(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "import com.codename1.backend.validation.*;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @GetMapping(\"/x\") public String x(@RequestParam(\"q\") @Min(1) String q) {\n"
+                + "        return q;\n"
+                + "    }\n"
+                + "}\n"));
+        assertTrue(ctx.hasErrors());
+        assertTrue(String.valueOf(ctx.getErrors()),
+                String.valueOf(ctx.getErrors()).contains("@Min applies to an integral number"));
+    }
+
+    /// Records every call into a log shared with the other recorders.
+    public static final class Recorder implements com.codename1.backend.web.HandlerInterceptor {
+        final List<String> calls;
+        final String name;
+        final boolean refuse;
+
+        Recorder(List<String> calls, String name, boolean refuse) {
+            this.calls = calls;
+            this.name = name;
+            this.refuse = refuse;
+        }
+
+        @Override
+        public HttpServer.Response preHandle(HttpServer.Request request,
+                com.codename1.backend.web.HandlerMethod handler) {
+            calls.add(name + ".pre " + handler.getPattern());
+            return refuse ? HttpServer.Response.text(401, "refused") : null;
+        }
+
+        @Override
+        public void postHandle(HttpServer.Request request,
+                com.codename1.backend.web.HandlerMethod handler, HttpServer.Response response) {
+            calls.add(name + ".post");
+        }
+
+        @Override
+        public void afterCompletion(HttpServer.Request request,
+                com.codename1.backend.web.HandlerMethod handler, HttpServer.Response response,
+                Throwable failure) {
+            calls.add(name + ".after " + (failure == null ? "-" : failure.getClass().getSimpleName()));
+        }
+    }
+
+    @Test
+    public void interceptorsCompleteOnEveryOutcome() throws Exception {
+        File classes = compile(HANDLED_SOURCE);
+        List<String> calls = new java.util.ArrayList<String>();
+        com.codename1.backend.web.ControllerHooks hooks = new com.codename1.backend.web.ControllerHooks(
+                new com.codename1.backend.web.HandlerInterceptor[] {
+                    new Recorder(calls, "a", false), null, new Recorder(calls, "b", false)},
+                new com.codename1.backend.web.ExceptionResolver[0]);
+        Router router = (Router) handledRouter(classes, hooks)[0];
+
+        router.call("GET", "/page?n=1", null);
+        assertEquals(Arrays.asList("a.pre /page", "b.pre /page", "b.post", "a.post",
+                "b.after -", "a.after -"), calls);
+
+        calls.clear();
+        assertEquals(400, Router.statusOf(router.call("GET", "/page?n=0", null)));
+        assertEquals("a validation failure is handled, so no postHandle, but cleanup runs",
+                Arrays.asList("a.pre /page", "b.pre /page", "b.after -", "a.after -"), calls);
+
+        calls.clear();
+        try {
+            router.call("GET", "/io", null);
+            fail("nothing handles the IOException");
+        } catch (java.lang.reflect.InvocationTargetException expected) {
+            assertTrue(expected.getCause() instanceof java.io.IOException);
+        }
+        assertEquals(Arrays.asList("a.pre /io", "b.pre /io", "b.after IOException",
+                "a.after IOException"), calls);
+
+        calls.clear();
+        Router refused = (Router) handledRouter(classes, new com.codename1.backend.web.ControllerHooks(
+                new com.codename1.backend.web.HandlerInterceptor[] {new Recorder(calls, "a", false),
+                    new Recorder(calls, "gate", true), new Recorder(calls, "c", false)},
+                new com.codename1.backend.web.ExceptionResolver[0]))[0];
+        assertEquals(401, Router.statusOf(refused.call("GET", "/page?n=1", null)));
+        assertEquals("only the interceptors before the refusal complete; nothing after it runs",
+                Arrays.asList("a.pre /page", "gate.pre /page", "a.after -"), calls);
+    }
+
     private Router generate(String controllerSource) throws Exception {
         File classes = compile(controllerSource);
         ProcessorContext ctx = run(classes);
