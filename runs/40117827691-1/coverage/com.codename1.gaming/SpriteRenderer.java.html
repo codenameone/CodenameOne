@@ -1,0 +1,524 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SpriteRenderer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming</a> &gt; <span class="el_source">SpriteRenderer.java</span></div><h1>SpriteRenderer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gaming;
+
+import com.codename1.gpu.Camera;
+import com.codename1.gpu.GraphicsDevice;
+import com.codename1.gpu.Light;
+import com.codename1.gpu.Material;
+import com.codename1.gpu.Matrix4;
+import com.codename1.gpu.Mesh;
+import com.codename1.gpu.Primitives;
+import com.codename1.gpu.RenderState;
+import com.codename1.gpu.Renderer;
+import com.codename1.gpu.Texture;
+import com.codename1.ui.Image;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// Draws a `Scene` of `Sprite`s on the GPU, implementing the `com.codename1.gpu`
+/// `com.codename1.gpu.Renderer` contract so it can be hosted in a
+/// `com.codename1.gpu.RenderView` (which `GameView` does for you).
+///
+/// Each frame it sets up an orthographic camera that maps one world unit to one
+/// pixel with the origin at the top left and y pointing down, then draws every
+/// visible sprite as a textured quad: a shared unit quad mesh scaled/rotated/
+/// translated by a per sprite model matrix, with a `com.codename1.gpu.Material.Type#SPRITE`
+/// material (alpha blended, depth test off) whose texture is the sprite's image and
+/// whose color is the sprite's tint. Images are uploaded to
+/// `com.codename1.gpu.Texture`s lazily and cached.
+///
+/// Use it directly for a custom host, or let `GameView` create and drive one:
+///
+/// ```java
+/// SpriteRenderer r = new SpriteRenderer();
+/// r.getScene().add(mySprite);
+/// RenderView view = new RenderView(r).setContinuous(true);
+/// form.add(BorderLayout.CENTER, view);
+/// ```
+public class SpriteRenderer implements Renderer {
+    /// Callbacks invoked by the renderer on the render thread (used by `GameView` to
+    /// run game logic and to let the game allocate GPU resources once the device is
+    /// ready).
+    interface Updatable {
+        /// Invoked once after the GPU device is created, before the first frame.
+        void setup(GraphicsDevice device);
+
+        /// Invoked every frame before the scene is drawn.
+        void frame(double deltaSeconds);
+    }
+
+    private final Scene scene;
+    private Updatable updatable;
+<span class="fc" id="L75">    private int clearColor = 0xff000000;</span>
+
+<span class="fc" id="L77">    private final GameCamera gameCamera = new GameCamera();</span>
+<span class="fc" id="L78">    private final Camera camera = new Camera();</span>
+<span class="fc" id="L79">    private final Light light = new Light();</span>
+<span class="fc" id="L80">    private final List models = new ArrayList();</span>
+    private TouchControls controls;
+    private Mesh quad;
+    private Material material;
+    private RenderState spriteState2D;
+    private RenderState spriteState3D;
+    private Map textures;
+    // images whose textures were asked back; see releaseTexture
+<span class="fc" id="L88">    private final List released = new ArrayList();</span>
+    private Image discImage;
+    private Image ringImage;
+    private Map labelImages;
+    private int viewWidth;
+    private int viewHeight;
+    private long lastTime;
+    private boolean hasLast;
+
+    // reusable model-matrix scratch buffers (onFrame is single threaded)
+<span class="fc" id="L98">    private final float[] scratchA = new float[16];</span>
+<span class="fc" id="L99">    private final float[] scratchB = new float[16];</span>
+<span class="fc" id="L100">    private final float[] model = new float[16];</span>
+
+    /// Creates a renderer with a fresh empty `Scene`.
+    public SpriteRenderer() {
+<span class="fc" id="L104">        this(new Scene());</span>
+<span class="fc" id="L105">    }</span>
+
+    /// Creates a renderer drawing the given scene.
+<span class="fc" id="L108">    public SpriteRenderer(Scene scene) {</span>
+<span class="fc" id="L109">        this.scene = scene;</span>
+<span class="fc" id="L110">    }</span>
+
+    /// The scene this renderer draws; add and remove sprites here.
+    public Scene getScene() {
+<span class="fc" id="L114">        return scene;</span>
+    }
+
+    /// The camera this renderer draws through. Leave it in its default 2D mode for a
+    /// classic sprite game, or put it in `GameCamera#MODE_PERSPECTIVE` to render the
+    /// sprites as billboards in a 3D world.
+    public GameCamera getCamera() {
+<span class="fc" id="L121">        return gameCamera;</span>
+    }
+
+    /// The directional light used to shade lit 3D `Model`s. Configure it with
+    /// `com.codename1.gpu.Light#setDirection(float, float, float)` etc.
+    public Light getLight() {
+<span class="fc" id="L127">        return light;</span>
+    }
+
+    /// Adds a 3D model to be drawn (in perspective mode) alongside the sprites.
+    public void addModel(Model model) {
+<span class="fc" id="L132">        models.add(model);</span>
+<span class="fc" id="L133">    }</span>
+
+    /// Removes a previously added 3D model.
+    public void removeModel(Model model) {
+<span class="fc" id="L137">        models.remove(model);</span>
+<span class="fc" id="L138">    }</span>
+
+    /// The number of 3D models in this renderer.
+    public int getModelCount() {
+<span class="fc" id="L142">        return models.size();</span>
+    }
+
+    /// Releases the texture this renderer keeps for an image, and forgets the
+    /// image.
+    ///
+    /// The renderer uploads every image a sprite is drawn with once, and keeps
+    /// the texture until it is disposed itself. That is right for the art of a
+    /// game, and wrong for an image that is made, shown for a while and never
+    /// shown again -- a text painted into an image, a generated frame: each one
+    /// would hold its texture, and the image with it, for as long as the view
+    /// lives. Call this when such an image is no longer drawn.
+    ///
+    /// The GPU is not touched here, since only a renderer callback has the
+    /// device: the texture is disposed at the start of the next frame, before
+    /// anything is drawn. So it may be called from the frame itself (`GameView`'s
+    /// `update`), and an image released and drawn again -- in the same frame or
+    /// any later one -- is simply uploaded again. An image the renderer has no
+    /// texture for, or null, is ignored.
+    ///
+    /// Like every change to the scene, it belongs on the thread that runs the
+    /// frame.
+    ///
+    /// #### Parameters
+    ///
+    /// - `image`: the image whose texture is no longer needed
+    public void releaseTexture(Image image) {
+<span class="fc bfc" id="L169" title="All 6 branches covered.">        if (image != null &amp;&amp; textures != null &amp;&amp; textures.containsKey(image)) {</span>
+<span class="fc" id="L170">            released.add(image);</span>
+        }
+<span class="fc" id="L172">    }</span>
+
+    /// The number of images this renderer holds a texture for at the moment:
+    /// those drawn since the device was created and not released since.
+    public int getTextureCount() {
+<span class="fc bfc" id="L177" title="All 2 branches covered.">        return textures == null ? 0 : textures.size();</span>
+    }
+
+    /// Disposes the textures that were released since the last frame. An image
+    /// released twice is found in the map only the first time, so no texture is
+    /// handed to the device twice.
+    private void disposeReleased(GraphicsDevice device) {
+<span class="fc" id="L184">        int n = released.size();</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L186">            Texture t = (Texture) textures.remove(released.get(i));</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">            if (t != null) {</span>
+<span class="fc" id="L188">                device.dispose(t);</span>
+            }
+        }
+<span class="fc" id="L191">        released.clear();</span>
+<span class="fc" id="L192">    }</span>
+
+    /// The ARGB color the framebuffer is cleared to each frame.
+    public void setClearColor(int argb) {
+<span class="fc" id="L196">        this.clearColor = argb;</span>
+<span class="fc" id="L197">    }</span>
+
+    public int getClearColor() {
+<span class="fc" id="L200">        return clearColor;</span>
+    }
+
+    void setUpdatable(Updatable updatable) {
+<span class="fc" id="L204">        this.updatable = updatable;</span>
+<span class="fc" id="L205">    }</span>
+
+    /// Sets the on-screen `TouchControls` this renderer draws as a screen-space
+    /// overlay (set by `GameView`).
+    void setControls(TouchControls controls) {
+<span class="fc" id="L210">        this.controls = controls;</span>
+<span class="fc" id="L211">    }</span>
+
+    /// Sets the logical coordinate space the scene is drawn in, in Codename One
+    /// component pixels. Game logic (sprite positions, the joystick, touch handling)
+    /// all work in this space, which can differ from the GPU framebuffer size (the GL
+    /// surface is sized in device pixels and may be scaled by the display's backing
+    /// factor). The renderer maps one world unit to one logical pixel while the GL
+    /// viewport still covers the full framebuffer, so the picture fills the surface
+    /// without the two coordinate spaces drifting apart. `GameView` calls this every
+    /// frame with its own size.
+    void setLogicalSize(int width, int height) {
+<span class="pc bpc" id="L222" title="1 of 4 branches missed.">        if (width &gt; 0 &amp;&amp; height &gt; 0) {</span>
+<span class="fc" id="L223">            viewWidth = width;</span>
+<span class="fc" id="L224">            viewHeight = height;</span>
+        }
+<span class="fc" id="L226">    }</span>
+
+    @Override
+    public void onInit(GraphicsDevice device) {
+<span class="fc" id="L230">        quad = Primitives.quad(device, 1f);</span>
+        // 2D: ignore depth entirely (draw order wins). 3D: still alpha blended with
+        // no depth write, but depth-test against opaque 3D models so closer geometry
+        // occludes the billboards.
+        // Sprites are flat quads (billboards in 3D); never cull a face, otherwise a
+        // sprite flipped to face the other way (negative scaleX/scaleY) reverses its
+        // winding and vanishes.
+<span class="fc" id="L237">        spriteState2D = RenderState.transparent().setDepthTest(false)</span>
+<span class="fc" id="L238">                .setCullMode(RenderState.CullMode.NONE);</span>
+<span class="fc" id="L239">        spriteState3D = RenderState.transparent().setDepthTest(true)</span>
+<span class="fc" id="L240">                .setCullMode(RenderState.CullMode.NONE);</span>
+<span class="fc" id="L241">        material = new Material(Material.Type.SPRITE).setRenderState(spriteState2D);</span>
+<span class="fc" id="L242">        textures = new HashMap();</span>
+        // a new device: what was released belonged to the one before it
+<span class="fc" id="L244">        released.clear();</span>
+<span class="fc" id="L245">        labelImages = new HashMap();</span>
+<span class="fc" id="L246">        discImage = circleTexture(128, 0f, 1f);</span>
+<span class="fc" id="L247">        ringImage = circleTexture(128, 0.72f, 1f);</span>
+<span class="fc" id="L248">        hasLast = false;</span>
+<span class="fc bfc" id="L249" title="All 2 branches covered.">        if (updatable != null) {</span>
+<span class="fc" id="L250">            updatable.setup(device);</span>
+        }
+<span class="fc" id="L252">    }</span>
+
+    @Override
+    public void onResize(GraphicsDevice device, int width, int height) {
+        // width/height are the GL framebuffer size in device pixels: use them for the
+        // viewport (which must cover the whole framebuffer) but NOT for the coordinate
+        // mapping -- that comes from setLogicalSize() in component pixels. Until the
+        // host sets a logical size, fall back to the framebuffer size so a bare
+        // RenderView still renders.
+<span class="pc bpc" id="L261" title="1 of 4 branches missed.">        if (viewWidth &lt;= 0 || viewHeight &lt;= 0) {</span>
+<span class="fc" id="L262">            viewWidth = width;</span>
+<span class="fc" id="L263">            viewHeight = height;</span>
+        }
+<span class="fc" id="L265">        device.setViewport(0, 0, width, height);</span>
+<span class="fc" id="L266">    }</span>
+
+    @Override
+    public void onFrame(GraphicsDevice device) {
+<span class="fc" id="L270">        long now = System.currentTimeMillis();</span>
+<span class="fc bfc" id="L271" title="All 2 branches covered.">        double dt = hasLast ? (now - lastTime) / 1000.0 : 0;</span>
+<span class="fc" id="L272">        lastTime = now;</span>
+<span class="fc" id="L273">        hasLast = true;</span>
+        // The wall clock can be set back (by the user, or a time sync); a
+        // frame never runs backwards, it just takes no time.
+<span class="pc bpc" id="L276" title="1 of 2 branches missed.">        if (dt &lt; 0) {</span>
+<span class="nc" id="L277">            dt = 0;</span>
+<span class="pc bpc" id="L278" title="1 of 2 branches missed.">        } else if (dt &gt; 0.25) {</span>
+<span class="nc" id="L279">            dt = 0.25;</span>
+        }
+
+<span class="fc bfc" id="L282" title="All 2 branches covered.">        if (updatable != null) {</span>
+<span class="fc" id="L283">            updatable.frame(dt);</span>
+        }
+<span class="fc" id="L285">        scene.update(dt);</span>
+<span class="fc bfc" id="L286" title="All 2 branches covered.">        if (!released.isEmpty()) {</span>
+<span class="fc" id="L287">            disposeReleased(device);</span>
+        }
+
+<span class="fc" id="L290">        device.clear(clearColor, true, true);</span>
+        // configure the GPU camera from the GameCamera each frame so a moving 3D
+        // camera (or a switch between 2D and perspective) takes effect immediately.
+<span class="fc" id="L293">        gameCamera.apply(camera, viewWidth, viewHeight);</span>
+<span class="fc" id="L294">        device.setCamera(camera);</span>
+<span class="fc" id="L295">        device.setLight(light);</span>
+<span class="pc bpc" id="L296" title="1 of 2 branches missed.">        boolean perspective = gameCamera.getMode() == GameCamera.MODE_PERSPECTIVE;</span>
+
+        // opaque 3D models first (they write depth), then alpha-blended sprites.
+<span class="fc" id="L299">        int modelCount = models.size();</span>
+<span class="pc bpc" id="L300" title="1 of 2 branches missed.">        for (int i = 0; i &lt; modelCount; i++) {</span>
+<span class="nc" id="L301">            Model m = (Model) models.get(i);</span>
+<span class="nc bnc" id="L302" title="All 4 branches missed.">            if (m.isVisible() &amp;&amp; m.getMesh() != null) {</span>
+<span class="nc" id="L303">                device.draw(m.getMesh(), m.getMaterial(), m.modelMatrix());</span>
+            }
+        }
+
+<span class="pc bpc" id="L307" title="1 of 2 branches missed.">        material.setRenderState(perspective ? spriteState3D : spriteState2D);</span>
+<span class="fc" id="L308">        scene.ensureSorted();</span>
+<span class="fc" id="L309">        int count = scene.size();</span>
+<span class="fc bfc" id="L310" title="All 2 branches covered.">        for (int i = 0; i &lt; count; i++) {</span>
+<span class="fc" id="L311">            Sprite s = scene.get(i);</span>
+<span class="pc bpc" id="L312" title="1 of 4 branches missed.">            if (!s.isVisible() || s.getImage() == null) {</span>
+<span class="nc" id="L313">                continue;</span>
+            }
+<span class="fc" id="L315">            Texture t = texture(device, s.getImage());</span>
+<span class="fc" id="L316">            material.setTexture(t).setColor(s.getColor());</span>
+<span class="fc" id="L317">            device.draw(quad, material, modelMatrix(s));</span>
+        }
+
+<span class="fc" id="L320">        drawControls(device);</span>
+<span class="fc" id="L321">    }</span>
+
+    /// Draws the on-screen `TouchControls` as a 2D screen-space overlay on top of the
+    /// scene, regardless of whether the game camera is 2D or perspective.
+    private void drawControls(GraphicsDevice device) {
+<span class="pc bpc" id="L326" title="2 of 6 branches missed.">        if (controls == null || !controls.isVisible() || !controls.hasControls()) {</span>
+<span class="fc" id="L327">            return;</span>
+        }
+        // dedicated pixel-space orthographic camera so controls sit in screen space
+<span class="nc" id="L330">        camera.setOrthographic(viewHeight, -1000f, 1000f)</span>
+<span class="nc" id="L331">                .setAspect((float) viewWidth / Math.max(1, viewHeight))</span>
+<span class="nc" id="L332">                .setPosition(0f, 0f, 1f)</span>
+<span class="nc" id="L333">                .setTarget(0f, 0f, 0f)</span>
+<span class="nc" id="L334">                .setUp(0f, 1f, 0f);</span>
+<span class="nc" id="L335">        device.setCamera(camera);</span>
+<span class="nc" id="L336">        material.setRenderState(spriteState2D);</span>
+
+<span class="nc" id="L338">        VirtualJoystick j = controls.getJoystick();</span>
+<span class="nc bnc" id="L339" title="All 2 branches missed.">        if (j != null) {</span>
+<span class="nc" id="L340">            screenQuad(device, ringImage, j.getCenterX(), j.getCenterY(),</span>
+<span class="nc" id="L341">                    j.getRadius() * 2, j.getRadius() * 2, 0x80ffffff);</span>
+<span class="nc" id="L342">            screenQuad(device, discImage, j.getKnobX(), j.getKnobY(),</span>
+<span class="nc" id="L343">                    j.getKnobRadius() * 2, j.getKnobRadius() * 2,</span>
+<span class="nc bnc" id="L344" title="All 2 branches missed.">                    j.isActive() ? 0xd0ffffff : 0x90ffffff);</span>
+        }
+<span class="nc" id="L346">        int bn = controls.getButtonCount();</span>
+<span class="nc bnc" id="L347" title="All 2 branches missed.">        for (int i = 0; i &lt; bn; i++) {</span>
+<span class="nc" id="L348">            VirtualButton b = controls.getButton(i);</span>
+<span class="nc bnc" id="L349" title="All 2 branches missed.">            Image face = b.getLabel() == null ? discImage : labelDisc(b.getLabel());</span>
+<span class="nc bnc" id="L350" title="All 2 branches missed.">            int col = b.isPressed() ? brighten(b.getColor()) : b.getColor();</span>
+<span class="nc" id="L351">            screenQuad(device, face, b.getCenterX(), b.getCenterY(),</span>
+<span class="nc" id="L352">                    b.getRadius() * 2, b.getRadius() * 2, col);</span>
+        }
+<span class="nc" id="L354">    }</span>
+
+    /// Draws a textured quad centered at the given screen pixel position.
+    private void screenQuad(GraphicsDevice device, Image image, float cx, float cy,
+            float w, float h, int color) {
+<span class="nc" id="L359">        Texture t = texture(device, image);</span>
+<span class="nc" id="L360">        material.setTexture(t).setColor(color);</span>
+<span class="nc" id="L361">        float worldX = cx - viewWidth / 2f;</span>
+<span class="nc" id="L362">        float worldY = viewHeight / 2f - cy;</span>
+<span class="nc" id="L363">        Matrix4.multiply(Matrix4.translation(worldX, worldY, 0f),</span>
+<span class="nc" id="L364">                Matrix4.scaling(w, h, 1f), model);</span>
+<span class="nc" id="L365">        device.draw(quad, material, model);</span>
+<span class="nc" id="L366">    }</span>
+
+    /// A white disc with a centered label, cached per label string. The font is
+    /// scaled down until the label fits inside the disc, so multi-letter labels
+    /// (e.g. &quot;Jump&quot;) are not clipped.
+    private Image labelDisc(String label) {
+<span class="nc" id="L372">        Image img = (Image) labelImages.get(label);</span>
+<span class="nc bnc" id="L373" title="All 2 branches missed.">        if (img == null) {</span>
+<span class="nc" id="L374">            int size = 128;</span>
+<span class="nc" id="L375">            float maxTextWidth = size * 0.74f;</span>
+<span class="nc" id="L376">            img = circleTexture(size, 0f, 1f);</span>
+<span class="nc" id="L377">            com.codename1.ui.Graphics g = img.getGraphics();</span>
+<span class="nc" id="L378">            g.setAntiAliased(true);</span>
+<span class="nc" id="L379">            g.setAntiAliasedText(true);</span>
+<span class="nc" id="L380">            int[] fontSizes = {</span>
+                com.codename1.ui.Font.SIZE_LARGE,
+                com.codename1.ui.Font.SIZE_MEDIUM,
+                com.codename1.ui.Font.SIZE_SMALL
+            };
+<span class="nc" id="L385">            com.codename1.ui.Font f = null;</span>
+<span class="nc" id="L386">            int tw = 0;</span>
+<span class="nc bnc" id="L387" title="All 2 branches missed.">            for (int fontSize : fontSizes) {</span>
+<span class="nc" id="L388">                f = com.codename1.ui.Font.createSystemFont(</span>
+                        com.codename1.ui.Font.FACE_SYSTEM, com.codename1.ui.Font.STYLE_BOLD,
+                        fontSize);
+<span class="nc" id="L391">                tw = f.stringWidth(label);</span>
+<span class="nc bnc" id="L392" title="All 2 branches missed.">                if (tw &lt;= maxTextWidth) {</span>
+<span class="nc" id="L393">                    break;</span>
+                }
+            }
+<span class="nc" id="L396">            g.setFont(f);</span>
+<span class="nc" id="L397">            g.setColor(0x303030);</span>
+<span class="nc" id="L398">            int th = f.getHeight();</span>
+<span class="nc" id="L399">            g.drawString(label, (size - tw) / 2, (size - th) / 2);</span>
+<span class="nc" id="L400">            labelImages.put(label, img);</span>
+        }
+<span class="nc" id="L402">        return img;</span>
+    }
+
+    /// Builds a soft-edged white circle (or ring) texture as an ARGB image. Pixels
+    /// whose normalized radius is between `innerFrac` and `outerFrac` are opaque
+    /// white; the rest is transparent, with ~1px antialiased edges.
+    private static Image circleTexture(int size, float innerFrac, float outerFrac) {
+<span class="fc" id="L409">        int[] px = new int[size * size];</span>
+<span class="fc" id="L410">        float c = (size - 1) / 2f;</span>
+<span class="fc" id="L411">        float rOut = outerFrac * c;</span>
+<span class="fc" id="L412">        float rIn = innerFrac * c;</span>
+<span class="fc bfc" id="L413" title="All 2 branches covered.">        for (int y = 0; y &lt; size; y++) {</span>
+<span class="fc bfc" id="L414" title="All 2 branches covered.">            for (int x = 0; x &lt; size; x++) {</span>
+<span class="fc" id="L415">                float dx = x - c;</span>
+<span class="fc" id="L416">                float dy = y - c;</span>
+<span class="fc" id="L417">                float d = (float) Math.sqrt(dx * dx + dy * dy);</span>
+<span class="fc" id="L418">                float a = clamp01(rOut - d + 0.5f);</span>
+<span class="fc bfc" id="L419" title="All 2 branches covered.">                if (innerFrac &gt; 0f) {</span>
+<span class="fc" id="L420">                    a = Math.min(a, clamp01(d - rIn + 0.5f));</span>
+                }
+<span class="fc" id="L422">                int alpha = (int) (a * 255);</span>
+<span class="fc" id="L423">                px[y * size + x] = (alpha &lt;&lt; 24) | 0xffffff;</span>
+            }
+        }
+<span class="fc" id="L426">        return Image.createImage(px, size, size);</span>
+    }
+
+    private static float clamp01(float v) {
+<span class="fc bfc" id="L430" title="All 4 branches covered.">        return v &lt; 0f ? 0f : (v &gt; 1f ? 1f : v);</span>
+    }
+
+    /// Lightens an ARGB color toward white (used to show a pressed button).
+    private static int brighten(int argb) {
+<span class="nc" id="L435">        int a = (argb &gt;&gt;&gt; 24) &amp; 0xff;</span>
+<span class="nc" id="L436">        int r = Math.min(255, ((argb &gt;&gt; 16) &amp; 0xff) + 60);</span>
+<span class="nc" id="L437">        int g = Math.min(255, ((argb &gt;&gt; 8) &amp; 0xff) + 60);</span>
+<span class="nc" id="L438">        int b = Math.min(255, (argb &amp; 0xff) + 60);</span>
+<span class="nc" id="L439">        return (a &lt;&lt; 24) | (r &lt;&lt; 16) | (g &lt;&lt; 8) | b;</span>
+    }
+
+    @Override
+    public void onDispose(GraphicsDevice device) {
+<span class="pc bpc" id="L444" title="1 of 2 branches missed.">        if (textures != null) {</span>
+<span class="fc" id="L445">            java.util.Iterator it = textures.values().iterator();</span>
+<span class="fc bfc" id="L446" title="All 2 branches covered.">            while (it.hasNext()) {</span>
+<span class="fc" id="L447">                device.dispose((Texture) it.next());</span>
+            }
+<span class="fc" id="L449">            textures.clear();</span>
+        }
+        // their textures went with the rest, just above
+<span class="fc" id="L452">        released.clear();</span>
+<span class="pc bpc" id="L453" title="1 of 2 branches missed.">        if (quad != null) {</span>
+<span class="fc" id="L454">            device.dispose(quad.getVertices());</span>
+<span class="fc" id="L455">            device.dispose(quad.getIndices());</span>
+<span class="fc" id="L456">            quad = null;</span>
+        }
+<span class="fc" id="L458">    }</span>
+
+    private Texture texture(GraphicsDevice device, Image image) {
+<span class="fc" id="L461">        Texture t = (Texture) textures.get(image);</span>
+<span class="fc bfc" id="L462" title="All 2 branches covered.">        if (t == null) {</span>
+<span class="fc" id="L463">            t = device.createTexture(image);</span>
+<span class="fc" id="L464">            textures.put(image, t);</span>
+        }
+<span class="fc" id="L466">        return t;</span>
+    }
+
+    /// Builds the sprite's model matrix, dispatching on the camera mode.
+    private float[] modelMatrix(Sprite s) {
+<span class="pc bpc" id="L471" title="1 of 2 branches missed.">        if (gameCamera.getMode() == GameCamera.MODE_PERSPECTIVE) {</span>
+<span class="nc" id="L472">            return billboardMatrix(s);</span>
+        }
+<span class="fc" id="L474">        return orthoMatrix(s);</span>
+    }
+
+    /// 2D path: translate the anchor to the origin, scale to the pixel size, rotate,
+    /// then translate to the sprite's world position (pixel coordinates converted to
+    /// the camera's centered, y-up space).
+    private float[] orthoMatrix(Sprite s) {
+<span class="fc" id="L481">        float w = s.getRenderWidth() * s.getScaleX();</span>
+<span class="fc" id="L482">        float h = s.getRenderHeight() * s.getScaleY();</span>
+<span class="fc" id="L483">        float worldX = (float) (s.getX() - scene.getCameraX() * s.getParallaxX()) - viewWidth / 2f;</span>
+<span class="fc" id="L484">        float worldY = viewHeight / 2f - (float) (s.getY() - scene.getCameraY() * s.getParallaxY());</span>
+
+        // anchor offset in unit-quad space so the anchor lands at the position
+<span class="fc" id="L487">        float[] anchor = Matrix4.translation(0.5f - (float) s.getAnchorX(),</span>
+<span class="fc" id="L488">                (float) s.getAnchorY() - 0.5f, 0f);</span>
+<span class="fc" id="L489">        float[] scale = Matrix4.scaling(w, h, 1f);</span>
+        // screen rotation is clockwise; negate for the y-up world
+<span class="fc" id="L491">        float[] rot = Matrix4.rotation((float) -Math.toRadians(s.getRotation()), 0f, 0f, 1f);</span>
+<span class="fc" id="L492">        float[] trans = Matrix4.translation(worldX, worldY, 0f);</span>
+
+<span class="fc" id="L494">        Matrix4.multiply(scale, anchor, scratchA);   // S * Ta</span>
+<span class="fc" id="L495">        Matrix4.multiply(rot, scratchA, scratchB);    // R * S * Ta</span>
+<span class="fc" id="L496">        Matrix4.multiply(trans, scratchB, model);     // T * R * S * Ta</span>
+<span class="fc" id="L497">        return model;</span>
+    }
+
+    /// 3D path: orient a quad in world space so it always faces the camera (a
+    /// billboard). The sprite's `Sprite#getX()`/`getY()`/`getZ()` is the world
+    /// position and its size/scale are world units. The quad is anchored, scaled,
+    /// rolled around the view axis, oriented by the camera billboard basis and then
+    /// translated to the world position: `T * B * R * S * Ta`.
+    private float[] billboardMatrix(Sprite s) {
+<span class="nc" id="L506">        float w = s.getRenderWidth() * s.getScaleX();</span>
+<span class="nc" id="L507">        float h = s.getRenderHeight() * s.getScaleY();</span>
+
+        // y-up anchor offset (image y is top-down, world y is up)
+<span class="nc" id="L510">        float[] anchor = Matrix4.translation(0.5f - (float) s.getAnchorX(),</span>
+<span class="nc" id="L511">                0.5f - (float) s.getAnchorY(), 0f);</span>
+<span class="nc" id="L512">        float[] scale = Matrix4.scaling(w, h, 1f);</span>
+<span class="nc" id="L513">        float[] roll = Matrix4.rotation((float) -Math.toRadians(s.getRotation()), 0f, 0f, 1f);</span>
+<span class="nc" id="L514">        float[] basis = gameCamera.getBillboardBasis();</span>
+<span class="nc" id="L515">        float[] trans = Matrix4.translation((float) s.getX(), (float) s.getY(), (float) s.getZ());</span>
+
+<span class="nc" id="L517">        Matrix4.multiply(scale, anchor, scratchA);    // S * Ta</span>
+<span class="nc" id="L518">        Matrix4.multiply(roll, scratchA, scratchB);    // R * S * Ta</span>
+<span class="nc" id="L519">        Matrix4.multiply(basis, scratchB, scratchA);   // B * R * S * Ta</span>
+<span class="nc" id="L520">        Matrix4.multiply(trans, scratchA, model);      // T * B * R * S * Ta</span>
+<span class="nc" id="L521">        return model;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

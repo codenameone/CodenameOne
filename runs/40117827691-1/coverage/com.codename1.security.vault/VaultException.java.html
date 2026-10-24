@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>VaultException.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.security.vault</a> &gt; <span class="el_source">VaultException.java</span></div><h1>VaultException.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security.vault;
+
+import com.codename1.security.CryptoException;
+
+/// The failure every vault and protected-storage operation reports, carrying a [VaultError]
+/// rather than only a message.
+///
+/// Extends [CryptoException] so existing `catch (CryptoException)` around
+/// [com.codename1.security.Cipher] work keeps compiling and keeps catching. Branch on
+/// [#getError()] rather than on the message.
+///
+/// #### The message carries no secret
+///
+/// Redaction happens where the exception is constructed rather than where it is read, because a
+/// message reaches logs, crash reports and telemetry before anybody chooses to look at it. The
+/// rule for anyone adding a throw site: the account name is allowed, the value is not, and
+/// neither is a length or a prefix of it.
+public class VaultException extends CryptoException {
+
+    private final VaultError error;
+    private final Protection unmetProtection;
+
+    /// #### Parameters
+    ///
+    /// - `error`: the code callers branch on, null becomes [VaultError#UNKNOWN]
+    ///
+    /// - `message`: description for a human. Must not contain a secret, an account value or a
+    ///   fragment of ciphertext: this string reaches logs, crash reports and telemetry.
+    public VaultException(VaultError error, String message) {
+<span class="fc" id="L52">        this(error, message, null, null);</span>
+<span class="fc" id="L53">    }</span>
+
+    /// #### Parameters
+    ///
+    /// - `error`: the code callers branch on
+    ///
+    /// - `message`: description for a human, carrying no secret material
+    ///
+    /// - `cause`: the underlying failure, or null
+    public VaultException(VaultError error, String message, Throwable cause) {
+<span class="fc" id="L63">        this(error, message, null, cause);</span>
+<span class="fc" id="L64">    }</span>
+
+    /// The constructor for [VaultError#POLICY_NOT_MET], which is the one failure that can name
+    /// what was missing.
+    ///
+    /// #### Parameters
+    ///
+    /// - `error`: the code callers branch on
+    ///
+    /// - `message`: description for a human, carrying no secret material
+    ///
+    /// - `unmetProtection`: the protection that was required and not provided, or null
+    ///
+    /// - `cause`: the underlying failure, or null
+    public VaultException(VaultError error, String message, Protection unmetProtection, Throwable cause) {
+<span class="fc" id="L79">        super(message, cause);</span>
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">        this.error = error == null ? VaultError.UNKNOWN : error;</span>
+<span class="fc" id="L81">        this.unmetProtection = unmetProtection;</span>
+<span class="fc" id="L82">    }</span>
+
+    /// The code to branch on.
+    public VaultError getError() {
+<span class="fc" id="L86">        return error;</span>
+    }
+
+    /// For [VaultError#POLICY_NOT_MET], the protection that was required and not provided.
+    /// Null for every other code.
+    public Protection getUnmetProtection() {
+<span class="nc" id="L92">        return unmetProtection;</span>
+    }
+
+    /// Whether this failure means the entry is definitely absent, which is the only state in
+    /// which generating a replacement key is safe.
+    ///
+    /// Written as a method rather than left to callers comparing codes because getting it wrong
+    /// is unrecoverable: a caller that also accepts [VaultError#TEMPORARILY_UNREADABLE] here
+    /// overwrites a key that was there and orphans everything it protected.
+    public boolean isDefinitelyAbsent() {
+<span class="nc bnc" id="L102" title="All 2 branches missed.">        return error == VaultError.KEY_MISSING;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

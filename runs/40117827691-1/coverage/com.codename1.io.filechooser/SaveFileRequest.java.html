@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SaveFileRequest.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io.filechooser</a> &gt; <span class="el_source">SaveFileRequest.java</span></div><h1>SaveFileRequest.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.io.filechooser;
+
+import com.codename1.io.FileSystemStorage;
+import com.codename1.io.Util;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+
+/// Describes a native Save dialog for
+/// `com.codename1.ui.Display#showSaveDialog(SaveFileRequest, com.codename1.util.SuccessCallback)`.
+///
+/// The content is supplied either as an existing file (`#sourceFile(String)`)
+/// or written on demand (`#content(SaveContent)`), after the user has chosen
+/// a location, format and options:
+///
+/// ```java
+/// Display.getInstance().showSaveDialog(new SaveFileRequest()
+///         .suggestedName(&quot;Report.pdf&quot;)
+///         .addFilter(new FileTypeFilter(&quot;PDF&quot;).extensions(&quot;pdf&quot;).mimeTypes(&quot;application/pdf&quot;))
+///         .addFilter(new FileTypeFilter(&quot;Plain text&quot;).extensions(&quot;txt&quot;).mimeTypes(&quot;text/plain&quot;))
+///         .addOption(FileDialogOption.checkbox(&quot;charts&quot;, &quot;Include charts&quot;, true))
+///         .content((result, out) -&gt; out.write((&quot;Charts: &quot; + result.getOptionValue(&quot;charts&quot;))
+///                 .getBytes(&quot;UTF-8&quot;))),
+///     result -&gt; {
+///         if (result.getError() != null) {
+///             ToastBar.showErrorMessage(&quot;Export failed&quot;);
+///         }
+///     });
+/// ```
+///
+/// On Android the user picks a document through the Storage Access Framework
+/// and the content is streamed into it; on iOS the content is written to a
+/// temporary file which the document picker then exports. Either way the
+/// application never needs a storage permission.
+<span class="fc" id="L59">public class SaveFileRequest extends FileDialogRequest&lt;SaveFileRequest&gt; {</span>
+    private String suggestedName;
+<span class="fc" id="L61">    private boolean confirmOverwrite = true;</span>
+    private String sourceFile;
+    private SaveContent content;
+
+    /// Sets the file name the dialog suggests, including its extension.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the file name
+    ///
+    /// #### Returns
+    ///
+    /// this request
+    public SaveFileRequest suggestedName(String name) {
+<span class="nc" id="L75">        this.suggestedName = name;</span>
+<span class="nc" id="L76">        return this;</span>
+    }
+
+    /// Asks before replacing an existing file. On by default; the mobile
+    /// pickers always handle conflicts their own way.
+    ///
+    /// #### Parameters
+    ///
+    /// - `confirm`: false to replace silently
+    ///
+    /// #### Returns
+    ///
+    /// this request
+    public SaveFileRequest confirmOverwrite(boolean confirm) {
+<span class="nc" id="L90">        this.confirmOverwrite = confirm;</span>
+<span class="nc" id="L91">        return this;</span>
+    }
+
+    /// Saves a copy of an existing `FileSystemStorage` file.
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: the file to copy
+    ///
+    /// #### Returns
+    ///
+    /// this request
+    public SaveFileRequest sourceFile(String path) {
+<span class="fc" id="L104">        this.sourceFile = path;</span>
+<span class="fc" id="L105">        return this;</span>
+    }
+
+    /// Writes the content once the destination is known. Takes precedence
+    /// over `#sourceFile(String)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `content`: the writer
+    ///
+    /// #### Returns
+    ///
+    /// this request
+    public SaveFileRequest content(SaveContent content) {
+<span class="fc" id="L119">        this.content = content;</span>
+<span class="fc" id="L120">        return this;</span>
+    }
+
+    /// The suggested file name, or null.
+    ///
+    /// #### Returns
+    ///
+    /// the name
+    public String getSuggestedName() {
+<span class="nc" id="L129">        return suggestedName;</span>
+    }
+
+    /// Whether replacing a file asks first.
+    ///
+    /// #### Returns
+    ///
+    /// true to confirm
+    public boolean isConfirmOverwrite() {
+<span class="nc" id="L138">        return confirmOverwrite;</span>
+    }
+
+    /// The file being copied, or null.
+    ///
+    /// #### Returns
+    ///
+    /// the path
+    public String getSourceFile() {
+<span class="nc" id="L147">        return sourceFile;</span>
+    }
+
+    /// The content writer, or null.
+    ///
+    /// #### Returns
+    ///
+    /// the writer
+    public SaveContent getContent() {
+<span class="nc" id="L156">        return content;</span>
+    }
+
+    /// Writes this request's content to a stream. Ports call it once the user
+    /// has chosen a destination; the stream is not closed here.
+    ///
+    /// #### Parameters
+    ///
+    /// - `result`: what the user chose
+    /// - `out`: the destination
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if neither content nor a source file was set, or writing fails
+    public void writeContent(FileDialogResult result, OutputStream out) throws IOException {
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        if (content != null) {</span>
+<span class="fc" id="L172">            content.write(result, out);</span>
+<span class="fc" id="L173">            return;</span>
+        }
+<span class="pc bpc" id="L175" title="1 of 2 branches missed.">        if (sourceFile == null) {</span>
+<span class="fc" id="L176">            throw new IOException(&quot;SaveFileRequest has neither content nor a source file&quot;);</span>
+        }
+<span class="nc" id="L178">        InputStream in = FileSystemStorage.getInstance().openInputStream(sourceFile);</span>
+        try {
+<span class="nc" id="L180">            Util.copyNoClose(in, out, 8192);</span>
+        } finally {
+<span class="nc" id="L182">            in.close();</span>
+        }
+<span class="nc" id="L184">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

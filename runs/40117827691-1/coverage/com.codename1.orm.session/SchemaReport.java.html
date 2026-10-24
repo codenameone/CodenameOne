@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SchemaReport.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.orm.session</a> &gt; <span class="el_source">SchemaReport.java</span></div><h1>SchemaReport.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.orm.session;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/// What [Session#schemaReport()] found when it compared the registered mappings
+/// with the tables that already exist. Reading it changes nothing in the
+/// database.
+///
+/// Every difference is one of three kinds, because they call for different fixes:
+///
+/// - [Kind#MIGRATION_REQUIRED]: the mapping is fine, the schema is behind it -- a
+///   table or column is missing. A migration brings the database to the mapping.
+/// - [Kind#UNSUPPORTED]: the existing column cannot hold what the mapping would
+///   write, or a key the mapping does not know identifies the rows. Data would be
+///   misread or refused, so the mapping has to change -- a different storage
+///   type, `@Temporal` for a native timestamp, an explicit `@Column` name -- or
+///   the column has to be converted deliberately.
+/// - [Kind#CONSTRAINT_MISMATCH]: a column's nullability differs from the
+///   mapping. Rows still read and write, but the database accepts a null the
+///   mapping cannot hold, or refuses one it can. A schema that is deliberately
+///   stricter than the mapping is legitimate, which is why this is kept apart.
+///
+/// ```java
+/// SchemaReport report = session.schemaReport();
+/// for (SchemaReport.Issue issue : report.getIssues()) {
+///     Log.p(issue.getKind() + &quot; &quot; + issue.getTable() + &quot;.&quot; + issue.getColumn()
+///             + &quot;: &quot; + issue.getMessage());
+/// }
+/// ```
+@com.codename1.impl.SharedWithBackend
+public final class SchemaReport {
+    /// How an [Issue] is resolved.
+<span class="nc" id="L57">    public enum Kind {</span>
+        /// The schema lacks something the mapping declares; a migration fixes it.
+<span class="nc" id="L59">        MIGRATION_REQUIRED,</span>
+        /// The mapping cannot be used with the column as it stands.
+<span class="nc" id="L61">        UNSUPPORTED,</span>
+        /// The column's nullability differs from the mapping's.
+<span class="nc" id="L63">        CONSTRAINT_MISMATCH</span>
+    }
+
+    /// One difference between a mapping and the existing schema.
+    public static final class Issue {
+        private final Kind kind;
+        private final String table;
+        private final String column;
+        private final String message;
+
+        /// Creates an issue.
+        /// @param kind how the issue is resolved
+        /// @param table the table it was found in
+        /// @param column the column, or null for a table-level issue
+        /// @param message a description of the difference
+<span class="nc" id="L78">        public Issue(Kind kind, String table, String column, String message) {</span>
+<span class="nc" id="L79">            this.kind = kind;</span>
+<span class="nc" id="L80">            this.table = table;</span>
+<span class="nc" id="L81">            this.column = column;</span>
+<span class="nc" id="L82">            this.message = message;</span>
+<span class="nc" id="L83">        }</span>
+
+        /// How the issue is resolved.
+        public Kind getKind() {
+<span class="nc" id="L87">            return kind;</span>
+        }
+
+        /// The table the issue was found in.
+        public String getTable() {
+<span class="nc" id="L92">            return table;</span>
+        }
+
+        /// The column, or null when the whole table is missing.
+        public String getColumn() {
+<span class="nc" id="L97">            return column;</span>
+        }
+
+        /// A description of the difference.
+        public String getMessage() {
+<span class="nc" id="L102">            return message;</span>
+        }
+
+        @Override
+        public String toString() {
+<span class="nc" id="L107">            return kind + &quot;: &quot; + message;</span>
+        }
+    }
+
+    private final List&lt;Issue&gt; issues;
+
+    /// Creates a report holding `issues`, in the order they were found.
+    /// @param issues the differences found; copied
+<span class="nc" id="L115">    public SchemaReport(List&lt;Issue&gt; issues) {</span>
+<span class="nc" id="L116">        this.issues = Collections.unmodifiableList(new ArrayList&lt;Issue&gt;(issues));</span>
+<span class="nc" id="L117">    }</span>
+
+    /// True when the existing schema matches every mapping.
+    public boolean isCompatible() {
+<span class="nc" id="L121">        return issues.isEmpty();</span>
+    }
+
+    /// Every difference found, unmodifiable.
+    public List&lt;Issue&gt; getIssues() {
+<span class="nc" id="L126">        return issues;</span>
+    }
+
+    /// The differences of one kind.
+    /// @param kind the kind to select
+    /// @return the matching issues, in the order they were found
+    public List&lt;Issue&gt; getIssues(Kind kind) {
+<span class="nc" id="L133">        List&lt;Issue&gt; result = new ArrayList&lt;Issue&gt;();</span>
+<span class="nc bnc" id="L134" title="All 2 branches missed.">        for (Issue issue : issues) {</span>
+<span class="nc bnc" id="L135" title="All 2 branches missed.">            if (issue.kind == kind) {</span>
+<span class="nc" id="L136">                result.add(issue);</span>
+            }
+<span class="nc" id="L138">        }</span>
+<span class="nc" id="L139">        return result;</span>
+    }
+
+    /// A multi-line summary: unsupported mappings first, then required
+    /// migrations, then constraint differences.
+    @Override
+    public String toString() {
+<span class="nc bnc" id="L146" title="All 2 branches missed.">        if (issues.isEmpty()) {</span>
+<span class="nc" id="L147">            return &quot;Schema matches the mappings&quot;;</span>
+        }
+<span class="nc" id="L149">        StringBuilder out = new StringBuilder();</span>
+<span class="nc" id="L150">        appendKind(out, Kind.UNSUPPORTED, &quot;Unsupported mappings (change the mapping or convert the column):&quot;);</span>
+<span class="nc" id="L151">        appendKind(out, Kind.MIGRATION_REQUIRED, &quot;Migrations required:&quot;);</span>
+<span class="nc" id="L152">        appendKind(out, Kind.CONSTRAINT_MISMATCH, &quot;Nullability differs from the mapping:&quot;);</span>
+<span class="nc" id="L153">        return out.toString();</span>
+    }
+
+    private void appendKind(StringBuilder out, Kind kind, String heading) {
+<span class="nc" id="L157">        List&lt;Issue&gt; selected = getIssues(kind);</span>
+<span class="nc bnc" id="L158" title="All 2 branches missed.">        if (selected.isEmpty()) {</span>
+<span class="nc" id="L159">            return;</span>
+        }
+<span class="nc bnc" id="L161" title="All 2 branches missed.">        if (out.length() &gt; 0) {</span>
+<span class="nc" id="L162">            out.append('\n');</span>
+        }
+<span class="nc" id="L164">        out.append(heading);</span>
+<span class="nc bnc" id="L165" title="All 2 branches missed.">        for (Issue issue : selected) {</span>
+<span class="nc" id="L166">            out.append(&quot;\n  &quot;).append(issue.message);</span>
+<span class="nc" id="L167">        }</span>
+<span class="nc" id="L168">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

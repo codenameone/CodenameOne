@@ -1,0 +1,692 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BidiUtil.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.editor</a> &gt; <span class="el_source">BidiUtil.java</span></div><h1>BidiUtil.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.ui.editor;
+
+/// A compact implementation of the core Unicode Bidirectional Algorithm (UAX #9) used by the pure text
+/// editor to lay out, hit test and render a single line of mixed left-to-right / right-to-left text.
+///
+/// The editor renders each directional run as a substring so the platform font engine performs the actual
+/// glyph shaping (Arabic joining, ligatures); this class only resolves the *embedding levels* of the
+/// characters on a line and the *visual order* those characters appear in. That division keeps the editor
+/// correct on every platform while remaining self contained and unit testable with no UI dependency.
+///
+/// A single paragraph is assumed (no line wrapping inside the algorithm). The implementation follows every
+/// resolution phase of UAX #9: character typing, explicit embeddings, overrides and isolates X1-X10, the
+/// weak type rules W1-W7, bracket pairs N0, the neutral rules N1-N2, the implicit level rules I1-I2, the
+/// separator and trailing whitespace reset of L1 and the reordering rule L2.
+final class BidiUtil {
+    // Bidirectional character types (a subset of UAX #9 sufficient for the editor).
+    static final byte L = 0;    // Left-to-Right (strong)
+    static final byte R = 1;    // Right-to-Left (strong)
+    static final byte AL = 2;   // Right-to-Left Arabic (strong)
+    static final byte EN = 3;   // European Number
+    static final byte ES = 4;   // European Number Separator
+    static final byte ET = 5;   // European Number Terminator
+    static final byte AN = 6;   // Arabic Number
+    static final byte CS = 7;   // Common Number Separator
+    static final byte NSM = 8;  // Nonspacing Mark
+    static final byte BN = 9;   // Boundary Neutral
+    static final byte ON = 10;  // Other Neutral
+    static final byte WS = 11;  // Whitespace
+
+    private BidiUtil() {
+    }
+
+    // Explicit formatting characters, separators and paragraph separators (UAX #9 Table 4).
+    static final byte LRE = 12;
+    static final byte RLE = 13;
+    static final byte LRO = 14;
+    static final byte RLO = 15;
+    static final byte PDF = 16;
+    static final byte LRI = 17;
+    static final byte RLI = 18;
+    static final byte FSI = 19;
+    static final byte PDI = 20;
+    static final byte B = 21;   // Paragraph Separator
+    static final byte S = 22;   // Segment Separator (tab)
+
+    private static final int MAX_DEPTH = 125;
+    private static final int MAX_BRACKETS = 63;
+    // BD14/BD15 paired brackets (Bidi_Paired_Bracket), opening and closing at the same index.
+    private static final String OPEN = &quot;([{\u0F3A\u0F3C\u169B\u2045\u207D\u208D\u2308\u230A\u3008\u300A&quot;
+            + &quot;\u300C\u300E\u3010\u3014\u3016\u3018\u301A\uFE59\uFE5B\uFE5D\uFF08\uFF3B\uFF5B\uFF5F\uFF62&quot;;
+    private static final String CLOSE = &quot;)]}\u0F3B\u0F3D\u169C\u2046\u207E\u208E\u2309\u230B\u3009\u300B&quot;
+            + &quot;\u300D\u300F\u3011\u3015\u3017\u3019\u301B\uFE5A\uFE5C\uFE5E\uFF09\uFF3D\uFF5D\uFF60\uFF63&quot;;
+
+    /// Bidi type of a UTF-16 code unit, including the explicit embedding, override and isolate controls,
+    /// segment and paragraph separators, boundary neutrals and paired brackets.
+    static byte typeOf(char c) {
+<span class="pc bpc" id="L80" title="6 of 17 branches missed.">        switch (c) {</span>
+<span class="nc" id="L81">            case 0x202A: return LRE;</span>
+<span class="fc" id="L82">            case 0x202B: return RLE;</span>
+<span class="fc" id="L83">            case 0x202D: return LRO;</span>
+<span class="fc" id="L84">            case 0x202E: return RLO;</span>
+<span class="fc" id="L85">            case 0x202C: return PDF;</span>
+<span class="fc" id="L86">            case 0x2066: return LRI;</span>
+<span class="fc" id="L87">            case 0x2067: return RLI;</span>
+<span class="fc" id="L88">            case 0x2068: return FSI;</span>
+<span class="fc" id="L89">            case 0x2069: return PDI;</span>
+<span class="fc" id="L90">            case 0x200E: return L;</span>
+<span class="nc" id="L91">            case 0x200F: return R;</span>
+<span class="nc" id="L92">            case 0x061C: return AL;</span>
+<span class="fc" id="L93">            case '\t': case 0x0B: case 0x1F: return S;</span>
+<span class="nc" id="L94">            case '\n': case '\r': case 0x1C: case 0x1D: case 0x1E: case 0x85: case 0x2029: return B;</span>
+<span class="nc" id="L95">            case 0x200B: case 0x200C: case 0x200D: case 0x2060: case 0xFEFF: case 0x00AD: return BN;</span>
+<span class="nc" id="L96">            case 0x2329: case 0x232A: return ON;</span>
+            default: break;
+        }
+<span class="fc bfc" id="L99" title="All 4 branches covered.">        if (OPEN.indexOf(c) &gt;= 0 || CLOSE.indexOf(c) &gt;= 0) {</span>
+<span class="fc" id="L100">            return ON;</span>
+        }
+<span class="fc" id="L102">        return baseTypeOf(c);</span>
+    }
+
+    /// Resolves the embedding level of every character of one paragraph following UAX #9 in full: explicit
+    /// embeddings, overrides and isolates (X1-X10), weak types (W1-W7), paired brackets (N0), neutrals
+    /// (N1-N2), implicit levels (I1-I2) and the separator/trailing-whitespace reset of L1. Characters removed
+    /// by X9 take the level of the preceding character so callers can still draw them.
+    static byte[] resolveLevels(String text, boolean baseRtl) {
+<span class="fc" id="L110">        int n = text.length();</span>
+<span class="fc" id="L111">        byte[] levels = new byte[n];</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">        if (n == 0) {</span>
+<span class="fc" id="L113">            return levels;</span>
+        }
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        byte para = (byte) (baseRtl ? 1 : 0);</span>
+<span class="fc" id="L116">        byte[] initial = new byte[n];</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L118">            initial[i] = typeOf(text.charAt(i));</span>
+        }
+        // BD9: matching isolate initiators and PDIs.
+<span class="fc" id="L121">        int[] matchingPdi = new int[n];</span>
+<span class="fc" id="L122">        int[] matchingInit = new int[n];</span>
+<span class="fc" id="L123">        int[] open = new int[n];</span>
+<span class="fc" id="L124">        int openCount = 0;</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L126">            matchingPdi[i] = -1;</span>
+<span class="fc" id="L127">            matchingInit[i] = -1;</span>
+<span class="fc" id="L128">            byte t = initial[i];</span>
+<span class="fc bfc" id="L129" title="All 6 branches covered.">            if (t == LRI || t == RLI || t == FSI) {</span>
+<span class="fc" id="L130">                matchingPdi[i] = n;</span>
+<span class="fc" id="L131">                open[openCount++] = i;</span>
+<span class="fc bfc" id="L132" title="All 4 branches covered.">            } else if (t == PDI &amp;&amp; openCount &gt; 0) {</span>
+<span class="fc" id="L133">                int o = open[--openCount];</span>
+<span class="fc" id="L134">                matchingPdi[o] = i;</span>
+<span class="fc" id="L135">                matchingInit[i] = o;</span>
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">            } else if (t == B) {</span>
+<span class="nc" id="L137">                openCount = 0;</span>
+            }
+        }
+        // X1-X8: the directional status stack.
+<span class="fc" id="L141">        byte[] types = new byte[n];</span>
+<span class="fc" id="L142">        System.arraycopy(initial, 0, types, 0, n);</span>
+<span class="fc" id="L143">        int[] stackLevel = new int[MAX_DEPTH + 2];</span>
+<span class="fc" id="L144">        byte[] stackOverride = new byte[MAX_DEPTH + 2];</span>
+<span class="fc" id="L145">        boolean[] stackIsolate = new boolean[MAX_DEPTH + 2];</span>
+<span class="fc" id="L146">        stackLevel[0] = para;</span>
+<span class="fc" id="L147">        stackOverride[0] = ON;</span>
+<span class="fc" id="L148">        int sp = 1;</span>
+<span class="fc" id="L149">        int overflowIsolates = 0;</span>
+<span class="fc" id="L150">        int overflowEmbeddings = 0;</span>
+<span class="fc" id="L151">        int validIsolates = 0;</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L153">            byte t = initial[i];</span>
+<span class="fc" id="L154">            int cur = stackLevel[sp - 1];</span>
+<span class="pc bpc" id="L155" title="1 of 14 branches missed.">            if (t == RLE || t == LRE || t == RLO || t == LRO || t == RLI || t == LRI || t == FSI) {</span>
+<span class="fc bfc" id="L156" title="All 6 branches covered.">                boolean isolate = t == RLI || t == LRI || t == FSI;</span>
+                boolean rtl;
+<span class="fc bfc" id="L158" title="All 2 branches covered.">                if (t == FSI) {</span>
+<span class="fc" id="L159">                    rtl = firstStrongRtl(initial, matchingPdi, i + 1, matchingPdi[i]);</span>
+                } else {
+<span class="fc bfc" id="L161" title="All 6 branches covered.">                    rtl = t == RLE || t == RLO || t == RLI;</span>
+                }
+<span class="fc" id="L163">                levels[i] = (byte) cur;</span>
+<span class="pc bpc" id="L164" title="1 of 4 branches missed.">                if (isolate &amp;&amp; stackOverride[sp - 1] != ON) {</span>
+<span class="nc" id="L165">                    types[i] = stackOverride[sp - 1];</span>
+                }
+<span class="fc bfc" id="L167" title="All 2 branches covered.">                int next = rtl ? (cur + 1) | 1 : (cur + 2) &amp; ~1;</span>
+<span class="pc bpc" id="L168" title="3 of 6 branches missed.">                if (next &lt;= MAX_DEPTH &amp;&amp; overflowIsolates == 0 &amp;&amp; overflowEmbeddings == 0) {</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">                    if (isolate) {</span>
+<span class="fc" id="L170">                        validIsolates++;</span>
+                    }
+<span class="fc" id="L172">                    stackLevel[sp] = next;</span>
+<span class="fc bfc" id="L173" title="All 4 branches covered.">                    stackOverride[sp] = t == LRO ? L : t == RLO ? R : ON;</span>
+<span class="fc" id="L174">                    stackIsolate[sp] = isolate;</span>
+<span class="fc" id="L175">                    sp++;</span>
+<span class="nc bnc" id="L176" title="All 2 branches missed.">                } else if (isolate) {</span>
+<span class="nc" id="L177">                    overflowIsolates++;</span>
+<span class="nc bnc" id="L178" title="All 2 branches missed.">                } else if (overflowIsolates == 0) {</span>
+<span class="nc" id="L179">                    overflowEmbeddings++;</span>
+                }
+<span class="fc bfc" id="L181" title="All 2 branches covered.">            } else if (t == PDI) {</span>
+<span class="pc bpc" id="L182" title="1 of 2 branches missed.">                if (overflowIsolates &gt; 0) {</span>
+<span class="nc" id="L183">                    overflowIsolates--;</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">                } else if (validIsolates &gt; 0) {</span>
+<span class="fc" id="L185">                    overflowEmbeddings = 0;</span>
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">                    while (!stackIsolate[sp - 1]) {</span>
+<span class="nc" id="L187">                        sp--;</span>
+                    }
+<span class="fc" id="L189">                    sp--;</span>
+<span class="fc" id="L190">                    validIsolates--;</span>
+                }
+<span class="fc" id="L192">                levels[i] = (byte) stackLevel[sp - 1];</span>
+<span class="pc bpc" id="L193" title="1 of 2 branches missed.">                if (stackOverride[sp - 1] != ON) {</span>
+<span class="nc" id="L194">                    types[i] = stackOverride[sp - 1];</span>
+                }
+<span class="fc bfc" id="L196" title="All 2 branches covered.">            } else if (t == PDF) {</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">                if (overflowIsolates == 0) {</span>
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">                    if (overflowEmbeddings &gt; 0) {</span>
+<span class="nc" id="L199">                        overflowEmbeddings--;</span>
+<span class="pc bpc" id="L200" title="2 of 4 branches missed.">                    } else if (!stackIsolate[sp - 1] &amp;&amp; sp &gt;= 2) {</span>
+<span class="fc" id="L201">                        sp--;</span>
+                    }
+                }
+<span class="fc" id="L204">                levels[i] = (byte) stackLevel[sp - 1];</span>
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">            } else if (t == B) {</span>
+<span class="nc" id="L206">                levels[i] = para;</span>
+            } else {
+<span class="fc" id="L208">                levels[i] = (byte) cur;</span>
+<span class="pc bpc" id="L209" title="1 of 4 branches missed.">                if (t != BN &amp;&amp; stackOverride[sp - 1] != ON) {</span>
+<span class="fc" id="L210">                    types[i] = stackOverride[sp - 1];</span>
+                }
+            }
+        }
+        // X9/X10: level runs over the retained characters, chained into isolating run sequences.
+<span class="fc" id="L215">        int[] kept = new int[n];</span>
+<span class="fc" id="L216">        int keptCount = 0;</span>
+<span class="fc bfc" id="L217" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc bfc" id="L218" title="All 2 branches covered.">            if (!removed(initial[i])) {</span>
+<span class="fc" id="L219">                kept[keptCount++] = i;</span>
+            }
+        }
+<span class="fc" id="L222">        int[] runStart = new int[keptCount + 1];</span>
+<span class="fc" id="L223">        int[] runOf = new int[n];</span>
+<span class="fc" id="L224">        int runCount = 0;</span>
+<span class="fc bfc" id="L225" title="All 2 branches covered.">        for (int k = 0; k &lt; keptCount; k++) {</span>
+<span class="fc bfc" id="L226" title="All 4 branches covered.">            if (k == 0 || levels[kept[k]] != levels[kept[k - 1]]) {</span>
+<span class="fc" id="L227">                runStart[runCount++] = k;</span>
+            }
+<span class="fc" id="L229">            runOf[kept[k]] = runCount - 1;</span>
+        }
+<span class="fc" id="L231">        runStart[runCount] = keptCount;</span>
+<span class="fc" id="L232">        int[] seq = new int[keptCount];</span>
+<span class="fc bfc" id="L233" title="All 2 branches covered.">        for (int r = 0; r &lt; runCount; r++) {</span>
+<span class="fc" id="L234">            int first = kept[runStart[r]];</span>
+<span class="pc bpc" id="L235" title="1 of 4 branches missed.">            if (initial[first] == PDI &amp;&amp; matchingInit[first] &gt;= 0) {</span>
+<span class="fc" id="L236">                continue;</span>
+            }
+<span class="fc" id="L238">            int len = 0;</span>
+<span class="fc" id="L239">            int run = r;</span>
+            while (true) {
+<span class="fc bfc" id="L241" title="All 2 branches covered.">                for (int k = runStart[run]; k &lt; runStart[run + 1]; k++) {</span>
+<span class="fc" id="L242">                    seq[len++] = kept[k];</span>
+                }
+<span class="fc" id="L244">                int last = seq[len - 1];</span>
+<span class="fc" id="L245">                byte lt = initial[last];</span>
+<span class="pc bpc" id="L246" title="1 of 8 branches missed.">                if ((lt == LRI || lt == RLI || lt == FSI) &amp;&amp; matchingPdi[last] &lt; n) {</span>
+<span class="fc" id="L247">                    run = runOf[matchingPdi[last]];</span>
+                } else {
+                    break;
+                }
+<span class="fc" id="L251">            }</span>
+<span class="fc" id="L252">            resolveSequence(text, seq, len, initial, types, levels, para, n);</span>
+        }
+        // X9 removed characters take the level of their predecessor.
+<span class="fc bfc" id="L255" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc bfc" id="L256" title="All 2 branches covered.">            if (removed(initial[i])) {</span>
+<span class="fc bfc" id="L257" title="All 2 branches covered.">                levels[i] = i == 0 ? para : levels[i - 1];</span>
+            }
+        }
+        // L1: separators, and whitespace before them or at the end of the paragraph, reset to the base.
+<span class="fc" id="L261">        boolean reset = true;</span>
+<span class="fc bfc" id="L262" title="All 2 branches covered.">        for (int i = n - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L263">            byte t = initial[i];</span>
+<span class="pc bpc" id="L264" title="1 of 4 branches missed.">            if (t == S || t == B) {</span>
+<span class="fc" id="L265">                levels[i] = para;</span>
+<span class="fc" id="L266">                reset = true;</span>
+<span class="pc bpc" id="L267" title="3 of 14 branches missed.">            } else if (reset &amp;&amp; (t == WS || t == LRI || t == RLI || t == FSI || t == PDI || removed(t))) {</span>
+<span class="fc" id="L268">                levels[i] = para;</span>
+            } else {
+<span class="fc" id="L270">                reset = false;</span>
+            }
+        }
+<span class="fc" id="L273">        return levels;</span>
+    }
+
+    private static boolean removed(byte t) {
+<span class="pc bpc" id="L277" title="2 of 12 branches missed.">        return t == RLE || t == LRE || t == RLO || t == LRO || t == PDF || t == BN;</span>
+    }
+
+    // P2/P3 within an isolate: the first strong type between from and to, skipping nested isolates.
+    private static boolean firstStrongRtl(byte[] initial, int[] matchingPdi, int from, int to) {
+<span class="pc bpc" id="L282" title="2 of 4 branches missed.">        for (int j = from; j &lt; to &amp;&amp; j &lt; initial.length; j++) {</span>
+<span class="fc" id="L283">            byte t = initial[j];</span>
+<span class="fc bfc" id="L284" title="All 2 branches covered.">            if (t == L) {</span>
+<span class="fc" id="L285">                return false;</span>
+            }
+<span class="pc bpc" id="L287" title="3 of 4 branches missed.">            if (t == R || t == AL) {</span>
+<span class="fc" id="L288">                return true;</span>
+            }
+<span class="nc bnc" id="L290" title="All 6 branches missed.">            if (t == LRI || t == RLI || t == FSI) {</span>
+<span class="nc" id="L291">                j = matchingPdi[j];</span>
+<span class="nc bnc" id="L292" title="All 2 branches missed.">            } else if (t == B) {</span>
+<span class="nc" id="L293">                break;</span>
+            }
+        }
+<span class="nc" id="L296">        return false;</span>
+    }
+
+    private static boolean isNi(byte t) {
+<span class="pc bpc" id="L300" title="1 of 16 branches missed.">        return t == ON || t == WS || t == S || t == B || t == LRI || t == RLI || t == FSI || t == PDI;</span>
+    }
+
+    // Strong direction for N0/N1: numbers count as R; anything else is not strong.
+    private static byte strongDir(byte t) {
+<span class="fc bfc" id="L305" title="All 2 branches covered.">        if (t == L) {</span>
+<span class="fc" id="L306">            return L;</span>
+        }
+<span class="pc bpc" id="L308" title="1 of 8 branches missed.">        if (t == R || t == AL || t == EN || t == AN) {</span>
+<span class="fc" id="L309">            return R;</span>
+        }
+<span class="fc" id="L311">        return ON;</span>
+    }
+
+    private static int openIndexOf(char c) {
+<span class="pc bpc" id="L315" title="1 of 2 branches missed.">        return OPEN.indexOf(c == 0x2329 ? (char) 0x3008 : c);</span>
+    }
+
+    private static int closeIndexOf(char c) {
+<span class="pc bpc" id="L319" title="1 of 2 branches missed.">        return CLOSE.indexOf(c == 0x232A ? (char) 0x3009 : c);</span>
+    }
+
+    private static void resolveSequence(String text, int[] seqIdx, int len, byte[] initial, byte[] types,
+            byte[] levels, byte para, int n) {
+<span class="fc" id="L324">        int first = seqIdx[0];</span>
+<span class="fc" id="L325">        int last = seqIdx[len - 1];</span>
+<span class="fc" id="L326">        int level = levels[first];</span>
+<span class="fc" id="L327">        int prev = para;</span>
+<span class="fc bfc" id="L328" title="All 2 branches covered.">        for (int i = first - 1; i &gt;= 0; i--) {</span>
+<span class="fc bfc" id="L329" title="All 2 branches covered.">            if (!removed(initial[i])) {</span>
+<span class="fc" id="L330">                prev = levels[i];</span>
+<span class="fc" id="L331">                break;</span>
+            }
+        }
+<span class="fc" id="L334">        int next = para;</span>
+<span class="fc" id="L335">        byte lt = initial[last];</span>
+<span class="pc bpc" id="L336" title="3 of 6 branches missed.">        if (!(lt == LRI || lt == RLI || lt == FSI)) {</span>
+<span class="fc bfc" id="L337" title="All 2 branches covered.">            for (int i = last + 1; i &lt; n; i++) {</span>
+<span class="fc bfc" id="L338" title="All 2 branches covered.">                if (!removed(initial[i])) {</span>
+<span class="fc" id="L339">                    next = levels[i];</span>
+<span class="fc" id="L340">                    break;</span>
+                }
+            }
+        }
+<span class="fc bfc" id="L344" title="All 2 branches covered.">        byte sos = (Math.max(prev, level) &amp; 1) != 0 ? R : L;</span>
+<span class="fc bfc" id="L345" title="All 2 branches covered.">        byte eos = (Math.max(next, level) &amp; 1) != 0 ? R : L;</span>
+<span class="fc" id="L346">        byte[] t = new byte[len];</span>
+<span class="fc bfc" id="L347" title="All 2 branches covered.">        for (int k = 0; k &lt; len; k++) {</span>
+<span class="fc" id="L348">            t[k] = types[seqIdx[k]];</span>
+        }
+        // W1
+<span class="fc bfc" id="L351" title="All 2 branches covered.">        for (int k = 0; k &lt; len; k++) {</span>
+<span class="fc bfc" id="L352" title="All 2 branches covered.">            if (t[k] == NSM) {</span>
+<span class="pc bpc" id="L353" title="1 of 2 branches missed.">                if (k == 0) {</span>
+<span class="nc" id="L354">                    t[k] = sos;</span>
+                } else {
+<span class="fc" id="L356">                    byte p = t[k - 1];</span>
+<span class="pc bpc" id="L357" title="4 of 8 branches missed.">                    t[k] = (p == LRI || p == RLI || p == FSI || p == PDI) ? ON : p;</span>
+                }
+            }
+        }
+        // W2, W3
+<span class="fc" id="L362">        byte strong = sos;</span>
+<span class="fc bfc" id="L363" title="All 2 branches covered.">        for (int k = 0; k &lt; len; k++) {</span>
+<span class="fc" id="L364">            byte c = t[k];</span>
+<span class="fc bfc" id="L365" title="All 6 branches covered.">            if (c == L || c == R || c == AL) {</span>
+<span class="fc" id="L366">                strong = c;</span>
+<span class="fc bfc" id="L367" title="All 4 branches covered.">            } else if (c == EN &amp;&amp; strong == AL) {</span>
+<span class="fc" id="L368">                t[k] = AN;</span>
+            }
+        }
+<span class="fc bfc" id="L371" title="All 2 branches covered.">        for (int k = 0; k &lt; len; k++) {</span>
+<span class="fc bfc" id="L372" title="All 2 branches covered.">            if (t[k] == AL) {</span>
+<span class="fc" id="L373">                t[k] = R;</span>
+            }
+        }
+        // W4
+<span class="fc bfc" id="L377" title="All 2 branches covered.">        for (int k = 1; k &lt; len - 1; k++) {</span>
+<span class="pc bpc" id="L378" title="2 of 6 branches missed.">            if (t[k] == ES &amp;&amp; t[k - 1] == EN &amp;&amp; t[k + 1] == EN) {</span>
+<span class="fc" id="L379">                t[k] = EN;</span>
+<span class="pc bpc" id="L380" title="4 of 8 branches missed.">            } else if (t[k] == CS &amp;&amp; t[k - 1] == t[k + 1] &amp;&amp; (t[k - 1] == EN || t[k - 1] == AN)) {</span>
+<span class="fc" id="L381">                t[k] = t[k - 1];</span>
+            }
+        }
+        // W5
+<span class="fc bfc" id="L385" title="All 2 branches covered.">        for (int k = 0; k &lt; len; k++) {</span>
+<span class="fc bfc" id="L386" title="All 2 branches covered.">            if (t[k] == ET) {</span>
+<span class="fc" id="L387">                int s = k;</span>
+<span class="pc bpc" id="L388" title="1 of 4 branches missed.">                while (k &lt; len &amp;&amp; t[k] == ET) {</span>
+<span class="fc" id="L389">                    k++;</span>
+                }
+<span class="pc bpc" id="L391" title="4 of 8 branches missed.">                if ((s &gt; 0 &amp;&amp; t[s - 1] == EN) || (k &lt; len &amp;&amp; t[k] == EN)) {</span>
+<span class="fc bfc" id="L392" title="All 2 branches covered.">                    for (int j = s; j &lt; k; j++) {</span>
+<span class="fc" id="L393">                        t[j] = EN;</span>
+                    }
+                }
+<span class="fc" id="L396">                k--;</span>
+            }
+        }
+        // W6
+<span class="fc bfc" id="L400" title="All 2 branches covered.">        for (int k = 0; k &lt; len; k++) {</span>
+<span class="pc bpc" id="L401" title="3 of 6 branches missed.">            if (t[k] == ES || t[k] == ET || t[k] == CS) {</span>
+<span class="nc" id="L402">                t[k] = ON;</span>
+            }
+        }
+        // W7
+<span class="fc" id="L406">        strong = sos;</span>
+<span class="fc bfc" id="L407" title="All 2 branches covered.">        for (int k = 0; k &lt; len; k++) {</span>
+<span class="fc bfc" id="L408" title="All 4 branches covered.">            if (t[k] == L || t[k] == R) {</span>
+<span class="fc" id="L409">                strong = t[k];</span>
+<span class="pc bpc" id="L410" title="1 of 4 branches missed.">            } else if (t[k] == EN &amp;&amp; strong == L) {</span>
+<span class="nc" id="L411">                t[k] = L;</span>
+            }
+        }
+<span class="fc bfc" id="L414" title="All 2 branches covered.">        byte e = (level &amp; 1) != 0 ? R : L;</span>
+        // N0: BD16 bracket pairs, processed in order of their opening bracket.
+<span class="fc" id="L416">        int[] stackChar = new int[MAX_BRACKETS];</span>
+<span class="fc" id="L417">        int[] stackPos = new int[MAX_BRACKETS];</span>
+<span class="fc" id="L418">        int depth = 0;</span>
+<span class="fc" id="L419">        int[] pairOpen = new int[len];</span>
+<span class="fc" id="L420">        int[] pairClose = new int[len];</span>
+<span class="fc" id="L421">        int pairs = 0;</span>
+<span class="fc bfc" id="L422" title="All 2 branches covered.">        for (int k = 0; k &lt; len; k++) {</span>
+<span class="fc bfc" id="L423" title="All 2 branches covered.">            if (t[k] != ON) {</span>
+<span class="fc" id="L424">                continue;</span>
+            }
+<span class="fc" id="L426">            char c = text.charAt(seqIdx[k]);</span>
+<span class="fc" id="L427">            int o = openIndexOf(c);</span>
+<span class="fc bfc" id="L428" title="All 2 branches covered.">            if (o &gt;= 0) {</span>
+<span class="pc bpc" id="L429" title="1 of 2 branches missed.">                if (depth == MAX_BRACKETS) {</span>
+<span class="nc" id="L430">                    break;</span>
+                }
+<span class="fc" id="L432">                stackChar[depth] = o;</span>
+<span class="fc" id="L433">                stackPos[depth++] = k;</span>
+<span class="fc" id="L434">                continue;</span>
+            }
+<span class="fc" id="L436">            int cl = closeIndexOf(c);</span>
+<span class="fc bfc" id="L437" title="All 2 branches covered.">            if (cl &gt;= 0) {</span>
+<span class="pc bpc" id="L438" title="1 of 2 branches missed.">                for (int d = depth - 1; d &gt;= 0; d--) {</span>
+<span class="pc bpc" id="L439" title="1 of 2 branches missed.">                    if (stackChar[d] == cl) {</span>
+<span class="fc" id="L440">                        pairOpen[pairs] = stackPos[d];</span>
+<span class="fc" id="L441">                        pairClose[pairs++] = k;</span>
+<span class="fc" id="L442">                        depth = d;</span>
+<span class="fc" id="L443">                        break;</span>
+                    }
+                }
+            }
+        }
+<span class="pc bpc" id="L448" title="1 of 2 branches missed.">        for (int a = 1; a &lt; pairs; a++) {</span>
+<span class="nc" id="L449">            int po = pairOpen[a];</span>
+<span class="nc" id="L450">            int pc = pairClose[a];</span>
+<span class="nc" id="L451">            int b = a - 1;</span>
+<span class="nc bnc" id="L452" title="All 4 branches missed.">            while (b &gt;= 0 &amp;&amp; pairOpen[b] &gt; po) {</span>
+<span class="nc" id="L453">                pairOpen[b + 1] = pairOpen[b];</span>
+<span class="nc" id="L454">                pairClose[b + 1] = pairClose[b];</span>
+<span class="nc" id="L455">                b--;</span>
+            }
+<span class="nc" id="L457">            pairOpen[b + 1] = po;</span>
+<span class="nc" id="L458">            pairClose[b + 1] = pc;</span>
+        }
+<span class="fc bfc" id="L460" title="All 2 branches covered.">        for (int p = 0; p &lt; pairs; p++) {</span>
+<span class="fc" id="L461">            int o = pairOpen[p];</span>
+<span class="fc" id="L462">            int c = pairClose[p];</span>
+<span class="fc" id="L463">            boolean embedding = false;</span>
+<span class="fc" id="L464">            boolean opposite = false;</span>
+<span class="fc bfc" id="L465" title="All 2 branches covered.">            for (int k = o + 1; k &lt; c; k++) {</span>
+<span class="fc" id="L466">                byte d = strongDir(t[k]);</span>
+<span class="fc bfc" id="L467" title="All 2 branches covered.">                if (d == e) {</span>
+<span class="fc" id="L468">                    embedding = true;</span>
+<span class="fc" id="L469">                    break;</span>
+                }
+<span class="pc bpc" id="L471" title="1 of 2 branches missed.">                if (d != ON) {</span>
+<span class="fc" id="L472">                    opposite = true;</span>
+                }
+            }
+<span class="fc" id="L475">            byte resolved = ON;</span>
+<span class="fc bfc" id="L476" title="All 2 branches covered.">            if (embedding) {</span>
+<span class="fc" id="L477">                resolved = e;</span>
+<span class="pc bpc" id="L478" title="1 of 2 branches missed.">            } else if (opposite) {</span>
+<span class="fc" id="L479">                byte before = sos;</span>
+<span class="pc bpc" id="L480" title="1 of 2 branches missed.">                for (int k = o - 1; k &gt;= 0; k--) {</span>
+<span class="fc" id="L481">                    byte d = strongDir(t[k]);</span>
+<span class="fc bfc" id="L482" title="All 2 branches covered.">                    if (d != ON) {</span>
+<span class="fc" id="L483">                        before = d;</span>
+<span class="fc" id="L484">                        break;</span>
+                    }
+                }
+<span class="fc" id="L487">                resolved = before;</span>
+            }
+<span class="pc bpc" id="L489" title="1 of 2 branches missed.">            if (resolved != ON) {</span>
+<span class="fc" id="L490">                t[o] = resolved;</span>
+<span class="fc" id="L491">                t[c] = resolved;</span>
+<span class="pc bpc" id="L492" title="2 of 4 branches missed.">                for (int k = o + 1; k &lt; len &amp;&amp; initial[seqIdx[k]] == NSM; k++) {</span>
+<span class="nc" id="L493">                    t[k] = resolved;</span>
+                }
+<span class="pc bpc" id="L495" title="1 of 4 branches missed.">                for (int k = c + 1; k &lt; len &amp;&amp; initial[seqIdx[k]] == NSM; k++) {</span>
+<span class="nc" id="L496">                    t[k] = resolved;</span>
+                }
+            }
+        }
+        // N1/N2
+<span class="fc bfc" id="L501" title="All 2 branches covered.">        for (int k = 0; k &lt; len; k++) {</span>
+<span class="fc bfc" id="L502" title="All 2 branches covered.">            if (isNi(t[k])) {</span>
+<span class="fc" id="L503">                int s = k;</span>
+<span class="fc bfc" id="L504" title="All 4 branches covered.">                while (k &lt; len &amp;&amp; isNi(t[k])) {</span>
+<span class="fc" id="L505">                    k++;</span>
+                }
+<span class="fc bfc" id="L507" title="All 2 branches covered.">                byte before = s == 0 ? sos : strongDir(t[s - 1]);</span>
+<span class="fc bfc" id="L508" title="All 2 branches covered.">                byte after = k &gt;= len ? eos : strongDir(t[k]);</span>
+<span class="fc bfc" id="L509" title="All 2 branches covered.">                byte resolved = before == after ? before : e;</span>
+<span class="fc bfc" id="L510" title="All 2 branches covered.">                for (int j = s; j &lt; k; j++) {</span>
+<span class="fc" id="L511">                    t[j] = resolved;</span>
+                }
+<span class="fc" id="L513">                k--;</span>
+            }
+        }
+        // I1/I2
+<span class="fc bfc" id="L517" title="All 2 branches covered.">        for (int k = 0; k &lt; len; k++) {</span>
+<span class="fc" id="L518">            byte c = t[k];</span>
+<span class="fc" id="L519">            int lv = level;</span>
+<span class="fc bfc" id="L520" title="All 2 branches covered.">            if ((level &amp; 1) == 0) {</span>
+<span class="fc bfc" id="L521" title="All 2 branches covered.">                if (c == R) {</span>
+<span class="fc" id="L522">                    lv++;</span>
+<span class="fc bfc" id="L523" title="All 4 branches covered.">                } else if (c == AN || c == EN) {</span>
+<span class="fc" id="L524">                    lv += 2;</span>
+                }
+<span class="fc bfc" id="L526" title="All 6 branches covered.">            } else if (c == L || c == EN || c == AN) {</span>
+<span class="fc" id="L527">                lv++;</span>
+            }
+<span class="fc" id="L529">            levels[seqIdx[k]] = (byte) lv;</span>
+        }
+<span class="fc" id="L531">    }</span>
+
+    /// True if the line, laid out with the given base direction, is purely left-to-right (no reordering
+    /// needed). This lets the editor keep its fast LTR path for the common case.
+    static boolean isTrivialLtr(String text, boolean baseRtl) {
+<span class="fc bfc" id="L536" title="All 2 branches covered.">        if (baseRtl) {</span>
+<span class="fc bfc" id="L537" title="All 2 branches covered.">            return text.length() == 0;</span>
+        }
+<span class="fc bfc" id="L539" title="All 2 branches covered.">        for (int i = 0; i &lt; text.length(); i++) {</span>
+<span class="fc" id="L540">            byte t = typeOf(text.charAt(i));</span>
+<span class="pc bpc" id="L541" title="2 of 10 branches missed.">            if (t == R || t == AL || t == AN || (t &gt;= LRE &amp;&amp; t &lt;= PDI)) {</span>
+<span class="fc" id="L542">                return false;</span>
+            }
+        }
+<span class="fc" id="L545">        return true;</span>
+    }
+
+    /// Returns the bidirectional character type of a single UTF-16 code unit. Uses coarse Unicode ranges
+    /// that cover the scripts an editor realistically handles (Latin, Arabic, Hebrew, Syriac, Thaana,
+    /// common digits, punctuation and whitespace).
+    private static byte baseTypeOf(char c) {
+<span class="pc bpc" id="L552" title="3 of 8 branches missed.">        if (c == ' ' || c == 0x00A0 || c == 0x2007 || c == 0x202F) {</span>
+<span class="fc" id="L553">            return WS;</span>
+        }
+<span class="pc bpc" id="L555" title="5 of 10 branches missed.">        if (c == '\n' || c == '\r' || c == 0x0085 || c == 0x2028 || c == 0x2029) {</span>
+<span class="nc" id="L556">            return WS;</span>
+        }
+        // European digits
+<span class="fc bfc" id="L559" title="All 4 branches covered.">        if (c &gt;= '0' &amp;&amp; c &lt;= '9') {</span>
+<span class="fc" id="L560">            return EN;</span>
+        }
+        // Arabic-Indic and Extended Arabic-Indic digits
+<span class="pc bpc" id="L563" title="1 of 8 branches missed.">        if ((c &gt;= 0x0660 &amp;&amp; c &lt;= 0x0669) || (c &gt;= 0x06F0 &amp;&amp; c &lt;= 0x06F9)) {</span>
+<span class="fc" id="L564">            return AN;</span>
+        }
+<span class="fc bfc" id="L566" title="All 4 branches covered.">        if (c == '+' || c == '-') {</span>
+<span class="fc" id="L567">            return ES;</span>
+        }
+<span class="pc bpc" id="L569" title="7 of 18 branches missed.">        if (c == '#' || c == '$' || c == '%' || c == 0x00A2 || c == 0x00A3 || c == 0x00A5</span>
+                || c == 0x00B0 || c == 0x00B1 || c == 0x066A) {
+<span class="fc" id="L571">            return ET;</span>
+        }
+<span class="pc bpc" id="L573" title="1 of 8 branches missed.">        if (c == ',' || c == '.' || c == ':' || c == '/') {</span>
+<span class="fc" id="L574">            return CS;</span>
+        }
+        // Combining marks
+<span class="pc bpc" id="L577" title="7 of 30 branches missed.">        if ((c &gt;= 0x0300 &amp;&amp; c &lt;= 0x036F) || (c &gt;= 0x0483 &amp;&amp; c &lt;= 0x0489)</span>
+                || (c &gt;= 0x0591 &amp;&amp; c &lt;= 0x05BD) || (c &gt;= 0x0610 &amp;&amp; c &lt;= 0x061A)
+                || (c &gt;= 0x064B &amp;&amp; c &lt;= 0x065F) || c == 0x0670
+                || (c &gt;= 0x06D6 &amp;&amp; c &lt;= 0x06DC) || (c &gt;= 0x06DF &amp;&amp; c &lt;= 0x06E4)) {
+<span class="fc" id="L581">            return NSM;</span>
+        }
+        // Hebrew and Hebrew presentation forms (strong R)
+<span class="pc bpc" id="L584" title="1 of 8 branches missed.">        if ((c &gt;= 0x0590 &amp;&amp; c &lt;= 0x05FF) || (c &gt;= 0xFB1D &amp;&amp; c &lt;= 0xFB4F)) {</span>
+<span class="fc" id="L585">            return R;</span>
+        }
+        // Arabic, Arabic Supplement/Extended, Syriac, Thaana, and Arabic presentation forms (strong AL)
+<span class="pc bpc" id="L588" title="6 of 28 branches missed.">        if ((c &gt;= 0x0600 &amp;&amp; c &lt;= 0x06FF) || (c &gt;= 0x0700 &amp;&amp; c &lt;= 0x074F)</span>
+                || (c &gt;= 0x0750 &amp;&amp; c &lt;= 0x077F) || (c &gt;= 0x0780 &amp;&amp; c &lt;= 0x07BF)
+                || (c &gt;= 0x08A0 &amp;&amp; c &lt;= 0x08FF)
+                || (c &gt;= 0xFB50 &amp;&amp; c &lt;= 0xFDFF) || (c &gt;= 0xFE70 &amp;&amp; c &lt;= 0xFEFF)) {
+<span class="fc" id="L592">            return AL;</span>
+        }
+        // Latin letters and the vast majority of the BMP letters an editor sees are strong L.
+<span class="fc bfc" id="L595" title="All 8 branches covered.">        if ((c &gt;= 'A' &amp;&amp; c &lt;= 'Z') || (c &gt;= 'a' &amp;&amp; c &lt;= 'z')) {</span>
+<span class="fc" id="L596">            return L;</span>
+        }
+<span class="pc bpc" id="L598" title="1 of 4 branches missed.">        if (c &gt;= 0x00C0 &amp;&amp; c &lt;= 0x024F) {</span>
+<span class="nc" id="L599">            return L;</span>
+        }
+        // CJK, Kana, Hangul and the like are strong L for bidi purposes.
+<span class="fc bfc" id="L602" title="All 4 branches covered.">        if (c &gt;= 0x2E80 &amp;&amp; c &lt;= 0xD7FF) {</span>
+<span class="fc" id="L603">            return L;</span>
+        }
+<span class="pc bpc" id="L605" title="1 of 4 branches missed.">        if (c &gt;= 0xF900 &amp;&amp; c &lt;= 0xFAFF) {</span>
+<span class="nc" id="L606">            return L;</span>
+        }
+        // Everything else (ASCII punctuation, symbols) is a neutral.
+<span class="fc" id="L609">        return ON;</span>
+    }
+
+    /// Returns true if the paragraph's automatically detected base direction is right-to-left, per rules
+    /// P2/P3: the direction of the first strong (L, R or AL) character, defaulting to left-to-right.
+    static boolean autoBaseRtl(String text) {
+<span class="pc bpc" id="L615" title="1 of 2 branches missed.">        for (int i = 0; i &lt; text.length(); i++) {</span>
+<span class="fc" id="L616">            byte t = typeOf(text.charAt(i));</span>
+<span class="fc bfc" id="L617" title="All 2 branches covered.">            if (t == L) {</span>
+<span class="fc" id="L618">                return false;</span>
+            }
+<span class="fc bfc" id="L620" title="All 4 branches covered.">            if (t == R || t == AL) {</span>
+<span class="fc" id="L621">                return true;</span>
+            }
+<span class="pc bpc" id="L623" title="3 of 6 branches missed.">            if (t == LRI || t == RLI || t == FSI) {</span>
+<span class="nc" id="L624">                int depth = 1;</span>
+<span class="nc bnc" id="L625" title="All 4 branches missed.">                while (depth &gt; 0 &amp;&amp; ++i &lt; text.length()) {</span>
+<span class="nc" id="L626">                    byte u = typeOf(text.charAt(i));</span>
+<span class="nc bnc" id="L627" title="All 6 branches missed.">                    if (u == LRI || u == RLI || u == FSI) {</span>
+<span class="nc" id="L628">                        depth++;</span>
+<span class="nc bnc" id="L629" title="All 2 branches missed.">                    } else if (u == PDI) {</span>
+<span class="nc" id="L630">                        depth--;</span>
+                    }
+<span class="nc" id="L632">                }</span>
+            }
+        }
+<span class="nc" id="L635">        return false;</span>
+    }
+
+    /// Applies reordering rule L2 to produce the visual order of the characters. Returns an array
+    /// `visualToLogical` where element `v` is the logical index of the character drawn at visual position
+    /// `v` (left to right on screen).
+    static int[] reorderVisual(byte[] levels) {
+<span class="fc" id="L642">        int n = levels.length;</span>
+<span class="fc" id="L643">        int[] order = new int[n];</span>
+<span class="fc bfc" id="L644" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L645">            order[i] = i;</span>
+        }
+<span class="fc bfc" id="L647" title="All 2 branches covered.">        if (n == 0) {</span>
+<span class="fc" id="L648">            return order;</span>
+        }
+<span class="fc" id="L650">        byte highest = 0;</span>
+<span class="fc" id="L651">        byte lowestOdd = Byte.MAX_VALUE;</span>
+<span class="fc bfc" id="L652" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L653">            byte lv = levels[i];</span>
+<span class="fc bfc" id="L654" title="All 2 branches covered.">            if (lv &gt; highest) {</span>
+<span class="fc" id="L655">                highest = lv;</span>
+            }
+<span class="fc bfc" id="L657" title="All 4 branches covered.">            if ((lv &amp; 1) != 0 &amp;&amp; lv &lt; lowestOdd) {</span>
+<span class="fc" id="L658">                lowestOdd = lv;</span>
+            }
+        }
+<span class="fc bfc" id="L661" title="All 2 branches covered.">        if (lowestOdd == Byte.MAX_VALUE) {</span>
+            // all even levels: already in logical == visual order
+<span class="fc" id="L663">            return order;</span>
+        }
+<span class="fc bfc" id="L665" title="All 2 branches covered.">        for (int level = highest; level &gt;= lowestOdd; level--) {</span>
+<span class="fc" id="L666">            int i = 0;</span>
+<span class="fc bfc" id="L667" title="All 2 branches covered.">            while (i &lt; n) {</span>
+<span class="fc bfc" id="L668" title="All 2 branches covered.">                if (levels[order[i]] &gt;= level) {</span>
+<span class="fc" id="L669">                    int start = i;</span>
+<span class="fc bfc" id="L670" title="All 4 branches covered.">                    while (i &lt; n &amp;&amp; levels[order[i]] &gt;= level) {</span>
+<span class="fc" id="L671">                        i++;</span>
+                    }
+<span class="fc" id="L673">                    reverse(order, start, i - 1);</span>
+<span class="fc" id="L674">                } else {</span>
+<span class="fc" id="L675">                    i++;</span>
+                }
+            }
+        }
+<span class="fc" id="L679">        return order;</span>
+    }
+
+    private static void reverse(int[] a, int from, int to) {
+<span class="fc bfc" id="L683" title="All 2 branches covered.">        while (from &lt; to) {</span>
+<span class="fc" id="L684">            int t = a[from];</span>
+<span class="fc" id="L685">            a[from] = a[to];</span>
+<span class="fc" id="L686">            a[to] = t;</span>
+<span class="fc" id="L687">            from++;</span>
+<span class="fc" id="L688">            to--;</span>
+<span class="fc" id="L689">        }</span>
+<span class="fc" id="L690">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

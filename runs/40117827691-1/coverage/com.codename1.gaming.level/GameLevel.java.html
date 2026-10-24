@@ -1,0 +1,867 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GameLevel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming.level</a> &gt; <span class="el_source">GameLevel.java</span></div><h1>GameLevel.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gaming.level;
+
+import com.codename1.gaming.AnimatedSprite;
+import com.codename1.gaming.Scene;
+import com.codename1.gaming.Sprite;
+import com.codename1.gaming.SpriteSheet;
+import com.codename1.io.JSONParser;
+import com.codename1.ui.Image;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.Reader;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// A saved, mode-aware game level or map: the data the visual editor writes and the
+/// runtime loads, deliberately decoupled from how it is drawn.
+///
+/// A level has a `#getMode()` -- `Mode#TWO_D` (tiles + sprites), `Mode#THREE_D` (meshes in a
+/// perspective world with terrain and lights) or `Mode#BOARD` (an isometric grid) --
+/// an `#getAssetPack()` it draws from, a grid size, ordered `Layer`s, freely placed
+/// `GameElement`s, and mode-specific extras (a camera rig, `#lights()`,
+/// `#getTerrain()`). It is pure data: load it with `#load(String)`, edit it,
+/// `#toJson()` it back. Turning it into live objects is the realizer's job --
+/// `#realizeSprites(Scene, AssetCatalog)` builds the 2D / board sprites here, while
+/// `GameSceneView` wires the full lifecycle (including the 3D camera and lights, which
+/// need the GPU device).
+public class GameLevel {
+    /// The kind of a level, which decides how its elements are realized and rendered. Each
+    /// constant carries its JSON wire token (`#wireName()`) and a display `#label()`.
+<span class="fc" id="L57">    public enum Mode {</span>
+        /// Orthographic 2D: tile layers + sprites in pixel space.
+<span class="fc" id="L59">        TWO_D(&quot;2d&quot;, &quot;2D&quot;),</span>
+        /// Perspective 3D: meshes, terrain and lights in a world.
+<span class="fc" id="L61">        THREE_D(&quot;3d&quot;, &quot;3D&quot;),</span>
+        /// Isometric board: sprites placed through an `IsoProjection`.
+<span class="fc" id="L63">        BOARD(&quot;board&quot;, &quot;Board&quot;);</span>
+
+        private final String wire;
+        private final String label;
+
+<span class="fc" id="L68">        Mode(String wire, String label) {</span>
+<span class="fc" id="L69">            this.wire = wire;</span>
+<span class="fc" id="L70">            this.label = label;</span>
+<span class="fc" id="L71">        }</span>
+
+        /// The lowercase token this mode is written as in the `.game` JSON (`&quot;2d&quot;` / `&quot;3d&quot;` /
+        /// `&quot;board&quot;`).
+        public String wireName() {
+<span class="fc" id="L76">            return wire;</span>
+        }
+
+        /// A human-readable label for menus (`&quot;2D&quot;` / `&quot;3D&quot;` / `&quot;Board&quot;`).
+        public String label() {
+<span class="nc" id="L81">            return label;</span>
+        }
+
+        /// The mode for a JSON wire token (case-insensitive); defaults to `#TWO_D` for an
+        /// unknown or missing token, so an older or hand-edited file still loads.
+        public static Mode fromWire(String name) {
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">            for (Mode m : values()) {</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">                if (m.wire.equalsIgnoreCase(name)) {</span>
+<span class="fc" id="L89">                    return m;</span>
+                }
+            }
+<span class="nc" id="L92">            return TWO_D;</span>
+        }
+    }
+
+<span class="fc" id="L96">    private Mode mode = Mode.TWO_D;</span>
+    private String assetPack;
+<span class="fc" id="L98">    private int cols = 20;</span>
+<span class="fc" id="L99">    private int rows = 12;</span>
+<span class="fc" id="L100">    private int tileSize = 32;</span>
+
+<span class="fc" id="L102">    private final Map&lt;String, Object&gt; props = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L103">    private final List&lt;Layer&gt; layers = new ArrayList&lt;Layer&gt;();</span>
+<span class="fc" id="L104">    private final List&lt;GameElement&gt; elements = new ArrayList&lt;GameElement&gt;();</span>
+<span class="fc" id="L105">    private final List&lt;LevelLight&gt; lights = new ArrayList&lt;LevelLight&gt;();</span>
+    private TerrainGrid terrain;
+    private transient GameWorld world;
+
+    // 3D camera rig
+    private float eyeX;
+<span class="fc" id="L111">    private float eyeY = 6f;</span>
+<span class="fc" id="L112">    private float eyeZ = 12f;</span>
+    private float targetX;
+    private float targetY;
+    private float targetZ;
+<span class="fc" id="L116">    private float fov = 60f;</span>
+<span class="fc" id="L117">    private float near = 0.1f;</span>
+<span class="fc" id="L118">    private float far = 1000f;</span>
+
+<span class="fc" id="L120">    public GameLevel() {</span>
+<span class="fc" id="L121">    }</span>
+
+<span class="fc" id="L123">    public GameLevel(Mode mode) {</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">        this.mode = mode == null ? Mode.TWO_D : mode;</span>
+<span class="fc" id="L125">    }</span>
+
+    // ---- mode ----------------------------------------------------------------
+
+    /// This level's `Mode`.
+    public Mode getMode() {
+<span class="fc" id="L131">        return mode;</span>
+    }
+
+    public GameLevel setMode(Mode mode) {
+<span class="nc bnc" id="L135" title="All 2 branches missed.">        this.mode = mode == null ? Mode.TWO_D : mode;</span>
+<span class="nc" id="L136">        return this;</span>
+    }
+
+    /// True for an orthographic 2D level (`Mode#TWO_D`).
+    public boolean is2D() {
+<span class="nc bnc" id="L141" title="All 2 branches missed.">        return mode == Mode.TWO_D;</span>
+    }
+
+    /// True for a perspective 3D level (`Mode#THREE_D`).
+    public boolean is3D() {
+<span class="nc bnc" id="L146" title="All 2 branches missed.">        return mode == Mode.THREE_D;</span>
+    }
+
+    /// True for an isometric board level (`Mode#BOARD`).
+    public boolean isBoard() {
+<span class="nc bnc" id="L151" title="All 2 branches missed.">        return mode == Mode.BOARD;</span>
+    }
+
+    // ---- simple accessors ----------------------------------------------------
+
+    /// The id of the `AssetPack` this level's elements draw from.
+    public String getAssetPack() {
+<span class="fc" id="L158">        return assetPack;</span>
+    }
+
+    /// Sets the asset-pack id (see `#getAssetPack()`).
+    public GameLevel setAssetPack(String assetPack) {
+<span class="fc" id="L163">        this.assetPack = assetPack;</span>
+<span class="fc" id="L164">        return this;</span>
+    }
+
+    /// The grid width in cells.
+    public int getCols() {
+<span class="fc" id="L169">        return cols;</span>
+    }
+
+    /// The grid height in cells.
+    public int getRows() {
+<span class="fc" id="L174">        return rows;</span>
+    }
+
+    /// The size of one grid cell -- pixels per tile in 2D / board, world units per cell in 3D.
+    public int getTileSize() {
+<span class="fc" id="L179">        return tileSize;</span>
+    }
+
+    /// Sets the grid dimensions and cell size in one call.
+    public GameLevel setGrid(int cols, int rows, int tileSize) {
+<span class="fc" id="L184">        this.cols = cols;</span>
+<span class="fc" id="L185">        this.rows = rows;</span>
+<span class="fc" id="L186">        this.tileSize = tileSize;</span>
+<span class="fc" id="L187">        return this;</span>
+    }
+
+    /// The level-wide authoring property bag (gravity, background, ...).
+    public Map&lt;String, Object&gt; props() {
+<span class="fc" id="L192">        return props;</span>
+    }
+
+    /// A level property as a double, coerced from a `Number`/numeric `String`, else `def`.
+    public double getDouble(String key, double def) {
+<span class="fc" id="L197">        return Json.num(props.get(key), def);</span>
+    }
+
+    /// A level property as an int, coerced from a `Number`/numeric `String`, else `def`.
+    public int getInt(String key, int def) {
+<span class="nc" id="L202">        return Json.intval(props.get(key), def);</span>
+    }
+
+    /// A level property as a String (any value's `toString()`), or `def` if absent.
+    public String getString(String key, String def) {
+<span class="fc" id="L207">        Object v = props.get(key);</span>
+<span class="pc bpc" id="L208" title="1 of 2 branches missed.">        return v == null ? def : v.toString();</span>
+    }
+
+    // ---- layers &amp; elements ---------------------------------------------------
+
+    /// The ordered `Layer` stack (low band first); mutable.
+    public List&lt;Layer&gt; layers() {
+<span class="fc" id="L215">        return layers;</span>
+    }
+
+    /// Appends a layer to the stack.
+    public GameLevel addLayer(Layer layer) {
+<span class="fc" id="L220">        layers.add(layer);</span>
+<span class="fc" id="L221">        return this;</span>
+    }
+
+    /// The layer with the given name, or `null` if there is none.
+    public Layer getLayer(String name) {
+<span class="pc bpc" id="L226" title="1 of 2 branches missed.">        for (Layer l : layers) {</span>
+<span class="pc bpc" id="L227" title="4 of 6 branches missed.">            if (name == null ? l.getName() == null : name.equals(l.getName())) {</span>
+<span class="fc" id="L228">                return l;</span>
+            }
+<span class="nc" id="L230">        }</span>
+<span class="nc" id="L231">        return null;</span>
+    }
+
+    /// The placed `GameElement`s, across all layers; mutable.
+    public List&lt;GameElement&gt; elements() {
+<span class="fc" id="L236">        return elements;</span>
+    }
+
+    /// Adds a placed element to the level.
+    public GameLevel addElement(GameElement element) {
+<span class="fc" id="L241">        elements.add(element);</span>
+<span class="fc" id="L242">        return this;</span>
+    }
+
+    // ---- 3D extras -----------------------------------------------------------
+
+    public List&lt;LevelLight&gt; lights() {
+<span class="fc" id="L248">        return lights;</span>
+    }
+
+    public TerrainGrid getTerrain() {
+<span class="fc" id="L252">        return terrain;</span>
+    }
+
+    public GameLevel setTerrain(TerrainGrid terrain) {
+<span class="fc" id="L256">        this.terrain = terrain;</span>
+<span class="fc" id="L257">        return this;</span>
+    }
+
+    /// The streaming/region world backing a &quot;large world&quot; level, or null for a bounded level.
+    /// When set, the active region's `StreamingTerrain` is the authoritative terrain and the
+    /// bounded `#getTerrain()` grid is unused. Serialized inline under the &quot;world&quot; key.
+    public GameWorld getWorld() {
+<span class="nc" id="L264">        return world;</span>
+    }
+
+    public GameLevel setWorld(GameWorld world) {
+<span class="nc" id="L268">        this.world = world;</span>
+<span class="nc" id="L269">        return this;</span>
+    }
+
+    /// True when this level is backed by a streaming `GameWorld` of regions rather than a
+    /// single bounded grid.
+    public boolean isLargeWorld() {
+<span class="nc bnc" id="L275" title="All 2 branches missed.">        return world != null;</span>
+    }
+
+    public GameLevel setCamera(float eyeX, float eyeY, float eyeZ,
+                               float targetX, float targetY, float targetZ) {
+<span class="fc" id="L280">        this.eyeX = eyeX;</span>
+<span class="fc" id="L281">        this.eyeY = eyeY;</span>
+<span class="fc" id="L282">        this.eyeZ = eyeZ;</span>
+<span class="fc" id="L283">        this.targetX = targetX;</span>
+<span class="fc" id="L284">        this.targetY = targetY;</span>
+<span class="fc" id="L285">        this.targetZ = targetZ;</span>
+<span class="fc" id="L286">        return this;</span>
+    }
+
+    public GameLevel setLens(float fov, float near, float far) {
+<span class="fc" id="L290">        this.fov = fov;</span>
+<span class="fc" id="L291">        this.near = near;</span>
+<span class="fc" id="L292">        this.far = far;</span>
+<span class="fc" id="L293">        return this;</span>
+    }
+
+    public float getEyeX() {
+<span class="nc" id="L297">        return eyeX;</span>
+    }
+
+    public float getEyeY() {
+<span class="fc" id="L301">        return eyeY;</span>
+    }
+
+    public float getEyeZ() {
+<span class="fc" id="L305">        return eyeZ;</span>
+    }
+
+    public float getTargetX() {
+<span class="nc" id="L309">        return targetX;</span>
+    }
+
+    public float getTargetY() {
+<span class="nc" id="L313">        return targetY;</span>
+    }
+
+    public float getTargetZ() {
+<span class="nc" id="L317">        return targetZ;</span>
+    }
+
+    public float getFov() {
+<span class="fc" id="L321">        return fov;</span>
+    }
+
+    public float getNear() {
+<span class="fc" id="L325">        return near;</span>
+    }
+
+    public float getFar() {
+<span class="fc" id="L329">        return far;</span>
+    }
+
+    // ---- realization (2D / board) -------------------------------------------
+
+    /// Builds `Sprite`s for the 2D / board content of this level and adds them to the
+    /// scene: every painted tile of each visible `Layer.Kind#TILE` layer plus every
+    /// `GameElement` whose layer is an entity layer. Each sprite's z-order is its
+    /// layer band times 1000 (so a higher layer always draws on top), and its
+    /// `Sprite#getUserData()` is the source `GameElement` (for tiles, the source
+    /// `Layer`), so an editor can map a picked sprite back to its data.
+    ///
+    /// In `Mode#THREE_D` this is a no-op (3D content is realized by `GameSceneView` once the
+    /// GPU device exists). In `Mode#BOARD` positions go through `projection` (board
+    /// elements store their column/row in x/y), so pass a fitted `IsoProjection`.
+    public void realizeSprites(Scene scene, AssetCatalog catalog) {
+<span class="nc" id="L345">        realizeSprites(scene, catalog, null);</span>
+<span class="nc" id="L346">    }</span>
+
+    public void realizeSprites(Scene scene, AssetCatalog catalog, IsoProjection projection) {
+<span class="nc bnc" id="L349" title="All 2 branches missed.">        if (mode == Mode.THREE_D) {</span>
+<span class="nc" id="L350">            return;</span>
+        }
+        // tile layers
+<span class="nc bnc" id="L353" title="All 2 branches missed.">        for (Layer layer : layers) {</span>
+<span class="nc bnc" id="L354" title="All 4 branches missed.">            if (layer.getKind() != Layer.Kind.TILE || !layer.isVisible()) {</span>
+<span class="nc" id="L355">                continue;</span>
+            }
+<span class="nc" id="L357">            int z = layer.getBand() * 1000;</span>
+<span class="nc" id="L358">            Map&lt;String, String&gt; tiles = layer.tiles();</span>
+<span class="nc bnc" id="L359" title="All 2 branches missed.">            for (Map.Entry&lt;String, String&gt; e : tiles.entrySet()) {</span>
+<span class="nc" id="L360">                int[] cr = parseCell(e.getKey());</span>
+<span class="nc bnc" id="L361" title="All 2 branches missed.">                if (cr == null) {</span>
+<span class="nc" id="L362">                    continue;</span>
+                }
+<span class="nc bnc" id="L364" title="All 2 branches missed.">                Image img = catalog == null ? null : catalog.image(e.getValue());</span>
+<span class="nc bnc" id="L365" title="All 2 branches missed.">                if (img == null) {</span>
+<span class="nc" id="L366">                    continue;</span>
+                }
+<span class="nc" id="L368">                Sprite s = new Sprite(img);</span>
+<span class="nc" id="L369">                placeCell(s, cr[0], cr[1], projection);</span>
+<span class="nc" id="L370">                s.setZOrder(z);</span>
+<span class="nc" id="L371">                s.setUserData(layer);</span>
+<span class="nc" id="L372">                s.setParallax(layer.getParallaxX(), layer.getParallaxY());</span>
+<span class="nc" id="L373">                scene.add(s);</span>
+<span class="nc" id="L374">            }</span>
+<span class="nc" id="L375">        }</span>
+        // freely placed elements
+<span class="nc bnc" id="L377" title="All 2 branches missed.">        for (GameElement el : elements) {</span>
+<span class="nc" id="L378">            Layer layer = getLayer(el.getLayer());</span>
+<span class="nc bnc" id="L379" title="All 4 branches missed.">            if (layer != null &amp;&amp; !layer.isVisible()) {</span>
+<span class="nc" id="L380">                continue;</span>
+            }
+<span class="nc bnc" id="L382" title="All 2 branches missed.">            Image img = catalog == null ? null : catalog.image(el.getAssetId());</span>
+<span class="nc bnc" id="L383" title="All 2 branches missed.">            if (img == null) {</span>
+<span class="nc" id="L384">                continue;</span>
+            }
+<span class="nc" id="L386">            Sprite s = makeSprite(catalog, el.getAssetId(), img);</span>
+            // render at the asset's intended size, not the raw frame size (a sprite-sheet
+            // frame can be far larger than the on-screen sprite)
+<span class="nc bnc" id="L389" title="All 2 branches missed.">            AssetDef def = catalog == null ? null : catalog.def(el.getAssetId());</span>
+<span class="nc bnc" id="L390" title="All 2 branches missed.">            if (def != null) {</span>
+<span class="nc" id="L391">                s.setSize(def.getWidth(), def.getHeight());</span>
+            }
+<span class="nc bnc" id="L393" title="All 4 branches missed.">            if (mode == Mode.BOARD &amp;&amp; projection != null) {</span>
+                // board elements are placed by their (col,row) stored as x,y
+<span class="nc" id="L395">                placeCell(s, (int) Math.round(el.getX()), (int) Math.round(el.getY()), projection);</span>
+            } else {
+<span class="nc" id="L397">                s.setAnchor(0.5, 0.5);</span>
+<span class="nc" id="L398">                s.setPosition(el.getX(), el.getY(), el.getZ());</span>
+            }
+<span class="nc" id="L400">            s.setRotation(el.getRotation());</span>
+<span class="nc" id="L401">            s.setScale(el.getScaleX(), el.getScaleY());</span>
+<span class="nc bnc" id="L402" title="All 2 branches missed.">            s.setZOrder((layer == null ? 0 : layer.getBand() * 1000) + 1);</span>
+<span class="nc" id="L403">            s.setUserData(el);</span>
+<span class="nc bnc" id="L404" title="All 2 branches missed.">            if (layer != null) {</span>
+<span class="nc" id="L405">                s.setParallax(layer.getParallaxX(), layer.getParallaxY());</span>
+            }
+<span class="nc" id="L407">            scene.add(s);</span>
+<span class="nc" id="L408">        }</span>
+<span class="nc" id="L409">    }</span>
+
+    /// Builds the runtime sprite for an element: an animated `AnimatedSprite` when the
+    /// asset is a sprite sheet (`AssetDef.Type#SHEET`), else a plain `Sprite`.
+    private Sprite makeSprite(AssetCatalog catalog, String assetId, Image img) {
+<span class="nc bnc" id="L414" title="All 2 branches missed.">        if (catalog != null) {</span>
+<span class="nc" id="L415">            AssetDef def = catalog.def(assetId);</span>
+<span class="nc" id="L416">            SpriteSheet sheet = catalog.sheet(assetId);</span>
+<span class="nc bnc" id="L417" title="All 6 branches missed.">            if (def != null &amp;&amp; def.isSheet() &amp;&amp; sheet != null) {</span>
+<span class="nc bnc" id="L418" title="All 2 branches missed.">                int n = def.getFrameCount() &gt; 0 ? def.getFrameCount() : sheet.getFrameCount();</span>
+<span class="nc" id="L419">                int[] idx = new int[Math.max(1, n)];</span>
+<span class="nc bnc" id="L420" title="All 2 branches missed.">                for (int i = 0; i &lt; idx.length; i++) {</span>
+<span class="nc" id="L421">                    idx[i] = i;</span>
+                }
+<span class="nc" id="L423">                AnimatedSprite anim = new AnimatedSprite(sheet, idx, 1.0 / Math.max(1.0, def.getFps()));</span>
+<span class="nc" id="L424">                anim.setLooping(true);</span>
+<span class="nc" id="L425">                anim.play();</span>
+<span class="nc" id="L426">                return anim;</span>
+            }
+        }
+<span class="nc" id="L429">        return new Sprite(img);</span>
+    }
+
+    private void placeCell(Sprite s, int col, int row, IsoProjection projection) {
+<span class="nc bnc" id="L433" title="All 4 branches missed.">        if (mode == Mode.BOARD &amp;&amp; projection != null) {</span>
+<span class="nc" id="L434">            s.setAnchor(0.5, 0.5);</span>
+<span class="nc" id="L435">            s.setPosition(projection.tileCenterX(row, col), projection.tileCenterY(row, col));</span>
+        } else {
+<span class="nc" id="L437">            s.setAnchor(0, 0);</span>
+<span class="nc" id="L438">            s.setPosition(col * tileSize, row * tileSize);</span>
+        }
+<span class="nc" id="L440">    }</span>
+
+    private static int[] parseCell(String key) {
+<span class="nc" id="L443">        int comma = key.indexOf(',');</span>
+<span class="nc bnc" id="L444" title="All 2 branches missed.">        if (comma &lt; 0) {</span>
+<span class="nc" id="L445">            return null;</span>
+        }
+        try {
+<span class="nc" id="L448">            int col = Integer.parseInt(key.substring(0, comma).trim());</span>
+<span class="nc" id="L449">            int row = Integer.parseInt(key.substring(comma + 1).trim());</span>
+<span class="nc" id="L450">            return new int[]{col, row};</span>
+<span class="nc" id="L451">        } catch (NumberFormatException e) {</span>
+<span class="nc" id="L452">            return null;</span>
+        }
+    }
+
+    // ---- serialization -------------------------------------------------------
+
+    /// Parses a level from a JSON string.
+    public static GameLevel load(String json) throws IOException {
+<span class="fc" id="L460">        return fromMap(JSONParser.parseJSON(json));</span>
+    }
+
+    /// Parses a level from a UTF-8 JSON stream and closes it.
+    public static GameLevel load(InputStream in) throws IOException {
+<span class="nc" id="L465">        Reader r = new InputStreamReader(in, &quot;UTF-8&quot;);</span>
+        try {
+<span class="nc" id="L467">            return fromMap(new JSONParser().parseJSON(r));</span>
+        } finally {
+            try {
+<span class="nc" id="L470">                r.close();</span>
+<span class="nc" id="L471">            } catch (IOException ignore) { //NOPMD - closing the reader is best-effort</span>
+<span class="nc" id="L472">            }</span>
+        }
+    }
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    static GameLevel fromMap(Map&lt;String, Object&gt; root) {
+<span class="fc" id="L478">        GameLevel level = new GameLevel();</span>
+<span class="pc bpc" id="L479" title="1 of 2 branches missed.">        if (root == null) {</span>
+<span class="nc" id="L480">            return level;</span>
+        }
+<span class="fc" id="L482">        level.mode = Mode.fromWire(Json.str(root.get(&quot;mode&quot;), &quot;2d&quot;));</span>
+<span class="fc" id="L483">        level.assetPack = Json.str(root.get(&quot;assetPack&quot;), null);</span>
+<span class="fc" id="L484">        level.cols = Json.intval(root.get(&quot;cols&quot;), level.cols);</span>
+<span class="fc" id="L485">        level.rows = Json.intval(root.get(&quot;rows&quot;), level.rows);</span>
+<span class="fc" id="L486">        level.tileSize = Json.intval(root.get(&quot;tileSize&quot;), level.tileSize);</span>
+
+<span class="fc" id="L488">        Map&lt;String, Object&gt; p = Json.asMap(root.get(&quot;props&quot;));</span>
+<span class="fc bfc" id="L489" title="All 2 branches covered.">        if (p != null) {</span>
+<span class="fc" id="L490">            level.props.putAll(p);</span>
+        }
+
+<span class="fc" id="L493">        Map&lt;String, Object&gt; cam = Json.asMap(root.get(&quot;camera&quot;));</span>
+<span class="fc bfc" id="L494" title="All 2 branches covered.">        if (cam != null) {</span>
+<span class="fc" id="L495">            float[] eye = readVec3(cam.get(&quot;eye&quot;), level.eyeX, level.eyeY, level.eyeZ);</span>
+<span class="fc" id="L496">            float[] tgt = readVec3(cam.get(&quot;target&quot;), level.targetX, level.targetY, level.targetZ);</span>
+<span class="fc" id="L497">            level.eyeX = eye[0];</span>
+<span class="fc" id="L498">            level.eyeY = eye[1];</span>
+<span class="fc" id="L499">            level.eyeZ = eye[2];</span>
+<span class="fc" id="L500">            level.targetX = tgt[0];</span>
+<span class="fc" id="L501">            level.targetY = tgt[1];</span>
+<span class="fc" id="L502">            level.targetZ = tgt[2];</span>
+<span class="fc" id="L503">            level.fov = (float) Json.num(cam.get(&quot;fov&quot;), level.fov);</span>
+<span class="fc" id="L504">            level.near = (float) Json.num(cam.get(&quot;near&quot;), level.near);</span>
+<span class="fc" id="L505">            level.far = (float) Json.num(cam.get(&quot;far&quot;), level.far);</span>
+        }
+
+<span class="fc" id="L508">        List&lt;Object&gt; lts = Json.asList(root.get(&quot;lights&quot;));</span>
+<span class="fc bfc" id="L509" title="All 2 branches covered.">        if (lts != null) {</span>
+<span class="fc bfc" id="L510" title="All 2 branches covered.">            for (Object lightEntry : lts) {</span>
+<span class="fc" id="L511">                Map&lt;String, Object&gt; lm = Json.asMap(lightEntry);</span>
+<span class="pc bpc" id="L512" title="1 of 2 branches missed.">                if (lm == null) {</span>
+<span class="nc" id="L513">                    continue;</span>
+                }
+<span class="fc" id="L515">                float[] dir = readVec3(lm.get(&quot;dir&quot;), 0, -1, 0);</span>
+<span class="fc" id="L516">                level.lights.add(new LevelLight(dir[0], dir[1], dir[2],</span>
+<span class="fc" id="L517">                        Json.intval(lm.get(&quot;color&quot;), 0xffffffff),</span>
+<span class="fc" id="L518">                        Json.intval(lm.get(&quot;ambient&quot;), 0xff202020)));</span>
+<span class="fc" id="L519">            }</span>
+        }
+
+<span class="fc" id="L522">        Map&lt;String, Object&gt; ter = Json.asMap(root.get(&quot;terrain&quot;));</span>
+<span class="fc bfc" id="L523" title="All 2 branches covered.">        if (ter != null) {</span>
+<span class="fc" id="L524">            int tc = Json.intval(ter.get(&quot;cols&quot;), 0);</span>
+<span class="fc" id="L525">            int tr = Json.intval(ter.get(&quot;rows&quot;), 0);</span>
+<span class="fc" id="L526">            TerrainGrid grid = new TerrainGrid(tc, tr, (float) Json.num(ter.get(&quot;cellSize&quot;), 1));</span>
+<span class="fc" id="L527">            List&lt;Object&gt; hs = Json.asList(ter.get(&quot;heights&quot;));</span>
+<span class="fc" id="L528">            float[] heights = grid.heights();</span>
+<span class="pc bpc" id="L529" title="2 of 4 branches missed.">            if (hs != null &amp;&amp; heights != null) {</span>
+<span class="pc bpc" id="L530" title="1 of 4 branches missed.">                for (int i = 0; i &lt; hs.size() &amp;&amp; i &lt; heights.length; i++) {</span>
+<span class="fc" id="L531">                    heights[i] = (float) Json.num(hs.get(i), 0);</span>
+                }
+            }
+<span class="fc" id="L534">            List&lt;Object&gt; ws = Json.asList(ter.get(&quot;walls&quot;));</span>
+<span class="fc" id="L535">            float[] walls = grid.walls();</span>
+<span class="pc bpc" id="L536" title="1 of 2 branches missed.">            if (ws != null) {</span>
+<span class="pc bpc" id="L537" title="1 of 4 branches missed.">                for (int i = 0; i &lt; ws.size() &amp;&amp; i &lt; walls.length; i++) {</span>
+<span class="fc" id="L538">                    walls[i] = (float) Json.num(ws.get(i), 0);</span>
+                }
+            }
+<span class="fc" id="L541">            List&lt;Object&gt; ms = Json.asList(ter.get(&quot;materials&quot;));</span>
+<span class="fc" id="L542">            String[] mats = grid.materials();</span>
+<span class="pc bpc" id="L543" title="1 of 2 branches missed.">            if (ms != null) {</span>
+<span class="pc bpc" id="L544" title="1 of 4 branches missed.">                for (int i = 0; i &lt; ms.size() &amp;&amp; i &lt; mats.length; i++) {</span>
+<span class="fc" id="L545">                    mats[i] = materialId(ms.get(i));</span>
+                }
+            }
+<span class="fc" id="L548">            level.terrain = grid;</span>
+        }
+
+<span class="fc" id="L551">        Map&lt;String, Object&gt; wm = Json.asMap(root.get(&quot;world&quot;));</span>
+<span class="pc bpc" id="L552" title="1 of 2 branches missed.">        if (wm != null) {</span>
+<span class="nc" id="L553">            level.world = GameWorld.fromMap(wm);</span>
+        }
+
+<span class="fc" id="L556">        List&lt;Object&gt; ls = Json.asList(root.get(&quot;layers&quot;));</span>
+<span class="pc bpc" id="L557" title="1 of 2 branches missed.">        if (ls != null) {</span>
+<span class="fc bfc" id="L558" title="All 2 branches covered.">            for (int i = 0; i &lt; ls.size(); i++) {</span>
+<span class="fc" id="L559">                Map&lt;String, Object&gt; lm = Json.asMap(ls.get(i));</span>
+<span class="pc bpc" id="L560" title="1 of 2 branches missed.">                if (lm == null) {</span>
+<span class="nc" id="L561">                    continue;</span>
+                }
+<span class="fc" id="L563">                Layer layer = new Layer(Json.str(lm.get(&quot;name&quot;), &quot;Layer&quot;), Layer.Kind.fromWire(Json.str(lm.get(&quot;kind&quot;), &quot;entity&quot;)));</span>
+<span class="fc" id="L564">                layer.setVisible(Json.bool(lm.get(&quot;visible&quot;), true));</span>
+<span class="fc" id="L565">                layer.setLocked(Json.bool(lm.get(&quot;locked&quot;), false));</span>
+<span class="fc" id="L566">                layer.setBand(Json.intval(lm.get(&quot;band&quot;), i));</span>
+<span class="fc" id="L567">                layer.setParallax((float) Json.num(lm.get(&quot;parallaxX&quot;), 1),</span>
+<span class="fc" id="L568">                        (float) Json.num(lm.get(&quot;parallaxY&quot;), 1));</span>
+<span class="fc" id="L569">                Map&lt;String, Object&gt; tm = Json.asMap(lm.get(&quot;tiles&quot;));</span>
+<span class="fc bfc" id="L570" title="All 2 branches covered.">                if (tm != null) {</span>
+<span class="fc bfc" id="L571" title="All 2 branches covered.">                    for (Map.Entry&lt;String, Object&gt; te : tm.entrySet()) {</span>
+<span class="fc" id="L572">                        layer.tiles().put(te.getKey(), Json.str(te.getValue(), null));</span>
+<span class="fc" id="L573">                    }</span>
+                }
+<span class="fc" id="L575">                level.layers.add(layer);</span>
+            }
+        }
+
+<span class="fc" id="L579">        List&lt;Object&gt; es = Json.asList(root.get(&quot;elements&quot;));</span>
+<span class="pc bpc" id="L580" title="1 of 2 branches missed.">        if (es != null) {</span>
+<span class="fc bfc" id="L581" title="All 2 branches covered.">            for (Object elementEntry : es) {</span>
+<span class="fc" id="L582">                Map&lt;String, Object&gt; em = Json.asMap(elementEntry);</span>
+<span class="pc bpc" id="L583" title="1 of 2 branches missed.">                if (em == null) {</span>
+<span class="nc" id="L584">                    continue;</span>
+                }
+<span class="fc" id="L586">                GameElement el = new GameElement(Json.str(em.get(&quot;id&quot;), null), Json.str(em.get(&quot;assetId&quot;), null));</span>
+<span class="fc" id="L587">                el.setName(Json.str(em.get(&quot;name&quot;), null));</span>
+<span class="fc" id="L588">                el.setLayer(Json.str(em.get(&quot;layer&quot;), null));</span>
+<span class="fc" id="L589">                el.setPosition(Json.num(em.get(&quot;x&quot;), 0), Json.num(em.get(&quot;y&quot;), 0), Json.num(em.get(&quot;z&quot;), 0));</span>
+<span class="fc" id="L590">                el.setRotation((float) Json.num(em.get(&quot;rotation&quot;), 0));</span>
+<span class="fc" id="L591">                el.setScale((float) Json.num(em.get(&quot;scaleX&quot;), 1),</span>
+<span class="fc" id="L592">                        (float) Json.num(em.get(&quot;scaleY&quot;), 1),</span>
+<span class="fc" id="L593">                        (float) Json.num(em.get(&quot;scaleZ&quot;), 1));</span>
+<span class="fc" id="L594">                Map&lt;String, Object&gt; ep = Json.asMap(em.get(&quot;props&quot;));</span>
+<span class="fc bfc" id="L595" title="All 2 branches covered.">                if (ep != null) {</span>
+<span class="fc" id="L596">                    el.properties().putAll(ep);</span>
+                }
+<span class="fc" id="L598">                level.elements.add(el);</span>
+<span class="fc" id="L599">            }</span>
+        }
+<span class="fc" id="L601">        return level;</span>
+    }
+
+    /// A terrain material id from a JSON value: a String id is used as-is; a legacy numeric
+    /// ordinal is mapped onto the original built-in order (0=grass..5=dirt) so older `.game`
+    /// files that stored material indices still load.
+    private static String materialId(Object v) {
+<span class="pc bpc" id="L608" title="1 of 2 branches missed.">        if (v instanceof String) {</span>
+<span class="fc" id="L609">            return (String) v;</span>
+        }
+<span class="nc bnc" id="L611" title="All 6 branches missed.">        switch (Json.intval(v, 0)) {</span>
+<span class="nc" id="L612">            case 1: return MaterialRegistry.ROAD;</span>
+<span class="nc" id="L613">            case 2: return MaterialRegistry.STONE;</span>
+<span class="nc" id="L614">            case 3: return MaterialRegistry.SAND;</span>
+<span class="nc" id="L615">            case 4: return MaterialRegistry.WATER;</span>
+<span class="nc" id="L616">            case 5: return MaterialRegistry.DIRT;</span>
+<span class="nc" id="L617">            default: return MaterialRegistry.GRASS;</span>
+        }
+    }
+
+    private static float[] readVec3(Object v, float dx, float dy, float dz) {
+<span class="fc" id="L622">        List&lt;Object&gt; l = Json.asList(v);</span>
+<span class="pc bpc" id="L623" title="1 of 2 branches missed.">        if (l == null) {</span>
+<span class="nc" id="L624">            return new float[]{dx, dy, dz};</span>
+        }
+<span class="fc" id="L626">        return new float[]{</span>
+<span class="pc bpc" id="L627" title="1 of 2 branches missed.">                !l.isEmpty() ? (float) Json.num(l.get(0), dx) : dx,</span>
+<span class="pc bpc" id="L628" title="1 of 2 branches missed.">                l.size() &gt; 1 ? (float) Json.num(l.get(1), dy) : dy,</span>
+<span class="pc bpc" id="L629" title="1 of 2 branches missed.">                l.size() &gt; 2 ? (float) Json.num(l.get(2), dz) : dz};</span>
+    }
+
+
+    /// Serializes this level to a compact JSON string (round-trips through
+    /// `#load(String)`).
+    public String toJson() {
+<span class="fc" id="L636">        StringBuilder sb = new StringBuilder(512);</span>
+<span class="fc" id="L637">        sb.append('{');</span>
+<span class="fc" id="L638">        kv(sb, &quot;mode&quot;);</span>
+<span class="fc" id="L639">        Json.writeString(sb, mode.wireName());</span>
+<span class="pc bpc" id="L640" title="1 of 2 branches missed.">        if (assetPack != null) {</span>
+<span class="fc" id="L641">            sb.append(',');</span>
+<span class="fc" id="L642">            kv(sb, &quot;assetPack&quot;);</span>
+<span class="fc" id="L643">            Json.writeString(sb, assetPack);</span>
+        }
+<span class="fc" id="L645">        sb.append(',');</span>
+<span class="fc" id="L646">        kv(sb, &quot;cols&quot;);</span>
+<span class="fc" id="L647">        Json.writeNumber(sb, cols);</span>
+<span class="fc" id="L648">        sb.append(',');</span>
+<span class="fc" id="L649">        kv(sb, &quot;rows&quot;);</span>
+<span class="fc" id="L650">        Json.writeNumber(sb, rows);</span>
+<span class="fc" id="L651">        sb.append(',');</span>
+<span class="fc" id="L652">        kv(sb, &quot;tileSize&quot;);</span>
+<span class="fc" id="L653">        Json.writeNumber(sb, tileSize);</span>
+
+<span class="fc bfc" id="L655" title="All 2 branches covered.">        if (!props.isEmpty()) {</span>
+<span class="fc" id="L656">            sb.append(',');</span>
+<span class="fc" id="L657">            kv(sb, &quot;props&quot;);</span>
+<span class="fc" id="L658">            Json.writeValue(sb, props);</span>
+        }
+
+<span class="fc bfc" id="L661" title="All 2 branches covered.">        if (mode == Mode.THREE_D) {</span>
+<span class="fc" id="L662">            sb.append(',');</span>
+<span class="fc" id="L663">            kv(sb, &quot;camera&quot;);</span>
+<span class="fc" id="L664">            sb.append(&quot;{\&quot;eye\&quot;:[&quot;);</span>
+<span class="fc" id="L665">            Json.writeNumber(sb, eyeX);</span>
+<span class="fc" id="L666">            sb.append(',');</span>
+<span class="fc" id="L667">            Json.writeNumber(sb, eyeY);</span>
+<span class="fc" id="L668">            sb.append(',');</span>
+<span class="fc" id="L669">            Json.writeNumber(sb, eyeZ);</span>
+<span class="fc" id="L670">            sb.append(&quot;],\&quot;target\&quot;:[&quot;);</span>
+<span class="fc" id="L671">            Json.writeNumber(sb, targetX);</span>
+<span class="fc" id="L672">            sb.append(',');</span>
+<span class="fc" id="L673">            Json.writeNumber(sb, targetY);</span>
+<span class="fc" id="L674">            sb.append(',');</span>
+<span class="fc" id="L675">            Json.writeNumber(sb, targetZ);</span>
+<span class="fc" id="L676">            sb.append(&quot;],\&quot;fov\&quot;:&quot;);</span>
+<span class="fc" id="L677">            Json.writeNumber(sb, fov);</span>
+<span class="fc" id="L678">            sb.append(&quot;,\&quot;near\&quot;:&quot;);</span>
+<span class="fc" id="L679">            Json.writeNumber(sb, near);</span>
+<span class="fc" id="L680">            sb.append(&quot;,\&quot;far\&quot;:&quot;);</span>
+<span class="fc" id="L681">            Json.writeNumber(sb, far);</span>
+<span class="fc" id="L682">            sb.append('}');</span>
+
+<span class="pc bpc" id="L684" title="1 of 2 branches missed.">            if (!lights.isEmpty()) {</span>
+<span class="fc" id="L685">                sb.append(',');</span>
+<span class="fc" id="L686">                kv(sb, &quot;lights&quot;);</span>
+<span class="fc" id="L687">                sb.append('[');</span>
+<span class="fc bfc" id="L688" title="All 2 branches covered.">                for (int i = 0; i &lt; lights.size(); i++) {</span>
+<span class="fc" id="L689">                    LevelLight l = lights.get(i);</span>
+<span class="pc bpc" id="L690" title="1 of 2 branches missed.">                    if (i &gt; 0) {</span>
+<span class="nc" id="L691">                        sb.append(',');</span>
+                    }
+<span class="fc" id="L693">                    sb.append(&quot;{\&quot;dir\&quot;:[&quot;);</span>
+<span class="fc" id="L694">                    Json.writeNumber(sb, l.getDirectionX());</span>
+<span class="fc" id="L695">                    sb.append(',');</span>
+<span class="fc" id="L696">                    Json.writeNumber(sb, l.getDirectionY());</span>
+<span class="fc" id="L697">                    sb.append(',');</span>
+<span class="fc" id="L698">                    Json.writeNumber(sb, l.getDirectionZ());</span>
+<span class="fc" id="L699">                    sb.append(&quot;],\&quot;color\&quot;:&quot;);</span>
+<span class="fc" id="L700">                    Json.writeNumber(sb, l.getColor());</span>
+<span class="fc" id="L701">                    sb.append(&quot;,\&quot;ambient\&quot;:&quot;);</span>
+<span class="fc" id="L702">                    Json.writeNumber(sb, l.getAmbientColor());</span>
+<span class="fc" id="L703">                    sb.append('}');</span>
+                }
+<span class="fc" id="L705">                sb.append(']');</span>
+            }
+
+<span class="pc bpc" id="L708" title="1 of 2 branches missed.">            if (terrain != null) {</span>
+<span class="fc" id="L709">                sb.append(',');</span>
+<span class="fc" id="L710">                kv(sb, &quot;terrain&quot;);</span>
+<span class="fc" id="L711">                sb.append(&quot;{\&quot;cols\&quot;:&quot;);</span>
+<span class="fc" id="L712">                Json.writeNumber(sb, terrain.getCols());</span>
+<span class="fc" id="L713">                sb.append(&quot;,\&quot;rows\&quot;:&quot;);</span>
+<span class="fc" id="L714">                Json.writeNumber(sb, terrain.getRows());</span>
+<span class="fc" id="L715">                sb.append(&quot;,\&quot;cellSize\&quot;:&quot;);</span>
+<span class="fc" id="L716">                Json.writeNumber(sb, terrain.getCellSize());</span>
+<span class="fc" id="L717">                sb.append(&quot;,\&quot;heights\&quot;:[&quot;);</span>
+<span class="fc" id="L718">                float[] h = terrain.heights();</span>
+<span class="pc bpc" id="L719" title="1 of 2 branches missed.">                if (h != null) {</span>
+<span class="fc bfc" id="L720" title="All 2 branches covered.">                    for (int i = 0; i &lt; h.length; i++) {</span>
+<span class="fc bfc" id="L721" title="All 2 branches covered.">                        if (i &gt; 0) {</span>
+<span class="fc" id="L722">                            sb.append(',');</span>
+                        }
+<span class="fc" id="L724">                        Json.writeNumber(sb, h[i]);</span>
+                    }
+                }
+<span class="fc" id="L727">                sb.append(&quot;],\&quot;walls\&quot;:[&quot;);</span>
+<span class="fc" id="L728">                float[] w = terrain.walls();</span>
+<span class="fc bfc" id="L729" title="All 2 branches covered.">                for (int i = 0; i &lt; w.length; i++) {</span>
+<span class="fc bfc" id="L730" title="All 2 branches covered.">                    if (i &gt; 0) {</span>
+<span class="fc" id="L731">                        sb.append(',');</span>
+                    }
+<span class="fc" id="L733">                    Json.writeNumber(sb, w[i]);</span>
+                }
+<span class="fc" id="L735">                sb.append(&quot;],\&quot;materials\&quot;:[&quot;);</span>
+<span class="fc" id="L736">                String[] mm = terrain.materials();</span>
+<span class="fc bfc" id="L737" title="All 2 branches covered.">                for (int i = 0; i &lt; mm.length; i++) {</span>
+<span class="fc bfc" id="L738" title="All 2 branches covered.">                    if (i &gt; 0) {</span>
+<span class="fc" id="L739">                        sb.append(',');</span>
+                    }
+<span class="pc bpc" id="L741" title="1 of 2 branches missed.">                    Json.writeString(sb, mm[i] == null ? MaterialRegistry.GRASS : mm[i]);</span>
+                }
+<span class="fc" id="L743">                sb.append(&quot;]}&quot;);</span>
+            }
+        }
+
+<span class="fc" id="L747">        sb.append(',');</span>
+<span class="fc" id="L748">        kv(sb, &quot;layers&quot;);</span>
+<span class="fc" id="L749">        sb.append('[');</span>
+<span class="fc bfc" id="L750" title="All 2 branches covered.">        for (int i = 0; i &lt; layers.size(); i++) {</span>
+<span class="fc" id="L751">            Layer layer = layers.get(i);</span>
+<span class="fc bfc" id="L752" title="All 2 branches covered.">            if (i &gt; 0) {</span>
+<span class="fc" id="L753">                sb.append(',');</span>
+            }
+<span class="fc" id="L755">            sb.append('{');</span>
+<span class="fc" id="L756">            kv(sb, &quot;name&quot;);</span>
+<span class="pc bpc" id="L757" title="1 of 2 branches missed.">            Json.writeString(sb, layer.getName() == null ? &quot;&quot; : layer.getName());</span>
+<span class="fc" id="L758">            sb.append(',');</span>
+<span class="fc" id="L759">            kv(sb, &quot;kind&quot;);</span>
+<span class="fc" id="L760">            Json.writeString(sb, layer.getKind().wireName());</span>
+<span class="pc bpc" id="L761" title="1 of 2 branches missed.">            sb.append(&quot;,\&quot;visible\&quot;:&quot;).append(layer.isVisible() ? &quot;true&quot; : &quot;false&quot;);</span>
+<span class="pc bpc" id="L762" title="1 of 2 branches missed.">            sb.append(&quot;,\&quot;locked\&quot;:&quot;).append(layer.isLocked() ? &quot;true&quot; : &quot;false&quot;);</span>
+<span class="fc" id="L763">            sb.append(&quot;,\&quot;band\&quot;:&quot;);</span>
+<span class="fc" id="L764">            Json.writeNumber(sb, layer.getBand());</span>
+<span class="pc bpc" id="L765" title="1 of 2 branches missed.">            if (layer.getParallaxX() != 1f) {</span>
+<span class="nc" id="L766">                sb.append(&quot;,\&quot;parallaxX\&quot;:&quot;);</span>
+<span class="nc" id="L767">                Json.writeNumber(sb, layer.getParallaxX());</span>
+            }
+<span class="pc bpc" id="L769" title="1 of 2 branches missed.">            if (layer.getParallaxY() != 1f) {</span>
+<span class="nc" id="L770">                sb.append(&quot;,\&quot;parallaxY\&quot;:&quot;);</span>
+<span class="nc" id="L771">                Json.writeNumber(sb, layer.getParallaxY());</span>
+            }
+<span class="pc bpc" id="L773" title="1 of 4 branches missed.">            if (layer.getKind() == Layer.Kind.TILE &amp;&amp; !layer.tiles().isEmpty()) {</span>
+<span class="fc" id="L774">                sb.append(',');</span>
+<span class="fc" id="L775">                kv(sb, &quot;tiles&quot;);</span>
+<span class="fc" id="L776">                sb.append('{');</span>
+<span class="fc" id="L777">                boolean first = true;</span>
+<span class="fc bfc" id="L778" title="All 2 branches covered.">                for (Map.Entry&lt;String, String&gt; e : layer.tiles().entrySet()) {</span>
+<span class="fc bfc" id="L779" title="All 2 branches covered.">                    if (!first) {</span>
+<span class="fc" id="L780">                        sb.append(',');</span>
+                    }
+<span class="fc" id="L782">                    first = false;</span>
+<span class="fc" id="L783">                    Json.writeString(sb, e.getKey());</span>
+<span class="fc" id="L784">                    sb.append(':');</span>
+<span class="fc" id="L785">                    Json.writeString(sb, e.getValue());</span>
+<span class="fc" id="L786">                }</span>
+<span class="fc" id="L787">                sb.append('}');</span>
+            }
+<span class="fc" id="L789">            sb.append('}');</span>
+        }
+<span class="fc" id="L791">        sb.append(']');</span>
+
+<span class="fc" id="L793">        sb.append(',');</span>
+<span class="fc" id="L794">        kv(sb, &quot;elements&quot;);</span>
+<span class="fc" id="L795">        sb.append('[');</span>
+<span class="fc bfc" id="L796" title="All 2 branches covered.">        for (int i = 0; i &lt; elements.size(); i++) {</span>
+<span class="fc" id="L797">            GameElement el = elements.get(i);</span>
+<span class="fc bfc" id="L798" title="All 2 branches covered.">            if (i &gt; 0) {</span>
+<span class="fc" id="L799">                sb.append(',');</span>
+            }
+<span class="fc" id="L801">            sb.append('{');</span>
+<span class="fc" id="L802">            kv(sb, &quot;id&quot;);</span>
+<span class="pc bpc" id="L803" title="1 of 2 branches missed.">            Json.writeString(sb, el.getId() == null ? &quot;&quot; : el.getId());</span>
+<span class="fc" id="L804">            sb.append(',');</span>
+<span class="fc" id="L805">            kv(sb, &quot;assetId&quot;);</span>
+<span class="pc bpc" id="L806" title="1 of 2 branches missed.">            Json.writeString(sb, el.getAssetId() == null ? &quot;&quot; : el.getAssetId());</span>
+<span class="fc bfc" id="L807" title="All 2 branches covered.">            if (el.getName() != null) {</span>
+<span class="fc" id="L808">                sb.append(',');</span>
+<span class="fc" id="L809">                kv(sb, &quot;name&quot;);</span>
+<span class="fc" id="L810">                Json.writeString(sb, el.getName());</span>
+            }
+<span class="pc bpc" id="L812" title="1 of 2 branches missed.">            if (el.getLayer() != null) {</span>
+<span class="fc" id="L813">                sb.append(',');</span>
+<span class="fc" id="L814">                kv(sb, &quot;layer&quot;);</span>
+<span class="fc" id="L815">                Json.writeString(sb, el.getLayer());</span>
+            }
+<span class="fc" id="L817">            sb.append(&quot;,\&quot;x\&quot;:&quot;);</span>
+<span class="fc" id="L818">            Json.writeNumber(sb, el.getX());</span>
+<span class="fc" id="L819">            sb.append(&quot;,\&quot;y\&quot;:&quot;);</span>
+<span class="fc" id="L820">            Json.writeNumber(sb, el.getY());</span>
+<span class="fc bfc" id="L821" title="All 2 branches covered.">            if (el.getZ() != 0) {</span>
+<span class="fc" id="L822">                sb.append(&quot;,\&quot;z\&quot;:&quot;);</span>
+<span class="fc" id="L823">                Json.writeNumber(sb, el.getZ());</span>
+            }
+<span class="fc bfc" id="L825" title="All 2 branches covered.">            if (el.getRotation() != 0) {</span>
+<span class="fc" id="L826">                sb.append(&quot;,\&quot;rotation\&quot;:&quot;);</span>
+<span class="fc" id="L827">                Json.writeNumber(sb, el.getRotation());</span>
+            }
+<span class="pc bpc" id="L829" title="2 of 6 branches missed.">            if (el.getScaleX() != 1 || el.getScaleY() != 1 || el.getScaleZ() != 1) {</span>
+<span class="fc" id="L830">                sb.append(&quot;,\&quot;scaleX\&quot;:&quot;);</span>
+<span class="fc" id="L831">                Json.writeNumber(sb, el.getScaleX());</span>
+<span class="fc" id="L832">                sb.append(&quot;,\&quot;scaleY\&quot;:&quot;);</span>
+<span class="fc" id="L833">                Json.writeNumber(sb, el.getScaleY());</span>
+<span class="fc" id="L834">                sb.append(&quot;,\&quot;scaleZ\&quot;:&quot;);</span>
+<span class="fc" id="L835">                Json.writeNumber(sb, el.getScaleZ());</span>
+            }
+<span class="fc bfc" id="L837" title="All 2 branches covered.">            if (!el.properties().isEmpty()) {</span>
+<span class="fc" id="L838">                sb.append(',');</span>
+<span class="fc" id="L839">                kv(sb, &quot;props&quot;);</span>
+<span class="fc" id="L840">                Json.writeValue(sb, el.properties());</span>
+            }
+<span class="fc" id="L842">            sb.append('}');</span>
+        }
+<span class="fc" id="L844">        sb.append(']');</span>
+
+<span class="pc bpc" id="L846" title="1 of 2 branches missed.">        if (world != null) {</span>
+<span class="nc" id="L847">            sb.append(',');</span>
+<span class="nc" id="L848">            kv(sb, &quot;world&quot;);</span>
+<span class="nc" id="L849">            sb.append(world.toJson());</span>
+        }
+
+<span class="fc" id="L852">        sb.append('}');</span>
+<span class="fc" id="L853">        return sb.toString();</span>
+    }
+
+    /// Writes this level as UTF-8 JSON to the stream (does not close it).
+    public void save(OutputStream out) throws IOException {
+<span class="nc" id="L858">        out.write(toJson().getBytes(&quot;UTF-8&quot;));</span>
+<span class="nc" id="L859">        out.flush();</span>
+<span class="nc" id="L860">    }</span>
+
+    private static void kv(StringBuilder sb, String key) {
+<span class="fc" id="L863">        Json.writeString(sb, key);</span>
+<span class="fc" id="L864">        sb.append(':');</span>
+<span class="fc" id="L865">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

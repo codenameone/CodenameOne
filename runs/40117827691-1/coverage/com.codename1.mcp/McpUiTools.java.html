@@ -1,0 +1,449 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>McpUiTools.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.mcp</a> &gt; <span class="el_source">McpUiTools.java</span></div><h1>McpUiTools.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.mcp;
+
+import com.codename1.ai.Tool;
+import com.codename1.ai.ToolHandler;
+import com.codename1.io.JSONParser;
+import com.codename1.ui.Display;
+import com.codename1.ui.Desktop;
+import com.codename1.ui.Window;
+import com.codename1.ui.Component;
+import com.codename1.ui.TopLevelContainer;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
+import com.codename1.ui.accessibility.AccessibilityAction;
+import com.codename1.ui.accessibility.AccessibilityManager;
+import com.codename1.ui.accessibility.AccessibilityNodeSnapshot;
+import com.codename1.ui.accessibility.AccessibilityTreeSnapshot;
+import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.util.ImageIO;
+import java.io.ByteArrayOutputStream;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/// Built in MCP tools that turn any Codename One application into an agent drivable
+/// surface with no application code. They wrap the portable accessibility semantics
+/// tree: {@link AccessibilityTreeSnapshot#toJson()} reads the current screen and
+/// {@link AccessibilityAction} entries drive it. All tree access is marshalled onto
+/// the Codename One EDT because the live component hierarchy must never be walked off
+/// thread.
+final class McpUiTools {
+    private McpUiTools() {
+    }
+
+    private static final String WINDOW_PROPERTY = &quot;\&quot;windowId\&quot;:{\&quot;type\&quot;:\&quot;integer\&quot;,\&quot;description\&quot;:\&quot;Optional window id from ui_windows; 0 is the main form, omitted uses current focus\&quot;}&quot;;
+
+    static List&lt;Tool&gt; builtInTools() {
+<span class="fc" id="L60">        List&lt;Tool&gt; tools = new ArrayList&lt;Tool&gt;();</span>
+
+<span class="fc" id="L62">        tools.add(new Tool(&quot;ui_windows&quot;, &quot;List application windows with ids, titles, visibility, focus and modal blocking. Use windowId with UI tools to address a dialog explicitly.&quot;,</span>
+<span class="fc" id="L63">                &quot;{\&quot;type\&quot;:\&quot;object\&quot;,\&quot;properties\&quot;:{}}&quot;, new ToolHandler() {</span>
+                    @Override
+                    public String invoke(String argumentsJson) {
+<span class="fc" id="L66">                        final List&lt;Object&gt; windows = new ArrayList&lt;Object&gt;();</span>
+<span class="fc" id="L67">                        runOnEdt(new Runnable() {</span>
+                            @Override
+                            public void run() {
+<span class="fc" id="L70">                                TopLevelContainer main = Display.getInstance().getCurrent();</span>
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">                                if (main != null) {</span>
+<span class="fc" id="L72">                                    windows.add(windowInfo(0, main));</span>
+                                }
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">                                if (Desktop.isSupported()) {</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">                                    for (Window window : Desktop.getInstance().getWindows()) {</span>
+<span class="fc" id="L76">                                        windows.add(windowInfo(window.getWindowId(), window));</span>
+                                    }
+                                }
+<span class="fc" id="L79">                            }</span>
+                        });
+<span class="fc" id="L81">                        return JSONParser.toJson(windows);</span>
+                    }
+                }));
+
+<span class="fc" id="L85">        tools.add(new Tool(&quot;ui_snapshot&quot;,</span>
+                &quot;Returns the accessibility semantics tree of the current screen as JSON: every &quot;
+                        + &quot;visible node with its id, role, label, value, state and the ids of the &quot;
+                        + &quot;actions that can be performed on it.&quot;,
+                &quot;{\&quot;type\&quot;:\&quot;object\&quot;,\&quot;properties\&quot;:{&quot; + WINDOW_PROPERTY + &quot;}}&quot;,
+<span class="fc" id="L90">                new ToolHandler() {</span>
+                    @Override
+                    public String invoke(String argumentsJson) throws Exception {
+<span class="fc" id="L93">                        return snapshotJson((int) longArg(parse(argumentsJson), &quot;windowId&quot;, -1));</span>
+                    }
+                }));
+
+<span class="fc" id="L97">        tools.add(new Tool(&quot;ui_perform_action&quot;,</span>
+                &quot;Performs an accessibility action on a node from ui_snapshot. actionId is one of the &quot;
+                        + &quot;action ids listed on the node (for example activate, setText, increment, focus). &quot;
+                        + &quot;Returns success and a fresh snapshot. If a modal action is still running, &quot;
+                        + &quot;returns pending:true without a completed success result; use subsequent UI calls to interact with the dialog.&quot;,
+                &quot;{\&quot;type\&quot;:\&quot;object\&quot;,\&quot;properties\&quot;:{&quot; + WINDOW_PROPERTY + &quot;,&quot;
+                        + &quot;\&quot;nodeId\&quot;:{\&quot;type\&quot;:\&quot;integer\&quot;,\&quot;description\&quot;:\&quot;id of the target node\&quot;},&quot;
+                        + &quot;\&quot;actionId\&quot;:{\&quot;type\&quot;:\&quot;string\&quot;,\&quot;description\&quot;:\&quot;id of the action to perform\&quot;},&quot;
+                        + &quot;\&quot;argument\&quot;:{\&quot;type\&quot;:\&quot;string\&quot;,\&quot;description\&quot;:\&quot;optional argument, e.g. text for setText\&quot;}&quot;
+                        + &quot;},\&quot;required\&quot;:[\&quot;nodeId\&quot;,\&quot;actionId\&quot;]}&quot;,
+<span class="fc" id="L107">                new ToolHandler() {</span>
+                    @Override
+                    public String invoke(String argumentsJson) throws Exception {
+<span class="nc" id="L110">                        Map&lt;String, Object&gt; args = parse(argumentsJson);</span>
+<span class="nc" id="L111">                        long nodeId = longArg(args, &quot;nodeId&quot;, -1);</span>
+<span class="nc" id="L112">                        String actionId = JSONParser.getString(args, &quot;actionId&quot;);</span>
+<span class="nc" id="L113">                        Object argument = args.get(&quot;argument&quot;);</span>
+<span class="nc" id="L114">                        return JSONParser.toJson(performAction(nodeId, actionId, argument, (int) longArg(args, &quot;windowId&quot;, -1)));</span>
+                    }
+                }));
+
+<span class="fc" id="L118">        tools.add(new Tool(&quot;ui_activate&quot;,</span>
+                &quot;Convenience wrapper that performs the activate action on a node (equivalent to a tap &quot;
+                        + &quot;or click). Returns success and a fresh snapshot. Modal actions return pending:true &quot;
+                        + &quot;without a completed success result so subsequent calls can interact with the dialog.&quot;,
+                &quot;{\&quot;type\&quot;:\&quot;object\&quot;,\&quot;properties\&quot;:{&quot; + WINDOW_PROPERTY + &quot;,&quot;
+                        + &quot;\&quot;nodeId\&quot;:{\&quot;type\&quot;:\&quot;integer\&quot;,\&quot;description\&quot;:\&quot;id of the node to activate\&quot;}&quot;
+                        + &quot;},\&quot;required\&quot;:[\&quot;nodeId\&quot;]}&quot;,
+<span class="fc" id="L125">                new ToolHandler() {</span>
+                    @Override
+                    public String invoke(String argumentsJson) throws Exception {
+<span class="fc" id="L128">                        Map&lt;String, Object&gt; args = parse(argumentsJson);</span>
+<span class="fc" id="L129">                        return JSONParser.toJson(performAction(longArg(args, &quot;nodeId&quot;, -1),</span>
+<span class="fc" id="L130">                                AccessibilityAction.ACTIVATE, null, (int) longArg(args, &quot;windowId&quot;, -1)));</span>
+                    }
+                }));
+
+<span class="fc" id="L134">        tools.add(new Tool(&quot;ui_set_text&quot;,</span>
+                &quot;Convenience wrapper that sets the text of an editable node (performs the setText &quot;
+                        + &quot;action with the given text). Returns whether it succeeded and a fresh snapshot.&quot;,
+                &quot;{\&quot;type\&quot;:\&quot;object\&quot;,\&quot;properties\&quot;:{&quot; + WINDOW_PROPERTY + &quot;,&quot;
+                        + &quot;\&quot;nodeId\&quot;:{\&quot;type\&quot;:\&quot;integer\&quot;,\&quot;description\&quot;:\&quot;id of the editable node\&quot;},&quot;
+                        + &quot;\&quot;text\&quot;:{\&quot;type\&quot;:\&quot;string\&quot;,\&quot;description\&quot;:\&quot;the text to set\&quot;}&quot;
+                        + &quot;},\&quot;required\&quot;:[\&quot;nodeId\&quot;,\&quot;text\&quot;]}&quot;,
+<span class="fc" id="L141">                new ToolHandler() {</span>
+                    @Override
+                    public String invoke(String argumentsJson) throws Exception {
+<span class="fc" id="L144">                        Map&lt;String, Object&gt; args = parse(argumentsJson);</span>
+<span class="fc" id="L145">                        return JSONParser.toJson(performAction(longArg(args, &quot;nodeId&quot;, -1),</span>
+<span class="fc" id="L146">                                AccessibilityAction.SET_TEXT, JSONParser.getString(args, &quot;text&quot;), (int) longArg(args, &quot;windowId&quot;, -1)));</span>
+                    }
+                }));
+
+<span class="fc" id="L150">        tools.add(new Tool(&quot;ui_find&quot;,</span>
+                &quot;Finds nodes on the current screen by application identifier, by a case insensitive &quot;
+                        + &quot;substring of their label, or by a screen coordinate. Returns a compact JSON array &quot;
+                        + &quot;of matches with their id, role, label and available action ids.&quot;,
+                &quot;{\&quot;type\&quot;:\&quot;object\&quot;,\&quot;properties\&quot;:{&quot; + WINDOW_PROPERTY + &quot;,&quot;
+                        + &quot;\&quot;identifier\&quot;:{\&quot;type\&quot;:\&quot;string\&quot;,\&quot;description\&quot;:\&quot;exact application identifier\&quot;},&quot;
+                        + &quot;\&quot;label\&quot;:{\&quot;type\&quot;:\&quot;string\&quot;,\&quot;description\&quot;:\&quot;label substring to search for\&quot;},&quot;
+                        + &quot;\&quot;x\&quot;:{\&quot;type\&quot;:\&quot;integer\&quot;,\&quot;description\&quot;:\&quot;screen x coordinate\&quot;},&quot;
+                        + &quot;\&quot;y\&quot;:{\&quot;type\&quot;:\&quot;integer\&quot;,\&quot;description\&quot;:\&quot;screen y coordinate\&quot;}&quot;
+                        + &quot;}}&quot;,
+<span class="fc" id="L160">                new ToolHandler() {</span>
+                    @Override
+                    public String invoke(String argumentsJson) throws Exception {
+<span class="fc" id="L163">                        Map&lt;String, Object&gt; args = parse(argumentsJson);</span>
+<span class="fc" id="L164">                        return findNodes(JSONParser.getString(args, &quot;identifier&quot;),</span>
+<span class="fc" id="L165">                                JSONParser.getString(args, &quot;label&quot;),</span>
+<span class="fc" id="L166">                                (int) longArg(args, &quot;x&quot;, Integer.MIN_VALUE),</span>
+<span class="fc" id="L167">                                (int) longArg(args, &quot;y&quot;, Integer.MIN_VALUE), (int) longArg(args, &quot;windowId&quot;, -1));</span>
+                    }
+                }));
+
+<span class="fc" id="L171">        return tools;</span>
+    }
+
+    static String snapshotJson() {
+<span class="nc" id="L175">        return snapshotJson(-1);</span>
+    }
+
+    private static String snapshotJson(final int windowId) {
+<span class="fc" id="L179">        final String[] holder = new String[1];</span>
+<span class="fc" id="L180">        runOnEdt(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L183">                holder[0] = currentSnapshot(windowId).toJson();</span>
+<span class="fc" id="L184">            }</span>
+        });
+<span class="fc" id="L186">        return holder[0];</span>
+    }
+
+    static Map&lt;String, Object&gt; performAction(final long nodeId, final String actionId, final Object argument, final int windowId) {
+<span class="fc" id="L190">        final Map&lt;String, Object&gt; outcome = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L191">        final boolean[] complete = new boolean[1];</span>
+<span class="fc" id="L192">        Runnable perform = new Runnable() {</span>
+            @Override
+            public void run() {
+                try {
+<span class="fc" id="L196">                    AccessibilityManager mgr = AccessibilityManager.getInstance();</span>
+<span class="fc" id="L197">                    AccessibilityTreeSnapshot snap = currentSnapshot(windowId);</span>
+<span class="fc" id="L198">                    AccessibilityNodeSnapshot node = snap.getNode(nodeId);</span>
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">                    AccessibilityAction action = node == null ? null : node.getAction(actionId);</span>
+<span class="fc" id="L200">                    boolean ok = false;</span>
+<span class="fc" id="L201">                    TopLevelContainer top = resolveWindow(windowId);</span>
+<span class="fc bfc" id="L202" title="All 2 branches covered.">                    int targetId = top instanceof Window ? ((Window) top).getWindowId() : 0;</span>
+<span class="fc bfc" id="L203" title="All 4 branches covered.">                    if (Desktop.isSupported() &amp;&amp; Desktop.getInstance().isWindowInputBlocked(targetId)) {</span>
+<span class="fc" id="L204">                        throw new IllegalStateException(&quot;Window is blocked by a modal dialog; inspect ui_windows&quot;);</span>
+                    }
+<span class="pc bpc" id="L206" title="3 of 6 branches missed.">                    if (node != null &amp;&amp; action != null &amp;&amp; action.isEnabled()) {</span>
+<span class="fc" id="L207">                        ok = action.perform(node.getComponent(), argument);</span>
+<span class="fc" id="L208">                        mgr.invalidate(node.getComponent(), AccessibilityManager.CHANGE_STATE</span>
+                                | AccessibilityManager.CHANGE_VALUE | AccessibilityManager.CHANGE_CONTENT
+                                | AccessibilityManager.CHANGE_STRUCTURE);
+                    }
+<span class="fc" id="L212">                    outcome.put(&quot;success&quot;, Boolean.valueOf(ok));</span>
+<span class="pc bpc" id="L213" title="1 of 2 branches missed.">                    if (node == null) {</span>
+<span class="nc" id="L214">                        outcome.put(&quot;error&quot;, &quot;no node with id &quot; + nodeId);</span>
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">                    } else if (action == null) {</span>
+<span class="nc" id="L216">                        outcome.put(&quot;error&quot;, &quot;node &quot; + nodeId + &quot; has no action &quot; + actionId);</span>
+                    }
+<span class="fc" id="L218">                } catch (RuntimeException ex) {</span>
+<span class="fc" id="L219">                    outcome.put(&quot;success&quot;, Boolean.FALSE);</span>
+<span class="fc" id="L220">                    outcome.put(&quot;error&quot;, ex.toString());</span>
+                } finally {
+<span class="fc" id="L222">                    complete[0] = true;</span>
+                }
+<span class="fc" id="L224">            }</span>
+        };
+<span class="fc" id="L226">        final Display display = Display.getInstance();</span>
+<span class="fc" id="L227">        final Map&lt;String, Object&gt; out = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L228">        final Object lock = new Object();</span>
+<span class="fc" id="L229">        final boolean[] ready = new boolean[1];</span>
+<span class="fc" id="L230">        final Runnable snapshot = new Runnable() {</span>
+            @Override
+            public void run() {
+                try {
+<span class="fc" id="L234">                    out.putAll(outcome);</span>
+<span class="fc bfc" id="L235" title="All 2 branches covered.">                    out.put(&quot;pending&quot;, Boolean.valueOf(!complete[0]));</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">                    if (!complete[0]) {</span>
+<span class="fc" id="L237">                        out.put(&quot;success&quot;, null);</span>
+                    }
+<span class="fc" id="L239">                    int snapshotWindow = windowId;</span>
+<span class="fc bfc" id="L240" title="All 2 branches covered.">                    if (snapshotWindow &gt; 0) {</span>
+<span class="fc" id="L241">                        Window window = Desktop.getInstance().windowById(snapshotWindow);</span>
+<span class="pc bpc" id="L242" title="2 of 4 branches missed.">                        if (window == null || !window.isWindowShowing()) {</span>
+<span class="nc" id="L243">                            snapshotWindow = -1;</span>
+                        }
+                    }
+<span class="fc" id="L246">                    out.put(&quot;snapshot&quot;, JSONParser.rawJson(currentSnapshot(snapshotWindow).toJson()));</span>
+<span class="nc" id="L247">                } catch (RuntimeException ex) {</span>
+<span class="nc" id="L248">                    out.put(&quot;success&quot;, Boolean.FALSE);</span>
+<span class="nc" id="L249">                    out.put(&quot;error&quot;, ex.toString());</span>
+                } finally {
+<span class="fc" id="L251">                    synchronized (lock) {</span>
+<span class="fc" id="L252">                        ready[0] = true;</span>
+<span class="fc" id="L253">                        lock.notifyAll();</span>
+<span class="fc" id="L254">                    }</span>
+                }
+<span class="fc" id="L256">            }</span>
+        };
+<span class="fc bfc" id="L258" title="All 2 branches covered.">        if (display.isEdt()) {</span>
+<span class="fc" id="L259">            perform.run();</span>
+<span class="fc" id="L260">            snapshot.run();</span>
+        } else {
+<span class="fc" id="L262">            final Runnable action = perform;</span>
+<span class="fc" id="L263">            display.callSerially(new Runnable() {</span>
+                @Override
+                public void run() {
+                    // Queue from INSIDE the action turn: otherwise both callbacks
+                    // can land in one serial-call batch and the snapshot gets stuck
+                    // behind the suspended modal action. Dialog's nested EDT loop
+                    // can now run the snapshot and release the MCP reader.
+<span class="fc" id="L270">                    display.callSerially(snapshot);</span>
+<span class="fc" id="L271">                    action.run();</span>
+<span class="fc" id="L272">                }</span>
+            });
+<span class="fc" id="L274">            synchronized (lock) {</span>
+<span class="fc bfc" id="L275" title="All 2 branches covered.">                while (!ready[0]) {</span>
+                    try {
+<span class="fc" id="L277">                        lock.wait();</span>
+<span class="nc" id="L278">                    } catch (InterruptedException ex) {</span>
+<span class="nc" id="L279">                        throw new RuntimeException(&quot;Interrupted while waiting for UI action&quot;, ex);</span>
+<span class="fc" id="L280">                    }</span>
+                }
+<span class="fc" id="L282">            }</span>
+        }
+<span class="fc" id="L284">        return out;</span>
+    }
+
+    static String findNodes(final String identifier, final String label, final int x, final int y, final int windowId) {
+<span class="fc" id="L288">        final List&lt;Object&gt; matches = new ArrayList&lt;Object&gt;();</span>
+<span class="fc" id="L289">        runOnEdt(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L292">                AccessibilityTreeSnapshot snap = currentSnapshot(windowId);</span>
+<span class="pc bpc" id="L293" title="3 of 4 branches missed.">                if (identifier != null &amp;&amp; identifier.length() &gt; 0) {</span>
+<span class="nc" id="L294">                    addNode(matches, snap.getNodeByIdentifier(identifier));</span>
+<span class="pc bpc" id="L295" title="3 of 4 branches missed.">                } else if (x != Integer.MIN_VALUE &amp;&amp; y != Integer.MIN_VALUE) {</span>
+<span class="nc" id="L296">                    addNode(matches, snap.getNodeAt(x, y));</span>
+<span class="pc bpc" id="L297" title="2 of 4 branches missed.">                } else if (label != null &amp;&amp; label.length() &gt; 0) {</span>
+<span class="fc" id="L298">                    String needle = label.toLowerCase();</span>
+<span class="fc bfc" id="L299" title="All 2 branches covered.">                    for (AccessibilityNodeSnapshot node : snap.getNodes().values()) {</span>
+<span class="fc" id="L300">                        String candidate = node.getLabel();</span>
+<span class="fc bfc" id="L301" title="All 4 branches covered.">                        if (candidate != null &amp;&amp; candidate.toLowerCase().indexOf(needle) &gt;= 0) {</span>
+<span class="fc" id="L302">                            addNode(matches, node);</span>
+                        }
+<span class="fc" id="L304">                    }</span>
+                }
+<span class="fc" id="L306">            }</span>
+        });
+<span class="fc" id="L308">        return JSONParser.toJson(matches);</span>
+    }
+
+    /// Renders the focused top level to a PNG. Returns null when none is showing or the
+    /// platform cannot encode PNG images. Runs on the EDT.
+    static byte[] screenshotPng() {
+<span class="nc" id="L314">        final byte[][] holder = new byte[1][];</span>
+<span class="nc" id="L315">        runOnEdt(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc" id="L318">                holder[0] = renderCurrentFormPng();</span>
+<span class="nc" id="L319">            }</span>
+        });
+<span class="nc" id="L321">        return holder[0];</span>
+    }
+
+    private static byte[] renderCurrentFormPng() {
+<span class="nc" id="L325">        TopLevelContainer top = Display.getInstance().getCurrentTopLevel();</span>
+<span class="nc bnc" id="L326" title="All 2 branches missed.">        Component form = top == null ? null : top.asContainer();</span>
+<span class="nc" id="L327">        ImageIO io = ImageIO.getImageIO();</span>
+<span class="nc bnc" id="L328" title="All 4 branches missed.">        if (form == null || io == null) {</span>
+<span class="nc" id="L329">            return null;</span>
+        }
+<span class="nc" id="L331">        int w = form.getWidth();</span>
+<span class="nc" id="L332">        int h = form.getHeight();</span>
+<span class="nc bnc" id="L333" title="All 4 branches missed.">        if (w &lt;= 0 || h &lt;= 0) {</span>
+<span class="nc" id="L334">            return null;</span>
+        }
+<span class="nc" id="L336">        Image image = Image.createImage(w, h, 0xffffffff);</span>
+<span class="nc" id="L337">        Graphics g = image.getGraphics();</span>
+<span class="nc" id="L338">        form.paintComponent(g, true);</span>
+        try {
+<span class="nc" id="L340">            ByteArrayOutputStream bo = new ByteArrayOutputStream();</span>
+<span class="nc" id="L341">            io.save(image, bo, ImageIO.FORMAT_PNG, 1);</span>
+<span class="nc" id="L342">            return bo.toByteArray();</span>
+<span class="nc" id="L343">        } catch (Exception ex) {</span>
+<span class="nc" id="L344">            return null;</span>
+        }
+    }
+
+    private static void addNode(List&lt;Object&gt; matches, AccessibilityNodeSnapshot node) {
+<span class="pc bpc" id="L349" title="1 of 2 branches missed.">        if (node == null) {</span>
+<span class="nc" id="L350">            return;</span>
+        }
+<span class="fc" id="L352">        Map&lt;String, Object&gt; out = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L353">        out.put(&quot;id&quot;, Long.valueOf(node.getId()));</span>
+<span class="fc" id="L354">        out.put(&quot;role&quot;, node.getRole().name());</span>
+<span class="fc" id="L355">        out.put(&quot;label&quot;, node.getLabel());</span>
+<span class="fc" id="L356">        out.put(&quot;value&quot;, node.getValue());</span>
+<span class="fc" id="L357">        out.put(&quot;identifier&quot;, node.getIdentifier());</span>
+<span class="fc" id="L358">        Rectangle b = node.getBounds();</span>
+<span class="fc" id="L359">        List&lt;Object&gt; bounds = new ArrayList&lt;Object&gt;();</span>
+<span class="fc" id="L360">        bounds.add(Integer.valueOf(b.getX()));</span>
+<span class="fc" id="L361">        bounds.add(Integer.valueOf(b.getY()));</span>
+<span class="fc" id="L362">        bounds.add(Integer.valueOf(b.getWidth()));</span>
+<span class="fc" id="L363">        bounds.add(Integer.valueOf(b.getHeight()));</span>
+<span class="fc" id="L364">        out.put(&quot;bounds&quot;, bounds);</span>
+<span class="fc" id="L365">        List&lt;Object&gt; actions = new ArrayList&lt;Object&gt;();</span>
+<span class="fc bfc" id="L366" title="All 2 branches covered.">        for (AccessibilityAction action : node.getActions()) {</span>
+<span class="fc" id="L367">            actions.add(action.getId());</span>
+<span class="fc" id="L368">        }</span>
+<span class="fc" id="L369">        out.put(&quot;actions&quot;, actions);</span>
+<span class="fc" id="L370">        matches.add(out);</span>
+<span class="fc" id="L371">    }</span>
+
+    private static TopLevelContainer resolveWindow(int windowId) {
+<span class="fc bfc" id="L374" title="All 2 branches covered.">        if (windowId == -1) {</span>
+<span class="fc" id="L375">            return Display.getInstance().getCurrentTopLevel();</span>
+        }
+<span class="fc bfc" id="L377" title="All 2 branches covered.">        if (windowId == 0) {</span>
+<span class="fc" id="L378">            return Display.getInstance().getCurrent();</span>
+        }
+<span class="fc" id="L380">        Window window = Desktop.getInstance().windowById(windowId);</span>
+<span class="pc bpc" id="L381" title="2 of 4 branches missed.">        if (window == null || !window.isWindowShowing()) {</span>
+<span class="nc" id="L382">            throw new IllegalArgumentException(&quot;No visible window with id &quot; + windowId);</span>
+        }
+<span class="fc" id="L384">        return window;</span>
+    }
+
+    private static Map&lt;String, Object&gt; windowInfo(int id, TopLevelContainer top) {
+<span class="fc" id="L388">        Map&lt;String, Object&gt; info = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L389">        info.put(&quot;windowId&quot;, Integer.valueOf(id));</span>
+<span class="fc" id="L390">        info.put(&quot;title&quot;, top.getTitle());</span>
+<span class="pc bpc" id="L391" title="1 of 4 branches missed.">        info.put(&quot;visible&quot;, Boolean.valueOf(!(top instanceof Window) || ((Window) top).isWindowShowing()));</span>
+<span class="fc bfc" id="L392" title="All 2 branches covered.">        info.put(&quot;focused&quot;, Boolean.valueOf(top == Display.getInstance().getCurrentTopLevel())); // NOPMD CompareObjectsWithEquals - focus identifies the exact window instance</span>
+<span class="pc bpc" id="L393" title="2 of 4 branches missed.">        info.put(&quot;blocked&quot;, Boolean.valueOf(Desktop.isSupported() &amp;&amp; Desktop.getInstance().isWindowInputBlocked(id)));</span>
+<span class="fc" id="L394">        return info;</span>
+    }
+
+    private static AccessibilityTreeSnapshot currentSnapshot(int windowId) {
+<span class="fc" id="L398">        return AccessibilityManager.getInstance().getSnapshot(resolveWindow(windowId));</span>
+    }
+
+    private static void runOnEdt(final Runnable r) {
+<span class="fc" id="L402">        Display display = Display.getInstance();</span>
+<span class="fc bfc" id="L403" title="All 2 branches covered.">        if (display.isEdt()) {</span>
+<span class="fc" id="L404">            r.run();</span>
+        } else {
+<span class="fc" id="L406">            final RuntimeException[] error = new RuntimeException[1];</span>
+<span class="fc" id="L407">            display.callSeriallyAndWait(new Runnable() {</span>
+                @Override
+                public void run() {
+                    try {
+<span class="fc" id="L411">                        r.run();</span>
+<span class="nc" id="L412">                    } catch (RuntimeException ex) {</span>
+<span class="nc" id="L413">                        error[0] = ex;</span>
+<span class="fc" id="L414">                    }</span>
+<span class="fc" id="L415">                }</span>
+            });
+<span class="pc bpc" id="L417" title="1 of 2 branches missed.">            if (error[0] != null) {</span>
+<span class="nc" id="L418">                throw error[0];</span>
+            }
+        }
+<span class="fc" id="L421">    }</span>
+
+    private static Map&lt;String, Object&gt; parse(String json) throws Exception {
+<span class="pc bpc" id="L424" title="2 of 4 branches missed.">        if (json == null || json.length() == 0) {</span>
+<span class="nc" id="L425">            return new LinkedHashMap&lt;String, Object&gt;();</span>
+        }
+<span class="fc" id="L427">        Map&lt;String, Object&gt; parsed = JSONParser.parseJSON(json);</span>
+<span class="pc bpc" id="L428" title="1 of 2 branches missed.">        return parsed == null ? new LinkedHashMap&lt;String, Object&gt;() : parsed;</span>
+    }
+
+    private static long longArg(Map&lt;String, Object&gt; args, String key, long defaultValue) {
+<span class="pc bpc" id="L432" title="1 of 2 branches missed.">        if (args == null) {</span>
+<span class="nc" id="L433">            return defaultValue;</span>
+        }
+<span class="fc" id="L435">        Object v = args.get(key);</span>
+<span class="fc bfc" id="L436" title="All 2 branches covered.">        if (v instanceof Number) {</span>
+<span class="fc" id="L437">            return ((Number) v).longValue();</span>
+        }
+<span class="pc bpc" id="L439" title="1 of 2 branches missed.">        if (v instanceof String) {</span>
+            try {
+<span class="nc" id="L441">                return Long.parseLong(((String) v).trim());</span>
+<span class="nc" id="L442">            } catch (NumberFormatException ex) {</span>
+<span class="nc" id="L443">                return defaultValue;</span>
+            }
+        }
+<span class="fc" id="L446">        return defaultValue;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

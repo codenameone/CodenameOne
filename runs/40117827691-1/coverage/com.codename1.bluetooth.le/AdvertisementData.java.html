@@ -1,0 +1,271 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AdvertisementData.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.bluetooth.le</a> &gt; <span class="el_source">AdvertisementData.java</span></div><h1>AdvertisementData.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.bluetooth.le;
+
+import com.codename1.bluetooth.BluetoothUuid;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+
+/// The parsed payload of a BLE advertisement: local name, advertised
+/// service UUIDs, manufacturer data, service data and TX power. Obtained
+/// from [ScanResult#getAdvertisementData()].
+///
+/// Ports that receive raw advertisement bytes (Android, the simulator)
+/// build instances via [#parse(byte[])]; ports that only get pre-parsed
+/// dictionaries (iOS) populate the fields directly through the `set*` /
+/// `add*` methods, which are not application API.
+<span class="fc" id="L39">public class AdvertisementData {</span>
+
+    private static final int TYPE_FLAGS = 0x01;
+    private static final int TYPE_UUID16_INCOMPLETE = 0x02;
+    private static final int TYPE_UUID16_COMPLETE = 0x03;
+    private static final int TYPE_UUID32_INCOMPLETE = 0x04;
+    private static final int TYPE_UUID32_COMPLETE = 0x05;
+    private static final int TYPE_UUID128_INCOMPLETE = 0x06;
+    private static final int TYPE_UUID128_COMPLETE = 0x07;
+    private static final int TYPE_NAME_SHORT = 0x08;
+    private static final int TYPE_NAME_COMPLETE = 0x09;
+    private static final int TYPE_TX_POWER = 0x0A;
+    private static final int TYPE_SERVICE_DATA_16 = 0x16;
+    private static final int TYPE_SERVICE_DATA_32 = 0x20;
+    private static final int TYPE_SERVICE_DATA_128 = 0x21;
+    private static final int TYPE_MANUFACTURER = 0xFF;
+
+    private String localName;
+<span class="fc" id="L57">    private final ArrayList&lt;BluetoothUuid&gt; serviceUuids =</span>
+            new ArrayList&lt;BluetoothUuid&gt;();
+<span class="fc" id="L59">    private final HashMap&lt;Integer, byte[]&gt; manufacturerData =</span>
+            new HashMap&lt;Integer, byte[]&gt;();
+<span class="fc" id="L61">    private final HashMap&lt;BluetoothUuid, byte[]&gt; serviceData =</span>
+            new HashMap&lt;BluetoothUuid, byte[]&gt;();
+    private Integer txPowerLevel;
+    private byte[] rawBytes;
+
+    /// Parses raw advertisement bytes -- a sequence of
+    /// `length, type, payload` AD structures -- into a populated instance.
+    /// Unknown AD types are skipped; a malformed trailing structure ends
+    /// parsing without failing.
+    public static AdvertisementData parse(byte[] raw) {
+<span class="fc" id="L71">        AdvertisementData ad = new AdvertisementData();</span>
+<span class="fc" id="L72">        ad.rawBytes = raw;</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        if (raw == null) {</span>
+<span class="fc" id="L74">            return ad;</span>
+        }
+<span class="fc" id="L76">        int i = 0;</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        while (i &lt; raw.length) {</span>
+<span class="fc" id="L78">            int len = raw[i] &amp; 0xFF;</span>
+            // a structure spans len + 1 bytes: the length byte itself,
+            // the type byte and len - 1 payload bytes
+<span class="fc bfc" id="L81" title="All 4 branches covered.">            if (len == 0 || i + 1 + len &gt; raw.length) {</span>
+<span class="fc" id="L82">                break;</span>
+            }
+<span class="fc" id="L84">            int type = raw[i + 1] &amp; 0xFF;</span>
+<span class="fc" id="L85">            ad.parseStructure(type, raw, i + 2, len - 1);</span>
+<span class="fc" id="L86">            i += len + 1;</span>
+<span class="fc" id="L87">        }</span>
+<span class="fc" id="L88">        return ad;</span>
+    }
+
+    private void parseStructure(int type, byte[] raw, int off, int len) {
+<span class="pc bpc" id="L92" title="1 of 10 branches missed.">        switch (type) {</span>
+            case TYPE_NAME_SHORT:
+            case TYPE_NAME_COMPLETE:
+<span class="fc" id="L95">                localName = utf8(raw, off, len);</span>
+<span class="fc" id="L96">                break;</span>
+            case TYPE_UUID16_INCOMPLETE:
+            case TYPE_UUID16_COMPLETE:
+<span class="fc bfc" id="L99" title="All 2 branches covered.">                for (int i = 0; i + 1 &lt; len; i += 2) {</span>
+<span class="fc" id="L100">                    addServiceUuid(BluetoothUuid.fromShort(</span>
+<span class="fc" id="L101">                            readLeInt(raw, off + i, 2)));</span>
+                }
+<span class="fc" id="L103">                break;</span>
+            case TYPE_UUID32_INCOMPLETE:
+            case TYPE_UUID32_COMPLETE:
+<span class="fc bfc" id="L106" title="All 2 branches covered.">                for (int i = 0; i + 3 &lt; len; i += 4) {</span>
+<span class="fc" id="L107">                    addServiceUuid(BluetoothUuid.fromShort(</span>
+<span class="fc" id="L108">                            readLeInt(raw, off + i, 4)));</span>
+                }
+<span class="fc" id="L110">                break;</span>
+            case TYPE_UUID128_INCOMPLETE:
+            case TYPE_UUID128_COMPLETE:
+<span class="fc bfc" id="L113" title="All 2 branches covered.">                for (int i = 0; i + 15 &lt; len; i += 16) {</span>
+<span class="fc" id="L114">                    addServiceUuid(readLeUuid(raw, off + i));</span>
+                }
+<span class="fc" id="L116">                break;</span>
+            case TYPE_TX_POWER:
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">                if (len &gt;= 1) {</span>
+<span class="fc" id="L119">                    txPowerLevel = Integer.valueOf(raw[off]);</span>
+                }
+                break;
+            case TYPE_MANUFACTURER:
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">                if (len &gt;= 2) {</span>
+<span class="fc" id="L124">                    int companyId = readLeInt(raw, off, 2);</span>
+<span class="fc" id="L125">                    byte[] payload = new byte[len - 2];</span>
+<span class="fc" id="L126">                    System.arraycopy(raw, off + 2, payload, 0, len - 2);</span>
+<span class="fc" id="L127">                    addManufacturerData(companyId, payload);</span>
+<span class="fc" id="L128">                }</span>
+                break;
+            case TYPE_SERVICE_DATA_16:
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">                if (len &gt;= 2) {</span>
+<span class="fc" id="L132">                    addServiceData(</span>
+<span class="fc" id="L133">                            BluetoothUuid.fromShort(readLeInt(raw, off, 2)),</span>
+<span class="fc" id="L134">                            copy(raw, off + 2, len - 2));</span>
+                }
+                break;
+            case TYPE_SERVICE_DATA_32:
+<span class="nc bnc" id="L138" title="All 2 branches missed.">                if (len &gt;= 4) {</span>
+<span class="nc" id="L139">                    addServiceData(</span>
+<span class="nc" id="L140">                            BluetoothUuid.fromShort(readLeInt(raw, off, 4)),</span>
+<span class="nc" id="L141">                            copy(raw, off + 4, len - 4));</span>
+                }
+                break;
+            case TYPE_SERVICE_DATA_128:
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">                if (len &gt;= 16) {</span>
+<span class="fc" id="L146">                    addServiceData(readLeUuid(raw, off),</span>
+<span class="fc" id="L147">                            copy(raw, off + 16, len - 16));</span>
+                }
+                break;
+            case TYPE_FLAGS:
+            default:
+                break;
+        }
+<span class="fc" id="L154">    }</span>
+
+    private static String utf8(byte[] raw, int off, int len) {
+        try {
+<span class="fc" id="L158">            return new String(raw, off, len, &quot;UTF-8&quot;);</span>
+<span class="nc" id="L159">        } catch (java.io.UnsupportedEncodingException e) {</span>
+            // every platform we run on ships UTF-8; decoding the name with
+            // whatever the default encoding happens to be would silently
+            // corrupt it, so treat this as impossible rather than guess
+<span class="nc" id="L163">            throw new IllegalStateException(&quot;UTF-8 is unavailable&quot;, e);</span>
+        }
+    }
+
+    private static byte[] copy(byte[] raw, int off, int len) {
+<span class="fc" id="L168">        byte[] out = new byte[len];</span>
+<span class="fc" id="L169">        System.arraycopy(raw, off, out, 0, len);</span>
+<span class="fc" id="L170">        return out;</span>
+    }
+
+    private static int readLeInt(byte[] raw, int off, int bytes) {
+<span class="fc" id="L174">        int v = 0;</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">        for (int i = bytes - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L176">            v = (v &lt;&lt; 8) | (raw[off + i] &amp; 0xFF);</span>
+        }
+<span class="fc" id="L178">        return v;</span>
+    }
+
+    /// 128-bit UUIDs travel little-endian in advertisement structures.
+    private static BluetoothUuid readLeUuid(byte[] raw, int off) {
+<span class="fc" id="L183">        long lsb = 0;</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">        for (int i = 7; i &gt;= 0; i--) {</span>
+<span class="fc" id="L185">            lsb = (lsb &lt;&lt; 8) | (raw[off + i] &amp; 0xFF);</span>
+        }
+<span class="fc" id="L187">        long msb = 0;</span>
+<span class="fc bfc" id="L188" title="All 2 branches covered.">        for (int i = 15; i &gt;= 8; i--) {</span>
+<span class="fc" id="L189">            msb = (msb &lt;&lt; 8) | (raw[off + i] &amp; 0xFF);</span>
+        }
+<span class="fc" id="L191">        return new BluetoothUuid(msb, lsb);</span>
+    }
+
+    /// The advertised local name, or `null` when the advertisement carries
+    /// none.
+    public String getLocalName() {
+<span class="fc" id="L197">        return localName;</span>
+    }
+
+    /// The advertised service UUIDs; empty when none were advertised.
+    public List&lt;BluetoothUuid&gt; getServiceUuids() {
+<span class="fc" id="L202">        return new ArrayList&lt;BluetoothUuid&gt;(serviceUuids);</span>
+    }
+
+    /// The manufacturer-specific payload advertised for the given company
+    /// identifier, or `null`.
+    public byte[] getManufacturerData(int companyId) {
+<span class="fc" id="L208">        return manufacturerData.get(Integer.valueOf(companyId));</span>
+    }
+
+    /// The company identifiers for which manufacturer data is present.
+    public int[] getManufacturerIds() {
+<span class="fc" id="L213">        int[] out = new int[manufacturerData.size()];</span>
+<span class="fc" id="L214">        int i = 0;</span>
+<span class="fc bfc" id="L215" title="All 2 branches covered.">        for (Integer id : manufacturerData.keySet()) {</span>
+<span class="fc" id="L216">            out[i++] = id.intValue();</span>
+<span class="fc" id="L217">        }</span>
+<span class="fc" id="L218">        return out;</span>
+    }
+
+    /// The service-data payload advertised for the given service UUID, or
+    /// `null`.
+    public byte[] getServiceData(BluetoothUuid serviceUuid) {
+<span class="fc" id="L224">        return serviceData.get(serviceUuid);</span>
+    }
+
+    /// The service UUIDs for which service data is present.
+    public List&lt;BluetoothUuid&gt; getServiceDataUuids() {
+<span class="nc" id="L229">        return new ArrayList&lt;BluetoothUuid&gt;(serviceData.keySet());</span>
+    }
+
+    /// The advertised TX power level in dBm, or `null` when absent.
+    public Integer getTxPowerLevel() {
+<span class="fc" id="L234">        return txPowerLevel;</span>
+    }
+
+    /// The raw advertisement bytes when the platform exposes them
+    /// (Android, simulator); `null` on iOS, which only provides parsed
+    /// fields.
+    public byte[] getRawBytes() {
+<span class="fc" id="L241">        return rawBytes;</span>
+    }
+
+    /// Populated by ports; not application API.
+    public void setLocalName(String localName) {
+<span class="fc" id="L246">        this.localName = localName;</span>
+<span class="fc" id="L247">    }</span>
+
+    /// Populated by ports; not application API.
+    public void addServiceUuid(BluetoothUuid uuid) {
+<span class="fc bfc" id="L251" title="All 2 branches covered.">        if (!serviceUuids.contains(uuid)) {</span>
+<span class="fc" id="L252">            serviceUuids.add(uuid);</span>
+        }
+<span class="fc" id="L254">    }</span>
+
+    /// Populated by ports; not application API.
+    public void addManufacturerData(int companyId, byte[] data) {
+<span class="fc" id="L258">        manufacturerData.put(Integer.valueOf(companyId), data);</span>
+<span class="fc" id="L259">    }</span>
+
+    /// Populated by ports; not application API.
+    public void addServiceData(BluetoothUuid uuid, byte[] data) {
+<span class="fc" id="L263">        serviceData.put(uuid, data);</span>
+<span class="fc" id="L264">    }</span>
+
+    /// Populated by ports; not application API.
+    public void setTxPowerLevel(Integer txPowerLevel) {
+<span class="fc" id="L268">        this.txPowerLevel = txPowerLevel;</span>
+<span class="fc" id="L269">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

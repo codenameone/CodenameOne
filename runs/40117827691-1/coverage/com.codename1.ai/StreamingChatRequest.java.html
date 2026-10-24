@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StreamingChatRequest.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ai</a> &gt; <span class="el_source">StreamingChatRequest.java</span></div><h1>StreamingChatRequest.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ai;
+
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.Log;
+import com.codename1.ui.Display;
+import com.codename1.util.AsyncResource;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+
+/// Internal `ConnectionRequest` subclass that streams an SSE response
+/// line-by-line, dispatching each `data:` payload through a
+/// provider-specific parser. Provider-agnostic plumbing (line
+/// reassembly, EDT dispatch, error mapping, cancellation, completion
+/// signaling) lives here; the parser and the request body are
+/// supplied by the concrete provider client.
+abstract class StreamingChatRequest extends ConnectionRequest {
+    private final StreamingListener listener;
+    private final AsyncResource&lt;ChatResponse&gt; result;
+    private final byte[] requestBody;
+
+    /// Provider-supplied accumulator that aggregates `data:` lines
+    /// into a final [ChatResponse] and fires per-delta listener
+    /// callbacks along the way.
+    private final SseDecoder decoder;
+
+    StreamingChatRequest(String url, byte[] requestBody,
+                         StreamingListener listener,
+                         AsyncResource&lt;ChatResponse&gt; result,
+<span class="fc" id="L53">                         SseDecoder decoder) {</span>
+<span class="fc" id="L54">        setUrl(url);</span>
+<span class="fc" id="L55">        setPost(true);</span>
+<span class="fc" id="L56">        setReadResponseForErrors(true);</span>
+<span class="fc" id="L57">        setContentType(&quot;application/json&quot;);</span>
+        // The framework's default duplicate-suppression collapses two
+        // identical-URL chat calls into one; that's actively wrong
+        // for chats, so opt out.
+<span class="fc" id="L61">        setDuplicateSupported(true);</span>
+<span class="fc" id="L62">        this.requestBody = requestBody;</span>
+<span class="fc" id="L63">        this.listener = listener;</span>
+<span class="fc" id="L64">        this.result = result;</span>
+<span class="fc" id="L65">        this.decoder = decoder;</span>
+<span class="fc" id="L66">    }</span>
+
+    @Override
+    protected void buildRequestBody(OutputStream os) throws IOException {
+<span class="nc bnc" id="L70" title="All 2 branches missed.">        if (requestBody != null) {</span>
+<span class="nc" id="L71">            os.write(requestBody);</span>
+        }
+<span class="nc" id="L73">    }</span>
+
+    @Override
+    protected void readResponse(InputStream input) throws IOException {
+<span class="fc" id="L77">        int status = getResponseCode();</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        if (status &gt;= 400) {</span>
+            // The framework will normally pump the body into `data`
+            // and we map to an LlmException via handleErrorResponseCode.
+            // Still drain so the body is captured.
+            // Util.readInputStream is documented to never return null;
+            // skip the redundant null guard to satisfy the static
+            // analyzer.
+<span class="fc" id="L85">            byte[] body = com.codename1.io.Util.readInputStream(input);</span>
+<span class="fc" id="L86">            String text = new String(body, &quot;UTF-8&quot;);</span>
+<span class="fc" id="L87">            failWith(decoder.mapError(status, text));</span>
+<span class="fc" id="L88">            return;</span>
+        }
+
+<span class="fc" id="L91">        StringBuilder lineBuf = new StringBuilder(256);</span>
+<span class="fc" id="L92">        StringBuilder dataBuf = new StringBuilder(1024);</span>
+        int b;
+<span class="pc bpc" id="L94" title="1 of 4 branches missed.">        while (!isKilled() &amp;&amp; (b = input.read()) != -1) {</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">            if (b == '\n') {</span>
+<span class="fc" id="L96">                String line = lineBuf.toString();</span>
+<span class="fc" id="L97">                lineBuf.setLength(0);</span>
+<span class="fc bfc" id="L98" title="All 4 branches covered.">                if (line.length() &gt; 0 &amp;&amp; line.charAt(line.length() - 1) == '\r') {</span>
+<span class="fc" id="L99">                    line = line.substring(0, line.length() - 1);</span>
+                }
+<span class="fc bfc" id="L101" title="All 2 branches covered.">                if (line.length() == 0) {</span>
+                    // Dispatch the accumulated event.
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">                    if (dataBuf.length() &gt; 0) {</span>
+<span class="fc" id="L104">                        dispatchEvent(dataBuf.toString());</span>
+<span class="fc" id="L105">                        dataBuf.setLength(0);</span>
+                    }
+<span class="fc bfc" id="L107" title="All 2 branches covered.">                } else if (line.startsWith(&quot;data:&quot;)) {</span>
+<span class="fc" id="L108">                    String payload = line.substring(5);</span>
+<span class="pc bpc" id="L109" title="2 of 4 branches missed.">                    if (payload.length() &gt; 0 &amp;&amp; payload.charAt(0) == ' ') {</span>
+<span class="fc" id="L110">                        payload = payload.substring(1);</span>
+                    }
+<span class="fc bfc" id="L112" title="All 2 branches covered.">                    if (dataBuf.length() &gt; 0) {</span>
+<span class="fc" id="L113">                        dataBuf.append('\n');</span>
+                    }
+<span class="fc" id="L115">                    dataBuf.append(payload);</span>
+                }
+                // Ignore other line types (event:, id:, retry:, comments).
+<span class="fc" id="L118">            } else {</span>
+<span class="fc" id="L119">                lineBuf.append((char) b);</span>
+            }
+        }
+        // Final dispatch for any trailing event without a blank-line
+        // terminator (some providers omit the trailing CRLF).
+<span class="fc bfc" id="L124" title="All 2 branches covered.">        if (dataBuf.length() &gt; 0) {</span>
+<span class="fc" id="L125">            dispatchEvent(dataBuf.toString());</span>
+        }
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">        if (isKilled()) {</span>
+<span class="nc" id="L128">            return;</span>
+        }
+        // Stream ended without an explicit terminator from the
+        // decoder; ask it to finalize whatever it has.
+<span class="fc" id="L132">        ChatResponse finalResponse = decoder.finish();</span>
+<span class="fc" id="L133">        completeWith(finalResponse);</span>
+<span class="fc" id="L134">    }</span>
+
+    private void dispatchEvent(String payload) {
+<span class="fc bfc" id="L137" title="All 2 branches covered.">        if (&quot;[DONE]&quot;.equals(payload)) {</span>
+            // OpenAI / Ollama sentinel -- the next call to finish()
+            // will assemble whatever the decoder accumulated.
+<span class="fc" id="L140">            return;</span>
+        }
+        try {
+<span class="fc" id="L143">            decoder.consume(payload, listener);</span>
+<span class="fc" id="L144">        } catch (Throwable t) {</span>
+<span class="fc" id="L145">            failWith(t);</span>
+<span class="fc" id="L146">        }</span>
+<span class="fc" id="L147">    }</span>
+
+    private void completeWith(final ChatResponse r) {
+<span class="fc" id="L150">        Display.getInstance().callSerially(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc bfc" id="L153" title="All 2 branches covered.">                if (!result.isDone()) {</span>
+<span class="fc" id="L154">                    result.complete(r);</span>
+                }
+<span class="fc" id="L156">            }</span>
+        });
+<span class="fc" id="L158">    }</span>
+
+    private void failWith(final Throwable t) {
+<span class="fc" id="L161">        Display.getInstance().callSerially(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">                if (listener != null) {</span>
+                    try {
+<span class="fc" id="L166">                        listener.onError(t);</span>
+<span class="nc" id="L167">                    } catch (Throwable ignore) {</span>
+                        // Listener errors are swallowed so the
+                        // AsyncResource.error below still fires.
+<span class="nc" id="L170">                        Log.e(ignore);</span>
+<span class="fc" id="L171">                    }</span>
+                }
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">                if (!result.isDone()) {</span>
+<span class="fc" id="L174">                    result.error(t);</span>
+                }
+<span class="fc" id="L176">            }</span>
+        });
+<span class="fc" id="L178">    }</span>
+
+    /// Invoked by the framework when an exception escapes the network
+    /// path. Convert to an `LlmNetworkException` and surface.
+    @Override
+    protected void handleException(Exception err) {
+<span class="nc" id="L184">        failWith(new LlmException(err.getMessage(), -1, null, null, err, LlmException.ErrorType.NETWORK));</span>
+<span class="nc" id="L185">    }</span>
+
+    /// Provider-specific SSE event decoder. Implementations are
+    /// stateful (accumulating text content and tool-call fragments)
+    /// and call back into the listener as deltas arrive.
+    interface SseDecoder {
+        /// Process one `data:` payload. Fire listener deltas as needed.
+        void consume(String dataPayload, StreamingListener listener) throws Exception;
+
+        /// Build the final aggregated [ChatResponse]. Called when the
+        /// stream closes cleanly (either after `[DONE]` or after EOF).
+        ChatResponse finish();
+
+        /// Convert an HTTP-error body into the right [LlmException]
+        /// subtype.
+        LlmException mapError(int httpStatus, String body);
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CalendarSource.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.calendar</a> &gt; <span class="el_source">CalendarSource.java</span></div><h1>CalendarSource.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.calendar;
+
+import com.codename1.ui.Display;
+import com.codename1.util.AsyncResource;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+
+/// Base contract shared by local stores and online providers.
+public abstract class CalendarSource {
+
+    private final String id;
+
+    private final String displayName;
+
+<span class="fc" id="L38">    private final List&lt;CalendarChangeListener&gt; listeners = new ArrayList&lt;CalendarChangeListener&gt;();</span>
+
+<span class="fc" id="L40">    protected CalendarSource(String id, String displayName) {</span>
+<span class="pc bpc" id="L41" title="2 of 4 branches missed.">        if (id == null || id.length() == 0) {</span>
+<span class="nc" id="L42">            throw new IllegalArgumentException(&quot;id required&quot;);</span>
+        }
+<span class="fc" id="L44">        this.id = id;</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        this.displayName = displayName == null ? id : displayName;</span>
+<span class="fc" id="L46">    }</span>
+
+    public final String getId() {
+<span class="fc" id="L49">        return id;</span>
+    }
+
+    public final String getDisplayName() {
+<span class="nc" id="L53">        return displayName;</span>
+    }
+
+    public boolean isAvailable() {
+<span class="nc bnc" id="L57" title="All 2 branches missed.">        return !getCapabilities().asSet().isEmpty();</span>
+    }
+
+    public CalendarCapabilities getCapabilities() {
+<span class="nc" id="L61">        return CalendarCapabilities.none();</span>
+    }
+
+    public CalendarAuthorizationStatus getAuthorizationStatus(CalendarAccess access) {
+<span class="nc" id="L65">        return CalendarAuthorizationStatus.DENIED;</span>
+    }
+
+    public AsyncResource&lt;CalendarAuthorizationStatus&gt; requestAuthorization(CalendarAccess access) {
+<span class="nc" id="L69">        return unavailable(&quot;Calendar authorization is unavailable&quot;);</span>
+    }
+
+    public AsyncResource&lt;CalendarPage&lt;CalendarInfo&gt;&gt; listCalendars(CalendarInfo.ContentType type, String pageToken) {
+<span class="nc" id="L73">        return unsupported(&quot;Listing calendars&quot;);</span>
+    }
+
+    public AsyncResource&lt;CalendarInfo&gt; saveCalendar(CalendarInfo calendar) {
+<span class="nc" id="L77">        return unsupported(&quot;Saving calendars&quot;);</span>
+    }
+
+    public AsyncResource&lt;Boolean&gt; deleteCalendar(String calendarId) {
+<span class="nc" id="L81">        return unsupported(&quot;Deleting calendars&quot;);</span>
+    }
+
+    /// Deletes a calendar or task list. Sources that expose both use the
+    /// content type to select the correct provider endpoint.
+    public AsyncResource&lt;Boolean&gt; deleteCalendar(CalendarInfo calendar) {
+<span class="nc bnc" id="L87" title="All 4 branches missed.">        if (calendar == null || calendar.getId() == null) {</span>
+<span class="nc" id="L88">            AsyncResource&lt;Boolean&gt; out = new AsyncResource&lt;Boolean&gt;();</span>
+<span class="nc" id="L89">            out.error(new CalendarException(CalendarError.INVALID_ARGUMENT, &quot;calendar and id required&quot;));</span>
+<span class="nc" id="L90">            return out;</span>
+        }
+<span class="nc" id="L92">        return deleteCalendar(calendar.getId());</span>
+    }
+
+    public AsyncResource&lt;CalendarPage&lt;CalendarEvent&gt;&gt; queryEvents(CalendarQuery query) {
+<span class="nc" id="L96">        return unsupported(&quot;Querying events&quot;);</span>
+    }
+
+    public AsyncResource&lt;CalendarEvent&gt; getEvent(String calendarId, String eventId) {
+<span class="nc" id="L100">        return unsupported(&quot;Reading events&quot;);</span>
+    }
+
+    public AsyncResource&lt;CalendarEvent&gt; saveEvent(CalendarEvent event, CalendarMutationScope scope) {
+<span class="nc" id="L104">        return unsupported(&quot;Saving events&quot;);</span>
+    }
+
+    public AsyncResource&lt;Boolean&gt; deleteEvent(String calendarId, String eventId, CalendarMutationScope scope, String version) {
+<span class="nc" id="L108">        return unsupported(&quot;Deleting events&quot;);</span>
+    }
+
+    public AsyncResource&lt;CalendarEvent&gt; respondToEvent(String calendarId, String eventId, CalendarAttendee.Response response, String comment) {
+<span class="nc" id="L112">        return unsupported(&quot;Responding to events&quot;);</span>
+    }
+
+    public AsyncResource&lt;List&lt;FreeBusyInterval&gt;&gt; queryFreeBusy(List&lt;String&gt; calendarIds, Instant startTime, Instant endTime) {
+<span class="nc" id="L116">        return unsupported(&quot;Free/busy&quot;);</span>
+    }
+
+    public AsyncResource&lt;CalendarPage&lt;CalendarTask&gt;&gt; queryTasks(CalendarQuery query) {
+<span class="nc" id="L120">        return unsupported(&quot;Querying tasks&quot;);</span>
+    }
+
+    public AsyncResource&lt;CalendarTask&gt; getTask(String calendarId, String taskId) {
+<span class="nc" id="L124">        return unsupported(&quot;Reading tasks&quot;);</span>
+    }
+
+    public AsyncResource&lt;CalendarTask&gt; saveTask(CalendarTask task, CalendarMutationScope scope) {
+<span class="nc" id="L128">        return unsupported(&quot;Saving tasks&quot;);</span>
+    }
+
+    public AsyncResource&lt;Boolean&gt; deleteTask(String calendarId, String taskId, CalendarMutationScope scope, String version) {
+<span class="nc" id="L132">        return unsupported(&quot;Deleting tasks&quot;);</span>
+    }
+
+    public final synchronized void addChangeListener(CalendarChangeListener listener) {
+<span class="pc bpc" id="L136" title="2 of 4 branches missed.">        if (listener != null &amp;&amp; !listeners.contains(listener)) {</span>
+<span class="fc" id="L137">            listeners.add(listener);</span>
+        }
+<span class="fc" id="L139">    }</span>
+
+    public final synchronized void removeChangeListener(CalendarChangeListener listener) {
+<span class="fc" id="L142">        listeners.remove(listener);</span>
+<span class="fc" id="L143">    }</span>
+
+    protected final void fireChange(final CalendarChange change) {
+        final List&lt;CalendarChangeListener&gt; snapshot;
+<span class="fc" id="L147">        synchronized (this) {</span>
+<span class="fc" id="L148">            snapshot = new ArrayList&lt;CalendarChangeListener&gt;(listeners);</span>
+<span class="fc" id="L149">        }</span>
+<span class="fc" id="L150">        Runnable notify = new Runnable() {</span>
+
+            @Override
+            public void run() {
+<span class="fc bfc" id="L154" title="All 2 branches covered.">                for (CalendarChangeListener listener : snapshot) {</span>
+<span class="fc" id="L155">                    listener.calendarChanged(change);</span>
+<span class="fc" id="L156">                }</span>
+<span class="fc" id="L157">            }</span>
+        };
+<span class="pc bpc" id="L159" title="3 of 4 branches missed.">        if (Display.isInitialized() &amp;&amp; !Display.getInstance().isEdt()) {</span>
+<span class="nc" id="L160">            Display.getInstance().callSerially(notify);</span>
+        } else {
+<span class="fc" id="L162">            notify.run();</span>
+        }
+<span class="fc" id="L164">    }</span>
+
+    protected static &lt;T&gt; AsyncResource&lt;T&gt; unsupported(String operation) {
+<span class="nc" id="L167">        AsyncResource&lt;T&gt; out = new AsyncResource&lt;T&gt;();</span>
+<span class="nc" id="L168">        out.error(new CalendarException(CalendarError.NOT_SUPPORTED, operation + &quot; is not supported by this source&quot;));</span>
+<span class="nc" id="L169">        return out;</span>
+    }
+
+    protected static &lt;T&gt; AsyncResource&lt;T&gt; unavailable(String message) {
+<span class="nc" id="L173">        AsyncResource&lt;T&gt; out = new AsyncResource&lt;T&gt;();</span>
+<span class="nc" id="L174">        out.error(new CalendarException(CalendarError.NOT_AVAILABLE, message));</span>
+<span class="nc" id="L175">        return out;</span>
+    }
+
+    protected static &lt;T&gt; AsyncResource&lt;T&gt; completed(T value) {
+<span class="nc" id="L179">        AsyncResource&lt;T&gt; out = new AsyncResource&lt;T&gt;();</span>
+<span class="nc" id="L180">        out.complete(value);</span>
+<span class="nc" id="L181">        return out;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ColorMatrixBlend.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.plaf</a> &gt; <span class="el_source">ColorMatrixBlend.java</span></div><h1>ColorMatrixBlend.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation. Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Codename One in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.plaf;
+
+/// Reference implementation of Graphics.colorMatrixRegion over an ARGB buffer.
+///
+/// Every pixel `p` (channels in 0..1) becomes `p + (clamp(M * p + offset) - p) * k`,
+/// where `k = amount * shape * mask`:
+///
+/// - `shape` is the anti-aliased coverage of a rounded rectangle filling the
+///   region, `clamp(0.5 - sdf, 0, 1)` at the pixel centre, with corner radius
+///   `cornerRadius` (a negative radius makes a capsule; zero covers the whole
+///   rectangle);
+/// - `mask` is the alpha of the optional mask sampled at the same relative
+///   position (nearest pixel), which is how vibrant content is drawn: the mask
+///   holds the glyphs, and each glyph pixel takes its colour from the matrix
+///   applied to what lies behind it.
+///
+/// The destination alpha is kept. Ports without a native path (JavaSE, the
+/// JavaScript port, iOS off-screen images) call this; the Metal shader
+/// cn1_fs_colormatrix mirrors it.
+public final class ColorMatrixBlend {
+    private ColorMatrixBlend() {
+    }
+
+    /// Applies the blend in place.
+    ///
+    /// #### Parameters
+    ///
+    /// - `argb`: the destination region, `w * h` pixels, row major
+    ///
+    /// - `w`: region width in pixels
+    ///
+    /// - `h`: region height in pixels
+    ///
+    /// - `matrix`: 12 floats, rows r, g, b of `[r, g, b, offset]` in 0..1 units
+    ///
+    /// - `mask`: the mask pixels (ARGB, alpha used), or null for no mask
+    ///
+    /// - `maskW`: mask width in pixels
+    ///
+    /// - `maskH`: mask height in pixels
+    ///
+    /// - `cornerRadius`: corner radius in region pixels, negative for a capsule
+    ///
+    /// - `amount`: overall strength 0..1
+    public static void apply(int[] argb, int w, int h, float[] matrix, int[] mask, int maskW, int maskH,
+            float cornerRadius, float amount) {
+<span class="pc bpc" id="L69" title="3 of 6 branches missed.">        if (amount &lt;= 0 || w &lt;= 0 || h &lt;= 0) {</span>
+<span class="nc" id="L70">            return;</span>
+        }
+<span class="fc" id="L72">        float hw = w / 2f;</span>
+<span class="fc" id="L73">        float hh = h / 2f;</span>
+<span class="fc" id="L74">        float r = 0;</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        if (cornerRadius != 0) {</span>
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">            r = cornerRadius &lt; 0 ? Math.min(hw, hh) : Math.min(cornerRadius, Math.min(hw, hh));</span>
+        }
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        for (int y = 0; y &lt; h; y++) {</span>
+<span class="fc" id="L79">            float py = y + 0.5f - hh;</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">            for (int x = 0; x &lt; w; x++) {</span>
+<span class="fc" id="L81">                float k = amount;</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">                if (r &gt; 0) {</span>
+<span class="fc" id="L83">                    float px = x + 0.5f - hw;</span>
+<span class="fc" id="L84">                    float dx = Math.abs(px) - (hw - r);</span>
+<span class="fc" id="L85">                    float dy = Math.abs(py) - (hh - r);</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">                    float ax = dx &gt; 0 ? dx : 0;</span>
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">                    float ay = dy &gt; 0 ? dy : 0;</span>
+<span class="fc" id="L88">                    float sdf = (float) Math.sqrt(ax * ax + ay * ay) + Math.min(Math.max(dx, dy), 0) - r;</span>
+<span class="fc" id="L89">                    float cov = 0.5f - sdf;</span>
+<span class="fc bfc" id="L90" title="All 4 branches covered.">                    k *= cov &lt; 0 ? 0 : (cov &gt; 1 ? 1 : cov);</span>
+                }
+<span class="fc bfc" id="L92" title="All 2 branches covered.">                if (mask != null) {</span>
+<span class="fc" id="L93">                    int mx = x * maskW / w;</span>
+<span class="fc" id="L94">                    int my = y * maskH / h;</span>
+<span class="fc" id="L95">                    k *= ((mask[my * maskW + mx] &gt;&gt;&gt; 24) &amp; 0xff) / 255f;</span>
+                }
+<span class="fc bfc" id="L97" title="All 2 branches covered.">                if (k &lt;= 0) {</span>
+<span class="fc" id="L98">                    continue;</span>
+                }
+<span class="fc" id="L100">                int i = y * w + x;</span>
+<span class="fc" id="L101">                int p = argb[i];</span>
+<span class="fc" id="L102">                float pr = ((p &gt;&gt; 16) &amp; 0xff) / 255f;</span>
+<span class="fc" id="L103">                float pg = ((p &gt;&gt; 8) &amp; 0xff) / 255f;</span>
+<span class="fc" id="L104">                float pb = (p &amp; 0xff) / 255f;</span>
+<span class="fc" id="L105">                int out = p &amp; 0xff000000;</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">                for (int row = 0; row &lt; 3; row++) {</span>
+<span class="fc" id="L107">                    float v = matrix[row * 4] * pr + matrix[row * 4 + 1] * pg + matrix[row * 4 + 2] * pb</span>
+                            + matrix[row * 4 + 3];
+<span class="pc bpc" id="L109" title="2 of 4 branches missed.">                    v = v &lt; 0 ? 0 : (v &gt; 1 ? 1 : v);</span>
+<span class="fc bfc" id="L110" title="All 4 branches covered.">                    float src = row == 0 ? pr : (row == 1 ? pg : pb);</span>
+<span class="fc" id="L111">                    float o = src + (v - src) * k;</span>
+<span class="fc" id="L112">                    out |= Math.round(o * 255) &lt;&lt; (16 - 8 * row);</span>
+                }
+<span class="fc" id="L114">                argb[i] = out;</span>
+            }
+        }
+<span class="fc" id="L117">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

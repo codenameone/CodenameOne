@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StringRegex.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.util.regex</a> &gt; <span class="el_source">StringRegex.java</span></div><h1>StringRegex.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.util.regex;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
+
+/// The methods of `java.lang.String` that take a regular expression, over
+/// this package's [Pattern]: `matches`, `split`, `replaceAll` and
+/// `replaceFirst`, with the JDK's syntax. Each takes the string as its
+/// first argument, so `s.split(&quot;;&quot;)` becomes `StringRegex.split(s, &quot;;&quot;)`.
+public final class StringRegex {
+
+    /// The pattern compiled last. Code that splits every line of a file by
+    /// the same expression compiles it once.
+<span class="nc" id="L37">    private static final AtomicReference&lt;Pattern&gt; LAST = new AtomicReference&lt;Pattern&gt;();</span>
+
+    private StringRegex() {
+    }
+
+    private static Pattern pattern(String regex) {
+<span class="nc" id="L43">        Pattern last = LAST.get();</span>
+<span class="nc bnc" id="L44" title="All 4 branches missed.">        if (last != null &amp;&amp; last.pattern().equals(regex)) {</span>
+<span class="nc" id="L45">            return last;</span>
+        }
+<span class="nc" id="L47">        Pattern compiled = Pattern.compile(regex);</span>
+<span class="nc" id="L48">        LAST.set(compiled);</span>
+<span class="nc" id="L49">        return compiled;</span>
+    }
+
+    /// The character a separator is, when it is one plain character or one
+    /// escaped: -1 when it has to be compiled.
+    private static int plain(String regex) {
+<span class="nc bnc" id="L55" title="All 2 branches missed.">        if (regex.length() == 1) {</span>
+<span class="nc" id="L56">            char c = regex.charAt(0);</span>
+            // A lone surrogate goes to the engine, which never splits a pair.
+<span class="nc bnc" id="L58" title="All 4 branches missed.">            if (c &gt;= 0xd800 &amp;&amp; c &lt;= 0xdfff) {</span>
+<span class="nc" id="L59">                return -1;</span>
+            }
+<span class="nc bnc" id="L61" title="All 2 branches missed.">            return &quot;.$|()[{^?*+\\&quot;.indexOf(c) &lt; 0 ? c : -1;</span>
+        }
+<span class="nc bnc" id="L63" title="All 4 branches missed.">        if (regex.length() == 2 &amp;&amp; regex.charAt(0) == '\\') {</span>
+<span class="nc" id="L64">            char c = regex.charAt(1);</span>
+<span class="nc bnc" id="L65" title="All 12 branches missed.">            boolean alnum = c &gt;= '0' &amp;&amp; c &lt;= '9' || c &gt;= 'a' &amp;&amp; c &lt;= 'z' || c &gt;= 'A' &amp;&amp; c &lt;= 'Z';</span>
+<span class="nc bnc" id="L66" title="All 6 branches missed.">            return alnum || c &gt;= 0xd800 &amp;&amp; c &lt;= 0xdfff ? -1 : c;</span>
+        }
+<span class="nc" id="L68">        return -1;</span>
+    }
+
+    public static boolean matches(String s, String regex) {
+<span class="nc" id="L72">        receiver(s);</span>
+<span class="nc" id="L73">        return pattern(regex).matcher(s).matches();</span>
+    }
+
+    public static String[] split(String s, String regex) {
+<span class="nc" id="L77">        receiver(s);</span>
+<span class="nc" id="L78">        return split(s, regex, 0);</span>
+    }
+
+    public static String[] split(String s, String regex, int limit) {
+<span class="nc" id="L82">        receiver(s);</span>
+<span class="nc" id="L83">        int c = plain(regex);</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">        if (c &lt; 0) {</span>
+<span class="nc" id="L85">            return pattern(regex).split(s, limit);</span>
+        }
+<span class="nc" id="L87">        List&lt;String&gt; list = new ArrayList&lt;String&gt;();</span>
+<span class="nc" id="L88">        int off = 0;</span>
+<span class="nc bnc" id="L89" title="All 2 branches missed.">        boolean limited = limit &gt; 0;</span>
+<span class="nc" id="L90">        int next = s.indexOf(c, off);</span>
+<span class="nc bnc" id="L91" title="All 6 branches missed.">        while (next &gt;= 0 &amp;&amp; (!limited || list.size() &lt; limit - 1)) {</span>
+<span class="nc" id="L92">            list.add(s.substring(off, next));</span>
+<span class="nc" id="L93">            off = next + 1;</span>
+<span class="nc" id="L94">            next = s.indexOf(c, off);</span>
+        }
+<span class="nc bnc" id="L96" title="All 2 branches missed.">        if (off == 0) {</span>
+<span class="nc" id="L97">            return new String[] {s};</span>
+        }
+<span class="nc" id="L99">        list.add(s.substring(off));</span>
+<span class="nc" id="L100">        int size = list.size();</span>
+<span class="nc bnc" id="L101" title="All 2 branches missed.">        if (limit == 0) {</span>
+<span class="nc bnc" id="L102" title="All 4 branches missed.">            while (size &gt; 0 &amp;&amp; list.get(size - 1).length() == 0) {</span>
+<span class="nc" id="L103">                size--;</span>
+            }
+        }
+<span class="nc" id="L106">        String[] out = new String[size];</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">        for (int i = 0; i &lt; size; i++) {</span>
+<span class="nc" id="L108">            out[i] = list.get(i);</span>
+        }
+<span class="nc" id="L110">        return out;</span>
+    }
+
+    public static String replaceAll(String s, String regex, String replacement) {
+<span class="nc" id="L114">        receiver(s);</span>
+<span class="nc" id="L115">        return pattern(regex).matcher(s).replaceAll(replacement);</span>
+    }
+
+    public static String replaceFirst(String s, String regex, String replacement) {
+<span class="nc" id="L119">        receiver(s);</span>
+<span class="nc" id="L120">        return pattern(regex).matcher(s).replaceFirst(replacement);</span>
+    }
+
+    /// The null check the JVM made on the String these calls were rewritten
+    /// from, before anything looks at the regex.
+    private static void receiver(String s) {
+<span class="nc bnc" id="L126" title="All 2 branches missed.">        if (s == null) {</span>
+<span class="nc" id="L127">            throw new NullPointerException();</span>
+        }
+<span class="nc" id="L129">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

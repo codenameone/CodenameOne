@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>VibrancyMatrix.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.plaf</a> &gt; <span class="el_source">VibrancyMatrix.java</span></div><h1>VibrancyMatrix.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation. Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Codename One in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.plaf;
+
+/// The colour matrix iOS uses to draw VIBRANT content over glass -- tab bar
+/// icons and labels, among others.
+///
+/// A vibrant glyph is not painted in its tint. Each of its pixels is a colour
+/// transform of whatever lies BEHIND it: `out = clamp(M * backdrop + offset)`,
+/// with the glyph's coverage deciding how much of `out` replaces the backdrop
+/// (Graphics.colorMatrixRegion paints exactly that). The tint only chooses the
+/// matrix. That is why the selected tab of an iOS tab bar is a different blue
+/// over every backdrop, and far more vivid than the plain accent in dark mode.
+///
+/// MEASURED, NOT APPROXIMATED BY EYE. The matrices were read from UIKit itself: the
+/// motion probe (scripts/fidelity-app/ios-native-ref/motion-probe) sets a tab
+/// bar's tint to thousands of colours on the iOS 27 simulator and reads back the
+/// `vibrantColorMatrix` filter UIKit installs on the item layers. They follow closed
+/// forms exactly, with `t` the tint, `d = 1 - t` and `e = 0.5 * min(t) / max(t)`:
+///
+/// - dark: `M = e * I + (0.5 - e) * 1 * t^T / |t|^2`, `offset = t`
+/// - light: `M = e * I + 0.3 * (0.5 - e) * (1 + t) * d^T / |d|^2`,
+///   `offset = alpha * (1 + t) - 1 + e * t` with
+///   `alpha = 1 - e - 0.3 * (0.5 - e) * sum(d) / |d|^2`, which is what makes a
+///   white backdrop come out as exactly `t`
+/// - grey tints `g` (both appearances): `M = 5/16 * I / q`,
+///   `offset = (19/16 * g - 1/4) / q` with `q = 1 + 0.05 * g * (1 - g)`
+///
+/// Against every matrix the probe logged (7024 distinct light tints, 1354 dark, and
+/// the grey levels of both) the worst entry is off by 5e-6, the precision of the
+/// log itself.
+/// `tabmotion.py vibrancy` re-checks them against new captures.
+public final class VibrancyMatrix {
+
+    private VibrancyMatrix() {
+    }
+
+    /// The vibrancy matrix for content tinted `rgb`, as 12 floats: three rows
+    /// (red, green, blue) of `[r, g, b, offset]`, in 0..1 units, the layout
+    /// Graphics.colorMatrixRegion takes.
+    ///
+    /// #### Parameters
+    ///
+    /// - `rgb`: the tint, 0xRRGGBB
+    ///
+    /// - `dark`: true for the dark appearance
+    ///
+    /// #### Returns
+    ///
+    /// a new 12-element matrix
+    public static float[] forTint(int rgb, boolean dark) {
+<span class="fc" id="L72">        double[] t = {((rgb &gt;&gt; 16) &amp; 0xff) / 255.0, ((rgb &gt;&gt; 8) &amp; 0xff) / 255.0, (rgb &amp; 0xff) / 255.0};</span>
+<span class="fc" id="L73">        double mx = Math.max(t[0], Math.max(t[1], t[2]));</span>
+<span class="fc" id="L74">        double mn = Math.min(t[0], Math.min(t[1], t[2]));</span>
+<span class="fc" id="L75">        float[] m = new float[12];</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        if (mx - mn &lt; 1e-9) {</span>
+<span class="fc" id="L77">            double q = 1 + 0.05 * mx * (1 - mx);</span>
+<span class="fc" id="L78">            double gain = 5.0 / 16 / q;</span>
+<span class="fc" id="L79">            double off = (19.0 / 16 * mx - 0.25) / q;</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">            for (int r = 0; r &lt; 3; r++) {</span>
+<span class="fc" id="L81">                m[r * 4 + r] = (float) gain;</span>
+<span class="fc" id="L82">                m[r * 4 + 3] = (float) off;</span>
+            }
+<span class="fc" id="L84">            return m;</span>
+        }
+<span class="fc" id="L86">        double e = 0.5 * mn / mx;</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        if (dark) {</span>
+<span class="fc" id="L88">            double tt = t[0] * t[0] + t[1] * t[1] + t[2] * t[2];</span>
+<span class="fc" id="L89">            double a = 0.5 - e;</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">            for (int r = 0; r &lt; 3; r++) {</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">                for (int c = 0; c &lt; 3; c++) {</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">                    m[r * 4 + c] = (float) ((r == c ? e : 0) + a * t[c] / tt);</span>
+                }
+<span class="fc" id="L94">                m[r * 4 + 3] = (float) t[r];</span>
+            }
+<span class="fc" id="L96">            return m;</span>
+        }
+<span class="fc" id="L98">        double sum = 0;</span>
+<span class="fc" id="L99">        double sq = 0;</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        for (int i = 0; i &lt; 3; i++) {</span>
+<span class="fc" id="L101">            double d = 1 - t[i];</span>
+<span class="fc" id="L102">            sum += d;</span>
+<span class="fc" id="L103">            sq += d * d;</span>
+        }
+<span class="fc" id="L105">        double c = 0.3 * (0.5 - e) / sq;</span>
+<span class="fc" id="L106">        double alpha = 1 - e - c * sum;</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        for (int r = 0; r &lt; 3; r++) {</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">            for (int col = 0; col &lt; 3; col++) {</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">                m[r * 4 + col] = (float) (c * (1 + t[r]) * (1 - t[col]) + (r == col ? e : 0));</span>
+            }
+<span class="fc" id="L111">            m[r * 4 + 3] = (float) (alpha * (1 + t[r]) - 1 + e * t[r]);</span>
+        }
+<span class="fc" id="L113">        return m;</span>
+    }
+
+    /// Applies a 12-float colour matrix to one 0xRRGGBB colour (clamped), the
+    /// per-pixel operation of Graphics.colorMatrixRegion at full coverage.
+    ///
+    /// #### Parameters
+    ///
+    /// - `m`: the matrix, as returned by `#forTint(int, boolean)`
+    ///
+    /// - `rgb`: the colour, 0xRRGGBB
+    ///
+    /// #### Returns
+    ///
+    /// the transformed colour, 0xRRGGBB
+    public static int apply(float[] m, int rgb) {
+<span class="fc" id="L129">        float r = ((rgb &gt;&gt; 16) &amp; 0xff) / 255f;</span>
+<span class="fc" id="L130">        float g = ((rgb &gt;&gt; 8) &amp; 0xff) / 255f;</span>
+<span class="fc" id="L131">        float b = (rgb &amp; 0xff) / 255f;</span>
+<span class="fc" id="L132">        int out = 0;</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        for (int row = 0; row &lt; 3; row++) {</span>
+<span class="fc" id="L134">            float v = m[row * 4] * r + m[row * 4 + 1] * g + m[row * 4 + 2] * b + m[row * 4 + 3];</span>
+<span class="fc bfc" id="L135" title="All 4 branches covered.">            int iv = Math.round((v &lt; 0 ? 0 : (v &gt; 1 ? 1 : v)) * 255);</span>
+<span class="fc" id="L136">            out = (out &lt;&lt; 8) | iv;</span>
+        }
+<span class="fc" id="L138">        return out;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

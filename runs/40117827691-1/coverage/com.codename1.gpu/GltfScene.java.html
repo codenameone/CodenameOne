@@ -1,0 +1,504 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GltfScene.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gpu</a> &gt; <span class="el_source">GltfScene.java</span></div><h1>GltfScene.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gpu;
+
+import com.codename1.ui.Image;
+
+/// The whole of a glTF 2.0 file as plain data: every node of the scene graph,
+/// every triangle primitive, the materials, the skins and the animation clips.
+/// Produced by `GltfLoader#loadScene(byte[])`.
+///
+/// Nothing here is uploaded to a `GraphicsDevice`; the vertex data is kept on the
+/// CPU so a renderer can pose it. `com.codename1.gaming.AnimatedModel` is the
+/// ready made consumer: it samples the clips, skins the vertices and draws the
+/// result as ordinary `Mesh`es.
+///
+/// Node transforms follow the glTF convention: a node's local matrix is
+/// `T * R * S` of its translation, rotation (an `x, y, z, w` quaternion) and
+/// scale, and its world matrix is its parent's world matrix times that.
+public final class GltfScene {
+    final Node[] nodes;
+    final int[] roots;
+    final Primitive[] primitives;
+    final MaterialInfo[] materials;
+    final Image[] images;
+    final Skin[] skins;
+    final Animation[] animations;
+    private Texture[] textures;
+    private GraphicsDevice textureDevice;
+
+    GltfScene(Node[] nodes, int[] roots, Primitive[] primitives, MaterialInfo[] materials,
+<span class="fc" id="L51">              Image[] images, Skin[] skins, Animation[] animations) {</span>
+<span class="fc" id="L52">        this.nodes = nodes;</span>
+<span class="fc" id="L53">        this.roots = roots;</span>
+<span class="fc" id="L54">        this.primitives = primitives;</span>
+<span class="fc" id="L55">        this.materials = materials;</span>
+<span class="fc" id="L56">        this.images = images;</span>
+<span class="fc" id="L57">        this.skins = skins;</span>
+<span class="fc" id="L58">        this.animations = animations;</span>
+<span class="fc" id="L59">    }</span>
+
+    /// The number of nodes in the file.
+    public int getNodeCount() {
+<span class="fc" id="L63">        return nodes.length;</span>
+    }
+
+    /// The node at `index`.
+    public Node getNode(int index) {
+<span class="fc" id="L68">        return nodes[index];</span>
+    }
+
+    /// The index of the first node named `name`, or -1.
+    public int findNode(String name) {
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        for (int i = 0; i &lt; nodes.length; i++) {</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">            if (name.equals(nodes[i].name)) {</span>
+<span class="fc" id="L75">                return i;</span>
+            }
+        }
+<span class="fc" id="L78">        return -1;</span>
+    }
+
+    /// The indices of the scene's root nodes, parents before children.
+    public int[] getRoots() {
+<span class="fc" id="L83">        return roots;</span>
+    }
+
+    /// The number of triangle primitives across every mesh node.
+    public int getPrimitiveCount() {
+<span class="fc" id="L88">        return primitives.length;</span>
+    }
+
+    /// The primitive at `index`.
+    public Primitive getPrimitive(int index) {
+<span class="fc" id="L93">        return primitives[index];</span>
+    }
+
+    /// The number of materials.
+    public int getMaterialCount() {
+<span class="fc" id="L98">        return materials.length;</span>
+    }
+
+    /// The material at `index`.
+    public MaterialInfo getMaterial(int index) {
+<span class="fc" id="L103">        return materials[index];</span>
+    }
+
+    /// The decoded embedded image at `index`, or null when it could not be read.
+    public Image getImage(int index) {
+<span class="nc" id="L108">        return images[index];</span>
+    }
+
+    /// The texture for image `index` on `device`, uploaded on first use and then
+    /// shared by every model drawn from this scene. Returns null when the image
+    /// could not be decoded. Asking with a different device uploads afresh.
+    public Texture getTexture(GraphicsDevice device, int index) {
+<span class="pc bpc" id="L115" title="5 of 6 branches missed.">        if (index &lt; 0 || index &gt;= images.length || images[index] == null) {</span>
+<span class="fc" id="L116">            return null;</span>
+        }
+<span class="nc bnc" id="L118" title="All 4 branches missed.">        if (textures == null || textureDevice != device) { //NOPMD CompareObjectsWithEquals - a different device instance needs its own textures</span>
+<span class="nc" id="L119">            textures = new Texture[images.length];</span>
+<span class="nc" id="L120">            textureDevice = device;</span>
+        }
+<span class="nc bnc" id="L122" title="All 2 branches missed.">        if (textures[index] == null) {</span>
+<span class="nc" id="L123">            textures[index] = device.createTexture(images[index]);</span>
+<span class="nc" id="L124">            textures[index].setFilter(Texture.Filter.LINEAR);</span>
+        }
+<span class="nc" id="L126">        return textures[index];</span>
+    }
+
+    /// The number of skins.
+    public int getSkinCount() {
+<span class="fc" id="L131">        return skins.length;</span>
+    }
+
+    /// The skin at `index`.
+    public Skin getSkin(int index) {
+<span class="fc" id="L136">        return skins[index];</span>
+    }
+
+    /// The number of animation clips.
+    public int getAnimationCount() {
+<span class="nc" id="L141">        return animations.length;</span>
+    }
+
+    /// The clip at `index`.
+    public Animation getAnimation(int index) {
+<span class="nc" id="L146">        return animations[index];</span>
+    }
+
+    /// The first clip named `name`, or null.
+    public Animation findAnimation(String name) {
+<span class="fc bfc" id="L151" title="All 2 branches covered.">        for (Animation a : animations) {</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">            if (name.equals(a.name)) {</span>
+<span class="fc" id="L153">                return a;</span>
+            }
+        }
+<span class="fc" id="L156">        return null;</span>
+    }
+
+    /// One node of the scene graph.
+    public static final class Node {
+        final String name;
+        final int parent;
+        final int[] children;
+        final float[] translation;
+        final float[] rotation;
+        final float[] scale;
+        final int skin;
+
+        Node(String name, int parent, int[] children, float[] translation, float[] rotation,
+<span class="fc" id="L170">                float[] scale, int skin) {</span>
+<span class="fc" id="L171">            this.name = name;</span>
+<span class="fc" id="L172">            this.parent = parent;</span>
+<span class="fc" id="L173">            this.children = children;</span>
+<span class="fc" id="L174">            this.translation = translation;</span>
+<span class="fc" id="L175">            this.rotation = rotation;</span>
+<span class="fc" id="L176">            this.scale = scale;</span>
+<span class="fc" id="L177">            this.skin = skin;</span>
+<span class="fc" id="L178">        }</span>
+
+        /// The node's name, or an empty string.
+        public String getName() {
+<span class="nc" id="L182">            return name;</span>
+        }
+
+        /// The parent node's index, or -1 for a root.
+        public int getParent() {
+<span class="fc" id="L187">            return parent;</span>
+        }
+
+        /// The child node indices.
+        public int[] getChildren() {
+<span class="fc" id="L192">            return children;</span>
+        }
+
+        /// The rest translation `x, y, z`.
+        public float[] getTranslation() {
+<span class="fc" id="L197">            return translation;</span>
+        }
+
+        /// The rest rotation as an `x, y, z, w` quaternion.
+        public float[] getRotation() {
+<span class="fc" id="L202">            return rotation;</span>
+        }
+
+        /// The rest scale `x, y, z`.
+        public float[] getScale() {
+<span class="fc" id="L207">            return scale;</span>
+        }
+
+        /// The index of the skin that deforms this node's mesh, or -1.
+        public int getSkin() {
+<span class="fc" id="L212">            return skin;</span>
+        }
+    }
+
+    /// One triangle primitive, with its vertex data in the node's local space.
+    public static final class Primitive {
+        final int node;
+        final int material;
+        final float[] positions;
+        final float[] normals;
+        final float[] texcoords;
+        final int[] indices;
+        final int[] joints;
+        final float[] weights;
+
+        Primitive(int node, int material, float[] positions, float[] normals, float[] texcoords,
+<span class="fc" id="L228">                  int[] indices, int[] joints, float[] weights) {</span>
+<span class="fc" id="L229">            this.node = node;</span>
+<span class="fc" id="L230">            this.material = material;</span>
+<span class="fc" id="L231">            this.positions = positions;</span>
+<span class="fc" id="L232">            this.normals = normals;</span>
+<span class="fc" id="L233">            this.texcoords = texcoords;</span>
+<span class="fc" id="L234">            this.indices = indices;</span>
+<span class="fc" id="L235">            this.joints = joints;</span>
+<span class="fc" id="L236">            this.weights = weights;</span>
+<span class="fc" id="L237">        }</span>
+
+        /// The node that places this primitive.
+        public int getNode() {
+<span class="fc" id="L241">            return node;</span>
+        }
+
+        /// The material index, or -1.
+        public int getMaterial() {
+<span class="fc" id="L246">            return material;</span>
+        }
+
+        /// The number of vertices.
+        public int getVertexCount() {
+<span class="fc" id="L251">            return positions.length / 3;</span>
+        }
+
+        /// `x, y, z` per vertex.
+        public float[] getPositions() {
+<span class="fc" id="L256">            return positions;</span>
+        }
+
+        /// `x, y, z` per vertex; computed flat normals when the file has none.
+        public float[] getNormals() {
+<span class="fc" id="L261">            return normals;</span>
+        }
+
+        /// `u, v` per vertex, or null.
+        public float[] getTexcoords() {
+<span class="fc" id="L266">            return texcoords;</span>
+        }
+
+        /// Triangle indices.
+        public int[] getIndices() {
+<span class="fc" id="L271">            return indices;</span>
+        }
+
+        /// Four joint indices per vertex (indices into the skin's joint list), or
+        /// null when the primitive is not skinned.
+        public int[] getJoints() {
+<span class="fc" id="L277">            return joints;</span>
+        }
+
+        /// Four weights per vertex, or null when the primitive is not skinned.
+        public float[] getWeights() {
+<span class="fc" id="L282">            return weights;</span>
+        }
+
+        /// True when the primitive carries joints and weights.
+        public boolean isSkinned() {
+<span class="pc bpc" id="L287" title="1 of 4 branches missed.">            return joints != null &amp;&amp; weights != null;</span>
+        }
+    }
+
+    /// The parts of a glTF material a `Material` can express.
+    public static final class MaterialInfo {
+        final String name;
+        final int baseColor;
+        final int image;
+        final boolean doubleSided;
+        final boolean blend;
+
+<span class="fc" id="L299">        MaterialInfo(String name, int baseColor, int image, boolean doubleSided, boolean blend) {</span>
+<span class="fc" id="L300">            this.name = name;</span>
+<span class="fc" id="L301">            this.baseColor = baseColor;</span>
+<span class="fc" id="L302">            this.image = image;</span>
+<span class="fc" id="L303">            this.doubleSided = doubleSided;</span>
+<span class="fc" id="L304">            this.blend = blend;</span>
+<span class="fc" id="L305">        }</span>
+
+        /// The material's name, or an empty string.
+        public String getName() {
+<span class="nc" id="L309">            return name;</span>
+        }
+
+        /// The base color factor as ARGB.
+        public int getBaseColor() {
+<span class="fc" id="L314">            return baseColor;</span>
+        }
+
+        /// The index of the base color image, or -1.
+        public int getImage() {
+<span class="fc" id="L319">            return image;</span>
+        }
+
+        /// True when back faces must not be culled.
+        public boolean isDoubleSided() {
+<span class="fc" id="L324">            return doubleSided;</span>
+        }
+
+        /// True when the material's alpha mode is `BLEND`.
+        public boolean isBlend() {
+<span class="fc" id="L329">            return blend;</span>
+        }
+    }
+
+    /// A skeleton: the joint nodes and the matrices that take a vertex from the
+    /// mesh's bind pose into each joint's space.
+    public static final class Skin {
+        final int[] joints;
+        final float[] inverseBindMatrices;
+
+<span class="fc" id="L339">        Skin(int[] joints, float[] inverseBindMatrices) {</span>
+<span class="fc" id="L340">            this.joints = joints;</span>
+<span class="fc" id="L341">            this.inverseBindMatrices = inverseBindMatrices;</span>
+<span class="fc" id="L342">        }</span>
+
+        /// The joint node indices.
+        public int[] getJoints() {
+<span class="fc" id="L346">            return joints;</span>
+        }
+
+        /// 16 column-major floats per joint.
+        public float[] getInverseBindMatrices() {
+<span class="fc" id="L351">            return inverseBindMatrices;</span>
+        }
+    }
+
+    /// A named animation clip.
+    public static final class Animation {
+        final String name;
+        final Channel[] channels;
+        final float duration;
+
+<span class="fc" id="L361">        Animation(String name, Channel[] channels) {</span>
+<span class="fc" id="L362">            this.name = name;</span>
+<span class="fc" id="L363">            this.channels = channels;</span>
+<span class="fc" id="L364">            float d = 0f;</span>
+<span class="fc bfc" id="L365" title="All 2 branches covered.">            for (Channel c : channels) {</span>
+<span class="fc" id="L366">                float[] t = c.times;</span>
+<span class="pc bpc" id="L367" title="2 of 4 branches missed.">                if (t.length &gt; 0 &amp;&amp; t[t.length - 1] &gt; d) {</span>
+<span class="fc" id="L368">                    d = t[t.length - 1];</span>
+                }
+            }
+<span class="fc" id="L371">            this.duration = d;</span>
+<span class="fc" id="L372">        }</span>
+
+        /// The clip's name, or an empty string.
+        public String getName() {
+<span class="fc" id="L376">            return name;</span>
+        }
+
+        /// The clip's length in seconds.
+        public float getDuration() {
+<span class="fc" id="L381">            return duration;</span>
+        }
+
+        /// The channels that animate node properties.
+        public Channel[] getChannels() {
+<span class="fc" id="L386">            return channels;</span>
+        }
+    }
+
+    /// Keyframes for one property of one node.
+    public static final class Channel {
+        /// The channel animates a node's translation.
+        public static final int TRANSLATION = 0;
+        /// The channel animates a node's rotation.
+        public static final int ROTATION = 1;
+        /// The channel animates a node's scale.
+        public static final int SCALE = 2;
+
+        final int node;
+        final int path;
+        final float[] times;
+        final float[] values;
+        final boolean step;
+
+<span class="fc" id="L405">        Channel(int node, int path, float[] times, float[] values, boolean step) {</span>
+<span class="fc" id="L406">            this.node = node;</span>
+<span class="fc" id="L407">            this.path = path;</span>
+<span class="fc" id="L408">            this.times = times;</span>
+<span class="fc" id="L409">            this.values = values;</span>
+<span class="fc" id="L410">            this.step = step;</span>
+<span class="fc" id="L411">        }</span>
+
+        /// The animated node.
+        public int getNode() {
+<span class="fc" id="L415">            return node;</span>
+        }
+
+        /// `TRANSLATION`, `ROTATION` or `SCALE`.
+        public int getPath() {
+<span class="fc" id="L420">            return path;</span>
+        }
+
+        /// Keyframe times in seconds, ascending.
+        public float[] getTimes() {
+<span class="nc" id="L425">            return times;</span>
+        }
+
+        /// The keyframe values: 3 floats per key, 4 for a rotation.
+        public float[] getValues() {
+<span class="nc" id="L430">            return values;</span>
+        }
+
+        /// True for `STEP` interpolation, false for `LINEAR`.
+        public boolean isStep() {
+<span class="nc" id="L435">            return step;</span>
+        }
+
+        /// Samples the channel at `time` (clamped to the keys) into `dst`.
+        public void sample(float time, float[] dst) {
+<span class="pc bpc" id="L440" title="1 of 2 branches missed.">            int width = path == ROTATION ? 4 : 3;</span>
+<span class="fc" id="L441">            int n = times.length;</span>
+<span class="pc bpc" id="L442" title="1 of 2 branches missed.">            if (n == 0) {</span>
+<span class="nc" id="L443">                return;</span>
+            }
+<span class="pc bpc" id="L445" title="1 of 4 branches missed.">            if (time &lt;= times[0] || n == 1) {</span>
+<span class="fc" id="L446">                System.arraycopy(values, 0, dst, 0, width);</span>
+<span class="fc" id="L447">                return;</span>
+            }
+<span class="fc bfc" id="L449" title="All 2 branches covered.">            if (time &gt;= times[n - 1]) {</span>
+<span class="fc" id="L450">                System.arraycopy(values, (n - 1) * width, dst, 0, width);</span>
+<span class="fc" id="L451">                return;</span>
+            }
+<span class="fc" id="L453">            int lo = 0;</span>
+<span class="fc" id="L454">            int hi = n - 1;</span>
+<span class="pc bpc" id="L455" title="1 of 2 branches missed.">            while (hi - lo &gt; 1) {</span>
+<span class="nc" id="L456">                int mid = (lo + hi) &gt;&gt;&gt; 1;</span>
+<span class="nc bnc" id="L457" title="All 2 branches missed.">                if (times[mid] &lt;= time) {</span>
+<span class="nc" id="L458">                    lo = mid;</span>
+                } else {
+<span class="nc" id="L460">                    hi = mid;</span>
+                }
+<span class="nc" id="L462">            }</span>
+<span class="pc bpc" id="L463" title="1 of 2 branches missed.">            if (step) {</span>
+<span class="nc" id="L464">                System.arraycopy(values, lo * width, dst, 0, width);</span>
+<span class="nc" id="L465">                return;</span>
+            }
+<span class="fc" id="L467">            float span = times[hi] - times[lo];</span>
+<span class="pc bpc" id="L468" title="1 of 2 branches missed.">            float t = span &gt; 0f ? (time - times[lo]) / span : 0f;</span>
+<span class="fc" id="L469">            int a = lo * width;</span>
+<span class="fc" id="L470">            int b = hi * width;</span>
+<span class="pc bpc" id="L471" title="1 of 2 branches missed.">            if (path == ROTATION) {</span>
+<span class="fc" id="L472">                nlerp(values, a, b, t, dst);</span>
+<span class="fc" id="L473">                return;</span>
+            }
+<span class="nc bnc" id="L475" title="All 2 branches missed.">            for (int i = 0; i &lt; width; i++) {</span>
+<span class="nc" id="L476">                dst[i] = values[a + i] + (values[b + i] - values[a + i]) * t;</span>
+            }
+<span class="nc" id="L478">        }</span>
+
+        /// Normalized linear interpolation along the shorter arc. Keyframes are
+        /// dense enough that the difference from slerp is not visible, and it
+        /// costs no trigonometry per joint per frame.
+        static void nlerp(float[] v, int a, int b, float t, float[] dst) {
+<span class="fc" id="L484">            float dot = v[a] * v[b] + v[a + 1] * v[b + 1] + v[a + 2] * v[b + 2] + v[a + 3] * v[b + 3];</span>
+<span class="pc bpc" id="L485" title="1 of 2 branches missed.">            float sign = dot &lt; 0f ? -1f : 1f;</span>
+<span class="fc" id="L486">            float x = v[a] + (sign * v[b] - v[a]) * t;</span>
+<span class="fc" id="L487">            float y = v[a + 1] + (sign * v[b + 1] - v[a + 1]) * t;</span>
+<span class="fc" id="L488">            float z = v[a + 2] + (sign * v[b + 2] - v[a + 2]) * t;</span>
+<span class="fc" id="L489">            float w = v[a + 3] + (sign * v[b + 3] - v[a + 3]) * t;</span>
+<span class="fc" id="L490">            float len = (float) Math.sqrt(x * x + y * y + z * z + w * w);</span>
+<span class="pc bpc" id="L491" title="1 of 2 branches missed.">            if (len &gt; 0f) {</span>
+<span class="fc" id="L492">                x /= len;</span>
+<span class="fc" id="L493">                y /= len;</span>
+<span class="fc" id="L494">                z /= len;</span>
+<span class="fc" id="L495">                w /= len;</span>
+            }
+<span class="fc" id="L497">            dst[0] = x;</span>
+<span class="fc" id="L498">            dst[1] = y;</span>
+<span class="fc" id="L499">            dst[2] = z;</span>
+<span class="fc" id="L500">            dst[3] = w;</span>
+<span class="fc" id="L501">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

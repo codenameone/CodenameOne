@@ -1,0 +1,346 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AudioEffects.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.media</a> &gt; <span class="el_source">AudioEffects.java</span></div><h1>AudioEffects.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.media;
+
+import com.codename1.util.Simd;
+
+/// Small PCM effects that operate on `AudioBuffer` data.
+///
+/// The methods in this class are platform-neutral and work on interleaved
+/// normalized float PCM samples in the `[-1, 1]` range.  They return new
+/// `AudioBuffer` instances and leave the source buffer unchanged.
+public final class AudioEffects {
+    private static final float DEFAULT_LOW_CUTOFF_HZ = 250.0f;
+    private static final float DEFAULT_HIGH_CUTOFF_HZ = 4000.0f;
+<span class="fc" id="L35">    private static boolean simdOptimizationsEnabled = Simd.get().isSupported();</span>
+
+    private AudioEffects() {
+    }
+
+    /// Indicates whether `AudioEffects` should use SIMD-backed kernels when
+    /// the current platform supports them. Scalar fallbacks are always used for
+    /// effects whose stateful filters don't map to the current SIMD API.
+    ///
+    /// #### Returns
+    ///
+    /// true when SIMD optimizations are enabled.
+    public static boolean isSimdOptimizationsEnabled() {
+<span class="nc" id="L48">        return simdOptimizationsEnabled;</span>
+    }
+
+    /// Enables or disables SIMD-backed `AudioEffects` optimizations.
+    ///
+    /// This only changes internal implementation choices. It doesn't change
+    /// output format or API behavior.
+    ///
+    /// #### Parameters
+    ///
+    /// - `enabled`: true to use SIMD where supported, false to force scalar loops.
+    public static void setSimdOptimizationsEnabled(boolean enabled) {
+<span class="nc" id="L60">        simdOptimizationsEnabled = enabled;</span>
+<span class="nc" id="L61">    }</span>
+
+    /// Restores the default SIMD optimization setting for this platform.
+    public static void resetSimdOptimizationsEnabled() {
+<span class="nc" id="L65">        simdOptimizationsEnabled = Simd.get().isSupported();</span>
+<span class="nc" id="L66">    }</span>
+
+    /// Applies gain to a PCM buffer.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: The source buffer.
+    /// - `gain`: Gain multiplier.  `1.0f` preserves level.
+    ///
+    /// #### Returns
+    ///
+    /// a new buffer with gain applied and samples clipped to `[-1, 1]`.
+    public static AudioBuffer gain(AudioBuffer source, float gain) {
+<span class="fc" id="L79">        validateBuffer(source);</span>
+<span class="fc" id="L80">        validateFinite(gain, &quot;gain&quot;);</span>
+<span class="fc" id="L81">        float[] pcm = copySamples(source);</span>
+<span class="fc" id="L82">        applyGainInPlace(pcm, gain);</span>
+<span class="fc" id="L83">        return buffer(source.getSampleRate(), source.getNumChannels(), pcm);</span>
+    }
+
+    /// Normalizes a PCM buffer so its largest absolute sample reaches `targetPeak`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: The source buffer.
+    /// - `targetPeak`: Desired peak amplitude in the range `[0, 1]`.
+    ///
+    /// #### Returns
+    ///
+    /// a new normalized buffer.  Silent buffers are returned unchanged.
+    public static AudioBuffer normalize(AudioBuffer source, float targetPeak) {
+<span class="fc" id="L97">        validateBuffer(source);</span>
+<span class="fc" id="L98">        validatePeak(targetPeak);</span>
+<span class="fc" id="L99">        float[] pcm = copySamples(source);</span>
+<span class="fc" id="L100">        float peak = 0.0f;</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        for (float sample : pcm) {</span>
+<span class="fc" id="L102">            peak = Math.max(peak, Math.abs(sample));</span>
+        }
+<span class="pc bpc" id="L104" title="2 of 4 branches missed.">        if (peak == 0.0f || peak == targetPeak) {</span>
+<span class="nc" id="L105">            return buffer(source.getSampleRate(), source.getNumChannels(), pcm);</span>
+        }
+<span class="fc" id="L107">        float gain = targetPeak / peak;</span>
+<span class="fc" id="L108">        applyGainInPlace(pcm, gain);</span>
+<span class="fc" id="L109">        return buffer(source.getSampleRate(), source.getNumChannels(), pcm);</span>
+    }
+
+    /// Applies a simple three-band equalizer using default crossover points.
+    ///
+    /// Low frequencies are shaped below roughly 250 Hz, high frequencies above
+    /// roughly 4 kHz, and the middle band contains the remaining signal.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: The source buffer.
+    /// - `lowGain`: Gain for the low band.
+    /// - `midGain`: Gain for the middle band.
+    /// - `highGain`: Gain for the high band.
+    ///
+    /// #### Returns
+    ///
+    /// a new equalized buffer clipped to `[-1, 1]`.
+    public static AudioBuffer equalize(AudioBuffer source, float lowGain, float midGain, float highGain) {
+<span class="nc" id="L128">        return equalize(source, lowGain, midGain, highGain, DEFAULT_LOW_CUTOFF_HZ, DEFAULT_HIGH_CUTOFF_HZ);</span>
+    }
+
+    /// Applies a simple three-band equalizer.
+    ///
+    /// This is intended for lightweight tone shaping and demos, not as a
+    /// mastering-grade parametric equalizer.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: The source buffer.
+    /// - `lowGain`: Gain for samples below `lowCutoffHz`.
+    /// - `midGain`: Gain for samples between the crossover bands.
+    /// - `highGain`: Gain for samples above `highCutoffHz`.
+    /// - `lowCutoffHz`: Low/mid crossover frequency.
+    /// - `highCutoffHz`: Mid/high crossover frequency.
+    ///
+    /// #### Returns
+    ///
+    /// a new equalized buffer clipped to `[-1, 1]`.
+    public static AudioBuffer equalize(AudioBuffer source, float lowGain, float midGain, float highGain,
+                                       float lowCutoffHz, float highCutoffHz) {
+<span class="fc" id="L150">        validateBuffer(source);</span>
+<span class="fc" id="L151">        validateFinite(lowGain, &quot;lowGain&quot;);</span>
+<span class="fc" id="L152">        validateFinite(midGain, &quot;midGain&quot;);</span>
+<span class="fc" id="L153">        validateFinite(highGain, &quot;highGain&quot;);</span>
+<span class="fc" id="L154">        validateCutoffs(source.getSampleRate(), lowCutoffHz, highCutoffHz);</span>
+<span class="fc" id="L155">        float[] input = copySamples(source);</span>
+<span class="fc" id="L156">        float[] output = new float[input.length];</span>
+<span class="fc" id="L157">        int channels = source.getNumChannels();</span>
+<span class="fc" id="L158">        float lowAlpha = lowPassAlpha(lowCutoffHz, source.getSampleRate());</span>
+<span class="fc" id="L159">        float highAlpha = highPassAlpha(highCutoffHz, source.getSampleRate());</span>
+<span class="fc" id="L160">        float[] lowState = new float[channels];</span>
+<span class="fc" id="L161">        float[] highState = new float[channels];</span>
+<span class="fc" id="L162">        float[] highPrevInput = new float[channels];</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">        for (int frameOffset = 0; frameOffset &lt; input.length; frameOffset += channels) {</span>
+<span class="fc bfc" id="L164" title="All 2 branches covered.">            for (int channel = 0; channel &lt; channels; channel++) {</span>
+<span class="fc" id="L165">                int index = frameOffset + channel;</span>
+<span class="fc" id="L166">                float sample = input[index];</span>
+<span class="fc" id="L167">                lowState[channel] += lowAlpha * (sample - lowState[channel]);</span>
+<span class="fc" id="L168">                float high = highAlpha * (highState[channel] + sample - highPrevInput[channel]);</span>
+<span class="fc" id="L169">                highState[channel] = high;</span>
+<span class="fc" id="L170">                highPrevInput[channel] = sample;</span>
+<span class="fc" id="L171">                float low = lowState[channel];</span>
+<span class="fc" id="L172">                float mid = sample - low - high;</span>
+<span class="fc" id="L173">                output[index] = clamp(low * lowGain + mid * midGain + high * highGain);</span>
+            }
+        }
+<span class="fc" id="L176">        return buffer(source.getSampleRate(), channels, output);</span>
+    }
+
+    /// Reduces center-panned content in a stereo buffer.
+    ///
+    /// This is the classic mid/side &quot;vocal remover&quot; technique.  It only works
+    /// when the content to remove is centered and similar in both channels.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: A stereo source buffer.
+    ///
+    /// #### Returns
+    ///
+    /// a new stereo buffer with the center channel reduced.
+    public static AudioBuffer removeCenter(AudioBuffer source) {
+<span class="fc" id="L192">        return midSide(source, 0.0f, 1.0f);</span>
+    }
+
+    /// Isolates center-panned content in a stereo buffer.
+    ///
+    /// This can be useful for centered dialog or vocals, but it isn't true
+    /// speech separation. It preserves only content common to the left and
+    /// right channels, so it requires a stereo source where the target content
+    /// is actually centered.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: A stereo source buffer.
+    ///
+    /// #### Returns
+    ///
+    /// a new stereo buffer containing the center component.
+    public static AudioBuffer isolateCenter(AudioBuffer source) {
+<span class="fc" id="L210">        return midSide(source, 1.0f, 0.0f);</span>
+    }
+
+    /// Applies mid/side processing to a stereo buffer.
+    ///
+    /// Use a larger `midGain` and smaller `sideGain` for simple voice/dialog
+    /// enhancement, or `midGain=0` and `sideGain=1` for center removal.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: A stereo source buffer.
+    /// - `midGain`: Gain for content common to left and right channels.
+    /// - `sideGain`: Gain for content that differs between channels.
+    ///
+    /// #### Returns
+    ///
+    /// a new stereo buffer.
+    public static AudioBuffer midSide(AudioBuffer source, float midGain, float sideGain) {
+<span class="fc" id="L228">        validateBuffer(source);</span>
+<span class="fc bfc" id="L229" title="All 2 branches covered.">        if (source.getNumChannels() != 2) {</span>
+<span class="fc" id="L230">            throw new IllegalArgumentException(&quot;midSide() requires a stereo buffer&quot;);</span>
+        }
+<span class="fc" id="L232">        validateFinite(midGain, &quot;midGain&quot;);</span>
+<span class="fc" id="L233">        validateFinite(sideGain, &quot;sideGain&quot;);</span>
+<span class="fc" id="L234">        float[] input = copySamples(source);</span>
+<span class="fc" id="L235">        float[] output = new float[input.length];</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">        for (int i = 0; i &lt; input.length; i += 2) {</span>
+<span class="fc" id="L237">            float left = input[i];</span>
+<span class="fc" id="L238">            float right = input[i + 1];</span>
+<span class="fc" id="L239">            float mid = (left + right) * 0.5f;</span>
+<span class="fc" id="L240">            float side = (left - right) * 0.5f;</span>
+<span class="fc" id="L241">            output[i] = clamp(mid * midGain + side * sideGain);</span>
+<span class="fc" id="L242">            output[i + 1] = clamp(mid * midGain - side * sideGain);</span>
+        }
+<span class="fc" id="L244">        return buffer(source.getSampleRate(), 2, output);</span>
+    }
+
+    private static float[] copySamples(AudioBuffer source) {
+<span class="fc" id="L248">        float[] pcm = allocFloat(source.getSize());</span>
+<span class="fc" id="L249">        source.copyTo(pcm);</span>
+<span class="fc" id="L250">        return pcm;</span>
+    }
+
+    private static float[] allocFloat(int size) {
+<span class="pc bpc" id="L254" title="1 of 2 branches missed.">        if (size &gt;= 16) {</span>
+<span class="nc" id="L255">            return Simd.get().allocFloat(size);</span>
+        }
+<span class="fc" id="L257">        return new float[size];</span>
+    }
+
+    private static boolean shouldUseSimd(int size) {
+<span class="pc bpc" id="L261" title="5 of 6 branches missed.">        return simdOptimizationsEnabled &amp;&amp; Simd.get().isSupported() &amp;&amp; size &gt;= 16;</span>
+    }
+
+    private static void applyGainInPlace(float[] pcm, float gain) {
+<span class="pc bpc" id="L265" title="1 of 2 branches missed.">        if (shouldUseSimd(pcm.length)) {</span>
+<span class="nc" id="L266">            Simd simd = Simd.get();</span>
+<span class="nc" id="L267">            float[] gains = simd.allocFloat(pcm.length);</span>
+<span class="nc" id="L268">            float[] multiplied = simd.allocFloat(pcm.length);</span>
+<span class="nc bnc" id="L269" title="All 2 branches missed.">            for (int i = 0; i &lt; gains.length; i++) {</span>
+<span class="nc" id="L270">                gains[i] = gain;</span>
+            }
+<span class="nc" id="L272">            simd.mul(pcm, gains, multiplied, 0, pcm.length);</span>
+<span class="nc" id="L273">            simd.clamp(multiplied, pcm, -1.0f, 1.0f, 0, pcm.length);</span>
+<span class="nc" id="L274">            return;</span>
+        }
+<span class="fc bfc" id="L276" title="All 2 branches covered.">        for (int i = 0; i &lt; pcm.length; i++) {</span>
+<span class="fc" id="L277">            pcm[i] = clamp(pcm[i] * gain);</span>
+        }
+<span class="fc" id="L279">    }</span>
+
+    private static AudioBuffer buffer(int sampleRate, int channels, float[] pcm) {
+<span class="fc" id="L282">        AudioBuffer out = new AudioBuffer(pcm.length);</span>
+<span class="fc" id="L283">        out.copyFrom(sampleRate, channels, pcm);</span>
+<span class="fc" id="L284">        return out;</span>
+    }
+
+    private static void validateBuffer(AudioBuffer source) {
+<span class="fc bfc" id="L288" title="All 2 branches covered.">        if (source == null) {</span>
+<span class="fc" id="L289">            throw new IllegalArgumentException(&quot;source must not be null&quot;);</span>
+        }
+<span class="pc bpc" id="L291" title="1 of 2 branches missed.">        if (source.getSampleRate() &lt;= 0) {</span>
+<span class="nc" id="L292">            throw new IllegalArgumentException(&quot;source sampleRate must be greater than zero&quot;);</span>
+        }
+<span class="pc bpc" id="L294" title="1 of 2 branches missed.">        if (source.getNumChannels() &lt;= 0) {</span>
+<span class="nc" id="L295">            throw new IllegalArgumentException(&quot;source numChannels must be greater than zero&quot;);</span>
+        }
+<span class="pc bpc" id="L297" title="1 of 2 branches missed.">        if (source.getSize() % source.getNumChannels() != 0) {</span>
+<span class="nc" id="L298">            throw new IllegalArgumentException(&quot;source sample count must be a multiple of numChannels&quot;);</span>
+        }
+<span class="fc" id="L300">    }</span>
+
+    private static void validateFinite(float value, String name) {
+<span class="pc bpc" id="L303" title="2 of 4 branches missed.">        if (Float.isNaN(value) || Float.isInfinite(value)) {</span>
+<span class="nc" id="L304">            throw new IllegalArgumentException(name + &quot; must be finite&quot;);</span>
+        }
+<span class="fc" id="L306">    }</span>
+
+    private static void validatePeak(float targetPeak) {
+<span class="fc" id="L309">        validateFinite(targetPeak, &quot;targetPeak&quot;);</span>
+<span class="pc bpc" id="L310" title="1 of 4 branches missed.">        if (targetPeak &lt; 0.0f || targetPeak &gt; 1.0f) {</span>
+<span class="fc" id="L311">            throw new IllegalArgumentException(&quot;targetPeak must be between 0 and 1&quot;);</span>
+        }
+<span class="fc" id="L313">    }</span>
+
+    private static void validateCutoffs(int sampleRate, float lowCutoffHz, float highCutoffHz) {
+<span class="fc" id="L316">        validateFinite(lowCutoffHz, &quot;lowCutoffHz&quot;);</span>
+<span class="fc" id="L317">        validateFinite(highCutoffHz, &quot;highCutoffHz&quot;);</span>
+<span class="fc" id="L318">        float nyquist = sampleRate * 0.5f;</span>
+<span class="pc bpc" id="L319" title="2 of 6 branches missed.">        if (lowCutoffHz &lt;= 0.0f || highCutoffHz &lt;= lowCutoffHz || highCutoffHz &gt;= nyquist) {</span>
+<span class="fc" id="L320">            throw new IllegalArgumentException(&quot;Cutoffs must satisfy 0 &lt; lowCutoffHz &lt; highCutoffHz &lt; Nyquist&quot;);</span>
+        }
+<span class="fc" id="L322">    }</span>
+
+    private static float lowPassAlpha(float cutoffHz, int sampleRate) {
+<span class="fc" id="L325">        float dt = 1.0f / sampleRate;</span>
+<span class="fc" id="L326">        float rc = 1.0f / (2.0f * (float) Math.PI * cutoffHz);</span>
+<span class="fc" id="L327">        return dt / (rc + dt);</span>
+    }
+
+    private static float highPassAlpha(float cutoffHz, int sampleRate) {
+<span class="fc" id="L331">        float dt = 1.0f / sampleRate;</span>
+<span class="fc" id="L332">        float rc = 1.0f / (2.0f * (float) Math.PI * cutoffHz);</span>
+<span class="fc" id="L333">        return rc / (rc + dt);</span>
+    }
+
+    private static float clamp(float sample) {
+<span class="fc bfc" id="L337" title="All 2 branches covered.">        if (sample &gt; 1.0f) {</span>
+<span class="fc" id="L338">            return 1.0f;</span>
+        }
+<span class="fc bfc" id="L340" title="All 2 branches covered.">        if (sample &lt; -1.0f) {</span>
+<span class="fc" id="L341">            return -1.0f;</span>
+        }
+<span class="fc" id="L343">        return sample;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

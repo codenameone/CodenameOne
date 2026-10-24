@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CarAction.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.car</a> &gt; <span class="el_source">CarAction.java</span></div><h1>CarAction.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.car;
+
+import com.codename1.ui.Image;
+
+/// A tappable action -- a button shown in a `CarActionStrip`, a header action, or an action attached
+/// to a `CarPaneTemplate` / `CarMessageTemplate`. Maps to `androidx.car.app.model.Action` and to a
+/// `CPBarButton` / `CPAlertAction` on CarPlay. Use the fluent setters to configure it:
+///
+/// ```java
+/// CarAction refresh = new CarAction(&quot;Refresh&quot;)
+///         .setIcon(refreshIcon)
+///         .setOnAction(ctx -&gt; screen.invalidate());
+/// ```
+public class CarAction {
+    private String title;
+    private Image icon;
+<span class="nc" id="L39">    private CarColor backgroundColor = CarColor.DEFAULT;</span>
+    private CarActionListener listener;
+
+    /// Creates an empty action. Set at least a title or an icon before use.
+<span class="nc" id="L43">    public CarAction() {</span>
+<span class="nc" id="L44">    }</span>
+
+    /// Creates an action with the supplied title.
+    ///
+    /// #### Parameters
+    ///
+    /// - `title`: the action label
+<span class="nc" id="L51">    public CarAction(String title) {</span>
+<span class="nc" id="L52">        this.title = title;</span>
+<span class="nc" id="L53">    }</span>
+
+    /// Returns the action label, or null if icon-only.
+    public String getTitle() {
+<span class="nc" id="L57">        return title;</span>
+    }
+
+    /// Sets the action label.
+    ///
+    /// #### Parameters
+    ///
+    /// - `title`: the label
+    ///
+    /// #### Returns
+    ///
+    /// this action, for chaining
+    public CarAction setTitle(String title) {
+<span class="nc" id="L70">        this.title = title;</span>
+<span class="nc" id="L71">        return this;</span>
+    }
+
+    /// Returns the action icon, or null.
+    public Image getIcon() {
+<span class="nc" id="L76">        return icon;</span>
+    }
+
+    /// Sets the action icon. The head unit renders it at a fixed size with its own tint.
+    ///
+    /// #### Parameters
+    ///
+    /// - `icon`: the icon image
+    ///
+    /// #### Returns
+    ///
+    /// this action, for chaining
+    public CarAction setIcon(Image icon) {
+<span class="nc" id="L89">        this.icon = icon;</span>
+<span class="nc" id="L90">        return this;</span>
+    }
+
+    /// Returns the requested background colour role.
+    public CarColor getBackgroundColor() {
+<span class="nc" id="L95">        return backgroundColor;</span>
+    }
+
+    /// Sets the background colour role (the head unit may ignore it for legibility).
+    ///
+    /// #### Parameters
+    ///
+    /// - `backgroundColor`: the colour role
+    ///
+    /// #### Returns
+    ///
+    /// this action, for chaining
+    public CarAction setBackgroundColor(CarColor backgroundColor) {
+<span class="nc bnc" id="L108" title="All 2 branches missed.">        this.backgroundColor = backgroundColor == null ? CarColor.DEFAULT : backgroundColor;</span>
+<span class="nc" id="L109">        return this;</span>
+    }
+
+    /// Returns the activation listener, or null.
+    public CarActionListener getOnAction() {
+<span class="nc" id="L114">        return listener;</span>
+    }
+
+    /// Sets the listener invoked (on the EDT) when the action is selected.
+    ///
+    /// #### Parameters
+    ///
+    /// - `listener`: the activation callback
+    ///
+    /// #### Returns
+    ///
+    /// this action, for chaining
+    public CarAction setOnAction(CarActionListener listener) {
+<span class="nc" id="L127">        this.listener = listener;</span>
+<span class="nc" id="L128">        return this;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

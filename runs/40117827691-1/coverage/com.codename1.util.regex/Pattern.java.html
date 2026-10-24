@@ -1,0 +1,2535 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Pattern.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.util.regex</a> &gt; <span class="el_source">Pattern.java</span></div><h1>Pattern.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.util.regex;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Spliterator;
+import java.util.Spliterators;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
+
+/// `java.util.regex.Pattern` for the Codename One runtime: a backtracking
+/// matcher written for this module, with the JDK's syntax and the JDK's
+/// answers for the constructs it has.
+///
+/// #### Supported
+///
+/// - Literals, `.`, and every escape for a character: `\t \n \r \f \a \e`,
+///   `\0nn`, `\xhh`, `\x{h...}`, backslash-u with four hex digits, `\cX`,
+///   and `\Q...\E`.
+/// - Character classes with ranges, negation, nested unions and `&amp;&amp;`
+///   intersections; `\d \D \w \W \s \S \h \H \v \V`; `\R`.
+/// - The POSIX classes (`\p{Alpha}`, `\p{Punct}`, ...), the `java...`
+///   classes, and the Unicode properties `L`, `Lu`, `Ll`, `N`/`Nd`,
+///   `IsAlphabetic`, `IsLetter`, `IsDigit`, `IsUppercase`, `IsLowercase`,
+///   `IsWhite_Space`.
+/// - Unicode scripts (`\p{IsGreek}`, `\p{script=Latn}`), blocks
+///   (`\p{InGreek}`, `\p{block=Arrows}`) and general categories (`\p{Sc}`,
+///   `\p{IsPd}`, `\p{gc=Mn}`), from the Unicode 15.0 tables of
+///   [UnicodeTables].
+/// - The binary properties `IsDigit`, `IsPunctuation`, `IsTitlecase`, `IsControl`,
+///   `IsAssigned`, `IsHex_Digit`, `IsJoin_Control`,
+///   `IsNoncharacter_Code_Point`, `IsWord`, `IsAlnum`, `IsBlank`, `IsGraph`
+///   and `IsPrint`, in any case.
+/// - `\p{all}`, any code point.
+/// - `UNICODE_CHARACTER_CLASS` (`(?U)`): `\d \w \s \b` and the POSIX
+///   classes take their Unicode definitions, as on the JDK.
+/// - Greedy, reluctant and possessive quantifiers.
+/// - Capturing, non-capturing and named groups, back references by number
+///   and by name, alternation, atomic groups.
+/// - Lookahead and bounded lookbehind, positive and negative.
+/// - `^ $ \A \z \Z \G \b \B`.
+/// - `CASE_INSENSITIVE`, `MULTILINE`, `DOTALL`, `COMMENTS`, `LITERAL`,
+///   `UNIX_LINES` and `UNICODE_CASE`, as arguments and inline (`(?i)`,
+///   `(?i:...)`, `(?-i)`).
+///
+/// #### Refused
+///
+/// These throw [PatternSyntaxException] (the flags an
+/// `UnsupportedOperationException`) naming the construct, when the pattern
+/// is compiled. Nothing is accepted and then matched differently.
+///
+/// - Other binary properties (`\p{IsEmoji}`, `\p{IsIdeographic}`, ...).
+/// - `\X`, `\N{name}`, `\b{g}`.
+/// - `CANON_EQ`.
+///
+/// #### Differences
+///
+/// Text is matched one code point at a time, as on the JDK: `.` and a
+/// character class take a whole surrogate pair. The Unicode properties and
+/// categories answer from the tables, for all of Unicode; `javaLetter` and
+/// its kin answer this class's own letter test, the scripts a device font is
+/// likely to have. A group repeated many thousand times
+/// over a long text recurses once for each repetition, as the JDK's does,
+/// on a stack that is smaller on a device.
+public final class Pattern {
+
+    public static final int UNIX_LINES = 0x01;
+    public static final int CASE_INSENSITIVE = 0x02;
+    public static final int COMMENTS = 0x04;
+    public static final int MULTILINE = 0x08;
+    public static final int LITERAL = 0x10;
+    public static final int DOTALL = 0x20;
+    public static final int UNICODE_CASE = 0x40;
+    public static final int CANON_EQ = 0x80;
+    public static final int UNICODE_CHARACTER_CLASS = 0x100;
+
+    private static final int ALL_FLAGS = UNIX_LINES | CASE_INSENSITIVE | COMMENTS | MULTILINE | LITERAL
+            | DOTALL | UNICODE_CASE | CANON_EQ | UNICODE_CHARACTER_CLASS;
+
+    private final String regex;
+    private final int flags;
+    final Node root;
+    final int groupCount;
+    final int loopCount;
+    final Map&lt;String, Integer&gt; names;
+    /// Whether the pattern names a supplementary code point or a surrogate.
+    /// Only then does a search skip the positions inside a surrogate pair,
+    /// as the JDK's does: otherwise `x*` finds an empty match between the
+    /// halves there too.
+    final boolean supplementary;
+
+<span class="fc" id="L118">    private Pattern(String regex, int flags) {</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">        if (regex == null) {</span>
+<span class="nc" id="L120">            throw new NullPointerException();</span>
+        }
+        // As in the JDK: a bit no flag constant names is a caller's mistake,
+        // not something to ignore.
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">        if ((flags &amp; ~ALL_FLAGS) != 0) {</span>
+<span class="nc" id="L125">            throw new IllegalArgumentException(&quot;Unknown flag 0x&quot; + Integer.toHexString(flags &amp; ~ALL_FLAGS));</span>
+        }
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">        if ((flags &amp; CANON_EQ) != 0) {</span>
+<span class="nc" id="L128">            throw new UnsupportedOperationException(&quot;Pattern.CANON_EQ is not supported by the Codename One runtime&quot;);</span>
+        }
+<span class="fc" id="L130">        this.regex = regex;</span>
+<span class="fc" id="L131">        Parser parser = new Parser(regex, flags);</span>
+<span class="fc" id="L132">        this.root = parser.compile();</span>
+<span class="fc" id="L133">        this.supplementary = parser.supplementary;</span>
+        // As in the JDK, flags() reports the top-level state the parse ended
+        // in: (?i) outside every group counts, (?i) inside one does not.
+<span class="fc" id="L136">        this.flags = parser.topLevelFlags();</span>
+<span class="fc" id="L137">        this.groupCount = parser.groups;</span>
+<span class="fc" id="L138">        this.loopCount = parser.loops;</span>
+<span class="fc" id="L139">        this.names = parser.names;</span>
+<span class="fc" id="L140">    }</span>
+
+    public static Pattern compile(String regex) {
+<span class="fc" id="L143">        return new Pattern(regex, 0);</span>
+    }
+
+    public static Pattern compile(String regex, int flags) {
+<span class="fc" id="L147">        return new Pattern(regex, flags);</span>
+    }
+
+    public String pattern() {
+<span class="nc" id="L151">        return regex;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L156">        return regex;</span>
+    }
+
+    public int flags() {
+<span class="nc" id="L160">        return flags;</span>
+    }
+
+    public Matcher matcher(CharSequence input) {
+<span class="fc" id="L164">        return new Matcher(this, input);</span>
+    }
+
+    public static boolean matches(String regex, CharSequence input) {
+<span class="nc" id="L168">        return compile(regex).matcher(input).matches();</span>
+    }
+
+    public String[] split(CharSequence input) {
+<span class="nc" id="L172">        return split(input, 0);</span>
+    }
+
+    /// Splits `input` around the matches of this pattern, by the JDK's
+    /// rules for `limit`.
+    public String[] split(CharSequence input, int limit) {
+<span class="nc" id="L178">        int index = 0;</span>
+<span class="nc bnc" id="L179" title="All 2 branches missed.">        boolean limited = limit &gt; 0;</span>
+<span class="nc" id="L180">        List&lt;String&gt; list = new ArrayList&lt;String&gt;();</span>
+<span class="nc" id="L181">        Matcher m = matcher(input);</span>
+<span class="nc bnc" id="L182" title="All 2 branches missed.">        while (m.find()) {</span>
+<span class="nc bnc" id="L183" title="All 4 branches missed.">            if (!limited || list.size() &lt; limit - 1) {</span>
+<span class="nc bnc" id="L184" title="All 6 branches missed.">                if (index == 0 &amp;&amp; m.start() == 0 &amp;&amp; m.end() == 0) {</span>
+                    // No empty leading piece for a zero-width match at the start.
+<span class="nc" id="L186">                    continue;</span>
+                }
+<span class="nc" id="L188">                list.add(input.subSequence(index, m.start()).toString());</span>
+<span class="nc" id="L189">                index = m.end();</span>
+<span class="nc bnc" id="L190" title="All 2 branches missed.">            } else if (list.size() == limit - 1) {</span>
+<span class="nc" id="L191">                list.add(input.subSequence(index, input.length()).toString());</span>
+<span class="nc" id="L192">                index = m.end();</span>
+            }
+        }
+<span class="nc bnc" id="L195" title="All 2 branches missed.">        if (index == 0) {</span>
+<span class="nc" id="L196">            return new String[] {input.toString()};</span>
+        }
+<span class="nc bnc" id="L198" title="All 4 branches missed.">        if (!limited || list.size() &lt; limit) {</span>
+<span class="nc" id="L199">            list.add(input.subSequence(index, input.length()).toString());</span>
+        }
+<span class="nc" id="L201">        int size = list.size();</span>
+<span class="nc bnc" id="L202" title="All 2 branches missed.">        if (limit == 0) {</span>
+<span class="nc bnc" id="L203" title="All 4 branches missed.">            while (size &gt; 0 &amp;&amp; list.get(size - 1).length() == 0) {</span>
+<span class="nc" id="L204">                size--;</span>
+            }
+        }
+<span class="nc" id="L207">        String[] out = new String[size];</span>
+<span class="nc bnc" id="L208" title="All 2 branches missed.">        for (int i = 0; i &lt; size; i++) {</span>
+<span class="nc" id="L209">            out[i] = list.get(i);</span>
+        }
+<span class="nc" id="L211">        return out;</span>
+    }
+
+    /// The pieces [#split(CharSequence)] would answer, found one at a time
+    /// as the stream asks for them, as the JDK's are: the search starts on
+    /// the first request, so a `limit` stops it and a change to a mutable
+    /// input before then is seen.
+    public Stream&lt;String&gt; splitAsStream(final CharSequence input) {
+<span class="nc" id="L219">        return StreamSupport.stream(Spliterators.spliteratorUnknownSize(new Pieces(this, input),</span>
+                Spliterator.ORDERED | Spliterator.NONNULL), false);
+    }
+
+    /// The pieces of one [#splitAsStream(CharSequence)]. Empty pieces are
+    /// held back until a non-empty one follows them, because trailing ones
+    /// are dropped, as `split` drops them.
+    private static final class Pieces implements Iterator&lt;String&gt; {
+        private final Pattern pattern;
+        private final CharSequence input;
+        private Matcher matcher;
+        private int current;
+        private String pending;
+        private int empties;
+        private String next;
+
+<span class="nc" id="L235">        Pieces(Pattern pattern, CharSequence input) {</span>
+<span class="nc" id="L236">            this.pattern = pattern;</span>
+<span class="nc" id="L237">            this.input = input;</span>
+<span class="nc" id="L238">        }</span>
+
+        @Override
+        public boolean hasNext() {
+<span class="nc bnc" id="L242" title="All 2 branches missed.">            if (next == null) {</span>
+<span class="nc" id="L243">                next = advance();</span>
+            }
+<span class="nc bnc" id="L245" title="All 2 branches missed.">            return next != null;</span>
+        }
+
+        @Override
+        public String next() {
+<span class="nc bnc" id="L250" title="All 2 branches missed.">            if (!hasNext()) {</span>
+<span class="nc" id="L251">                throw new NoSuchElementException();</span>
+            }
+<span class="nc" id="L253">            String out = next;</span>
+<span class="nc" id="L254">            next = null;</span>
+<span class="nc" id="L255">            return out;</span>
+        }
+
+        private String advance() {
+<span class="nc bnc" id="L259" title="All 2 branches missed.">            if (matcher == null) {</span>
+<span class="nc" id="L260">                matcher = pattern.matcher(input);</span>
+                // An empty input is one empty piece, as split answers.
+<span class="nc bnc" id="L262" title="All 2 branches missed.">                if (input.length() == 0) {</span>
+<span class="nc" id="L263">                    empties = 1;</span>
+                }
+            }
+            while (true) {
+<span class="nc bnc" id="L267" title="All 2 branches missed.">                if (empties &gt; 0) {</span>
+<span class="nc" id="L268">                    empties--;</span>
+<span class="nc" id="L269">                    return &quot;&quot;;</span>
+                }
+<span class="nc bnc" id="L271" title="All 2 branches missed.">                if (pending != null) {</span>
+<span class="nc" id="L272">                    String out = pending;</span>
+<span class="nc" id="L273">                    pending = null;</span>
+<span class="nc" id="L274">                    return out;</span>
+                }
+<span class="nc bnc" id="L276" title="All 2 branches missed.">                if (current == input.length()) {</span>
+<span class="nc" id="L277">                    return null;</span>
+                }
+<span class="nc bnc" id="L279" title="All 4 branches missed.">                while (pending == null &amp;&amp; matcher.find()) {</span>
+<span class="nc" id="L280">                    String piece = input.subSequence(current, matcher.start()).toString();</span>
+<span class="nc" id="L281">                    current = matcher.end();</span>
+<span class="nc bnc" id="L282" title="All 2 branches missed.">                    if (piece.length() &gt; 0) {</span>
+<span class="nc" id="L283">                        pending = piece;</span>
+<span class="nc bnc" id="L284" title="All 2 branches missed.">                    } else if (current &gt; 0) {</span>
+                        // No empty leading piece for a zero-width match at the start.
+<span class="nc" id="L286">                        empties++;</span>
+                    }
+<span class="nc" id="L288">                }</span>
+<span class="nc bnc" id="L289" title="All 2 branches missed.">                if (pending == null) {</span>
+<span class="nc" id="L290">                    String last = input.subSequence(current, input.length()).toString();</span>
+<span class="nc" id="L291">                    current = input.length();</span>
+<span class="nc bnc" id="L292" title="All 2 branches missed.">                    if (last.length() == 0) {</span>
+                        // Only trailing empty pieces were owed: dropped.
+<span class="nc" id="L294">                        empties = 0;</span>
+<span class="nc" id="L295">                        return null;</span>
+                    }
+<span class="nc" id="L297">                    pending = last;</span>
+<span class="nc" id="L298">                }</span>
+            }
+        }
+    }
+
+    /// A pattern that matches `s` and nothing else.
+    public static String quote(String s) {
+<span class="fc" id="L305">        int slashE = s.indexOf(&quot;\\E&quot;);</span>
+<span class="pc bpc" id="L306" title="1 of 2 branches missed.">        if (slashE &lt; 0) {</span>
+<span class="fc" id="L307">            return &quot;\\Q&quot; + s + &quot;\\E&quot;;</span>
+        }
+<span class="nc" id="L309">        StringBuilder sb = new StringBuilder(s.length() * 2);</span>
+<span class="nc" id="L310">        sb.append(&quot;\\Q&quot;);</span>
+<span class="nc" id="L311">        int current = 0;</span>
+<span class="nc bnc" id="L312" title="All 2 branches missed.">        while (slashE &gt;= 0) {</span>
+<span class="nc" id="L313">            sb.append(s.substring(current, slashE));</span>
+<span class="nc" id="L314">            current = slashE + 2;</span>
+<span class="nc" id="L315">            sb.append(&quot;\\E\\\\E\\Q&quot;);</span>
+<span class="nc" id="L316">            slashE = s.indexOf(&quot;\\E&quot;, current);</span>
+        }
+<span class="nc" id="L318">        sb.append(s.substring(current));</span>
+<span class="nc" id="L319">        sb.append(&quot;\\E&quot;);</span>
+<span class="nc" id="L320">        return sb.toString();</span>
+    }
+
+    public Predicate&lt;String&gt; asPredicate() {
+<span class="nc" id="L324">        return new Predicate&lt;String&gt;() {</span>
+            @Override
+            public boolean test(String s) {
+<span class="nc" id="L327">                return matcher(s).find();</span>
+            }
+        };
+    }
+
+    public Predicate&lt;String&gt; asMatchPredicate() {
+<span class="nc" id="L333">        return new Predicate&lt;String&gt;() {</span>
+            @Override
+            public boolean test(String s) {
+<span class="nc" id="L336">                return matcher(s).matches();</span>
+            }
+        };
+    }
+
+    // ------------------------------------------------------------------
+    // Characters
+    // ------------------------------------------------------------------
+
+    /// The code point at `i`: a surrogate pair when both halves lie before
+    /// `to`, otherwise the single char.
+    static int codePointAt(CharSequence text, int i, int to) {
+<span class="fc" id="L348">        char c = text.charAt(i);</span>
+<span class="fc bfc" id="L349" title="All 6 branches covered.">        if (c &gt;= 0xd800 &amp;&amp; c &lt;= 0xdbff &amp;&amp; i + 1 &lt; to) {</span>
+<span class="fc" id="L350">            char d = text.charAt(i + 1);</span>
+<span class="pc bpc" id="L351" title="2 of 4 branches missed.">            if (d &gt;= 0xdc00 &amp;&amp; d &lt;= 0xdfff) {</span>
+<span class="fc" id="L352">                return ((c - 0xd800) &lt;&lt; 10) + (d - 0xdc00) + 0x10000;</span>
+            }
+        }
+<span class="fc" id="L355">        return c;</span>
+    }
+
+    /// The code point that ends just before `i`, no further back than `from`.
+    static int codePointBefore(CharSequence text, int i, int from) {
+<span class="fc" id="L360">        char d = text.charAt(i - 1);</span>
+<span class="pc bpc" id="L361" title="2 of 6 branches missed.">        if (d &gt;= 0xdc00 &amp;&amp; d &lt;= 0xdfff &amp;&amp; i - 2 &gt;= from) {</span>
+<span class="fc" id="L362">            char c = text.charAt(i - 2);</span>
+<span class="pc bpc" id="L363" title="2 of 4 branches missed.">            if (c &gt;= 0xd800 &amp;&amp; c &lt;= 0xdbff) {</span>
+<span class="fc" id="L364">                return ((c - 0xd800) &lt;&lt; 10) + (d - 0xdc00) + 0x10000;</span>
+            }
+        }
+<span class="fc" id="L367">        return d;</span>
+    }
+
+    /// A word character under `UNICODE_CHARACTER_CLASS`, as the JDK defines
+    /// it: alphabetic, a mark, a decimal digit, a connector, or a joiner.
+    static boolean unicodeWordChar(int c) {
+<span class="fc bfc" id="L373" title="All 2 branches covered.">        if (UnicodeTables.alphabetic(c)) {</span>
+<span class="fc" id="L374">            return true;</span>
+        }
+<span class="fc" id="L376">        int type = UnicodeTables.category(c);</span>
+<span class="pc bpc" id="L377" title="6 of 14 branches missed.">        return type == Character.NON_SPACING_MARK || type == Character.ENCLOSING_MARK</span>
+                || type == Character.COMBINING_SPACING_MARK || type == Character.DECIMAL_DIGIT_NUMBER
+                || type == Character.CONNECTOR_PUNCTUATION || c == 0x200c || c == 0x200d;
+    }
+
+    /// `White_Space` under `UNICODE_CHARACTER_CLASS`.
+    static boolean unicodeWhiteSpace(int c) {
+<span class="fc" id="L384">        int type = UnicodeTables.category(c);</span>
+<span class="pc bpc" id="L385" title="5 of 12 branches missed.">        return type == Character.SPACE_SEPARATOR || type == Character.LINE_SEPARATOR</span>
+                || type == Character.PARAGRAPH_SEPARATOR || c &gt;= 0x9 &amp;&amp; c &lt;= 0xd || c == 0x85;
+    }
+
+    static boolean lineTerminator(int c, boolean unix) {
+<span class="pc bpc" id="L390" title="1 of 2 branches missed.">        if (c == '\n') {</span>
+<span class="nc" id="L391">            return true;</span>
+        }
+<span class="pc bpc" id="L393" title="5 of 10 branches missed.">        return !unix &amp;&amp; (c == '\r' || c == 0x85 || c == 0x2028 || c == 0x2029);</span>
+    }
+
+    static boolean asciiLetter(int c) {
+<span class="pc bpc" id="L397" title="1 of 8 branches missed.">        return c &gt;= 'a' &amp;&amp; c &lt;= 'z' || c &gt;= 'A' &amp;&amp; c &lt;= 'Z';</span>
+    }
+
+    /// A word character for `\b` and `\B`: the ASCII `[a-zA-Z0-9_]` that
+    /// `\w` matches. The JDK has defined the boundary this way since 19
+    /// (JDK-8264160); before, it took any Unicode letter or digit, so `\b`
+    /// fell inside a word `\w+` could not match. The Unicode reading comes
+    /// with `UNICODE_CHARACTER_CLASS`.
+    static boolean wordChar(int c) {
+<span class="pc bpc" id="L406" title="3 of 8 branches missed.">        return c == '_' || asciiLetter(c) || c &gt;= '0' &amp;&amp; c &lt;= '9';</span>
+    }
+
+    static boolean isLetterOrDigit(int c) {
+<span class="nc bnc" id="L410" title="All 4 branches missed.">        return isLetter(c) || Character.isDigit(c);</span>
+    }
+
+    /// Whether `c` is a letter: the scripts a device font is likely to
+    /// have rather than all of Unicode. Written out here because
+    /// `Character.isLetter` is not available on every device runtime.
+    static boolean isLetter(int c) {
+<span class="nc bnc" id="L417" title="All 2 branches missed.">        if (c &gt; 0xffff) {</span>
+<span class="nc" id="L418">            return Character.isLetter(c);</span>
+        }
+<span class="nc bnc" id="L420" title="All 2 branches missed.">        if (c &lt; 0x80) {</span>
+<span class="nc bnc" id="L421" title="All 8 branches missed.">            return c &gt;= 'a' &amp;&amp; c &lt;= 'z' || c &gt;= 'A' &amp;&amp; c &lt;= 'Z';</span>
+        }
+<span class="nc bnc" id="L423" title="All 2 branches missed.">        if (c &lt; 0x100) {</span>
+<span class="nc bnc" id="L424" title="All 12 branches missed.">            return c == 0xaa || c == 0xb5 || c == 0xba || c &gt;= 0xc0 &amp;&amp; c != 0xd7 &amp;&amp; c != 0xf7;</span>
+        }
+<span class="nc bnc" id="L426" title="All 76 branches missed.">        return c &lt;= 0x24f // Latin Extended</span>
+                || c &gt;= 0x370 &amp;&amp; c &lt;= 0x3ff &amp;&amp; c != 0x37e &amp;&amp; c != 0x387 // Greek
+                || c &gt;= 0x400 &amp;&amp; c &lt;= 0x481 || c &gt;= 0x48a &amp;&amp; c &lt;= 0x52f // Cyrillic
+                || c &gt;= 0x531 &amp;&amp; c &lt;= 0x556 || c &gt;= 0x561 &amp;&amp; c &lt;= 0x587 // Armenian
+                || c &gt;= 0x5d0 &amp;&amp; c &lt;= 0x5ea // Hebrew
+                || c &gt;= 0x620 &amp;&amp; c &lt;= 0x64a || c &gt;= 0x671 &amp;&amp; c &lt;= 0x6d3 // Arabic
+                || c &gt;= 0x904 &amp;&amp; c &lt;= 0x939 // Devanagari
+                || c &gt;= 0xe01 &amp;&amp; c &lt;= 0xe30 // Thai
+                || c &gt;= 0x10a0 &amp;&amp; c &lt;= 0x10ff &amp;&amp; c != 0x10fb // Georgian
+                || c &gt;= 0x1e00 &amp;&amp; c &lt;= 0x1fff // Latin and Greek Extended Additional
+                || c &gt;= 0x3041 &amp;&amp; c &lt;= 0x3096 || c &gt;= 0x30a1 &amp;&amp; c &lt;= 0x30fa // Kana
+                || c &gt;= 0x3400 &amp;&amp; c &lt;= 0x4dbf || c &gt;= 0x4e00 &amp;&amp; c &lt;= 0x9fff // CJK
+                || c &gt;= 0xac00 &amp;&amp; c &lt;= 0xd7a3; // Hangul
+    }
+
+    /// Whether `a` and `b` are the same character when case is ignored:
+    /// for ASCII letters only, or by the device's case tables.
+    static boolean sameIgnoringCase(int a, int b, boolean unicode) {
+<span class="fc bfc" id="L444" title="All 2 branches covered.">        if (a == b) {</span>
+<span class="fc" id="L445">            return true;</span>
+        }
+<span class="pc bpc" id="L447" title="3 of 4 branches missed.">        if (a &lt; 0x80 &amp;&amp; b &lt; 0x80) {</span>
+<span class="nc bnc" id="L448" title="All 4 branches missed.">            return asciiLetter(a) &amp;&amp; (a ^ 0x20) == b;</span>
+        }
+<span class="pc bpc" id="L450" title="1 of 2 branches missed.">        if (!unicode) {</span>
+<span class="nc" id="L451">            return false;</span>
+        }
+<span class="fc" id="L453">        int ua = Character.toUpperCase(a);</span>
+<span class="fc" id="L454">        int ub = Character.toUpperCase(b);</span>
+<span class="pc bpc" id="L455" title="3 of 4 branches missed.">        return ua == ub || Character.toLowerCase(ua) == Character.toLowerCase(ub);</span>
+    }
+
+    // ------------------------------------------------------------------
+    // The compiled form: a chain of nodes, each matching at a position and
+    // then asking the next one to match the rest.
+    // ------------------------------------------------------------------
+
+<span class="fc" id="L463">    abstract static class Node {</span>
+        Node next;
+
+        abstract boolean match(Matcher m, int i);
+    }
+
+    /// The end of the whole pattern.
+<span class="fc" id="L470">    static final class Accept extends Node {</span>
+        @Override
+        boolean match(Matcher m, int i) {
+<span class="pc bpc" id="L473" title="1 of 4 branches missed.">            if (m.requireEnd &amp;&amp; i != m.to) {</span>
+<span class="nc" id="L474">                return false;</span>
+            }
+<span class="fc" id="L476">            m.matchEnd = i;</span>
+<span class="fc" id="L477">            return true;</span>
+        }
+    }
+
+    /// The end of a pattern inside another: an atomic group or a lookaround.
+<span class="fc" id="L482">    static final class SubEnd extends Node {</span>
+        @Override
+        boolean match(Matcher m, int i) {
+<span class="fc bfc" id="L485" title="All 4 branches covered.">            if (m.endAt &gt;= 0 &amp;&amp; i != m.endAt) {</span>
+<span class="fc" id="L486">                return false;</span>
+            }
+<span class="fc" id="L488">            m.subEnd = i;</span>
+<span class="fc" id="L489">            return true;</span>
+        }
+    }
+
+<span class="fc" id="L493">    static final class Pass extends Node {</span>
+        @Override
+        boolean match(Matcher m, int i) {
+<span class="fc" id="L496">            return next.match(m, i);</span>
+        }
+    }
+
+    /// A node that takes exactly one code point: one char, or both halves of
+    /// a surrogate pair.
+<span class="fc" id="L502">    abstract static class Single extends Node {</span>
+        abstract boolean is(int c);
+
+        /// The fewest and most chars this can take: 1 and 2 unless it names
+        /// one code point.
+        int minChars() {
+<span class="fc" id="L508">            return 1;</span>
+        }
+
+        int maxChars() {
+<span class="fc" id="L512">            return 2;</span>
+        }
+
+        @Override
+        boolean match(Matcher m, int i) {
+<span class="fc bfc" id="L517" title="All 2 branches covered.">            if (i &gt;= m.to) {</span>
+<span class="fc" id="L518">                return false;</span>
+            }
+<span class="fc" id="L520">            int c = codePointAt(m.text, i, m.to);</span>
+<span class="fc bfc" id="L521" title="All 6 branches covered.">            return is(c) &amp;&amp; next.match(m, i + (c &gt; 0xffff ? 2 : 1));</span>
+        }
+    }
+
+    static final class Char extends Single {
+        final int c;
+
+<span class="fc" id="L528">        Char(int c) {</span>
+<span class="fc" id="L529">            this.c = c;</span>
+<span class="fc" id="L530">        }</span>
+
+        @Override
+        int minChars() {
+<span class="fc bfc" id="L534" title="All 2 branches covered.">            return c &gt; 0xffff ? 2 : 1;</span>
+        }
+
+        @Override
+        int maxChars() {
+<span class="fc" id="L539">            return minChars();</span>
+        }
+
+        @Override
+        boolean is(int ch) {
+<span class="fc bfc" id="L544" title="All 2 branches covered.">            return ch == c;</span>
+        }
+    }
+
+    static final class CharIgnoringCase extends Single {
+        final int c;
+        final boolean unicode;
+
+<span class="fc" id="L552">        CharIgnoringCase(int c, boolean unicode) {</span>
+<span class="fc" id="L553">            this.c = c;</span>
+<span class="fc" id="L554">            this.unicode = unicode;</span>
+<span class="fc" id="L555">        }</span>
+
+        @Override
+        boolean is(int ch) {
+<span class="fc" id="L559">            return sameIgnoringCase(ch, c, unicode);</span>
+        }
+    }
+
+    static final class Any extends Single {
+        final boolean all;
+        final boolean unix;
+
+<span class="fc" id="L567">        Any(boolean all, boolean unix) {</span>
+<span class="fc" id="L568">            this.all = all;</span>
+<span class="fc" id="L569">            this.unix = unix;</span>
+<span class="fc" id="L570">        }</span>
+
+        @Override
+        boolean is(int c) {
+<span class="pc bpc" id="L574" title="1 of 4 branches missed.">            return all || !lineTerminator(c, unix);</span>
+        }
+    }
+
+    static final class InClass extends Single {
+        final CharSet set;
+
+<span class="fc" id="L581">        InClass(CharSet set) {</span>
+<span class="fc" id="L582">            this.set = set;</span>
+<span class="fc" id="L583">        }</span>
+
+        @Override
+        boolean is(int c) {
+<span class="fc" id="L587">            return set.has(c);</span>
+        }
+    }
+
+    /// A set of characters: ranges, the predicates a device answers, other
+    /// sets united with it, and one it is intersected with.
+    static final class CharSet {
+        static final int LETTER = 1;
+        static final int UPPER = 2;
+        static final int LOWER = 4;
+        static final int DIGIT = 8;
+        static final int WHITESPACE = 16;
+        static final int LETTER_OR_DIGIT = 32;
+        static final int TITLE = 64;
+        // UNICODE_CHARACTER_CLASS, all answered from UnicodeTables.
+        static final int U_ALPHABETIC = 128;
+        static final int U_LOWER = 256;
+        static final int U_UPPER = 512;
+        static final int U_WORD = 1024;
+        static final int U_WHITE_SPACE = 2048;
+        static final int U_HEX_DIGIT = 4096;
+        static final int U_GRAPH = 8192;
+        static final int U_PRINT = 16384;
+        static final int U_BLANK = 32768;
+
+<span class="fc" id="L612">        private int[] ranges = new int[8];</span>
+        /// General categories, one bit for each `Character.getType` value.
+        int categories;
+        /// A script index into [UnicodeTables], or -1.
+<span class="fc" id="L616">        int script = -1;</span>
+        private int count;
+        private int kinds;
+<span class="fc" id="L619">        private final List&lt;CharSet&gt; united = new ArrayList&lt;CharSet&gt;();</span>
+        CharSet and;
+        boolean negate;
+        /// 0 for exact, 1 to ignore the case of ASCII letters, 2 of any.
+        final int ignoreCase;
+
+<span class="fc" id="L625">        CharSet(int ignoreCase) {</span>
+<span class="fc" id="L626">            this.ignoreCase = ignoreCase;</span>
+<span class="fc" id="L627">        }</span>
+
+        CharSet add(int lo, int hi) {
+<span class="fc bfc" id="L630" title="All 2 branches covered.">            if (count + 2 &gt; ranges.length) {</span>
+<span class="fc" id="L631">                int[] grown = new int[ranges.length * 2];</span>
+<span class="fc" id="L632">                System.arraycopy(ranges, 0, grown, 0, count);</span>
+<span class="fc" id="L633">                ranges = grown;</span>
+            }
+<span class="fc" id="L635">            ranges[count++] = lo;</span>
+<span class="fc" id="L636">            ranges[count++] = hi;</span>
+<span class="fc" id="L637">            return this;</span>
+        }
+
+        CharSet add(int c) {
+<span class="fc" id="L641">            return add(c, c);</span>
+        }
+
+        CharSet kind(int kind) {
+<span class="fc" id="L645">            kinds |= kind;</span>
+<span class="fc" id="L646">            return this;</span>
+        }
+
+        CharSet unite(CharSet other) {
+<span class="fc" id="L650">            united.add(other);</span>
+<span class="fc" id="L651">            return this;</span>
+        }
+
+        CharSet not() {
+<span class="fc" id="L655">            CharSet out = new CharSet(0);</span>
+<span class="fc" id="L656">            out.united.add(this);</span>
+<span class="fc" id="L657">            out.negate = true;</span>
+<span class="fc" id="L658">            return out;</span>
+        }
+
+        boolean isEmpty() {
+<span class="nc bnc" id="L662" title="All 10 branches missed.">            return count == 0 &amp;&amp; kinds == 0 &amp;&amp; categories == 0 &amp;&amp; script &lt; 0 &amp;&amp; united.isEmpty();</span>
+        }
+
+        private boolean inRanges(int c) {
+<span class="fc bfc" id="L666" title="All 2 branches covered.">            for (int k = 0; k &lt; count; k += 2) {</span>
+<span class="fc bfc" id="L667" title="All 4 branches covered.">                if (c &gt;= ranges[k] &amp;&amp; c &lt;= ranges[k + 1]) {</span>
+<span class="fc" id="L668">                    return true;</span>
+                }
+            }
+<span class="fc" id="L671">            return false;</span>
+        }
+
+        private boolean inKinds(int c) {
+<span class="fc bfc" id="L675" title="All 4 branches covered.">            if (categories != 0 &amp;&amp; (categories &amp; (1 &lt;&lt; UnicodeTables.category(c))) != 0) {</span>
+<span class="fc" id="L676">                return true;</span>
+            }
+<span class="fc bfc" id="L678" title="All 4 branches covered.">            if (script &gt;= 0 &amp;&amp; UnicodeTables.scriptOf(c) == script) {</span>
+<span class="fc" id="L679">                return true;</span>
+            }
+<span class="fc bfc" id="L681" title="All 2 branches covered.">            if (kinds == 0) {</span>
+<span class="fc" id="L682">                return false;</span>
+            }
+<span class="pc bpc" id="L684" title="1 of 4 branches missed.">            if (kinds &gt;= U_ALPHABETIC &amp;&amp; inUnicodeKinds(c)) {</span>
+<span class="fc" id="L685">                return true;</span>
+            }
+<span class="pc bpc" id="L687" title="4 of 6 branches missed.">            return (kinds &amp; LETTER) != 0 &amp;&amp; isLetter(c)</span>
+<span class="pc bpc" id="L688" title="3 of 4 branches missed.">                    || (kinds &amp; UPPER) != 0 &amp;&amp; Character.isUpperCase(c)</span>
+<span class="pc bpc" id="L689" title="3 of 4 branches missed.">                    || (kinds &amp; LOWER) != 0 &amp;&amp; Character.isLowerCase(c)</span>
+<span class="pc bpc" id="L690" title="3 of 4 branches missed.">                    || (kinds &amp; DIGIT) != 0 &amp;&amp; Character.isDigit(c)</span>
+<span class="pc bpc" id="L691" title="3 of 4 branches missed.">                    || (kinds &amp; WHITESPACE) != 0 &amp;&amp; Character.isWhitespace(c)</span>
+<span class="pc bpc" id="L692" title="3 of 4 branches missed.">                    || (kinds &amp; LETTER_OR_DIGIT) != 0 &amp;&amp; isLetterOrDigit(c)</span>
+<span class="pc bnc" id="L693" title="All 2 branches missed.">                    || (kinds &amp; TITLE) != 0 &amp;&amp; Character.isTitleCase(c);</span>
+        }
+
+        /// The `UNICODE_CHARACTER_CLASS` predicates, as the JDK's
+        /// `CharPredicates` define them.
+        private boolean inUnicodeKinds(int c) {
+<span class="fc" id="L699">            int type = UnicodeTables.category(c);</span>
+<span class="pc bpc" id="L700" title="1 of 2 branches missed.">            boolean digit = type == Character.DECIMAL_DIGIT_NUMBER;</span>
+<span class="pc bpc" id="L701" title="4 of 12 branches missed.">            boolean graph = type != Character.SPACE_SEPARATOR &amp;&amp; type != Character.LINE_SEPARATOR</span>
+                    &amp;&amp; type != Character.PARAGRAPH_SEPARATOR &amp;&amp; type != Character.CONTROL
+                    &amp;&amp; type != Character.SURROGATE &amp;&amp; type != Character.UNASSIGNED;
+<span class="pc bpc" id="L704" title="1 of 4 branches missed.">            boolean blank = type == Character.SPACE_SEPARATOR || c == '\t';</span>
+<span class="pc bpc" id="L705" title="1 of 6 branches missed.">            return (kinds &amp; U_ALPHABETIC) != 0 &amp;&amp; UnicodeTables.alphabetic(c)</span>
+<span class="pc bpc" id="L706" title="2 of 4 branches missed.">                    || (kinds &amp; U_LOWER) != 0 &amp;&amp; UnicodeTables.lowercase(c)</span>
+<span class="pc bpc" id="L707" title="2 of 4 branches missed.">                    || (kinds &amp; U_UPPER) != 0 &amp;&amp; UnicodeTables.uppercase(c)</span>
+<span class="pc bpc" id="L708" title="2 of 4 branches missed.">                    || (kinds &amp; U_WORD) != 0 &amp;&amp; unicodeWordChar(c)</span>
+<span class="pc bpc" id="L709" title="40 of 46 branches missed.">                    || (kinds &amp; U_WHITE_SPACE) != 0 &amp;&amp; unicodeWhiteSpace(c)</span>
+                    || (kinds &amp; U_HEX_DIGIT) != 0 &amp;&amp; (digit || c &gt;= '0' &amp;&amp; c &lt;= '9' || c &gt;= 'a' &amp;&amp; c &lt;= 'f'
+                            || c &gt;= 'A' &amp;&amp; c &lt;= 'F' || c &gt;= 0xff10 &amp;&amp; c &lt;= 0xff19 || c &gt;= 0xff21 &amp;&amp; c &lt;= 0xff26
+                            || c &gt;= 0xff41 &amp;&amp; c &lt;= 0xff46)
+                    || (kinds &amp; U_GRAPH) != 0 &amp;&amp; graph
+                    || (kinds &amp; U_PRINT) != 0 &amp;&amp; (graph || blank) &amp;&amp; type != Character.CONTROL
+                    || (kinds &amp; U_BLANK) != 0 &amp;&amp; blank;
+        }
+
+        boolean has(int c) {
+<span class="fc bfc" id="L719" title="All 4 branches covered.">            boolean in = inRanges(c) || inKinds(c);</span>
+<span class="pc bpc" id="L720" title="1 of 6 branches missed.">            if (!in &amp;&amp; ignoreCase != 0 &amp;&amp; count &gt; 0) {</span>
+<span class="fc bfc" id="L721" title="All 2 branches covered.">                if (c &lt; 0x80) {</span>
+<span class="pc bpc" id="L722" title="2 of 4 branches missed.">                    in = asciiLetter(c) &amp;&amp; inRanges((char) (c ^ 0x20));</span>
+                }
+<span class="pc bpc" id="L724" title="1 of 4 branches missed.">                if (!in &amp;&amp; ignoreCase == 2) {</span>
+                    // As the JDK: the upper and lower forms, and the lower
+                    // form of the upper one, which takes U+0131 and U+017F
+                    // into [a-z].
+<span class="fc" id="L728">                    int upper = Character.toUpperCase(c);</span>
+<span class="pc bpc" id="L729" title="2 of 4 branches missed.">                    in = inRanges(upper) || inRanges(Character.toLowerCase(c))</span>
+<span class="pc bpc" id="L730" title="1 of 2 branches missed.">                            || inRanges(Character.toLowerCase(upper));</span>
+                }
+            }
+<span class="fc bfc" id="L733" title="All 4 branches covered.">            for (int k = 0; !in &amp;&amp; k &lt; united.size(); k++) {</span>
+<span class="fc" id="L734">                in = united.get(k).has(c);</span>
+            }
+<span class="pc bpc" id="L736" title="1 of 4 branches missed.">            if (in &amp;&amp; and != null) {</span>
+<span class="nc" id="L737">                in = and.has(c);</span>
+            }
+<span class="fc bfc" id="L739" title="All 2 branches covered.">            return in != negate;</span>
+        }
+    }
+
+    /// One character, repeated. Counted in a loop rather than by recursion,
+    /// so `.*` over a long text costs no stack.
+    static final class SingleLoop extends Node {
+        final Single atom;
+        final int min;
+        final int max;
+        final int mode;
+
+<span class="fc" id="L751">        SingleLoop(Single atom, int min, int max, int mode) {</span>
+<span class="fc" id="L752">            this.atom = atom;</span>
+<span class="fc" id="L753">            this.min = min;</span>
+<span class="fc bfc" id="L754" title="All 2 branches covered.">            this.max = max &lt; 0 ? Integer.MAX_VALUE : max;</span>
+<span class="fc" id="L755">            this.mode = mode;</span>
+<span class="fc" id="L756">        }</span>
+
+        @Override
+        boolean match(Matcher m, int i) {
+<span class="fc" id="L760">            CharSequence text = m.text;</span>
+<span class="fc" id="L761">            int to = m.to;</span>
+<span class="fc" id="L762">            int n = 0;</span>
+<span class="fc" id="L763">            int j = i;</span>
+<span class="fc bfc" id="L764" title="All 2 branches covered.">            if (mode == Parser.RELUCTANT) {</span>
+<span class="pc bpc" id="L765" title="1 of 2 branches missed.">                while (n &lt; min) {</span>
+<span class="nc bnc" id="L766" title="All 2 branches missed.">                    if (j &gt;= to) {</span>
+<span class="nc" id="L767">                        return false;</span>
+                    }
+<span class="nc" id="L769">                    int c = codePointAt(text, j, to);</span>
+<span class="nc bnc" id="L770" title="All 2 branches missed.">                    if (!atom.is(c)) {</span>
+<span class="nc" id="L771">                        return false;</span>
+                    }
+<span class="nc bnc" id="L773" title="All 2 branches missed.">                    j += c &gt; 0xffff ? 2 : 1;</span>
+<span class="nc" id="L774">                    n++;</span>
+<span class="nc" id="L775">                }</span>
+                while (true) {
+<span class="fc bfc" id="L777" title="All 2 branches covered.">                    if (next.match(m, j)) {</span>
+<span class="fc" id="L778">                        return true;</span>
+                    }
+<span class="pc bpc" id="L780" title="2 of 4 branches missed.">                    if (n &gt;= max || j &gt;= to) {</span>
+<span class="nc" id="L781">                        return false;</span>
+                    }
+<span class="fc" id="L783">                    int c = codePointAt(text, j, to);</span>
+<span class="pc bpc" id="L784" title="1 of 2 branches missed.">                    if (!atom.is(c)) {</span>
+<span class="nc" id="L785">                        return false;</span>
+                    }
+<span class="pc bpc" id="L787" title="1 of 2 branches missed.">                    j += c &gt; 0xffff ? 2 : 1;</span>
+<span class="fc" id="L788">                    n++;</span>
+<span class="fc" id="L789">                }</span>
+            }
+<span class="fc bfc" id="L791" title="All 4 branches covered.">            while (n &lt; max &amp;&amp; j &lt; to) {</span>
+<span class="fc" id="L792">                int c = codePointAt(text, j, to);</span>
+<span class="fc bfc" id="L793" title="All 2 branches covered.">                if (!atom.is(c)) {</span>
+<span class="fc" id="L794">                    break;</span>
+                }
+<span class="fc bfc" id="L796" title="All 2 branches covered.">                j += c &gt; 0xffff ? 2 : 1;</span>
+<span class="fc" id="L797">                n++;</span>
+<span class="fc" id="L798">            }</span>
+<span class="fc bfc" id="L799" title="All 2 branches covered.">            if (n &lt; min) {</span>
+<span class="fc" id="L800">                return false;</span>
+            }
+<span class="pc bpc" id="L802" title="1 of 2 branches missed.">            if (mode == Parser.POSSESSIVE) {</span>
+<span class="nc" id="L803">                return next.match(m, j);</span>
+            }
+            while (true) {
+<span class="fc bfc" id="L806" title="All 2 branches covered.">                if (next.match(m, j)) {</span>
+<span class="fc" id="L807">                    return true;</span>
+                }
+<span class="pc bpc" id="L809" title="1 of 2 branches missed.">                if (n == min) {</span>
+<span class="nc" id="L810">                    return false;</span>
+                }
+<span class="fc" id="L812">                n--;</span>
+                // Back over one code point. Going forward from i paired every
+                // pair it met, so a pair ending here was taken whole.
+<span class="fc bfc" id="L815" title="All 2 branches covered.">                j -= codePointBefore(text, j, i) &gt; 0xffff ? 2 : 1;</span>
+            }
+        }
+    }
+
+    /// Anything else, repeated. The body ends in a [LoopTail] that comes
+    /// back here to decide between another round and the rest.
+    static final class Loop extends Node {
+        Node body;
+        final int id;
+        final int min;
+        final int max;
+        final boolean reluctant;
+
+<span class="fc" id="L829">        Loop(int id, int min, int max, boolean reluctant) {</span>
+<span class="fc" id="L830">            this.id = id;</span>
+<span class="fc" id="L831">            this.min = min;</span>
+<span class="fc bfc" id="L832" title="All 2 branches covered.">            this.max = max &lt; 0 ? Integer.MAX_VALUE : max;</span>
+<span class="fc" id="L833">            this.reluctant = reluctant;</span>
+<span class="fc" id="L834">        }</span>
+
+        @Override
+        boolean match(Matcher m, int i) {
+<span class="fc" id="L838">            int count = m.loopCount[id];</span>
+<span class="fc" id="L839">            int position = m.loopStart[id];</span>
+<span class="fc" id="L840">            m.loopCount[id] = 0;</span>
+<span class="fc" id="L841">            m.loopStart[id] = -1;</span>
+<span class="fc" id="L842">            boolean matched = step(m, i);</span>
+<span class="fc" id="L843">            m.loopCount[id] = count;</span>
+<span class="fc" id="L844">            m.loopStart[id] = position;</span>
+<span class="fc" id="L845">            return matched;</span>
+        }
+
+        boolean step(Matcher m, int i) {
+<span class="fc" id="L849">            int count = m.loopCount[id];</span>
+<span class="fc bfc" id="L850" title="All 2 branches covered.">            if (count &lt; min) {</span>
+<span class="fc" id="L851">                return round(m, i, count);</span>
+            }
+<span class="fc bfc" id="L853" title="All 2 branches covered.">            if (reluctant) {</span>
+<span class="pc bpc" id="L854" title="5 of 6 branches missed.">                return next.match(m, i) || count &lt; max &amp;&amp; round(m, i, count);</span>
+            }
+<span class="fc bfc" id="L856" title="All 6 branches covered.">            return count &lt; max &amp;&amp; round(m, i, count) || next.match(m, i);</span>
+        }
+
+        private boolean round(Matcher m, int i, int count) {
+<span class="fc" id="L860">            int position = m.loopStart[id];</span>
+<span class="fc bfc" id="L861" title="All 4 branches covered.">            if (count &gt;= min &amp;&amp; i == position) {</span>
+                // The round before this one took nothing; another would
+                // take nothing for ever.
+<span class="fc" id="L864">                return false;</span>
+            }
+<span class="fc" id="L866">            m.loopCount[id] = count + 1;</span>
+<span class="fc" id="L867">            m.loopStart[id] = i;</span>
+<span class="fc" id="L868">            boolean matched = body.match(m, i);</span>
+<span class="fc" id="L869">            m.loopCount[id] = count;</span>
+<span class="fc" id="L870">            m.loopStart[id] = position;</span>
+<span class="fc" id="L871">            return matched;</span>
+        }
+    }
+
+    static final class LoopTail extends Node {
+        final Loop loop;
+
+<span class="fc" id="L878">        LoopTail(Loop loop) {</span>
+<span class="fc" id="L879">            this.loop = loop;</span>
+<span class="fc" id="L880">        }</span>
+
+        @Override
+        boolean match(Matcher m, int i) {
+<span class="fc" id="L884">            return loop.step(m, i);</span>
+        }
+    }
+
+    static final class Branch extends Node {
+        final Node[] alternatives;
+
+<span class="fc" id="L891">        Branch(Node[] alternatives) {</span>
+<span class="fc" id="L892">            this.alternatives = alternatives;</span>
+<span class="fc" id="L893">        }</span>
+
+        @Override
+        boolean match(Matcher m, int i) {
+<span class="fc bfc" id="L897" title="All 2 branches covered.">            for (Node alternative : alternatives) {</span>
+<span class="fc bfc" id="L898" title="All 2 branches covered.">                if (alternative.match(m, i)) {</span>
+<span class="fc" id="L899">                    return true;</span>
+                }
+            }
+<span class="fc" id="L902">            return false;</span>
+        }
+    }
+
+    static final class GroupOpen extends Node {
+        final int group;
+
+<span class="fc" id="L909">        GroupOpen(int group) {</span>
+<span class="fc" id="L910">            this.group = group;</span>
+<span class="fc" id="L911">        }</span>
+
+        @Override
+        boolean match(Matcher m, int i) {
+<span class="fc" id="L915">            int saved = m.opened[group];</span>
+<span class="fc" id="L916">            m.opened[group] = i;</span>
+<span class="fc bfc" id="L917" title="All 2 branches covered.">            if (next.match(m, i)) {</span>
+<span class="fc" id="L918">                return true;</span>
+            }
+<span class="fc" id="L920">            m.opened[group] = saved;</span>
+<span class="fc" id="L921">            return false;</span>
+        }
+    }
+
+    static final class GroupClose extends Node {
+        final int group;
+
+<span class="fc" id="L928">        GroupClose(int group) {</span>
+<span class="fc" id="L929">            this.group = group;</span>
+<span class="fc" id="L930">        }</span>
+
+        @Override
+        boolean match(Matcher m, int i) {
+<span class="fc" id="L934">            int start = m.starts[group];</span>
+<span class="fc" id="L935">            int end = m.ends[group];</span>
+<span class="fc" id="L936">            m.starts[group] = m.opened[group];</span>
+<span class="fc" id="L937">            m.ends[group] = i;</span>
+<span class="fc bfc" id="L938" title="All 2 branches covered.">            if (next.match(m, i)) {</span>
+<span class="fc" id="L939">                return true;</span>
+            }
+<span class="fc" id="L941">            m.starts[group] = start;</span>
+<span class="fc" id="L942">            m.ends[group] = end;</span>
+<span class="fc" id="L943">            return false;</span>
+        }
+    }
+
+    static final class BackReference extends Node {
+        final int group;
+        final boolean ignoreCase;
+        final boolean unicode;
+
+<span class="fc" id="L952">        BackReference(int group, boolean ignoreCase, boolean unicode) {</span>
+<span class="fc" id="L953">            this.group = group;</span>
+<span class="fc" id="L954">            this.ignoreCase = ignoreCase;</span>
+<span class="fc" id="L955">            this.unicode = unicode;</span>
+<span class="fc" id="L956">        }</span>
+
+        @Override
+        boolean match(Matcher m, int i) {
+<span class="pc bpc" id="L960" title="1 of 2 branches missed.">            if (group &gt;= m.starts.length) {</span>
+                // A reference to a group the pattern never defines.
+<span class="nc" id="L962">                return false;</span>
+            }
+<span class="fc" id="L964">            int start = m.starts[group];</span>
+<span class="fc" id="L965">            int end = m.ends[group];</span>
+<span class="pc bpc" id="L966" title="1 of 2 branches missed.">            if (start &lt; 0) {</span>
+<span class="nc" id="L967">                return false;</span>
+            }
+<span class="fc" id="L969">            int length = end - start;</span>
+<span class="pc bpc" id="L970" title="1 of 2 branches missed.">            if (i + length &gt; m.to) {</span>
+<span class="nc" id="L971">                return false;</span>
+            }
+            // By code point, so a supplementary case pair compares whole.
+<span class="fc bfc" id="L974" title="All 2 branches covered.">            for (int k = 0; k &lt; length;) {</span>
+<span class="fc" id="L975">                int a = codePointAt(m.text, start + k, end);</span>
+<span class="fc" id="L976">                int b = codePointAt(m.text, i + k, i + length);</span>
+<span class="pc bpc" id="L977" title="3 of 6 branches missed.">                if (a != b &amp;&amp; !(ignoreCase &amp;&amp; sameIgnoringCase(a, b, unicode))) {</span>
+<span class="nc" id="L978">                    return false;</span>
+                }
+<span class="pc bpc" id="L980" title="1 of 2 branches missed.">                k += a &gt; 0xffff ? 2 : 1;</span>
+<span class="fc" id="L981">            }</span>
+<span class="fc" id="L982">            return next.match(m, i + length);</span>
+        }
+    }
+
+    static final class Anchor extends Node {
+        static final int BEGIN = 0;
+        static final int LINE_START = 1;
+        static final int LINE_END = 2;
+        static final int END_OR_FINAL_TERMINATOR = 3;
+        static final int END = 4;
+        static final int LAST_MATCH = 5;
+        static final int WORD = 6;
+        static final int NOT_WORD = 7;
+
+        final int kind;
+        final boolean unix;
+        /// `\b` and `\B` under `UNICODE_CHARACTER_CLASS`: Unicode words.
+        boolean unicode;
+
+<span class="fc" id="L1001">        Anchor(int kind, boolean unix) {</span>
+<span class="fc" id="L1002">            this.kind = kind;</span>
+<span class="fc" id="L1003">            this.unix = unix;</span>
+<span class="fc" id="L1004">        }</span>
+
+        private boolean word(int c) {
+<span class="fc bfc" id="L1007" title="All 2 branches covered.">            return unicode ? unicodeWordChar(c) : wordChar(c);</span>
+        }
+
+        /// A word character, or a non-spacing mark that follows a letter or
+        /// digit and so belongs to it, as the JDK's boundary reads `i`.
+        private boolean wordAt(Matcher m, int i, int to) {
+<span class="fc" id="L1013">            int c = codePointAt(m.text, i, to);</span>
+<span class="pc bpc" id="L1014" title="1 of 6 branches missed.">            return word(c) || UnicodeTables.category(c) == Character.NON_SPACING_MARK &amp;&amp; hasBase(m, i);</span>
+        }
+
+        private static boolean hasBase(Matcher m, int i) {
+<span class="pc bpc" id="L1018" title="1 of 2 branches missed.">            for (int x = i; x &gt;= m.from;) {</span>
+<span class="fc" id="L1019">                int c = codePointAt(m.text, x, m.to);</span>
+<span class="fc" id="L1020">                int type = UnicodeTables.category(c);</span>
+<span class="pc bpc" id="L1021" title="2 of 6 branches missed.">                if (type &gt;= Character.UPPERCASE_LETTER &amp;&amp; type &lt;= Character.OTHER_LETTER</span>
+                        || type == Character.DECIMAL_DIGIT_NUMBER) {
+<span class="fc" id="L1023">                    return true;</span>
+                }
+<span class="pc bpc" id="L1025" title="1 of 2 branches missed.">                if (type != Character.NON_SPACING_MARK) {</span>
+<span class="nc" id="L1026">                    return false;</span>
+                }
+<span class="pc bpc" id="L1028" title="1 of 2 branches missed.">                if (x == m.from) {</span>
+<span class="nc" id="L1029">                    break;</span>
+                }
+<span class="pc bpc" id="L1031" title="1 of 2 branches missed.">                x -= codePointBefore(m.text, x, m.from) &gt; 0xffff ? 2 : 1;</span>
+<span class="fc" id="L1032">            }</span>
+<span class="nc" id="L1033">            return false;</span>
+        }
+
+        private boolean lineEnd(Matcher m, int i, boolean multiline) {
+<span class="fc" id="L1037">            CharSequence text = m.text;</span>
+<span class="fc" id="L1038">            int end = m.to;</span>
+<span class="pc bpc" id="L1039" title="1 of 2 branches missed.">            if (unix) {</span>
+<span class="nc bnc" id="L1040" title="All 2 branches missed.">                if (i &lt; end) {</span>
+<span class="nc bnc" id="L1041" title="All 2 branches missed.">                    if (text.charAt(i) != '\n') {</span>
+<span class="nc" id="L1042">                        return false;</span>
+                    }
+<span class="nc bnc" id="L1044" title="All 4 branches missed.">                    return multiline || i == end - 1;</span>
+                }
+<span class="nc" id="L1046">                return true;</span>
+            }
+<span class="pc bpc" id="L1048" title="1 of 2 branches missed.">            if (!multiline) {</span>
+<span class="pc bpc" id="L1049" title="1 of 2 branches missed.">                if (i &lt; end - 2) {</span>
+<span class="nc" id="L1050">                    return false;</span>
+                }
+<span class="pc bpc" id="L1052" title="5 of 6 branches missed.">                if (i == end - 2 &amp;&amp; (text.charAt(i) != '\r' || text.charAt(i + 1) != '\n')) {</span>
+<span class="nc" id="L1053">                    return false;</span>
+                }
+            }
+<span class="fc bfc" id="L1056" title="All 2 branches covered.">            if (i &lt; end) {</span>
+<span class="fc" id="L1057">                char c = text.charAt(i);</span>
+<span class="pc bpc" id="L1058" title="1 of 2 branches missed.">                if (c == '\n') {</span>
+                    // Never between the two characters of one line end.
+<span class="nc bnc" id="L1060" title="All 4 branches missed.">                    return !(i &gt; 0 &amp;&amp; text.charAt(i - 1) == '\r');</span>
+                }
+<span class="pc bpc" id="L1062" title="4 of 8 branches missed.">                return c == '\r' || c == 0x85 || c == 0x2028 || c == 0x2029;</span>
+            }
+<span class="fc" id="L1064">            return true;</span>
+        }
+
+        private boolean lineStart(Matcher m, int i) {
+<span class="nc bnc" id="L1068" title="All 2 branches missed.">            if (i == m.to) {</span>
+                // Not at the end of the input, even after a line end.
+<span class="nc" id="L1070">                return false;</span>
+            }
+<span class="nc bnc" id="L1072" title="All 2 branches missed.">            if (i &gt; m.from) {</span>
+<span class="nc" id="L1073">                char c = m.text.charAt(i - 1);</span>
+<span class="nc bnc" id="L1074" title="All 2 branches missed.">                if (!lineTerminator(c, unix)) {</span>
+<span class="nc" id="L1075">                    return false;</span>
+                }
+<span class="nc bnc" id="L1077" title="All 4 branches missed.">                if (c == '\r' &amp;&amp; m.text.charAt(i) == '\n') {</span>
+<span class="nc" id="L1078">                    return false;</span>
+                }
+            }
+<span class="nc" id="L1081">            return true;</span>
+        }
+
+        @Override
+        boolean match(Matcher m, int i) {
+            boolean here;
+<span class="pc bpc" id="L1087" title="4 of 7 branches missed.">            switch (kind) {</span>
+                case BEGIN:
+<span class="fc bfc" id="L1089" title="All 2 branches covered.">                    here = i == m.from;</span>
+<span class="fc" id="L1090">                    break;</span>
+                case LINE_START:
+<span class="nc" id="L1092">                    here = lineStart(m, i);</span>
+<span class="nc" id="L1093">                    break;</span>
+                case LINE_END:
+<span class="nc" id="L1095">                    here = lineEnd(m, i, true);</span>
+<span class="nc" id="L1096">                    break;</span>
+                case END_OR_FINAL_TERMINATOR:
+<span class="fc" id="L1098">                    here = lineEnd(m, i, false);</span>
+<span class="fc" id="L1099">                    break;</span>
+                case END:
+<span class="nc bnc" id="L1101" title="All 2 branches missed.">                    here = i == m.to;</span>
+<span class="nc" id="L1102">                    break;</span>
+                case LAST_MATCH:
+<span class="nc bnc" id="L1104" title="All 2 branches missed.">                    here = i == m.oldLast;</span>
+<span class="nc" id="L1105">                    break;</span>
+                default:
+                    // The code point before i ends at i: inside a pair that is
+                    // the lone high half, as the JDK reads it.
+<span class="fc" id="L1109">                    boolean left = false;</span>
+<span class="fc bfc" id="L1110" title="All 2 branches covered.">                    if (i &gt; m.from) {</span>
+<span class="fc" id="L1111">                        int before = i - 1;</span>
+<span class="fc bfc" id="L1112" title="All 4 branches covered.">                        if (before &gt; m.from &amp;&amp; Character.isLowSurrogate(m.text.charAt(before))</span>
+<span class="pc bpc" id="L1113" title="1 of 2 branches missed.">                                &amp;&amp; Character.isHighSurrogate(m.text.charAt(before - 1))) {</span>
+<span class="fc" id="L1114">                            before--;</span>
+                        }
+<span class="fc" id="L1116">                        left = wordAt(m, before, i);</span>
+                    }
+<span class="fc bfc" id="L1118" title="All 4 branches covered.">                    boolean right = i &lt; m.to &amp;&amp; wordAt(m, i, m.to);</span>
+<span class="fc bfc" id="L1119" title="All 6 branches covered.">                    here = (left != right) == (kind == WORD);</span>
+                    break;
+            }
+<span class="fc bfc" id="L1122" title="All 4 branches covered.">            return here &amp;&amp; next.match(m, i);</span>
+        }
+    }
+
+    /// `(?&gt;X)`: what `X` took first is kept, whatever follows.
+    static final class Atomic extends Node {
+        final Node body;
+
+<span class="fc" id="L1130">        Atomic(Node body) {</span>
+<span class="fc" id="L1131">            this.body = body;</span>
+<span class="fc" id="L1132">        }</span>
+
+        @Override
+        boolean match(Matcher m, int i) {
+<span class="fc" id="L1136">            int[] groups = m.saveGroups();</span>
+<span class="fc" id="L1137">            int endAt = m.endAt;</span>
+<span class="fc" id="L1138">            m.endAt = -1;</span>
+<span class="fc" id="L1139">            boolean matched = body.match(m, i);</span>
+<span class="fc" id="L1140">            m.endAt = endAt;</span>
+<span class="fc bfc" id="L1141" title="All 2 branches covered.">            if (!matched) {</span>
+<span class="fc" id="L1142">                return false;</span>
+            }
+<span class="fc bfc" id="L1144" title="All 2 branches covered.">            if (next.match(m, m.subEnd)) {</span>
+<span class="fc" id="L1145">                return true;</span>
+            }
+<span class="fc" id="L1147">            m.restoreGroups(groups);</span>
+<span class="fc" id="L1148">            return false;</span>
+        }
+    }
+
+    static final class Look extends Node {
+        final Node body;
+        final boolean behind;
+        final boolean negative;
+        final int min;
+        final int max;
+
+<span class="fc" id="L1159">        Look(Node body, boolean behind, boolean negative, int min, int max) {</span>
+<span class="fc" id="L1160">            this.body = body;</span>
+<span class="fc" id="L1161">            this.behind = behind;</span>
+<span class="fc" id="L1162">            this.negative = negative;</span>
+<span class="fc" id="L1163">            this.min = min;</span>
+            // -1 for a lookbehind without bound: tried back to the region start.
+<span class="fc bfc" id="L1165" title="All 2 branches covered.">            this.max = max &lt; 0 ? Integer.MAX_VALUE : max;</span>
+<span class="fc" id="L1166">        }</span>
+
+        @Override
+        boolean match(Matcher m, int i) {
+<span class="fc" id="L1170">            int[] groups = m.saveGroups();</span>
+<span class="fc" id="L1171">            int endAt = m.endAt;</span>
+<span class="fc" id="L1172">            boolean found = false;</span>
+<span class="pc bpc" id="L1173" title="1 of 2 branches missed.">            if (behind) {</span>
+<span class="fc" id="L1174">                int lowest = Math.max(m.from, i - max);</span>
+<span class="fc bfc" id="L1175" title="All 4 branches covered.">                for (int j = i - min; !found &amp;&amp; j &gt;= lowest; j--) {</span>
+<span class="fc" id="L1176">                    m.endAt = i;</span>
+<span class="fc" id="L1177">                    found = body.match(m, j);</span>
+                }
+<span class="fc" id="L1179">            } else {</span>
+<span class="nc" id="L1180">                m.endAt = -1;</span>
+<span class="nc" id="L1181">                found = body.match(m, i);</span>
+            }
+<span class="fc" id="L1183">            m.endAt = endAt;</span>
+<span class="fc bfc" id="L1184" title="All 2 branches covered.">            if (found == negative) {</span>
+<span class="fc bfc" id="L1185" title="All 2 branches covered.">                if (found) {</span>
+<span class="fc" id="L1186">                    m.restoreGroups(groups);</span>
+                }
+<span class="fc" id="L1188">                return false;</span>
+            }
+<span class="pc bpc" id="L1190" title="1 of 2 branches missed.">            if (negative) {</span>
+<span class="nc" id="L1191">                m.restoreGroups(groups);</span>
+            }
+<span class="fc bfc" id="L1193" title="All 2 branches covered.">            if (next.match(m, i)) {</span>
+<span class="fc" id="L1194">                return true;</span>
+            }
+<span class="fc" id="L1196">            m.restoreGroups(groups);</span>
+<span class="fc" id="L1197">            return false;</span>
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // The parser
+    // ------------------------------------------------------------------
+
+    /// A piece of the chain being built: where it starts, the node whose
+    /// `next` is still open, and how many characters it can take.
+    private static final class Piece {
+        Node first;
+        Node last;
+        int min;
+        /// -1 for no upper bound.
+        int max;
+        /// Whether there is one way only for this to match at a position.
+<span class="fc" id="L1214">        boolean deterministic = true;</span>
+        /// `\R`, which a quantifier repeats whole: each round takes `\r\n`
+        /// as a pair and never gives the `\n` back, as the JDK's does.
+        boolean lineEnding;
+
+<span class="fc" id="L1219">        Piece(Node first, Node last, int min, int max) {</span>
+<span class="fc" id="L1220">            this.first = first;</span>
+<span class="fc" id="L1221">            this.last = last;</span>
+<span class="fc" id="L1222">            this.min = min;</span>
+<span class="fc" id="L1223">            this.max = max;</span>
+<span class="fc" id="L1224">        }</span>
+
+        static Piece of(Node node, int length) {
+<span class="fc" id="L1227">            return new Piece(node, node, length, length);</span>
+        }
+
+        static Piece empty() {
+<span class="fc" id="L1231">            return of(new Pass(), 0);</span>
+        }
+
+        Piece unbounded() {
+<span class="fc" id="L1235">            max = -1;</span>
+<span class="fc" id="L1236">            return this;</span>
+        }
+
+        void then(Piece other) {
+<span class="fc" id="L1240">            last.next = other.first;</span>
+<span class="fc" id="L1241">            last = other.last;</span>
+<span class="fc" id="L1242">            deterministic &amp;= other.deterministic;</span>
+<span class="fc" id="L1243">            min = sum(min, other.min);</span>
+<span class="fc bfc" id="L1244" title="All 4 branches covered.">            max = max &lt; 0 || other.max &lt; 0 ? -1 : sum(max, other.max);</span>
+<span class="fc" id="L1245">        }</span>
+
+        private static int sum(int a, int b) {
+<span class="fc" id="L1248">            long s = (long) a + b;</span>
+<span class="pc bpc" id="L1249" title="1 of 2 branches missed.">            return s &gt; 1000000000L ? 1000000000 : (int) s;</span>
+        }
+    }
+
+    /// Pieces put one after another.
+    private static final class Seq {
+        private Piece all;
+
+        void then(Piece next) {
+<span class="fc bfc" id="L1258" title="All 2 branches covered.">            if (all == null) {</span>
+<span class="fc" id="L1259">                all = next;</span>
+            } else {
+<span class="fc" id="L1261">                all.then(next);</span>
+            }
+<span class="fc" id="L1263">        }</span>
+
+        Piece piece() {
+<span class="fc bfc" id="L1266" title="All 2 branches covered.">            return all == null ? Piece.empty() : all;</span>
+        }
+    }
+
+    private static final class Parser {
+        static final int GREEDY = 0;
+        static final int RELUCTANT = 1;
+        static final int POSSESSIVE = 2;
+
+        private final String p;
+        private int at;
+        private int flags;
+        int groups;
+        int loops;
+<span class="fc" id="L1280">        final Map&lt;String, Integer&gt; names = new HashMap&lt;String, Integer&gt;();</span>
+        boolean supplementary;
+        /// Groups repeated without an upper bound, and back references, so far.
+        int unboundedGroups;
+
+<span class="fc" id="L1285">        Parser(String pattern, int flags) {</span>
+<span class="fc" id="L1286">            this.p = pattern;</span>
+<span class="fc" id="L1287">            this.flags = flags;</span>
+<span class="fc bfc" id="L1288" title="All 4 branches covered.">            for (int k = 0; k &lt; pattern.length() &amp;&amp; !supplementary; k++) {</span>
+<span class="fc" id="L1289">                char c = pattern.charAt(k);</span>
+<span class="pc bpc" id="L1290" title="1 of 4 branches missed.">                supplementary = c &gt;= 0xd800 &amp;&amp; c &lt;= 0xdfff;</span>
+            }
+<span class="fc" id="L1292">        }</span>
+
+        /// Records a code point the pattern names, and returns it.
+        private int note(int c) {
+<span class="pc bpc" id="L1296" title="1 of 6 branches missed.">            if (c &gt; 0xffff || c &gt;= 0xd800 &amp;&amp; c &lt;= 0xdfff) {</span>
+<span class="fc" id="L1297">                supplementary = true;</span>
+            }
+<span class="fc" id="L1299">            return c;</span>
+        }
+
+        private PatternSyntaxException error(String description) {
+<span class="fc" id="L1303">            return new PatternSyntaxException(description, p, Math.min(at, p.length()));</span>
+        }
+
+        private PatternSyntaxException unsupported(String construct) {
+<span class="nc" id="L1307">            return error(construct + &quot; is not supported by the Codename One runtime&quot;);</span>
+        }
+
+        private boolean has(int flag) {
+            // UNICODE_CHARACTER_CLASS implies UNICODE_CASE, as on the JDK.
+<span class="pc bpc" id="L1312" title="1 of 4 branches missed.">            if (flag == UNICODE_CASE &amp;&amp; (flags &amp; UNICODE_CHARACTER_CLASS) != 0) {</span>
+<span class="nc" id="L1313">                return true;</span>
+            }
+<span class="fc bfc" id="L1315" title="All 2 branches covered.">            return (flags &amp; flag) != 0;</span>
+        }
+
+        /// A piece for one code point, as wide in chars as it can be.
+        private static Piece single(Single s) {
+<span class="fc" id="L1320">            return new Piece(s, s, s.minChars(), s.maxChars());</span>
+        }
+
+        /// The flags in force after the whole pattern, which a group's own
+        /// inline flags never reach because the group restores them.
+        int topLevelFlags() {
+<span class="fc" id="L1326">            return flags;</span>
+        }
+
+        Node compile() {
+            Piece whole;
+<span class="pc bpc" id="L1331" title="1 of 2 branches missed.">            if (has(LITERAL)) {</span>
+<span class="nc" id="L1332">                Seq all = new Seq();</span>
+<span class="nc bnc" id="L1333" title="All 2 branches missed.">                for (at = 0; at &lt; p.length(); at++) {</span>
+<span class="nc" id="L1334">                    all.then(literal(p.charAt(at)));</span>
+                }
+<span class="nc" id="L1336">                whole = all.piece();</span>
+<span class="nc" id="L1337">            } else {</span>
+<span class="fc" id="L1338">                whole = alternatives();</span>
+<span class="pc bpc" id="L1339" title="1 of 2 branches missed.">                if (at &lt; p.length()) {</span>
+<span class="nc" id="L1340">                    throw error(&quot;Unmatched closing ')'&quot;);</span>
+                }
+            }
+<span class="fc" id="L1343">            whole.last.next = new Accept();</span>
+<span class="fc" id="L1344">            return whole.first;</span>
+        }
+
+        private Piece literal(int c) {
+<span class="fc" id="L1348">            note(c);</span>
+<span class="fc bfc" id="L1349" title="All 2 branches covered.">            if (has(CASE_INSENSITIVE)) {</span>
+<span class="fc" id="L1350">                boolean unicode = has(UNICODE_CASE);</span>
+<span class="pc bpc" id="L1351" title="2 of 4 branches missed.">                boolean cased = c &lt; 0x80 ? asciiLetter(c)</span>
+<span class="pc bpc" id="L1352" title="2 of 4 branches missed.">                        : unicode &amp;&amp; (Character.toUpperCase(c) != c || Character.toLowerCase(c) != c);</span>
+<span class="pc bpc" id="L1353" title="1 of 2 branches missed.">                if (cased) {</span>
+<span class="fc" id="L1354">                    return single(new CharIgnoringCase(c, unicode));</span>
+                }
+            }
+<span class="fc" id="L1357">            return single(new Char(c));</span>
+        }
+
+        /// The code point at `at` in the pattern, consuming it.
+        private int patternCodePoint() {
+<span class="fc" id="L1362">            int c = codePointAt(p, at, p.length());</span>
+<span class="fc bfc" id="L1363" title="All 2 branches covered.">            at += c &gt; 0xffff ? 2 : 1;</span>
+<span class="fc" id="L1364">            return c;</span>
+        }
+
+        private CharSet newSet() {
+<span class="pc bpc" id="L1368" title="1 of 4 branches missed.">            return new CharSet(has(CASE_INSENSITIVE) ? has(UNICODE_CASE) ? 2 : 1 : 0);</span>
+        }
+
+        private void skipComments() {
+<span class="fc bfc" id="L1372" title="All 2 branches covered.">            if (!has(COMMENTS)) {</span>
+<span class="fc" id="L1373">                return;</span>
+            }
+<span class="fc bfc" id="L1375" title="All 2 branches covered.">            while (at &lt; p.length()) {</span>
+<span class="fc" id="L1376">                char c = p.charAt(at);</span>
+<span class="pc bpc" id="L1377" title="5 of 12 branches missed.">                if (c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f' || c == 0x0b) {</span>
+<span class="fc" id="L1378">                    at++;</span>
+<span class="pc bpc" id="L1379" title="1 of 2 branches missed.">                } else if (c == '#') {</span>
+<span class="nc bnc" id="L1380" title="All 4 branches missed.">                    while (at &lt; p.length() &amp;&amp; !lineTerminator(p.charAt(at), false)) {</span>
+<span class="nc" id="L1381">                        at++;</span>
+                    }
+                } else {
+<span class="fc" id="L1384">                    return;</span>
+                }
+<span class="fc" id="L1386">            }</span>
+<span class="fc" id="L1387">        }</span>
+
+        /// `X|Y|Z`, up to a closing parenthesis or the end.
+        private Piece alternatives() {
+<span class="fc" id="L1391">            List&lt;Piece&gt; all = new ArrayList&lt;Piece&gt;();</span>
+<span class="fc" id="L1392">            all.add(sequence());</span>
+<span class="fc bfc" id="L1393" title="All 4 branches covered.">            while (at &lt; p.length() &amp;&amp; p.charAt(at) == '|') {</span>
+<span class="fc" id="L1394">                at++;</span>
+<span class="fc" id="L1395">                all.add(sequence());</span>
+            }
+<span class="fc bfc" id="L1397" title="All 2 branches covered.">            if (all.size() == 1) {</span>
+<span class="fc" id="L1398">                return all.get(0);</span>
+            }
+            // Alternatives of one character each are one character class,
+            // which repeats without recursion.
+<span class="fc" id="L1402">            CharSet merged = new CharSet(0);</span>
+<span class="fc" id="L1403">            boolean mergeable = true;</span>
+<span class="fc bfc" id="L1404" title="All 2 branches covered.">            for (Piece piece : all) {</span>
+<span class="fc" id="L1405">                Node n = piece.first;</span>
+<span class="fc bfc" id="L1406" title="All 2 branches covered.">                if (piece.first != piece.last) { //NOPMD CompareObjectsWithEquals - one node, by identity</span>
+<span class="fc" id="L1407">                    mergeable = false;</span>
+<span class="fc bfc" id="L1408" title="All 2 branches covered.">                } else if (n instanceof Char) {</span>
+<span class="fc" id="L1409">                    merged.add(((Char) n).c);</span>
+<span class="pc bpc" id="L1410" title="1 of 2 branches missed.">                } else if (n instanceof InClass) {</span>
+<span class="nc" id="L1411">                    merged.unite(((InClass) n).set);</span>
+                } else {
+<span class="fc" id="L1413">                    mergeable = false;</span>
+                }
+<span class="fc" id="L1415">            }</span>
+<span class="pc bpc" id="L1416" title="1 of 2 branches missed.">            if (mergeable) {</span>
+<span class="nc" id="L1417">                return single(new InClass(merged));</span>
+            }
+<span class="fc" id="L1419">            Node[] heads = new Node[all.size()];</span>
+<span class="fc" id="L1420">            Pass join = new Pass();</span>
+<span class="fc" id="L1421">            int min = Integer.MAX_VALUE;</span>
+<span class="fc" id="L1422">            int max = 0;</span>
+<span class="fc bfc" id="L1423" title="All 2 branches covered.">            for (int k = 0; k &lt; heads.length; k++) {</span>
+<span class="fc" id="L1424">                Piece piece = all.get(k);</span>
+<span class="fc" id="L1425">                heads[k] = piece.first;</span>
+<span class="fc" id="L1426">                piece.last.next = join;</span>
+<span class="fc" id="L1427">                min = Math.min(min, piece.min);</span>
+<span class="pc bpc" id="L1428" title="1 of 4 branches missed.">                max = max &lt; 0 || piece.max &lt; 0 ? -1 : Math.max(max, piece.max);</span>
+            }
+<span class="fc" id="L1430">            Piece branch = new Piece(new Branch(heads), join, min, max);</span>
+<span class="fc" id="L1431">            branch.deterministic = false;</span>
+<span class="fc" id="L1432">            return branch;</span>
+        }
+
+        private Piece sequence() {
+<span class="fc" id="L1436">            Seq out = new Seq();</span>
+            while (true) {
+<span class="fc" id="L1438">                skipComments();</span>
+<span class="fc bfc" id="L1439" title="All 2 branches covered.">                if (at &gt;= p.length()) {</span>
+<span class="fc" id="L1440">                    return out.piece();</span>
+                }
+<span class="fc" id="L1442">                char c = p.charAt(at);</span>
+<span class="fc bfc" id="L1443" title="All 4 branches covered.">                if (c == '|' || c == ')') {</span>
+<span class="fc" id="L1444">                    return out.piece();</span>
+                }
+<span class="pc bpc" id="L1446" title="1 of 6 branches missed.">                if (c == '\\' &amp;&amp; at + 1 &lt; p.length() &amp;&amp; p.charAt(at + 1) == 'Q') {</span>
+<span class="fc" id="L1447">                    at += 2;</span>
+<span class="fc" id="L1448">                    int end = p.indexOf(&quot;\\E&quot;, at);</span>
+<span class="pc bpc" id="L1449" title="1 of 2 branches missed.">                    if (end &lt; 0) {</span>
+<span class="nc" id="L1450">                        end = p.length();</span>
+                    }
+                    // A quantifier after the quotation applies to its last
+                    // code point, so that one goes through the usual path.
+<span class="pc bpc" id="L1454" title="1 of 2 branches missed.">                    if (at &gt;= end) {</span>
+<span class="nc" id="L1455">                        at = Math.min(end + 2, p.length());</span>
+                    }
+<span class="pc bpc" id="L1457" title="1 of 2 branches missed.">                    while (at &lt; end) {</span>
+<span class="fc" id="L1458">                        int cp = codePointAt(p, at, end);</span>
+<span class="fc bfc" id="L1459" title="All 2 branches covered.">                        at += cp &gt; 0xffff ? 2 : 1;</span>
+<span class="fc bfc" id="L1460" title="All 2 branches covered.">                        if (at &lt; end) {</span>
+<span class="fc" id="L1461">                            out.then(literal(cp));</span>
+                        } else {
+<span class="fc" id="L1463">                            Piece last = literal(cp);</span>
+<span class="fc" id="L1464">                            at = Math.min(end + 2, p.length());</span>
+<span class="fc" id="L1465">                            out.then(quantified(last));</span>
+<span class="fc" id="L1466">                            break;</span>
+                        }
+<span class="fc" id="L1468">                    }</span>
+                    continue;
+                }
+<span class="pc bpc" id="L1471" title="2 of 6 branches missed.">                if (c == '\\' &amp;&amp; at + 1 &lt; p.length() &amp;&amp; p.charAt(at + 1) == 'E') {</span>
+<span class="nc" id="L1472">                    at += 2;</span>
+<span class="nc" id="L1473">                    continue;</span>
+                }
+<span class="fc" id="L1475">                out.then(quantified(atom()));</span>
+<span class="fc" id="L1476">            }</span>
+        }
+
+        private Piece atom() {
+<span class="fc" id="L1480">            char c = p.charAt(at);</span>
+<span class="pc bpc" id="L1481" title="2 of 9 branches missed.">            switch (c) {</span>
+                case '(':
+<span class="fc" id="L1483">                    return group();</span>
+                case '[':
+<span class="fc" id="L1485">                    at++;</span>
+<span class="fc" id="L1486">                    return single(new InClass(characterClass()));</span>
+                case '.':
+<span class="fc" id="L1488">                    at++;</span>
+<span class="fc" id="L1489">                    return single(new Any(has(DOTALL), has(UNIX_LINES)));</span>
+                case '^':
+<span class="fc" id="L1491">                    at++;</span>
+<span class="pc bpc" id="L1492" title="1 of 2 branches missed.">                    return Piece.of(new Anchor(has(MULTILINE) ? Anchor.LINE_START : Anchor.BEGIN, has(UNIX_LINES)), 0);</span>
+                case '$':
+<span class="fc" id="L1494">                    at++;</span>
+<span class="pc bpc" id="L1495" title="1 of 2 branches missed.">                    return Piece.of(new Anchor(has(MULTILINE) ? Anchor.LINE_END : Anchor.END_OR_FINAL_TERMINATOR,</span>
+<span class="fc" id="L1496">                            has(UNIX_LINES)), 0);</span>
+                case '\\':
+<span class="fc" id="L1498">                    at++;</span>
+<span class="fc" id="L1499">                    return escape();</span>
+                case '*':
+                case '+':
+                case '?':
+<span class="nc" id="L1503">                    throw error(&quot;Dangling meta character '&quot; + c + &quot;'&quot;);</span>
+                case '{':
+                    // The JDK reads a leading &quot;{1}&quot; as an empty match; that is
+                    // an accident of its parser, not syntax anyone writes, and
+                    // refusing it says so at compile time.
+<span class="nc" id="L1508">                    throw error(&quot;Illegal repetition&quot;);</span>
+                default:
+                    // A code point written out is one atom, so a quantifier
+                    // after it repeats both halves.
+<span class="fc" id="L1512">                    return literal(patternCodePoint());</span>
+            }
+        }
+
+        private Piece quantified(Piece piece) {
+<span class="fc" id="L1517">            skipComments();</span>
+<span class="fc bfc" id="L1518" title="All 2 branches covered.">            if (at &gt;= p.length()) {</span>
+<span class="fc" id="L1519">                return piece;</span>
+            }
+            int min;
+            int max;
+<span class="fc" id="L1523">            char c = p.charAt(at);</span>
+<span class="fc bfc" id="L1524" title="All 2 branches covered.">            if (c == '*') {</span>
+<span class="fc" id="L1525">                min = 0;</span>
+<span class="fc" id="L1526">                max = -1;</span>
+<span class="fc" id="L1527">                at++;</span>
+<span class="fc bfc" id="L1528" title="All 2 branches covered.">            } else if (c == '+') {</span>
+<span class="fc" id="L1529">                min = 1;</span>
+<span class="fc" id="L1530">                max = -1;</span>
+<span class="fc" id="L1531">                at++;</span>
+<span class="fc bfc" id="L1532" title="All 2 branches covered.">            } else if (c == '?') {</span>
+<span class="fc" id="L1533">                min = 0;</span>
+<span class="fc" id="L1534">                max = 1;</span>
+<span class="fc" id="L1535">                at++;</span>
+<span class="fc bfc" id="L1536" title="All 2 branches covered.">            } else if (c == '{') {</span>
+<span class="fc" id="L1537">                at++;</span>
+<span class="fc" id="L1538">                int start = at;</span>
+<span class="fc" id="L1539">                min = number();</span>
+<span class="pc bpc" id="L1540" title="1 of 2 branches missed.">                if (at == start) {</span>
+<span class="nc" id="L1541">                    throw error(&quot;Illegal repetition&quot;);</span>
+                }
+<span class="fc" id="L1543">                max = min;</span>
+<span class="pc bpc" id="L1544" title="1 of 4 branches missed.">                if (at &lt; p.length() &amp;&amp; p.charAt(at) == ',') {</span>
+<span class="fc" id="L1545">                    at++;</span>
+<span class="pc bpc" id="L1546" title="1 of 4 branches missed.">                    if (at &lt; p.length() &amp;&amp; p.charAt(at) == '}') {</span>
+<span class="fc" id="L1547">                        max = -1;</span>
+                    } else {
+<span class="fc" id="L1549">                        int from = at;</span>
+<span class="fc" id="L1550">                        max = number();</span>
+<span class="pc bpc" id="L1551" title="1 of 2 branches missed.">                        if (at == from) {</span>
+<span class="nc" id="L1552">                            throw error(&quot;Illegal repetition&quot;);</span>
+                        }
+<span class="pc bpc" id="L1554" title="1 of 2 branches missed.">                        if (max &lt; min) {</span>
+<span class="nc" id="L1555">                            throw error(&quot;Illegal repetition range&quot;);</span>
+                        }
+                    }
+                }
+<span class="pc bpc" id="L1559" title="2 of 4 branches missed.">                if (at &gt;= p.length() || p.charAt(at) != '}') {</span>
+<span class="nc" id="L1560">                    throw error(&quot;Unclosed counted closure&quot;);</span>
+                }
+<span class="fc" id="L1562">                at++;</span>
+<span class="fc" id="L1563">            } else {</span>
+<span class="fc" id="L1564">                return piece;</span>
+            }
+<span class="fc bfc" id="L1566" title="All 2 branches covered.">            if (piece.lineEnding) {</span>
+<span class="fc" id="L1567">                piece.last.next = new SubEnd();</span>
+<span class="fc" id="L1568">                Node atomic = new Atomic(piece.first);</span>
+<span class="fc" id="L1569">                Piece whole = new Piece(atomic, atomic, piece.min, piece.max);</span>
+<span class="fc" id="L1570">                whole.deterministic = false;</span>
+<span class="fc" id="L1571">                piece = whole;</span>
+            }
+            // In COMMENTS mode &quot;a* ?&quot; is &quot;a*?&quot;, as on the JDK.
+<span class="fc" id="L1574">            skipComments();</span>
+<span class="fc" id="L1575">            int mode = GREEDY;</span>
+<span class="fc bfc" id="L1576" title="All 4 branches covered.">            if (at &lt; p.length() &amp;&amp; p.charAt(at) == '?') {</span>
+<span class="fc" id="L1577">                mode = RELUCTANT;</span>
+<span class="fc" id="L1578">                at++;</span>
+<span class="fc bfc" id="L1579" title="All 4 branches covered.">            } else if (at &lt; p.length() &amp;&amp; p.charAt(at) == '+') {</span>
+<span class="fc" id="L1580">                mode = POSSESSIVE;</span>
+<span class="fc" id="L1581">                at++;</span>
+            }
+<span class="fc" id="L1583">            int lowest = (int) Math.min(1000000000L, (long) piece.min * min);</span>
+<span class="pc bpc" id="L1584" title="1 of 4 branches missed.">            int highest = max &lt; 0 || piece.max &lt; 0 ? -1 : (int) Math.min(1000000000L, (long) piece.max * max);</span>
+<span class="fc bfc" id="L1585" title="All 2 branches covered.">            if (max == 0) {</span>
+<span class="fc" id="L1586">                highest = 0;</span>
+            }
+            Piece out;
+            // Not possessive: there the JDK takes its round, and &quot;()*+&quot; sets
+            // the group. It also takes the round for &quot;(?:())*&quot; and for the
+            // inner group of &quot;(())*&quot;, an accident of how it optimizes a
+            // repeated group, which is not copied here.
+<span class="pc bpc" id="L1593" title="1 of 12 branches missed.">            if (min == 0 &amp;&amp; max != 1 &amp;&amp; mode != POSSESSIVE &amp;&amp; piece.max == 0 &amp;&amp; piece.deterministic</span>
+                    &amp;&amp; piece.first instanceof GroupOpen) {
+                // A group that can only be empty, repeated from zero times:
+                // the JDK takes no round of it, so the group stays unset. Not
+                // for at most one round (? and {0,1}): there the JDK tries its
+                // round, and &quot;(^)?&quot; sets the group to the empty string.
+<span class="fc" id="L1599">                out = Piece.empty();</span>
+<span class="fc bfc" id="L1600" title="All 4 branches covered.">            } else if (piece.first == piece.last &amp;&amp; piece.first instanceof Single) { //NOPMD CompareObjectsWithEquals</span>
+<span class="fc" id="L1601">                out = new Piece(null, null, lowest, highest);</span>
+<span class="fc" id="L1602">                out.first = new SingleLoop((Single) piece.first, min, max, mode);</span>
+<span class="fc" id="L1603">                out.last = out.first;</span>
+            } else {
+<span class="fc bfc" id="L1605" title="All 2 branches covered.">                if (highest &lt; 0) {</span>
+<span class="fc" id="L1606">                    unboundedGroups++;</span>
+                }
+<span class="fc bfc" id="L1608" title="All 2 branches covered.">                Loop loop = new Loop(loops++, min, max, mode == RELUCTANT);</span>
+<span class="fc" id="L1609">                loop.body = piece.first;</span>
+<span class="fc" id="L1610">                piece.last.next = new LoopTail(loop);</span>
+<span class="fc bfc" id="L1611" title="All 2 branches covered.">                if (mode == POSSESSIVE) {</span>
+<span class="fc" id="L1612">                    loop.next = new SubEnd();</span>
+<span class="fc" id="L1613">                    Node atomic = new Atomic(loop);</span>
+<span class="fc" id="L1614">                    out = new Piece(atomic, atomic, lowest, highest);</span>
+<span class="fc" id="L1615">                } else {</span>
+<span class="fc" id="L1616">                    out = new Piece(loop, loop, lowest, highest);</span>
+                }
+            }
+<span class="fc bfc" id="L1619" title="All 4 branches covered.">            out.deterministic = piece.deterministic &amp;&amp; min == max;</span>
+<span class="fc" id="L1620">            skipComments();</span>
+<span class="fc bfc" id="L1621" title="All 2 branches covered.">            if (at &lt; p.length()) {</span>
+<span class="fc" id="L1622">                char after = p.charAt(at);</span>
+<span class="pc bpc" id="L1623" title="3 of 6 branches missed.">                if (after == '*' || after == '+' || after == '?') {</span>
+<span class="nc" id="L1624">                    throw error(&quot;Dangling meta character '&quot; + after + &quot;'&quot;);</span>
+                }
+<span class="pc bpc" id="L1626" title="1 of 2 branches missed.">                if (after == '{') {</span>
+                    // &quot;x{1}{2}&quot; repeats the repetition. The JDK parses the
+                    // second count and then drops it, which reads as a bug
+                    // in it rather than a meaning to copy.
+<span class="nc" id="L1630">                    return quantified(out);</span>
+                }
+            }
+<span class="fc" id="L1633">            return out;</span>
+        }
+
+        private int number() {
+<span class="fc" id="L1637">            long n = 0;</span>
+<span class="pc bpc" id="L1638" title="1 of 6 branches missed.">            while (at &lt; p.length() &amp;&amp; p.charAt(at) &gt;= '0' &amp;&amp; p.charAt(at) &lt;= '9') {</span>
+<span class="fc" id="L1639">                n = n * 10 + (p.charAt(at) - '0');</span>
+<span class="pc bpc" id="L1640" title="1 of 2 branches missed.">                if (n &gt; Integer.MAX_VALUE) {</span>
+<span class="nc" id="L1641">                    throw error(&quot;Illegal repetition range&quot;);</span>
+                }
+<span class="fc" id="L1643">                at++;</span>
+            }
+<span class="fc" id="L1645">            return (int) n;</span>
+        }
+
+        private Piece group() {
+<span class="fc" id="L1649">            at++;</span>
+<span class="fc" id="L1650">            int saved = flags;</span>
+            Piece out;
+<span class="pc bpc" id="L1652" title="1 of 4 branches missed.">            if (at &lt; p.length() &amp;&amp; p.charAt(at) == '?') {</span>
+<span class="fc" id="L1653">                at++;</span>
+<span class="pc bpc" id="L1654" title="1 of 2 branches missed.">                if (at &gt;= p.length()) {</span>
+<span class="nc" id="L1655">                    throw error(&quot;Unknown inline modifier&quot;);</span>
+                }
+<span class="fc" id="L1657">                char c = p.charAt(at);</span>
+<span class="fc bfc" id="L1658" title="All 2 branches covered.">                if (c == ':') {</span>
+<span class="fc" id="L1659">                    at++;</span>
+<span class="fc" id="L1660">                    out = body();</span>
+<span class="pc bpc" id="L1661" title="2 of 4 branches missed.">                } else if (c == '=' || c == '!') {</span>
+<span class="nc" id="L1662">                    at++;</span>
+<span class="nc bnc" id="L1663" title="All 2 branches missed.">                    out = look(false, c == '!');</span>
+<span class="pc bpc" id="L1664" title="1 of 2 branches missed.">                } else if (c == '&gt;') {</span>
+<span class="nc" id="L1665">                    at++;</span>
+<span class="nc" id="L1666">                    Piece inner = body();</span>
+<span class="nc" id="L1667">                    inner.last.next = new SubEnd();</span>
+<span class="nc" id="L1668">                    Node atomic = new Atomic(inner.first);</span>
+<span class="nc" id="L1669">                    out = new Piece(atomic, atomic, inner.min, inner.max);</span>
+<span class="pc bfc" id="L1670" title="All 2 branches covered.">                } else if (c == '&lt;') {</span>
+<span class="fc" id="L1671">                    at++;</span>
+<span class="pc bpc" id="L1672" title="2 of 6 branches missed.">                    if (at &lt; p.length() &amp;&amp; (p.charAt(at) == '=' || p.charAt(at) == '!')) {</span>
+<span class="fc bfc" id="L1673" title="All 2 branches covered.">                        boolean negative = p.charAt(at) == '!';</span>
+<span class="fc" id="L1674">                        at++;</span>
+<span class="fc" id="L1675">                        out = look(true, negative);</span>
+<span class="fc" id="L1676">                    } else {</span>
+<span class="nc" id="L1677">                        String name = groupName('&gt;');</span>
+<span class="nc bnc" id="L1678" title="All 2 branches missed.">                        if (names.containsKey(name)) {</span>
+<span class="nc" id="L1679">                            throw error(&quot;Named capturing group &lt;&quot; + name + &quot;&gt; is already defined&quot;);</span>
+                        }
+<span class="nc" id="L1681">                        int group = ++groups;</span>
+<span class="nc" id="L1682">                        names.put(name, Integer.valueOf(group));</span>
+<span class="nc" id="L1683">                        out = capture(group);</span>
+<span class="nc" id="L1684">                    }</span>
+                } else {
+                    // (?flags) for the rest of the enclosing group, or
+                    // (?flags:X) for X alone.
+<span class="fc" id="L1688">                    int flagsStart = at;</span>
+<span class="fc" id="L1689">                    inlineFlags();</span>
+<span class="pc bpc" id="L1690" title="2 of 6 branches missed.">                    if (at &gt;= p.length() || at == flagsStart &amp;&amp; p.charAt(at) == ')') {</span>
+<span class="fc" id="L1691">                        throw error(&quot;Unknown inline modifier&quot;);</span>
+                    }
+<span class="pc bpc" id="L1693" title="1 of 2 branches missed.">                    if (p.charAt(at) == ')') {</span>
+<span class="fc" id="L1694">                        at++;</span>
+<span class="fc" id="L1695">                        return Piece.empty();</span>
+                    }
+<span class="nc bnc" id="L1697" title="All 2 branches missed.">                    if (p.charAt(at) != ':') {</span>
+<span class="nc" id="L1698">                        throw error(&quot;Unknown inline modifier&quot;);</span>
+                    }
+<span class="nc" id="L1700">                    at++;</span>
+<span class="nc" id="L1701">                    out = body();</span>
+                }
+<span class="fc" id="L1703">            } else {</span>
+<span class="fc" id="L1704">                out = capture(++groups);</span>
+            }
+<span class="fc" id="L1706">            flags = saved;</span>
+<span class="fc" id="L1707">            return out;</span>
+        }
+
+        private Piece body() {
+<span class="fc" id="L1711">            Piece inner = alternatives();</span>
+<span class="pc bpc" id="L1712" title="2 of 4 branches missed.">            if (at &gt;= p.length() || p.charAt(at) != ')') {</span>
+<span class="nc" id="L1713">                throw error(&quot;Unclosed group&quot;);</span>
+            }
+<span class="fc" id="L1715">            at++;</span>
+<span class="fc" id="L1716">            return inner;</span>
+        }
+
+        private Piece capture(int group) {
+<span class="fc" id="L1720">            Piece out = Piece.of(new GroupOpen(group), 0);</span>
+<span class="fc" id="L1721">            out.then(body());</span>
+<span class="fc" id="L1722">            out.then(Piece.of(new GroupClose(group), 0));</span>
+<span class="fc" id="L1723">            return out;</span>
+        }
+
+        private Piece look(boolean behind, boolean negative) {
+<span class="fc" id="L1727">            int groupsBefore = unboundedGroups;</span>
+<span class="fc" id="L1728">            Piece inner = body();</span>
+            // As on the JDK: a lookbehind may repeat one character without
+            // bound (&quot;(?&lt;=a+)b&quot;), and is then tried from every earlier
+            // position; a group repeated without bound has no maximum.
+<span class="pc bpc" id="L1732" title="2 of 6 branches missed.">            if (behind &amp;&amp; inner.max &lt; 0 &amp;&amp; unboundedGroups != groupsBefore) {</span>
+<span class="nc" id="L1733">                throw error(&quot;Look-behind group does not have an obvious maximum length&quot;);</span>
+            }
+<span class="fc" id="L1735">            inner.last.next = new SubEnd();</span>
+<span class="fc" id="L1736">            return Piece.of(new Look(inner.first, behind, negative, inner.min, inner.max), 0);</span>
+        }
+
+        private String groupName(char close) {
+<span class="nc" id="L1740">            int start = at;</span>
+<span class="nc bnc" id="L1741" title="All 4 branches missed.">            while (at &lt; p.length() &amp;&amp; p.charAt(at) != close) {</span>
+<span class="nc" id="L1742">                char c = p.charAt(at);</span>
+<span class="nc" id="L1743">                boolean letter = asciiLetter(c);</span>
+<span class="nc bnc" id="L1744" title="All 8 branches missed.">                if (!(letter || at &gt; start &amp;&amp; c &gt;= '0' &amp;&amp; c &lt;= '9')) {</span>
+<span class="nc bnc" id="L1745" title="All 2 branches missed.">                    throw error(at == start ? &quot;capturing group name does not start with a Latin letter&quot;</span>
+                            : &quot;named capturing group is missing trailing '&quot; + close + &quot;'&quot;);
+                }
+<span class="nc" id="L1748">                at++;</span>
+<span class="nc" id="L1749">            }</span>
+<span class="nc bnc" id="L1750" title="All 2 branches missed.">            if (at &gt;= p.length()) {</span>
+<span class="nc" id="L1751">                throw error(&quot;named capturing group is missing trailing '&quot; + close + &quot;'&quot;);</span>
+            }
+<span class="nc bnc" id="L1753" title="All 2 branches missed.">            if (at == start) {</span>
+<span class="nc" id="L1754">                throw error(&quot;named capturing group has 0 length name&quot;);</span>
+            }
+<span class="nc" id="L1756">            String name = p.substring(start, at);</span>
+<span class="nc" id="L1757">            at++;</span>
+<span class="nc" id="L1758">            return name;</span>
+        }
+
+        private void inlineFlags() {
+<span class="fc" id="L1762">            boolean on = true;</span>
+<span class="pc bpc" id="L1763" title="1 of 2 branches missed.">            while (at &lt; p.length()) {</span>
+<span class="fc" id="L1764">                char c = p.charAt(at);</span>
+                int flag;
+<span class="pc bpc" id="L1766" title="6 of 10 branches missed.">                switch (c) {</span>
+                    case 'i':
+<span class="fc" id="L1768">                        flag = CASE_INSENSITIVE;</span>
+<span class="fc" id="L1769">                        break;</span>
+                    case 'm':
+<span class="nc" id="L1771">                        flag = MULTILINE;</span>
+<span class="nc" id="L1772">                        break;</span>
+                    case 's':
+<span class="nc" id="L1774">                        flag = DOTALL;</span>
+<span class="nc" id="L1775">                        break;</span>
+                    case 'd':
+<span class="nc" id="L1777">                        flag = UNIX_LINES;</span>
+<span class="nc" id="L1778">                        break;</span>
+                    case 'u':
+<span class="fc" id="L1780">                        flag = UNICODE_CASE;</span>
+<span class="fc" id="L1781">                        break;</span>
+                    case 'x':
+<span class="nc" id="L1783">                        flag = COMMENTS;</span>
+<span class="nc" id="L1784">                        break;</span>
+                    case 'c':
+<span class="nc" id="L1786">                        throw unsupported(&quot;The inline flag (?c), canonical equivalence,&quot;);</span>
+                    case 'U':
+<span class="fc" id="L1788">                        flag = UNICODE_CHARACTER_CLASS;</span>
+<span class="fc" id="L1789">                        break;</span>
+                    case '-':
+<span class="nc bnc" id="L1791" title="All 2 branches missed.">                        if (!on) {</span>
+<span class="nc" id="L1792">                            return;</span>
+                        }
+<span class="nc" id="L1794">                        on = false;</span>
+<span class="nc" id="L1795">                        at++;</span>
+<span class="nc" id="L1796">                        continue;</span>
+                    default:
+<span class="fc" id="L1798">                        return;</span>
+                }
+<span class="pc bpc" id="L1800" title="1 of 2 branches missed.">                flags = on ? flags | flag : flags &amp; ~flag;</span>
+<span class="fc" id="L1801">                at++;</span>
+<span class="fc" id="L1802">            }</span>
+<span class="nc" id="L1803">        }</span>
+
+        private int hex(int digits) {
+<span class="pc bpc" id="L1806" title="1 of 2 branches missed.">            if (at + digits &gt; p.length()) {</span>
+<span class="nc" id="L1807">                throw error(&quot;Illegal hexadecimal escape sequence&quot;);</span>
+            }
+<span class="fc" id="L1809">            int v = 0;</span>
+<span class="fc bfc" id="L1810" title="All 2 branches covered.">            for (int k = 0; k &lt; digits; k++) {</span>
+<span class="fc" id="L1811">                int d = Character.digit(p.charAt(at++), 16);</span>
+<span class="pc bpc" id="L1812" title="1 of 2 branches missed.">                if (d &lt; 0) {</span>
+<span class="nc" id="L1813">                    throw error(&quot;Illegal hexadecimal escape sequence&quot;);</span>
+                }
+<span class="fc" id="L1815">                v = v * 16 + d;</span>
+            }
+<span class="fc" id="L1817">            return v;</span>
+        }
+
+        /// The character an escape names, with `at` after the letter that
+        /// follows the backslash; -1 when the letter is not one of those.
+        private int escapedChar(char e) {
+<span class="pc bpc" id="L1823" title="7 of 11 branches missed.">            switch (e) {</span>
+                case 't':
+<span class="nc" id="L1825">                    return '\t';</span>
+                case 'n':
+<span class="fc" id="L1827">                    return '\n';</span>
+                case 'r':
+<span class="nc" id="L1829">                    return '\r';</span>
+                case 'f':
+<span class="nc" id="L1831">                    return '\f';</span>
+                case 'a':
+<span class="nc" id="L1833">                    return 7;</span>
+                case 'e':
+<span class="nc" id="L1835">                    return 0x1b;</span>
+                case '0': {
+<span class="nc" id="L1837">                    int v = 0;</span>
+<span class="nc" id="L1838">                    int digits = 0;</span>
+<span class="nc bnc" id="L1839" title="All 8 branches missed.">                    while (at &lt; p.length() &amp;&amp; digits &lt; 3 &amp;&amp; p.charAt(at) &gt;= '0' &amp;&amp; p.charAt(at) &lt;= '7') {</span>
+<span class="nc" id="L1840">                        int d = p.charAt(at) - '0';</span>
+<span class="nc bnc" id="L1841" title="All 4 branches missed.">                        if (digits == 2 &amp;&amp; v &gt; 0x1f) {</span>
+<span class="nc" id="L1842">                            break;</span>
+                        }
+<span class="nc" id="L1844">                        v = v * 8 + d;</span>
+<span class="nc" id="L1845">                        digits++;</span>
+<span class="nc" id="L1846">                        at++;</span>
+<span class="nc" id="L1847">                    }</span>
+<span class="nc bnc" id="L1848" title="All 2 branches missed.">                    if (digits == 0) {</span>
+<span class="nc" id="L1849">                        throw error(&quot;Illegal octal escape sequence&quot;);</span>
+                    }
+<span class="nc" id="L1851">                    return v;</span>
+                }
+                case 'x':
+<span class="pc bpc" id="L1854" title="2 of 4 branches missed.">                    if (at &lt; p.length() &amp;&amp; p.charAt(at) == '{') {</span>
+<span class="fc" id="L1855">                        at++;</span>
+<span class="fc" id="L1856">                        int v = 0;</span>
+<span class="fc" id="L1857">                        int start = at;</span>
+<span class="pc bpc" id="L1858" title="1 of 4 branches missed.">                        while (at &lt; p.length() &amp;&amp; p.charAt(at) != '}') {</span>
+<span class="fc" id="L1859">                            int d = Character.digit(p.charAt(at), 16);</span>
+<span class="pc bpc" id="L1860" title="2 of 4 branches missed.">                            if (d &lt; 0 || v &gt; 0x10ffff) {</span>
+<span class="nc" id="L1861">                                throw error(&quot;Illegal hexadecimal escape sequence&quot;);</span>
+                            }
+<span class="fc" id="L1863">                            v = v * 16 + d;</span>
+<span class="fc" id="L1864">                            at++;</span>
+<span class="fc" id="L1865">                        }</span>
+<span class="pc bpc" id="L1866" title="3 of 6 branches missed.">                        if (at &gt;= p.length() || at == start || v &gt; 0x10ffff) {</span>
+<span class="nc" id="L1867">                            throw error(&quot;Illegal hexadecimal escape sequence&quot;);</span>
+                        }
+<span class="fc" id="L1869">                        at++;</span>
+<span class="fc" id="L1870">                        return v;</span>
+                    }
+<span class="nc" id="L1872">                    return hex(2);</span>
+                case 'u':
+<span class="pc bpc" id="L1874" title="1 of 2 branches missed.">                    if (at + 4 &gt; p.length()) {</span>
+<span class="nc" id="L1875">                        throw error(&quot;Illegal Unicode escape sequence&quot;);</span>
+                    }
+<span class="fc bfc" id="L1877" title="All 2 branches covered.">                    for (int k = 0; k &lt; 4; k++) {</span>
+<span class="pc bpc" id="L1878" title="1 of 2 branches missed.">                        if (Character.digit(p.charAt(at + k), 16) &lt; 0) {</span>
+<span class="nc" id="L1879">                            throw error(&quot;Illegal Unicode escape sequence&quot;);</span>
+                        }
+                    }
+<span class="fc" id="L1882">                    int unit = hex(4);</span>
+                    // Two escapes that spell a surrogate pair are one code
+                    // point, as on the JDK.
+<span class="pc bpc" id="L1885" title="3 of 8 branches missed.">                    if (unit &gt;= 0xd800 &amp;&amp; unit &lt;= 0xdbff &amp;&amp; at + 6 &lt;= p.length() &amp;&amp; p.charAt(at) == '\\'</span>
+<span class="pc bpc" id="L1886" title="1 of 2 branches missed.">                            &amp;&amp; p.charAt(at + 1) == 'u') {</span>
+<span class="fc" id="L1887">                        int low = 0;</span>
+<span class="pc bpc" id="L1888" title="1 of 4 branches missed.">                        for (int k = 2; k &lt; 6 &amp;&amp; low &gt;= 0; k++) {</span>
+<span class="fc" id="L1889">                            int d = Character.digit(p.charAt(at + k), 16);</span>
+<span class="pc bpc" id="L1890" title="1 of 2 branches missed.">                            low = d &lt; 0 ? -1 : low * 16 + d;</span>
+                        }
+<span class="pc bpc" id="L1892" title="2 of 4 branches missed.">                        if (low &gt;= 0xdc00 &amp;&amp; low &lt;= 0xdfff) {</span>
+<span class="fc" id="L1893">                            at += 6;</span>
+<span class="fc" id="L1894">                            return ((unit - 0xd800) &lt;&lt; 10) + (low - 0xdc00) + 0x10000;</span>
+                        }
+                    }
+<span class="fc" id="L1897">                    return unit;</span>
+                case 'c':
+<span class="nc bnc" id="L1899" title="All 2 branches missed.">                    if (at &gt;= p.length()) {</span>
+<span class="nc" id="L1900">                        throw error(&quot;Illegal control escape sequence&quot;);</span>
+                    }
+<span class="nc" id="L1902">                    return p.charAt(at++) ^ 64;</span>
+                default:
+<span class="fc" id="L1904">                    return -1;</span>
+            }
+        }
+
+        /// The class an escape names, or null.
+        private CharSet escapedClass(char e) {
+<span class="fc bfc" id="L1910" title="All 2 branches covered.">            if (has(UNICODE_CHARACTER_CLASS)) {</span>
+<span class="fc" id="L1911">                supplementary = true;</span>
+<span class="pc bpc" id="L1912" title="2 of 7 branches missed.">                switch (e) {</span>
+                    case 'd':
+<span class="fc" id="L1914">                        return categories(1 &lt;&lt; Character.DECIMAL_DIGIT_NUMBER);</span>
+                    case 'D':
+<span class="nc" id="L1916">                        return categories(1 &lt;&lt; Character.DECIMAL_DIGIT_NUMBER).not();</span>
+                    case 'w':
+<span class="fc" id="L1918">                        return new CharSet(0).kind(CharSet.U_WORD);</span>
+                    case 'W':
+<span class="fc" id="L1920">                        return new CharSet(0).kind(CharSet.U_WORD).not();</span>
+                    case 's':
+<span class="fc" id="L1922">                        return new CharSet(0).kind(CharSet.U_WHITE_SPACE);</span>
+                    case 'S':
+<span class="nc" id="L1924">                        return new CharSet(0).kind(CharSet.U_WHITE_SPACE).not();</span>
+                    default:
+                        break;
+                }
+            }
+<span class="pc bpc" id="L1929" title="8 of 12 branches missed.">            switch (e) {</span>
+                case 'd':
+<span class="fc" id="L1931">                    return new CharSet(0).add('0', '9');</span>
+                case 'D':
+<span class="nc" id="L1933">                    return new CharSet(0).add('0', '9').not();</span>
+                case 'w':
+<span class="fc" id="L1935">                    return word();</span>
+                case 'W':
+<span class="nc" id="L1937">                    return word().not();</span>
+                case 's':
+<span class="nc" id="L1939">                    return new CharSet(0).add(' ').add('\t', '\r');</span>
+                case 'S':
+<span class="nc" id="L1941">                    return new CharSet(0).add(' ').add('\t', '\r').not();</span>
+                case 'h':
+<span class="nc" id="L1943">                    return horizontal();</span>
+                case 'H':
+<span class="nc" id="L1945">                    return horizontal().not();</span>
+                case 'v':
+<span class="nc" id="L1947">                    return vertical();</span>
+                case 'V':
+<span class="nc" id="L1949">                    return vertical().not();</span>
+                case 'p':
+                case 'P': {
+<span class="fc" id="L1952">                    CharSet set = property();</span>
+<span class="fc bfc" id="L1953" title="All 2 branches covered.">                    return e == 'P' ? set.not() : set;</span>
+                }
+                default:
+<span class="fc" id="L1956">                    return null;</span>
+            }
+        }
+
+        private static CharSet word() {
+<span class="fc" id="L1961">            return new CharSet(0).add('a', 'z').add('A', 'Z').add('0', '9').add('_');</span>
+        }
+
+        private static CharSet horizontal() {
+<span class="nc" id="L1965">            return new CharSet(0).add(' ').add('\t').add(0xa0).add(0x1680).add(0x180e).add(0x2000, 0x200a)</span>
+<span class="nc" id="L1966">                    .add(0x202f).add(0x205f).add(0x3000);</span>
+        }
+
+        private static CharSet vertical() {
+<span class="fc" id="L1970">            return new CharSet(0).add('\n', '\r').add(0x85).add(0x2028, 0x2029);</span>
+        }
+
+        private CharSet property() {
+            // A Unicode property can be negated, and a negated one would take
+            // the low half of a pair a search started on; the JDK's search
+            // skips those positions for a property too.
+<span class="fc" id="L1977">            supplementary = true;</span>
+            String name;
+<span class="pc bpc" id="L1979" title="2 of 4 branches missed.">            if (at &lt; p.length() &amp;&amp; p.charAt(at) == '{') {</span>
+<span class="fc" id="L1980">                int close = p.indexOf('}', at);</span>
+<span class="pc bpc" id="L1981" title="1 of 2 branches missed.">                if (close &lt; 0) {</span>
+<span class="nc" id="L1982">                    throw error(&quot;Unclosed character family&quot;);</span>
+                }
+<span class="fc" id="L1984">                name = p.substring(at + 1, close);</span>
+<span class="fc" id="L1985">                at = close + 1;</span>
+<span class="pc bnc" id="L1986" title="All 2 branches missed.">            } else if (at &lt; p.length()) {</span>
+<span class="nc" id="L1987">                name = String.valueOf(p.charAt(at++));</span>
+            } else {
+<span class="nc" id="L1989">                throw error(&quot;Illegal character family&quot;);</span>
+            }
+<span class="fc" id="L1991">            CharSet s = new CharSet(0);</span>
+            // Under CASE_INSENSITIVE the case classes match either case, as
+            // they have on the JDK since 16 (JDK-8214245): the ASCII ones become
+            // the ASCII letters, the Unicode ones any cased letter.
+<span class="fc" id="L1995">            boolean anyCase = has(CASE_INSENSITIVE);</span>
+<span class="fc bfc" id="L1996" title="All 2 branches covered.">            if (&quot;all&quot;.equals(name)) {</span>
+<span class="fc" id="L1997">                return new CharSet(0).add(0, 0x10ffff);</span>
+            }
+<span class="fc" id="L1999">            CharSet unicode = unicodeProperty(name, anyCase);</span>
+<span class="fc bfc" id="L2000" title="All 2 branches covered.">            if (unicode != null) {</span>
+<span class="fc" id="L2001">                return unicode;</span>
+            }
+            // The Unicode binary properties come from the tables, so they
+            // answer exactly what the JDK does for every code point.
+<span class="fc bfc" id="L2005" title="All 2 branches covered.">            if (name.startsWith(&quot;Is&quot;)) {</span>
+<span class="fc" id="L2006">                CharSet binary = binaryProperty(name.substring(2));</span>
+<span class="fc bfc" id="L2007" title="All 2 branches covered.">                if (binary != null) {</span>
+<span class="fc" id="L2008">                    return binary;</span>
+                }
+            }
+<span class="fc bfc" id="L2011" title="All 4 branches covered.">            if (category(name.startsWith(&quot;Is&quot;) ? name.substring(2) : name) != 0) {</span>
+<span class="fc" id="L2012">                return tableProperty(name);</span>
+            }
+<span class="pc bpc" id="L2014" title="1 of 2 branches missed.">            if (&quot;Lower&quot;.equals(name)) {</span>
+<span class="nc bnc" id="L2015" title="All 2 branches missed.">                return anyCase ? s.add('a', 'z').add('A', 'Z') : s.add('a', 'z');</span>
+            }
+<span class="pc bpc" id="L2017" title="1 of 2 branches missed.">            if (&quot;Upper&quot;.equals(name)) {</span>
+<span class="nc bnc" id="L2018" title="All 2 branches missed.">                return anyCase ? s.add('a', 'z').add('A', 'Z') : s.add('A', 'Z');</span>
+            }
+<span class="pc bpc" id="L2020" title="1 of 2 branches missed.">            if (&quot;ASCII&quot;.equals(name)) {</span>
+<span class="nc" id="L2021">                return s.add(0, 0x7f);</span>
+            }
+<span class="pc bpc" id="L2023" title="1 of 2 branches missed.">            if (&quot;Alpha&quot;.equals(name)) {</span>
+<span class="nc" id="L2024">                return s.add('a', 'z').add('A', 'Z');</span>
+            }
+<span class="pc bpc" id="L2026" title="1 of 2 branches missed.">            if (&quot;Digit&quot;.equals(name)) {</span>
+<span class="nc" id="L2027">                return s.add('0', '9');</span>
+            }
+<span class="pc bpc" id="L2029" title="1 of 2 branches missed.">            if (&quot;Alnum&quot;.equals(name)) {</span>
+<span class="nc" id="L2030">                return s.add('a', 'z').add('A', 'Z').add('0', '9');</span>
+            }
+<span class="pc bpc" id="L2032" title="1 of 2 branches missed.">            if (&quot;Punct&quot;.equals(name)) {</span>
+<span class="nc" id="L2033">                return s.add('!', '/').add(':', '@').add('[', '`').add('{', '~');</span>
+            }
+<span class="pc bpc" id="L2035" title="1 of 2 branches missed.">            if (&quot;Graph&quot;.equals(name)) {</span>
+<span class="nc" id="L2036">                return s.add('!', '~');</span>
+            }
+<span class="pc bpc" id="L2038" title="1 of 2 branches missed.">            if (&quot;Print&quot;.equals(name)) {</span>
+<span class="nc" id="L2039">                return s.add(' ', '~');</span>
+            }
+<span class="pc bpc" id="L2041" title="1 of 2 branches missed.">            if (&quot;Blank&quot;.equals(name)) {</span>
+<span class="nc" id="L2042">                return s.add(' ').add('\t');</span>
+            }
+<span class="pc bpc" id="L2044" title="1 of 2 branches missed.">            if (&quot;Cntrl&quot;.equals(name)) {</span>
+<span class="nc" id="L2045">                return s.add(0, 0x1f).add(0x7f);</span>
+            }
+<span class="pc bpc" id="L2047" title="1 of 2 branches missed.">            if (&quot;XDigit&quot;.equals(name)) {</span>
+<span class="nc" id="L2048">                return s.add('0', '9').add('a', 'f').add('A', 'F');</span>
+            }
+<span class="pc bpc" id="L2050" title="1 of 2 branches missed.">            if (&quot;Space&quot;.equals(name)) {</span>
+<span class="nc" id="L2051">                return s.add(' ').add('\t', '\r');</span>
+            }
+<span class="pc bpc" id="L2053" title="3 of 6 branches missed.">            if (&quot;javaLowerCase&quot;.equals(name) || &quot;Ll&quot;.equals(name) || &quot;IsLl&quot;.equals(name)</span>
+<span class="pc bpc" id="L2054" title="1 of 2 branches missed.">                    || &quot;IsLowercase&quot;.equals(name)) {</span>
+<span class="nc bnc" id="L2055" title="All 2 branches missed.">                return anyCase ? s.kind(CharSet.LOWER | CharSet.UPPER | CharSet.TITLE) : s.kind(CharSet.LOWER);</span>
+            }
+<span class="pc bpc" id="L2057" title="3 of 6 branches missed.">            if (&quot;javaUpperCase&quot;.equals(name) || &quot;Lu&quot;.equals(name) || &quot;IsLu&quot;.equals(name)</span>
+<span class="pc bpc" id="L2058" title="1 of 2 branches missed.">                    || &quot;IsUppercase&quot;.equals(name)) {</span>
+<span class="nc bnc" id="L2059" title="All 2 branches missed.">                return anyCase ? s.kind(CharSet.LOWER | CharSet.UPPER | CharSet.TITLE) : s.kind(CharSet.UPPER);</span>
+            }
+<span class="pc bpc" id="L2061" title="3 of 6 branches missed.">            if (&quot;javaWhitespace&quot;.equals(name) || &quot;IsWhite_Space&quot;.equals(name) || &quot;IsWhiteSpace&quot;.equals(name)) {</span>
+<span class="nc" id="L2062">                return s.kind(CharSet.WHITESPACE);</span>
+            }
+<span class="pc bpc" id="L2064" title="4 of 8 branches missed.">            if (&quot;javaLetter&quot;.equals(name) || &quot;L&quot;.equals(name) || &quot;IsL&quot;.equals(name) || &quot;IsLetter&quot;.equals(name)</span>
+<span class="pc bpc" id="L2065" title="2 of 4 branches missed.">                    || &quot;IsAlphabetic&quot;.equals(name) || &quot;javaAlphabetic&quot;.equals(name)) {</span>
+<span class="nc" id="L2066">                return s.kind(CharSet.LETTER);</span>
+            }
+<span class="pc bpc" id="L2068" title="1 of 2 branches missed.">            if (&quot;javaLetterOrDigit&quot;.equals(name)) {</span>
+<span class="nc" id="L2069">                return s.kind(CharSet.LETTER_OR_DIGIT);</span>
+            }
+<span class="pc bpc" id="L2071" title="4 of 8 branches missed.">            if (&quot;javaDigit&quot;.equals(name) || &quot;N&quot;.equals(name) || &quot;Nd&quot;.equals(name) || &quot;IsN&quot;.equals(name)</span>
+<span class="pc bpc" id="L2072" title="2 of 4 branches missed.">                    || &quot;IsNd&quot;.equals(name) || &quot;IsDigit&quot;.equals(name)) {</span>
+<span class="nc" id="L2073">                return s.kind(CharSet.DIGIT);</span>
+            }
+<span class="fc" id="L2075">            CharSet table = tableProperty(name);</span>
+<span class="pc bpc" id="L2076" title="1 of 2 branches missed.">            if (table != null) {</span>
+<span class="fc" id="L2077">                return table;</span>
+            }
+<span class="nc" id="L2079">            throw unsupported(&quot;The character property {&quot; + name + &quot;}&quot;);</span>
+        }
+
+        private static CharSet categories(int mask) {
+<span class="fc" id="L2083">            CharSet s = new CharSet(0);</span>
+<span class="fc" id="L2084">            s.categories = mask;</span>
+<span class="fc" id="L2085">            return s;</span>
+        }
+
+        /// The POSIX classes under `UNICODE_CHARACTER_CLASS`, or null.
+        private CharSet unicodeProperty(String name, boolean anyCase) {
+<span class="fc bfc" id="L2090" title="All 2 branches covered.">            if (!has(UNICODE_CHARACTER_CLASS)) {</span>
+<span class="fc" id="L2091">                return null;</span>
+            }
+<span class="fc" id="L2093">            CharSet s = new CharSet(0);</span>
+<span class="pc bpc" id="L2094" title="1 of 2 branches missed.">            if (&quot;Lower&quot;.equals(name)) {</span>
+<span class="nc bnc" id="L2095" title="All 2 branches missed.">                return anyCase ? s.kind(CharSet.U_LOWER | CharSet.U_UPPER).unite(categories(1 &lt;&lt; Character.TITLECASE_LETTER))</span>
+<span class="nc" id="L2096">                        : s.kind(CharSet.U_LOWER);</span>
+            }
+<span class="pc bpc" id="L2098" title="1 of 2 branches missed.">            if (&quot;Upper&quot;.equals(name)) {</span>
+<span class="nc bnc" id="L2099" title="All 2 branches missed.">                return anyCase ? s.kind(CharSet.U_LOWER | CharSet.U_UPPER).unite(categories(1 &lt;&lt; Character.TITLECASE_LETTER))</span>
+<span class="nc" id="L2100">                        : s.kind(CharSet.U_UPPER);</span>
+            }
+<span class="pc bpc" id="L2102" title="1 of 2 branches missed.">            if (&quot;Alpha&quot;.equals(name)) {</span>
+<span class="fc" id="L2103">                return s.kind(CharSet.U_ALPHABETIC);</span>
+            }
+<span class="nc bnc" id="L2105" title="All 2 branches missed.">            if (&quot;Digit&quot;.equals(name)) {</span>
+<span class="nc" id="L2106">                return categories(1 &lt;&lt; Character.DECIMAL_DIGIT_NUMBER);</span>
+            }
+<span class="nc bnc" id="L2108" title="All 2 branches missed.">            if (&quot;Alnum&quot;.equals(name)) {</span>
+<span class="nc" id="L2109">                return s.kind(CharSet.U_ALPHABETIC).unite(categories(1 &lt;&lt; Character.DECIMAL_DIGIT_NUMBER));</span>
+            }
+<span class="nc bnc" id="L2111" title="All 2 branches missed.">            if (&quot;Punct&quot;.equals(name)) {</span>
+<span class="nc" id="L2112">                return categories(PUNCTUATION);</span>
+            }
+<span class="nc bnc" id="L2114" title="All 2 branches missed.">            if (&quot;Graph&quot;.equals(name)) {</span>
+<span class="nc" id="L2115">                return s.kind(CharSet.U_GRAPH);</span>
+            }
+<span class="nc bnc" id="L2117" title="All 2 branches missed.">            if (&quot;Print&quot;.equals(name)) {</span>
+<span class="nc" id="L2118">                return s.kind(CharSet.U_PRINT);</span>
+            }
+<span class="nc bnc" id="L2120" title="All 2 branches missed.">            if (&quot;Blank&quot;.equals(name)) {</span>
+<span class="nc" id="L2121">                return s.kind(CharSet.U_BLANK);</span>
+            }
+<span class="nc bnc" id="L2123" title="All 2 branches missed.">            if (&quot;Cntrl&quot;.equals(name)) {</span>
+<span class="nc" id="L2124">                return categories(1 &lt;&lt; Character.CONTROL);</span>
+            }
+<span class="nc bnc" id="L2126" title="All 2 branches missed.">            if (&quot;XDigit&quot;.equals(name)) {</span>
+<span class="nc" id="L2127">                return s.kind(CharSet.U_HEX_DIGIT);</span>
+            }
+<span class="nc bnc" id="L2129" title="All 2 branches missed.">            if (&quot;Space&quot;.equals(name)) {</span>
+<span class="nc" id="L2130">                return s.kind(CharSet.U_WHITE_SPACE);</span>
+            }
+<span class="nc" id="L2132">            return null;</span>
+        }
+
+        private static final int PUNCTUATION = 1 &lt;&lt; Character.CONNECTOR_PUNCTUATION | 1 &lt;&lt; Character.DASH_PUNCTUATION
+                | 1 &lt;&lt; Character.START_PUNCTUATION | 1 &lt;&lt; Character.END_PUNCTUATION
+                | 1 &lt;&lt; Character.OTHER_PUNCTUATION | 1 &lt;&lt; Character.INITIAL_QUOTE_PUNCTUATION
+                | 1 &lt;&lt; Character.FINAL_QUOTE_PUNCTUATION;
+
+        /// The general category masks, by the names the JDK accepts.
+        private static int category(String name) {
+<span class="fc" id="L2142">            String[] single = {&quot;Cn&quot;, &quot;Lu&quot;, &quot;Ll&quot;, &quot;Lt&quot;, &quot;Lm&quot;, &quot;Lo&quot;, &quot;Mn&quot;, &quot;Me&quot;, &quot;Mc&quot;, &quot;Nd&quot;, &quot;Nl&quot;, &quot;No&quot;, &quot;Zs&quot;, &quot;Zl&quot;,</span>
+                &quot;Zp&quot;, &quot;Cc&quot;, &quot;Cf&quot;, null, &quot;Co&quot;, &quot;Cs&quot;, &quot;Pd&quot;, &quot;Ps&quot;, &quot;Pe&quot;, &quot;Pc&quot;, &quot;Po&quot;, &quot;Sm&quot;, &quot;Sc&quot;, &quot;Sk&quot;, &quot;So&quot;, &quot;Pi&quot;, &quot;Pf&quot;};
+<span class="fc bfc" id="L2144" title="All 2 branches covered.">            for (int k = 0; k &lt; single.length; k++) {</span>
+<span class="fc bfc" id="L2145" title="All 2 branches covered.">                if (name.equals(single[k])) {</span>
+<span class="fc" id="L2146">                    return 1 &lt;&lt; k;</span>
+                }
+            }
+<span class="fc bfc" id="L2149" title="All 2 branches covered.">            if (name.length() == 1) {</span>
+<span class="fc" id="L2150">                int mask = 0;</span>
+<span class="fc bfc" id="L2151" title="All 2 branches covered.">                for (int k = 0; k &lt; single.length; k++) {</span>
+<span class="fc bfc" id="L2152" title="All 4 branches covered.">                    if (single[k] != null &amp;&amp; single[k].charAt(0) == name.charAt(0)) {</span>
+<span class="fc" id="L2153">                        mask |= 1 &lt;&lt; k;</span>
+                    }
+                }
+<span class="fc" id="L2156">                return mask;</span>
+            }
+<span class="pc bpc" id="L2158" title="1 of 2 branches missed.">            if (&quot;LC&quot;.equals(name)) {</span>
+<span class="nc" id="L2159">                return 1 &lt;&lt; Character.UPPERCASE_LETTER | 1 &lt;&lt; Character.LOWERCASE_LETTER</span>
+                        | 1 &lt;&lt; Character.TITLECASE_LETTER;
+            }
+<span class="fc" id="L2162">            return 0;</span>
+        }
+
+        /// Scripts, blocks and general categories, from [UnicodeTables];
+        /// null for a name that is none of them.
+        private CharSet tableProperty(String name) {
+<span class="fc" id="L2168">            int eq = name.indexOf('=');</span>
+<span class="fc bfc" id="L2169" title="All 2 branches covered.">            if (eq &gt;= 0) {</span>
+<span class="fc" id="L2170">                String key = name.substring(0, eq);</span>
+<span class="fc" id="L2171">                String value = name.substring(eq + 1);</span>
+<span class="pc bpc" id="L2172" title="1 of 4 branches missed.">                if (&quot;script&quot;.equals(key) || &quot;sc&quot;.equals(key)) {</span>
+<span class="fc" id="L2173">                    return script(value);</span>
+                }
+<span class="pc bpc" id="L2175" title="1 of 4 branches missed.">                if (&quot;block&quot;.equals(key) || &quot;blk&quot;.equals(key)) {</span>
+<span class="fc" id="L2176">                    return block(value);</span>
+                }
+<span class="pc bpc" id="L2178" title="2 of 4 branches missed.">                if (&quot;general_category&quot;.equals(key) || &quot;gc&quot;.equals(key)) {</span>
+<span class="fc" id="L2179">                    int mask = category(value);</span>
+<span class="pc bpc" id="L2180" title="1 of 2 branches missed.">                    return mask == 0 ? null : caseless(mask);</span>
+                }
+<span class="nc" id="L2182">                return null;</span>
+            }
+<span class="fc bfc" id="L2184" title="All 2 branches covered.">            if (name.startsWith(&quot;In&quot;)) {</span>
+<span class="fc" id="L2185">                return block(name.substring(2));</span>
+            }
+<span class="fc bfc" id="L2187" title="All 2 branches covered.">            if (name.startsWith(&quot;Is&quot;)) {</span>
+<span class="fc" id="L2188">                String rest = name.substring(2);</span>
+<span class="fc" id="L2189">                CharSet binary = binaryProperty(rest);</span>
+<span class="pc bpc" id="L2190" title="1 of 2 branches missed.">                if (binary != null) {</span>
+<span class="nc" id="L2191">                    return binary;</span>
+                }
+<span class="fc" id="L2193">                int mask = category(rest);</span>
+<span class="fc bfc" id="L2194" title="All 2 branches covered.">                if (mask != 0) {</span>
+<span class="fc" id="L2195">                    return caseless(mask);</span>
+                }
+<span class="fc" id="L2197">                return script(rest);</span>
+            }
+<span class="fc" id="L2199">            int mask = category(name);</span>
+<span class="pc bpc" id="L2200" title="1 of 2 branches missed.">            return mask == 0 ? null : caseless(mask);</span>
+        }
+
+        /// The set a general category names. Under `CASE_INSENSITIVE` a case
+        /// category matches every cased character, as the JDK's does.
+        private CharSet caseless(int mask) {
+<span class="fc" id="L2206">            int cased = 1 &lt;&lt; Character.UPPERCASE_LETTER | 1 &lt;&lt; Character.LOWERCASE_LETTER</span>
+                    | 1 &lt;&lt; Character.TITLECASE_LETTER;
+<span class="pc bpc" id="L2208" title="1 of 4 branches missed.">            return categories(has(CASE_INSENSITIVE) &amp;&amp; (mask &amp; cased) != 0 ? mask | cased : mask);</span>
+        }
+
+        /// The JDK's binary properties that these tables can answer, named
+        /// without regard to case as the JDK reads them; null for any other.
+        private CharSet binaryProperty(String name) {
+<span class="fc" id="L2214">            StringBuilder folded = new StringBuilder(name.length());</span>
+<span class="fc bfc" id="L2215" title="All 2 branches covered.">            for (int k = 0; k &lt; name.length(); k++) {</span>
+<span class="fc" id="L2216">                char c = name.charAt(k);</span>
+<span class="pc bpc" id="L2217" title="1 of 4 branches missed.">                folded.append(c &gt;= 'a' &amp;&amp; c &lt;= 'z' ? (char) (c - 32) : c);</span>
+            }
+<span class="fc" id="L2219">            String key = folded.toString();</span>
+<span class="fc" id="L2220">            CharSet s = new CharSet(0);</span>
+<span class="pc bpc" id="L2221" title="1 of 2 branches missed.">            if (&quot;ALPHABETIC&quot;.equals(key)) {</span>
+<span class="nc" id="L2222">                return s.kind(CharSet.U_ALPHABETIC);</span>
+            }
+<span class="pc bpc" id="L2224" title="1 of 2 branches missed.">            if (&quot;DIGIT&quot;.equals(key)) {</span>
+<span class="nc" id="L2225">                return categories(1 &lt;&lt; Character.DECIMAL_DIGIT_NUMBER);</span>
+            }
+<span class="fc bfc" id="L2227" title="All 2 branches covered.">            if (&quot;PUNCTUATION&quot;.equals(key)) {</span>
+<span class="fc" id="L2228">                return categories(PUNCTUATION);</span>
+            }
+<span class="pc bpc" id="L2230" title="1 of 2 branches missed.">            if (&quot;CONTROL&quot;.equals(key)) {</span>
+<span class="nc" id="L2231">                return categories(1 &lt;&lt; Character.CONTROL);</span>
+            }
+<span class="pc bpc" id="L2233" title="1 of 2 branches missed.">            if (&quot;ASSIGNED&quot;.equals(key)) {</span>
+<span class="nc" id="L2234">                return categories(1 &lt;&lt; Character.UNASSIGNED).not();</span>
+            }
+<span class="pc bpc" id="L2236" title="2 of 4 branches missed.">            if (&quot;HEXDIGIT&quot;.equals(key) || &quot;HEX_DIGIT&quot;.equals(key)) {</span>
+<span class="nc" id="L2237">                return s.kind(CharSet.U_HEX_DIGIT);</span>
+            }
+<span class="pc bpc" id="L2239" title="1 of 4 branches missed.">            if (&quot;JOINCONTROL&quot;.equals(key) || &quot;JOIN_CONTROL&quot;.equals(key)) {</span>
+<span class="fc" id="L2240">                return s.add(0x200c, 0x200d);</span>
+            }
+<span class="pc bpc" id="L2242" title="1 of 4 branches missed.">            if (&quot;NONCHARACTERCODEPOINT&quot;.equals(key) || &quot;NONCHARACTER_CODE_POINT&quot;.equals(key)) {</span>
+<span class="fc" id="L2243">                s.add(0xfdd0, 0xfdef);</span>
+<span class="fc bfc" id="L2244" title="All 2 branches covered.">                for (int plane = 0; plane &lt;= 0x10; plane++) {</span>
+<span class="fc" id="L2245">                    s.add(plane * 0x10000 + 0xfffe, plane * 0x10000 + 0xffff);</span>
+                }
+<span class="fc" id="L2247">                return s;</span>
+            }
+<span class="pc bpc" id="L2249" title="1 of 4 branches missed.">            if (&quot;WHITESPACE&quot;.equals(key) || &quot;WHITE_SPACE&quot;.equals(key)) {</span>
+<span class="fc" id="L2250">                return s.kind(CharSet.U_WHITE_SPACE);</span>
+            }
+<span class="pc bpc" id="L2252" title="1 of 2 branches missed.">            if (&quot;WORD&quot;.equals(key)) {</span>
+<span class="nc" id="L2253">                return s.kind(CharSet.U_WORD);</span>
+            }
+<span class="pc bpc" id="L2255" title="1 of 2 branches missed.">            if (&quot;ALNUM&quot;.equals(key)) {</span>
+<span class="nc" id="L2256">                return s.kind(CharSet.U_ALPHABETIC).unite(categories(1 &lt;&lt; Character.DECIMAL_DIGIT_NUMBER));</span>
+            }
+<span class="pc bpc" id="L2258" title="1 of 2 branches missed.">            if (&quot;BLANK&quot;.equals(key)) {</span>
+<span class="nc" id="L2259">                return s.kind(CharSet.U_BLANK);</span>
+            }
+<span class="pc bpc" id="L2261" title="1 of 2 branches missed.">            if (&quot;GRAPH&quot;.equals(key)) {</span>
+<span class="nc" id="L2262">                return s.kind(CharSet.U_GRAPH);</span>
+            }
+<span class="pc bpc" id="L2264" title="1 of 2 branches missed.">            if (&quot;PRINT&quot;.equals(key)) {</span>
+<span class="nc" id="L2265">                return s.kind(CharSet.U_PRINT);</span>
+            }
+<span class="fc" id="L2267">            boolean anyCase = has(CASE_INSENSITIVE);</span>
+<span class="fc" id="L2268">            int cased = 1 &lt;&lt; Character.TITLECASE_LETTER;</span>
+<span class="pc bpc" id="L2269" title="1 of 2 branches missed.">            if (&quot;LOWERCASE&quot;.equals(key)) {</span>
+<span class="nc bnc" id="L2270" title="All 2 branches missed.">                return anyCase ? s.kind(CharSet.U_LOWER | CharSet.U_UPPER).unite(categories(cased)) : s.kind(CharSet.U_LOWER);</span>
+            }
+<span class="pc bpc" id="L2272" title="1 of 2 branches missed.">            if (&quot;UPPERCASE&quot;.equals(key)) {</span>
+<span class="nc bnc" id="L2273" title="All 2 branches missed.">                return anyCase ? s.kind(CharSet.U_LOWER | CharSet.U_UPPER).unite(categories(cased)) : s.kind(CharSet.U_UPPER);</span>
+            }
+<span class="fc bfc" id="L2275" title="All 2 branches covered.">            if (&quot;TITLECASE&quot;.equals(key)) {</span>
+<span class="fc bfc" id="L2276" title="All 2 branches covered.">                return anyCase ? s.kind(CharSet.U_LOWER | CharSet.U_UPPER).unite(categories(cased)) : categories(cased);</span>
+            }
+<span class="pc bpc" id="L2278" title="1 of 2 branches missed.">            if (&quot;LETTER&quot;.equals(key)) {</span>
+<span class="nc" id="L2279">                return categories(1 &lt;&lt; Character.UPPERCASE_LETTER | 1 &lt;&lt; Character.LOWERCASE_LETTER</span>
+                        | cased | 1 &lt;&lt; Character.MODIFIER_LETTER | 1 &lt;&lt; Character.OTHER_LETTER);
+            }
+<span class="fc" id="L2282">            return null;</span>
+        }
+
+        private static CharSet script(String name) {
+<span class="fc" id="L2286">            int index = UnicodeTables.script(name);</span>
+<span class="pc bpc" id="L2287" title="1 of 2 branches missed.">            if (index &lt; 0) {</span>
+<span class="nc" id="L2288">                return null;</span>
+            }
+<span class="fc" id="L2290">            CharSet s = new CharSet(0);</span>
+<span class="fc" id="L2291">            s.script = index;</span>
+<span class="fc" id="L2292">            return s;</span>
+        }
+
+        private static CharSet block(String name) {
+<span class="fc" id="L2296">            int[] range = UnicodeTables.block(name);</span>
+<span class="pc bpc" id="L2297" title="1 of 2 branches missed.">            return range == null ? null : new CharSet(0).add(range[0], range[1]);</span>
+        }
+
+        private Piece escape() {
+<span class="pc bpc" id="L2301" title="1 of 2 branches missed.">            if (at &gt;= p.length()) {</span>
+<span class="nc" id="L2302">                throw error(&quot;Unexpected internal error&quot;);</span>
+            }
+<span class="fc" id="L2304">            char e = p.charAt(at++);</span>
+<span class="fc" id="L2305">            boolean unix = has(UNIX_LINES);</span>
+<span class="pc bpc" id="L2306" title="7 of 11 branches missed.">            switch (e) {</span>
+                case 'A':
+<span class="nc" id="L2308">                    return Piece.of(new Anchor(Anchor.BEGIN, unix), 0);</span>
+                case 'z':
+<span class="nc" id="L2310">                    return Piece.of(new Anchor(Anchor.END, unix), 0);</span>
+                case 'Z':
+<span class="nc" id="L2312">                    return Piece.of(new Anchor(Anchor.END_OR_FINAL_TERMINATOR, unix), 0);</span>
+                case 'G':
+<span class="nc" id="L2314">                    return Piece.of(new Anchor(Anchor.LAST_MATCH, unix), 0);</span>
+                case 'b': {
+                    // Only \b{g} is a grapheme boundary; \b{2} is a word
+                    // boundary under a counted quantifier, as in the JDK.
+<span class="pc bpc" id="L2318" title="1 of 6 branches missed.">                    if (at + 1 &lt; p.length() &amp;&amp; p.charAt(at) == '{' &amp;&amp; p.charAt(at + 1) == 'g') {</span>
+<span class="nc" id="L2319">                        throw unsupported(&quot;The boundary \\b{g}&quot;);</span>
+                    }
+<span class="fc" id="L2321">                    Anchor word = new Anchor(Anchor.WORD, unix);</span>
+<span class="fc" id="L2322">                    word.unicode = has(UNICODE_CHARACTER_CLASS);</span>
+<span class="fc" id="L2323">                    return Piece.of(word, 0);</span>
+                }
+                case 'B': {
+<span class="fc" id="L2326">                    Anchor word = new Anchor(Anchor.NOT_WORD, unix);</span>
+<span class="fc" id="L2327">                    word.unicode = has(UNICODE_CHARACTER_CLASS);</span>
+<span class="fc" id="L2328">                    return Piece.of(word, 0);</span>
+                }
+                case 'X':
+<span class="nc" id="L2331">                    throw unsupported(&quot;The grapheme cluster \\X&quot;);</span>
+                case 'N':
+<span class="nc" id="L2333">                    throw unsupported(&quot;The named character \\N{...}&quot;);</span>
+                case 'R': {
+                    // \r\n as one, or any single line end. Not atomic: when
+                    // what follows needs the \n, the pair splits and \R takes
+                    // the \r alone, as Java 9 and later do (&quot;\R\R&quot; matches
+                    // &quot;\r\n&quot;).
+<span class="fc" id="L2339">                    Piece crlf = Piece.of(new Char('\r'), 1);</span>
+<span class="fc" id="L2340">                    crlf.then(Piece.of(new Char('\n'), 1));</span>
+<span class="fc" id="L2341">                    Piece one = single(new InClass(vertical()));</span>
+<span class="fc" id="L2342">                    Pass join = new Pass();</span>
+<span class="fc" id="L2343">                    crlf.last.next = join;</span>
+<span class="fc" id="L2344">                    one.last.next = join;</span>
+<span class="fc" id="L2345">                    Piece lineEnd = new Piece(new Branch(new Node[] {crlf.first, one.first}), join, 1, 2);</span>
+<span class="fc" id="L2346">                    lineEnd.deterministic = false;</span>
+<span class="fc" id="L2347">                    lineEnd.lineEnding = true;</span>
+<span class="fc" id="L2348">                    return lineEnd;</span>
+                }
+                case 'k': {
+<span class="nc bnc" id="L2351" title="All 4 branches missed.">                    if (at &gt;= p.length() || p.charAt(at) != '&lt;') {</span>
+<span class="nc" id="L2352">                        throw error(&quot;\\k is not followed by '&lt;' for named capturing group&quot;);</span>
+                    }
+<span class="nc" id="L2354">                    at++;</span>
+<span class="nc" id="L2355">                    String name = groupName('&gt;');</span>
+<span class="nc" id="L2356">                    Integer group = names.get(name);</span>
+<span class="nc bnc" id="L2357" title="All 2 branches missed.">                    if (group == null) {</span>
+<span class="nc" id="L2358">                        throw error(&quot;named capturing group &lt;&quot; + name + &quot;&gt; does not exist&quot;);</span>
+                    }
+<span class="nc" id="L2360">                    unboundedGroups++;</span>
+<span class="nc" id="L2361">                    return Piece.of(new BackReference(group.intValue(), has(CASE_INSENSITIVE), has(UNICODE_CASE)), 0)</span>
+<span class="nc" id="L2362">                            .unbounded();</span>
+                }
+                default:
+                    break;
+            }
+<span class="pc bpc" id="L2367" title="1 of 4 branches missed.">            if (e &gt;= '1' &amp;&amp; e &lt;= '9') {</span>
+<span class="fc" id="L2368">                int group = e - '0';</span>
+<span class="pc bpc" id="L2369" title="5 of 6 branches missed.">                while (at &lt; p.length() &amp;&amp; p.charAt(at) &gt;= '0' &amp;&amp; p.charAt(at) &lt;= '9') {</span>
+<span class="nc" id="L2370">                    int more = group * 10 + (p.charAt(at) - '0');</span>
+<span class="nc bnc" id="L2371" title="All 2 branches missed.">                    if (more &gt; groups) {</span>
+<span class="nc" id="L2372">                        break;</span>
+                    }
+<span class="nc" id="L2374">                    group = more;</span>
+<span class="nc" id="L2375">                    at++;</span>
+<span class="nc" id="L2376">                }</span>
+                // A back reference has no maximum length either.
+<span class="fc" id="L2378">                unboundedGroups++;</span>
+<span class="fc" id="L2379">                return Piece.of(new BackReference(group, has(CASE_INSENSITIVE), has(UNICODE_CASE)), 0).unbounded();</span>
+            }
+<span class="fc" id="L2381">            CharSet set = escapedClass(e);</span>
+<span class="fc bfc" id="L2382" title="All 2 branches covered.">            if (set != null) {</span>
+<span class="fc" id="L2383">                return single(new InClass(set));</span>
+            }
+<span class="fc" id="L2385">            int c = escapedChar(e);</span>
+<span class="fc bfc" id="L2386" title="All 2 branches covered.">            if (c &gt;= 0) {</span>
+<span class="fc" id="L2387">                return literal(c);</span>
+            }
+<span class="pc bpc" id="L2389" title="1 of 2 branches missed.">            if (asciiLetter(e)) {</span>
+<span class="nc" id="L2390">                at--;</span>
+<span class="nc" id="L2391">                throw error(&quot;Illegal/unsupported escape sequence&quot;);</span>
+            }
+            // An escaped code point above U+FFFF is one atom, both halves.
+<span class="fc" id="L2394">            at--;</span>
+<span class="fc" id="L2395">            return literal(patternCodePoint());</span>
+        }
+
+        /// A class, with `at` after its opening bracket; consumes the
+        /// closing one.
+        private CharSet characterClass() {
+<span class="fc" id="L2401">            boolean negate = false;</span>
+<span class="pc bpc" id="L2402" title="1 of 4 branches missed.">            if (at &lt; p.length() &amp;&amp; p.charAt(at) == '^') {</span>
+<span class="fc" id="L2403">                negate = true;</span>
+<span class="fc" id="L2404">                at++;</span>
+            }
+<span class="fc" id="L2406">            CharSet set = classBody();</span>
+<span class="fc" id="L2407">            set.negate = negate;</span>
+<span class="fc" id="L2408">            return set;</span>
+        }
+
+        private CharSet classBody() {
+<span class="fc" id="L2412">            CharSet set = newSet();</span>
+<span class="fc" id="L2413">            boolean first = true;</span>
+            while (true) {
+<span class="pc bpc" id="L2415" title="1 of 2 branches missed.">                if (has(COMMENTS)) {</span>
+<span class="nc" id="L2416">                    skipComments();</span>
+                }
+<span class="pc bpc" id="L2418" title="1 of 2 branches missed.">                if (at &gt;= p.length()) {</span>
+<span class="nc" id="L2419">                    throw error(&quot;Unclosed character class&quot;);</span>
+                }
+<span class="fc" id="L2421">                char c = p.charAt(at);</span>
+<span class="pc bpc" id="L2422" title="1 of 4 branches missed.">                if (c == ']' &amp;&amp; !first) {</span>
+<span class="fc" id="L2423">                    at++;</span>
+<span class="fc" id="L2424">                    return set;</span>
+                }
+<span class="fc" id="L2426">                first = false;</span>
+<span class="pc bpc" id="L2427" title="1 of 2 branches missed.">                if (c == '[') {</span>
+<span class="nc" id="L2428">                    at++;</span>
+<span class="nc" id="L2429">                    set.unite(characterClass());</span>
+<span class="nc" id="L2430">                    continue;</span>
+                }
+                // &quot;[a&amp;&amp;&amp;b]&quot; is an intersection with &quot;&amp;b&quot; here; the JDK reads
+                // the third '&amp;' as a literal of the left operand. Its reading
+                // of several &amp;&amp; in one class, or of one with an empty left
+                // side (&quot;[&amp;&amp;[a]b&amp;&amp;[c]]&quot;), does not follow its own grammar
+                // either. Nobody writes those on purpose, so the plainer
+                // reading stands.
+<span class="pc bpc" id="L2438" title="5 of 6 branches missed.">                if (c == '&amp;' &amp;&amp; at + 1 &lt; p.length() &amp;&amp; p.charAt(at + 1) == '&amp;') {</span>
+<span class="nc" id="L2439">                    at += 2;</span>
+<span class="nc bnc" id="L2440" title="All 4 branches missed.">                    if (at &lt; p.length() &amp;&amp; p.charAt(at) == ']') {</span>
+                        // Nothing to intersect with.
+<span class="nc" id="L2442">                        continue;</span>
+                    }
+                    // Everything after &amp;&amp; is the other operand, up to the
+                    // bracket that closes this class.
+<span class="nc" id="L2446">                    CharSet right = classBody();</span>
+<span class="nc bnc" id="L2447" title="All 2 branches missed.">                    if (set.isEmpty()) {</span>
+<span class="nc" id="L2448">                        return right;</span>
+                    }
+<span class="nc" id="L2450">                    set.and = right;</span>
+<span class="nc" id="L2451">                    return set;</span>
+                }
+                int lo;
+<span class="fc bfc" id="L2454" title="All 2 branches covered.">                if (c == '\\') {</span>
+<span class="fc" id="L2455">                    at++;</span>
+<span class="pc bpc" id="L2456" title="1 of 2 branches missed.">                    if (at &gt;= p.length()) {</span>
+<span class="nc" id="L2457">                        throw error(&quot;Unclosed character class&quot;);</span>
+                    }
+<span class="fc" id="L2459">                    char e = p.charAt(at++);</span>
+<span class="fc bfc" id="L2460" title="All 2 branches covered.">                    if (e == 'Q') {</span>
+<span class="fc" id="L2461">                        int end = p.indexOf(&quot;\\E&quot;, at);</span>
+<span class="pc bpc" id="L2462" title="1 of 2 branches missed.">                        if (end &lt; 0) {</span>
+<span class="nc" id="L2463">                            throw error(&quot;Unclosed character class&quot;);</span>
+                        }
+<span class="fc bfc" id="L2465" title="All 2 branches covered.">                        while (at &lt; end) {</span>
+<span class="fc" id="L2466">                            int cp = codePointAt(p, at, end);</span>
+<span class="fc" id="L2467">                            set.add(note(cp));</span>
+<span class="pc bpc" id="L2468" title="1 of 2 branches missed.">                            at += cp &gt; 0xffff ? 2 : 1;</span>
+<span class="fc" id="L2469">                        }</span>
+<span class="fc" id="L2470">                        at = end + 2;</span>
+<span class="fc" id="L2471">                        continue;</span>
+                    }
+<span class="pc bpc" id="L2473" title="1 of 2 branches missed.">                    if (e == 'E') {</span>
+<span class="nc" id="L2474">                        continue;</span>
+                    }
+<span class="fc" id="L2476">                    CharSet named = escapedClass(e);</span>
+<span class="fc bfc" id="L2477" title="All 2 branches covered.">                    if (named != null) {</span>
+<span class="fc" id="L2478">                        set.unite(named);</span>
+<span class="fc" id="L2479">                        continue;</span>
+                    }
+<span class="fc" id="L2481">                    lo = escapedChar(e);</span>
+<span class="pc bpc" id="L2482" title="1 of 2 branches missed.">                    if (lo &lt; 0) {</span>
+<span class="nc bnc" id="L2483" title="All 6 branches missed.">                        if (asciiLetter(e) || e &gt;= '0' &amp;&amp; e &lt;= '9') {</span>
+<span class="nc" id="L2484">                            at--;</span>
+<span class="nc" id="L2485">                            throw error(&quot;Illegal/unsupported escape sequence&quot;);</span>
+                        }
+<span class="nc" id="L2487">                        lo = e;</span>
+                    }
+<span class="fc" id="L2489">                } else {</span>
+<span class="fc" id="L2490">                    lo = patternCodePoint();</span>
+                }
+<span class="fc" id="L2492">                int hi = lo;</span>
+<span class="pc bpc" id="L2493" title="2 of 6 branches missed.">                if (at + 1 &lt; p.length() &amp;&amp; p.charAt(at) == '-' &amp;&amp; p.charAt(at + 1) != ']'</span>
+<span class="pc bpc" id="L2494" title="1 of 2 branches missed.">                        &amp;&amp; p.charAt(at + 1) != '[') {</span>
+<span class="fc" id="L2495">                    at++;</span>
+<span class="fc" id="L2496">                    int h = patternCodePoint();</span>
+<span class="fc bfc" id="L2497" title="All 2 branches covered.">                    if (h == '\\') {</span>
+<span class="pc bpc" id="L2498" title="1 of 2 branches missed.">                        if (at &gt;= p.length()) {</span>
+<span class="nc" id="L2499">                            throw error(&quot;Unclosed character class&quot;);</span>
+                        }
+<span class="fc" id="L2501">                        char e = p.charAt(at++);</span>
+<span class="fc" id="L2502">                        hi = escapedChar(e);</span>
+<span class="pc bpc" id="L2503" title="1 of 2 branches missed.">                        if (hi &lt; 0) {</span>
+<span class="nc bnc" id="L2504" title="All 2 branches missed.">                            if (asciiLetter(e)) {</span>
+<span class="nc" id="L2505">                                at--;</span>
+<span class="nc" id="L2506">                                throw error(&quot;Illegal character range&quot;);</span>
+                            }
+<span class="nc" id="L2508">                            hi = e;</span>
+                        }
+<span class="fc" id="L2510">                    } else {</span>
+<span class="fc" id="L2511">                        hi = h;</span>
+                    }
+<span class="pc bpc" id="L2513" title="1 of 2 branches missed.">                    if (hi &lt; lo) {</span>
+<span class="nc" id="L2514">                        throw error(&quot;Illegal character range&quot;);</span>
+                    }
+                }
+<span class="fc" id="L2517">                note(lo);</span>
+<span class="fc" id="L2518">                note(hi);</span>
+<span class="pc bpc" id="L2519" title="1 of 4 branches missed.">                if (lo &lt; 0xd800 &amp;&amp; hi &gt; 0xdfff) {</span>
+<span class="nc" id="L2520">                    supplementary = true;</span>
+                }
+<span class="fc" id="L2522">                set.add(lo, hi);</span>
+                // A single member under UNICODE_CASE also stands for its folded
+                // form, as the JDK compares them: [\u0131] takes &quot;I&quot;.
+<span class="pc bpc" id="L2525" title="1 of 6 branches missed.">                if (lo == hi &amp;&amp; has(CASE_INSENSITIVE) &amp;&amp; has(UNICODE_CASE)) {</span>
+<span class="fc" id="L2526">                    int folded = Character.toLowerCase(Character.toUpperCase(lo));</span>
+<span class="fc bfc" id="L2527" title="All 2 branches covered.">                    if (folded != lo) {</span>
+<span class="fc" id="L2528">                        set.add(folded);</span>
+                    }
+                }
+<span class="fc" id="L2531">            }</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

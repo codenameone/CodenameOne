@@ -1,0 +1,729 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AnimatedModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming</a> &gt; <span class="el_source">AnimatedModel.java</span></div><h1>AnimatedModel.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gaming;
+
+import com.codename1.gpu.GltfScene;
+import com.codename1.gpu.GraphicsDevice;
+import com.codename1.gpu.IndexBuffer;
+import com.codename1.gpu.Material;
+import com.codename1.gpu.Mesh;
+import com.codename1.gpu.PrimitiveType;
+import com.codename1.gpu.Quaternion;
+import com.codename1.gpu.RenderState;
+import com.codename1.gpu.Texture;
+import com.codename1.gpu.VertexBuffer;
+import com.codename1.gpu.VertexFormat;
+
+/// One posed, animated instance of a `GltfScene`: a character, a creature, a
+/// door that swings. It plays the scene's animation clips, cross fades between
+/// them, deforms skinned parts with their skeleton and carries rigid parts
+/// (a sword in a hand bone, a helmet on the head) along with the bones they
+/// hang from.
+///
+/// Each triangle primitive of the scene becomes one `Model` with its own
+/// vertex buffer, so add the instance to a view with `addTo(GameView)` and move
+/// it with `setPosition`, `setRotation` and `setScale` -- every part follows.
+/// Skinning runs on the CPU and re-uploads the posed vertices when the pose
+/// changes, which keeps it identical on every port and needs nothing from the
+/// shaders.
+///
+/// Many instances can share one scene: the vertex data, the clips and the
+/// uploaded textures are shared; only the posed buffers are per instance.
+///
+/// ```java
+/// import com.codename1.gaming.*;
+/// import com.codename1.gpu.*;
+/// import com.codename1.io.Log;
+/// import com.codename1.ui.*;
+/// import com.codename1.ui.layouts.BorderLayout;
+/// import java.io.InputStream;
+///
+/// class Knight extends GameView {
+///     private AnimatedModel unit;
+///
+///     protected void onSetup(GraphicsDevice device) {
+///         try {
+///             InputStream in = Display.getInstance().getResourceAsStream(getClass(), &quot;/knight.glb&quot;);
+///             GltfScene knight = GltfLoader.loadScene(in);
+///             in.close();
+///             unit = new AnimatedModel(device, knight);
+///             unit.hideNode(&quot;Shield_Spike&quot;);          // the file carries every prop
+///             unit.play(&quot;Walking_A&quot;, true);
+///             unit.addTo(this);
+///         } catch (Exception err) {
+///             Log.e(err);
+///         }
+///     }
+///
+///     protected void update(double deltaSeconds) {
+///         if (unit != null) {
+///             unit.update((float) deltaSeconds);
+///         }
+///     }
+///
+///     void attack() {
+///         unit.crossFade(&quot;1H_Melee_Attack_Chop&quot;, 0.15f, false);
+///     }
+/// }
+///
+/// Form f = new Form(&quot;Knight&quot;, new BorderLayout());
+/// f.add(BorderLayout.CENTER, new Knight());
+/// f.show();
+/// ```
+public class AnimatedModel {
+    private static final int POSE = 10; // t(3) r(4) s(3)
+
+    private final GltfScene scene;
+    private final Model[] parts;
+    private final boolean[] hidden;
+    private final int[] order;
+    private final float[] rest;
+    private final float[] pose;
+    private final float[] fadePose;
+    private final float[] world;
+<span class="fc" id="L104">    private final float[] local = new float[16]; //NOPMD SingularField - per-frame scratch, kept to avoid allocating every frame</span>
+<span class="fc" id="L105">    private final float[] rot = new float[16];</span>
+<span class="fc" id="L106">    private final float[] skinMatrix = new float[16];</span>
+    private final float[] jointMatrices;
+<span class="fc" id="L108">    private final float[] key = new float[4];</span>
+
+    private GltfScene.Animation clip;
+    private float time;
+    private boolean loop;
+<span class="fc" id="L113">    private float speed = 1f;</span>
+    private GltfScene.Animation fadeFrom;
+    private float fadeFromTime;
+    private boolean fadeFromLoop;
+    private float fadeLength;
+    private float fadeElapsed;
+    private boolean posed;
+
+    private float x;
+    private float y;
+    private float z;
+    private float rotX;
+    private float rotY;
+    private float rotZ;
+<span class="fc" id="L127">    private float scale = 1f;</span>
+<span class="fc" id="L128">    private boolean visible = true;</span>
+
+    /// Creates an instance of `scene`, uploading its textures through
+    /// `device` the first time any instance needs them. Call it from
+    /// `GameView#onSetup(GraphicsDevice)` or later.
+    ///
+    /// #### Parameters
+    ///
+    /// - `device`: the device that will draw the instance
+    ///
+    /// - `scene`: a scene from `GltfLoader#loadScene(byte[])`
+<span class="fc" id="L139">    public AnimatedModel(GraphicsDevice device, GltfScene scene) {</span>
+<span class="fc" id="L140">        this.scene = scene;</span>
+<span class="fc" id="L141">        int nodeCount = scene.getNodeCount();</span>
+<span class="fc" id="L142">        rest = new float[nodeCount * POSE];</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">        for (int i = 0; i &lt; nodeCount; i++) {</span>
+<span class="fc" id="L144">            GltfScene.Node n = scene.getNode(i);</span>
+<span class="fc" id="L145">            System.arraycopy(n.getTranslation(), 0, rest, i * POSE, 3);</span>
+<span class="fc" id="L146">            System.arraycopy(n.getRotation(), 0, rest, i * POSE + 3, 4);</span>
+<span class="fc" id="L147">            System.arraycopy(n.getScale(), 0, rest, i * POSE + 7, 3);</span>
+        }
+<span class="fc" id="L149">        pose = new float[rest.length];</span>
+<span class="fc" id="L150">        fadePose = new float[rest.length];</span>
+<span class="fc" id="L151">        world = new float[nodeCount * 16];</span>
+<span class="fc" id="L152">        order = parentsFirst(scene);</span>
+<span class="fc" id="L153">        int maxJoints = 0;</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">        for (int i = 0; i &lt; scene.getSkinCount(); i++) {</span>
+<span class="fc" id="L155">            maxJoints = Math.max(maxJoints, scene.getSkin(i).getJoints().length);</span>
+        }
+<span class="fc" id="L157">        jointMatrices = new float[maxJoints * 16];</span>
+
+<span class="fc" id="L159">        int count = scene.getPrimitiveCount();</span>
+<span class="fc" id="L160">        parts = new Model[count];</span>
+<span class="fc" id="L161">        hidden = new boolean[count];</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">        for (int i = 0; i &lt; count; i++) {</span>
+<span class="fc" id="L163">            GltfScene.Primitive p = scene.getPrimitive(i);</span>
+<span class="fc" id="L164">            VertexBuffer vb = new VertexBuffer(VertexFormat.POSITION_NORMAL_TEXCOORD, p.getVertexCount());</span>
+<span class="fc" id="L165">            IndexBuffer ib = new IndexBuffer(p.getIndices().length);</span>
+<span class="fc" id="L166">            ib.setData(p.getIndices());</span>
+<span class="fc" id="L167">            Material material = new Material(Material.Type.LAMBERT);</span>
+<span class="fc" id="L168">            RenderState state = RenderState.opaque();</span>
+<span class="pc bpc" id="L169" title="1 of 4 branches missed.">            if (p.getMaterial() &gt;= 0 &amp;&amp; p.getMaterial() &lt; scene.getMaterialCount()) {</span>
+<span class="fc" id="L170">                GltfScene.MaterialInfo info = scene.getMaterial(p.getMaterial());</span>
+<span class="fc" id="L171">                material.setColor(info.getBaseColor());</span>
+<span class="fc" id="L172">                Texture t = scene.getTexture(device, info.getImage());</span>
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">                if (t != null) {</span>
+<span class="nc" id="L174">                    material.setTexture(t);</span>
+                }
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">                if (info.isDoubleSided()) {</span>
+<span class="fc" id="L177">                    state.setCullMode(RenderState.CullMode.NONE);</span>
+                }
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">                if (info.isBlend()) {</span>
+<span class="nc" id="L180">                    state.setBlendMode(RenderState.BlendMode.ALPHA);</span>
+                }
+            }
+<span class="fc" id="L183">            material.setRenderState(state);</span>
+<span class="fc" id="L184">            parts[i] = new Model(new Mesh(vb, ib, PrimitiveType.TRIANGLES), material);</span>
+        }
+<span class="fc" id="L186">        pose();</span>
+<span class="fc" id="L187">    }</span>
+
+    /// The scene this instance poses.
+    public GltfScene getScene() {
+<span class="nc" id="L191">        return scene;</span>
+    }
+
+    /// The models that draw this instance, one per primitive.
+    public Model[] getParts() {
+<span class="fc" id="L196">        return parts;</span>
+    }
+
+    /// Adds every part to `view`.
+    public void addTo(GameView view) {
+<span class="nc bnc" id="L201" title="All 2 branches missed.">        for (Model part : parts) {</span>
+<span class="nc" id="L202">            view.addModel(part);</span>
+        }
+<span class="nc" id="L204">    }</span>
+
+    /// Removes every part from `view`.
+    public void removeFrom(GameView view) {
+<span class="nc bnc" id="L208" title="All 2 branches missed.">        for (Model part : parts) {</span>
+<span class="nc" id="L209">            view.removeModel(part);</span>
+        }
+<span class="nc" id="L211">    }</span>
+
+    /// Hides the primitives placed by the node named `name` and by every node
+    /// below it. Character files often carry every weapon and accessory a
+    /// variant might hold; hide the ones this instance does not use.
+    ///
+    /// #### Returns
+    ///
+    /// true when a node of that name exists
+    public boolean hideNode(String name) {
+<span class="fc" id="L221">        return setNodeVisible(name, false);</span>
+    }
+
+    /// Shows or hides the primitives placed by the node named `name` and by
+    /// every node below it.
+    ///
+    /// #### Returns
+    ///
+    /// true when a node of that name exists
+    public boolean setNodeVisible(String name, boolean show) {
+<span class="fc" id="L231">        int node = scene.findNode(name);</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">        if (node &lt; 0) {</span>
+<span class="fc" id="L233">            return false;</span>
+        }
+<span class="fc bfc" id="L235" title="All 2 branches covered.">        for (int i = 0; i &lt; parts.length; i++) {</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">            if (isUnder(scene.getPrimitive(i).getNode(), node)) {</span>
+<span class="fc bfc" id="L237" title="All 2 branches covered.">                hidden[i] = !show;</span>
+<span class="pc bpc" id="L238" title="1 of 4 branches missed.">                parts[i].setVisible(visible &amp;&amp; show);</span>
+            }
+        }
+<span class="fc" id="L241">        posed = false;</span>
+<span class="fc" id="L242">        return true;</span>
+    }
+
+    private boolean isUnder(int node, int ancestor) {
+<span class="fc bfc" id="L246" title="All 2 branches covered.">        while (node &gt;= 0) {</span>
+<span class="fc bfc" id="L247" title="All 2 branches covered.">            if (node == ancestor) {</span>
+<span class="fc" id="L248">                return true;</span>
+            }
+<span class="fc" id="L250">            node = scene.getNode(node).getParent();</span>
+        }
+<span class="fc" id="L252">        return false;</span>
+    }
+
+    /// Multiplies every part's color by `argb`, for a team tint or a hit flash.
+    /// Pass `0xffffffff` to restore the file's colors.
+    public void setTint(int argb) {
+<span class="fc bfc" id="L258" title="All 2 branches covered.">        for (int i = 0; i &lt; parts.length; i++) {</span>
+<span class="fc" id="L259">            GltfScene.Primitive p = scene.getPrimitive(i);</span>
+<span class="fc" id="L260">            int base = 0xffffffff;</span>
+<span class="pc bpc" id="L261" title="1 of 4 branches missed.">            if (p.getMaterial() &gt;= 0 &amp;&amp; p.getMaterial() &lt; scene.getMaterialCount()) {</span>
+<span class="fc" id="L262">                base = scene.getMaterial(p.getMaterial()).getBaseColor();</span>
+            }
+<span class="fc" id="L264">            parts[i].getMaterial().setColor(multiply(base, argb));</span>
+        }
+<span class="fc" id="L266">    }</span>
+
+    private static int multiply(int a, int b) {
+<span class="fc" id="L269">        int out = 0;</span>
+<span class="fc bfc" id="L270" title="All 2 branches covered.">        for (int shift = 0; shift &lt; 32; shift += 8) {</span>
+<span class="fc" id="L271">            int ca = (a &gt;&gt;&gt; shift) &amp; 0xff;</span>
+<span class="fc" id="L272">            int cb = (b &gt;&gt;&gt; shift) &amp; 0xff;</span>
+<span class="fc" id="L273">            out |= ((ca * cb + 127) / 255) &lt;&lt; shift;</span>
+        }
+<span class="fc" id="L275">        return out;</span>
+    }
+
+    /// Starts the clip named `name` from its beginning, replacing whatever was
+    /// playing.
+    ///
+    /// #### Returns
+    ///
+    /// false (and nothing changes) when the scene has no such clip
+    public boolean play(String name, boolean loop) {
+<span class="fc" id="L285">        GltfScene.Animation a = scene.findAnimation(name);</span>
+<span class="pc bpc" id="L286" title="1 of 2 branches missed.">        if (a == null) {</span>
+<span class="nc" id="L287">            return false;</span>
+        }
+<span class="fc" id="L289">        clip = a;</span>
+<span class="fc" id="L290">        time = 0f;</span>
+<span class="fc" id="L291">        this.loop = loop;</span>
+<span class="fc" id="L292">        fadeFrom = null;</span>
+<span class="fc" id="L293">        posed = false;</span>
+<span class="fc" id="L294">        return true;</span>
+    }
+
+    /// Blends from the current pose into the clip named `name` over `seconds`.
+    /// Calling it with the clip that is already playing and looping does
+    /// nothing, so it is safe to call every frame with the state's clip.
+    ///
+    /// #### Returns
+    ///
+    /// false (and nothing changes) when the scene has no such clip
+    public boolean crossFade(String name, float seconds, boolean loop) {
+<span class="fc" id="L305">        GltfScene.Animation a = scene.findAnimation(name);</span>
+<span class="fc bfc" id="L306" title="All 2 branches covered.">        if (a == null) {</span>
+<span class="fc" id="L307">            return false;</span>
+        }
+<span class="pc bpc" id="L309" title="4 of 6 branches missed.">        if (a == clip &amp;&amp; this.loop &amp;&amp; loop) { //NOPMD CompareObjectsWithEquals - the same clip instance</span>
+<span class="nc" id="L310">            return true;</span>
+        }
+<span class="pc bpc" id="L312" title="2 of 4 branches missed.">        if (clip == null || seconds &lt;= 0f) {</span>
+<span class="nc" id="L313">            return play(name, loop);</span>
+        }
+<span class="fc" id="L315">        fadeFrom = clip;</span>
+<span class="fc" id="L316">        fadeFromTime = time;</span>
+<span class="fc" id="L317">        fadeFromLoop = this.loop;</span>
+<span class="fc" id="L318">        fadeLength = seconds;</span>
+<span class="fc" id="L319">        fadeElapsed = 0f;</span>
+<span class="fc" id="L320">        clip = a;</span>
+<span class="fc" id="L321">        time = 0f;</span>
+<span class="fc" id="L322">        this.loop = loop;</span>
+<span class="fc" id="L323">        posed = false;</span>
+<span class="fc" id="L324">        return true;</span>
+    }
+
+    /// The name of the clip playing, or null.
+    public String getClipName() {
+<span class="pc bpc" id="L329" title="1 of 2 branches missed.">        return clip == null ? null : clip.getName();</span>
+    }
+
+    /// The position in the current clip, in seconds.
+    public float getClipTime() {
+<span class="fc" id="L334">        return time;</span>
+    }
+
+    /// Jumps to `seconds` in the current clip.
+    public void setClipTime(float seconds) {
+<span class="fc" id="L339">        time = seconds;</span>
+<span class="fc" id="L340">        posed = false;</span>
+<span class="fc" id="L341">    }</span>
+
+    /// True when a non-looping clip has reached its end.
+    public boolean isFinished() {
+<span class="pc bpc" id="L345" title="2 of 6 branches missed.">        return clip != null &amp;&amp; !loop &amp;&amp; time &gt;= clip.getDuration();</span>
+    }
+
+    /// The playback rate; 1 is the authored speed.
+    public float getSpeed() {
+<span class="nc" id="L350">        return speed;</span>
+    }
+
+    /// Sets the playback rate; 1 is the authored speed.
+    public void setSpeed(float speed) {
+<span class="nc" id="L355">        this.speed = speed;</span>
+<span class="nc" id="L356">    }</span>
+
+    /// Advances the animation by `deltaSeconds` and re-poses the vertices.
+    /// Call it once per frame, typically from `GameView#update(double)`.
+    public void update(float deltaSeconds) {
+<span class="fc" id="L361">        float dt = deltaSeconds * speed;</span>
+<span class="pc bpc" id="L362" title="1 of 2 branches missed.">        if (clip != null) {</span>
+<span class="fc" id="L363">            time = advance(clip, time + dt, loop);</span>
+<span class="fc" id="L364">            posed = false;</span>
+        }
+<span class="fc bfc" id="L366" title="All 2 branches covered.">        if (fadeFrom != null) {</span>
+<span class="fc" id="L367">            fadeFromTime = advance(fadeFrom, fadeFromTime + dt, fadeFromLoop);</span>
+<span class="fc" id="L368">            fadeElapsed += deltaSeconds;</span>
+<span class="fc bfc" id="L369" title="All 2 branches covered.">            if (fadeElapsed &gt;= fadeLength) {</span>
+<span class="fc" id="L370">                fadeFrom = null;</span>
+            }
+<span class="fc" id="L372">            posed = false;</span>
+        }
+<span class="pc bpc" id="L374" title="2 of 4 branches missed.">        if (!posed &amp;&amp; visible) {</span>
+<span class="fc" id="L375">            pose();</span>
+        }
+<span class="fc" id="L377">    }</span>
+
+    private static float advance(GltfScene.Animation a, float t, boolean loop) {
+<span class="fc" id="L380">        float d = a.getDuration();</span>
+<span class="pc bpc" id="L381" title="1 of 2 branches missed.">        if (d &lt;= 0f) {</span>
+<span class="nc" id="L382">            return 0f;</span>
+        }
+<span class="fc bfc" id="L384" title="All 2 branches covered.">        if (loop) {</span>
+<span class="fc" id="L385">            t = t % d;</span>
+<span class="pc bpc" id="L386" title="1 of 2 branches missed.">            return t &lt; 0f ? t + d : t;</span>
+        }
+<span class="fc bfc" id="L388" title="All 2 branches covered.">        return t &gt; d ? d : t;</span>
+    }
+
+    /// Computes the current pose and writes the deformed vertices of every
+    /// visible part. `update(float)` calls this; call it directly only after
+    /// changing the clip time of a paused instance.
+    public void pose() {
+<span class="fc" id="L395">        sample(clip, time, pose);</span>
+<span class="fc bfc" id="L396" title="All 2 branches covered.">        if (fadeFrom != null) {</span>
+<span class="fc" id="L397">            sample(fadeFrom, fadeFromTime, fadePose);</span>
+<span class="pc bpc" id="L398" title="1 of 2 branches missed.">            float w = fadeLength &lt;= 0f ? 1f : Math.min(1f, fadeElapsed / fadeLength);</span>
+<span class="fc" id="L399">            blend(fadePose, pose, w, pose);</span>
+        }
+<span class="fc" id="L401">        computeWorld();</span>
+<span class="fc" id="L402">        int skinned = -1;</span>
+<span class="fc bfc" id="L403" title="All 2 branches covered.">        for (int i = 0; i &lt; parts.length; i++) {</span>
+<span class="pc bpc" id="L404" title="1 of 2 branches missed.">            if (hidden[i]) {</span>
+<span class="nc" id="L405">                continue;</span>
+            }
+<span class="fc" id="L407">            GltfScene.Primitive p = scene.getPrimitive(i);</span>
+<span class="fc" id="L408">            int skin = scene.getNode(p.getNode()).getSkin();</span>
+<span class="pc bpc" id="L409" title="1 of 4 branches missed.">            if (p.isSkinned() &amp;&amp; skin &gt;= 0) {</span>
+<span class="pc bpc" id="L410" title="1 of 2 branches missed.">                if (skinned != skin) {</span>
+<span class="fc" id="L411">                    computeJoints(scene.getSkin(skin));</span>
+<span class="fc" id="L412">                    skinned = skin;</span>
+                }
+<span class="fc" id="L414">                skin(p, parts[i].getMesh().getVertices());</span>
+            } else {
+<span class="fc" id="L416">                rigid(p, p.getNode(), parts[i].getMesh().getVertices());</span>
+            }
+        }
+<span class="fc" id="L419">        posed = true;</span>
+<span class="fc" id="L420">    }</span>
+
+    private void sample(GltfScene.Animation a, float t, float[] dst) {
+<span class="fc" id="L423">        System.arraycopy(rest, 0, dst, 0, rest.length);</span>
+<span class="fc bfc" id="L424" title="All 2 branches covered.">        if (a == null) {</span>
+<span class="fc" id="L425">            return;</span>
+        }
+<span class="fc" id="L427">        GltfScene.Channel[] channels = a.getChannels();</span>
+<span class="fc bfc" id="L428" title="All 2 branches covered.">        for (GltfScene.Channel c : channels) {</span>
+<span class="fc" id="L429">            int node = c.getNode();</span>
+<span class="pc bpc" id="L430" title="2 of 4 branches missed.">            if (node &lt; 0 || node * POSE &gt;= dst.length) {</span>
+<span class="nc" id="L431">                continue;</span>
+            }
+<span class="fc" id="L433">            c.sample(t, key);</span>
+<span class="fc" id="L434">            int base = node * POSE;</span>
+<span class="pc bpc" id="L435" title="2 of 3 branches missed.">            switch (c.getPath()) {</span>
+                case GltfScene.Channel.TRANSLATION:
+<span class="nc" id="L437">                    System.arraycopy(key, 0, dst, base, 3);</span>
+<span class="nc" id="L438">                    break;</span>
+                case GltfScene.Channel.ROTATION:
+<span class="fc" id="L440">                    System.arraycopy(key, 0, dst, base + 3, 4);</span>
+<span class="fc" id="L441">                    break;</span>
+                default:
+<span class="nc" id="L443">                    System.arraycopy(key, 0, dst, base + 7, 3);</span>
+                    break;
+            }
+        }
+<span class="fc" id="L447">    }</span>
+
+    private static void blend(float[] a, float[] b, float w, float[] dst) {
+<span class="fc bfc" id="L450" title="All 2 branches covered.">        for (int n = 0; n &lt; a.length; n += POSE) {</span>
+<span class="fc bfc" id="L451" title="All 2 branches covered.">            for (int i = 0; i &lt; 3; i++) {</span>
+<span class="fc" id="L452">                dst[n + i] = a[n + i] + (b[n + i] - a[n + i]) * w;</span>
+<span class="fc" id="L453">                dst[n + 7 + i] = a[n + 7 + i] + (b[n + 7 + i] - a[n + 7 + i]) * w;</span>
+            }
+<span class="fc" id="L455">            float dot = a[n + 3] * b[n + 3] + a[n + 4] * b[n + 4] + a[n + 5] * b[n + 5] + a[n + 6] * b[n + 6];</span>
+<span class="pc bpc" id="L456" title="1 of 2 branches missed.">            float sign = dot &lt; 0f ? -1f : 1f;</span>
+<span class="fc" id="L457">            float len = 0f;</span>
+<span class="fc bfc" id="L458" title="All 2 branches covered.">            for (int i = 3; i &lt; 7; i++) {</span>
+<span class="fc" id="L459">                float v = a[n + i] + (sign * b[n + i] - a[n + i]) * w;</span>
+<span class="fc" id="L460">                dst[n + i] = v;</span>
+<span class="fc" id="L461">                len += v * v;</span>
+            }
+<span class="fc" id="L463">            len = (float) Math.sqrt(len);</span>
+<span class="pc bpc" id="L464" title="1 of 2 branches missed.">            if (len &gt; 0f) {</span>
+<span class="fc bfc" id="L465" title="All 2 branches covered.">                for (int i = 3; i &lt; 7; i++) {</span>
+<span class="fc" id="L466">                    dst[n + i] /= len;</span>
+                }
+            }
+        }
+<span class="fc" id="L470">    }</span>
+
+    private void computeWorld() {
+<span class="fc bfc" id="L473" title="All 2 branches covered.">        for (int n : order) {</span>
+<span class="fc" id="L474">            int b = n * POSE;</span>
+<span class="fc" id="L475">            key[0] = pose[b + 3];</span>
+<span class="fc" id="L476">            key[1] = pose[b + 4];</span>
+<span class="fc" id="L477">            key[2] = pose[b + 5];</span>
+<span class="fc" id="L478">            key[3] = pose[b + 6];</span>
+<span class="fc" id="L479">            Quaternion.toMatrix(key, rot);</span>
+<span class="fc" id="L480">            float sx = pose[b + 7];</span>
+<span class="fc" id="L481">            float sy = pose[b + 8];</span>
+<span class="fc" id="L482">            float sz = pose[b + 9];</span>
+            // local = T * R * S
+<span class="fc bfc" id="L484" title="All 2 branches covered.">            for (int i = 0; i &lt; 3; i++) {</span>
+<span class="fc" id="L485">                local[i] = rot[i] * sx;</span>
+<span class="fc" id="L486">                local[4 + i] = rot[4 + i] * sy;</span>
+<span class="fc" id="L487">                local[8 + i] = rot[8 + i] * sz;</span>
+            }
+<span class="fc" id="L489">            local[3] = 0f;</span>
+<span class="fc" id="L490">            local[7] = 0f;</span>
+<span class="fc" id="L491">            local[11] = 0f;</span>
+<span class="fc" id="L492">            local[12] = pose[b];</span>
+<span class="fc" id="L493">            local[13] = pose[b + 1];</span>
+<span class="fc" id="L494">            local[14] = pose[b + 2];</span>
+<span class="fc" id="L495">            local[15] = 1f;</span>
+<span class="fc" id="L496">            int parent = scene.getNode(n).getParent();</span>
+<span class="fc bfc" id="L497" title="All 2 branches covered.">            if (parent &lt; 0) {</span>
+<span class="fc" id="L498">                System.arraycopy(local, 0, world, n * 16, 16);</span>
+            } else {
+<span class="fc" id="L500">                multiplyInto(world, parent * 16, local, 0, world, n * 16);</span>
+            }
+        }
+<span class="fc" id="L503">    }</span>
+
+    private void computeJoints(GltfScene.Skin skin) {
+<span class="fc" id="L506">        int[] joints = skin.getJoints();</span>
+<span class="fc" id="L507">        float[] ibm = skin.getInverseBindMatrices();</span>
+<span class="fc bfc" id="L508" title="All 2 branches covered.">        for (int j = 0; j &lt; joints.length; j++) {</span>
+<span class="fc" id="L509">            multiplyInto(world, joints[j] * 16, ibm, j * 16, jointMatrices, j * 16);</span>
+        }
+<span class="fc" id="L511">    }</span>
+
+    /// `dst[d..] = a[ao..] * b[bo..]`, column major; `dst` must not overlap `b`.
+    private static void multiplyInto(float[] a, int ao, float[] b, int bo, float[] dst, int d) {
+<span class="fc bfc" id="L515" title="All 2 branches covered.">        for (int c = 0; c &lt; 4; c++) {</span>
+<span class="fc" id="L516">            float b0 = b[bo + c * 4];</span>
+<span class="fc" id="L517">            float b1 = b[bo + c * 4 + 1];</span>
+<span class="fc" id="L518">            float b2 = b[bo + c * 4 + 2];</span>
+<span class="fc" id="L519">            float b3 = b[bo + c * 4 + 3];</span>
+<span class="fc bfc" id="L520" title="All 2 branches covered.">            for (int r = 0; r &lt; 4; r++) {</span>
+<span class="fc" id="L521">                dst[d + c * 4 + r] = a[ao + r] * b0 + a[ao + 4 + r] * b1 + a[ao + 8 + r] * b2 + a[ao + 12 + r] * b3;</span>
+            }
+        }
+<span class="fc" id="L524">    }</span>
+
+    private void skin(GltfScene.Primitive p, VertexBuffer vb) {
+<span class="fc" id="L527">        float[] pos = p.getPositions();</span>
+<span class="fc" id="L528">        float[] nor = p.getNormals();</span>
+<span class="fc" id="L529">        float[] uv = p.getTexcoords();</span>
+<span class="fc" id="L530">        int[] joints = p.getJoints();</span>
+<span class="fc" id="L531">        float[] weights = p.getWeights();</span>
+<span class="fc" id="L532">        float[] out = vb.getData();</span>
+<span class="fc" id="L533">        float[] m = skinMatrix;</span>
+<span class="fc" id="L534">        int jointLimit = jointMatrices.length / 16;</span>
+<span class="fc" id="L535">        int count = p.getVertexCount();</span>
+<span class="fc bfc" id="L536" title="All 2 branches covered.">        for (int v = 0; v &lt; count; v++) {</span>
+<span class="fc bfc" id="L537" title="All 2 branches covered.">            for (int i = 0; i &lt; 16; i++) {</span>
+<span class="fc" id="L538">                m[i] = 0f;</span>
+            }
+<span class="fc bfc" id="L540" title="All 2 branches covered.">            for (int k = 0; k &lt; 4; k++) {</span>
+<span class="fc" id="L541">                float w = weights[v * 4 + k];</span>
+<span class="fc" id="L542">                int j = joints[v * 4 + k];</span>
+<span class="pc bpc" id="L543" title="2 of 6 branches missed.">                if (w == 0f || j &lt; 0 || j &gt;= jointLimit) {</span>
+<span class="nc" id="L544">                    continue;</span>
+                }
+<span class="fc" id="L546">                int o = j * 16;</span>
+<span class="fc bfc" id="L547" title="All 2 branches covered.">                for (int i = 0; i &lt; 16; i++) {</span>
+<span class="fc" id="L548">                    m[i] += jointMatrices[o + i] * w;</span>
+                }
+            }
+<span class="fc" id="L551">            write(m, pos, nor, uv, v, out);</span>
+        }
+<span class="fc" id="L553">        vb.setDirty();</span>
+<span class="fc" id="L554">    }</span>
+
+    private void rigid(GltfScene.Primitive p, int node, VertexBuffer vb) {
+<span class="fc" id="L557">        float[] out = vb.getData();</span>
+<span class="fc" id="L558">        System.arraycopy(world, node * 16, skinMatrix, 0, 16);</span>
+<span class="fc" id="L559">        int count = p.getVertexCount();</span>
+<span class="fc" id="L560">        float[] pos = p.getPositions();</span>
+<span class="fc" id="L561">        float[] nor = p.getNormals();</span>
+<span class="fc" id="L562">        float[] uv = p.getTexcoords();</span>
+<span class="fc bfc" id="L563" title="All 2 branches covered.">        for (int v = 0; v &lt; count; v++) {</span>
+<span class="fc" id="L564">            write(skinMatrix, pos, nor, uv, v, out);</span>
+        }
+<span class="fc" id="L566">        vb.setDirty();</span>
+<span class="fc" id="L567">    }</span>
+
+    private static void write(float[] m, float[] pos, float[] nor, float[] uv, int v, float[] out) {
+<span class="fc" id="L570">        int i3 = v * 3;</span>
+<span class="fc" id="L571">        int o = v * 8;</span>
+<span class="fc" id="L572">        float px = pos[i3];</span>
+<span class="fc" id="L573">        float py = pos[i3 + 1];</span>
+<span class="fc" id="L574">        float pz = pos[i3 + 2];</span>
+<span class="fc" id="L575">        out[o] = m[0] * px + m[4] * py + m[8] * pz + m[12];</span>
+<span class="fc" id="L576">        out[o + 1] = m[1] * px + m[5] * py + m[9] * pz + m[13];</span>
+<span class="fc" id="L577">        out[o + 2] = m[2] * px + m[6] * py + m[10] * pz + m[14];</span>
+<span class="fc" id="L578">        float nx = nor[i3];</span>
+<span class="fc" id="L579">        float ny = nor[i3 + 1];</span>
+<span class="fc" id="L580">        float nz = nor[i3 + 2];</span>
+        // joint matrices carry no shear in practice, so the upper 3x3
+        // re-normalized is the normal transform.
+<span class="fc" id="L583">        float tx = m[0] * nx + m[4] * ny + m[8] * nz;</span>
+<span class="fc" id="L584">        float ty = m[1] * nx + m[5] * ny + m[9] * nz;</span>
+<span class="fc" id="L585">        float tz = m[2] * nx + m[6] * ny + m[10] * nz;</span>
+<span class="fc" id="L586">        float len = (float) Math.sqrt(tx * tx + ty * ty + tz * tz);</span>
+<span class="pc bpc" id="L587" title="1 of 2 branches missed.">        if (len &gt; 0f) {</span>
+<span class="fc" id="L588">            tx /= len;</span>
+<span class="fc" id="L589">            ty /= len;</span>
+<span class="fc" id="L590">            tz /= len;</span>
+        }
+<span class="fc" id="L592">        out[o + 3] = tx;</span>
+<span class="fc" id="L593">        out[o + 4] = ty;</span>
+<span class="fc" id="L594">        out[o + 5] = tz;</span>
+<span class="pc bpc" id="L595" title="1 of 2 branches missed.">        if (uv != null) {</span>
+<span class="nc" id="L596">            out[o + 6] = uv[v * 2];</span>
+<span class="nc" id="L597">            out[o + 7] = uv[v * 2 + 1];</span>
+        }
+<span class="fc" id="L599">    }</span>
+
+    /// Copies the current world matrix of the node named `name` (in the
+    /// instance's own space, before `setPosition` and friends) into `dst16`.
+    /// Use it to attach an effect to a bone, such as a spark at a sword tip.
+    ///
+    /// #### Returns
+    ///
+    /// false when no node has that name
+    public boolean getNodeMatrix(String name, float[] dst16) {
+<span class="fc" id="L609">        int n = scene.findNode(name);</span>
+<span class="pc bpc" id="L610" title="1 of 2 branches missed.">        if (n &lt; 0) {</span>
+<span class="nc" id="L611">            return false;</span>
+        }
+<span class="pc bpc" id="L613" title="1 of 2 branches missed.">        if (!posed) {</span>
+<span class="nc" id="L614">            pose();</span>
+        }
+<span class="fc" id="L616">        System.arraycopy(world, n * 16, dst16, 0, 16);</span>
+<span class="fc" id="L617">        return true;</span>
+    }
+
+    private static int[] parentsFirst(GltfScene scene) {
+<span class="fc" id="L621">        int n = scene.getNodeCount();</span>
+<span class="fc" id="L622">        int[] out = new int[n];</span>
+<span class="fc" id="L623">        int[] stack = new int[n];</span>
+<span class="fc" id="L624">        int count = 0;</span>
+<span class="fc bfc" id="L625" title="All 2 branches covered.">        for (int r = 0; r &lt; n; r++) {</span>
+<span class="fc bfc" id="L626" title="All 2 branches covered.">            if (scene.getNode(r).getParent() &gt;= 0) {</span>
+<span class="fc" id="L627">                continue;</span>
+            }
+<span class="fc" id="L629">            int sp = 0;</span>
+<span class="fc" id="L630">            stack[sp++] = r;</span>
+<span class="pc bpc" id="L631" title="1 of 4 branches missed.">            while (sp &gt; 0 &amp;&amp; count &lt; n) {</span>
+<span class="fc" id="L632">                int node = stack[--sp];</span>
+<span class="fc" id="L633">                out[count++] = node;</span>
+<span class="fc" id="L634">                int[] children = scene.getNode(node).getChildren();</span>
+<span class="fc bfc" id="L635" title="All 2 branches covered.">                for (int c = children.length - 1; c &gt;= 0; c--) {</span>
+<span class="pc bpc" id="L636" title="3 of 6 branches missed.">                    if (sp &lt; n &amp;&amp; children[c] &gt;= 0 &amp;&amp; children[c] &lt; n) {</span>
+<span class="fc" id="L637">                        stack[sp++] = children[c];</span>
+                    }
+                }
+<span class="fc" id="L640">            }</span>
+        }
+<span class="pc bpc" id="L642" title="1 of 2 branches missed.">        if (count &lt; n) {</span>
+<span class="nc" id="L643">            int[] trimmed = new int[count];</span>
+<span class="nc" id="L644">            System.arraycopy(out, 0, trimmed, 0, count);</span>
+<span class="nc" id="L645">            return trimmed;</span>
+        }
+<span class="fc" id="L647">        return out;</span>
+    }
+
+    /// Places the instance.
+    public AnimatedModel setPosition(float x, float y, float z) {
+<span class="fc" id="L652">        this.x = x;</span>
+<span class="fc" id="L653">        this.y = y;</span>
+<span class="fc" id="L654">        this.z = z;</span>
+<span class="fc bfc" id="L655" title="All 2 branches covered.">        for (Model part : parts) {</span>
+<span class="fc" id="L656">            part.setPosition(x, y, z);</span>
+        }
+<span class="fc" id="L658">        return this;</span>
+    }
+
+    /// Rotates the instance, in degrees about each axis.
+    public AnimatedModel setRotation(float degX, float degY, float degZ) {
+<span class="fc" id="L663">        rotX = degX;</span>
+<span class="fc" id="L664">        rotY = degY;</span>
+<span class="fc" id="L665">        rotZ = degZ;</span>
+<span class="fc bfc" id="L666" title="All 2 branches covered.">        for (Model part : parts) {</span>
+<span class="fc" id="L667">            part.setRotation(degX, degY, degZ);</span>
+        }
+<span class="fc" id="L669">        return this;</span>
+    }
+
+    /// Scales the instance uniformly.
+    public AnimatedModel setScale(float scale) {
+<span class="fc" id="L674">        this.scale = scale;</span>
+<span class="fc bfc" id="L675" title="All 2 branches covered.">        for (Model part : parts) {</span>
+<span class="fc" id="L676">            part.setScale(scale);</span>
+        }
+<span class="fc" id="L678">        return this;</span>
+    }
+
+    /// The x position.
+    public float getX() {
+<span class="nc" id="L683">        return x;</span>
+    }
+
+    /// The y position.
+    public float getY() {
+<span class="nc" id="L688">        return y;</span>
+    }
+
+    /// The z position.
+    public float getZ() {
+<span class="nc" id="L693">        return z;</span>
+    }
+
+    /// The rotation about the y axis in degrees.
+    public float getRotationY() {
+<span class="nc" id="L698">        return rotY;</span>
+    }
+
+    /// The rotation about the x axis in degrees.
+    public float getRotationX() {
+<span class="nc" id="L703">        return rotX;</span>
+    }
+
+    /// The rotation about the z axis in degrees.
+    public float getRotationZ() {
+<span class="nc" id="L708">        return rotZ;</span>
+    }
+
+    /// The uniform scale.
+    public float getScale() {
+<span class="nc" id="L713">        return scale;</span>
+    }
+
+    /// True unless hidden with `setVisible(false)`.
+    public boolean isVisible() {
+<span class="nc" id="L718">        return visible;</span>
+    }
+
+    /// Shows or hides every part. A hidden instance skips its skinning work.
+    public void setVisible(boolean visible) {
+<span class="fc" id="L723">        this.visible = visible;</span>
+<span class="fc bfc" id="L724" title="All 2 branches covered.">        for (int i = 0; i &lt; parts.length; i++) {</span>
+<span class="fc bfc" id="L725" title="All 4 branches covered.">            parts[i].setVisible(visible &amp;&amp; !hidden[i]);</span>
+        }
+<span class="fc" id="L727">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

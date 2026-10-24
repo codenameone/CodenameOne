@@ -1,0 +1,651 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Matcher.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.util.regex</a> &gt; <span class="el_source">Matcher.java</span></div><h1>Matcher.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.util.regex;
+
+import java.util.Iterator;
+import java.util.NoSuchElementException;
+import java.util.Spliterator;
+import java.util.Spliterators;
+import java.util.function.Function;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
+
+/// The same shape as `java.util.regex.Matcher`, over this package's [Pattern].
+///
+/// Everything a match is read through is here -- `matches`, `lookingAt`,
+/// `find`, groups by number and by name, regions, and the replacement
+/// methods with the JDK's `$1` and `${name}` syntax. `hitEnd`,
+/// `requireEnd` and the two bounds switches are not provided.
+public final class Matcher implements MatchResult {
+
+    private Pattern pattern;
+    CharSequence text;
+    int from;
+    int to;
+
+    /// The state the nodes of a pattern read and write while matching.
+    boolean requireEnd;
+    int matchEnd;
+<span class="fc" id="L49">    int endAt = -1;</span>
+    int subEnd;
+<span class="fc" id="L51">    int oldLast = -1;</span>
+    int[] starts;
+    int[] ends;
+    int[] opened;
+    int[] loopCount;
+    int[] loopStart;
+
+<span class="fc" id="L58">    private int first = -1;</span>
+    private int last;
+    /// Where a zero-width match ended before `usePattern` cleared the match,
+    /// so the next `find()` still steps past it; -1 when there is none.
+<span class="fc" id="L62">    private int emptyAt = -1;</span>
+    private int appendPosition;
+
+<span class="fc" id="L65">    Matcher(Pattern pattern, CharSequence text) {</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        if (text == null) {</span>
+<span class="nc" id="L67">            throw new NullPointerException();</span>
+        }
+<span class="fc" id="L69">        this.text = text;</span>
+<span class="fc" id="L70">        use(pattern);</span>
+<span class="fc" id="L71">        reset();</span>
+<span class="fc" id="L72">    }</span>
+
+    private void use(Pattern p) {
+<span class="fc" id="L75">        pattern = p;</span>
+<span class="fc" id="L76">        starts = new int[p.groupCount + 1];</span>
+<span class="fc" id="L77">        ends = new int[p.groupCount + 1];</span>
+<span class="fc" id="L78">        opened = new int[p.groupCount + 1];</span>
+<span class="fc" id="L79">        loopCount = new int[p.loopCount];</span>
+<span class="fc" id="L80">        loopStart = new int[p.loopCount];</span>
+<span class="fc" id="L81">    }</span>
+
+    int[] saveGroups() {
+<span class="fc" id="L84">        int n = starts.length;</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        if (n == 1) {</span>
+<span class="fc" id="L86">            return null;</span>
+        }
+<span class="fc" id="L88">        int[] saved = new int[n * 2];</span>
+<span class="fc" id="L89">        System.arraycopy(starts, 0, saved, 0, n);</span>
+<span class="fc" id="L90">        System.arraycopy(ends, 0, saved, n, n);</span>
+<span class="fc" id="L91">        return saved;</span>
+    }
+
+    void restoreGroups(int[] saved) {
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">        if (saved != null) {</span>
+<span class="nc" id="L96">            int n = starts.length;</span>
+<span class="nc" id="L97">            System.arraycopy(saved, 0, starts, 0, n);</span>
+<span class="nc" id="L98">            System.arraycopy(saved, n, ends, 0, n);</span>
+        }
+<span class="fc" id="L100">    }</span>
+
+    private void clearGroups() {
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        for (int g = 0; g &lt; starts.length; g++) {</span>
+<span class="fc" id="L104">            starts[g] = -1;</span>
+<span class="fc" id="L105">            ends[g] = -1;</span>
+<span class="fc" id="L106">            opened[g] = -1;</span>
+        }
+<span class="fc" id="L108">    }</span>
+
+    public Pattern pattern() {
+<span class="nc" id="L111">        return pattern;</span>
+    }
+
+    public Matcher usePattern(Pattern newPattern) {
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">        if (newPattern == null) {</span>
+<span class="nc" id="L116">            throw new IllegalArgumentException(&quot;Pattern cannot be null&quot;);</span>
+        }
+<span class="fc" id="L118">        use(newPattern);</span>
+<span class="fc" id="L119">        clearGroups();</span>
+<span class="pc bpc" id="L120" title="1 of 4 branches missed.">        emptyAt = first &gt;= 0 &amp;&amp; first == last ? last : -1;</span>
+        // The match stays, its groups do not: group(0) answers null, as on
+        // the JDK, rather than throwing.
+<span class="fc" id="L123">        return this;</span>
+    }
+
+    public Matcher reset() {
+<span class="fc" id="L127">        first = -1;</span>
+<span class="fc" id="L128">        emptyAt = -1;</span>
+<span class="fc" id="L129">        last = 0;</span>
+<span class="fc" id="L130">        oldLast = -1;</span>
+<span class="fc" id="L131">        appendPosition = 0;</span>
+<span class="fc" id="L132">        from = 0;</span>
+<span class="fc" id="L133">        to = text.length();</span>
+<span class="fc" id="L134">        clearGroups();</span>
+<span class="fc" id="L135">        return this;</span>
+    }
+
+    public Matcher reset(CharSequence input) {
+<span class="nc bnc" id="L139" title="All 2 branches missed.">        if (input == null) {</span>
+<span class="nc" id="L140">            throw new NullPointerException();</span>
+        }
+<span class="nc" id="L142">        text = input;</span>
+<span class="nc" id="L143">        return reset();</span>
+    }
+
+    public Matcher region(int start, int end) {
+<span class="nc bnc" id="L147" title="All 10 branches missed.">        if (start &lt; 0 || start &gt; text.length() || end &lt; 0 || end &gt; text.length() || start &gt; end) {</span>
+<span class="nc" id="L148">            throw new IndexOutOfBoundsException(&quot;start &quot; + start + &quot;, end &quot; + end);</span>
+        }
+<span class="nc" id="L150">        reset();</span>
+<span class="nc" id="L151">        from = start;</span>
+<span class="nc" id="L152">        to = end;</span>
+<span class="nc" id="L153">        return this;</span>
+    }
+
+    public int regionStart() {
+<span class="nc" id="L157">        return from;</span>
+    }
+
+    public int regionEnd() {
+<span class="nc" id="L161">        return to;</span>
+    }
+
+    private boolean attempt(int start, boolean whole) {
+<span class="fc" id="L165">        clearGroups();</span>
+<span class="fc" id="L166">        requireEnd = whole;</span>
+<span class="fc" id="L167">        endAt = -1;</span>
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">        if (oldLast &lt; 0) {</span>
+<span class="fc" id="L169">            oldLast = start;</span>
+        }
+<span class="fc" id="L171">        boolean matched = pattern.root.match(this, start);</span>
+<span class="fc bfc" id="L172" title="All 2 branches covered.">        if (matched) {</span>
+<span class="fc" id="L173">            first = start;</span>
+<span class="fc" id="L174">            last = matchEnd;</span>
+<span class="fc" id="L175">            starts[0] = start;</span>
+<span class="fc" id="L176">            ends[0] = matchEnd;</span>
+        } else {
+<span class="fc" id="L178">            first = -1;</span>
+<span class="fc" id="L179">            clearGroups();</span>
+        }
+<span class="fc" id="L181">        oldLast = last;</span>
+<span class="fc" id="L182">        return matched;</span>
+    }
+
+    public boolean matches() {
+<span class="fc" id="L186">        return attempt(from, true);</span>
+    }
+
+    public boolean lookingAt() {
+<span class="nc" id="L190">        return attempt(from, false);</span>
+    }
+
+    private boolean search(int start) {
+<span class="fc" id="L194">        emptyAt = -1;</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">        if (oldLast &lt; 0) {</span>
+<span class="fc" id="L196">            oldLast = start;</span>
+        }
+<span class="fc" id="L198">        requireEnd = false;</span>
+<span class="fc" id="L199">        endAt = -1;</span>
+<span class="fc bfc" id="L200" title="All 2 branches covered.">        for (int i = start; i &lt;= to; i++) {</span>
+            // A match never starts inside a surrogate pair when the pattern
+            // names a supplementary code point, a surrogate or a Unicode
+            // property, as on the JDK. Otherwise every char position is
+            // tried, as the JDK's search also does; which of those the JDK
+            // then accepts depends on the node its optimizer picked (&quot;\\B.&quot;
+            // matches the low half and &quot;\\B[^b]&quot; does not), and that is not
+            // copied.
+<span class="fc bfc" id="L208" title="All 8 branches covered.">            if (pattern.supplementary &amp;&amp; i &gt; from &amp;&amp; i &lt; to &amp;&amp; Character.isLowSurrogate(text.charAt(i))</span>
+<span class="pc bpc" id="L209" title="1 of 2 branches missed.">                    &amp;&amp; Character.isHighSurrogate(text.charAt(i - 1))) {</span>
+<span class="fc" id="L210">                continue;</span>
+            }
+<span class="fc" id="L212">            clearGroups();</span>
+<span class="fc bfc" id="L213" title="All 2 branches covered.">            if (pattern.root.match(this, i)) {</span>
+<span class="fc" id="L214">                first = i;</span>
+<span class="fc" id="L215">                last = matchEnd;</span>
+<span class="fc" id="L216">                starts[0] = i;</span>
+<span class="fc" id="L217">                ends[0] = matchEnd;</span>
+<span class="fc" id="L218">                oldLast = last;</span>
+<span class="fc" id="L219">                return true;</span>
+            }
+        }
+<span class="fc" id="L222">        first = -1;</span>
+<span class="fc" id="L223">        clearGroups();</span>
+<span class="fc" id="L224">        oldLast = last;</span>
+<span class="fc" id="L225">        return false;</span>
+    }
+
+    public boolean find() {
+<span class="fc" id="L229">        int next = last;</span>
+<span class="pc bpc" id="L230" title="1 of 4 branches missed.">        if (next == first || next == emptyAt) {</span>
+<span class="fc" id="L231">            next++;</span>
+        }
+<span class="pc bpc" id="L233" title="1 of 2 branches missed.">        if (next &lt; from) {</span>
+<span class="nc" id="L234">            next = from;</span>
+        }
+<span class="fc bfc" id="L236" title="All 2 branches covered.">        if (next &gt; to) {</span>
+            // Exhausted, and it stays so: left at the end, the next find()
+            // would search the end again and hand back a zero-width match
+            // at the end (&quot;$&quot;) once more.
+<span class="fc" id="L240">            first = -1;</span>
+<span class="fc" id="L241">            last = to + 1;</span>
+<span class="fc" id="L242">            clearGroups();</span>
+<span class="fc" id="L243">            return false;</span>
+        }
+<span class="fc" id="L245">        return search(next);</span>
+    }
+
+    public boolean find(int start) {
+<span class="nc bnc" id="L249" title="All 4 branches missed.">        if (start &lt; 0 || start &gt; text.length()) {</span>
+<span class="nc" id="L250">            throw new IndexOutOfBoundsException(&quot;Illegal start index&quot;);</span>
+        }
+<span class="nc" id="L252">        reset();</span>
+<span class="nc" id="L253">        return search(start);</span>
+    }
+
+    /// Whether the last match operation found something.
+    public boolean hasMatch() {
+<span class="nc bnc" id="L258" title="All 2 branches missed.">        return first &gt;= 0;</span>
+    }
+
+    private void requireMatch() {
+<span class="pc bpc" id="L262" title="1 of 2 branches missed.">        if (first &lt; 0) {</span>
+<span class="nc" id="L263">            throw new IllegalStateException(&quot;No match found&quot;);</span>
+        }
+<span class="fc" id="L265">    }</span>
+
+    private void requireGroup(int group) {
+<span class="fc" id="L268">        requireMatch();</span>
+<span class="pc bpc" id="L269" title="2 of 4 branches missed.">        if (group &lt; 0 || group &gt; pattern.groupCount) {</span>
+<span class="nc" id="L270">            throw new IndexOutOfBoundsException(&quot;No group &quot; + group);</span>
+        }
+<span class="fc" id="L272">    }</span>
+
+    private int named(String name) {
+<span class="nc bnc" id="L275" title="All 2 branches missed.">        if (name == null) {</span>
+<span class="nc" id="L276">            throw new NullPointerException(&quot;Null group name&quot;);</span>
+        }
+<span class="nc" id="L278">        Integer group = pattern.names.get(name);</span>
+<span class="nc bnc" id="L279" title="All 2 branches missed.">        if (group == null) {</span>
+<span class="nc" id="L280">            throw new IllegalArgumentException(&quot;No group with name &lt;&quot; + name + &quot;&gt;&quot;);</span>
+        }
+<span class="nc" id="L282">        return group.intValue();</span>
+    }
+
+    @Override
+    public int start() {
+<span class="fc" id="L287">        requireMatch();</span>
+<span class="fc" id="L288">        return first;</span>
+    }
+
+    @Override
+    public int start(int group) {
+<span class="fc" id="L293">        requireGroup(group);</span>
+<span class="fc" id="L294">        return starts[group];</span>
+    }
+
+    public int start(String name) {
+<span class="nc" id="L298">        requireMatch();</span>
+<span class="nc" id="L299">        return starts[named(name)];</span>
+    }
+
+    @Override
+    public int end() {
+<span class="fc" id="L304">        requireMatch();</span>
+<span class="fc" id="L305">        return last;</span>
+    }
+
+    @Override
+    public int end(int group) {
+<span class="nc" id="L310">        requireGroup(group);</span>
+<span class="nc" id="L311">        return ends[group];</span>
+    }
+
+    public int end(String name) {
+<span class="nc" id="L315">        requireMatch();</span>
+<span class="nc" id="L316">        return ends[named(name)];</span>
+    }
+
+    @Override
+    public String group() {
+<span class="nc" id="L321">        return group(0);</span>
+    }
+
+    @Override
+    public String group(int group) {
+<span class="fc" id="L326">        requireGroup(group);</span>
+<span class="pc bpc" id="L327" title="1 of 4 branches missed.">        if (starts[group] &lt; 0 || ends[group] &lt; 0) {</span>
+<span class="fc" id="L328">            return null;</span>
+        }
+<span class="fc" id="L330">        return text.subSequence(starts[group], ends[group]).toString();</span>
+    }
+
+    public String group(String name) {
+<span class="nc" id="L334">        requireMatch();</span>
+<span class="nc" id="L335">        int group = named(name);</span>
+<span class="nc bnc" id="L336" title="All 4 branches missed.">        if (starts[group] &lt; 0 || ends[group] &lt; 0) {</span>
+<span class="nc" id="L337">            return null;</span>
+        }
+<span class="nc" id="L339">        return text.subSequence(starts[group], ends[group]).toString();</span>
+    }
+
+    @Override
+    public int groupCount() {
+<span class="nc" id="L344">        return pattern.groupCount;</span>
+    }
+
+    /// The match as it is now, unaffected by what this matcher does next.
+    public MatchResult toMatchResult() {
+<span class="fc" id="L349">        return new Snapshot(this);</span>
+    }
+
+    private static final class Snapshot implements MatchResult {
+        private final int[] starts;
+        private final int[] ends;
+        private final String text;
+        private final boolean matched;
+
+<span class="fc" id="L358">        Snapshot(Matcher m) {</span>
+<span class="pc bpc" id="L359" title="1 of 2 branches missed.">            matched = m.first &gt;= 0;</span>
+<span class="fc" id="L360">            starts = new int[m.starts.length];</span>
+<span class="fc" id="L361">            ends = new int[m.ends.length];</span>
+<span class="fc" id="L362">            System.arraycopy(m.starts, 0, starts, 0, starts.length);</span>
+<span class="fc" id="L363">            System.arraycopy(m.ends, 0, ends, 0, ends.length);</span>
+<span class="fc" id="L364">            text = m.text.toString();</span>
+<span class="fc" id="L365">        }</span>
+
+        private void check(int group) {
+<span class="nc bnc" id="L368" title="All 2 branches missed.">            if (!matched) {</span>
+<span class="nc" id="L369">                throw new IllegalStateException(&quot;No match found&quot;);</span>
+            }
+<span class="nc bnc" id="L371" title="All 4 branches missed.">            if (group &lt; 0 || group &gt;= starts.length) {</span>
+<span class="nc" id="L372">                throw new IndexOutOfBoundsException(&quot;No group &quot; + group);</span>
+            }
+<span class="nc" id="L374">        }</span>
+
+        @Override
+        public int start() {
+<span class="nc" id="L378">            return start(0);</span>
+        }
+
+        @Override
+        public int start(int group) {
+<span class="nc" id="L383">            check(group);</span>
+<span class="nc" id="L384">            return starts[group];</span>
+        }
+
+        @Override
+        public int end() {
+<span class="nc" id="L389">            return end(0);</span>
+        }
+
+        @Override
+        public int end(int group) {
+<span class="nc" id="L394">            check(group);</span>
+<span class="nc" id="L395">            return ends[group];</span>
+        }
+
+        @Override
+        public String group() {
+<span class="nc" id="L400">            return group(0);</span>
+        }
+
+        @Override
+        public String group(int group) {
+<span class="nc" id="L405">            check(group);</span>
+<span class="nc bnc" id="L406" title="All 4 branches missed.">            return starts[group] &lt; 0 || ends[group] &lt; 0 ? null : text.substring(starts[group], ends[group]);</span>
+        }
+
+        @Override
+        public int groupCount() {
+<span class="nc" id="L411">            return starts.length - 1;</span>
+        }
+    }
+
+    /// Each match from here on, as [#toMatchResult()] would answer it: from
+    /// after the last match found, or from the start of the region when
+    /// there is none. The matcher is not reset, so a match already consumed
+    /// is not answered again and a region stays in force.
+    ///
+    /// Lazy, as the JDK's is: each match is found only when the stream asks
+    /// for it, so `results().limit(1)` scans no further than the first.
+    public Stream&lt;MatchResult&gt; results() {
+<span class="fc" id="L423">        return StreamSupport.stream(Spliterators.spliteratorUnknownSize(new Results(this),</span>
+                Spliterator.ORDERED | Spliterator.NONNULL), false);
+    }
+
+    /// The matches of one [#results()].
+    // Neither this iterator nor the replaceAll/replaceFirst(Function)
+    // callbacks fail fast when the matcher is reset or moved under them,
+    // where the JDK throws ConcurrentModificationException: that is misuse,
+    // and tracking it would cost a counter on every matcher operation for
+    // code that is already wrong.
+    private static final class Results implements Iterator&lt;MatchResult&gt; {
+        private final Matcher matcher;
+        private MatchResult next;
+        private boolean done;
+
+<span class="fc" id="L438">        Results(Matcher matcher) {</span>
+<span class="fc" id="L439">            this.matcher = matcher;</span>
+<span class="fc" id="L440">        }</span>
+
+        @Override
+        public boolean hasNext() {
+<span class="pc bpc" id="L444" title="1 of 4 branches missed.">            if (next == null &amp;&amp; !done) {</span>
+<span class="fc bfc" id="L445" title="All 2 branches covered.">                if (matcher.find()) {</span>
+<span class="fc" id="L446">                    next = matcher.toMatchResult();</span>
+                } else {
+<span class="fc" id="L448">                    done = true;</span>
+                }
+            }
+<span class="fc bfc" id="L451" title="All 2 branches covered.">            return next != null;</span>
+        }
+
+        @Override
+        public MatchResult next() {
+<span class="pc bpc" id="L456" title="1 of 2 branches missed.">            if (!hasNext()) {</span>
+<span class="nc" id="L457">                throw new NoSuchElementException();</span>
+            }
+<span class="fc" id="L459">            MatchResult out = next;</span>
+<span class="fc" id="L460">            next = null;</span>
+<span class="fc" id="L461">            return out;</span>
+        }
+    }
+
+    /// A replacement in which `$` and backslash stand for themselves.
+    public static String quoteReplacement(String s) {
+<span class="nc bnc" id="L467" title="All 4 branches missed.">        if (s.indexOf('\\') &lt; 0 &amp;&amp; s.indexOf('$') &lt; 0) {</span>
+<span class="nc" id="L468">            return s;</span>
+        }
+<span class="nc" id="L470">        StringBuilder sb = new StringBuilder(s.length() + 8);</span>
+<span class="nc bnc" id="L471" title="All 2 branches missed.">        for (int i = 0; i &lt; s.length(); i++) {</span>
+<span class="nc" id="L472">            char c = s.charAt(i);</span>
+<span class="nc bnc" id="L473" title="All 4 branches missed.">            if (c == '\\' || c == '$') {</span>
+<span class="nc" id="L474">                sb.append('\\');</span>
+            }
+<span class="nc" id="L476">            sb.append(c);</span>
+        }
+<span class="nc" id="L478">        return sb.toString();</span>
+    }
+
+    private void expand(String replacement, StringBuilder out) {
+<span class="fc" id="L482">        int cursor = 0;</span>
+<span class="fc" id="L483">        int length = replacement.length();</span>
+<span class="fc bfc" id="L484" title="All 2 branches covered.">        while (cursor &lt; length) {</span>
+<span class="fc" id="L485">            char c = replacement.charAt(cursor);</span>
+<span class="pc bpc" id="L486" title="1 of 2 branches missed.">            if (c == '\\') {</span>
+<span class="nc" id="L487">                cursor++;</span>
+<span class="nc bnc" id="L488" title="All 2 branches missed.">                if (cursor == length) {</span>
+<span class="nc" id="L489">                    throw new IllegalArgumentException(&quot;character to be escaped is missing&quot;);</span>
+                }
+<span class="nc" id="L491">                out.append(replacement.charAt(cursor));</span>
+<span class="nc" id="L492">                cursor++;</span>
+<span class="pc bpc" id="L493" title="1 of 2 branches missed.">            } else if (c == '$') {</span>
+<span class="nc" id="L494">                cursor++;</span>
+<span class="nc bnc" id="L495" title="All 2 branches missed.">                if (cursor == length) {</span>
+<span class="nc" id="L496">                    throw new IllegalArgumentException(&quot;Illegal group reference: group index is missing&quot;);</span>
+                }
+<span class="nc" id="L498">                char next = replacement.charAt(cursor);</span>
+                int group;
+<span class="nc bnc" id="L500" title="All 2 branches missed.">                if (next == '{') {</span>
+<span class="nc" id="L501">                    cursor++;</span>
+<span class="nc" id="L502">                    int start = cursor;</span>
+<span class="nc bnc" id="L503" title="All 2 branches missed.">                    while (cursor &lt; length) {</span>
+<span class="nc" id="L504">                        char n = replacement.charAt(cursor);</span>
+<span class="nc bnc" id="L505" title="All 6 branches missed.">                        if (Pattern.asciiLetter(n) || n &gt;= '0' &amp;&amp; n &lt;= '9') {</span>
+<span class="nc" id="L506">                            cursor++;</span>
+                        } else {
+                            break;
+                        }
+<span class="nc" id="L510">                    }</span>
+<span class="nc bnc" id="L511" title="All 2 branches missed.">                    if (cursor == start) {</span>
+<span class="nc" id="L512">                        throw new IllegalArgumentException(&quot;named capturing group has 0 length name&quot;);</span>
+                    }
+<span class="nc bnc" id="L514" title="All 4 branches missed.">                    if (cursor == length || replacement.charAt(cursor) != '}') {</span>
+<span class="nc" id="L515">                        throw new IllegalArgumentException(&quot;named capturing group is missing trailing '}'&quot;);</span>
+                    }
+<span class="nc" id="L517">                    String name = replacement.substring(start, cursor);</span>
+<span class="nc" id="L518">                    char lead = name.charAt(0);</span>
+<span class="nc bnc" id="L519" title="All 4 branches missed.">                    if (lead &gt;= '0' &amp;&amp; lead &lt;= '9') {</span>
+<span class="nc" id="L520">                        throw new IllegalArgumentException(&quot;capturing group name {&quot; + name</span>
+                                + &quot;} starts with digit character&quot;);
+                    }
+<span class="nc" id="L523">                    Integer found = pattern.names.get(name);</span>
+<span class="nc bnc" id="L524" title="All 2 branches missed.">                    if (found == null) {</span>
+<span class="nc" id="L525">                        throw new IllegalArgumentException(&quot;No group with name {&quot; + name + &quot;}&quot;);</span>
+                    }
+<span class="nc" id="L527">                    group = found.intValue();</span>
+<span class="nc" id="L528">                    cursor++;</span>
+<span class="nc" id="L529">                } else {</span>
+<span class="nc" id="L530">                    group = next - '0';</span>
+<span class="nc bnc" id="L531" title="All 4 branches missed.">                    if (group &lt; 0 || group &gt; 9) {</span>
+<span class="nc" id="L532">                        throw new IllegalArgumentException(&quot;Illegal group reference&quot;);</span>
+                    }
+<span class="nc" id="L534">                    cursor++;</span>
+<span class="nc bnc" id="L535" title="All 2 branches missed.">                    if (group &gt; pattern.groupCount) {</span>
+<span class="nc" id="L536">                        throw new IndexOutOfBoundsException(&quot;No group &quot; + group);</span>
+                    }
+<span class="nc bnc" id="L538" title="All 2 branches missed.">                    while (cursor &lt; length) {</span>
+<span class="nc" id="L539">                        int digit = replacement.charAt(cursor) - '0';</span>
+<span class="nc bnc" id="L540" title="All 4 branches missed.">                        if (digit &lt; 0 || digit &gt; 9) {</span>
+<span class="nc" id="L541">                            break;</span>
+                        }
+<span class="nc" id="L543">                        int wider = group * 10 + digit;</span>
+<span class="nc bnc" id="L544" title="All 2 branches missed.">                        if (wider &gt; pattern.groupCount) {</span>
+<span class="nc" id="L545">                            break;</span>
+                        }
+<span class="nc" id="L547">                        group = wider;</span>
+<span class="nc" id="L548">                        cursor++;</span>
+<span class="nc" id="L549">                    }</span>
+                }
+<span class="nc bnc" id="L551" title="All 4 branches missed.">                if (starts[group] &gt;= 0 &amp;&amp; ends[group] &gt;= 0) {</span>
+<span class="nc" id="L552">                    out.append(text.subSequence(starts[group], ends[group]).toString());</span>
+                }
+<span class="nc" id="L554">            } else {</span>
+<span class="fc" id="L555">                out.append(c);</span>
+<span class="fc" id="L556">                cursor++;</span>
+            }
+<span class="fc" id="L558">        }</span>
+<span class="fc" id="L559">    }</span>
+
+    public Matcher appendReplacement(StringBuilder sb, String replacement) {
+<span class="fc" id="L562">        requireMatch();</span>
+<span class="fc" id="L563">        StringBuilder expanded = new StringBuilder();</span>
+<span class="fc" id="L564">        expand(replacement, expanded);</span>
+<span class="fc" id="L565">        sb.append(text.subSequence(appendPosition, first).toString());</span>
+<span class="fc" id="L566">        sb.append(expanded.toString());</span>
+<span class="fc" id="L567">        appendPosition = last;</span>
+<span class="fc" id="L568">        return this;</span>
+    }
+
+    public Matcher appendReplacement(StringBuffer sb, String replacement) {
+<span class="nc" id="L572">        requireMatch();</span>
+<span class="nc" id="L573">        StringBuilder expanded = new StringBuilder();</span>
+<span class="nc" id="L574">        expand(replacement, expanded);</span>
+<span class="nc" id="L575">        sb.append(text.subSequence(appendPosition, first).toString());</span>
+<span class="nc" id="L576">        sb.append(expanded.toString());</span>
+<span class="nc" id="L577">        appendPosition = last;</span>
+<span class="nc" id="L578">        return this;</span>
+    }
+
+    public StringBuilder appendTail(StringBuilder sb) {
+<span class="fc" id="L582">        sb.append(text.subSequence(appendPosition, text.length()).toString());</span>
+<span class="fc" id="L583">        return sb;</span>
+    }
+
+    public StringBuffer appendTail(StringBuffer sb) {
+<span class="nc" id="L587">        sb.append(text.subSequence(appendPosition, text.length()).toString());</span>
+<span class="nc" id="L588">        return sb;</span>
+    }
+
+    public String replaceAll(String replacement) {
+<span class="fc" id="L592">        reset();</span>
+<span class="pc bpc" id="L593" title="1 of 2 branches missed.">        if (!find()) {</span>
+<span class="nc" id="L594">            return text.toString();</span>
+        }
+<span class="fc" id="L596">        StringBuilder sb = new StringBuilder();</span>
+        do {
+<span class="fc" id="L598">            appendReplacement(sb, replacement);</span>
+<span class="fc bfc" id="L599" title="All 2 branches covered.">        } while (find());</span>
+<span class="fc" id="L600">        return appendTail(sb).toString();</span>
+    }
+
+    public String replaceAll(Function&lt;MatchResult, String&gt; replacer) {
+<span class="nc bnc" id="L604" title="All 2 branches missed.">        if (replacer == null) {</span>
+<span class="nc" id="L605">            throw new NullPointerException();</span>
+        }
+<span class="nc" id="L607">        reset();</span>
+<span class="nc bnc" id="L608" title="All 2 branches missed.">        if (!find()) {</span>
+<span class="nc" id="L609">            return text.toString();</span>
+        }
+<span class="nc" id="L611">        StringBuilder sb = new StringBuilder();</span>
+        // A replacer that moves this matcher is not detected; see Results.
+        do {
+<span class="nc" id="L614">            appendReplacement(sb, replacer.apply(this));</span>
+<span class="nc bnc" id="L615" title="All 2 branches missed.">        } while (find());</span>
+<span class="nc" id="L616">        return appendTail(sb).toString();</span>
+    }
+
+    public String replaceFirst(String replacement) {
+<span class="nc bnc" id="L620" title="All 2 branches missed.">        if (replacement == null) {</span>
+<span class="nc" id="L621">            throw new NullPointerException(&quot;replacement&quot;);</span>
+        }
+<span class="nc" id="L623">        reset();</span>
+<span class="nc bnc" id="L624" title="All 2 branches missed.">        if (!find()) {</span>
+<span class="nc" id="L625">            return text.toString();</span>
+        }
+<span class="nc" id="L627">        StringBuilder sb = new StringBuilder();</span>
+<span class="nc" id="L628">        appendReplacement(sb, replacement);</span>
+<span class="nc" id="L629">        return appendTail(sb).toString();</span>
+    }
+
+    public String replaceFirst(Function&lt;MatchResult, String&gt; replacer) {
+<span class="nc bnc" id="L633" title="All 2 branches missed.">        if (replacer == null) {</span>
+<span class="nc" id="L634">            throw new NullPointerException();</span>
+        }
+<span class="nc" id="L636">        reset();</span>
+<span class="nc bnc" id="L637" title="All 2 branches missed.">        if (!find()) {</span>
+<span class="nc" id="L638">            return text.toString();</span>
+        }
+<span class="nc" id="L640">        StringBuilder sb = new StringBuilder();</span>
+<span class="nc" id="L641">        appendReplacement(sb, replacer.apply(this));</span>
+<span class="nc" id="L642">        return appendTail(sb).toString();</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc bnc" id="L647" title="All 2 branches missed.">        return &quot;java.util.regex.Matcher[pattern=&quot; + pattern.pattern() + &quot; region=&quot; + from + &quot;,&quot; + to</span>
+<span class="nc" id="L648">                + &quot; lastmatch=&quot; + (first &gt;= 0 ? group() : &quot;&quot;) + &quot;]&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

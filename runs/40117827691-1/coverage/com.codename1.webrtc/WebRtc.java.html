@@ -1,0 +1,279 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WebRtc.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.webrtc</a> &gt; <span class="el_source">WebRtc.java</span></div><h1>WebRtc.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.webrtc;
+
+import com.codename1.ui.CN;
+import com.codename1.ui.Display;
+import com.codename1.util.AsyncResource;
+import com.codename1.webrtc.spi.WebRtcBridge;
+import java.util.HashMap;
+import java.util.Map;
+
+/// Real-time audio and video between two devices: the entry point of the
+/// package.
+///
+/// ```java
+/// import com.codename1.webrtc.*;
+///
+/// Form form = new Form(&quot;Call&quot;, new BorderLayout());
+/// if (WebRtc.isSupported()) {
+///     WebRtc.openUserMedia(true, true, true).ready(media -&gt; {
+///         PeerConnection pc = WebRtc.createPeerConnection(
+///                 new PeerConnectionConfig().addIceServer(IceServer.stun(&quot;stun:stun.example.com&quot;)),
+///                 new PeerConnection.Listener() {
+///                     public void iceCandidate(PeerConnection connection, IceCandidate candidate) {
+///                         // send it to the other side over your own channel
+///                     }
+///
+///                     public void stateChanged(PeerConnection connection, String state) {
+///                         form.setTitle(state);
+///                     }
+///
+///                     public void remoteTrack(PeerConnection connection, MediaTrack track) {
+///                         if (track.isVideo()) {
+///                             form.add(BorderLayout.CENTER, new VideoView(track, false));
+///                             form.revalidate();
+///                         }
+///                     }
+///                 });
+///         pc.addTrack(media.getAudio());
+///         pc.addTrack(media.getVideo());
+///         form.add(BorderLayout.SOUTH, new VideoView(media.getVideo(), true));
+///         form.revalidate();
+///     });
+/// } else {
+///     form.add(BorderLayout.CENTER, new Label(&quot;No camera calls on this device&quot;));
+/// }
+/// form.show();
+/// ```
+///
+/// The package carries media. It does not ring, place the call in the
+/// system call log, or wake a sleeping phone: that is `com.codename1.call`,
+/// which an app uses alongside this one. And it does not signal -- see
+/// [PeerConnection].
+///
+/// On Android this is Google's WebRTC library and on iOS Apple-platform
+/// builds of the same library; both are added to an app only when it uses
+/// this package. In a browser it is the browser's own WebRTC. The simulator
+/// connects calls without carrying media: tracks open, descriptions are
+/// exchanged and connections reach [PeerConnection#CONNECTED], and the
+/// video views show a test pattern, so an app's call flow can be developed
+/// and tested end to end on the desktop.
+public final class WebRtc {
+<span class="fc" id="L83">    private static final Map&lt;Integer, AsyncResource&lt;?&gt;&gt; REQUESTS =</span>
+            new HashMap&lt;Integer, AsyncResource&lt;?&gt;&gt;();
+<span class="fc" id="L85">    private static final Map&lt;Integer, PeerConnection&gt; PEERS = new HashMap&lt;Integer, PeerConnection&gt;();</span>
+<span class="fc" id="L86">    private static int nextRequest = 1;</span>
+
+    private WebRtc() {
+    }
+
+    static WebRtcBridge bridge() {
+<span class="fc" id="L92">        WebRtcBridge bridge = Display.getInstance().getWebRtcBridge();</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        if (bridge == null) {</span>
+<span class="fc" id="L94">            throw new IllegalStateException(&quot;WebRTC is not supported on this platform&quot;);</span>
+        }
+<span class="fc" id="L96">        return bridge;</span>
+    }
+
+    /// Whether this platform carries WebRTC media.
+    public static boolean isSupported() {
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        return Display.getInstance().getWebRtcBridge() != null;</span>
+    }
+
+    /// Opens the camera and/or the microphone, asking the user's permission
+    /// where the platform asks for it. Fails when the user refuses or the
+    /// device has neither.
+    ///
+    /// #### Parameters
+    ///
+    /// - `frontCamera`: which camera to open first; see
+    ///   [MediaTrack#switchCamera()]
+    public static AsyncResource&lt;LocalMedia&gt; openUserMedia(boolean audio, boolean video,
+            boolean frontCamera) {
+<span class="fc" id="L114">        AsyncResource&lt;LocalMedia&gt; out = new AsyncResource&lt;LocalMedia&gt;();</span>
+<span class="pc bpc" id="L115" title="3 of 4 branches missed.">        if (!audio &amp;&amp; !video) {</span>
+<span class="nc" id="L116">            out.error(new IllegalArgumentException(&quot;Ask for audio, video or both&quot;));</span>
+<span class="nc" id="L117">            return out;</span>
+        }
+<span class="fc" id="L119">        bridge().openUserMedia(request(out), audio, video, frontCamera);</span>
+<span class="fc" id="L120">        return out;</span>
+    }
+
+    /// Creates a peer connection, which reports to `listener` on the EDT.
+    public static PeerConnection createPeerConnection(PeerConnectionConfig config,
+            PeerConnection.Listener listener) {
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">        if (listener == null) {</span>
+<span class="nc" id="L127">            throw new IllegalArgumentException(&quot;A peer connection needs a listener&quot;);</span>
+        }
+<span class="fc bfc" id="L129" title="All 2 branches covered.">        PeerConnectionConfig used = config == null ? new PeerConnectionConfig() : config;</span>
+<span class="fc" id="L130">        int handle = bridge().createPeerConnection(used.wire(), used.isRelayOnly());</span>
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">        if (handle &lt; 0) {</span>
+<span class="nc" id="L132">            throw new IllegalStateException(&quot;The platform could not create a peer connection&quot;);</span>
+        }
+<span class="fc" id="L134">        PeerConnection connection = new PeerConnection(handle, listener);</span>
+<span class="fc" id="L135">        PEERS.put(Integer.valueOf(handle), connection);</span>
+<span class="fc" id="L136">        return connection;</span>
+    }
+
+    /// Routes call audio to the loudspeaker, or with false back to the
+    /// earpiece or headset.
+    public static void setSpeakerphone(boolean on) {
+<span class="nc" id="L142">        bridge().setSpeakerphone(on);</span>
+<span class="nc" id="L143">    }</span>
+
+    // The registries are touched only on the EDT: the API is called there, and
+    // every answer from a port is marshalled there by callSerially below.
+    static int request(AsyncResource&lt;?&gt; pending) {
+<span class="fc" id="L148">        int id = nextRequest++;</span>
+<span class="fc" id="L149">        REQUESTS.put(Integer.valueOf(id), pending);</span>
+<span class="fc" id="L150">        return id;</span>
+    }
+
+    static void forget(PeerConnection connection) {
+<span class="fc" id="L154">        PEERS.remove(Integer.valueOf(connection.handle()));</span>
+<span class="fc" id="L155">    }</span>
+
+    private static AsyncResource&lt;?&gt; take(int requestId) {
+<span class="fc" id="L158">        return REQUESTS.remove(Integer.valueOf(requestId));</span>
+    }
+
+    private static PeerConnection peer(int handle) {
+<span class="fc" id="L162">        return PEERS.get(Integer.valueOf(handle));</span>
+    }
+
+    // ------------------------------------------------- answers from a port
+
+    /// A port's answer to `createDescription`: the description, or a null
+    /// `sdp` and the reason.
+    public static void deliverDescription(final int requestId, final String type,
+            final String sdp, final String error) {
+<span class="fc" id="L171">        CN.callSerially(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L174">                AsyncResource&lt;?&gt; pending = take(requestId);</span>
+<span class="pc bpc" id="L175" title="1 of 2 branches missed.">                if (pending == null) {</span>
+<span class="nc" id="L176">                    return;</span>
+                }
+                @SuppressWarnings(&quot;unchecked&quot;)
+<span class="fc" id="L179">                AsyncResource&lt;SessionDescription&gt; out = (AsyncResource&lt;SessionDescription&gt;) pending;</span>
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">                if (sdp == null) {</span>
+<span class="nc bnc" id="L181" title="All 2 branches missed.">                    out.error(new IllegalStateException(error == null ? &quot;failed&quot; : error));</span>
+                } else {
+<span class="fc" id="L183">                    out.complete(new SessionDescription(type, sdp));</span>
+                }
+<span class="fc" id="L185">            }</span>
+        });
+<span class="fc" id="L187">    }</span>
+
+    /// A port's answer to `openUserMedia`: the track handles, 0 for none,
+    /// or both 0 and the reason.
+    public static void deliverTracks(final int requestId, final int audio, final int video,
+            final String error) {
+<span class="fc" id="L193">        CN.callSerially(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L196">                AsyncResource&lt;?&gt; pending = take(requestId);</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">                if (pending == null) {</span>
+<span class="nc" id="L198">                    return;</span>
+                }
+                @SuppressWarnings(&quot;unchecked&quot;)
+<span class="fc" id="L201">                AsyncResource&lt;LocalMedia&gt; out = (AsyncResource&lt;LocalMedia&gt;) pending;</span>
+<span class="pc bpc" id="L202" title="3 of 4 branches missed.">                if (audio == 0 &amp;&amp; video == 0) {</span>
+<span class="nc bnc" id="L203" title="All 2 branches missed.">                    out.error(new IllegalStateException(error == null</span>
+                            ? &quot;The camera or microphone could not be opened&quot; : error));
+<span class="nc" id="L205">                    return;</span>
+                }
+<span class="pc bpc" id="L207" title="2 of 4 branches missed.">                out.complete(new LocalMedia(</span>
+                        audio == 0 ? null : new MediaTrack(audio, MediaTrack.AUDIO, true),
+                        video == 0 ? null : new MediaTrack(video, MediaTrack.VIDEO, true)));
+<span class="fc" id="L210">            }</span>
+        });
+<span class="fc" id="L212">    }</span>
+
+    /// A port's answer to `setDescription`: null for success, else the
+    /// reason.
+    public static void deliverResult(final int requestId, final String error) {
+<span class="fc" id="L217">        CN.callSerially(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L220">                AsyncResource&lt;?&gt; pending = take(requestId);</span>
+<span class="pc bpc" id="L221" title="1 of 2 branches missed.">                if (pending == null) {</span>
+<span class="nc" id="L222">                    return;</span>
+                }
+                @SuppressWarnings(&quot;unchecked&quot;)
+<span class="fc" id="L225">                AsyncResource&lt;Boolean&gt; out = (AsyncResource&lt;Boolean&gt;) pending;</span>
+<span class="fc bfc" id="L226" title="All 2 branches covered.">                if (error == null) {</span>
+<span class="fc" id="L227">                    out.complete(Boolean.TRUE);</span>
+                } else {
+<span class="fc" id="L229">                    out.error(new IllegalStateException(error));</span>
+                }
+<span class="fc" id="L231">            }</span>
+        });
+<span class="fc" id="L233">    }</span>
+
+    /// A candidate a peer connection gathered.
+    public static void iceCandidate(final int peer, final String sdpMid, final int sdpMLineIndex,
+            final String candidate) {
+<span class="fc" id="L238">        CN.callSerially(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L241">                PeerConnection connection = peer(peer);</span>
+<span class="pc bpc" id="L242" title="2 of 4 branches missed.">                if (connection != null &amp;&amp; candidate != null) {</span>
+<span class="fc" id="L243">                    connection.listener().iceCandidate(connection,</span>
+                            new IceCandidate(sdpMid, sdpMLineIndex, candidate));
+                }
+<span class="fc" id="L246">            }</span>
+        });
+<span class="fc" id="L248">    }</span>
+
+    /// A peer connection moved to `state`, one of the names on
+    /// [PeerConnection].
+    public static void stateChanged(final int peer, final String state) {
+<span class="fc" id="L253">        CN.callSerially(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L256">                PeerConnection connection = peer(peer);</span>
+<span class="pc bpc" id="L257" title="1 of 4 branches missed.">                if (connection != null &amp;&amp; !state.equals(connection.getState())) {</span>
+<span class="fc" id="L258">                    connection.state(state);</span>
+<span class="fc" id="L259">                    connection.listener().stateChanged(connection, state);</span>
+                }
+<span class="fc" id="L261">            }</span>
+        });
+<span class="fc" id="L263">    }</span>
+
+    /// The other side's track arrived on a peer connection.
+    public static void remoteTrack(final int peer, final int track, final boolean video) {
+<span class="fc" id="L267">        CN.callSerially(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L270">                PeerConnection connection = peer(peer);</span>
+<span class="pc bpc" id="L271" title="1 of 2 branches missed.">                if (connection != null) {</span>
+<span class="pc bpc" id="L272" title="1 of 2 branches missed.">                    connection.listener().remoteTrack(connection, new MediaTrack(track,</span>
+                            video ? MediaTrack.VIDEO : MediaTrack.AUDIO, false));
+                }
+<span class="fc" id="L275">            }</span>
+        });
+<span class="fc" id="L277">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

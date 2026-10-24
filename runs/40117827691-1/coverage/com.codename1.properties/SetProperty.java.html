@@ -1,0 +1,264 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SetProperty.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.properties</a> &gt; <span class="el_source">SetProperty.java</span></div><h1>SetProperty.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.properties;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Set;
+
+/// Base class for a property as a set which can contain multiple elements within
+public class SetProperty&lt;T, K&gt; extends CollectionProperty&lt;T, K&gt; {
+
+<span class="pc" id="L37">    private final Set&lt;T&gt; value = new HashSet&lt;T&gt;();</span>
+
+    /// Constructs a property with the given name and value
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name of the property
+    ///
+    /// - `values`: default values for the property
+    public SetProperty(String name, T... values) {
+<span class="nc" id="L47">        this(name, null, values);</span>
+<span class="nc" id="L48">    }</span>
+
+    /// Constructs a property with the given name and values by specifying the
+    /// type of the elements explicitly. The element type needs to be specified
+    /// if the set should contain `PropertyBusinessObject`s and needs
+    /// to get deserialized properly!
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name of the property
+    ///
+    /// - `elementType`: subclass of `PropertyBusinessObject`
+    ///
+    /// - `values`: default values for the property
+    public SetProperty(String name, Class&lt;T&gt; elementType, T... values) {
+<span class="fc" id="L63">        super(name, elementType);</span>
+<span class="fc" id="L64">        Collections.addAll(value, values);</span>
+<span class="fc" id="L65">    }</span>
+
+    /// Constructs a property with null value
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name of the property
+    public SetProperty(String name) {
+<span class="nc" id="L73">        super(name);</span>
+<span class="nc" id="L74">    }</span>
+
+    /// The size of the property set
+    ///
+    /// #### Returns
+    ///
+    /// the number of elements
+    @Override
+    public int size() {
+<span class="fc" id="L83">        internalGet();</span>
+<span class="fc" id="L84">        return value.size();</span>
+    }
+
+    /// Sets the entire content of the property
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: the collection of elements to set
+    ///
+    /// #### Returns
+    ///
+    /// the parent object for chaining
+    @Override
+    public K set(Collection&lt;T&gt; t) {
+<span class="nc" id="L98">        value.clear();</span>
+<span class="nc" id="L99">        value.addAll(t);</span>
+<span class="nc" id="L100">        firePropertyChanged();</span>
+<span class="nc" id="L101">        internalSet();</span>
+<span class="nc" id="L102">        return (K) parent.parent;</span>
+    }
+
+    /// Adds a property value to the set and fires a change event if it changed the set
+    ///
+    /// #### Parameters
+    ///
+    /// - `v`: the new value
+    @Override
+    public K add(T v) {
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">        if (value.add(v)) {</span>
+<span class="fc" id="L113">            firePropertyChanged();</span>
+<span class="fc" id="L114">            internalSet();</span>
+        }
+<span class="fc" id="L116">        return (K) parent.parent;</span>
+    }
+
+    /// Adds a collection of values to the set and fires a change event if it changed the set
+    ///
+    /// #### Parameters
+    ///
+    /// - `v`: the new value
+    @Override
+    public K addAll(Collection&lt;? extends T&gt; v) {
+<span class="nc bnc" id="L126" title="All 2 branches missed.">        if (value.addAll(v)) {</span>
+<span class="nc" id="L127">            firePropertyChanged();</span>
+<span class="nc" id="L128">            internalSet();</span>
+        }
+<span class="nc" id="L130">        return (K) parent.parent;</span>
+    }
+
+    /// Removes the given item from the set and fires a change event if this item has been successfully removed
+    ///
+    /// #### Parameters
+    ///
+    /// - `v`: the item to remove
+    @Override
+    public K remove(T v) {
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">        if (value.remove(v)) {</span>
+<span class="fc" id="L141">            firePropertyChanged();</span>
+<span class="fc" id="L142">            internalSet();</span>
+        }
+<span class="fc" id="L144">        return (K) parent.parent;</span>
+    }
+
+    /// Removes the given item from the set and fires a change event if this item has been successfully removed
+    ///
+    /// #### Parameters
+    ///
+    /// - `v`: the item to remove
+    @Override
+    public K remove(int v) {
+<span class="nc bnc" id="L154" title="All 2 branches missed.">        for (T o : value) {</span>
+<span class="nc bnc" id="L155" title="All 2 branches missed.">            if (v == 0) {</span>
+<span class="nc" id="L156">                return remove(o);</span>
+            }
+<span class="nc" id="L158">            v--;</span>
+<span class="nc" id="L159">        }</span>
+<span class="nc" id="L160">        return (K) parent.parent;</span>
+    }
+
+    /// Removes from the set all values from the given collection and fires a change event if the set has changed
+    ///
+    /// #### Parameters
+    ///
+    /// - `the`: item to remove
+    @Override
+    public K removeAll(Collection&lt;? extends T&gt; v) {
+<span class="nc bnc" id="L170" title="All 2 branches missed.">        if (value.removeAll(v)) {</span>
+<span class="nc" id="L171">            firePropertyChanged();</span>
+<span class="nc" id="L172">            internalSet();</span>
+        }
+<span class="nc" id="L174">        return (K) parent.parent;</span>
+    }
+
+    /// Compares this property to another property
+    ///
+    /// #### Parameters
+    ///
+    /// - `obj`: the other property
+    ///
+    /// #### Returns
+    ///
+    /// true if they are equal in name and value
+    @Override
+    public boolean equals(Object obj) {
+<span class="nc bnc" id="L188" title="All 2 branches missed.">        if (!super.equals(obj)) {</span>
+<span class="nc" id="L189">            return false;</span>
+        }
+<span class="nc" id="L191">        SetProperty other = (SetProperty) obj;</span>
+<span class="nc" id="L192">        return other.value.equals(value);</span>
+    }
+
+    /// Returns the internal hashcode or 0 for null property
+    ///
+    /// #### Returns
+    ///
+    /// the hashcode value
+    @Override
+    public int hashCode() {
+<span class="nc" id="L202">        return value.hashCode();</span>
+    }
+
+    /// Iterate over the elements of the property
+    ///
+    /// #### Returns
+    ///
+    /// an iterator
+    @Override
+    public Iterator&lt;T&gt; iterator() {
+<span class="nc" id="L212">        internalGet();</span>
+<span class="nc" id="L213">        return value.iterator();</span>
+    }
+
+    /// Returns a copy of the content as a new list
+    ///
+    /// #### Returns
+    ///
+    /// a list
+    @Override
+    public List&lt;T&gt; asList() {
+<span class="nc" id="L223">        internalGet();</span>
+<span class="nc" id="L224">        return new ArrayList&lt;T&gt;(value);</span>
+    }
+
+    /// Returns a copy of the content as a new list but if the value is a PropertyBusinessObject it will
+    /// be converted to a Map
+    ///
+    /// #### Returns
+    ///
+    /// a list
+    @Override
+    public List&lt;Object&gt; asExplodedList() {
+<span class="nc" id="L235">        return asExplodedList(value);</span>
+    }
+
+    /// Remove all the elements from the set and fires a change event if the set wasn't empty
+    @Override
+    public void clear() {
+<span class="pc bpc" id="L241" title="1 of 2 branches missed.">        if (!value.isEmpty()) {</span>
+<span class="fc" id="L242">            value.clear();</span>
+<span class="fc" id="L243">            firePropertyChanged();</span>
+<span class="fc" id="L244">            internalSet();</span>
+        }
+<span class="fc" id="L246">    }</span>
+
+    /// Returns true if the given element is contained in the set property
+    ///
+    /// #### Parameters
+    ///
+    /// - `element`: the element
+    ///
+    /// #### Returns
+    ///
+    /// true if the given element is contained in the set property
+    @Override
+    public boolean contains(T element) {
+<span class="fc" id="L259">        return value.contains(element);</span>
+    }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

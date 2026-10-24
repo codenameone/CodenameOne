@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SleepStage.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.health</a> &gt; <span class="el_source">SleepStage.java</span></div><h1>SleepStage.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.health;
+
+/// One stage within a [SleepSample]. The values mirror Health Connect's
+/// eight stage constants; the iOS mapping is noted per value.
+///
+/// Not every source reports stages. Check
+/// [SleepSample#hasStageDetail()] before drawing a hypnogram -- a session
+/// recorded by a phone rather than a watch will only say &quot;asleep&quot;.
+<span class="fc" id="L31">public enum SleepStage {</span>
+
+    /// The source did not classify this span.
+<span class="fc" id="L34">    UNKNOWN,</span>
+
+    /// Awake during the sleep session. HealthKit `awake`.
+<span class="fc" id="L37">    AWAKE,</span>
+
+    /// Awake but in bed, before or after sleeping. HealthKit `inBed`.
+<span class="fc" id="L40">    AWAKE_IN_BED,</span>
+
+    /// Out of bed during the session. **Android only** -- HealthKit has no
+    /// equivalent and never reports it.
+<span class="fc" id="L44">    OUT_OF_BED,</span>
+
+    /// Asleep, with no stage breakdown available. HealthKit
+    /// `asleepUnspecified`, and the only asleep value iOS reported before
+    /// iOS 16.
+<span class="fc" id="L49">    ASLEEP_UNSPECIFIED,</span>
+
+    /// Light sleep, as Health Connect classifies it -- the N1 and N2
+    /// stages.
+    ///
+    /// HealthKit does not report this. Its nearest value is `asleepCore`,
+    /// which arrives as [#CORE] rather than being folded in here.
+<span class="fc" id="L56">    LIGHT,</span>
+
+    /// Apple's &quot;core&quot; sleep, from HealthKit `asleepCore` (iOS 16+).
+    ///
+    /// Its own value rather than a synonym for [#LIGHT]. This used to be
+    /// mapped there with the approximation written into the javadoc, and a
+    /// documented approximation is still a value the caller cannot tell
+    /// from a real one: an app drawing a hypnogram, or comparing a night on
+    /// iOS with a night on Android, was handed Apple's classification
+    /// labelled as the clinical one.
+    ///
+    /// Apple's core is a vendor classification and is not clinically
+    /// identical to N1+N2. If your reading of the two is the same, treat
+    /// them the same; the API will not do it for you.
+<span class="fc" id="L70">    CORE,</span>
+
+    /// Deep sleep. HealthKit `asleepDeep`, iOS 16+.
+<span class="fc" id="L73">    DEEP,</span>
+
+    /// REM sleep. HealthKit `asleepREM`, iOS 16+.
+<span class="fc" id="L76">    REM</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

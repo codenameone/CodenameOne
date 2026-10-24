@@ -1,0 +1,271 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CombinedXYChart.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.charts.views</a> &gt; <span class="el_source">CombinedXYChart.java</span></div><h1>CombinedXYChart.java</h1><pre class="source lang-java linenums">/// Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
+///
+/// Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+/// you may not use this file except in compliance with the License.
+/// You may obtain a copy of the License at
+///
+/// http://www.apache.org/licenses/LICENSE-2.0
+///
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
+package com.codename1.charts.views;
+
+import com.codename1.charts.compat.Canvas;
+import com.codename1.charts.compat.Paint;
+import com.codename1.charts.models.XYMultipleSeriesDataset;
+import com.codename1.charts.models.XYSeries;
+import com.codename1.charts.renderers.SimpleSeriesRenderer;
+import com.codename1.charts.renderers.XYMultipleSeriesRenderer;
+import com.codename1.charts.renderers.XYMultipleSeriesRenderer.Orientation;
+import com.codename1.charts.renderers.XYSeriesRenderer;
+import java.util.List;
+
+
+/// Aggregates multiple `XYChart` implementations into a single plot so
+/// different series can be visualised using different renderers (for example a
+/// line overlaid on top of a bar chart).
+///
+/// Provide the constructor with an `XYMultipleSeriesDataset`, a matching
+/// `XYMultipleSeriesRenderer` and an array of
+/// `XYCombinedChartDef` instances that describe which inner chart type
+/// should render each data series. The combined chart can then be wrapped in a
+/// `com.codename1.charts.ChartComponent` for display.
+public class CombinedXYChart extends XYChart {
+
+    private final XYCombinedChartDef[] chartDefinitions;
+
+    /// The embedded XY charts.
+    private final XYChart[] mCharts;
+
+    /// Builds a new combined XY chart instance.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dataset`: the multiple series dataset
+    ///
+    /// - `renderer`: the multiple series renderer
+    ///
+    /// - `chartDefinitions`: the XY chart definitions
+    public CombinedXYChart(XYMultipleSeriesDataset dataset, XYMultipleSeriesRenderer renderer,
+                           XYCombinedChartDef[] chartDefinitions) {
+<span class="fc" id="L54">        super(dataset, renderer);</span>
+<span class="fc" id="L55">        this.chartDefinitions = chartDefinitions;</span>
+<span class="fc" id="L56">        int length = chartDefinitions.length;</span>
+<span class="fc" id="L57">        mCharts = new XYChart[length];</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="fc" id="L59">            mCharts[i] = createXYChart(chartDefinitions[i].getType());</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">            if (mCharts[i] == null) {</span>
+<span class="nc" id="L61">                throw new IllegalArgumentException(&quot;Unknown chart type &quot; + chartDefinitions[i].getType());</span>
+            } else {
+<span class="fc" id="L63">                XYMultipleSeriesDataset newDataset = new XYMultipleSeriesDataset();</span>
+<span class="fc" id="L64">                XYMultipleSeriesRenderer newRenderer = new XYMultipleSeriesRenderer();</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">                for (int seriesIndex : chartDefinitions[i].getSeriesIndex()) {</span>
+<span class="fc" id="L66">                    newDataset.addSeries(dataset.getSeriesAt(seriesIndex));</span>
+<span class="fc" id="L67">                    newRenderer.addSeriesRenderer(renderer.getSeriesRendererAt(seriesIndex));</span>
+                }
+<span class="fc" id="L69">                newRenderer.setBarSpacing(renderer.getBarSpacing());</span>
+<span class="fc" id="L70">                newRenderer.setPointSize(renderer.getPointSize());</span>
+
+<span class="fc" id="L72">                mCharts[i].setDatasetRenderer(newDataset, newRenderer);</span>
+            }
+        }
+<span class="fc" id="L75">    }</span>
+
+    /// Returns a chart instance based on the provided type.
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: the chart type
+    ///
+    /// #### Returns
+    ///
+    /// an instance of a chart implementation
+    ///
+    static XYChart createXYChart(String type) {
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        if (TimeChart.TYPE.equals(type)) {</span>
+<span class="fc" id="L89">            return new TimeChart();</span>
+        }
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        if (LineChart.TYPE.equals(type)) {</span>
+<span class="fc" id="L92">            return new LineChart();</span>
+        }
+<span class="fc bfc" id="L94" title="All 2 branches covered.">        if (CubicLineChart.TYPE.equals(type)) {</span>
+<span class="fc" id="L95">            return new CubicLineChart();</span>
+        }
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        if (BarChart.TYPE.equals(type)) {</span>
+<span class="fc" id="L98">            return new BarChart();</span>
+        }
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        if (BubbleChart.TYPE.equals(type)) {</span>
+<span class="fc" id="L101">            return new BubbleChart();</span>
+        }
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        if (ScatterChart.TYPE.equals(type)) {</span>
+<span class="fc" id="L104">            return new ScatterChart();</span>
+        }
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        if (RangeBarChart.TYPE.equals(type)) {</span>
+<span class="fc" id="L107">            return new RangeBarChart();</span>
+        }
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        if (RangeStackedBarChart.TYPE.equals(type)) {</span>
+<span class="fc" id="L110">            return new RangeStackedBarChart();</span>
+        }
+<span class="fc" id="L112">        return null;</span>
+    }
+
+    /// The graphical representation of a series.
+    ///
+    /// #### Parameters
+    ///
+    /// - `canvas`: the canvas to paint to
+    ///
+    /// - `paint`: the paint to be used for drawing
+    ///
+    /// - `points`: the array of points to be used for drawing the series
+    ///
+    /// - `seriesRenderer`: the series renderer
+    ///
+    /// - `yAxisValue`: the minimum value of the y axis
+    ///
+    /// - `seriesIndex`: the index of the series currently being drawn
+    ///
+    /// - `startIndex`: the start index of the rendering points
+    @Override
+    public void drawSeries(Canvas canvas, Paint paint, List&lt;Float&gt; points,
+                           XYSeriesRenderer seriesRenderer, float yAxisValue, int seriesIndex, int startIndex) {
+<span class="nc" id="L135">        XYChart chart = getXYChart(seriesIndex);</span>
+<span class="nc" id="L136">        chart.setScreenR(getScreenR());</span>
+<span class="nc" id="L137">        chart.setCalcRange(getCalcRange(mDataset.getSeriesAt(seriesIndex).getScaleNumber()), 0);</span>
+<span class="nc" id="L138">        chart.drawSeries(canvas, paint, points, seriesRenderer, yAxisValue,</span>
+<span class="nc" id="L139">                getChartSeriesIndex(seriesIndex), startIndex);</span>
+<span class="nc" id="L140">    }</span>
+
+    @Override
+    protected ClickableArea[] clickableAreasForPoints(List&lt;Float&gt; points, List&lt;Double&gt; values,
+                                                      float yAxisValue, int seriesIndex, int startIndex) {
+<span class="nc" id="L145">        XYChart chart = getXYChart(seriesIndex);</span>
+<span class="nc" id="L146">        return chart.clickableAreasForPoints(points, values, yAxisValue,</span>
+<span class="nc" id="L147">                getChartSeriesIndex(seriesIndex), startIndex);</span>
+    }
+
+    @Override
+    protected void drawSeries(XYSeries series, Canvas canvas, Paint paint, List&lt;Float&gt; pointsList,
+                              XYSeriesRenderer seriesRenderer, float yAxisValue, int seriesIndex, Orientation or,
+                              int startIndex) {
+<span class="nc" id="L154">        XYChart chart = getXYChart(seriesIndex);</span>
+<span class="nc" id="L155">        chart.setScreenR(getScreenR());</span>
+<span class="nc" id="L156">        chart.setCalcRange(getCalcRange(mDataset.getSeriesAt(seriesIndex).getScaleNumber()), 0);</span>
+<span class="nc" id="L157">        chart.drawSeries(series, canvas, paint, pointsList, seriesRenderer, yAxisValue,</span>
+<span class="nc" id="L158">                getChartSeriesIndex(seriesIndex), or, startIndex);</span>
+<span class="nc" id="L159">    }</span>
+
+    /// Returns the legend shape width.
+    ///
+    /// #### Parameters
+    ///
+    /// - `seriesIndex`: the series index
+    ///
+    /// #### Returns
+    ///
+    /// the legend shape width
+    @Override
+    public int getLegendShapeWidth(int seriesIndex) {
+<span class="nc" id="L172">        XYChart chart = getXYChart(seriesIndex);</span>
+<span class="nc" id="L173">        return chart.getLegendShapeWidth(getChartSeriesIndex(seriesIndex));</span>
+    }
+
+    /// The graphical representation of the legend shape.
+    ///
+    /// #### Parameters
+    ///
+    /// - `canvas`: the canvas to paint to
+    ///
+    /// - `renderer`: the series renderer
+    ///
+    /// - `x`: the x value of the point the shape should be drawn at
+    ///
+    /// - `y`: the y value of the point the shape should be drawn at
+    ///
+    /// - `seriesIndex`: the series index
+    ///
+    /// - `paint`: the paint to be used for drawing
+    @Override
+    public void drawLegendShape(Canvas canvas, SimpleSeriesRenderer renderer, float x, float y,
+                                int seriesIndex, Paint paint) {
+<span class="nc" id="L194">        XYChart chart = getXYChart(seriesIndex);</span>
+<span class="nc" id="L195">        chart.drawLegendShape(canvas, renderer, x, y, getChartSeriesIndex(seriesIndex), paint);</span>
+<span class="nc" id="L196">    }</span>
+
+    /// Returns the chart type identifier.
+    ///
+    /// #### Returns
+    ///
+    /// the chart type
+    @Override
+    public String getChartType() {
+<span class="fc" id="L205">        return &quot;Combined&quot;;</span>
+    }
+
+    private XYChart getXYChart(int seriesIndex) {
+<span class="nc" id="L209">        int clen = chartDefinitions.length;</span>
+<span class="nc bnc" id="L210" title="All 2 branches missed.">        for (int i = 0; i &lt; clen; i++) {</span>
+<span class="nc bnc" id="L211" title="All 2 branches missed.">            if (chartDefinitions[i].containsSeries(seriesIndex)) {</span>
+<span class="nc" id="L212">                return mCharts[i];</span>
+            }
+        }
+<span class="nc" id="L215">        throw new IllegalArgumentException(&quot;Unknown series with index &quot; + seriesIndex);</span>
+    }
+
+    private int getChartSeriesIndex(int seriesIndex) {
+<span class="nc" id="L219">        int clen = chartDefinitions.length;</span>
+<span class="nc bnc" id="L220" title="All 2 branches missed.">        for (int i = 0; i &lt; clen; i++) {</span>
+<span class="nc bnc" id="L221" title="All 2 branches missed.">            if (chartDefinitions[i].containsSeries(seriesIndex)) {</span>
+<span class="nc" id="L222">                return chartDefinitions[i].getChartSeriesIndex(seriesIndex);</span>
+            }
+        }
+<span class="nc" id="L225">        throw new IllegalArgumentException(&quot;Unknown series with index &quot; + seriesIndex);</span>
+    }
+
+    /// Definition of a chart inside a combined XY chart.
+    public static class XYCombinedChartDef {
+        /// The chart type.
+        private final String type;
+        /// The series index.
+        private final int[] seriesIndex;
+
+        /// Constructs a chart definition.
+        ///
+        /// #### Parameters
+        ///
+        /// - `type`: XY chart type
+        ///
+        /// - `seriesIndex`: corresponding data series indexes
+<span class="fc" id="L242">        public XYCombinedChartDef(String type, int... seriesIndex) {</span>
+<span class="fc" id="L243">            this.type = type;</span>
+<span class="fc" id="L244">            this.seriesIndex = seriesIndex;</span>
+<span class="fc" id="L245">        }</span>
+
+        public boolean containsSeries(int seriesIndex) {
+<span class="nc bnc" id="L248" title="All 2 branches missed.">            return getChartSeriesIndex(seriesIndex) &gt;= 0;</span>
+        }
+
+        public int getChartSeriesIndex(int seriesIndex) {
+<span class="nc" id="L252">            int slen = getSeriesIndex().length;</span>
+<span class="nc bnc" id="L253" title="All 2 branches missed.">            for (int i = 0; i &lt; slen; i++) {</span>
+<span class="nc bnc" id="L254" title="All 2 branches missed.">                if (this.seriesIndex[i] == seriesIndex) {</span>
+<span class="nc" id="L255">                    return i;</span>
+                }
+            }
+<span class="nc" id="L258">            return -1;</span>
+        }
+
+        public String getType() {
+<span class="fc" id="L262">            return type;</span>
+        }
+
+        public int[] getSeriesIndex() {
+<span class="fc" id="L266">            return seriesIndex;</span>
+        }
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

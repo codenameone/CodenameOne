@@ -1,0 +1,531 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OidcRequestAuthorizer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io.oidc</a> &gt; <span class="el_source">OidcRequestAuthorizer.java</span></div><h1>OidcRequestAuthorizer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation. Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.io.oidc;
+
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.NetworkManager;
+import com.codename1.io.RequestAuthorizer;
+import com.codename1.ui.CN;
+import com.codename1.ui.Display;
+import com.codename1.util.AsyncResource;
+import com.codename1.util.SuccessCallback;
+
+import java.util.ArrayList;
+
+/// Sends an [OidcClient]'s access token with the application's requests, and renews it with the
+/// refresh token when the service refuses it.
+///
+/// ```java
+/// OidcRequestAuthorizer authorizer = new OidcRequestAuthorizer(client);
+/// authorizer.install(&quot;https://api.example.com&quot;);
+/// authorizer.load();          // a session saved by an earlier run, if there is one
+/// ```
+///
+/// From then on every request under that base URL carries `Authorization: Bearer ...`,
+/// generated `@RestClient` clients included. The authorizer follows its client: tokens obtained
+/// by [OidcClient#authorize()], [OidcClient#refresh(String)] or the device grant are picked up
+/// as they arrive, and [OidcClient#clearStoredTokens()] drops them.
+///
+/// #### When the service answers 401
+///
+/// The request is held and the refresh token is exchanged for a new set -- once, however many
+/// requests were refused together; they all wait for the same exchange. Each is then sent again
+/// with the new access token. See [RequestAuthorizer] for what the caller of a request sees.
+///
+/// When the authorization server returns a permanent refresh error, the session is over: the tokens
+/// are dropped from memory and from the [TokenStore], the held requests deliver their `401`,
+/// and every [SignInRequiredListener] is told so the application can show its sign-in screen.
+/// Transport failures, malformed responses, and the provider's `server_error` or
+/// `temporarily_unavailable` errors keep the tokens: nothing has said they are bad.
+///
+/// #### Before the token expires
+///
+/// A refusal is the fallback, not the way a token is normally renewed. When a request is
+/// queued and the access token is within [#setRefreshLeeway(int)] of its expiry -- sixty
+/// seconds unless set -- the refresh token is exchanged first and the request is kept out
+/// of the queue until the exchange is done. It is then sent once, with the new token.
+/// Requests queued in the meantime wait for the same exchange.
+///
+/// Nothing blocks for this: the request has simply not been handed to a network thread
+/// yet. Code that waits for it -- `addToQueueAndWait`, the blocking methods of
+/// `RequestBuilder` -- returns the one final answer.
+///
+/// If that exchange is refused the session ends as described above, and the request goes
+/// out with no token for the service to answer `401`. If it fails without an answer the
+/// request is sent with the token it has, which may still be good, and no exchange is tried
+/// ahead of time for the next few seconds.
+///
+/// A token whose response carried no `expires_in` has no known expiry, and is renewed only
+/// when the service refuses it.
+///
+/// #### Threads
+///
+/// Everything an authorizer holds -- the tokens, the exchange in progress, the listeners --
+/// belongs to the event dispatch thread and is read and changed nowhere else. Nothing here
+/// is locked. A network thread never calls an authorizer: it sends the header the EDT put
+/// on the request when the request was queued. Tokens that arrive on a network thread, and
+/// a `401` seen there, are passed to the EDT before the authorizer hears of them.
+///
+/// Call this class on the EDT. The methods that read or change its state can also be
+/// called from another thread, and then wait for the EDT to do the work -- so not from a
+/// thread the EDT is itself waiting for.
+public final class OidcRequestAuthorizer implements RequestAuthorizer.Proactive {
+    /// How long after an exchange failed without an answer before one is tried ahead of
+    /// time again. A request refused in between is still renewed at once.
+    private static final long RETRY_AHEAD_MILLIS = 5000;
+
+    /// Told when the user has to sign in again.
+    public interface SignInRequiredListener {
+        /// The authorization server refused the refresh token, or there was none. Called on
+        /// the event dispatch thread, after the tokens were dropped.
+        ///
+        /// #### Parameters
+        ///
+        /// - `authorizer`: the authorizer whose session ended
+        ///
+        /// - `reason`: what the server answered, or null when there was no refresh token
+        void signInRequired(OidcRequestAuthorizer authorizer, Throwable reason);
+    }
+
+    private final OidcClient client;
+    // Everything below is read and written on the event dispatch thread only.
+<span class="fc" id="L113">    private final ArrayList&lt;SignInRequiredListener&gt; listeners =</span>
+            new ArrayList&lt;SignInRequiredListener&gt;();
+    private OidcTokens tokens;
+    /// Changes when tokens are replaced or a newer load starts; EDT-owned.
+    private long tokenGeneration;
+    /// The exchange in progress, shared by every request refused or held while it runs.
+    private AsyncResource&lt;Boolean&gt; renewal;
+    /// The client's exchange behind `renewal`, kept so that signing out can abandon it.
+    private AsyncResource&lt;OidcTokens&gt; exchanging;
+    /// Set to true, for that exchange's callbacks to read, when it is abandoned.
+    private boolean[] exchangeAbandoned;
+<span class="fc" id="L124">    private int refreshLeewaySeconds = 60;</span>
+    /// When an exchange started ahead of time last failed without an answer.
+    private long aheadFailedAt;
+
+    /// Runs `work` on the event dispatch thread and returns when it has run: at once on
+    /// the EDT itself, and before there is one.
+    private static void onEdt(Runnable work) {
+<span class="pc bpc" id="L131" title="1 of 4 branches missed.">        if (!Display.isInitialized() || CN.isEdt()) {</span>
+<span class="fc" id="L132">            work.run();</span>
+        } else {
+<span class="fc" id="L134">            CN.callSeriallyAndWait(work);</span>
+        }
+<span class="fc" id="L136">    }</span>
+
+    /// An authorizer for the tokens of `client`.
+    ///
+    /// A client has one authorizer: creating a second one for the same client takes its
+    /// place.
+    ///
+    /// #### Parameters
+    ///
+    /// - `client`: a configured client
+<span class="fc" id="L146">    public OidcRequestAuthorizer(OidcClient client) {</span>
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">        if (client == null) {</span>
+<span class="nc" id="L148">            throw new IllegalArgumentException(&quot;client must not be null&quot;);</span>
+        }
+<span class="fc" id="L150">        this.client = client;</span>
+<span class="fc" id="L151">        onEdt(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L154">                OidcRequestAuthorizer.this.client.setTokenListener(OidcRequestAuthorizer.this);</span>
+<span class="fc" id="L155">            }</span>
+        });
+<span class="fc" id="L157">    }</span>
+
+    /// Registers this authorizer for every request under a base URL. Shorthand for
+    /// [NetworkManager#setAuthorizer(String, RequestAuthorizer)], whose matching rules apply.
+    ///
+    /// #### Parameters
+    ///
+    /// - `baseUrl`: the base URL of the application's service
+    ///
+    /// #### Returns
+    ///
+    /// this authorizer
+    public OidcRequestAuthorizer install(String baseUrl) {
+<span class="fc" id="L170">        NetworkManager.getInstance().setAuthorizer(baseUrl, this);</span>
+<span class="fc" id="L171">        return this;</span>
+    }
+
+    /// Reads the tokens an earlier run saved into memory. Call it when the application
+    /// starts; with a [SecureStorageTokenStore] that requires biometrics, this is the one
+    /// moment the user is prompted.
+    ///
+    /// #### Returns
+    ///
+    /// a resource that completes with the tokens, or with null when nothing was stored
+    public AsyncResource&lt;OidcTokens&gt; load() {
+<span class="fc" id="L182">        final AsyncResource&lt;OidcTokens&gt; out = new AsyncResource&lt;OidcTokens&gt;();</span>
+<span class="fc" id="L183">        final long[] generation = new long[1];</span>
+<span class="fc" id="L184">        onEdt(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L187">                tokenGeneration++;</span>
+<span class="fc" id="L188">                generation[0] = tokenGeneration;</span>
+<span class="fc" id="L189">            }</span>
+        });
+<span class="fc" id="L191">        client.loadStoredTokens().ready(new SuccessCallback&lt;OidcTokens&gt;() {</span>
+            @Override
+            public void onSucess(final OidcTokens stored) {
+<span class="fc" id="L194">                Runnable take = new Runnable() {</span>
+                    @Override
+                    public void run() {
+<span class="fc bfc" id="L197" title="All 2 branches covered.">                        if (generation[0] != tokenGeneration) {</span>
+<span class="fc" id="L198">                            out.complete(null);</span>
+<span class="fc" id="L199">                            return;</span>
+                        }
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">                        if (stored != null) {</span>
+<span class="fc" id="L202">                            tokens = stored;</span>
+                        }
+<span class="fc" id="L204">                        out.complete(stored);</span>
+<span class="fc" id="L205">                    }</span>
+                };
+<span class="pc bpc" id="L207" title="2 of 4 branches missed.">                if (!Display.isInitialized() || CN.isEdt()) {</span>
+<span class="nc" id="L208">                    take.run();</span>
+                } else {
+                    // A store may answer on a thread of its own, which is not made to wait.
+<span class="fc" id="L211">                    CN.callSerially(take);</span>
+                }
+<span class="fc" id="L213">            }</span>
+<span class="fc" id="L214">        }).except(new SuccessCallback&lt;Throwable&gt;() {</span>
+            @Override
+            public void onSucess(final Throwable err) {
+<span class="nc" id="L217">                Runnable fail = new Runnable() {</span>
+                    @Override
+                    public void run() {
+<span class="nc bnc" id="L220" title="All 2 branches missed.">                        if (generation[0] == tokenGeneration) {</span>
+<span class="nc" id="L221">                            out.error(err);</span>
+                        } else {
+<span class="nc" id="L223">                            out.complete(null);</span>
+                        }
+<span class="nc" id="L225">                    }</span>
+                };
+<span class="nc bnc" id="L227" title="All 4 branches missed.">                if (!Display.isInitialized() || CN.isEdt()) {</span>
+<span class="nc" id="L228">                    fail.run();</span>
+                } else {
+<span class="nc" id="L230">                    CN.callSerially(fail);</span>
+                }
+<span class="nc" id="L232">            }</span>
+        });
+<span class="fc" id="L234">        return out;</span>
+    }
+
+    /// The tokens in use.
+    ///
+    /// #### Returns
+    ///
+    /// the tokens, or null when nobody is signed in
+    public OidcTokens getTokens() {
+<span class="fc" id="L243">        final OidcTokens[] out = new OidcTokens[1];</span>
+<span class="fc" id="L244">        onEdt(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L247">                out[0] = tokens;</span>
+<span class="fc" id="L248">            }</span>
+        });
+<span class="fc" id="L250">        return out[0];</span>
+    }
+
+    /// Replaces the tokens in use. Tokens the client obtains arrive here by themselves; this
+    /// is for a set that came from somewhere else.
+    ///
+    /// #### Parameters
+    ///
+    /// - `tokens`: the tokens, or null for none
+    public void setTokens(final OidcTokens tokens) {
+<span class="fc" id="L260">        onEdt(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L263">                OidcRequestAuthorizer.this.tokens = tokens;</span>
+<span class="fc" id="L264">                tokenGeneration++;</span>
+<span class="fc bfc" id="L265" title="All 2 branches covered.">                if (tokens == null) {</span>
+<span class="fc" id="L266">                    abandonRenewal();</span>
+                }
+<span class="fc" id="L268">            }</span>
+        });
+<span class="fc" id="L270">    }</span>
+
+    /// Whether there is an access token to send.
+    public boolean isSignedIn() {
+<span class="fc" id="L274">        OidcTokens current = getTokens();</span>
+<span class="pc bpc" id="L275" title="1 of 4 branches missed.">        return current != null &amp;&amp; current.getAccessToken() != null;</span>
+    }
+
+    /// Drops the tokens from memory and from the client's [TokenStore]. Requests go out
+    /// without a header from then on. This doesn't tell the server; call
+    /// [OidcClient#revoke(String)] with the refresh token first for that.
+    ///
+    /// A renewal in progress is abandoned: whatever it comes back with is dropped, and the
+    /// requests waiting for it go out with no token.
+    ///
+    /// #### Returns
+    ///
+    /// the result of clearing the store
+    public AsyncResource&lt;Boolean&gt; signOut() {
+        // setTokens(null) abandons a renewal in progress before the store is cleared.
+<span class="fc" id="L290">        setTokens(null);</span>
+<span class="fc" id="L291">        return client.clearStoredTokens();</span>
+    }
+
+    /// Adds a listener told when the session can't be renewed.
+    public void addSignInRequiredListener(final SignInRequiredListener listener) {
+<span class="fc" id="L296">        onEdt(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="pc bpc" id="L299" title="2 of 4 branches missed.">                if (listener != null &amp;&amp; !listeners.contains(listener)) {</span>
+<span class="fc" id="L300">                    listeners.add(listener);</span>
+                }
+<span class="fc" id="L302">            }</span>
+        });
+<span class="fc" id="L304">    }</span>
+
+    /// Removes a listener.
+    public void removeSignInRequiredListener(final SignInRequiredListener listener) {
+<span class="fc" id="L308">        onEdt(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L311">                listeners.remove(listener);</span>
+<span class="fc" id="L312">            }</span>
+        });
+<span class="fc" id="L314">    }</span>
+
+    /// How close to its expiry an access token is renewed before a request is sent with it.
+    /// Sixty seconds unless set: long enough for the request to reach a service whose clock
+    /// runs a little ahead. Zero renews a token only once it has expired, and a negative
+    /// value turns renewing ahead of time off, leaving the `401` as the only trigger.
+    ///
+    /// #### Parameters
+    ///
+    /// - `seconds`: the leeway in seconds
+    ///
+    /// #### Returns
+    ///
+    /// this authorizer
+    public OidcRequestAuthorizer setRefreshLeeway(final int seconds) {
+<span class="fc" id="L329">        onEdt(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L332">                refreshLeewaySeconds = seconds;</span>
+<span class="fc" id="L333">            }</span>
+        });
+<span class="fc" id="L335">        return this;</span>
+    }
+
+    /// The leeway set with [#setRefreshLeeway(int)].
+    public int getRefreshLeeway() {
+<span class="fc" id="L340">        final int[] out = new int[1];</span>
+<span class="fc" id="L341">        onEdt(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L344">                out[0] = refreshLeewaySeconds;</span>
+<span class="fc" id="L345">            }</span>
+        });
+<span class="fc" id="L347">        return out[0];</span>
+    }
+
+    /// Called on the event dispatch thread as a request is queued; the request carries the
+    /// answer to the network thread.
+    @Override
+    public String getAuthorization(ConnectionRequest request) {
+<span class="fc" id="L354">        return headerOf(tokens);</span>
+    }
+
+    /// Called on the event dispatch thread as a request is queued.
+    @Override
+    public AsyncResource&lt;Boolean&gt; prepareAuthorization(ConnectionRequest request) {
+<span class="fc" id="L360">        OidcTokens current = tokens;</span>
+<span class="pc bpc" id="L361" title="1 of 6 branches missed.">        if (refreshLeewaySeconds &lt; 0 || current == null || current.getAccessToken() == null</span>
+<span class="fc bfc" id="L362" title="All 2 branches covered.">                || current.getRefreshToken() == null</span>
+<span class="fc bfc" id="L363" title="All 2 branches covered.">                || !current.isExpiringWithin(refreshLeewaySeconds)</span>
+<span class="fc bfc" id="L364" title="All 2 branches covered.">                || System.currentTimeMillis() - aheadFailedAt &lt; RETRY_AHEAD_MILLIS) {</span>
+<span class="fc" id="L365">            return null;</span>
+        }
+<span class="fc bfc" id="L367" title="All 2 branches covered.">        if (renewal != null) {</span>
+<span class="fc" id="L368">            return renewal;</span>
+        }
+<span class="fc" id="L370">        return exchange(current, true);</span>
+    }
+
+    @Override
+    public AsyncResource&lt;Boolean&gt; refreshAuthorization(ConnectionRequest request,
+            String rejectedAuthorization) {
+<span class="fc bfc" id="L376" title="All 2 branches covered.">        if (renewal != null) {</span>
+<span class="fc" id="L377">            return renewal;</span>
+        }
+<span class="fc" id="L379">        OidcTokens current = tokens;</span>
+<span class="fc" id="L380">        String header = headerOf(current);</span>
+<span class="pc bpc" id="L381" title="2 of 4 branches missed.">        if (header != null &amp;&amp; !header.equals(rejectedAuthorization)) {</span>
+            // Refused with a token that has been replaced since: this request left before
+            // an earlier renewal finished. The new token is already here.
+<span class="nc" id="L384">            return done(true);</span>
+        }
+<span class="pc bpc" id="L386" title="1 of 2 branches missed.">        final String refreshToken = current == null ? null : current.getRefreshToken();</span>
+<span class="fc bfc" id="L387" title="All 2 branches covered.">        if (refreshToken == null) {</span>
+<span class="pc bpc" id="L388" title="1 of 2 branches missed.">            if (current != null) {</span>
+<span class="fc" id="L389">                endSession(null);</span>
+            }
+<span class="fc" id="L391">            return done(false);</span>
+        }
+<span class="fc" id="L393">        return exchange(current, false);</span>
+    }
+
+    /// Exchanges the refresh token of `current` for a new set, as the one exchange every
+    /// request that needs it shares until it is done. `ahead` says that nothing has refused
+    /// the token yet.
+    private AsyncResource&lt;Boolean&gt; exchange(OidcTokens current, final boolean ahead) {
+<span class="fc" id="L400">        final AsyncResource&lt;Boolean&gt; out = new AsyncResource&lt;Boolean&gt;();</span>
+<span class="fc" id="L401">        renewal = out;</span>
+        final AsyncResource&lt;OidcTokens&gt; exchange;
+        try {
+<span class="fc" id="L404">            exchange = client.refreshTokens(current);</span>
+<span class="nc" id="L405">        } catch (RuntimeException misconfigured) {</span>
+<span class="nc" id="L406">            renewal = null;</span>
+<span class="nc" id="L407">            out.complete(Boolean.FALSE);</span>
+<span class="nc" id="L408">            return out;</span>
+<span class="fc" id="L409">        }</span>
+<span class="fc" id="L410">        final boolean[] abandoned = new boolean[1];</span>
+<span class="fc" id="L411">        exchanging = exchange;</span>
+<span class="fc" id="L412">        exchangeAbandoned = abandoned;</span>
+<span class="fc" id="L413">        exchange.ready(new SuccessCallback&lt;OidcTokens&gt;() {</span>
+            @Override
+            public void onSucess(OidcTokens fresh) {
+<span class="pc bpc" id="L416" title="1 of 2 branches missed.">                if (abandoned[0]) {</span>
+                    // Abandoned by a sign-out; see abandonRenewal().
+<span class="nc" id="L418">                    return;</span>
+                }
+                // The client has handed the new set over already; this covers a client
+                // whose listener is another authorizer by now.
+<span class="fc" id="L422">                tokenGeneration++;</span>
+<span class="fc" id="L423">                tokens = fresh;</span>
+<span class="fc" id="L424">                exchanging = null;</span>
+<span class="fc" id="L425">                exchangeAbandoned = null;</span>
+<span class="fc" id="L426">                renewal = null;</span>
+<span class="fc" id="L427">                out.complete(Boolean.TRUE);</span>
+<span class="fc" id="L428">            }</span>
+<span class="fc" id="L429">        }).except(new SuccessCallback&lt;Throwable&gt;() {</span>
+            @Override
+            public void onSucess(Throwable err) {
+<span class="pc bpc" id="L432" title="1 of 2 branches missed.">                if (abandoned[0]) {</span>
+                    // Abandoned by a sign-out, which ended the session already: a refusal
+                    // arriving now must not end whatever session came after it.
+<span class="nc" id="L435">                    return;</span>
+                }
+<span class="fc" id="L437">                exchanging = null;</span>
+<span class="fc" id="L438">                exchangeAbandoned = null;</span>
+<span class="fc" id="L439">                renewal = null;</span>
+<span class="fc bfc" id="L440" title="All 2 branches covered.">                if (permanentRefreshError(err)) {</span>
+<span class="fc" id="L441">                    endSession(err);</span>
+<span class="fc bfc" id="L442" title="All 2 branches covered.">                } else if (ahead) {</span>
+                    // Nothing said the token is bad; it is sent as it is, and the next
+                    // request does not try again at once.
+<span class="fc" id="L445">                    aheadFailedAt = System.currentTimeMillis();</span>
+                }
+<span class="fc" id="L447">                out.complete(Boolean.FALSE);</span>
+<span class="fc" id="L448">            }</span>
+        });
+<span class="fc" id="L450">        return out;</span>
+    }
+
+    /// Local delivery/validation failures and explicitly temporary provider errors
+    /// do not invalidate the saved session. Other OAuth refusals require sign-in,
+    /// rather than an endless exchange of the same unusable refresh token.
+    private static boolean permanentRefreshError(Throwable failure) {
+<span class="pc bpc" id="L457" title="1 of 2 branches missed.">        if (!(failure instanceof OidcException)) {</span>
+<span class="nc" id="L458">            return false;</span>
+        }
+<span class="fc" id="L460">        String error = ((OidcException) failure).getError();</span>
+<span class="pc bpc" id="L461" title="2 of 4 branches missed.">        return error != null &amp;&amp; error.length() &gt; 0</span>
+<span class="fc bfc" id="L462" title="All 2 branches covered.">                &amp;&amp; !OidcException.TRANSPORT_ERROR.equals(error)</span>
+<span class="fc bfc" id="L463" title="All 2 branches covered.">                &amp;&amp; !OidcException.INVALID_RESPONSE.equals(error)</span>
+<span class="pc bpc" id="L464" title="1 of 2 branches missed.">                &amp;&amp; !OidcException.INVALID_ID_TOKEN.equals(error)</span>
+<span class="pc bpc" id="L465" title="1 of 2 branches missed.">                &amp;&amp; !OidcException.DISCOVERY_FAILED.equals(error)</span>
+<span class="pc bpc" id="L466" title="1 of 2 branches missed.">                &amp;&amp; !OidcException.STORAGE_UNAVAILABLE.equals(error)</span>
+<span class="fc bfc" id="L467" title="All 2 branches covered.">                &amp;&amp; !&quot;server_error&quot;.equals(error)</span>
+<span class="fc bfc" id="L468" title="All 2 branches covered.">                &amp;&amp; !&quot;temporarily_unavailable&quot;.equals(error);</span>
+    }
+
+    /// Called by the client for every token set it obtains, and with null when it clears
+    /// them. On the event dispatch thread: the client passes over there what a network
+    /// thread read.
+    void tokensChanged(OidcTokens fresh) {
+<span class="fc" id="L475">        tokenGeneration++;</span>
+<span class="fc" id="L476">        tokens = fresh;</span>
+<span class="fc bfc" id="L477" title="All 2 branches covered.">        if (fresh == null) {</span>
+<span class="fc" id="L478">            abandonRenewal();</span>
+        }
+<span class="fc" id="L480">    }</span>
+
+    /// Gives up on the exchange in progress, if there is one, because the tokens it would
+    /// renew have just been dropped -- the user signed out. On the event dispatch thread.
+    ///
+    /// Dropping the tokens was not enough. The exchange was still on its way, and when it
+    /// succeeded the client saved the new set and handed it over, so the user who had
+    /// signed out was signed in again a moment later. Cancelling the client's resource is
+    /// what makes the client drop that answer -- it looks, on this thread, before it stores
+    /// or tells anyone. The requests held for the renewal are released as not renewed.
+    private void abandonRenewal() {
+<span class="fc" id="L491">        AsyncResource&lt;OidcTokens&gt; inFlight = exchanging;</span>
+<span class="fc" id="L492">        AsyncResource&lt;Boolean&gt; held = renewal;</span>
+<span class="fc bfc" id="L493" title="All 2 branches covered.">        if (exchangeAbandoned != null) {</span>
+<span class="fc" id="L494">            exchangeAbandoned[0] = true;</span>
+        }
+<span class="fc" id="L496">        exchanging = null;</span>
+<span class="fc" id="L497">        exchangeAbandoned = null;</span>
+<span class="fc" id="L498">        renewal = null;</span>
+<span class="fc bfc" id="L499" title="All 2 branches covered.">        if (inFlight != null) {</span>
+<span class="fc" id="L500">            inFlight.cancel(false);</span>
+        }
+<span class="pc bpc" id="L502" title="1 of 4 branches missed.">        if (held != null &amp;&amp; !held.isDone()) {</span>
+<span class="fc" id="L503">            held.complete(Boolean.FALSE);</span>
+        }
+<span class="fc" id="L505">    }</span>
+
+    private void endSession(Throwable reason) {
+<span class="fc" id="L508">        tokenGeneration++;</span>
+<span class="fc" id="L509">        tokens = null;</span>
+<span class="fc" id="L510">        client.clearStoredTokens();</span>
+<span class="fc" id="L511">        SignInRequiredListener[] told =</span>
+<span class="fc" id="L512">                listeners.toArray(new SignInRequiredListener[listeners.size()]);</span>
+<span class="fc bfc" id="L513" title="All 2 branches covered.">        for (SignInRequiredListener l : told) {</span>
+<span class="fc" id="L514">            l.signInRequired(this, reason);</span>
+        }
+<span class="fc" id="L516">    }</span>
+
+    private static AsyncResource&lt;Boolean&gt; done(boolean renewed) {
+<span class="fc" id="L519">        AsyncResource&lt;Boolean&gt; out = new AsyncResource&lt;Boolean&gt;();</span>
+<span class="pc bpc" id="L520" title="1 of 2 branches missed.">        out.complete(renewed ? Boolean.TRUE : Boolean.FALSE);</span>
+<span class="fc" id="L521">        return out;</span>
+    }
+
+    private static String headerOf(OidcTokens t) {
+<span class="pc bpc" id="L525" title="1 of 4 branches missed.">        if (t == null || t.getAccessToken() == null) {</span>
+<span class="fc" id="L526">            return null;</span>
+        }
+<span class="fc" id="L528">        return &quot;Bearer &quot; + t.getAccessToken();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>
