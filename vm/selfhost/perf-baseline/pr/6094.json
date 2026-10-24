@@ -40,6 +40,23 @@
      }
     }
    }
+  },
+  "windows-x64@amd64-family-25-model-17-authenticamd": {
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.551,
+      "time": 0.701,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.551,
+     "reason": "Translator all-cores time on Windows x64 runners measures 0.83-0.90x on PRs with no vm/ changes (#6094, #6098) against rows the nightly fold set at 0.60-0.70x",
+     "runs": 1,
+     "time": 0.889
+    }
+   }
   }
  }
 }
