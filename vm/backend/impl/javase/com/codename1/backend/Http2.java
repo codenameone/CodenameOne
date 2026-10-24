@@ -56,6 +56,7 @@ public final class Http2 {
         final String authority;
         final Map headers;
         final byte[] body;
+        private long bodyLength;
 
         Stream(int id, String method, String path, String authority, Map headers, byte[] body) {
             this.id = id;
@@ -64,6 +65,7 @@ public final class Http2 {
             this.authority = authority;
             this.headers = headers;
             this.body = body;
+            this.bodyLength = body == null ? 0 : body.length;
         }
 
         public int getId() {
@@ -87,8 +89,21 @@ public final class Http2 {
         }
 
         /// The body as it ARRIVED, so the caller can check it before decoding.
+        /// Empty when the body was spooled; see [#takeBodyFd].
         public byte[] getBody() {
             return body;
+        }
+
+        /// The descriptor of a body that went to disk on arrival (an unlinked
+        /// temporary file), or -1 when it is in [#getBody]. Handed over once:
+        /// the caller owns closing it, and a second call answers -1.
+        public int takeBodyFd() {
+            return -1;
+        }
+
+        /// The body's whole length, wherever it is.
+        public long getBodyLength() {
+            return bodyLength;
         }
 
         public String getBodyAsString() {
@@ -127,6 +142,10 @@ public final class Http2 {
     }
 
     /// Nothing is ever submitted here, so there is no ceiling to enforce.
+    /// Nothing to set: this arm does not serve HTTP/2.
+    public static void setBodyLimits(long limit, int spoolThreshold, String dir) {
+    }
+
     public static void setMaxBodyBytes(long limit) {
     }
 
