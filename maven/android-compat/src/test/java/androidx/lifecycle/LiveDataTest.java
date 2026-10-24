@@ -26,7 +26,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-import com.codename1.androidcompat.testing.MainThreadRule;
+import com.codename1.compat.testing.MainThreadRule;
 
 import org.junit.Rule;
 import org.junit.Test;

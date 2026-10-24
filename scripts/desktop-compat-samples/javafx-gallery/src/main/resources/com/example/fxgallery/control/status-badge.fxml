@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.shape.Circle?>
+
+<fx:root type="HBox" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
+         spacing="6" alignment="CENTER_LEFT" styleClass="status-badge">
+    <Circle fx:id="dot" radius="6" fill="GRAY"/>
+    <Label fx:id="caption" text="-"/>
+</fx:root>

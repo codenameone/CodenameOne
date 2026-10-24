@@ -261,6 +261,63 @@ class GeneralPathTest extends UITestBase {
         assertNull(path.getCurrentPoint());
     }
 
+    private static GeneralPath roundedRectangle() {
+        // 40,300 to 290,385 with a corner radius of 10.
+        GeneralPath p = new GeneralPath();
+        p.moveTo(50, 300);
+        p.lineTo(280, 300);
+        p.curveTo(285, 300, 290, 305, 290, 310);
+        p.lineTo(290, 375);
+        p.curveTo(290, 380, 285, 385, 280, 385);
+        p.lineTo(50, 385);
+        p.curveTo(45, 385, 40, 380, 40, 375);
+        p.lineTo(40, 310);
+        p.curveTo(40, 305, 45, 300, 50, 300);
+        p.closePath();
+        return p;
+    }
+
+    private static int count(GeneralPath p, int segmentType) {
+        int n = 0;
+        PathIterator it = p.getPathIterator();
+        float[] c = new float[6];
+        while (!it.isDone()) {
+            if (it.currentSegment(c) == segmentType) {
+                n++;
+            }
+            it.next();
+        }
+        return n;
+    }
+
+    /// A shape with curved corners clipped by a rectangle is still ONE
+    /// outline. Every curve used to start a subpath of its own, so a rounded
+    /// rectangle came back as four slivers, one a corner and the edge after
+    /// it, and a port that keeps its shape clip as a path (Android, iOS, the
+    /// browser) filled those: `setClip(shape)` followed by `clipRect` left
+    /// only the outline of the shape to paint in.
+    @Test
+    void testIntersectKeepsACurvedShapeInOnePiece() {
+        GeneralPath whole = roundedRectangle();
+        assertTrue(whole.intersect(0, 0, 320, 640));
+        assertEquals(1, count(whole, PathIterator.SEG_MOVETO));
+        assertEquals(4, count(whole, PathIterator.SEG_CUBICTO));
+        assertTrue(whole.contains(165, 342), "the middle of the shape is inside it");
+        assertFalse(whole.contains(41, 301), "the corner of the bounds is outside the round corner");
+
+        // The rectangle cuts the right end off: the two corners left of the
+        // cut stay, joined to the rest by straight lines.
+        GeneralPath cut = roundedRectangle();
+        assertTrue(cut.intersect(0, 0, 200, 640));
+        assertEquals(1, count(cut, PathIterator.SEG_MOVETO));
+        assertEquals(2, count(cut, PathIterator.SEG_CUBICTO));
+        assertTrue(cut.contains(120, 342));
+        assertFalse(cut.contains(210, 342));
+        float[] b = cut.getBounds2D();
+        assertEquals(40f, b[0], 0.01f);
+        assertEquals(160f, b[2], 0.01f);
+    }
+
     @Test
     void testIsConvexPolygonLogic() {
         // Triangle (convex)

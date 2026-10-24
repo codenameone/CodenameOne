@@ -25,8 +25,8 @@ package android.graphics.drawable;
 import android.graphics.Canvas;
 
 import com.codename1.androidcompat.testing.AndroidTestSupport;
-import com.codename1.androidcompat.testing.HeadlessImplementation;
-import com.codename1.androidcompat.testing.MainThreadRule;
+import com.codename1.compat.testing.HeadlessImplementation;
+import com.codename1.compat.testing.MainThreadRule;
 import com.codename1.ui.Image;
 import com.codename1.ui.LinearGradient;
 

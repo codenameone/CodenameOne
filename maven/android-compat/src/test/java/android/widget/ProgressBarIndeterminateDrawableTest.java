@@ -29,7 +29,7 @@ import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 
 import com.codename1.androidcompat.testing.AndroidTestSupport;
-import com.codename1.androidcompat.testing.MainThreadRule;
+import com.codename1.compat.testing.MainThreadRule;
 import com.codename1.ui.Image;
 
 import org.junit.Before;
