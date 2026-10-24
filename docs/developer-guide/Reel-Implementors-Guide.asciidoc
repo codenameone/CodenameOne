@@ -67,12 +67,12 @@ may play: the profile's rating, the plan or a rental, the device, and how many
 streams the plan allows at once. It then answers a manifest URL and a license
 URL, each carrying a token signed for this session alone, the scheme it chose,
 the ad breaks, the chapters and the interactions. The app hands that to the
-framework's streaming API, with a `DrmConfig` (built by `PlayerForm.drm`) that
-sends the license token in an `X-Reel-License` header:
+framework's streaming API, with a `DrmConfig` that sends the license token in
+an `X-Reel-License` header (`PlayerForm.startMain` in the sample):
 
 [source,java]
 ----
-include::../../scripts/reel/common/src/main/java/com/codenameone/examples/reel/player/PlayerForm.java[tag=reel-stream,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/StreamingSnippets.java[tag=reel-stream,indent=0]
 ----
 
 While the title plays, the app reports a heartbeat. A session whose heartbeats
@@ -108,7 +108,7 @@ include::../demos/common/src/main/snippets/developer-guide/reel.sh[tag=reel-sh-d
 The FairPlay certificate is a URL the device downloads, not a file on the server.
 A device then gets the strongest scheme it supports that the server can
 license, and a device that can play none is told so before playback starts.
-The app also blocks screenshots while protected video is on screen, and draws
+The app also blocks screenshots while protected video is on the screen, and draws
 the account's name over the picture when the *watermark* feature is on.
 
 === Uploads and packaging

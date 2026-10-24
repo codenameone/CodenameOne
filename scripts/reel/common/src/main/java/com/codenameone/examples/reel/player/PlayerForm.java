@@ -192,7 +192,6 @@ public final class PlayerForm {
         if (closed) {
             return;
         }
-        // tag::reel-stream[]
         StreamRequest req = new StreamRequest(Art.url(session.manifestUrl()))
                 .setStartPosition(session.resumeSeconds() * 1000)
                 .setOnCompletion(() -> CN.callSerially(() -> close(true)));
@@ -202,7 +201,6 @@ public final class PlayerForm {
             req.setDrm(drm);
         }
         open(req);
-        // end::reel-stream[]
     }
 
     static DrmConfig drm(String scheme, String licenseUrl, String certificateUrl, String token, String contentId) {
