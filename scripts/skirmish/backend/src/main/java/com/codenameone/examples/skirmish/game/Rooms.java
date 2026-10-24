@@ -384,12 +384,7 @@ public class Rooms {
                 }
             }
             for (MatchRoom room : ended) {
-                byId.remove(room.id);
-                for (Seat s : room.seats) {
-                    if (byPlayer.get(s.username) == room) {
-                        byPlayer.remove(s.username);
-                    }
-                }
+                detach(room);
             }
         }
         for (MatchRoom room : ended) {
@@ -400,8 +395,9 @@ public class Rooms {
     /// Steps one room straight to the end without waiting for the clock; tests use
     /// it to play a whole match in milliseconds.
     public void fastForward(String matchId) {
+        MatchRoom room;
         synchronized (this) {
-            MatchRoom room = byId.get(matchId);
+            room = byId.get(matchId);
             if (room == null) {
                 return;
             }
@@ -409,8 +405,25 @@ public class Rooms {
                 room.step();
             }
             flush(room);
+            // Taken out here, under the same lock, so this thread records it.
+            // Left to the next tick, the scheduled ticker could take it first
+            // and record it on its own thread, and a caller reading the match
+            // history straight after this returns would not find it yet.
+            detach(room);
         }
+        finish(room);
         tick(Clock.now());
+    }
+
+    /// Removes an ended room from both indexes; the caller holds the lock and
+    /// records the room once it has released it.
+    private void detach(MatchRoom room) {
+        byId.remove(room.id);
+        for (Seat s : room.seats) {
+            if (byPlayer.get(s.username) == room) {
+                byPlayer.remove(s.username);
+            }
+        }
     }
 
     private void finish(MatchRoom room) {
