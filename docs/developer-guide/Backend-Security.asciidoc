@@ -1570,6 +1570,86 @@ recovery code and a rate limit's last permit.
 `OAuth2AuthorizationService.purgeExpired` remove rows nobody will present
 again. The first two are yours to call from a scheduled job.
 
+[[backend-security-pki]]
+=== Certificates, key stores and key agreement
+
+`com.codename1.backend.security.pki` reads and writes the files a server
+exchanges with certificate authorities and partners. It is plain Java over the
+same primitives as the rest of the layer, so a local run and the native build
+give the same answers.
+
+[source,java]
+----
+// A PEM chain, validated against the partner's CA and nothing else
+List<Certificate> anchors = Certificate.listFromPem(KeyFiles.read("/etc/app/partner-ca.pem"));
+List<Certificate> path = new CertificateValidator(anchors)
+        .forHost("partner.example.com")
+        .validate(Certificate.listFromPem(presentedPem));
+
+// A key and a certification request to send to a CA
+byte[] key = Crypto.generateEcKey(Crypto.P256);
+String csr = CertificationRequest.create(DistinguishedName.parse("CN=api.example.com"),
+        key, Arrays.asList("api.example.com")).toPem();
+
+// A .p12 in, and one out
+Pkcs12 store = Pkcs12.decode(p12Bytes, password);
+byte[] p12 = Pkcs12.encode(store.getPrivateKey(), store.getCertificates(), "api", password);
+----
+
+Keys are bytes in two forms: PKCS#8 DER for a private key and
+SubjectPublicKeyInfo DER for a public one. `Crypto.sign`, `Crypto.verify` and
+`Crypto.ecdh` take those forms, `KeyFiles` reads them from PEM, and
+`Der.publicKeyOf` derives the public half of a private key.
+
+`Crypto.ecdh` returns the shared secret of two P-256 or P-384 keys, as SEC 1
+defines it. That secret is key material, not a key: derive the key from it
+with a KDF such as HKDF.
+
+A `CertificateValidator` trusts only the anchors it is given. There is no
+default trust store, so a server that accepts certificates from a partner
+trusts that partner's CA and no other. The validator builds a path from the
+leaf through the other certificates, which may come in any order, and checks:
+
+* every signature;
+* the validity periods, at the current time or the one `at` gives;
+* basic constraints, key usage and path length on every issuer;
+* that no critical extension is one it does not understand;
+* the host name and extended key usage, when `forHost` or `forPurpose` asks
+  for them.
+
+Host names match the subject alternative names only. The common name is never
+used, as RFC 9525 requires. The validator does not check revocation.
+
+The algorithm profile is the same on every runtime:
+
+[cols="1,2,2",options="header"]
+|===
+|Use |Supported |Refused
+
+|Signatures on certificates and requests
+|RSA with SHA-256, SHA-384 or SHA-512; RSASSA-PSS with SHA-256; ECDSA with
+P-256 and SHA-256, or P-384 and SHA-384
+|SHA-1, MD5, ECDSA with a digest that does not match its curve
+
+|Keys
+|RSA from 2048 to 8192 bits; EC on P-256 and P-384
+|Other curves, DSA, Ed25519
+
+|PKCS#12
+|PBES2 with PBKDF2 and AES-CBC, with an HMAC integrity check. This is what
+OpenSSL 3 and current JDKs write
+|The legacy RC2 and 3DES schemes (`openssl pkcs12 -legacy`), stores without
+an integrity check
+
+|Encoding
+|DER and PEM
+|BER indefinite lengths
+|===
+
+A file outside the profile is refused with a message that names what it uses.
+For a legacy PKCS#12 file, the message also gives the `openssl` command that
+re-exports it.
+
 [[backend-security-testing]]
 === Testing
 

@@ -524,3 +524,151 @@ JAVA_OBJECT com_codename1_backend_Crypto_aesGcmImpl___boolean_byte_1ARRAY_byte_1
     ERR_clear_error();
     return result;
 }
+
+/* A new EC key on P-256 (curve 1) or P-384 (curve 2) as PKCS#8 DER. OpenSSL
+   writes the public point into the SEC1 structure, which Der.publicKeyOf and
+   the JVM arm rely on. */
+JAVA_OBJECT com_codename1_backend_Crypto_generateEcKeyImpl___int_R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_INT curve) {
+    EVP_PKEY* key;
+    PKCS8_PRIV_KEY_INFO* info;
+    unsigned char* der = NULL;
+    int derLength;
+    JAVA_OBJECT result = JAVA_NULL;
+    if(curve != 1 && curve != 2) {
+        return JAVA_NULL;
+    }
+    key = EVP_EC_gen(curve == 1 ? "P-256" : "P-384");
+    if(key == NULL) {
+        ERR_clear_error();
+        return JAVA_NULL;
+    }
+    info = EVP_PKEY2PKCS8(key);
+    EVP_PKEY_free(key);
+    if(info == NULL) {
+        ERR_clear_error();
+        return JAVA_NULL;
+    }
+    derLength = i2d_PKCS8_PRIV_KEY_INFO(info, &der);
+    PKCS8_PRIV_KEY_INFO_free(info);
+    if(derLength > 0 && der != NULL) {
+        result = cn1BytesToArray(threadStateData, der, derLength);
+        OPENSSL_cleanse(der, (size_t)derLength);
+    }
+    OPENSSL_free(der);
+    ERR_clear_error();
+    return result;
+}
+
+static int cn1EcGroupNid(EVP_PKEY* key) {
+    char group[64];
+    size_t groupLength = 0;
+    if(EVP_PKEY_base_id(key) != EVP_PKEY_EC
+            || EVP_PKEY_get_utf8_string_param(key, "group", group, sizeof(group), &groupLength) != 1) {
+        return NID_undef;
+    }
+    return OBJ_sn2nid(group);
+}
+
+/*
+ * ECDH: the x coordinate of the shared point, as long as the curve's field.
+ * Both keys must be EC keys on the same curve, P-256 or P-384; d2i_PUBKEY
+ * refuses a point that is not on its curve. Null for any failure.
+ */
+JAVA_OBJECT com_codename1_backend_Crypto_ecdhImpl___byte_1ARRAY_byte_1ARRAY_R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT pkcs8, JAVA_OBJECT spki) {
+    JAVA_ARRAY keyArr;
+    JAVA_ARRAY peerArr;
+    const unsigned char* p;
+    EVP_PKEY* key = NULL;
+    EVP_PKEY* peer = NULL;
+    EVP_PKEY_CTX* ctx = NULL;
+    unsigned char secret[66];
+    size_t secretLength = sizeof(secret);
+    int nid;
+    JAVA_OBJECT result = JAVA_NULL;
+    if(pkcs8 == JAVA_NULL || spki == JAVA_NULL) {
+        return JAVA_NULL;
+    }
+    keyArr = (JAVA_ARRAY)pkcs8;
+    peerArr = (JAVA_ARRAY)spki;
+    p = (const unsigned char*)(JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(keyArr);
+    key = d2i_AutoPrivateKey(NULL, &p, (long)keyArr->length);
+    p = (const unsigned char*)(JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(peerArr);
+    peer = d2i_PUBKEY(NULL, &p, (long)peerArr->length);
+    if(key != NULL && peer != NULL) {
+        nid = cn1EcGroupNid(key);
+        if((nid == NID_X9_62_prime256v1 || nid == NID_secp384r1) && cn1EcGroupNid(peer) == nid) {
+            ctx = EVP_PKEY_CTX_new(key, NULL);
+            if(ctx != NULL && EVP_PKEY_derive_init(ctx) == 1
+                    && EVP_PKEY_derive_set_peer(ctx, peer) == 1
+                    && EVP_PKEY_derive(ctx, secret, &secretLength) == 1) {
+                result = cn1BytesToArray(threadStateData, secret, (int)secretLength);
+            }
+        }
+    }
+    OPENSSL_cleanse(secret, sizeof(secret));
+    EVP_PKEY_CTX_free(ctx);
+    EVP_PKEY_free(peer);
+    EVP_PKEY_free(key);
+    ERR_clear_error();
+    return result;
+}
+
+/*
+ * AES-CBC with PKCS#7 padding, the cipher PKCS#12 and encrypted PKCS#8 use.
+ * The Java side checks the key and IV sizes. Null for any failure, which when
+ * decrypting means the padding did not check out.
+ */
+JAVA_OBJECT com_codename1_backend_Crypto_aesCbcImpl___boolean_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_BOOLEAN encrypt, JAVA_OBJECT key, JAVA_OBJECT iv, JAVA_OBJECT input) {
+    JAVA_ARRAY keyArr;
+    JAVA_ARRAY ivArr;
+    JAVA_ARRAY inArr;
+    const EVP_CIPHER* cipher;
+    EVP_CIPHER_CTX* ctx;
+    unsigned char* out;
+    int inLength;
+    int produced = 0;
+    int finalLength = 0;
+    int ok;
+    JAVA_OBJECT result = JAVA_NULL;
+    if(key == JAVA_NULL || iv == JAVA_NULL || input == JAVA_NULL) {
+        return JAVA_NULL;
+    }
+    keyArr = (JAVA_ARRAY)key;
+    ivArr = (JAVA_ARRAY)iv;
+    inArr = (JAVA_ARRAY)input;
+    switch(keyArr->length) {
+        case 16: cipher = EVP_aes_128_cbc(); break;
+        case 24: cipher = EVP_aes_192_cbc(); break;
+        case 32: cipher = EVP_aes_256_cbc(); break;
+        default: return JAVA_NULL;
+    }
+    inLength = (int)inArr->length;
+    if(ivArr->length != 16 || (!encrypt && (inLength == 0 || inLength % 16 != 0))) {
+        return JAVA_NULL;
+    }
+    out = (unsigned char*)malloc((size_t)inLength + 16);
+    ctx = EVP_CIPHER_CTX_new();
+    if(out == NULL || ctx == NULL) {
+        free(out);
+        EVP_CIPHER_CTX_free(ctx);
+        return JAVA_NULL;
+    }
+    ok = EVP_CipherInit_ex(ctx, cipher, NULL,
+            (const unsigned char*)(JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(keyArr),
+            (const unsigned char*)(JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(ivArr), encrypt ? 1 : 0) == 1;
+    if(ok && inLength > 0) {
+        ok = EVP_CipherUpdate(ctx, out, &produced,
+                (const unsigned char*)(JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(inArr), inLength) == 1;
+    }
+    if(ok) {
+        ok = EVP_CipherFinal_ex(ctx, out + produced, &finalLength) == 1;
+    }
+    if(ok) {
+        result = cn1BytesToArray(threadStateData, out, produced + finalLength);
+    }
+    OPENSSL_cleanse(out, (size_t)inLength + 16);
+    free(out);
+    EVP_CIPHER_CTX_free(ctx);
+    ERR_clear_error();
+    return result;
+}
