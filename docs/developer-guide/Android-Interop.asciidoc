@@ -165,11 +165,11 @@ view class the Codename One Android runtime implements (android2cn1:E0201)`.
 * XML: `getResources().getXml()` returns a pull parser over the compiled
   resource, and `Xml.newPullParser()` and `Xml.newSerializer()` read and write
   XML text.
-* Room: entities, DAOs, type converters, `@Embedded`, upsert, `@RawQuery`,
+* Room: entities, DAOs, type converters, `@Embedded`, `@Upsert`, `@RawQuery`,
   `LiveData` queries and migrations. The build generates the `_Impl` classes
   that the Room annotation processor would, so nothing is found by reflection.
 * WorkManager: one-time and periodic work, chains whose outputs merge into the
-  next worker's input, unique work, retry with backoff and `LiveData` status
+  next worker's input, unique work, retries with a growing delay and `LiveData` status
   queries. Pending work is saved and resumes on the next run.
 * Location and sensors: `LocationManager` with its listeners, last known and
   current location, and `SensorManager` with the accelerometer, gyroscope,

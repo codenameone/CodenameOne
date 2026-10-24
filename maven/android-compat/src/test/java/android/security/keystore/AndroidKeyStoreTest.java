@@ -205,7 +205,7 @@ public class AndroidKeyStoreTest {
         }
         try {
             Cipher.getInstance("AES/GCM/NoPadding").init(Cipher.ENCRYPT_MODE, k,
-                    new GCMParameterSpec(128, new byte[12]));
+                    new GCMParameterSpec(128, randomIv(12)));
             fail("caller IV accepted");
         } catch (java.security.InvalidAlgorithmParameterException expected) {
             // expected
@@ -215,7 +215,7 @@ public class AndroidKeyStoreTest {
     @Test
     public void plainSecretKeySpecWorksAndBadPaddingIsReported() throws Exception {
         SecretKeySpec key = new SecretKeySpec(new byte[16], "AES");
-        byte[] iv = new byte[16];
+        byte[] iv = randomIv(16);
         Cipher c = Cipher.getInstance("AES/CBC/PKCS5Padding");
         c.init(Cipher.ENCRYPT_MODE, key, new IvParameterSpec(iv));
         byte[] ct = c.doFinal(DATA);
@@ -315,7 +315,7 @@ public class AndroidKeyStoreTest {
     @Test
     public void gcmRefusesTheLastKeyAndIvAgain() throws Exception {
         SecretKeySpec key = new SecretKeySpec(new byte[16], "AES");
-        byte[] iv = new byte[12];
+        byte[] iv = randomIv(12);
         Cipher c = Cipher.getInstance("AES/GCM/NoPadding");
         c.init(Cipher.ENCRYPT_MODE, key, new GCMParameterSpec(128, iv));
         c.doFinal(DATA);
@@ -327,14 +327,23 @@ public class AndroidKeyStoreTest {
         }
         // Decrypting with them is fine.
         c.init(Cipher.DECRYPT_MODE, key, new GCMParameterSpec(128, iv));
+        byte[] other = randomIv(12);
         Cipher twice = Cipher.getInstance("AES/GCM/NoPadding");
-        twice.init(Cipher.ENCRYPT_MODE, key, new GCMParameterSpec(128, new byte[] {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}));
+        twice.init(Cipher.ENCRYPT_MODE, key, new GCMParameterSpec(128, other));
         try {
             twice.init(Cipher.ENCRYPT_MODE, key,
-                    new GCMParameterSpec(128, new byte[] {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}));
+                    new GCMParameterSpec(128, other));
             fail("two encrypt inits with one IV were accepted");
         } catch (java.security.InvalidAlgorithmParameterException expected) {
             // recorded at init
         }
+    }
+
+    /// A fresh IV per test, as real code must use; a constant one is what
+    /// code scanning rightly flags.
+    private static byte[] randomIv(int length) {
+        byte[] iv = new byte[length];
+        new java.security.SecureRandom().nextBytes(iv);
+        return iv;
     }
 }
