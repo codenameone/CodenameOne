@@ -29,6 +29,7 @@ import com.codenameone.examples.reel.api.StudioTitleDto;
 import com.codenameone.examples.reel.api.StudioTitleEditDto;
 import com.codenameone.examples.reel.api.StudioVideoDto;
 import com.codenameone.examples.reel.api.StudioVideoEditDto;
+import com.codenameone.examples.reel.api.SubtitleUploadDto;
 import com.codenameone.examples.reel.api.TitleAnalyticsDto;
 import com.codenameone.examples.reel.api.UploadDto;
 import com.codenameone.examples.reel.api.UploadStartDto;
@@ -118,6 +119,16 @@ public class StudioEndpoint implements StudioApiServer {
     @Override
     public StudioVideoDto setChapters(String id, ChaptersDto chapters) throws Exception {
         return studio.setChapters(who(), id, chapters);
+    }
+
+    @Override
+    public StudioVideoDto setSubtitle(String id, String lang, SubtitleUploadDto subtitle) throws Exception {
+        return studio.setSubtitle(who(), id, lang, subtitle);
+    }
+
+    @Override
+    public StudioVideoDto deleteSubtitle(String id, String lang) throws Exception {
+        return studio.deleteSubtitle(who(), id, lang);
     }
 
     @Override

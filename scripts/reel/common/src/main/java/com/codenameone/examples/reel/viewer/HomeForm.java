@@ -36,6 +36,7 @@ import com.codenameone.examples.reel.ui.Layouts;
 import com.codenameone.examples.reel.ui.Nav;
 import com.codenameone.examples.reel.ui.SettingsForm;
 import com.codenameone.examples.reel.ui.Shell;
+import com.codenameone.examples.reel.ui.Lang;
 import com.codenameone.examples.reel.ui.Ui;
 
 /// The viewer's home: a featured title, then the rows the server composed
@@ -80,6 +81,20 @@ public final class HomeForm implements Nav.Home {
         }, Ui.failed(page, this::load)));
     }
 
+    /// What a row is, for the rows whose name alone does not say.
+    static String caption(String row) {
+        if ("courses".equals(row)) {
+            return Lang.tr("Short video lessons, taken in order, with quizzes inside the video.");
+        }
+        if ("for-you".equals(row)) {
+            return Lang.tr("Picked from what this profile watches and rates.");
+        }
+        if ("trending".equals(row)) {
+            return Lang.tr("What most people watched this week.");
+        }
+        return null;
+    }
+
     private void fill(Form form, HomeDto home) {
         page.removeAll();
         if (home.hero() != null) {
@@ -89,7 +104,7 @@ public final class HomeForm implements Nav.Home {
         for (int iter = 0; home.rows() != null && iter < home.rows().size(); iter++) {
             HomeRowDto row = home.rows().get(iter);
             if (row.titles() != null && !row.titles().isEmpty()) {
-                page.add(Cards.row(form, row.id(), row.title(), row.titles()));
+                page.add(Cards.row(form, row.id(), row.title(), caption(row.id()), row.titles()));
                 any = true;
             }
         }

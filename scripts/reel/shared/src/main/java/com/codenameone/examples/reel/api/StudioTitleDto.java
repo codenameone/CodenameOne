@@ -31,6 +31,7 @@ public record StudioTitleDto(
         String synopsis,
         int year,
         String rating,
+        List<String> advisories,
         List<String> genres,
         List<String> tags,
         String access,

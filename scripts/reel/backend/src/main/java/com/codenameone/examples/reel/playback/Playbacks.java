@@ -41,7 +41,6 @@ import com.codenameone.examples.reel.api.PlaybackDto;
 import com.codenameone.examples.reel.api.PlaybackRequestDto;
 import com.codenameone.examples.reel.api.SessionDto;
 import com.codenameone.examples.reel.api.StopDto;
-import com.codenameone.examples.reel.api.SubtitleDto;
 import com.codenameone.examples.reel.billing.Entitlements;
 import com.codenameone.examples.reel.domain.AdCampaign;
 import com.codenameone.examples.reel.domain.Chapter;
@@ -110,11 +109,12 @@ public class Playbacks {
     private final Licenses licenses;
     private final MediaTokens tokens;
     private final Ads ads;
+    private final Tracks tracks;
 
     public Playbacks(PlaybackRepository sessions, TitleRepository titles, VideoRepository videos,
             ProgressRepository progress, ChapterRepository chapters, InteractionRepository interactions,
             SharingAlertRepository alerts, DownloadRepository downloads, Households households, Devices devices, Entitlements entitlements,
-            Settings settings, Licenses licenses, MediaTokens tokens, Ads ads) {
+            Settings settings, Licenses licenses, MediaTokens tokens, Ads ads, Tracks tracks) {
         this.sessions = sessions;
         this.titles = titles;
         this.videos = videos;
@@ -130,6 +130,7 @@ public class Playbacks {
         this.licenses = licenses;
         this.tokens = tokens;
         this.ads = ads;
+        this.tracks = tracks;
     }
 
     /// Opens a session. Throws 403 for a rating the profile may not watch,
@@ -200,6 +201,13 @@ public class Playbacks {
             // ladder can be filtered down to it.
             scheme = Licenses.AES_128;
         }
+        String audio = Tracks.audioTrack(video, request.audioTrack());
+        boolean original = audio.equals(Tracks.audio(video).get(0).id());
+        if (!original && !Licenses.FAIRPLAY.equals(scheme)) {
+            // The single-file CENC stream carries the original audio only; any
+            // other track is a playlist.
+            scheme = Licenses.AES_128;
+        }
 
         Playback session = new Playback();
         session.setId(Ids.next());
@@ -223,6 +231,7 @@ public class Playbacks {
         detectSharing(username, now);
 
         String base = "/media/" + mediaToken + "/" + video.getId() + "/";
+
         boolean hls = Licenses.AES_128.equals(scheme) || Licenses.FAIRPLAY.equals(scheme);
         String licenseUrl = null;
         String certificateUrl = null;
@@ -242,9 +251,15 @@ public class Playbacks {
                 : new ArrayList<AdBreakDto>();
         String watermark = settings.enabled(Features.WATERMARK)
                 ? username + " " + session.getId().substring(0, Math.min(8, session.getId().length())) : null;
-        return new PlaybackDto(session.getId(), base + (hls ? "master.m3u8" : "cenc.mp4"), scheme, licenseUrl,
+        String manifest = hls ? "master.m3u8" + (original ? "" : "?audio=" + audio) : "cenc.mp4";
+        boolean single = Kinds.FEATURE.equals(video.getRole());
+        return new PlaybackDto(session.getId(), title.getName(), single ? null : video.getName(),
+                title.getBackdropUrl() == null || title.getBackdropUrl().length() == 0 ? title.getPosterUrl()
+                        : title.getBackdropUrl(), video.getDurationSeconds(), next(title, video),
+                base + manifest, scheme, licenseUrl,
                 certificateUrl, video.getId(), licenseToken, resume, HEARTBEAT_SECONDS, breaks,
-                new ArrayList<SubtitleDto>(), chapters(video.getId()),
+                tracks.subtitles(video.getId(), base), Tracks.audio(video), audio,
+                Tracks.qualities(video.getRenditions(), maxHeight), maxHeight, chapters(video.getId()),
                 settings.enabled(Features.INTERACTIVE) ? interactions(video.getId()) : new ArrayList<InteractionDto>(),
                 watermark, now + ttl * 1000L);
     }
@@ -429,6 +444,24 @@ public class Playbacks {
             }
         }
         throw new ResponseStatusException(404, "This title has nothing ready to play yet");
+    }
+
+    /// The episode or lesson after `video`, for the player's "Next" button;
+    /// null after the last one and for a film.
+    private String next(Title title, Video video) {
+        if (Kinds.FEATURE.equals(video.getRole())) {
+            return null;
+        }
+        List<Video> all = videos.findByTitleIdOrderBySeasonAscNumberAsc(title.getId());
+        boolean after = false;
+        for (int iter = 0; iter < all.size(); iter++) {
+            Video v = all.get(iter);
+            if (after && !Kinds.TRAILER.equals(v.getRole()) && Kinds.READY.equals(v.getStatus())) {
+                return v.getId();
+            }
+            after |= v.getId().equals(video.getId());
+        }
+        return null;
     }
 
     private int resume(String profileId, Video video) {

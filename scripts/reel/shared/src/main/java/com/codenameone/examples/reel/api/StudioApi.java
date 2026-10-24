@@ -76,6 +76,16 @@ public interface StudioApi {
     void setInteractions(@Path("id") String id, @Body InteractionsDto interactions,
             OnComplete<Response<StudioVideoDto>> callback);
 
+    /// Adds or replaces a subtitle track: `label` and the WebVTT text, in
+    /// the language `lang` names (`en`, `pt-BR`).
+    @PUT("/api/studio/videos/{id}/subtitles/{lang}")
+    void setSubtitle(@Path("id") String id, @Path("lang") String lang, @Body SubtitleUploadDto subtitle,
+            OnComplete<Response<StudioVideoDto>> callback);
+
+    @DELETE("/api/studio/videos/{id}/subtitles/{lang}")
+    void deleteSubtitle(@Path("id") String id, @Path("lang") String lang,
+            OnComplete<Response<StudioVideoDto>> callback);
+
     /// Opens a resumable upload. The chunks go to `PUT /api/studio/uploads/{id}?offset=n` as raw bytes.
     @POST("/api/studio/uploads")
     void startUpload(@Body UploadStartDto upload, OnComplete<Response<UploadDto>> callback);

@@ -32,6 +32,7 @@ import com.codename1.ui.layouts.BorderLayout;
 import com.codenameone.examples.reel.Telemetry;
 import com.codenameone.examples.reel.api.AppealDto;
 import com.codenameone.examples.reel.api.StudioTitleDto;
+import com.codenameone.examples.reel.api.Advisories;
 import com.codenameone.examples.reel.api.StudioTitleEditDto;
 import com.codenameone.examples.reel.api.StudioVideoDto;
 import com.codenameone.examples.reel.api.StudioVideoEditDto;
@@ -306,6 +307,7 @@ final class TitleEditor {
         final TextField price;
         final Slider pass;
         final boolean[] certificate = {false};
+        final java.util.List<String> advisories = new java.util.ArrayList<String>();
 
         Details(Container page, StudioTitleDto t) {
             if (t != null) {
@@ -313,6 +315,9 @@ final class TitleEditor {
                 access[0] = t.access();
                 rating[0] = t.rating();
                 certificate[0] = t.certificate();
+                if (t.advisories() != null) {
+                    advisories.addAll(t.advisories());
+                }
             }
             page.add(Ui.label("Kind", "SvLabel"));
             page.add(Ui.choice("kind", labels(KINDS), KINDS, kind[0], v -> kind[0] = v));
@@ -323,6 +328,19 @@ final class TitleEditor {
             year = Ui.field(page, "Year", "year", "2008", TextArea.NUMERIC);
             page.add(Ui.label("Rating", "SvLabel"));
             page.add(Ui.choice("rating", RATINGS, RATINGS, rating[0], v -> rating[0] = v));
+            // What the rating is for: shown beside it on the title's page and
+            // on the shared link, so a parent sees why it is not a U.
+            page.add(Ui.label("Content advisories", "SvLabel"));
+            for (int iter = 0; iter < Advisories.ALL.length; iter++) {
+                final String code = Advisories.ALL[iter];
+                page.add(Ui.row((char) 0, Lang.tr(Advisories.LABELS[iter]), null,
+                        Ui.toggle("advisory-" + code, advisories.contains(code), on -> {
+                            advisories.remove(code);
+                            if (on) {
+                                advisories.add(code);
+                            }
+                        })));
+            }
             genres = Ui.field(page, "Genres", "genres", "Animation, Comedy");
             tags = Ui.field(page, "Tags", "tags", "Optional, comma separated");
             page.add(Ui.label("Access", "SvLabel"));
@@ -359,7 +377,7 @@ final class TitleEditor {
             }
             error.setText("");
             return new StudioTitleEditDto(kind[0], name.getText().trim(), synopsis.getText().trim(), number(year),
-                    rating[0], words(genres.getText()), words(tags.getText()), access[0], number(price),
+                    rating[0], new java.util.ArrayList<String>(advisories), words(genres.getText()), words(tags.getText()), access[0], number(price),
                     certificate[0], pass.getProgress());
         }
     }

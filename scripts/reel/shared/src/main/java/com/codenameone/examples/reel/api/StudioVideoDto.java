@@ -36,6 +36,7 @@ public record StudioVideoDto(
         String error,
         int durationSeconds,
         String thumbnailUrl,
+        List<SubtitleDto> subtitles,
         List<ChapterDto> chapters,
         List<InteractionEditDto> interactions) {
 }

@@ -21,6 +21,9 @@ package com.codenameone.examples.reel.viewer;
 import com.codename1.media.DrmScheme;
 import com.codename1.media.MediaManager;
 import com.codename1.ui.Button;
+import com.codename1.ui.Component;
+import com.codename1.ui.Display;
+import com.codename1.ui.Slider;
 import com.codename1.ui.Container;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
@@ -32,6 +35,8 @@ import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codenameone.examples.reel.Prefs;
 import com.codenameone.examples.reel.Telemetry;
+import com.codenameone.examples.reel.api.Advisories;
+import com.codenameone.examples.reel.api.CourseProgressDto;
 import com.codenameone.examples.reel.api.EpisodeDto;
 import com.codenameone.examples.reel.api.Features;
 import com.codenameone.examples.reel.api.RatingDto;
@@ -95,11 +100,19 @@ public final class TitleForm {
         name.setUIID("Container");
         name.setTextUIID("RlHeroTitle");
         over.add(name);
-        String meta = t.year() + Ui.DOT + t.rating() + Ui.DOT + Ui.minutes(t.durationSeconds());
-        if (t.ratingCount() > 0) {
-            meta += Ui.DOT + Ui.tenths(t.averageRating()) + " / 5";
+        over.add(facts(t));
+        if (t.advisories() != null && !t.advisories().isEmpty()) {
+            StringBuilder why = new StringBuilder();
+            for (int iter = 0; iter < t.advisories().size(); iter++) {
+                if (iter > 0) {
+                    why.append(Ui.DOT);
+                }
+                why.append(Lang.tr(Advisories.label(t.advisories().get(iter))));
+            }
+            Label advisories = Ui.label(why.toString(), "RlAdvisories");
+            advisories.setName("advisories");
+            over.add(advisories);
         }
-        over.add(Ui.label(meta, "RlHeroMeta"));
         art.add(BorderLayout.SOUTH, over);
         page.add(art);
         Container info = Ui.page();
@@ -132,6 +145,9 @@ public final class TitleForm {
                 && MediaManager.isDrmSupported(DrmScheme.CLEARKEY)) {
             actions.add(Ui.action(FontImage.MATERIAL_DOWNLOAD, "Download", "download", e -> download(t)));
         }
+        if (t.shareUrl() != null) {
+            actions.add(Ui.action(FontImage.MATERIAL_SHARE, "Share", "share", e -> share(form, t)));
+        }
         if (Account.enabled(Features.REPORTS)) {
             actions.add(Ui.action(FontImage.MATERIAL_FLAG, "Report", "report", e -> report(form, t)));
         }
@@ -140,10 +156,13 @@ public final class TitleForm {
         if (t.creatorName() != null && t.creatorName().length() > 0) {
             info.add(Ui.label(Lang.tr("By {0}", t.creatorName()), "SvMuted"));
         }
-        if (t.certificate()) {
+        if ("COURSE".equals(t.kind())) {
+            info.add(course(t));
+        } else if (t.certificate()) {
             info.add(Ui.callout(FontImage.MATERIAL_WORKSPACE_PREMIUM, "Certificate course",
                     "Watch every lesson and pass the quizzes to earn a certificate anyone can verify."));
         }
+        languages(info, t);
 
         info.add(Ui.label("Your rating", "SvLabel"));
         info.add(stars(form, page, t));
@@ -166,6 +185,149 @@ public final class TitleForm {
             page.add(Cards.row(form, "similar", "More like this", t.similar()));
         }
         page.revalidate();
+    }
+
+    /// The line under the name: year, the age rating in its box, how long,
+    /// the best quality and CC when there are subtitles, and the stars.
+    private static Container facts(TitleDto t) {
+        Container row = new Container(new FlowLayout(Component.LEFT, Component.CENTER));
+        row.setUIID("RlHeroFacts");
+        if (t.year() > 0) {
+            row.add(Ui.label(String.valueOf(t.year()), "RlHeroMeta"));
+        }
+        if (t.rating() != null && t.rating().length() > 0) {
+            Label rating = Ui.badge(t.rating(), "RlRatingBox");
+            rating.setName("ratingBox");
+            row.add(rating);
+        }
+        if (t.durationSeconds() > 0) {
+            row.add(Ui.label(Ui.minutes(t.durationSeconds()), "RlHeroMeta"));
+        }
+        if (t.maxHeight() >= 720) {
+            row.add(Ui.badge(t.maxHeight() >= 2160 ? "4K" : "HD", "RlQualityBox"));
+        }
+        if (t.subtitleLanguages() != null && !t.subtitleLanguages().isEmpty()) {
+            row.add(Ui.badge("CC", "RlQualityBox"));
+        }
+        if (t.ratingCount() > 0) {
+            Label stars = Ui.label(Ui.tenths(t.averageRating()) + " / 5", "RlHeroMeta");
+            Ui.icon(stars, FontImage.MATERIAL_STAR, 2.6f);
+            row.add(stars);
+        }
+        return row;
+    }
+
+    /// Audio and subtitle languages, as a viewer reads them on a box.
+    private static void languages(Container info, TitleDto t) {
+        String audio = join(t.audioLanguages());
+        String subs = join(t.subtitleLanguages());
+        if (audio.length() == 0 && subs.length() == 0) {
+            return;
+        }
+        Container facts = new Container(BoxLayout.y());
+        facts.setName("languages");
+        if (audio.length() > 0) {
+            facts.add(Ui.fact(Lang.tr("Audio"), audio));
+        }
+        facts.add(Ui.fact(Lang.tr("Subtitles"), subs.length() == 0 ? Lang.tr("None") : subs));
+        info.add(facts);
+    }
+
+    private static String join(java.util.List<String> all) {
+        StringBuilder out = new StringBuilder();
+        if (all != null) {
+            for (int iter = 0; iter < all.size(); iter++) {
+                if (iter > 0) {
+                    out.append(", ");
+                }
+                out.append(all.get(iter));
+            }
+        }
+        return out.toString();
+    }
+
+    /// What a course is, in three steps, and how far this profile is.
+    private static Container course(final TitleDto t) {
+        Container box = new Container(BoxLayout.y());
+        box.setUIID("RlCourse");
+        box.setName("courseExplainer");
+        box.add(Ui.label("How this course works", "RlCourseTitle"));
+        int lessons = t.episodes() == null ? 0 : t.episodes().size();
+        box.add(Ui.row(FontImage.MATERIAL_PLAY_LESSON, Lang.tr("{0} short lessons", String.valueOf(lessons)),
+                Lang.tr("Watch them in order; each picks up where the last one ended"), null));
+        box.add(Ui.row(FontImage.MATERIAL_QUIZ, Lang.tr("Quizzes inside the video"),
+                Lang.tr("The lesson pauses on a question and carries on when you answer"), null));
+        if (t.certificate()) {
+            box.add(Ui.row(FontImage.MATERIAL_WORKSPACE_PREMIUM, Lang.tr("A certificate at the end"),
+                    Lang.tr("Finish every lesson and pass the quizzes; anyone can verify it by its code"), null));
+        }
+        final Label progress = Ui.label("", "RlCourseProgress");
+        progress.setName("courseProgress");
+        final Slider bar = new Slider();
+        bar.setUIID("RlCourseBar");
+        bar.setMinValue(0);
+        bar.setMaxValue(Math.max(1, lessons));
+        bar.setProgress(0);
+        box.add(progress);
+        box.add(bar);
+        Api.learning().progress(Account.profileId(), Net.to(all -> {
+            for (int iter = 0; iter < all.size(); iter++) {
+                CourseProgressDto c = all.get(iter);
+                if (t.id().equals(c.titleId())) {
+                    bar.setMaxValue(Math.max(1, c.lessonsTotal()));
+                    bar.setProgress(c.lessonsCompleted());
+                    String text = Lang.tr("{0} of {1} lessons done", String.valueOf(c.lessonsCompleted()),
+                            String.valueOf(c.lessonsTotal()));
+                    if (c.quizScorePercent() > 0) {
+                        text += Ui.DOT + Lang.tr("quizzes {0}%", String.valueOf(c.quizScorePercent()));
+                    }
+                    if (c.certificateEarned()) {
+                        text += Ui.DOT + Lang.tr("certificate earned");
+                    }
+                    progress.setText(text);
+                    box.revalidateLater();
+                    return;
+                }
+            }
+            progress.setText(Lang.tr("Not started yet"));
+            box.revalidateLater();
+        }, (code, message) -> { }));
+        return box;
+    }
+
+    /// The share sheet: how the link will look where it is pasted, the link
+    /// itself, and the ways to send it.
+    private static void share(final Form previous, final TitleDto t) {
+        final Form form = Ui.form("Share", "Share");
+        Ui.back(form, previous);
+        Container page = Ui.page();
+        final String link = com.codenameone.examples.reel.ui.Art.url(t.shareUrl());
+        Container preview = new Container(new BorderLayout());
+        preview.setUIID("RlSharePreview");
+        Label poster = new Label("", "RlSharePoster");
+        com.codenameone.examples.reel.ui.Art.load(poster, t.posterUrl(), 16f, 24f);
+        preview.add(BorderLayout.WEST, poster);
+        Container words = new Container(BoxLayout.y());
+        words.add(Ui.label(t.name(), "RlShareTitle"));
+        words.add(Ui.label(t.year() + Ui.DOT + t.rating(), "SvMuted"));
+        words.add(Ui.text(t.synopsis(), "RlShareText"));
+        preview.add(BorderLayout.CENTER, words);
+        page.add(Ui.label("What people will see", "SvLabel"));
+        page.add(preview);
+        page.add(Ui.label("Link", "SvLabel"));
+        Label url = Ui.label(link, "RlShareLink");
+        url.setName("shareLink");
+        page.add(url);
+        page.add(Ui.primary("Share", "shareSend", e -> Display.getInstance().share(
+                Lang.tr("Watch {0} with me", t.name()) + " " + link, null, "text/plain")));
+        page.add(Ui.secondary("Copy link", "shareCopy", e -> {
+            Display.getInstance().copyToClipboard(link);
+            Ui.say("Link copied");
+        }));
+        page.add(Ui.text("Anyone with the link sees the title's page; watching it still needs an account.",
+                "SvMuted"));
+        form.add(BorderLayout.CENTER, page);
+        form.show();
     }
 
     private static Container episode(final Form form, final TitleDto t, final EpisodeDto ep) {

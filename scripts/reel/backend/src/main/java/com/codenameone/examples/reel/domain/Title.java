@@ -44,6 +44,10 @@ public class Title {
     @Column(nullable = false, type = "VARCHAR(8)")
     private String rating = "";
 
+    /// What earned the rating -- `violence`, `language` -- comma separated.
+    @Column(nullable = false, type = "VARCHAR(255)")
+    private String advisories = "";
+
     @Column(nullable = false, type = "VARCHAR(255)")
     private String genres = "";
 
@@ -143,6 +147,14 @@ public class Title {
 
     public void setYear(int year) {
         this.year = year;
+    }
+
+    public String getAdvisories() {
+        return advisories;
+    }
+
+    public void setAdvisories(String advisories) {
+        this.advisories = advisories;
     }
 
     public String getRating() {

@@ -85,6 +85,12 @@ public final class Cards {
     /// A headed row of cards that scrolls sideways, starting at the gutter and
     /// running out under the right-hand edge.
     public static Container row(Form from, String id, String heading, List<TitleCardDto> titles) {
+        return row(from, id, heading, null, titles);
+    }
+
+    /// The same, with a line under the heading saying what the row is.
+    public static Container row(Form from, String id, String heading, String caption,
+            List<TitleCardDto> titles) {
         int side = CN.convertToPixels(Layouts.gutter());
         Container row = new Container(BoxLayout.y());
         row.setUIID("RlRow");
@@ -92,6 +98,14 @@ public final class Cards {
         title.getAllStyles().setPaddingUnit(Style.UNIT_TYPE_PIXELS);
         title.getAllStyles().setPaddingLeft(side);
         row.add(title);
+        if (caption != null) {
+            com.codename1.components.SpanLabel about = Ui.text(caption, "RlRowCaption");
+            about.setName("caption-" + id);
+            about.getAllStyles().setPaddingUnit(Style.UNIT_TYPE_PIXELS);
+            about.getAllStyles().setPaddingLeft(side);
+            about.getAllStyles().setPaddingRight(side);
+            row.add(about);
+        }
         Container strip = new Container(BoxLayout.x());
         strip.setUIID("RlStrip");
         strip.getAllStyles().setPaddingUnit(Style.UNIT_TYPE_PIXELS);

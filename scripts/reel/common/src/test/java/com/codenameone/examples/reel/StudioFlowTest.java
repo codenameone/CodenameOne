@@ -37,6 +37,8 @@ public class StudioFlowTest extends E2e {
         type("name", name);
         type("synopsis", "Made by the end-to-end test.");
         type("year", "2026");
+        reveal("advisory-violence");
+        shot("studio-new-title");
         click("create");
         waitForForm("StudioTitle");
         shot("studio-title");
@@ -46,6 +48,13 @@ public class StudioFlowTest extends E2e {
         click("add");
         waitForForm("StudioTitle");
         until(() -> findByName("video-0") != null, 20000, "the new video");
+        click("video-0");
+        waitForForm("StudioVideo");
+        shot("studio-video");
+        reveal("addSubtitle");
+        shot("studio-video-subtitles");
+        back();
+        waitForForm("StudioTitle");
         boolean found = false;
         for (Object each : Actor.signIn(CREATOR).list("/api/studio/titles")) {
             if (each instanceof java.util.Map && name.equals(Actor.text((java.util.Map<String, Object>) each,

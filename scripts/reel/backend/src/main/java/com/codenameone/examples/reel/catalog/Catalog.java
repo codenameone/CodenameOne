@@ -44,6 +44,7 @@ import com.codenameone.examples.reel.domain.Progress;
 import com.codenameone.examples.reel.domain.Title;
 import com.codenameone.examples.reel.domain.TitleRating;
 import com.codenameone.examples.reel.domain.Video;
+import com.codenameone.examples.reel.playback.Tracks;
 import com.codenameone.examples.reel.repository.ChapterRepository;
 import com.codenameone.examples.reel.repository.GenreRepository;
 import com.codenameone.examples.reel.repository.InteractionRepository;
@@ -89,11 +90,13 @@ public class Catalog {
     private final Entitlements entitlements;
     private final Settings settings;
     private final Recommender recommender;
+    private final Tracks tracks;
 
     public Catalog(TitleRepository titles, VideoRepository videos, GenreRepository genres,
             ProgressRepository progress, ListEntryRepository lists, TitleRatingRepository ratings,
             ChapterRepository chapters, InteractionRepository interactions, Households households,
-            Accounts accounts, Entitlements entitlements, Settings settings, Recommender recommender) {
+            Accounts accounts, Entitlements entitlements, Settings settings, Recommender recommender,
+            Tracks tracks) {
         this.titles = titles;
         this.videos = videos;
         this.genres = genres;
@@ -107,6 +110,7 @@ public class Catalog {
         this.entitlements = entitlements;
         this.settings = settings;
         this.recommender = recommender;
+        this.tracks = tracks;
     }
 
     @Transactional(rollbackFor = IOException.class)
@@ -265,7 +269,11 @@ public class Catalog {
         List<Recommender.Scored> similar = recommender.similar(t, visible(profile));
         Map<String, Integer> none = new HashMap<String, Integer>();
         return new TitleDto(t.getId(), t.getKind(), t.getName(), t.getSynopsis(), t.getPosterUrl(),
-                t.getBackdropUrl(), t.getYear(), t.getRating(), Rows.split(t.getGenres()), Rows.split(t.getTags()),
+                t.getBackdropUrl(), t.getYear(), t.getRating(), Rows.split(t.getAdvisories()),
+                first == null ? 0 : Tracks.tallest(first.getRenditions()), Tracks.audioLabels(first),
+                first == null ? new ArrayList<String>() : tracks.subtitleLabels(first.getId()),
+                Kinds.PUBLISHED.equals(t.getStatus()) ? WatchPage.path(t.getId()) : null,
+                Rows.split(t.getGenres()), Rows.split(t.getTags()),
                 t.getCreator(), accounts.displayName(t.getCreator()), first == null ? 0 : first.getDurationSeconds(),
                 average(t), t.getRatingCount(), mineRating == null ? 0 : mineRating.getStars(), listed, resume,
                 t.getAccess(), t.getRentalPriceCents(), settings.currency(), access.allowed,

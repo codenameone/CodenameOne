@@ -26,6 +26,11 @@ import java.util.List;
 @Mapped
 public record PlaybackDto(
         String sessionId,
+        String titleName,
+        String episodeName,
+        String posterUrl,
+        int durationSeconds,
+        String nextEpisodeId,
         String manifestUrl,
         String scheme,
         String licenseUrl,
@@ -36,6 +41,10 @@ public record PlaybackDto(
         int heartbeatSeconds,
         List<AdBreakDto> adBreaks,
         List<SubtitleDto> subtitles,
+        List<AudioTrackDto> audioTracks,
+        String audioTrack,
+        List<Integer> qualities,
+        int maxHeight,
         List<ChapterDto> chapters,
         List<InteractionDto> interactions,
         String watermark,

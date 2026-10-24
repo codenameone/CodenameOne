@@ -73,24 +73,77 @@ On a desktop or a tablet the sections of the app sit along the top bar, the
 featured title's text moves to the left of its artwork, and the rows show as
 many titles as the window has room for.
 
-image::img/reel-viewer-title.png["A title's page with its artwork, year, rating and length, genre chips, a Play button and buttons to add it to the list and to report it",scaledwidth=40%]
+image::img/reel-viewer-title.png["A title's page with its artwork, year, age rating, length and HD badge, its content advisories, genre chips, a Play button and buttons to add it to the list, share it and report it",scaledwidth=40%]
 
 A title's page shows its episodes or lessons, plays it from where the profile
-stopped, adds it to the list, rates it, downloads it and reports it. A title
-that's not in the plan offers the plan that has it, or a rental.
+stopped, adds it to the list, rates it, downloads it, shares it and reports it.
+Under the name are the year, the age rating in its box, the length, the best
+quality the title was packaged in and a CC mark when it has subtitles. The
+content advisories say what the rating is for: violence, frightening scenes,
+strong language, sexual content, drugs or alcohol, flashing lights. Further
+down the page lists the audio and subtitle languages. A title that's not in
+the plan offers the plan that has it, or a rental.
 
 image::img/reel-viewer-title-desktop.png["A title's page in a desktop window, its artwork across the top and its details in a centered column under the title",scaledwidth=90%]
 
-The player is the platform's own. On a plan with ads, short ad breaks play
-before and during the title, and some can be skipped after a few seconds.
-Chapters jump through the title. A course pauses for a quiz or a poll and, where
-the course branches, moves on to the lesson the answer leads to. While a
+image::img/reel-viewer-share.png["The share screen: a preview card with the title's poster, name, year, rating and synopsis, the link, and buttons to share it and copy it",scaledwidth=40%]
+
+Share shows how the link will look where it's pasted and offers the device's
+share sheet or a copy of the link. The link opens a public page on the server
+with the poster, the rating, the advisories and the synopsis, which is what a
+chat app or a social network shows in its preview. Its Watch button opens the
+app on that title, after signing in where needed. A draft or a removed title has
+no public page.
+
+==== The player
+
+image::img/reel-viewer-player.png["The player over the title's artwork: the title and episode at the top, back ten seconds, play or pause and forward ten seconds in the middle, and a scrub bar with the time played and the time left over buttons for chapters, audio and subtitles, and the next episode",scaledwidth=40%]
+
+The player draws its own controls over the picture: back and forward ten
+seconds, play and pause, a scrub bar with the time played and the time left,
+chapters, Audio & subtitles and, in a series or a course, the next episode. The
+controls fade after a few seconds of playback and come back on a tap. When an
+episode ends and autoplay is on, the next one starts.
+
+image::img/reel-viewer-player-tracks.png["The Audio and subtitles sheet over the bottom of the player, with choices for subtitles, the audio track and the streaming quality",scaledwidth=40%]
+
+Audio & subtitles picks the subtitles (or none), the audio track and the
+quality: Auto, or one of the heights the title was packaged in, up to what the
+plan allows. Subtitles change at once. A different audio track or quality
+reopens the stream where it was.
+
+Subtitles are WebVTT files kept beside the video and drawn by the app, so they
+look the same on every device and work with every kind of protection. The
+audio track is chosen by the server, which marks it as the default in the
+playlist the player reads.
+
+On a plan with ads, short ad breaks play before and during the title, and some
+can be skipped after a few seconds. A course pauses for a quiz or a poll and,
+where the course branches, moves on to the lesson the answer leads to. While a
 protected title plays, screenshots and screen recording are blocked where the
 device allows it, and a faint mark naming the account sits over the picture.
 
 A plan allows a number of screens at once. Starting one more ends with a
 message saying so, and an administrator, a suspension or a sign-out on another
 device can end a stream that's playing.
+
+==== Your library, settings and account
+
+image::img/reel-viewer-library.png["The library with the profile's list, its downloads and the titles it watched, each with how far it got",scaledwidth=40%]
+
+The library holds the profile's list, its downloads and what it watched. A
+title can be taken out of the history, which also takes it out of what the
+recommendations learn from.
+
+image::img/reel-viewer-settings-subtitles.png["Settings with autoplay, data saver and the streaming quality, then the subtitle language, the subtitle size and a sample of how subtitles look",scaledwidth=40%]
+
+Settings hold the playback preferences (autoplay, data saver, the streaming
+quality), the subtitle language and size used whenever a title has a track in
+that language, notifications, the language and the theme of the app, and
+privacy. The account screen shows the devices signed in and what's playing on
+each, and signs any of them out.
+
+image::img/reel-viewer-account.png["The account screen with the name, the streams playing now and the devices signed in, each with a button to sign it out",scaledwidth=40%]
 
 === Downloads
 
@@ -115,9 +168,19 @@ the plan can also be bought through the app store.
 
 === Learning
 
-On a service with courses, a course is a title whose episodes are lessons.
-Progress is kept per lesson, the quizzes are marked, and a course that's
-finished earns a certificate the viewer can open from the learning screen.
+image::img/reel-viewer-course.png["A course's page explaining how it works: short lessons in order, quizzes inside the video and a certificate at the end, with the profile's progress under them",scaledwidth=40%]
+
+On a service with courses, a course is a title whose episodes are short lessons.
+The Courses row on the home screen says so, and a course's page explains how it
+works: the lessons are watched in order, the video pauses on a quiz and carries
+on when it's answered, and finishing every lesson and passing the quizzes earns
+a certificate. The page shows how far the profile got. Progress is kept per
+lesson, and a certificate opens from the learning screen, where anyone can
+verify it by its code.
+
+image::img/reel-viewer-lesson-subtitles.png["A lesson in the player with the Audio and subtitles sheet open and Spanish chosen among English, Spanish, French and German subtitles",scaledwidth=40%]
+
+The demo course has subtitles in English, Spanish, French and German.
 
 === Creating
 
@@ -129,6 +192,13 @@ a rating and its videos. A video is uploaded in pieces, so a dropped connection
 costs one piece and not the file, and the server packages it into the protected
 formats the players need. Its chapters are lines of `m:ss Title`, and its
 quizzes, polls and branches are added at a time in the video.
+
+image::img/reel-studio-video-subtitles.png["The studio's page for a video, with its subtitle tracks and the fields to add one: the language, the name viewers see and the WebVTT text",scaledwidth=40%]
+
+A video's subtitles are added one language at a time, as WebVTT: a language
+such as `en` or `pt-BR`, the name viewers see, and the text. A title's age
+rating comes with its content advisories, which the creator ticks when making
+or editing the title.
 
 A finished title is submitted for review. A rejected one comes back with the
 moderator's note, and the creator can correct it and submit it again, or appeal.

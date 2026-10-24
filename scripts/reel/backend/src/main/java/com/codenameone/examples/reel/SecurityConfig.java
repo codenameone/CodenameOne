@@ -379,10 +379,11 @@ public class SecurityConfig {
                     RateLimitKeys.firstOf(RateLimitKeys.principal(), RateLimitKeys.clientAddress()),
                     new InMemoryRateLimiter(30, 60))
             // tag::reel-api-rules[]
-            // The media origin, the license server, the worker API and the
-            // certificate page are outside this chain: each checks its own
-            // signed token (MediaTokens, the worker's bearer secret) and none
-            // of them takes the user's access token.
+            // The media origin, the license server, the worker API, the
+            // certificate page and the shared-title page are outside this
+            // chain: each checks its own signed token (MediaTokens, the
+            // worker's bearer secret) or shows only public facts, and none of
+            // them takes the user's access token.
             .authorizeHttpRequests(auth -> auth
                     .requestMatchers(AntPathRequestMatcher.antMatcher("POST", "/api/signup")).permitAll()
                     .requestMatchers(AntPathRequestMatcher.antMatcher("GET", "/api/config")).permitAll()

@@ -18,6 +18,7 @@ CREATE TABLE title (
     synopsis TEXT NOT NULL,
     year INTEGER NOT NULL,
     rating VARCHAR(8) NOT NULL,
+    advisories VARCHAR(255) NOT NULL,
     genres VARCHAR(255) NOT NULL,
     tags VARCHAR(255) NOT NULL,
     creator VARCHAR(190) NOT NULL,
@@ -58,10 +59,22 @@ CREATE TABLE video (
     height INTEGER NOT NULL,
     renditions VARCHAR(255) NOT NULL,
     schemes VARCHAR(64) NOT NULL,
+    audio VARCHAR(255) NOT NULL,
     thumbnail_url VARCHAR(255) NOT NULL,
     created_at BIGINT NOT NULL
 );
 CREATE INDEX video_title_id ON video (title_id);
+
+-- A subtitle track of a video, kept whole: WebVTT is small text.
+CREATE TABLE subtitle (
+    id VARCHAR(32) NOT NULL PRIMARY KEY,
+    video_id VARCHAR(32) NOT NULL,
+    language VARCHAR(16) NOT NULL,
+    label VARCHAR(64) NOT NULL,
+    vtt TEXT NOT NULL,
+    created_at BIGINT NOT NULL
+);
+CREATE UNIQUE INDEX subtitle_video_language ON subtitle (video_id, language);
 
 -- A named point in a video.
 CREATE TABLE chapter (

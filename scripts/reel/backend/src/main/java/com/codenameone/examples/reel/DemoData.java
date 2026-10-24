@@ -37,6 +37,8 @@ import com.codenameone.examples.reel.domain.Title;
 import com.codenameone.examples.reel.domain.Video;
 import com.codenameone.examples.reel.domain.VideoKey;
 import com.codenameone.examples.reel.learning.Learning;
+import com.codenameone.examples.reel.playback.Subtitles;
+import com.codenameone.examples.reel.playback.Tracks;
 import com.codenameone.examples.reel.repository.AdCampaignRepository;
 import com.codenameone.examples.reel.repository.ChapterRepository;
 import com.codenameone.examples.reel.repository.GenreRepository;
@@ -84,6 +86,12 @@ public class DemoData {
     private static final String[][] GENRES = {
         {"animation", "Animation"}, {"comedy", "Comedy"}, {"fantasy", "Fantasy"}, {"sci-fi", "Science Fiction"},
         {"action", "Action"}, {"learning", "Learning"}};
+    /// Each title's classification beyond its rating (see Advisories).
+    private static final String[][] ADVISORIES = {
+        {"big-buck-bunny", "violence"},
+        {"sintel", "violence,frightening"},
+        {"tears-of-steel", "violence,language"},
+        {"elephants-dream", "frightening,flashing"}};
     private static final String[] LESSONS = {
         "Welcome to Reel Academy", "Keys and licences", "Watching offline"};
 
@@ -96,17 +104,19 @@ public class DemoData {
     private final ChapterRepository chapters;
     private final InteractionRepository interactions;
     private final AdCampaignRepository campaigns;
+    private final Subtitles subtitles;
     private final String mediaDir;
     private final String currency;
 
     public DemoData(DemoAccounts accounts, PlanRepository plans, GenreRepository genres, TitleRepository titles,
             VideoRepository videos, VideoKeyRepository keys, ChapterRepository chapters,
-            InteractionRepository interactions, AdCampaignRepository campaigns,
+            InteractionRepository interactions, AdCampaignRepository campaigns, Subtitles subtitles,
             @Value("${reel.media.dir:media}") String mediaDir,
             @Value("${reel.currency:USD}") String currency) {
         this.accounts = accounts;
         this.plans = plans;
         this.genres = genres;
+        this.subtitles = subtitles;
         this.titles = titles;
         this.videos = videos;
         this.keys = keys;
@@ -148,6 +158,11 @@ public class DemoData {
             row.setName(t[2]);
             row.setYear(Integer.parseInt(t[3]));
             row.setRating(t[4]);
+            for (int a = 0; a < ADVISORIES.length; a++) {
+                if (ADVISORIES[a][0].equals(t[0])) {
+                    row.setAdvisories(ADVISORIES[a][1]);
+                }
+            }
             row.setGenres(t[5]);
             row.setAccess(t[6]);
             row.setRentalPriceCents(Entitlements.RENTAL.equals(t[6]) ? 399 : 0);
@@ -167,6 +182,10 @@ public class DemoData {
                 for (int lesson = 0; lesson < LESSONS.length; lesson++) {
                     video("academy-lesson-" + (lesson + 1), t[0], Kinds.LESSON, lesson + 1, LESSONS[lesson],
                             seed, now);
+                    for (int lang = 0; lang < DemoSubtitles.LANGUAGES.length; lang++) {
+                        subtitles.put("academy-lesson-" + (lesson + 1), DemoSubtitles.LANGUAGES[lang][0],
+                                DemoSubtitles.LANGUAGES[lang][1], DemoSubtitles.vtt(lang, lesson), now);
+                    }
                 }
                 lessonContent();
             } else {
@@ -216,6 +235,9 @@ public class DemoData {
         v.setRenditions(entry == null ? "360,720" : Rows.join(strings(entry.get("renditions"))));
         // The same three as a video the worker packaged: see Jobs.done.
         v.setSchemes("AES_128,CLEARKEY,WIDEVINE");
+        // A packaged film names its audio tracks in seed.json; the generated
+        // clips have the one.
+        v.setAudio(entry == null || entry.get("audio") == null ? Tracks.ORIGINAL : Rows.text(entry.get("audio")));
         v.setThumbnailUrl("/art/" + id + "/poster.jpg");
         v.setCreatedAt(now);
         videos.insert(v);

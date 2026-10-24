@@ -36,6 +36,8 @@ public final class Prefs {
     public static final String AUTOPLAY = "autoplay";
     public static final String SUBTITLES = "subtitles";
     public static final String DATA_SAVER = "dataSaver";
+    public static final String QUALITY = "quality";
+    public static final String CAPTION_SIZE = "captionSize";
     public static final String NOTIFY_NEW_EPISODES = "notifyNewEpisodes";
     public static final String NOTIFY_ACCOUNT = "notifyAccount";
     public static final String PAYMENT_METHOD = "defaultPaymentMethodId";
@@ -101,6 +103,25 @@ public final class Prefs {
 
     public static void setSubtitles(String code) {
         put(SUBTITLES, code);
+    }
+
+    /// The tallest picture to stream, as a height, or empty for whatever the
+    /// connection carries.
+    public static String quality() {
+        return text(QUALITY, "");
+    }
+
+    public static void setQuality(String height) {
+        put(QUALITY, height);
+    }
+
+    /// How large subtitles are drawn: `small`, `medium` or `large`.
+    public static String captionSize() {
+        return text(CAPTION_SIZE, "medium");
+    }
+
+    public static void setCaptionSize(String size) {
+        put(CAPTION_SIZE, size);
     }
 
     /// Whether streams are held to standard definition, to spare a data plan.

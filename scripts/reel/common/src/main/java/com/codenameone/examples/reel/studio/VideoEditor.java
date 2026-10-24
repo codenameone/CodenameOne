@@ -32,6 +32,8 @@ import com.codenameone.examples.reel.api.InteractionEditDto;
 import com.codenameone.examples.reel.api.InteractionsDto;
 import com.codenameone.examples.reel.api.StudioTitleDto;
 import com.codenameone.examples.reel.api.StudioVideoDto;
+import com.codenameone.examples.reel.api.SubtitleDto;
+import com.codenameone.examples.reel.api.SubtitleUploadDto;
 import com.codenameone.examples.reel.api.StudioVideoEditDto;
 import com.codenameone.examples.reel.net.Api;
 import com.codenameone.examples.reel.net.Net;
@@ -101,6 +103,8 @@ final class VideoEditor {
                     (code, message) -> error.setText(message)));
         }));
 
+        subtitles(page, form, v, error);
+
         Ui.section(page, "Interactions");
         final List<InteractionEditDto> items = v.interactions() == null ? new ArrayList<InteractionEditDto>()
                 : new ArrayList<InteractionEditDto>(v.interactions());
@@ -134,6 +138,57 @@ final class VideoEditor {
         }, Ui::fail))));
         form.add(BorderLayout.CENTER, page);
         form.show();
+    }
+
+    /// The video's subtitle tracks: one per language, WebVTT pasted in.
+    /// The player draws them itself, so they work with every DRM scheme.
+    private static void subtitles(Container page, final Form form, final StudioVideoDto v, final SpanLabel error) {
+        Ui.section(page, "Subtitles");
+        final Container list = new Container(com.codename1.ui.layouts.BoxLayout.y());
+        list.setName("subtitleTracks");
+        page.add(list);
+        final List<SubtitleDto> tracks = v.subtitles() == null ? new ArrayList<SubtitleDto>()
+                : new ArrayList<SubtitleDto>(v.subtitles());
+        final Runnable[] draw = new Runnable[1];
+        draw[0] = () -> {
+            list.removeAll();
+            if (tracks.isEmpty()) {
+                list.add(Ui.text("No subtitles yet. Viewers who need captions cannot follow this video.",
+                        "SvMuted"));
+            }
+            for (int iter = 0; iter < tracks.size(); iter++) {
+                final SubtitleDto track = tracks.get(iter);
+                list.add(Ui.row(FontImage.MATERIAL_SUBTITLES, track.label(), track.language(),
+                        Ui.flat(FontImage.MATERIAL_DELETE, "removeSubtitle-" + track.language(),
+                                e -> Api.studio().deleteSubtitle(v.id(), track.language(), Net.to(updated -> {
+                                    tracks.clear();
+                                    tracks.addAll(updated.subtitles());
+                                    draw[0].run();
+                                }, (code, message) -> error.setText(message))))));
+            }
+            list.revalidate();
+        };
+        draw[0].run();
+        final TextField language = Ui.field(page, "Language", "subtitleLanguage", "en, es, pt-BR");
+        final TextField label = Ui.field(page, "Name viewers see", "subtitleLabel", "English");
+        page.add(Ui.label("WebVTT", "SvLabel"));
+        final TextArea vtt = new TextArea("", 6, 24);
+        vtt.setUIID("SvField");
+        vtt.setName("subtitleVtt");
+        vtt.setHint("Paste a .vtt file: WEBVTT, then its cues");
+        page.add(vtt);
+        page.add(Ui.secondary("Add subtitles", "addSubtitle", e -> Api.studio().setSubtitle(v.id(),
+                language.getText().trim(), new SubtitleUploadDto(label.getText().trim(), vtt.getText()),
+                Net.to(updated -> {
+                    tracks.clear();
+                    tracks.addAll(updated.subtitles());
+                    language.setText("");
+                    label.setText("");
+                    vtt.setText("");
+                    error.setText("");
+                    draw[0].run();
+                    form.revalidate();
+                }, (code, message) -> error.setText(message)))));
     }
 
     private static void interaction(final Form previous, StudioTitleDto t, final List<InteractionEditDto> items,

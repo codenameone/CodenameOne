@@ -18,13 +18,16 @@
  */
 package com.codenameone.examples.reel.playback;
 
+import com.codenameone.examples.reel.domain.Subtitle;
 import com.codenameone.examples.reel.domain.Video;
+import com.codenameone.examples.reel.repository.SubtitleRepository;
 import com.codenameone.examples.reel.repository.VideoRepository;
 import com.codename1.backend.HttpServer;
 import com.codename1.backend.StaticFiles;
 import com.codename1.backend.annotations.GetMapping;
 import com.codename1.backend.annotations.PathVariable;
 import com.codename1.backend.annotations.RestController;
+import com.codename1.backend.annotations.Transactional;
 import com.codename1.backend.annotations.Value;
 
 import java.io.ByteArrayOutputStream;
@@ -61,10 +64,12 @@ public class MediaOrigin {
     private final Licenses licenses;
     private final Playbacks playbacks;
     private final VideoRepository videos;
+    private final SubtitleRepository subtitles;
 
     public MediaOrigin(@Value("${reel.media.dir:media}") String root, MediaTokens tokens, Licenses licenses,
-            Playbacks playbacks, VideoRepository videos) {
+            Playbacks playbacks, VideoRepository videos, SubtitleRepository subtitles) {
         this.videos = videos;
+        this.subtitles = subtitles;
         this.root = root;
         // A server with no packaged media yet (a fresh install, the test profile)
         // must answer 404 for art and segments, not fail every request on a
@@ -75,6 +80,7 @@ public class MediaOrigin {
         this.playbacks = playbacks;
     }
 
+    @Transactional(readOnly = true)
     @GetMapping("/media/{token}/{video}/{file}")
     public HttpServer.Response media(HttpServer.Request request, @PathVariable("token") String token,
             @PathVariable("video") String video, @PathVariable("file") String file) throws Exception {
@@ -93,6 +99,16 @@ public class MediaOrigin {
             }
             return new HttpServer.Response(200, "application/octet-stream", key, noStore());
         }
+        String language = subtitleLanguage(file);
+        if (language != null) {
+            // Subtitles are kept in the database, not beside the segments: a
+            // creator adds them long after the worker packaged the video.
+            Subtitle s = subtitles.findByVideoIdAndLanguage(video, language);
+            if (s == null) {
+                return HttpServer.Response.text(404, "not found");
+            }
+            return new HttpServer.Response(200, "text/vtt; charset=utf-8", s.getVtt().getBytes("UTF-8"), noStore());
+        }
         int height = renditionHeight(file);
         if ("cenc.mp4".equals(file)) {
             // One file at one quality, so the cap is all or nothing.
@@ -109,7 +125,8 @@ public class MediaOrigin {
             if (raw == null) {
                 return HttpServer.Response.text(404, "not found");
             }
-            String filtered = filterMaster(new String(raw, "UTF-8"), grant.maxHeight);
+            String filtered = preferAudio(filterMaster(new String(raw, "UTF-8"), grant.maxHeight),
+                    request.queryParam("audio"));
             return new HttpServer.Response(200, "application/vnd.apple.mpegurl", filtered.getBytes("UTF-8"), noStore());
         }
         HttpServer.Response out = new StaticFiles(root, "/media/" + token, "none",
@@ -194,6 +211,56 @@ public class MediaOrigin {
             out.append(smallest);
         }
         return out.toString();
+    }
+
+    /// The language of a subtitle file name, `sub_<language>.vtt`, or null.
+    static String subtitleLanguage(String file) {
+        if (!file.startsWith("sub_") || !file.endsWith(".vtt")) {
+            return null;
+        }
+        String language = file.substring(4, file.length() - 4);
+        return Subtitles.validLanguage(language) ? language : null;
+    }
+
+    /// Makes the audio rendition named `track` the one a player picks: it
+    /// becomes the group's only `DEFAULT=YES` and `AUTOSELECT=YES`. A player
+    /// plays the default of an audio group unless told otherwise, and none of
+    /// the platform players is told otherwise here. A playlist with no audio
+    /// renditions, or no rendition of that name, is left as it is.
+    static String preferAudio(String master, String track) {
+        if (track == null || track.length() == 0 || master.indexOf("TYPE=AUDIO") < 0
+                || master.indexOf("NAME=\"" + track + "\"") < 0) {
+            return master;
+        }
+        java.util.List<String> lines = com.codenameone.examples.reel.Rows.split(master, '\n');
+        StringBuilder out = new StringBuilder();
+        for (int iter = 0; iter < lines.size(); iter++) {
+            String line = lines.get(iter);
+            if (line.startsWith("#EXT-X-MEDIA:") && line.indexOf("TYPE=AUDIO") > 0) {
+                boolean chosen = line.indexOf("NAME=\"" + track + "\"") > 0;
+                line = attribute(attribute(line, "DEFAULT", chosen ? "YES" : "NO"), "AUTOSELECT",
+                        chosen ? "YES" : "NO");
+            }
+            out.append(line).append('\n');
+        }
+        return out.toString();
+    }
+
+    /// `line` with attribute `name` set to `value`, added when missing.
+    private static String attribute(String line, String name, String value) {
+        int at = line.indexOf("," + name + "=");
+        if (at < 0) {
+            at = line.indexOf(":" + name + "=");
+        }
+        if (at < 0) {
+            return line + "," + name + "=" + value;
+        }
+        int start = at + name.length() + 2;
+        int end = line.indexOf(',', start);
+        if (end < 0) {
+            end = line.length();
+        }
+        return line.substring(0, start) + value + line.substring(end);
     }
 
     private static int heightOf(String info, String uri) {

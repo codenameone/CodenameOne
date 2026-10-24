@@ -27,6 +27,7 @@ import com.codenameone.examples.reel.Kinds;
 import com.codenameone.examples.reel.Roles;
 import com.codenameone.examples.reel.Rows;
 import com.codenameone.examples.reel.account.Households;
+import com.codenameone.examples.reel.api.Advisories;
 import com.codenameone.examples.reel.api.AppealDto;
 import com.codenameone.examples.reel.api.ChapterDto;
 import com.codenameone.examples.reel.api.ChaptersDto;
@@ -38,6 +39,8 @@ import com.codenameone.examples.reel.api.StudioTitleDto;
 import com.codenameone.examples.reel.api.StudioTitleEditDto;
 import com.codenameone.examples.reel.api.StudioVideoDto;
 import com.codenameone.examples.reel.api.StudioVideoEditDto;
+import com.codenameone.examples.reel.api.SubtitleDto;
+import com.codenameone.examples.reel.api.SubtitleUploadDto;
 import com.codenameone.examples.reel.api.TitleAnalyticsDto;
 import com.codenameone.examples.reel.billing.Entitlements;
 import com.codenameone.examples.reel.domain.Answer;
@@ -50,6 +53,8 @@ import com.codenameone.examples.reel.domain.Title;
 import com.codenameone.examples.reel.domain.Video;
 import com.codenameone.examples.reel.domain.VideoKey;
 import com.codenameone.examples.reel.moderation.Reviews;
+import com.codenameone.examples.reel.playback.Subtitles;
+import com.codenameone.examples.reel.playback.Tracks;
 import com.codenameone.examples.reel.repository.AnswerRepository;
 import com.codenameone.examples.reel.repository.CertificateRepository;
 import com.codenameone.examples.reel.repository.ChapterRepository;
@@ -97,11 +102,13 @@ public class Studio {
     private final InvoiceRepository invoices;
     private final Reviews reviews;
     private final Settings settings;
+    private final Subtitles subtitles;
+    private final Tracks tracks;
 
     public Studio(TitleRepository titles, VideoRepository videos, VideoKeyRepository keys,
             ChapterRepository chapters, InteractionRepository interactions, PlaybackRepository playbacks,
             ProgressRepository progress, AnswerRepository answers, CertificateRepository certificates,
-            InvoiceRepository invoices, Reviews reviews, Settings settings) {
+            InvoiceRepository invoices, Reviews reviews, Settings settings, Subtitles subtitles, Tracks tracks) {
         this.titles = titles;
         this.videos = videos;
         this.keys = keys;
@@ -114,6 +121,8 @@ public class Studio {
         this.invoices = invoices;
         this.reviews = reviews;
         this.settings = settings;
+        this.subtitles = subtitles;
+        this.tracks = tracks;
     }
 
     /// Who may use the studio: creators and admins, and everyone when open
@@ -249,6 +258,7 @@ public class Studio {
         Video v = ownVideo(username, id);
         chapters.deleteByVideoId(id);
         interactions.deleteByVideoId(id);
+        subtitles.removeAll(id);
         if (keys.findById(id) != null) {
             keys.deleteById(id);
         }
@@ -278,6 +288,24 @@ public class Studio {
             chapters.insert(row);
         }
         reviews.changed(titles.findById(v.getTitleId()), trusted());
+        return video(v, true);
+    }
+
+    /// Adds or replaces the subtitle track of a video in one language.
+    @Transactional(rollbackFor = IOException.class)
+    public StudioVideoDto setSubtitle(String username, String id, String language, SubtitleUploadDto wanted)
+            throws IOException {
+        Video v = ownVideo(username, id);
+        subtitles.put(id, language, wanted == null ? null : wanted.label(), wanted == null ? null : wanted.vtt(),
+                System.currentTimeMillis());
+        reviews.changed(titles.findById(v.getTitleId()), trusted());
+        return video(v, true);
+    }
+
+    @Transactional(rollbackFor = IOException.class)
+    public StudioVideoDto deleteSubtitle(String username, String id, String language) throws IOException {
+        Video v = ownVideo(username, id);
+        subtitles.remove(id, language);
         return video(v, true);
     }
 
@@ -476,6 +504,17 @@ public class Studio {
         }
         t.setRating(rating);
         t.setAgeRestricted("R".equals(rating) || "NC-17".equals(rating));
+        List<String> advisories = new ArrayList<String>();
+        for (int iter = 0; e.advisories() != null && iter < e.advisories().size(); iter++) {
+            String a = e.advisories().get(iter);
+            if (Advisories.label(a) == null) {
+                throw new ResponseStatusException(400, "Unknown advisory: " + a);
+            }
+            if (!advisories.contains(a)) {
+                advisories.add(a);
+            }
+        }
+        t.setAdvisories(Rows.join(advisories));
         t.setGenres(cut(Rows.join(e.genres()), 255));
         t.setTags(cut(Rows.join(e.tags()), 255));
         String access = e.access() == null ? Entitlements.SUBSCRIPTION : e.access();
@@ -531,6 +570,7 @@ public class Studio {
             }
         }
         return new StudioTitleDto(t.getId(), t.getKind(), t.getName(), t.getSynopsis(), t.getYear(), t.getRating(),
+                Rows.split(t.getAdvisories()),
                 Rows.split(t.getGenres()), Rows.split(t.getTags()), t.getAccess(), t.getRentalPriceCents(),
                 t.getStatus(), reviews.status(t.getId()), t.getModerationNote(), t.getPosterUrl(), interactive,
                 t.isCertificate(), t.getPassPercent(), t.getCreatedAt(), t.getPublishedAt(), list);
@@ -555,7 +595,7 @@ public class Studio {
         }
         return new StudioVideoDto(v.getId(), v.getRole(), v.getSeason(), v.getNumber(), v.getName(),
                 v.getSynopsis(), v.getStatus(), v.getProgressPercent(), v.getError(), v.getDurationSeconds(),
-                v.getThumbnailUrl(), cs, is);
+                v.getThumbnailUrl(), full ? tracks.subtitles(v.getId(), null) : new ArrayList<SubtitleDto>(), cs, is);
     }
 
     private static String required(String value, int max, String what) {

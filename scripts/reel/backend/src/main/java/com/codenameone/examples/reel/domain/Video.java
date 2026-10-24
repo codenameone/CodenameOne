@@ -71,6 +71,11 @@ public class Video {
     @Column(nullable = false, type = "VARCHAR(64)")
     private String schemes = "";
 
+    /// The audio tracks, as `id:language:label` separated by commas; the
+    /// first is the original.
+    @Column(nullable = false, type = "VARCHAR(255)")
+    private String audio = "";
+
     @Column(nullable = false, type = "VARCHAR(255)")
     private String thumbnailUrl = "";
 
@@ -182,6 +187,14 @@ public class Video {
 
     public void setHeight(int height) {
         this.height = height;
+    }
+
+    public String getAudio() {
+        return audio;
+    }
+
+    public void setAudio(String audio) {
+        this.audio = audio;
     }
 
     public String getRenditions() {

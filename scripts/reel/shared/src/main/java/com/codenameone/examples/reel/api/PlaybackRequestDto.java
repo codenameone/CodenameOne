@@ -31,5 +31,6 @@ public record PlaybackRequestDto(
         String deviceId,
         List<String> schemes,
         String maxQuality,
+        String audioTrack,
         boolean offline) {
 }

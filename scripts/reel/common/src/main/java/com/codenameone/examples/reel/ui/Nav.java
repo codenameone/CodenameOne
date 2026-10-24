@@ -130,7 +130,53 @@ public final class Nav {
         Form home = build();
         if (home != null) {
             home.show();
+            String shared = sharedTitle();
+            if (shared != null && VIEWER.equals(homeMode)) {
+                com.codenameone.examples.reel.viewer.TitleForm.show(home, shared);
+            }
         }
+    }
+
+    private static boolean sharedTaken;
+
+    /// The title a shared link opened the app on, once: `?title=<id>` on the
+    /// page in a browser (the server's `/watch/<id>` page links there), or
+    /// the same query in the URL a device opened the app with.
+    static String sharedTitle() {
+        if (sharedTaken) {
+            return null;
+        }
+        sharedTaken = true;
+        String query = com.codename1.ui.CN.getProperty("browser.window.location.search", null);
+        if (query == null || query.length() == 0) {
+            query = com.codename1.ui.CN.getProperty("AppArg", null);
+        }
+        return titleParameter(query);
+    }
+
+    /// The id in a `title=` parameter of `text`, when it is one the server
+    /// could have made: letters, digits, `-` and `_`.
+    static String titleParameter(String text) {
+        if (text == null) {
+            return null;
+        }
+        int at = text.indexOf("title=");
+        while (at > 0 && text.charAt(at - 1) != '?' && text.charAt(at - 1) != '&') {
+            at = text.indexOf("title=", at + 1);
+        }
+        if (at < 0) {
+            return null;
+        }
+        int from = at + "title=".length();
+        int end = from;
+        while (end < text.length()) {
+            char c = text.charAt(end);
+            if (!(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '-' || c == '_')) {
+                break;
+            }
+            end++;
+        }
+        return end > from && end - from <= 64 ? text.substring(from, end) : null;
     }
 
     /// The account was asked about again: back to the home screen only if

@@ -1536,6 +1536,298 @@ RlWatermark {
     margin: 0;
 }
 
+RlRowCaption {
+    color: var(--text-muted);
+    background-color: transparent;
+    font-size: 2.4mm;
+    padding: 0 0 1.2mm 0;
+    margin: 0;
+}
+
+/* The facts under a title's name: the age rating in a box, HD and CC tags. */
+RlHeroFacts {
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+}
+
+RlRatingBox {
+    color: var(--text-muted);
+    border: 0.25mm solid var(--text-muted);
+    border-radius: 0.6mm;
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 2.2mm;
+    padding: 0.3mm 1.2mm 0.3mm 1.2mm;
+    margin: 0 1.6mm 0 1.6mm;
+}
+
+RlQualityBox {
+    color: var(--text-muted);
+    background-color: rgba(127, 127, 127, 0.28);
+    border-radius: 0.6mm;
+    font-family: "native:MainBold";
+    font-size: 2mm;
+    padding: 0.3mm 1mm 0.3mm 1mm;
+    margin: 0 0 0 1.6mm;
+}
+
+RlAdvisories {
+    color: var(--text-muted);
+    background-color: transparent;
+    font-size: 2.4mm;
+    padding: 0 0 1.2mm 0;
+    margin: 0;
+}
+
+RlCourse {
+    background-color: var(--surface-alt);
+    border-radius: 2mm;
+    padding: 2mm 2.4mm 2.4mm 2.4mm;
+    margin: 2mm 0 1mm 0;
+}
+
+RlCourseTitle {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 3.2mm;
+    padding: 0.4mm 0 0.8mm 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+RlCourseProgress {
+    color: var(--text-muted);
+    font-family: "native:MainBold";
+    font-size: 2.4mm;
+    padding: 1.6mm 0 0.6mm 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+RlCourseBar {
+    background-color: rgba(127, 127, 127, 0.3);
+    border-radius: 0.5mm;
+    padding: 0.5mm;
+    margin: 0.6mm 0 0 0;
+}
+
+RlCourseBarFull {
+    background-color: var(--brand);
+    border-radius: 0.5mm;
+    padding: 0.5mm;
+    margin: 0.6mm 0 0 0;
+}
+
+RlSharePreview {
+    background-color: var(--surface-alt);
+    border-radius: 2mm;
+    padding: 2mm;
+    margin: 0 0 1mm 0;
+}
+
+RlSharePoster {
+    background-color: transparent;
+    border-radius: 1mm;
+    padding: 0;
+    margin: 0 2mm 0 0;
+}
+
+RlShareTitle {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 3.2mm;
+    padding: 0.4mm 0 0.4mm 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+RlShareText {
+    color: var(--text);
+    font-family: "native:MainRegular";
+    font-size: 2.5mm;
+    padding: 0.8mm 0 0 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+RlShareLink {
+    color: var(--brand);
+    background-color: var(--surface-alt);
+    border-radius: 1mm;
+    font-family: "native:MainRegular";
+    font-size: 2.5mm;
+    padding: 1.6mm 2mm 1.6mm 2mm;
+    margin: 0 0 2mm 0;
+}
+
+/* The player's controls: light on a shaded picture, whatever the theme. */
+RlPlayerTop {
+    background-color: rgba(0, 0, 0, 0.45);
+    padding: 1mm 2mm 1.6mm 1mm;
+    margin: 0;
+}
+
+RlPlayerTitle {
+    color: #ffffff;
+    font-family: "native:MainBold";
+    font-size: 3.4mm;
+    padding: 1mm 2mm 0 2mm;
+    margin: 0;
+    background-color: transparent;
+}
+
+RlPlayerSubtitle {
+    color: rgba(255, 255, 255, 0.75);
+    font-family: "native:MainRegular";
+    font-size: 2.5mm;
+    padding: 0 2mm 0 2mm;
+    margin: 0;
+    background-color: transparent;
+}
+
+RlPlayerPoster {
+    background-color: #000000;
+    padding: 0;
+    margin: 0;
+}
+
+RlTransport {
+    color: #ffffff;
+    background-color: rgba(0, 0, 0, 0.35);
+    border-radius: 7mm;
+    padding: 2.6mm;
+    margin: 0 4mm 0 4mm;
+}
+
+RlTransport.pressed {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+RlPlayButton {
+    color: #ffffff;
+    background-color: var(--brand);
+    border-radius: 9mm;
+    padding: 3.6mm;
+    margin: 0 4mm 0 4mm;
+}
+
+RlPlayButton.pressed {
+    background-color: #b52f36;
+}
+
+RlPlayerChrome {
+    background-color: rgba(0, 0, 0, 0.55);
+    padding: 1mm 2mm 1mm 2mm;
+    margin: 0;
+}
+
+RlScrub {
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+}
+
+RlPlayerTime {
+    color: #ffffff;
+    font-family: "native:MainRegular";
+    font-size: 2.3mm;
+    padding: 1.6mm 1.4mm 1.6mm 1.4mm;
+    margin: 0;
+    background-color: transparent;
+}
+
+RlSeek {
+    background-color: #5c5c5c;
+    border-radius: 0.5mm;
+    padding: 0.5mm;
+    margin: 2.4mm 1mm 2.4mm 1mm;
+}
+
+RlSeekFull {
+    background-color: var(--brand);
+    border-radius: 0.5mm;
+    padding: 0.5mm;
+    margin: 2.4mm 1mm 2.4mm 1mm;
+}
+
+RlPlayerBar {
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+}
+
+RlPlayerAction {
+    color: #ffffff;
+    font-family: "native:MainRegular";
+    font-size: 2.5mm;
+    background-color: transparent;
+    padding: 1.4mm 2.4mm 1.4mm 1.4mm;
+    margin: 0;
+}
+
+RlPlayerAction.pressed {
+    background-color: rgba(255, 255, 255, 0.15);
+    border-radius: 1mm;
+}
+
+/* Subtitles: a box behind each line, the way broadcast captions are drawn. */
+RlCaption {
+    background-color: transparent;
+    padding: 0;
+    margin: 0 4mm 2mm 4mm;
+}
+
+RlCaptionText {
+    color: #ffffff;
+    background-color: rgba(0, 0, 0, 0.72);
+    font-family: "native:MainRegular";
+    font-size: 3.4mm;
+    padding: 0.6mm 2mm 0.6mm 2mm;
+    margin: 0;
+}
+
+RlCaptionTextSmall {
+    cn1-derive: RlCaptionText;
+    font-size: 2.7mm;
+}
+
+RlCaptionTextLarge {
+    cn1-derive: RlCaptionText;
+    font-size: 4.4mm;
+}
+
+RlCaptionSample {
+    cn1-derive: RlCaptionText;
+    margin: 1.6mm 0 1mm 0;
+}
+
+/* The Audio and subtitles sheet. */
+RlTracks {
+    background-color: #17181c;
+    border-radius: 3mm 3mm 0 0;
+    padding: 2mm 3mm 4mm 3mm;
+    margin: 0;
+}
+
+RlTracksTitle {
+    color: #ffffff;
+    font-family: "native:MainBold";
+    font-size: 3.6mm;
+    padding: 1.4mm 0 1mm 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+RlTracksSection {
+    color: rgba(255, 255, 255, 0.6);
+    font-family: "native:MainBold";
+    font-size: 2.2mm;
+    padding: 2.6mm 0 1mm 0.3mm;
+    margin: 0;
+    background-color: transparent;
+}
+
 RlAdLabel {
     color: #ffffff;
     background-color: rgba(0, 0, 0, 0.6);
@@ -1666,6 +1958,19 @@ RlProfileName {
     SvSheet { background-color: var(--surface-dark); }
     SvGrip { color: var(--line-strong-dark); }
     SvAvatar { background: cn1-round-border; color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
+    RlRowCaption { color: var(--text-muted-dark); }
+    RlRatingBox { color: var(--text-muted-dark); border: 0.25mm solid var(--text-muted-dark); }
+    RlQualityBox { color: var(--text-muted-dark); }
+    RlAdvisories { color: var(--text-muted-dark); }
+    RlCourse { background-color: var(--surface-alt-dark); }
+    RlCourseTitle { color: var(--text-dark); }
+    RlCourseProgress { color: var(--text-muted-dark); }
+    RlCourseBar { background-color: var(--line-dark); }
+    RlCourseBarFull { background-color: var(--brand-dark); }
+    RlSharePreview { background-color: var(--surface-alt-dark); }
+    RlShareTitle { color: var(--text-dark); }
+    RlShareText { color: var(--text-dark); }
+    RlShareLink { color: var(--brand-dark); background-color: var(--surface-alt-dark); }
     SvAction { color: var(--text-dark); }
     SvAction.pressed { color: var(--brand-dark); background-color: var(--surface-alt-dark); }
     SvActionDanger { color: var(--danger-dark); }

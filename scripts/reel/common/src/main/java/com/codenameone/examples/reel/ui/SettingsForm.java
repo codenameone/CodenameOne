@@ -87,7 +87,25 @@ public final class SettingsForm {
                 Ui.toggle("autoplay", Prefs.autoplay(), Prefs::setAutoplay)));
         play.add(Ui.row(FontImage.MATERIAL_DATA_SAVER_ON, "Data saver", "Stream at 480p or lower",
                 Ui.toggle("dataSaver", Prefs.dataSaver(), Prefs::setDataSaver)));
+        play.add(Ui.label("Streaming quality", "SvLabel"));
+        play.add(Ui.choice("quality", new String[] {Lang.tr("Auto"), "1080p", "720p", "480p"},
+                new String[] {"", "1080", "720", "480"}, Prefs.quality(), Prefs::setQuality));
         page.add(play);
+
+        Ui.section(page, "Subtitles");
+        Container subs = group();
+        subs.add(Ui.label("Show subtitles in", "SvLabel"));
+        subs.add(Ui.choice("subtitleLanguage", new String[] {Lang.tr("Off"), "English", "Espa\u00f1ol",
+                "Fran\u00e7ais", "Deutsch"}, new String[] {"", "en", "es", "fr", "de"}, Prefs.subtitles(),
+                Prefs::setSubtitles, 3));
+        subs.add(Ui.label("Size", "SvLabel"));
+        subs.add(Ui.choice("captionSize", new String[] {Lang.tr("Small"), Lang.tr("Medium"), Lang.tr("Large")},
+                new String[] {"small", "medium", "large"}, Prefs.captionSize(), Prefs::setCaptionSize));
+        Label sample = new Label(Lang.tr("This is how subtitles look"), "RlCaptionSample");
+        subs.add(com.codename1.ui.layouts.FlowLayout.encloseCenter(sample));
+        subs.add(Ui.text("Used whenever a video has a track in that language. Change it for one video from "
+                + "Audio & subtitles in the player.", "SvMuted"));
+        page.add(subs);
 
         Ui.section(page, "Notifications");
         Container notify = group();
