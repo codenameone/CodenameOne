@@ -1580,20 +1580,7 @@ give the same answers.
 
 [source,java]
 ----
-// A PEM chain, validated against the partner's CA and nothing else
-List<Certificate> anchors = Certificate.listFromPem(KeyFiles.read("/etc/app/partner-ca.pem"));
-List<Certificate> path = new CertificateValidator(anchors)
-        .forHost("partner.example.com")
-        .validate(Certificate.listFromPem(presentedPem));
-
-// A key and a certification request to send to a CA
-byte[] key = Crypto.generateEcKey(Crypto.P256);
-String csr = CertificationRequest.create(DistinguishedName.parse("CN=api.example.com"),
-        key, Arrays.asList("api.example.com")).toPem();
-
-// A .p12 in, and one out
-Pkcs12 store = Pkcs12.decode(p12Bytes, password);
-byte[] p12 = Pkcs12.encode(store.getPrivateKey(), store.getCertificates(), "api", password);
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/PkiSnippets.java[tag=backend-security-pki,indent=0]
 ----
 
 Keys are bytes in two forms: PKCS#8 DER for a private key and
