@@ -108,6 +108,35 @@ The server exposes a screenshot of the focused top-level container as an MCP ima
 
 The JavaSE simulator drives the same MCP menu described above, so an application can be exposed and driven from the running simulator during development.
 
+=== Simulator keyboard, touches and recording
+
+The simulator adds tools of its own, prefixed `sim_`, that exist only on the desktop. Together with the user interface tools they let an agent script a video of a feature from start to finish.
+
+*The on-screen keyboard.* With *Simulate > Virtual Keyboard* (or `sim_keyboard_set`) turned on, editing a text field slides up a keyboard drawn in the style of the skin's platform, or of the platform you force. The layout follows the field's constraint: letters, an email layout with `@`, or a number pad. The return key reads *Next* while another field follows and *Done* on the last one, and *Next* moves editing to the following field without hiding the keyboard. What the application sees follows each port:
+
+* iOS: the screen keeps its size, `Display.getInvisibleAreaUnderVKB()` returns the keyboard height, a form in bottom padding editing mode is padded by it, and the field scrolls into view.
+* Android in resize mode: the application gets `sizeChanged` with the height above the keyboard.
+* Android in pan mode: the size stays the same and the whole screen shifts up until the field clears the keyboard.
+
+By default Android chooses between resize and pan for each field, the same way the Android port does. The *Android: Resize* and *Android: Pan* items, or `androidSoftInput`, force one mode. Virtual keyboard listeners fire on show and hide in both cases.
+
+*Touches.* `sim_tap` and `sim_drag` press the screen through the same path as a mouse click, so they reach the simulated keyboard and appear as touch indicators, which `ui_activate` doesn't. `sim_touch_indicators` sets the style (`none`, `dot` or `ripple`), color, size and drag trails. *Simulate > Show Touches* also draws them in the simulator window.
+
+*Recording.* `sim_record_start` records the screen to MP4, MOV, WebM or an animated GIF, either the screen alone or inside the device skin. Frames are taken on a fixed clock, so the video plays back in real time even while the screen is still. The options cover the frame rate and scale, the touch indicator style, a click sound mixed into the audio track at every tap, and the audio source. By default the recording carries what the application plays: sound effects, game sounds, music and video soundtracks, taken from the simulator's own audio output so nothing else playing on the computer gets in. `audio` can also be `microphone`, `app_and_microphone` for narration over the application's sound, or `none`. `sim_record_caption` overlays a caption on the video for a few seconds, and `sim_record_stop` finishes the file and returns its path and length. *Simulate > Start Recording* offers the same options in a dialog. Recording needs `ffmpeg`. Without it, the recorder writes numbered PNG frames and says so in its result.
+
+A typical script calls these tools in order:
+
+. `sim_keyboard_set` with `{"mode": "auto"}` to use the skin's keyboard.
+. `sim_record_start` with `{"path": "/tmp/signup.mp4", "tapSound": true}`.
+. `sim_record_caption` with `{"text": "Sign up in one step"}`.
+. `sim_tap` with the `nodeId` of the email field, found with `ui_find`.
+. `sim_keyboard_type` with `{"text": "ada@example.com"}`, then `sim_keyboard_key` with `{"key": "next"}`.
+. `sim_keyboard_type` with `{"text": "42"}`, then `sim_keyboard_key` with `{"key": "done"}`.
+. `sim_wait` with `{"ms": 800}` to let the last frame settle.
+. `sim_record_stop`, which returns the file's path and length.
+
+`sim_rotate` switches between portrait and landscape, and `sim_keyboard_state` reports whether the keyboard is showing, its height, the layout, and the screen size the application currently sees.
+
 === Debug logging
 
 Because an agent drives the tool on its own, it helps to watch what it does. The server echoes the MCP conversation to the Codename One log at a level chosen through the menu's *Debug Logging* item or in code:
