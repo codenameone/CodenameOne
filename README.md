@@ -21,8 +21,11 @@ The UI ships with your app, so you control its components and theme. Native inte
 | An app and its backend | [Share models and generated REST clients](https://www.codenameone.com/blog/java-backend-shared-models/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=shared-models) |
 | An existing Android app on more platforms | [Import classic Android application code](https://www.codenameone.com/developer-guide/android-interop/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=android-import), including activities, XML layouts and resources |
 | Existing Flutter screens | [Compile supported Dart and Flutter code to Java](https://www.codenameone.com/developer-guide/flutter-interop/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=flutter-import); experimental compatibility, with interaction limits documented in the guide |
+| A Unity 2D game | [Import supported C# scripts, scenes and assets](https://www.codenameone.com/developer-guide/unity-interop/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=unity-import) into a Codename One application; 3D rendering and unsupported Unity APIs are outside the compatibility layer |
 | A full-stack example to run | [Explore Wayline](https://www.codenameone.com/developer-guide/wayline-implementors-guide/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=wayline): a ride-hailing sample with rider, driver and admin screens, shared Java models and a backend; available as an Initializr template |
 | Evidence before adopting | [Compare performance](#measured-performance) and [inspect platform support](https://www.codenameone.com/port-status/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=platforms) |
+
+Explore more [full-stack sample applications](https://www.codenameone.com/demos/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=fullstack-samples): Savor for food delivery, Parley for messaging and Skirmish for multiplayer battles. Each includes a Java client and backend.
 
 ### A backend that compiles the wiring into your application
 
