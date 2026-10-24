@@ -106,8 +106,36 @@
       </plugin>
     </plugins>
   </build>
-  <repositories/>
-  <pluginRepositories/>
+  <!--
+    Releases are published to the Codename One repository, not Maven Central, so
+    without these the pinned cn1.version cannot be resolved by anything but a build
+    that bootstraps the local snapshots (-Dcn1.localWorkspace=true). Both lists are
+    needed: plugins resolve only through pluginRepositories.
+  -->
+  <repositories>
+    <repository>
+      <id>codenameone</id>
+      <url>https://repo.codenameone.com/maven2</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </repository>
+  </repositories>
+  <pluginRepositories>
+    <pluginRepository>
+      <id>codenameone-plugins</id>
+      <url>https://repo.codenameone.com/maven2</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </pluginRepository>
+  </pluginRepositories>
   <profiles>
     <profile>
       <id>cn1-local-workspace</id>

@@ -75,7 +75,38 @@ MATRIX_TEST="$ROOT_DIR/scripts/initializr/common/src/test/java/com/codename1/ini
 while IFS= read -r pom; do
   replace_file "$pom" "s|<cn1\\.plugin\\.version>$VERSION_LITERAL</cn1\\.plugin\\.version>|<cn1.plugin.version>$VERSION</cn1.plugin.version>|g;"
   replace_file "$pom" "s|<cn1\\.version>$VERSION_LITERAL</cn1\\.version>|<cn1.version>$VERSION</cn1.version>|g;"
-done < <(find "$ROOT_INITIALIZR_DIR" -name pom.xml -type f)
+done < <(find "$ROOT_INITIALIZR_DIR" -name '*pom.xml' -not -path '*/target/*' -type f)
+# *pom.xml, not pom.xml: the poms the generator ships as resources are named for
+# what they are (backend-only-pom.xml), and a bump that matched only pom.xml left
+# the backend-only one on 8.0-SNAPSHOT.
+
+# The root pom every Maven download starts from lives inside common.zip. The
+# generator rewrites both properties on the way out, so a stale value here never
+# reached a download -- but it is what anyone reading the template sees, and it
+# had fallen 30 releases behind. Rewritten in place: entry order, names and
+# timestamps are kept, so the only difference is that one file.
+python3 - "$ROOT_INITIALIZR_DIR/common/src/main/resources/common.zip" "$VERSION" <<'PY'
+import re, shutil, sys, tempfile, zipfile
+path, version = sys.argv[1], sys.argv[2]
+with zipfile.ZipFile(path) as src:
+    infos = src.infolist()
+    data = {i.filename: src.read(i.filename) for i in infos}
+pom = data['pom.xml'].decode('utf-8')
+for tag in ('cn1.plugin.version', 'cn1.version'):
+    pom, n = re.subn(r'<%s>[0-9][0-9A-Za-z.-]*</%s>' % (re.escape(tag), re.escape(tag)),
+                     '<%s>%s</%s>' % (tag, version, tag), pom)
+    if n != 1:
+        sys.exit('common.zip pom.xml: expected one <%s>, found %d' % (tag, n))
+if pom.encode('utf-8') == data['pom.xml']:
+    sys.exit(0)  # already at this version: leave the archive's bytes alone
+data['pom.xml'] = pom.encode('utf-8')
+tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.zip')
+tmp.close()
+with zipfile.ZipFile(tmp.name, 'w') as out:
+    for info in infos:
+        out.writestr(info, data[info.filename])
+shutil.move(tmp.name, path)
+PY
 
 # The cn1-local-workspace profile (scripts/initializr/pom.xml) is built against the
 # locally bootstrapped repo HEAD (the current SNAPSHOT), NOT the pinned release, so

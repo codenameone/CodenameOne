@@ -22,6 +22,14 @@
             <artifactId>codenameone-javase</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- The engine for JUnit 5 tests under src/test/java (CodenameOneTest);
+             the junit-platform provider below finds none without it. -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.9.3</version>
+            <scope>test</scope>
+        </dependency>
 
         <!-- INJECT DEPENDENCIES -->
     </dependencies>
