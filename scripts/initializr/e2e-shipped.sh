@@ -12,7 +12,7 @@
 #
 #   e2e-shipped.sh [--require-latest] [--no-ui] [TEMPLATE ...]
 #
-# TEMPLATE is BAREBONES, KOTLIN, WAYLINE, SAVOR, SKIRMISH or PARLEY; all of them
+# TEMPLATE is BAREBONES, KOTLIN, WAYLINE, SAVOR, SKIRMISH, PARLEY or REEL; all of them
 # by default. Every other check of the templates builds them against this
 # checkout's 8.0-SNAPSHOT, which no developer has: the generated pom names the
 # release the Initializr pins, and that is the only thing this script builds
@@ -59,7 +59,7 @@ for arg in "$@"; do
     *) TEMPLATES+=("$arg") ;;
   esac
 done
-[ ${#TEMPLATES[@]} -gt 0 ] || TEMPLATES=(BAREBONES KOTLIN WAYLINE SAVOR SKIRMISH PARLEY)
+[ ${#TEMPLATES[@]} -gt 0 ] || TEMPLATES=(BAREBONES KOTLIN WAYLINE SAVOR SKIRMISH PARLEY REEL)
 
 log() { echo "[e2e-shipped] $*" >&2; }
 fail() { echo "[e2e-shipped] FAIL: $*" >&2; exit 1; }
@@ -134,6 +134,10 @@ PY
 
 for template in "${TEMPLATES[@]}"; do
   zip="$WORK/zips/SHIPPED-$template.zip"
+  if [ -f "$WORK/zips/SHIPPED-$template.unoffered" ]; then
+    log "$template: skipped, the Initializr does not offer it at $PINNED"
+    continue
+  fi
   [ -f "$zip" ] || fail "no download for $template"
   dir="$WORK/$template"
   mkdir -p "$dir"

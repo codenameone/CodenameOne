@@ -17346,6 +17346,14 @@ public class JavaSEPort extends CodenameOneImplementation {
     
 
     @Override
+    public boolean isDrmSupported(com.codename1.media.DrmScheme scheme) {
+        // The simulator plays through ffmpeg, whose HLS demuxer fetches the
+        // #EXT-X-KEY URI and decrypts AES-128 segments. It has no CDM, so the
+        // CENC schemes (ClearKey, Widevine, FairPlay) are answered honestly as no.
+        return scheme == com.codename1.media.DrmScheme.AES_128 && FFMPEGMedia.isConfigured();
+    }
+
+    @Override
     public AsyncResource<Media> createMediaAsync(String uriAddress, final boolean isVideo, final Runnable onCompletion) {
         if (FFMPEGMedia.isConfigured() && !"cef".equalsIgnoreCase(System.getProperty("cn1.javase.mediaImplementation", ""))) {
             return FFMPEGMedia.createMediaAsync(this, uriAddress, isVideo, onCompletion);

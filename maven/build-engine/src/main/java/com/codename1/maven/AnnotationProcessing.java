@@ -168,6 +168,12 @@ public final class AnnotationProcessing {
                     + outputDirectory + ": " + e.getMessage(), e);
         }
 
+        // What javac left, so the classes the processors write -- through the
+        // context or by compiling generated source straight into the output, as
+        // the mapper processor does -- can be told apart from it afterwards.
+        Map<String, Long> before = new java.util.HashMap<String, Long>();
+        listClassFiles(outputDirectory, "", before);
+
         ProcessorContext ctx = new ProcessorContext(outputDirectory, stubSourceDirectory,
                 index, log, cn1ProjectDir, rawSettings, mainClass,
                 // The roots the build is actually compiling, so a processor asking
@@ -266,6 +272,17 @@ public final class AnnotationProcessing {
             }
         }
 
+        // Taken before the ORM enhancer rewrites entity classes in place: those
+        // are the project's own and javac writes them afresh every build.
+        Map<String, Long> after = new java.util.HashMap<String, Long>();
+        listClassFiles(outputDirectory, "", after);
+        java.util.Set<String> generated = new java.util.TreeSet<String>();
+        for (Map.Entry<String, Long> e : after.entrySet()) {
+            if (!e.getValue().equals(before.get(e.getKey()))) {
+                generated.add(e.getKey());
+            }
+        }
+
         for (AnnotationProcessor processor : processors) {
             if (processor instanceof com.codename1.maven.processors.OrmAnnotationProcessor) {
                 try { ((com.codename1.maven.processors.OrmAnnotationProcessor) processor).enhance(ctx); }
@@ -277,6 +294,7 @@ public final class AnnotationProcessing {
             log.info("cn1: emitted " + emitted.size() + " generated class(es) under "
                     + outputDirectory);
         }
+        writeGeneratedList(outputDirectory, generated);
 
         // Flush generated resources. These ride the project jar to the native
         // builders -- including a cloud build server, which receives the whole
@@ -400,4 +418,50 @@ public final class AnnotationProcessing {
         return Collections.unmodifiableList(out);
     }
 
+
+    private static void listClassFiles(File dir, String prefix, Map<String, Long> out) {
+        File[] children = dir.listFiles();
+        if (children == null) {
+            return;
+        }
+        for (File child : children) {
+            String name = child.getName();
+            if (child.isDirectory()) {
+                listClassFiles(child, prefix + name + "/", out);
+            } else if (name.endsWith(".class")) {
+                out.put(prefix + name.substring(0, name.length() - 6), Long.valueOf(child.lastModified()));
+            }
+        }
+    }
+
+    /// The file beside `classes` that names the classes the last run of the
+    /// processors wrote into it, one internal name a line.
+    public static File generatedList(File classes) {
+        return new File(classes.getParentFile(), classes.getName() + ".cn1-generated.txt");
+    }
+
+    /// Records what was generated, for [BytecodeCompliance], which runs before
+    /// this step on the next build and would otherwise check last build's
+    /// generated classes -- stale ones, when a shared class they were made
+    /// from has changed since.
+    private static void writeGeneratedList(File classes, java.util.Set<String> names) {
+        if (classes == null || classes.getParentFile() == null) {
+            return;
+        }
+        StringBuilder out = new StringBuilder();
+        for (String name : new java.util.TreeSet<String>(names)) {
+            out.append(name).append('\n');
+        }
+        try {
+            FileOutputStream fos = new FileOutputStream(generatedList(classes));
+            try {
+                fos.write(out.toString().getBytes("UTF-8"));
+            } finally {
+                fos.close();
+            }
+        } catch (IOException unwritable) {
+            // The next compliance check then reads last build's generated
+            // classes as it always did; nothing else depends on the list.
+        }
+    }
 }

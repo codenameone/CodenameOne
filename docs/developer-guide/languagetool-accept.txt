@@ -830,3 +830,6 @@ callee
 signalling
 coturn
 unconfigured
+Widevine
+blocklist
+blocklists

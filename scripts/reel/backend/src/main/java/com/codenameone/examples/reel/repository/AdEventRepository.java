@@ -1,0 +1,41 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
+package com.codenameone.examples.reel.repository;
+
+import com.codename1.orm.repository.CrudRepository;
+import com.codename1.orm.repository.Query;
+import com.codename1.orm.repository.Param;
+import com.codename1.orm.repository.Repository;
+import com.codenameone.examples.reel.domain.AdEvent;
+
+import java.util.List;
+
+/// The ad_event rows.
+@Repository(entity = AdEvent.class, key = String.class)
+public interface AdEventRepository extends CrudRepository<AdEvent, String> {
+    long countBySessionIdAndCampaignIdAndEvent(String sessionId, String campaignId, String event);
+
+    @Query("select count(e) from AdEvent e where e.event = :event and e.createdAt >= :since")
+    Long countSince(@Param("event") String event, @Param("since") long since);
+
+    @Query("select e.createdAt from AdEvent e where e.event = :event and e.createdAt >= :since")
+    List<Long> timesSince(@Param("event") String event, @Param("since") long since);
+
+    List<AdEvent> findByEventAndCreatedAtGreaterThan(String event, long since);
+}

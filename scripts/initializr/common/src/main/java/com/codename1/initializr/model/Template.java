@@ -79,7 +79,16 @@ public enum Template {
             "com.codenameone.examples.parley", "Parley", "/parley-preview.jpg",
             "The messaging template is an app, a server and the contract module they share; "
                     + "an Initializr Gradle project is a single project.",
-            new String[0], "/parley-modules.zip", "/parley-settings.properties");
+            new String[0], "/parley-modules.zip", "/parley-settings.properties"),
+    // The same kind of template as WAYLINE: a video streaming service (catalog,
+    // player, creator studio, moderation, admin) and its server. It is the
+    // project in scripts/reel, and its resources come from
+    // `scripts/sync-initializr-template.py reel`.
+    REEL(false, "/reel-src.zip", "/reel-css.zip", "/reel-pom.xml",
+            "com.codenameone.examples.reel", "Reel", "/reel-preview.jpg",
+            "The streaming template is an app, a server and the contract module they share; "
+                    + "an Initializr Gradle project is a single project.",
+            new String[0], "/reel-modules.zip", "/reel-settings.properties");
 
     /// The resource holding the picture shown for a template that has no live
     /// preview, or null for one that has.

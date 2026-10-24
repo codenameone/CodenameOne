@@ -19,6 +19,7 @@ on:
       - 'scripts/savor/**'
       - 'scripts/skirmish/**'
       - 'scripts/parley/**'
+      - 'scripts/reel/**'
       # The API-name check derives the published pages from the javadoc's own
       # sources, and the guide links into the java.* compatibility classes --
       # java/util/List.html among them. A change that renames or deletes one
@@ -136,6 +137,7 @@ jobs:
               - 'scripts/savor/**'
               - 'scripts/skirmish/**'
               - 'scripts/parley/**'
+              - 'scripts/reel/**'
             workflow:
               - '.github/workflows/developer-guide-docs.yml'
 

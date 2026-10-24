@@ -467,10 +467,14 @@ public class Initializr extends Lifecycle {
         if (!GeneratorModel.isTemplateOffered(Template.WAYLINE)) {
             return empty;
         }
-        Template[] apps = {Template.WAYLINE, Template.SAVOR, Template.SKIRMISH, Template.PARLEY};
-        Container complete = new Container(new GridLayout(2, 2));
+        Template[] apps = {Template.WAYLINE, Template.SAVOR, Template.SKIRMISH, Template.PARLEY,
+            Template.REEL};
+        Container complete = new Container(new GridLayout(3, 2));
         complete.setUIID("InitializrChoicesGrid");
         for (Template app : apps) {
+            if (!GeneratorModel.isTemplateOffered(app)) {
+                continue;
+            }
             addTemplateChoice(complete, group, app, templateTitle(app), selectedTemplate, onSelectionChanged);
         }
         SpanLabel hint = new SpanLabel("A complete app is the app, its server and the API module they share, "
@@ -500,7 +504,8 @@ public class Initializr extends Lifecycle {
     /// What a full-stack template is, in a few words.
     static String templateTitle(Template template) {
         return template == Template.SAVOR ? "Food delivery" : template == Template.SKIRMISH ? "Card battle game"
-                : template == Template.PARLEY ? "Messaging" : template == Template.WAYLINE ? "Ride hailing"
+                : template == Template.PARLEY ? "Messaging" : template == Template.REEL ? "Video streaming"
+                : template == Template.WAYLINE ? "Ride hailing"
                 : template.IS_KOTLIN ? "Empty app, Kotlin" : "Empty app, Java";
     }
 
