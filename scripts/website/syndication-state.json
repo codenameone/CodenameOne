@@ -2969,6 +2969,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-10-24T00:03:45+00:00"
+      },
+      "devto": {
+        "id": 4911447,
+        "url": "https://dev.to/codenameone/spring-data-style-repositories-compiled-to-native-code-2f4b",
+        "syndicated_at": "2026-10-24T16:40:54+00:00"
       }
     }
   }
