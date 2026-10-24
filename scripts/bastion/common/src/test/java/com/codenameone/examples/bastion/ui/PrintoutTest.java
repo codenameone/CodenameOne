@@ -105,6 +105,78 @@ class PrintoutTest {
         assertEquals("No events.", lines.get(lines.size() - 1));
     }
 
+    private static Printout longStatement(int rows) {
+        Printout p = new Printout("Statement", GENERATED).fact("Account", "Everyday");
+        Printout.Section s = p.section("Transactions", new String[] {"Date", "Description", "Balance"},
+                new int[] {1, 2, 1}, new boolean[] {false, false, true});
+        for (int iter = 0; iter < rows; iter++) {
+            s.row("Mar " + iter, "Row " + iter, "$" + iter + ".00");
+        }
+        s.total("", "Total", "$1.00");
+        return p.total("Closing balance", "$1.00");
+    }
+
+    @Test
+    void aLongReportBreaksIntoNumberedPagesThatRepeatTheTableHeader() {
+        Printout p = longStatement(60);
+        List<Printout.Page> pages = p.pages(20);
+        assertTrue(pages.size() > 3, "pages: " + pages.size());
+        int rows = 0;
+        for (int iter = 0; iter < pages.size(); iter++) {
+            List<String> lines = pages.get(iter).lines();
+            assertTrue(lines.size() <= 20, "page " + iter + " has " + lines.size());
+            String last = lines.get(lines.size() - 1);
+            assertTrue(last.trim().equals("Page " + (iter + 1) + " of " + pages.size()), last);
+            if (iter > 0) {
+                assertTrue(lines.get(0).startsWith(Printout.BANK), lines.get(0));
+                if (lines.contains("Transactions (continued)")) {
+                    boolean header = false;
+                    for (String line : lines) {
+                        header |= line.startsWith("Date") && line.indexOf("Balance") > 0;
+                    }
+                    assertTrue(header, "page " + iter + " repeats the header");
+                }
+            }
+            for (String line : lines) {
+                if (line.matches("Mar \\d+ .*")) {
+                    rows++;
+                }
+            }
+        }
+        assertEquals(60, rows, "every row is printed once");
+        List<String> end = pages.get(pages.size() - 1).lines();
+        boolean closing = false;
+        for (String line : end) {
+            closing |= line.startsWith("Closing balance");
+        }
+        assertTrue(closing, "the totals end the last page");
+    }
+
+    @Test
+    void aShortReportIsOnePage() {
+        assertEquals(1, statement().pages(60).size());
+    }
+
+    @Test
+    void thePdfHasAPagePerPictureAndAValidCrossReference() throws Exception {
+        PdfPages pdf = new PdfPages(595, 842);
+        pdf.add(new int[] {0xffffff, 0, 0xff0000, 0x00ff00}, 2, 2);
+        pdf.add(new int[] {0x123456}, 1, 1);
+        byte[] bytes = pdf.toBytes();
+        String text = new String(bytes, "ISO-8859-1");
+        assertTrue(text.startsWith("%PDF-1.4"));
+        assertTrue(text.indexOf("/Count 2") > 0);
+        assertTrue(text.endsWith("%%EOF\n"));
+        int xref = Integer.parseInt(text.substring(text.lastIndexOf("startxref\n") + 10,
+                text.lastIndexOf("\n%%EOF")).trim());
+        assertTrue(text.startsWith("xref", xref));
+        String[] entries = text.substring(xref).split("\n");
+        for (int obj = 1; obj <= 8; obj++) {
+            int at = Integer.parseInt(entries[2 + obj].substring(0, 10));
+            assertTrue(text.startsWith(obj + " 0 obj", at), "object " + obj);
+        }
+    }
+
     @Test
     void theStrongestWayInIsOfferedFirst() {
         assertEquals(SignInForm.PASSKEY, SignInForm.strongest(true, true));

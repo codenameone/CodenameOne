@@ -19,6 +19,7 @@
 package com.codenameone.examples.bastion.ui;
 
 import com.codename1.components.ToastBar;
+import com.codename1.io.FileSystemStorage;
 import com.codename1.printing.PrintResult;
 import com.codename1.printing.Printer;
 import com.codename1.ui.Button;
@@ -26,6 +27,8 @@ import com.codename1.ui.Font;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
@@ -36,10 +39,11 @@ import java.util.TimeZone;
 /// account and period it covers and when it was made; then its tables; then
 /// its totals.
 ///
-/// The page is laid out as lines of monospaced text ([#lines]) -- columns
+/// The report is laid out as lines of monospaced text ([#lines]) -- columns
 /// line up without measuring a font, and the layout is a plain list of
-/// strings a test can read -- and drawn onto a white image ([#render]), which
-/// [Printer#printImage] hands to the platform's print dialog. Every text is
+/// strings a test can read -- cut into A4 pages ([#pages]), each drawn onto a
+/// white image ([#render]); the pages go into one PDF ([PdfPages]), which
+/// [Printer#printPDF] hands to the platform's print dialog. Every text is
 /// given already translated: the screen that builds the printout has the
 /// words the reader sees.
 public final class Printout {
@@ -53,6 +57,9 @@ public final class Printout {
     /// The header's word for [#generated]: translated when the page is
     /// printed, so that laying it out needs no theme.
     private String generatedLabel = "Generated";
+    /// "Page {0} of {1}" and "{0} (continued)", likewise translated at print time.
+    private String pageLabel = "Page {0} of {1}";
+    private String continuedLabel = "{0} (continued)";
     private final List<String[]> facts = new ArrayList<String[]>();
     private final List<Section> sections = new ArrayList<Section>();
     private final List<String[]> totals = new ArrayList<String[]>();
@@ -142,90 +149,213 @@ public final class Printout {
         return title;
     }
 
-    /// The page, as lines of at most [#COLUMNS] characters.
+    /// The report, as lines of at most [#COLUMNS] characters, before it is
+    /// cut into pages ([#pages]).
     public List<String> lines() {
         List<String> out = new ArrayList<String>();
-        out.add(BANK);
-        out.add(fit(title, COLUMNS));
-        out.add(repeat('=', COLUMNS));
+        for (Line line : body()) {
+            out.add(line.text);
+        }
+        return out;
+    }
+
+    /// One line of the report, with what pagination needs to know about it.
+    private static final class Line {
+        final String text;
+        /// Bold on paper: the bank, the title, the totals at the end.
+        final boolean bold;
+        /// Opens a table (the space, caption, column names and rule above
+        /// its first row): never left at the foot of a page on its own.
+        final boolean opens;
+        /// For a row of a table, the lines that head the table again at the
+        /// top of a page the table runs on to; null for anything else.
+        final String[] heading;
+
+        Line(String text, boolean bold, boolean opens, String[] heading) {
+            this.text = text;
+            this.bold = bold;
+            this.opens = opens;
+            this.heading = heading;
+        }
+    }
+
+    private List<Line> body() {
+        List<Line> out = new ArrayList<Line>();
+        out.add(new Line(BANK, true, false, null));
+        out.add(new Line(fit(title, COLUMNS), true, false, null));
+        out.add(new Line(repeat('=', COLUMNS), false, false, null));
         int labelWidth = generatedLabel.length();
         for (String[] f : facts) {
             labelWidth = Math.max(labelWidth, f[0].length());
         }
         labelWidth = Math.min(labelWidth, COLUMNS / 3);
         for (String[] f : facts) {
-            out.add(fit(pad(fit(f[0], labelWidth) + ":", labelWidth + 2) + f[1], COLUMNS));
+            out.add(new Line(fit(pad(fit(f[0], labelWidth) + ":", labelWidth + 2) + f[1], COLUMNS),
+                    false, false, null));
         }
-        out.add(pad(generatedLabel + ":", labelWidth + 2) + stamp(generated));
+        out.add(new Line(pad(generatedLabel + ":", labelWidth + 2) + stamp(generated), false, false, null));
         for (Section s : sections) {
-            out.add("");
-            if (s.caption != null && s.caption.length() > 0) {
-                out.add(fit(s.caption, COLUMNS));
-            }
             int[] widths = widths(s.weights, COLUMNS);
-            out.add(cells(s.headers, widths, s.numeric));
-            out.add(repeat('-', COLUMNS));
+            String header = cells(s.headers, widths, s.numeric);
+            String rule = repeat('-', COLUMNS);
+            boolean captioned = s.caption != null && s.caption.length() > 0;
+            String[] heading = captioned
+                    ? new String[] {fit(format(continuedLabel, "{0}", s.caption), COLUMNS), header, rule}
+                    : new String[] {header, rule};
+            out.add(new Line("", false, true, null));
+            if (captioned) {
+                out.add(new Line(fit(s.caption, COLUMNS), false, true, null));
+            }
+            out.add(new Line(header, false, true, null));
+            out.add(new Line(rule, false, true, null));
             boolean totalsBegun = false;
             for (int iter = 0; iter < s.rows.size(); iter++) {
                 int kind = s.kinds.get(iter).intValue();
                 if (kind == 2) {
-                    out.add(fit(s.rows.get(iter)[0], COLUMNS));
+                    out.add(new Line(fit(s.rows.get(iter)[0], COLUMNS), false, false, heading));
                     continue;
                 }
                 if (kind == 1 && !totalsBegun) {
-                    out.add(repeat('-', COLUMNS));
+                    out.add(new Line(rule, false, false, heading));
                     totalsBegun = true;
                 }
-                out.add(cells(s.rows.get(iter), widths, s.numeric));
+                out.add(new Line(cells(s.rows.get(iter), widths, s.numeric), false, false, heading));
             }
         }
         if (!totals.isEmpty()) {
-            out.add("");
-            out.add(repeat('=', COLUMNS));
+            out.add(new Line("", false, true, null));
+            out.add(new Line(repeat('=', COLUMNS), false, true, null));
             for (String[] t : totals) {
                 int room = COLUMNS - t[1].length() - 1;
-                out.add(pad(fit(t[0], Math.max(1, room)), Math.max(1, room) + 1) + t[1]);
+                // The totals stay together: every one but the last opens.
+                boolean last = t == totals.get(totals.size() - 1);
+                out.add(new Line(pad(fit(t[0], Math.max(1, room)), Math.max(1, room) + 1) + t[1],
+                        true, !last, null));
             }
         }
         return out;
     }
 
-    /// The page drawn in black on white.
-    public Image render() {
-        List<String> lines = lines();
+    /// A sheet of paper: its lines, top to bottom, the last one its page
+    /// number.
+    public static final class Page {
+        final List<String> lines = new ArrayList<String>();
+        final List<Boolean> bold = new ArrayList<Boolean>();
+
+        public List<String> lines() {
+            return lines;
+        }
+
+        boolean isBold(int index) {
+            return bold.get(index).booleanValue();
+        }
+
+        void add(String text, boolean strong) {
+            lines.add(text);
+            bold.add(Boolean.valueOf(strong));
+        }
+    }
+
+    /// The report cut into pages of `linesPerPage` lines. The first page has
+    /// the full header; every page after it names the bank and the report,
+    /// and a table that runs on to it repeats its column names there. A table
+    /// never starts at the foot of a page with none of its rows under it, the
+    /// totals at the end stay together, and the last line of every page is
+    /// "Page X of Y".
+    public List<Page> pages(int linesPerPage) {
+        // Two lines at the foot: a space, then the page number.
+        int room = Math.max(8, linesPerPage) - 2;
+        List<Line> all = body();
+        List<Page> pages = new ArrayList<Page>();
+        Page page = new Page();
+        int bodyLines = 0;
+        for (int iter = 0; iter < all.size(); iter++) {
+            Line line = all.get(iter);
+            // What has to fit together: a run of opening lines and the line
+            // after it.
+            int together = 1;
+            if (line.opens) {
+                int at = iter;
+                while (at < all.size() && all.get(at).opens) {
+                    at++;
+                }
+                together = Math.min(at, all.size() - 1) - iter + 1;
+            }
+            if (page.lines.size() + together > room && bodyLines > 0) {
+                pages.add(page);
+                page = new Page();
+                bodyLines = 0;
+                page.add(fit(BANK + " - " + title, COLUMNS), true);
+                page.add(repeat('=', COLUMNS), false);
+                if (!line.opens && line.heading != null) {
+                    for (String h : line.heading) {
+                        page.add(h, false);
+                    }
+                }
+            }
+            if (bodyLines == 0 && pages.size() > 0 && line.text.length() == 0) {
+                // A page does not start with a space.
+                continue;
+            }
+            page.add(line.text, line.bold);
+            bodyLines++;
+        }
+        pages.add(page);
+        for (int iter = 0; iter < pages.size(); iter++) {
+            Page p = pages.get(iter);
+            while (p.lines.size() < room + 1) {
+                p.add("", false);
+            }
+            String number = fit(format(format(pageLabel, "{0}", String.valueOf(iter + 1)), "{1}",
+                    String.valueOf(pages.size())), COLUMNS);
+            p.add(repeat(' ', COLUMNS - number.length()) + number, false);
+        }
+        return pages;
+    }
+
+    /// `pattern` with `mark` replaced by `value`.
+    private static String format(String pattern, String mark, String value) {
+        int at = pattern.indexOf(mark);
+        return at < 0 ? pattern
+                : pattern.substring(0, at) + value + pattern.substring(at + mark.length());
+    }
+
+    /// Paper is A4 upright: 210 by 297 millimetres.
+    static final int PAGE_WIDTH_POINTS = 595;
+    static final int PAGE_HEIGHT_POINTS = 842;
+
+    /// The pages drawn in black on white, each the shape of a sheet of A4.
+    public List<Image> render() {
         Font mono = Font.createSystemFont(Font.FACE_MONOSPACE, Font.STYLE_PLAIN, Font.SIZE_SMALL);
         Font bold = Font.createSystemFont(Font.FACE_MONOSPACE, Font.STYLE_BOLD, Font.SIZE_SMALL);
         int cell = Math.max(1, mono.charWidth('M'));
         int line = mono.getHeight() + 2;
         int margin = cell * 4;
-        Image page = Image.createImage(cell * COLUMNS + margin * 2,
-                line * lines.size() + margin * 2, 0xffffffff);
-        Graphics g = page.getGraphics();
-        g.setAntiAliased(true);
-        g.setAntiAliasedText(true);
-        g.setColor(0x000000);
-        for (int iter = 0; iter < lines.size(); iter++) {
-            String text = lines.get(iter);
-            // The bank, the title, and the totals at the end are bold.
-            g.setFont(iter < 2 || isTotal(lines, iter) ? bold : mono);
-            // Monospaced by position, not by the font's own advance: a
-            // character the font lacks must not move the next column.
-            int y = margin + iter * line;
-            for (int at = 0; at < text.length(); at++) {
-                char c = text.charAt(at);
-                if (c != ' ') {
-                    g.drawChar(c, margin + at * cell, y);
+        int width = cell * COLUMNS + margin * 2;
+        int height = width * PAGE_HEIGHT_POINTS / PAGE_WIDTH_POINTS;
+        List<Image> out = new ArrayList<Image>();
+        for (Page p : pages((height - margin * 2) / line)) {
+            Image image = Image.createImage(width, height, 0xffffffff);
+            Graphics g = image.getGraphics();
+            g.setAntiAliased(true);
+            g.setAntiAliasedText(true);
+            g.setColor(0x000000);
+            for (int iter = 0; iter < p.lines.size(); iter++) {
+                String text = p.lines.get(iter);
+                g.setFont(p.isBold(iter) ? bold : mono);
+                // Monospaced by position, not by the font's own advance: a
+                // character the font lacks must not move the next column.
+                int y = margin + iter * line;
+                for (int at = 0; at < text.length(); at++) {
+                    char c = text.charAt(at);
+                    if (c != ' ') {
+                        g.drawChar(c, margin + at * cell, y);
+                    }
                 }
             }
+            out.add(image);
         }
-        return page;
-    }
-
-    private boolean isTotal(List<String> lines, int index) {
-        if (totals.isEmpty()) {
-            return false;
-        }
-        return index >= lines.size() - totals.size();
+        return out;
     }
 
     /// Makes the printout when it is asked for, so that it holds what the
@@ -259,7 +389,30 @@ public final class Printout {
             return;
         }
         printout.generatedLabel = Lang.tr("Generated");
-        Printer.printImage(printout.render(), result -> {
+        // Translated with their placeholders left in; the page fills them.
+        printout.pageLabel = Lang.tr("Page {0} of {1}");
+        printout.continuedLabel = Lang.tr("{0} (continued)");
+        final FileSystemStorage fs = FileSystemStorage.getInstance();
+        final String path = fs.getAppHomePath() + "bastion-report.pdf";
+        try {
+            PdfPages pdf = new PdfPages(PAGE_WIDTH_POINTS, PAGE_HEIGHT_POINTS);
+            for (Image page : printout.render()) {
+                pdf.add(page.getRGB(), page.getWidth(), page.getHeight());
+            }
+            OutputStream out = fs.openOutputStream(path);
+            try {
+                out.write(pdf.toBytes());
+            } finally {
+                out.close();
+            }
+        } catch (IOException err) {
+            ToastBar.showErrorMessage(Lang.tr("Could not print: {0}", String.valueOf(err.getMessage())));
+            return;
+        }
+        // One document of many pages, so the print dialog paginates it and
+        // shows them all, rather than shrinking one tall image to a sheet.
+        Printer.printPDF(path, result -> {
+            fs.delete(path);
             if (result.getStatus() == PrintResult.STATUS_FAILED) {
                 ToastBar.showErrorMessage(Lang.tr("Could not print: {0}",
                         String.valueOf(result.getError())));
