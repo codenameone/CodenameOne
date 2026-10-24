@@ -21,8 +21,10 @@ package com.codenameone.examples.bastion.ui;
 import com.codename1.ui.Button;
 import com.codename1.ui.CN;
 import com.codename1.ui.Command;
+import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
+import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.TextField;
@@ -206,6 +208,7 @@ public final class AccountForm {
                 "BnHeroAmount"));
         hero.add(new Label(Ui.when(posting.createdAt()), "BnHeroNote"));
         form.add(hero);
+        form.add(Ui.row(describe(posting), category(posting.kind()), null, null, null));
         form.add(Ui.row(Lang.tr("Account"), account.name(), account.asset(), "BnRowValueMuted",
                 null));
         form.add(Ui.row(Lang.tr("Side"), Lang.tr(in ? "Credit to your account"
@@ -219,12 +222,32 @@ public final class AccountForm {
         Ui.show(form, true);
     }
 
-    /// A statement: every posting oldest first with the running balance, the
-    /// way a bank statement lists them.
-    private static void statement(final AccountDto account, List<PostingDto> postings,
+    /// The statement's columns, by key; the header of each is its English
+    /// name in [#COLUMN_NAMES], and [#COLUMN_WEIGHTS] its share of the width.
+    static final String[] COLUMNS = {"date", "description", "category", "reference", "in", "out",
+        "amount", "balance"};
+    private static final String[] COLUMN_NAMES = {"Date", "Description", "Category", "Reference",
+        "Money in", "Money out", "Amount", "Balance"};
+    private static final int[] COLUMN_WEIGHTS = {3, 5, 3, 3, 3, 3, 3, 3};
+    private static final boolean[] COLUMN_NUMERIC = {false, false, false, false, true, true, true,
+        true};
+    /// What a phone in portrait shows until the user picks: the date, what
+    /// the line was and its signed amount. A tap on a line shows the rest.
+    static final String NARROW_DEFAULT = "date,description,amount";
+    /// What a wider window shows: everything but the signed amount, which
+    /// the money in and money out columns already say.
+    static final String WIDE_DEFAULT = "date,description,category,reference,in,out,balance";
+
+    /// A window this wide (in mm) has room for the wide set of columns.
+    private static final float WIDE_MM = 120f;
+
+    /// A statement: a header with the account, the period and its totals,
+    /// then every posting oldest first with the running balance, in the
+    /// columns the window has room for -- or the ones the user picked.
+    private static void statement(final AccountDto account, final List<PostingDto> postings,
             final Runnable back) {
-        Form form = Nav.form("Statement", back);
-        form.add(new Label(account.name() + " - " + account.asset(), "BnTitle"));
+        final Form form = Nav.form("Statement", back);
+        final Runnable stay = () -> Ui.show(form, true);
         long opening = account.balance();
         long in = 0;
         long out = 0;
@@ -236,45 +259,221 @@ public final class AccountForm {
                 out -= posting.amount();
             }
         }
+        final String asset = account.asset();
+        Container head = new Container(BoxLayout.y(), "BnStatementHead");
+        head.add(new Label(account.name(), "BnRowTitle"));
+        String period = postings.isEmpty() ? "" : Lang.tr("{0} to {1}",
+                Ui.day(postings.get(postings.size() - 1).createdAt()),
+                Ui.day(postings.get(0).createdAt()));
+        Ui.addDetail(head, HomeForm.kindName(account.kind()) + " - " + asset
+                + (period.length() > 0 ? " - " + period : ""));
+        boolean wide = CN.getDisplayWidth() >= CN.convertToPixels(WIDE_MM);
+        Container totals = new Container(new com.codename1.ui.layouts.GridLayout(wide ? 1 : 2,
+                wide ? 4 : 2));
+        totals.add(fact("Opening balance", Amounts.format(opening, asset)));
+        totals.add(fact("Closing balance", Amounts.format(account.balance(), asset)));
+        totals.add(fact("Money in", Amounts.format(in, asset)));
+        totals.add(fact("Money out", Amounts.format(out, asset)));
+        head.add(totals);
+        form.add(head);
+        final Container holder = new Container(BoxLayout.y());
+        form.add(holder);
+        final long openingBalance = opening;
+        final Runnable fill = () -> {
+            holder.removeAll();
+            holder.add(statementTable(account, postings, openingBalance, stay));
+            form.revalidate();
+        };
+        fill.run();
+        form.getToolbar().addMaterialCommandToRightBar("", FontImage.MATERIAL_VIEW_COLUMN,
+                evt -> {
+                    if (chooseColumns()) {
+                        fill.run();
+                    }
+                });
+        // Turning a phone, or resizing a desktop window, changes what fits.
+        final boolean[] wasWide = {wide};
+        form.addSizeChangedListener(evt -> {
+            boolean now = CN.getDisplayWidth() >= CN.convertToPixels(WIDE_MM);
+            if (now != wasWide[0]) {
+                wasWide[0] = now;
+                fill.run();
+            }
+        });
+        Ui.show(form, true);
+    }
+
+    private static Container fact(String label, String value) {
+        Container fact = new Container(BoxLayout.y(), "BnFact");
+        com.codename1.components.SpanLabel name = new com.codename1.components.SpanLabel(
+                Lang.tr(label));
+        name.setTextUIID("BnFactLabel");
+        fact.add(name);
+        fact.add(new Label(value, "BnFactValue"));
+        return fact;
+    }
+
+    /// The preference that holds the columns picked for this width of window.
+    private static String columnsKey() {
+        return CN.getDisplayWidth() >= CN.convertToPixels(WIDE_MM)
+                ? "bastion.statement.columns.wide" : "bastion.statement.columns.narrow";
+    }
+
+    /// The column keys to show, in table order.
+    static String[] chosenColumns() {
+        boolean wide = CN.getDisplayWidth() >= CN.convertToPixels(WIDE_MM);
+        String saved = com.codename1.io.Preferences.get(columnsKey(),
+                wide ? WIDE_DEFAULT : NARROW_DEFAULT);
+        return pickColumns(saved);
+    }
+
+    /// The known keys in `csv`, in the table's order; the date always.
+    static String[] pickColumns(String csv) {
+        String list = "," + (csv == null ? "" : csv) + ",";
+        int count = 0;
+        boolean[] on = new boolean[COLUMNS.length];
+        for (int iter = 0; iter < COLUMNS.length; iter++) {
+            on[iter] = iter == 0 || list.indexOf("," + COLUMNS[iter] + ",") >= 0;
+            if (on[iter]) {
+                count++;
+            }
+        }
+        String[] out = new String[count];
+        int at = 0;
+        for (int iter = 0; iter < COLUMNS.length; iter++) {
+            if (on[iter]) {
+                out[at++] = COLUMNS[iter];
+            }
+        }
+        return out;
+    }
+
+    /// Asks which columns to show; answers whether the choice changed.
+    private static boolean chooseColumns() {
+        String[] current = chosenColumns();
+        Container box = new Container(BoxLayout.y());
+        com.codename1.ui.CheckBox[] boxes = new com.codename1.ui.CheckBox[COLUMNS.length];
+        for (int iter = 0; iter < COLUMNS.length; iter++) {
+            boxes[iter] = new com.codename1.ui.CheckBox(Lang.tr(COLUMN_NAMES[iter]));
+            boxes[iter].setUIID("BnCheck");
+            boxes[iter].setSelected(Ui.indexOf(current, COLUMNS[iter]) >= 0);
+            // The date says which line is which; it is always there.
+            boxes[iter].setEnabled(iter != 0);
+            box.add(boxes[iter]);
+        }
+        Command ok = new Command(Lang.tr("Show"));
+        if (Dialog.show(Lang.tr("Columns"), box, ok, new Command(Lang.tr("Cancel"))) != ok) {
+            return false;
+        }
+        StringBuilder csv = new StringBuilder();
+        for (int iter = 0; iter < COLUMNS.length; iter++) {
+            if (boxes[iter].isSelected() || iter == 0) {
+                csv.append(csv.length() == 0 ? "" : ",").append(COLUMNS[iter]);
+            }
+        }
+        com.codename1.io.Preferences.set(columnsKey(), csv.toString());
+        return true;
+    }
+
+    private static Component statementTable(final AccountDto account, List<PostingDto> postings,
+            long opening, final Runnable stay) {
         String asset = account.asset();
-        // A phone has room for three columns: the amount is signed rather
-        // than split into money in and money out, and the description goes
-        // (each row is a posting to this account, in or out).
-        boolean narrow = CN.getDisplayWidth() < CN.convertToPixels(120f);
-        Table table = narrow
-                ? new Table(new String[] {"Date", "Amount", "Balance"}, new int[] {3, 2, 2},
-                        new boolean[] {false, true, true}, true)
-                : new Table(new String[] {"Date", "Description", "Money in", "Money out",
-                    "Balance"}, new int[] {3, 4, 3, 3, 3},
-                        new boolean[] {false, false, true, true, true});
-        // "Opening balance" does not fit a phone's date column.
-        table.add(narrow ? new String[] {Lang.tr("Opening"), "",
-            Amounts.format(opening, asset)} : new String[] {"", Lang.tr("Opening balance"), "", "",
-            Amounts.format(opening, asset)}, "BnTableTotal", null, null);
+        String[] keys = chosenColumns();
+        String[] headers = new String[keys.length];
+        int[] weights = new int[keys.length];
+        boolean[] numeric = new boolean[keys.length];
+        int weight = 0;
+        for (int iter = 0; iter < keys.length; iter++) {
+            int column = Ui.indexOf(COLUMNS, keys[iter]);
+            headers[iter] = COLUMN_NAMES[column];
+            weights[iter] = COLUMN_WEIGHTS[column];
+            numeric[iter] = COLUMN_NUMERIC[column];
+            weight += weights[iter];
+        }
+        // Up to the width of the narrow default the columns are fitted to the
+        // window; more than that scrolls sideways rather than squeeze.
+        final boolean fitted = weight <= 11;
+        Table table = new Table(headers, weights, numeric, fitted);
         long running = opening;
         for (int iter = postings.size() - 1; iter >= 0; iter--) {
-            PostingDto posting = postings.get(iter);
+            final PostingDto posting = postings.get(iter);
             running += posting.amount();
+            final long after = running;
             boolean credit = posting.amount() > 0;
-            if (narrow) {
-                table.add(new String[] {Ui.when(posting.createdAt()),
-                    (credit ? "+" : "") + Amounts.format(posting.amount(), asset),
-                    Amounts.format(running, asset)}, "BnTableRow",
-                        new String[] {null, credit ? null : "BnCellNumOut", null}, null);
-                continue;
+            String[] cells = new String[keys.length];
+            String[] styles = new String[keys.length];
+            for (int c = 0; c < keys.length; c++) {
+                String key = keys[c];
+                if ("date".equals(key)) {
+                    // A fitted phone column has room for the day; the time
+                    // is on the line's own screen, a tap away.
+                    cells[c] = fitted ? Ui.day(posting.createdAt()) : Ui.when(posting.createdAt());
+                } else if ("description".equals(key)) {
+                    cells[c] = describe(posting);
+                } else if ("category".equals(key)) {
+                    cells[c] = category(posting.kind());
+                } else if ("reference".equals(key)) {
+                    cells[c] = shortReference(posting.entryId());
+                } else if ("in".equals(key)) {
+                    cells[c] = credit ? Amounts.format(posting.amount(), asset) : "";
+                } else if ("out".equals(key)) {
+                    cells[c] = credit ? "" : Amounts.format(-posting.amount(), asset);
+                    styles[c] = "BnCellNumOut";
+                } else if ("amount".equals(key)) {
+                    cells[c] = (credit ? "+" : "") + Amounts.format(posting.amount(), asset);
+                    styles[c] = credit ? null : "BnCellNumOut";
+                } else {
+                    cells[c] = Amounts.format(after, asset);
+                }
             }
-            table.add(new String[] {Ui.when(posting.createdAt()),
-                Lang.tr(credit ? "Money in" : "Money out"),
-                credit ? Amounts.format(posting.amount(), asset) : "",
-                credit ? "" : Amounts.format(-posting.amount(), asset),
-                Amounts.format(running, asset)}, null);
+            // Every line opens in full: on a phone that is how the columns
+            // left out are read.
+            table.add(cells, "BnTableRow", styles, () -> detail(account, posting, after, stay));
         }
-        table.add(narrow ? new String[] {Lang.tr("Closing"), "",
-            Amounts.format(account.balance(), asset)} : new String[] {"", Lang.tr("Closing balance"),
-            Amounts.format(in, asset), Amounts.format(out, asset),
-            Amounts.format(account.balance(), asset)}, "BnTableTotal", null, null);
-        form.add(table.component());
-        Ui.show(form, true);
+        return table.component();
+    }
+
+    /// What a line was: the entry's description (a merchant, the sender's
+    /// note), else what kind of movement it was.
+    static String describe(PostingDto posting) {
+        String memo = posting.memo();
+        if (memo != null && memo.length() > 0) {
+            return ReceiptForm.memo(memo);
+        }
+        return category(posting.kind());
+    }
+
+    /// The ledger's kind of an entry, in words.
+    static String category(String kind) {
+        if ("CARD".equals(kind)) {
+            return Lang.tr("Card");
+        }
+        if ("TRANSFER".equals(kind) || "PAYMENT".equals(kind)) {
+            return Lang.tr("Transfer");
+        }
+        if ("DEPOSIT".equals(kind) || "CAPITAL".equals(kind)) {
+            return Lang.tr("Deposit");
+        }
+        if ("WITHDRAWAL".equals(kind)) {
+            return Lang.tr("Cash withdrawal");
+        }
+        if ("CRYPTO_OUT".equals(kind)) {
+            return Lang.tr("Crypto withdrawal");
+        }
+        if ("TRADE".equals(kind) || "ORDER_HOLD".equals(kind) || "ORDER_RELEASE".equals(kind)) {
+            return Lang.tr("Trade");
+        }
+        return Lang.tr("Other");
+    }
+
+    /// A reference short enough for a column: its first eight characters,
+    /// which a support agent can search by. The full one is on the line's
+    /// own screen.
+    static String shortReference(String entryId) {
+        if (entryId == null) {
+            return "";
+        }
+        return entryId.length() <= 8 ? entryId : entryId.substring(0, 8);
     }
 
     /// Cash in or out at the counter -- the sample's stand-in for a card top-up

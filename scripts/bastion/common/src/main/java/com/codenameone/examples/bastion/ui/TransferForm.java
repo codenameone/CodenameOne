@@ -211,7 +211,7 @@ public final class TransferForm {
                 tried[0] = transfer;
                 key[0] = RequestSigner.idempotencyKey();
             }
-            send(review, error, transfer, key[0], back);
+            send(review, error, transfer, toName, key[0], back);
         });
         content.revalidate();
     }
@@ -219,11 +219,11 @@ public final class TransferForm {
     /// Sends `transfer`; `key` is the payment's idempotency key and stays the
     /// same for the retry that follows registering the device.
     private static void send(final Button review, final Label error, final TransferDto transfer,
-            final String key, final Runnable back) {
+            final String toName, final String key, final Runnable back) {
         review.setEnabled(false);
         DeviceSetup.withDevice(failed -> Api.banking().transfer(key,
                 RequestSigner.sign("POST", TARGET, key, transfer), transfer,
-                Net.to((ReceiptDto receipt) -> ReceiptForm.show(receipt, back), failed)),
+                Net.to((ReceiptDto receipt) -> ReceiptForm.show(receipt, toName, back), failed)),
                 (status, message) -> {
                     review.setEnabled(true);
                     Ui.showError(error, Lang.tr(message));

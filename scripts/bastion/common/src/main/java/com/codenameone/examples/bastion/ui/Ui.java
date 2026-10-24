@@ -27,6 +27,7 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
+import com.codename1.ui.Font;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.animations.CommonTransitions;
@@ -175,7 +176,11 @@ public final class Ui {
         Label logo = new Label("", "BnBrandLogo");
         FontImage.setMaterialIcon(logo, FontImage.MATERIAL_SHIELD, 9f);
         band.add(logo);
-        band.add(new Label(Lang.tr(heading), "BnBrandTitle"));
+        // Wraps rather than ending in "...": a longer translation, or a
+        // narrow phone, gets a second line.
+        SpanLabel headline = new SpanLabel(Lang.tr(heading));
+        headline.setTextUIID("BnBrandTitle");
+        band.add(headline);
         if (subtitle != null) {
             SpanLabel line = new SpanLabel(Lang.tr(subtitle));
             line.setTextUIID("BnBrandText");
@@ -241,24 +246,111 @@ public final class Ui {
         return label;
     }
 
-    /// Buttons side by side, sharing the width.
+    /// Buttons side by side, sharing the width, with the theme's gap
+    /// (`bnButtonGapMm`) between each two. The label size is the theme's and
+    /// the same for every button: nothing here shrinks one label to fit.
+    ///
+    /// When the buttons do not fit one row at that size -- three on a phone,
+    /// or a long translation -- the first, the screen's main action, takes a
+    /// row of its own and the rest share the row under it; two that still do
+    /// not fit are stacked. Wrapping beats a label ending in "...".
     public static Container across(Component... parts) {
-        Container row = new Container(new GridLayout(1, parts.length));
+        int gap = CN.convertToPixels(buttonGapMm());
+        // A grid gives every cell the same width, so the widest button
+        // decides whether the row fits.
+        int widest = 0;
         for (Component part : parts) {
-            if (part instanceof Label) {
-                // Three buttons share a phone's width: they give up most of
-                // their side padding, and a longer label (or a longer
-                // translation) shrinks a little rather than end in "...".
-                Label label = (Label) part;
-                label.getAllStyles().setPaddingLeft(1f);
-                label.getAllStyles().setPaddingRight(1f);
-                label.setAutoSizeMode(true);
-                label.setMaxAutoSize(2.9f);
-                label.setMinAutoSize(2.2f);
-            }
+            widest = Math.max(widest, part.getPreferredW());
+        }
+        int needed = widest * parts.length + gap * (parts.length - 1);
+        // The page's own side padding is about 4mm each side.
+        int room = CN.getDisplayWidth() - CN.convertToPixels(8f);
+        if (needed <= room || parts.length < 2) {
+            return gridRow(gap, parts);
+        }
+        Container column = new Container(BoxLayout.y());
+        if (parts.length > 2) {
+            Component[] rest = new Component[parts.length - 1];
+            System.arraycopy(parts, 1, rest, 0, rest.length);
+            column.add(parts[0]);
+            column.add(across(rest));
+            return column;
+        }
+        column.addAll(parts);
+        return column;
+    }
+
+    /// One grid row of `parts`, `gap` pixels apart. A grid has no gap of its
+    /// own, so each cell gives up half of it on each inner side; the margins
+    /// are start and end ones, which the RTL layout mirrors with the grid.
+    private static Container gridRow(int gap, Component... parts) {
+        Container row = new Container(new GridLayout(1, parts.length));
+        int half = gap / 2;
+        for (int iter = 0; iter < parts.length; iter++) {
+            com.codename1.ui.plaf.Style style = parts[iter].getAllStyles();
+            style.setMarginUnitLeft(com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS);
+            style.setMarginUnitRight(com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS);
+            style.setMarginLeft(iter == 0 ? 0 : half);
+            style.setMarginRight(iter == parts.length - 1 ? 0 : gap - half);
         }
         row.addAll(parts);
         return row;
+    }
+
+    private static float buttonGapMm() {
+        String value = com.codename1.ui.plaf.UIManager.getInstance().getThemeConstant(
+                "bnButtonGapMm", "2");
+        try {
+            return Float.parseFloat(value);
+        } catch (NumberFormatException e) {
+            return 2f;
+        }
+    }
+
+    /// A key or code shown to be copied by eye: its groups of four (split at
+    /// the spaces of `grouped`), each in a monospaced box, wrapping between
+    /// groups and never inside one -- so it is always shown whole.
+    public static Container keyGroups(String grouped) {
+        Container box = new Container(new com.codename1.ui.layouts.FlowLayout(Component.CENTER));
+        Font mono = Font.createSystemFont(Font.FACE_MONOSPACE, Font.STYLE_BOLD, Font.SIZE_LARGE);
+        int start = 0;
+        while (start < grouped.length()) {
+            int end = grouped.indexOf(' ', start);
+            if (end < 0) {
+                end = grouped.length();
+            }
+            if (end > start) {
+                Label group = new Label(grouped.substring(start, end), "BnKeyGroup");
+                group.getAllStyles().setFont(mono);
+                box.add(group);
+            }
+            start = end + 1;
+        }
+        return box;
+    }
+
+    /// A fact whose value may be long -- a reference, an address: the label
+    /// on a line of its own and the value wrapping in full under it, never
+    /// cut off.
+    public static Container fact(String title, String value) {
+        Container row = new Container(BoxLayout.y(), "BnRow");
+        row.add(new Label(title, "BnRowTitle"));
+        SpanLabel text = new SpanLabel(value);
+        text.setTextUIID("BnRowValueWrap");
+        row.add(text);
+        return row;
+    }
+
+    /// A screen at the end of a flow -- a receipt: no menu and no back arrow
+    /// into the flow just finished, but a close button that runs `close`
+    /// (the device's back button does the same).
+    public static Form finished(String title, final Runnable close) {
+        Form form = form(title);
+        com.codename1.ui.Command done = com.codename1.ui.Command.createMaterial("",
+                FontImage.MATERIAL_CLOSE, evt -> close.run());
+        form.getToolbar().addCommandToLeftBar(done);
+        form.setBackCommand(done);
+        return form;
     }
 
     /// A choice among `labels`, shown as segments; `chosen` is told the index
@@ -362,6 +454,18 @@ public final class Ui {
             return "";
         }
         return new SimpleDateFormat("MMM d, HH:mm").format(new Date(millis));
+    }
+
+    /// A day, the way a statement's period shows it.
+    public static String day(long millis) {
+        return new SimpleDateFormat("MMM d").format(new Date(millis));
+    }
+
+    /// Adds a quiet line of detail, wrapping, under a row's title.
+    public static void addDetail(Container to, String text) {
+        SpanLabel line = new SpanLabel(text);
+        line.setTextUIID("BnRowDetail");
+        to.add(line);
     }
 
     /// A rebuildable form: `content` is emptied and refilled on every load.

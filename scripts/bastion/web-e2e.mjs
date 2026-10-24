@@ -151,6 +151,7 @@ async function components() {
     const box = el.getBoundingClientRect();
     return {
       role: el.getAttribute('role'),
+      readonly: el.getAttribute('aria-readonly') === 'true',
       label: el.getAttribute('aria-label'),
       text: el.innerText,
       x: box.x, y: box.y, width: box.width, height: box.height
@@ -184,7 +185,9 @@ const button = label => async () =>
 
 /// The single-line fields of the form on screen, top to bottom.
 async function fields() {
-  return (await components()).filter(c => c.role === 'textbox' && c.height > 44 && c.height < 66)
+  // A wrapping heading (a SpanLabel) is a read-only text area: not a field.
+  return (await components()).filter(c => c.role === 'textbox' && !c.readonly
+      && c.height > 44 && c.height < 66)
       .sort((a, b) => a.y - b.y);
 }
 
@@ -332,16 +335,18 @@ async function codeDiagnostics(where, secret, usedStep) {
 async function scrapeSecret() {
   let last = '';
   const secret = await waitFor('a valid authenticator key', stepSeconds, async () => {
-    const texts = (await components()).map(c => (c.label || c.text || '').trim());
-    for (const text of texts) {
-      if (/^[A-Z2-7]{4}( [A-Z2-7]{1,4})+$/.test(text)) {
-        last = text.replace(/\s/g, '');
-        if (validSecret(last)) {
-          return last;
-        }
-      }
+    // The key is shown as boxes of four (Ui.keyGroups), wrapping: read the
+    // boxes between its heading and the Copy key button, in reading order.
+    const all = await components();
+    const text = c => (c.label || c.text || '').trim();
+    const heading = all.find(c => /^Or enter this key$/.test(text(c)));
+    const copy = all.find(c => /^Copy key$/.test(text(c)));
+    if (!heading || !copy) {
+      return null;
     }
-    return null;
+    last = all.filter(c => c.y > heading.y && c.y < copy.y && /^[A-Z2-7]{1,4}$/.test(text(c)))
+        .sort((a, b) => (a.y - b.y) || (a.x - b.x)).map(text).join('');
+    return validSecret(last) ? last : null;
   }).catch(e => {
     throw new Error(`${e.message}; last candidate had ${last.length} characters`);
   });
@@ -522,6 +527,8 @@ async function guideTour() {
   await press('Order a card');
   await waitFor('the card', stepSeconds, async () => requests.some(r => /POST \/api\/accounts\/.*\/card/.test(r)));
   await waitFor('the cards screen', stepSeconds, textOnScreen(/Daily limit/));
+  await waitFor('the card payments', stepSeconds, textOnScreen(/Recent card payments/));
+  await page.waitForTimeout(1000);
   await shot('bastion-cards');
 
   await menu('Payees');
@@ -542,15 +549,28 @@ async function guideTour() {
   await shot('bastion-transfer-confirm');
   await press('Send');
   await waitFor('the receipt', stepSeconds, textOnScreen(/Sent/));
+  // The balance it left arrives after the receipt is up.
+  await page.waitForTimeout(2000);
   await shot('bastion-receipt');
+  // A receipt is the end of a flow: it closes back to where it started.
+  await press('Done');
+  await waitFor('the dashboard', stepSeconds, textOnScreen(/Total balance/));
 
 
   await menu('Exchange');
   await waitFor('the markets', stepSeconds, textOnScreen(/BTC/));
   await shot('bastion-exchange');
-  const btc = await waitFor('the BTC market', stepSeconds, async () =>
-      (await components()).find(c => /BTC/.test(c.label || c.text || '') && c.height < 200));
-  await click(btc);
+  // The first tap after the side menu closes can land on the closing
+  // menu rather than the list (the Exchange item sits where the BTC row
+  // is); tap again, freshly aimed, until the market opens.
+  for (let tries = 0; tries < 4 && !/Last price/.test(await screenText()); tries++) {
+    const btc = await waitFor('the BTC market', stepSeconds, async () =>
+        (await components()).find(c => /^BTC \/ USD$/.test(c.label || c.text || '')
+            && c.height < 200));
+    await click(btc);
+    await page.waitForTimeout(2000);
+    await settled();
+  }
   await waitFor('the order book', stepSeconds, textOnScreen(/Last price/));
   await page.waitForTimeout(3000);
   await shot('bastion-order-book');

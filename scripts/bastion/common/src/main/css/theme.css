@@ -62,6 +62,10 @@
     --danger-tint-dark: #3a1f22;
 
     --radius: 2mm;
+
+    /* The space between two buttons side by side (Ui.across), in mm: the
+       same as the vertical space between two stacked ones. */
+    bnButtonGapMm: "2";
 }
 
 /* ---------------------------------------------------------------- surfaces */
@@ -142,7 +146,7 @@ BnRowTitle {
     color: var(--text);
     font-family: "native:MainBold";
     font-size: 2.75mm;
-    padding: 0;
+    padding: 0.4mm 0 0.4mm 0;
     margin: 0;
     background-color: transparent;
 }
@@ -195,10 +199,10 @@ BnPrimary {
     background-color: var(--brand);
     border-radius: var(--radius);
     font-family: "native:MainBold";
-    font-size: 2.9mm;
+    font-size: 2.5mm;
     text-align: center;
-    padding: 2.75mm 4mm 2.75mm 4mm;
-    margin: 1.6mm 0 0.8mm 0;
+    padding: 2.6mm 3.2mm 2.6mm 3.2mm;
+    margin: 1mm 0 1mm 0;
 }
 
 BnPrimary.pressed {
@@ -215,10 +219,10 @@ BnSecondary {
     background-color: var(--surface-alt);
     border-radius: var(--radius);
     font-family: "native:MainBold";
-    font-size: 2.9mm;
+    font-size: 2.5mm;
     text-align: center;
-    padding: 2.75mm 4mm 2.75mm 4mm;
-    margin: 1.6mm 0 0.8mm 0;
+    padding: 2.6mm 3.2mm 2.6mm 3.2mm;
+    margin: 1mm 0 1mm 0;
 }
 
 BnSecondary.pressed {
@@ -276,7 +280,7 @@ BnRowValue {
     font-family: "native:MainBold";
     font-size: 2.8mm;
     text-align: right;
-    padding: 0 0 0 2mm;
+    padding: 0.4mm 0 0.4mm 2mm;
     margin: 0;
     background-color: transparent;
 }
@@ -286,7 +290,7 @@ BnRowValueMuted {
     font-family: "native:MainBold";
     font-size: 2.8mm;
     text-align: right;
-    padding: 0 0 0 2mm;
+    padding: 0.4mm 0 0.4mm 2mm;
     margin: 0;
     background-color: transparent;
 }
@@ -306,7 +310,7 @@ BnAmountIn {
     font-family: "native:MainBold";
     font-size: 2.8mm;
     text-align: right;
-    padding: 0 0 0 2mm;
+    padding: 0.4mm 0 0.4mm 2mm;
     margin: 0;
     background-color: transparent;
 }
@@ -316,7 +320,7 @@ BnAmountOut {
     font-family: "native:MainBold";
     font-size: 2.8mm;
     text-align: right;
-    padding: 0 0 0 2mm;
+    padding: 0.4mm 0 0.4mm 2mm;
     margin: 0;
     background-color: transparent;
 }
@@ -410,22 +414,9 @@ BnLink {
 
 /* ---------------------------------------------------------------- cards */
 
-BnCard {
-    background-color: var(--brand);
-    border-radius: 3mm;
-    padding: 4mm 4mm 4mm 4mm;
-    margin: 2mm 0 1mm 0;
-}
-
-BnCardFrozen {
-    background-color: var(--text-muted);
-    border-radius: 3mm;
-    padding: 4mm 4mm 4mm 4mm;
-    margin: 2mm 0 1mm 0;
-}
-
+/* The face is always a dark card, in either mode: its type is white. */
 BnCardBrand {
-    color: var(--brand-contrast);
+    color: #ffffff;
     font-family: "native:MainBold";
     font-size: 3mm;
     padding: 0 0 3mm 0;
@@ -434,7 +425,7 @@ BnCardBrand {
 }
 
 BnCardNumber {
-    color: var(--brand-contrast);
+    color: #ffffff;
     font-family: "native:MainRegular";
     font-size: 3.6mm;
     padding: 0 0 1mm 0;
@@ -442,13 +433,60 @@ BnCardNumber {
     background-color: transparent;
 }
 
-BnCardNote {
-    color: var(--brand-contrast);
-    font-family: "native:MainLight";
-    font-size: 2.4mm;
+/* The card face (CardFace) paints itself; these give it its colours and
+   type: the gradient runs from BnCardFace's foreground to BnCardFaceEnd's. */
+BnCardFace { color: #2747a8; background-color: transparent; padding: 0; margin: 2mm 0 2mm 0; }
+BnCardFaceEnd { color: #0f1d4d; background-color: transparent; }
+BnCardFaceFrozen { color: #8a93a6; background-color: transparent; }
+BnCardFaceFrozenEnd { color: #4b5263; background-color: transparent; }
+BnCardChip { color: #d9b45a; background-color: transparent; }
+BnCardCaption {
+    color: #c9d3f2;
+    font-family: "native:MainRegular";
+    font-size: 1.7mm;
     padding: 0;
     margin: 0;
     background-color: transparent;
+}
+BnCardName {
+    color: #ffffff;
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+    padding: 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+/* How much of the daily limit is used: a bar in a track. */
+BnMeter { color: var(--brand); background-color: var(--surface-press); border-radius: 1mm; padding: 0; margin: 1mm 0 0.4mm 0; }
+BnMeterHigh { color: var(--danger); background-color: var(--surface-press); border-radius: 1mm; padding: 0; margin: 1mm 0 0.4mm 0; }
+
+/* A fact whose value may be long (a reference): the label above, the value
+   wrapping under it. */
+BnRowValueWrap {
+    color: var(--text);
+    font-family: "native:MainRegular";
+    font-size: 2.4mm;
+    padding: 0.6mm 0 0 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+/* The block at the top of a statement: account, period and totals. */
+BnStatementHead {
+    background-color: var(--surface-alt);
+    border-radius: var(--radius);
+    padding: 2.4mm 3mm 2.4mm 3mm;
+    margin: 0 0 1.6mm 0;
+}
+
+BnCheck {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2.8mm;
+    padding: 1.6mm 1mm 1.6mm 1mm;
+    margin: 0;
 }
 
 /* ------------------------------------------------------------- exchange */
@@ -515,6 +553,19 @@ BnSecret {
     padding: 1mm 0 1mm 0;
     margin: 0;
     background-color: transparent;
+}
+
+/* One group of four characters of a key: monospaced (Ui.monospace sets the
+   face), so a key copied by eye cannot mistake one character's width for
+   another's. */
+BnKeyGroup {
+    color: var(--text);
+    background-color: var(--surface-alt);
+    border-radius: 1mm;
+    font-size: 3.2mm;
+    text-align: center;
+    padding: 1mm 1.4mm 1mm 1.4mm;
+    margin: 0.8mm;
 }
 
 /* Always white: a QR code in dark-mode colours does not scan. */
@@ -610,7 +661,7 @@ BnBrandTitle {
     color: var(--brand-contrast);
     background-color: transparent;
     font-family: "native:MainBold";
-    font-size: 7mm;
+    font-size: 5.6mm;
     padding: 0;
     margin: 0;
 }
@@ -911,11 +962,12 @@ BnAmountNegative {
     BnSegment { color: var(--text-muted-dark); }
     BnSegmentOn { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
     BnLink { color: var(--brand-dark); }
-    BnCard { background-color: var(--brand-dark); }
-    BnCardFrozen { background-color: var(--surface-press-dark); }
-    BnCardBrand { color: var(--brand-contrast-dark); }
-    BnCardNumber { color: var(--brand-contrast-dark); }
-    BnCardNote { color: var(--brand-contrast-dark); }
+    BnKeyGroup { color: var(--text-dark); background-color: var(--surface-alt-dark); }
+    BnMeter { color: var(--brand-dark); background-color: var(--surface-press-dark); }
+    BnMeterHigh { color: var(--danger-dark); background-color: var(--surface-press-dark); }
+    BnRowValueWrap { color: var(--text-dark); }
+    BnStatementHead { background-color: var(--surface-alt-dark); }
+    BnCheck { color: var(--text-dark); }
     BnAsk { color: var(--danger-dark); }
     BnBid { color: var(--success-dark); }
     BnBookQty { color: var(--text-dark); }

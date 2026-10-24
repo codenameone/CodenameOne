@@ -226,7 +226,7 @@ public final class OnboardingForm {
             content.add(qr);
         }
         content.add(Ui.section("Or enter this key"));
-        content.add(new Label(group(enrollment.secret()), "BnSecret"));
+        content.add(Ui.keyGroups(group(enrollment.secret())));
         Button copy = Ui.secondary("Copy key");
         copy.addActionListener(evt -> {
             Protect.copy(enrollment.secret());

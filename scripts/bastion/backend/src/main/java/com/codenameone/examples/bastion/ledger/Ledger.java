@@ -162,6 +162,12 @@ public class Ledger {
         return postings.findTop100ByAccountIdOrderByCreatedAtDescIdDesc(accountId);
     }
 
+    /// The entry `id`, or null when there is none.
+    @Transactional(readOnly = true)
+    public JournalEntry entry(String id) throws IOException {
+        return id == null ? null : entries.findById(id);
+    }
+
     @Transactional(rollbackFor = Exception.class)
     public void freeze(String accountId, boolean frozen) throws IOException {
         if (accounts.setFrozen(accountId, frozen) != 1) {

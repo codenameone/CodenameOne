@@ -23,7 +23,11 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BoxLayout;
+import com.codenameone.examples.bastion.api.AccountDto;
 import com.codenameone.examples.bastion.api.ReceiptDto;
+import com.codenameone.examples.bastion.net.Api;
+import com.codenameone.examples.bastion.net.Net;
+import java.util.List;
 import com.codenameone.examples.bastion.money.Amounts;
 
 /// What the server booked: the ledger entry's id is the receipt's reference,
@@ -49,20 +53,63 @@ public final class ReceiptForm {
         return memo;
     }
 
-    public static void show(ReceiptDto receipt, final Runnable done) {
-        Form form = Nav.form("Done", null);
+    /// The receipt of a movement the user just made. `toName` is who or
+    /// what it went to, as the screen that sent it named it (a payee's
+    /// nickname, an account, an address); `done` closes it.
+    public static void show(final ReceiptDto receipt, String toName, final Runnable done) {
+        // The end of a flow: a close button, no menu, and a title that says
+        // what this is rather than what was pressed.
+        Form form = Ui.finished("Receipt", done);
+        String asset = receipt.asset();
         Container hero = new Container(BoxLayout.y(), "BnHero");
         hero.add(new Label(Lang.tr("Sent"), "BnHeroLabel"));
-        hero.add(new Label(Amounts.format(receipt.amount(), receipt.asset()), "BnHeroAmount"));
+        hero.add(new Label(Amounts.format(receipt.amount(), asset), "BnHeroAmount"));
+        hero.add(new Label(Ui.when(receipt.createdAt()), "BnHeroNote"));
         form.add(hero);
-        form.add(Ui.row(Lang.tr("Reference"), null, receipt.entryId(), "BnRowValueMono", null));
+        // Booked is final: the ledger entry exists, and the receipt is its.
+        form.add(Ui.row(Lang.tr("Status"), null, Lang.tr("Completed"), "BnAmountIn", null));
+        final Container from = Ui.row(Lang.tr("From"), null, "", "BnRowValue", null);
+        form.add(from);
+        if (toName != null && toName.length() > 0) {
+            // A name fits beside its label; an address wraps under it.
+            form.add(toName.length() <= 24 ? Ui.row(Lang.tr("To"), null, toName, null, null)
+                    : Ui.fact(Lang.tr("To"), toName));
+        }
+        form.add(Ui.row(Lang.tr("Amount"), null, Amounts.format(receipt.amount(), asset), null,
+                null));
+        // The bank charges nothing for a movement; the line says so rather
+        // than leave the reader wondering.
+        form.add(Ui.row(Lang.tr("Fee"), null, Amounts.format(0L, asset), "BnRowValueMuted", null));
+        final Container balance = Ui.row(Lang.tr("Balance after"), null, "", null, null);
+        form.add(balance);
         form.add(Ui.row(Lang.tr("When"), null, Ui.when(receipt.createdAt()), null, null));
         if (receipt.memo() != null && receipt.memo().length() > 0) {
-            form.add(Ui.row(Lang.tr("Note"), null, memo(receipt.memo()), null, null));
+            form.add(Ui.fact(Lang.tr("Note"), memo(receipt.memo())));
         }
+        form.add(Ui.fact(Lang.tr("Reference"), receipt.entryId()));
         Button ok = Ui.primary("Done");
         ok.addActionListener(evt -> done.run());
         form.add(ok);
         Ui.show(form, true);
+        // The account it left and what that account holds now.
+        Api.banking().accounts(Net.to((List<AccountDto> accounts) -> {
+            for (AccountDto account : accounts) {
+                if (account.id().equals(receipt.fromAccountId())) {
+                    setValue(from, account.name());
+                    setValue(balance, Amounts.format(account.balance(), account.asset()));
+                }
+            }
+        }, (status, message) -> { }));
+    }
+
+    /// Sets the value of a row made by [Ui#row].
+    private static void setValue(Container row, String value) {
+        com.codename1.ui.Component east = row.getLayout() instanceof
+                com.codename1.ui.layouts.BorderLayout
+                ? ((com.codename1.ui.layouts.BorderLayout) row.getLayout()).getEast() : null;
+        if (east instanceof Label) {
+            ((Label) east).setText(value);
+            row.revalidate();
+        }
     }
 }

@@ -189,7 +189,7 @@ public final class WithdrawForm {
             final String target2 = "/api/accounts/" + from.id() + "/crypto-withdraw";
             DeviceSetup.withDevice(failed -> Api.exchange().withdrawCrypto(from.id(), key[0],
                     RequestSigner.sign("POST", target2, key[0], withdrawal), withdrawal,
-                    Net.to((ReceiptDto receipt) -> ReceiptForm.show(receipt, back), failed)),
+                    Net.to((ReceiptDto receipt) -> ReceiptForm.show(receipt, address.address(), back), failed)),
                     (status, message) -> {
                         send.setEnabled(true);
                         Ui.showError(error, Lang.tr(message));

@@ -43,6 +43,7 @@ import com.codenameone.examples.bastion.audit.Audit;
 import com.codenameone.examples.bastion.domain.Asset;
 import com.codenameone.examples.bastion.domain.Card;
 import com.codenameone.examples.bastion.domain.Device;
+import com.codenameone.examples.bastion.domain.JournalEntry;
 import com.codenameone.examples.bastion.domain.LedgerAccount;
 import com.codenameone.examples.bastion.domain.Payee;
 import com.codenameone.examples.bastion.domain.Posting;
@@ -144,9 +145,18 @@ public class BankingEndpoint implements BankingApiServer {
         String owner = Devices.customer();
         LedgerAccount account = ledger.owned(owner, id);
         List<PostingDto> out = new ArrayList<PostingDto>();
+        // At most a hundred postings, and most share no entry; each entry is
+        // read once for its kind and description.
+        java.util.Map<String, JournalEntry> entries = new java.util.HashMap<String, JournalEntry>();
         for (Posting p : ledger.history(account.getId())) {
+            JournalEntry entry = entries.get(p.getEntryId());
+            if (entry == null && !entries.containsKey(p.getEntryId())) {
+                entry = ledger.entry(p.getEntryId());
+                entries.put(p.getEntryId(), entry);
+            }
             out.add(new PostingDto(p.getId(), p.getEntryId(), p.getAsset(), p.getAmount(),
-                    p.getCreatedAt()));
+                    p.getCreatedAt(), entry == null ? "" : entry.getKind(),
+                    entry == null ? "" : entry.getMemo()));
         }
         return out;
     }
