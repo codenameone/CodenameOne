@@ -109,7 +109,8 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 if (template.isFullStack() && type == ProjectOptions.ProjectType.APP) {
                     // An app with its server is not offered without the server.
                     assertRefused(GeneratorModel.createForPluginVersion(IDE.INTELLIJ, template, "NoServer",
-                            "com.acme.noserver", mavenOptions(type, false), FULL_STACK_VERSION),
+                            "com.acme.noserver", mavenOptions(type, false),
+                            GeneratorModel.templateSince(template)),
                             "an app and its server", template + " must refuse to leave its server out");
                     continue;
                 }
@@ -488,6 +489,10 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 ProjectOptions.BuildTool.MAVEN, ProjectOptions.ProjectType.APP_WITH_BACKEND);
         assertRefused(GeneratorModel.createForPluginVersion(IDE.INTELLIJ, Template.WAYLINE, "NoJava8",
                 "com.acme.nojava8", java8, FULL_STACK_VERSION), "Java 17", "A full-stack template is Java 17");
+        // Bastion's app calls framework API newer than the other templates need.
+        assertRefused(GeneratorModel.createForPluginVersion(IDE.INTELLIJ, Template.BASTION, "TooOld",
+                "com.acme.tooold", mavenOptions(ProjectOptions.ProjectType.APP_WITH_BACKEND, false),
+                FULL_STACK_VERSION), GeneratorModel.BASTION_SINCE, "Bastion must refuse a release before its own");
         ProjectOptions forced = java8.withBuild(ProjectOptions.BuildTool.GRADLE, ProjectOptions.ProjectType.APP)
                 .forFullStack();
         assertTrue(!forced.isGradle() && forced.projectType == ProjectOptions.ProjectType.APP_WITH_BACKEND
@@ -694,7 +699,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         String mainClassName = "Mvn" + template.ordinal() + type.ordinal() + (allModules ? 1 : 0) + ide.ordinal() + "App";
         String packageName = "com.acme.m" + template.ordinal() + ".t" + type.ordinal() + ".i" + ide.ordinal();
         String label = template + "/" + type + "/" + (allModules ? "full" : "minimal") + "/" + ide + ": ";
-        String version = template.isFullStack() ? FULL_STACK_VERSION : LAYOUTS_VERSION;
+        String version = template.isFullStack() ? GeneratorModel.templateSince(template) : LAYOUTS_VERSION;
         byte[] zipData = mavenZip(version, template, ide, mainClassName, packageName,
                 mavenOptions(type, allModules));
         Map<String, byte[]> entries = readZipEntries(zipData);
