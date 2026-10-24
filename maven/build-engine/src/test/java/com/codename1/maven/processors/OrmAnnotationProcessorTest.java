@@ -1399,7 +1399,65 @@ public class OrmAnnotationProcessorTest {
             + "@Entity public class Diary { @Id public long id; @Temporal(TemporalType.DATE) @ElementCollection public List<Date> days=new ArrayList<Date>(); }");
         JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
         String errors=runProcessor(classes,Collections.<String>emptyList()).getErrors().toString();
-        assertTrue(errors,errors.contains("@Temporal applies to a single java.util.Date field, not a relationship or collection: days"));
+        assertTrue(errors,errors.contains("@Temporal applies to a single date or time field, not a relationship or collection: days"));
+    }
+
+    /// Instant, LocalDate and LocalDateTime map without an annotation, to the
+    /// numbers a Date's default writes, and to native columns under @Temporal.
+    /// Both models store, load, bind a query parameter and order by each one.
+    @Test
+    public void javaTimeFieldsRoundTripAndQuery() throws Exception {
+        File classes=tmp.newFolder("javatime");Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("javatime.Event","package javatime; import com.codename1.annotations.*; import com.codename1.annotations.db.*; import java.time.*; "
+            + "@Entity public class Event { @Id public long id; public Instant at; public LocalDate day; public LocalDateTime local; "
+            + "@Temporal(TemporalType.TIMESTAMP) public Instant nativeAt; @Temporal(TemporalType.DATE) public LocalDate nativeDay; @Temporal(TemporalType.TIMESTAMP) public LocalDateTime nativeLocal; public long rawAt; }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+        ProcessorContext client=runProcessor(classes);assertFalse(client.getErrors().toString(),client.hasErrors());
+        ProcessorContext backend=runProcessor(classes,backendClasspath());assertFalse(backend.getErrors().toString(),backend.hasErrors());
+        java.time.Instant early=java.time.Instant.parse("1969-07-20T20:17:40.123456Z"),late=java.time.Instant.parse("2026-10-24T09:30:00.250Z");
+        try(java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader())) {
+            Class type=loader.loadClass("javatime.Event");
+            for(String suffix:Arrays.asList("Cn1Model","Cn1BackendModel")) {
+                Map<String,com.codename1.impl.orm.EntityModel<?>> models=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();models.put(type.getName(),(com.codename1.impl.orm.EntityModel)loader.loadClass(type.getName()+suffix).newInstance());
+                com.codename1.backend.Database db=com.codename1.backend.Database.open(":memory:");com.codename1.orm.session.Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect()),models);
+                try {
+                    session.createTables();session.beginTransaction();
+                    for(java.time.Instant at:Arrays.asList(late,early)) {
+                        Object e=type.newInstance();java.time.LocalDateTime local=java.time.LocalDateTime.ofInstant(at,java.time.ZoneOffset.UTC);
+                        type.getField("at").set(e,at);type.getField("nativeAt").set(e,at);type.getField("day").set(e,local.toLocalDate());type.getField("nativeDay").set(e,local.toLocalDate());
+                        type.getField("local").set(e,local);type.getField("nativeLocal").set(e,local);type.getField("rawAt").setLong(e,at.toEpochMilli());session.persist(e);
+                    }
+                    Object empty=type.newInstance();session.persist(empty);session.commitTransaction();session.clear();
+                    for(String field:Arrays.asList("at","nativeAt","day","nativeDay","local","nativeLocal")) {
+                        java.util.List<?> rows=session.createQuery("select e from Event e where e."+field+" is not null order by e."+field).list();
+                        assertEquals(suffix+" "+field,2,rows.size());
+                        Object first=rows.get(0),second=rows.get(1);
+                        // Milliseconds are kept, finer digits are dropped.
+                        java.time.Instant truncated=java.time.Instant.ofEpochMilli(early.toEpochMilli());
+                        Object expected=field.toLowerCase().endsWith("day")?java.time.LocalDate.of(1969,7,20)
+                            :field.toLowerCase().endsWith("local")?java.time.LocalDateTime.ofInstant(truncated,java.time.ZoneOffset.UTC):truncated;
+                        assertEquals(suffix+" "+field,expected,type.getField(field).get(first));
+                        Object after=session.createQuery("select e from Event e where e."+field+" > :v").setParameter("v",expected).first();
+                        assertEquals(suffix+" "+field,type.getField(field).get(second),type.getField(field).get(after));
+                    }
+                    // The default Instant column is the epoch milliseconds a long holds.
+                    assertEquals(1,session.createQuery("select e from Event e where e.rawAt = :v").setParameter("v",late.toEpochMilli()).list().size());
+                    Object loadedEmpty=session.find(type,type.getField("id").get(empty));
+                    for(String field:Arrays.asList("at","nativeAt","day","nativeDay","local","nativeLocal")) org.junit.Assert.assertNull(suffix+" "+field,type.getField(field).get(loadedEmpty));
+                } finally { session.close();db.close(); }
+            }
+        }
+        String[][] rejected={{"@Temporal(TemporalType.DATE) public java.time.Instant at;","@Temporal(DATE) does not hold a java.time.Instant: at"},
+            {"@Temporal(TemporalType.TIMESTAMP) public java.time.LocalDate at;","@Temporal(TIMESTAMP) does not hold a java.time.LocalDate: at"},
+            {"@Temporal(TemporalType.DATE) public java.time.LocalDateTime at;","@Temporal(DATE) does not hold a java.time.LocalDateTime: at"},
+            {"@Temporal public java.time.LocalTime at;","@Temporal requires a java.util.Date, Instant, LocalDate or LocalDateTime field: at"}};
+        for(String[] c:rejected) {
+            File bad=tmp.newFolder();Map<String,String> badSources=new java.util.LinkedHashMap<String,String>();
+            badSources.put("javatimebad.Entry","package javatimebad; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity public class Entry { @Id public long id; "+c[0]+" }");
+            JavaSourceCompiler.compile(badSources,bad,Arrays.asList(testClassesDir()));
+            String errors=runProcessor(bad,Collections.<String>emptyList()).getErrors().toString();
+            assertTrue(errors,errors.contains(c[1]));
+        }
     }
 
     @Test
