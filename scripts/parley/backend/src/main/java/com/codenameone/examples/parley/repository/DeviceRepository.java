@@ -25,6 +25,7 @@ import com.codename1.orm.repository.Query;
 import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.parley.domain.Device;
 
+import java.time.Instant;
 import java.util.List;
 
 /// The devices of each account, with their published public keys.
@@ -45,5 +46,5 @@ public interface DeviceRepository extends CrudRepository<Device, String> {
 
     @Modifying
     @Query("update Device d set d.lastSeenAt = :at where d.id = :id")
-    int seen(@Param("id") String id, @Param("at") long at);
+    int seen(@Param("id") String id, @Param("at") Instant at);
 }

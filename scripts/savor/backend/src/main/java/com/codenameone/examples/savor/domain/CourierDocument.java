@@ -21,6 +21,7 @@ package com.codenameone.examples.savor.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
+import java.time.Instant;
 
 /// A document an applicant uploaded, one of each kind. `data` is the file in
 /// Base64, which is text on every database.
@@ -41,7 +42,7 @@ public class CourierDocument {
     private String status = "";
 
     @Column(nullable = false)
-    private long uploadedAt;
+    private Instant uploadedAt = Instant.EPOCH;
 
     @Column(nullable = false)
     private String data = "";
@@ -81,11 +82,11 @@ public class CourierDocument {
         this.status = status;
     }
 
-    public long getUploadedAt() {
+    public Instant getUploadedAt() {
         return uploadedAt;
     }
 
-    public void setUploadedAt(long uploadedAt) {
+    public void setUploadedAt(Instant uploadedAt) {
         this.uploadedAt = uploadedAt;
     }
 

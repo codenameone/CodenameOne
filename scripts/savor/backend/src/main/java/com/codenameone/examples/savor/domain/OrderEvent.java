@@ -23,6 +23,7 @@ import com.codenameone.examples.savor.api.OrderState;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
+import java.time.Instant;
 
 /// A change of an order's state: what it became, who made it, and when.
 @Entity
@@ -41,7 +42,7 @@ public class OrderEvent {
     private String actor = "";
 
     @Column(nullable = false)
-    private long createdAt;
+    private Instant createdAt = Instant.EPOCH;
 
     public OrderEvent() {
     }
@@ -78,11 +79,11 @@ public class OrderEvent {
         this.actor = actor;
     }
 
-    public long getCreatedAt() {
+    public Instant getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(long createdAt) {
+    public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
     }
 }

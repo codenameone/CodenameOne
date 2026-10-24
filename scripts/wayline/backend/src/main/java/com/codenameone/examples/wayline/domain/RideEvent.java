@@ -22,6 +22,7 @@ import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
 import com.codenameone.examples.wayline.api.RideState;
+import java.time.Instant;
 
 /// One change of a ride's state: what it became, who made it so, and when.
 @Entity
@@ -40,7 +41,7 @@ public class RideEvent {
     private String actor = "";
 
     @Column(nullable = false)
-    private long createdAt;
+    private Instant createdAt = Instant.EPOCH;
 
     public RideEvent() {
     }
@@ -77,11 +78,11 @@ public class RideEvent {
         this.actor = actor;
     }
 
-    public long getCreatedAt() {
+    public Instant getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(long createdAt) {
+    public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
     }
 }

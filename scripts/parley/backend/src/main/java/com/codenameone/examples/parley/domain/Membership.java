@@ -21,6 +21,7 @@ package com.codenameone.examples.parley.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
+import java.time.Instant;
 
 /// One account's place in a conversation, and its own view of it.
 @Entity
@@ -48,7 +49,7 @@ public class Membership {
     private boolean pinned;
 
     @Column(nullable = false)
-    private long joinedAt;
+    private Instant joinedAt = Instant.EPOCH;
 
     public Membership() {
     }
@@ -109,11 +110,11 @@ public class Membership {
         this.pinned = pinned;
     }
 
-    public long getJoinedAt() {
+    public Instant getJoinedAt() {
         return joinedAt;
     }
 
-    public void setJoinedAt(long joinedAt) {
+    public void setJoinedAt(Instant joinedAt) {
         this.joinedAt = joinedAt;
     }
 }

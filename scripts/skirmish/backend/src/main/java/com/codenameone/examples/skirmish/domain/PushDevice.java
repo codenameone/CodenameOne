@@ -21,6 +21,7 @@ package com.codenameone.examples.skirmish.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
+import java.time.Instant;
 
 /// A device an account is sent push notifications on.
 ///
@@ -46,7 +47,7 @@ public class PushDevice {
     private String platform = "";
 
     @Column(nullable = false)
-    private long updatedAt;
+    private Instant updatedAt = Instant.EPOCH;
 
     public PushDevice() {
     }
@@ -91,11 +92,11 @@ public class PushDevice {
         this.platform = platform;
     }
 
-    public long getUpdatedAt() {
+    public Instant getUpdatedAt() {
         return updatedAt;
     }
 
-    public void setUpdatedAt(long updatedAt) {
+    public void setUpdatedAt(Instant updatedAt) {
         this.updatedAt = updatedAt;
     }
 }

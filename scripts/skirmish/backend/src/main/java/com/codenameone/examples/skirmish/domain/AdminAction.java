@@ -21,6 +21,7 @@ package com.codenameone.examples.skirmish.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
+import java.time.Instant;
 
 /// One entry of the admin audit log. Rows are only ever inserted.
 @Entity
@@ -42,7 +43,7 @@ public class AdminAction {
     private String reason = "";
 
     @Column(nullable = false)
-    private long createdAt;
+    private Instant createdAt = Instant.EPOCH;
 
     public AdminAction() {
     }
@@ -87,11 +88,11 @@ public class AdminAction {
         this.reason = reason;
     }
 
-    public long getCreatedAt() {
+    public Instant getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(long createdAt) {
+    public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
     }
 }

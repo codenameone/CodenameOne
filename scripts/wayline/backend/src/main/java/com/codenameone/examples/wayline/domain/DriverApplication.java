@@ -21,6 +21,7 @@ package com.codenameone.examples.wayline.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
+import java.time.Instant;
 
 /// An account's application to drive, and what became of it.
 @Entity
@@ -75,13 +76,13 @@ public class DriverApplication {
     private String rejectionReason = "";
 
     @Column(nullable = false)
-    private long createdAt;
+    private Instant createdAt = Instant.EPOCH;
 
     @Column(nullable = false)
-    private long submittedAt;
+    private Instant submittedAt = Instant.EPOCH;
 
     @Column(nullable = false)
-    private long reviewedAt;
+    private Instant reviewedAt = Instant.EPOCH;
 
     @Column(nullable = false, type = "VARCHAR(190)")
     private String reviewedBy = "";
@@ -217,27 +218,27 @@ public class DriverApplication {
         this.rejectionReason = rejectionReason;
     }
 
-    public long getCreatedAt() {
+    public Instant getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(long createdAt) {
+    public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
     }
 
-    public long getSubmittedAt() {
+    public Instant getSubmittedAt() {
         return submittedAt;
     }
 
-    public void setSubmittedAt(long submittedAt) {
+    public void setSubmittedAt(Instant submittedAt) {
         this.submittedAt = submittedAt;
     }
 
-    public long getReviewedAt() {
+    public Instant getReviewedAt() {
         return reviewedAt;
     }
 
-    public void setReviewedAt(long reviewedAt) {
+    public void setReviewedAt(Instant reviewedAt) {
         this.reviewedAt = reviewedAt;
     }
 
