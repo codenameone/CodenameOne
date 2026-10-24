@@ -217,6 +217,12 @@ public class Cipher {
         this.key = material;
         this.iv = newIv;
         gcmSpent = false;
+        if (opmode == ENCRYPT_MODE && "GCM".equals(mode)) {
+            // Recorded at init, as Conscrypt does, so two inits with one IV
+            // are refused even without a doFinal between them.
+            lastGcmKey = material;
+            lastGcmIv = newIv;
+        }
         input.reset();
         aad.reset();
     }
@@ -340,8 +346,6 @@ public class Cipher {
                 byte[] out = com.codename1.security.Cipher.aesEncrypt(coreTransformation, k, iv, ad, data);
                 if (gcm) {
                     gcmSpent = true;
-                    lastGcmKey = key;
-                    lastGcmIv = iv;
                 }
                 return out;
             } catch (com.codename1.security.CryptoException e) {

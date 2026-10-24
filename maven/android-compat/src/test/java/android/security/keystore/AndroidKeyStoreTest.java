@@ -327,5 +327,14 @@ public class AndroidKeyStoreTest {
         }
         // Decrypting with them is fine.
         c.init(Cipher.DECRYPT_MODE, key, new GCMParameterSpec(128, iv));
+        Cipher twice = Cipher.getInstance("AES/GCM/NoPadding");
+        twice.init(Cipher.ENCRYPT_MODE, key, new GCMParameterSpec(128, new byte[] {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}));
+        try {
+            twice.init(Cipher.ENCRYPT_MODE, key,
+                    new GCMParameterSpec(128, new byte[] {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}));
+            fail("two encrypt inits with one IV were accepted");
+        } catch (java.security.InvalidAlgorithmParameterException expected) {
+            // recorded at init
+        }
     }
 }

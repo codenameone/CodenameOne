@@ -130,14 +130,17 @@ public final class SQLiteDatabase extends SQLiteClosable {
     static final java.util.concurrent.atomic.AtomicLong BUSY_TIMEOUT_MS =
             new java.util.concurrent.atomic.AtomicLong(10000);
 
-    /// The main thread does not wait: a worker's transaction may itself be
-    /// waiting on the main thread (a posted callback, a `Future` of main
-    /// thread work), and a wait here would freeze the UI and then fail
-    /// anyway. It is refused at once, as before the wait existed.
+    /// How long the main thread waits, in milliseconds. Shorter: a worker's
+    /// transaction may itself be waiting on the main thread (a posted
+    /// callback, a `Future` of main thread work), and the UI is frozen for
+    /// as long as this waits.
+    static final java.util.concurrent.atomic.AtomicLong MAIN_BUSY_TIMEOUT_MS =
+            new java.util.concurrent.atomic.AtomicLong(2000);
+
     private static long deadline() {
         if (com.codename1.androidcompat.runtime.MainThread.isMainThread()
                 && com.codename1.ui.Display.isInitialized()) {
-            return 0;
+            return System.currentTimeMillis() + MAIN_BUSY_TIMEOUT_MS.get();
         }
         return System.currentTimeMillis() + BUSY_TIMEOUT_MS.get();
     }

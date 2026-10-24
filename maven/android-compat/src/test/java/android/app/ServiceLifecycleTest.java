@@ -103,6 +103,8 @@ public class ServiceLifecycleTest {
         MainThreadRule.drain();
         assertFalse(ActiveServices.isRunning(AndroidTestSupport.TestService.class));
         assertEquals("[create, start:1:1, destroy]", AndroidTestSupport.TestService.calls.toString());
+        assertFalse("nothing is left to stop",
+                context.stopService(new Intent(context, AndroidTestSupport.TestService.class)));
     }
 
     /// An unbind in the same frame as its bind is accepted and nothing

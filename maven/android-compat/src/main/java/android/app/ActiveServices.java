@@ -203,7 +203,11 @@ public final class ActiveServices {
                 }
                 Record r = ensureCreated(type, name);
                 if (r == null) {
-                    BIND_REQUESTED.remove(conn);
+                    if (!BINDINGS.containsKey(conn)) {
+                        // Only when no live binding of this connection
+                        // owns the record.
+                        BIND_REQUESTED.remove(conn);
+                    }
                     return;
                 }
                 if (BINDINGS.containsKey(conn)) {
@@ -392,6 +396,8 @@ public final class ActiveServices {
             return;
         }
         RUNNING.remove(r.type);
+        // A destroyed service is not started, whatever re-added it.
+        START_REQUESTED.remove(r.type);
         endForeground(r);
         r.service.onDestroy();
     }
