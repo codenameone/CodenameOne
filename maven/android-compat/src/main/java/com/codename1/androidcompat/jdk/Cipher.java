@@ -206,6 +206,13 @@ public class Cipher {
             }
             newIv = com.codename1.security.SecureRandom.bytes("GCM".equals(mode) ? GCM_IV : BLOCK);
         }
+        if (opmode == ENCRYPT_MODE && "GCM".equals(mode) && lastGcmKey != null
+                && java.util.Arrays.equals(lastGcmKey, material) && java.util.Arrays.equals(lastGcmIv, newIv)) {
+            // Re-initialising with the key and IV of the last encryption is
+            // the same nonce reuse by another route; Conscrypt refuses it too.
+            throw new java.security.InvalidAlgorithmParameterException(
+                    "Cannot reuse iv for GCM encryption");
+        }
         this.opmode = opmode;
         this.key = material;
         this.iv = newIv;
@@ -258,6 +265,11 @@ public class Cipher {
 
     /// Set by a GCM encryption's doFinal; cleared by init.
     private boolean gcmSpent;
+
+    /// The key and IV of this cipher's last GCM encryption, which init will
+    /// not accept again.
+    private byte[] lastGcmKey;
+    private byte[] lastGcmIv;
 
     public final void updateAAD(byte[] src) {
         if (src == null) {
@@ -324,9 +336,14 @@ public class Cipher {
         }
         com.codename1.security.SecretKey k = new com.codename1.security.SecretKey("AES", key);
         if (opmode == ENCRYPT_MODE) {
-            gcmSpent = gcm;
             try {
-                return com.codename1.security.Cipher.aesEncrypt(coreTransformation, k, iv, ad, data);
+                byte[] out = com.codename1.security.Cipher.aesEncrypt(coreTransformation, k, iv, ad, data);
+                if (gcm) {
+                    gcmSpent = true;
+                    lastGcmKey = key;
+                    lastGcmIv = iv;
+                }
+                return out;
             } catch (com.codename1.security.CryptoException e) {
                 throw new javax.crypto.IllegalBlockSizeException(e.getMessage());
             }

@@ -143,6 +143,21 @@ public class ServiceLifecycleTest {
         assertFalse(ActiveServices.isRunning(AndroidTestSupport.TestService.class));
     }
 
+    /// A start that arrives after a stopSelf has stopped the service starts
+    /// it again, and a later stopService still stops it.
+    @Test
+    public void aStartAfterStopSelfCanStillBeStopped() {
+        context.startService(new Intent(context, AndroidTestSupport.TestService.class).putExtra("n", 1));
+        MainThreadRule.drain();
+        AndroidTestSupport.TestService.last.stopSelf(1);
+        context.startService(new Intent(context, AndroidTestSupport.TestService.class).putExtra("n", 2));
+        MainThreadRule.drain();
+        assertTrue(ActiveServices.isRunning(AndroidTestSupport.TestService.class));
+        assertTrue(context.stopService(new Intent(context, AndroidTestSupport.TestService.class)));
+        MainThreadRule.drain();
+        assertFalse(ActiveServices.isRunning(AndroidTestSupport.TestService.class));
+    }
+
     @Test
     public void anUndeclaredServiceDoesNotStart() {
         assertNull(context.startService(new Intent(context, Undeclared.class)));

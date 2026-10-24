@@ -309,4 +309,23 @@ public class AndroidKeyStoreTest {
         assertFalse(java.util.Arrays.equals(iv, c.getIV()));
         assertEquals(DATA.length + 16, c.doFinal(DATA).length);
     }
+
+    /// Initialising again with the last encryption's key and IV is refused,
+    /// the other route to GCM nonce reuse.
+    @Test
+    public void gcmRefusesTheLastKeyAndIvAgain() throws Exception {
+        SecretKeySpec key = new SecretKeySpec(new byte[16], "AES");
+        byte[] iv = new byte[12];
+        Cipher c = Cipher.getInstance("AES/GCM/NoPadding");
+        c.init(Cipher.ENCRYPT_MODE, key, new GCMParameterSpec(128, iv));
+        c.doFinal(DATA);
+        try {
+            c.init(Cipher.ENCRYPT_MODE, key, new GCMParameterSpec(128, iv));
+            fail("the same key and IV were accepted for a second encryption");
+        } catch (java.security.InvalidAlgorithmParameterException expected) {
+            // as Conscrypt
+        }
+        // Decrypting with them is fine.
+        c.init(Cipher.DECRYPT_MODE, key, new GCMParameterSpec(128, iv));
+    }
 }

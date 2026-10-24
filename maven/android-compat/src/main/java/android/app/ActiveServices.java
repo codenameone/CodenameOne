@@ -81,8 +81,51 @@ public final class ActiveServices {
     // lifecycle runs later, on the main thread, so a stop or unbind made in
     // the same frame as its start or bind is judged against these rather than
     // against a service that is not created yet.
-    private static final java.util.Set<Class<?>> START_REQUESTED = new java.util.HashSet<Class<?>>();
-    private static final java.util.Set<ServiceConnection> BIND_REQUESTED = new java.util.HashSet<ServiceConnection>();
+    //
+    // Callers may be on any thread (a worker calling stopService is
+    // ordinary), so each is an immutable set swapped atomically.
+    private static final CowSet<Class<?>> START_REQUESTED = new CowSet<Class<?>>();
+    private static final CowSet<ServiceConnection> BIND_REQUESTED = new CowSet<ServiceConnection>();
+
+    /// A copy-on-write set: every change publishes a new set with
+    /// compareAndSet, so readers on any thread see a whole one.
+    static final class CowSet<T> {
+        private final java.util.concurrent.atomic.AtomicReference<java.util.Set<T>> ref =
+                new java.util.concurrent.atomic.AtomicReference<java.util.Set<T>>(new java.util.HashSet<T>());
+
+        boolean contains(T t) {
+            return ref.get().contains(t);
+        }
+
+        void add(T t) {
+            while (true) {
+                java.util.Set<T> cur = ref.get();
+                if (cur.contains(t)) {
+                    return;
+                }
+                java.util.Set<T> next = new java.util.HashSet<T>(cur);
+                next.add(t);
+                if (ref.compareAndSet(cur, next)) {
+                    return;
+                }
+            }
+        }
+
+        /// True when `t` was there.
+        boolean remove(T t) {
+            while (true) {
+                java.util.Set<T> cur = ref.get();
+                if (!cur.contains(t)) {
+                    return false;
+                }
+                java.util.Set<T> next = new java.util.HashSet<T>(cur);
+                next.remove(t);
+                if (ref.compareAndSet(cur, next)) {
+                    return true;
+                }
+            }
+        }
+    }
 
     // ------------------------------------------------------------ Context
 
@@ -102,6 +145,9 @@ public final class ActiveServices {
                     START_REQUESTED.remove(type);
                     return;
                 }
+                // Again here: a stopSelf that ran between the call and this
+                // delivery cleared it, and this start is still a request.
+                START_REQUESTED.add(type);
                 r.started = true;
                 r.service.onStartCommand(copy, 0, r.service.nextStartId());
             }
@@ -156,7 +202,11 @@ public final class ActiveServices {
                     return;
                 }
                 Record r = ensureCreated(type, name);
-                if (r == null || BINDINGS.containsKey(conn)) {
+                if (r == null) {
+                    BIND_REQUESTED.remove(conn);
+                    return;
+                }
+                if (BINDINGS.containsKey(conn)) {
                     return;
                 }
                 if (!r.binderAsked) {

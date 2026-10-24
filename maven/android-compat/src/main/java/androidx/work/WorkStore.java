@@ -535,9 +535,11 @@ final class WorkStore {
             com.codename1.io.Log.e(e);
             return null;
         } catch (IllegalArgumentException e) {
-            // An enum constant this runtime no longer has.
+            // An enum constant this runtime no longer has. Nothing is kept:
+            // a partial queue would load dependents without the work they wait
+            // on, and the next save would make that permanent.
             com.codename1.io.Log.e(e);
-            return out;
+            return new ArrayList<WorkSpec>();
         } finally {
             close(is);
         }
