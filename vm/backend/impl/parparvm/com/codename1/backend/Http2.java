@@ -65,6 +65,8 @@ public final class Http2 {
         final String authority;
         final Map headers;
         final byte[] body;
+        private Http2 owner;
+        private long bodyLength;
 
         Stream(int id, String method, String path, String authority, Map headers, byte[] body) {
             this.id = id;
@@ -73,6 +75,7 @@ public final class Http2 {
             this.authority = authority;
             this.headers = headers;
             this.body = body;
+            this.bodyLength = body == null ? 0 : body.length;
         }
 
         public int getId() {
@@ -99,8 +102,25 @@ public final class Http2 {
         }
 
         /// The body as it ARRIVED, so the caller can check it before decoding.
+        /// Empty when the body was spooled; see [#takeBodyFd].
         public byte[] getBody() {
             return body;
+        }
+
+        /// The descriptor of a body that went to disk on arrival (an unlinked
+        /// temporary file), or -1 when it is in [#getBody]. Handed over once:
+        /// the caller owns closing it, and a second call answers -1. Must be
+        /// called before the next [Http2#nextRequest], which frees an unclaimed
+        /// one.
+        public int takeBodyFd() {
+            Http2 from = owner;
+            owner = null;
+            return from == null || from.session == 0 ? -1 : bodyFdImpl(from.session);
+        }
+
+        /// The body's whole length, wherever it is.
+        public long getBodyLength() {
+            return bodyLength;
         }
 
         public String getBodyAsString() {
@@ -152,8 +172,17 @@ public final class Http2 {
                 }
             }
         }
-        return new Stream(id, methodImpl(session), pathImpl(session),
+        Stream stream = new Stream(id, methodImpl(session), pathImpl(session),
                 authorityImpl(session), headers, bodyImpl(session));
+        long length = bodyLengthImpl(session);
+        if (length > stream.bodyLength) {
+            // Spooled. The descriptor stays the session's -- freed with the
+            // request at the next nextRequest() -- until takeBodyFd claims it,
+            // so a stream refused before its body is looked at leaks nothing.
+            stream.owner = this;
+            stream.bodyLength = length;
+        }
+        return stream;
     }
 
     /// - `extraHeaders`: "name: value" strings. Connection-specific headers are
@@ -186,6 +215,13 @@ public final class Http2 {
     /// The ceiling for outstanding response bodies across the process.
     ///
     /// Set once, and enforced natively where the memory is actually taken.
+    /// The request-body rules HttpServer applies to HTTP/1, for this protocol
+    /// too: the largest body taken, and the size past which it is written to an
+    /// unlinked temporary file in `dir` (null for the system's) as it arrives.
+    public static void setBodyLimits(long limit, int spoolThreshold, String dir) {
+        setBodyLimitsImpl(limit, spoolThreshold, dir);
+    }
+
     public static void setMaxBodyBytes(long limit) {
         setMaxBodyBytesImpl(limit);
     }
@@ -355,6 +391,9 @@ public final class Http2 {
     private static native String headerNameImpl(long session, int index);
     private static native String headerValueImpl(long session, int index);
     private static native byte[] bodyImpl(long session);
+    private static native int bodyFdImpl(long session);
+    private static native long bodyLengthImpl(long session);
+    private static native void setBodyLimitsImpl(long limit, int threshold, String dir);
     /// The header block both response forms send, as "name: value" lines.
     ///
     /// BYTES, one per character, and not a String for the native to encode. A

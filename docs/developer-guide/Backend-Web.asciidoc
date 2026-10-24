@@ -254,6 +254,48 @@ for any other body. A body that isn't text -- an upload, an image,
 form, after checking that it's valid UTF-8, and refuses a binary body rather
 than hand the handler garbled characters.
 
+==== Large uploads and downloads
+
+A binary body can be larger than 8 MB when `CN1_HTTP_MAX_SPOOLED_BODY_MB` raises
+its limit. Such a body is never held in memory whole. Up to
+`CN1_HTTP_SPOOL_THRESHOLD_KB` (1024 by default) it stays on the heap, and past
+that the server writes it to a temporary file as it arrives. The file is deleted
+from the directory as soon as it's created, so a crash leaves nothing behind.
+`CN1_HTTP_SPOOL_DIR` chooses the directory, the system temporary directory
+otherwise. A body over the limit is answered 413, over HTTP/1.1 and HTTP/2
+alike. JSON, forms, XML and compressed bodies keep the 8 MB limit, because a
+handler reads those whole anyway.
+
+Read such a body with `getBodyStream()`, which reads the file or the memory
+without the handler knowing which. `getBodyLength()` gives its size without
+reading it. A multipart upload is spooled the same way, and each
+`HttpServer.Part` has `getInputStream()` and `getLength()` for it:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/Streaming.java[tag=backend-web-upload-stream,indent=0]
+----
+
+The body is valid until the request ends. A handler that needs it later copies
+it somewhere of its own.
+
+A response is streamed with `HttpServer.Response.stream`. The writer runs after
+the headers are sent and writes as much as it likes: chunked on HTTP/1.1, DATA
+frames on HTTP/2. A write blocks while the client is slow, so a slow client
+slows the writer rather than filling memory, and a client that goes away makes
+the next write throw.
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/Streaming.java[tag=backend-web-download-stream,indent=0]
+----
+
+The server doesn't run the writer for a `HEAD` request, a status without a
+body, or a client that left before the headers went out. A writer that holds
+something open until it runs, such as a connection or a file, should also
+implement `java.io.Closeable`. In those cases the server calls `close()`
+instead.
+
 ==== Compression
 
 `cn1.server.compression.enabled=true` turns on gzip for responses, with the two
@@ -764,6 +806,63 @@ The local Java SE runtime speaks HTTP/1.1 only, so there a client that requires
 HTTP/2 fails every request with an exception that says so. It reads PKCS#12
 archives, and PEM keys in unencrypted PKCS#8 or RSA form. The packaged server also
 reads encrypted PEM keys. A PKCS#12 archive works the same in both.
+
+==== Streaming a request
+
+`Web.request` holds the whole response in memory. `Web.open` (or
+`WebClient.open`) returns a `Web.Exchange` instead, which sends the request body
+as it's written and reads the response as it arrives. The length is the body's
+size, `Web.UNKNOWN_LENGTH` for a body of unknown size, or `Web.NO_BODY`:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/Streaming.java[tag=backend-web-exchange,indent=0]
+----
+
+Write and close the request body first, then read the status, the headers and
+the response body, all from one thread. Each direction buffers a fixed window,
+so a slow peer slows its producer. `close()` ends the exchange in any state.
+Before the response has been read to its end it cancels the exchange, closing
+the connection instead of draining it, so always close it in a `finally`. An
+exchange never follows a redirect, because a streamed body can't be sent twice.
+
+==== Forwarding to another service
+
+`HttpProxy` forwards a request to another server and streams the answer back,
+the way a gateway in front of an internal service would:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/Streaming.java[tag=backend-web-proxy-create,indent=0]
+----
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/Streaming.java[tag=backend-web-proxy-forward,indent=0]
+----
+
+The response body is streamed back as it arrives, and a binary upload is
+streamed up from wherever it lives, a spooled one included. A text or compressed
+request body is read whole on arrival, under the 8 MB limit, and forwarded
+decompressed. Every end-to-end header goes
+through, a repeated one such as `Set-Cookie` line by line. The hop-by-hop
+headers (`Connection`, `Keep-Alive`, `Proxy-*`, `TE`, `Trailer`,
+`Transfer-Encoding`, `Upgrade`) and any header a `Connection` field names are
+removed in both directions. `X-Forwarded-For`, `X-Forwarded-Proto` and
+`X-Forwarded-Host` are added unless `setForwardedHeaders(false)` turns them off.
+
+Only the target's host is reached, plus the hosts named with `allowHost`, over
+`http` and `https`. Redirects are passed back to the client.
+`setFollowRedirects(n)` follows up to `n` hops itself, for a request without a
+body and only to allowed hosts. A hop to another host doesn't carry the
+client's `Authorization` and `Cookie` headers.
+
+Failures go both ways. A client that disconnects cancels the upstream exchange.
+An upstream that fails before answering is a `502`. Once the status has been
+sent, a later upstream failure aborts the client's response, closing the
+HTTP/1.1 connection or resetting the HTTP/2 stream, so the client sees a
+truncated response and never one that looks complete. `setClient` gives the
+proxy a `WebClient` for its timeouts and client certificate.
 
 A static binary in a `scratch` image has no certificate store. Copy a
 `ca-certificates.crt` into the image and name it in `CURL_CA_BUNDLE` or

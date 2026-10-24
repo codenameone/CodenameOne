@@ -50,6 +50,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -2379,6 +2380,148 @@ class BackendHttpIntegrationTest {
                 }
             }
             return status;
+        } finally {
+            socket.close();
+        }
+    }
+
+    @Test
+    @DisplayName("an HTTP/2 body that crosses the limit is answered 413, never served short")
+    void http2BodyPastTheLimitIsAnswered413() throws Exception {
+        // The reader refuses the DATA chunk that crosses the limit, which makes
+        // nghttp2 reset the stream -- but the frames the client already sent are
+        // still delivered, the last with END_STREAM, and that used to complete
+        // the request: the handler answered 200 for the first 8 MB of a 9 MB
+        // upload. Over HTTP/1.1 the same body is a 413, so it must be here too,
+        // as a status the client reads rather than a bare reset.
+        assertEquals(413, h2Upload(port, "/echo", "text/plain", 9 * 1024 * 1024),
+                "a body past the limit must be answered 413");
+        // The control: under the limit it is still served, whole.
+        assertEquals(200, h2Upload(port, "/echo", "text/plain", 3 * 1000 * 1000),
+                "a body under the limit must still be served");
+    }
+
+    /**
+     * POSTs `size` bytes of 'a' as one h2c stream, honouring the server's flow
+     * control windows, and returns the response's :status (-1 when the stream
+     * ended without one). Stops sending once the server has answered.
+     */
+    private int h2Upload(int onPort, String path, String contentType, int size)
+            throws Exception {
+        final Socket socket = new Socket();
+        socket.connect(new InetSocketAddress("127.0.0.1", onPort), 5000);
+        socket.setSoTimeout(30000);
+        final Object lock = new Object();
+        final long[] windows = {65535, 65535};          // connection, stream 1
+        final int[] result = {-1, 0};                   // status, finished
+        try {
+            final OutputStream out = socket.getOutputStream();
+            out.write("PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n".getBytes(StandardCharsets.UTF_8));
+            out.write(frame(4, 0, 0, new byte[0]));
+            ByteArrayOutputStream block = new ByteArrayOutputStream();
+            hpackLiteral(block, ":method", "POST");
+            hpackLiteral(block, ":path", path);
+            hpackLiteral(block, ":scheme", "http");
+            hpackLiteral(block, ":authority", "127.0.0.1");
+            hpackLiteral(block, "content-type", contentType);
+            hpackLiteral(block, "content-length", String.valueOf(size));
+            out.write(frame(1, 0x04, 1, block.toByteArray()));
+            out.flush();
+            final InputStream in = socket.getInputStream();
+            Thread reader = new Thread(new Runnable() {
+                public void run() {
+                    try {
+                        while (true) {
+                            byte[] header = readExactly(in, 9);
+                            if (header == null) {
+                                break;
+                            }
+                            int length = ((header[0] & 0xff) << 16) | ((header[1] & 0xff) << 8)
+                                    | (header[2] & 0xff);
+                            int type = header[3] & 0xff;
+                            int flags = header[4] & 0xff;
+                            int stream = ((header[5] & 0x7f) << 24) | ((header[6] & 0xff) << 16)
+                                    | ((header[7] & 0xff) << 8) | (header[8] & 0xff);
+                            byte[] payload = length == 0 ? new byte[0] : readExactly(in, length);
+                            if (payload == null) {
+                                break;
+                            }
+                            synchronized (lock) {
+                                if (type == 4 && (flags & 1) == 0) {
+                                    for (int at = 0; at + 6 <= payload.length; at += 6) {
+                                        int id = ((payload[at] & 0xff) << 8) | (payload[at + 1] & 0xff);
+                                        if (id == 4) {
+                                            long v = ((payload[at + 2] & 0xffL) << 24)
+                                                    | ((payload[at + 3] & 0xff) << 16)
+                                                    | ((payload[at + 4] & 0xff) << 8)
+                                                    | (payload[at + 5] & 0xff);
+                                            windows[1] += v - 65535;
+                                        }
+                                    }
+                                    out.write(frame(4, 1, 0, new byte[0]));
+                                    out.flush();
+                                } else if (type == 8 && payload.length == 4) {
+                                    long inc = ((payload[0] & 0x7fL) << 24) | ((payload[1] & 0xff) << 16)
+                                            | ((payload[2] & 0xff) << 8) | (payload[3] & 0xff);
+                                    windows[stream == 0 ? 0 : 1] += inc;
+                                } else if (type == 1 && stream == 1 && payload.length > 0) {
+                                    result[0] = hpackStatus(payload);
+                                    if ((flags & 1) != 0) {
+                                        result[1] = 1;
+                                    }
+                                } else if ((type == 0 && stream == 1 && (flags & 1) != 0)
+                                        || (type == 3 && stream == 1) || type == 7) {
+                                    result[1] = 1;
+                                }
+                                lock.notifyAll();
+                                if (result[1] != 0) {
+                                    return;
+                                }
+                            }
+                        }
+                    } catch (IOException ended) {
+                        // the socket closed; whatever was seen is the answer
+                    } finally {
+                        synchronized (lock) {
+                            result[1] = 1;
+                            lock.notifyAll();
+                        }
+                    }
+                }
+            });
+            reader.setDaemon(true);
+            reader.start();
+            byte[] chunk = new byte[16384];
+            Arrays.fill(chunk, (byte) 'a');
+            int sent = 0;
+            long deadline = System.currentTimeMillis() + 30000;
+            while (sent < size) {
+                int n;
+                synchronized (lock) {
+                    while (result[1] == 0 && result[0] < 0 && Math.min(windows[0], windows[1]) <= 0
+                            && System.currentTimeMillis() < deadline) {
+                        lock.wait(200);
+                    }
+                    if (result[1] != 0 || result[0] >= 0 || System.currentTimeMillis() >= deadline) {
+                        break;
+                    }
+                    n = (int) Math.min(Math.min(chunk.length, size - sent),
+                            Math.min(windows[0], windows[1]));
+                    windows[0] -= n;
+                    windows[1] -= n;
+                    boolean last = sent + n == size;
+                    out.write(frame(0, last ? 1 : 0, 1, n == chunk.length ? chunk
+                            : Arrays.copyOf(chunk, n)));
+                    out.flush();
+                }
+                sent += n;
+            }
+            synchronized (lock) {
+                while (result[1] == 0 && System.currentTimeMillis() < deadline) {
+                    lock.wait(200);
+                }
+                return result[0];
+            }
         } finally {
             socket.close();
         }
