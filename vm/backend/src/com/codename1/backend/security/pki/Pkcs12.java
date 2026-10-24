@@ -336,12 +336,25 @@ public final class Pkcs12 {
         }
         byte[] iv = scheme.read(Asn1.OCTET_STRING);
         byte[] key = Crypto.pbkdf2(prf, Asn1.utf8Bytes(password), salt, iterations, aesLength);
-        byte[] out = Crypto.aesCbcDecrypt(key, iv, sealed);
-        if (out == null) {
+        if (iv.length != 16 || sealed.length == 0 || sealed.length % 16 != 0) {
+            throw new CertificateException("A PKCS#12 AES-CBC part is not whole blocks");
+        }
+        // Reached only after checkMac() has accepted the whole file, so the
+        // padding verdict below says nothing an attacker could not already
+        // compute: the ciphertext cannot be changed without failing the MAC.
+        byte[] out = Crypto.aesCbcBlocks(false, key, iv, sealed);
+        int pad = out[out.length - 1] & 0xff;
+        boolean good = pad >= 1 && pad <= 16;
+        for (int iter = 1 ; good && iter <= pad ; iter++) {
+            good = (out[out.length - iter] & 0xff) == pad;
+        }
+        if (!good) {
             throw new CertificateException("The PKCS#12 password is wrong: a part of the file "
                     + "does not decrypt");
         }
-        return out;
+        byte[] plain = new byte[out.length - pad];
+        System.arraycopy(out, 0, plain, 0, plain.length);
+        return plain;
     }
 
     private static void checkIterations(int iterations) throws CertificateException {
@@ -513,7 +526,14 @@ public final class Pkcs12 {
         byte[] salt = Crypto.randomBytes(16);
         byte[] iv = Crypto.randomBytes(16);
         byte[] key = Crypto.pbkdf2(Crypto.SHA256, Asn1.utf8Bytes(password), salt, ITERATIONS, 32);
-        byte[] sealed = Crypto.aesCbcEncrypt(key, iv, plaintext);
+        // PKCS#7: one to sixteen bytes, each holding the count.
+        int pad = 16 - plaintext.length % 16;
+        byte[] padded = new byte[plaintext.length + pad];
+        System.arraycopy(plaintext, 0, padded, 0, plaintext.length);
+        for (int iter = plaintext.length ; iter < padded.length ; iter++) {
+            padded[iter] = (byte) pad;
+        }
+        byte[] sealed = Crypto.aesCbcBlocks(true, key, iv, padded);
         byte[] kdf = Asn1.sequence(Asn1.oid(PBKDF2), Asn1.sequence(Asn1.octets(salt),
                 Asn1.integer(ITERATIONS), Asn1.sequence(Asn1.oid(HMAC_SHA256), Asn1.nullValue())));
         byte[] scheme = Asn1.sequence(Asn1.oid(AES256_CBC), Asn1.octets(iv));

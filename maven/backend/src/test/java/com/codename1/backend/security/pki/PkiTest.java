@@ -310,25 +310,25 @@ class PkiTest {
 
     @Test
     void aesCbcIsTheJdksCipher() throws Exception {
-        byte[] key = new byte[32];
-        byte[] iv = new byte[16];
-        for (int iter = 0 ; iter < 32 ; iter++) {
-            key[iter] = (byte) iter;
-        }
-        for (int length : new int[] {0, 1, 15, 16, 17, 100}) {
-            byte[] plain = new byte[length];
-            Arrays.fill(plain, (byte) 'a');
-            Cipher jdk = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        byte[] key = random(32);
+        byte[] iv = random(16);
+        for (int length : new int[] {0, 16, 32, 96}) {
+            byte[] plain = random(length);
+            Cipher jdk = Cipher.getInstance("AES/CBC/NoPadding");
             jdk.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(key, "AES"), new IvParameterSpec(iv));
-            byte[] sealed = Crypto.aesCbcEncrypt(key, iv, plain);
+            byte[] sealed = Crypto.aesCbcBlocks(true, key, iv, plain);
             assertArrayEquals(jdk.doFinal(plain), sealed);
-            assertArrayEquals(plain, Crypto.aesCbcDecrypt(key, iv, sealed));
+            assertArrayEquals(plain, Crypto.aesCbcBlocks(false, key, iv, sealed));
         }
-        byte[] sealed = Crypto.aesCbcEncrypt(key, iv, new byte[5]);
-        sealed[sealed.length - 1] ^= 1;
-        assertNull(Crypto.aesCbcDecrypt(key, iv, sealed));
-        assertThrows(IOException.class, () -> Crypto.aesCbcDecrypt(key, iv, new byte[15]));
-        assertThrows(IOException.class, () -> Crypto.aesCbcEncrypt(key, new byte[12], new byte[1]));
+        assertThrows(IOException.class, () -> Crypto.aesCbcBlocks(false, key, iv, new byte[15]));
+        assertThrows(IOException.class, () -> Crypto.aesCbcBlocks(true, key, new byte[12],
+                new byte[16]));
+    }
+
+    private static byte[] random(int length) {
+        byte[] out = new byte[length];
+        new java.security.SecureRandom().nextBytes(out);
+        return out;
     }
 
     @Test

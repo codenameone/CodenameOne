@@ -614,9 +614,10 @@ JAVA_OBJECT com_codename1_backend_Crypto_ecdhImpl___byte_1ARRAY_byte_1ARRAY_R_by
 }
 
 /*
- * AES-CBC with PKCS#7 padding, the cipher PKCS#12 and encrypted PKCS#8 use.
- * The Java side checks the key and IV sizes. Null for any failure, which when
- * decrypting means the padding did not check out.
+ * AES-CBC over whole blocks with no padding, the mode PKCS#12 and encrypted
+ * PKCS#8 are defined over; the format removes its own padding after checking
+ * its MAC, so no padding verdict ever comes out of here. The Java side checks
+ * the sizes. Null for any failure.
  */
 JAVA_OBJECT com_codename1_backend_Crypto_aesCbcImpl___boolean_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_BOOLEAN encrypt, JAVA_OBJECT key, JAVA_OBJECT iv, JAVA_OBJECT input) {
     JAVA_ARRAY keyArr;
@@ -643,7 +644,7 @@ JAVA_OBJECT com_codename1_backend_Crypto_aesCbcImpl___boolean_byte_1ARRAY_byte_1
         default: return JAVA_NULL;
     }
     inLength = (int)inArr->length;
-    if(ivArr->length != 16 || (!encrypt && (inLength == 0 || inLength % 16 != 0))) {
+    if(ivArr->length != 16 || inLength % 16 != 0) {
         return JAVA_NULL;
     }
     out = (unsigned char*)malloc((size_t)inLength + 16);
@@ -656,6 +657,9 @@ JAVA_OBJECT com_codename1_backend_Crypto_aesCbcImpl___boolean_byte_1ARRAY_byte_1
     ok = EVP_CipherInit_ex(ctx, cipher, NULL,
             (const unsigned char*)(JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(keyArr),
             (const unsigned char*)(JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(ivArr), encrypt ? 1 : 0) == 1;
+    if(ok) {
+        ok = EVP_CIPHER_CTX_set_padding(ctx, 0) == 1;
+    }
     if(ok && inLength > 0) {
         ok = EVP_CipherUpdate(ctx, out, &produced,
                 (const unsigned char*)(JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(inArr), inLength) == 1;

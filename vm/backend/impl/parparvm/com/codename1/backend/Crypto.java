@@ -361,31 +361,28 @@ public final class Crypto {
         return out;
     }
 
-    /// AES-CBC with PKCS#7 padding.
+    /// AES-CBC over whole blocks, with no padding.
     ///
-    /// CBC is not authenticated. It is here for the formats that are defined
-    /// over it, PKCS#12 and encrypted PKCS#8; new data is sealed with
-    /// [#aesGcmEncrypt].
+    /// This is the raw mode a format defined over CBC needs -- PKCS#12 and
+    /// encrypted PKCS#8 -- and nothing more. CBC is not authenticated, so it is
+    /// deliberately not a general cipher: there is no padding, and so no padding
+    /// check whose pass or fail an attacker could probe (the padding oracle). A
+    /// format that pads removes the padding itself, and only after it has
+    /// verified the data's integrity some other way, as PKCS#12 does with its
+    /// MAC. Seal new data with [#aesGcmEncrypt].
     ///
+    /// @param encrypt true to encrypt, false to decrypt
     /// @param key 16, 24 or 32 bytes
-    /// @param iv 16 bytes, never repeated under one key
-    public static byte[] aesCbcEncrypt(byte[] key, byte[] iv, byte[] plaintext) throws IOException {
-        checkCbc(key, iv, plaintext, false);
-        byte[] out = aesCbcImpl(true, key, iv, plaintext);
+    /// @param iv 16 bytes; when encrypting, random and never repeated under one key
+    /// @param blocks a whole number of 16 byte blocks
+    public static byte[] aesCbcBlocks(boolean encrypt, byte[] key, byte[] iv, byte[] blocks)
+            throws IOException {
+        checkCbc(key, iv, blocks);
+        byte[] out = aesCbcImpl(encrypt, key, iv, blocks);
         if (out == null) {
-            throw new IOException("AES-CBC encryption failed");
+            throw new IOException("AES-CBC failed");
         }
         return out;
-    }
-
-    /// Opens what [#aesCbcEncrypt] produced.
-    ///
-    /// @return the plaintext, or null when the padding does not check out: the
-    /// key or the IV is wrong, or the data was changed. A null is not proof of
-    /// either, since CBC carries no tag.
-    public static byte[] aesCbcDecrypt(byte[] key, byte[] iv, byte[] ciphertext) throws IOException {
-        checkCbc(key, iv, ciphertext, true);
-        return aesCbcImpl(false, key, iv, ciphertext);
     }
 
     private static int curveCode(String curve) throws IOException {
@@ -398,9 +395,8 @@ public final class Crypto {
         throw new IOException("Not a supported curve: " + curve + "; P-256 or P-384");
     }
 
-    private static void checkCbc(byte[] key, byte[] iv, byte[] input, boolean decrypt)
-            throws IOException {
-        if (key == null || iv == null || input == null) {
+    private static void checkCbc(byte[] key, byte[] iv, byte[] blocks) throws IOException {
+        if (key == null || iv == null || blocks == null) {
             throw new IOException("AES-CBC needs a key, an IV and data");
         }
         if (key.length != 16 && key.length != 24 && key.length != 32) {
@@ -409,8 +405,8 @@ public final class Crypto {
         if (iv.length != 16) {
             throw new IOException("An AES-CBC IV is 16 bytes, not " + iv.length);
         }
-        if (decrypt && (input.length == 0 || input.length % 16 != 0)) {
-            throw new IOException("AES-CBC ciphertext is a whole number of 16 byte blocks");
+        if (blocks.length % 16 != 0) {
+            throw new IOException("AES-CBC data is a whole number of 16 byte blocks");
         }
     }
 

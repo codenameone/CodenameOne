@@ -223,20 +223,17 @@ final class AuthCheckPki {
     }
 
     private static void aesCbc() throws IOException {
-        // NIST SP 800-38A F.2.5, CBC-AES256.Encrypt, first block; PKCS#7 then
-        // adds one block of padding.
+        // NIST SP 800-38A F.2.6, CBC-AES256.Decrypt, first block.
         byte[] key = AuthCheck.fromHex(
                 "603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4");
         byte[] iv = AuthCheck.fromHex("000102030405060708090a0b0c0d0e0f");
-        byte[] plain = AuthCheck.fromHex("6bc1bee22e409f96e93d7e117393172a");
-        byte[] sealed = Crypto.aesCbcEncrypt(key, iv, plain);
-        AuthCheck.value("pki.cbc.nist", sealed);
-        AuthCheck.check("pki.cbc.nist.block", "f58c4c04d6e5f1ba779eabfb5f7bfbd6",
-                AuthCheck.hex(sealed).substring(0, 32));
-        AuthCheck.check("pki.cbc.open", AuthCheck.hex(plain),
-                AuthCheck.hex(Crypto.aesCbcDecrypt(key, iv, sealed)));
-        sealed[sealed.length - 1] ^= 1;
-        AuthCheck.value("pki.cbc.badpadding", Crypto.aesCbcDecrypt(key, iv, sealed));
-        AuthCheck.value("pki.cbc.empty", Crypto.aesCbcEncrypt(key, iv, new byte[0]));
+        byte[] sealed = AuthCheck.fromHex("f58c4c04d6e5f1ba779eabfb5f7bfbd6");
+        AuthCheck.check("pki.cbc.nist", "6bc1bee22e409f96e93d7e117393172a",
+                AuthCheck.hex(Crypto.aesCbcBlocks(false, key, iv, sealed)));
+        byte[] fresh = Crypto.randomBytes(16);
+        byte[] round = Crypto.aesCbcBlocks(true, key, fresh, sealed);
+        AuthCheck.check("pki.cbc.round", AuthCheck.hex(sealed),
+                AuthCheck.hex(Crypto.aesCbcBlocks(false, key, fresh, round)));
+        AuthCheck.value("pki.cbc.empty", Crypto.aesCbcBlocks(true, key, fresh, new byte[0]));
     }
 }
