@@ -44,6 +44,64 @@ app.show();</code></pre>
     {{ partial "cn1-proof-strip.html" . }}
   </div>
 
+  <section class="cn1-v2-section cn1-home-templates" id="full-stack-templates">
+    <div class="cn1-v2-section__intro">
+      <p class="cn1-eyebrow">Complete full-stack templates</p>
+      <h2>Start with an application. Make it yours.</h2>
+      <p>Generate the Java client, backend, database and administration screens in one project. Run it, change the branding and build on the features already connected. Template source is free under MIT-0.</p>
+      <div class="cn1-action-row">
+        {{ partial "cn1-cta.html" (dict "label" "Generate your application" "href" "/initializr/" "event" "home-template-start") }}
+        {{ partial "cn1-cta.html" (dict "label" "Explore all templates" "href" "/demos/" "event" "home-fullstack-samples" "variant" "secondary") }}
+      </div>
+    </div>
+    <div class="cn1-home-templates__grid">
+      <article class="cn1-home-template">
+        <a class="cn1-home-template__screen" href="/savor/" data-cn1-conversion="home-savor" aria-label="Explore Savor, the food delivery template">
+          <img src="/developer-guide/img/savor-customer-home.png" alt="Savor restaurant browsing screen" width="420" height="909" loading="lazy">
+        </a>
+        <div class="cn1-home-template__body">
+          <p class="cn1-eyebrow">Food delivery</p>
+          <h3>Savor</h3>
+          <p>Customer, restaurant, courier and admin screens, with a Java backend for ordering, dispatch, tracking and payments.</p>
+          <a href="/savor/" data-cn1-conversion="home-savor">Explore Savor →</a>
+        </div>
+      </article>
+      <article class="cn1-home-template">
+        <a class="cn1-home-template__screen" href="/parley/" data-cn1-conversion="home-parley" aria-label="Explore Parley, the private messaging template">
+          <img src="/developer-guide/img/parley-chats.png" alt="Parley conversations screen" width="419" height="909" loading="lazy">
+        </a>
+        <div class="cn1-home-template__body">
+          <p class="cn1-eyebrow">Private messaging</p>
+          <h3>Parley</h3>
+          <p>Chats, groups, voice and video calls, with a Java backend and an administration console.</p>
+          <a href="/parley/" data-cn1-conversion="home-parley">Explore Parley →</a>
+        </div>
+      </article>
+      <article class="cn1-home-template">
+        <a class="cn1-home-template__screen" href="/wayline/" data-cn1-conversion="home-wayline" aria-label="Explore Wayline, the ride hailing template">
+          <img src="/developer-guide/img/wayline-rider-home.png" alt="Wayline rider map and destination screen" width="420" height="909" loading="lazy">
+        </a>
+        <div class="cn1-home-template__body">
+          <p class="cn1-eyebrow">Ride hailing</p>
+          <h3>Wayline</h3>
+          <p>Rider, driver and admin screens, with a Java backend for matching, live trips, earnings and payments.</p>
+          <a href="/wayline/" data-cn1-conversion="home-wayline">Explore Wayline →</a>
+        </div>
+      </article>
+      <article class="cn1-home-template">
+        <a class="cn1-home-template__screen" href="/skirmish/" data-cn1-conversion="home-skirmish" aria-label="Explore Skirmish, the multiplayer strategy template">
+          <img src="/developer-guide/img/skirmish-battle.png" alt="Skirmish live battle screen" width="420" height="909" loading="lazy">
+        </a>
+        <div class="cn1-home-template__body">
+          <p class="cn1-eyebrow">Multiplayer strategy</p>
+          <h3>Skirmish</h3>
+          <p>Online battles, replays and progression, with a Java game server and a moderation console.</p>
+          <a href="/skirmish/" data-cn1-conversion="home-skirmish">Explore Skirmish →</a>
+        </div>
+      </article>
+    </div>
+  </section>
+
   <section class="cn1-v2-section" id="build-with-java">
     <div class="cn1-v2-section__intro">
       <p class="cn1-eyebrow">Choose your starting point</p>
@@ -74,8 +132,7 @@ app.show();</code></pre>
           <p>Bring Java or Kotlin activities, XML layouts and resources to iOS, desktop and the web.</p>
           <p class="cn1-home-caveat">Check your dependencies against the supported Android and AndroidX APIs.</p>
           <a href="/developer-guide/android-interop/" data-cn1-conversion="home-android-import">Explore Android compatibility →</a>
-          <p class="cn1-home-caveat">Also explore <a href="/developer-guide/flutter-interop/" data-cn1-conversion="home-flutter-import">experimental Flutter compatibility</a>. Some callbacks and parameters are not implemented.</p>
-          <p class="cn1-home-caveat">Bring <a href="/developer-guide/unity-interop/" data-cn1-conversion="home-unity-import">supported Unity 2D games</a> into the same app, including C# scripts, scenes and sprites. 3D rendering is outside the compatibility layer.</p>
+          <p class="cn1-home-caveat">Experimental imports: <a href="/developer-guide/flutter-interop/" data-cn1-conversion="home-flutter-import">Flutter screens</a> and <a href="/developer-guide/unity-interop/" data-cn1-conversion="home-unity-import">Unity 2D games</a>. Check the documented API and behavior limits before porting.</p>
         </div>
         <figure class="cn1-home-visual cn1-home-gallery">
           <div class="cn1-home-gallery__screens">
@@ -90,8 +147,6 @@ app.show();</code></pre>
           <h3>Keep app and server contracts together</h3>
           <p>Share Java models and generate typed REST clients. Change the contract in one place.</p>
           <a href="/blog/java-backend-shared-models/" data-cn1-conversion="home-shared-models">See the shared-model example →</a>
-          <p class="cn1-home-caveat">Try <a href="/developer-guide/wayline-implementors-guide/" data-cn1-conversion="home-wayline">Wayline</a>, the full-stack ride-hailing template in Initializr.</p>
-          <p class="cn1-home-caveat">Explore <a href="/demos/" data-cn1-conversion="home-fullstack-samples">more full-stack samples</a>: food delivery with Savor, messaging with Parley and multiplayer battles with Skirmish.</p>
         </div>
         <figure class="cn1-home-visual">
           <div class="cn1-home-contract"><span>shared /</span><code>Java models</code><div class="cn1-home-contract__branches"><div><b>App</b><small>Generated REST client</small></div><div><b>Backend</b><small>Typed controller</small></div></div></div>
