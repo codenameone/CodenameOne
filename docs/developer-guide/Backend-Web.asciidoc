@@ -260,7 +260,7 @@ A binary body can be larger than 8 MB when `CN1_HTTP_MAX_SPOOLED_BODY_MB` raises
 its limit. Such a body is never held in memory whole. Up to
 `CN1_HTTP_SPOOL_THRESHOLD_KB` (1024 by default) it stays on the heap, and past
 that the server writes it to a temporary file as it arrives. The file is deleted
-from the directory as soon as it is created, so a crash leaves nothing behind.
+from the directory as soon as it's created, so a crash leaves nothing behind.
 `CN1_HTTP_SPOOL_DIR` chooses the directory, the system temporary directory
 otherwise. A body over the limit is answered 413, over HTTP/1.1 and HTTP/2
 alike. JSON, forms, XML and compressed bodies keep the 8 MB limit, because a
@@ -290,7 +290,7 @@ the next write throw.
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/Streaming.java[tag=backend-web-download-stream,indent=0]
 ----
 
-The server does not run the writer for a `HEAD` request, a status without a
+The server doesn't run the writer for a `HEAD` request, a status without a
 body, or a client that left before the headers went out. A writer that holds
 something open until it runs, such as a connection or a file, should also
 implement `java.io.Closeable`. In those cases the server calls `close()`
@@ -842,7 +842,7 @@ include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/S
 ----
 
 The response body is streamed back as it arrives, and a binary upload is
-streamed up from wherever it is, a spooled one included. A text or compressed
+streamed up from wherever it lives, a spooled one included. A text or compressed
 request body is read whole on arrival, under the 8 MB limit, and forwarded
 decompressed. Every end-to-end header goes
 through, a repeated one such as `Set-Cookie` line by line. The hop-by-hop
