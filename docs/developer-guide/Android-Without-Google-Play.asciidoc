@@ -1,7 +1,7 @@
 [[android-without-google-play]]
-== Android without Google Play services
+== Android without Google Play Services
 
-Many Android devices have no Google Play services. GrapheneOS, CalyxOS, /e/OS
+Many Android devices have no Google Play Services. GrapheneOS, CalyxOS, /e/OS
 and LineageOS without Google apps ship without it, and GrapheneOS installs it
 only as an ordinary app the user can remove. Huawei and Amazon devices have
 their own services instead. A Codename One application runs on these devices
@@ -16,7 +16,7 @@ Play Core or Firebase without asking first, and a CI check holds it to that.
 
 [cols="1,2",options="header"]
 |===
-|Feature |Behavior without Google Play services
+|Feature |Behavior without Google Play Services
 
 |User interface, storage, networking, SQLite, media
 |Unchanged. None of them use Play services.
@@ -83,7 +83,7 @@ include::../demos/common/src/main/snippets/developer-guide/android-without-googl
 The key is 87 base64url characters. The build rejects anything else. With the
 hint set and `PushClient` in use, the application registers in this order:
 
-. Firebase Cloud Messaging, when Google Play services is available and the
+. Firebase Cloud Messaging, when Google Play Services is available and the
   build includes `google-services.json`.
 . Huawei Push Kit, when HMS Core is installed and the build includes
   `agconnect-services.json`.
