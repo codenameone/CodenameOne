@@ -3157,9 +3157,9 @@ public class IOSImplementation extends CodenameOneImplementation {
                 InputStream sub = getResourceAsStream("/" + subclassTheme + ".res");
                 if (sub != null) {
                     r = Resources.open(sub);
-                    Hashtable tp = r.getTheme(r.getThemeResourceNames()[0]);
+                    HashMap<String, Object> tp = r.getThemeMap(r.getThemeResourceNames()[0]);
                     injectDesktopThemeConstants(tp);
-                    UIManager.getInstance().setThemeProps(tp);
+                    UIManager.getInstance().setThemeMap(tp);
                     return;
                 }
                 // Not in the bundle (a framework build that has not generated it yet):
@@ -3192,9 +3192,9 @@ public class IOSImplementation extends CodenameOneImplementation {
                 }
                 if (in != null) {
                     r = Resources.open(in);
-                    Hashtable tp = r.getTheme(r.getThemeResourceNames()[0]);
+                    HashMap<String, Object> tp = r.getThemeMap(r.getThemeResourceNames()[0]);
                     injectDesktopThemeConstants(tp);
-                    UIManager.getInstance().setThemeProps(tp);
+                    UIManager.getInstance().setThemeMap(tp);
                     return;
                 }
                 // Modern theme isn't in the jar (e.g. framework build hasn't
@@ -3202,19 +3202,19 @@ public class IOSImplementation extends CodenameOneImplementation {
             }
             if(mode.equals("ios7") || mode.equals("flat") || mode.equals("auto") || mode.equals("modern") || mode.equals("liquid")) {
                 r = Resources.open("/iOS7Theme.res");
-                Hashtable tp = r.getTheme(r.getThemeResourceNames()[0]);
+                HashMap<String, Object> tp = r.getThemeMap(r.getThemeResourceNames()[0]);
                 if(!nativeInstance.isIOS7()) {
                     tp.put("TitleArea.padding", "0,0,0,0");
                 }
                 injectDesktopThemeConstants(tp);
-                UIManager.getInstance().setThemeProps(tp);
+                UIManager.getInstance().setThemeMap(tp);
                 return;
             }
             // "legacy" / "iphone" / anything else: pre-flat iPhone theme.
             r = Resources.open("/iPhoneTheme.res");
-            Hashtable tp = r.getTheme(r.getThemeResourceNames()[0]);
+            HashMap<String, Object> tp = r.getThemeMap(r.getThemeResourceNames()[0]);
             injectDesktopThemeConstants(tp);
-            UIManager.getInstance().setThemeProps(tp);
+            UIManager.getInstance().setThemeMap(tp);
         } catch (IOException ex) {
             ex.printStackTrace();
         }
@@ -3226,7 +3226,7 @@ public class IOSImplementation extends CodenameOneImplementation {
      * native menu bar). These theme constants are injected only on the desktop so iOS
      * phones/tablets are unaffected. Mirrors JavaSEPort.injectDesktopThemeConstants.
      */
-    private void injectDesktopThemeConstants(Hashtable tp) {
+    private void injectDesktopThemeConstants(HashMap<String, Object> tp) {
         if (tp == null || !isDesktop()) {
             return;
         }
@@ -3264,7 +3264,7 @@ public class IOSImplementation extends CodenameOneImplementation {
      * system accent is used rather than a colour invented here, and the guard
      * leaves any theme that does define the UIID alone.
      */
-    private void injectListFocusStyle(Hashtable tp) {
+    private void injectListFocusStyle(HashMap<String, Object> tp) {
         // Any entry at all under the UIID means the theme has an opinion; leave it.
         for (Object key : tp.keySet()) {
             if (key instanceof String && ((String) key).indexOf("ListRendererFocus") > -1) {

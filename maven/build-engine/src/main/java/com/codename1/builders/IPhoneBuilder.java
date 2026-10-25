@@ -4860,6 +4860,15 @@ public class IPhoneBuilder extends Executor {
                 }
             }
 
+            // The legacy AddressBook natives compile only under
+            // INCLUDE_CONTACTS_USAGE, which the usage-description block above
+            // turns on (every define, before Xcode 9). The frameworks go with
+            // the define: linked unconditionally they were loaded by every
+            // application at launch, and called by none without it.
+            if (xcodeVersion < 9 || privacyUsageDescriptions.containsKey("NSContactsUsageDescription")) {
+                addLibs = appendFrameworks(addLibs, "AddressBookUI.framework", "AddressBook.framework");
+            }
+
             // LocalAuthentication is required only when the app actually uses
             // com.codename1.security.Biometrics / SecureStorage. The scanner
             // above sets usesBiometrics if any com/codename1/security/ class

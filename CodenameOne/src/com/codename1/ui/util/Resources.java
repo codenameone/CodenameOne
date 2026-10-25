@@ -519,7 +519,7 @@ public class Resources {
                     continue;
                 case MAGIC_THEME:
                 case MAGIC_THEME_LEGACY:
-                    setResource(id, MAGIC_THEME, loadTheme(id, magic == MAGIC_THEME));
+                    setResource(id, MAGIC_THEME, loadThemeMap(id, magic == MAGIC_THEME));
                     continue;
                 case MAGIC_IMAGE:
                     Image img = createImage();
@@ -1058,42 +1058,31 @@ public class Resources {
     ///
     /// cached theme instance
     public Hashtable getTheme(String id) {
-        Hashtable h = (Hashtable) resources.get(id);
+        Object stored = resources.get(id);
+        if (stored instanceof HashMap) {
+            // Callers of this method edit the table in place (the CSS compiler, the
+            // resource editor), so the table handed out has to be the stored one.
+            HashMap<String, Object> map = getThemeMap(id);
+            Hashtable h = new Hashtable(map.size() * 2);
+            for (Map.Entry<String, Object> e : map.entrySet()) {
+                Object value = e.getValue();
+                if (value != null) {
+                    h.put(e.getKey(), value);
+                }
+            }
+            resources.put(id, h);
+            return h;
+        }
+        Hashtable h = (Hashtable) stored;
 
         // theme can be null in valid use cases such as the resource editor
         if (h != null && h.containsKey("uninitialized")) {
             Enumeration e = h.keys();
             while (e.hasMoreElements()) {
                 String key = (String) e.nextElement();
-                if (key.endsWith("font") || (key.endsWith("Image") && !key.endsWith("scaledImage"))) {
-                    Object value = h.get(key);
-                    if (value == null) {
-                        throw new IllegalArgumentException("Couldn't find resource: " + key);
-                    }
-
-                    // the resource was not already loaded when we loaded the theme
-                    // it must be loaded now so we can resolve the temporary name
-                    if (value instanceof String) {
-                        Object o;
-
-                        // we need to trigger multi image logic  in the  resource editor
-                        if (key.endsWith("Image")) {
-                            o = getImage((String) value);
-                        } else {
-                            o = resources.get(value);
-                        }
-                        if (o == null) {
-                            throw new IllegalArgumentException("Theme entry for " + key + " could not be found: " + value);
-                        }
-                        h.put(key, o);
-                    }
-                }
-                // if this is a border we might need to do additional work for older versions
-                // of Codename One and for the case of an image border where the images might not have
-                // been loaded yet when the border was created
-                if (key.endsWith("order")) {
-                    Border b = confirmBorder(h, key);
-                    h.put(key, b);
+                Object value = resolveThemeEntry(key, h.get(key));
+                if (value != null) {
+                    h.put(key, value);
                 }
             }
             h.remove("uninitialized");
@@ -1101,8 +1090,89 @@ public class Resources {
         return h;
     }
 
-    private Border confirmBorder(Hashtable h, String key) {
-        Object val = h.get(key);
+    /// Returns the theme resource from the file as the map
+    /// [com.codename1.ui.plaf.UIManager#setThemeMap(HashMap)] takes. Prefer this
+    /// to [#getTheme(String)]: the theme is loaded as this map, so nothing is
+    /// copied, and its loops compile to direct table walks with no iterator and
+    /// no locking.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: name of the theme resource
+    ///
+    /// #### Returns
+    ///
+    /// cached theme instance
+    public HashMap<String, Object> getThemeMap(String id) {
+        Object stored = resources.get(id);
+        if (stored instanceof Hashtable) {
+            // Set as a table (MutableResource, the resource editor) or handed out
+            // by getTheme: resolve it there, then keep the map from now on.
+            Hashtable h = getTheme(id);
+            HashMap<String, Object> map = new HashMap<String, Object>(h.size() * 2);
+            Enumeration e = h.keys();
+            while (e.hasMoreElements()) {
+                Object key = e.nextElement();
+                if (key instanceof String) {
+                    map.put((String) key, h.get(key));
+                }
+            }
+            resources.put(id, map);
+            return map;
+        }
+        if (!(stored instanceof HashMap)) {
+            return null;
+        }
+        HashMap<String, Object> map = (HashMap<String, Object>) stored;
+        if (map.containsKey("uninitialized")) {
+            for (Map.Entry<String, Object> e : map.entrySet()) {
+                Object value = resolveThemeEntry(e.getKey(), e.getValue());
+                if (value != null) {
+                    e.setValue(value);
+                }
+            }
+            map.remove("uninitialized");
+        }
+        return map;
+    }
+
+    /// The loaded form of a theme entry that still names a resource loaded after
+    /// the theme, or null when the entry needs nothing.
+    private Object resolveThemeEntry(String key, Object value) {
+        Object result = null;
+        if (key.endsWith("font") || (key.endsWith("Image") && !key.endsWith("scaledImage"))) {
+            if (value == null) {
+                throw new IllegalArgumentException("Couldn't find resource: " + key);
+            }
+
+            // the resource was not already loaded when we loaded the theme
+            // it must be loaded now so we can resolve the temporary name
+            if (value instanceof String) {
+                Object o;
+
+                // we need to trigger multi image logic  in the  resource editor
+                if (key.endsWith("Image")) {
+                    o = getImage((String) value);
+                } else {
+                    o = resources.get(value);
+                }
+                if (o == null) {
+                    throw new IllegalArgumentException("Theme entry for " + key + " could not be found: " + value);
+                }
+                result = o;
+                value = o;
+            }
+        }
+        // if this is a border we might need to do additional work for older versions
+        // of Codename One and for the case of an image border where the images might not have
+        // been loaded yet when the border was created
+        if (key.endsWith("order")) {
+            result = confirmBorder(value);
+        }
+        return result;
+    }
+
+    private Border confirmBorder(Object val) {
         if (val == null) {
             return null;
         }
@@ -1556,7 +1626,21 @@ public class Resources {
     }
 
     Hashtable loadTheme(String id, boolean newerVersion) throws IOException {
-        Hashtable theme = new Hashtable();
+        HashMap<String, Object> map = loadThemeMap(id, newerVersion);
+        Hashtable theme = new Hashtable(map.size() * 2);
+        for (Map.Entry<String, Object> e : map.entrySet()) {
+            Object value = e.getValue();
+            if (value != null) {
+                theme.put(e.getKey(), value);
+            }
+        }
+        return theme;
+    }
+
+    /// Reads a theme as the map [#getThemeMap(String)] hands out; what a resource
+    /// file load stores. [#loadTheme(String, boolean)] is the same table copied.
+    HashMap<String, Object> loadThemeMap(String id, boolean newerVersion) throws IOException {
+        HashMap<String, Object> theme = new HashMap<String, Object>();
         String densityStr = Display.getInstance().getDensityStr();
         String platformName = Display.getInstance().getPlatformName();
         if ("HTML5".equals(platformName)) {
@@ -1572,14 +1656,15 @@ public class Resources {
         // marks the theme as uninitialized so we can finish "wiring" cached resources
         theme.put("uninitialized", Boolean.TRUE);
         int size = input.readShort();
+        ThemeStrings values = new ThemeStrings(size);
         List<String> fontKeys = new ArrayList<String>();
         Map<String, Float> fontScaleRules = null;
         Map<String, MediaRule> mediaRules = new HashMap<String, MediaRule>();
         int defaultFontSizeSetPriority = 0;
         for (int iter = 0; iter < size; iter++) {
-            String key = input.readUTF();
+            String key = values.readUTF(input);
             if (key.startsWith("@")) {
-                theme.put(key, input.readUTF());
+                theme.put(key, values.readUTF(input));
                 if (enableMediaQueries) {
                     if (key.endsWith("-font-scale")) {
                         if (fontScaleRules == null) {
@@ -1648,7 +1733,10 @@ public class Resources {
                     }
                 }
 
-                if (mediaMatch) {
+                // A key with no media prefix is its own translation, and a rule for it
+                // never wins over one that matched a prefix. A rule per plain key was
+                // 5,000 objects and map entries of garbage per theme load.
+                if (mediaMatch && matchCount > 0) {
                     MediaRule rule = mediaRules.get(subkey);
                     boolean replace = rule == null;
                     if (!replace && rule.matchCount <= matchCount) {
@@ -1674,7 +1762,7 @@ public class Resources {
             // if this is a simple numeric value
             if (key.endsWith("Color")) {
 
-                theme.put(key, Integer.toHexString(input.readInt()));
+                theme.put(key, values.hex(input.readInt()));
                 continue;
             }
 
@@ -1685,7 +1773,7 @@ public class Resources {
 
             // if this is a short numeric value for transparency
             if (key.endsWith("ransparency")) {
-                theme.put(key, "" + (input.readByte() & 0xff));
+                theme.put(key, values.decimal(input.readByte() & 0xff));
                 continue;
             }
 
@@ -1694,7 +1782,7 @@ public class Resources {
                 continue;
             }
             if (key.endsWith("opacity")) {
-                theme.put(key, "" + (input.readInt() & 0xff));
+                theme.put(key, values.decimal(input.readInt() & 0xff));
                 continue;
             }
 
@@ -1730,13 +1818,13 @@ public class Resources {
                     float p2 = input.readFloat();
                     float p3 = input.readFloat();
                     float p4 = input.readFloat();
-                    theme.put(key, "" + p1 + "," + p2 + "," + p3 + "," + p4);
+                    theme.put(key, values.floats(p1, p2, p3, p4));
                 } else {
                     int p1 = input.readByte() & 0xff;
                     int p2 = input.readByte() & 0xff;
                     int p3 = input.readByte() & 0xff;
                     int p4 = input.readByte() & 0xff;
-                    theme.put(key, "" + p1 + "," + p2 + "," + p3 + "," + p4);
+                    theme.put(key, values.ints(p1, p2, p3, p4));
                 }
                 continue;
             }
@@ -1765,7 +1853,7 @@ public class Resources {
 
                 // is this a new font?
                 if (input.readBoolean()) {
-                    String fontId = input.readUTF();
+                    String fontId = values.readUTF(input);
                     f = (Font) resources.get(fontId);
 
                     // if the font is not yet loaded
@@ -1778,8 +1866,8 @@ public class Resources {
                     if (minorVersion > 4) {
                         boolean hasTTF = input.readBoolean();
                         if (hasTTF) {
-                            String fileName = input.readUTF();
-                            String fontName = input.readUTF();
+                            String fileName = values.readUTF(input);
+                            String fontName = values.readUTF(input);
                             int sizeSetting = input.readInt();
                             float fontSize = input.readFloat();
                             if (isTrueTypeFileSupported()) {
@@ -1810,7 +1898,7 @@ public class Resources {
                         // Tiled Both Image
                     case MAGIC_INDEXED_IMAGE_LEGACY:
                         // the image name coupled with the type
-                        theme.put(key + Style.BG_IMAGE, input.readUTF());
+                        theme.put(key + Style.BG_IMAGE, values.readUTF(input));
                         break;
 
                     // Aligned Image
@@ -1820,7 +1908,7 @@ public class Resources {
                         // Tiled Horizontally Image
                     case 0xF3:
                         // the image name coupled with the type and with alignment information
-                        String imageName = input.readUTF();
+                        String imageName = values.readUTF(input);
                         theme.put(key + Style.BG_IMAGE, imageName);
                         byte align = input.readByte();
                         theme.put(key + Style.BACKGROUND_ALIGNMENT, Byte.valueOf(align));
@@ -1858,13 +1946,13 @@ public class Resources {
 
             // if this is a background image bgImage
             if (key.endsWith("derive")) {
-                theme.put(key, input.readUTF());
+                theme.put(key, values.readUTF(input));
                 continue;
             }
 
             // if this is a background image bgImage
             if (key.endsWith("bgImage")) {
-                String imageId = input.readUTF();
+                String imageId = values.readUTF(input);
                 Image i = getImage(imageId);
 
                 // if the font is not yet loaded

@@ -144,7 +144,7 @@ public class PreviewInSimulator {
                             com.codename1.ui.Display.getInstance().installNativeTheme();
                         }
                     } else {
-                        com.codename1.ui.plaf.UIManager.getInstance().setThemeProps(res.getTheme(theme));
+                        com.codename1.ui.plaf.UIManager.getInstance().setThemeMap(res.getThemeMap(theme));
                     }
                     com.codename1.ui.util.UIBuilder.registerCustomComponent("Table", com.codename1.ui.table.Table.class);
                     com.codename1.ui.util.UIBuilder.registerCustomComponent("MediaPlayer", com.codename1.components.MediaPlayer.class);

@@ -742,7 +742,7 @@ private void refreshTreeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-F
                         public void run() {
                             try {
                                 Resources res = Resources.open(new FileInputStream(themeFile));
-                                UIManager.getInstance().addThemeProps(res.getTheme(themeName));
+                                UIManager.getInstance().addThemeMap(res.getThemeMap(themeName));
                                 Display.getInstance().getCurrent().refreshTheme();
                                 Display.getInstance().getCurrent().revalidate();
                             } catch(Exception err) {

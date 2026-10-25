@@ -23,6 +23,19 @@
 package java.lang.reflect;
 
 public class Constructor {
+    public Class<?>[] getParameterTypes() {
+        return new Class<?>[0];
+    }
+
+    public int getModifiers() {
+        return 0;
+    }
+
+    public Object newInstance(Object... args) throws InstantiationException, IllegalAccessException,
+            InvocationTargetException {
+        throw new InstantiationException("reflection is not supported on this platform");
+    }
+
     public String getName() {
         return null;
     }

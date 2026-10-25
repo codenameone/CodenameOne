@@ -41,6 +41,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -1393,9 +1394,7 @@ public class ByteCodeClass {
         }
         
         if(isInterface) {
-            b.append("int **classToInterfaceMap_");
-            b.append(clsName);
-            b.append(";\n");
+            appendInterfaceMap(b, allClasses);
         }
         
         fullFieldList = new ArrayList<ByteCodeField>();
@@ -1963,8 +1962,7 @@ public class ByteCodeClass {
                         // we pretend to have a virtual method here but the optimizer says its not really needed
                         if(!m.isVirtualOverriden()) {
                             m.setThunkCases(thunkCasesFor(m));
-                            m.appendVirtualMethodC(clsName, b, "classToInterfaceMap_" + clsName +
-                                    "[cn1__cls->classId][" + offset + "]", true);
+                            m.appendVirtualMethodC(clsName, b, interfaceSlot(offset), true);
                             m.setThunkCases(null);
                         }
                         offset++;
@@ -2034,13 +2032,13 @@ public class ByteCodeClass {
         // ACQUIRE, not a plain load. This is the fast path of a double-checked
         // initialisation: the completing store below is a RELEASE, and the two
         // together are what make the writes this function performed -- the
-        // vtable, and every classToInterfaceMap_<iface>[classId] row -- visible
-        // to a thread that observes the flag set.
+        // vtable -- visible to a thread that observes the flag set.
         //
         // With plain accesses on arm64 a second thread could see LOADED==1 while
         // those table stores were still invisible, then index a row that read as
-        // NULL. OBSERVED: three identical SIGSEGVs at
-        // classToInterfaceMap_java_util_NavigableMap[classId] + 0x8, reached from
+        // NULL. OBSERVED: three identical SIGSEGVs at what was then the run-time
+        // built classToInterfaceMap_java_util_NavigableMap[classId] + 0x8 (the map
+        // is constant data now, see appendInterfaceMap), reached from
         // TreeSet.clear -> the interface dispatch for NavigableMap.clear, in a
         // translator that is single-threaded in its own code but shares the
         // process with the GC thread, which also runs Java and so also runs
@@ -2081,57 +2079,20 @@ public class ByteCodeClass {
             b.append(".vtable = initVtableForInterface();\n    ");
         }
         
-        // create the vtable
-        b.append("    class__");
-        b.append(clsName);
-        b.append(".vtable = malloc(sizeof(void*) *");
-        b.append(virtualMethodList.size());
-        b.append(");\n");
         if(isInterface) {
             // special case, java_lang_object calls on interfaces should
-            // act like standard virtual method calls
+            // act like standard virtual method calls. The dispatch map is constant
+            // data (appendInterfaceMap), so there is nothing else to build here.
             b.append("    class__");
             b.append(clsName);
             b.append(".vtable = initVtableForInterface();\n");
-            b.append("    classToInterfaceMap_");
-            b.append(clsName);
-            // calloc, not malloc: rows are filled only for classes that implement
-            // this interface, so an id that does not read as a registered row must
-            // read as NULL rather than as whatever the allocator last left there.
-            b.append(" = calloc(cn1_array_start_offset, sizeof(int*));\n");
-            for(ByteCodeClass cls : allClasses) {
-                if(!cls.isInterface) {
-                    if(cls.doesImplement(this)) {
-                        b.append("    classToInterfaceMap_");
-                        b.append(clsName);
-                        b.append("[cn1_class_id_");
-                        b.append(cls.clsName);
-                        // sizeof(int), not sizeof(int*): a row is an int[] of vtable
-                        // slot indices -- the map is int**, so the ROW is what is
-                        // int-sized. Asking for pointer size allocated twice what the
-                        // row can ever hold, on every interface/implementor pair.
-                        b.append("] = malloc(sizeof(int) * ");
-                        b.append(getMethodCountIncludingBase());
-                        b.append(");\n");
-                        offset = 0;
-                        for(BytecodeMethod m : virtualMethodList) {
-                            if(!m.getClsName().equals("java_lang_Object")) {
-                                b.append("    classToInterfaceMap_");
-                                b.append(clsName);
-                                b.append("[cn1_class_id_");
-                                b.append(cls.clsName);
-                                b.append("][");
-                                b.append(offset);
-                                b.append("] = ");
-                                b.append(cls.virtualMethodList.indexOf(m));
-                                b.append(";\n");
-                                offset++;
-                            }
-                        }
-                    }
-                }
-            }
         } else {
+            // create the vtable
+            b.append("    class__");
+            b.append(clsName);
+            b.append(".vtable = malloc(sizeof(void*) *");
+            b.append(virtualMethodList.size());
+            b.append(");\n");
             b.append("    __INIT_VTABLE_");
             b.append(clsName);
             b.append("(threadStateData, class__");
@@ -2151,8 +2112,8 @@ public class ByteCodeClass {
         // that recursion guard. Nothing outside this function may treat it as
         // "safe to use the class" in the JLS sense -- a class under initialization
         // is not finished. The release is what the INLINE GUARDS acquire against:
-        // they test this flag, and it is what publishes the vtable and the
-        // classToInterfaceMap rows written just above. Guarding them on
+        // they test this flag, and it is what publishes the vtable written just
+        // above. Guarding them on
         // __X_LOADED__ instead would also be correct about the vtable and would
         // additionally hold other threads until __CLINIT__ returned -- a strictly
         // later gate than master opens, which moved layout on four native ports
@@ -2313,6 +2274,131 @@ public class ByteCodeClass {
      * @param interfaceObj the interface to test
      * @return true when this class is assignable to it
      */
+    /// The interface dispatch map, emitted as constant data.
+    ///
+    /// Dispatching a method of an interface needs, for the receiver's class, the
+    /// vtable slot that implements it. That used to be a table built by the
+    /// interface's static initializer: one `calloc` of a pointer per class in the
+    /// program, plus one `malloc`ed row per implementing class. With 3,500 classes
+    /// that was 28 KB per interface whatever its implementers, and a Compose
+    /// application initializes ninety of them -- 2.5 MB of dirty heap, written once
+    /// and never changed, describing nothing the translator did not already know.
+    ///
+    /// It is now two `static const` arrays, which the linker puts in read-only
+    /// pages that are mapped from the binary and never dirtied:
+    ///
+    /// - `cn1_itrows_<iface>`: the rows, one slot per method that is not
+    ///   Object's. Classes that inherit one layout share one row, so the
+    ///   hundred-odd implementers of `Iterator` take a handful.
+    /// - `cn1_itix_<iface>`: for every class id between the lowest and highest
+    ///   implementer, where its row starts. Only implementers ever index it --
+    ///   the thunk is only reached with a receiver of the interface's type -- so
+    ///   ids outside that range need no entry and no bounds check.
+    ///
+    /// The lookup is the same two dependent loads as before, and needs no
+    /// publication: nothing is written at run time, so no thread can read it half
+    /// built.
+    private void appendInterfaceMap(StringBuilder b, List<ByteCodeClass> allClasses) {
+        List<BytecodeMethod> slots = new ArrayList<BytecodeMethod>();
+        for(BytecodeMethod m : virtualMethodList) {
+            if(!m.getClsName().equals("java_lang_Object")) {
+                slots.add(m);
+            }
+        }
+        interfaceMapBase = 0;
+        if(slots.isEmpty()) {
+            return;
+        }
+        List<ByteCodeClass> implementers = new ArrayList<ByteCodeClass>();
+        int min = Integer.MAX_VALUE;
+        int max = Integer.MIN_VALUE;
+        for(ByteCodeClass cls : allClasses) {
+            // An abstract class is never the class of an object, so no dispatch reads its row.
+            if(!cls.isInterface && !cls.isAbstract && cls.doesImplement(this)) {
+                implementers.add(cls);
+                min = Math.min(min, cls.getClassOffset());
+                max = Math.max(max, cls.getClassOffset());
+            }
+        }
+        if(implementers.isEmpty()) {
+            // Never dispatched through: no object of this type can exist. The thunks
+            // still compile against an empty map.
+            b.append("static const unsigned short cn1_itrows_").append(clsName).append("[1] __attribute__((unused));\n");
+            b.append("static inline JAVA_INT cn1_itrow_").append(clsName).append("(JAVA_INT id) __attribute__((unused));\n");
+            b.append("static inline JAVA_INT cn1_itrow_").append(clsName).append("(JAVA_INT id) {\n");
+            b.append("    __builtin_trap();\n    return 0;\n}\n");
+            return;
+        }
+        Map<String, Integer> rowOffsets = new HashMap<String, Integer>();
+        StringBuilder rows = new StringBuilder();
+        int[] starts = new int[implementers.size()];
+        int rowCount = 0;
+        int maxValue = 0;
+        boolean missing = false;
+        for(int k = 0 ; k < implementers.size() ; k++) {
+            ByteCodeClass cls = implementers.get(k);
+            StringBuilder row = new StringBuilder();
+            for(BytecodeMethod m : slots) {
+                int idx = cls.virtualMethodList.indexOf(m);
+                maxValue = Math.max(maxValue, idx);
+                missing |= idx < 0;
+                row.append(idx).append(',');
+            }
+            String key = row.toString();
+            Integer at = rowOffsets.get(key);
+            if(at == null) {
+                at = rowCount * slots.size();
+                rowOffsets.put(key, at);
+                rows.append("\n    ").append(key);
+                rowCount++;
+            }
+            starts[k] = at;
+        }
+        int lastStart = (rowCount - 1) * slots.size() + 1;
+        // A concrete class without the method (a stale or mismatched class file) gets -1, as it
+        // did when the rows were written at start-up: a call through it fails as it always has,
+        // and a class that is never called through still links. An unsigned row would turn the
+        // -1 into 65535, an index past any vtable, so such a table is stored signed.
+        String rowType = missing ? (maxValue < 32768 ? "short" : "JAVA_INT")
+                : (maxValue < 65536 ? "unsigned short" : "JAVA_INT");
+        String ixType = lastStart < 65536 ? "unsigned short" : "JAVA_INT";
+        b.append("static const ").append(rowType).append(" cn1_itrows_").append(clsName)
+         .append("[] __attribute__((unused)) = {");
+        b.append(rows).append("\n};\n");
+        b.append("static const ").append(ixType).append(" cn1_itix_").append(clsName)
+         .append("[").append(max - min + 1).append("] __attribute__((unused)) = {");
+        for(int k = 0 ; k < implementers.size() ; k++) {
+            b.append(k == 0 ? "\n    [" : ",\n    [");
+            b.append("cn1_class_id_").append(implementers.get(k).clsName).append(" - ").append(min);
+            // Plus one: an id the designated initializers skip reads 0, "implements nothing".
+            b.append("] = ").append(starts[k] + 1);
+        }
+        b.append("\n};\n");
+        interfaceMapBase = min;
+        appendRowLookup(b, String.valueOf(max - min + 1), "cn1_itix_" + clsName + "[d]");
+    }
+
+    /// The row of the receiver's class. A receiver that does not implement the interface -- its id
+    /// outside the table or in a gap of it -- traps. It can only get here through a cast that did
+    /// not hold, and ParparVM's CHECKCAST is unchecked; the old map read a NULL row and faulted
+    /// the same way, where reading the table out of bounds would jump through a random row.
+    private void appendRowLookup(StringBuilder b, String len, String read) {
+        b.append("static inline JAVA_INT cn1_itrow_").append(clsName).append("(JAVA_INT id) __attribute__((unused));\n");
+        b.append("static inline JAVA_INT cn1_itrow_").append(clsName).append("(JAVA_INT id) {\n");
+        b.append("    unsigned int d = (unsigned int)(id - ").append(interfaceMapBase).append(");\n");
+        b.append("    JAVA_INT v = d < ").append(len).append("u ? ").append(read).append(" : 0;\n");
+        b.append("    if (__builtin_expect(v == 0, 0)) __builtin_trap();\n");
+        b.append("    return v - 1;\n}\n");
+    }
+
+    /// The lowest class id cn1_itix_ covers; see appendInterfaceMap.
+    private int interfaceMapBase;
+
+    /// The vtable slot of the receiver's class for the interface method at `slot`.
+    private String interfaceSlot(int slot) {
+        return "cn1_itrows_" + clsName + "[cn1_itrow_" + clsName + "(cn1__cls->classId) + " + slot + "]";
+    }
+
     boolean doesImplement(ByteCodeClass interfaceObj) {
         if(baseInterfacesObject != null) {
             if(baseInterfacesObject.contains(interfaceObj)) {
@@ -3160,7 +3246,7 @@ public class ByteCodeClass {
     /// from then on it is always false. Two kinds qualify:
     ///
     /// - A class with NO <clinit>. Its __STATIC_INITIALIZER only mallocs and fills its
-    ///   vtable, or for an interface its classToInterfaceMap rows. These run first, in
+    ///   vtable, or for an interface points its vtable at Object's. These run first, in
     ///   cn1EagerInitClasses, at the very start of initConstantPool.
     /// - A class whose <clinit> is PURE (see computePureClinits): it reads and writes
     ///   only its own static fields, constants, string literals and arrays it creates,

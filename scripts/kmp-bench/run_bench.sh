@@ -1,0 +1,161 @@
+#!/usr/bin/env bash
+#
+# Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+# DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+#
+# This code is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License version 2 only, as
+# published by the Free Software Foundation.  Codename One designates this
+# particular file as subject to the "Classpath" exception as provided
+# by Oracle in the LICENSE file that accompanied this code.
+#
+# This code is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+# FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+# version 2 for more details (a copy is included in the LICENSE file that
+# accompanied this code).
+#
+# You should have received a copy of the GNU General Public License version
+# 2 along with this work; if not, write to the Free Software Foundation,
+# Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+#
+# Please contact Codename One through http://www.codenameone.com/ if you
+# need additional information or have any questions.
+#
+# Builds the Keynote app twice from the same Compose source -- once with
+# Codename One (compose-compat, ParparVM) and once with Compose Multiplatform
+# (Kotlin/Native + Skia) -- runs both on one iOS simulator and writes
+# results.json and results.md into the work directory.
+#
+#   run_bench.sh --work <dir> [--runs N] [--device <udid>] [--maven-repo <dir>]
+#
+# Start-up is process start to marker: each app prints "KMPBENCH first-frame
+# <epoch ms>" from the first main-thread turn after its UI is installed, and the
+# start is the kernel's start time for the process, so simctl's own latency is
+# in neither. Compose Multiplatform's marker runs before Skia has drawn, which
+# favours it. Memory is physical footprint (footprint(1)) a few seconds after
+# launch; resident size counts the shared dyld cache on the simulator. Run 1 of
+# each is cold (first launch after install) and reported separately.
+set -Eeuo pipefail
+trap 'rc=$?; echo "run_bench.sh: FAILED at line $LINENO (exit $rc)" >&2' ERR
+
+WORK=""; RUNS=5; DEVICE=""; MAVEN_REPO_LOCAL="${MAVEN_REPO_LOCAL:-}"
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --work) WORK="$2"; shift 2 ;;
+    --runs) RUNS="$2"; shift 2 ;;
+    --device) DEVICE="$2"; shift 2 ;;
+    --maven-repo) MAVEN_REPO_LOCAL="$2"; shift 2 ;;
+    *) echo "unknown argument: $1" >&2; exit 2 ;;
+  esac
+done
+[ -n "$WORK" ] || { echo "usage: run_bench.sh --work <dir> [--runs N]" >&2; exit 2; }
+HERE="$(cd "$(dirname "$0")" && pwd)"
+mkdir -p "$WORK"; WORK="$(cd "$WORK" && pwd)"
+MVN_REPO_ARG=""
+[ -n "$MAVEN_REPO_LOCAL" ] && MVN_REPO_ARG="-Dmaven.repo.local=$MAVEN_REPO_LOCAL"
+: "${JAVA17_HOME:?JAVA17_HOME must name a JDK 17}"
+
+"$HERE/app/prepare.sh" --work "$WORK" ${MAVEN_REPO_LOCAL:+--maven-repo "$MAVEN_REPO_LOCAL"}
+
+echo "== Codename One: translate and build"
+( cd "$WORK/cn1" && JAVA_HOME="$JAVA17_HOME" mvn -B -q $MVN_REPO_ARG package -DskipTests \
+    -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-source -Dopen=false ) > "$WORK/cn1-build.log" 2>&1
+SRC="$(dirname "$(find "$WORK/cn1/common/target" -maxdepth 2 -name Bench.xcodeproj | head -1)")"
+( cd "$SRC" && xcodebuild -project Bench.xcodeproj -scheme Bench -configuration Release \
+    -sdk iphonesimulator -arch arm64 -derivedDataPath "$WORK/dd" CODE_SIGNING_ALLOWED=NO build ) \
+    > "$WORK/cn1-xcode.log" 2>&1
+CN1_APP="$WORK/dd/Build/Products/Release-iphonesimulator/Bench.app"
+CN1_EXE="$CN1_APP/Bench"
+CN1_ID=com.example.kmpbench
+
+echo "== Compose Multiplatform: build"
+( cd "$WORK/cmp" && JAVA_HOME="$JAVA17_HOME" gradle --no-daemon -q \
+    :composeApp:linkReleaseExecutableIosSimulatorArm64 ) > "$WORK/cmp-build.log" 2>&1
+# An executable, not a framework in an Xcode project: the bundle is the
+# executable plus an Info.plist, which is all a simulator app needs.
+CMP_APP="$WORK/Keynote.app"; CMP_EXE="$CMP_APP/Keynote"; CMP_ID=com.example.kmpbench.cmp
+rm -rf "$CMP_APP"; mkdir -p "$CMP_APP"
+cp "$WORK/cmp/composeApp/build/bin/iosSimulatorArm64/releaseExecutable/composeApp.kexe" "$CMP_EXE"
+cp "$HERE/app/cmp/Info.plist" "$CMP_APP/Info.plist"
+codesign -s - --force "$CMP_APP" > /dev/null 2>&1
+
+stripped() { cp "$1" "$WORK/strip.tmp"; strip "$WORK/strip.tmp" 2>/dev/null || true; stat -f %z "$WORK/strip.tmp"; }
+bundle() { du -sk "$1" | awk '{print $1 * 1024}'; }
+
+if [ -z "$DEVICE" ]; then
+  DEVICE="$(xcrun simctl list devices available | sed -n 's/.*iPhone 17 Pro (\([0-9A-F-]*\)).*/\1/p' | head -1)"
+fi
+[ -n "$DEVICE" ] || { echo "no iPhone simulator found; pass --device" >&2; exit 1; }
+xcrun simctl boot "$DEVICE" 2>/dev/null || true
+trap 'xcrun simctl shutdown "$DEVICE" 2>/dev/null || true' EXIT
+xcrun simctl bootstatus "$DEVICE" > /dev/null
+
+# The kernel's start time of a process, epoch milliseconds.
+started() {
+  python3 - "$1" <<'PY'
+import ctypes, ctypes.util, struct, sys
+libc = ctypes.CDLL(ctypes.util.find_library("c"))
+mib = (ctypes.c_int * 4)(1, 14, 1, int(sys.argv[1]))  # CTL_KERN, KERN_PROC, KERN_PROC_PID
+buf = ctypes.create_string_buffer(1024); size = ctypes.c_size_t(1024)
+libc.sysctl(mib, 4, buf, ctypes.byref(size), None, 0)
+sec, usec = struct.unpack_from("qi", buf.raw, 0)  # kp_proc.p_starttime
+print(sec * 1000 + usec // 1000)
+PY
+}
+# Prints one start-up time per run, milliseconds, space separated.
+measure() {
+  local id="$1" name="$2" exe="$3" out=""
+  for i in $(seq 1 "$RUNS"); do
+    xcrun simctl terminate "$DEVICE" "$id" 2>/dev/null || true
+    local log="$WORK/$name-run$i.log" t0 t
+    ( timeout 20 xcrun simctl launch --console-pty "$DEVICE" "$id" > "$log" 2>&1 || true ) &
+    for _ in $(seq 1 100); do grep -q "KMPBENCH first-frame" "$log" 2>/dev/null && break; sleep 0.1; done
+    t="$(grep -o 'KMPBENCH first-frame [0-9]*' "$log" | awk '{print $3}' | head -1)"
+    [ -n "$t" ] || { echo "$name run $i printed no marker; see $log" >&2; exit 1; }
+    t0="$(started "$(pgrep -f "$exe" | head -1)")"
+    out="$out $((t - t0))"
+    sleep 3
+    # While the app is still up: a launch is killed by its timeout after 20s.
+    [ "$i" = "$RUNS" ] && xcrun simctl io "$DEVICE" screenshot "$WORK/$name.png" > /dev/null 2>&1 || true
+  done
+  echo "$out"
+}
+footprint_bytes() {
+  xcrun simctl launch "$DEVICE" "$1" > /dev/null 2>&1; sleep 5
+  footprint "$(pgrep -f "$2" | head -1)" 2>&1 \
+    | awk '/Footprint:/ { for (i = 1; i <= NF; i++) if ($i == "Footprint:") {
+        v = $(i + 1); u = $(i + 2); print int(v * (u == "GB" ? 1073741824 : u == "MB" ? 1048576 : 1024)); exit } }'
+}
+
+for side in cn1 cmp; do
+  if [ $side = cn1 ]; then app="$CN1_APP"; id=$CN1_ID; exe=Bench.app/Bench
+  else app="$CMP_APP"; id=$CMP_ID; exe=Keynote.app/Keynote; fi
+  xcrun simctl uninstall "$DEVICE" "$id" 2>/dev/null || true
+  xcrun simctl install "$DEVICE" "$app"
+  eval "STARTS_$side=\"\$(measure \"\$id\" \"\$side\" \"\$exe\")\""
+done
+CN1_RSS="$(footprint_bytes $CN1_ID Bench.app/Bench)"; CMP_RSS="$(footprint_bytes $CMP_ID Keynote.app/Keynote)"
+
+python3 - "$WORK" <<EOF
+import json, statistics, sys
+work = sys.argv[1]
+def side(starts, exe, bundle, rss):
+    s = [int(x) for x in starts.split()]
+    warm = s[1:] or s
+    return {"cold_start_ms": s[0], "warm_start_median_ms": statistics.median(warm), "starts_ms": s,
+            "executable_stripped_bytes": exe, "bundle_bytes": bundle, "footprint_bytes": rss}
+r = {"codename_one": side("$STARTS_cn1", $(stripped "$CN1_EXE"), $(bundle "$CN1_APP"), ${CN1_RSS:-0}),
+     "compose_multiplatform": side("$STARTS_cmp", $(stripped "$CMP_EXE"), $(bundle "$CMP_APP"), ${CMP_RSS:-0})}
+json.dump(r, open(work + "/results.json", "w"), indent=2)
+mb = lambda b: "%.1f MB" % (b / 1048576.0)
+rows = [("Cold start", lambda x: "%d ms" % x["cold_start_ms"]),
+        ("Warm start (median)", lambda x: "%d ms" % x["warm_start_median_ms"]),
+        ("Executable, stripped", lambda x: mb(x["executable_stripped_bytes"])),
+        ("App bundle", lambda x: mb(x["bundle_bytes"])),
+        ("Physical footprint", lambda x: mb(x["footprint_bytes"]))]
+md = ["| | Codename One | Compose Multiplatform |", "|---|---|---|"]
+md += ["| %s | %s | %s |" % (n, f(r["codename_one"]), f(r["compose_multiplatform"])) for n, f in rows]
+open(work + "/results.md", "w").write("\n".join(md) + "\n")
+print("\n".join(md))
+EOF

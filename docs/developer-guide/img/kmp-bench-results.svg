@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="330" viewBox="0 0 880 330">
+  <rect x="0" y="0" width="880" height="330" fill="#ffffff"/>
+  <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#555555"/></marker></defs>
+  <text x="440.0" y="24" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#222222">Keynote on an iPhone 17 Pro simulator: the same commonMain built both ways</text>
+  <text x="440.0" y="43" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">Release builds, five runs; a start-up bar sits mid-range. Smaller is better. Start-up of an empty UIKit app is 640-750 ms on the</text>
+  <text x="440.0" y="57" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">same simulator, so start-up is near the floor for both; memory is level; the executable is where the gap is.</text>
+  <text x="30" y="116" font-family="Arial, sans-serif" font-size="10.5" font-weight="bold" text-anchor="start" fill="#333333">Executable, stripped (MB)</text>
+  <rect x="250" y="100" width="267.7805202202392" height="16" fill="#b5651d" stroke="none"/>
+  <text x="523.7805202202392" y="112" font-family="Arial, sans-serif" font-size="9.5" text-anchor="start" fill="#333333">16.4</text>
+  <rect x="250" y="120" width="373.91304347826093" height="16" fill="#4a6fa5" stroke="none"/>
+  <text x="629.913043478261" y="132" font-family="Arial, sans-serif" font-size="9.5" text-anchor="start" fill="#333333">22.9</text>
+  <text x="30" y="168" font-family="Arial, sans-serif" font-size="10.5" font-weight="bold" text-anchor="start" fill="#333333">App bundle (MB)</text>
+  <rect x="250" y="152" width="354.4384057971015" height="16" fill="#b5651d" stroke="none"/>
+  <text x="610.4384057971015" y="164" font-family="Arial, sans-serif" font-size="9.5" text-anchor="start" fill="#333333">27.3</text>
+  <rect x="250" y="172" width="373.9130434782609" height="16" fill="#4a6fa5" stroke="none"/>
+  <text x="629.9130434782609" y="184" font-family="Arial, sans-serif" font-size="9.5" text-anchor="start" fill="#333333">28.8</text>
+  <text x="30" y="220" font-family="Arial, sans-serif" font-size="10.5" font-weight="bold" text-anchor="start" fill="#333333">Physical footprint (MB)</text>
+  <rect x="250" y="204" width="370.018115942029" height="16" fill="#b5651d" stroke="none"/>
+  <text x="626.018115942029" y="216" font-family="Arial, sans-serif" font-size="9.5" text-anchor="start" fill="#333333">47-48</text>
+  <rect x="250" y="224" width="373.9130434782609" height="16" fill="#4a6fa5" stroke="none"/>
+  <text x="629.9130434782609" y="236" font-family="Arial, sans-serif" font-size="9.5" text-anchor="start" fill="#333333">48</text>
+  <text x="30" y="272" font-family="Arial, sans-serif" font-size="10.5" font-weight="bold" text-anchor="start" fill="#333333">Start-up (ms, runs 2-5)</text>
+  <rect x="250" y="256" width="332.36714975845416" height="16" fill="#b5651d" stroke="none"/>
+  <text x="588.3671497584542" y="268" font-family="Arial, sans-serif" font-size="9.5" text-anchor="start" fill="#333333">596-685</text>
+  <rect x="250" y="276" width="373.91304347826093" height="16" fill="#4a6fa5" stroke="none"/>
+  <text x="629.913043478261" y="288" font-family="Arial, sans-serif" font-size="9.5" text-anchor="start" fill="#333333">646-794</text>
+  <rect x="250" y="312" width="12" height="12" fill="#b5651d" stroke="none"/>
+  <text x="268" y="322" font-family="Arial, sans-serif" font-size="10" text-anchor="start" fill="#333333">Codename One</text>
+  <rect x="380" y="312" width="12" height="12" fill="#4a6fa5" stroke="none"/>
+  <text x="398" y="322" font-family="Arial, sans-serif" font-size="10" text-anchor="start" fill="#333333">Compose Multiplatform</text>
+</svg>

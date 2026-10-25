@@ -1,0 +1,106 @@
+name: Kotlin Multiplatform compatibility
+
+# Compose Multiplatform code built as a Codename One application: the Compose UI
+# layer written over Codename One (maven/compose-compat, which carries the real
+# Compose runtime and kotlinx.coroutines as they are), the headless harness its
+# tests run on (maven/compat-testing) and the build steps that import and
+# package it (build-engine, the Maven and Gradle plugins, the archetype's
+# compose profile).
+#
+#   unit tests           layout, recomposition, text and input, and the
+#                        benchmark's Keynote application driven screen by
+#                        screen, headless; JDK 17, as the Compose runtime's
+#                        inline functions are JVM 11 bytecode
+#   kmp-compat-test.sh   every sample under scripts/kmp-compat-samples
+#                        imported unmodified, built by Maven and Gradle with
+#                        the Compose compiler, and staged for iOS, Android,
+#                        JavaScript and the desktop with identical uploads
+#                        from both tools
+#
+# No display anywhere: the CSS compiler is headless, and so is every test.
+on:
+  pull_request:
+    branches: [ master ]
+    paths:
+      - 'maven/compose-compat/**'
+      - 'maven/compat-testing/**'
+      - 'maven/build-engine/**'
+      - 'maven/codenameone-maven-plugin/**'
+      - 'maven/codenameone-gradle-plugin/**'
+      - 'maven/project-model/**'
+      - 'maven/cn1app-archetype/**'
+      - 'maven/pom.xml'
+      - 'maven/integration-tests/kmp-compat-test.sh'
+      - 'maven/integration-tests/inc/**'
+      - 'scripts/kmp-compat-samples/**'
+      # The unit tests drive the benchmark's shared application.
+      - 'scripts/kmp-bench/app/shared/**'
+      - '.github/workflows/kmp-compat.yml'
+  push:
+    branches: [ master ]
+    paths:
+      - 'maven/compose-compat/**'
+      - 'maven/compat-testing/**'
+      - 'maven/build-engine/**'
+      - 'maven/codenameone-maven-plugin/**'
+      - 'maven/codenameone-gradle-plugin/**'
+      - 'maven/project-model/**'
+      - 'maven/cn1app-archetype/**'
+      - 'maven/pom.xml'
+      - 'maven/integration-tests/kmp-compat-test.sh'
+      - 'maven/integration-tests/inc/**'
+      - 'scripts/kmp-compat-samples/**'
+      - 'scripts/kmp-bench/app/shared/**'
+      - '.github/workflows/kmp-compat.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  kmp-compat:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      CN1_GRADLE_REQUIRED: '1'
+    steps:
+      - uses: actions/checkout@v6
+      # Installed FIRST so the JDK 8 below is the one JAVA_HOME names.
+      - name: Set up JDK 17 for Gradle and the Compose tests
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      - run: echo "GRADLE_JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
+      - name: Set up JDK 8
+        uses: actions/setup-java@v5
+        with:
+          java-version: '8'
+          distribution: 'temurin'
+          cache: 'maven'
+      - name: Build Codename One Maven artifacts (includes archetypes and both plugins)
+        env:
+          RETRY_ONLY_MATCHING: transient
+          RETRY_ATTEMPTS: '5'
+          RETRY_DELAY_SECONDS: '60'
+        run: |
+          cd maven
+          bash ../scripts/ci/retry.sh mvn install -Plocal-dev-javase -DskipTests -Darchetype.test.skip=true -Dmaven.javadoc.skip=true
+      - name: Unit tests
+        working-directory: maven
+        run: JAVA_HOME="$GRADLE_JAVA_HOME" mvn -B -Plocal-dev-javase -pl compose-compat test
+      - name: Refresh archetype catalog
+        run: |
+          cd maven
+          mvn archetype:update-local-catalog -Plocal-dev-javase
+          mvn archetype:crawl -Plocal-dev-javase
+      - name: Kotlin Multiplatform samples, imported and built by Maven and Gradle
+        working-directory: maven/integration-tests
+        run: bash kmp-compat-test.sh
+      - name: Upload the test projects' logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: kmp-compat-logs
+          path: maven/integration-tests/build/kmp-compat/**/*.log
+          if-no-files-found: ignore

@@ -2413,8 +2413,8 @@ public class BytecodeMethod implements SignatureSet {
             b.append("\n#if CN1_TAGGED_ACTIVE\n    if(CN1_TAG_CODE(__cn1ThisObject) == CN1_TAG_INTEGER && CN1_TAG_CODE(__cn1Arg1) == CN1_TAG_INTEGER) { return (__cn1ThisObject == __cn1Arg1) ? JAVA_TRUE : JAVA_FALSE; }\n#endif\n    ");
         }
 
-        // An eagerly initialized interface (no <clinit>) had its classToInterfaceMap
-        // rows written in initConstantPool before any Java thread existed, so there is
+        // An eagerly initialized interface (no <clinit>) had its vtable written in
+        // initConstantPool before any Java thread existed, so there is
         // nothing left for this guard to publish -- see
         // ByteCodeClass.isEagerInitEligible.
         if(includeStaticInitializer && !ByteCodeClass.eagerInit(cls)) {
@@ -2432,9 +2432,9 @@ public class BytecodeMethod implements SignatureSet {
             // self time doing nothing but returning.
             //
             // The flag is the right thing to test and the ordering is not incidental:
-            // class__X.initialized is RELEASE-stored after the vtable and the
-            // classToInterfaceMap rows are written, and this thunk is about to index
-            // exactly those rows -- so the ACQUIRE load here is what makes them visible.
+            // class__X.initialized is RELEASE-stored after the interface's vtable is
+            // written, and this thunk may read it -- so the ACQUIRE load here is what
+            // makes it visible. (The dispatch map itself is constant data.)
             // Testing __X_LOADED__ instead would be a weaker gate that publishes
             // nothing; that distinction is why the inline guards were moved onto this
             // flag in the first place.
@@ -2450,8 +2450,8 @@ public class BytecodeMethod implements SignatureSet {
         // CN1_CLASS_OF is not a field load when tagged values are compiled in: it
         // masks the pointer, tests the tag and selects between a proxy and the object
         // before it loads anything. The interface form of this thunk used it twice --
-        // once for the vtable and once for the classId that indexes
-        // classToInterfaceMap -- so resolving it once here removes that work from
+        // once for the vtable and once for the classId that indexes the
+        // interface map -- so resolving it once here removes that work from
         // every interface dispatch, which is the hottest indirect call the VM makes.
         // Skip the tagged resolve where a tagged value cannot arrive: this thunk only
         // ever sees objects whose class is its owner or below, and a boxed immediate
@@ -2467,7 +2467,7 @@ public class BytecodeMethod implements SignatureSet {
         /* A SWITCH ON THE CLASS ID, ahead of the indirect dispatch below.
          *
          * The indirect form is six dependent loads -- class pointer, class id, the
-         * classToInterfaceMap row, the offset within it, the vtable, the slot -- and
+         * interface map row, the offset within it, the vtable, the slot -- and
          * then a branch the C compiler cannot see through, so nothing on either side
          * of the call is optimised across it. The switch is ONE load and a jump table,
          * and every arm is a named callee that ThinLTO can inline.

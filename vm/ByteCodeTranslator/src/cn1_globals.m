@@ -21003,9 +21003,21 @@ CN1_COLD JAVA_INT cn1ThrowNullPointer_R_int(CODENAME_ONE_THREAD_STATE) {
 
 void** interfaceVtableGlobal = 0;
 
+// Slots 9 and 10 of java.lang.Object's vtable are the protected clone() and finalize().
+// An array reaches slot 9 when clone is invoked on it as java/lang/Object.clone, which is
+// how kotlinc compiles an enum's values() -- javac names the array type, and the
+// translator turns that into cloneArray without any dispatch. The table used to stop at
+// slot 8, so that call read past the end of this allocation and jumped to garbage.
+static JAVA_OBJECT cn1ArrayVirtualClone(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array) {
+    return cloneArray(array);
+}
+
+static JAVA_VOID cn1ArrayVirtualFinalize(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array) {
+}
+
 void** initVtableForInterface() {
     if(interfaceVtableGlobal == 0) {
-        interfaceVtableGlobal = malloc(9 * sizeof(void*));
+        interfaceVtableGlobal = malloc(11 * sizeof(void*));
         interfaceVtableGlobal[0] = &java_lang_Object_equals___java_lang_Object_R_boolean;
         interfaceVtableGlobal[1] = &java_lang_Object_getClass___R_java_lang_Class;
         interfaceVtableGlobal[2] = &java_lang_Object_hashCode___R_int;
@@ -21015,6 +21027,8 @@ void** initVtableForInterface() {
         interfaceVtableGlobal[6] = &java_lang_Object_wait__;
         interfaceVtableGlobal[7] = &java_lang_Object_wait___long;
         interfaceVtableGlobal[8] = &java_lang_Object_wait___long_int;
+        interfaceVtableGlobal[9] = &cn1ArrayVirtualClone;
+        interfaceVtableGlobal[10] = &cn1ArrayVirtualFinalize;
         class_array1__JAVA_BOOLEAN.vtable = interfaceVtableGlobal;
         class_array2__JAVA_BOOLEAN.vtable = interfaceVtableGlobal;
         class_array3__JAVA_BOOLEAN.vtable = interfaceVtableGlobal;
