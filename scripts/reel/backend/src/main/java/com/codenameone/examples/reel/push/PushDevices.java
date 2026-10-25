@@ -29,6 +29,7 @@ import com.codenameone.examples.reel.domain.PushDevice;
 import com.codenameone.examples.reel.repository.ProfileRepository;
 import com.codenameone.examples.reel.repository.PushDeviceRepository;
 
+import java.time.Instant;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -59,7 +60,7 @@ public class PushDevices {
     public PushDeviceDto register(String username, PushDeviceDto device) throws IOException {
         PushTarget target = target(device);
         String id = key(target);
-        long now = System.currentTimeMillis();
+        Instant now = Instant.now();
         // Before anything is read, the account's profile row is held: a no-op
         // update that answers 0 when the profile is gone and otherwise keeps
         // the row locked until this commits. It settles two races.
@@ -113,7 +114,7 @@ public class PushDevices {
         while (held.size() >= MAX_PER_ACCOUNT) {
             PushDevice oldest = held.get(0);
             for (PushDevice each : held) {
-                if (each.getUpdatedAt() < oldest.getUpdatedAt()) {
+                if (each.getUpdatedAt().isBefore(oldest.getUpdatedAt())) {
                     oldest = each;
                 }
             }
@@ -164,7 +165,7 @@ public class PushDevices {
     }
     // end::reel-push-devices[]
 
-    private static void fill(PushDevice row, String username, PushDeviceDto device, long now) {
+    private static void fill(PushDevice row, String username, PushDeviceDto device, Instant now) {
         row.setUsername(username);
         row.setPlatform(Text.optional(device.platform(), 32, "the platform"));
         row.setNewEpisodes(device.newEpisodes());

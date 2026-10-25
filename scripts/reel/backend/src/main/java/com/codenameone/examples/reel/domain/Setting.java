@@ -21,6 +21,7 @@ package com.codenameone.examples.reel.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
+import java.time.Instant;
 
 /// One admin-controlled setting: a feature switch, the preset, the branding.
 @Entity
@@ -33,7 +34,7 @@ public class Setting {
     private String value = "";
 
     @Column(nullable = false)
-    private long updatedAt;
+    private Instant updatedAt = Instant.EPOCH;
 
     @Column(nullable = false, type = "VARCHAR(190)")
     private String updatedBy = "";
@@ -57,11 +58,11 @@ public class Setting {
         this.value = value;
     }
 
-    public long getUpdatedAt() {
+    public Instant getUpdatedAt() {
         return updatedAt;
     }
 
-    public void setUpdatedAt(long updatedAt) {
+    public void setUpdatedAt(Instant updatedAt) {
         this.updatedAt = updatedAt;
     }
 

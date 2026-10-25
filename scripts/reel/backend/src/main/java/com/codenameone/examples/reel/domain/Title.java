@@ -21,6 +21,7 @@ package com.codenameone.examples.reel.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
+import java.time.Instant;
 
 /// A movie, a series, a course or a creator's video, with its listing and moderation state.
 @Entity
@@ -88,10 +89,10 @@ public class Title {
     private boolean ageRestricted;
 
     @Column(nullable = false)
-    private long createdAt;
+    private Instant createdAt = Instant.EPOCH;
 
     @Column(nullable = false)
-    private long publishedAt;
+    private Instant publishedAt = Instant.EPOCH;
 
     /// How many of its videos the viewers following it have been told about.
     @Column(nullable = false)
@@ -269,19 +270,19 @@ public class Title {
         this.ageRestricted = ageRestricted;
     }
 
-    public long getCreatedAt() {
+    public Instant getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(long createdAt) {
+    public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
     }
 
-    public long getPublishedAt() {
+    public Instant getPublishedAt() {
         return publishedAt;
     }
 
-    public void setPublishedAt(long publishedAt) {
+    public void setPublishedAt(Instant publishedAt) {
         this.publishedAt = publishedAt;
     }
 

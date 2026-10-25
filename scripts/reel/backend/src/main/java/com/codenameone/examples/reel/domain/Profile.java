@@ -21,6 +21,7 @@ package com.codenameone.examples.reel.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
+import java.time.Instant;
 
 /// What Reel knows about an account beyond its sign-in, keyed by the same username.
 @Entity
@@ -33,7 +34,7 @@ public class Profile {
     private String displayName = "";
 
     @Column(nullable = false)
-    private long createdAt;
+    private Instant createdAt = Instant.EPOCH;
 
     @Column(nullable = false, type = "VARCHAR(8)")
     private String language = "";
@@ -45,7 +46,7 @@ public class Profile {
     private String flagReason = "";
 
     @Column(nullable = false)
-    private long lastSeenAt;
+    private Instant lastSeenAt = Instant.EPOCH;
 
     public Profile() {
     }
@@ -66,11 +67,11 @@ public class Profile {
         this.displayName = displayName;
     }
 
-    public long getCreatedAt() {
+    public Instant getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(long createdAt) {
+    public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
     }
 
@@ -98,11 +99,11 @@ public class Profile {
         this.flagReason = flagReason;
     }
 
-    public long getLastSeenAt() {
+    public Instant getLastSeenAt() {
         return lastSeenAt;
     }
 
-    public void setLastSeenAt(long lastSeenAt) {
+    public void setLastSeenAt(Instant lastSeenAt) {
         this.lastSeenAt = lastSeenAt;
     }
 }

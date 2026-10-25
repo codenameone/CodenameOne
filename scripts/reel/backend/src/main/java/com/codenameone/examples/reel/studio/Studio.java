@@ -68,6 +68,7 @@ import com.codenameone.examples.reel.repository.VideoRepository;
 import com.codenameone.examples.reel.settings.Settings;
 import com.codename1.backend.Crypto;
 
+import java.time.Instant;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -159,7 +160,7 @@ public class Studio {
         t.setId(Ids.next());
         t.setCreator(username);
         t.setStatus(Kinds.DRAFT);
-        t.setCreatedAt(System.currentTimeMillis());
+        t.setCreatedAt(Instant.now());
         apply(t, wanted);
         titles.insert(t);
         return dto(t, true);
@@ -185,7 +186,7 @@ public class Studio {
         }
         if (Caller.hasRole(Roles.ADMIN)) {
             t.setStatus(Kinds.PUBLISHED);
-            t.setPublishedAt(System.currentTimeMillis());
+            t.setPublishedAt(Instant.now());
             titles.save(t);
         } else {
             t.setStatus(Kinds.IN_REVIEW);
@@ -222,7 +223,7 @@ public class Studio {
         if (videos.findByTitleIdOrderBySeasonAscNumberAsc(titleId).size() >= 500) {
             throw new ResponseStatusException(409, "A title holds at most 500 videos");
         }
-        long now = System.currentTimeMillis();
+        Instant now = Instant.now();
         Video v = new Video();
         v.setId(Ids.next());
         v.setTitleId(t.getId());
@@ -297,7 +298,7 @@ public class Studio {
             throws IOException {
         Video v = ownVideo(username, id);
         subtitles.put(id, language, wanted == null ? null : wanted.label(), wanted == null ? null : wanted.vtt(),
-                System.currentTimeMillis());
+                Instant.now());
         reviews.changed(titles.findById(v.getTitleId()), trusted());
         return video(v, true);
     }
@@ -394,7 +395,7 @@ public class Studio {
     @Transactional(readOnly = true)
     public TitleAnalyticsDto analytics(String username, String id, int days) {
         Title t = own(username, id);
-        long since = System.currentTimeMillis() - Math.max(1, Math.min(365, days)) * 86400000L;
+        Instant since = Instant.now().minusMillis(Math.max(1, Math.min(365, days)) * 86400000L);
         List<Playback> plays = playbacks.findByTitleIdAndStartedAtGreaterThan(id, since);
         Set<String> viewers = new HashSet<String>();
         Map<String, Integer> countries = new HashMap<String, Integer>();
@@ -402,8 +403,8 @@ public class Studio {
         for (int iter = 0; iter < plays.size(); iter++) {
             Playback p = plays.get(iter);
             viewers.add(p.getProfileId().length() > 0 ? p.getProfileId() : p.getUsername());
-            long end = p.getEndedAt() > 0 ? p.getEndedAt() : p.getLastHeartbeatAt();
-            seconds += Math.max(0L, (end - p.getStartedAt()) / 1000L);
+            Instant end = p.getEndedAt().isAfter(Instant.EPOCH) ? p.getEndedAt() : p.getLastHeartbeatAt();
+            seconds += Math.max(0L, (end.toEpochMilli() - p.getStartedAt().toEpochMilli()) / 1000L);
             String c = p.getCountry().length() == 0 ? "??" : p.getCountry();
             Integer n = countries.get(c);
             countries.put(c, Integer.valueOf(n == null ? 1 : n.intValue() + 1));
@@ -573,7 +574,8 @@ public class Studio {
                 Rows.split(t.getAdvisories()),
                 Rows.split(t.getGenres()), Rows.split(t.getTags()), t.getAccess(), t.getRentalPriceCents(),
                 t.getStatus(), reviews.status(t.getId()), t.getModerationNote(), t.getPosterUrl(), interactive,
-                t.isCertificate(), t.getPassPercent(), t.getCreatedAt(), t.getPublishedAt(), list);
+                t.isCertificate(), t.getPassPercent(), t.getCreatedAt().toEpochMilli(),
+                t.getPublishedAt().toEpochMilli(), list);
     }
 
     StudioVideoDto video(Video v, boolean full) {

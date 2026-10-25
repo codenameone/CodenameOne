@@ -44,6 +44,7 @@ import com.codenameone.examples.reel.repository.TitleRepository;
 import com.codenameone.examples.reel.repository.VideoRepository;
 import com.codenameone.examples.reel.settings.Settings;
 
+import java.time.Instant;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -119,7 +120,7 @@ public class Reviews {
     /// Closes the open submissions of a title its creator took back, so a
     /// moderator working an old queue cannot republish it.
     public void withdrawn(String titleId, String by) {
-        closeOthers(titleId, TITLE, by, DISMISS, System.currentTimeMillis());
+        closeOthers(titleId, TITLE, by, DISMISS, Instant.now());
     }
 
     /// Queues a submitted title, with what the text checks found.
@@ -257,7 +258,7 @@ public class Reviews {
         }
         String action = decision == null || decision.action() == null ? "" : decision.action();
         String note = cut(decision == null ? null : decision.note(), 500);
-        long now = System.currentTimeMillis();
+        Instant now = Instant.now();
         String kind = item.getKind();
         if ((TITLE.equals(kind) || APPEAL.equals(kind)) && DISMISS.equals(action)) {
             // Closing a stale item changes nothing about the title.
@@ -279,7 +280,7 @@ public class Reviews {
                 }
                 title.setStatus(Kinds.PUBLISHED);
                 title.setModerationNote("");
-                if (title.getPublishedAt() == 0) {
+                if (title.getPublishedAt().equals(Instant.EPOCH)) {
                     title.setPublishedAt(now);
                 }
                 history.record(title.getCreator(), by, APPEAL.equals(kind) ? Moderation.RESTORE : Moderation.APPROVE,
@@ -329,7 +330,7 @@ public class Reviews {
     }
 
     // Closed either way; the decision column says which way.
-    private static ModerationItem close(ModerationItem item, String action, String by, String note, long now) {
+    private static ModerationItem close(ModerationItem item, String action, String by, String note, Instant now) {
         item.setStatus(DISMISS.equals(action) ? Kinds.DISMISSED : Kinds.UPHELD);
         item.setDecision(action);
         item.setDecidedBy(by);
@@ -346,7 +347,7 @@ public class Reviews {
         List<BlocklistEntryDto> out = new ArrayList<BlocklistEntryDto>();
         for (int iter = 0; iter < all.size(); iter++) {
             BlockedItem b = all.get(iter);
-            out.add(new BlocklistEntryDto(b.getId(), b.getKind(), b.getValue(), b.getNote(), b.getCreatedAt()));
+            out.add(new BlocklistEntryDto(b.getId(), b.getKind(), b.getValue(), b.getNote(), b.getCreatedAt().toEpochMilli()));
         }
         return out;
     }
@@ -401,9 +402,9 @@ public class Reviews {
         row.setValue(cut(value, 120));
         row.setNote(note);
         row.setCreatedBy(by);
-        row.setCreatedAt(System.currentTimeMillis());
+        row.setCreatedAt(Instant.now());
         blocked.insert(row);
-        return new BlocklistEntryDto(row.getId(), kind, row.getValue(), note, row.getCreatedAt());
+        return new BlocklistEntryDto(row.getId(), kind, row.getValue(), note, row.getCreatedAt().toEpochMilli());
     }
 
     private void queue(String kind, String subject, String owner, String reason, String detail, List<String> signals)
@@ -418,7 +419,7 @@ public class Reviews {
         row.setSignals(cut(Rows.join(signals), 1000));
         row.setScore(score(kind, signals));
         row.setStatus(Kinds.OPEN);
-        row.setCreatedAt(System.currentTimeMillis());
+        row.setCreatedAt(Instant.now());
         items.insert(row);
     }
 
@@ -443,7 +444,7 @@ public class Reviews {
         }
     }
 
-    private void closeOthers(String subject, String kind, String by, String action, long now) {
+    private void closeOthers(String subject, String kind, String by, String action, Instant now) {
         List<ModerationItem> open = items.findBySubjectIdAndStatus(subject, Kinds.OPEN);
         for (int iter = 0; iter < open.size(); iter++) {
             ModerationItem m = open.get(iter);
@@ -510,7 +511,7 @@ public class Reviews {
             thumb = t == null ? "" : t.getPosterUrl();
         }
         return new ModerationItemDto(m.getId(), m.getKind(), m.getSubjectId(), name, m.getOwner(), m.getReason(),
-                m.getDetail(), Rows.split(m.getSignals()), m.getScore(), thumb, m.getStatus(), m.getCreatedAt());
+                m.getDetail(), Rows.split(m.getSignals()), m.getScore(), thumb, m.getStatus(), m.getCreatedAt().toEpochMilli());
     }
 
     static boolean hash64(String h) {

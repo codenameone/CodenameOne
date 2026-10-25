@@ -50,6 +50,7 @@ import com.codenameone.examples.reel.repository.TitleRepository;
 import com.codenameone.examples.reel.repository.VideoRepository;
 import com.codenameone.examples.reel.settings.Settings;
 
+import java.time.Instant;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -131,7 +132,7 @@ public class Library {
         row.setId(Ids.next());
         row.setProfileId(profile.getId());
         row.setTitleId(titleId);
-        row.setAddedAt(System.currentTimeMillis());
+        row.setAddedAt(Instant.now());
         lists.insert(row);
     }
 
@@ -163,13 +164,13 @@ public class Library {
             row.setUsername(username);
             row.setTitleId(titleId);
             row.setStars(stars);
-            row.setUpdatedAt(System.currentTimeMillis());
+            row.setUpdatedAt(Instant.now());
             ratings.insert(row);
         } else if (row != null && stars == 0) {
             ratings.deleteById(row.getId());
         } else if (row != null) {
             row.setStars(stars);
-            row.setUpdatedAt(System.currentTimeMillis());
+            row.setUpdatedAt(Instant.now());
             ratings.save(row);
         }
         t.setRatingSum(t.getRatingSum() - before + stars);
@@ -193,7 +194,7 @@ public class Library {
                 continue;
             }
             out.add(new HistoryEntryDto(t.getId(), t.getName(), p.getVideoId(), t.getPosterUrl(),
-                    p.getPositionSeconds(), p.getDurationSeconds(), p.getUpdatedAt()));
+                    p.getPositionSeconds(), p.getDurationSeconds(), p.getUpdatedAt().toEpochMilli()));
         }
         return out;
     }
@@ -243,7 +244,7 @@ public class Library {
             throw new ResponseStatusException(409, "Rentals stream only");
         }
         Video v = playable(t, episodeId);
-        long now = System.currentTimeMillis();
+        Instant now = Instant.now();
         List<Download> mine = downloads.findByUsernameAndDeviceId(username, deviceId);
         Download row = null;
         for (int iter = 0; iter < mine.size(); iter++) {
@@ -270,7 +271,7 @@ public class Library {
             row.setCreatedAt(now);
         }
         long ttl = LICENSE_DAYS * 86400L;
-        row.setLicenseExpiresAt(now + ttl * 1000L);
+        row.setLicenseExpiresAt(now.plusMillis(ttl * 1000L));
         if (fresh) {
             downloads.insert(row);
         } else {
@@ -294,7 +295,7 @@ public class Library {
         Title t = titles.findById(d.getTitleId());
         File f = new File(mediaDir, d.getVideoId() + "/cenc.mp4");
         return new DownloadDto(d.getId(), d.getTitleId(), t == null ? "" : t.getName(), d.getVideoId(), url,
-                d.getScheme(), license, d.getLicenseExpiresAt(), f.exists() ? f.length() : 0L, d.getDeviceId());
+                d.getScheme(), license, d.getLicenseExpiresAt().toEpochMilli(), f.exists() ? f.length() : 0L, d.getDeviceId());
     }
 
     private Title published(String titleId) {

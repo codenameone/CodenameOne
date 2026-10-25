@@ -21,7 +21,7 @@ package com.codenameone.examples.reel.repository;
 import com.codename1.orm.repository.CrudRepository;
 import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.reel.domain.Upload;
-
+import java.time.Instant;
 import java.util.List;
 
 /// The upload rows.
@@ -29,5 +29,5 @@ import java.util.List;
 public interface UploadRepository extends CrudRepository<Upload, String> {
     List<Upload> findByVideoIdOrderByCreatedAtDesc(String videoId);
 
-    List<Upload> findByStatusAndUpdatedAtLessThan(String status, long before);
+    List<Upload> findByStatusAndUpdatedAtLessThan(String status, Instant before);
 }

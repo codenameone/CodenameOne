@@ -22,6 +22,7 @@ import com.codename1.backend.annotations.Autowired;
 import com.codename1.backend.test.BackendTest;
 import com.codenameone.examples.reel.domain.Subscription;
 import org.junit.jupiter.api.Test;
+import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -34,14 +35,14 @@ class RenewalGraceTest {
 
     @Test
     void aPastDueSubscriptionIsNotRetriedBeforeItsTime() {
-        long now = System.currentTimeMillis();
+        Instant now = Instant.now();
         Subscription sub = new Subscription();
         sub.setUsername("nobody");
         sub.setPlanCode("basic");
         sub.setStatus(Entitlements.PAST_DUE);
-        sub.setPeriodEndsAt(now - 60000L);
+        sub.setPeriodEndsAt(now.minusMillis(60000L));
         sub.setFailedAttempts(1);
-        sub.setNextRetryAt(now + Billing.RETRY_MILLIS);
+        sub.setNextRetryAt(now.plusMillis(Billing.RETRY_MILLIS));
         billing.renewOne(sub, now);
         assertEquals(Entitlements.PAST_DUE, sub.getStatus());
         assertEquals(1, sub.getFailedAttempts());

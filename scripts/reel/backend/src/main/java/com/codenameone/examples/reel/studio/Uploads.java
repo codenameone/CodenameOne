@@ -32,6 +32,7 @@ import com.codenameone.examples.reel.repository.UploadRepository;
 import com.codenameone.examples.reel.repository.VideoRepository;
 import com.codename1.security.Hash;
 
+import java.time.Instant;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -89,7 +90,7 @@ public class Uploads {
         if (sha.length() != 0 && sha.length() != 64) {
             throw new ResponseStatusException(400, "The SHA-256 is 64 hex digits");
         }
-        long now = System.currentTimeMillis();
+        Instant now = Instant.now();
         Upload row = new Upload();
         row.setId(Ids.next());
         row.setVideoId(video.getId());
@@ -143,7 +144,7 @@ public class Uploads {
             out.close();
         }
         row.setReceivedBytes(offset + body.length);
-        row.setUpdatedAt(System.currentTimeMillis());
+        row.setUpdatedAt(Instant.now());
         Video video = videos.findById(row.getVideoId());
         if (row.getReceivedBytes() == row.getTotalBytes()) {
             if (row.getSha256().length() > 0 && !row.getSha256().equalsIgnoreCase(sha256(f))) {

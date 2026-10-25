@@ -49,6 +49,7 @@ import com.codenameone.examples.reel.repository.VideoRepository;
 import com.codenameone.examples.reel.settings.Settings;
 import com.codename1.backend.Crypto;
 
+import java.time.Instant;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -161,7 +162,7 @@ public class Learning {
         row.setProfileId(profileId);
         row.setChoices(Rows.joinInts(new ArrayList<Integer>(picked)));
         row.setCorrect(correct);
-        row.setCreatedAt(System.currentTimeMillis());
+        row.setCreatedAt(Instant.now());
         answers.insert(row);
 
         List<Integer> tally = new ArrayList<Integer>();
@@ -253,7 +254,7 @@ public class Learning {
         c.setTitleId(t.getId());
         c.setHolderName(accounts.displayName(username));
         c.setScorePercent(score);
-        c.setIssuedAt(System.currentTimeMillis());
+        c.setIssuedAt(Instant.now());
         c.setVerifyCode(code());
         certificates.insert(c);
         return c;
@@ -308,7 +309,7 @@ public class Learning {
     private CertificateDto dto(Certificate c) {
         Title t = titles.findById(c.getTitleId());
         return new CertificateDto(c.getId(), c.getTitleId(), t == null ? "" : t.getName(), c.getHolderName(),
-                c.getScorePercent(), c.getIssuedAt(), c.getVerifyCode(), "/verify/" + c.getVerifyCode());
+                c.getScorePercent(), c.getIssuedAt().toEpochMilli(), c.getVerifyCode(), "/verify/" + c.getVerifyCode());
     }
 
     private static String code() throws IOException {

@@ -39,6 +39,7 @@ import com.codenameone.examples.reel.pay.Payments;
 import com.codenameone.examples.reel.repository.ClosedAccountRepository;
 import com.codenameone.examples.reel.repository.ProfileRepository;
 
+import java.time.Instant;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -111,13 +112,13 @@ public class Accounts {
                     "That e-mail belonged to an account that was closed. Use another");
         }
         create(username, request.password(), name, new String[] {Roles.VIEWER},
-                System.currentTimeMillis());
+                Instant.now());
         return describe(username);
     }
 
     /// Creates the sign-in and the profile. The caller has checked the name is free.
     @Transactional(rollbackFor = IOException.class)
-    public void create(String username, String password, String name, String[] roles, long openedAt)
+    public void create(String username, String password, String name, String[] roles, Instant openedAt)
             throws IOException {
         users.createUser(User.withUsername(username).password(encoder.encode(password))
                 .roles(roles).build());
@@ -159,7 +160,7 @@ public class Accounts {
         Entitlements.Allowance plan = entitlements.allowance(username);
         return new UserDto(username, profile.getDisplayName(), username, roles(signIn), plan.planCode,
                 plan.status, !signIn.isEnabled(), profile.isFlagged(), devices, streamsNow,
-                profile.getCreatedAt(), profile.getLastSeenAt());
+                profile.getCreatedAt().toEpochMilli(), profile.getLastSeenAt().toEpochMilli());
     }
 
     @Transactional(readOnly = true)
@@ -267,8 +268,8 @@ public class Accounts {
     @Transactional
     public void seen(String username) {
         Profile profile = profiles.findById(username);
-        long now = System.currentTimeMillis();
-        if (profile != null && now - profile.getLastSeenAt() > 60000L) {
+        Instant now = Instant.now();
+        if (profile != null && profile.getLastSeenAt().plusMillis(60000L).isBefore(now)) {
             profile.setLastSeenAt(now);
             profiles.save(profile);
         }
@@ -317,7 +318,7 @@ public class Accounts {
         if (!closed.existsById(hash)) {
             ClosedAccount row = new ClosedAccount();
             row.setUsernameHash(hash);
-            row.setClosedAt(System.currentTimeMillis());
+            row.setClosedAt(Instant.now());
             closed.insert(row);
         }
         users.deleteUser(username);

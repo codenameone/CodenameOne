@@ -32,6 +32,7 @@ import com.codenameone.examples.reel.domain.AdEvent;
 import com.codenameone.examples.reel.repository.AdCampaignRepository;
 import com.codenameone.examples.reel.repository.AdEventRepository;
 
+import java.time.Instant;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -90,13 +91,14 @@ public class Ads {
     /// creative per break keeps breaks short; null when nothing is eligible.
     @Transactional(readOnly = true)
     public AdCampaign choose(List<String> genres, String breakId) {
-        long now = System.currentTimeMillis();
+        Instant now = Instant.now();
         List<AdCampaign> all = campaigns.findByActiveTrue();
         AdCampaign best = null;
         double bestScore = -1;
         for (int iter = 0; iter < all.size(); iter++) {
             AdCampaign c = all.get(iter);
-            if ((c.getStartsAt() > 0 && c.getStartsAt() > now) || (c.getEndsAt() > 0 && c.getEndsAt() < now)) {
+            if ((c.getStartsAt().isAfter(Instant.EPOCH) && c.getStartsAt().isAfter(now))
+                    || (c.getEndsAt().isAfter(Instant.EPOCH) && c.getEndsAt().isBefore(now))) {
                 continue;
             }
             if (c.getBudgetCents() > 0 && c.getSpentMillicents() >= c.getBudgetCents() * 1000L) {
@@ -165,7 +167,7 @@ public class Ads {
         row.setSessionId(sessionId);
         row.setUsername(username);
         row.setEvent(kind);
-        row.setCreatedAt(System.currentTimeMillis());
+        row.setCreatedAt(Instant.now());
         events.insert(row);
     }
 
@@ -196,7 +198,7 @@ public class Ads {
         if (fresh) {
             row = new AdCampaign();
             row.setId(Ids.next());
-            row.setCreatedAt(System.currentTimeMillis());
+            row.setCreatedAt(Instant.now());
         }
         row.setAdvertiser(text(wanted.advertiser(), 120, "the advertiser"));
         row.setName(text(wanted.name(), 120, "the campaign name"));
@@ -216,8 +218,8 @@ public class Ads {
         row.setBudgetCents(Math.max(0L, wanted.budgetCents()));
         row.setGenres(Rows.join(wanted.genres()));
         row.setActive(wanted.active());
-        row.setStartsAt(Math.max(0L, wanted.startsAt()));
-        row.setEndsAt(Math.max(0L, wanted.endsAt()));
+        row.setStartsAt(Instant.ofEpochMilli(Math.max(0L, wanted.startsAt())));
+        row.setEndsAt(Instant.ofEpochMilli(Math.max(0L, wanted.endsAt())));
         if (fresh) {
             campaigns.insert(row);
         } else {
@@ -230,7 +232,8 @@ public class Ads {
         return new AdCampaignDto(c.getId(), c.getAdvertiser(), c.getName(), c.getCreativeUrl(),
                 c.getDurationSeconds(), c.getSkippableAfterSeconds(), c.getClickUrl(), c.getCpmCents(),
                 c.getBudgetCents(), c.getSpentMillicents() / 1000L, (int) c.getImpressions(), (int) c.getClicks(),
-                Rows.split(c.getGenres()), c.isActive(), c.getStartsAt(), c.getEndsAt());
+                Rows.split(c.getGenres()), c.isActive(), c.getStartsAt().toEpochMilli(),
+                c.getEndsAt().toEpochMilli());
     }
 
     private static String text(String value, int max, String what) {

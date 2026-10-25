@@ -27,6 +27,7 @@ import com.codenameone.examples.reel.push.Notifier;
 import com.codenameone.examples.reel.domain.Device;
 import com.codenameone.examples.reel.repository.DeviceRepository;
 
+import java.time.Instant;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -62,7 +63,7 @@ public class Devices {
         if (id.length() == 0) {
             return;
         }
-        long now = System.currentTimeMillis();
+        Instant now = Instant.now();
         Device row = devices.findFirstByIdAndUsername(id, username);
         if (row == null) {
             Device elsewhere = devices.findById(id);
@@ -87,11 +88,11 @@ public class Devices {
             }
             return;
         }
-        if (row.getRevokedAt() > 0L) {
+        if (row.getRevokedAt().isAfter(Instant.EPOCH)) {
             throw new ResponseStatusException(401, "This device was signed out");
         }
         String grant = Grants.current();
-        if (now - row.getLastSeenAt() > 60000L || !Requests.ip().equals(row.getLastIp())
+        if (row.getLastSeenAt().plusMillis(60000L).isBefore(now) || !Requests.ip().equals(row.getLastIp())
                 || !grant.equals(row.getGrantId())) {
             fill(row, now);
             row.setGrantId(grant);
@@ -106,7 +107,7 @@ public class Devices {
             return true;
         }
         Device row = devices.findFirstByIdAndUsername(id, username);
-        return row == null || row.getRevokedAt() == 0L;
+        return row == null || row.getRevokedAt().equals(Instant.EPOCH);
     }
 
     /// Whether a download's device is still signed in. Stricter than
@@ -119,7 +120,7 @@ public class Devices {
             return false;
         }
         Device row = devices.findFirstByIdAndUsername(id, username);
-        return row != null && row.getRevokedAt() == 0L;
+        return row != null && row.getRevokedAt().equals(Instant.EPOCH);
     }
 
     @Transactional(readOnly = true)
@@ -129,28 +130,28 @@ public class Devices {
         List<DeviceDto> out = new ArrayList<DeviceDto>();
         for (int iter = 0; iter < rows.size(); iter++) {
             Device d = rows.get(iter);
-            if (d.getRevokedAt() > 0L) {
+            if (d.getRevokedAt().isAfter(Instant.EPOCH)) {
                 continue;
             }
             out.add(new DeviceDto(d.getId(), d.getName(), d.getPlatform(), d.getLastIp(),
-                    d.getLastCountry(), d.getLastSeenAt(), d.getId().equals(current)));
+                    d.getLastCountry(), d.getLastSeenAt().toEpochMilli(), d.getId().equals(current)));
         }
         return out;
     }
 
     @Transactional(readOnly = true)
     public int count(String username) {
-        return (int) devices.countByUsernameAndRevokedAt(username, 0L);
+        return (int) devices.countByUsernameAndRevokedAt(username, Instant.EPOCH);
     }
 
     @Transactional(rollbackFor = IOException.class)
     /// Revokes every device the account is signed in on.
     public void signOutAll(String username) throws IOException {
         List<Device> rows = devices.findByUsernameOrderByLastSeenAtDesc(username);
-        long now = System.currentTimeMillis();
+        Instant now = Instant.now();
         for (int iter = 0; iter < rows.size(); iter++) {
             Device row = rows.get(iter);
-            if (row.getRevokedAt() == 0L) {
+            if (row.getRevokedAt().equals(Instant.EPOCH)) {
                 row.setRevokedAt(now);
                 devices.save(row);
                 grants.endGrant(row.getGrantId());
@@ -164,7 +165,7 @@ public class Devices {
         if (row == null) {
             throw new ResponseStatusException(404, "No such device");
         }
-        row.setRevokedAt(System.currentTimeMillis());
+        row.setRevokedAt(Instant.now());
         devices.save(row);
         // The device id is the app's own claim; what really signs the device
         // out is ending the sign-in it last used, so its refresh token stops
@@ -179,7 +180,7 @@ public class Devices {
         }
     }
 
-    private static void fill(Device row, long now) {
+    private static void fill(Device row, Instant now) {
         row.setName(Requests.deviceName());
         row.setPlatform(Requests.platform());
         row.setLastIp(Requests.ip());

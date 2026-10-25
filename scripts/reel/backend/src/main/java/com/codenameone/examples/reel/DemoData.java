@@ -48,6 +48,7 @@ import com.codenameone.examples.reel.repository.TitleRepository;
 import com.codenameone.examples.reel.repository.VideoKeyRepository;
 import com.codenameone.examples.reel.repository.VideoRepository;
 
+import java.time.Instant;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -136,7 +137,7 @@ public class DemoData {
 
     @Transactional(rollbackFor = IOException.class)
     void catalog(Map<String, Map> seed) throws IOException {
-        long now = System.currentTimeMillis();
+        Instant now = Instant.now();
         plan("basic", "Basic with ads", "Everything, with short ad breaks. One screen, HD.", 699, 1, "720", true,
                 false, 7, 0);
         plan("standard", "Standard", "No ads, two screens in Full HD, downloads.", 1549, 2, "1080", false, true,
@@ -170,7 +171,7 @@ public class DemoData {
             row.setCreator(DemoAccounts.CREATOR);
             row.setStatus(Kinds.PUBLISHED);
             row.setFeatured(iter == 1);
-            row.setCreatedAt(now - (TITLES.length - iter) * Days.MILLIS);
+            row.setCreatedAt(now.minusMillis((TITLES.length - iter) * Days.MILLIS));
             row.setPublishedAt(row.getCreatedAt());
             if (Kinds.COURSE.equals(t[1])) {
                 row.setCertificate(true);
@@ -219,7 +220,7 @@ public class DemoData {
     }
 
     private void video(String id, String titleId, String role, int number, String name, Map<String, Map> seed,
-            long now) throws IOException {
+            Instant now) throws IOException {
         Map entry = seed.get(id);
         Video v = new Video();
         v.setId(id);
@@ -296,7 +297,7 @@ public class DemoData {
         interactions.insert(i);
     }
 
-    private void campaign(String video, String advertiser, String name, String click, String genreList, long now,
+    private void campaign(String video, String advertiser, String name, String click, String genreList, Instant now,
             Map<String, Map> seed) throws IOException {
         video(video, "", Kinds.AD, 1, name, seed, now);
         AdCampaign c = new AdCampaign();
@@ -311,8 +312,8 @@ public class DemoData {
         c.setBudgetCents(50000);
         c.setGenres(genreList);
         c.setActive(true);
-        c.setStartsAt(now - Days.MILLIS);
-        c.setEndsAt(now + 90 * Days.MILLIS);
+        c.setStartsAt(now.minusMillis(Days.MILLIS));
+        c.setEndsAt(now.plusMillis(90 * Days.MILLIS));
         c.setCreatedAt(now);
         campaigns.insert(c);
     }

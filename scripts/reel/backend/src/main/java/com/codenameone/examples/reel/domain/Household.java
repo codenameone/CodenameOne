@@ -21,6 +21,7 @@ package com.codenameone.examples.reel.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
+import java.time.Instant;
 
 /// A viewer profile inside an account: its own list, history and rating limit.
 @Entity
@@ -51,7 +52,7 @@ public class Household {
     private String language = "";
 
     @Column(nullable = false)
-    private long createdAt;
+    private Instant createdAt = Instant.EPOCH;
 
     public Household() {
     }
@@ -120,11 +121,11 @@ public class Household {
         this.language = language;
     }
 
-    public long getCreatedAt() {
+    public Instant getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(long createdAt) {
+    public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
     }
 }

@@ -21,6 +21,7 @@ package com.codenameone.examples.reel.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
+import java.time.Instant;
 
 /// That an account used a coupon. Keyed by the code and the account together,
 /// so the insert itself refuses a second use.
@@ -31,7 +32,7 @@ public class CouponRedemption {
     private String id = "";
 
     @Column(nullable = false)
-    private long redeemedAt;
+    private Instant redeemedAt = Instant.EPOCH;
 
     public CouponRedemption() {
     }
@@ -48,11 +49,11 @@ public class CouponRedemption {
         this.id = id;
     }
 
-    public long getRedeemedAt() {
+    public Instant getRedeemedAt() {
         return redeemedAt;
     }
 
-    public void setRedeemedAt(long redeemedAt) {
+    public void setRedeemedAt(Instant redeemedAt) {
         this.redeemedAt = redeemedAt;
     }
 }

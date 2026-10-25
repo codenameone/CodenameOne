@@ -21,6 +21,7 @@ package com.codenameone.examples.reel.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
+import java.time.Instant;
 
 /// An ad campaign, its creative and its budget.
 @Entity
@@ -69,13 +70,13 @@ public class AdCampaign {
     private boolean active;
 
     @Column(nullable = false)
-    private long startsAt;
+    private Instant startsAt = Instant.EPOCH;
 
     @Column(nullable = false)
-    private long endsAt;
+    private Instant endsAt = Instant.EPOCH;
 
     @Column(nullable = false)
-    private long createdAt;
+    private Instant createdAt = Instant.EPOCH;
 
     public AdCampaign() {
     }
@@ -192,27 +193,27 @@ public class AdCampaign {
         this.active = active;
     }
 
-    public long getStartsAt() {
+    public Instant getStartsAt() {
         return startsAt;
     }
 
-    public void setStartsAt(long startsAt) {
+    public void setStartsAt(Instant startsAt) {
         this.startsAt = startsAt;
     }
 
-    public long getEndsAt() {
+    public Instant getEndsAt() {
         return endsAt;
     }
 
-    public void setEndsAt(long endsAt) {
+    public void setEndsAt(Instant endsAt) {
         this.endsAt = endsAt;
     }
 
-    public long getCreatedAt() {
+    public Instant getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(long createdAt) {
+    public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
     }
 }

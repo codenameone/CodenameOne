@@ -21,6 +21,7 @@ package com.codenameone.examples.reel.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
+import java.time.Instant;
 
 /// A subtitle track of a video, in one language. The WebVTT text is kept in
 /// the row: a feature's subtitles are tens of kilobytes, and the player
@@ -44,7 +45,7 @@ public class Subtitle {
     private String vtt = "";
 
     @Column(nullable = false)
-    private long createdAt;
+    private Instant createdAt = Instant.EPOCH;
 
     public Subtitle() {
     }
@@ -89,11 +90,11 @@ public class Subtitle {
         this.vtt = vtt;
     }
 
-    public long getCreatedAt() {
+    public Instant getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(long createdAt) {
+    public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
     }
 }

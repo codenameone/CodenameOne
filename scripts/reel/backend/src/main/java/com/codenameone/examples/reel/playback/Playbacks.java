@@ -64,6 +64,7 @@ import com.codenameone.examples.reel.settings.Settings;
 import com.codename1.backend.Crypto;
 import com.codename1.backend.Base64Url;
 
+import java.time.Instant;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -168,9 +169,9 @@ public class Playbacks {
         if (deviceId.length() > 0 && !devices.usable(username, deviceId)) {
             throw new ResponseStatusException(401, "This device was signed out");
         }
-        long now = System.currentTimeMillis();
+        Instant now = Instant.now();
         Entitlements.Allowance allowance = entitlements.allowance(username);
-        List<Playback> live = sessions.findByUsernameAndEndedAt(username, 0L);
+        List<Playback> live = sessions.findByUsernameAndEndedAt(username, Instant.EPOCH);
         int streams = 0;
         for (int iter = 0; iter < live.size(); iter++) {
             Playback p = live.get(iter);
@@ -178,7 +179,7 @@ public class Playbacks {
             // viewer picked another episode) rather than counting twice.
             if (deviceId.length() > 0 && deviceId.equals(p.getDeviceId())) {
                 end(p, "REPLACED", now);
-            } else if (p.getLastHeartbeatAt() < now - STALE_MILLIS) {
+            } else if (p.getLastHeartbeatAt().isBefore(now.minusMillis(STALE_MILLIS))) {
                 end(p, "STALE", now);
             } else {
                 streams++;
@@ -261,15 +262,15 @@ public class Playbacks {
                 tracks.subtitles(video.getId(), base), Tracks.audio(video), audio,
                 Tracks.qualities(video.getRenditions(), maxHeight), maxHeight, chapters(video.getId()),
                 settings.enabled(Features.INTERACTIVE) ? interactions(video.getId()) : new ArrayList<InteractionDto>(),
-                watermark, now + ttl * 1000L);
+                watermark, now.toEpochMilli() + ttl * 1000L);
     }
 
     @Transactional(rollbackFor = IOException.class)
     public HeartbeatReplyDto heartbeat(String username, HeartbeatDto beat) throws IOException {
         Playback session = owned(username, beat == null ? null : beat.sessionId());
-        long now = System.currentTimeMillis();
-        long expires = session.getStartedAt() + MediaTokens.STREAM_SECONDS * 1000L;
-        if (session.getEndedAt() > 0) {
+        Instant now = Instant.now();
+        long expires = session.getStartedAt().toEpochMilli() + MediaTokens.STREAM_SECONDS * 1000L;
+        if (session.getEndedAt().isAfter(Instant.EPOCH)) {
             return new HeartbeatReplyDto(false, reason(session.getEndedReason()), expires);
         }
         // What allowed the session to start is checked again at every beat: a
@@ -291,8 +292,8 @@ public class Playbacks {
     @Transactional(rollbackFor = IOException.class)
     public void stop(String username, StopDto stop) throws IOException {
         Playback session = owned(username, stop == null ? null : stop.sessionId());
-        long now = System.currentTimeMillis();
-        boolean first = session.getEndedAt() == 0;
+        Instant now = Instant.now();
+        boolean first = session.getEndedAt().equals(Instant.EPOCH);
         if (first) {
             session.setPositionSeconds(Math.max(0, stop.positionSeconds()));
             end(session, stop.completed() ? "COMPLETED" : "STOPPED", now);
@@ -313,7 +314,7 @@ public class Playbacks {
     public List<AdDto> adsFor(String username, String sessionId, String breakId) throws IOException {
         Playback session = owned(username, sessionId);
         List<AdDto> out = new ArrayList<AdDto>();
-        if (breakId == null || !breakId.startsWith(session.getId() + "~") || session.getEndedAt() > 0
+        if (breakId == null || !breakId.startsWith(session.getId() + "~") || session.getEndedAt().isAfter(Instant.EPOCH)
                 || !settings.enabled(Features.ADS)) {
             return out;
         }
@@ -343,8 +344,8 @@ public class Playbacks {
     /// Ends what a device is streaming, when the device is signed out.
     @Transactional
     public void endForDevice(String username, String deviceId) {
-        List<Playback> live = sessions.findByUsernameAndEndedAt(username, 0L);
-        long now = System.currentTimeMillis();
+        List<Playback> live = sessions.findByUsernameAndEndedAt(username, Instant.EPOCH);
+        Instant now = Instant.now();
         for (int iter = 0; iter < live.size(); iter++) {
             if (live.get(iter).getDeviceId().equals(deviceId)) {
                 end(live.get(iter), "SIGNED_OUT", now);
@@ -357,8 +358,8 @@ public class Playbacks {
     /// the session, and must not outlive the reason the sessions ended.
     @Transactional
     public int endAll(String username, String reason) {
-        List<Playback> live = sessions.findByUsernameAndEndedAt(username, 0L);
-        long now = System.currentTimeMillis();
+        List<Playback> live = sessions.findByUsernameAndEndedAt(username, Instant.EPOCH);
+        Instant now = Instant.now();
         for (int iter = 0; iter < live.size(); iter++) {
             end(live.get(iter), reason, now);
         }
@@ -373,24 +374,24 @@ public class Playbacks {
         if (p == null) {
             throw new ResponseStatusException(404, "No such session");
         }
-        if (p.getEndedAt() == 0) {
-            end(p, "ENDED_BY_ADMIN", System.currentTimeMillis());
+        if (p.getEndedAt().equals(Instant.EPOCH)) {
+            end(p, "ENDED_BY_ADMIN", Instant.now());
         }
     }
 
     @Transactional(readOnly = true)
     public List<SessionDto> liveFor(String username) {
-        return dtos(sessions.findByUsernameAndEndedAt(username, 0L));
+        return dtos(sessions.findByUsernameAndEndedAt(username, Instant.EPOCH));
     }
 
     @Transactional(readOnly = true)
     public List<SessionDto> allLive() {
-        return dtos(sessions.findByEndedAtOrderByStartedAtDesc(0L));
+        return dtos(sessions.findByEndedAtOrderByStartedAtDesc(Instant.EPOCH));
     }
 
     @Transactional(readOnly = true)
     public int liveCount() {
-        return (int) sessions.countByEndedAt(0L);
+        return (int) sessions.countByEndedAt(Instant.EPOCH);
     }
 
     /// Whether a token still stands for something live: a session that has
@@ -407,20 +408,20 @@ public class Playbacks {
             // still signed in, the title still published and still in the
             // plan or a rental. Staff review titles by streaming them, so only
             // the creator's own downloads skip the plan.
-            return d != null && d.getLicenseExpiresAt() > System.currentTimeMillis()
+            return d != null && d.getLicenseExpiresAt().isAfter(Instant.now())
                     && devices.signedIn(d.getUsername(), d.getDeviceId())
                     && lost(d.getUsername(), d.getTitleId(), false) == null;
         }
         Playback p = sessions.findById(grant.owner);
-        return p != null && p.getEndedAt() == 0;
+        return p != null && p.getEndedAt().equals(Instant.EPOCH);
     }
 
     /// Ends sessions whose app stopped reporting.
     @Scheduled(fixedDelay = 60000, initialDelay = 60000, lock = "reel-sweep-sessions")
     @Transactional
     public void sweep() {
-        long now = System.currentTimeMillis();
-        List<Playback> stale = sessions.findByEndedAtAndLastHeartbeatAtLessThan(0L, now - STALE_MILLIS);
+        Instant now = Instant.now();
+        List<Playback> stale = sessions.findByEndedAtAndLastHeartbeatAtLessThan(Instant.EPOCH, now.minusMillis(STALE_MILLIS));
         for (int iter = 0; iter < stale.size(); iter++) {
             end(stale.get(iter), "STALE", now);
         }
@@ -477,7 +478,7 @@ public class Playbacks {
         return Math.max(0, p.getPositionSeconds());
     }
 
-    private void remember(Playback session, int position, boolean completed, long now) throws IOException {
+    private void remember(Playback session, int position, boolean completed, Instant now) throws IOException {
         Video video = videos.findById(session.getVideoId());
         int duration = video == null ? 0 : video.getDurationSeconds();
         int at = Math.max(0, duration > 0 ? Math.min(position, duration) : position);
@@ -507,7 +508,7 @@ public class Playbacks {
         }
     }
 
-    private void end(Playback p, String reason, long now) {
+    private void end(Playback p, String reason, Instant now) {
         p.setEndedAt(now);
         p.setEndedReason(reason);
         sessions.save(p);
@@ -554,11 +555,11 @@ public class Playbacks {
     /// Raises a sharing alert when an account streamed from more addresses or
     /// countries in a day than a household plausibly has. The alert is for a
     /// person to look at; nothing is blocked automatically.
-    private void detectSharing(String username, long now) throws IOException {
+    private void detectSharing(String username, Instant now) throws IOException {
         if (!settings.enabled(Features.SHARING_DETECTION)) {
             return;
         }
-        List<Playback> day = sessions.findByUsernameAndStartedAtGreaterThan(username, now - DAY);
+        List<Playback> day = sessions.findByUsernameAndStartedAtGreaterThan(username, now.minusMillis(DAY));
         Set<String> ips = new HashSet<String>();
         Set<String> countries = new HashSet<String>();
         for (int iter = 0; iter < day.size(); iter++) {
@@ -622,7 +623,7 @@ public class Playbacks {
             Household h = p.getProfileId().length() == 0 ? null : households.find(p.getProfileId());
             out.add(new SessionDto(p.getId(), p.getUsername(), p.getProfileId(), h == null ? "" : h.getName(),
                     p.getTitleId(), t == null ? "" : t.getName(), p.getDeviceName(), p.getIp(), p.getCountry(),
-                    p.getStartedAt(), p.getLastHeartbeatAt()));
+                    p.getStartedAt().toEpochMilli(), p.getLastHeartbeatAt().toEpochMilli()));
         }
         return out;
     }

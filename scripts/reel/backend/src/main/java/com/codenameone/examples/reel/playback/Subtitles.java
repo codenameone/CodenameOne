@@ -24,6 +24,7 @@ import com.codenameone.examples.reel.Ids;
 import com.codenameone.examples.reel.domain.Subtitle;
 import com.codenameone.examples.reel.repository.SubtitleRepository;
 
+import java.time.Instant;
 import java.io.IOException;
 
 /// Stores a video's subtitle tracks, one per language.
@@ -80,7 +81,7 @@ public class Subtitles {
     }
 
     /// Adds the track in `language`, or replaces the one already there.
-    public void put(String videoId, String language, String label, String vtt, long now) throws IOException {
+    public void put(String videoId, String language, String label, String vtt, Instant now) throws IOException {
         if (!validLanguage(language)) {
             throw new ResponseStatusException(400, "A language is a tag such as en or pt-BR");
         }

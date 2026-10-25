@@ -21,6 +21,7 @@ package com.codenameone.examples.reel.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
+import java.time.Instant;
 
 /// A course completion certificate.
 @Entity
@@ -42,7 +43,7 @@ public class Certificate {
     private int scorePercent;
 
     @Column(nullable = false)
-    private long issuedAt;
+    private Instant issuedAt = Instant.EPOCH;
 
     @Column(nullable = false, type = "VARCHAR(16)")
     private String verifyCode = "";
@@ -90,11 +91,11 @@ public class Certificate {
         this.scorePercent = scorePercent;
     }
 
-    public long getIssuedAt() {
+    public Instant getIssuedAt() {
         return issuedAt;
     }
 
-    public void setIssuedAt(long issuedAt) {
+    public void setIssuedAt(Instant issuedAt) {
         this.issuedAt = issuedAt;
     }
 

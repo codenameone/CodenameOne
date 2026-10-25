@@ -21,17 +21,17 @@ package com.codenameone.examples.reel.repository;
 import com.codename1.orm.repository.CrudRepository;
 import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.reel.domain.Subscription;
-
+import java.time.Instant;
 import java.util.List;
 
 /// The subscription rows.
 @Repository(entity = Subscription.class, key = String.class)
 public interface SubscriptionRepository extends CrudRepository<Subscription, String> {
-    List<Subscription> findByPeriodEndsAtLessThan(long before);
+    List<Subscription> findByPeriodEndsAtLessThan(Instant before);
 
     long countByStatus(String status);
 
     List<Subscription> findByStatus(String status);
 
-    List<Subscription> findByStatusAndUpdatedAtGreaterThan(String status, long since);
+    List<Subscription> findByStatusAndUpdatedAtGreaterThan(String status, Instant since);
 }

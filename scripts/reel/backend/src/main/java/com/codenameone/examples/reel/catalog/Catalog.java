@@ -55,6 +55,7 @@ import com.codenameone.examples.reel.repository.TitleRepository;
 import com.codenameone.examples.reel.repository.VideoRepository;
 import com.codenameone.examples.reel.settings.Settings;
 
+import java.time.Instant;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -384,7 +385,7 @@ public class Catalog {
             Title t = list.get(i);
             int j = i - 1;
             while (j >= 0 && (byViews ? list.get(j).getViewCount() < t.getViewCount()
-                    : list.get(j).getPublishedAt() < t.getPublishedAt())) {
+                    : list.get(j).getPublishedAt().isBefore(t.getPublishedAt()))) {
                 list.set(j + 1, list.get(j));
                 j--;
             }
@@ -428,10 +429,10 @@ public class Catalog {
             }
         }
         String badge = "";
-        long now = System.currentTimeMillis();
+        Instant now = Instant.now();
         if (Kinds.COURSE.equals(t.getKind()) && t.isCertificate()) {
             badge = "CERTIFICATE";
-        } else if (t.getPublishedAt() > now - 14L * 86400000L) {
+        } else if (t.getPublishedAt().isAfter(now.minusMillis(14L * 86400000L))) {
             badge = "NEW";
         }
         return new TitleCardDto(t.getId(), t.getKind(), t.getName(), t.getPosterUrl(), t.getBackdropUrl(),

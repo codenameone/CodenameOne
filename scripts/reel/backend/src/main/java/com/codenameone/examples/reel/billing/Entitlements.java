@@ -30,6 +30,7 @@ import com.codenameone.examples.reel.repository.RentalRepository;
 import com.codenameone.examples.reel.repository.SubscriptionRepository;
 import com.codenameone.examples.reel.settings.Settings;
 
+import java.time.Instant;
 import java.util.List;
 
 /// What an account may watch, and how: the one place that turns a plan, a
@@ -129,29 +130,29 @@ public class Entitlements {
             return new Allowance("", "Free", NONE, 0L, true, adsOn, 4, "1080", downloadsOn);
         }
         Subscription sub = username == null ? null : subscriptions.findById(username);
-        long now = System.currentTimeMillis();
+        Instant now = Instant.now();
         if (sub != null && isLive(sub, now)) {
             Plan plan = plans.findById(sub.getPlanCode());
             if (plan != null) {
                 return new Allowance(plan.getCode(), plan.getName(), sub.getStatus(),
-                        sub.getPeriodEndsAt(), true, adsOn && plan.isAdSupported(),
+                        sub.getPeriodEndsAt().toEpochMilli(), true, adsOn && plan.isAdSupported(),
                         Math.max(1, plan.getMaxStreams()), plan.getMaxQuality(),
                         downloadsOn && plan.isDownloads());
             }
         }
         String status = sub == null ? NONE : sub.getStatus();
-        return new Allowance("", "No plan", status, sub == null ? 0L : sub.getPeriodEndsAt(), false,
+        return new Allowance("", "No plan", status, sub == null ? 0L : sub.getPeriodEndsAt().toEpochMilli(), false,
                 adsOn, 1, "480", false);
     }
 
     /// Whether a subscription row is playing now.
-    public static boolean isLive(Subscription sub, long now) {
+    public static boolean isLive(Subscription sub, Instant now) {
         String status = sub.getStatus();
         if (TRIALING.equals(status) || ACTIVE.equals(status) || CANCELED.equals(status)) {
-            return sub.getPeriodEndsAt() > now;
+            return sub.getPeriodEndsAt().isAfter(now);
         }
         if (PAST_DUE.equals(status)) {
-            return sub.getPeriodEndsAt() + GRACE_MILLIS > now;
+            return sub.getPeriodEndsAt().plusMillis(GRACE_MILLIS).isAfter(now);
         }
         return false;
     }
@@ -185,10 +186,10 @@ public class Entitlements {
         if (username == null) {
             return false;
         }
-        long now = System.currentTimeMillis();
+        Instant now = Instant.now();
         List<Rental> held = rentals.findByUsernameAndTitleId(username, titleId);
         for (int iter = 0; iter < held.size(); iter++) {
-            if (held.get(iter).getExpiresAt() > now) {
+            if (held.get(iter).getExpiresAt().isAfter(now)) {
                 return true;
             }
         }

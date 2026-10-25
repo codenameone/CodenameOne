@@ -21,7 +21,7 @@ package com.codenameone.examples.reel.repository;
 import com.codename1.orm.repository.CrudRepository;
 import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.reel.domain.Device;
-
+import java.time.Instant;
 import java.util.List;
 
 /// The device rows.
@@ -31,7 +31,7 @@ public interface DeviceRepository extends CrudRepository<Device, String> {
 
     Device findFirstByIdAndUsername(String id, String username);
 
-    long countByUsernameAndRevokedAt(String username, long revokedAt);
+    long countByUsernameAndRevokedAt(String username, Instant revokedAt);
 
     int deleteByUsername(String username);
 }

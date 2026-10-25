@@ -21,7 +21,7 @@ package com.codenameone.examples.reel.repository;
 import com.codename1.orm.repository.CrudRepository;
 import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.reel.domain.Invoice;
-
+import java.time.Instant;
 import java.util.List;
 
 /// The invoice rows.
@@ -29,9 +29,9 @@ import java.util.List;
 public interface InvoiceRepository extends CrudRepository<Invoice, String> {
     List<Invoice> findByUsernameOrderByCreatedAtDesc(String username);
 
-    List<Invoice> findByCreatedAtGreaterThan(long since);
+    List<Invoice> findByCreatedAtGreaterThan(Instant since);
 
     int deleteByUsername(String username);
 
-    List<Invoice> findByTitleIdAndCreatedAtGreaterThan(String titleId, long since);
+    List<Invoice> findByTitleIdAndCreatedAtGreaterThan(String titleId, Instant since);
 }

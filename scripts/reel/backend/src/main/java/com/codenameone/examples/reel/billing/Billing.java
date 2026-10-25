@@ -54,6 +54,7 @@ import com.codenameone.examples.reel.repository.SubscriptionRepository;
 import com.codenameone.examples.reel.repository.TitleRepository;
 import com.codenameone.examples.reel.settings.Settings;
 
+import java.time.Instant;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -185,7 +186,7 @@ public class Billing {
         if (plan == null || !plan.isActive()) {
             throw new ResponseStatusException(404, "No such plan");
         }
-        long now = System.currentTimeMillis();
+        Instant now = Instant.now();
         Subscription sub = subscriptions.findById(username);
         if (sub != null && Entitlements.isLive(sub, now) && sub.getStore().length() == 0) {
             // Already paying: a change of plan waits for the period's end.
@@ -219,7 +220,7 @@ public class Billing {
             sub = new Subscription();
             sub.setUsername(username);
         }
-        boolean trial = plan.getTrialDays() > 0 && (fresh || sub.getStartedAt() == 0);
+        boolean trial = plan.getTrialDays() > 0 && (fresh || sub.getStartedAt().equals(Instant.EPOCH));
         sub.setPlanCode(plan.getCode());
         sub.setPendingPlanCode("");
         sub.setCancelAtPeriodEnd(false);
@@ -241,10 +242,10 @@ public class Billing {
         }
         if (trial) {
             sub.setStatus(Entitlements.TRIALING);
-            sub.setPeriodEndsAt(now + plan.getTrialDays() * DAY);
+            sub.setPeriodEndsAt(now.plusMillis(plan.getTrialDays() * DAY));
         } else {
             long amount = price(plan, sub);
-            charge(username, method, amount, plan, "start:" + now, now);
+            charge(username, method, amount, plan, "start:" + now.toEpochMilli(), now);
             sub.setStatus(Entitlements.ACTIVE);
             sub.setPeriodEndsAt(periodEnd(plan, now));
             usedCouponPeriod(sub);
@@ -260,12 +261,12 @@ public class Billing {
     @Transactional(rollbackFor = IOException.class)
     public SubscriptionDto cancel(String username) throws IOException {
         Subscription sub = subscriptions.findById(username);
-        if (sub == null || !Entitlements.isLive(sub, System.currentTimeMillis())) {
+        if (sub == null || !Entitlements.isLive(sub, Instant.now())) {
             throw new ResponseStatusException(404, "No subscription to cancel");
         }
         sub.setCancelAtPeriodEnd(true);
         sub.setPendingPlanCode("");
-        sub.setUpdatedAt(System.currentTimeMillis());
+        sub.setUpdatedAt(Instant.now());
         subscriptions.save(sub);
         return dto(sub);
     }
@@ -273,14 +274,14 @@ public class Billing {
     @Transactional(rollbackFor = IOException.class)
     public SubscriptionDto resume(String username) throws IOException {
         Subscription sub = subscriptions.findById(username);
-        if (sub == null || !Entitlements.isLive(sub, System.currentTimeMillis())) {
+        if (sub == null || !Entitlements.isLive(sub, Instant.now())) {
             throw new ResponseStatusException(404, "No subscription to resume; subscribe again");
         }
         sub.setCancelAtPeriodEnd(false);
         if (Entitlements.CANCELED.equals(sub.getStatus())) {
             sub.setStatus(Entitlements.ACTIVE);
         }
-        sub.setUpdatedAt(System.currentTimeMillis());
+        sub.setUpdatedAt(Instant.now());
         subscriptions.save(sub);
         return dto(sub);
     }
@@ -289,7 +290,7 @@ public class Billing {
     public CouponCheckDto checkCoupon(String code, String planCode) {
         Plan plan = planCode == null ? null : plans.findById(planCode);
         Coupon coupon = code == null ? null : coupons.findById(normalize(code));
-        String why = couponProblem(coupon, System.currentTimeMillis());
+        String why = couponProblem(coupon, Instant.now());
         long base = plan == null ? 0L : plan.getPriceCents();
         if (why != null) {
             return new CouponCheckDto(code, false, why, base, 0);
@@ -317,7 +318,7 @@ public class Billing {
         if (plan == null) {
             throw new ResponseStatusException(404, "No plan matches " + receipt.productId());
         }
-        long now = System.currentTimeMillis();
+        Instant now = Instant.now();
         Subscription sub = subscriptions.findById(username);
         boolean fresh = sub == null;
         if (fresh) {
@@ -348,20 +349,20 @@ public class Billing {
     @Scheduled(fixedDelay = 300000, initialDelay = 30000, lock = "reel-renewals")
     @Transactional
     public void renew() {
-        long now = System.currentTimeMillis();
+        Instant now = Instant.now();
         List<Subscription> due = subscriptions.findByPeriodEndsAtLessThan(now);
         for (int iter = 0; iter < due.size(); iter++) {
             renewOne(due.get(iter), now);
         }
     }
 
-    void renewOne(Subscription sub, long now) {
+    void renewOne(Subscription sub, Instant now) {
         String status = sub.getStatus();
         if (Entitlements.CANCELED.equals(status) || Entitlements.NONE.equals(status)) {
             return;
         }
-        if (Entitlements.PAST_DUE.equals(status) && now < sub.getNextRetryAt()
-                && now <= sub.getPeriodEndsAt() + Entitlements.GRACE_MILLIS) {
+        if (Entitlements.PAST_DUE.equals(status) && now.isBefore(sub.getNextRetryAt())
+                && !now.isAfter(sub.getPeriodEndsAt().plusMillis(Entitlements.GRACE_MILLIS))) {
             return;
         }
         if (sub.isCancelAtPeriodEnd() || sub.getStore().length() > 0) {
@@ -381,7 +382,7 @@ public class Billing {
         }
         // The period being paid for names the charge, so a retry of the same
         // period reuses the key and the card is charged once.
-        String period = "renew:" + sub.getPeriodEndsAt();
+        String period = "renew:" + sub.getPeriodEndsAt().toEpochMilli();
         try {
             charge(sub.getUsername(), sub.getPaymentMethodId(), price(plan, sub), plan, period, now);
             sub.setStatus(Entitlements.ACTIVE);
@@ -391,12 +392,12 @@ public class Billing {
         } catch (IOException declined) {
             sub.setFailedAttempts(sub.getFailedAttempts() + 1);
             if (sub.getFailedAttempts() >= MAX_ATTEMPTS
-                    || now > sub.getPeriodEndsAt() + Entitlements.GRACE_MILLIS) {
+                    || now.isAfter(sub.getPeriodEndsAt().plusMillis(Entitlements.GRACE_MILLIS))) {
                 end(sub, now);
                 return;
             }
             sub.setStatus(Entitlements.PAST_DUE);
-            sub.setNextRetryAt(now + RETRY_MILLIS);
+            sub.setNextRetryAt(now.plusMillis(RETRY_MILLIS));
             notifier.account(sub.getUsername(), "Payment failed",
                     "We will try again tomorrow. Check your card in Settings to keep watching.", null);
         }
@@ -404,7 +405,7 @@ public class Billing {
         subscriptions.save(sub);
     }
 
-    private void end(Subscription sub, long now) {
+    private void end(Subscription sub, Instant now) {
         sub.setStatus(Entitlements.CANCELED);
         sub.setCancelAtPeriodEnd(false);
         sub.setUpdatedAt(now);
@@ -421,10 +422,10 @@ public class Billing {
                 || !Kinds.PUBLISHED.equals(title.getStatus())) {
             throw new ResponseStatusException(404, "This title is not for rent");
         }
-        long now = System.currentTimeMillis();
+        Instant now = Instant.now();
         List<Rental> mine = rentals.findByUsernameAndTitleId(username, title.getId());
         for (int iter = 0; iter < mine.size(); iter++) {
-            if (mine.get(iter).getExpiresAt() > now) {
+            if (mine.get(iter).getExpiresAt().isAfter(now)) {
                 return rental(mine.get(iter), title);
             }
         }
@@ -439,7 +440,7 @@ public class Billing {
         row.setPriceCents(title.getRentalPriceCents());
         row.setCurrency(settings.currency());
         row.setCreatedAt(now);
-        row.setExpiresAt(now + RENTAL_MILLIS);
+        row.setExpiresAt(now.plusMillis(RENTAL_MILLIS));
         String ref = payments.chargeCard("rent:" + row.getId(), username, method, row.getPriceCents(),
                 row.getCurrency(), "Rental: " + title.getName());
         row.setInvoiceId(invoice(username, KIND_RENTAL, "Rental: " + title.getName(), row.getPriceCents(), PAID,
@@ -465,7 +466,7 @@ public class Billing {
         for (int iter = 0; iter < all.size(); iter++) {
             Invoice i = all.get(iter);
             out.add(new InvoiceDto(i.getId(), i.getKind(), i.getDescription(), i.getAmountCents(), i.getCurrency(),
-                    i.getStatus(), i.getCreatedAt(), i.getTitleId()));
+                    i.getStatus(), i.getCreatedAt().toEpochMilli(), i.getTitleId()));
         }
         return out;
     }
@@ -493,12 +494,12 @@ public class Billing {
         if (fresh) {
             row = new Coupon();
             row.setCode(key);
-            row.setCreatedAt(System.currentTimeMillis());
+            row.setCreatedAt(Instant.now());
         }
         row.setPercentOff(Math.max(1, Math.min(100, wanted.percentOff())));
         row.setPeriods(Math.max(1, Math.min(36, wanted.periods())));
         row.setMaxRedemptions(Math.max(0, wanted.maxRedemptions()));
-        row.setExpiresAt(Math.max(0L, wanted.expiresAt()));
+        row.setExpiresAt(Instant.ofEpochMilli(Math.max(0L, wanted.expiresAt())));
         row.setActive(wanted.active());
         if (fresh) {
             coupons.insert(row);
@@ -510,7 +511,7 @@ public class Billing {
 
     // ------------------------------------------------------------ helpers
 
-    private void charge(String username, String method, long amount, Plan plan, String period, long now)
+    private void charge(String username, String method, long amount, Plan plan, String period, Instant now)
             throws IOException {
         String description = plan.getName() + " plan";
         if (amount <= 0) {
@@ -528,7 +529,7 @@ public class Billing {
     }
 
     private String invoice(String username, String kind, String description, long amount, String status,
-            String ref, String titleId, long now) throws IOException {
+            String ref, String titleId, Instant now) throws IOException {
         Invoice row = new Invoice();
         row.setId(Ids.next());
         row.setUsername(username);
@@ -563,15 +564,15 @@ public class Billing {
         }
     }
 
-    private static long periodEnd(Plan plan, long from) {
-        return from + (YEAR.equals(plan.getBillingInterval()) ? 365L : 30L) * DAY;
+    private static Instant periodEnd(Plan plan, Instant from) {
+        return from.plusMillis((YEAR.equals(plan.getBillingInterval()) ? 365L : 30L) * DAY);
     }
 
-    private static String couponProblem(Coupon c, long now) {
+    private static String couponProblem(Coupon c, Instant now) {
         if (c == null || !c.isActive()) {
             return "That code is not valid";
         }
-        if (c.getExpiresAt() > 0 && c.getExpiresAt() < now) {
+        if (c.getExpiresAt().isAfter(Instant.EPOCH) && c.getExpiresAt().isBefore(now)) {
             return "That code has expired";
         }
         if (c.getMaxRedemptions() > 0 && c.getRedemptions() >= c.getMaxRedemptions()) {
@@ -606,7 +607,7 @@ public class Billing {
             percent = c == null ? 0 : c.getPercentOff();
         }
         return new SubscriptionDto(sub.getPlanCode(), plan == null ? "" : plan.getName(), sub.getStatus(),
-                sub.getStartedAt(), sub.getPeriodEndsAt(), sub.isCancelAtPeriodEnd(),
+                sub.getStartedAt().toEpochMilli(), sub.getPeriodEndsAt().toEpochMilli(), sub.isCancelAtPeriodEnd(),
                 plan == null ? 0L : plan.getPriceCents(), settings.currency(), sub.getCouponCode(), percent,
                 sub.getPendingPlanCode());
     }
@@ -619,12 +620,12 @@ public class Billing {
 
     static CouponDto coupon(Coupon c) {
         return new CouponDto(c.getCode(), c.getPercentOff(), c.getPeriods(), c.getMaxRedemptions(),
-                c.getRedemptions(), c.getExpiresAt(), c.isActive());
+                c.getRedemptions(), c.getExpiresAt().toEpochMilli(), c.isActive());
     }
 
     private RentalDto rental(Rental r, Title t) {
         return new RentalDto(r.getId(), r.getTitleId(), t == null ? "" : t.getName(), r.getPriceCents(),
-                r.getCurrency(), r.getExpiresAt(), r.getStartedAt() > 0);
+                r.getCurrency(), r.getExpiresAt().toEpochMilli(), r.getStartedAt().isAfter(Instant.EPOCH));
     }
 
     /// Coupon and plan codes are compared in upper case, folded by hand

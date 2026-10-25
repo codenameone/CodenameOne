@@ -21,6 +21,7 @@ package com.codenameone.examples.reel.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
+import java.time.Instant;
 
 /// Something waiting for a moderator: a title, a report or an appeal.
 @Entity
@@ -63,10 +64,10 @@ public class ModerationItem {
     private String note = "";
 
     @Column(nullable = false)
-    private long createdAt;
+    private Instant createdAt = Instant.EPOCH;
 
     @Column(nullable = false)
-    private long decidedAt;
+    private Instant decidedAt = Instant.EPOCH;
 
     public ModerationItem() {
     }
@@ -167,19 +168,19 @@ public class ModerationItem {
         this.note = note;
     }
 
-    public long getCreatedAt() {
+    public Instant getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(long createdAt) {
+    public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
     }
 
-    public long getDecidedAt() {
+    public Instant getDecidedAt() {
         return decidedAt;
     }
 
-    public void setDecidedAt(long decidedAt) {
+    public void setDecidedAt(Instant decidedAt) {
         this.decidedAt = decidedAt;
     }
 }

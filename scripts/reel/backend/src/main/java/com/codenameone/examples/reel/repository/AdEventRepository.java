@@ -23,7 +23,7 @@ import com.codename1.orm.repository.Query;
 import com.codename1.orm.repository.Param;
 import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.reel.domain.AdEvent;
-
+import java.time.Instant;
 import java.util.List;
 
 /// The ad_event rows.
@@ -32,10 +32,10 @@ public interface AdEventRepository extends CrudRepository<AdEvent, String> {
     long countBySessionIdAndCampaignIdAndEvent(String sessionId, String campaignId, String event);
 
     @Query("select count(e) from AdEvent e where e.event = :event and e.createdAt >= :since")
-    Long countSince(@Param("event") String event, @Param("since") long since);
+    Long countSince(@Param("event") String event, @Param("since") Instant since);
 
     @Query("select e.createdAt from AdEvent e where e.event = :event and e.createdAt >= :since")
-    List<Long> timesSince(@Param("event") String event, @Param("since") long since);
+    List<Instant> timesSince(@Param("event") String event, @Param("since") Instant since);
 
-    List<AdEvent> findByEventAndCreatedAtGreaterThan(String event, long since);
+    List<AdEvent> findByEventAndCreatedAtGreaterThan(String event, Instant since);
 }

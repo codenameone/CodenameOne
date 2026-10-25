@@ -21,7 +21,7 @@ package com.codenameone.examples.reel.repository;
 import com.codename1.orm.repository.CrudRepository;
 import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.reel.domain.Job;
-
+import java.time.Instant;
 import java.util.List;
 
 /// The job rows.
@@ -31,9 +31,9 @@ public interface JobRepository extends CrudRepository<Job, String> {
 
     List<Job> findByVideoIdOrderByCreatedAtDesc(String videoId);
 
-    List<Job> findByStatusAndLeaseUntilLessThan(String status, long before);
+    List<Job> findByStatusAndLeaseUntilLessThan(String status, Instant before);
 
-    List<Job> findTop200ByCreatedAtGreaterThanOrderByCreatedAtDesc(long since);
+    List<Job> findTop200ByCreatedAtGreaterThanOrderByCreatedAtDesc(Instant since);
 
     long countByStatus(String status);
 }

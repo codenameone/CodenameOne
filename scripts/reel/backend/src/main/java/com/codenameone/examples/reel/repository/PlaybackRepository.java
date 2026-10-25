@@ -21,7 +21,7 @@ package com.codenameone.examples.reel.repository;
 import com.codename1.orm.repository.CrudRepository;
 import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.reel.domain.Playback;
-
+import java.time.Instant;
 import java.util.List;
 
 /// The playback rows.
@@ -29,17 +29,17 @@ import java.util.List;
 public interface PlaybackRepository extends CrudRepository<Playback, String> {
     int deleteByUsername(String username);
 
-    List<Playback> findByUsernameAndEndedAt(String username, long endedAt);
+    List<Playback> findByUsernameAndEndedAt(String username, Instant endedAt);
 
-    List<Playback> findByEndedAtOrderByStartedAtDesc(long endedAt);
+    List<Playback> findByEndedAtOrderByStartedAtDesc(Instant endedAt);
 
-    List<Playback> findByEndedAtAndLastHeartbeatAtLessThan(long endedAt, long before);
+    List<Playback> findByEndedAtAndLastHeartbeatAtLessThan(Instant endedAt, Instant before);
 
-    List<Playback> findByUsernameAndStartedAtGreaterThan(String username, long since);
+    List<Playback> findByUsernameAndStartedAtGreaterThan(String username, Instant since);
 
-    List<Playback> findByStartedAtGreaterThan(long since);
+    List<Playback> findByStartedAtGreaterThan(Instant since);
 
-    List<Playback> findByTitleIdAndStartedAtGreaterThan(String titleId, long since);
+    List<Playback> findByTitleIdAndStartedAtGreaterThan(String titleId, Instant since);
 
-    long countByEndedAt(long endedAt);
+    long countByEndedAt(Instant endedAt);
 }

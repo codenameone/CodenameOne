@@ -29,6 +29,7 @@ import com.codenameone.examples.reel.api.PresetDto;
 import com.codenameone.examples.reel.domain.Setting;
 import com.codenameone.examples.reel.repository.SettingRepository;
 
+import java.time.Instant;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -170,7 +171,7 @@ public class Settings {
     @Transactional(rollbackFor = IOException.class)
     public void put(String name, String value, String by) throws IOException {
         Setting row = rows.findById(name);
-        long now = System.currentTimeMillis();
+        Instant now = Instant.now();
         if (row == null) {
             row = new Setting();
             row.setName(name);

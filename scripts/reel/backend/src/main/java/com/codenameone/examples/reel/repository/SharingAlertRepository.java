@@ -21,7 +21,7 @@ package com.codenameone.examples.reel.repository;
 import com.codename1.orm.repository.CrudRepository;
 import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.reel.domain.SharingAlert;
-
+import java.time.Instant;
 import java.util.List;
 
 /// The sharing_alert rows.
@@ -33,7 +33,7 @@ public interface SharingAlertRepository extends CrudRepository<SharingAlert, Str
 
     List<SharingAlert> findByStatusOrderByCreatedAtDesc(String status);
 
-    List<SharingAlert> findByCreatedAtGreaterThanOrderByCreatedAtDesc(long since);
+    List<SharingAlert> findByCreatedAtGreaterThanOrderByCreatedAtDesc(Instant since);
 
     List<SharingAlert> findByUsernameOrderByCreatedAtDesc(String username);
 }

@@ -21,6 +21,7 @@ package com.codenameone.examples.reel.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
+import java.time.Instant;
 
 /// A device that signed in to an account, keyed by the id the app made for itself.
 @Entity
@@ -45,13 +46,13 @@ public class Device {
     private String lastCountry = "";
 
     @Column(nullable = false)
-    private long lastSeenAt;
+    private Instant lastSeenAt = Instant.EPOCH;
 
     @Column(nullable = false)
-    private long createdAt;
+    private Instant createdAt = Instant.EPOCH;
 
     @Column(nullable = false)
-    private long revokedAt;
+    private Instant revokedAt = Instant.EPOCH;
 
     @Column(nullable = false, type = "VARCHAR(190)")
     private String grantId = "";
@@ -107,27 +108,27 @@ public class Device {
         this.lastCountry = lastCountry;
     }
 
-    public long getLastSeenAt() {
+    public Instant getLastSeenAt() {
         return lastSeenAt;
     }
 
-    public void setLastSeenAt(long lastSeenAt) {
+    public void setLastSeenAt(Instant lastSeenAt) {
         this.lastSeenAt = lastSeenAt;
     }
 
-    public long getCreatedAt() {
+    public Instant getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(long createdAt) {
+    public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
     }
 
-    public long getRevokedAt() {
+    public Instant getRevokedAt() {
         return revokedAt;
     }
 
-    public void setRevokedAt(long revokedAt) {
+    public void setRevokedAt(Instant revokedAt) {
         this.revokedAt = revokedAt;
     }
 

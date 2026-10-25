@@ -21,6 +21,7 @@ package com.codenameone.examples.reel.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
+import java.time.Instant;
 
 /// A stream: who plays what where, and the lease its heartbeats renew.
 @Entity
@@ -60,16 +61,16 @@ public class Playback {
     private String tokenHash = "";
 
     @Column(nullable = false)
-    private long startedAt;
+    private Instant startedAt = Instant.EPOCH;
 
     @Column(nullable = false)
-    private long lastHeartbeatAt;
+    private Instant lastHeartbeatAt = Instant.EPOCH;
 
     @Column(nullable = false)
     private int positionSeconds;
 
     @Column(nullable = false)
-    private long endedAt;
+    private Instant endedAt = Instant.EPOCH;
 
     @Column(nullable = false, type = "VARCHAR(32)")
     private String endedReason = "";
@@ -165,19 +166,19 @@ public class Playback {
         this.tokenHash = tokenHash;
     }
 
-    public long getStartedAt() {
+    public Instant getStartedAt() {
         return startedAt;
     }
 
-    public void setStartedAt(long startedAt) {
+    public void setStartedAt(Instant startedAt) {
         this.startedAt = startedAt;
     }
 
-    public long getLastHeartbeatAt() {
+    public Instant getLastHeartbeatAt() {
         return lastHeartbeatAt;
     }
 
-    public void setLastHeartbeatAt(long lastHeartbeatAt) {
+    public void setLastHeartbeatAt(Instant lastHeartbeatAt) {
         this.lastHeartbeatAt = lastHeartbeatAt;
     }
 
@@ -189,11 +190,11 @@ public class Playback {
         this.positionSeconds = positionSeconds;
     }
 
-    public long getEndedAt() {
+    public Instant getEndedAt() {
         return endedAt;
     }
 
-    public void setEndedAt(long endedAt) {
+    public void setEndedAt(Instant endedAt) {
         this.endedAt = endedAt;
     }
 

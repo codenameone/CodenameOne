@@ -21,6 +21,7 @@ package com.codenameone.examples.reel.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
+import java.time.Instant;
 
 /// A title licensed for offline play on one device.
 @Entity
@@ -45,10 +46,10 @@ public class Download {
     private String scheme = "";
 
     @Column(nullable = false)
-    private long licenseExpiresAt;
+    private Instant licenseExpiresAt = Instant.EPOCH;
 
     @Column(nullable = false)
-    private long createdAt;
+    private Instant createdAt = Instant.EPOCH;
 
     public Download() {
     }
@@ -101,19 +102,19 @@ public class Download {
         this.scheme = scheme;
     }
 
-    public long getLicenseExpiresAt() {
+    public Instant getLicenseExpiresAt() {
         return licenseExpiresAt;
     }
 
-    public void setLicenseExpiresAt(long licenseExpiresAt) {
+    public void setLicenseExpiresAt(Instant licenseExpiresAt) {
         this.licenseExpiresAt = licenseExpiresAt;
     }
 
-    public long getCreatedAt() {
+    public Instant getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(long createdAt) {
+    public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
     }
 }

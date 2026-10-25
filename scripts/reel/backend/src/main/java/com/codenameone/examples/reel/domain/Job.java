@@ -21,6 +21,7 @@ package com.codenameone.examples.reel.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
+import java.time.Instant;
 
 /// A packaging job a worker claims, with the lease it holds it under.
 @Entity
@@ -51,16 +52,16 @@ public class Job {
     private int attempts;
 
     @Column(nullable = false)
-    private long createdAt;
+    private Instant createdAt = Instant.EPOCH;
 
     @Column(nullable = false)
-    private long startedAt;
+    private Instant startedAt = Instant.EPOCH;
 
     @Column(nullable = false)
-    private long finishedAt;
+    private Instant finishedAt = Instant.EPOCH;
 
     @Column(nullable = false)
-    private long leaseUntil;
+    private Instant leaseUntil = Instant.EPOCH;
 
     public Job() {
     }
@@ -129,35 +130,35 @@ public class Job {
         this.attempts = attempts;
     }
 
-    public long getCreatedAt() {
+    public Instant getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(long createdAt) {
+    public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
     }
 
-    public long getStartedAt() {
+    public Instant getStartedAt() {
         return startedAt;
     }
 
-    public void setStartedAt(long startedAt) {
+    public void setStartedAt(Instant startedAt) {
         this.startedAt = startedAt;
     }
 
-    public long getFinishedAt() {
+    public Instant getFinishedAt() {
         return finishedAt;
     }
 
-    public void setFinishedAt(long finishedAt) {
+    public void setFinishedAt(Instant finishedAt) {
         this.finishedAt = finishedAt;
     }
 
-    public long getLeaseUntil() {
+    public Instant getLeaseUntil() {
         return leaseUntil;
     }
 
-    public void setLeaseUntil(long leaseUntil) {
+    public void setLeaseUntil(Instant leaseUntil) {
         this.leaseUntil = leaseUntil;
     }
 }

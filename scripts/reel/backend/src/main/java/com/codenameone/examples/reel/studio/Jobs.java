@@ -40,6 +40,7 @@ import com.codenameone.examples.reel.repository.TitleRepository;
 import com.codenameone.examples.reel.repository.VideoKeyRepository;
 import com.codenameone.examples.reel.repository.VideoRepository;
 
+import java.time.Instant;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -95,7 +96,7 @@ public class Jobs {
         job.setVideoId(videoId);
         job.setKind(PACKAGE);
         job.setStatus(Kinds.QUEUED);
-        job.setCreatedAt(System.currentTimeMillis());
+        job.setCreatedAt(Instant.now());
         jobs.insert(job);
         return job;
     }
@@ -103,7 +104,7 @@ public class Jobs {
     /// The next job for a worker, or null when there is none.
     @Transactional(rollbackFor = IOException.class)
     public WorkerJobDto claim(String worker) throws IOException {
-        long now = System.currentTimeMillis();
+        Instant now = Instant.now();
         Job job = null;
         List<Job> lapsed = jobs.findByStatusAndLeaseUntilLessThan(RUNNING, now);
         for (int iter = 0; iter < lapsed.size(); iter++) {
@@ -131,7 +132,7 @@ public class Jobs {
         job.setWorker(cut(worker, 64));
         job.setAttempts(job.getAttempts() + 1);
         job.setStartedAt(now);
-        job.setLeaseUntil(now + LEASE_MILLIS);
+        job.setLeaseUntil(now.plusMillis(LEASE_MILLIS));
         job.setProgressPercent(0);
         jobs.save(job);
         video.setStatus(Kinds.PROCESSING);
@@ -147,7 +148,7 @@ public class Jobs {
         Job job = running(id);
         int pct = p == null ? 0 : Math.max(0, Math.min(100, p.progressPercent()));
         job.setProgressPercent(pct);
-        job.setLeaseUntil(System.currentTimeMillis() + LEASE_MILLIS);
+        job.setLeaseUntil(Instant.now().plusMillis(LEASE_MILLIS));
         jobs.save(job);
         Video video = videos.findById(job.getVideoId());
         if (video != null) {
@@ -189,7 +190,7 @@ public class Jobs {
         if (!new File(dir, "master.m3u8").exists() || !new File(dir, "cenc.mp4").exists()) {
             throw new ResponseStatusException(409, "The playlists and cenc.mp4 have not all arrived");
         }
-        long now = System.currentTimeMillis();
+        Instant now = Instant.now();
         Video video = videos.findById(job.getVideoId());
         if (video == null) {
             failFor(job, "The video was deleted", now);
@@ -244,12 +245,12 @@ public class Jobs {
     @Transactional(rollbackFor = IOException.class)
     public void fail(String id, WorkerProgressDto why) throws IOException {
         Job job = running(id);
-        long now = System.currentTimeMillis();
+        Instant now = Instant.now();
         String error = why == null || why.error() == null ? "The worker failed" : why.error();
         if (job.getAttempts() < MAX_ATTEMPTS) {
             job.setStatus(Kinds.QUEUED);
             job.setError(cut(error, 255));
-            job.setLeaseUntil(0);
+            job.setLeaseUntil(Instant.EPOCH);
             jobs.save(job);
             return;
         }
@@ -268,7 +269,7 @@ public class Jobs {
         job.setStatus(Kinds.QUEUED);
         job.setAttempts(0);
         job.setError("");
-        job.setLeaseUntil(0);
+        job.setLeaseUntil(Instant.EPOCH);
         jobs.save(job);
         Video video = videos.findById(job.getVideoId());
         if (video != null) {
@@ -281,7 +282,7 @@ public class Jobs {
 
     @Transactional(readOnly = true)
     public List<JobDto> list(String status) {
-        List<Job> rows = status == null || status.length() == 0 ? jobs.findTop200ByCreatedAtGreaterThanOrderByCreatedAtDesc(0L)
+        List<Job> rows = status == null || status.length() == 0 ? jobs.findTop200ByCreatedAtGreaterThanOrderByCreatedAtDesc(Instant.EPOCH)
                 : jobs.findByStatusOrderByCreatedAtAsc(status);
         List<JobDto> out = new ArrayList<JobDto>();
         for (int iter = 0; iter < rows.size(); iter++) {
@@ -307,7 +308,7 @@ public class Jobs {
         return (int) jobs.countByStatus(status);
     }
 
-    private void failFor(Job job, String error, long now) {
+    private void failFor(Job job, String error, Instant now) {
         job.setStatus(Kinds.FAILED);
         job.setError(cut(error, 255));
         job.setFinishedAt(now);
@@ -346,7 +347,8 @@ public class Jobs {
 
     static JobDto dto(Job j) {
         return new JobDto(j.getId(), j.getVideoId(), j.getKind(), j.getStatus(), j.getProgressPercent(),
-                j.getWorker(), j.getError(), j.getCreatedAt(), j.getStartedAt(), j.getFinishedAt());
+                j.getWorker(), j.getError(), j.getCreatedAt().toEpochMilli(), j.getStartedAt().toEpochMilli(),
+                j.getFinishedAt().toEpochMilli());
     }
 
     private static String cut(String value, int max) {

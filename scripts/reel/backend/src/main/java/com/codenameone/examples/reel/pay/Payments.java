@@ -36,6 +36,7 @@ import com.codenameone.examples.reel.repository.PaymentMethodRepository;
 import com.codenameone.examples.reel.repository.PaymentSetupRepository;
 import com.codenameone.examples.reel.repository.ProfileRepository;
 
+import java.time.Instant;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -158,7 +159,7 @@ public class Payments {
     /// that are neither finished nor abandoned.
     private void refuseTooManySetups(String username) {
         if (setups.countByUsernameAndCompletedFalseAndCreatedAtGreaterThan(username,
-                System.currentTimeMillis() - SETUP_MILLIS) >= MAX_OPEN_SETUPS) {
+                Instant.now().minusMillis(SETUP_MILLIS)) >= MAX_OPEN_SETUPS) {
             throw new ResponseStatusException(429,
                     "Too many cards are being added. Finish one, or try again later");
         }
@@ -175,7 +176,7 @@ public class Payments {
     @Transactional
     public void sweepSetups() throws IOException {
         setups.deleteByCompletedTrue();
-        setups.deleteByCreatedAtLessThan(System.currentTimeMillis() - 2L * SETUP_MILLIS);
+        setups.deleteByCreatedAtLessThan(Instant.now().minusMillis(2L * SETUP_MILLIS));
     }
 
     /// Keeps the reference the processor made for a customer on first use, and
@@ -223,7 +224,7 @@ public class Payments {
         row.setId(id);
         row.setUsername(username);
         row.setReference(reference);
-        row.setCreatedAt(System.currentTimeMillis());
+        row.setCreatedAt(Instant.now());
         row.setCompleted(false);
         setups.insert(row);
     }
@@ -286,7 +287,7 @@ public class Payments {
         PaymentSetup setup = setupId == null || setupId.length() == 0 || setupId.length() > 32
                 ? null : setups.findFirstByIdAndUsername(setupId, username);
         if (setup == null || setup.isCompleted()
-                || setup.getCreatedAt() < System.currentTimeMillis() - SETUP_MILLIS) {
+                || setup.getCreatedAt().isBefore(Instant.now().minusMillis(SETUP_MILLIS))) {
             throw new ResponseStatusException(404, "No such card setup");
         }
         PaymentCustomer customer = customers.findById(username);
@@ -315,8 +316,8 @@ public class Payments {
         // Cards are listed in the order they were added, and two added in the
         // same millisecond would have no order: the later is stamped after
         // the one before it.
-        Long newest = cards.newestAt(username);
-        long after = newest == null ? 0L : newest.longValue() + 1L;
+        Instant newest = cards.newestAt(username);
+        Instant after = newest == null ? Instant.EPOCH : newest.plusMillis(1L);
         PaymentMethod row = new PaymentMethod();
         row.setId(id);
         row.setUsername(username);
@@ -326,7 +327,8 @@ public class Payments {
         row.setExpYear(card.expYear);
         row.setToken(card.token);
         row.setPreferred(first);
-        row.setCreatedAt(Math.max(System.currentTimeMillis(), after));
+        Instant stamped = Instant.now();
+        row.setCreatedAt(stamped.isAfter(after) ? stamped : after);
         cards.insert(row);
         return card(row);
     }

@@ -27,6 +27,7 @@ import com.codenameone.examples.reel.Roles;
 import com.codenameone.examples.reel.domain.Profile;
 import com.codenameone.examples.reel.repository.ProfileRepository;
 
+import java.time.Instant;
 import java.io.IOException;
 
 /// The accounts a development server starts with, one per role, all with the
@@ -94,7 +95,7 @@ public class DemoAccounts {
         profile.setFlagReason(why);
         profiles.save(profile);
         moderation.record(username, ADMIN, Moderation.FLAG, why,
-                System.currentTimeMillis() - daysAgo * Days.MILLIS);
+                Instant.now().minusMillis(daysAgo * Days.MILLIS));
     }
 
     private void add(String username, String name, int daysAgo, String... roles) throws IOException {
@@ -103,7 +104,7 @@ public class DemoAccounts {
         }
         String password = config.isDevelopmentProfile() ? PASSWORD : adminPassword;
         try {
-            accounts.create(username, password, name, roles, System.currentTimeMillis() - daysAgo * Days.MILLIS);
+            accounts.create(username, password, name, roles, Instant.now().minusMillis(daysAgo * Days.MILLIS));
         } catch (IOException | RuntimeException failed) {
             // Two servers started together against a new database both find
             // no admin and both make one; the second insert fails on the name.

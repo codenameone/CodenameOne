@@ -32,6 +32,7 @@ import com.codenameone.examples.reel.playback.MediaTokens;
 import com.codenameone.examples.reel.repository.HouseholdRepository;
 import com.codenameone.examples.reel.settings.Settings;
 
+import java.time.Instant;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -134,7 +135,7 @@ public class Households {
         Household row = new Household();
         row.setId(Ids.next());
         row.setUsername(username);
-        row.setCreatedAt(System.currentTimeMillis());
+        row.setCreatedAt(Instant.now());
         apply(row, wanted);
         rows.insert(row);
         return dto(row);
@@ -208,7 +209,7 @@ public class Households {
         first.setAvatar("red");
         first.setMaxRating("NC-17");
         first.setLanguage("en");
-        first.setCreatedAt(System.currentTimeMillis());
+        first.setCreatedAt(Instant.now());
         rows.insert(first);
         all = new ArrayList<Household>();
         all.add(first);

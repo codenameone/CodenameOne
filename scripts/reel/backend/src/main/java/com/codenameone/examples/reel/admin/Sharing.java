@@ -30,6 +30,7 @@ import com.codenameone.examples.reel.domain.SharingAlert;
 import com.codenameone.examples.reel.playback.Playbacks;
 import com.codenameone.examples.reel.repository.SharingAlertRepository;
 
+import java.time.Instant;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -58,7 +59,7 @@ public class Sharing {
     @Transactional(readOnly = true)
     public List<SharingAlertDto> list(String status) {
         List<SharingAlert> rows = status == null || status.length() == 0
-                ? alerts.findByCreatedAtGreaterThanOrderByCreatedAtDesc(0L)
+                ? alerts.findByCreatedAtGreaterThanOrderByCreatedAtDesc(Instant.EPOCH)
                 : alerts.findByStatusOrderByCreatedAtDesc(status);
         return dtos(rows);
     }
@@ -105,6 +106,6 @@ public class Sharing {
 
     static SharingAlertDto dto(SharingAlert a) {
         return new SharingAlertDto(a.getId(), a.getUsername(), a.getKind(), a.getDetail(), a.getDistinctIps(),
-                a.getDistinctCountries(), a.getStatus(), a.getCreatedAt());
+                a.getDistinctCountries(), a.getStatus(), a.getCreatedAt().toEpochMilli());
     }
 }

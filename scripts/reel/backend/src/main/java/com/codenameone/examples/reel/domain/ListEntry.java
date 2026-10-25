@@ -21,6 +21,7 @@ package com.codenameone.examples.reel.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
+import java.time.Instant;
 
 /// A title on a profile's list. The id is the profile id and the title id.
 @Entity
@@ -36,7 +37,7 @@ public class ListEntry {
     private String titleId = "";
 
     @Column(nullable = false)
-    private long addedAt;
+    private Instant addedAt = Instant.EPOCH;
 
     public ListEntry() {
     }
@@ -65,11 +66,11 @@ public class ListEntry {
         this.titleId = titleId;
     }
 
-    public long getAddedAt() {
+    public Instant getAddedAt() {
         return addedAt;
     }
 
-    public void setAddedAt(long addedAt) {
+    public void setAddedAt(Instant addedAt) {
         this.addedAt = addedAt;
     }
 }

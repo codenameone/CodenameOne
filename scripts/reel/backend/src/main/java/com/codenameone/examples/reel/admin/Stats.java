@@ -50,6 +50,7 @@ import com.codenameone.examples.reel.repository.TitleRepository;
 import com.codenameone.examples.reel.settings.Settings;
 import com.codenameone.examples.reel.studio.Jobs;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -95,8 +96,8 @@ public class Stats {
 
     @Transactional(readOnly = true)
     public AdminStatsDto now() {
-        long now = System.currentTimeMillis();
-        long today = now - now % DAY;
+        Instant now = Instant.now();
+        Instant today = Instant.ofEpochMilli(now.toEpochMilli() - now.toEpochMilli() % DAY);
         List<Subscription> active = subscriptions.findByStatus(Entitlements.ACTIVE);
         long mrr = 0;
         for (int iter = 0; iter < active.size(); iter++) {
@@ -110,10 +111,10 @@ public class Stats {
         int streams = 0;
         for (int iter = 0; iter < sinceMidnight.size(); iter++) {
             Playback p = sinceMidnight.get(iter);
-            seconds += Math.max(0L, ((p.getEndedAt() > 0 ? p.getEndedAt() : p.getLastHeartbeatAt())
-                    - p.getStartedAt()) / 1000L);
+            Instant end = p.getEndedAt().isAfter(Instant.EPOCH) ? p.getEndedAt() : p.getLastHeartbeatAt();
+            seconds += Math.max(0L, (end.toEpochMilli() - p.getStartedAt().toEpochMilli()) / 1000L);
         }
-        streams = (int) playbacks.countByEndedAt(0L);
+        streams = (int) playbacks.countByEndedAt(Instant.EPOCH);
         long impressions = Rows.number(adEvents.countSince(Ads.IMPRESSION, today));
         return new AdminStatsDto((int) profiles.count(), active.size(),
                 (int) subscriptions.countByStatus(Entitlements.TRIALING), mrr, settings.currency(), streams,
@@ -125,34 +126,36 @@ public class Stats {
     @Transactional(readOnly = true)
     public StatsSeriesDto series(int days) {
         int n = Math.max(1, Math.min(90, days));
-        long now = System.currentTimeMillis();
-        long first = now - now % DAY - (n - 1) * DAY;
-        Map<String, Long> signups = buckets(first, n);
-        Map<String, Long> minutes = buckets(first, n);
-        Map<String, Long> revenue = buckets(first, n);
-        Map<String, Long> churn = buckets(first, n);
+        Instant now = Instant.now();
+        long firstMillis = now.toEpochMilli() - now.toEpochMilli() % DAY - (n - 1) * DAY;
+        Instant first = Instant.ofEpochMilli(firstMillis);
+        Map<String, Long> signups = buckets(firstMillis, n);
+        Map<String, Long> minutes = buckets(firstMillis, n);
+        Map<String, Long> revenue = buckets(firstMillis, n);
+        Map<String, Long> churn = buckets(firstMillis, n);
         List<Profile> people = profiles.findAll();
         for (int iter = 0; iter < people.size(); iter++) {
-            add(signups, people.get(iter).getCreatedAt(), 1);
+            add(signups, people.get(iter).getCreatedAt().toEpochMilli(), 1);
         }
         Map<String, Integer> plays = new HashMap<String, Integer>();
         List<Playback> sessions = playbacks.findByStartedAtGreaterThan(first);
         for (int iter = 0; iter < sessions.size(); iter++) {
             Playback p = sessions.get(iter);
-            long end = p.getEndedAt() > 0 ? p.getEndedAt() : p.getLastHeartbeatAt();
-            add(minutes, p.getStartedAt(), Math.max(0L, (end - p.getStartedAt()) / 60000L));
+            Instant end = p.getEndedAt().isAfter(Instant.EPOCH) ? p.getEndedAt() : p.getLastHeartbeatAt();
+            add(minutes, p.getStartedAt().toEpochMilli(),
+                    Math.max(0L, (end.toEpochMilli() - p.getStartedAt().toEpochMilli()) / 60000L));
             Integer c = plays.get(p.getTitleId());
             plays.put(p.getTitleId(), Integer.valueOf(c == null ? 1 : c.intValue() + 1));
         }
         List<Invoice> paid = invoices.findByCreatedAtGreaterThan(first);
         for (int iter = 0; iter < paid.size(); iter++) {
             if (Billing.PAID.equals(paid.get(iter).getStatus())) {
-                add(revenue, paid.get(iter).getCreatedAt(), paid.get(iter).getAmountCents());
+                add(revenue, paid.get(iter).getCreatedAt().toEpochMilli(), paid.get(iter).getAmountCents());
             }
         }
         List<Subscription> ended = subscriptions.findByStatusAndUpdatedAtGreaterThan(Entitlements.CANCELED, first);
         for (int iter = 0; iter < ended.size(); iter++) {
-            add(churn, ended.get(iter).getUpdatedAt(), 1);
+            add(churn, ended.get(iter).getUpdatedAt().toEpochMilli(), 1);
         }
         List<NameCountDto> top = new ArrayList<NameCountDto>();
         for (Map.Entry<String, Integer> e : plays.entrySet()) {
@@ -174,7 +177,7 @@ public class Stats {
 
     /// What the day's counted impressions earned: each campaign's CPM over a
     /// thousand, summed.
-    private long adRevenueSince(long since) {
+    private long adRevenueSince(Instant since) {
         Map<String, Long> cpm = new HashMap<String, Long>();
         List<AdCampaign> all = campaigns.findAll();
         for (int iter = 0; iter < all.size(); iter++) {
