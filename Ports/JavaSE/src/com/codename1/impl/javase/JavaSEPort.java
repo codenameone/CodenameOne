@@ -4457,26 +4457,6 @@ public class JavaSEPort extends CodenameOneImplementation {
                                 updateEdtBufferSize();
                             }
                             
-                            if (window != null) {
-
-                                if (zoomLevel != 1) {
-                                    Graphics2D g2d = (Graphics2D) g;
-                                    g2d.setTransform(AffineTransform.getScaleInstance(1, 1));
-                                }
-                                
-                                if (window.getJMenuBar() != null) {
-                                    for (int i = 0; i < window.getJMenuBar().getComponentCount(); i++) {
-                                        JMenu m = (JMenu) window.getJMenuBar().getComponent(i);
-                                        if (m.isPopupMenuVisible()) {
-                                            JPopupMenu pop = m.getPopupMenu();
-                                            pop.getInvoker().getX();
-                                            g.translate(pop.getInvoker().getX(), 0);
-                                            pop.update(g);
-                                            g.translate(-pop.getInvoker().getX(), 0);
-                                        }
-                                    }
-                                }
-                            }
                             g.dispose();
                         }
                     }
@@ -7464,6 +7444,11 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     private void installMenu(final JFrame frm, boolean desktopSkin) throws IOException{
         final Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+        // The canvas blits straight to the screen through getGraphics(), outside
+        // Swing's paint cycle, so a lightweight popup (painted into the same
+        // surface) is overwritten wherever it overlaps the canvas and smears
+        // (#5850). A heavyweight popup lives in its own native window above it.
+        JPopupMenu.setDefaultLightWeightPopupEnabled(false);
         JMenuBar bar = new JMenuBar();
         frm.setJMenuBar(bar);
 
