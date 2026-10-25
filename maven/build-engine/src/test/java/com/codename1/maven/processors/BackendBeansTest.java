@@ -3122,6 +3122,78 @@ public class BackendBeansTest {
 
     // ------------------------------------------------------------------ helpers
 
+    /// #5993 end to end: an interceptor bean and a global advice wired by the
+    /// build, running INSIDE the security chain -- a request it refuses meets
+    /// neither, and a method-security denial passes a catch-all handler
+    /// untouched on its way back to the chain's 403.
+    @Test
+    public void interceptorsAndAdviceRunInsideTheSecurityChain() throws Exception {
+        Map<String, String> s = secured();
+        s.put("com.example.Guarded", SECURED
+                + "@RestController public class Guarded {\n"
+                + "    @GetMapping(\"/api/hello\") public String hello() { return \"hello\"; }\n"
+                + "    @GetMapping(\"/api/boom\") public String boom() { throw new IllegalStateException(\"boom\"); }\n"
+                + "    @PreAuthorize(\"hasRole('ADMIN')\") @GetMapping(\"/api/admin\")\n"
+                + "    public String admin() { return \"admin\"; }\n"
+                + "}\n");
+        s.put("com.example.Audit", SECURED
+                + "import com.codename1.backend.web.*;\n"
+                + "@Component public class Audit implements HandlerInterceptor {\n"
+                + "    public static final List<String> LOG = new java.util.ArrayList<String>();\n"
+                + "    public HttpServer.Response preHandle(HttpServer.Request r, HandlerMethod h) {\n"
+                + "        LOG.add(\"pre \" + h.getMethodName()); return null;\n"
+                + "    }\n"
+                + "    public void afterCompletion(HttpServer.Request r, HandlerMethod h,\n"
+                + "            HttpServer.Response response, Throwable failure) {\n"
+                + "        LOG.add(\"after \" + h.getMethodName() + \" \" + (failure == null ? \"ok\"\n"
+                + "                : failure.getClass().getSimpleName()));\n"
+                + "    }\n"
+                + "}\n");
+        s.put("com.example.Errors", SECURED
+                + "@RestControllerAdvice public class Errors {\n"
+                + "    @ExceptionHandler(Exception.class) @ResponseStatus(418)\n"
+                + "    public String any(Exception e) { return \"handled:\" + e.getMessage(); }\n"
+                + "}\n");
+        File classes = compile(s);
+        RestControllerAnnotationProcessor proc = new RestControllerAnnotationProcessor();
+        proc.setDevTools(false);
+        assertNoErrors(process(classes, proc));
+        String wiring = proc.generateWiring("com.example");
+        assertTrue(wiring, wiring.contains("new com.codename1.backend.web.HandlerInterceptor[] {"
+                + "(com.codename1.backend.web.HandlerInterceptor) b_audit}"));
+        assertTrue(wiring, wiring.contains("new com.example.ErrorsCn1Advice("));
+
+        URLClassLoader loader = new URLClassLoader(new URL[] {classes.toURI().toURL()},
+                getClass().getClassLoader());
+        @SuppressWarnings("unchecked")
+        List<String> log = (List<String>) loader.loadClass("com.example.Audit").getField("LOG")
+                .get(null);
+        BackendApplication app = (BackendApplication) loader
+                .loadClass("com.example.BackendWiring").newInstance();
+        int port = freePort();
+        Properties settings = new Properties();
+        settings.setProperty(Config.SERVER_PORT, String.valueOf(port));
+        Backend.Builder builder = withApplication(Backend.builder(Config.of(settings, "dev")).quiet(), app);
+        BackendAccess.get().security(builder);
+        Backend backend = builder.start();
+        try {
+            assertEquals("HTTP 401: Unauthorized", call(port, "/api/hello", null, null));
+            assertTrue("security refused it, so no interceptor ran: " + log, log.isEmpty());
+            assertEquals("hello", call(port, "/api/hello", "ada", "ada-pw"));
+            assertEquals(Arrays.asList("pre hello", "after hello ok"), log);
+            log.clear();
+            assertEquals("HTTP 418: handled:boom", call(port, "/api/boom", "ada", "ada-pw"));
+            assertEquals(Arrays.asList("pre boom", "after boom ok"), log);
+            log.clear();
+            String denied = call(port, "/api/admin", "ada", "ada-pw");
+            assertTrue("a catch-all handler must not answer a denial: " + denied,
+                    denied.startsWith("HTTP 403"));
+            assertEquals(Arrays.asList("pre admin", "after admin AccessDeniedException"), log);
+        } finally {
+            backend.stop();
+        }
+    }
+
     private Backend start(File classes, int port, Properties settings) throws Exception {
         URLClassLoader loader = new URLClassLoader(new URL[] {classes.toURI().toURL()},
                 getClass().getClassLoader());

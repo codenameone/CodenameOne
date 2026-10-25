@@ -79,6 +79,8 @@ public abstract class AndroidApp {
     private String versionName = "1.0";
     private int versionCode = 1;
     private final List<ActivityInfo> activities = new ArrayList<ActivityInfo>();
+    private final List<Class<?>> serviceTypes = new ArrayList<Class<?>>();
+    private final List<String> serviceNames = new ArrayList<String>();
     private Map<String, Integer> tagIndex;
 
     protected AndroidApp(String table, String packageName) {
@@ -110,6 +112,23 @@ public abstract class AndroidApp {
         a.softInputMode = softInputMode;
         a.launcher = launcher;
         activities.add(a);
+    }
+
+    /// A `<service>` the manifest declares.
+    protected final void service(Class<?> type, String className) {
+        serviceTypes.add(type);
+        serviceNames.add(className);
+    }
+
+    /// The declared service class named `className`, or null.
+    public Class<?> serviceClass(String className) {
+        int i = serviceNames.indexOf(className);
+        return i < 0 ? null : serviceTypes.get(i);
+    }
+
+    /// Whether the manifest declares `type` as a service.
+    public boolean isService(Class<?> type) {
+        return serviceTypes.contains(type);
     }
 
     protected final void configChanges(Class<?> type, int mask) {
@@ -288,6 +307,12 @@ public abstract class AndroidApp {
     public abstract Activity createActivity(Class<?> type);
 
     public abstract Application createApplication();
+
+    /// `new` for a declared service class, or null. Not abstract, so an
+    /// application factory generated before services existed still links.
+    public android.app.Service createService(Class<?> type) {
+        return null;
+    }
 
     /// `new` for the fragment class `className` (a binary name, as
     /// `Class.getName()` spells it), or null when the application has no such

@@ -23,6 +23,7 @@
 package com.codename1.backend;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -89,6 +90,9 @@ public final class HttpServer {
         private byte[] encodedBody;
         /// The parts of a multipart body, split on first ask; see [#getParts].
         private List parts;
+        /// A binary body too large to keep in memory, on disk until [#release];
+        /// null when the body is in [#body] or [#bodyBytes]. See [#getBodyStream].
+        private Spool bodySpool;
         /// The connection this request arrived on; null for HTTP/2, see respond.
         private Conn conn;
         /// The bytes the header block was read from.
@@ -571,6 +575,7 @@ public final class HttpServer {
         /// an upload is the whole of it. Every field cleared here is assigned again
         /// by reset() before anything reads it.
         void releaseRetained() {
+            release();
             this.raw = null;
             this.slices = null;
             this.body = null;
@@ -755,10 +760,34 @@ public final class HttpServer {
 
         /// The body as [#bodyContent] decided it: text, or bytes, never both.
         void setBody(String text, byte[] binary) {
+            release();
             this.body = text;
             this.bodyBytes = binary;
             this.encodedBody = null;
             this.parts = null;
+        }
+
+        /// A binary body that was spooled while it arrived. The request owns it
+        /// from here and closes it in [#release].
+        void setBody(Spool spooled) {
+            release();
+            this.body = null;
+            this.bodyBytes = null;
+            this.encodedBody = null;
+            this.parts = null;
+            this.bodySpool = spooled;
+        }
+
+        /// Ends this request's hold on a spooled body, deleting its file. The
+        /// server calls it when the exchange is over -- answered, failed, or the
+        /// peer gone -- so streams handed out by [#getBodyStream] and
+        /// [Part#getInputStream] stop working then.
+        void release() {
+            if (bodySpool != null) {
+                bodySpool.close();
+                bodySpool = null;
+                parts = null;
+            }
         }
 
         void reset(Conn conn, String method, String target, String version, byte[] raw,
@@ -771,6 +800,9 @@ public final class HttpServer {
             this.raw = raw;
             this.slices = slices;
             this.headerCount = headerCount;
+            // A spool the previous request on this connection left is closed
+            // here at the latest; the serving loop's finally normally has.
+            release();
             this.body = body;
             this.bodyBytes = null;
             this.encodedBody = null;
@@ -1062,6 +1094,9 @@ public final class HttpServer {
         /// when they are not, rather than handing a handler characters the client
         /// never sent.
         public String getBody() {
+            if (body == null && bodySpool != null) {
+                getBodyBytes();
+            }
             if (body == null && bodyBytes != null) {
                 if (!Utf8.isValid(bodyBytes, 0, bodyBytes.length)) {
                     throw new IllegalStateException("The request body is binary ("
@@ -1080,8 +1115,25 @@ public final class HttpServer {
         /// it arrived -- decompressed when the client sent it gzip encoded -- and a
         /// text body as its UTF-8. The array is the request's; copy it to keep it
         /// beyond the handler.
+        ///
+        /// @throws IllegalStateException for a body larger than the in-memory
+        /// limit (`CN1_HTTP_MAX_BODY_MB`), which only a spooled binary body can
+        /// be; read that one with [#getBodyStream]
         public byte[] getBodyBytes() {
             if (bodyBytes != null) {
+                return bodyBytes;
+            }
+            if (bodySpool != null) {
+                if (bodySpool.length() > MAX_BODY_BYTES) {
+                    throw new IllegalStateException("The request body is " + bodySpool.length()
+                            + " bytes, past the in-memory limit; read it with getBodyStream()");
+                }
+                try {
+                    bodyBytes = bodySpool.toBytes();
+                } catch (IOException err) {
+                    throw new IllegalStateException("could not read the spooled body: "
+                            + err.getMessage(), err);
+                }
                 return bodyBytes;
             }
             if (body == null) {
@@ -1091,6 +1143,30 @@ public final class HttpServer {
                 encodedBody = Response.bytes(body);
             }
             return encodedBody;
+        }
+
+        /// The body as a stream, whatever its size: the way to read an upload that
+        /// may be larger than the server keeps in memory. A binary body past
+        /// `CN1_HTTP_SPOOL_THRESHOLD_KB` was written to an unlinked temporary file
+        /// as it arrived, and this reads that file; a smaller one is read from
+        /// memory. Each call starts from the beginning. Valid for the duration of
+        /// the request -- the file is deleted once the exchange ends.
+        public InputStream getBodyStream() {
+            if (bodySpool != null) {
+                return bodySpool.open();
+            }
+            byte[] bytes = getBodyBytes();
+            return new java.io.ByteArrayInputStream(bytes == null ? EMPTY_BODY : bytes);
+        }
+
+        /// The body's length in bytes, 0 when there is none, without reading a
+        /// spooled one into memory.
+        public long getBodyLength() {
+            if (bodySpool != null) {
+                return bodySpool.length();
+            }
+            byte[] bytes = getBodyBytes();
+            return bytes == null ? 0 : bytes.length;
         }
 
         /// The parts of a `multipart/form-data` body, in order; an empty list
@@ -1107,6 +1183,11 @@ public final class HttpServer {
                     // @RequestPart values are optional ran on a body nothing parsed.
                     throw new IllegalArgumentException("the multipart/form-data body names no "
                             + "valid boundary");
+                }
+                if (boundary != null && bodySpool != null) {
+                    // Parsed in place: each part is a slice of the spool file.
+                    parts = Multipart.parse(bodySpool, boundary);
+                    return parts;
                 }
                 byte[] data = boundary == null ? null : getBodyBytes();
                 if (boundary != null && (data == null || data.length == 0)) {
@@ -1165,7 +1246,13 @@ public final class HttpServer {
         private final String filename;
         private final String contentType;
         private final Map headers;
-        private final byte[] data;
+        /// The content in memory; null for a part of a spooled body until
+        /// [#getBytes] reads it.
+        private byte[] data;
+        /// The spooled body this part is a slice of, or null.
+        private final Spool source;
+        private final long offset;
+        private final long length;
 
         Part(String name, String filename, String contentType, Map headers, byte[] data) {
             this.name = name;
@@ -1173,6 +1260,21 @@ public final class HttpServer {
             this.contentType = contentType;
             this.headers = headers;
             this.data = data;
+            this.source = null;
+            this.offset = 0;
+            this.length = data.length;
+        }
+
+        /// A part of a body spooled to disk, read in place rather than copied.
+        Part(String name, String filename, String contentType, Map headers, Spool source,
+                long offset, long length) {
+            this.name = name;
+            this.filename = filename;
+            this.contentType = contentType;
+            this.headers = headers;
+            this.source = source;
+            this.offset = offset;
+            this.length = length;
         }
 
         /// The field name from its Content-Disposition, or null.
@@ -1206,13 +1308,46 @@ public final class HttpServer {
             return null;
         }
 
-        /// The part's content length in bytes.
+        /// The part's content length in bytes, capped at [Integer#MAX_VALUE]; see
+        /// [#getLength] for a part that may be larger.
         public int getSize() {
-            return data.length;
+            return length > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) length;
+        }
+
+        /// The part's content length in bytes.
+        public long getLength() {
+            return length;
+        }
+
+        /// The part's content as a stream, which is how to read a large upload: a
+        /// part of a body that was spooled to disk is read from the spool file,
+        /// never brought into memory whole. The stream is valid for the duration
+        /// of the request; the file is gone once the response has been sent.
+        public InputStream getInputStream() {
+            if (data != null) {
+                return new java.io.ByteArrayInputStream(data);
+            }
+            return source.open(offset, length);
         }
 
         /// The part's content. The array is the part's; copy it to change it.
+        ///
+        /// @throws IllegalStateException for a part larger than the server's
+        /// in-memory body limit (`CN1_HTTP_MAX_BODY_MB`), which only a spooled
+        /// body can hold; read that one with [#getInputStream]
         public byte[] getBytes() {
+            if (data == null) {
+                if (length > MAX_BODY_BYTES) {
+                    throw new IllegalStateException("Part \"" + name + "\" is " + length
+                            + " bytes, past the in-memory limit; read it with getInputStream()");
+                }
+                try {
+                    data = source.toBytes(offset, (int) length);
+                } catch (IOException err) {
+                    throw new IllegalStateException("could not read part \"" + name + "\": "
+                            + err.getMessage(), err);
+                }
+            }
             return data;
         }
 
@@ -1220,11 +1355,12 @@ public final class HttpServer {
         /// is not valid UTF-8 -- a binary upload -- rather than returning
         /// replacement characters the client never sent.
         public String getText() {
-            if (!Utf8.isValid(data, 0, data.length)) {
+            byte[] bytes = getBytes();
+            if (!Utf8.isValid(bytes, 0, bytes.length)) {
                 throw new IllegalStateException("Part \"" + name + "\" is not UTF-8 text");
             }
             try {
-                return new String(data, "UTF-8");
+                return new String(bytes, "UTF-8");
             } catch (java.io.UnsupportedEncodingException err) {
                 throw new IllegalStateException(err.toString(), err);
             }
@@ -1238,6 +1374,13 @@ public final class HttpServer {
     /// A disconnect, reset or socket timeout makes writes throw IOException; let it
     /// propagate so generation stops and source cleanup runs. No temporary files or
     /// producer threads are created. Closing output flushes it, but not the connection.
+    ///
+    /// A writer that holds something open until it runs -- an upstream
+    /// connection, a file -- should also implement `java.io.Closeable`. The
+    /// server does not always call [#writeTo(OutputStream)]: a HEAD request, a
+    /// status that carries no body, an HTTP/2 stream it cannot open, or a client
+    /// gone before the headers were written all skip it. In each of those it
+    /// calls `close()` instead, so the writer's resource is released either way.
     public interface BodyWriter {
         void writeTo(OutputStream output) throws IOException;
     }
@@ -1261,6 +1404,11 @@ public final class HttpServer {
         Object deferredJson;
         boolean hasDeferredJson;
         BodyWriter bodyWriter;
+        /// The length a HEAD answer advertises for a bodiless response, or -1 to
+        /// measure the body as usual: HttpProxy's HEAD carries the upstream's
+        /// figure for a representation it never fetched. Content-Length belongs
+        /// to the server (isServerOwnedHeader), so this is how it is passed.
+        long describedLength = -1;
 
         /// Drops what this response pointed at, once it has been written.
         ///
@@ -1272,6 +1420,7 @@ public final class HttpServer {
             this.deferredJson = null;
             this.hasDeferredJson = false;
             this.bodyWriter = null;
+            this.describedLength = -1;
             this.body = EMPTY_BODY;
             this.extraHeaders = null;
         }
@@ -1283,6 +1432,21 @@ public final class HttpServer {
             if (fileFd >= 0) {
                 StaticFiles.closeFile(fileFd);
                 fileFd = -1;
+            }
+            releaseWriter();
+        }
+
+        /// Closes a Closeable writer that will never run, and forgets it.
+        void releaseWriter() {
+            BodyWriter writer = bodyWriter;
+            bodyWriter = null;
+            if (writer instanceof java.io.Closeable) {
+                try {
+                    ((java.io.Closeable) writer).close();
+                } catch (IOException ignored) {
+                    // Releasing what a response that is never sent held; there is
+                    // nobody left to report a failure to.
+                }
             }
         }
 
@@ -1312,6 +1476,7 @@ public final class HttpServer {
             this.deferredJson = null;
             this.hasDeferredJson = false;
             this.bodyWriter = null;
+            this.describedLength = -1;
         }
 
         public Response(int status, String contentType, byte[] body) {
@@ -1353,6 +1518,7 @@ public final class HttpServer {
             copy.deferredJson = deferredJson;
             copy.hasDeferredJson = hasDeferredJson;
             copy.bodyWriter = bodyWriter;
+            copy.describedLength = describedLength;
             return copy;
         }
 
@@ -1759,6 +1925,38 @@ public final class HttpServer {
     private static final long MAX_OPEN_H2_BODY_BYTES =
             envInt("CN1_HTTP_MAX_H2_BODY_MB", 64) * 1024L * 1024L;
     private static final int MAX_BODY_BYTES = 8 * 1024 * 1024;
+
+    /// The largest BINARY, identity-encoded request body taken -- an upload, a
+    /// `multipart/form-data` form -- on either protocol. Such a body past
+    /// [#SPOOL_THRESHOLD] is written to an unlinked temporary file as it
+    /// arrives and read through Request.getBodyStream, so this bounds disk, not
+    /// heap. Text bodies (JSON, forms, XML) and compressed ones stay in memory
+    /// and under MAX_BODY_BYTES, because a handler reads them whole anyway.
+    /// The default is MAX_BODY_BYTES, so nothing changes until it is raised.
+    /// Capped below 2 GiB: an HTTP/1 Content-Length is read as an int.
+    static final long MAX_SPOOLED_BODY_BYTES = Math.min(Integer.MAX_VALUE,
+            Math.max(MAX_BODY_BYTES, envInt("CN1_HTTP_MAX_SPOOLED_BODY_MB", 8) * 1024L * 1024L));
+
+    /// The heap a spoolable body may take before it goes to disk.
+    static final int SPOOL_THRESHOLD = Math.max(16 * 1024,
+            Math.min(MAX_BODY_BYTES, envInt("CN1_HTTP_SPOOL_THRESHOLD_KB", 1024) * 1024));
+
+    /// Where spool files go; null for the system temporary directory. Each is
+    /// unlinked as it is created, so nothing is ever left there.
+    static final String SPOOL_DIRECTORY = emptyToNull(System.getenv("CN1_HTTP_SPOOL_DIR"));
+
+    private static String emptyToNull(String value) {
+        return value == null || value.trim().length() == 0 ? null : value.trim();
+    }
+
+    /// Whether a body with these headers may be spooled: binary by the rule
+    /// bodyContent applies, and not content-encoded, since an encoded body has
+    /// to be decoded -- in memory -- before anyone can read it.
+    static boolean isSpoolable(String contentType, String contentEncoding) {
+        return isBinaryType(contentType)
+                && (contentEncoding == null || contentEncoding.trim().length() == 0
+                    || "identity".equalsIgnoreCase(contentEncoding.trim()));
+    }
     private static final int READY_CAPACITY = 256;
 
     /// Bodies at or below this are sent together with the headers in one write.
@@ -5773,6 +5971,54 @@ public final class HttpServer {
         // The copy happens only when bytes are actually left over -- the pipelining
         // case. The ordinary request-per-read path copies nothing.
 
+        /// Reads the next `needed` body bytes into `spool` -- what is already
+        /// buffered first, then the socket one block at a time -- so an upload of
+        /// any size costs one block of heap. The same rate floor and in-flight
+        /// budget as fillTo, which the block is charged against. Leaves anything
+        /// past the body (a pipelined request) in the socket. False when the peer
+        /// went away.
+        boolean spoolTo(Spool spool, int needed) throws IOException {
+            if (borrowed) {
+                // Before anything moves: see fillTo.
+                detachPreservingOffsets();
+            }
+            int keep = Math.min(available(), needed);
+            if (keep > 0 && !spool.write(buffer, pos, keep)) {
+                throw new ProtocolException(413, "request body too large");
+            }
+            pos += keep;
+            int left = needed - keep;
+            if (left == 0) {
+                return true;
+            }
+            int block = Math.min(left, BODY_CHUNK_BYTES * 4);
+            long charged = block;
+            try {
+                if (http1UploadBytes.addAndGet(block) > MAX_HTTP1_UPLOAD_BYTES) {
+                    throw new ProtocolException(503, "too many uploads in flight");
+                }
+                byte[] chunk = new byte[block];
+                long started = System.currentTimeMillis();
+                long allowed = SOCKET_TIMEOUT_MILLIS + (long) left * 1000L / MIN_BODY_BYTES_PER_SECOND;
+                while (left > 0) {
+                    if (System.currentTimeMillis() - started > allowed) {
+                        throw new ProtocolException(408, "the request body did not arrive in time");
+                    }
+                    int n = readFrom(fd, session, chunk, 0, Math.min(chunk.length, left));
+                    if (n <= 0) {
+                        return false;
+                    }
+                    if (!spool.write(chunk, 0, n)) {
+                        throw new ProtocolException(413, "request body too large");
+                    }
+                    left -= n;
+                }
+                return true;
+            } finally {
+                http1UploadBytes.addAndGet(-charged);
+            }
+        }
+
         /// Take a private copy of the whole borrowed buffer, keeping every index the
         /// same, so anything already parsed out of it (a Request's header slices)
         /// keeps pointing at the right bytes.
@@ -6139,6 +6385,9 @@ public final class HttpServer {
                     return;
                 }
             } finally {
+                // The exchange is over however it ended, so a spooled body's
+                // file goes now rather than when the next request arrives.
+                request.release();
                 inFlightRequests.decrementAndGet();
                 SERVING_FD.set(null);
                 if (span != null) {
@@ -6328,6 +6577,7 @@ public final class HttpServer {
                 // startup hook costs an atomic store on a path that is already
                 // creating a session.
                 Http2.setMaxBodyBytes(MAX_OPEN_H2_BODY_BYTES);
+                Http2.setBodyLimits(MAX_SPOOLED_BODY_BYTES, SPOOL_THRESHOLD, SPOOL_DIRECTORY);
                 Http2.setMaxFileBodies(MAX_OPEN_H2_FILES);
                 h2 = Http2.create();
                 http2Sessions.put(Integer.valueOf(fd), h2);
@@ -6407,6 +6657,41 @@ public final class HttpServer {
                     continue;
                 }
                 byte[] h2RequestBody = stream.getBody();
+                // A body past the spool threshold arrived in a file (the native
+                // receiver spools under the same limits as HTTP/1). Binary and
+                // unencoded, it stays there for getBodyStream, exactly as HTTP/1
+                // keeps it; otherwise it is text or compressed, which HTTP/1 holds
+                // in memory under MAX_BODY_BYTES, so it is read back under that
+                // same rule and decoded the ordinary way below.
+                Spool h2Spool = null;
+                int h2BodyFd = stream.takeBodyFd();
+                if (h2BodyFd >= 0) {
+                    h2Spool = Spool.adopt(h2BodyFd, stream.getBodyLength());
+                    Object h2Type = headers.get("content-type");
+                    Object h2Coding = headers.get("content-encoding");
+                    if (!isSpoolable(h2Type == null ? null : h2Type.toString(),
+                            h2Coding == null ? null : h2Coding.toString())) {
+                        byte[] loaded = null;
+                        if (h2Spool.length() <= MAX_BODY_BYTES) {
+                            try {
+                                loaded = h2Spool.toBytes();
+                            } catch (IOException unreadable) {
+                                loaded = null;
+                            }
+                        }
+                        h2Spool.close();
+                        h2Spool = null;
+                        if (loaded == null) {
+                            if (!h2.respond(stream.getId(), 413, "text/plain", new ArrayList(),
+                                    asciiBytes("request body too large"))) {
+                                h2.respond(stream.getId(), 413, "text/plain", new ArrayList(), null);
+                            }
+                            requestsServed.incrementAndGet();
+                            continue;
+                        }
+                        h2RequestBody = loaded;
+                    }
+                }
                 // The body read through the same decision HTTP/1 makes -- gzip,
                 // then text or bytes by Content-Type -- so a handler cannot tell
                 // which protocol carried it. Decided here rather than in
@@ -6453,6 +6738,9 @@ public final class HttpServer {
                         h2.respond(stream.getId(), 400, "text/plain", new ArrayList(), null);
                     }
                     requestsServed.incrementAndGet();
+                    if (h2Spool != null) {
+                        h2Spool.close();
+                    }
                     continue;
                 }
                 if (targetHasFragment(stream.getPath())) {
@@ -6465,6 +6753,9 @@ public final class HttpServer {
                         h2.respond(stream.getId(), 400, "text/plain", new ArrayList(), null);
                     }
                     requestsServed.incrementAndGet();
+                    if (h2Spool != null) {
+                        h2Spool.close();
+                    }
                     continue;
                 }
                 if (!isKnownMethod(stream.getMethod())) {
@@ -6481,10 +6772,16 @@ public final class HttpServer {
                         h2.respond(stream.getId(), 501, "text/plain", new ArrayList(), null);
                     }
                     requestsServed.incrementAndGet();
+                    if (h2Spool != null) {
+                        h2Spool.close();
+                    }
                     continue;
                 }
                 Request request = new Request(stream.getMethod(), stream.getPath(),
                         "HTTP/2", headers, h2Text, h2Binary);
+                if (h2Spool != null) {
+                    request.setBody(h2Spool);
+                }
                 request.peerFd = fd;
                 request.overTls = tls != null;
                 request.forwarded = forwardedHeaders;
@@ -6591,6 +6888,7 @@ public final class HttpServer {
                     boolean noBody = headOnly || statusForbidsBody(response.status);
                     if (response.bodyWriter != null && !noBody) {
                         if (!h2.respondStream(stream.getId(), response.status, contentType, extra)) {
+                            response.discard();
                             h2.respond(stream.getId(), 503, "text/plain", refusalHeaders(), null);
                             fallbackStatus = 503;
                         } else {
@@ -6681,7 +6979,9 @@ public final class HttpServer {
                         // and the second one then lands on whatever took it.
                         if (headOnly && response.bodyWriter == null && !statusForbidsLength(response.status)) {
                             long described;
-                            if (response.fileFd >= 0) {
+                            if (response.describedLength >= 0) {
+                                described = response.describedLength;
+                            } else if (response.fileFd >= 0) {
                                 described = response.fileLength;
                             } else if (response.hasDeferredJson) {
                                 // respondJson leaves the value UNSERIALISED so the
@@ -6697,6 +6997,10 @@ public final class HttpServer {
                             }
                             extra.add("content-length: " + described);
                         }
+                        // After the length above, which reads whether there was a
+                        // writer: a bodiless answer never runs it, so it is closed.
+                        // Only the writer -- responseBodyFor closes a file itself.
+                        response.releaseWriter();
                         byte[] h2Body = responseBodyFor(response, noBody);
                         int bodyBytes = h2Body == null ? 0 : h2Body.length;
                         // The RESERVATION is the check. Testing the counter here and
@@ -6767,6 +7071,7 @@ public final class HttpServer {
                     // while this thread was still about to call into nghttp2 -- so the
                     // deadline sweep could close the descriptor and free the session
                     // underneath it, which truncates the response at best.
+                    request.release();
                     inFlightRequests.decrementAndGet();
                     SERVING_FD.set(null);
                     SERVING_H2.set(null);
@@ -8043,6 +8348,9 @@ public final class HttpServer {
             // past a proxy that believes one and a server that believes the other.
             throw new ProtocolException(400, "both Content-Length and Transfer-Encoding");
         }
+        boolean spoolable = (chunked || contentLength != null)
+                && isSpoolable(request.getHeader("Content-Type"),
+                        request.getHeader("Content-Encoding"));
 
         // BEFORE THE EXPECTATION IS ANSWERED, because 100 Continue is an
         // invitation to send a body and these are the two reasons this server
@@ -8062,7 +8370,7 @@ public final class HttpServer {
             if (declaredLength < 0) {
                 throw new ProtocolException(400, "malformed Content-Length");
             }
-            if (declaredLength > MAX_BODY_BYTES) {
+            if (declaredLength > (spoolable ? MAX_SPOOLED_BODY_BYTES : MAX_BODY_BYTES)) {
                 throw new ProtocolException(413, "request body too large");
             }
         }
@@ -8095,8 +8403,33 @@ public final class HttpServer {
 
         String body = null;
         byte[] binary = null;
+        if (spoolable && (chunked || declaredLength > SPOOL_THRESHOLD)) {
+            // Written to the spool as it arrives, so the heap holds one read's
+            // worth whatever the client declared. Closed here on every way out
+            // but success; on success the Request owns it and the serving loop
+            // closes it when the exchange ends.
+            Spool spool = new Spool(SPOOL_THRESHOLD, MAX_SPOOLED_BODY_BYTES, SPOOL_DIRECTORY);
+            boolean kept = false;
+            try {
+                boolean complete = chunked ? readChunked(conn, scratch, spool) != null
+                        : conn.spoolTo(spool, declaredLength);
+                if (!complete) {
+                    return null;
+                }
+                if (spool.length() == 0) {
+                    return request;
+                }
+                request.setBody(spool);
+                kept = true;
+                return request;
+            } finally {
+                if (!kept) {
+                    spool.close();
+                }
+            }
+        }
         if (chunked) {
-            byte[] decoded = readChunked(conn, scratch);
+            byte[] decoded = readChunked(conn, scratch, null);
             if (decoded == null) {
                 return null;
             }
@@ -8287,7 +8620,11 @@ public final class HttpServer {
     /// zero-length chunk. The trailer section after it is consumed and discarded --
     /// ignoring trailers is allowed, but leaving them in the stream would
     /// desynchronise the next request on a keep-alive connection.
-    private byte[] readChunked(Conn conn, byte[] scratch) throws IOException {
+    /// With a `spool`, the decoded body is written to it chunk by chunk -- each
+    /// chunk as it arrives, never a whole chunk in the connection buffer -- and
+    /// under MAX_SPOOLED_BODY_BYTES; the answer is then an empty array, or null
+    /// for a peer that went away.
+    private byte[] readChunked(Conn conn, byte[] scratch, Spool spool) throws IOException {
         // Charged against the SAME process-wide budget the fixed-length path uses.
         // Bounding only that path left this one open: a chunked body is capped per
         // request at MAX_BODY_BYTES and by nothing at all across requests, so
@@ -8429,7 +8766,7 @@ public final class HttpServer {
                         }
                         conn.pos = trailerEnd + 2;
                         if (blank) {
-                            return usedBytes(body);
+                            return spool != null ? EMPTY_BODY : usedBytes(body);
                         }
                     }
                 }
@@ -8439,6 +8776,41 @@ public final class HttpServer {
                 // chunk. Four bytes and a "7ffffffd" header was enough for an
                 // unauthenticated client to take the process out. Both sides here are
                 // non-negative, so there is nothing left to overflow.
+                if (spool != null) {
+                    if (size > MAX_SPOOLED_BODY_BYTES - spool.length()) {
+                        throw new ProtocolException(413, "chunked body too large");
+                    }
+                    int left = size;
+                    while (left > 0) {
+                        if (conn.available() == 0) {
+                            requireChunkedProgress(started,
+                                    (int) Math.min(Integer.MAX_VALUE, spool.length()));
+                            reserveUploadUpTo(charged, conn.available());
+                            if (!conn.fill(scratch)) {
+                                return null;
+                            }
+                            continue;
+                        }
+                        int take = Math.min(left, conn.available());
+                        if (!spool.write(conn.buffer, conn.pos, take)) {
+                            throw new ProtocolException(413, "chunked body too large");
+                        }
+                        conn.pos += take;
+                        left -= take;
+                    }
+                    while (conn.available() < 2) {
+                        requireChunkedProgress(started,
+                                (int) Math.min(Integer.MAX_VALUE, spool.length()));
+                        if (!conn.fill(scratch)) {
+                            return null;
+                        }
+                    }
+                    if (conn.buffer[conn.pos] != '\r' || conn.buffer[conn.pos + 1] != '\n') {
+                        throw new ProtocolException(400, "malformed chunk terminator");
+                    }
+                    conn.pos += 2;
+                    continue;
+                }
                 if (size > MAX_BODY_BYTES - body.length()) {
                     throw new ProtocolException(413, "chunked body too large");
                 }
@@ -8661,6 +9033,9 @@ public final class HttpServer {
         if (noBody && !headOnly) {
             bodyLength = 0;
         }
+        if (headOnly && !streamed && response.describedLength >= 0) {
+            bodyLength = response.describedLength;
+        }
 
         // Assembled into the connection's own buffer, as bytes, with no
         // intermediate String. See Conn.out: the StringBuilder-to-String-to-bytes
@@ -8773,8 +9148,15 @@ public final class HttpServer {
         }
 
         if (streamed) {
-            writeTo(fd, session, conn.out, 0, conn.outLength);
-            if (!noBody) {
+            try {
+                writeTo(fd, session, conn.out, 0, conn.outLength);
+            } catch (IOException | RuntimeException headFailed) {
+                response.discard();
+                throw headFailed;
+            }
+            if (noBody) {
+                response.discard();
+            } else {
                 ResponseOutput output = new ResponseOutput(fd, session, chunked, null, 0); //NOPMD CloseResource - complete flushes on success; failure must abort and the connection owns the socket.
                 response.bodyWriter.writeTo(output);
                 output.complete();

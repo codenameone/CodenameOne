@@ -1524,6 +1524,12 @@ public class GeneratorModel {
         return replaced;
     }
 
+    /// The skill's files and the two pointers to it: [#addAgentSkillEntries(Map)].
+    static boolean isAgentSkillPath(String targetPath) {
+        return targetPath.startsWith(AGENT_SKILL_TARGET_PREFIX) || CLAUDE_SKILL_STUB_PATH.equals(targetPath)
+                || "AGENTS.md".equals(targetPath);
+    }
+
     private byte[] applyDataReplacements(String targetPath, byte[] sourceData) throws IOException {
         if (!isTextFile(targetPath)) {
             return sourceData;
@@ -1534,10 +1540,19 @@ public class GeneratorModel {
             // Ahead of the replacements below, which the template's hints get too.
             content = (content.endsWith("\n") ? content : content + "\n") + readResourceToString(template.SETTINGS);
         }
+        // The agent skill names the demo applications (Wayline, Savor, ...) on purpose,
+        // so an agent can go and read them; renaming the template's own name inside it
+        // would turn "read Wayline's map code" into a pointer at a demo that does not
+        // exist. It still gets the generic placeholders below.
+        boolean agentSkillFile = isAgentSkillPath(targetPath);
         content = StringUtil.replaceAll(content, "com.example.myapp", packageName);
-        content = StringUtil.replaceAll(content, template.SOURCE_PACKAGE, packageName);
+        if (!agentSkillFile) {
+            content = StringUtil.replaceAll(content, template.SOURCE_PACKAGE, packageName);
+        }
         content = StringUtil.replaceAll(content, "MyAppName", appName);
-        content = StringUtil.replaceAll(content, template.SOURCE_MAIN_CLASS, appName);
+        if (!agentSkillFile) {
+            content = StringUtil.replaceAll(content, template.SOURCE_MAIN_CLASS, appName);
+        }
         content = StringUtil.replaceAll(content, "myappname", toLowerCaseInvariant(appName));
         // The name in capitals is how an environment variable spells a setting
         // that starts with it: myappname.payments.key is read from

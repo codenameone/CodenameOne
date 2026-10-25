@@ -150,6 +150,15 @@ public abstract class Context {
         if (serviceClass == android.view.inputmethod.InputMethodManager.class) {
             return INPUT_METHOD_SERVICE;
         }
+        if (serviceClass == android.location.LocationManager.class) {
+            return LOCATION_SERVICE;
+        }
+        if (serviceClass == android.hardware.SensorManager.class) {
+            return SENSOR_SERVICE;
+        }
+        if (serviceClass == android.app.NotificationManager.class) {
+            return NOTIFICATION_SERVICE;
+        }
         return null;
     }
 
@@ -406,5 +415,35 @@ public abstract class Context {
 
     public boolean isRestricted() {
         return false;
+    }
+
+    // ------------------------------------------------------------ services
+
+    /// Starts a service the manifest declares; see `android.app.ActiveServices`.
+    public ComponentName startService(Intent service) {
+        return android.app.ActiveServices.startService(this, service);
+    }
+
+    /// The same start as [#startService(Intent)]: the service is expected to
+    /// call `startForeground`, which is what puts it in the foreground.
+    public ComponentName startForegroundService(Intent service) {
+        return android.app.ActiveServices.startService(this, service);
+    }
+
+    public boolean stopService(Intent service) {
+        return android.app.ActiveServices.stopService(this, service);
+    }
+
+    public boolean bindService(Intent service, ServiceConnection conn, int flags) {
+        return android.app.ActiveServices.bindService(this, service, conn, flags);
+    }
+
+    public boolean bindService(Intent service, int flags, java.util.concurrent.Executor executor,
+            ServiceConnection conn) {
+        return bindService(service, conn, flags);
+    }
+
+    public void unbindService(ServiceConnection conn) {
+        android.app.ActiveServices.unbindService(this, conn);
     }
 }

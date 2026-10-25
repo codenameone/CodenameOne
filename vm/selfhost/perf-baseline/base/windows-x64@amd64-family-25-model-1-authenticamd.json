@@ -93,8 +93,8 @@
  "translator": {
   "all": {
    "memory": 0.542,
-   "runs": 11,
-   "time": 0.605,
+   "runs": 1,
+   "time": 0.833,
    "tolerance": {
     "time": 0.35
    }

@@ -307,6 +307,7 @@ final class BackendWiringWriter {
             sb.append("        }\n        }\n");
         }
         sb.append("        java.util.List handlers = new java.util.ArrayList();\n");
+        controllerHooks(sb);
         for (Router r : routers) {
             BackendBeans.Bean b = model.beanOfClass(r.controllerBinary);
             String ref = "routed" + b.var;
@@ -314,7 +315,7 @@ final class BackendWiringWriter {
               .append(" = ").append(reference(b)).append(";\n");
             sb.append("        if (").append(ref).append(" != null) {\n");
             sb.append("            handlers.add(new ").append(r.routerBinary).append('(').append(ref)
-              .append("));\n");
+              .append(", cn1Hooks));\n");
             sb.append("            synchronized (this) {\n                active.add(")
               .append(BackendSources.quote(r.controllerBinary))
               .append(");\n            }\n        }\n        }\n");
@@ -715,6 +716,59 @@ final class BackendWiringWriter {
 
     private String typeOf(BackendBeans.Bean b) {
         return types.sourceOf(b.type);
+    }
+
+    // -------------------------------------------------------- controller hooks
+
+    static final String INTERCEPTOR_TYPE = "com/codename1/backend/web/HandlerInterceptor";
+    static final String RESOLVER_TYPE = "com/codename1/backend/web/ExceptionResolver";
+
+    /// `cn1Hooks`: every HandlerInterceptor bean, and every @ControllerAdvice or
+    /// ExceptionResolver bean, each in @Order order and then by bean name -- the
+    /// precedence ControllerHooks documents. A conditional bean that was not
+    /// created is null here, and ControllerHooks drops it.
+    private void controllerHooks(StringBuilder sb) {
+        List<BackendBeans.Bean> ordered = new ArrayList<BackendBeans.Bean>(model.beans);
+        java.util.Collections.sort(ordered, new java.util.Comparator<BackendBeans.Bean>() {
+            @Override
+            public int compare(BackendBeans.Bean a, BackendBeans.Bean b) {
+                if (a.order != b.order) {
+                    return a.order < b.order ? -1 : 1;
+                }
+                return a.name.compareTo(b.name);
+            }
+        });
+        StringBuilder interceptors = new StringBuilder();
+        StringBuilder resolvers = new StringBuilder();
+        for (BackendBeans.Bean b : ordered) {
+            if (b.mockType != null) {
+                continue;
+            }
+            boolean advice = b.factory == null && b.cls != null
+                    && BackendExceptionHandlers.advice(b.cls) != null;
+            if (b.types.contains(INTERCEPTOR_TYPE)) {
+                interceptors.append(interceptors.length() == 0 ? "" : ", ")
+                  .append("(com.codename1.backend.web.HandlerInterceptor) ").append(reference(b));
+            }
+            if (advice) {
+                String ref = "advice" + b.var;
+                sb.append("        ").append(typeOf(b)).append(' ').append(ref).append(" = ")
+                  .append(reference(b)).append(";\n");
+                resolvers.append(resolvers.length() == 0 ? "" : ", ").append(ref)
+                  .append(" == null ? null : new ")
+                  .append(BackendExceptionHandlers.adapterName(b.type.replace('/', '.')).replace('$', '.'))
+                  .append('(').append(ref).append(')');
+            } else if (b.types.contains(RESOLVER_TYPE)) {
+                resolvers.append(resolvers.length() == 0 ? "" : ", ")
+                  .append("(com.codename1.backend.web.ExceptionResolver) ").append(reference(b));
+            }
+        }
+        sb.append("        com.codename1.backend.web.ControllerHooks cn1Hooks =\n")
+          .append("                new com.codename1.backend.web.ControllerHooks(\n")
+          .append("                new com.codename1.backend.web.HandlerInterceptor[] {")
+          .append(interceptors).append("},\n")
+          .append("                new com.codename1.backend.web.ExceptionResolver[] {")
+          .append(resolvers).append("});\n");
     }
 
     // ------------------------------------------------------------- websockets
