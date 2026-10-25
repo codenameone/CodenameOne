@@ -35,24 +35,26 @@ import java.lang.annotation.Target;
 /// A field's adapter wins over its class's.
 ///
 /// ```java
-/// public final class CentsAdapter implements JsonTypeAdapter<Money> {
-///     public Object toJson(Money m) { return m == null ? null : Long.valueOf(m.cents()); }
-///     public Money fromJson(Object json) {
+/// public final class EpochSecondsAdapter implements JsonTypeAdapter<java.util.Date> {
+///     public Object toJson(java.util.Date d) {
+///         return d == null ? null : Long.valueOf(d.getTime() / 1000);
+///     }
+///     public java.util.Date fromJson(Object json) {
 ///         if (json == null) {
 ///             return null;
 ///         }
 ///         // instanceof, never a bare cast: a failed cast does not throw on iOS.
 ///         if (!(json instanceof Number)) {
-///             throw new IllegalArgumentException("expected cents");
+///             throw new IllegalArgumentException("expected epoch seconds");
 ///         }
-///         return new Money(((Number) json).longValue());
+///         return new java.util.Date(((Number) json).longValue() * 1000);
 ///     }
 /// }
 ///
 /// @Mapped
 /// public class Invoice {
-///     @JsonAdapter(CentsAdapter.class)
-///     public Money total;
+///     @JsonAdapter(EpochSecondsAdapter.class)
+///     public java.util.Date issued;
 /// }
 /// ```
 ///

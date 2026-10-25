@@ -264,21 +264,7 @@ An immutable class keeps its fields `final` and is read through its creator:
 
 [source,java,role=cn1-no-try]
 ----
-@JsonStrict
-public final class Point {
-    private final int x;
-    private final int y;
-
-    @JsonCreator
-    public Point(@JsonProperty(value = "x", required = true) int x,
-                 @JsonProperty("y") int y) {
-        this.x = x;
-        this.y = y;
-    }
-
-    public int getX() { return x; }
-    public int getY() { return y; }
-}
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/contract/Point.java[tag=backend-json-creator,indent=0]
 ----
 
 An adapter converts between a type and the parsed form of JSON: `null`, a
@@ -288,18 +274,7 @@ in cents and sent as a decimal string:
 
 [source,java,role=cn1-no-try]
 ----
-public final class MoneyAdapter implements JsonTypeAdapter<Money> {
-    public Object toJson(Money m) {
-        return m == null ? null : m.toDecimalString();
-    }
-
-    public Money fromJson(Object json) {
-        if (!(json instanceof String)) {
-            throw new IllegalArgumentException("expected an amount");
-        }
-        return Money.parse((String) json);
-    }
-}
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/contract/MoneyAdapter.java[tag=backend-json-adapter,indent=0]
 ----
 
 The adapter needs a public constructor without arguments. The build creates one
