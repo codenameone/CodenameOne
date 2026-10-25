@@ -32,6 +32,9 @@ public final class MoneyAdapter implements JsonTypeAdapter<Money> {
     }
 
     public Money fromJson(Object json) {
+        if (json == null) {
+            return null;
+        }
         if (!(json instanceof String)) {
             throw new IllegalArgumentException("expected an amount");
         }

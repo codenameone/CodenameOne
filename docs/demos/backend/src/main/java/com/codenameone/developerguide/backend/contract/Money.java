@@ -27,30 +27,48 @@ public final class Money {
     private final long cents;
 
     public Money(long cents) {
+        if (cents == Long.MIN_VALUE) {
+            // Has no positive counterpart, so it has no decimal form below.
+            throw new IllegalArgumentException("amount out of range");
+        }
         this.cents = cents;
     }
 
-    /** Parses "12.34"; anything else is refused. */
+    /**
+     * Parses a whole amount ("12") or one with exactly two decimals ("12.34"),
+     * optionally negative; anything else, or an amount too large to hold, is
+     * refused.
+     */
     public static Money parse(String s) {
+        int i = s.startsWith("-") ? 1 : 0;
         int dot = s.indexOf('.');
-        try {
-            if (dot < 0) {
-                return new Money(Long.parseLong(s) * 100);
-            }
-            if (s.length() - dot != 3) {
-                throw new IllegalArgumentException("expected an amount");
-            }
-            long whole = Long.parseLong(s.substring(0, dot));
-            long frac = Long.parseLong(s.substring(dot + 1));
-            return new Money(whole * 100 + (s.startsWith("-") ? -frac : frac));
-        } catch (NumberFormatException e) {
+        int end = dot < 0 ? s.length() : dot;
+        if (end == i || (dot >= 0 && s.length() - dot != 3)) {
             throw new IllegalArgumentException("expected an amount");
         }
+        long units = 0;
+        for (int p = i; p < s.length(); p++) {
+            if (p == dot) {
+                continue;
+            }
+            char c = s.charAt(p);
+            if (c < '0' || c > '9' || units > (Long.MAX_VALUE - 9) / 10) {
+                throw new IllegalArgumentException("expected an amount");
+            }
+            units = units * 10 + (c - '0');
+        }
+        if (dot < 0) {
+            if (units > Long.MAX_VALUE / 100) {
+                throw new IllegalArgumentException("expected an amount");
+            }
+            units *= 100;
+        }
+        return new Money(i == 1 ? -units : units);
     }
 
     public String toDecimalString() {
         long abs = Math.abs(cents);
-        String frac = String.valueOf(abs % 100);
-        return (cents < 0 ? "-" : "") + abs / 100 + "." + (frac.length() == 1 ? "0" + frac : frac);
+        long frac = abs % 100;
+        return (cents < 0 ? "-" : "") + abs / 100 + (frac < 10 ? ".0" : ".") + frac;
     }
 }
