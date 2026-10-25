@@ -77,7 +77,7 @@ credential into a build hint:
 
 [source,properties]
 ----
-codename1.arg.android.unifiedPush.vapidKey=BExampleKeyOf87Base64UrlCharacters...
+include::../demos/common/src/main/snippets/developer-guide/android-without-google-play.properties[tag=android-without-google-play-properties-001,indent=0]
 ----
 
 The key is 87 base64url characters. The build rejects anything else. With the
