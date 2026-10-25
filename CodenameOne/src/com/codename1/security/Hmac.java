@@ -97,6 +97,11 @@ public final class Hmac {
         if ("SHA384".equals(a) || "SHA512".equals(a)) {
             return 128;
         }
+        if ("SHA3256".equals(a) || "KECCAK256".equals(a)) {
+            // FIPS 202: the block size of a sponge is its rate, 136 bytes for
+            // a 256-bit output.
+            return 136;
+        }
         throw new CryptoException("unsupported HMAC algorithm: " + algorithm);
     }
 
