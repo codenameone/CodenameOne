@@ -1,0 +1,34 @@
+# The controls tab of the Swing gallery, the same controls in both arms.
+#
+# The native look is taller than Metal, so the window of the Codename One
+# build does not put a control where the JVM's has it, and default.txt
+# pressed different things in the two: it typed into the editable combo box
+# in one and moved the slider in the other. Every press is given per arm.
+sleep 0.5
+# "Click me"
+jvm: click 0.086 0.269
+cn1: click 0.077 0.323
+# the radio buttons "Small", then "Large"
+jvm: click 0.275 0.269
+cn1: click 0.260 0.323
+jvm: click 0.470 0.269
+cn1: click 0.462 0.323
+# the name field, then on to the password
+jvm: click 0.369 0.368
+cn1: click 0.376 0.418
+type hello
+key Tab
+type secret
+# the slider, at 75
+jvm: click 0.547 0.534
+cn1: click 0.717 0.610
+# "Start", and the progress bar runs
+jvm: click 0.264 0.677
+cn1: click 0.251 0.748
+move 0.20 0.90
+move 0.80 0.90
+# the text area
+jvm: click 0.739 0.420
+cn1: click 0.732 0.467
+type codename one
+sleep 0.5

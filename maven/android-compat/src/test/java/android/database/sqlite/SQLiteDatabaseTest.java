@@ -39,7 +39,7 @@ import android.database.DatabaseUtils;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.codename1.androidcompat.testing.MainThreadRule;
+import com.codename1.compat.testing.MainThreadRule;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -389,6 +389,7 @@ public class SQLiteDatabaseTest {
     /// rolled back with ours.
     @Test
     public void anotherThreadDoesNotNestIntoThisThreadsTransaction() throws Exception {
+        SQLiteDatabase.BUSY_TIMEOUT_MS.set(50);
         db.beginTransaction();
         final boolean[] otherSawTransaction = new boolean[1];
         final Throwable[] otherFailure = new Throwable[1];
@@ -444,6 +445,7 @@ public class SQLiteDatabaseTest {
     /// thread's insert, and its query saw rows that were never committed.
     @Test
     public void anotherThreadsStatementDoesNotJoinThisThreadsTransaction() throws Exception {
+        SQLiteDatabase.BUSY_TIMEOUT_MS.set(50);
         db.beginTransaction();
         db.insert("notes", null, note("uncommitted", 1));
         final Throwable[] failures = new Throwable[2];
@@ -479,6 +481,7 @@ public class SQLiteDatabaseTest {
     /// call, so the outcome does not depend on timing.
     @Test
     public void anotherThreadsStatementIsRefusedWhileTheEngineTransactionBeginsAndCommits() throws Exception {
+        SQLiteDatabase.BUSY_TIMEOUT_MS.set(50);
         final SQLiteDatabase[] shared = new SQLiteDatabase[1];
         final List<String> outcomes = new ArrayList<String>();
         final boolean[] armed = new boolean[1];
@@ -512,6 +515,48 @@ public class SQLiteDatabaseTest {
         // Released once the transaction ended: the other thread writes now.
         assertEquals("ran", insertFromAnotherThread(shared[0], "after"));
         shared[0].close();
+    }
+
+    @After
+    public void restoreBusyTimeout() {
+        SQLiteDatabase.BUSY_TIMEOUT_MS.set(10000);
+    }
+
+    /// A second thread waits for this thread's transaction rather than
+    /// failing, as Android's connection pool makes it: two Room executor
+    /// threads writing at once is ordinary.
+    @Test
+    public void anotherThreadWaitsForThisThreadsTransactionToEnd() throws Exception {
+        db.beginTransaction();
+        db.insert("notes", null, note("mine", 1));
+        final Throwable[] failure = new Throwable[1];
+        final boolean[] done = new boolean[1];
+        Thread other = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    db.beginTransaction();
+                    try {
+                        db.insert("notes", null, note("theirs", 2));
+                        db.setTransactionSuccessful();
+                    } finally {
+                        db.endTransaction();
+                    }
+                    done[0] = true;
+                } catch (Throwable t) {
+                    failure[0] = t;
+                }
+            }
+        });
+        other.start();
+        other.join(200);
+        assertTrue("still waiting while ours is open", other.isAlive());
+        db.setTransactionSuccessful();
+        db.endTransaction();
+        other.join(5000);
+        assertNull(String.valueOf(failure[0]), failure[0]);
+        assertTrue(done[0]);
+        assertEquals(2, DatabaseUtils.queryNumEntries(db, "notes"));
     }
 
     /// Inserts `value` from a new thread and waits for it: "refused" for

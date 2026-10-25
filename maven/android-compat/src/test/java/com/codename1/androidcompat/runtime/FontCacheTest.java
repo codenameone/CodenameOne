@@ -24,7 +24,7 @@ package com.codename1.androidcompat.runtime;
 
 import android.graphics.Typeface;
 
-import com.codename1.androidcompat.testing.MainThreadRule;
+import com.codename1.compat.testing.MainThreadRule;
 import org.junit.Rule;
 import org.junit.Test;
 

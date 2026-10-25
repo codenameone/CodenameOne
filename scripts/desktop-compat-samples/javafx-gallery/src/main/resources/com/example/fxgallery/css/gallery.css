@@ -1,0 +1,124 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+/* The gallery's look: colours are looked up from .root, so a theme is a change of three lines. */
+.root {
+    -brand: #1565c0;
+    -brand-light: derive(-brand, 60%);
+    -accent: #ef6c00;
+    -fx-font-size: 13px;
+    -fx-background-color: #fafafa;
+}
+
+/* Type selectors */
+Label {
+    -fx-text-fill: #263238;
+}
+
+/* Class selectors */
+.title {
+    -fx-font-size: 20px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -brand;
+}
+
+.section {
+    -fx-font-weight: bold;
+    -fx-text-fill: derive(-brand, -20%);
+}
+
+.card {
+    -fx-background-color: white;
+    -fx-background-radius: 6;
+    -fx-border-color: #cfd8dc;
+    -fx-border-radius: 6;
+    -fx-padding: 8;
+}
+
+.echo {
+    -fx-font-style: italic;
+    -fx-text-fill: gray;
+}
+
+.button {
+    -fx-background-radius: 4;
+    -fx-padding: 5 12 5 12;
+}
+
+.button.primary {
+    -fx-background-color: -brand;
+    -fx-text-fill: white;
+}
+
+/* Pseudo-class states */
+.button.primary:hover {
+    -fx-background-color: derive(-brand, 20%);
+}
+
+.button.primary:pressed {
+    -fx-background-color: derive(-brand, -25%);
+}
+
+.button:disabled {
+    -fx-opacity: 0.5;
+}
+
+.text-field:focused {
+    -fx-border-color: -accent;
+}
+
+.check-box:selected .label {
+    -fx-text-fill: -brand;
+}
+
+/* Id selector */
+#status {
+    -fx-background-color: -brand-light;
+    -fx-text-fill: #0d47a1;
+    -fx-max-width: infinity;
+}
+
+#primary-button {
+    -fx-font-weight: bold;
+}
+
+/* Descendant and child selectors */
+.card .label {
+    -fx-padding: 0 0 2 0;
+}
+
+.tab-pane > .tab-header-area .tab:selected .tab-label {
+    -fx-text-fill: -brand;
+}
+
+.table-view .column-header .label {
+    -fx-font-weight: bold;
+}
+
+.list-cell:selected {
+    -fx-background-color: -brand;
+    -fx-text-fill: white;
+}
+
+.progress-bar {
+    -fx-accent: -accent;
+}

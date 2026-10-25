@@ -22,8 +22,7 @@
  */
 package android.net;
 
-import com.codename1.androidcompat.jdk.File;
-import com.codename1.androidcompat.testing.MainThreadRule;
+import com.codename1.compat.testing.MainThreadRule;
 
 import org.junit.Rule;
 import org.junit.Test;
@@ -32,21 +31,35 @@ import static org.junit.Assert.assertEquals;
 
 /// A context directory is already a `file:` path; `fromFile` prefixed a
 /// second scheme to it (`file://file:///...`).
+///
+/// A device's `java.io.File` keeps the storage path it was made from, which
+/// the JDK's running these tests would rewrite (`file:///a` becomes
+/// `file:/a`), so the files here are stand-ins that print their path as the
+/// device's does: `fromFile` reads nothing of a file but that.
 public class UriFromFileTest {
+
+    private static Object file(final String path) {
+        return new Object() {
+            @Override
+            public String toString() {
+                return path;
+            }
+        };
+    }
 
     @Rule
     public final MainThreadRule mainThread = new MainThreadRule();
 
     @Test
     public void keepsAnExistingFileScheme() {
-        Uri u = Uri.fromFile(new File("file:///data/files/report.pdf"));
+        Uri u = Uri.fromFile(file("file:///data/files/report.pdf"));
         assertEquals("file:///data/files/report.pdf", u.toString());
         assertEquals("/data/files/report.pdf", u.getPath());
     }
 
     @Test
     public void anAbsolutePathGainsTheScheme() {
-        assertEquals("file:///data/report.pdf", Uri.fromFile(new File("/data/report.pdf")).toString());
+        assertEquals("file:///data/report.pdf", Uri.fromFile(file("/data/report.pdf")).toString());
     }
 
     /// Reserved characters in a file name are percent-encoded, so the whole
@@ -54,12 +67,12 @@ public class UriFromFileTest {
     /// `getPath()` answered `/data/a`.
     @Test
     public void encodesReservedCharactersInThePath() {
-        Uri u = Uri.fromFile(new File("/data/a#b?c d.txt"));
+        Uri u = Uri.fromFile(file("/data/a#b?c d.txt"));
         assertEquals("file:///data/a%23b%3Fc%20d.txt", u.toString());
         assertEquals("/data/a#b?c d.txt", u.getPath());
         assertEquals(null, u.getFragment());
 
-        Uri home = Uri.fromFile(new File("file://home/x#1.txt"));
+        Uri home = Uri.fromFile(file("file://home/x#1.txt"));
         assertEquals("file://home/x%231.txt", home.toString());
         assertEquals("home", home.getAuthority());
         assertEquals("/x#1.txt", home.getPath());

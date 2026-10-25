@@ -1991,8 +1991,23 @@ public final class GeneralPath implements Shape {
                                 maxY = (float) (boundingRect.getY() + boundingRect.getHeight());
                             }
                             if (rect2D.contains(curve.x(0.5), curve.y(0.5))) {
-                                // It is fully inside, we can just add it to the out path
-                                curve.addToPath(out, false);
+                                // It is fully inside, we can just add it to the out path.
+                                // It CONTINUES the subpath: passing join == false here
+                                // made every curve open a subpath of its own, so a shape
+                                // with a curved corner came back as one sliver per corner
+                                // (the corner and the edge after it, closed across the
+                                // shape) and its inside was no longer inside. Every port
+                                // that narrows a shape clip with clipRect goes through
+                                // this, which is how a gradient filled through a rounded
+                                // rectangle was drawn as a hollow, skewed outline. The
+                                // segment before may have ended outside and been clamped
+                                // to the rectangle, in which case the outline first runs
+                                // from there to where the curve really starts.
+                                if (started && (Math.abs(prevX - origPrevX) > epsilon
+                                        || Math.abs(prevY - origPrevY) > epsilon)) {
+                                    out.lineTo((float) origPrevX, (float) origPrevY);
+                                }
+                                curve.addToPath(out, started);
                                 prevX = (float) curveEnd.getX();
                                 prevY = (float) curveEnd.getY();
                                 origPrevX = curveEnd.getX();

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.GridPane?>
+
+<GridPane xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
+          fx:controller="com.example.fxgallery.fxml.AddressController" hgap="8" vgap="6">
+    <Label text="%address.street" GridPane.rowIndex="0" GridPane.columnIndex="0"/>
+    <TextField fx:id="streetField" GridPane.rowIndex="0" GridPane.columnIndex="1" GridPane.hgrow="ALWAYS"/>
+    <Label text="%address.city" GridPane.rowIndex="1" GridPane.columnIndex="0"/>
+    <TextField fx:id="cityField" GridPane.rowIndex="1" GridPane.columnIndex="1" GridPane.hgrow="ALWAYS"/>
+</GridPane>

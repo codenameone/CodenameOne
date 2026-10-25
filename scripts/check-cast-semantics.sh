@@ -24,8 +24,10 @@ TRANSLATOR="$REPO_ROOT/vm/ByteCodeTranslator/target/classes"
 # The modules whose bytecode ParparVM translates and that we own. A translation
 # sees maven/core, maven/ios and vm/JavaAPI, and -- in an application with
 # Android sources -- maven/android-compat, whose runtime the build relocates into
-# the application's own classes. Nothing else of ours, but for OPTIONAL_ROOTS
-# below.
+# the application's own classes. An application with Swing, SwingX or JavaFX sources gets the same
+# treatment from maven/swing-compat and maven/javafx-compat: their classes are
+# relocated into the application and translated with it. Nothing else of ours,
+# but for OPTIONAL_ROOTS below.
 # Deliberately NOT covered, for the one reason: the code runs on a VM whose
 # CHECKCAST does throw, so its catch(ClassCastException) handlers are live and
 # correct and demanding an instanceof there buys nothing.
@@ -38,6 +40,8 @@ DEFAULT_ROOTS=(
   "maven/core/target/classes"
   "maven/ios/target/classes"
   "maven/android-compat/target/classes"
+  "maven/swing-compat/target/classes"
+  "maven/javafx-compat/target/classes"
 )
 # Translated too, but built only under the unity-compat Maven profile, which
 # needs the .NET SDK: maven/unity-compat, the runtime an application with Unity

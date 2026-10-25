@@ -618,7 +618,7 @@ class PortStatusTest(unittest.TestCase):
 
     def test_a_skip_documented_for_another_port_accounts_for_nothing(self):
         # map-tiles-never-loaded is written about android and the two iOS renderers. The same
-        # reason arriving from Linux, where the errata expect no-api-key instead, is a port
+        # reason arriving from Linux, where the errata expect a desktop reason instead, is a port
         # behaving unexpectedly rather than a network nobody can reach.
         self.assertEqual(
             [],

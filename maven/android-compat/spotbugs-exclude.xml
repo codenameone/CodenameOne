@@ -362,4 +362,13 @@
         <Method name="setNavigationIcon"/>
         <Bug pattern="UR_UNINIT_READ_CALLED_FROM_SUPER_CONSTRUCTOR"/>
     </Match>
+    <!--
+        The support-library configuration publishes its settings as public
+        final fields, as AndroidX does; the framework helper reads only the
+        ones this runtime acts on.
+    -->
+    <Match>
+        <Class name="androidx.sqlite.db.SupportSQLiteOpenHelper$Configuration"/>
+        <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD"/>
+    </Match>
 </FindBugsFilter>

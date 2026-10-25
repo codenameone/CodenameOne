@@ -82,15 +82,108 @@ final class Multipart {
 
     /// The parts of `body`, in order.
     static List parse(byte[] body, String boundary) {
+        return parse(new ArraySource(body), boundary);
+    }
+
+    /// The parts of a body spooled to disk, in order, parsed in place: each part
+    /// is a slice of the spool, so a large upload is never read into memory to
+    /// be split, and its file parts are read through [HttpServer.Part#getInputStream].
+    static List parse(Spool body, String boundary) {
+        return parse(new SpoolSource(body), boundary);
+    }
+
+    /// What the parser reads: a body as an array, or as a spool it reads through
+    /// a window. Positions are longs because a spooled body may pass 2 GiB.
+    abstract static class Source {
+        abstract long length();
+
+        abstract int at(long position);
+
+        abstract HttpServer.Part part(String name, String filename, String contentType,
+                                      Map headers, long offset, long length);
+    }
+
+    private static final class ArraySource extends Source {
+        private final byte[] data;
+
+        ArraySource(byte[] data) {
+            this.data = data;
+        }
+
+        @Override
+        long length() {
+            return data.length;
+        }
+
+        @Override
+        int at(long position) {
+            return data[(int) position];
+        }
+
+        @Override
+        HttpServer.Part part(String name, String filename, String contentType, Map headers,
+                             long offset, long length) {
+            byte[] copy = new byte[(int) length];
+            System.arraycopy(data, (int) offset, copy, 0, copy.length);
+            return new HttpServer.Part(name, filename, contentType, headers, copy);
+        }
+    }
+
+    /// Reads a spool through one 64 KiB window, which the parser's forward scans
+    /// keep hitting; the boundary search looks back at most a delimiter's length.
+    private static final class SpoolSource extends Source {
+        private final Spool spool;
+        private final byte[] window = new byte[64 * 1024];
+        private long windowStart = -1;
+        private int windowLength;
+
+        SpoolSource(Spool spool) {
+            this.spool = spool;
+        }
+
+        @Override
+        long length() {
+            return spool.length();
+        }
+
+        @Override
+        int at(long position) {
+            if (position < windowStart || position >= windowStart + windowLength
+                    || windowStart < 0) {
+                // Starting a little before the position, so a scan that steps
+                // back over a delimiter does not reload.
+                long start = Math.max(0, position - 128);
+                try {
+                    windowLength = spool.read(start, window);
+                } catch (java.io.IOException err) {
+                    throw new IllegalStateException("could not read the spooled body: " + err, err);
+                }
+                windowStart = start;
+                if (position >= windowStart + windowLength) {
+                    throw new IllegalStateException("the spooled body ended early");
+                }
+            }
+            return window[(int) (position - windowStart)];
+        }
+
+        @Override
+        HttpServer.Part part(String name, String filename, String contentType, Map headers,
+                             long offset, long length) {
+            return new HttpServer.Part(name, filename, contentType, headers, spool, offset,
+                    length);
+        }
+    }
+
+    static List parse(Source body, String boundary) {
         byte[] delimiter = ascii("--" + boundary);
         List parts = new ArrayList();
-        int pos = openingDelimiter(body, delimiter);
+        long pos = openingDelimiter(body, delimiter);
         if (pos < 0) {
             throw new IllegalArgumentException("the multipart body has no boundary");
         }
         while (true) {
             pos += delimiter.length;
-            if (pos + 1 < body.length && body[pos] == '-' && body[pos + 1] == '-') {
+            if (pos + 1 < body.length() && body.at(pos) == '-' && body.at(pos + 1) == '-') {
                 if (!closeEnds(body, pos + 2)) {
                     throw new IllegalArgumentException("the closing multipart boundary is "
                             + "followed by more than padding and CRLF");
@@ -98,7 +191,7 @@ final class Multipart {
                 return parts;
             }
             // Transport padding (RFC 2046) is allowed between a boundary and its CRLF.
-            while (pos < body.length && (body[pos] == ' ' || body[pos] == '\t')) {
+            while (pos < body.length() && (body.at(pos) == ' ' || body.at(pos) == '\t')) {
                 pos++;
             }
             if (!crlfAt(body, pos)) {
@@ -113,13 +206,13 @@ final class Multipart {
             // The limit is on the whole header block, counted from its start. Per
             // line, it let one part carry hundreds of thousands of short headers --
             // each line parsed and stored -- inside the body limit.
-            int headersStart = pos;
+            long headersStart = pos;
             while (!crlfAt(body, pos)) {
-                int end = indexOfCrLf(body, pos);
+                long end = indexOfCrLf(body, pos);
                 if (end < 0 || end - headersStart > MAX_PART_HEADER_BYTES) {
                     throw new IllegalArgumentException("a multipart part's headers never end");
                 }
-                String line = latin1(body, pos, end - pos);
+                String line = latin1(body, pos, (int) (end - pos));
                 int colon = line.indexOf(':');
                 if (colon <= 0) {
                     throw new IllegalArgumentException("a multipart part has a malformed header");
@@ -133,12 +226,10 @@ final class Multipart {
             closing[0] = '\r';
             closing[1] = '\n';
             System.arraycopy(delimiter, 0, closing, 2, delimiter.length);
-            int next = closingDelimiter(body, closing, pos);
+            long next = closingDelimiter(body, closing, pos);
             if (next < 0) {
                 throw new IllegalArgumentException("a multipart part is never closed");
             }
-            byte[] data = new byte[next - pos];
-            System.arraycopy(body, pos, data, 0, data.length);
             String disposition = (String) headers.get("content-disposition");
             // RFC 7578 4.2: every part of a form says Content-Disposition: form-data
             // and names its field. One that does not is a malformed form, not a
@@ -152,8 +243,8 @@ final class Multipart {
                 throw new IllegalArgumentException("a multipart/form-data part names no field");
             }
             String filename = parameter(afterType(disposition), "filename");
-            parts.add(new HttpServer.Part(name, filename, (String) headers.get("content-type"),
-                    headers, data));
+            parts.add(body.part(name, filename, (String) headers.get("content-type"),
+                    headers, pos, next - pos));
             pos = next + 2;
         }
     }
@@ -163,16 +254,16 @@ final class Multipart {
     /// optional transport padding and CRLF (RFC 2046 5.1.1). A part's own bytes
     /// may contain `CRLF--boundary` followed by anything else -- a binary file
     /// can -- and taking that for the end of the part refused a legal upload.
-    private static int closingDelimiter(byte[] body, byte[] closing, int from) {
-        int at = indexOf(body, closing, from);
+    private static long closingDelimiter(Source body, byte[] closing, long from) {
+        long at = indexOf(body, closing, from);
         while (at >= 0) {
-            int after = at + closing.length;
-            if (after + 1 < body.length && body[after] == '-' && body[after + 1] == '-'
+            long after = at + closing.length;
+            if (after + 1 < body.length() && body.at(after) == '-' && body.at(after + 1) == '-'
                     && closeEnds(body, after + 2)) {
                 return at;
             }
-            int p = after;
-            while (p < body.length && (body[p] == ' ' || body[p] == '\t')) {
+            long p = after;
+            while (p < body.length() && (body.at(p) == ' ' || body.at(p) == '\t')) {
                 p++;
             }
             if (crlfAt(body, p)) {
@@ -188,17 +279,17 @@ final class Multipart {
     /// 5.1.1). Any other `--boundary` is preamble text: taking the first substring
     /// match accepted `prefix--b` as an opening and refused a valid preamble that
     /// merely mentioned the boundary before the real one.
-    private static int openingDelimiter(byte[] body, byte[] delimiter) {
-        int at = indexOf(body, delimiter, 0);
+    private static long openingDelimiter(Source body, byte[] delimiter) {
+        long at = indexOf(body, delimiter, 0);
         while (at >= 0) {
-            boolean lineStart = at == 0 || (at >= 2 && body[at - 2] == '\r' && body[at - 1] == '\n');
-            int after = at + delimiter.length;
+            boolean lineStart = at == 0 || (at >= 2 && body.at(at - 2) == '\r' && body.at(at - 1) == '\n');
+            long after = at + delimiter.length;
             boolean complete;
-            if (after + 1 < body.length && body[after] == '-' && body[after + 1] == '-') {
+            if (after + 1 < body.length() && body.at(after) == '-' && body.at(after + 1) == '-') {
                 complete = closeEnds(body, after + 2);
             } else {
-                int p = after;
-                while (p < body.length && (body[p] == ' ' || body[p] == '\t')) {
+                long p = after;
+                while (p < body.length() && (body.at(p) == ' ' || body.at(p) == '\t')) {
                     p++;
                 }
                 complete = crlfAt(body, p);
@@ -219,12 +310,12 @@ final class Multipart {
     /// Whether the close delimiter whose `--` ends just before `pos` really ends
     /// there: transport padding, then the end of the body or the CRLF that starts
     /// the epilogue (RFC 2046 5.1.1). `--b--garbage` is not a close delimiter.
-    private static boolean closeEnds(byte[] body, int pos) {
-        int p = pos;
-        while (p < body.length && (body[p] == ' ' || body[p] == '\t')) {
+    private static boolean closeEnds(Source body, long pos) {
+        long p = pos;
+        while (p < body.length() && (body.at(p) == ' ' || body.at(p) == '\t')) {
             p++;
         }
-        return p == body.length || crlfAt(body, p);
+        return p == body.length() || crlfAt(body, p);
     }
 
     /// The value of `name` in a urlencoded form, or null. `+` is a space, as the
@@ -381,13 +472,13 @@ final class Multipart {
         return null;
     }
 
-    private static boolean crlfAt(byte[] data, int pos) {
-        return pos + 1 < data.length && data[pos] == '\r' && data[pos + 1] == '\n';
+    private static boolean crlfAt(Source data, long pos) {
+        return pos + 1 < data.length() && data.at(pos) == '\r' && data.at(pos + 1) == '\n';
     }
 
-    private static int indexOfCrLf(byte[] data, int from) {
-        for (int iter = from ; iter + 1 < data.length ; iter++) {
-            if (data[iter] == '\r' && data[iter + 1] == '\n') {
+    private static long indexOfCrLf(Source data, long from) {
+        for (long iter = from ; iter + 1 < data.length() ; iter++) {
+            if (data.at(iter) == '\r' && data.at(iter + 1) == '\n') {
                 return iter;
             }
         }
@@ -399,7 +490,7 @@ final class Multipart {
     /// a naive search restarted the comparison at every matching first byte, so a
     /// boundary of dashes over a body of dashes cost hundreds of millions of
     /// comparisons per request before it was refused.
-    private static int indexOf(byte[] data, byte[] needle, int from) {
+    private static long indexOf(Source data, byte[] needle, long from) {
         int[] fallback = new int[needle.length];
         int k = 0;
         for (int iter = 1 ; iter < needle.length ; iter++) {
@@ -412,11 +503,11 @@ final class Multipart {
             fallback[iter] = k;
         }
         k = 0;
-        for (int iter = Math.max(from, 0) ; iter < data.length ; iter++) {
-            while (k > 0 && data[iter] != needle[k]) {
+        for (long iter = Math.max(from, 0) ; iter < data.length() ; iter++) {
+            while (k > 0 && data.at(iter) != needle[k]) {
                 k = fallback[k - 1];
             }
-            if (data[iter] == needle[k]) {
+            if (data.at(iter) == needle[k]) {
                 k++;
             }
             if (k == needle.length) {
@@ -434,10 +525,10 @@ final class Multipart {
         return out;
     }
 
-    private static String latin1(byte[] data, int offset, int length) {
+    private static String latin1(Source data, long offset, int length) {
         char[] out = new char[length];
         for (int iter = 0 ; iter < length ; iter++) {
-            out[iter] = (char) (data[offset + iter] & 0xff);
+            out[iter] = (char) (data.at(offset + iter) & 0xff);
         }
         return new String(out);
     }
