@@ -44,6 +44,7 @@
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <nghttp2/nghttp2.h>
 
 #define CN1_H2_MAX_HEADERS 64
@@ -69,6 +70,15 @@
    HTTP/2 must agree, or the limit is only as good as the protocol chosen. */
 #define CN1_H2_MAX_BODY_BYTES (8 * 1024 * 1024)
 
+/* Set from HttpServer through setBodyLimitsImpl, so the two protocols take the
+   same upload: the largest body accepted at all, and the size past which it
+   goes to disk rather than the heap. The in-memory ceilings above then bound
+   only what is in memory. Defaults are the HTTP/1 side's own defaults. */
+static _Atomic long cn1H2BodyLimit = CN1_H2_MAX_BODY_BYTES;
+static _Atomic long cn1H2SpoolThreshold = 1024 * 1024;
+static char cn1H2SpoolDir[1024];
+static _Atomic int cn1H2SpoolDirSet = 0;
+
 typedef struct CN1H2Header {
     char* name;
     char* value;
@@ -86,7 +96,20 @@ typedef struct CN1H2Request {
     unsigned char* body;
     size_t bodyLength;
     size_t bodyCapacity;
+    /* A body past the spool threshold lives in an unlinked temporary file
+       instead of `body` (spooled set, spoolFd its descriptor until Java takes
+       it with bodyFdImpl, -1 after). bodyLength still counts all of it. */
+    int spooled;
+    int spoolFd;
     int complete;
+    /* A DATA chunk of this stream was refused, so nghttp2 is resetting it. The
+       peer's frames already in flight are still delivered, the last one with
+       END_STREAM, and that must not complete a request missing part of its
+       body: the handler would answer for an upload it never received whole. */
+    int refused;
+    /* The largest body this stream may carry, decided from its headers on its
+       first DATA chunk (0 until then); see cn1H2BodyCap. */
+    long bodyCap;
     struct CN1H2Request* next;
 } CN1H2Request;
 
@@ -348,6 +371,9 @@ static void cn1H2FreeRequest(CN1H2Request* r) {
         free(r->headers[i].value);
     }
     free(r->body);
+    if(r->spooled && r->spoolFd >= 0) {
+        close(r->spoolFd);
+    }
     free(r);
 }
 
@@ -578,8 +604,93 @@ static int cn1H2OnHeader(nghttp2_session* session, const nghttp2_frame* frame,
     return 0;
 }
 
+/* Writes all of `length` or fails. */
+static int cn1H2WriteAll(int fd, const uint8_t* data, size_t length) {
+    size_t done = 0;
+    while(done < length) {
+        ssize_t n = write(fd, data + done, length - done);
+        if(n < 0 && errno == EINTR) {
+            continue;
+        }
+        if(n <= 0) {
+            return 0;
+        }
+        done += (size_t)n;
+    }
+    return 1;
+}
+
+/* Moves a request's body from the heap to a fresh unlinked temporary file,
+   which the kernel reclaims when the descriptor closes however the request
+   ends. */
+static int cn1H2Spill(CN1H2Request* r) {
+    char path[1100];
+    const char* dir = NULL;
+    int fd;
+    if(atomic_load_explicit(&cn1H2SpoolDirSet, memory_order_acquire) && cn1H2SpoolDir[0] != 0) {
+        dir = cn1H2SpoolDir;
+    }
+    if(dir == NULL) {
+        dir = getenv("TMPDIR");
+    }
+    if(dir == NULL || dir[0] == 0) {
+        dir = "/tmp";
+    }
+    if(snprintf(path, sizeof(path), "%s/cn1-spool-XXXXXX", dir) >= (int)sizeof(path)) {
+        return 0;
+    }
+    fd = mkstemp(path);
+    if(fd < 0) {
+        return 0;
+    }
+    unlink(path);
+    fcntl(fd, F_SETFD, FD_CLOEXEC);
+    if(r->bodyLength > 0 && !cn1H2WriteAll(fd, r->body, r->bodyLength)) {
+        close(fd);
+        return 0;
+    }
+    atomic_fetch_sub_explicit(&cn1H2InboundBytes, (long)r->bodyCapacity, memory_order_relaxed);
+    free(r->body);
+    r->body = NULL;
+    r->bodyCapacity = 0;
+    r->spooled = 1;
+    r->spoolFd = fd;
+    return 1;
+}
+
+static int cn1H2OnDataChunk(nghttp2_session* session, uint8_t flags, int32_t streamId,
+                            const uint8_t* data, size_t length, void* userData);
+static long cn1H2BodyCap(CN1H2Request* r);
+/* Only its address is used: the stream user data that marks a refused upload. */
+static char cn1H2ResetAfterAnswer;
+static void cn1H2RefuseTooLarge(CN1H2Session* s, CN1H2Request* r);
+
 static int cn1H2OnData(nghttp2_session* session, uint8_t flags, int32_t streamId,
                        const uint8_t* data, size_t length, void* userData) {
+    CN1H2Session* s = (CN1H2Session*)userData;
+    CN1H2Request* open = cn1H2FindOpen(s, streamId);
+    int result;
+    /* Too large is answered, as HTTP/1 answers it: a 413 the client can read,
+       then RST_STREAM(NO_ERROR) so it stops sending (RFC 9113 8.1). Only a
+       plain reset used to follow, which an uploader reports as a protocol
+       error rather than the limit it ran into. */
+    if(open != NULL && !open->refused
+            && (long)(open->bodyLength + length) > cn1H2BodyCap(open)) {
+        cn1H2RefuseTooLarge(s, open);
+        return 0;
+    }
+    result = cn1H2OnDataChunk(session, flags, streamId, data, length, userData);
+    if(result != 0) {
+        CN1H2Request* r = cn1H2FindOpen((CN1H2Session*)userData, streamId);
+        if(r != NULL) {
+            r->refused = 1;
+        }
+    }
+    return result;
+}
+
+static int cn1H2OnDataChunk(nghttp2_session* session, uint8_t flags, int32_t streamId,
+                            const uint8_t* data, size_t length, void* userData) {
     CN1H2Session* s = (CN1H2Session*)userData;
     CN1H2Request* r = cn1H2FindOpen(s, streamId);
     (void)session;
@@ -593,8 +704,24 @@ static int cn1H2OnData(nghttp2_session* session, uint8_t flags, int32_t streamId
        which the HTTP/1 side simply does not permit. Resetting the stream rather
        than failing the callback keeps the connection and its other streams alive:
        one oversized upload is that request's problem, not the session's. */
-    if(r->bodyLength + length > CN1_H2_MAX_BODY_BYTES) {
+    if((long)(r->bodyLength + length) > atomic_load_explicit(&cn1H2BodyLimit, memory_order_relaxed)) {
         return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
+    }
+    if(!r->spooled && (long)(r->bodyLength + length)
+            > atomic_load_explicit(&cn1H2SpoolThreshold, memory_order_relaxed)) {
+        /* Past the threshold the body goes to disk, where it costs no heap and
+           none of the in-memory ceilings below. A file that cannot be made is
+           this stream's failure, as running out of buffer would be. */
+        if(!cn1H2Spill(r)) {
+            return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
+        }
+    }
+    if(r->spooled) {
+        if(!cn1H2WriteAll(r->spoolFd, data, length)) {
+            return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
+        }
+        r->bodyLength += length;
+        return 0;
     }
     {
         /* Walked rather than counted in a running total: the total would have to
@@ -606,13 +733,14 @@ static int cn1H2OnData(nghttp2_session* session, uint8_t flags, int32_t streamId
            the sum and only the new bytes are added. */
         size_t total = length;
         CN1H2Request* other = s->open;
+        /* Heap only: a spooled body is on disk and bounded by its own limit. */
         while(other != NULL) {
-            total += other->bodyLength;
+            total += other->spooled ? 0 : other->bodyLength;
             other = other->next;
         }
         other = s->readyHead;
         while(other != NULL) {
-            total += other->bodyLength;
+            total += other->spooled ? 0 : other->bodyLength;
             other = other->next;
         }
         if(total > CN1_H2_MAX_SESSION_BODY_BYTES) {
@@ -642,8 +770,15 @@ static int cn1H2OnData(nghttp2_session* session, uint8_t flags, int32_t streamId
         size_t grown = (r->bodyLength + length) * 2 + 1024;
         size_t added;
         unsigned char* buf;
-        if(grown > CN1_H2_MAX_BODY_BYTES) {
-            grown = CN1_H2_MAX_BODY_BYTES;
+        size_t cap = (size_t)atomic_load_explicit(&cn1H2SpoolThreshold, memory_order_relaxed);
+        if(cap > CN1_H2_MAX_BODY_BYTES) {
+            cap = CN1_H2_MAX_BODY_BYTES;
+        }
+        if(grown > cap) {
+            grown = cap;
+        }
+        if(grown < r->bodyLength + length) {
+            grown = r->bodyLength + length;
         }
         added = grown - r->bodyCapacity;
         if(!cn1H2ReserveInboundBytes((long)added)) {
@@ -683,6 +818,116 @@ static int cn1H2EqualsLower(const char* at, size_t length, const char* lower) {
         }
     }
     return lower[length] == 0 ? 1 : 0;
+}
+
+/* Whether an ASCII value ends with `lower` (given in lower case), ignoring case. */
+static int cn1H2EndsWithLower(const char* value, size_t length, const char* lower) {
+    size_t n = strlen(lower);
+    return length >= n && cn1H2EqualsLower(value + length - n, n, lower);
+}
+
+/*
+ * HttpServer.isSpoolable, for the headers of one stream: a binary content type
+ * sent identity encoded. The rule is Java's and lives there; this is the same
+ * rule where it has to be applied, as the body arrives, so that a text or
+ * compressed body is refused at the in-memory limit HTTP/1 holds it to rather
+ * than written to disk up to the far larger spooled one and refused after.
+ */
+static int cn1H2Spoolable(CN1H2Request* r) {
+    const char* type = NULL;
+    const char* coding = NULL;
+    size_t iter;
+    size_t length;
+    for(iter = 0 ; iter < (size_t)r->headerCount ; iter++) {
+        if(r->headers[iter].name == NULL || r->headers[iter].value == NULL) {
+            continue;
+        }
+        if(strcmp(r->headers[iter].name, "content-type") == 0) {
+            type = r->headers[iter].value;
+        } else if(strcmp(r->headers[iter].name, "content-encoding") == 0) {
+            coding = r->headers[iter].value;
+        }
+    }
+    if(coding != NULL) {
+        while(*coding == ' ' || *coding == '\t') {
+            coding++;
+        }
+        length = strlen(coding);
+        while(length > 0 && (coding[length - 1] == ' ' || coding[length - 1] == '\t')) {
+            length--;
+        }
+        if(length != 0 && !(length == 8 && cn1H2EqualsLower(coding, 8, "identity"))) {
+            return 0;
+        }
+    }
+    if(type == NULL) {
+        return 0;
+    }
+    while(*type == ' ' || *type == '\t') {
+        type++;
+    }
+    {
+        const char* semi = strchr(type, ';');
+        length = semi == NULL ? strlen(type) : (size_t)(semi - type);
+    }
+    while(length > 0 && (type[length - 1] == ' ' || type[length - 1] == '\t')) {
+        length--;
+    }
+    if(length == 0 || (length >= 5 && cn1H2EqualsLower(type, 5, "text/"))) {
+        return 0;
+    }
+    if((length == 16 && cn1H2EqualsLower(type, 16, "application/json"))
+            || (length == 15 && cn1H2EqualsLower(type, 15, "application/xml"))
+            || (length == 33 && cn1H2EqualsLower(type, 33, "application/x-www-form-urlencoded"))
+            || (length == 22 && cn1H2EqualsLower(type, 22, "application/javascript"))
+            || (length == 19 && cn1H2EqualsLower(type, 19, "application/graphql"))) {
+        return 0;
+    }
+    return !(cn1H2EndsWithLower(type, length, "+json") || cn1H2EndsWithLower(type, length, "+xml"));
+}
+
+/* The spooled limit for a body that may be spooled, the in-memory one for any
+   other -- the two limits HTTP/1 applies, chosen by the same rule. */
+static long cn1H2BodyCap(CN1H2Request* r) {
+    if(r->bodyCap == 0) {
+        long limit = atomic_load_explicit(&cn1H2BodyLimit, memory_order_relaxed);
+        r->bodyCap = cn1H2Spoolable(r) || limit < CN1_H2_MAX_BODY_BYTES
+                ? limit : CN1_H2_MAX_BODY_BYTES;
+    }
+    return r->bodyCap;
+}
+
+/* Answers 413 and stops the upload; the request never reaches Java. */
+static void cn1H2RefuseTooLarge(CN1H2Session* s, CN1H2Request* r) {
+    nghttp2_nv tooLarge[1];
+    tooLarge[0].name = (uint8_t*)":status";
+    tooLarge[0].namelen = 7;
+    tooLarge[0].value = (uint8_t*)"413";
+    tooLarge[0].valuelen = 3;
+    tooLarge[0].flags = NGHTTP2_NV_FLAG_NONE;
+    nghttp2_submit_response(s->session, r->streamId, tooLarge, 1, NULL);
+    /* The reset waits for the 413 to be on the wire (cn1H2OnFrameSend): nghttp2
+       sends a queued RST_STREAM ahead of queued HEADERS, so submitting both here
+       closed the stream before the client ever saw a status. */
+    nghttp2_session_set_stream_user_data(s->session, r->streamId, &cn1H2ResetAfterAnswer);
+    cn1H2Unlink(&s->open, r);
+    cn1H2FreeRequest(r);
+}
+
+/* After a 413 for an upload still in progress, tell the client to stop
+   sending (RFC 9113 8.1): the answer is complete and the rest is unwanted. */
+static int cn1H2OnFrameSend(nghttp2_session* session, const nghttp2_frame* frame,
+                            void* userData) {
+    (void)userData;
+    if(frame->hd.type == NGHTTP2_HEADERS
+            && (frame->hd.flags & NGHTTP2_FLAG_END_STREAM) != 0
+            && nghttp2_session_get_stream_user_data(session, frame->hd.stream_id)
+                == &cn1H2ResetAfterAnswer) {
+        nghttp2_session_set_stream_user_data(session, frame->hd.stream_id, NULL);
+        nghttp2_submit_rst_stream(session, NGHTTP2_FLAG_NONE, frame->hd.stream_id,
+                NGHTTP2_NO_ERROR);
+    }
+    return 0;
 }
 
 /*
@@ -787,16 +1032,10 @@ static int cn1H2ResolveExpect(CN1H2Session* s, CN1H2Request* r, int bodyToCome) 
                 /* Only a length this server can read is judged here. A malformed
                    one is nghttp2's to refuse, and an unreadable value must not be
                    turned into a refusal of its own by this loop. */
-                if(end != NULL && *end == '\0' && declared > CN1_H2_MAX_BODY_BYTES) {
-                    nghttp2_nv tooLarge[1];
-                    tooLarge[0].name = (uint8_t*)":status";
-                    tooLarge[0].namelen = 7;
-                    tooLarge[0].value = (uint8_t*)"413";
-                    tooLarge[0].valuelen = 3;
-                    tooLarge[0].flags = NGHTTP2_NV_FLAG_NONE;
-                    nghttp2_submit_response(s->session, r->streamId, tooLarge, 1, NULL);
-                    cn1H2Unlink(&s->open, r);
-                    cn1H2FreeRequest(r);
+                if(end != NULL && *end == '\0' && declared > cn1H2BodyCap(r)) {
+                    /* Answered, then reset once the 413 is out, so a client that
+                       sends anyway after its wait is told to stop. */
+                    cn1H2RefuseTooLarge(s, r);
                     return 1;
                 }
             }
@@ -847,8 +1086,8 @@ static int cn1H2OnFrameRecv(nghttp2_session* session, const nghttp2_frame* frame
         return 0;
     }
     r = cn1H2FindOpen(s, frame->hd.stream_id);
-    if(r == NULL) {
-        return 0;
+    if(r == NULL || r->refused) {
+        return 0;   /* a refused stream is freed when its reset closes it */
     }
     /* BEFORE the END_STREAM test below, because a request that is waiting to be
        told to send its body has not set it. */
@@ -953,6 +1192,7 @@ JAVA_LONG com_codename1_backend_Http2_createImpl___R_long(CODENAME_ONE_THREAD_ST
     nghttp2_session_callbacks_set_on_data_chunk_recv_callback(callbacks, cn1H2OnData);
     nghttp2_session_callbacks_set_on_frame_recv_callback(callbacks, cn1H2OnFrameRecv);
     nghttp2_session_callbacks_set_on_stream_close_callback(callbacks, cn1H2OnStreamClose);
+    nghttp2_session_callbacks_set_on_frame_send_callback(callbacks, cn1H2OnFrameSend);
 
     if(nghttp2_session_server_new(&s->session, callbacks, s) != 0) {
         nghttp2_session_callbacks_del(callbacks);
@@ -1210,6 +1450,42 @@ JAVA_OBJECT com_codename1_backend_Http2_headerValueImpl___long_int_R_java_lang_S
             (int)strlen(s->current->headers[index].value));
 }
 
+/* The descriptor of the current request's spooled body, handed to Java, which
+   closes it from here on; -1 when the body is in memory. */
+JAVA_INT com_codename1_backend_Http2_bodyFdImpl___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
+    CN1H2Session* s = (CN1H2Session*)(intptr_t)handle;
+    int fd;
+    if(s == NULL || s->current == NULL || !s->current->spooled) {
+        return -1;
+    }
+    fd = s->current->spoolFd;
+    s->current->spoolFd = -1;
+    return fd;
+}
+
+JAVA_LONG com_codename1_backend_Http2_bodyLengthImpl___long_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
+    CN1H2Session* s = (CN1H2Session*)(intptr_t)handle;
+    if(s == NULL || s->current == NULL) {
+        return 0;
+    }
+    return (JAVA_LONG)s->current->bodyLength;
+}
+
+JAVA_VOID com_codename1_backend_Http2_setBodyLimitsImpl___long_int_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG limit, JAVA_INT threshold, JAVA_OBJECT dir) {
+    atomic_store_explicit(&cn1H2BodyLimit, (long)limit, memory_order_relaxed);
+    atomic_store_explicit(&cn1H2SpoolThreshold, (long)threshold, memory_order_relaxed);
+    /* Written once: the directory comes from the environment and every session
+       passes the same one, so later calls have nothing to change and must not
+       rewrite a buffer another worker may be reading. */
+    if(dir != JAVA_NULL && !atomic_load_explicit(&cn1H2SpoolDirSet, memory_order_acquire)) {
+        const char* d = stringToUTF8(threadStateData, dir);
+        if(d != NULL && strlen(d) < sizeof(cn1H2SpoolDir)) {
+            strcpy(cn1H2SpoolDir, d);
+            atomic_store_explicit(&cn1H2SpoolDirSet, 1, memory_order_release);
+        }
+    }
+}
+
 JAVA_OBJECT com_codename1_backend_Http2_bodyImpl___long_R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
     CN1H2Session* s = (CN1H2Session*)(intptr_t)handle;
     JAVA_OBJECT arr;
@@ -1217,7 +1493,7 @@ JAVA_OBJECT com_codename1_backend_Http2_bodyImpl___long_R_byte_1ARRAY(CODENAME_O
     if(s == NULL || s->current == NULL) {
         return JAVA_NULL;
     }
-    length = s->current->bodyLength;
+    length = s->current->spooled ? 0 : s->current->bodyLength;
     arr = allocArray(threadStateData, (int)length, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
     if(length > 0) {
         memcpy((JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(arr), s->current->body, length);

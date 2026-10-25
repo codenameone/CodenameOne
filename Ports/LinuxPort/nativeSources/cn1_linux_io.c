@@ -467,6 +467,32 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_storageDir___R_java_lang_String
     return newStringFromCString(threadStateData, cn1StorageDir());
 }
 
+/*
+ * A moment written the way the user's locale writes a date (what == 0, strftime's %x)
+ * or a time of day (what == 1, %X), in the local time zone. An empty string when the
+ * moment cannot be broken down.
+ *
+ * The locale is the one GTK selected from the environment when it started
+ * (setlocale(LC_ALL, "")), so LC_TIME decides: 02/29/2024 for en_US, 29.02.2024 for
+ * de_DE, 02/29/24 with no locale set at all.
+ */
+JAVA_OBJECT com_codename1_impl_linux_LinuxNative_formatLocalTime___long_int_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG millis, JAVA_INT what) {
+    char buf[256];
+    struct tm parts;
+    time_t seconds = (time_t) (millis / 1000);
+    if (millis < 0 && millis % 1000 != 0) {
+        /* Division truncates towards zero; a moment before 1970 belongs to the second below. */
+        seconds--;
+    }
+    buf[0] = 0;
+    if (localtime_r(&seconds, &parts) != 0) {
+        if (strftime(buf, sizeof(buf), what == 1 ? "%X" : "%x", &parts) == 0) {
+            buf[0] = 0;
+        }
+    }
+    return newStringFromCString(threadStateData, buf);
+}
+
 JAVA_OBJECT com_codename1_impl_linux_LinuxNative_executableDir___R_java_lang_String(CODENAME_ONE_THREAD_STATE) {
     char buf[4096];
     ssize_t n = readlink("/proc/self/exe", buf, sizeof(buf) - 1);

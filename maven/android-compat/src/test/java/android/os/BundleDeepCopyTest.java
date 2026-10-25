@@ -24,7 +24,7 @@ package android.os;
 
 import android.util.SparseArray;
 
-import com.codename1.androidcompat.testing.MainThreadRule;
+import com.codename1.compat.testing.MainThreadRule;
 
 import java.util.ArrayList;
 

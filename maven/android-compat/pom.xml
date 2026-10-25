@@ -167,6 +167,13 @@
             <artifactId>junit</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- The headless Codename One implementation the tests run on. -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-compat-testing</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
         <!-- A real SQLite engine for the android.database tests, behind a
              JDBC-backed Codename One Database. -->
         <dependency>

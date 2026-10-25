@@ -465,8 +465,85 @@ public final class FileIo {
         }
     }
 
+    /// A spool file's channel. Deleted as soon as it is open where the platform
+    /// allows that, and on close where it does not, so the packaged arm's
+    /// "closing is the cleanup" holds here too.
+    private static final class SpoolFile {
+        final FileChannel channel;
+
+        SpoolFile(FileChannel channel) {
+            this.channel = channel;
+        }
+    }
+
+    public static int createTemp(String dir) {
+        try {
+            Path parent = dir == null || dir.length() == 0
+                    ? Paths.get(System.getProperty("java.io.tmpdir")) : Paths.get(dir);
+            Path file = Files.createTempFile(parent, "cn1-spool-", "");
+            FileChannel channel = FileChannel.open(file, StandardOpenOption.READ, //NOPMD CloseResource - owned by the descriptor table once added, closed here otherwise
+                    StandardOpenOption.WRITE, StandardOpenOption.DELETE_ON_CLOSE);
+            boolean added = false;
+            try {
+                try {
+                    Files.deleteIfExists(file);
+                } catch (IOException stillOpenOnWindows) {
+                    // DELETE_ON_CLOSE removes it when the channel closes instead.
+                }
+                int fd = Descriptors.add(new SpoolFile(channel));
+                added = true;
+                return fd;
+            } finally {
+                if (!added) {
+                    channel.close();
+                }
+            }
+        } catch (IOException | RuntimeException err) {
+            return -1;
+        }
+    }
+
+    public static boolean write(int fd, byte[] buffer, int offset, int length) {
+        Object entry = Descriptors.get(fd);
+        if (!(entry instanceof SpoolFile)) {
+            return false;
+        }
+        try {
+            ByteBuffer source = ByteBuffer.wrap(buffer, offset, length);
+            FileChannel channel = ((SpoolFile) entry).channel; //NOPMD CloseResource - borrowed from the descriptor table, which closes it
+            while (source.hasRemaining()) {
+                channel.write(source, channel.size());
+            }
+            return true;
+        } catch (IOException | RuntimeException err) {
+            return false;
+        }
+    }
+
+    public static int pread(int fd, byte[] buffer, int offset, int length, long position) {
+        Object entry = Descriptors.get(fd);
+        if (!(entry instanceof SpoolFile)) {
+            return -1;
+        }
+        try {
+            int n = ((SpoolFile) entry).channel.read(ByteBuffer.wrap(buffer, offset, length),
+                    position);
+            return n < 0 ? 0 : n;
+        } catch (IOException | RuntimeException err) {
+            return -1;
+        }
+    }
+
     public static void close(int fd) {
         Object entry = Descriptors.remove(fd);
+        if (entry instanceof SpoolFile) {
+            try {
+                ((SpoolFile) entry).channel.close();
+            } catch (IOException ignored) {
+                // already gone
+            }
+            return;
+        }
         if (entry instanceof OpenFile) {
             FileChannel channel = ((OpenFile) entry).channel; //NOPMD CloseResource - closed just below
             if (channel != null) {

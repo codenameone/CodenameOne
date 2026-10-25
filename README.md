@@ -14,6 +14,20 @@
 
 The UI ships with your app, so you control its components and theme. Native interfaces and peer components give you access to platform SDKs and views. The framework is GPLv2 with the Classpath Exception: free for commercial applications, with no royalties.
 
+## Start with a complete full-stack application
+
+Generate a complete application from Initializr, then make it your own. These templates include the Java client, backend, database and administration screens, with guides for running and customizing them. The template source is free under MIT-0.
+
+| [Savor — Food delivery](https://www.codenameone.com/savor/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=savor) | [Parley — Private messaging](https://www.codenameone.com/parley/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=parley) |
+| --- | --- |
+| <a href="https://www.codenameone.com/savor/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=savor"><img src="docs/developer-guide/img/savor-customer-home.png" alt="Savor restaurant browsing screen" width="200"></a><br><br>Customer, restaurant, courier and admin screens, with a Java backend for ordering, dispatch, tracking and payments. | <a href="https://www.codenameone.com/parley/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=parley"><img src="docs/developer-guide/img/parley-chats.png" alt="Parley conversations screen" width="200"></a><br><br>Chats, groups, voice and video calls, with a Java backend and an administration console. |
+
+| [Wayline — Ride hailing](https://www.codenameone.com/wayline/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=wayline) | [Skirmish — Multiplayer strategy](https://www.codenameone.com/skirmish/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=skirmish) |
+| --- | --- |
+| <a href="https://www.codenameone.com/wayline/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=wayline"><img src="docs/developer-guide/img/wayline-rider-home.png" alt="Wayline rider map and destination screen" width="200"></a><br><br>Rider, driver and admin screens, with a Java backend for matching, live trips, earnings and payments. | <a href="https://www.codenameone.com/skirmish/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=skirmish"><img src="docs/developer-guide/img/skirmish-battle.png" alt="Skirmish live battle screen" width="200"></a><br><br>Online battles, replays and progression, with a Java game server and a moderation console. |
+
+[Generate your application](https://www.codenameone.com/initializr/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=template-start) · [Explore the complete templates](https://www.codenameone.com/demos/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=fullstack-samples)
+
 | What do you want to build? | Start here |
 | --- | --- |
 | A new Java app | [Generate a project](https://www.codenameone.com/initializr/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=app-start) or [try the browser playground](https://www.codenameone.com/playground/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=playground) |
@@ -21,7 +35,7 @@ The UI ships with your app, so you control its components and theme. Native inte
 | An app and its backend | [Share models and generated REST clients](https://www.codenameone.com/blog/java-backend-shared-models/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=shared-models) |
 | An existing Android app on more platforms | [Import classic Android application code](https://www.codenameone.com/developer-guide/android-interop/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=android-import), including activities, XML layouts and resources |
 | Existing Flutter screens | [Compile supported Dart and Flutter code to Java](https://www.codenameone.com/developer-guide/flutter-interop/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=flutter-import); experimental compatibility, with interaction limits documented in the guide |
-| A full-stack example to run | [Explore Wayline](https://www.codenameone.com/developer-guide/wayline-implementors-guide/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=wayline): a ride-hailing sample with rider, driver and admin screens, shared Java models and a backend; available as an Initializr template |
+| A complete full-stack application | [Choose a template](#start-with-a-complete-full-stack-application): food delivery, messaging, ride hailing or multiplayer strategy |
 | Evidence before adopting | [Compare performance](#measured-performance) and [inspect platform support](https://www.codenameone.com/port-status/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=platforms) |
 
 ### A backend that compiles the wiring into your application
@@ -39,6 +53,8 @@ This is an evolving backend with its own supported API surface. Its annotations 
 Import an Android Studio module with `cn1:import-android-project`, or place its sources in `common/src/main/android`. The compatibility layer implements supported `android.*` and AndroidX APIs over Codename One, including activities, fragments, XML layouts, RecyclerView, ConstraintLayout and Material Components. Java and Kotlin sources are supported.
 
 The application runs through Codename One's ports without an Android runtime on the other platforms. This supports the documented classic Android API surface, not every Android library or framework behavior. Check the [supported APIs, side-by-side captures and limitations](https://www.codenameone.com/developer-guide/android-interop/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=android-coverage), particularly reflection, Parcel and SQLite concurrency, against your application's screens and data flows.
+
+Experimental compatibility also covers [supported Unity 2D projects](https://www.codenameone.com/developer-guide/unity-interop/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=unity-import). Check the documented API limits before porting; 3D rendering is outside this compatibility layer.
 
 ### Measured performance
 

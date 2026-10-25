@@ -91,7 +91,7 @@ FULL_STACK = {
 
 
 FIRST_FULL_STACK = next(iter(FULL_STACK))
-LAUNCHERS = ('build.sh', 'build.bat', 'run.sh', 'run.bat', 'mvnw', 'mvnw.cmd', 'backend/server.sh')
+LAUNCHERS = ('build.sh', 'build.bat', 'run.sh', 'run.bat', 'mvnw', 'mvnw.cmd', 'backend/server.sh', 'run-server.sh', 'run-server.bat')
 
 
 def same_launchers(archive, twin):
@@ -179,14 +179,20 @@ with tempfile.TemporaryDirectory(prefix='cn1-generator-') as directory:
     java += [sources / 'com/codename1/initializr/WebsiteThemeNative.java', root / 'scripts/tests/GenerateInitializr.java']
     cp = os.pathsep.join(map(str, deps))
     subprocess.run(['javac', '--release', '8', '-encoding', 'UTF-8', '-cp', cp, '-d', str(classes)] + list(map(str, java)), check=True)
+    shipped = '--shipped' in sys.argv[2:]
     subprocess.run(['java', '-Djava.awt.headless=true', '-cp', cp + os.pathsep + str(classes) + os.pathsep + str(resources),
-                    'com.codename1.initializr.model.GenerateInitializr', str(output)], check=True, timeout=60)
+                    'com.codename1.initializr.model.GenerateInitializr', str(output)] + (['shipped'] if shipped else []),
+                   check=True, timeout=60)
+    if shipped:
+        # Only the downloads; scripts/initializr/e2e-shipped.sh checks and runs them.
+        print('Wrote the shipped downloads to', output)
+        sys.exit(0)
     maven_settings = zipfile.ZipFile(output / 'INTELLIJ-JAVA_17.zip').read('common/codenameone_settings.properties')
     for archive in sorted(output.glob('*.zip')):
         with zipfile.ZipFile(archive) as z:
             assert z.testzip() is None
             for entry in z.infolist():
-                executable = ('build.sh', 'run.sh', 'mvnw', 'gradlew', 'backend/server.sh')
+                executable = ('build.sh', 'run.sh', 'mvnw', 'gradlew', 'backend/server.sh', 'run-server.sh')
                 expected = 0o100755 if entry.filename in executable else 0o100644
                 assert entry.create_system == 3 and entry.external_attr >> 16 == expected, entry.filename
             if archive.name.startswith('GRADLE-'):

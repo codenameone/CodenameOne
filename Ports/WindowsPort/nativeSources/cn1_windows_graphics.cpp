@@ -84,6 +84,8 @@ CN1Graphics* cn1WinCreateGraphics(ID2D1RenderTarget* target) {
     g->clipIsRect = JAVA_TRUE;
     g->clipGeom = NULL;
     g->clipLayer = NULL;
+    g->clipGeomHasRect = JAVA_FALSE;
+    g->clipRectPushed = JAVA_FALSE;
     g->clipMaskTransform = D2D1::Matrix3x2F::Identity();
     g->font = cn1Win.defaultFont;
     g->inFrame = JAVA_FALSE;
@@ -179,6 +181,22 @@ extern "C" void cn1WinPushClip(CN1Graphics* g) {
      * the fill) -- so the clip stays fixed while the fill transforms within it. */
     if (!g->clipIsRect && g->clipGeom != NULL) {
         ID2D1Layer* layer = NULL;
+        /* A clipRect that came after the shape: the clip is the shape AND that
+         * rectangle (see clipRect below). The rectangle goes on first, under
+         * identity for the reason given at the end of this function, and the
+         * shape's layer inside it; cn1WinPopClip takes them off in reverse. */
+        if (g->clipGeomHasRect) {
+            D2D1_RECT_F rc;
+            D2D1_MATRIX_3X2_F idr = D2D1::Matrix3x2F::Identity();
+            rc.left = (FLOAT)g->clipX;
+            rc.top = (FLOAT)g->clipY;
+            rc.right = (FLOAT)(g->clipX + g->clipW);
+            rc.bottom = (FLOAT)(g->clipY + g->clipH);
+            ID2D1RenderTarget_SetTransform(g->target, &idr);
+            ID2D1RenderTarget_PushAxisAlignedClip(g->target, &rc, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+            ID2D1RenderTarget_SetTransform(g->target, &g->transform);
+            g->clipRectPushed = JAVA_TRUE;
+        }
         if (SUCCEEDED(ID2D1RenderTarget_CreateLayer(g->target, NULL, &layer)) && layer != NULL) {
             D2D1_LAYER_PARAMETERS lp;
             lp.contentBounds = D2D1::InfiniteRect();
@@ -253,6 +271,20 @@ extern "C" void cn1WinPopClip(CN1Graphics* g) {
         ID2D1RenderTarget_PopLayer(g->target);
         ID2D1Layer_Release((ID2D1Layer*) g->clipLayer);
         g->clipLayer = NULL;
+        if (g->clipRectPushed) {
+            ID2D1RenderTarget_PopAxisAlignedClip(g->target);
+            g->clipRectPushed = JAVA_FALSE;
+        }
+        return;
+    }
+    if (g->clipRectPushed) {
+        /* The shape's layer could not be made; its rectangle was still pushed. */
+        ID2D1RenderTarget_PopAxisAlignedClip(g->target);
+        g->clipRectPushed = JAVA_FALSE;
+        return;
+    }
+    if (!g->clipIsRect && g->clipGeom != NULL) {
+        /* A shape clip whose layer could not be made pushed nothing at all. */
         return;
     }
     ID2D1RenderTarget_PopAxisAlignedClip(g->target);
@@ -335,6 +367,7 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_setClip___long_int_int_int_in
     g->clipW = __cn1Arg4;
     g->clipH = __cn1Arg5;
     g->clipIsRect = JAVA_TRUE;
+    g->clipGeomHasRect = JAVA_FALSE;
     cn1WinReleaseClipGeom(g);
 }
 
@@ -375,12 +408,33 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_setClipShape___long_float_1AR
     g->clipGeom = cn1WinBuildPathGeometry(coords, types, __cn1Arg4, __cn1Arg5);
     g->clipMaskTransform = g->transform; /* freeze the world transform at setClip time */
     g->clipIsRect = (g->clipGeom == NULL) ? JAVA_TRUE : JAVA_FALSE;
-    /* Keep clipX/Y/W/H as the geometry's bounding box so getClip* stays sane. */
+    /* clipX/Y/W/H is left as it was: the rectangle that was the clip BEFORE the
+     * shape replaced it. It is what getClip* goes on answering, and it is not
+     * part of the clip until a clipRect says so. */
+    g->clipGeomHasRect = JAVA_FALSE;
 }
 
 JAVA_VOID com_codename1_impl_windows_WindowsNative_clipRect___long_int_int_int_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_INT __cn1Arg2, JAVA_INT __cn1Arg3, JAVA_INT __cn1Arg4, JAVA_INT __cn1Arg5) {
     /* Intersect the requested rectangle with the current clip. */
     CN1Graphics* g = (CN1Graphics*)__cn1Arg1;
+    /* A shape clip is narrowed, not thrown away. This used to end in
+     * clipIsRect = JAVA_TRUE and a released geometry whatever the clip was, so
+     * "setClip(shape); clipRect(the clip that was there)" -- which is how
+     * Graphics.fillShape confines a Paint to the shape it fills, and how any
+     * caller narrows the clip to a shape without widening it -- left only the
+     * rectangle that had been the clip BEFORE the shape: a gradient meant for a
+     * small rounded rectangle covered everything from the panel's corner to the
+     * end of the gradient's band. The first clipRect after the shape supplies
+     * the rectangle outright, since clipX/Y/W/H still holds the replaced clip
+     * then; later ones intersect with it as they always did. */
+    if (!g->clipIsRect && g->clipGeom != NULL && !g->clipGeomHasRect) {
+        g->clipX = __cn1Arg2;
+        g->clipY = __cn1Arg3;
+        g->clipW = (__cn1Arg4 > 0) ? __cn1Arg4 : 0;
+        g->clipH = (__cn1Arg5 > 0) ? __cn1Arg5 : 0;
+        g->clipGeomHasRect = JAVA_TRUE;
+        return;
+    }
     JAVA_INT curRight = g->clipX + g->clipW;
     JAVA_INT curBottom = g->clipY + g->clipH;
     JAVA_INT reqRight = __cn1Arg2 + __cn1Arg4;
@@ -395,6 +449,9 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_clipRect___long_int_int_int_i
     g->clipY = newY;
     g->clipW = (newRight > newX) ? (newRight - newX) : 0;
     g->clipH = (newBottom > newY) ? (newBottom - newY) : 0;
+    if (!g->clipIsRect && g->clipGeom != NULL) {
+        return; /* the shape stays, cut to the narrower rectangle */
+    }
     g->clipIsRect = JAVA_TRUE;
     cn1WinReleaseClipGeom(g);
 }
