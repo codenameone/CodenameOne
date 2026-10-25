@@ -299,6 +299,76 @@ class AndroidGradleBuilderVersionTest {
     }
 
     @Test
+    void unifiedPushNeedsPushClientAndAKeyOrAnExplicitChoice() {
+        assertTrue(AndroidGradleBuilder.usesUnifiedPush(3, "unifiedpush", false));
+        assertTrue(AndroidGradleBuilder.usesUnifiedPush(3, "auto", true));
+        assertFalse(AndroidGradleBuilder.usesUnifiedPush(3, "auto", false));
+        assertFalse(AndroidGradleBuilder.usesUnifiedPush(3, "fcm", true));
+        assertFalse(AndroidGradleBuilder.usesUnifiedPush(1, "unifiedpush", true));
+    }
+
+    @Test
+    void unifiedPushVapidKeyIsAnUnpaddedBase64UrlP256Point() {
+        assertTrue(AndroidGradleBuilder.isUnifiedPushVapidKey("BAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"));
+        assertTrue(AndroidGradleBuilder.isUnifiedPushVapidKey("BAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA".substring(0, 85) + "-_"));
+        assertFalse(AndroidGradleBuilder.isUnifiedPushVapidKey(null));
+        assertFalse(AndroidGradleBuilder.isUnifiedPushVapidKey("BAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA".substring(1)));
+        assertFalse(AndroidGradleBuilder.isUnifiedPushVapidKey("BAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA".substring(0, 86) + "="));
+        assertFalse(AndroidGradleBuilder.isUnifiedPushVapidKey("BAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA".substring(0, 86) + "+"));
+    }
+
+    @Test
+    void pushTransportsAreListedInTheOrderTheActivityTriesThem() {
+        assertEquals("fcm,huawei,unifiedpush", AndroidGradleBuilder.pushTransportList(true, true, true));
+        assertEquals("unifiedpush", AndroidGradleBuilder.pushTransportList(false, false, true));
+        assertEquals("fcm", AndroidGradleBuilder.pushTransportList(true, false, false));
+        assertEquals("", AndroidGradleBuilder.pushTransportList(false, false, false));
+    }
+
+    @Test
+    void firebaseAloneKeepsTheActivityPushMethods() {
+        assertEquals("", AndroidGradleBuilder.pushTransportMembers(true, false, false, null));
+    }
+
+    @Test
+    void pushTransportMembersFallBackFromFirebaseToHuaweiToUnifiedPush() {
+        String all = AndroidGradleBuilder.pushTransportMembers(true, true, true, "BAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
+        int fcm = all.indexOf("GoogleServices.isPlayServicesAvailable(activity)) { super.registerForPush(key)");
+        int hms = all.indexOf("\"com.huawei.hwid\")) { cn1RegisterHuaweiPush(activity)");
+        int up = all.indexOf("UnifiedPushSupport.register(activity, \"BAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\")");
+        assertTrue(fcm > 0 && hms > fcm && up > hms, all);
+        assertTrue(all.contains("{ super.stopReceivingPush(); } else if ("), all);
+        assertTrue(all.contains("UnifiedPushSupport.unregister(activity);"), all);
+        assertFalse(all.contains("com.google."), all);
+    }
+
+    @Test
+    void huaweiAsTheOnlyAlternativeRegistersUnconditionally() {
+        String hms = AndroidGradleBuilder.pushTransportMembers(true, true, false, null);
+        assertTrue(hms.contains("        cn1RegisterHuaweiPush(activity);\n"), hms);
+        assertFalse(hms.contains("com.huawei.hwid"), hms);
+        assertFalse(hms.contains("UnifiedPushSupport"), hms);
+        assertTrue(hms.contains("} else { cn1StopHuaweiPush(activity); }"), hms);
+    }
+
+    @Test
+    void unifiedPushWithoutAKeyPassesNull() {
+        String up = AndroidGradleBuilder.pushTransportMembers(false, false, true, null);
+        assertTrue(up.contains("UnifiedPushSupport.register(activity, null);"), up);
+        assertFalse(up.contains("super.registerForPush"), up);
+        assertFalse(up.contains("cn1RegisterHuaweiPush"), up);
+    }
+
+    @Test
+    void startupFirebaseFetchIsGuardedByPlayServices() {
+        assertEquals("", AndroidGradleBuilder.guardedFcmRegisterPushCode(null));
+        assertEquals("", AndroidGradleBuilder.guardedFcmRegisterPushCode(""));
+        String guarded = AndroidGradleBuilder.guardedFcmRegisterPushCode("FETCH();");
+        assertTrue(guarded.startsWith("            if (com.codename1.impl.android.GoogleServices.isPlayServicesAvailable(this)) {\n"), guarded);
+        assertTrue(guarded.contains("FETCH();"), guarded);
+    }
+
+    @Test
     void typedPushReplaysColdStartMessagesBeforeTheListenerIsInstalled() {
         String typedReplay = AndroidGradleBuilder.pendingPushReplayCode(3);
         assertTrue(typedReplay.contains("AndroidImplementation.firePendingPushes(new PushCallback()"));

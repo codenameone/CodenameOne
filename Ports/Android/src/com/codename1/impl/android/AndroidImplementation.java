@@ -4109,8 +4109,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             /*if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to get notifications")){
                 return "";
             }*/
-            boolean has = hasAndroidMarket();
-            if(has) {
+            if(GoogleServices.isPlayServicesAvailable(getContext())) {
                 return "gcm";
             }
             return defaultValue;
@@ -9450,7 +9449,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         boolean includesPlayServices = Display.getInstance().getProperty("IncludeGPlayServices", "false").equals("true");
-        if (includesPlayServices && hasAndroidMarket()) {
+        // Play services, not the Play Store: the fused provider is a service of
+        // the former, and a device can carry either without the other. Without
+        // it the framework manager covers the same API, background updates and
+        // geofences included, instead of a GoogleApiClient that never connects.
+        if (includesPlayServices && GoogleServices.isPlayServicesAvailable(getContext())) {
             try {
                 Class clazz = Class.forName("com.codename1.location.AndroidLocationPlayServiceManager");
                 return (com.codename1.location.LocationManager)clazz.getMethod("getInstance").invoke(null);
@@ -14331,27 +14334,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         Log.d(Display.getInstance().getProperty("AppName", "CodenameOne"), content);
     }
 
-    private boolean hasAndroidMarket() {
-        return hasAndroidMarket(getContext());
-    }
-
-    private static final String GooglePlayStorePackageNameOld = "com.google.market";
-    private static final String GooglePlayStorePackageNameNew = "com.android.vending";
 
     /**
      * Indicates whether this is a Google certified device which means that it
      * has Android market etc.
      */
     public static boolean hasAndroidMarket(Context activity) {
-        final PackageManager packageManager = activity.getPackageManager();
-        List<PackageInfo> packages = packageManager.getInstalledPackages(PackageManager.GET_UNINSTALLED_PACKAGES);
-        for (PackageInfo packageInfo : packages) {
-            if (packageInfo.packageName.equals(GooglePlayStorePackageNameOld) ||
-                    packageInfo.packageName.equals(GooglePlayStorePackageNameNew)) {
-                return true;
-            }
-        }
-        return false;
+        // A direct lookup of the two packages rather than a scan of every
+        // installed one: from API 30 getInstalledPackages() lists only what the
+        // manifest's <queries> names, and a scan answers false on a Google device
+        // as readily as on a de-Googled one. The builder declares these packages.
+        return GoogleServices.isPlayStoreInstalled(activity);
     }
 
     @Override
@@ -14367,8 +14360,21 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         boolean huawei = "huawei".equals(Display.getInstance().getProperty("cn1.push.transport", ""));
-        if (!hasAndroidMarket() && !huawei) {
-            Log.d("Codename One", "Device doesn't have Android market/google play can't register for push!");
+        if (!hasAlternativePushTransport() && !GoogleServices.isPlayServicesAvailable(getContext())) {
+            // Reported, not just logged: a PushClient waits for exactly one
+            // registration result, and returning in silence left it waiting for
+            // good on every device without Google Play services.
+            final String message = "Google Play services is not available on this device, and "
+                    + "the application was built with no other push transport";
+            Log.d("Codename One", message);
+            final com.codename1.push.PushCallback callback = getPushCallback();
+            if (callback != null) {
+                Display.getInstance().callSerially(new Runnable() {
+                    public void run() {
+                        callback.pushRegistrationError(message, 0);
+                    }
+                });
+            }
             return;
         }
         String id = "";
@@ -14390,10 +14396,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         registerPollingFallback();
     }
 
+    /// Whether the build compiled in a push transport other than Firebase
+    /// (Huawei Push Kit, UnifiedPush). The generated activity then chooses among
+    /// them at run time in registerForPush, so the Play services check above
+    /// must not decide for it.
+    private static boolean hasAlternativePushTransport() {
+        Display d = Display.getInstance();
+        if ("huawei".equals(d.getProperty("cn1.push.transport", ""))) {
+            return true;
+        }
+        String transports = d.getProperty("cn1.push.transports", "");
+        return transports.indexOf("huawei") > -1 || transports.indexOf("unifiedpush") > -1;
+    }
+
     @Override
     public void deregisterPush() {
-        boolean has = hasAndroidMarket()
-                || "huawei".equals(Display.getInstance().getProperty("cn1.push.transport", ""));
+        boolean has = hasAlternativePushTransport()
+                || GoogleServices.isPlayServicesAvailable(getContext());
         if (has) {
             ((CodenameOneActivity) getActivity()).stopReceivingPush();
             deregisterPushFromServer();
@@ -18086,16 +18105,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     private void invokeFirebaseTopic(String methodName, String topic) {
-        try {
-            Class<?> cls = Class.forName("com.google.firebase.messaging.FirebaseMessaging");
-            Object instance = cls.getMethod("getInstance").invoke(null);
-            cls.getMethod(methodName, String.class).invoke(instance, topic);
-        } catch (ClassNotFoundException notAvailable) {
-            com.codename1.io.Log.p("Firebase Cloud Messaging is not available; topic '" + topic
-                    + "' subscription must be handled server side");
-        } catch (Throwable t) {
-            com.codename1.io.Log.e(t);
-        }
+        GoogleServices.firebaseTopic(getContext(), methodName, topic);
     }
 
     @Override
@@ -18565,74 +18575,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public boolean isAttestationSupported() {
-        try {
-            Class.forName("com.google.android.play.core.integrity.IntegrityManagerFactory");
-            return true;
-        } catch(Throwable t) {
-            return false;
-        }
+        return GoogleServices.isPlayIntegritySupported(getContext());
     }
 
     @Override
     public AsyncResource<String> requestIntegrityToken(final String nonce) {
         final AsyncResource<String> result = new AsyncResource<String>();
-        try {
-            Context context = getContext();
-            Class factory = Class.forName("com.google.android.play.core.integrity.IntegrityManagerFactory");
-            Object manager = factory.getMethod("create", Context.class).invoke(null, context);
-            Class requestClass = Class.forName("com.google.android.play.core.integrity.IntegrityTokenRequest");
-            Object builder = requestClass.getMethod("builder").invoke(null);
-            builder = builder.getClass().getMethod("setNonce", String.class).invoke(builder, nonce);
-            Object request = builder.getClass().getMethod("build").invoke(builder);
-            Class managerClass = Class.forName("com.google.android.play.core.integrity.IntegrityManager");
-            Object task = managerClass.getMethod("requestIntegrityToken", requestClass).invoke(manager, request);
-
-            Class taskClass = Class.forName("com.google.android.gms.tasks.Task");
-            Class onSuccessClass = Class.forName("com.google.android.gms.tasks.OnSuccessListener");
-            Class onFailureClass = Class.forName("com.google.android.gms.tasks.OnFailureListener");
-            final Class responseClass = Class.forName("com.google.android.play.core.integrity.IntegrityTokenResponse");
-
-            Object successListener = java.lang.reflect.Proxy.newProxyInstance(
-                    onSuccessClass.getClassLoader(), new Class[] { onSuccessClass },
-                    new java.lang.reflect.InvocationHandler() {
-                        public Object invoke(Object proxy, java.lang.reflect.Method method, Object[] args) {
-                            try {
-                                Object response = args[0];
-                                Object token = responseClass.getMethod("token").invoke(response);
-                                // Tested rather than cast into the catch below: a
-                                // wrong type here is a bad token rather than a
-                                // failed call, and a reflective call's answer is
-                                // exactly the kind of value worth testing.
-                                if (token instanceof String) {
-                                    result.complete((String) token);
-                                } else {
-                                    result.error(new IllegalStateException(
-                                            "integrity token was not a string"));
-                                }
-                            } catch(Throwable t) {
-                                result.error(t);
-                            }
-                            return null;
-                        }
-                    });
-            Object failureListener = java.lang.reflect.Proxy.newProxyInstance(
-                    onFailureClass.getClassLoader(), new Class[] { onFailureClass },
-                    new java.lang.reflect.InvocationHandler() {
-                        public Object invoke(Object proxy, java.lang.reflect.Method method, Object[] args) {
-                            Throwable err = (args != null && args.length > 0 && args[0] instanceof Throwable)
-                                    ? (Throwable) args[0] : new RuntimeException("Play Integrity request failed");
-                            result.error(err);
-                            return null;
-                        }
-                    });
-            taskClass.getMethod("addOnSuccessListener", onSuccessClass).invoke(task, successListener);
-            taskClass.getMethod("addOnFailureListener", onFailureClass).invoke(task, failureListener);
-        } catch(ClassNotFoundException notBundled) {
-            result.error(new UnsupportedOperationException(
-                    "Google Play Integrity is not bundled. Enable the android.playIntegrity build hint."));
-        } catch(Throwable t) {
-            result.error(t);
-        }
+        GoogleServices.requestIntegrityToken(getContext(), nonce, result);
         return result;
     }
 

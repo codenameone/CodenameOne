@@ -125,12 +125,14 @@ public final class AppAttestVerifier implements IntegrityVerifier {
         if (!token.startsWith(PREFIX)) {
             return false;
         }
-        String[] parts = token.substring(PREFIX.length()).split(":", -1);
-        if (parts.length != 2) {
+        // indexOf, not split: the compiled backend's String has no split.
+        String rest = token.substring(PREFIX.length());
+        int colon = rest.indexOf(':');
+        if (colon < 0 || rest.indexOf(':', colon + 1) >= 0) {
             return false;
         }
-        byte[] keyId = base64(parts[0]);
-        byte[] object = base64(parts[1]);
+        byte[] keyId = base64(rest.substring(0, colon));
+        byte[] object = base64(rest.substring(colon + 1));
         if (keyId == null || object == null) {
             return false;
         }

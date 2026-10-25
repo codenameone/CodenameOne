@@ -837,3 +837,4 @@ signalling
 coturn
 unconfigured
 Sepolia
+ntfy

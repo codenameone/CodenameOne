@@ -33,7 +33,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /// in the CBOR attestation object the iOS port sends as
 /// `cn1aa1:attest:<keyId>:<attestation>`. The development AAGUID.
 class AppAttestVerifierTest {
-    private static final String APP_ID = "TEAMID1234.com.example.bastion";
+    // The fixtures hash this exact id. It is assembled so the Initializr's
+    // project rename, which rewrites the app's name in every source, leaves
+    // it as the fixtures were made with.
+    private static final String APP_ID = "TEAMID1234.com.example." + "bas" + "tion";
     private static final String NONCE = "device-public-key";
 
     private static final String TEST_ROOT = "-----BEGIN CERTIFICATE-----\n"

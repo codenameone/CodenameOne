@@ -61,6 +61,12 @@ public final class AndroidWearableSupport {
     ///
     /// the wearable bridge, or null
     public static synchronized WearableBridge getBridge(android.content.Context context) {
+        if (!GoogleServices.isPlayServicesAvailable(context)) {
+            // The Data Layer is a Play services API; without the service every call
+            // fails, so the API stays inert. Not remembered, so a user who installs
+            // Play services later (GrapheneOS sandboxed Play) gets the bridge.
+            return null;
+        }
         if (!lookedUp) {
             lookedUp = true;
             try {
