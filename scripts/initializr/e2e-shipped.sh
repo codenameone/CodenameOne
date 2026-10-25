@@ -68,6 +68,24 @@ GENERATOR="$ROOT/scripts/initializr/common/src/main/java/com/codename1/initializ
 PINNED="$(sed -n 's/.*private static final String CN1_PLUGIN_VERSION = "\([^"]*\)";.*/\1/p' "$GENERATOR")"
 [ -n "$PINNED" ] || fail "could not read CN1_PLUGIN_VERSION from $GENERATOR"
 log "the Initializr pins Codename One $PINNED"
+since() {
+  sed -n "s/.*static final String $1 = \"\([^\"]*\)\";.*/\1/p" "$GENERATOR"
+}
+FULL_STACK_SINCE="$(since FULL_STACK_SINCE)"
+BASTION_SINCE="$(since BASTION_SINCE)"
+[ -n "$FULL_STACK_SINCE" ] && [ -n "$BASTION_SINCE" ] || fail "could not read the template floors from $GENERATOR"
+# The oldest release a template's generated code compiles against: Bastion
+# calls framework API that first shipped in BASTION_SINCE.
+template_since() {
+  case "$1" in
+    BASTION) echo "$BASTION_SINCE" ;;
+    *) echo "$FULL_STACK_SINCE" ;;
+  esac
+}
+# True when release $1 is $2 or newer (numeric, dot by dot).
+at_least() {
+  [ "$(printf '%s\n%s\n' "$2" "$1" | sort -t. -k1,1n -k2,2n -k3,3n | head -n 1)" = "$2" ]
+}
 
 # Published, and whole: the release workflow writes this marker last.
 cb="$(date +%s)"
@@ -111,13 +129,18 @@ trap stop_server EXIT
 
 check_values() {
   local dir="$1" name="$2"
-  python3 - "$dir" "$PINNED" "$name" <<'PY'
+  python3 - "$dir" "$PINNED" "$name" "$(template_since "$name")" <<'PY'
 import pathlib, re, sys
-root, pinned, name = pathlib.Path(sys.argv[1]), sys.argv[2], sys.argv[3]
+root, pinned, name, floor = pathlib.Path(sys.argv[1]), sys.argv[2], sys.argv[3], sys.argv[4]
+def release(v):
+    assert re.fullmatch(r'[0-9]+(\.[0-9]+)*', v), '%s: %s is not a release version' % (name, v)
+    return tuple(int(p) for p in v.split('.'))
 pom = (root / 'pom.xml').read_text(encoding='utf-8')
 for tag in ('cn1.version', 'cn1.plugin.version'):
     found = re.findall(r'<%s>([^<]*)</%s>' % (re.escape(tag), re.escape(tag)), pom)
     assert found == [pinned], '%s: pom.xml %s is %s, the Initializr pins %s' % (name, tag, found, pinned)
+    # A release, never a SNAPSHOT, and one that has the API the template calls.
+    assert release(found[0]) >= release(floor), '%s: pom.xml %s is %s, older than %s, the first release with the API it uses' % (name, tag, found[0], floor)
 assert 'https://repo.codenameone.com/maven2' in pom, name + ': pom.xml does not name the Codename One repository'
 # A SNAPSHOT of Codename One anywhere a build reads it. The project's own
 # 1.0-SNAPSHOT is fine; the agent skill's notes on building from source are docs.
@@ -134,10 +157,17 @@ PY
 
 for template in "${TEMPLATES[@]}"; do
   zip="$WORK/zips/SHIPPED-$template.zip"
+  floor="$(template_since "$template")"
   if [ -f "$WORK/zips/NOT-OFFERED-$template" ]; then
-    log "$template: skipped, the Initializr does not offer it at $PINNED"
+    # Withheld is right only while the pinned release predates the template's
+    # floor; withheld at or past it means the gate is wrong.
+    if at_least "$PINNED" "$floor"; then
+      fail "$template: not offered at $PINNED, although it needs only $floor"
+    fi
+    log "$template: skipped, the Initializr does not offer it at $PINNED (it needs $floor)"
     continue
   fi
+  at_least "$PINNED" "$floor" || fail "$template: offered at $PINNED, older than $floor, the first release with the API it uses"
   [ -f "$zip" ] || fail "no download for $template"
   dir="$WORK/$template"
   mkdir -p "$dir"

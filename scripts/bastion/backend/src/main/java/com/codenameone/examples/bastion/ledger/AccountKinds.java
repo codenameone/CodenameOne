@@ -40,6 +40,13 @@ public final class AccountKinds {
     /// The blockchain, simulated: coins withdrawn to an outside address go
     /// here, as fiat withdrawn goes to SYS_CASH.
     public static final String SYS_CHAIN = "SYS_CHAIN";
+    /// Coins taken from a customer for a withdrawal whose transaction is not
+    /// final yet: confirmed, they move on to SYS_CHAIN; failed, back to the
+    /// customer. Never anything else, so its balance is the coins in flight.
+    public static final String SYS_CHAIN_TRANSIT = "SYS_CHAIN_TRANSIT";
+    /// What the bank pays the network to move coins (gas): withdrawals and
+    /// the sweeps that gather deposits into the hot wallet.
+    public static final String SYS_NETWORK_FEES = "SYS_NETWORK_FEES";
     /// The bank's own capital: what its owners paid in.
     public static final String SYS_EQUITY = "SYS_EQUITY";
     /// Profit kept from closed periods; period close moves revenue and

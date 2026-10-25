@@ -80,6 +80,7 @@ import com.codenameone.examples.bastion.audit.Audit;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 
 /// Who may call what, and how they prove who they are.
 ///
@@ -401,6 +402,7 @@ public class SecurityConfig {
             @Value("${" + ISSUER_KEY + ":}") final String issuer,
             @Value("${bastion.register.per-hour:20}") int registrationsPerHour,
             @Value("${bastion.transfer.per-minute:20}") int movementsPerMinute,
+            @Value("${bastion.api.per-minute:300}") int callsPerMinute,
             JdbcUserDetailsManager users) throws IOException {
         DefaultJwtDecoder decoder = DefaultJwtDecoder.withJwkSource(signingKeys).build();
         decoder.setJwtValidator(JwtValidators.createDefaultWithValidators(
@@ -421,8 +423,22 @@ public class SecurityConfig {
             if (!account.isEnabled() || !account.isAccountNonLocked()) {
                 throw new DisabledException("This account is suspended");
             }
+            // Staff act on every customer's money and records, so a staff role
+            // is held only by a token whose sign-in used a second factor: an
+            // authenticator code (`otp`) or a passkey (`hwk`). A password-only
+            // staff token keeps what any account has -- enough to turn on an
+            // authenticator app -- and the console answers it 403.
+            List<String> amr = jwt.getClaimAsStringList("amr");
+            boolean second = amr != null && (amr.contains("otp") || amr.contains("hwk"));
             Collection<GrantedAuthority> held = new ArrayList<GrantedAuthority>();
-            held.addAll(account.getAuthorities());
+            for (GrantedAuthority a : account.getAuthorities()) {
+                String role = a.getAuthority();
+                boolean staff = ("ROLE_" + Roles.ADMIN).equals(role)
+                        || ("ROLE_" + Roles.AUDITOR).equals(role);
+                if (second || !staff) {
+                    held.add(a);
+                }
+            }
             return held;
         });
 
@@ -450,15 +466,32 @@ public class SecurityConfig {
                     new InMemoryRateLimiter(10, 600))
             // Moving money, and the steps before it: a script with a stolen
             // token and device key still moves it no faster than a person.
-            .rateLimit("/api/transfers",
+            .rateLimit("/api/transfers/**",
                     RateLimitKeys.firstOf(RateLimitKeys.principal(), RateLimitKeys.clientAddress()),
                     new InMemoryRateLimiter(movementsPerMinute, 60))
-            .rateLimit("/api/payees",
+            .rateLimit("/api/payees/**",
                     RateLimitKeys.firstOf(RateLimitKeys.principal(), RateLimitKeys.clientAddress()),
                     new InMemoryRateLimiter(movementsPerMinute, 60))
-            .rateLimit("/api/devices",
+            .rateLimit("/api/devices/**",
                     RateLimitKeys.firstOf(RateLimitKeys.principal(), RateLimitKeys.clientAddress()),
                     new InMemoryRateLimiter(movementsPerMinute, 60))
+            // The rest of what a customer's token reaches: orders, coin
+            // withdrawals and addresses, cards, accounts and their deposits.
+            // Reads are most of it -- a dashboard is a dozen calls -- so the
+            // allowance is a person's pace many times over, and a script
+            // with a stolen token is still held to it.
+            .rateLimit("/api/exchange/**",
+                    RateLimitKeys.firstOf(RateLimitKeys.principal(), RateLimitKeys.clientAddress()),
+                    new InMemoryRateLimiter(callsPerMinute, 60))
+            .rateLimit("/api/crypto/**",
+                    RateLimitKeys.firstOf(RateLimitKeys.principal(), RateLimitKeys.clientAddress()),
+                    new InMemoryRateLimiter(callsPerMinute, 60))
+            .rateLimit("/api/cards/**",
+                    RateLimitKeys.firstOf(RateLimitKeys.principal(), RateLimitKeys.clientAddress()),
+                    new InMemoryRateLimiter(callsPerMinute, 60))
+            .rateLimit("/api/accounts/**",
+                    RateLimitKeys.firstOf(RateLimitKeys.principal(), RateLimitKeys.clientAddress()),
+                    new InMemoryRateLimiter(callsPerMinute, 60))
             .authorizeHttpRequests(auth -> auth
                     .requestMatchers(AntPathRequestMatcher.antMatcher("POST",
                             "/api/account/register")).permitAll()

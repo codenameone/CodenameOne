@@ -35,6 +35,11 @@ import com.codenameone.examples.bastion.api.ReceiptDto;
 import com.codenameone.examples.bastion.api.TickerDto;
 import com.codenameone.examples.bastion.api.TradeDto;
 import com.codenameone.examples.bastion.audit.Audit;
+import com.codenameone.examples.bastion.chain.Chain;
+import com.codenameone.examples.bastion.chain.EthAddress;
+import com.codenameone.examples.bastion.domain.ChainTransfer;
+import com.codenameone.examples.bastion.api.ChainTransferDto;
+import com.codenameone.examples.bastion.api.DepositAddressDto;
 import com.codenameone.examples.bastion.domain.CryptoAddress;
 import com.codenameone.examples.bastion.domain.Device;
 import com.codenameone.examples.bastion.domain.LedgerAccount;
@@ -76,9 +81,12 @@ public class ExchangeEndpoint implements ExchangeApiServer {
     private final TradeOrderRepository orders;
     private final TradeRepository trades;
 
+    private final Chain chain;
+
     public ExchangeEndpoint(Markets markets, Exchange exchange, CryptoWallets wallets,
             Ledger ledger, Money money, RequestSigning signing, Audit audit,
-            TradeOrderRepository orders, TradeRepository trades) {
+            TradeOrderRepository orders, TradeRepository trades, Chain chain) {
+        this.chain = chain;
         this.markets = markets;
         this.exchange = exchange;
         this.wallets = wallets;
@@ -282,5 +290,30 @@ public class ExchangeEndpoint implements ExchangeApiServer {
             }
             throw refused;
         }
+    }
+
+    /// A customer's own deposit address. Read-only and harmless to show, but
+    /// only to its owner: it links on-chain activity to a person.
+    @Override
+    public DepositAddressDto depositAddress(String asset) throws Exception {
+        String owner = Devices.customer();
+        if (!chain.handles(asset)) {
+            return new DepositAddressDto(false, asset, "", "", 0, 0);
+        }
+        String address = chain.depositAddress(owner).getAddress();
+        return new DepositAddressDto(true, asset, EthAddress.checksum(address), chain.network(),
+                chain.chainId(), chain.confirmations());
+    }
+
+    @Override
+    public List<ChainTransferDto> chainTransfers() throws Exception {
+        String owner = Devices.customer();
+        List<ChainTransferDto> out = new java.util.ArrayList<ChainTransferDto>();
+        for (ChainTransfer t : chain.history(owner)) {
+            out.add(new ChainTransferDto(t.getId(), t.getDirection(), t.getAsset(), t.getAddress(),
+                    t.getAmount(), t.getStatus(), t.getTxHash().startsWith("0x") ? t.getTxHash() : "",
+                    t.getBlockNumber(), t.getFee(), t.getDetail(), t.getCreatedAt()));
+        }
+        return out;
     }
 }

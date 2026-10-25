@@ -18,12 +18,9 @@
  */
 package com.codenameone.examples.bastion.ui;
 
-import com.codename1.components.SpanLabel;
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
-import com.codename1.ui.layouts.BorderLayout;
-import com.codename1.ui.layouts.BoxLayout;
 import com.codenameone.examples.bastion.security.SecurityStatus;
 
 import java.util.List;
@@ -51,15 +48,8 @@ public final class SecurityCenterForm {
     }
 
     private static Container row(SecurityStatus.Item item) {
-        Container row = new Container(new BorderLayout(), "BnRow");
-        Container words = new Container(BoxLayout.y());
-        words.add(new Label(Lang.tr(item.name), "BnRowTitle"));
-        SpanLabel detail = new SpanLabel(Lang.tr(item.detail, item.values));
-        detail.setTextUIID("BnRowDetail");
-        words.add(detail);
-        row.add(BorderLayout.CENTER, words);
-        row.add(BorderLayout.EAST, new Label(Lang.tr(stateName(item.state)), stateStyle(item.state)));
-        return row;
+        return Ui.row(Lang.tr(item.name), Lang.tr(item.detail, item.values),
+                Lang.tr(stateName(item.state)), stateStyle(item.state), null);
     }
 
     static String stateName(int state) {

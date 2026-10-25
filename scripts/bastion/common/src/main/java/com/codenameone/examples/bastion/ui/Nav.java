@@ -63,6 +63,8 @@ public final class Nav {
                 evt -> ExchangeForm.show(null));
         bar.addMaterialCommandToSideMenu(Lang.tr("Send crypto"), FontImage.MATERIAL_CALL_MADE,
                 evt -> WithdrawForm.show(null, Nav::home));
+        bar.addMaterialCommandToSideMenu(Lang.tr("Receive crypto"), FontImage.MATERIAL_CALL_RECEIVED,
+                evt -> DepositForm.show(Nav::home));
         bar.addMaterialCommandToSideMenu(Lang.tr("Security Center"), FontImage.MATERIAL_SECURITY,
                 evt -> SecurityCenterForm.show(Nav::home));
         bar.addMaterialCommandToSideMenu(Lang.tr("Settings"), FontImage.MATERIAL_SETTINGS,

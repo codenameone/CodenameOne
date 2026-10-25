@@ -59,11 +59,13 @@ public final class Chart {
         {"2010", "Customer deposits - savings", LIABILITY, AccountKinds.SAVINGS},
         {"2100", "Customer digital asset custody", LIABILITY, AccountKinds.WALLET},
         {"2200", "Order escrow", LIABILITY, AccountKinds.HOLD},
+        {"2300", "Withdrawals in transit", LIABILITY, AccountKinds.SYS_CHAIN_TRANSIT},
         {"3000", "Paid-in capital", EQUITY, AccountKinds.SYS_EQUITY},
         {"3100", "Retained earnings", EQUITY, AccountKinds.SYS_RETAINED},
         {"4000", "Fee and trading revenue", REVENUE, AccountKinds.SYS_FEES},
         {"5000", "Interest expense", EXPENSE, AccountKinds.SYS_INTEREST},
         {"5100", "Operational adjustments", EXPENSE, AccountKinds.SYS_ADJUST},
+        {"5200", "Network fees", EXPENSE, AccountKinds.SYS_NETWORK_FEES},
     };
 
     private Chart() {

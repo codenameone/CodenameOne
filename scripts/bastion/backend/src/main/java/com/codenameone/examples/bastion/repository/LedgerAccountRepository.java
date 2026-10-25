@@ -37,6 +37,9 @@ public interface LedgerAccountRepository extends CrudRepository<LedgerAccount, S
 
     LedgerAccount findFirstByOwnerAndAssetAndKind(String owner, String asset, String kind);
 
+    /// Every account in `asset`: what the chain's reserve check adds up.
+    List<LedgerAccount> findByAsset(String asset);
+
     /// Adds `delta` (which may be negative) unless that would take the balance
     /// below zero or the account is frozen. Answers 1 when applied, 0 when
     /// refused.

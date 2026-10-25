@@ -165,30 +165,30 @@ BnRowDetail {
 BnBadgeGood {
     color: var(--success);
     background-color: var(--success-tint);
-    border-radius: 1mm;
+    border-radius: 2mm;
     font-family: "native:MainBold";
-    font-size: 2.1mm;
-    padding: 0.6mm 1.6mm 0.6mm 1.6mm;
+    font-size: 1.9mm;
+    padding: 0.5mm 1.8mm 0.5mm 1.8mm;
     margin: 0 0 0 1.6mm;
 }
 
 BnBadgeWarn {
     color: var(--warning);
     background-color: var(--warning-tint);
-    border-radius: 1mm;
+    border-radius: 2mm;
     font-family: "native:MainBold";
-    font-size: 2.1mm;
-    padding: 0.6mm 1.6mm 0.6mm 1.6mm;
+    font-size: 1.9mm;
+    padding: 0.5mm 1.8mm 0.5mm 1.8mm;
     margin: 0 0 0 1.6mm;
 }
 
 BnBadgeBad {
     color: var(--danger);
     background-color: var(--danger-tint);
-    border-radius: 1mm;
+    border-radius: 2mm;
     font-family: "native:MainBold";
-    font-size: 2.1mm;
-    padding: 0.6mm 1.6mm 0.6mm 1.6mm;
+    font-size: 1.9mm;
+    padding: 0.5mm 1.8mm 0.5mm 1.8mm;
     margin: 0 0 0 1.6mm;
 }
 
@@ -339,6 +339,29 @@ BnEmpty {
     padding: 3mm 2mm 3mm 2mm;
     margin: 0;
     background-color: transparent;
+}
+
+BnLoadingCaption {
+    color: var(--text-muted);
+    font-family: "native:MainRegular";
+    font-size: 2.2mm;
+    padding: 0.6mm 0 2mm 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+BnSkeletonCard {
+    background-color: var(--surface-alt);
+    border-radius: var(--radius);
+    padding: 2.6mm 3mm 2.6mm 3mm;
+    margin: 1mm 0 1mm 0;
+}
+
+BnSkeletonBar {
+    background-color: var(--surface-press);
+    border-radius: 1mm;
+    padding: 0;
+    margin: 0.6mm 0 0.6mm 0;
 }
 
 BnPanel {
@@ -948,6 +971,9 @@ BnAmountNegative {
     BnError { color: var(--danger-dark); }
     BnRowTitle { color: var(--text-dark); }
     BnRowDetail { color: var(--text-muted-dark); }
+    BnLoadingCaption { color: var(--text-muted-dark); }
+    BnSkeletonCard { background-color: var(--surface-alt-dark); }
+    BnSkeletonBar { background-color: var(--surface-press-dark); }
     BnBadgeGood { color: var(--success-dark); background-color: var(--success-tint-dark); }
     BnBadgeWarn { color: var(--warning-dark); background-color: var(--warning-tint-dark); }
     BnBadgeBad { color: var(--danger-dark); background-color: var(--danger-tint-dark); }

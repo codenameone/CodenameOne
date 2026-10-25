@@ -307,6 +307,84 @@ The server's tests cover the ledger's invariants under concurrent transfers and 
 * *Markets and assets.* `bastion.markets` lists the markets; the assets are rows in the ledger's migrations (`V2__ledger.sql`), served to the app by `/api/assets`.
 * *Limits.* Every limit and cooling-off period is a setting in the table above.
 
+[[bastion-chain]]
+=== On a real chain
+
+With `bastion.chain.rpc-url` set, ether is real: deposits arrive at an address of the customer's own, withdrawals are signed and broadcast, and the ledger follows the chain. Left empty, ether is a ledger balance like the other coins. The code is in `backend/.../chain`, and each piece follows a published standard, checked against known answers in `ChainVectorTest`:
+
+[cols="2,4",options="header"]
+|===
+|Piece |What it does
+|`Rlp`, `Eip1559Tx` |Encodes and signs type-2 transactions (EIP-1559), with a chain id so a signature can't be replayed on another network (EIP-155).
+|`EthKeys` |secp256k1 signatures with deterministic nonces (RFC 6979) and low-S values, and Keccak-256, from the Codename One security API.
+|`Bip32`, `SeedSigner` |Derives every key from one seed the way wallets do (BIP-32, BIP-44): deposit address _i_ is `m/44'/60'/0'/0/i`, the hot wallet `m/44'/60'/1'/0/0`. A key is wiped after each signature.
+|`EthAddress` |Checksummed addresses (EIP-55). A withdrawal address with a wrong checksum is refused when it's added.
+|`EthRpc` |Talks JSON-RPC to a node over HTTPS (plain HTTP only to the local host).
+|`Chain` |Scans blocks, credits deposits, signs, broadcasts and settles transfers, sweeps deposits into the hot wallet, and checks reserves.
+|===
+
+How the money stays right:
+
+* *Confirmations and reorganizations.* A block is read only once it's `bastion.chain.confirmations` deep, and each block's parent must be the block read before it. If it isn't, the chain reorganized deeper than the setting allows: scanning stops, an audit event is written, and nothing more is credited until someone looks. Only transactions whose receipt reports success are credited.
+* *Exactly once.* A deposit is posted under the key `chain:in:<transaction>`, so reading a block twice credits it once. Every transfer moves between states by a conditional update, and one instance at a time holds a lease on the chain, so two servers or two overlapping ticks can't sign the same withdrawal twice.
+* *Nonces.* A withdrawal takes the larger of the node's pending nonce and the highest nonce the database has used, plus one. A transaction that's dropped is broadcast again after `bastion.chain.rebroadcast-seconds`, unchanged, so it can only ever land once.
+* *Withdrawals in transit.* A withdrawal moves the coins to the liability account 2300 when it's requested. A confirmed one moves them out to the chain; a failed one returns them to the customer. The network fee is posted to the expense account 5200 at what the receipt says was spent.
+* *Rounding toward the bank.* The ledger counts ether in gwei. Deposits round down and fees round up, so the ledger never claims coins the chain doesn't hold.
+* *Reserves.* Before signing a withdrawal, the server adds up what it owes (every customer's ether plus what's in transit) and what it holds on the chain. If it holds less, or the hot wallet can't pay the amount and the worst-case fee, the withdrawal waits, says why, and an audit event `CHAIN_RESERVES_SHORT` is written. Coins the demo data would mint aren't minted for a coin on a real chain.
+* *A float for fees.* Sweeps and withdrawals pay the network out of the bank's own coins, while the customer is still owed the full deposit. Until the hot wallet holds a float of the bank's own, the first sweep leaves custody short by its fee and the reserves check holds every withdrawal. Fund the hot wallet before opening deposits, and alert when the float runs low.
+* *The wrong network.* At startup the node's chain id must match `bastion.chain.id`, or the server refuses to start rather than sign for another network.
+
+The console's custody report (`/api/books/custody`) shows the hot wallet, what's on the chain, what's owed and what's in transit.
+
+[cols="2,1,4",options="header"]
+|===
+|Setting |Default |Meaning
+|`bastion.chain.rpc-url` |empty |The node. Empty turns the chain off.
+|`bastion.chain.id` |11155111 (Sepolia) |The network the node must be on.
+|`bastion.chain.confirmations` |12 |How deep a block must be before it's read.
+|`bastion.chain.seed` |none |64 hex digits of seed. Keep it in a secret store, and in production replace `SeedSigner` altogether.
+|`bastion.chain.rebroadcast-seconds` |300 |When a transaction that hasn't landed is sent again.
+|`bastion.chain.sweep-minimum-gwei` |1000000 |The smallest deposit balance worth a sweep's fee.
+|`bastion.chain.period-ms` |15000 |How often the chain is read.
+|===
+
+`run-chain-test.sh` checks the whole path against a local development node in a container: a deposit is credited after its confirmations and swept, a withdrawal arrives on the chain to the wei, the ledger and custody agree, and the reserves check holds a withdrawal the chain can't back. To try it on a public test network, point `bastion.chain.rpc-url` at a Sepolia node, set the seed, and fund the deposit address the app shows from a faucet.
+
+What the chain code doesn't do yet: tokens (ERC-20 transfers are calls into a contract and need their own scan of the transfer logs), deposits sent by a contract rather than in a plain transaction, more than one withdrawal in flight per nonce at a time, and a fee policy beyond twice the base fee plus the node's suggested tip.
+
+[[bastion-security-checklist]]
+=== Security checklist
+
+Work through this before a release. The first list is what the sample already does; keep each item true as you change it. The second is what a product has to add.
+
+*Already in place, keep it so:*
+
+* [ ] Passwords hashed with an adaptive hash, a minimum checked on the server, and a lockout per account with rate limits per address and per user.
+* [ ] A second factor or passkey for every sign-in that registers a device, and for every staff session that reaches the console.
+* [ ] Short-lived access tokens; a password change ends every other session.
+* [ ] Money leaving an account, every order and every new payee or address signed by a registered device key, over the body, the path and a single-use nonce.
+* [ ] New payees and addresses cool off, with a daily cap on how many are added; removing one and adding it again doesn't restart the clock.
+* [ ] Every balance change is a balanced ledger entry under an idempotency key, with conditional updates and ordered locks.
+* [ ] The audit log is hash-chained, and the ledger and audit checks run and alert.
+* [ ] The server refuses to start outside development with default token keys, encryption keys or passkey origins.
+* [ ] No cleartext, a host allow-list and certificate pins in the app; HSTS on the server; forwarded addresses trusted only from configured proxies.
+* [ ] Keys on the device sealed by the OS and opened by a biometric or PIN; the app locks in the background and keeps balances out of screenshots.
+* [ ] Withdrawal addresses validated by their checksum; chain transfers only after confirmations, with the reserves check on.
+
+*A product adds:*
+
+* [ ] Server keys, the authenticator-sealing key and chain keys in an HSM or key service; cold storage for most reserves, with signing that needs more than one person.
+* [ ] A real integrity verifier for Play Integrity and App Attest on the server, and a policy for what an unattested device may do.
+* [ ] The audit head published at intervals to storage the database's administrators can't write.
+* [ ] Identity verification, sanctions screening and transaction monitoring, and the reports the law asks for.
+* [ ] A web application firewall and a proxy in front of the server, with `cn1.server.trustedProxies` set to it.
+* [ ] Monitoring and alerting on sign-in failures, refused signatures, reserve shortfalls, reorganizations and the ledger check, with an incident response plan that's been rehearsed.
+* [ ] Encrypted backups that have been restored in a test, and a plan for the loss of a region.
+* [ ] A support console with its own second factor, least privilege and audit.
+* [ ] Dependencies and build tools kept current; release builds from a clean machine with code hardening on, and their signing keys off developer machines.
+* [ ] A penetration test and a code review by someone outside the team, before launch and after major changes.
+* [ ] The certifications your market expects, such as PCI DSS for cards, SOC 2, strong customer authentication rules, and data protection law for personal data and its deletion.
+
 [[bastion-before-product]]
 === Before it's a product
 
@@ -315,7 +393,8 @@ The sample is complete as a demonstration and stops where a real bank's own syst
 * *Identity verification.* Opening an account takes an e-mail and a password. A bank verifies who the customer is (know your customer) through a vendor, screens them against sanctions lists, and keeps the evidence.
 * *Payment rails and core banking.* Deposits are a counter and transfers stay inside the sample's ledger. Real money arrives and leaves through card networks, bank transfers and instant payment schemes, and a bank's core banking system is usually the ledger of record, which this ledger would then mirror or replace.
 * *Keys in a hardware security module.* The server's token-signing key, the key that seals authenticator secrets, and any card or custody keys belong in an HSM or a cloud key service, never in the server's configuration.
-* *Real custody of coins.* The coins are entries in the ledger, and a withdrawal moves them to a holding account. A product needs wallets on the real chains, with the keys in custody, deposit addresses per customer, confirmations, and the chain's fees.
+* *Keys out of the server for ether.* The chain code in <<bastion-chain>> works on a real network, but `SeedSigner` derives its keys from a seed in the server's settings. A product binds `ChainSigner` to a key service or an HSM, and moves most reserves to cold storage that needs people to sign.
+* *Bitcoin.* Only ether settles on a chain. Bitcoin stays a ledger balance until it gets an adapter of its own.
 * *A real integrity check.* `SimulatedIntegrityVerifier` believes the device. Production verifies the Play Integrity token with Google and the App Attest assertion with Apple, on the server.
 * *A real market.* The market maker is a development-only random walk. A product takes its prices from a market data provider and its liquidity from real counterparties, and runs the exchange's own surveillance.
 * *Regulatory reporting.* Suspicious activity reports, transaction reporting, statements and tax documents, and records kept for as long as the law asks.

@@ -33,10 +33,11 @@ import com.codenameone.examples.bastion.security.DeviceKey;
 /// want of a signature.
 ///
 /// The server asks for two things before it trusts a new key: a sign-in a
-/// few minutes old, and -- for an account without an authenticator app --
-/// the password again, since a stolen session alone must not be able to add
-/// the device that then signs payments. A sign-in made with a passkey is
-/// asked for neither: its token says so (`amr`), and the server accepts it.
+/// few minutes old, and a second factor used in that sign-in -- an
+/// authenticator code or a passkey -- since a stolen session and password
+/// must not be able to add the device that then signs payments. A sign-in
+/// made with the password alone is sent to Settings to set one up instead of
+/// being refused by the server with nothing to do about it.
 public final class DeviceSetup {
     private DeviceSetup() {
     }
@@ -56,10 +57,16 @@ public final class DeviceSetup {
             return;
         }
         String password = null;
+        if (!Session.signedInWith("mfa") && !Session.signedInWith("otp")
+                && !Session.signedInWith("hwk")) {
+            secondFactorFirst();
+            return;
+        }
         // The same rule as Devices on the server, which reads the token's own
         // record of the sign-in, never whether an app is on the account now: a
         // code sign-in (`otp`/`mfa`) or a user-verified passkey (`hwk` with
-        // `user`) is not asked for the password; anything else is.
+        // `user`) is not asked for the password; a passkey the authenticator
+        // did not verify the user for (`hwk` alone) is.
         if (!Session.signedInWith("mfa") && !Session.signedInWith("otp")
                 && !(Session.signedInWith("hwk") && Session.signedInWith("user"))) {
             TextField field = new TextField("", Lang.tr("Password"), 20, TextArea.PASSWORD);
@@ -74,7 +81,26 @@ public final class DeviceSetup {
             }
             password = field.getText();
         }
-        DeviceKey.register(user.username(), password, (DeviceDto device) -> done.run(), failed);
+        DeviceKey.register(user.username(), password, (DeviceDto device) -> done.run(),
+                (status, message) -> {
+                    if ("second-factor-add-device".equals(Net.refusalCode())) {
+                        secondFactorFirst();
+                    } else {
+                        failed.failed(status, message);
+                    }
+                });
+    }
+
+    /// The server's answer to a password-only sign-in, said before asking it:
+    /// set up an authenticator app or a passkey, then sign in with it.
+    private static void secondFactorFirst() {
+        if (Dialog.show(Lang.tr("Set up a second factor"),
+                Lang.tr("Adding a device that signs payments needs a sign-in with an "
+                        + "authenticator app or a passkey. Set one up in Settings, then sign "
+                        + "in with it and register this device."),
+                Lang.tr("Open Settings"), Lang.tr("Not now"))) {
+            SettingsForm.show(null);
+        }
     }
 
     /// A refusal that a registered device would have avoided, as the server

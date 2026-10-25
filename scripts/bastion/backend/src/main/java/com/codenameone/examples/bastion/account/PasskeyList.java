@@ -36,10 +36,11 @@ import java.util.List;
 /// The passkeys on an account, for the app's Settings screen.
 ///
 /// Adding one stays a WebAuthn ceremony (`/webauthn/register`, on the
-/// signed-in session). Listing and removing need only the caller's token:
-/// removing a passkey takes nothing away the password and second factor do
-/// not still guard, so a stolen token can at worst make its owner sign in the
-/// longer way -- and every removal is in the audit log.
+/// signed-in session). Listing needs only the caller's token. Removing one
+/// needs more: [AccountEndpoint] asks for a signature from one of the
+/// account's devices or, with none at hand, the password again -- the same
+/// step-up as revoking a device -- so a stolen token alone cannot take away
+/// the passkeys the owner signs in with. Every removal is in the audit log.
 @Component
 public class PasskeyList {
     private final UserCredentialRepository credentials;

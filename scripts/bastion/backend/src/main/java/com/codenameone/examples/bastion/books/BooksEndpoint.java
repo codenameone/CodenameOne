@@ -23,6 +23,7 @@ import com.codenameone.examples.bastion.Refused;
 import com.codenameone.examples.bastion.api.BalanceSheetDto;
 import com.codenameone.examples.bastion.api.BooksApiServer;
 import com.codenameone.examples.bastion.api.ChartAccountDto;
+import com.codenameone.examples.bastion.api.CustodyDto;
 import com.codenameone.examples.bastion.api.GeneralLedgerDto;
 import com.codenameone.examples.bastion.api.IncomeStatementDto;
 import com.codenameone.examples.bastion.api.JournalEntryDto;
@@ -32,6 +33,7 @@ import com.codenameone.examples.bastion.api.TAccountDto;
 import com.codenameone.examples.bastion.api.TrialBalanceDto;
 import com.codenameone.examples.bastion.api.VolumeDayDto;
 import com.codenameone.examples.bastion.audit.Audit;
+import com.codenameone.examples.bastion.chain.Chain;
 
 import java.util.List;
 
@@ -41,10 +43,17 @@ import java.util.List;
 public class BooksEndpoint implements BooksApiServer {
     private final Books books;
     private final Audit audit;
+    private final Chain chain;
 
-    public BooksEndpoint(Books books, Audit audit) {
+    public BooksEndpoint(Books books, Audit audit, Chain chain) {
+        this.chain = chain;
         this.books = books;
         this.audit = audit;
+    }
+
+    @Override
+    public CustodyDto custody() throws Exception {
+        return chain.custodyReport();
     }
 
     @Override

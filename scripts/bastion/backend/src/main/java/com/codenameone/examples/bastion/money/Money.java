@@ -25,6 +25,7 @@ import com.codename1.backend.annotations.Transactional;
 import com.codename1.backend.annotations.Value;
 import com.codenameone.examples.bastion.api.ReceiptDto;
 import com.codenameone.examples.bastion.audit.Audit;
+import com.codenameone.examples.bastion.chain.Chain;
 import com.codenameone.examples.bastion.domain.Asset;
 import com.codenameone.examples.bastion.domain.Card;
 import com.codenameone.examples.bastion.domain.CryptoAddress;
@@ -93,10 +94,11 @@ public class Money {
     private final long cryptoDaily;
     private final Map<String, Long> fxBps;
     private final TradeRepository trades;
+    private final Chain chain;
 
     public Money(Ledger ledger, Audit audit, TransferRepository transfers,
             JournalEntryRepository entries, ProfileRepository profiles, Markets markets,
-            CardRepository cards, TradeRepository trades,
+            CardRepository cards, TradeRepository trades, Chain chain,
             @Value("${bastion.crypto.limit.per-withdrawal:1000000}") String cryptoPerMove,
             @Value("${bastion.crypto.limit.daily:2000000}") String cryptoDaily,
             @Value("${bastion.limit.per-transfer:500000}") String perTransfer,
@@ -108,6 +110,7 @@ public class Money {
             @Value("${bastion.limit.fx:EUR=11000}") String fx) {
         this.ledger = ledger;
         this.trades = trades;
+        this.chain = chain;
         this.audit = audit;
         this.transfers = transfers;
         this.entries = entries;
@@ -318,15 +321,27 @@ public class Money {
         return move(new Move(owner, key, "WITHDRAWAL", from, cash, "", amount, true, memo, null));
     }
 
-    /// Coins out of the bank to an allow-listed address: into SYS_CHAIN,
-    /// standing for the blockchain transaction a real exchange would
-    /// broadcast. The caller has checked the address is the owner's, for this
-    /// asset, and past its cooling-off.
+    /// Coins out of the bank to an allow-listed address. The caller has
+    /// checked the address is the owner's, for this asset, and past its
+    /// cooling-off.
+    ///
+    /// On a real chain ([Chain#handles]) the coins go to SYS_CHAIN_TRANSIT
+    /// and the transaction is queued in the same database transaction, so
+    /// there is never a debit without a withdrawal to settle it nor the
+    /// reverse; [Chain] signs, broadcasts and settles it. Otherwise they go
+    /// straight to SYS_CHAIN, standing for the transaction a real exchange
+    /// would broadcast.
     public ReceiptDto withdrawCrypto(String owner, String key, LedgerAccount from,
             CryptoAddress address, long amount) throws IOException {
-        LedgerAccount chain = ledger.system(from.getAsset(), AccountKinds.SYS_CHAIN);
-        return move(new Move(owner, key, "CRYPTO_OUT", from, chain, address.getId(), amount,
-                true, "to " + address.getAddress(), null));
+        boolean real = chain.handles(from.getAsset());
+        LedgerAccount to = ledger.system(from.getAsset(), real ? AccountKinds.SYS_CHAIN_TRANSIT
+                : AccountKinds.SYS_CHAIN);
+        Move m = new Move(owner, key, "CRYPTO_OUT", from, to, address.getId(), amount,
+                true, "to " + address.getAddress(), null);
+        if (real) {
+            m.chainTo = address;
+        }
+        return move(m);
     }
 
     /// Simulated money in, from SYS_CASH. Not counted against any limit.
@@ -422,6 +437,9 @@ public class Money {
         t.setMemo(entry.getMemo());
         t.setCreatedAt(entry.getCreatedAt());
         transfers.insert(t);
+        if (m.chainTo != null) {
+            chain.queue(entry.getId(), m.owner, m.chainTo, m.amount);
+        }
         audit.append(m.owner, m.kind, entry.getId(), m.amount + " " + t.getAsset() + " "
                 + t.getFromAccount() + " -> " + t.getToAccount()
                 + (m.via.length() > 0 ? " via " + m.via : ""));
@@ -529,6 +547,8 @@ public class Money {
         final String memo;
         final Payee payee;
         Card card;
+        /// Set for a withdrawal [Chain] carries to a real network.
+        CryptoAddress chainTo;
 
         Move(String owner, String key, String kind, LedgerAccount from, LedgerAccount to,
                 String via, long amount, boolean outgoing, String memo, Payee payee) {

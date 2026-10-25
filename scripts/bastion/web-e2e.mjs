@@ -423,6 +423,11 @@ async function menu(label) {
 
 async function shot(name) {
   await settled();
+  // A screen still loading is never a picture of the screen: wait the
+  // placeholder out (Ui.loading captions it "Loading...").
+  await waitFor(name + ' to finish loading', stepSeconds,
+      async () => !/Loading\.\.\./.test(await screenText()));
+  await settled();
   await noErrorDialog();
   await page.screenshot({ path: path.join(tour, name + '.png') });
   say('took ' + name);
@@ -457,6 +462,12 @@ async function scroll(dy) {
   await settled();
 }
 
+/// DemoAccounts.STAFF_TOTP_SECRET: staff hold their role only after a sign-in
+/// with a second factor, so the demo staff have this authenticator.
+const STAFF_TOTP_SECRET = 'BASTIONDEMOSTAFFAUTHENTICATOR234';
+/// The last step each staff member's code went out in: a code is good once.
+const staffSteps = {};
+
 async function signInStaff(who, viewport) {
   await newPage({ viewport });
   await page.goto(url, { waitUntil: 'load' });
@@ -464,6 +475,17 @@ async function signInStaff(who, viewport) {
   await typeInto(0, who, 'email');
   await typeInto(1, 'bastion-demo-password', 'password');
   await press('Sign in');
+  await waitFor('the code screen', stepSeconds, button('Continue'));
+  // The server takes the step before and after the current one too.
+  let at = Math.max(step() - 1, (staffSteps[who] ?? -Infinity) + 1);
+  if (at > step() + 1) {
+    await waitFor('a new code', 35, async () => step() + 1 >= at);
+  }
+  staffSteps[who] = at;
+  await typeInto(0, totp(STAFF_TOTP_SECRET, at), 'any');
+  await page.mouse.click(210, 8);
+  await settled();
+  await press('Continue');
 }
 
 /// The screens the guides show, on the development profile's demo accounts:
@@ -485,12 +507,12 @@ async function guideTour() {
   await press('Sign in');
   await waitFor('the dashboard', stepSeconds, textOnScreen(/Total balance/));
   await shot('bastion-dashboard-unregistered');
+  // A password-only sign-in registers no device: the app says to set up an
+  // authenticator app or a passkey first, and the dashboard stays as it is.
   await press('Register this device');
-  await waitFor('the password prompt', stepSeconds, textOnScreen(/Confirm it is you/));
-  await typeInto(0, 'bastion-demo-password', 'password');
-  await press('Continue');
-  await waitFor('the device to be registered', stepSeconds, async () =>
-      requests.includes('200 POST /api/devices'));
+  await waitFor('the second-factor prompt', stepSeconds,
+      textOnScreen(/Set up a second factor/));
+  await press('Not now');
   await settled();
   await waitFor('the dashboard charts', stepSeconds, textOnScreen(/Where your money is/));
   await page.waitForTimeout(1500);
@@ -560,7 +582,7 @@ async function guideTour() {
 
 
   await menu('Exchange');
-  await waitFor('the markets', stepSeconds, textOnScreen(/BTC/));
+  await waitFor('the markets', stepSeconds, textOnScreen(/BTC \/ USD/));
   await shot('bastion-exchange');
   const btc = await waitFor('the BTC market', stepSeconds, async () =>
       (await components()).find(c => /^BTC \/ USD$/.test(c.label || c.text || '')

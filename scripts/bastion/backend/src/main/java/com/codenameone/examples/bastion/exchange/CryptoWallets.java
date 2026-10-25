@@ -59,10 +59,13 @@ public class CryptoWallets {
     private final Ledger ledger;
     private final Audit audit;
     private final long coolOffMillis;
+    private final int perDay;
 
     public CryptoWallets(CryptoAddressRepository addresses, ProfileRepository profiles,
             Ledger ledger, Audit audit,
-            @Value("${bastion.address.cooloff-hours:24}") String coolOffHours) {
+            @Value("${bastion.address.cooloff-hours:24}") String coolOffHours,
+            @Value("${bastion.address.per-day:5}") String perDay) {
+        this.perDay = Integer.parseInt(perDay.trim());
         this.addresses = addresses;
         this.profiles = profiles;
         this.ledger = ledger;
@@ -83,11 +86,27 @@ public class CryptoWallets {
         if (!wellFormed(address)) {
             throw Refused.with(400, "not-address", "That is not an address");
         }
+        if ("ETH".equals(asset.getCode())) {
+            // An Ethereum address carries its own checksum in its letter case
+            // (EIP-55): a mistyped mixed-case address is refused here rather
+            // than sent to an address nobody holds. Stored in the canonical
+            // checksummed form so the duplicate check below compares like with like.
+            if (!com.codenameone.examples.bastion.chain.EthAddress.valid(address)) {
+                throw Refused.with(400, "not-address", "That is not an address");
+            }
+            address = com.codenameone.examples.bastion.chain.EthAddress.normalize(address);
+        }
         // Behind the customer's profile row: two of these at once would each
         // count the rows before the other inserted and together pass the cap.
         profiles.hold(owner);
         int live = 0;
+        // New addresses per day, removed ones counted: a cap on live ones
+        // alone lets a thief add, withdraw after cooling-off, remove and add
+        // again as fast as the API answers.
+        int today = 0;
+        long since = System.currentTimeMillis() - 24L * 3600000L;
         for (CryptoAddress a : addresses.findByOwnerOrderByCreatedAtAsc(owner)) {
+            today += a.getCreatedAt() > since ? 1 : 0;
             if (!a.isRemoved()) {
                 live++;
                 if (a.getAsset().equals(asset.getCode()) && a.getAddress().equals(address)) {
@@ -97,6 +116,9 @@ public class CryptoWallets {
         }
         if (live >= MAX_ADDRESSES) {
             throw Refused.with(409, "remove-address-before-adding-another", "Remove an address before adding another");
+        }
+        if (today >= perDay) {
+            throw Refused.with(429, "too-many-new-addresses", "You have added as many addresses as a day allows; try again tomorrow");
         }
         long now = System.currentTimeMillis();
         CryptoAddress a = new CryptoAddress();

@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bastion.ui;
 
+import com.codename1.components.InfiniteProgress;
 import com.codename1.components.SpanLabel;
 import com.codename1.components.ToastBar;
 import com.codename1.l10n.SimpleDateFormat;
@@ -37,6 +38,7 @@ import com.codename1.ui.TextField;
 import com.codename1.ui.Toolbar;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.spinner.Picker;
 import java.util.Date;
@@ -235,12 +237,22 @@ public final class Ui {
         Container row = new Container(new BorderLayout(), "BnRow");
         row.add(BorderLayout.CENTER, words);
         if (value != null) {
-            row.add(BorderLayout.EAST, new Label(value, valueUiid == null ? "BnRowValue" : valueUiid));
+            row.add(BorderLayout.EAST, valueUiid != null && valueUiid.startsWith("BnBadge")
+                    ? chip(value, valueUiid) : new Label(value, "BnRowValue"));
         }
         if (tap != null) {
             row.setLeadComponent(lead(row, tap));
         }
         return row;
+    }
+
+    /// A status pill, as tall as its text and centred on the row beside it.
+    /// Put straight into a border layout's side a label stretches to the
+    /// row's whole height, which made a tall coloured block of every status.
+    public static Container chip(String text, String uiid) {
+        Container box = new Container(new FlowLayout(Component.CENTER, Component.CENTER));
+        box.add(new Label(text, uiid));
+        return box;
     }
 
     /// An invisible button that makes a whole row one tap target.
@@ -293,21 +305,40 @@ public final class Ui {
         return column;
     }
 
-    /// One grid row of `parts`, `gap` pixels apart. A grid has no gap of its
-    /// own, so each cell gives up half of it on each inner side; the margins
-    /// are start and end ones, which the RTL layout mirrors with the grid.
+    /// One grid row of `parts`, `gap` pixels apart.
     private static Container gridRow(int gap, Component... parts) {
         Container row = new Container(new GridLayout(1, parts.length));
-        int half = gap / 2;
-        for (int iter = 0; iter < parts.length; iter++) {
-            com.codename1.ui.plaf.Style style = parts[iter].getAllStyles();
-            style.setMarginUnitLeft(com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS);
-            style.setMarginUnitRight(com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS);
-            style.setMarginLeft(iter == 0 ? 0 : half);
-            style.setMarginRight(iter == parts.length - 1 ? 0 : gap - half);
-        }
         row.addAll(parts);
+        gaps(row, gap);
         return row;
+    }
+
+    /// Spaces the children of a one-row grid, or of a column, the standard
+    /// button gap apart. Call it again after refilling the container.
+    public static void gaps(Container row) {
+        gaps(row, CN.convertToPixels(buttonGapMm()));
+    }
+
+    /// A grid has no gap of its own, so each cell gives up half of it on each
+    /// inner side; the margins are start and end ones, which the RTL layout
+    /// mirrors with the grid. A column gets the gap above every child but the
+    /// first.
+    private static void gaps(Container row, int gap) {
+        boolean across = row.getLayout() instanceof GridLayout;
+        int count = row.getComponentCount();
+        int half = gap / 2;
+        for (int iter = 0; iter < count; iter++) {
+            com.codename1.ui.plaf.Style style = row.getComponentAt(iter).getAllStyles();
+            if (across) {
+                style.setMarginUnitLeft(com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS);
+                style.setMarginUnitRight(com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS);
+                style.setMarginLeft(iter == 0 ? 0 : half);
+                style.setMarginRight(iter == count - 1 ? 0 : gap - half);
+            } else {
+                style.setMarginUnitTop(com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS);
+                style.setMarginTop(iter == 0 ? 0 : gap);
+            }
+        }
     }
 
     private static float buttonGapMm() {
@@ -528,12 +559,35 @@ public final class Ui {
     }
 
     /// A rebuildable form: `content` is emptied and refilled on every load.
-    /// While the first answer is on its way there is a line saying so; a
-    /// failure shows the reason and a way to try again.
+    /// While the first answer is on its way it shows the shape of what is
+    /// coming -- a spinner over grey placeholder rows -- rather than a bare
+    /// line of text; a failure shows the reason and a way to try again.
     public static void loading(Container content) {
         content.removeAll();
-        content.add(muted(Lang.tr("Loading...")));
+        InfiniteProgress spinner = new InfiniteProgress();
+        content.add(FlowLayout.encloseCenter(spinner));
+        Label caption = new Label(Lang.tr("Loading..."), "BnLoadingCaption");
+        content.add(FlowLayout.encloseCenter(caption));
+        for (int iter = 0; iter < 3; iter++) {
+            Container card = new Container(BoxLayout.y(), "BnSkeletonCard");
+            card.add(skeletonBar(iter == 1 ? 45 : 60, 3f));
+            card.add(skeletonBar(iter == 2 ? 70 : 35, 2.2f));
+            content.add(card);
+        }
         content.revalidate();
+    }
+
+    /// A rounded grey bar `percent` of the page wide and `mm` tall.
+    private static Component skeletonBar(final int percent, final float mm) {
+        Component bar = new Component() {
+            @Override
+            protected com.codename1.ui.geom.Dimension calcPreferredSize() {
+                return new com.codename1.ui.geom.Dimension(
+                        CN.getDisplayWidth() * percent / 100, CN.convertToPixels(mm));
+            }
+        };
+        bar.setUIID("BnSkeletonBar");
+        return bar;
     }
 
     /// "Enter an amount, like 25.00.", with the example written the way this

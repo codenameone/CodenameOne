@@ -85,6 +85,14 @@ public interface ExchangeApi {
             OnComplete<Response<CryptoAddressDto>> callback);
 
     /// Coins out of wallet `id` to an allow-listed address. Always signed.
+    /// The caller's deposit address for `asset`, made the first time.
+    @GET("/api/crypto/deposit-address/{asset}")
+    void depositAddress(@Path("asset") String asset, OnComplete<Response<DepositAddressDto>> callback);
+
+    /// The caller's coins that crossed to or from the chain, newest first.
+    @GET("/api/crypto/chain-transfers")
+    void chainTransfers(OnComplete<Response<List<ChainTransferDto>>> callback);
+
     @POST("/api/accounts/{id}/crypto-withdraw")
     void withdrawCrypto(@Path("id") String id, @Header("Idempotency-Key") String idempotencyKey,
             @Header("Bastion-Signature") String signature, @Body CryptoWithdrawalDto withdrawal,

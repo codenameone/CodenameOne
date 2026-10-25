@@ -41,6 +41,10 @@ public class Payee {
     @Column(nullable = false)
     private long createdAt;
 
+    /// Kept rather than deleted; see `V9__payee_removed.sql`.
+    @Column(nullable = false)
+    private boolean removed;
+
     public Payee() {
     }
 
@@ -82,5 +86,13 @@ public class Payee {
 
     public void setCreatedAt(long createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public boolean isRemoved() {
+        return removed;
+    }
+
+    public void setRemoved(boolean removed) {
+        this.removed = removed;
     }
 }

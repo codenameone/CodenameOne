@@ -99,6 +99,14 @@ public final class LiveE2e {
         alice.token = alice.tokens(session);
 
         step("a device key is registered");
+        // Only a sign-in with a second factor adds a device: bob's password
+        // alone is refused, so he turns on an app and signs in with it.
+        check(bob.deviceStatus() == 403, "a password-only sign-in adds no device");
+        bob.enrolTotp();
+        String bobPending = bob.password();
+        String bobSession = bob.code(bobPending, totp(bob.secret, 30000));
+        check(bobSession != null, "bob signs in with his code");
+        bob.token = bob.tokens(bobSession);
         alice.registerDevice();
         bob.registerDevice();
 
@@ -218,13 +226,28 @@ public final class LiveE2e {
         String device;
         final String pw;
 
-        /// An account the server already has -- the demo staff -- signed in.
+        /// An account the server already has -- the demo staff -- signed in
+        /// with the password and the demo authenticator's code: staff hold
+        /// their role only with a second factor.
         Customer(String existing, String password) throws Exception {
             email = existing;
             pw = password;
-            String session = password();
-            check(session != null, email + " signs in with the password");
+            String pending = password();
+            check(pending != null, email + " signs in with the password");
+            String session = code(pending, totp(STAFF_TOTP_SECRET, 0));
+            check(session != null, email + " gives the authenticator code");
             token = tokens(session);
+        }
+
+        /// What adding a throwaway key answers with this token.
+        int deviceStatus() throws Exception {
+            KeyPairGenerator generator = KeyPairGenerator.getInstance("EC");
+            generator.initialize(new ECGenParameterSpec("secp256r1"));
+            return call("POST", "/api/devices", "{\"publicKey\":\""
+                    + b64(generator.generateKeyPair().getPublic().getEncoded())
+                    + "\",\"platform\":\"and\",\"rooted\":false,\"attested\":true,"
+                    + "\"integrityToken\":\"e2e\",\"password\":\"" + PASSWORD + "\"}",
+                    null, null).statusCode();
         }
 
         Customer(String name) throws Exception {
@@ -466,6 +489,9 @@ public final class LiveE2e {
 
     /// RFC 6238, 30-second steps, six digits, HMAC-SHA1 -- what an
     /// authenticator app computes from the enrolment's secret.
+    /// DemoAccounts.STAFF_TOTP_SECRET: the demo staff's authenticator.
+    private static final String STAFF_TOTP_SECRET = "BASTIONDEMOSTAFFAUTHENTICATOR234";
+
     private static String totp(String base32, long offsetMillis) throws Exception {
         long step = (System.currentTimeMillis() + offsetMillis) / 30000L;
         byte[] counter = new byte[8];

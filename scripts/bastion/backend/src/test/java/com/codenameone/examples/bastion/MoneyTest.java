@@ -100,11 +100,20 @@ class MoneyTest {
             device = register(key, rooted);
         }
 
+        /// Adds `pair` as a device, from a sign-in with a second factor (the
+        /// only kind that may add one); the test goes on with its own token.
         String register(TestKeys pair, boolean rooted) throws Exception {
-            MockResponse answer = send(json("/api/devices", "{\"publicKey\":\""
+            String plain = token;
+            token = aged(plain, 0, java.util.Arrays.asList("pwd", "otp", "mfa"));
+            MockResponse answer;
+            try {
+                answer = send(json("/api/devices", "{\"publicKey\":\""
                     + Base64Url.encode(pair.publicKey) + "\",\"platform\":\"and\","
                     + "\"rooted\":" + rooted + ",\"attested\":true,\"integrityToken\":\"t\","
                     + "\"password\":\"" + PASSWORD + "\"}"));
+            } finally {
+                token = plain;
+            }
             assertEquals(200, answer.getStatus(), answer.getContentAsString());
             Map device = Json.parseObject(answer.getContentAsString());
             assertEquals(Boolean.valueOf(!rooted), device.get("trusted"));
@@ -414,6 +423,79 @@ class MoneyTest {
     }
 
     @Test
+    void removingAndAddingAPayeeAgainKeepsItsCoolingOff() throws Exception {
+        Customer a = new Customer(false);
+        Customer b = new Customer(false);
+        a.deposit(a.checking, 100000);
+        String payee = a.addPayee(b);
+        assertEquals(200, a.signed("/api/transfers", a.payBody(payee, 10000), key()).getStatus());
+        assertEquals(200, a.signedAs("DELETE", "/api/payees/" + payee, "").getStatus());
+        // Removed: off the list, and not payable.
+        assertTrue(a.send(get("/api/payees")).getContentAsString().indexOf(payee) < 0);
+        assertEquals(404, a.signed("/api/transfers", a.payBody(payee, 1), key()).getStatus());
+        // Added again: the same payee, still cooling off from when it was
+        // first added, its allowance already spent.
+        assertEquals(payee, a.addPayee(b));
+        MockResponse again = a.signed("/api/transfers", a.payBody(payee, 1), key());
+        assertEquals(409, again.getStatus());
+        assertTrue(again.getContentAsString().indexOf("new-payee-receive-until-their") >= 0,
+                again.getContentAsString());
+        assertEquals(10000, b.balance(b.checking));
+    }
+
+    @Test
+    void newPayeesAreCappedPerDayRemovedOnesCounted() throws Exception {
+        Customer a = new Customer(false);
+        for (int i = 0; i < 5; i++) {
+            Customer other = new Customer(false);
+            String id = a.addPayee(other);
+            assertEquals(200, a.signedAs("DELETE", "/api/payees/" + id, "").getStatus());
+        }
+        Customer sixth = new Customer(false);
+        MockResponse refused = a.signed("/api/payees", "{\"email\":\"" + sixth.name
+                + "\",\"nickname\":\"x\"}", null);
+        assertEquals(429, refused.getStatus(), refused.getContentAsString());
+    }
+
+    @Test
+    void staffNeedASecondFactor() throws Exception {
+        String coded = SignIn.token(mvc,
+                com.codenameone.examples.bastion.account.DemoAccounts.AUDITOR,
+                com.codenameone.examples.bastion.account.DemoAccounts.PASSWORD);
+        assertEquals(200, mvc.perform(get("/api/books/trial-balance").header("Host", SignIn.HOST)
+                .header("Authorization", "Bearer " + coded)).andReturn().getResponse()
+                .getStatus());
+        String plain = aged(coded, 0, java.util.Arrays.asList("pwd"));
+        assertEquals(403, mvc.perform(get("/api/books/trial-balance").header("Host", SignIn.HOST)
+                .header("Authorization", "Bearer " + plain)).andReturn().getResponse()
+                .getStatus());
+    }
+
+    @Test
+    void productionRefusesTheShippedSettings() {
+        com.codenameone.examples.bastion.ProductionSettings.check(true, "", "", "localhost",
+                "http://localhost:8080");
+        String[][] cases = {
+            {"", "k", "bank.example", "https://bank.example"},
+            {"/keys.json", "", "bank.example", "https://bank.example"},
+            {"/keys.json", "k", "localhost", "https://bank.example"},
+            {"/keys.json", "k", "bank.example", "http://localhost:8080"},
+        };
+        for (String[] c : cases) {
+            boolean refused = false;
+            try {
+                com.codenameone.examples.bastion.ProductionSettings.check(false, c[0], c[1], c[2],
+                        c[3]);
+            } catch (IllegalStateException expected) {
+                refused = true;
+            }
+            assertTrue(refused, java.util.Arrays.toString(c));
+        }
+        com.codenameone.examples.bastion.ProductionSettings.check(false, "/keys.json", "k",
+                "bank.example", "https://bank.example");
+    }
+
+    @Test
     void aNewPayeeIsCoolingOff() throws Exception {
         Customer a = new Customer(false);
         Customer b = new Customer(false);
@@ -515,27 +597,30 @@ class MoneyTest {
     }
 
     @Test
-    void addingADeviceNeedsAFreshSignInAndThePassword() throws Exception {
+    void addingADeviceNeedsAFreshSecondFactorSignIn() throws Exception {
         Customer c = new Customer(false);
         String key = Base64Url.encode(newKey().publicKey);
         String noPassword = "{\"publicKey\":\"" + key + "\",\"platform\":\"and\","
                 + "\"rooted\":false,\"attested\":true,\"integrityToken\":\"t\"}";
-        assertEquals(403, c.send(json("/api/devices", noPassword)).getStatus());
-        String wrong = noPassword.replace("}", ",\"password\":\"not my password at all\"}");
-        assertEquals(403, c.send(json("/api/devices", wrong)).getStatus());
         String right = noPassword.replace("}", ",\"password\":\"" + PASSWORD + "\"}");
-        // A token whose sign-in is half an hour old is refused even with the
-        // password: it is what a stolen, refreshed token looks like.
+        // A fresh password-only sign-in is refused even with the password:
+        // a phished session comes with it. The refusal says what to do.
+        MockResponse plain = c.send(json("/api/devices", right));
+        assertEquals(403, plain.getStatus());
+        assertTrue(plain.getContentAsString().indexOf("second-factor-add-device") >= 0,
+                plain.getContentAsString());
+        // A token whose sign-in is half an hour old is refused even with a
+        // code: it is what a stolen, refreshed token looks like.
         String fresh = c.token;
-        c.token = aged(fresh, 30);
-        assertEquals(403, c.send(json("/api/devices", right)).getStatus());
-        c.token = aged(fresh, 1);
-        assertEquals(200, c.send(json("/api/devices", right)).getStatus());
+        c.token = aged(fresh, 30, java.util.Arrays.asList("pwd", "otp", "mfa"));
+        assertEquals(403, c.send(json("/api/devices", noPassword)).getStatus());
+        c.token = aged(fresh, 1, java.util.Arrays.asList("pwd", "otp", "mfa"));
+        assertEquals(200, c.send(json("/api/devices", noPassword)).getStatus());
         assertTrue(audit.verify().isEmpty());
     }
 
     @Test
-    void aPasskeySignInAddsADeviceWithoutThePassword() throws Exception {
+    void aPasskeySignInAddsADevice() throws Exception {
         Customer c = new Customer(false);
         // The token says how its sign-in was made: here, a password alone.
         String payload = c.token.substring(c.token.indexOf('.') + 1, c.token.lastIndexOf('.'));
@@ -549,6 +634,8 @@ class MoneyTest {
         // no `user`) proves only that the key was present: still the password.
         c.token = aged(c.token, 1, java.util.Arrays.asList("hwk"));
         assertEquals(403, c.send(json("/api/devices", noPassword)).getStatus());
+        assertEquals(200, c.send(json("/api/devices", noPassword.replace("}",
+                ",\"password\":\"" + PASSWORD + "\"}"))).getStatus());
         // A fresh, user-verified passkey sign-in needs none.
         c.token = aged(c.token, 1, java.util.Arrays.asList("hwk", "user", "mfa"));
         assertEquals(200, c.send(json("/api/devices", noPassword)).getStatus());

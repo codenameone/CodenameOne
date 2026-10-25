@@ -26,6 +26,7 @@ import com.codename1.backend.annotations.Transactional;
 import com.codename1.backend.annotations.Value;
 import com.codenameone.examples.bastion.Ids;
 import com.codenameone.examples.bastion.account.DemoAccounts;
+import com.codenameone.examples.bastion.chain.Chain;
 import com.codenameone.examples.bastion.api.NewOrderDto;
 import com.codenameone.examples.bastion.domain.Asset;
 import com.codenameone.examples.bastion.domain.LedgerAccount;
@@ -74,10 +75,13 @@ public class MarketMaker {
     /// `demo` is taken only so that it is built, and its history seeded,
     /// before this starts: that history funds the maker at its first day,
     /// and a float posted again today would be a day's volume of a million.
+    private final Chain chain;
+
     public MarketMaker(Exchange exchange, Markets markets, Ledger ledger,
-            TradeOrderRepository orders, Config config, DemoAccounts demo,
+            TradeOrderRepository orders, Config config, DemoAccounts demo, Chain chain,
             @Value("${bastion.market-maker.enabled:true}") String enabled) {
         this.exchange = exchange;
+        this.chain = chain;
         this.markets = markets;
         this.ledger = ledger;
         this.orders = orders;
@@ -92,7 +96,11 @@ public class MarketMaker {
         markets.seed();
         for (Market m : markets.all()) {
             fund(m.getQuote(), AccountKinds.CHECKING);
-            fund(m.getBase(), AccountKinds.WALLET);
+            if (!chain.handles(m.getBase())) {
+                // A real coin is never minted, not even for the maker: it
+                // quotes only what it bought.
+                fund(m.getBase(), AccountKinds.WALLET);
+            }
         }
         quote();
     }

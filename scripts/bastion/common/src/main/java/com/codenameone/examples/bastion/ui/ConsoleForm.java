@@ -45,6 +45,7 @@ import com.codenameone.examples.bastion.api.AuditEventDto;
 import com.codenameone.examples.bastion.api.BalanceSheetDto;
 import com.codenameone.examples.bastion.api.BreakDto;
 import com.codenameone.examples.bastion.api.ChainReportDto;
+import com.codenameone.examples.bastion.api.CustodyDto;
 import com.codenameone.examples.bastion.api.ChartAccountDto;
 import com.codenameone.examples.bastion.api.ClosePeriodDto;
 import com.codenameone.examples.bastion.api.ControlDto;
@@ -306,9 +307,30 @@ public final class ConsoleForm {
             body.add(Ui.section("Integrity checks"));
             checks.add(BoxLayout.encloseY(verifyAudit, auditBox));
             checks.add(BoxLayout.encloseY(verifyLedger, ledgerBox));
+            Ui.gaps(checks);
             body.add(checks);
         }
+        final Container custody = new Container(BoxLayout.y());
+        body.add(custody);
         done(body);
+        // Only a coin that settles on a real chain has custody to show; the
+        // report answers live=false otherwise and the section stays empty.
+        Api.books().custody(Net.to((CustodyDto c) -> {
+            if (!c.live()) {
+                return;
+            }
+            boolean backed = c.onChain() >= c.owed();
+            custody.add(Ui.section("Custody"));
+            custody.add(Ui.row(Lang.tr("Held on chain {0}", String.valueOf(c.chainId())),
+                    Lang.tr("Owed to customers {0}", Amounts.format(c.owed(), c.asset())),
+                    Amounts.format(c.onChain(), c.asset()),
+                    backed ? "BnBadgeGood" : "BnBadgeBad", null));
+            custody.add(Ui.row(Lang.tr("Hot wallet"), c.hotWallet(),
+                    Amounts.format(c.hotBalance(), c.asset()), "BnRowValue", null));
+            custody.add(Ui.row(Lang.tr("In transit"), Lang.tr("Withdrawals not yet confirmed"),
+                    Amounts.format(c.inTransit(), c.asset()), "BnRowValue", null));
+            body.revalidate();
+        }, (s, m) -> { }));
         Api.books().trialBalance(null, Net.to((TrialBalanceDto tb) -> state(trial,
                 tb.balanced(), "Balanced", "Out of balance"), (s, m) -> state(trial, false,
                 "", "Unavailable")));
@@ -372,6 +394,7 @@ public final class ConsoleForm {
                 "BnChartLine", "$", 1.5f)));
         charts.add(panel("Journal entries a day", Charts.bars("entries-chart", at, count,
                 "BnChartIn", "", 1.5f)));
+        Ui.gaps(charts);
         charts.revalidate();
         form.revalidate();
     }

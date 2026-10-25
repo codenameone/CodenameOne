@@ -19,12 +19,15 @@
 package com.codenameone.examples.bastion.account;
 
 import com.codename1.backend.Config;
+import com.codename1.backend.security.mfa.JdbcTotpRepository;
+import com.codename1.security.Base32;
 import com.codename1.backend.DataSource;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.PostConstruct;
 import com.codename1.backend.annotations.Value;
 import com.codenameone.examples.bastion.Roles;
 import com.codenameone.examples.bastion.books.Books;
+import com.codenameone.examples.bastion.chain.Chain;
 import com.codenameone.examples.bastion.domain.LedgerAccount;
 import com.codenameone.examples.bastion.exchange.Markets;
 import com.codenameone.examples.bastion.ledger.AccountKinds;
@@ -56,6 +59,11 @@ public class DemoAccounts {
     /// Reads the books and the audit trail, and can change nothing.
     public static final String AUDITOR = "auditor@bastion.example";
     public static final String PASSWORD = "bastion-demo-password";
+    /// The demo staff's authenticator-app secret, base32 as an app takes it.
+    /// Staff need a second factor to use the console (see SecurityConfig), so
+    /// the demo staff have one, and it is public for the same reason the
+    /// password is: these accounts exist only on a development profile.
+    public static final String STAFF_TOTP_SECRET = "BASTIONDEMOSTAFFAUTHENTICATOR234";
 
     private final Accounts accounts;
     private final Ledger ledger;
@@ -67,14 +75,18 @@ public class DemoAccounts {
     private final Books books;
     private final int historyDays;
 
+    /// Asked which coins are real: the demo never mints those.
+    private final Chain chain;
+
     public DemoAccounts(Accounts accounts, Ledger ledger, Config config, Markets markets,
-            DataSource db, Books books,
+            DataSource db, Books books, Chain chain,
             @Value("${bastion.admin.email:}") String adminEmail,
             @Value("${bastion.admin.password:}") String adminPassword,
             @Value("${bastion.demo.history-days:42}") String historyDays) {
         this.markets = markets;
         this.db = db;
         this.books = books;
+        this.chain = chain;
         this.historyDays = Math.max(0, Integer.parseInt(historyDays.trim()));
         this.accounts = accounts;
         this.ledger = ledger;
@@ -98,12 +110,19 @@ public class DemoAccounts {
         staff(ADMIN, PASSWORD, Roles.ADMIN, "Administrator");
         staff(SECOND_ADMIN, PASSWORD, Roles.ADMIN, "Second Administrator");
         staff(AUDITOR, PASSWORD, Roles.AUDITOR, "Internal Auditor");
+        JdbcTotpRepository apps = JdbcTotpRepository.fromConfig(db, config);
+        for (String who : new String[] {ADMIN, SECOND_ADMIN, AUDITOR}) {
+            if (apps.find(who) == null) {
+                apps.save(who, Base32.decode(STAFF_TOTP_SECRET));
+                apps.confirm(who);
+            }
+        }
         boolean fresh = !accounts.exists(CUSTOMER);
         long opened = DemoHistory.start(historyDays) - 3600000L;
         customer(CUSTOMER, "Riley Customer", 250000, opened);
         customer(SECOND_CUSTOMER, "Robin Customer", 120000, opened);
         if (fresh && historyDays > 0) {
-            new DemoHistory(ledger, markets, db).seed(historyDays, CUSTOMER,
+            new DemoHistory(ledger, markets, db, chain).seed(historyDays, CUSTOMER,
                     SECOND_CUSTOMER);
             if (historyDays > 35 && ledger.closedThrough() == 0) {
                 // The first four weeks as a closed period, so the demo shows

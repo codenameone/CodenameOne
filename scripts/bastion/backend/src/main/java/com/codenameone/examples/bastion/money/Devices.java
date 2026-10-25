@@ -58,12 +58,16 @@ import java.util.List;
 ///    must be under `bastion.device.fresh-minutes` (10) old. A refresh keeps
 ///    the original sign-in time, so only someone who signed in just now
 ///    passes.
-/// 2. **The second factor, or the password again.** A token whose sign-in
-///    was made with a code (`amr` holding `otp` or `mfa`) already *was* a
-///    second-factor sign-in. Any other must carry the password in the
-///    registration as well -- even on an account that has an authenticator
-///    app now, since the app may have been enrolled with the very token being
-///    used; a wrong one counts toward the sign-in lockout like any other. The token says how
+/// 2. **A second factor, used in that sign-in.** A token whose sign-in was
+///    made with the password alone (`amr` holding none of `otp`, `mfa` or
+///    `hwk`) is refused whatever it carries, even the password: a password is
+///    the one thing a phished or stolen session is most likely to come with,
+///    and the key registered here is what signs payments. The customer is
+///    asked to set up an authenticator app or a passkey and sign in with it
+///    -- even on an account that has an app now, since the app may have been
+///    enrolled with the very token being used. A passkey sign-in the
+///    authenticator did not verify the user for (`hwk` alone) must carry the
+///    password as well; a wrong one counts toward the sign-in lockout. The token says how
 ///    its sign-in was made ([Caller#authMethods], the `amr` claim): a sign-in
 ///    with a user-verified passkey (`hwk` together with `user`) already proved
 ///    possession of a key bound to this site and the person holding it, so it
@@ -104,7 +108,7 @@ public class Devices {
     }
 
     /// Registers a key once the caller has shown a fresh sign-in, and the
-    /// password when there is no second factor; see the class comment. The
+    /// second factor used in that sign-in; see the class comment. The
     /// refusals are audited here, outside the registration's transaction.
     public DeviceDto register(String owner, DeviceRegistrationDto request) throws IOException {
         if (request == null || request.publicKey() == null) {
@@ -123,6 +127,12 @@ public class Devices {
         // one the authenticator verified the user for (`hwk` with `user`), is
         // spared the password: `hwk` alone is a key that was merely present,
         // which proves possession of the device and nothing about who holds it.
+        boolean second = how.contains("mfa") || how.contains("otp") || how.contains("hwk");
+        if (!second) {
+            audit.append(owner, "DEVICE_REFUSED", owner, "no second factor, amr " + how);
+            throw Refused.with(403, "second-factor-add-device",
+                    "Set up an authenticator app or a passkey, then sign in with it to add a device");
+        }
         boolean strong = how.contains("mfa") || how.contains("otp")
                 || (how.contains("hwk") && how.contains("user"));
         if (!strong) {
@@ -130,12 +140,12 @@ public class Devices {
                     "enter-password-add-device-turn",
                     "Enter your password to add a device, or turn on an authenticator app");
         }
-        return registerOnce(owner, request);
+        return registerOnce(owner, request, how);
     }
 
     @Transactional(rollbackFor = Exception.class)
-    private DeviceDto registerOnce(String owner, DeviceRegistrationDto request)
-            throws IOException {
+    private DeviceDto registerOnce(String owner, DeviceRegistrationDto request,
+            java.util.List<String> how) throws IOException {
         byte[] key = decode(request.publicKey());
         // A P-256 key and nothing else: that is the curve ES256 is defined
         // over, and the one every phone's secure hardware can hold.
@@ -172,7 +182,10 @@ public class Devices {
         devices.insert(device);
         audit.append(owner, "DEVICE_REGISTERED", device.getId(), platform
                 + (trusted(device) ? " trusted" : " untrusted")
-                + (device.isRooted() ? " rooted" : "") + (device.isAttested() ? " attested" : ""));
+                + (device.isRooted() ? " rooted" : "") + (device.isAttested() ? " attested" : "")
+                // How the sign-in that added it was made, for whoever reads
+                // the trail after a takeover.
+                + " amr " + how);
         return dto(device);
     }
 

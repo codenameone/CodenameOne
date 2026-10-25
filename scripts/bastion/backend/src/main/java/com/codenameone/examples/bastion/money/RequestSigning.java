@@ -22,6 +22,7 @@ import com.codenameone.examples.bastion.Refused;
 import com.codename1.backend.Crypto;
 import com.codename1.backend.HttpServer;
 import com.codename1.backend.annotations.Component;
+import com.codename1.backend.annotations.Scheduled;
 import com.codename1.backend.annotations.Transactional;
 import com.codename1.backend.security.SecurityExchange;
 import com.codename1.backend.security.crypto.Der;
@@ -189,6 +190,15 @@ public class RequestSigning {
         used.setId(id);
         used.setExpiresAt(expiresAt);
         nonces.insert(used);
+    }
+
+    /// Drops the nonces whose signatures are past the allowed clock skew, on a
+    /// timer as well as on each insert: a server that stops receiving signed
+    /// requests would otherwise keep the last batch for good.
+    @Scheduled(fixedRateString = "${bastion.nonce.purge-ms:60000}")
+    @Transactional(rollbackFor = Exception.class)
+    public void purgeExpired() throws IOException {
+        nonces.purge(System.currentTimeMillis());
     }
 
     @Transactional(readOnly = true)

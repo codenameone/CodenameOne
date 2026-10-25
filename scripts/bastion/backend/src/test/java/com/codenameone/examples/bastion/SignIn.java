@@ -18,6 +18,8 @@
  */
 package com.codenameone.examples.bastion;
 
+import com.codenameone.examples.bastion.account.DemoAccounts;
+
 import com.codename1.backend.Json;
 import com.codename1.backend.security.oauth2.core.OAuth2Parameters;
 import com.codename1.backend.test.MockMvc;
@@ -59,7 +61,46 @@ final class SignIn {
 
     static String session(MockMvc mvc, String username, String password) throws Exception {
         MockResponse answer = password(mvc, username, password);
+        String redirect = answer.getRedirectedUrl();
+        if (answer.getStatus() == 302 && redirect != null && redirect.indexOf("/login/mfa") >= 0
+                && isDemoStaff(username)) {
+            // The demo staff have an authenticator app; give its code the way
+            // the staff member would, a step no earlier sign-in used.
+            String pending = answer.getCookie("CN1SESSION");
+            MockResponse coded = mvc.perform(formPost("/login/mfa", "code", staffCode(username))
+                    .cookie("CN1SESSION", pending)).andReturn().getResponse();
+            if (coded.getStatus() != 200) {
+                return null;
+            }
+            String session = coded.getCookie("CN1SESSION");
+            return session != null ? session : pending;
+        }
         return answer.getStatus() == 200 ? answer.getCookie("CN1SESSION") : null;
+    }
+
+    private static boolean isDemoStaff(String username) {
+        return DemoAccounts.ADMIN.equals(username) || DemoAccounts.SECOND_ADMIN.equals(username)
+                || DemoAccounts.AUDITOR.equals(username);
+    }
+
+    /// The last step each demo staff member's code was used in: a step's code
+    /// is good once, and the server takes the one before and after too.
+    private static final java.util.Map<String, Long> USED_STEP =
+            new java.util.HashMap<String, Long>();
+
+    private static synchronized String staffCode(String username) throws Exception {
+        Long last = USED_STEP.get(username);
+        long step = System.currentTimeMillis() / 30000L - 1;
+        if (last != null && last.longValue() >= step) {
+            step = last.longValue() + 1;
+        }
+        while (step > System.currentTimeMillis() / 30000L + 1) {
+            Thread.sleep(1000);
+        }
+        USED_STEP.put(username, Long.valueOf(step));
+        return com.codename1.security.Otp.totp(
+                com.codename1.security.Base32.decode(DemoAccounts.STAFF_TOTP_SECRET),
+                step * 30000L, 30, 6, com.codename1.security.Hash.SHA1);
     }
 
     /// The authorization code a signed-in session gets, or null when the

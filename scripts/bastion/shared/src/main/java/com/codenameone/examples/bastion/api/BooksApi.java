@@ -38,6 +38,11 @@ import java.util.List;
 /// `to` means now, an absent `from` the beginning.
 @RestClient
 public interface BooksApi {
+    /// Proof of reserves: what the chain holds against what the ledger owes,
+    /// for the coin on a real chain.
+    @GET("/api/books/custody")
+    void custody(OnComplete<Response<CustodyDto>> callback);
+
     /// The chart of accounts.
     @GET("/api/books/chart")
     void chart(OnComplete<Response<List<ChartAccountDto>>> callback);

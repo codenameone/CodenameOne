@@ -20,6 +20,7 @@ package com.codenameone.examples.bastion.account;
 
 import com.codenameone.examples.bastion.Ids;
 import com.codenameone.examples.bastion.books.Books;
+import com.codenameone.examples.bastion.chain.Chain;
 import com.codenameone.examples.bastion.domain.LedgerAccount;
 import com.codenameone.examples.bastion.domain.Market;
 import com.codenameone.examples.bastion.exchange.MarketMaker;
@@ -66,7 +67,10 @@ final class DemoHistory {
     private final Random random = new Random(20261021L);
     private int seq;
 
-    DemoHistory(Ledger ledger, Markets markets, DataSource db) {
+    private final Chain chain;
+
+    DemoHistory(Ledger ledger, Markets markets, DataSource db, Chain chain) {
+        this.chain = chain;
         this.ledger = ledger;
         this.markets = markets;
         this.db = db;
@@ -94,7 +98,9 @@ final class DemoHistory {
         List<Market> tape = new ArrayList<Market>();
         for (Market m : markets.all()) {
             // The configured markets, not the tests' T1..T9: one per pair.
-            if (m.getId().equals(m.getBase() + "-" + m.getQuote())) {
+            // A coin on a real chain gets no history: every unit of it in the
+            // ledger must be a deposit the chain can show.
+            if (m.getId().equals(m.getBase() + "-" + m.getQuote()) && !chain.handles(m.getBase())) {
                 tape.add(m);
             }
         }
