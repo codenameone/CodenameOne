@@ -73,8 +73,9 @@ public final class GoogleServices {
     /// The package must be present and enabled -- a user can disable it, and
     /// GrapheneOS lets them uninstall it. When the application bundles the Play
     /// services base library its own verdict is asked as well, so a version too
-    /// old for the bundled client, or a service still being set up, answers false
-    /// rather than handing the caller a client that will never connect.
+    /// missing, disabled or invalid service answers false rather than handing the
+    /// caller a client that will never connect. An outdated or updating service
+    /// still answers true: Play services recovers from both by itself.
     ///
     /// #### Parameters
     ///
@@ -92,10 +93,18 @@ public final class GoogleServices {
             Object instance = availability.getMethod("getInstance").invoke(null);
             Object result = availability.getMethod("isGooglePlayServicesAvailable", Context.class)
                     .invoke(instance, context);
-            // ConnectionResult.SUCCESS is 0. Anything else -- SERVICE_MISSING,
-            // SERVICE_DISABLED, SERVICE_VERSION_UPDATE_REQUIRED, SERVICE_INVALID --
-            // is a client that would sit waiting or ask the user to fix the device.
-            return result instanceof Integer && ((Integer) result).intValue() == 0;
+            if (!(result instanceof Integer)) {
+                return false;
+            }
+            // ConnectionResult codes. SUCCESS (0) is plainly present. So are
+            // SERVICE_VERSION_UPDATE_REQUIRED (2) and SERVICE_UPDATING (18): that is
+            // a Google device whose Play services is outdated or mid-update, where
+            // the client recovers or prompts the update, exactly as before this
+            // check existed. Answering false there would lock such a device into the
+            // fallbacks for the whole process. SERVICE_MISSING, SERVICE_DISABLED and
+            // SERVICE_INVALID are the de-Googled cases.
+            int code = ((Integer) result).intValue();
+            return code == 0 || code == 2 || code == 18;
         } catch (ClassNotFoundException notBundled) {
             // The application never bundled the base library, so nothing in it will
             // call the service through a client; the installed package is the answer.

@@ -64,9 +64,15 @@ public class CN1UnifiedPushService extends PushService {
         }
         if (!Display.isInitialized()) {
             // A distributor can rotate the endpoint while the application is not
-            // running. Nothing can be stored or reported without the Codename One
-            // context; the application registers again when it next starts, and the
-            // distributor answers that with the current endpoint.
+            // running. Store it anyway, so push_key never names a dead endpoint;
+            // the push server learns it when the application next starts and
+            // registers, which the distributor answers with this endpoint.
+            AndroidImplementation.startContext(this);
+            try {
+                Preferences.set("push_key", deviceKey);
+            } finally {
+                AndroidImplementation.stopContext(this);
+            }
             return;
         }
         Preferences.set("push_key", deviceKey);
@@ -127,10 +133,18 @@ public class CN1UnifiedPushService extends PushService {
 
     @Override
     public void onUnregistered(String instance) {
-        if (Display.isInitialized()) {
+        boolean started = !Display.isInitialized();
+        if (started) {
+            AndroidImplementation.startContext(this);
+        }
+        try {
             String key = Preferences.get("push_key", null);
             if (key != null && key.startsWith(WEB_KEY_PREFIX)) {
                 Preferences.delete("push_key");
+            }
+        } finally {
+            if (started) {
+                AndroidImplementation.stopContext(this);
             }
         }
     }

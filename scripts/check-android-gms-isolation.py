@@ -49,6 +49,15 @@ TYPE_REFERENCE = re.compile(
     r"\bcom\.google\.(?:android\.gms|android\.play|firebase)"
     r"(?:\.[a-z_][A-Za-z0-9_]*)*\.[A-Z][A-Za-z0-9_]*")
 
+# What reaches a type without spelling its name: a wildcard import, and a string
+# that only begins a qualified name (Class.forName("com.google.firebase." + x)).
+# A bare package string with no trailing dot -- an Intent package, a
+# PackageManager lookup -- matches neither.
+INDIRECT_REFERENCE = re.compile(
+    r"\bimport\s+(?:static\s+)?com\.google\.(?:android\.gms|android\.play|firebase)"
+    r"(?:\.[A-Za-z_][A-Za-z0-9_]*)*\.\*"
+    r"|\"com\.google\.(?:android\.gms|android\.play|firebase)(?:\.[a-z_][A-Za-z0-9_]*)*\.\"")
+
 
 def strip_comments(text):
     """Remove // and /* */ comments, keeping string and char literals intact."""
@@ -121,7 +130,7 @@ def main():
                 code = strip_comments(f.read())
             hits = []
             for number, line in enumerate(code.split("\n"), 1):
-                match = TYPE_REFERENCE.search(line)
+                match = TYPE_REFERENCE.search(line) or INDIRECT_REFERENCE.search(line)
                 if match:
                     hits.append((number, match.group(0)))
             if not hits:

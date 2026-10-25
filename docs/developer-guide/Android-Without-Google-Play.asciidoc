@@ -25,7 +25,9 @@ Play Core or Firebase without asking first, and a CI check holds it to that.
 |Uses Android's own location manager. Background location and geofences use
 the framework's pending-intent updates and proximity alerts instead of the
 fused provider. The listener API and the `android.backgroundLocation.*` build
-hints are the same.
+hints are the same. An application built without Play services location
+uses the same fallback on Google devices too, where background location and
+geofences used to be unsupported.
 
 |Maps
 |`NativeMap` falls back to the vector `MapView` instead of the native Google map.

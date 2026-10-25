@@ -5240,6 +5240,10 @@ public class AndroidGradleBuilder extends Executor {
             xQueries = "<queries>\n"
                     + "<package android:name=\"com.google.android.gms\" />\n"
                     + "<package android:name=\"com.android.vending\" />\n"
+                    // The generated registerForPush looks HMS Core up by name to
+                    // choose Push Kit over UnifiedPush; invisible, every Huawei
+                    // device would skip Push Kit.
+                    + (useHMS ? "<package android:name=\"com.huawei.hwid\" />\n" : "")
                     + request.getArg("android.manifest.queries", "")
                     + healthQueriesFragment + smartHomeQueriesFragment
                     + "</queries>\n";

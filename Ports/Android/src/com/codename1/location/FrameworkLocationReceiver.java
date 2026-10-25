@@ -78,6 +78,9 @@ public class FrameworkLocationReceiver extends BroadcastReceiver {
         }
     }
 
+    // The listener runs synchronously in onReceive, as BackgroundLocationBroadcastReceiver
+    // runs it on the Play services path: the background listener contract is a short
+    // callback, and both paths keep the same threading so an application sees one.
     private static void deliverLocation(Context context, String className, Location location) {
         boolean stopWhenDone = startIfNeeded(context);
         try {
