@@ -2990,6 +2990,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-10-25T01:01:05+00:00"
+      },
+      "devto": {
+        "id": 4916759,
+        "url": "https://dev.to/codenameone/thymeleaf-spring-mvc-and-htmx-for-native-java-backends-3kma",
+        "syndicated_at": "2026-10-25T17:22:45+00:00"
       }
     }
   }
