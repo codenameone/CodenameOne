@@ -52,7 +52,7 @@ public final class Money {
                 continue;
             }
             char c = s.charAt(p);
-            if (c < '0' || c > '9' || units > (Long.MAX_VALUE - 9) / 10) {
+            if (c < '0' || c > '9' || units > (Long.MAX_VALUE - (c - '0')) / 10) {
                 throw new IllegalArgumentException("expected an amount");
             }
             units = units * 10 + (c - '0');
