@@ -180,7 +180,7 @@ verify it by its code.
 
 image::img/reel-viewer-lesson-subtitles.png["A lesson in the player with the Audio and subtitles sheet open and Spanish chosen among English, Spanish, French and German subtitles",scaledwidth=40%]
 
-The demo course has subtitles in English, Spanish, French and German.
+The demo course has subtitles in English, Spanish, French, and German.
 
 === Creating
 

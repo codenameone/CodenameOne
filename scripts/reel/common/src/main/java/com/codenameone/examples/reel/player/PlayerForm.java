@@ -144,6 +144,8 @@ public final class PlayerForm {
         middle.setUIID("Container");
         overlay.add(BorderLayout.CENTER, middle);
 
+        elapsed.setName("elapsed");
+        status.setName("status");
         seek.setEditable(true);
         seek.setUIID("RlSeek");
         seek.setName("seek");

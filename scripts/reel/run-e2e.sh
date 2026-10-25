@@ -43,6 +43,19 @@ if [ "$BUILD" = 1 ]; then
   "$HERE/backend/server.sh" build "$MODE"
 fi
 
+# Packaged video, when tools/fetch-demo-media.sh has made some, is linked into
+# the test profile's media directory so the player shots show real frames.
+# CI has none and captures the controls over the art instead.
+TEST_MEDIA="$HERE/backend/target/test-media"
+rm -rf "$TEST_MEDIA"
+mkdir -p "$TEST_MEDIA"
+if [ -f "$HERE/media/seed.json" ] && [ "${REEL_E2E_MEDIA:-1}" != "0" ]; then
+  # Hard links, not symbolic ones: the media origin serves files through
+  # StaticFiles, which refuses a path that resolves outside its root.
+  (cd "$HERE/media" && pax -rwl . "$TEST_MEDIA")
+  echo "[reel-e2e] serving the packaged media in $HERE/media"
+fi
+
 echo "[reel-e2e] starting the server on port $PORT"
 CN1_PROFILE=test "$HERE/backend/server.sh" run "$MODE" --prebuilt --port "$PORT" >"$LOG" 2>&1 &
 SERVER_PID=$!

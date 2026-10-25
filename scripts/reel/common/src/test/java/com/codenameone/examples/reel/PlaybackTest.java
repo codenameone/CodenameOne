@@ -38,6 +38,15 @@ public class PlaybackTest extends E2e {
         Actor me = Actor.signIn(VIEWER);
         String film = firstOfRow(me, "trending");
         String course = firstOfRow(me, "courses");
+        // Courses are in the subscription, and a plan also takes the ads off
+        // the film: start the demo viewer's trial with the simulated card
+        // that always works, as a viewer would.
+        if (Actor.text(me.get("/api/billing/subscription"), "planCode").length() == 0) {
+            String setup = Actor.text(me.post("/api/payments/methods/setup", null), "id");
+            me.post("/api/payments/methods/setup/" + setup + "/complete", "{\"number\":\"4242424242424242\","
+                    + "\"expMonth\":12,\"expYear\":2040,\"cvc\":\"123\",\"holder\":\"Demo Viewer\"}");
+            me.post("/api/billing/subscribe", "{\"planCode\":\"standard\"}");
+        }
 
         if (course != null) {
             reveal("row-courses");
@@ -56,25 +65,19 @@ public class PlaybackTest extends E2e {
             click("play");
             waitForForm("Player");
             until(() -> has("tracks"), 30000, "the player's controls");
+            playing();
             shot("viewer-player");
             click("tracks");
             until(() -> findByName("tracksSheet") != null, 10000, "the Audio and subtitles sheet");
             shot("viewer-player-tracks");
-            click("close");
+            click("tracksClose");
+            back();
             waitForForm("Title");
             back();
             waitForForm("Home");
         }
 
         if (course != null) {
-            // Courses are in the subscription; start the demo viewer's trial
-            // with the simulated card that always works, as a viewer would.
-            if (Actor.text(me.get("/api/billing/subscription"), "planCode").length() == 0) {
-                String setup = Actor.text(me.post("/api/payments/methods/setup", null), "id");
-                me.post("/api/payments/methods/setup/" + setup + "/complete", "{\"number\":\"4242424242424242\","
-                        + "\"expMonth\":12,\"expYear\":2040,\"cvc\":\"123\",\"holder\":\"Demo Viewer\"}");
-                me.post("/api/billing/subscribe", "{\"planCode\":\"standard\"}");
-            }
             open(course);
             until(() -> findByName("courseExplainer") != null, 20000, "the course explainer");
             reveal("courseProgress");
@@ -85,14 +88,36 @@ public class PlaybackTest extends E2e {
             click("tracks");
             until(() -> findByName("subtitle-es") != null, 10000, "the lesson's Spanish subtitles");
             click("subtitle-es");
+            click("tracksClose");
+            if (playing()) {
+                // The Spanish cue over the moving picture.
+                until(() -> text("caption").length() > 0, 20000, "a Spanish caption");
+            }
             shot("viewer-lesson-subtitles");
-            click("close");
+            back();
             waitForForm("Title");
             back();
             waitForForm("Home");
         }
         signOut();
         return true;
+    }
+
+    /// Waits for the picture to move, when there is video to play: locally
+    /// with the packaged media, but not on CI, where the server has none and
+    /// the controls stay over the art. True when the video is playing.
+    private boolean playing() {
+        long deadline = System.currentTimeMillis() + 20000;
+        while (System.currentTimeMillis() < deadline) {
+            if (!"0:00".equals(text("elapsed")) && text("elapsed").length() > 0) {
+                return true;
+            }
+            if (text("status").length() > 0 && !text("status").startsWith("Starting")) {
+                return false;
+            }
+            waitFor(200);
+        }
+        return false;
     }
 
     private void open(final String titleId) {
