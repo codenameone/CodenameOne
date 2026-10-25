@@ -143,6 +143,10 @@ def check_full_stack_fixture(archive, z, template):
     assert ('## The game and its server' if rules else '## The app and its server') in z.read('README.md').decode(), \
         archive.name
     for name in names:
+        # The agent skill names the demos on purpose (GeneratorModel.isAgentSkillPath):
+        # it is how an agent finds this demo's upstream source.
+        if name.startswith('.agent-skills/') or name in ('AGENTS.md', '.claude/skills/codename-one/SKILL.md'):
+            continue
         assert token not in name.lower(), (archive.name, name)
         if name.endswith(('.png', '.jar', '.res', '.ttf', '.glb')):
             continue
