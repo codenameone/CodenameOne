@@ -279,6 +279,17 @@ public class JavaSEPort extends CodenameOneImplementation {
     static final int MAX_PERSISTED_WINDOW_DIMENSION = 32767;
 
     static {
+        // The canvas blits straight to the screen through getGraphics(), outside
+        // Swing's paint cycle, so a lightweight popup (painted into the same
+        // surface) is overwritten wherever it overlaps the canvas and smears
+        // (#5850). A heavyweight popup lives in its own native window above it.
+        // Set here, before any frame or menu exists: a JPopupMenu reads the default
+        // when it is constructed, and the native-chrome menu bars
+        // (buildNativeMenuBar) are built without installMenu ever running.
+        JPopupMenu.setDefaultLightWeightPopupEnabled(false);
+    }
+
+    static {
         IOS_NATIVE_FONT_CANDIDATES.put("native:MainThin", new String[] {
             "SF Pro Display", "SF Pro Text",
             ".SF NS Text", ".SF NS Display", "SF UI Text",
@@ -7444,11 +7455,6 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     private void installMenu(final JFrame frm, boolean desktopSkin) throws IOException{
         final Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
-        // The canvas blits straight to the screen through getGraphics(), outside
-        // Swing's paint cycle, so a lightweight popup (painted into the same
-        // surface) is overwritten wherever it overlaps the canvas and smears
-        // (#5850). A heavyweight popup lives in its own native window above it.
-        JPopupMenu.setDefaultLightWeightPopupEnabled(false);
         JMenuBar bar = new JMenuBar();
         frm.setJMenuBar(bar);
 
