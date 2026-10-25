@@ -50,7 +50,7 @@ https://start.codenameone.com) and import the KMP project into it:
 
 [source,bash]
 ----
-mvn cn1:import-kmp-project -Dcn1.kmp.import=/path/to/MyKmpApp
+include::../demos/common/src/main/snippets/developer-guide/kotlin-multiplatform-interop.sh[tag=kotlin-multiplatform-interop-bash-001,indent=0]
 ----
 
 The goal copies the module's `commonMain` and its JVM source set (`jvmMain`,
@@ -72,8 +72,7 @@ Then build and run as usual:
 
 [source,bash]
 ----
-mvn cn1:run                         # the simulator
-mvn cn1:build -Dcodename1.platform=ios   # an iOS build on the build server
+include::../demos/common/src/main/snippets/developer-guide/kotlin-multiplatform-interop.sh[tag=kotlin-multiplatform-interop-bash-002,indent=0]
 ----
 
 ==== Gradle
@@ -83,9 +82,7 @@ Codename One plugin. The build stops with the line to add when it's missing:
 
 [source,kotlin]
 ----
-plugins {
-    id("org.jetbrains.kotlin.plugin.compose") version "2.2.10"
-}
+include::../demos/common/src/main/snippets/developer-guide/kotlin-multiplatform-interop.kt[tag=kotlin-multiplatform-interop-kotlin-001,indent=0]
 ----
 
 `convert-to-gradle` writes it for you. The Codename One settings plugin adds
@@ -109,17 +106,7 @@ A composition is shown in a `ComposeForm`, or embedded anywhere as a
 
 [source,kotlin]
 ----
-class MyApp : Lifecycle() {
-    override fun runApp() {
-        ComposeForm { App() }.show()
-    }
-}
-
-// Or beside other components:
-val form = Form("Mixed", BorderLayout())
-form.add(BorderLayout.NORTH, Label("Codename One"))
-form.add(BorderLayout.CENTER, ComposeView { Schedule() })
-form.show()
+include::../demos/common/src/main/snippets/developer-guide/kotlin-multiplatform-interop.kt[tag=kotlin-multiplatform-interop-kotlin-002,indent=0]
 ----
 
 Both live in `com.codename1.compose`. From Java, a `ComposeView` is created

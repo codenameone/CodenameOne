@@ -164,7 +164,7 @@ jobs:
         run: |
           cd maven
           JAVA_HOME="$JDK_8_HOME" bash ../scripts/ci/retry.sh \
-            mvn -B -pl codenameone-maven-plugin,cn1-ads-mock,backend,backend-test -am \
+            mvn -B -pl codenameone-maven-plugin,cn1-ads-mock,compose-compat,backend,backend-test -am \
             -DskipTests '-Dmaven.javadoc.skip=true' '-Plocal-dev-javase' install
 
       # After everything that fills the local Maven repository and before the

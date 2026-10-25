@@ -221,7 +221,7 @@ jobs:
         run: |
           cd maven
           JAVA_HOME="$JDK_8_HOME" bash ../scripts/ci/retry.sh \
-            mvn -B -pl windows,codenameone-maven-plugin,cn1-ads-mock -am \
+            mvn -B -pl windows,codenameone-maven-plugin,cn1-ads-mock,compose-compat -am \
             -DskipTests '-Dmaven.javadoc.skip=true' '-Plocal-dev-javase' install
           test -f core/target/classes/com/codename1/ui/Form.class
           test -f windows/target/classes/com/codename1/impl/windows/WindowsImplementation.class
