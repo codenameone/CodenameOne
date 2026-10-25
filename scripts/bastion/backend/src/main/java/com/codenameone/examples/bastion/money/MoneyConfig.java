@@ -22,6 +22,7 @@ import com.codename1.backend.annotations.Bean;
 import com.codename1.backend.annotations.ConditionalOnMissingBean;
 import com.codename1.backend.annotations.Configuration;
 import com.codename1.backend.Config;
+import java.io.IOException;
 
 /// The pieces of money movement a deployment replaces.
 @Configuration
@@ -33,9 +34,21 @@ public class MoneyConfig {
     /// sends the Play Integrity token to Google's `decodeIntegrityToken` and
     /// checks an App Attest assertion against Apple's, see [IntegrityVerifier].
     /// Declaring that bean makes this one step aside.
+    ///
+    /// Setting `bastion.appattest.app-id` (`<teamId>.<bundleId>`) verifies
+    /// iOS attestations for real with [AppAttestVerifier], anchored at Apple's
+    /// App Attestation Root CA; `bastion.appattest.production=true` expects
+    /// the production AAGUID instead of the development one. Every other
+    /// platform stays with the simulated check.
     @Bean
     @ConditionalOnMissingBean(IntegrityVerifier.class)
-    public IntegrityVerifier integrityVerifier(Config config) {
-        return SimulatedIntegrityVerifier.forProfile(config.isDevelopmentProfile());
+    public IntegrityVerifier integrityVerifier(Config config) throws IOException {
+        IntegrityVerifier simulated = SimulatedIntegrityVerifier.forProfile(config.isDevelopmentProfile());
+        String appId = config.get("bastion.appattest.app-id", "");
+        if (appId.length() == 0) {
+            return simulated;
+        }
+        return AppAttestVerifier.apple(appId, config.getBoolean("bastion.appattest.production", false),
+                simulated);
     }
 }

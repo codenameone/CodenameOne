@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bastion.domain;
 
+import java.time.Instant;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
@@ -93,13 +94,13 @@ public class ChainTransfer {
     private String detail = "";
 
     @Column(nullable = false)
-    private long broadcastAt;
+    private Instant broadcastAt = Instant.EPOCH;
 
     @Column(nullable = false)
-    private long createdAt;
+    private Instant createdAt = Instant.EPOCH;
 
     @Column(nullable = false)
-    private long updatedAt;
+    private Instant updatedAt = Instant.EPOCH;
 
     public ChainTransfer() {
     }
@@ -232,27 +233,27 @@ public class ChainTransfer {
         this.detail = detail;
     }
 
-    public long getBroadcastAt() {
+    public Instant getBroadcastAt() {
         return broadcastAt;
     }
 
-    public void setBroadcastAt(long broadcastAt) {
+    public void setBroadcastAt(Instant broadcastAt) {
         this.broadcastAt = broadcastAt;
     }
 
-    public long getCreatedAt() {
+    public Instant getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(long createdAt) {
+    public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
     }
 
-    public long getUpdatedAt() {
+    public Instant getUpdatedAt() {
         return updatedAt;
     }
 
-    public void setUpdatedAt(long updatedAt) {
+    public void setUpdatedAt(Instant updatedAt) {
         this.updatedAt = updatedAt;
     }
 }

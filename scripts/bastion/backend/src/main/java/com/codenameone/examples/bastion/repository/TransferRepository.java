@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bastion.repository;
 
+import java.time.Instant;
 import com.codename1.orm.repository.CrudRepository;
 import com.codename1.orm.repository.Param;
 import com.codename1.orm.repository.Query;
@@ -33,15 +34,15 @@ public interface TransferRepository extends CrudRepository<Transfer, String> {
     @Query("select sum(t.amount) from Transfer t where t.owner = :owner and t.asset = :asset "
             + "and t.outgoing = TRUE and t.createdAt >= :since")
     Long sentSince(@Param("owner") String owner, @Param("asset") String asset,
-            @Param("since") long since);
+            @Param("since") Instant since);
 
     /// What has gone through a payee or a card since `since`; null when nothing.
     @Query("select sum(t.amount) from Transfer t where t.via = :via and t.createdAt >= :since")
-    Long throughSince(@Param("via") String via, @Param("since") long since);
+    Long throughSince(@Param("via") String via, @Param("since") Instant since);
 
     /// What has gone through a payee in `asset` since `since`; null when nothing.
     @Query("select sum(t.amount) from Transfer t where t.via = :via and t.asset = :asset "
             + "and t.createdAt >= :since")
     Long throughSinceIn(@Param("via") String via, @Param("asset") String asset,
-            @Param("since") long since);
+            @Param("since") Instant since);
 }

@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bastion.money;
 
+import java.time.Instant;
 import com.codenameone.examples.bastion.Refused;
 import com.codename1.backend.Crypto;
 import com.codename1.backend.HttpServer;
@@ -185,10 +186,10 @@ public class RequestSigning {
         }
         // Purged as it goes: the table never holds more than a few minutes'
         // worth of signed requests.
-        nonces.purge(now);
+        nonces.purge(Instant.ofEpochMilli(now));
         UsedNonce used = new UsedNonce();
         used.setId(id);
-        used.setExpiresAt(expiresAt);
+        used.setExpiresAt(Instant.ofEpochMilli(expiresAt));
         nonces.insert(used);
     }
 
@@ -198,7 +199,7 @@ public class RequestSigning {
     @Scheduled(fixedRateString = "${bastion.nonce.purge-ms:60000}")
     @Transactional(rollbackFor = Exception.class)
     public void purgeExpired() throws IOException {
-        nonces.purge(System.currentTimeMillis());
+        nonces.purge(Instant.now());
     }
 
     @Transactional(readOnly = true)

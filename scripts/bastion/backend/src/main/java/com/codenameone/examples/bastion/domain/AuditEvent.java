@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bastion.domain;
 
+import java.time.Instant;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
@@ -30,7 +31,7 @@ public class AuditEvent {
     private long seq;
 
     @Column(nullable = false)
-    private long at;
+    private Instant at = Instant.EPOCH;
 
     @Column(nullable = false, type = "VARCHAR(190)")
     private String actor = "";
@@ -64,11 +65,11 @@ public class AuditEvent {
         this.seq = seq;
     }
 
-    public long getAt() {
+    public Instant getAt() {
         return at;
     }
 
-    public void setAt(long at) {
+    public void setAt(Instant at) {
         this.at = at;
     }
 

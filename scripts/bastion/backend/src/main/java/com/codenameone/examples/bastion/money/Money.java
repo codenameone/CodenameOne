@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bastion.money;
 
+import java.time.Instant;
 import com.codenameone.examples.bastion.Refused;
 import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
@@ -203,7 +204,7 @@ public class Money {
     /// would fail open.
     private long tradedSince(String owner, long since) throws IOException {
         long sum = 0;
-        for (Trade t : trades.since(owner, since)) {
+        for (Trade t : trades.since(owner, Instant.ofEpochMilli(since))) {
             Market market = markets.find(t.getMarket());
             if (market == null) {
                 continue;
@@ -253,7 +254,7 @@ public class Money {
         long sent = 0;
         for (Asset fiat : ledger.assets()) {
             if ("FIAT".equals(fiat.getKind())) {
-                Long moved = transfers.sentSince(owner, fiat.getCode(), since);
+                Long moved = transfers.sentSince(owner, fiat.getCode(), Instant.ofEpochMilli(since));
                 if (moved != null && moved.longValue() > 0) {
                     sent = saturatedAdd(sent, fiatValue(fiat.getCode(), moved.longValue()));
                 }
@@ -474,7 +475,7 @@ public class Money {
         if (sent > daily) {
             throw Refused.with(409, "would-pass-limit-day", "That would pass your limit for the day");
         }
-        if (m.payee != null && now < m.payee.getCreatedAt() + coolOffMillis) {
+        if (m.payee != null && now < m.payee.getCreatedAt().toEpochMilli() + coolOffMillis) {
             // In USD cents, each currency valued by itself: a raw sum would
             // add euro cents to dollar cents, and the limit would mean a
             // different amount in every currency.
@@ -493,7 +494,7 @@ public class Money {
             }
         }
         if (m.card != null) {
-            Long spent = transfers.throughSince(m.card.getId(), now - DAY);
+            Long spent = transfers.throughSince(m.card.getId(), Instant.ofEpochMilli(now - DAY));
             if ((spent == null ? 0L : spent.longValue()) + m.amount > m.card.getDailyLimit()) {
                 throw Refused.with(409, "over-card-daily-limit", "That is over the card's daily limit");
             }
@@ -509,7 +510,7 @@ public class Money {
         long sent = value;
         for (Asset coin : ledger.assets()) {
             if (!"FIAT".equals(coin.getKind())) {
-                Long moved = transfers.sentSince(m.owner, coin.getCode(), now - DAY);
+                Long moved = transfers.sentSince(m.owner, coin.getCode(), Instant.ofEpochMilli(now - DAY));
                 if (moved != null && moved.longValue() > 0) {
                     sent = saturatedAdd(sent, markets.value(coin.getCode(), moved.longValue(),
                             "USD"));
@@ -531,7 +532,7 @@ public class Money {
 
     static ReceiptDto receipt(Transfer t) {
         return new ReceiptDto(t.getId(), t.getKind(), t.getFromAccount(), t.getToAccount(),
-                t.getAsset(), t.getAmount(), t.getMemo(), t.getCreatedAt());
+                t.getAsset(), t.getAmount(), t.getMemo(), t.getCreatedAt().toEpochMilli());
     }
 
     /// What one call asked to move.

@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bastion.exchange;
 
+import java.time.Instant;
 import com.codenameone.examples.bastion.Refused;
 import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
@@ -270,8 +271,8 @@ public class Exchange {
         // would answer the session's cached row, not the update.
         o.setSeq(m.getSeq() + 1);
         o.setClientKey(key);
-        o.setCreatedAt(now);
-        o.setUpdatedAt(now);
+        o.setCreatedAt(Instant.ofEpochMilli(now));
+        o.setUpdatedAt(Instant.ofEpochMilli(now));
         // Inserted before anything moves: a concurrent copy of the request
         // fails on the key index here.
         orders.insert(o);
@@ -292,7 +293,7 @@ public class Exchange {
         if (!limit || o.getFilled() == o.getQuantity()) {
             finish(m, o, events);
         }
-        o.setUpdatedAt(System.currentTimeMillis());
+        o.setUpdatedAt(Instant.now());
         orders.save(o);
         record(events);
         return dto(o);
@@ -316,7 +317,7 @@ public class Exchange {
         }
         List<String[]> events = new ArrayList<String[]>();
         finish(m, o, events);
-        o.setUpdatedAt(System.currentTimeMillis());
+        o.setUpdatedAt(Instant.now());
         orders.save(o);
         record(events);
         return dto(o);
@@ -362,7 +363,7 @@ public class Exchange {
                 events.add(new String[] {resting.getOwner(), "SELF_TRADE_PREVENTED",
                         resting.getId(), "cancelled by " + taker.getId()});
                 finish(m, resting, events);
-                resting.setUpdatedAt(System.currentTimeMillis());
+                resting.setUpdatedAt(Instant.now());
                 orders.save(resting);
                 continue;
             }
@@ -383,7 +384,7 @@ public class Exchange {
             if (resting.getFilled() == resting.getQuantity()) {
                 finish(m, resting, events);
             }
-            resting.setUpdatedAt(System.currentTimeMillis());
+            resting.setUpdatedAt(Instant.now());
             orders.save(resting);
         }
     }
@@ -490,7 +491,7 @@ public class Exchange {
         t.setSellerGot(sellerIn);
         t.setFee(feeNow);
         t.setEntryId(entry);
-        t.setCreatedAt(System.currentTimeMillis());
+        t.setCreatedAt(Instant.now());
         trades.insert(t);
         marketRows.traded(m.getId(), price);
         String detail = m.getId() + " " + quantity + " @ " + price + " buy " + buy.getId()
@@ -623,6 +624,6 @@ public class Exchange {
     public static OrderDto dto(TradeOrder o) {
         return new OrderDto(o.getId(), o.getMarket(), o.getSide(), o.getType(), o.getPrice(),
                 o.getQuantity(), o.getBudget(), o.getFilled(), o.getSettled(), o.getFee(),
-                o.getStatus(), o.getCreatedAt());
+                o.getStatus(), o.getCreatedAt().toEpochMilli());
     }
 }

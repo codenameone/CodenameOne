@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bastion.chain;
 
+import java.time.Instant;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.PostConstruct;
 import com.codename1.backend.annotations.Scheduled;
@@ -258,14 +259,14 @@ public class Chain {
         }
         long index = counter.getNextBlock();
         counter.setNextBlock(index + 1);
-        counter.setUpdatedAt(System.currentTimeMillis());
+        counter.setUpdatedAt(Instant.now());
         cursors.save(counter);
         DepositAddress d = new DepositAddress();
         d.setAddress(signer.depositAddress(index));
         d.setOwner(owner);
         d.setAsset(ASSET);
         d.setHdIndex(index);
-        d.setCreatedAt(System.currentTimeMillis());
+        d.setCreatedAt(Instant.now());
         deposits.insert(d);
         audit.append(owner, "DEPOSIT_ADDRESS", d.getAddress(), "index " + index);
         return d;
@@ -331,7 +332,7 @@ public class Chain {
             c.setChain(CURSOR);
             c.setNextBlock(Math.max(0, safeHead));
             c.setLastHash("");
-            c.setUpdatedAt(System.currentTimeMillis());
+            c.setUpdatedAt(Instant.now());
             cursors.insert(c);
         }
         return c;
@@ -341,7 +342,7 @@ public class Chain {
     private void advance(ChainCursor c, long next, String hash) throws IOException {
         c.setNextBlock(next);
         c.setLastHash(hash);
-        c.setUpdatedAt(System.currentTimeMillis());
+        c.setUpdatedAt(Instant.now());
         cursors.save(c);
     }
 
@@ -435,7 +436,7 @@ public class Chain {
             cursors.insert(row);
         }
         long now = System.currentTimeMillis();
-        return cursors.lease(LEASE, instance, now, now - LEASE_MILLIS) == 1;
+        return cursors.lease(LEASE, instance, Instant.ofEpochMilli(now), Instant.ofEpochMilli(now - LEASE_MILLIS)) == 1;
     }
 
     /// Fixes a nonce and fees and signs, saving the signed bytes before any
@@ -488,7 +489,7 @@ public class Chain {
         // Saved before any broadcast, and only over the QUEUED row it was
         // made from: a second worker's signature is dropped here, unsent.
         transfers.signed(t.getId(), QUEUED, SIGNED, nonce, Hex32.encode(raw), Eip1559Tx.hash(raw),
-                t.getAmount(), System.currentTimeMillis());
+                t.getAmount(), Instant.now());
     }
 
     /// The node's pending nonce, or one past the highest this bank has
@@ -523,9 +524,9 @@ public class Chain {
                 return;
             }
         }
-        if (transfers.advance(t.getId(), SIGNED, BROADCAST, System.currentTimeMillis()) == 1) {
+        if (transfers.advance(t.getId(), SIGNED, BROADCAST, Instant.now()) == 1) {
             t.setStatus(BROADCAST);
-            t.setBroadcastAt(System.currentTimeMillis());
+            t.setBroadcastAt(Instant.now());
             t.setUpdatedAt(t.getBroadcastAt());
             save(t);
         }
@@ -536,14 +537,14 @@ public class Chain {
     private void settle(ChainTransfer t) throws IOException {
         Map<String, Object> receipt = rpc.receipt(t.getTxHash());
         if (receipt == null) {
-            if (System.currentTimeMillis() - t.getBroadcastAt() > rebroadcastMillis) {
+            if (System.currentTimeMillis() - t.getBroadcastAt().toEpochMilli() > rebroadcastMillis) {
                 // Dropped from a node's pool: send the same bytes again.
                 try {
                     rpc.sendRaw(Hex32.decode(t.getRaw()));
                 } catch (EthRpc.NodeException ignored) {
                     // "already known" and "nonce too low" both mean wait.
                 }
-                t.setBroadcastAt(System.currentTimeMillis());
+                t.setBroadcastAt(Instant.now());
                 save(t);
             }
             return;
@@ -572,7 +573,7 @@ public class Chain {
     /// back to the customer; the fee is the bank's either way.
     @Transactional(rollbackFor = Exception.class)
     private void finish(ChainTransfer t, String status, String detail) throws IOException {
-        if (transfers.advance(t.getId(), t.getStatus(), status, System.currentTimeMillis()) != 1) {
+        if (transfers.advance(t.getId(), t.getStatus(), status, Instant.now()) != 1) {
             // Another worker settled it; its postings stand.
             return;
         }
@@ -595,7 +596,7 @@ public class Chain {
         if (detail.length() > 0) {
             t.setDetail(detail);
         }
-        t.setUpdatedAt(System.currentTimeMillis());
+        t.setUpdatedAt(Instant.now());
         transfers.save(t);
         audit.append(t.getOwner(), "CHAIN_" + t.getDirection() + "_" + status, t.getTxHash(),
                 t.getAmount() + " " + ASSET + " fee " + t.getFee());
@@ -737,8 +738,8 @@ public class Chain {
         t.setStatus(status);
         t.setTxHash("unsigned:" + id);
         t.setNonce(-1);
-        t.setCreatedAt(now);
-        t.setUpdatedAt(now);
+        t.setCreatedAt(Instant.ofEpochMilli(now));
+        t.setUpdatedAt(Instant.ofEpochMilli(now));
         return t;
     }
 

@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bastion.repository;
 
+import java.time.Instant;
 import com.codename1.orm.repository.CrudRepository;
 import com.codename1.orm.repository.Param;
 import com.codename1.orm.repository.Query;
@@ -36,5 +37,5 @@ public interface TradeRepository extends CrudRepository<Trade, String> {
     /// counts of their trading.
     @Query("select t from Trade t where (t.buyer = :who or t.seller = :who) "
             + "and t.createdAt >= :since")
-    List<Trade> since(@Param("who") String who, @Param("since") long since);
+    List<Trade> since(@Param("who") String who, @Param("since") Instant since);
 }

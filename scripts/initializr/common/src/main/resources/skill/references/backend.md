@@ -129,6 +129,36 @@ shared by app and backend round-trips:
 - Build errors: generic `Page<T>` fields (use a concrete subclass), a body class
   without a no-arg constructor, interfaces, arrays other than `byte[]`.
 
+## Errors, validation and interceptors
+
+- A method that throws answers a 500 that reveals nothing, a
+  `ResponseStatusException` its own status. For anything else declare an
+  `@ExceptionHandler` (`com.codename1.backend.annotations`) on the controller, or
+  on a `@ControllerAdvice` / `@RestControllerAdvice` bean for every controller
+  (`basePackages` narrows it). A handler takes the exception, the
+  `HttpServer.Request` and the `HandlerMethod` in any order, and returns an
+  `HttpServer.Response`, a JSON-able value with its `@ResponseStatus`, or a null
+  `Response` to decline. Resolution is decided **at build time**: the controller's
+  own handlers by closest exception type, then each advice in `@Order` order.
+- `Error`s and security failures (`AccessDeniedException`,
+  `AuthenticationException`, CSRF) never reach a handler, so a catch-all can't
+  turn a 403 into a 200.
+- Validation: `@Valid` on a `@RequestBody`/`@ModelAttribute` parameter, or a
+  constraint straight on a `@RequestParam`/`@PathVariable`/`@RequestHeader`.
+  Constraints in `com.codename1.backend.validation`: `@NotNull`, `@NotBlank`,
+  `@NotEmpty`, `@Size`, `@Min`, `@Max`. They compile to plain checks (a constraint
+  on a type that can't carry it fails the build) and throw `ValidationException`,
+  which answers 400 with stable JSON field paths unless a handler takes it. There
+  is no `@Pattern` (no regex in the class library): check in the method and throw
+  a `ValidationException` yourself.
+- `HandlerInterceptor` beans (`com.codename1.backend.web`) run `preHandle`,
+  `postHandle`, `afterCompletion` with Spring's semantics, *inside* the security
+  chain: for auditing and metrics, never for access rules (those belong in the
+  `SecurityFilterChain`).
+- An app whose client shows translated errors may prefer its own stable refusal
+  codes over `@Valid`'s field paths; the Bastion demo keeps
+  `ResponseStatusException`s with a code for that reason.
+
 ## Transactions
 
 ```java
@@ -160,6 +190,13 @@ public class Transfers {
 - `Transactions.setRollbackOnly()` in the method that began the transaction rolls it back without throwing; in a joined method it makes the outer commit throw `UnexpectedRollback`.
 - The injected `Session` only works inside a `@Transactional` method.
 - Use `?` placeholders; the same SQL runs on SQLite, PostgreSQL and MySQL.
+- Entity timestamps: use `java.time.Instant` (`LocalDate`, `LocalDateTime`
+  also map). Unannotated they are the same epoch-millisecond `BIGINT` a `long`
+  held, so switching a field needs no migration; `@Temporal` opts into native
+  `TIMESTAMP`/`DATE`. **Pass an `Instant` as the query parameter** for such a
+  field -- a `long` there fails at run time ("Converter input requires
+  java.time.Instant"), not at compile time. For a `NOT NULL` "unset" value use
+  `Instant.EPOCH`; keep DTOs on the wire as epoch milliseconds.
 
 ## Background work: `@Async`, `@Scheduled`, threads
 
@@ -192,6 +229,38 @@ public class Reports {
   `cn1.task.executor.<name>.kind=virtual|platform`; name one with
   `@Async("reports")`. One-off work: `Tasks.platform(runnable)`,
   `Tasks.virtual(runnable)`.
+
+## Large bodies, streaming and proxying
+
+- Binary request bodies past `CN1_HTTP_SPOOL_THRESHOLD_KB` spool to a temporary
+  file (limit `CN1_HTTP_MAX_SPOOLED_BODY_MB`); read them with
+  `getBodyStream()`/`getBodyLength()`, multipart parts with
+  `HttpServer.Part.getInputStream()`. JSON, forms and XML keep the 8 MB limit.
+  The body is valid only until the request ends.
+- Stream a response with `HttpServer.Response.stream(...)`; a slow client blocks
+  the writer instead of filling memory. A writer holding a resource should also be
+  `Closeable` (it is closed instead of run for `HEAD` or a vanished client).
+- Outbound: `Web.open`/`WebClient.open` give a `Web.Exchange` that streams both
+  ways (write and close the body, then read; always `close()` in `finally`; no
+  redirects). `HttpProxy` forwards a request to another service and streams the
+  answer back.
+
+## Certificates, keys and key agreement
+
+- `com.codename1.backend.security.pki`: `Pem.decode`, `Certificate.fromPem`/
+  `decode`, `CertificateValidator(anchors).at(millis).forHost(h).forPurpose(eku)
+  .validate(chain)` (signatures, validity, constraints, key usage, path length,
+  critical extensions), `CertificationRequest` (PKCS#10), `Pkcs12` read/write.
+  Trust anchors are always explicit: there is no system trust store.
+- `Crypto.generateEcKey(Crypto.P256 | Crypto.P384)` (PKCS#8 DER) and
+  `Crypto.ecdh(privateKey, peerPublicKey)` -- the result is key material; run it
+  through HKDF before use. AES-GCM for sealing; the CBC calls are raw blocks for
+  protocols that need them.
+- Shared with the client (`com.codename1.security`, usable in the app and the
+  server alike): `Hash` (SHA-2, SHA3-256, `Hash.keccak256`), `Hmac`, and
+  `Secp256k1` (keys, deterministic low-S ECDSA with recovery id, public-key
+  recovery, tweaks) -- enough for Ethereum and Bitcoin signing. See the Bastion
+  demo's `chain/` package for a full Ethereum client built on them.
 
 ## Sessions
 

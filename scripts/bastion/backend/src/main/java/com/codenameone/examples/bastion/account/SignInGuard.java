@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bastion.account;
 
+import java.time.Instant;
 import com.codename1.backend.HttpServer;
 import com.codename1.backend.HttpSession;
 import com.codename1.backend.annotations.Component;
@@ -253,7 +254,7 @@ public class SignInGuard {
     @Transactional(readOnly = true)
     public boolean locked(String username) throws IOException {
         LoginFailure row = failures.findById(username);
-        return row != null && row.getLockedUntil() > System.currentTimeMillis();
+        return row != null && row.getLockedUntil().toEpochMilli() > System.currentTimeMillis();
     }
 
     /// One more wrong password for `username`; locks the account on the last
@@ -287,16 +288,16 @@ public class SignInGuard {
     private void create(String username) throws IOException {
         LoginFailure row = new LoginFailure();
         row.setUsername(username);
-        row.setFirstAt(System.currentTimeMillis());
+        row.setFirstAt(Instant.now());
         failures.insert(row);
     }
 
     @Transactional(rollbackFor = Exception.class)
     private void countOne(String username) throws IOException {
         long now = System.currentTimeMillis();
-        failures.restartWindow(username, now, now - windowMillis);
+        failures.restartWindow(username, Instant.ofEpochMilli(now), Instant.ofEpochMilli(now - windowMillis));
         failures.increment(username);
-        if (failures.lockIfReached(username, attempts, now, now + lockMillis) == 1) {
+        if (failures.lockIfReached(username, attempts, Instant.ofEpochMilli(now), Instant.ofEpochMilli(now + lockMillis)) == 1) {
             audit.append(username, "ACCOUNT_LOCKED", username,
                     attempts + " wrong passwords; " + lockMillis / 1000 + "s");
         }

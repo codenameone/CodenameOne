@@ -155,7 +155,7 @@ public class BankingEndpoint implements BankingApiServer {
                 entries.put(p.getEntryId(), entry);
             }
             out.add(new PostingDto(p.getId(), p.getEntryId(), p.getAsset(), p.getAmount(),
-                    p.getCreatedAt(), entry == null ? "" : entry.getKind(),
+                    p.getCreatedAt().toEpochMilli(), entry == null ? "" : entry.getKind(),
                     entry == null ? "" : entry.getMemo()));
         }
         return out;
@@ -357,6 +357,6 @@ public class BankingEndpoint implements BankingApiServer {
 
     private static AccountDto dto(LedgerAccount a) {
         return new AccountDto(a.getId(), a.getAsset(), a.getKind(), a.getName(), a.getBalance(),
-                a.isFrozen(), a.getCreatedAt());
+                a.isFrozen(), a.getCreatedAt().toEpochMilli());
     }
 }

@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bastion.exchange;
 
+import java.time.Instant;
 import com.codenameone.examples.bastion.repository.ProfileRepository;
 import com.codenameone.examples.bastion.Refused;
 import com.codename1.backend.annotations.Component;
@@ -106,7 +107,7 @@ public class CryptoWallets {
         int today = 0;
         long since = System.currentTimeMillis() - 24L * 3600000L;
         for (CryptoAddress a : addresses.findByOwnerOrderByCreatedAtAsc(owner)) {
-            today += a.getCreatedAt() > since ? 1 : 0;
+            today += a.getCreatedAt().toEpochMilli() > since ? 1 : 0;
             if (!a.isRemoved()) {
                 live++;
                 if (a.getAsset().equals(asset.getCode()) && a.getAddress().equals(address)) {
@@ -128,8 +129,8 @@ public class CryptoWallets {
         a.setAddress(address);
         String label = request.label() == null ? "" : request.label();
         a.setLabel(label.length() > 80 ? label.substring(0, 80) : label);
-        a.setUsableAt(now + coolOffMillis);
-        a.setCreatedAt(now);
+        a.setUsableAt(Instant.ofEpochMilli(now + coolOffMillis));
+        a.setCreatedAt(Instant.ofEpochMilli(now));
         addresses.insert(a);
         audit.append(owner, "ADDRESS_ADDED", a.getId(), asset.getCode() + " " + address
                 + " usable at " + a.getUsableAt());
@@ -183,6 +184,6 @@ public class CryptoWallets {
 
     static CryptoAddressDto dto(CryptoAddress a) {
         return new CryptoAddressDto(a.getId(), a.getAsset(), a.getAddress(), a.getLabel(),
-                a.getUsableAt(), a.getCreatedAt());
+                a.getUsableAt().toEpochMilli(), a.getCreatedAt().toEpochMilli());
     }
 }

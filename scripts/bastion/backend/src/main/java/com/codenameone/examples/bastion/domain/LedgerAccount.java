@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bastion.domain;
 
+import java.time.Instant;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
@@ -48,7 +49,7 @@ public class LedgerAccount {
     private boolean frozen;
 
     @Column(nullable = false)
-    private long createdAt;
+    private Instant createdAt = Instant.EPOCH;
 
     public LedgerAccount() {
     }
@@ -109,11 +110,11 @@ public class LedgerAccount {
         this.frozen = frozen;
     }
 
-    public long getCreatedAt() {
+    public Instant getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(long createdAt) {
+    public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
     }
 }

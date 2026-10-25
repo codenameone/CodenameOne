@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bastion.repository;
 
+import java.time.Instant;
 import com.codename1.orm.repository.CrudRepository;
 import com.codename1.orm.repository.Modifying;
 import com.codename1.orm.repository.Param;
@@ -31,5 +32,5 @@ import com.codenameone.examples.bastion.domain.UsedNonce;
 public interface UsedNonceRepository extends CrudRepository<UsedNonce, String> {
     @Modifying
     @Query("delete from UsedNonce n where n.expiresAt < :now")
-    int purge(@Param("now") long now);
+    int purge(@Param("now") Instant now);
 }

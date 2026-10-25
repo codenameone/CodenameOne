@@ -152,12 +152,12 @@ public class AuditTrailEndpoint implements AuditApiServer {
                 List<AuditEvent> page = audit.after(after, 500);
                 for (AuditEvent e : page) {
                     after = e.getSeq();
-                    if (e.getAt() > at) {
+                    if (e.getAt().toEpochMilli() > at) {
                         continue;
                     }
                     Map<String, Object> r = new LinkedHashMap<String, Object>();
                     r.put("seq", Long.valueOf(e.getSeq()));
-                    r.put("at", Staff.iso(e.getAt()));
+                    r.put("at", Staff.iso(e.getAt().toEpochMilli()));
                     r.put("actor", e.getActor());
                     r.put("action", e.getAction());
                     r.put("subject", e.getSubject());
@@ -197,7 +197,7 @@ public class AuditTrailEndpoint implements AuditApiServer {
     }
 
     static AuditEventDto dto(AuditEvent e) {
-        return new AuditEventDto(e.getSeq(), e.getAt(), e.getActor(), e.getAction(),
+        return new AuditEventDto(e.getSeq(), e.getAt().toEpochMilli(), e.getActor(), e.getAction(),
                 e.getSubject(), e.getDetail(), e.getAddress(), e.getPrevHash(), e.getHash());
     }
 

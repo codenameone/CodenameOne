@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bastion.domain;
 
+import java.time.Instant;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
@@ -39,7 +40,7 @@ public class Payee {
     private String nickname = "";
 
     @Column(nullable = false)
-    private long createdAt;
+    private Instant createdAt = Instant.EPOCH;
 
     /// Kept rather than deleted; see `V9__payee_removed.sql`.
     @Column(nullable = false)
@@ -80,11 +81,11 @@ public class Payee {
         this.nickname = nickname;
     }
 
-    public long getCreatedAt() {
+    public Instant getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(long createdAt) {
+    public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
     }
 

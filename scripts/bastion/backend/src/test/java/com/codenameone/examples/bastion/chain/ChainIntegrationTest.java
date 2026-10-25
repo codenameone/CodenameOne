@@ -19,6 +19,7 @@
 package com.codenameone.examples.bastion.chain;
 
 import com.codename1.backend.DataSource;
+import java.time.Instant;
 import com.codename1.backend.Json;
 import com.codename1.backend.Web;
 import com.codename1.backend.annotations.Autowired;
@@ -108,8 +109,8 @@ class ChainIntegrationTest {
         to.setAsset("ETH");
         to.setAddress(outside);
         to.setLabel("test");
-        to.setUsableAt(0);
-        to.setCreatedAt(System.currentTimeMillis());
+        to.setUsableAt(Instant.EPOCH);
+        to.setCreatedAt(Instant.now());
         // In memory only: the endpoint's allow-list and cooling-off checks
         // are ExchangeTest's subject, not this one's.
         String entry = money.withdrawCrypto(owner, "chain-test-withdrawal-1", wallet,

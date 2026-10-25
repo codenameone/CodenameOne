@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bastion.account;
 
+import java.time.Instant;
 import com.codenameone.examples.bastion.Refused;
 import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
@@ -131,7 +132,7 @@ public class Accounts {
         Profile profile = new Profile();
         profile.setUsername(username);
         profile.setDisplayName(displayName);
-        profile.setCreatedAt(openedAt);
+        profile.setCreatedAt(Instant.ofEpochMilli(openedAt));
         profiles.insert(profile);
     }
 
@@ -158,7 +159,7 @@ public class Accounts {
         }
         boolean second = totp.isEnabled(username);
         return new UserDto(username, profile.getDisplayName(), customer, admin, second,
-                second ? recoveryCodes.remaining(username) : 0, profile.getCreatedAt(), auditor);
+                second ? recoveryCodes.remaining(username) : 0, profile.getCreatedAt().toEpochMilli(), auditor);
     }
 
     public UserDto changePassword(String username, String current, String replacement)

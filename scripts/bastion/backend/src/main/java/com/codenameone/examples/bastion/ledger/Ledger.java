@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bastion.ledger;
 
+import java.time.Instant;
 import com.codenameone.examples.bastion.Refused;
 import com.codename1.backend.DataSource;
 import com.codename1.backend.annotations.Component;
@@ -113,7 +114,7 @@ public class Ledger {
         account.setAsset(asset.getCode());
         account.setKind(kind);
         account.setName(name == null ? "" : name);
-        account.setCreatedAt(System.currentTimeMillis());
+        account.setCreatedAt(Instant.now());
         accounts.insert(account);
         return account;
     }
@@ -256,7 +257,7 @@ public class Ledger {
                 "Reversal of " + entryId + (memo == null || memo.length() == 0 ? "" : ": " + memo),
                 legs, System.currentTimeMillis(), false);
         db.execute("INSERT INTO reversal (entry_id, reversed_by, at) VALUES (?, ?, ?)",
-                new Object[] {entryId, entry.getId(), Long.valueOf(entry.getCreatedAt())});
+                new Object[] {entryId, entry.getId(), Long.valueOf(entry.getCreatedAt().toEpochMilli())});
         return entry;
     }
 
@@ -345,7 +346,7 @@ public class Ledger {
         entry.setKind(kind);
         entry.setInitiator(initiator == null ? "" : initiator);
         entry.setMemo(memo == null ? "" : (memo.length() > 140 ? memo.substring(0, 140) : memo));
-        entry.setCreatedAt(now);
+        entry.setCreatedAt(Instant.ofEpochMilli(now));
         // Written first: a concurrent request with the same key fails on the
         // unique index here, before either has touched a balance.
         entries.insert(entry);
@@ -379,7 +380,7 @@ public class Ledger {
             posting.setAccountId(account.getId());
             posting.setAsset(account.getAsset());
             posting.setAmount(leg.amount());
-            posting.setCreatedAt(now);
+            posting.setCreatedAt(Instant.ofEpochMilli(now));
             postings.insert(posting);
         }
         return entry;

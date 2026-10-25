@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bastion.domain;
 
+import java.time.Instant;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
@@ -36,10 +37,10 @@ public class LoginFailure {
     private int failures;
 
     @Column(nullable = false)
-    private long firstAt;
+    private Instant firstAt = Instant.EPOCH;
 
     @Column(nullable = false)
-    private long lockedUntil;
+    private Instant lockedUntil = Instant.EPOCH;
 
     public LoginFailure() {
     }
@@ -60,19 +61,19 @@ public class LoginFailure {
         this.failures = failures;
     }
 
-    public long getFirstAt() {
+    public Instant getFirstAt() {
         return firstAt;
     }
 
-    public void setFirstAt(long firstAt) {
+    public void setFirstAt(Instant firstAt) {
         this.firstAt = firstAt;
     }
 
-    public long getLockedUntil() {
+    public Instant getLockedUntil() {
         return lockedUntil;
     }
 
-    public void setLockedUntil(long lockedUntil) {
+    public void setLockedUntil(Instant lockedUntil) {
         this.lockedUntil = lockedUntil;
     }
 }

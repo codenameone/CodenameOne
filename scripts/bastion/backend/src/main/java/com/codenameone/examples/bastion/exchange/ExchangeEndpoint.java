@@ -216,7 +216,7 @@ public class ExchangeEndpoint implements ExchangeApiServer {
             boolean taker = side.equals(t.getTakerSide());
             out.add(new TradeDto(t.getId(), t.getMarket(), side, taker, t.getPrice(),
                     t.getQuantity(), bought ? t.getBuyerPaid() : t.getSellerGot(),
-                    taker ? t.getFee() : 0L, t.getCreatedAt()));
+                    taker ? t.getFee() : 0L, t.getCreatedAt().toEpochMilli()));
         }
         return out;
     }
@@ -276,7 +276,7 @@ public class ExchangeEndpoint implements ExchangeApiServer {
         if (!address.getAsset().equals(from.getAsset())) {
             throw Refused.with(400, "address-wrong-asset", "That address is for {0}", address.getAsset());
         }
-        if (System.currentTimeMillis() < address.getUsableAt()) {
+        if (System.currentTimeMillis() < address.getUsableAt().toEpochMilli()) {
             audit.append(owner, "CRYPTO_OUT_REFUSED", address.getId(), "cooling off until "
                     + address.getUsableAt());
             throw Refused.with(409, "address-new-used", "That address is new: it can be used from {0}", address.getUsableAt());
@@ -312,7 +312,7 @@ public class ExchangeEndpoint implements ExchangeApiServer {
         for (ChainTransfer t : chain.history(owner)) {
             out.add(new ChainTransferDto(t.getId(), t.getDirection(), t.getAsset(), t.getAddress(),
                     t.getAmount(), t.getStatus(), t.getTxHash().startsWith("0x") ? t.getTxHash() : "",
-                    t.getBlockNumber(), t.getFee(), t.getDetail(), t.getCreatedAt()));
+                    t.getBlockNumber(), t.getFee(), t.getDetail(), t.getCreatedAt().toEpochMilli()));
         }
         return out;
     }

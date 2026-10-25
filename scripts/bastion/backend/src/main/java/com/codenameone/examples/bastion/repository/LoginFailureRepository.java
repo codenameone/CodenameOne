@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bastion.repository;
 
+import java.time.Instant;
 import com.codename1.orm.repository.CrudRepository;
 import com.codename1.orm.repository.Modifying;
 import com.codename1.orm.repository.Param;
@@ -31,8 +32,8 @@ public interface LoginFailureRepository extends CrudRepository<LoginFailure, Str
     @Modifying
     @Query("update LoginFailure f set f.failures = 0, f.firstAt = :now "
             + "where f.username = :username and f.firstAt < :cutoff")
-    int restartWindow(@Param("username") String username, @Param("now") long now,
-            @Param("cutoff") long cutoff);
+    int restartWindow(@Param("username") String username, @Param("now") Instant now,
+            @Param("cutoff") Instant cutoff);
 
     /// One more failure, counted by the database: two at once are two.
     @Modifying
@@ -45,5 +46,5 @@ public interface LoginFailureRepository extends CrudRepository<LoginFailure, Str
     @Query("update LoginFailure f set f.lockedUntil = :until, f.failures = 0, f.firstAt = :now "
             + "where f.username = :username and f.failures >= :attempts")
     int lockIfReached(@Param("username") String username, @Param("attempts") int attempts,
-            @Param("now") long now, @Param("until") long until);
+            @Param("now") Instant now, @Param("until") Instant until);
 }

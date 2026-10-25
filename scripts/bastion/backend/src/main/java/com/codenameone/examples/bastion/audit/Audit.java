@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bastion.audit;
 
+import java.time.Instant;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codenameone.examples.bastion.Caller;
@@ -63,7 +64,7 @@ public class Audit {
         AuditHead tail = head.findById(AuditHeadRepository.ONLY);
         AuditEvent event = new AuditEvent();
         event.setSeq(tail.getSeq() + 1);
-        event.setAt(System.currentTimeMillis());
+        event.setAt(Instant.now());
         event.setActor(clip(actor, 190));
         event.setAction(clip(action, 40));
         event.setSubject(clip(subject, 190));
@@ -176,7 +177,7 @@ public class Audit {
         StringBuilder b = new StringBuilder();
         field(b, e.getPrevHash());
         field(b, Long.toString(e.getSeq()));
-        field(b, Long.toString(e.getAt()));
+        field(b, Long.toString(e.getAt().toEpochMilli()));
         field(b, e.getActor());
         field(b, e.getAction());
         field(b, e.getSubject());

@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bastion.domain;
 
+import java.time.Instant;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
@@ -30,7 +31,7 @@ public class UsedNonce {
     private String id = "";
 
     @Column(nullable = false)
-    private long expiresAt;
+    private Instant expiresAt = Instant.EPOCH;
 
     public UsedNonce() {
     }
@@ -43,11 +44,11 @@ public class UsedNonce {
         this.id = id;
     }
 
-    public long getExpiresAt() {
+    public Instant getExpiresAt() {
         return expiresAt;
     }
 
-    public void setExpiresAt(long expiresAt) {
+    public void setExpiresAt(Instant expiresAt) {
         this.expiresAt = expiresAt;
     }
 }

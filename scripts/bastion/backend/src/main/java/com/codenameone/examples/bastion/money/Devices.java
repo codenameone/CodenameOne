@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bastion.money;
 
+import java.time.Instant;
 import com.codenameone.examples.bastion.repository.ProfileRepository;
 import com.codenameone.examples.bastion.Refused;
 import com.codename1.backend.Base64Url;
@@ -170,7 +171,7 @@ public class Devices {
         }
         String platform = clip(request.platform(), 20);
         IntegrityVerifier.Verdict verdict = integrity.verify(platform, request.integrityToken(),
-                request.rooted(), request.attested());
+                request.publicKey(), request.rooted(), request.attested());
         Device device = new Device();
         device.setId(Ids.next());
         device.setOwner(owner);
@@ -178,7 +179,7 @@ public class Devices {
         device.setPlatform(platform);
         device.setRooted(verdict.rooted());
         device.setAttested(verdict.attested());
-        device.setCreatedAt(System.currentTimeMillis());
+        device.setCreatedAt(Instant.now());
         devices.insert(device);
         audit.append(owner, "DEVICE_REGISTERED", device.getId(), platform
                 + (trusted(device) ? " trusted" : " untrusted")
@@ -244,7 +245,7 @@ public class Devices {
 
     private static DeviceDto dto(Device d) {
         return new DeviceDto(d.getId(), d.getPlatform(), d.isRooted(), d.isAttested(), trusted(d),
-                d.getCreatedAt());
+                d.getCreatedAt().toEpochMilli());
     }
 
     private static String clip(String value, int max) {

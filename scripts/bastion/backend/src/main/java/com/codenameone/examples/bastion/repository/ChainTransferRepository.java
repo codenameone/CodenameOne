@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bastion.repository;
 
+import java.time.Instant;
 import com.codename1.orm.repository.CrudRepository;
 import com.codename1.orm.repository.Modifying;
 import com.codename1.orm.repository.Param;
@@ -45,7 +46,7 @@ public interface ChainTransferRepository extends CrudRepository<ChainTransfer, S
             + "where t.id = :id and t.status = :expected")
     int signed(@Param("id") String id, @Param("expected") String expected,
             @Param("next") String next, @Param("nonce") long nonce, @Param("raw") String raw,
-            @Param("txHash") String txHash, @Param("amount") long amount, @Param("now") long now);
+            @Param("txHash") String txHash, @Param("amount") long amount, @Param("now") Instant now);
 
     /// Moves a row from `expected` to `next`, or answers 0 if another worker
     /// moved it first.
@@ -53,5 +54,5 @@ public interface ChainTransferRepository extends CrudRepository<ChainTransfer, S
     @Query("update ChainTransfer t set t.status = :next, t.updatedAt = :now "
             + "where t.id = :id and t.status = :expected")
     int advance(@Param("id") String id, @Param("expected") String expected,
-            @Param("next") String next, @Param("now") long now);
+            @Param("next") String next, @Param("now") Instant now);
 }

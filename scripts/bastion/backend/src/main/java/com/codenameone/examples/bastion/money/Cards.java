@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bastion.money;
 
+import java.time.Instant;
 import com.codenameone.examples.bastion.Refused;
 import com.codename1.backend.Crypto;
 import com.codename1.backend.annotations.Component;
@@ -73,7 +74,7 @@ public class Cards {
         card.setAccountId(account.getId());
         card.setLast4(last4);
         card.setDailyLimit(DEFAULT_LIMIT);
-        card.setCreatedAt(System.currentTimeMillis());
+        card.setCreatedAt(Instant.now());
         cards.insert(card);
         audit.append(owner, "CARD_ISSUED", card.getId(), "account " + account.getId()
                 + " ending " + last4);
@@ -143,6 +144,6 @@ public class Cards {
 
     static CardDto dto(Card c) {
         return new CardDto(c.getId(), c.getAccountId(), c.getLast4(), c.isFrozen(),
-                c.getDailyLimit(), c.getCreatedAt());
+                c.getDailyLimit(), c.getCreatedAt().toEpochMilli());
     }
 }

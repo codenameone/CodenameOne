@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bastion.repository;
 
+import java.time.Instant;
 import com.codename1.orm.repository.CrudRepository;
 import com.codename1.orm.repository.Modifying;
 import com.codename1.orm.repository.Param;
@@ -35,5 +36,5 @@ public interface ChainCursorRepository extends CrudRepository<ChainCursor, Strin
     @Query("update ChainCursor c set c.lastHash = :holder, c.updatedAt = :now "
             + "where c.chain = :chain and (c.lastHash = :holder or c.updatedAt < :staleBefore)")
     int lease(@Param("chain") String chain, @Param("holder") String holder,
-            @Param("now") long now, @Param("staleBefore") long staleBefore);
+            @Param("now") Instant now, @Param("staleBefore") Instant staleBefore);
 }

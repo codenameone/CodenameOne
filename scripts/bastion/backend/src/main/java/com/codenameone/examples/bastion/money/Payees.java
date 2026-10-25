@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bastion.money;
 
+import java.time.Instant;
 import com.codenameone.examples.bastion.repository.ProfileRepository;
 import com.codenameone.examples.bastion.Refused;
 import com.codename1.backend.ResponseStatusException;
@@ -116,7 +117,7 @@ public class Payees {
         int today = 0;
         for (Payee p : payees.findByOwnerOrderByCreatedAtAsc(owner)) {
             live += p.isRemoved() ? 0 : 1;
-            today += p.getCreatedAt() > now - DAY ? 1 : 0;
+            today += p.getCreatedAt().toEpochMilli() > now - DAY ? 1 : 0;
         }
         if (live >= MAX_PAYEES) {
             throw Refused.with(409, "remove-payee-before-adding-another", "Remove a payee before adding another");
@@ -129,7 +130,7 @@ public class Payees {
         payee.setOwner(owner);
         payee.setUsername(username);
         payee.setNickname(nickname(request.nickname(), username));
-        payee.setCreatedAt(now);
+        payee.setCreatedAt(Instant.ofEpochMilli(now));
         payees.insert(payee);
         audit.append(owner, "PAYEE_ADDED", payee.getId(), username);
         return dto(payee);
@@ -179,8 +180,8 @@ public class Payees {
     }
 
     private PayeeDto dto(Payee p) {
-        return new PayeeDto(p.getId(), p.getUsername(), p.getNickname(), p.getCreatedAt(),
-                p.getCreatedAt() + money.coolOffMillis());
+        return new PayeeDto(p.getId(), p.getUsername(), p.getNickname(), p.getCreatedAt().toEpochMilli(),
+                p.getCreatedAt().toEpochMilli() + money.coolOffMillis());
     }
 
     private static String nickname(String value, String fallback) {

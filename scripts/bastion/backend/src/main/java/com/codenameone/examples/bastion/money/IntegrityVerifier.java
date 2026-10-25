@@ -33,6 +33,14 @@ public interface IntegrityVerifier {
     Verdict verify(String platform, String token, boolean reportedRooted,
             boolean reportedAttested) throws java.io.IOException;
 
+    /// The same check with the nonce the token was requested over -- the
+    /// device public key the registration carries -- for verifiers that bind
+    /// the token to it, as App Attest does. The default ignores the nonce.
+    default Verdict verify(String platform, String token, String nonce, boolean reportedRooted,
+            boolean reportedAttested) throws java.io.IOException {
+        return verify(platform, token, reportedRooted, reportedAttested);
+    }
+
     /// A verdict: whether the platform vouched for the app and the device,
     /// and whether the device is rooted or jailbroken.
     final class Verdict {
