@@ -445,8 +445,20 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertContains(getText(entries, "README.md"), game ? "## The game and its server" : "## The app and its server",
                 label + "README should explain the app and its server");
 
+        // The demo template ships the agent skill like every app, and the skill's
+        // demo guide is how an agent finds this very demo's upstream source, so the
+        // template's name survives there -- and only there.
+        assertNotNull(entries.get(".agent-skills/codename-one/references/demos.md"),
+                label + "a demo project ships the skill's demo guide");
+        assertNotNull(entries.get(".agent-skills/codename-one/references/compatibility.md"),
+                label + "a demo project ships the skill's compatibility guide");
+        assertContains(getText(entries, ".agent-skills/codename-one/references/demos.md"), "scripts/" + lower,
+                label + "the demo guide still points at this demo's source");
         for (Map.Entry<String, byte[]> entry : entries.entrySet()) {
             String path = entry.getKey();
+            if (GeneratorModel.isAgentSkillPath(path)) {
+                continue;
+            }
             assertFalse(path.indexOf(lower) >= 0 || path.indexOf(name) >= 0,
                     label + "the template's name is still in the path " + path);
             if (path.endsWith(".png") || path.endsWith(".jar") || path.endsWith(".res") || path.endsWith(".ttf")
@@ -990,6 +1002,9 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 ".agent-skills/codename-one/references/ai-and-speech.md",
                 ".agent-skills/codename-one/references/backend.md",
                 ".agent-skills/codename-one/references/full-stack-loop.md",
+                ".agent-skills/codename-one/references/demos.md",
+                ".agent-skills/codename-one/references/compatibility.md",
+                ".agent-skills/codename-one/references/flutter-to-cn1.md",
                 ".agent-skills/codename-one/tools/README.md",
                 ".agent-skills/codename-one/tools/IsApiSupported.java",
                 ".agent-skills/codename-one/tools/IsCssValid.java"
