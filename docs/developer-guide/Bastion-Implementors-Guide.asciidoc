@@ -317,7 +317,7 @@ With `bastion.chain.rpc-url` set, ether is real: deposits arrive at an address o
 |Piece |What it does
 |`Rlp`, `Eip1559Tx` |Encodes and signs type-2 transactions (EIP-1559), with a chain id so a signature can't be replayed on another network (EIP-155).
 |`EthKeys` |secp256k1 signatures with deterministic nonces (RFC 6979) and low-S values, and Keccak-256, from the Codename One security API.
-|`Bip32`, `SeedSigner` |Derives every key from one seed the way wallets do (BIP-32, BIP-44): deposit address _i_ is `m/44'/60'/0'/0/i`, the hot wallet `m/44'/60'/1'/0/0`. A key is wiped after each signature.
+|`Bip32`, `SeedSigner` |Derives every key from one seed the way wallets do (BIP-32, BIP-44): deposit address number _n_ is `m/44'/60'/0'/0/n`, the hot wallet `m/44'/60'/1'/0/0`. A key is wiped after each signature.
 |`EthAddress` |Checksummed addresses (EIP-55). A withdrawal address with a wrong checksum is refused when it's added.
 |`EthRpc` |Talks JSON-RPC to a node over HTTPS (plain HTTP only to the local host).
 |`Chain` |Scans blocks, credits deposits, signs, broadcasts and settles transfers, sweeps deposits into the hot wallet, and checks reserves.
@@ -374,7 +374,7 @@ Work through this before a release. The first list is what the sample already do
 *A product adds:*
 
 * [ ] Server keys, the authenticator-sealing key and chain keys in an HSM or key service; cold storage for most reserves, with signing that needs more than one person.
-* [ ] A real integrity verifier for Play Integrity and App Attest on the server, and a policy for what an unattested device may do.
+* [ ] A real integrity verifier on the server for Google's Play Integrity and Apple's App Attest, and a policy for what an unattested device may do.
 * [ ] The audit head published at intervals to storage the database's administrators can't write.
 * [ ] Identity verification, sanctions screening and transaction monitoring, and the reports the law asks for.
 * [ ] A web application firewall and a proxy in front of the server, with `cn1.server.trustedProxies` set to it.

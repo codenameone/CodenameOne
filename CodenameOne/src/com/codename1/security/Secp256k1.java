@@ -45,6 +45,7 @@ package com.codename1.security;
 /// System.arraycopy(digest, 12, address, 0, 20);           // 2c7536e3605d9c16a7a3d7b1898e529396a65c23
 ///
 /// // sign the keccak256 of the RLP-encoded transaction
+/// byte[] rlp = Hash.fromHex("02c0");                       // your encoded transaction
 /// Secp256k1.EcdsaSignature sig = Secp256k1.sign(Hash.keccak256(rlp), priv);
 /// byte[] r = sig.r();
 /// byte[] s = sig.s();
