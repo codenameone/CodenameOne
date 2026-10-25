@@ -311,14 +311,13 @@ final class Asn1 {
     }
 
     static byte[] nullValue() {
-        // Written element by element, like every other encoder here, and not
-        // as an array literal: CodeQL treats a byte array that is never
-        // written after it is made as a constant IV, follows these two bytes
-        // through an encoded PFX into the IV decode() reads back out of it, and
-        // reports the decrypting Cipher.init as java/static-initialization-vector.
-        byte[] out = new byte[2];
-        out[0] = NULL;
-        return out;
+        // Through tlv() like every other encoder, never as a literal or a
+        // new byte[2] filled with constants: CodeQL takes such an array for a
+        // constant IV, follows its two bytes through an encoded PFX into the
+        // IV decode() reads back out, and reports the decrypting Cipher.init
+        // as java/static-initialization-vector. tlv() writes the tag from a
+        // parameter, which the query counts as the array being written.
+        return tlv(NULL);
     }
 
     /// A non-negative INTEGER.
