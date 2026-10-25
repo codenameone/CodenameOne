@@ -27,8 +27,12 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-/// Stores a `java.util.Date` field in a native date or timestamp column instead
-/// of the portable default, epoch milliseconds in an integer column.
+/// Stores a `java.util.Date`, `java.time.Instant`, `LocalDate` or
+/// `LocalDateTime` field in a native date or timestamp column instead of the
+/// portable default, a number in an integer column: epoch milliseconds, or
+/// epoch days for a `LocalDate`. A `LocalDate` takes `DATE` and the other
+/// java.time types take `TIMESTAMP`; a `LocalDateTime` is written as its wall
+/// clock, with no zone applied.
 ///
 /// Opt-in, because the two are different columns: an existing integer column
 /// keeps its milliseconds and an existing native one needs this annotation.
