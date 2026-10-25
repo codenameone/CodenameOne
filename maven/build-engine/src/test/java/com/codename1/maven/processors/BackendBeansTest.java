@@ -507,13 +507,13 @@ public class BackendBeansTest {
         s.put("com.example.Shop", PKG
                 + "@Component public class Shop {\n"
                 + "    @McpTool(description = \"a\")\n"
-                + "    public String a(@McpParam(\"ids\") int[] ids) { return \"a\"; }\n"
+                + "    public String a(@McpParam(\"ids\") int[][] ids) { return \"a\"; }\n"
                 + "    @McpTool(description = \"b\")\n"
                 + "    public StringBuilder b() { return null; }\n"
                 + "}\n");
         String errors = String.valueOf(process(compile(s)).getErrors());
         assertTrue(errors, errors.contains("Parameter 1 of @McpTool"));
-        assertTrue(errors, errors.contains("an array, which has no JSON form here"));
+        assertTrue(errors, errors.contains("which has more than one dimension"));
         assertTrue(errors, errors.contains("returns java.lang.StringBuilder, which cannot be "
                 + "written as JSON"));
     }
@@ -532,6 +532,168 @@ public class BackendBeansTest {
         String errors = String.valueOf(process(compile(s)).getErrors());
         assertTrue(errors, errors.contains("would both get the JSON codec "
                 + "com.example.Outer_InnerCn1Json. Rename one of them."));
+    }
+
+    /// The JSON contract options of #5995 on one running server: renamed and
+    /// aliased members, required ones, absent versus explicit null, a strict
+    /// class, members left out when null, string-shaped numbers and dates, an
+    /// adapter on a field and on a class, an immutable class read through its
+    /// @JsonCreator, a generic class used with its type argument, and arrays.
+    @Test
+    public void jsonContractOptionsHoldEndToEnd() throws Exception {
+        String a = "@com.codename1.annotations.";
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Money", PKG + a + "JsonAdapter(MoneyAdapter.class)\n"
+                + "public final class Money {\n"
+                + "    public final long cents;\n"
+                + "    public Money(long cents) { this.cents = cents; }\n"
+                + "}\n");
+        s.put("com.example.MoneyAdapter", PKG + "public class MoneyAdapter implements "
+                + "com.codename1.annotations.JsonTypeAdapter<Money> {\n"
+                + "    public Object toJson(Money m) {\n"
+                + "        return m == null ? null : (m.cents / 100) + \".\" + (m.cents % 100 < 10 ? \"0\" : \"\") + (m.cents % 100);\n"
+                + "    }\n"
+                + "    public Money fromJson(Object j) {\n"
+                + "        if (!(j instanceof String)) { throw new IllegalArgumentException(\"expected an amount\"); }\n"
+                + "        String t = (String) j;\n"
+                + "        int dot = t.indexOf('.');\n"
+                + "        return new Money(Long.parseLong(t.substring(0, dot)) * 100 + Long.parseLong(t.substring(dot + 1)));\n"
+                + "    }\n"
+                + "}\n");
+        s.put("com.example.Upper", PKG + "public class Upper implements "
+                + "com.codename1.annotations.JsonTypeAdapter<String> {\n"
+                + "    public Object toJson(String v) { return v == null ? null : \"<\" + v + \">\"; }\n"
+                + "    public String fromJson(Object j) { return j == null ? null : String.valueOf(j) + \"!\"; }\n"
+                + "}\n");
+        s.put("com.example.Point", PKG + a + "JsonStrict\n"
+                + "public final class Point {\n"
+                + "    private final int x;\n"
+                + "    private final int y;\n"
+                + "    " + a + "JsonCreator\n"
+                + "    public Point(" + a + "JsonProperty(value = \"x\", required = true) int x,\n"
+                + "                 " + a + "JsonProperty(value = \"y\", aliases = \"why\") int y) {\n"
+                + "        this.x = x; this.y = y;\n"
+                + "    }\n"
+                + "    public int getX() { return x; }\n"
+                + "    public int getY() { return y; }\n"
+                + "}\n");
+        s.put("com.example.Page", PKG + "public class Page<T> {\n"
+                + "    public List<T> items;\n"
+                + "    public T first;\n"
+                + "    public T[] none;\n"
+                + "}\n");
+        s.put("com.example.Order", PKG + a + "JsonOmitNull\n"
+                + "public class Order {\n"
+                + "    " + a + "JsonProperty(value = \"order_id\", aliases = {\"orderId\", \"id\"}, required = true)\n"
+                + "    public String id;\n"
+                + "    public String note = \"unset\";\n"
+                + "    " + a + "JsonFormat(com.codename1.annotations.JsonFormat.Shape.STRING)\n"
+                + "    public long big;\n"
+                + "    " + a + "JsonFormat(com.codename1.annotations.JsonFormat.Shape.STRING)\n"
+                + "    public Date at;\n"
+                + "    public Money total;\n"
+                + "    " + a + "JsonAdapter(Upper.class) public String shout;\n"
+                + "    public int[] counts;\n"
+                + "    public Point[] path;\n"
+                + "    public Page<Point> page;\n"
+                + "}\n");
+        s.put("com.example.Api", PKG + "@RestController public class Api {\n"
+                + "    @PostMapping(\"/order\") public Order order(@RequestBody Order o) { return o; }\n"
+                + "    @PostMapping(\"/note\") public String note(@RequestBody Order o) {\n"
+                + "        return String.valueOf(o.note);\n"
+                + "    }\n"
+                + "    @PostMapping(\"/point\") public Point point(@RequestBody Point p) { return p; }\n"
+                + "}\n");
+        File classes = compile(s);
+        ProcessorContext ctx = process(classes);
+        assertNoErrors(ctx);
+        int port = freePort();
+        Backend backend = start(classes, port, new Properties());
+        try {
+            String order = post(port, "/order", "{\"orderId\":\"o1\",\"big\":\"9007199254740993\","
+                    + "\"at\":86400000,\"total\":\"12.05\",\"shout\":\"hey\",\"counts\":[1,2],"
+                    + "\"path\":[{\"x\":1,\"why\":2}],\"page\":{\"items\":[{\"x\":3,\"y\":4}],"
+                    + "\"first\":{\"x\":5}},\"extra\":true}");
+            assertEquals("{\"order_id\":\"o1\",\"note\":\"unset\",\"big\":\"9007199254740993\","
+                    + "\"at\":\"1970-01-02T00:00:00.000Z\",\"total\":\"12.05\",\"shout\":\"<hey!>\","
+                    + "\"counts\":[1,2],\"path\":[{\"x\":1,\"y\":2}],\"page\":{\"items\":"
+                    + "[{\"x\":3,\"y\":4}],\"first\":{\"x\":5,\"y\":0},\"none\":null}}", order);
+            // Absent leaves the field as constructed; an explicit null sets it.
+            assertEquals("unset", post(port, "/note", "{\"id\":\"a\"}"));
+            assertEquals("null", post(port, "/note", "{\"id\":\"a\",\"note\":null}"));
+            // Required: missing under every name is refused; explicit null is a value.
+            assertEquals("HTTP 400: $.order_id: required member is missing",
+                    post(port, "/note", "{\"note\":\"n\"}"));
+            assertEquals("null", post(port, "/note", "{\"order_id\":null,\"note\":null}"));
+            // A value read from an alias is reported under the alias it came in.
+            String alias = post(port, "/note", "{\"orderId\":5}");
+            assertTrue(alias, alias.startsWith("HTTP 400: $.orderId: "));
+            assertEquals("HTTP 400: $.x: required member is missing",
+                    post(port, "/point", "{\"y\":1}"));
+            assertEquals("HTTP 400: $.x: expected a value, got null",
+                    post(port, "/point", "{\"x\":null}"));
+            // Strict refuses an unknown member, by path, nested too.
+            assertEquals("HTTP 400: $.z: unknown member",
+                    post(port, "/point", "{\"x\":1,\"z\":0}"));
+            assertEquals("HTTP 400: $.path[0].colour: unknown member",
+                    post(port, "/order", "{\"id\":\"a\",\"path\":[{\"x\":1,\"colour\":2}]}"));
+            // An adapter's refusal is located; a numeric string must be a number.
+            assertEquals("HTTP 400: $.total: expected an amount",
+                    post(port, "/order", "{\"id\":\"a\",\"total\":5}"));
+            assertTrue(post(port, "/order", "{\"id\":\"a\",\"big\":\"lots\"}")
+                    .startsWith("HTTP 400: $.big: expected a whole number"));
+            assertEquals("HTTP 400: $.counts[1]: expected a whole number from -2147483648 to "
+                    + "2147483647, got a string",
+                    post(port, "/order", "{\"id\":\"a\",\"counts\":[1,\"2\"]}"));
+        } finally {
+            backend.stop();
+        }
+    }
+
+    @Test
+    public void unsupportedJsonShapesFailTheBuildByName() throws Exception {
+        String format = "@com.codename1.annotations.JsonFormat("
+                + "com.codename1.annotations.JsonFormat.Shape.STRING)";
+        assertJsonBuildError("public class Shape { public int[][] cells; }",
+                "the array int[][], which has more than one dimension");
+        assertJsonBuildError("public class Shape { " + format + " public boolean flag; }",
+                "is marked @JsonFormat(STRING), which a boolean has no form of");
+        assertJsonBuildError("public class Shape<T> { public T value; }",
+                "has a type variable for its type (com.example.Shape)");
+        assertJsonBuildError("public class Shape { @com.codename1.annotations.JsonAdapter("
+                + "Conv.class) public String s; }\n"
+                + "class Conv implements com.codename1.annotations.JsonTypeAdapter<String> {\n"
+                + "    public Object toJson(String v) { return v; }\n"
+                + "    public String fromJson(Object j) { return null; }\n"
+                + "}", "which the generated code cannot create");
+    }
+
+    /// Builds a route returning `Shape`, declared by `source`, and expects `error`.
+    @Test
+    public void aGenericCodecNameThatFoldsOntoAClassIsABuildError() throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Page", PKG + "public class Page<T> { public T item; }\n");
+        s.put("com.example.User", PKG + "public class User { public String n; }\n");
+        // Page<com.example.User> and this class both mangle to one codec name.
+        s.put("com.example.Page_com_example_User", PKG
+                + "public class Page_com_example_User { public String n; }\n");
+        s.put("com.example.Api", PKG + "@RestController public class Api {\n"
+                + "    @GetMapping(\"/p\") public Page<User> p() { return null; }\n"
+                + "    @GetMapping(\"/q\") public Page_com_example_User q() { return null; }\n"
+                + "}\n");
+        String errors = String.valueOf(process(compile(s)).getErrors());
+        assertTrue(errors, errors.contains("would both get the JSON codec "
+                + "com.example.Page_com_example_UserCn1Json"));
+    }
+
+    private void assertJsonBuildError(String source, String error) throws Exception {
+        Map<String, String> s = new LinkedHashMap<String, String>();
+        s.put("com.example.Shape", PKG + source + "\n");
+        s.put("com.example.Api", PKG + "@RestController public class Api {\n"
+                + "    @GetMapping(\"/s\") public Shape s() { return null; }\n"
+                + "}\n");
+        String errors = String.valueOf(process(compile(s)).getErrors());
+        assertTrue(errors, errors.contains(error));
     }
 
     @Test
@@ -682,7 +844,7 @@ public class BackendBeansTest {
                 + "}\n");
         s.put("com.example.ArrayApi", PKG
                 + "@RestController public class ArrayApi {\n"
-                + "    @GetMapping(\"/a\") public int[] a() { return null; }\n"
+                + "    @GetMapping(\"/a\") public int[][] a() { return null; }\n"
                 + "}\n");
         s.put("com.example.Unordered", PKG + "public class Unordered { public String n; }\n");
         s.put("com.example.SetApi", PKG
@@ -695,10 +857,11 @@ public class BackendBeansTest {
                 + "    }\n"
                 + "}\n");
         String errors = String.valueOf(process(compile(s)).getErrors());
-        assertTrue(errors, errors.contains("has a type variable for its type"));
+        // A parameterized DTO gets a codec of its own per type argument.
+        assertFalse("Page<String> is a typed generic DTO: " + errors,
+                errors.contains("com.example.PageApi"));
         assertTrue(errors, errors.contains("has no constructor without arguments"));
-        assertTrue(errors, errors.contains("an array, which has no JSON form here other than "
-                + "byte[]"));
+        assertTrue(errors, errors.contains("which has more than one dimension"));
         assertTrue(errors, errors.contains("a TreeSet of com.example.Unordered, which is not "
                 + "Comparable"));
         assertFalse("a TreeSet of String is ordered by String: " + errors,

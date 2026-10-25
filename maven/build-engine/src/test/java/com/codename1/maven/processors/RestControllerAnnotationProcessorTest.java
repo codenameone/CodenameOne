@@ -1193,17 +1193,16 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
-    public void anArrayReturnOtherThanBytesIsRefused() throws Exception {
-        // Json writes byte[] as base64 and has no handling for any other array,
-        // so this would be answered as the JSON string "[I@1a2b3c" while the
-        // build and the request both reported success.
+    public void aMultiDimensionalArrayReturnIsRefused() throws Exception {
+        // One-dimensional arrays are written as JSON arrays; an array of arrays
+        // has no codec, and must not reach Json as "[[I@1a2b3c".
         ProcessorContext ctx = run(compile(
                 "package com.example;\n"
                 + "import com.codename1.backend.annotations.*;\n"
                 + "@RestController\n"
                 + "public class Notes {\n"
                 + "    @GetMapping(\"/ids\")\n"
-                + "    public int[] ids() { return new int[0]; }\n"
+                + "    public int[][] ids() { return new int[0][]; }\n"
                 + "}\n"));
         assertTrue("an array the router cannot encode should not compile", ctx.hasErrors());
         String all = ctx.getErrors().toString();
