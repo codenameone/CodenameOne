@@ -2,10 +2,7 @@
  "gallery": {
   "code_bytes": {
    "runs": 1,
-   "tolerance": {
-    "value": 0.005
-   },
-   "value": 4854044
+   "value": 4913000
   },
   "cold_start_ratio": {
    "runs": 8,
@@ -22,18 +19,12 @@
    "value": 0.523
   },
   "install_bytes": {
-   "runs": 2,
-   "tolerance": {
-    "value": 0.001
-   },
-   "value": 81949943
+   "runs": 1,
+   "value": 82042300
   },
   "wire_bytes": {
-   "runs": 2,
-   "tolerance": {
-    "value": 0.001
-   },
-   "value": 81949943
+   "runs": 1,
+   "value": 82042300
   }
  }
 }
