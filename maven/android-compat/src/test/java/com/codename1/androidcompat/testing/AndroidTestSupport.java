@@ -320,6 +320,47 @@ public final class AndroidTestSupport {
         @Override protected void onDestroy() { super.onDestroy(); event("destroy"); }
     }
 
+    /// A service declared by the test application, recording its lifecycle.
+    public static final class TestService extends android.app.Service {
+        public static final java.util.List<String> calls = new java.util.ArrayList<String>();
+        public static TestService last;
+
+        public final class LocalBinder extends android.os.Binder {
+            public TestService service() {
+                return TestService.this;
+            }
+        }
+
+        @Override
+        public void onCreate() {
+            last = this;
+            calls.add("create");
+        }
+
+        @Override
+        public int onStartCommand(android.content.Intent intent, int flags, int startId) {
+            calls.add("start:" + intent.getIntExtra("n", 0) + ":" + startId);
+            return START_NOT_STICKY;
+        }
+
+        @Override
+        public android.os.IBinder onBind(android.content.Intent intent) {
+            calls.add("bind");
+            return new LocalBinder();
+        }
+
+        @Override
+        public boolean onUnbind(android.content.Intent intent) {
+            calls.add("unbind");
+            return false;
+        }
+
+        @Override
+        public void onDestroy() {
+            calls.add("destroy");
+        }
+    }
+
     private static final class TestApp extends AndroidApp {
         TestApp() {
             super(null, "com.codename1.androidcompat.test");
@@ -350,6 +391,12 @@ public final class AndroidTestSupport {
             parentActivity(CompatChildActivity.class, TestActivity.class.getName());
             activity(GalleryActivity.class, GalleryActivity.class.getName(),
                     android.R.style.Theme_Material_Light_DarkActionBar, 0, "Gallery", null, null, false);
+            service(TestService.class, TestService.class.getName());
+        }
+
+        @Override
+        public android.app.Service createService(Class<?> type) {
+            return type == TestService.class ? new TestService() : null;
         }
 
         @Override
