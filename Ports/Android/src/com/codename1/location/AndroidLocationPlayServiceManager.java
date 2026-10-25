@@ -40,6 +40,7 @@ import android.support.annotation.RequiresApi;
 import android.support.v4.app.ActivityCompat;
 import com.codename1.impl.android.AndroidImplementation;
 import com.codename1.impl.android.AndroidNativeUtil;
+import com.codename1.impl.android.GoogleServices;
 import com.codename1.impl.android.LifecycleListener;
 import com.codename1.impl.android.PlayServices;
 import com.codename1.io.Log;
@@ -619,7 +620,12 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
 
     @Override
     public void onResume() {
-        getmGoogleApiClient(); // This should initialize it if it isn't already.
+        // The builder registers this listener for every application that uses
+        // location, but the manager is only chosen when Play services is there.
+        // Connecting a client without the service fails on every resume.
+        if (GoogleServices.isPlayServicesAvailable(AndroidNativeUtil.getContext())) {
+            getmGoogleApiClient(); // This should initialize it if it isn't already.
+        }
     }
 
     @Override
