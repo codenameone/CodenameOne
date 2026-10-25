@@ -161,9 +161,16 @@ jobs:
           - name: "JDK 17"
             id: jdk17
             java_version: '17'
+          # The JDK 21 leg also runs the suite on an AOSP image WITHOUT Google
+          # apps, the device GrapheneOS, CalyxOS, /e/OS and LineageOS users have:
+          # every test that touches Play services has to fall back or skip there
+          # instead of hanging or failing (GoogleServices.isPlayServicesAvailable).
+          # Screenshots on these legs are uploaded, not compared, so the image
+          # changes no baseline; a test problem still fails the leg.
           - name: "JDK 21"
             id: jdk21
             java_version: '21'
+            emulator_target: default
     permissions:
       contents: read
       pull-requests: write
@@ -320,7 +327,7 @@ jobs:
         with:
           api-level: 36
           arch: x86_64
-          target: google_apis
+          target: ${{ matrix.emulator_target || 'google_apis' }}
           disk-size: 2048M
           script: ./scripts/run-android-instrumentation-tests.sh "${{ steps.build-android-app.outputs.gradle_project_dir }}"
       # After the emulator, deliberately: the instrumentation suite runs against

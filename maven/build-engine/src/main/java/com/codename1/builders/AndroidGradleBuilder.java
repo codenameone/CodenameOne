@@ -1066,6 +1066,149 @@ public class AndroidGradleBuilder extends Executor {
                                 && hasHuaweiConfiguration));
     }
 
+    /**
+     * Wraps the startup FCM token fetch in a Play services check. Without the
+     * service the fetch can only fail, and its failure reached the push callback
+     * as a registration error even when the activity was about to register with
+     * Huawei Push Kit or UnifiedPush instead. The check names no Google type.
+     */
+    static String guardedFcmRegisterPushCode(String fcmRegisterPushCode) {
+        if (fcmRegisterPushCode == null || fcmRegisterPushCode.length() == 0) {
+            return "";
+        }
+        return "            if (com.codename1.impl.android.GoogleServices.isPlayServicesAvailable(this)) {\n"
+                + fcmRegisterPushCode + "\n            }\n";
+    }
+
+    static boolean usesUnifiedPush(int detectedPushVersion, String messagingService,
+            boolean hasVapidKey) {
+        // PushClient only: UnifiedPush delivers the schema-3 envelope, which the
+        // classic Push API cannot read. "auto" turns it on when the application
+        // supplies the VAPID key the push service signs its requests with, the
+        // same way google-services.json and agconnect-services.json turn on the
+        // other two.
+        return detectedPushVersion == 3
+                && ("unifiedpush".equalsIgnoreCase(messagingService)
+                        || ("auto".equalsIgnoreCase(messagingService) && hasVapidKey));
+    }
+
+    /**
+     * True for a VAPID public key in the form the UnifiedPush connector accepts and
+     * the push service's web credential stores: the 65-byte uncompressed P-256 point,
+     * base64url without padding, which is exactly 87 characters. The connector throws
+     * at run time for anything else, so it is refused here instead.
+     */
+    static boolean isUnifiedPushVapidKey(String key) {
+        if (key == null || key.length() != 87) {
+            return false;
+        }
+        for (int i = 0; i < key.length(); i++) {
+            char c = key.charAt(i);
+            boolean ok = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
+                    || (c >= '0' && c <= '9') || c == '-' || c == '_';
+            if (!ok) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** The compiled push transports, in the order the activity tries them. */
+    static String pushTransportList(boolean useFCM, boolean useHMS, boolean useUnifiedPush) {
+        StringBuilder out = new StringBuilder();
+        if (useFCM) {
+            out.append("fcm");
+        }
+        if (useHMS) {
+            out.append(out.length() > 0 ? "," : "").append("huawei");
+        }
+        if (useUnifiedPush) {
+            out.append(out.length() > 0 ? "," : "").append("unifiedpush");
+        }
+        return out.toString();
+    }
+
+    /**
+     * The activity members that choose a push transport at run time, or "" when
+     * Firebase is the only one and CodenameOneActivity's own methods apply.
+     *
+     * <p>Firebase is used when Google Play services is available. Otherwise Huawei
+     * Push Kit, when HMS Core is installed (or unconditionally when it is the only
+     * alternative, as before UnifiedPush existed), and otherwise UnifiedPush, which
+     * reports a registration error itself when no distributor is installed. The
+     * Play services check goes through GoogleServices, never a Google type, so the
+     * generated code compiles whichever libraries the build bundled.</p>
+     */
+    static String pushTransportMembers(boolean useFCM, boolean useHMS, boolean useUnifiedPush,
+            String vapidKey) {
+        if (!useHMS && !useUnifiedPush) {
+            return "";
+        }
+        String playServices = "com.codename1.impl.android.GoogleServices.isPlayServicesAvailable(activity)";
+        String huaweiInstalled = "com.codename1.impl.android.GoogleServices.isPackageEnabled(activity, \"com.huawei.hwid\")";
+        String vapidLiteral = vapidKey == null || vapidKey.length() == 0 ? "null" : "\"" + vapidKey + "\"";
+        StringBuilder out = new StringBuilder();
+        if (useHMS) {
+            out.append("\n    private void cn1RegisterHuaweiPush(final android.app.Activity activity) {\n")
+                    .append("        new Thread(new Runnable() { public void run() { try {\n")
+                    .append("            // Push Kit derives the app id from native/android/agconnect-services.json.\n")
+                    .append("            String appId = com.huawei.agconnect.config.AGConnectServicesConfig.fromContext(activity).getString(\"client/app_id\");\n")
+                    .append("            final String token = com.huawei.hms.aaid.HmsInstanceId.getInstance(activity).getToken(appId, \"HCM\");\n")
+                    .append("            if (token != null && token.length() > 0) { com.codename1.io.Preferences.set(\"push_key\", \"cn1-hms-\" + token);\n")
+                    .append("                final com.codename1.push.PushCallback cb = com.codename1.impl.CodenameOneImplementation.getPushCallback();\n")
+                    .append("                if (cb != null) com.codename1.ui.Display.getInstance().callSerially(new Runnable(){ public void run(){ cb.registeredForPush(\"cn1-hms-\" + token); }}); }\n")
+                    .append("        } catch (final Exception ex) { final com.codename1.push.PushCallback cb = com.codename1.impl.CodenameOneImplementation.getPushCallback();\n")
+                    .append("            if (cb != null) com.codename1.ui.Display.getInstance().callSerially(new Runnable(){ public void run(){ cb.pushRegistrationError(ex.getMessage(), 0); }}); } }}).start();\n")
+                    .append("    }\n")
+                    .append("    private void cn1StopHuaweiPush(final android.app.Activity activity) {\n")
+                    .append("        new Thread(new Runnable(){ public void run(){ try {\n")
+                    .append("            String appId = com.huawei.agconnect.config.AGConnectServicesConfig.fromContext(activity).getString(\"client/app_id\");\n")
+                    .append("            com.huawei.hms.aaid.HmsInstanceId.getInstance(activity).deleteToken(appId, \"HCM\");\n")
+                    .append("        } catch (Exception ex) { ex.printStackTrace(); } }}).start();\n")
+                    .append("    }\n");
+        }
+        out.append("\n    @Override public void registerForPush(final String key) {\n")
+                .append("        final android.app.Activity activity = this;\n");
+        if (useFCM) {
+            out.append("        if (").append(playServices).append(") { super.registerForPush(key); return; }\n");
+        }
+        if (useHMS && useUnifiedPush) {
+            out.append("        if (").append(huaweiInstalled).append(") { cn1RegisterHuaweiPush(activity); return; }\n");
+        } else if (useHMS) {
+            out.append("        cn1RegisterHuaweiPush(activity);\n");
+        }
+        if (useUnifiedPush) {
+            out.append("        com.codename1.impl.android.unifiedpush.UnifiedPushSupport.register(activity, ")
+                    .append(vapidLiteral).append(");\n");
+        }
+        out.append("    }\n");
+        out.append("    @Override public void stopReceivingPush() {\n")
+                .append("        final android.app.Activity activity = this;\n");
+        // Firebase and Huawei are exclusive, as registration made them: a device
+        // with Play services never registered with Push Kit.
+        String elseClause = "        ";
+        if (useFCM) {
+            out.append("        if (").append(playServices).append(") { super.stopReceivingPush(); }");
+            elseClause = useHMS ? " else " : "\n";
+        }
+        if (useHMS && useUnifiedPush) {
+            out.append(elseClause).append("if (").append(huaweiInstalled)
+                    .append(") { cn1StopHuaweiPush(activity); }\n");
+        } else if (useHMS) {
+            out.append(elseClause).append("{ cn1StopHuaweiPush(activity); }\n");
+        } else if (useFCM) {
+            out.append(elseClause);
+        }
+        if (useUnifiedPush) {
+            // Unconditional: the device may have registered here before Play
+            // services or HMS Core was installed, and unregistering a distributor
+            // the application never used is a no-op.
+            out.append("        com.codename1.impl.android.unifiedpush.UnifiedPushSupport.unregister(activity);\n");
+        }
+        out.append("    }\n");
+        return out.toString();
+    }
+
     static String pendingPushReplayCode(int detectedPushVersion) {
         if (detectedPushVersion != 3) {
             return "        if(com.codename1.impl.CodenameOneImplementation.getPushCallback() != null) {\n"
@@ -4042,9 +4185,21 @@ public class AndroidGradleBuilder extends Executor {
                 googleServicesJson.exists());
         boolean useHMS = pushPermission && usesHuaweiPush(pushVersion, messagingService,
                 agconnectServicesJson.exists());
-        if (pushPermission && automaticPush && !useFCM && !useHMS) {
+        String unifiedPushVapidKey = request.getArg("android.unifiedPush.vapidKey", "").trim();
+        boolean useUnifiedPush = pushPermission && usesUnifiedPush(pushVersion, messagingService,
+                unifiedPushVapidKey.length() > 0);
+        if (useUnifiedPush && unifiedPushVapidKey.length() > 0
+                && !isUnifiedPushVapidKey(unifiedPushVapidKey)) {
+            error("android.unifiedPush.vapidKey must be the application's VAPID public key: the "
+                    + "uncompressed P-256 point, base64url encoded without padding, 87 characters. "
+                    + "It is the publicKey of the application's web push credential.",
+                    new RuntimeException());
+            return false;
+        }
+        if (pushPermission && automaticPush && !useFCM && !useHMS && !useUnifiedPush) {
             error("PushClient requires google-services.json, agconnect-services.json, "
-                    + "or both in native/android.", new RuntimeException());
+                    + "the android.unifiedPush.vapidKey build hint, or any combination of them "
+                    + "in native/android.", new RuntimeException());
             return false;
         }
         if (useFCM) {
@@ -4118,6 +4273,14 @@ public class AndroidGradleBuilder extends Executor {
                 );
             }
         }
+        if (useUnifiedPush
+                && !request.getArg("gradleDependencies", "").contains("org.unifiedpush.android:connector")) {
+            request.putArgument("gradleDependencies", request.getArg("gradleDependencies", "")
+                    + "\n" + compile + " 'org.unifiedpush.android:connector:"
+                    + request.getArg("android.unifiedPush.connectorVersion", "3.3.5") + "'\n");
+        }
+        additionalMembers += pushTransportMembers(useFCM, useHMS, useUnifiedPush,
+                unifiedPushVapidKey);
         if (useHMS) {
             if (!agconnectServicesJson.exists()) {
                 error("agconnect-services.json not found. Huawei Push Kit builds require the AppGallery Connect configuration in native/android.", new RuntimeException());
@@ -4140,39 +4303,6 @@ public class AndroidGradleBuilder extends Executor {
                         + "\n" + compile + " 'com.huawei.hms:push:"
                         + request.getArg("android.hms.pushVersion", "6.3.0.302") + "'\n");
             }
-            String preferFcm = useFCM
-                    ? "        if (com.google.android.gms.common.GoogleApiAvailability.getInstance()"
-                            + ".isGooglePlayServicesAvailable(activity) == "
-                            + "com.google.android.gms.common.ConnectionResult.SUCCESS) {"
-                            + " super.registerForPush(key); return; }\n"
-                    : "";
-            String stopFcm = useFCM
-                    ? "        if (com.google.android.gms.common.GoogleApiAvailability.getInstance()"
-                            + ".isGooglePlayServicesAvailable(activity) == "
-                            + "com.google.android.gms.common.ConnectionResult.SUCCESS) {"
-                            + " super.stopReceivingPush(); return; }\n"
-                    : "";
-            additionalMembers += "\n    @Override public void registerForPush(final String key) {\n"
-                    + "        final android.app.Activity activity = this;\n"
-                    + preferFcm
-                    + "        new Thread(new Runnable() { public void run() { try {\n"
-                    + "            // Push Kit derives the app id from native/android/agconnect-services.json.\n"
-                    + "            String appId = com.huawei.agconnect.config.AGConnectServicesConfig.fromContext(activity).getString(\"client/app_id\");\n"
-                    + "            final String token = com.huawei.hms.aaid.HmsInstanceId.getInstance(activity).getToken(appId, \"HCM\");\n"
-                    + "            if (token != null && token.length() > 0) { com.codename1.io.Preferences.set(\"push_key\", \"cn1-hms-\" + token);\n"
-                    + "                final com.codename1.push.PushCallback cb = com.codename1.impl.CodenameOneImplementation.getPushCallback();\n"
-                    + "                if (cb != null) com.codename1.ui.Display.getInstance().callSerially(new Runnable(){ public void run(){ cb.registeredForPush(\"cn1-hms-\" + token); }}); }\n"
-                    + "        } catch (final Exception ex) { final com.codename1.push.PushCallback cb = com.codename1.impl.CodenameOneImplementation.getPushCallback();\n"
-                    + "            if (cb != null) com.codename1.ui.Display.getInstance().callSerially(new Runnable(){ public void run(){ cb.pushRegistrationError(ex.getMessage(), 0); }}); } }}).start();\n"
-                    + "    }\n"
-                    + "    @Override public void stopReceivingPush() {\n"
-                    + "        final android.app.Activity activity = this;\n"
-                    + stopFcm
-                    + "        new Thread(new Runnable(){ public void run(){ try {\n"
-                    + "            String appId = com.huawei.agconnect.config.AGConnectServicesConfig.fromContext(activity).getString(\"client/app_id\");\n"
-                    + "            com.huawei.hms.aaid.HmsInstanceId.getInstance(activity).deleteToken(appId, \"HCM\");\n"
-                    + "        } catch (Exception ex) { ex.printStackTrace(); } }}).start();\n"
-                    + "    }\n";
         }
 
         // Firebase Analytics (com.codename1.analytics.FirebaseAnalyticsProvider
@@ -5103,7 +5233,13 @@ public class AndroidGradleBuilder extends Executor {
         }
         xQueries = "";
         if (targetSDKVersionInt >= 30) {
+            // GoogleServices looks these two packages up by name to decide whether
+            // Play services and the Play Store are on the device. From API 30 a
+            // package the manifest does not name here is invisible, and the lookup
+            // would answer "absent" on every Google device too.
             xQueries = "<queries>\n"
+                    + "<package android:name=\"com.google.android.gms\" />\n"
+                    + "<package android:name=\"com.android.vending\" />\n"
                     + request.getArg("android.manifest.queries", "")
                     + healthQueriesFragment + smartHomeQueriesFragment
                     + "</queries>\n";
@@ -5163,6 +5299,12 @@ public class AndroidGradleBuilder extends Executor {
         if (!shouldIncludeGoogleImpl) {
             File fb = new File(srcDir, "com/codename1/social/GoogleImpl.java");
             fb.delete();
+        }
+
+        // The UnifiedPush glue names org.unifiedpush, which only an application
+        // with UnifiedPush turned on has as a dependency.
+        if (!useUnifiedPush) {
+            delTree(new File(srcDir, "com/codename1/impl/android/unifiedpush"));
         }
 
         // The nearby package compiles against a modern SDK plus, for two of
@@ -5726,6 +5868,13 @@ public class AndroidGradleBuilder extends Executor {
         if (useHMS) {
             nativeThemeStubProps += "        Display.getInstance().setProperty(\"cn1.push.transport\", \"huawei\");\n";
         }
+        if (useHMS || useUnifiedPush) {
+            // Read by AndroidImplementation.registerPush: with a transport other
+            // than Firebase compiled in, a device without Play services is not a
+            // reason to give up before the activity has tried the others.
+            nativeThemeStubProps += "        Display.getInstance().setProperty(\"cn1.push.transports\", \""
+                    + pushTransportList(useFCM, useHMS, useUnifiedPush) + "\");\n";
+        }
         nativeThemeStubProps += databaseLegacyStubProperty(request, usesDatabase);
 
         String gcmSenderId = request.getArg("gcm.sender_id", null);
@@ -5767,7 +5916,12 @@ public class AndroidGradleBuilder extends Executor {
 
         String locationServices = "<activity android:name=\"com.codename1.location.CodenameOneBackgroundLocationActivity\" android:theme=\"@android:style/Theme.NoDisplay\" android:exported=\"true\"/>\n"
                 + "<service android:name=\"com.codename1.location.BackgroundLocationHandler\" android:exported=\"false\" />\n"
-                + "<service android:name=\"com.codename1.location.GeofenceHandler\" android:exported=\"false\" />\n";
+                + "<service android:name=\"com.codename1.location.GeofenceHandler\" android:exported=\"false\" />\n"
+                // Background location and geofences through the platform location
+                // service, for devices without Google Play services. Not exported:
+                // only the location service, holding this app's PendingIntent,
+                // delivers to it.
+                + "<receiver android:name=\"com.codename1.location.FrameworkLocationReceiver\" android:exported=\"false\" />\n";
         String mediaService = "<service android:name=\"com.codename1.media.AudioService\" android:exported=\"false\" />";
         String remoteControlService = "<service android:name=\"com.codename1.media.BackgroundAudioService\"  android:exported=\"true\">\n" +
                 "            <intent-filter>\n" +
@@ -6112,7 +6266,7 @@ public class AndroidGradleBuilder extends Executor {
             permissions += permissionAdd(request, "USE_LOCATION_BUTTON",
                     LOCATION_BUTTON_PERMISSION);
         }
-        if (pushPermission && !useFCM && !useHMS) {
+        if (pushPermission && !useFCM && !useHMS && !useUnifiedPush) {
             permissions += "<permission android:name=\"" + request.getPackageName() + ".permission.C2D_MESSAGE\" android:protectionLevel=\"signature\" />\n"
                     + "    <uses-permission android:name=\"" + request.getPackageName() + ".permission.C2D_MESSAGE\" />\n"
                     + "    <uses-permission android:name=\"com.google.android.c2dm.permission.RECEIVE\" />\n";
@@ -6392,6 +6546,11 @@ public class AndroidGradleBuilder extends Executor {
                         + "              <action android:name=\"com.google.firebase.MESSAGING_EVENT\" />\n"
                         + "          </intent-filter>\n"
                         + "      </service>\n";
+            }
+            if (useUnifiedPush) {
+                pushManifestEntries += "<service android:name=\"com.codename1.impl.android.unifiedpush.CN1UnifiedPushService\" android:exported=\"false\">\n"
+                        + "  <intent-filter><action android:name=\"org.unifiedpush.android.connector.PUSH_EVENT\" /></intent-filter>\n"
+                        + "</service>\n";
             }
             if (useHMS) {
                 pushManifestEntries += "<service android:name=\".CN1HuaweiMessagingService\" android:exported=\"false\">\n"
@@ -7228,7 +7387,7 @@ public class AndroidGradleBuilder extends Executor {
                             + inviteRegisterInstall
                             + svgRegistryInstall
                             + "            i.init(this);\n"
-                            + fcmRegisterPushCode
+                            + guardedFcmRegisterPushCode(fcmRegisterPushCode)
                             + "         } else {\n"
                             + "             synchronized(LOCK) {\n"
                             + "                 if(!wasStopped) {\n"
@@ -7298,7 +7457,7 @@ public class AndroidGradleBuilder extends Executor {
             }
         }
         boolean backgroundPushHandling = "true".equals(request.getArg("android.background_push_handling", "false"));
-        if (!useFCM && !useHMS) {
+        if (!useFCM && !useHMS && !useUnifiedPush) {
             File pushServiceFileSourceFile = new File(stubFileSourceDir, "PushNotificationService.java");
 
             String pushServiceOnCreate = "";

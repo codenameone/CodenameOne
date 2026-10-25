@@ -254,6 +254,8 @@ include::On-Device-Debugging.asciidoc[]
 
 include::On-Device-Debugging-Android.asciidoc[]
 
+include::Android-Without-Google-Play.asciidoc[]
+
 = Build, sign and ship
 
 include::Build-Hints.asciidoc[]

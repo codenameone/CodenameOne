@@ -1,0 +1,96 @@
+[[android-without-google-play]]
+== Android without Google Play services
+
+Many Android devices have no Google Play services. GrapheneOS, CalyxOS, /e/OS
+and LineageOS without Google apps ship without it, and GrapheneOS installs it
+only as an ordinary app the user can remove. Huawei and Amazon devices have
+their own services instead. A Codename One application runs on these devices
+without a separate build: the same APK checks at run time whether Play
+services is present and uses a fallback, or reports a feature as unsupported,
+when it isn't.
+
+No build hint turns this on. The Android port never calls into Play services,
+Play Core or Firebase without asking first, and a CI check holds it to that.
+
+=== What changes without Play services
+
+[cols="1,2",options="header"]
+|===
+|Feature |Behavior without Google Play services
+
+|User interface, storage, networking, SQLite, media
+|Unchanged. None of them use Play services.
+
+|Location
+|Uses Android's own location manager. Background location and geofences use
+the framework's pending-intent updates and proximity alerts instead of the
+fused provider. The listener API and the `android.backgroundLocation.*` build
+hints are the same.
+
+|Maps
+|`NativeMap` falls back to the vector `MapView` instead of the native Google map.
+
+|Push notifications
+|`PushClient` delivers through UnifiedPush (see below) or Huawei Push Kit when
+the build includes them. Without any of them, `pushRegistrationError` reports
+that no push service is available rather than registration never answering.
+
+|Google sign-in
+|`isNativeLoginSupported()` answers `false`, so `GoogleConnect` signs in
+through the browser OAuth flow.
+
+|On-device AI (ML Kit)
+|Works. The bundled models run locally.
+
+|Device attestation (Play Integrity)
+|`isAttestationSupported()` answers `false`.
+
+|In-app review
+|`isSupported()` answers `false`. The review prompt belongs to the Play Store.
+
+|Nearby connections
+|The transport reports `NOT_SUPPORTED`.
+
+|Wear OS data layer
+|Unavailable.
+
+|In-app purchase
+|Google Play Billing needs the Play Store; purchases are unavailable on these
+devices.
+|===
+
+Test an application on such a device with the Android emulator's *AOSP*
+system images (`default` target), which have no Google apps.
+
+=== Push notifications through UnifiedPush
+
+https://unifiedpush.org[UnifiedPush] lets the user choose the app that holds
+the push connection: ntfy, NextPush, Sunup and others, called distributors. A
+UnifiedPush endpoint is a standard Web Push subscription, so the push service
+delivers to it with the *Web Push* credential the application already has. It
+needs no server change and no other credential.
+
+To enable it, copy the VAPID public key from the application's Web Push
+credential into a build hint:
+
+[source,properties]
+----
+codename1.arg.android.unifiedPush.vapidKey=BExampleKeyOf87Base64UrlCharacters...
+----
+
+The key is 87 base64url characters. The build rejects anything else. With the
+hint set and `PushClient` in use, the application registers in this order:
+
+. Firebase Cloud Messaging, when Google Play services is available and the
+  build includes `google-services.json`.
+. Huawei Push Kit, when HMS Core is installed and the build includes
+  `agconnect-services.json`.
+. UnifiedPush, otherwise. If the user has more than one distributor installed,
+  Android asks which one to use. With none installed, `pushRegistrationError`
+  explains that a push service is needed.
+
+The device key the application receives starts with `cn1-web-`, and the push
+service routes it as a Web Push target. `android.messagingService=unifiedpush`
+forces UnifiedPush even without the key, for distributors that don't require
+one. `android.unifiedPush.connectorVersion` overrides the version of the
+UnifiedPush connector library the build adds.

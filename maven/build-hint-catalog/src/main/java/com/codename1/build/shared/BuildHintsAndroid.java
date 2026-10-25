@@ -709,9 +709,10 @@ final class BuildHintsAndroid {
                 .platform("android")
                 .doc("The Android push provider. Left unset, a build that uses PushClient picks FCM, "
                         + "Huawei Push Kit or both from the google-services.json and "
-                        + "agconnect-services.json files present, and fails when neither is. "
-                        + "fcm or huawei forces one provider; none builds without push, for an "
-                        + "app that hasn't got its push configuration yet."));
+                        + "agconnect-services.json files present, and fails when none is configured. "
+                        + "The android.unifiedPush.vapidKey hint adds UnifiedPush to that choice. "
+                        + "fcm, huawei or unifiedpush forces one provider; none builds without push, "
+                        + "for an app that hasn't got its push configuration yet."));
 
         h.add(new Hint("android.migrateToAndroidX")
                 .group(HintGroup.ANDROID)
@@ -1149,6 +1150,24 @@ final class BuildHintsAndroid {
                         + "a 320×180 launcher banner (`@drawable/tv_banner`) from the app icon. The same APK still "
                         + "installs and runs on phones and tablets, and `CN.isTV()` returns true at runtime on a "
                         + "TV."));
+
+        h.add(new Hint("android.unifiedPush.connectorVersion")
+                .group(HintGroup.ANDROID)
+                .type(HintType.STRING)
+                .def("3.3.5")
+                .platform("android")
+                .doc("Version of the UnifiedPush connector library (org.unifiedpush.android:connector) "
+                        + "added when UnifiedPush is turned on."));
+
+        h.add(new Hint("android.unifiedPush.vapidKey")
+                .group(HintGroup.ANDROID)
+                .type(HintType.STRING)
+                .platform("android")
+                .doc("Turns on UnifiedPush for an app that uses PushClient, so it receives push on "
+                        + "devices without Google Play services (GrapheneOS, LineageOS, /e/OS) through "
+                        + "a distributor such as ntfy. The value is the public key of the app's web push "
+                        + "(VAPID) credential: 87 base64url characters. Firebase is still used where "
+                        + "Play services is available."));
 
         h.add(new Hint("android.useGradle8")
                 .group(HintGroup.ANDROID)
