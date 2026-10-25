@@ -23,6 +23,8 @@
 package com.codename1.backend;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -380,14 +382,317 @@ public final class Web {
     private static final int FLAG_CLIENT = 2;
     /// Bit 2: never keep or reuse a connection.
     private static final int FLAG_NO_REUSE = 4;
+    /// Bit 3: a streamed exchange, stepped from Java; see Exchange.
+    private static final int FLAG_STREAM = 8;
+
+    private static final int WANT_HEADERS = 1;
+    private static final int WANT_DATA = 2;
+    private static final int WANT_SPACE = 3;
+
+    /// The request has no body.
+    public static final long NO_BODY = -2;
+    /// The request has a body whose length is not known in advance: chunked on
+    /// HTTP/1.1, DATA frames until the end on HTTP/2.
+    public static final long UNKNOWN_LENGTH = -1;
+
+    /// Opens a streamed exchange; see [Exchange]. Every default, no pool.
+    public static Exchange open(String method, String url, List headers, long requestLength)
+            throws IOException {
+        return open(null, method, url, headers, requestLength);
+    }
+
+    static Exchange open(WebClient client, String method, String url, List headers,
+                         long requestLength) throws IOException {
+        Urls.requireHttp(url);
+        HeaderLines.requireMethod(method);
+        HeaderLines.validate(headers);
+        if (requestLength < NO_BODY) {
+            throw new IllegalArgumentException("requestLength " + requestLength);
+        }
+        StringBuilder joined = new StringBuilder();
+        if (headers != null) {
+            for (int iter = 0 ; iter < headers.size() ; iter++) {
+                if (iter > 0) {
+                    joined.append('\n');
+                }
+                joined.append(String.valueOf(headers.get(iter)));
+            }
+        }
+        initialiseCurlOnce();
+        // callerHeaders true: redirects are never followed in a stream anyway,
+        // and it keeps the follow decision out of the transfer entirely.
+        long handle = performClient(client, 0, method, url,
+                HeaderLines.narrowed(joined.toString()), null, true, FLAG_STREAM, requestLength);
+        if (handle == 0) {
+            throw new IOException("Could not start a request to " + Urls.forMessage(url));
+        }
+        if (statusImpl(handle) == -1 && errorImpl(handle) != null) {
+            String error = errorImpl(handle);
+            freeImpl(handle);
+            throw new IOException("Request to " + Urls.forMessage(url) + " failed: " + error);
+        }
+        return new Exchange(client, handle, url, requestLength != NO_BODY);
+    }
+
+    /// One streamed HTTP exchange: the request body written as it is produced,
+    /// the response read as it arrives, neither held in memory whole. The way to
+    /// move a large upload or download, or to forward one (see HttpProxy).
+    ///
+    /// Use it from one thread, in order: write and close [#getRequestBody] when
+    /// the request has one, then [#getStatus] and the headers, then read
+    /// [#getResponseBody]. Writes block until the transport has taken the bytes
+    /// and reads until some have arrived, so a slow peer at either end slows the
+    /// producer rather than filling memory -- each direction buffers a fixed
+    /// 256 KiB window. [#close] ends the exchange whatever state it is in;
+    /// before the response has been read to its end that CANCELS it, closing the
+    /// upstream connection rather than draining it. Always close it, in a finally.
+    ///
+    /// Redirects are never followed here: a streamed body cannot be replayed.
+    /// The request timeout of a WebClient does not apply either -- a stream may
+    /// legitimately run for as long as it moves -- while its connect and read
+    /// timeouts do, the read timeout bounding each wait for the peer. A stream
+    /// has a connection of its own rather than one from the client's pool.
+    public static final class Exchange {
+        private final WebClient client;
+        private final String url;
+        private final boolean hasBody;
+        private long handle;
+        private boolean requestDone;
+        private boolean headersRead;
+        private boolean ended;
+        private int status = -1;
+        private String protocol;
+        private Map values;
+        private Map firstValues;
+        private OutputStream requestBody;
+        private InputStream responseBody;
+
+        Exchange(WebClient client, long handle, String url, boolean hasBody) {
+            this.client = client;
+            this.handle = handle;
+            this.url = url;
+            this.hasBody = hasBody;
+            this.requestDone = !hasBody;
+        }
+
+        /// Where the request body goes. Closing it ends the request body; the
+        /// stream is the exchange's and closing it does not end the exchange.
+        public OutputStream getRequestBody() throws IOException {
+            if (!hasBody) {
+                throw new IllegalStateException("this exchange was opened with NO_BODY");
+            }
+            requireOpen();
+            if (requestBody == null) {
+                requestBody = new OutputStream() {
+                    @Override
+                    public void write(int b) throws IOException {
+                        write(new byte[] {(byte) b}, 0, 1);
+                    }
+
+                    @Override
+                    public void write(byte[] data, int offset, int length) throws IOException {
+                        if (requestDone) {
+                            throw new IOException("the request body has been closed");
+                        }
+                        if (offset < 0 || length < 0 || length > data.length - offset) {
+                            throw new IndexOutOfBoundsException();
+                        }
+                        int at = offset;
+                        int left = length;
+                        while (left > 0) {
+                            requireOpen();
+                            int taken = streamWriteImpl(handle, data, at, left);
+                            if (taken < 0) {
+                                throw new IOException("Out of memory for the request body to "
+                                        + Urls.forMessage(url));
+                            }
+                            // Returns once libcurl has taken the whole block: the
+                            // backpressure, and what makes reusing `data` safe.
+                            int state = streamStepImpl(handle, WANT_SPACE);
+                            if ((state & 2) != 0) {
+                                ended = true;
+                                if (statusImpl(handle) < 0) {
+                                    throw failure();
+                                }
+                                throw new IOException("Request to " + Urls.forMessage(url)
+                                        + " ended before its body was sent");
+                            }
+                            at += taken;
+                            left -= taken;
+                        }
+                    }
+
+                    @Override
+                    public void close() throws IOException {
+                        if (!requestDone) {
+                            requestDone = true;
+                            requireOpen();
+                            streamEndUploadImpl(handle);
+                        }
+                    }
+                };
+            }
+            return requestBody;
+        }
+
+        /// The response status, waiting for the response headers. Ends a request
+        /// body that is still open first.
+        public int getStatus() throws IOException {
+            awaitResponse();
+            return status;
+        }
+
+        /// "HTTP/1.1" or "HTTP/2", as negotiated.
+        public String getProtocol() throws IOException {
+            awaitResponse();
+            return protocol;
+        }
+
+        /// The first value of every response header, by lower-case name.
+        public Map getHeaders() throws IOException {
+            awaitResponse();
+            return firstValues;
+        }
+
+        /// Every response header, by lower-case name, each a List of values in
+        /// arrival order -- Set-Cookie and the like keep every line.
+        public Map getHeaderValueMap() throws IOException {
+            awaitResponse();
+            return values;
+        }
+
+        public String getHeader(String name) throws IOException {
+            List all = getHeaderValues(name);
+            return all.isEmpty() ? null : (String) all.get(0);
+        }
+
+        public List getHeaderValues(String name) throws IOException {
+            awaitResponse();
+            List all = name == null ? null : (List) values.get(asciiLower(name));
+            return all == null ? new ArrayList() : all;
+        }
+
+        /// The response body as it arrives. Reading it to the end completes the
+        /// exchange; [#close] before that cancels it.
+        public InputStream getResponseBody() throws IOException {
+            awaitResponse();
+            if (responseBody == null) {
+                responseBody = new InputStream() {
+                    @Override
+                    public int read() throws IOException {
+                        byte[] one = new byte[1];
+                        int n = read(one, 0, 1);
+                        return n <= 0 ? -1 : one[0] & 0xff;
+                    }
+
+                    @Override
+                    public int read(byte[] target, int offset, int length) throws IOException {
+                        if (offset < 0 || length < 0 || length > target.length - offset) {
+                            throw new IndexOutOfBoundsException();
+                        }
+                        if (length == 0) {
+                            return 0;
+                        }
+                        while (true) {
+                            requireOpen();
+                            int n = streamReadImpl(handle, target, offset, length);
+                            if (n > 0) {
+                                return n;
+                            }
+                            if (ended) {
+                                return -1;
+                            }
+                            int state = streamStepImpl(handle, WANT_DATA);
+                            if ((state & 2) != 0) {
+                                ended = true;
+                                if (statusImpl(handle) < 0) {
+                                    throw failure();
+                                }
+                            }
+                        }
+                    }
+
+                    @Override
+                    public void close() {
+                        Exchange.this.close();
+                    }
+                };
+            }
+            return responseBody;
+        }
+
+        /// Ends the exchange. Before the response body has been read to its end
+        /// this cancels it: the transfer is aborted and its connection closed.
+        public void close() {
+            if (handle == 0) {
+                return;
+            }
+            long release = handle;
+            handle = 0;
+            freeImpl(release);
+            if (client != null) {
+                client.exchangeEnded();
+            }
+        }
+
+        private void awaitResponse() throws IOException {
+            requireOpen();
+            if (headersRead) {
+                return;
+            }
+            if (!requestDone) {
+                getRequestBody().close();
+            }
+            int state = streamStepImpl(handle, WANT_HEADERS);
+            if ((state & 2) != 0) {
+                ended = true;
+            }
+            status = statusImpl(handle);
+            if (status < 0) {
+                throw failure();
+            }
+            values = parseHeaders(headersImpl(handle));
+            firstValues = new LinkedHashMap();
+            java.util.Iterator it = values.entrySet().iterator();
+            while (it.hasNext()) {
+                Map.Entry entry = (Map.Entry) it.next();
+                List all = (List) entry.getValue();
+                if (all != null && !all.isEmpty()) {
+                    firstValues.put(entry.getKey(), all.get(0));
+                }
+            }
+            protocol = protocolName(protocolImpl(handle));
+            headersRead = true;
+        }
+
+        private void requireOpen() throws IOException {
+            if (handle == 0) {
+                throw new IOException("this exchange has been closed");
+            }
+        }
+
+        private IOException failure() {
+            String error = errorImpl(handle);
+            return new IOException("Request to " + Urls.forMessage(url) + " failed: "
+                    + (error == null ? "unknown error" : error));
+        }
+    }
 
     private static long performClient(WebClient client, long pool, String method, String url,
                                       byte[] headerLines, byte[] body, boolean callerHeaders) {
+        return performClient(client, pool, method, url, headerLines, body, callerHeaders, 0,
+                NO_BODY);
+    }
+
+    private static long performClient(WebClient client, long pool, String method, String url,
+                                      byte[] headerLines, byte[] body, boolean callerHeaders,
+                                      int extraFlags, long uploadLength) {
+        boolean streamed = (extraFlags & FLAG_STREAM) != 0;
         if (client == null) {
-            return performImpl(0, method, url, headerLines, body, callerHeaders, 0,
-                    30000, 30000, 0, null, null, -1, null);
+            return performImpl(0, method, url, headerLines, body, callerHeaders, extraFlags,
+                    30000, 30000, 0, null, null, -1, null, uploadLength);
         }
-        int flags = FLAG_CLIENT;
+        int flags = FLAG_CLIENT | extraFlags;
         if (client.isRequireHttp2()) {
             flags |= FLAG_REQUIRE_HTTP2;
         }
@@ -405,9 +710,12 @@ public final class Web {
             type = credential.getType();
             password = credential.getPassword();
         }
+        // A stream has no whole-request deadline: it may run for as long as it
+        // moves, which the read timeout (LOW_SPEED_TIME) still bounds.
         return performImpl(pool, method, url, headerLines, body, callerHeaders, flags,
                 client.getConnectTimeoutMillis(), client.getReadTimeoutMillis(),
-                client.getRequestTimeoutMillis(), certificate, key, type, password);
+                streamed ? 0 : client.getRequestTimeoutMillis(), certificate, key, type,
+                password, uploadLength);
     }
 
     /// CURLINFO_HTTP_VERSION's answer as a protocol name.
@@ -523,7 +831,12 @@ public final class Web {
                                            boolean callerHeaders, int flags,
                                            int connectTimeoutMillis, int readTimeoutMillis,
                                            int requestTimeoutMillis, byte[] certificate,
-                                           byte[] key, int certificateType, String password);
+                                           byte[] key, int certificateType, String password,
+                                           long uploadLength);
+    private static native int streamStepImpl(long handle, int want);
+    private static native int streamReadImpl(long handle, byte[] buffer, int offset, int length);
+    private static native int streamWriteImpl(long handle, byte[] buffer, int offset, int length);
+    private static native void streamEndUploadImpl(long handle);
     private static native long poolCreateImpl();
     private static native void poolFreeImpl(long pool);
     private static native int protocolImpl(long handle);
