@@ -95,7 +95,7 @@ public final class JsonValues {
     /// #### Throws
     ///
     /// - `IllegalArgumentException`: when `json` is not an object
-    public static Object object(com.codename1.mapping.Mapper mapper, Object json) {
+    public static Object object(Mapper mapper, Object json) {
         if (!(json instanceof java.util.Map) || mapper == null) {
             throw new IllegalArgumentException("expected a JSON object");
         }
@@ -121,7 +121,7 @@ public final class JsonValues {
         try {
             return Double.parseDouble(s);
         } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("expected a number, found \"" + s + "\"");
+            throw new IllegalArgumentException("expected a number, found \"" + s + "\"", e);
         }
     }
 
@@ -317,7 +317,7 @@ public final class JsonValues {
         } catch (RuntimeException e) {
             // NumberFormatException and StringIndexOutOfBoundsException are
             // thrown explicitly by the parsers, never by a cast.
-            throw new IllegalArgumentException("expected an ISO-8601 date, found \"" + s + "\"");
+            throw new IllegalArgumentException("expected an ISO-8601 date, found \"" + s + "\"", e);
         }
     }
 

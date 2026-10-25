@@ -197,14 +197,13 @@ public final class JsonCodec {
         boolean whole = true;
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
-            if (c >= '0' && c <= '9' || (i == 0 && c == '-')) {
-                continue;
-            }
-            if (c == '.' || c == 'e' || c == 'E' || c == '+' || c == '-') {
+            if (c == '.' || c == 'e' || c == 'E' || c == '+' || (c == '-' && i > 0)) {
                 whole = false;
-                continue;
+            } else if (c < '0' || c > '9') {
+                if (i != 0 || c != '-') {
+                    return json;
+                }
             }
-            return json;
         }
         try {
             if (whole) {

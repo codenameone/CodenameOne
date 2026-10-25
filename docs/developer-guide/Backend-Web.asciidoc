@@ -319,7 +319,7 @@ did becomes a declaration:
 
 | `JsonNode`, `mapper.readTree(text)`
 | `Json.parse(text)`, which answers a `Map`, a `List`, a `String`, a `Long`, a
-  `Double`, a `Boolean` or `null`, nested as deeply as the document is.
+  `Double`, a `Boolean` or `null`, nested to whatever depth the document has.
 
 | `ObjectNode` built by hand for a response
 | A `Map` or `List` returned from the method, or written with `Json.write(value)`.
