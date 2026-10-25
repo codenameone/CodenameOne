@@ -463,7 +463,7 @@ public class LinuxWindowManager extends WindowManager {
         if (img == 0) {
             return null;
         }
-        return Long.valueOf(img);
+        return LinuxImplementation.wrapImage(img, 0, 0);
     }
 
     @Override

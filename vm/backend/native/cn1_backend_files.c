@@ -42,6 +42,7 @@
  */
 #include "cn1_globals.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <limits.h>   /* PATH_MAX, for the component walk below */
 #include <errno.h>
@@ -478,5 +479,90 @@ JAVA_VOID com_codename1_backend_FileIo_closeImpl___int(CODENAME_ONE_THREAD_STATE
     }
 #else
     (void)fd;
+#endif
+}
+
+/*
+ * Spool files: the disk side of a request body or multipart part too large to
+ * hold in memory (Spool.java). The file is unlinked the moment it is created,
+ * so it has no name for anything else to open and the kernel reclaims it when
+ * the descriptor closes -- on the normal path, on a handler that throws, on a
+ * dropped connection, and on a process that dies, none of which has to find a
+ * path to delete. Owner-only either way: mkstemp creates it 0600.
+ */
+JAVA_INT com_codename1_backend_FileIo_createTempImpl___java_lang_String_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT dir) {
+#ifdef _WIN32
+    (void)dir;
+    return -1;
+#else
+    const char* d = dir == JAVA_NULL ? NULL : stringToUTF8(threadStateData, dir);
+    char path[PATH_MAX];
+    int fd;
+    if(d == NULL || d[0] == 0) {
+        d = getenv("TMPDIR");
+    }
+    if(d == NULL || d[0] == 0) {
+        d = "/tmp";
+    }
+    if(snprintf(path, sizeof(path), "%s/cn1-spool-XXXXXX", d) >= (int)sizeof(path)) {
+        return -1;
+    }
+    fd = mkstemp(path);
+    if(fd < 0) {
+        return -1;
+    }
+    unlink(path);
+    fcntl(fd, F_SETFD, FD_CLOEXEC);
+    return fd;
+#endif
+}
+
+/* Writes all of the slice or fails: -1 on error, otherwise length. */
+JAVA_INT com_codename1_backend_FileIo_writeImpl___int_byte_1ARRAY_int_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_INT fd, JAVA_OBJECT buffer, JAVA_INT offset, JAVA_INT length) {
+#ifdef _WIN32
+    (void)fd; (void)buffer; (void)offset; (void)length;
+    return -1;
+#else
+    JAVA_ARRAY_BYTE* data;
+    size_t done = 0;
+    if(fd < 0 || buffer == JAVA_NULL) {
+        return -1;
+    }
+    data = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(buffer);
+    CN1_YIELD_THREAD;
+    while(done < (size_t)length) {
+        ssize_t n = write(fd, &data[offset + done], (size_t)length - done);
+        if(n < 0 && errno == EINTR) {
+            continue;
+        }
+        if(n <= 0) {
+            CN1_RESUME_THREAD;
+            return -1;
+        }
+        done += (size_t)n;
+    }
+    CN1_RESUME_THREAD;
+    return length;
+#endif
+}
+
+/* A positioned read, so any number of streams can read one spool file. */
+JAVA_INT com_codename1_backend_FileIo_preadImpl___int_byte_1ARRAY_int_int_long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_INT fd, JAVA_OBJECT buffer, JAVA_INT offset, JAVA_INT length, JAVA_LONG position) {
+#ifdef _WIN32
+    (void)fd; (void)buffer; (void)offset; (void)length; (void)position;
+    return -1;
+#else
+    JAVA_ARRAY_BYTE* data;
+    ssize_t n;
+    if(fd < 0 || buffer == JAVA_NULL || position < 0) {
+        return -1;
+    }
+    data = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(buffer);
+    CN1_YIELD_THREAD;
+    do {
+        n = pread(fd, &data[offset], (size_t)length, (off_t)position);
+    } while(n < 0 && errno == EINTR);
+    CN1_RESUME_THREAD;
+    return n < 0 ? -1 : (JAVA_INT)n;
 #endif
 }

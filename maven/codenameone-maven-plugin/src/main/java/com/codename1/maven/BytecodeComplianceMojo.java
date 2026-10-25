@@ -26,6 +26,7 @@ import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
+import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.plugins.annotations.ResolutionScope;
 
 import org.apache.maven.artifact.Artifact;
@@ -45,6 +46,13 @@ import java.util.Set;
 @Mojo(name = "bytecode-compliance", defaultPhase = LifecyclePhase.PROCESS_CLASSES, requiresDependencyResolution = ResolutionScope.TEST)
 public class BytecodeComplianceMojo extends AbstractCN1Mojo {
 
+    /// Where the port report of a desktop application is written: what works
+    /// unchanged, what to change by source file, and what becomes of each
+    /// dependency. Written whether the check passes or fails; the default is
+    /// `target/codenameone/desktop-port-report.md`.
+    @Parameter(property = "cn1.desktop.report")
+    private java.io.File desktopReport;
+
     @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
         if (!isCN1ProjectDir()) {
@@ -62,6 +70,7 @@ public class BytecodeComplianceMojo extends AbstractCN1Mojo {
                 copyKotlinIncrementalCompileOutputToOutputDir();
             }
         };
+        check.portReport(desktopReport);
         check.checkedDependencyRoots(plainSiblingModules());
         try {
             check.execute();

@@ -54,6 +54,24 @@ public class FFMPEGVideoIO extends VideoIO {
         return FFMPEGMedia.isConfigured();
     }
 
+    /// Converts a recorded video to an animated GIF with a palette generated from the
+    /// video itself, which is what keeps a screen recording's flat colours from
+    /// dithering. Used by the simulator's recorder.
+    public static void transcodeToGif(java.io.File in, java.io.File out, int fps, int width) throws IOException {
+        List<String> command = new ArrayList<String>();
+        command.add(FFMPEGSupport.ffmpeg());
+        command.add("-y");
+        command.add("-hide_banner");
+        command.add("-loglevel");
+        command.add("error");
+        command.add("-i");
+        command.add(in.getAbsolutePath());
+        command.add("-vf");
+        command.add("fps=" + fps + ",scale=" + width + ":-1:flags=lanczos,split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=none");
+        command.add(out.getAbsolutePath());
+        FFMPEGSupport.runChecked(command);
+    }
+
     @Override
     public synchronized VideoCodec[] getAvailableEncoders() {
         if (encoders == null) {

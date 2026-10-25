@@ -196,17 +196,47 @@ public final class WebClient {
         try {
             return Web.request(this, method, url, headers, body);
         } finally {
-            Object released = null;
-            synchronized (this) {
-                inFlight--;
-                if (closed && inFlight == 0) {
-                    released = transport;
-                    transport = null;
-                }
+            exchangeEnded();
+        }
+    }
+
+    /// As [Web#open(String, String, List, long)], through this client: its
+    /// certificate, pool and connect and read timeouts. The exchange counts as a
+    /// request in flight until it is closed, so [#close] waits for it.
+    public Web.Exchange open(String method, String url, List headers, long requestLength)
+            throws IOException {
+        synchronized (this) {
+            if (closed) {
+                throw new IOException("This WebClient has been closed");
             }
-            if (released != null) {
-                Web.closeTransport(released);
+            used = true;
+            inFlight++;
+        }
+        boolean opened = false;
+        try {
+            Web.Exchange exchange = Web.open(this, method, url, headers, requestLength);
+            opened = true;
+            return exchange;
+        } finally {
+            if (!opened) {
+                exchangeEnded();
             }
+        }
+    }
+
+    /// One request or exchange is over; the last one out after close() releases
+    /// the transport.
+    void exchangeEnded() {
+        Object released = null;
+        synchronized (this) {
+            inFlight--;
+            if (closed && inFlight == 0) {
+                released = transport;
+                transport = null;
+            }
+        }
+        if (released != null) {
+            Web.closeTransport(released);
         }
     }
 

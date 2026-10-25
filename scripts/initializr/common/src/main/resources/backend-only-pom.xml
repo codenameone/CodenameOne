@@ -25,8 +25,8 @@
     than a crash at start-up.
   -->
   <properties>
-    <cn1.plugin.version>8.0-SNAPSHOT</cn1.plugin.version>
-    <cn1.version>8.0-SNAPSHOT</cn1.version>
+    <cn1.plugin.version>7.0.279</cn1.plugin.version>
+    <cn1.version>7.0.279</cn1.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <!-- The native build translates class files of this level. -->
     <maven.compiler.source>1.8</maven.compiler.source>

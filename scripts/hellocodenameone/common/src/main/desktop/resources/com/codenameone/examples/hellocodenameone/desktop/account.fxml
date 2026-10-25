@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.CheckBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox xmlns:fx="http://javafx.com/fxml/1" spacing="12" styleClass="screen"
+      fx:controller="com.codenameone.examples.hellocodenameone.desktop.AccountController">
+    <padding>
+        <Insets top="12" right="12" bottom="12" left="12"/>
+    </padding>
+    <Label text="Account" styleClass="heading"/>
+    <VBox spacing="10" styleClass="card">
+        <padding>
+            <Insets top="12" right="12" bottom="12" left="12"/>
+        </padding>
+        <Label fx:id="status" text="Set in the document"/>
+        <GridPane hgap="8" vgap="8">
+            <Label text="Owner:" GridPane.columnIndex="0" GridPane.rowIndex="0"/>
+            <TextField fx:id="owner" promptText="Name" GridPane.columnIndex="1" GridPane.rowIndex="0"/>
+            <Label text="Plan:" GridPane.columnIndex="0" GridPane.rowIndex="1"/>
+            <Label text="Analytical" styleClass="value" GridPane.columnIndex="1" GridPane.rowIndex="1"/>
+        </GridPane>
+        <CheckBox text="Send a receipt" selected="true"/>
+        <HBox spacing="8">
+            <Button fx:id="save" text="Save" styleClass="primary" onAction="#save"/>
+            <Button text="Cancel"/>
+        </HBox>
+    </VBox>
+    <Label text="Styled by account.css" styleClass="note"/>
+</VBox>

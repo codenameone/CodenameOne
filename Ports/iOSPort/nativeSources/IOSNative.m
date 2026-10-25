@@ -4459,9 +4459,81 @@ void com_codename1_impl_ios_IOSNative_lockOrientation___boolean(CN1_THREAD_STATE
 #endif
 }
 
+#if !TARGET_OS_OSX && !TARGET_OS_WATCH && !TARGET_OS_TV
+// Tells UIKit that the root controller's supportedInterfaceOrientations
+// answer changed. Changing orientationLock alone changes nothing UIKit can
+// see: since iOS 16 it caches the mask and re-reads it only when asked, so an
+// unlock after a lock (issue #6089, a lock held across the native camera)
+// left autorotation off until the process was restarted. Must run on the
+// main thread.
+static void cn1RefreshSupportedOrientations(void) {
+    UIViewController *root = [CodenameOne_GLViewController instance];
+    if (root == nil) {
+        return;
+    }
+    if (@available(iOS 16.0, *)) {
+        [root setNeedsUpdateOfSupportedInterfaceOrientations];
+        // While a native modal (the camera, a picker) is up it owns the
+        // interface orientation, and UIKit re-reads the root's mask when it
+        // is dismissed. A geometry request now would rotate under it.
+        if (root.presentedViewController != nil) {
+            return;
+        }
+#if TARGET_OS_MACCATALYST
+        // A Mac window has no interface orientation to request, and the
+        // iOS geometry preferences are refused there.
+        return;
+#endif
+        UIWindowScene *scene = root.view.window.windowScene;
+        if (scene == nil) {
+            return;
+        }
+        // Ask for the orientation the device is physically held in, when it
+        // is known and allowed, so the interface follows the hand at once
+        // instead of waiting for the next physical rotation.
+        UIInterfaceOrientationMask wanted = 0;
+        switch ([[UIDevice currentDevice] orientation]) {
+            case UIDeviceOrientationPortrait:
+                wanted = UIInterfaceOrientationMaskPortrait;
+                break;
+            case UIDeviceOrientationPortraitUpsideDown:
+                wanted = UIInterfaceOrientationMaskPortraitUpsideDown;
+                break;
+            // Device and interface landscape are mirrored.
+            case UIDeviceOrientationLandscapeLeft:
+                wanted = UIInterfaceOrientationMaskLandscapeRight;
+                break;
+            case UIDeviceOrientationLandscapeRight:
+                wanted = UIInterfaceOrientationMaskLandscapeLeft;
+                break;
+            default:
+                break;
+        }
+        UIInterfaceOrientationMask allowed = [root supportedInterfaceOrientations]
+                & [[UIApplication sharedApplication] supportedInterfaceOrientationsForWindow:root.view.window];
+        if ((wanted & allowed) == 0) {
+            return;
+        }
+        UIWindowSceneGeometryPreferencesIOS *prefs =
+                [[UIWindowSceneGeometryPreferencesIOS alloc] initWithInterfaceOrientations:wanted];
+        [scene requestGeometryUpdateWithPreferences:prefs errorHandler:^(NSError *error) {
+            NSLog(@"CN1: orientation geometry request failed: %@", error);
+        }];
+        [prefs release];
+    } else {
+        [UIViewController attemptRotationToDeviceOrientation];
+    }
+}
+#endif
+
 void com_codename1_impl_ios_IOSNative_unlockOrientation__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject)
 {
     orientationLock = 0;
+#if !TARGET_OS_OSX && !TARGET_OS_WATCH && !TARGET_OS_TV
+    dispatch_async(dispatch_get_main_queue(), ^{
+        cn1RefreshSupportedOrientations();
+    });
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_lockScreen__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject)

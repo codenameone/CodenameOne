@@ -1,0 +1,24 @@
+# 2048 is played with the arrow keys: one click to take the focus, then moves.
+sleep 0.5
+click 0.50 0.60
+key Left
+key Down
+key Right
+key Down
+key Left
+key Up
+key Right
+key Down
+key Left
+key Down
+key Right
+key Up
+key Left
+key Down
+key Right
+key Down
+key Left
+key Left
+key Down
+key Right
+sleep 1.0
