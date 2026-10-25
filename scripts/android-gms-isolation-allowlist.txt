@@ -1,0 +1,18 @@
+# Files in Ports/Android/src allowed to name a Google Play services, Play Core or
+# Firebase type, and how each one stays safe on a device without the service.
+# Read by scripts/check-android-gms-isolation.py; see its docstring.
+#
+# Format: <path or directory/>  <how it is guarded>
+# Every entry must still name such a type, or the gate fails: keep it exact.
+
+Ports/Android/src/com/codename1/impl/android/GoogleServices.java  The proxy itself: everything by reflection, availability checked before any call.
+Ports/Android/src/com/codename1/impl/android/AppReviewSupport.java  isSupported() requires the Play Store (GoogleServices.isPlayStoreInstalled); Play Core reached by reflection.
+Ports/Android/src/com/codename1/impl/android/PlayServices.java  Used only by AndroidLocationPlayServiceManager and GoogleImpl, each guarded below; deleted from builds without Play services location.
+Ports/Android/src/com/codename1/impl/android/PlayServices_12_0_0.java  As PlayServices.java.
+Ports/Android/src/com/codename1/location/AndroidLocationPlayServiceManager.java  Chosen by AndroidImplementation.getLocationManager only when isPlayServicesAvailable; its onResume connects only then too.
+Ports/Android/src/com/codename1/location/BackgroundLocationBroadcastReceiver.java  Receives only PendingIntents that AndroidLocationPlayServiceManager registered, so Play services was there.
+Ports/Android/src/com/codename1/location/BackgroundLocationHandler.java  As BackgroundLocationBroadcastReceiver.java.
+Ports/Android/src/com/codename1/location/GeofenceHandler.java  As BackgroundLocationBroadcastReceiver.java.
+Ports/Android/src/com/codename1/social/GoogleImpl.java  isNativeLoginSupported() is isPlayServicesAvailable, so Login uses web OAuth without it; onResume reconnects only then.
+Ports/Android/src/com/codename1/impl/android/nearby/AndroidNearbyTransport.java  isTransportSupported() is isPlayServicesAvailable and availability reports NOT_SUPPORTED without it.
+Ports/Android/src/com/codename1/impl/android/ai/  Bundled ML Kit (com.google.mlkit): only the Tasks client classes are named, which complete locally with no Play services.

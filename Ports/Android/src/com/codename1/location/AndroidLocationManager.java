@@ -22,7 +22,10 @@
  */
 package com.codename1.location;
 
+import android.app.PendingIntent;
 import android.content.Context;
+import android.content.Intent;
+import android.net.Uri;
 import android.location.Criteria;
 import android.location.GpsStatus;
 import android.location.GnssStatus;
@@ -33,12 +36,14 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
 import com.codename1.impl.android.AndroidImplementation;
+import com.codename1.impl.android.AndroidNativeUtil;
 import com.codename1.io.Log;
 import static com.codename1.location.LocationManager.AVAILABLE;
 import static com.codename1.location.LocationManager.OUT_OF_SERVICE;
 import static com.codename1.location.LocationManager.TEMPORARILY_UNAVAILABLE;
 import com.codename1.ui.Display;
 import java.io.IOException;
+import java.util.List;
 
 public class AndroidLocationManager extends com.codename1.location.LocationManager implements android.location.LocationListener {
     private LocationManager locationManager;
@@ -226,7 +231,10 @@ public class AndroidLocationManager extends com.codename1.location.LocationManag
             public void run() {
                 locationManager.requestLocationUpdates(bestProvider, 0, 0, AndroidLocationManager.this);
                 if (android.os.Build.VERSION.SDK_INT >= 24) {
-                    locationManager.unregisterGnssStatusCallback(gnssStatusListener());
+                    // Register on start and unregister on clear. The two were
+                    // swapped, so the status callback was only ever registered
+                    // after the listener had been cleared.
+                    locationManager.registerGnssStatusCallback(gnssStatusListener());
                 } else {
                     locationManager.addGpsStatusListener(gpsStatusListener());
                 }
@@ -242,7 +250,7 @@ public class AndroidLocationManager extends com.codename1.location.LocationManag
             public void run() {
                 locationManager.removeUpdates(AndroidLocationManager.this);
                 if (android.os.Build.VERSION.SDK_INT >= 24) {
-                    locationManager.registerGnssStatusCallback(gnssStatusListener());
+                    locationManager.unregisterGnssStatusCallback(gnssStatusListener());
                 } else {
                     locationManager.removeGpsStatusListener(gpsStatusListener());
                 }
@@ -347,6 +355,181 @@ public class AndroidLocationManager extends com.codename1.location.LocationManag
 
     public boolean isGPSEnabled() {
         return locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER);
+    }
+
+    // ------------------------------------------------------------------
+    // Background location and geofences without Google Play services.
+    //
+    // The Play services manager is preferred where the service exists. This is
+    // what a device without it gets -- GrapheneOS, LineageOS without GApps,
+    // Huawei -- and also what an application gets when the builder was told to
+    // leave the Play services location library out. Both are delivered to
+    // FrameworkLocationReceiver, which names no Google type.
+    // ------------------------------------------------------------------
+
+    /// PendingIntent.FLAG_MUTABLE, API 31; absent from the SDK this port compiles
+    /// against. The location service adds its result to the intent as an extra,
+    /// which an immutable PendingIntent would refuse.
+    private static final int FLAG_MUTABLE = 33554432;
+
+    /// LocationManager.FUSED_PROVIDER, API 31: the platform's own fused provider,
+    /// part of AOSP and so present without Play services.
+    private static final String FUSED_PROVIDER = "fused";
+
+    static final String ACTION_BACKGROUND = "com.codename1.location.FRAMEWORK_BACKGROUND_LOCATION";
+    static final String ACTION_GEOFENCE = "com.codename1.location.FRAMEWORK_GEOFENCE";
+    static final String EXTRA_LISTENER_CLASS = "cn1ListenerClass";
+    static final String GEOFENCE_SCHEME = "cn1-geofence";
+    private static final Uri BACKGROUND_DATA = Uri.parse("cn1-location:background");
+
+    @Override
+    public boolean isBackgroundLocationSupported() {
+        return true;
+    }
+
+    @Override
+    public boolean isGeofenceSupported() {
+        return true;
+    }
+
+    private static int mutableFlags(int flags) {
+        return android.os.Build.VERSION.SDK_INT >= 31 ? flags | FLAG_MUTABLE : flags;
+    }
+
+    private boolean checkBackgroundPermission() {
+        // ACCESS_BACKGROUND_LOCATION exists from API 29; below it the foreground
+        // grant covers the background too.
+        return android.os.Build.VERSION.SDK_INT < 29
+                || AndroidNativeUtil.checkForPermission("android.permission.ACCESS_BACKGROUND_LOCATION",
+                "This is required to get the location");
+    }
+
+    /// The provider background updates come from: the platform fused provider
+    /// where there is one, else network, else GPS. A de-Googled device often has
+    /// no network provider at all -- that was Play services' -- so GPS is a real
+    /// answer here, not only a last resort.
+    private String backgroundProvider() {
+        List<String> providers = locationManager.getProviders(true);
+        if (providers.contains(FUSED_PROVIDER)) {
+            return FUSED_PROVIDER;
+        }
+        if (providers.contains(LocationManager.NETWORK_PROVIDER)) {
+            return LocationManager.NETWORK_PROVIDER;
+        }
+        if (providers.contains(LocationManager.GPS_PROVIDER)) {
+            return LocationManager.GPS_PROVIDER;
+        }
+        if (providers.contains(LocationManager.PASSIVE_PROVIDER)) {
+            return LocationManager.PASSIVE_PROVIDER;
+        }
+        return null;
+    }
+
+    private PendingIntent backgroundIntent(Class listenerClass, int flags) {
+        Intent intent = new Intent(context, FrameworkLocationReceiver.class);
+        intent.setAction(ACTION_BACKGROUND);
+        intent.setData(BACKGROUND_DATA);
+        if (listenerClass != null) {
+            intent.putExtra(EXTRA_LISTENER_CLASS, listenerClass.getName());
+        }
+        return PendingIntent.getBroadcast(context, 0, intent, mutableFlags(flags));
+    }
+
+    /// One PendingIntent per geofence id: the id is the data URI, which is what
+    /// makes two intents distinct, so removeGeoFencing(id) finds it again without
+    /// knowing the listener class, which travels as an extra.
+    private PendingIntent geofenceIntent(String id, Class listenerClass, int flags) {
+        Intent intent = new Intent(context, FrameworkLocationReceiver.class);
+        intent.setAction(ACTION_GEOFENCE);
+        intent.setData(Uri.fromParts(GEOFENCE_SCHEME, id, null));
+        if (listenerClass != null) {
+            intent.putExtra(EXTRA_LISTENER_CLASS, listenerClass.getName());
+        }
+        return PendingIntent.getBroadcast(context, 0, intent, mutableFlags(flags));
+    }
+
+    private static long longProperty(String name, long defaultValue) {
+        try {
+            return Long.parseLong(Display.getInstance().getProperty(name, String.valueOf(defaultValue)));
+        } catch (NumberFormatException err) {
+            return defaultValue;
+        }
+    }
+
+    @Override
+    protected void bindBackgroundListener() {
+        final Class listenerClass = getBackgroundLocationListener();
+        if (listenerClass == null || !checkBackgroundPermission()) {
+            return;
+        }
+        final String provider = backgroundProvider();
+        if (provider == null) {
+            Log.p("No location provider is enabled; background location updates were not started");
+            return;
+        }
+        // The same build hints the Play services manager reads.
+        final long interval = longProperty("android.backgroundLocation.interval", 10000);
+        final long displacement = longProperty("android.backgroundLocation.smallestDisplacement", 50);
+        new Handler(Looper.getMainLooper()).post(new Runnable() {
+            public void run() {
+                try {
+                    locationManager.requestLocationUpdates(provider, interval, displacement,
+                            backgroundIntent(listenerClass, PendingIntent.FLAG_UPDATE_CURRENT));
+                } catch (SecurityException denied) {
+                    Log.e(denied);
+                }
+            }
+        });
+    }
+
+    @Override
+    protected void clearBackgroundListener() {
+        new Handler(Looper.getMainLooper()).post(new Runnable() {
+            public void run() {
+                PendingIntent pending = backgroundIntent(null, PendingIntent.FLAG_NO_CREATE);
+                if (pending != null) {
+                    locationManager.removeUpdates(pending);
+                    pending.cancel();
+                }
+            }
+        });
+    }
+
+    @Override
+    public void addGeoFencing(final Class geofenceListenerClass, final Geofence gf) {
+        if (!AndroidNativeUtil.checkForPermission("android.permission.ACCESS_FINE_LOCATION",
+                "This is required to get the location") || !checkBackgroundPermission()) {
+            Log.e(new RuntimeException("Permission denied for geofence"));
+            return;
+        }
+        // Same meaning as the Play services geofence: a duration in milliseconds,
+        // with zero or less for one that never expires (-1 to the platform).
+        final long expiration = gf.getExpiration() > 0 ? gf.getExpiration() : -1;
+        new Handler(Looper.getMainLooper()).post(new Runnable() {
+            public void run() {
+                try {
+                    locationManager.addProximityAlert(gf.getLoc().getLatitude(),
+                            gf.getLoc().getLongitude(), gf.getRadius(), expiration,
+                            geofenceIntent(gf.getId(), geofenceListenerClass,
+                                    PendingIntent.FLAG_UPDATE_CURRENT));
+                } catch (SecurityException denied) {
+                    Log.e(denied);
+                }
+            }
+        });
+    }
+
+    @Override
+    public void removeGeoFencing(final String id) {
+        new Handler(Looper.getMainLooper()).post(new Runnable() {
+            public void run() {
+                PendingIntent pending = geofenceIntent(id, null, PendingIntent.FLAG_NO_CREATE);
+                if (pending != null) {
+                    locationManager.removeProximityAlert(pending);
+                    pending.cancel();
+                }
+            }
+        });
     }
 
 }

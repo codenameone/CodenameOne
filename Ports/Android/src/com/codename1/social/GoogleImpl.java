@@ -83,7 +83,11 @@ public class GoogleImpl extends GoogleConnect implements
 
     @Override
     public boolean isNativeLoginSupported() {
-        return true;
+        // Native sign-in is a Play services API. Without the service the client
+        // never connects and its resolution only prompts the user to install
+        // Google Play services, so Login falls back to the web OAuth flow instead.
+        return com.codename1.impl.android.GoogleServices.isPlayServicesAvailable(
+                AndroidNativeUtil.getContext());
     }
 
     @Override
@@ -386,7 +390,7 @@ public class GoogleImpl extends GoogleConnect implements
     }
 
     public void onResume() {
-        if (wasConnected) {
+        if (wasConnected && isNativeLoginSupported()) {
             wasConnected = false;
             getClient(null);
         }

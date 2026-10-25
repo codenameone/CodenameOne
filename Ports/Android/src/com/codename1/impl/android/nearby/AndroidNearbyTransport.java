@@ -324,10 +324,16 @@ public class AndroidNearbyTransport implements NearbyBridge {
     // ------------------------------------------------------------------
 
     public boolean isTransportSupported() {
-        return true;
+        // Nearby Connections is a service of Google Play services. Without it --
+        // GrapheneOS, LineageOS without GApps, Huawei -- every call fails through
+        // its failure listener, so the transport is reported as absent instead.
+        return com.codename1.impl.android.GoogleServices.isPlayServicesAvailable(context);
     }
 
     public int getTransportAvailability() {
+        if (!isTransportSupported()) {
+            return NearbyAvailability.NOT_SUPPORTED.ordinal();
+        }
         // Reported honestly rather than as a flat AVAILABLE. Nearby
         // Connections needs Bluetooth and, depending on the level, nearby-WiFi
         // or location; without them advertising and discovery fail on the
