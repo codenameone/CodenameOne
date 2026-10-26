@@ -42,6 +42,10 @@ import com.codenameone.examples.hellocodenameone.NativeModalRotationNative;
 /// size the framework uses equals the view's size in pixels. iOS only; other
 /// platforms have no such modal and finish at once.
 ///
+/// A second case starts in landscape and stays there: presenting the
+/// portrait-only modal announces a portrait size to the covered view, whose
+/// bounds never change, so nothing corrected it after the dismissal.
+///
 /// No screenshot -- this is an assertion test.
 public class NativeModalRotationTest extends BaseTest {
     private static final int POLL_INTERVAL_MS = 100;
@@ -53,6 +57,7 @@ public class NativeModalRotationTest extends BaseTest {
     private static final int TOLERANCE_PX = 2;
 
     private NativeModalRotationNative modal;
+    private boolean landscapeCase;
 
     @Override
     public boolean shouldTakeScreenshot() {
@@ -135,11 +140,17 @@ public class NativeModalRotationTest extends BaseTest {
         int displayW = Display.getInstance().getDisplayWidth();
         int displayH = Display.getInstance().getDisplayHeight();
         if (Math.abs(viewW - displayW) <= TOLERANCE_PX && Math.abs(viewH - displayH) <= TOLERANCE_PX) {
-            finish(form, null);
+            if (landscapeCase) {
+                finish(form, null);
+            } else {
+                landscapeCase = true;
+                startLandscape(form);
+            }
             return;
         }
         if (attemptsLeft <= 0) {
-            finish(form, "after a native modal closed over a rotation the view is "
+            finish(form, (landscapeCase ? "landscape case: " : "")
+                    + "after a native modal closed over a rotation the view is "
                     + viewW + "x" + viewH + " pixels but the display is "
                     + displayW + "x" + displayH + " (issue #6080)");
             return;
@@ -147,6 +158,48 @@ public class NativeModalRotationTest extends BaseTest {
         UITimer.timer(POLL_INTERVAL_MS, false, form, new Runnable() {
             public void run() {
                 awaitDisplayMatchesView(form, attemptsLeft - 1);
+            }
+        });
+    }
+
+    /// Landscape before the modal, landscape under it, landscape after it.
+    private void startLandscape(final Form form) {
+        CN.lockOrientation(false);
+        poll(form, POLL_ATTEMPTS, new Condition() {
+            public boolean holds() {
+                return !modal.isModalPresented()
+                        && modal.getViewPixelWidth() > modal.getViewPixelHeight();
+            }
+        }, "the device to start the landscape case in landscape", new Runnable() {
+            public void run() {
+                modal.presentPortraitOnlyModal();
+                poll(form, POLL_ATTEMPTS, new Condition() {
+                    public boolean holds() {
+                        return modal.isModalPresented();
+                    }
+                }, "the native modal to be presented over landscape", new Runnable() {
+                    public void run() {
+                        UITimer.timer(UNDER_MODAL_SETTLE_MS, false, form, new Runnable() {
+                            public void run() {
+                                System.out.println("CN1SS:INFO:test=NativeModalRotationTest landscape case under the modal view="
+                                        + modal.getViewPixelWidth() + "x" + modal.getViewPixelHeight()
+                                        + " display=" + Display.getInstance().getDisplayWidth()
+                                        + "x" + Display.getInstance().getDisplayHeight());
+                                modal.dismissModal();
+                                poll(form, POLL_ATTEMPTS, new Condition() {
+                                    public boolean holds() {
+                                        return !modal.isModalPresented()
+                                                && modal.getViewPixelWidth() > modal.getViewPixelHeight();
+                                    }
+                                }, "the modal to close with the view still landscape", new Runnable() {
+                                    public void run() {
+                                        awaitDisplayMatchesView(form, POLL_ATTEMPTS);
+                                    }
+                                });
+                            }
+                        });
+                    }
+                });
             }
         });
     }

@@ -4977,7 +4977,11 @@ BOOL prefersStatusBarHidden = NO;
     // (#6080, see cn1PublishViewSizeIfChanged); settle on the real ones.
     if (coordinator != nil) {
         [coordinator animateAlongsideTransition:nil completion:^(id context) {
-            [self cn1PublishViewSizeIfChanged];
+            // Still covered, the bounds are the stale ones; republishing them
+            // would only churn the framebuffer. viewDidAppear settles it.
+            if (self.presentedViewController == nil) {
+                [self cn1PublishViewSizeIfChanged];
+            }
         }];
     }
 #endif
