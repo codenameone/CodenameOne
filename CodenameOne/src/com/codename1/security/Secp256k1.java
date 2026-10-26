@@ -63,14 +63,16 @@ package com.codename1.security;
 ///
 /// Everything that touches a private key or a nonce -- key derivation,
 /// signing, the tweak used by BIP32 derivation -- runs in constant time: the
-/// field and scalar arithmetic uses fixed 16-bit limbs with no data-dependent
-/// branches, the curve arithmetic uses complete addition formulas that have
-/// no special case for doubling or the point at infinity, and the scalar
-/// multiplication is a fixed-window ladder whose table lookup reads every
-/// entry. Verification and recovery handle public data only and share the
-/// same code. The implementation is independent of libsecp256k1 and
-/// depends on nothing but this package and the core JDK subset, so it runs
-/// identically on every port and on the backend.
+/// field arithmetic has no data-dependent branches, `k G` is a signed-digit
+/// comb whose every digit is odd (so no table entry is the point at
+/// infinity), each comb step uses the complete addition formula of Renes,
+/// Costello and Batina and reads every entry of its table, and inversion is
+/// the branch-free safegcd of Bernstein and Yang. Verification and recovery
+/// handle public data only and take the fast variable-time path: a
+/// Strauss-Shamir double multiplication over wNAF expansions, with both
+/// scalars split in half by the curve's endomorphism. The arithmetic lives in
+/// `Secp256k1Math`; it depends on nothing but this package and the core JDK
+/// subset, so it runs identically on every port and on the backend.
 @com.codename1.impl.SharedWithBackend
 public final class Secp256k1 {
 
@@ -87,13 +89,12 @@ public final class Secp256k1 {
     public static final int UNCOMPRESSED_PUBLIC_KEY_LENGTH = 65;
 
     // ----------------------------------------------------------------
-    // Representation. A 256-bit integer is int[16] of 16-bit limbs, little
-    // endian. The limb is deliberately narrow: a product of two limbs is 32
-    // bits and a column of sixteen of them 36, so a whole schoolbook product
-    // accumulates in a long with room to spare and the reduction never has
-    // to interleave carries with multiplications. That costs more multiplies
-    // than libsecp256k1's 26-bit limbs and buys a reduction that is a few
-    // short, obviously bounded loops -- see Modulus.reduce.
+    // Scalars modulo n are int[16] of 16-bit limbs, little endian: a product
+    // of two limbs is 32 bits and a column of sixteen of them 36, so a whole
+    // schoolbook product accumulates in a long and the reduction is a few
+    // short, obviously bounded loops (see Modulus.reduce). A signature needs
+    // only a handful of scalar products, so this is not where the time goes;
+    // the field and the curve are in Secp256k1Math.
 
     private static final int LIMBS = 16;
     private static final int LIMB_MASK = 0xffff;
