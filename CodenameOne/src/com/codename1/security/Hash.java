@@ -86,6 +86,10 @@ public final class Hash {
     /// Ethereum; standardised SHA3-256 pads with `0x06` and is [#SHA3_256].
     public static final String KECCAK256 = "KECCAK-256";
 
+    /// RIPEMD-160 algorithm identifier (160-bit digest). Bitcoin's address
+    /// hash is RIPEMD-160 over SHA-256; see [#hash160].
+    public static final String RIPEMD160 = "RIPEMD-160";
+
     private final MessageDigestImpl impl;
 
     private Hash(MessageDigestImpl impl) {
@@ -97,7 +101,7 @@ public final class Hash {
     /// #### Parameters
     ///
     /// - `algorithm`: one of [#MD5], [#SHA1], [#SHA224], [#SHA256], [#SHA384],
-    ///   [#SHA512], [#SHA3_256], [#KECCAK256] -- case insensitive, with or
+    ///   [#SHA512], [#SHA3_256], [#KECCAK256], [#RIPEMD160] -- case insensitive, with or
     ///   without the dash
     ///
     /// #### Returns
@@ -200,6 +204,17 @@ public final class Hash {
     /// One-shot Keccak-256 hash (Ethereum's hash, see [#KECCAK256]).
     public static byte[] keccak256(byte[] data) {
         return create(KECCAK256).digest(data);
+    }
+
+    /// One-shot RIPEMD-160 hash.
+    public static byte[] ripemd160(byte[] data) {
+        return create(RIPEMD160).digest(data);
+    }
+
+    /// RIPEMD-160 of the SHA-256 of `data`: Bitcoin's `HASH160`, the hash
+    /// inside P2PKH and P2WPKH addresses.
+    public static byte[] hash160(byte[] data) {
+        return ripemd160(sha256(data));
     }
 
     // ----------------------------------------------------------------

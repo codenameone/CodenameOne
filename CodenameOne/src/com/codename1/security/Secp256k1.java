@@ -663,6 +663,134 @@ public final class Secp256k1 {
     }
 
     // ----------------------------------------------------------------
+    // BIP-340 Schnorr signatures, reached through Schnorr
+
+    static byte[] xOnlyPublicKey(byte[] privateKey) {
+        int[] d = privateScalar(privateKey);
+        int[][] p = mulGen(d);
+        wipe(d);
+        byte[] out = new byte[32];
+        Secp256k1Math.toBytes(p[0], out, 0);
+        return out;
+    }
+
+    static byte[] schnorrSign(byte[] message, byte[] privateKey, byte[] auxRand) {
+        if (message == null) {
+            throw new CryptoException("message must not be null");
+        }
+        if (auxRand != null) {
+            checkLength(auxRand, 32, "auxiliary randomness");
+        }
+        int[] d = privateScalar(privateKey);
+        int[][] p = mulGen(d);
+        if ((p[1][0] & 1) != 0) {
+            FN.sub(ZERO, d, d);
+        }
+        byte[] px = new byte[32];
+        Secp256k1Math.toBytes(p[0], px, 0);
+        byte[] dBytes = new byte[32];
+        toBytes(d, dBytes, 0);
+        byte[] t = taggedHash(TAG_AUX, auxRand == null ? new byte[32] : auxRand, null, null);
+        for (int i = 0; i < 32; i++) {
+            t[i] ^= dBytes[i];
+        }
+        byte[] rand = taggedHash(TAG_NONCE, t, px, message);
+        wipe(t);
+        wipe(dBytes);
+        int[] k = FN.reduce(toLimbs(rand, 0));
+        wipe(rand);
+        try {
+            if (isZero(k)) {
+                throw new CryptoException("nonce generation failed");
+            }
+            int[][] r = mulGen(k);
+            if ((r[1][0] & 1) != 0) {
+                FN.sub(ZERO, k, k);
+            }
+            byte[] sig = new byte[64];
+            Secp256k1Math.toBytes(r[0], sig, 0);
+            int[] e = FN.reduce(toLimbs(taggedHash(TAG_CHALLENGE, slice(sig, 0, 32), px, message), 0));
+            int[] s = new int[LIMBS];
+            FN.mul(e, d, s);
+            FN.add(s, k, s);
+            toBytes(s, sig, 32);
+            wipe(s);
+            return sig;
+        } finally {
+            wipe(k);
+            wipe(d);
+        }
+    }
+
+    static boolean schnorrVerify(byte[] message, byte[] signature, byte[] xOnlyKey) {
+        if (message == null) {
+            throw new CryptoException("message must not be null");
+        }
+        checkLength(xOnlyKey, 32, "x-only public key");
+        if (signature == null || signature.length != 64) {
+            return false;
+        }
+        if (!Secp256k1Math.isCanonical(xOnlyKey, 0) || !Secp256k1Math.isCanonical(signature, 0)) {
+            return false;
+        }
+        int[] px = new int[10];
+        Secp256k1Math.fromBytes(px, xOnlyKey, 0);
+        int[] py = Secp256k1Math.liftY(px, false);
+        if (py == null) {
+            return false;
+        }
+        int[] s = toLimbs(signature, 32);
+        if (!lessThan(s, FN.m)) {
+            return false;
+        }
+        int[] e = FN.reduce(toLimbs(taggedHash(TAG_CHALLENGE, slice(signature, 0, 32), xOnlyKey, message), 0));
+        FN.sub(ZERO, e, e);
+        Secp256k1Math.Gej sum = new Secp256k1Math.Gej();
+        doubleMul(sum, new int[][] {px, py}, e, s);
+        int[] rx = new int[10];
+        int[] ry = new int[10];
+        if (!Secp256k1Math.toAffine(new Secp256k1Math.Ctx(), sum, rx, ry) || (ry[0] & 1) != 0) {
+            return false;
+        }
+        int[] r = new int[10];
+        Secp256k1Math.fromBytes(r, signature, 0);
+        return Secp256k1Math.equal(r, rx);
+    }
+
+    private static final byte[] TAG_AUX = tag("BIP0340/aux");
+    private static final byte[] TAG_NONCE = tag("BIP0340/nonce");
+    private static final byte[] TAG_CHALLENGE = tag("BIP0340/challenge");
+
+    private static byte[] tag(String name) {
+        byte[] n = new byte[name.length()];
+        for (int i = 0; i < n.length; i++) {
+            n[i] = (byte) name.charAt(i);
+        }
+        return Hash.sha256(n);
+    }
+
+    // SHA256(SHA256(tag) || SHA256(tag) || a || b || c), BIP-340's tagged hash
+    private static byte[] taggedHash(byte[] tagHash, byte[] a, byte[] b, byte[] c) {
+        Hash h = Hash.create(Hash.SHA256);
+        h.update(tagHash);
+        h.update(tagHash);
+        h.update(a);
+        if (b != null) {
+            h.update(b);
+        }
+        if (c != null) {
+            h.update(c);
+        }
+        return h.digest();
+    }
+
+    private static byte[] slice(byte[] a, int off, int len) {
+        byte[] out = new byte[len];
+        System.arraycopy(a, off, out, 0, len);
+        return out;
+    }
+
+    // ----------------------------------------------------------------
     // bridges to Secp256k1Math
 
     // k G for 0 < k < n, as normalized {x, y}; constant time

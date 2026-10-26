@@ -62,6 +62,9 @@ abstract class MessageDigestImpl {
         if ("KECCAK256".equals(a)) {
             return new Keccak(32, (byte) 0x01);
         }
+        if ("RIPEMD160".equals(a)) {
+            return new Ripemd160();
+        }
         if ("SHA3256".equals(a)) {
             return new Keccak(32, (byte) 0x06);
         }
@@ -1020,5 +1023,262 @@ abstract class MessageDigestImpl {
         out[o + 5] = (byte) (v >>> 16);
         out[o + 6] = (byte) (v >>> 8);
         out[o + 7] = (byte) v;
+    }
+    // RIPEMD-160 (Dobbertin, Bosselaers, Preneel), unrolled: both lines of
+    // 80 steps run on locals, and the sixteen message words are read once.
+    static final class Ripemd160 extends Block64 {
+        int h0;
+        int h1;
+        int h2;
+        int h3;
+        int h4;
+
+        Ripemd160() {
+            reset();
+        }
+
+        @Override
+        public void reset() {
+            h0 = 0x67452301;
+            h1 = 0xefcdab89;
+            h2 = 0x98badcfe;
+            h3 = 0x10325476;
+            h4 = 0xc3d2e1f0;
+            bufferLen = 0;
+            byteCount = 0;
+        }
+
+        @Override
+        public int digestLength() {
+            return 20;
+        }
+
+        @Override
+        public byte[] digest() {
+            return finishCommon(false);
+        }
+
+        @Override
+        void writeStateBigEndian(byte[] out) {
+            // little-endian, like MD5; the shared finish path keeps the name
+            writeLE(out, 0, h0);
+            writeLE(out, 4, h1);
+            writeLE(out, 8, h2);
+            writeLE(out, 12, h3);
+            writeLE(out, 16, h4);
+        }
+
+        private static void writeLE(byte[] out, int o, int v) {
+            out[o] = (byte) v;
+            out[o + 1] = (byte) (v >>> 8);
+            out[o + 2] = (byte) (v >>> 16);
+            out[o + 3] = (byte) (v >>> 24);
+        }
+
+        final int[] x = new int[16];
+        final int[] lr = new int[5];
+
+        @Override
+        void processBlock(byte[] block, int o) {
+            int[] x = this.x;
+            for (int i = 0; i < 16; i++, o += 4) {
+                x[i] = (block[o] & 0xff) | (block[o + 1] & 0xff) << 8 | (block[o + 2] & 0xff) << 16 | block[o + 3] << 24;
+            }
+            int[] l = lr;
+            left(x, h0, h1, h2, h3, h4, l);
+            int la = l[0];
+            int lb = l[1];
+            int lc = l[2];
+            int ld = l[3];
+            int le = l[4];
+            right(x, h0, h1, h2, h3, h4, l);
+            int t = h1 + lc + l[3];
+            h1 = h2 + ld + l[4];
+            h2 = h3 + le + l[0];
+            h3 = h4 + la + l[1];
+            h4 = h0 + lb + l[2];
+            h0 = t;
+        }
+
+        // The two lines are separate methods because one method holding all
+        // 160 steps is past HotSpot's limit for JIT compilation and runs
+        // interpreted, seven times slower.
+        private static void left(int[] x, int la, int lb, int lc, int ld, int le, int[] out) {
+            int t;
+            t = la + (lb ^ lc ^ ld) + x[0]; la = ((t << 11) | (t >>> 21)) + le; lc = (lc << 10) | (lc >>> 22);
+            t = le + (la ^ lb ^ lc) + x[1]; le = ((t << 14) | (t >>> 18)) + ld; lb = (lb << 10) | (lb >>> 22);
+            t = ld + (le ^ la ^ lb) + x[2]; ld = ((t << 15) | (t >>> 17)) + lc; la = (la << 10) | (la >>> 22);
+            t = lc + (ld ^ le ^ la) + x[3]; lc = ((t << 12) | (t >>> 20)) + lb; le = (le << 10) | (le >>> 22);
+            t = lb + (lc ^ ld ^ le) + x[4]; lb = ((t << 5) | (t >>> 27)) + la; ld = (ld << 10) | (ld >>> 22);
+            t = la + (lb ^ lc ^ ld) + x[5]; la = ((t << 8) | (t >>> 24)) + le; lc = (lc << 10) | (lc >>> 22);
+            t = le + (la ^ lb ^ lc) + x[6]; le = ((t << 7) | (t >>> 25)) + ld; lb = (lb << 10) | (lb >>> 22);
+            t = ld + (le ^ la ^ lb) + x[7]; ld = ((t << 9) | (t >>> 23)) + lc; la = (la << 10) | (la >>> 22);
+            t = lc + (ld ^ le ^ la) + x[8]; lc = ((t << 11) | (t >>> 21)) + lb; le = (le << 10) | (le >>> 22);
+            t = lb + (lc ^ ld ^ le) + x[9]; lb = ((t << 13) | (t >>> 19)) + la; ld = (ld << 10) | (ld >>> 22);
+            t = la + (lb ^ lc ^ ld) + x[10]; la = ((t << 14) | (t >>> 18)) + le; lc = (lc << 10) | (lc >>> 22);
+            t = le + (la ^ lb ^ lc) + x[11]; le = ((t << 15) | (t >>> 17)) + ld; lb = (lb << 10) | (lb >>> 22);
+            t = ld + (le ^ la ^ lb) + x[12]; ld = ((t << 6) | (t >>> 26)) + lc; la = (la << 10) | (la >>> 22);
+            t = lc + (ld ^ le ^ la) + x[13]; lc = ((t << 7) | (t >>> 25)) + lb; le = (le << 10) | (le >>> 22);
+            t = lb + (lc ^ ld ^ le) + x[14]; lb = ((t << 9) | (t >>> 23)) + la; ld = (ld << 10) | (ld >>> 22);
+            t = la + (lb ^ lc ^ ld) + x[15]; la = ((t << 8) | (t >>> 24)) + le; lc = (lc << 10) | (lc >>> 22);
+            t = le + ((la & lb) | (~la & lc)) + x[7] + 0x5a827999; le = ((t << 7) | (t >>> 25)) + ld; lb = (lb << 10) | (lb >>> 22);
+            t = ld + ((le & la) | (~le & lb)) + x[4] + 0x5a827999; ld = ((t << 6) | (t >>> 26)) + lc; la = (la << 10) | (la >>> 22);
+            t = lc + ((ld & le) | (~ld & la)) + x[13] + 0x5a827999; lc = ((t << 8) | (t >>> 24)) + lb; le = (le << 10) | (le >>> 22);
+            t = lb + ((lc & ld) | (~lc & le)) + x[1] + 0x5a827999; lb = ((t << 13) | (t >>> 19)) + la; ld = (ld << 10) | (ld >>> 22);
+            t = la + ((lb & lc) | (~lb & ld)) + x[10] + 0x5a827999; la = ((t << 11) | (t >>> 21)) + le; lc = (lc << 10) | (lc >>> 22);
+            t = le + ((la & lb) | (~la & lc)) + x[6] + 0x5a827999; le = ((t << 9) | (t >>> 23)) + ld; lb = (lb << 10) | (lb >>> 22);
+            t = ld + ((le & la) | (~le & lb)) + x[15] + 0x5a827999; ld = ((t << 7) | (t >>> 25)) + lc; la = (la << 10) | (la >>> 22);
+            t = lc + ((ld & le) | (~ld & la)) + x[3] + 0x5a827999; lc = ((t << 15) | (t >>> 17)) + lb; le = (le << 10) | (le >>> 22);
+            t = lb + ((lc & ld) | (~lc & le)) + x[12] + 0x5a827999; lb = ((t << 7) | (t >>> 25)) + la; ld = (ld << 10) | (ld >>> 22);
+            t = la + ((lb & lc) | (~lb & ld)) + x[0] + 0x5a827999; la = ((t << 12) | (t >>> 20)) + le; lc = (lc << 10) | (lc >>> 22);
+            t = le + ((la & lb) | (~la & lc)) + x[9] + 0x5a827999; le = ((t << 15) | (t >>> 17)) + ld; lb = (lb << 10) | (lb >>> 22);
+            t = ld + ((le & la) | (~le & lb)) + x[5] + 0x5a827999; ld = ((t << 9) | (t >>> 23)) + lc; la = (la << 10) | (la >>> 22);
+            t = lc + ((ld & le) | (~ld & la)) + x[2] + 0x5a827999; lc = ((t << 11) | (t >>> 21)) + lb; le = (le << 10) | (le >>> 22);
+            t = lb + ((lc & ld) | (~lc & le)) + x[14] + 0x5a827999; lb = ((t << 7) | (t >>> 25)) + la; ld = (ld << 10) | (ld >>> 22);
+            t = la + ((lb & lc) | (~lb & ld)) + x[11] + 0x5a827999; la = ((t << 13) | (t >>> 19)) + le; lc = (lc << 10) | (lc >>> 22);
+            t = le + ((la & lb) | (~la & lc)) + x[8] + 0x5a827999; le = ((t << 12) | (t >>> 20)) + ld; lb = (lb << 10) | (lb >>> 22);
+            t = ld + ((le | ~la) ^ lb) + x[3] + 0x6ed9eba1; ld = ((t << 11) | (t >>> 21)) + lc; la = (la << 10) | (la >>> 22);
+            t = lc + ((ld | ~le) ^ la) + x[10] + 0x6ed9eba1; lc = ((t << 13) | (t >>> 19)) + lb; le = (le << 10) | (le >>> 22);
+            t = lb + ((lc | ~ld) ^ le) + x[14] + 0x6ed9eba1; lb = ((t << 6) | (t >>> 26)) + la; ld = (ld << 10) | (ld >>> 22);
+            t = la + ((lb | ~lc) ^ ld) + x[4] + 0x6ed9eba1; la = ((t << 7) | (t >>> 25)) + le; lc = (lc << 10) | (lc >>> 22);
+            t = le + ((la | ~lb) ^ lc) + x[9] + 0x6ed9eba1; le = ((t << 14) | (t >>> 18)) + ld; lb = (lb << 10) | (lb >>> 22);
+            t = ld + ((le | ~la) ^ lb) + x[15] + 0x6ed9eba1; ld = ((t << 9) | (t >>> 23)) + lc; la = (la << 10) | (la >>> 22);
+            t = lc + ((ld | ~le) ^ la) + x[8] + 0x6ed9eba1; lc = ((t << 13) | (t >>> 19)) + lb; le = (le << 10) | (le >>> 22);
+            t = lb + ((lc | ~ld) ^ le) + x[1] + 0x6ed9eba1; lb = ((t << 15) | (t >>> 17)) + la; ld = (ld << 10) | (ld >>> 22);
+            t = la + ((lb | ~lc) ^ ld) + x[2] + 0x6ed9eba1; la = ((t << 14) | (t >>> 18)) + le; lc = (lc << 10) | (lc >>> 22);
+            t = le + ((la | ~lb) ^ lc) + x[7] + 0x6ed9eba1; le = ((t << 8) | (t >>> 24)) + ld; lb = (lb << 10) | (lb >>> 22);
+            t = ld + ((le | ~la) ^ lb) + x[0] + 0x6ed9eba1; ld = ((t << 13) | (t >>> 19)) + lc; la = (la << 10) | (la >>> 22);
+            t = lc + ((ld | ~le) ^ la) + x[6] + 0x6ed9eba1; lc = ((t << 6) | (t >>> 26)) + lb; le = (le << 10) | (le >>> 22);
+            t = lb + ((lc | ~ld) ^ le) + x[13] + 0x6ed9eba1; lb = ((t << 5) | (t >>> 27)) + la; ld = (ld << 10) | (ld >>> 22);
+            t = la + ((lb | ~lc) ^ ld) + x[11] + 0x6ed9eba1; la = ((t << 12) | (t >>> 20)) + le; lc = (lc << 10) | (lc >>> 22);
+            t = le + ((la | ~lb) ^ lc) + x[5] + 0x6ed9eba1; le = ((t << 7) | (t >>> 25)) + ld; lb = (lb << 10) | (lb >>> 22);
+            t = ld + ((le | ~la) ^ lb) + x[12] + 0x6ed9eba1; ld = ((t << 5) | (t >>> 27)) + lc; la = (la << 10) | (la >>> 22);
+            t = lc + ((ld & la) | (le & ~la)) + x[1] + 0x8f1bbcdc; lc = ((t << 11) | (t >>> 21)) + lb; le = (le << 10) | (le >>> 22);
+            t = lb + ((lc & le) | (ld & ~le)) + x[9] + 0x8f1bbcdc; lb = ((t << 12) | (t >>> 20)) + la; ld = (ld << 10) | (ld >>> 22);
+            t = la + ((lb & ld) | (lc & ~ld)) + x[11] + 0x8f1bbcdc; la = ((t << 14) | (t >>> 18)) + le; lc = (lc << 10) | (lc >>> 22);
+            t = le + ((la & lc) | (lb & ~lc)) + x[10] + 0x8f1bbcdc; le = ((t << 15) | (t >>> 17)) + ld; lb = (lb << 10) | (lb >>> 22);
+            t = ld + ((le & lb) | (la & ~lb)) + x[0] + 0x8f1bbcdc; ld = ((t << 14) | (t >>> 18)) + lc; la = (la << 10) | (la >>> 22);
+            t = lc + ((ld & la) | (le & ~la)) + x[8] + 0x8f1bbcdc; lc = ((t << 15) | (t >>> 17)) + lb; le = (le << 10) | (le >>> 22);
+            t = lb + ((lc & le) | (ld & ~le)) + x[12] + 0x8f1bbcdc; lb = ((t << 9) | (t >>> 23)) + la; ld = (ld << 10) | (ld >>> 22);
+            t = la + ((lb & ld) | (lc & ~ld)) + x[4] + 0x8f1bbcdc; la = ((t << 8) | (t >>> 24)) + le; lc = (lc << 10) | (lc >>> 22);
+            t = le + ((la & lc) | (lb & ~lc)) + x[13] + 0x8f1bbcdc; le = ((t << 9) | (t >>> 23)) + ld; lb = (lb << 10) | (lb >>> 22);
+            t = ld + ((le & lb) | (la & ~lb)) + x[3] + 0x8f1bbcdc; ld = ((t << 14) | (t >>> 18)) + lc; la = (la << 10) | (la >>> 22);
+            t = lc + ((ld & la) | (le & ~la)) + x[7] + 0x8f1bbcdc; lc = ((t << 5) | (t >>> 27)) + lb; le = (le << 10) | (le >>> 22);
+            t = lb + ((lc & le) | (ld & ~le)) + x[15] + 0x8f1bbcdc; lb = ((t << 6) | (t >>> 26)) + la; ld = (ld << 10) | (ld >>> 22);
+            t = la + ((lb & ld) | (lc & ~ld)) + x[14] + 0x8f1bbcdc; la = ((t << 8) | (t >>> 24)) + le; lc = (lc << 10) | (lc >>> 22);
+            t = le + ((la & lc) | (lb & ~lc)) + x[5] + 0x8f1bbcdc; le = ((t << 6) | (t >>> 26)) + ld; lb = (lb << 10) | (lb >>> 22);
+            t = ld + ((le & lb) | (la & ~lb)) + x[6] + 0x8f1bbcdc; ld = ((t << 5) | (t >>> 27)) + lc; la = (la << 10) | (la >>> 22);
+            t = lc + ((ld & la) | (le & ~la)) + x[2] + 0x8f1bbcdc; lc = ((t << 12) | (t >>> 20)) + lb; le = (le << 10) | (le >>> 22);
+            t = lb + (lc ^ (ld | ~le)) + x[4] + 0xa953fd4e; lb = ((t << 9) | (t >>> 23)) + la; ld = (ld << 10) | (ld >>> 22);
+            t = la + (lb ^ (lc | ~ld)) + x[0] + 0xa953fd4e; la = ((t << 15) | (t >>> 17)) + le; lc = (lc << 10) | (lc >>> 22);
+            t = le + (la ^ (lb | ~lc)) + x[5] + 0xa953fd4e; le = ((t << 5) | (t >>> 27)) + ld; lb = (lb << 10) | (lb >>> 22);
+            t = ld + (le ^ (la | ~lb)) + x[9] + 0xa953fd4e; ld = ((t << 11) | (t >>> 21)) + lc; la = (la << 10) | (la >>> 22);
+            t = lc + (ld ^ (le | ~la)) + x[7] + 0xa953fd4e; lc = ((t << 6) | (t >>> 26)) + lb; le = (le << 10) | (le >>> 22);
+            t = lb + (lc ^ (ld | ~le)) + x[12] + 0xa953fd4e; lb = ((t << 8) | (t >>> 24)) + la; ld = (ld << 10) | (ld >>> 22);
+            t = la + (lb ^ (lc | ~ld)) + x[2] + 0xa953fd4e; la = ((t << 13) | (t >>> 19)) + le; lc = (lc << 10) | (lc >>> 22);
+            t = le + (la ^ (lb | ~lc)) + x[10] + 0xa953fd4e; le = ((t << 12) | (t >>> 20)) + ld; lb = (lb << 10) | (lb >>> 22);
+            t = ld + (le ^ (la | ~lb)) + x[14] + 0xa953fd4e; ld = ((t << 5) | (t >>> 27)) + lc; la = (la << 10) | (la >>> 22);
+            t = lc + (ld ^ (le | ~la)) + x[1] + 0xa953fd4e; lc = ((t << 12) | (t >>> 20)) + lb; le = (le << 10) | (le >>> 22);
+            t = lb + (lc ^ (ld | ~le)) + x[3] + 0xa953fd4e; lb = ((t << 13) | (t >>> 19)) + la; ld = (ld << 10) | (ld >>> 22);
+            t = la + (lb ^ (lc | ~ld)) + x[8] + 0xa953fd4e; la = ((t << 14) | (t >>> 18)) + le; lc = (lc << 10) | (lc >>> 22);
+            t = le + (la ^ (lb | ~lc)) + x[11] + 0xa953fd4e; le = ((t << 11) | (t >>> 21)) + ld; lb = (lb << 10) | (lb >>> 22);
+            t = ld + (le ^ (la | ~lb)) + x[6] + 0xa953fd4e; ld = ((t << 8) | (t >>> 24)) + lc; la = (la << 10) | (la >>> 22);
+            t = lc + (ld ^ (le | ~la)) + x[15] + 0xa953fd4e; lc = ((t << 5) | (t >>> 27)) + lb; le = (le << 10) | (le >>> 22);
+            t = lb + (lc ^ (ld | ~le)) + x[13] + 0xa953fd4e; lb = ((t << 6) | (t >>> 26)) + la; ld = (ld << 10) | (ld >>> 22);
+            out[0] = la;
+            out[1] = lb;
+            out[2] = lc;
+            out[3] = ld;
+            out[4] = le;
+        }
+
+        private static void right(int[] x, int ra, int rb, int rc, int rd, int re, int[] out) {
+            int t;
+            t = ra + (rb ^ (rc | ~rd)) + x[5] + 0x50a28be6; ra = ((t << 8) | (t >>> 24)) + re; rc = (rc << 10) | (rc >>> 22);
+            t = re + (ra ^ (rb | ~rc)) + x[14] + 0x50a28be6; re = ((t << 9) | (t >>> 23)) + rd; rb = (rb << 10) | (rb >>> 22);
+            t = rd + (re ^ (ra | ~rb)) + x[7] + 0x50a28be6; rd = ((t << 9) | (t >>> 23)) + rc; ra = (ra << 10) | (ra >>> 22);
+            t = rc + (rd ^ (re | ~ra)) + x[0] + 0x50a28be6; rc = ((t << 11) | (t >>> 21)) + rb; re = (re << 10) | (re >>> 22);
+            t = rb + (rc ^ (rd | ~re)) + x[9] + 0x50a28be6; rb = ((t << 13) | (t >>> 19)) + ra; rd = (rd << 10) | (rd >>> 22);
+            t = ra + (rb ^ (rc | ~rd)) + x[2] + 0x50a28be6; ra = ((t << 15) | (t >>> 17)) + re; rc = (rc << 10) | (rc >>> 22);
+            t = re + (ra ^ (rb | ~rc)) + x[11] + 0x50a28be6; re = ((t << 15) | (t >>> 17)) + rd; rb = (rb << 10) | (rb >>> 22);
+            t = rd + (re ^ (ra | ~rb)) + x[4] + 0x50a28be6; rd = ((t << 5) | (t >>> 27)) + rc; ra = (ra << 10) | (ra >>> 22);
+            t = rc + (rd ^ (re | ~ra)) + x[13] + 0x50a28be6; rc = ((t << 7) | (t >>> 25)) + rb; re = (re << 10) | (re >>> 22);
+            t = rb + (rc ^ (rd | ~re)) + x[6] + 0x50a28be6; rb = ((t << 7) | (t >>> 25)) + ra; rd = (rd << 10) | (rd >>> 22);
+            t = ra + (rb ^ (rc | ~rd)) + x[15] + 0x50a28be6; ra = ((t << 8) | (t >>> 24)) + re; rc = (rc << 10) | (rc >>> 22);
+            t = re + (ra ^ (rb | ~rc)) + x[8] + 0x50a28be6; re = ((t << 11) | (t >>> 21)) + rd; rb = (rb << 10) | (rb >>> 22);
+            t = rd + (re ^ (ra | ~rb)) + x[1] + 0x50a28be6; rd = ((t << 14) | (t >>> 18)) + rc; ra = (ra << 10) | (ra >>> 22);
+            t = rc + (rd ^ (re | ~ra)) + x[10] + 0x50a28be6; rc = ((t << 14) | (t >>> 18)) + rb; re = (re << 10) | (re >>> 22);
+            t = rb + (rc ^ (rd | ~re)) + x[3] + 0x50a28be6; rb = ((t << 12) | (t >>> 20)) + ra; rd = (rd << 10) | (rd >>> 22);
+            t = ra + (rb ^ (rc | ~rd)) + x[12] + 0x50a28be6; ra = ((t << 6) | (t >>> 26)) + re; rc = (rc << 10) | (rc >>> 22);
+            t = re + ((ra & rc) | (rb & ~rc)) + x[6] + 0x5c4dd124; re = ((t << 9) | (t >>> 23)) + rd; rb = (rb << 10) | (rb >>> 22);
+            t = rd + ((re & rb) | (ra & ~rb)) + x[11] + 0x5c4dd124; rd = ((t << 13) | (t >>> 19)) + rc; ra = (ra << 10) | (ra >>> 22);
+            t = rc + ((rd & ra) | (re & ~ra)) + x[3] + 0x5c4dd124; rc = ((t << 15) | (t >>> 17)) + rb; re = (re << 10) | (re >>> 22);
+            t = rb + ((rc & re) | (rd & ~re)) + x[7] + 0x5c4dd124; rb = ((t << 7) | (t >>> 25)) + ra; rd = (rd << 10) | (rd >>> 22);
+            t = ra + ((rb & rd) | (rc & ~rd)) + x[0] + 0x5c4dd124; ra = ((t << 12) | (t >>> 20)) + re; rc = (rc << 10) | (rc >>> 22);
+            t = re + ((ra & rc) | (rb & ~rc)) + x[13] + 0x5c4dd124; re = ((t << 8) | (t >>> 24)) + rd; rb = (rb << 10) | (rb >>> 22);
+            t = rd + ((re & rb) | (ra & ~rb)) + x[5] + 0x5c4dd124; rd = ((t << 9) | (t >>> 23)) + rc; ra = (ra << 10) | (ra >>> 22);
+            t = rc + ((rd & ra) | (re & ~ra)) + x[10] + 0x5c4dd124; rc = ((t << 11) | (t >>> 21)) + rb; re = (re << 10) | (re >>> 22);
+            t = rb + ((rc & re) | (rd & ~re)) + x[14] + 0x5c4dd124; rb = ((t << 7) | (t >>> 25)) + ra; rd = (rd << 10) | (rd >>> 22);
+            t = ra + ((rb & rd) | (rc & ~rd)) + x[15] + 0x5c4dd124; ra = ((t << 7) | (t >>> 25)) + re; rc = (rc << 10) | (rc >>> 22);
+            t = re + ((ra & rc) | (rb & ~rc)) + x[8] + 0x5c4dd124; re = ((t << 12) | (t >>> 20)) + rd; rb = (rb << 10) | (rb >>> 22);
+            t = rd + ((re & rb) | (ra & ~rb)) + x[12] + 0x5c4dd124; rd = ((t << 7) | (t >>> 25)) + rc; ra = (ra << 10) | (ra >>> 22);
+            t = rc + ((rd & ra) | (re & ~ra)) + x[4] + 0x5c4dd124; rc = ((t << 6) | (t >>> 26)) + rb; re = (re << 10) | (re >>> 22);
+            t = rb + ((rc & re) | (rd & ~re)) + x[9] + 0x5c4dd124; rb = ((t << 15) | (t >>> 17)) + ra; rd = (rd << 10) | (rd >>> 22);
+            t = ra + ((rb & rd) | (rc & ~rd)) + x[1] + 0x5c4dd124; ra = ((t << 13) | (t >>> 19)) + re; rc = (rc << 10) | (rc >>> 22);
+            t = re + ((ra & rc) | (rb & ~rc)) + x[2] + 0x5c4dd124; re = ((t << 11) | (t >>> 21)) + rd; rb = (rb << 10) | (rb >>> 22);
+            t = rd + ((re | ~ra) ^ rb) + x[15] + 0x6d703ef3; rd = ((t << 9) | (t >>> 23)) + rc; ra = (ra << 10) | (ra >>> 22);
+            t = rc + ((rd | ~re) ^ ra) + x[5] + 0x6d703ef3; rc = ((t << 7) | (t >>> 25)) + rb; re = (re << 10) | (re >>> 22);
+            t = rb + ((rc | ~rd) ^ re) + x[1] + 0x6d703ef3; rb = ((t << 15) | (t >>> 17)) + ra; rd = (rd << 10) | (rd >>> 22);
+            t = ra + ((rb | ~rc) ^ rd) + x[3] + 0x6d703ef3; ra = ((t << 11) | (t >>> 21)) + re; rc = (rc << 10) | (rc >>> 22);
+            t = re + ((ra | ~rb) ^ rc) + x[7] + 0x6d703ef3; re = ((t << 8) | (t >>> 24)) + rd; rb = (rb << 10) | (rb >>> 22);
+            t = rd + ((re | ~ra) ^ rb) + x[14] + 0x6d703ef3; rd = ((t << 6) | (t >>> 26)) + rc; ra = (ra << 10) | (ra >>> 22);
+            t = rc + ((rd | ~re) ^ ra) + x[6] + 0x6d703ef3; rc = ((t << 6) | (t >>> 26)) + rb; re = (re << 10) | (re >>> 22);
+            t = rb + ((rc | ~rd) ^ re) + x[9] + 0x6d703ef3; rb = ((t << 14) | (t >>> 18)) + ra; rd = (rd << 10) | (rd >>> 22);
+            t = ra + ((rb | ~rc) ^ rd) + x[11] + 0x6d703ef3; ra = ((t << 12) | (t >>> 20)) + re; rc = (rc << 10) | (rc >>> 22);
+            t = re + ((ra | ~rb) ^ rc) + x[8] + 0x6d703ef3; re = ((t << 13) | (t >>> 19)) + rd; rb = (rb << 10) | (rb >>> 22);
+            t = rd + ((re | ~ra) ^ rb) + x[12] + 0x6d703ef3; rd = ((t << 5) | (t >>> 27)) + rc; ra = (ra << 10) | (ra >>> 22);
+            t = rc + ((rd | ~re) ^ ra) + x[2] + 0x6d703ef3; rc = ((t << 14) | (t >>> 18)) + rb; re = (re << 10) | (re >>> 22);
+            t = rb + ((rc | ~rd) ^ re) + x[10] + 0x6d703ef3; rb = ((t << 13) | (t >>> 19)) + ra; rd = (rd << 10) | (rd >>> 22);
+            t = ra + ((rb | ~rc) ^ rd) + x[0] + 0x6d703ef3; ra = ((t << 13) | (t >>> 19)) + re; rc = (rc << 10) | (rc >>> 22);
+            t = re + ((ra | ~rb) ^ rc) + x[4] + 0x6d703ef3; re = ((t << 7) | (t >>> 25)) + rd; rb = (rb << 10) | (rb >>> 22);
+            t = rd + ((re | ~ra) ^ rb) + x[13] + 0x6d703ef3; rd = ((t << 5) | (t >>> 27)) + rc; ra = (ra << 10) | (ra >>> 22);
+            t = rc + ((rd & re) | (~rd & ra)) + x[8] + 0x7a6d76e9; rc = ((t << 15) | (t >>> 17)) + rb; re = (re << 10) | (re >>> 22);
+            t = rb + ((rc & rd) | (~rc & re)) + x[6] + 0x7a6d76e9; rb = ((t << 5) | (t >>> 27)) + ra; rd = (rd << 10) | (rd >>> 22);
+            t = ra + ((rb & rc) | (~rb & rd)) + x[4] + 0x7a6d76e9; ra = ((t << 8) | (t >>> 24)) + re; rc = (rc << 10) | (rc >>> 22);
+            t = re + ((ra & rb) | (~ra & rc)) + x[1] + 0x7a6d76e9; re = ((t << 11) | (t >>> 21)) + rd; rb = (rb << 10) | (rb >>> 22);
+            t = rd + ((re & ra) | (~re & rb)) + x[3] + 0x7a6d76e9; rd = ((t << 14) | (t >>> 18)) + rc; ra = (ra << 10) | (ra >>> 22);
+            t = rc + ((rd & re) | (~rd & ra)) + x[11] + 0x7a6d76e9; rc = ((t << 14) | (t >>> 18)) + rb; re = (re << 10) | (re >>> 22);
+            t = rb + ((rc & rd) | (~rc & re)) + x[15] + 0x7a6d76e9; rb = ((t << 6) | (t >>> 26)) + ra; rd = (rd << 10) | (rd >>> 22);
+            t = ra + ((rb & rc) | (~rb & rd)) + x[0] + 0x7a6d76e9; ra = ((t << 14) | (t >>> 18)) + re; rc = (rc << 10) | (rc >>> 22);
+            t = re + ((ra & rb) | (~ra & rc)) + x[5] + 0x7a6d76e9; re = ((t << 6) | (t >>> 26)) + rd; rb = (rb << 10) | (rb >>> 22);
+            t = rd + ((re & ra) | (~re & rb)) + x[12] + 0x7a6d76e9; rd = ((t << 9) | (t >>> 23)) + rc; ra = (ra << 10) | (ra >>> 22);
+            t = rc + ((rd & re) | (~rd & ra)) + x[2] + 0x7a6d76e9; rc = ((t << 12) | (t >>> 20)) + rb; re = (re << 10) | (re >>> 22);
+            t = rb + ((rc & rd) | (~rc & re)) + x[13] + 0x7a6d76e9; rb = ((t << 9) | (t >>> 23)) + ra; rd = (rd << 10) | (rd >>> 22);
+            t = ra + ((rb & rc) | (~rb & rd)) + x[9] + 0x7a6d76e9; ra = ((t << 12) | (t >>> 20)) + re; rc = (rc << 10) | (rc >>> 22);
+            t = re + ((ra & rb) | (~ra & rc)) + x[7] + 0x7a6d76e9; re = ((t << 5) | (t >>> 27)) + rd; rb = (rb << 10) | (rb >>> 22);
+            t = rd + ((re & ra) | (~re & rb)) + x[10] + 0x7a6d76e9; rd = ((t << 15) | (t >>> 17)) + rc; ra = (ra << 10) | (ra >>> 22);
+            t = rc + ((rd & re) | (~rd & ra)) + x[14] + 0x7a6d76e9; rc = ((t << 8) | (t >>> 24)) + rb; re = (re << 10) | (re >>> 22);
+            t = rb + (rc ^ rd ^ re) + x[12]; rb = ((t << 8) | (t >>> 24)) + ra; rd = (rd << 10) | (rd >>> 22);
+            t = ra + (rb ^ rc ^ rd) + x[15]; ra = ((t << 5) | (t >>> 27)) + re; rc = (rc << 10) | (rc >>> 22);
+            t = re + (ra ^ rb ^ rc) + x[10]; re = ((t << 12) | (t >>> 20)) + rd; rb = (rb << 10) | (rb >>> 22);
+            t = rd + (re ^ ra ^ rb) + x[4]; rd = ((t << 9) | (t >>> 23)) + rc; ra = (ra << 10) | (ra >>> 22);
+            t = rc + (rd ^ re ^ ra) + x[1]; rc = ((t << 12) | (t >>> 20)) + rb; re = (re << 10) | (re >>> 22);
+            t = rb + (rc ^ rd ^ re) + x[5]; rb = ((t << 5) | (t >>> 27)) + ra; rd = (rd << 10) | (rd >>> 22);
+            t = ra + (rb ^ rc ^ rd) + x[8]; ra = ((t << 14) | (t >>> 18)) + re; rc = (rc << 10) | (rc >>> 22);
+            t = re + (ra ^ rb ^ rc) + x[7]; re = ((t << 6) | (t >>> 26)) + rd; rb = (rb << 10) | (rb >>> 22);
+            t = rd + (re ^ ra ^ rb) + x[6]; rd = ((t << 8) | (t >>> 24)) + rc; ra = (ra << 10) | (ra >>> 22);
+            t = rc + (rd ^ re ^ ra) + x[2]; rc = ((t << 13) | (t >>> 19)) + rb; re = (re << 10) | (re >>> 22);
+            t = rb + (rc ^ rd ^ re) + x[13]; rb = ((t << 6) | (t >>> 26)) + ra; rd = (rd << 10) | (rd >>> 22);
+            t = ra + (rb ^ rc ^ rd) + x[14]; ra = ((t << 5) | (t >>> 27)) + re; rc = (rc << 10) | (rc >>> 22);
+            t = re + (ra ^ rb ^ rc) + x[0]; re = ((t << 15) | (t >>> 17)) + rd; rb = (rb << 10) | (rb >>> 22);
+            t = rd + (re ^ ra ^ rb) + x[3]; rd = ((t << 13) | (t >>> 19)) + rc; ra = (ra << 10) | (ra >>> 22);
+            t = rc + (rd ^ re ^ ra) + x[9]; rc = ((t << 11) | (t >>> 21)) + rb; re = (re << 10) | (re >>> 22);
+            t = rb + (rc ^ rd ^ re) + x[11]; rb = ((t << 11) | (t >>> 21)) + ra; rd = (rd << 10) | (rd >>> 22);
+            out[0] = ra;
+            out[1] = rb;
+            out[2] = rc;
+            out[3] = rd;
+            out[4] = re;
+        }
     }
 }

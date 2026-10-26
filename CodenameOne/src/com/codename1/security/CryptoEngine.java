@@ -62,4 +62,16 @@ public class CryptoEngine {
     public byte[] pbkdf2(String hashAlgorithm, byte[] password, byte[] salt, int iterations, int length) {
         return null;
     }
+
+    /// An Ed25519 signature ([Ed25519#sign(byte[], byte[], byte[])]), or
+    /// `null` to sign in Java. The arguments are already validated.
+    public byte[] ed25519Sign(byte[] privateKey, byte[] publicKey, byte[] message) {
+        return null;
+    }
+
+    /// An Ed25519 verification: 1 for a valid signature, 0 for an invalid
+    /// one, or -1 to verify in Java.
+    public int ed25519Verify(byte[] message, byte[] signature, byte[] publicKey) {
+        return -1;
+    }
 }
