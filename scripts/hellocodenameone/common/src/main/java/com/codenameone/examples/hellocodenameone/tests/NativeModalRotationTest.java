@@ -185,6 +185,18 @@ public class NativeModalRotationTest extends BaseTest {
                                         + modal.getViewPixelWidth() + "x" + modal.getViewPixelHeight()
                                         + " display=" + Display.getInstance().getDisplayWidth()
                                         + "x" + Display.getInstance().getDisplayHeight());
+                                // This state is the bug's precondition: the covered view
+                                // was told portrait while its bounds stayed landscape.
+                                // Without it the dismissal below proves nothing.
+                                if (Display.getInstance().getDisplayWidth() >= Display.getInstance().getDisplayHeight()
+                                        || modal.getViewPixelWidth() <= modal.getViewPixelHeight()) {
+                                    finish(form, "landscape case precondition: the modal did not announce portrait"
+                                            + " to the covered landscape view; view="
+                                            + modal.getViewPixelWidth() + "x" + modal.getViewPixelHeight()
+                                            + " display=" + Display.getInstance().getDisplayWidth()
+                                            + "x" + Display.getInstance().getDisplayHeight());
+                                    return;
+                                }
                                 modal.dismissModal();
                                 poll(form, POLL_ATTEMPTS, new Condition() {
                                     public boolean holds() {
