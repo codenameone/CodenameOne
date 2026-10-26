@@ -75,6 +75,42 @@ async function exercise(context, name, host, mobileDevice = null) {
       }, name);
       assert.ok(activated, name + ' is available');
     }
+    // A form with text selection on: what is typed reaches the model, and a button pressed
+    // straight after typing reads it. Real pointer events, not accessible actions -- the
+    // bug was in the order the press and the release of one click were handled.
+    if (!mobile) {
+      await openReview('selectionsignin&selection=off');
+      const typed = { 0: 'someone@bastion.example', 1: 'correct horse battery staple' };
+      for (const index of [0, 1]) {
+        const field = await page.evaluate(index => {
+          const boxes = [...document.querySelectorAll('#cn1-accessibility-tree [role="textbox"]')]
+            .filter(el => el.getAttribute('aria-readonly') !== 'true')
+            .map(el => el.getBoundingClientRect()).sort((a, b) => a.y - b.y);
+          const box = boxes[index];
+          return box && { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+        }, index);
+        assert.ok(field, 'sign-in field ' + index + ' is on screen');
+        await page.mouse.click(field.x, field.y);
+        await page.waitForFunction(type => document.activeElement?.tagName === 'INPUT'
+          && document.activeElement.type === type, index ? 'password' : 'email');
+        await page.keyboard.type(typed[index], { delay: 10 });
+      }
+      const submit = await page.evaluate(() => {
+        const el = [...document.querySelectorAll('#cn1-accessibility-tree [role="button"]')]
+          .find(el => el.getAttribute('aria-label') === 'Submit sign-in');
+        const box = el && el.getBoundingClientRect();
+        return box && { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+      });
+      assert.ok(submit, 'the submit button is on screen');
+      await page.mouse.click(submit.x, submit.y);
+      const expected = 'Submitted ' + typed[0] + '|' + typed[1];
+      await page.waitForFunction(() => /Submitted /.test(document.body.innerText));
+      await page.waitForTimeout(500);
+      const shown = await page.evaluate(() => document.body.innerText.match(/Submitted [^\n]*/)[0]);
+      assert.equal(shown, expected, 'a field typed on a form with text selection on keeps its text');
+      console.log('PASS', name, 'typing on a form with text selection on reaches the model before a button reads it');
+      if (process.env.CN1_JS_REVIEW_ONLY === 'selectionsignin') return;
+    }
     for (const kind of ['editor', 'label']) {
       for (const mode of ['grab', 'focus', 'scroll', 'drag']) {
         await openReview('transparentcover&kind=' + kind + '&mode=' + mode);
@@ -1063,7 +1099,7 @@ async function exercise(context, name, host, mobileDevice = null) {
     assert.deepEqual(errors, [], 'no browser/worker exceptions in review regressions');
   }
   try {
-    if (process.env.CN1_JS_REVIEW_ONLY === 'true') { await exerciseReview(); return; }
+    if (process.env.CN1_JS_REVIEW_ONLY === 'true' || process.env.CN1_JS_REVIEW_ONLY === 'selectionsignin') { await exerciseReview(); return; }
     await page.goto(`http://${host}:${port}/`, { waitUntil: 'domcontentloaded' });
     await page.bringToFront();
     await page.waitForFunction(() => !document.getElementById('cn1-splash'), null, { timeout: 60000 });

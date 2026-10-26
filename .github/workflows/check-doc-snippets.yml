@@ -15,6 +15,7 @@ on:
       - 'docs/demos/**'
       - 'scripts/wayline/**'
       - 'scripts/savor/**'
+      - 'scripts/bastion/**'
       - 'scripts/skirmish/**'
       - 'scripts/hellocodenameone/common/src/main/kmp/**'
       - 'docs/website/content/blog/**'

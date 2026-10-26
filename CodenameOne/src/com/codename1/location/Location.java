@@ -131,7 +131,8 @@ public class Location {
     }
 
     public void setAccuracy(float accuracy) {
-        if (Float.isNaN(accuracy)) {
+        // A NaN reading means the platform has none; keep the previous value.
+        if (!Float.isNaN(accuracy)) {
             this.accuracy = accuracy;
         }
     }

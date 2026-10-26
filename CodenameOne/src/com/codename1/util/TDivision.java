@@ -70,7 +70,7 @@ final class TDivision {
          * Step D1: normalize a and b and put the results to a1 and b1 the
          * normalized divisor's first digit must be >= 2^31
          */
-        int divisorShift = TBigDecimal.numberOfLeadingZeros(b[bLength - 1]);
+        int divisorShift = TBitLevel.numberOfLeadingZeros(b[bLength - 1]);
         if (divisorShift != 0) {
             TBitLevel.shiftLeft(normB, b, 0, divisorShift);
             TBitLevel.shiftLeft(normA, a, 0, divisorShift);
@@ -120,7 +120,7 @@ final class TDivision {
                          * this ensures that rightHand will overflow unsigned
                          * long in the next step
                          */
-                        if (TBigDecimal.numberOfLeadingZeros((int) (longR >>> 32)) < 32) {
+                        if (TBitLevel.numberOfLeadingZeros((int) (longR >>> 32)) < 32) {
                             rOverflowed = true;
                         } else {
                             rem = (int) longR;
@@ -494,97 +494,37 @@ final class TDivision {
         return (op2 << pow2Count);
     }
 
-    /// Calculates a.modInverse(p) Based on: Savas, E; Koc, C "The Montgomery
-    /// Modular Inverse - Revised"
-    static TBigInteger modInverseMontgomery(TBigInteger a, TBigInteger p) {
-
+    /// Calculates `a.modInverse(p)` for `a` in `[1, p - 1]` with the extended
+    /// Euclidean algorithm.
+    ///
+    /// This replaced the Harmony Montgomery inverse (Savas and Koc) and Hars'
+    /// shifting inverse, both of which answered wrong values for ordinary
+    /// 256-bit inputs -- the P-256 group order among them -- because their
+    /// in-place shifts outgrew the fixed digit arrays they were given.
+    /// `BigIntegerModInverseTest` holds this against `java.math.BigInteger`.
+    static TBigInteger modInverseEuclid(TBigInteger a, TBigInteger p) {
         if (a.sign == 0) {
-            // ZERO hasn't inverse
             throw new ArithmeticException("BigInteger not invertible");
         }
-
-        if (!p.testBit(0)) {
-            // montgomery inverse require even modulo
-            return modInverseHars(a, p);
+        TBigInteger oldR = a;
+        TBigInteger r = p;
+        TBigInteger oldS = TBigInteger.ONE;
+        TBigInteger s = TBigInteger.ZERO;
+        while (r.sign != 0) {
+            TBigInteger[] qr = oldR.divideAndRemainder(r);
+            oldR = r;
+            r = qr[1];
+            TBigInteger nextS = oldS.subtract(qr[0].multiply(s));
+            oldS = s;
+            s = nextS;
         }
-
-        int m = p.numberLength * 32;
-        // PRE: a \in [1, p - 1]
-        TBigInteger u;
-        TBigInteger v;
-        TBigInteger r;
-        TBigInteger s;
-        u = p.copy(); // make copy to use inplace method
-        v = a.copy();
-        int max = Math.max(v.numberLength, u.numberLength);
-        r = new TBigInteger(1, 1, new int[max + 1]);
-        s = new TBigInteger(1, 1, new int[max + 1]);
-        s.digits[0] = 1;
-        // s == 1 && v == 0
-
-        int k = 0;
-
-        int lsbu = u.getLowestSetBit();
-        int lsbv = v.getLowestSetBit();
-        int toShift;
-
-        if (lsbu > lsbv) {
-            TBitLevel.inplaceShiftRight(u, lsbu);
-            TBitLevel.inplaceShiftRight(v, lsbv);
-            TBitLevel.inplaceShiftLeft(r, lsbv);
-            k += lsbu - lsbv;
-        } else {
-            TBitLevel.inplaceShiftRight(u, lsbu);
-            TBitLevel.inplaceShiftRight(v, lsbv);
-            TBitLevel.inplaceShiftLeft(s, lsbu);
-            k += lsbv - lsbu;
-        }
-
-        r.sign = 1;
-        while (v.signum() > 0) {
-            // INV v >= 0, u >= 0, v odd, u odd (except last iteration when v is
-            // even (0))
-
-            while (u.compareTo(v) > TBigInteger.EQUALS) {
-                TElementary.inplaceSubtract(u, v);
-                toShift = u.getLowestSetBit();
-                TBitLevel.inplaceShiftRight(u, toShift);
-                TElementary.inplaceAdd(r, s);
-                TBitLevel.inplaceShiftLeft(s, toShift);
-                k += toShift;
-            }
-
-            while (u.compareTo(v) <= TBigInteger.EQUALS) {
-                TElementary.inplaceSubtract(v, u);
-                if (v.signum() == 0) {
-                    break;
-                }
-                toShift = v.getLowestSetBit();
-                TBitLevel.inplaceShiftRight(v, toShift);
-                TElementary.inplaceAdd(s, r);
-                TBitLevel.inplaceShiftLeft(r, toShift);
-                k += toShift;
-            }
-        }
-        if (!u.isOne()) {
+        if (!oldR.isOne()) {
             throw new ArithmeticException("BigInteger not invertible.");
         }
-        if (r.compareTo(p) >= TBigInteger.EQUALS) {
-            TElementary.inplaceSubtract(r, p);
+        if (oldS.sign < 0) {
+            oldS = oldS.add(p);
         }
-
-        r = p.subtract(r);
-
-        // Have pair: ((BigInteger)r, (Integer)k) where r == a^(-1) * 2^k mod
-        // (module)
-        int n1 = calcN(p);
-        if (k > m) {
-            r = monPro(r, TBigInteger.ONE, p, n1);
-            k = k - m;
-        }
-
-        r = monPro(r, TBigInteger.getPowerOfTwo(m - k), p, n1);
-        return r;
+        return oldS;
     }
 
     /// Calculate the first digit of the inverse
@@ -612,82 +552,6 @@ final class TDivision {
             }
         }
         return res;
-    }
-
-    /// Implements the "Shifting Euclidean modular inverse algorithm". "Laszlo
-    /// Hars - Modular Inverse Algorithms Without Multiplications for
-    /// Cryptographic Applications"
-    ///
-    /// #### Parameters
-    ///
-    /// - `a`: a positive number
-    ///
-    /// - `m`: a positive modulus
-    ///
-    /// #### See also
-    ///
-    /// - TBigInteger#modInverse(TBigInteger)
-    static TBigInteger modInverseHars(TBigInteger a, TBigInteger m) {
-        // PRE: (a > 0) and (m > 0)
-        TBigInteger u;
-        TBigInteger v;
-        TBigInteger r;
-        TBigInteger s;
-        TBigInteger temp;
-        // u = MAX(a,m), v = MIN(a,m)
-        if (a.compareTo(m) == TBigInteger.LESS) {
-            u = m;
-            v = a;
-            r = TBigInteger.ZERO;
-            s = TBigInteger.ONE;
-        } else {
-            v = m;
-            u = a;
-            s = TBigInteger.ZERO;
-            r = TBigInteger.ONE;
-        }
-        int uLen = u.bitLength();
-        int vLen = v.bitLength();
-        int f = uLen - vLen;
-
-        while (vLen > 1) {
-            if (u.sign == v.sign) {
-                u = u.subtract(v.shiftLeft(f));
-                r = r.subtract(s.shiftLeft(f));
-            } else {
-                u = u.add(v.shiftLeft(f));
-                r = r.add(s.shiftLeft(f));
-            }
-            uLen = u.abs().bitLength();
-            vLen = v.abs().bitLength();
-            f = uLen - vLen;
-            if (f < 0) {
-                // SWAP(u,v)
-                temp = u;
-                u = v;
-                v = temp;
-                // SWAP(r,s)
-                temp = r;
-                r = s;
-                s = temp;
-
-                f = -f;
-                vLen = uLen;
-            }
-        }
-        if (v.sign == 0) {
-            return TBigInteger.ZERO;
-        }
-        if (v.sign < 0) {
-            s = s.negate();
-        }
-        if (s.compareTo(m) == TBigInteger.GREATER) {
-            return s.subtract(m);
-        }
-        if (s.sign < 0) {
-            return s.add(m);
-        }
-        return s; // a^(-1) mod m
     }
 
     /*

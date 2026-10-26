@@ -28,8 +28,13 @@
 ///   authenticator application shows. Being the same class the client runs,
 ///   a code made on a device is the code a server expects.
 /// - [Base32] -- the encoding an authenticator's shared secret travels in.
-/// - [Hash] / [Hmac] -- MD5, SHA-1 and the SHA-2 family, and HMAC over each,
-///   written in Java. They are what [Otp] computes with.
+/// - [Hash] / [Hmac] -- MD5, SHA-1, the SHA-2 family, SHA3-256 and Keccak-256
+///   (Ethereum's hash), and HMAC over each, written in Java. They are what
+///   [Otp] computes with.
+/// - [Secp256k1] -- ECDSA over the curve of Bitcoin and Ethereum: key
+///   derivation, deterministic low-S signing, verification and public key
+///   recovery. A server can sign a chain transaction, or check the signature
+///   a wallet made on the device, with the class the device used.
 ///
 /// A server reaches for these to verify a second factor and for little else.
 /// What a request path computes -- a password hash, a token's signature, a

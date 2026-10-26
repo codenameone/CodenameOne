@@ -330,3 +330,88 @@ counter, so `http.server.request.duration` is scraped as
 
 The management endpoints are served before the application's routes, so a
 catch-all route can't answer them.
+
+=== Application caches
+
+`Cache` keeps values a server would otherwise fetch or compute again, with a bound
+on how many it holds and how long each one lives. It's plain Java, so the same cache
+runs on the JVM and in the packaged native server:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/CacheSnippets.java[tag=backend-cache,indent=0]
+----
+
+A builder sets the bounds, and nothing is bounded unless it's asked for:
+
+[cols="2,5"]
+|===
+| Setting | Meaning
+
+| `maximumSize(n)` | At most `n` entries; the least recently used go first.
+| `maximumWeight(w, weigher)` | At most `w` in total, as the weigher weighs each entry. An entry heavier than the whole bound isn't kept: it's reported as a `SIZE` removal, and the other entries stay.
+| `expireAfterWriteMillis(ms)` | An entry lives this long after it's stored.
+| `expireAfterAccessMillis(ms)` | An entry lives this long after it was last read or stored.
+| `expiry(expiry)` | Each entry's lifetime, chosen when it's stored. It replaces the write lifetime for that entry; the access lifetime still applies. A lifetime of zero or less isn't stored and removes the key's old value, so a `get` of such a value calls its loader every time.
+| `removalListener(listener)` | Called for every entry that leaves, with the cause: `EXPLICIT`, `REPLACED`, `EXPIRED` or `SIZE`.
+| `clock(clock)` | Where the cache reads the time. Tests replace it to move time without waiting.
+|===
+
+==== Loading
+
+`get(key, loader)` returns the entry, or runs the loader on the calling thread when
+there's none. Requests asking for a key while its load runs don't load it again:
+they wait for that load and get its result. A waiting request on a virtual thread
+yields, so a slow load holds back only the requests that want its key.
+
+A loader that throws stores nothing. Every request waiting for it gets the same
+failure: an unchecked exception as it was thrown, a checked one wrapped in
+`Cache.LoadException`. The next request loads again. A loader that returns null
+stores nothing either. When the key is invalidated or `put` while its load runs,
+the loaded value goes to the requests waiting for it and isn't stored over the newer
+state. A loader can use the cache, but asking for its own key is refused rather than
+waiting forever for itself.
+
+The loader runs as part of the request that started the load, with that request's
+transaction, security context and trace. The others only receive its value, so a
+loader shouldn't return anything specific to one user.
+
+==== Expiry and removal
+
+An expired entry is never returned. It's removed when a read finds it, by a
+periodic sweep during writes, or by `cleanUp()`. `size()` cleans up first, so it
+counts live entries only.
+
+The removal listener runs on the thread whose call removed the entry, after the
+cache has released its lock, so it may use the cache. A listener that throws is
+reported on standard error and changes nothing else.
+
+==== Metrics
+
+Every cache publishes its figures to `Metrics` under its name:
+
+[cols="2,1,4"]
+|===
+| Name | Kind | Meaning
+
+| `cache.<name>.hits` | counter | Lookups answered from the cache.
+| `cache.<name>.misses` | counter | Lookups that weren't.
+| `cache.<name>.loads` | counter | Loads that finished, including those that returned null.
+| `cache.<name>.load_failures` | counter | Loads that threw.
+| `cache.<name>.evictions` | counter | Entries removed for the size or weight bound.
+| `cache.<name>.load.duration` | histogram | Time spent in the loader, in milliseconds.
+| `cache.<name>.size`, `.weight` | gauge | Entries held, and their total weight.
+|===
+
+The same figures are on the cache itself, from `hitCount()` to `evictionCount()`.
+Give each cache its own name; two caches with one name share the counters.
+
+==== Scope and memory
+
+A cache belongs to one process. Two instances of a server each hold their own, and
+invalidating a key in one doesn't reach the other. Values are held by reference, so
+treat them as read only.
+
+Each entry costs about a hundred bytes beyond its key and value: a map entry with
+its links in access order, and a node holding the value, its weight and its
+timestamps.

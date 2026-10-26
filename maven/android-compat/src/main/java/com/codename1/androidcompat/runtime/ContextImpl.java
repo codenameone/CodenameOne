@@ -104,6 +104,15 @@ final class ContextImpl extends Context {
         if (INPUT_METHOD_SERVICE.equals(name)) {
             return new InputMethodManager();
         }
+        if (LOCATION_SERVICE.equals(name)) {
+            return android.location.LocationManager.getInstance();
+        }
+        if (SENSOR_SERVICE.equals(name)) {
+            return android.hardware.SensorManager.getInstance();
+        }
+        if (NOTIFICATION_SERVICE.equals(name)) {
+            return android.app.NotificationManager.getInstance();
+        }
         CompatReport.unsupported("system service", name);
         return null;
     }

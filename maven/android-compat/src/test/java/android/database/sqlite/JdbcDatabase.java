@@ -42,8 +42,12 @@ class JdbcDatabase extends Database {
     private final Connection conn;
 
     JdbcDatabase() throws IOException {
+        this("jdbc:sqlite::memory:");
+    }
+
+    JdbcDatabase(String url) throws IOException {
         try {
-            conn = DriverManager.getConnection("jdbc:sqlite::memory:");
+            conn = DriverManager.getConnection(url);
         } catch (java.sql.SQLException e) {
             throw new IOException(e.getMessage());
         }

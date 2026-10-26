@@ -177,6 +177,25 @@ NETStandard.Library.Ref is distributed under the MIT license:
   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
   SOFTWARE.
+
+================================================================================
+Android Open Source Project: SensorManager math
+================================================================================
+
+maven/android-compat/src/main/java/android/hardware/SensorMath.java is rewritten
+from the static methods of android.hardware.SensorManager in the Android Open
+Source Project (https://source.android.com), so that rotation matrices,
+orientation angles and altitude computed by Android applications on the
+Codename One compatibility runtime match the platform's. It retains the
+original copyright notice:
+
+  Copyright (C) 2008 The Android Open Source Project
+
+  Licensed under the Apache License, Version 2.0 (the "License"); you may not
+  use this file except in compliance with the License. You may obtain a copy of
+  the License at http://www.apache.org/licenses/LICENSE-2.0
+
+================================================================================
 GroupLayout
 ================================================================================
 

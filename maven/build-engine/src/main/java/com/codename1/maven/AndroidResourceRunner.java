@@ -227,6 +227,12 @@ public class AndroidResourceRunner {
         }
         if (result.manifest != null) {
             writeMainClass(result.manifest.packageName);
+            try {
+                IosLocationHints.apply(IosLocationHints.settingsFor(androidDir), result.manifest.permissions,
+                        sourceRoots, log);
+            } catch (IOException e) {
+                log.warn("Cannot add the iOS location build hints: " + e.getMessage());
+            }
         }
         log.info("Compiled " + result.resourceCount + " Android resources");
         try {

@@ -20,3 +20,4 @@ pseudonymous
 Plausible
 PostHog
 Piwik
+Sepolia

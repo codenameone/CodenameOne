@@ -134,10 +134,19 @@ public class CodenameOneActivity extends Activity {
     }
 
     @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) {
+            AndroidImplementation.verifyClipOwnershipOnFocus(this);
+        }
+    }
+
+    @Override
     protected void onResume() {
         super.onResume();
         AndroidImplementation.setActivity(this);
         AndroidNativeUtil.onResume();
+        AndroidImplementation.verifyClipOwnershipOnResume(this);
         com.codename1.ui.Display.getInstance().nativeThemeSettingsChanged();
         if (isBillingEnabled() && getBillingSupport() != null) {
             billingSupport.consumeAndAcknowlegePurchases();

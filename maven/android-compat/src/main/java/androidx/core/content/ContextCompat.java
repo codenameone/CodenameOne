@@ -49,6 +49,10 @@ public class ContextCompat {
         return context.getDrawable(id);
     }
 
+    public static void startForegroundService(Context context, Intent intent) {
+        context.startForegroundService(intent);
+    }
+
     public static int checkSelfPermission(Context context, String permission) {
         return context.checkSelfPermission(permission);
     }

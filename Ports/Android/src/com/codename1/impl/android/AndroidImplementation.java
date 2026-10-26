@@ -4109,8 +4109,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             /*if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to get notifications")){
                 return "";
             }*/
-            boolean has = hasAndroidMarket();
-            if(has) {
+            if(GoogleServices.isPlayServicesAvailable(getContext())) {
                 return "gcm";
             }
             return defaultValue;
@@ -9450,7 +9449,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         boolean includesPlayServices = Display.getInstance().getProperty("IncludeGPlayServices", "false").equals("true");
-        if (includesPlayServices && hasAndroidMarket()) {
+        // Play services, not the Play Store: the fused provider is a service of
+        // the former, and a device can carry either without the other. Without
+        // it the framework manager covers the same API, background updates and
+        // geofences included, instead of a GoogleApiClient that never connects.
+        if (includesPlayServices && GoogleServices.isPlayServicesAvailable(getContext())) {
             try {
                 Class clazz = Class.forName("com.codename1.location.AndroidLocationPlayServiceManager");
                 return (com.codename1.location.LocationManager)clazz.getMethod("getInstance").invoke(null);
@@ -10909,9 +10912,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             // somewhere and tells that receiver it succeeded.
                             clip = ClipData.newPlainText("Codename One", "");
                         }
+                        markClip(clip, (ClipboardContent) obj, sdk);
+                        takeClipOwnership((ClipboardContent) obj, clip, sdk);
                     } else {
                         // Nothing of ours is staged for a plain text clip.
                         clip = ClipData.newPlainText("Codename One", obj.toString());
+                        // A later copy of ours replaces whatever a pending clear was waiting for.
+                        synchronized (STAGED_CLIP_FILES) {
+                            clipOwner = null;
+                            clipOwnerToken = null;
+                            pendingClipClear = null;
+                        }
                     }
                     watchPrimaryClip(clipboard);
                     // Pinned for the length of the call, held only if it returns. setPrimaryClip
@@ -10934,6 +10945,254 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             endStagingClip(staged);
                         }
                     }
+                }
+            }
+        });
+    }
+
+    /// The extra API 33 reads to keep a clip's text out of the copy preview and the keyboard's
+    /// suggestions. Spelled out because the platform jar this port compiles against predates the
+    /// constant; API 24 is the floor of `ClipDescription.setExtras`.
+    private static final String EXTRA_IS_SENSITIVE = "android.content.extra.IS_SENSITIVE";
+
+    /// Ours, so a scheduled clear can recognise its own clip without reading the clip itself
+    /// (reading it shows the "pasted from" notice on Android 12 and newer).
+    private static final String EXTRA_CN1_CLEAR_AFTER = "com.codename1.clipboard.clearAfter";
+
+    /// Ours, naming the one copy a clip came from, so a clear can tell its own clip from a later
+    /// copy of ours or another application's when the description is readable.
+    private static final String EXTRA_CN1_CLIP_TOKEN = "com.codename1.clipboard.token";
+
+    /// The content whose clip is on the clipboard now, as far as this process knows, and the
+    /// token stamped into that clip. Ownership is per copy: a scheduled clear only acts when its
+    /// own content is still the owner, so a second copy is never wiped by the first one's timer.
+    ///
+    /// The description cannot be the evidence on its own: from Android 10 a background
+    /// application reads null from `getPrimaryClipDescription`, which is exactly when a timed
+    /// clear fires. So ownership is kept here, dropped by the clip-changed listener (delivered
+    /// only while focused) and re-checked against the description on resume and whenever the
+    /// description is readable.
+    private static ClipboardContent clipOwner;
+    private static String clipOwnerToken;
+    private static long clipTokenCounter;
+
+    /// A timed clear that fired while the clipboard could not be read (a background
+    /// application on Android 10 and later reads a null description), so nothing proved the
+    /// clip was still ours. Clearing anyway could wipe a clip the user copied from another
+    /// application in the meantime, so the clear waits here and runs on the next resume once
+    /// the token is readable and still ours.
+    ///
+    /// The tradeoff is deliberate: a sensitive clip can outlive its timer for as long as the
+    /// application stays in the background. Destroying another application's clip is the
+    /// worse failure, and the sensitive flag still keeps the value out of clipboard previews.
+    private static ClipboardContent pendingClipClear;
+
+    private static final int CLIP_OURS = 0;
+    private static final int CLIP_NOT_OURS = 1;
+    private static final int CLIP_UNKNOWN = 2;
+
+    private static void markClip(ClipData clip, ClipboardContent content, int sdk) {
+        if (sdk < 24 || (!content.isSensitive() && content.getClearAfter() <= 0)) {
+            return;
+        }
+        PersistableBundle extras = new PersistableBundle();
+        if (content.isSensitive()) {
+            extras.putBoolean(EXTRA_IS_SENSITIVE, true);
+        }
+        if (content.getClearAfter() > 0) {
+            extras.putInt(EXTRA_CN1_CLEAR_AFTER, content.getClearAfter());
+        }
+        clip.getDescription().setExtras(extras);
+    }
+
+    /// Records `content` as the owner of the clip about to be published. Below API 24 there is
+    /// nowhere to stamp a token and no listener to trust, so nothing is owned and nothing is
+    /// cleared there.
+    private static void takeClipOwnership(ClipboardContent content, ClipData clip, int sdk) {
+        synchronized (STAGED_CLIP_FILES) {
+            clipOwner = null;
+            clipOwnerToken = null;
+            pendingClipClear = null;
+            if (sdk < 24 || content.getClearAfter() <= 0) {
+                return;
+            }
+            clipTokenCounter++;
+            String token = System.currentTimeMillis() + "-" + clipTokenCounter;
+            PersistableBundle extras = clip.getDescription().getExtras();
+            if (extras == null) {
+                extras = new PersistableBundle();
+            }
+            extras.putString(EXTRA_CN1_CLIP_TOKEN, token);
+            clip.getDescription().setExtras(extras);
+            clipOwner = content;
+            clipOwnerToken = token;
+        }
+    }
+
+    /// Drops ownership when the clipboard, read while it can be, holds something other than
+    /// the owned clip. A null description says nothing (background, or no clip yet) and keeps it.
+    ///
+    /// #### Returns
+    ///
+    /// `CLIP_OURS` when the description carries the owned token, `CLIP_NOT_OURS` when nothing
+    /// is owned or another clip replaced it, `CLIP_UNKNOWN` when the description is unreadable
+    private static int verifyClipOwnership(android.content.ClipboardManager clipboard) {
+        synchronized (STAGED_CLIP_FILES) {
+            if (clipOwnerToken == null) {
+                return CLIP_NOT_OURS;
+            }
+        }
+        android.content.ClipDescription description;
+        try {
+            description = clipboard.getPrimaryClipDescription();
+        } catch (Throwable t) {
+            return CLIP_UNKNOWN;
+        }
+        if (description == null) {
+            return CLIP_UNKNOWN;
+        }
+        PersistableBundle extras = description.getExtras();
+        String token = extras == null ? null : extras.getString(EXTRA_CN1_CLIP_TOKEN);
+        synchronized (STAGED_CLIP_FILES) {
+            if (clipOwnerToken != null && clipOwnerToken.equals(token)) {
+                return CLIP_OURS;
+            }
+            clipOwner = null;
+            clipOwnerToken = null;
+            pendingClipClear = null;
+            return CLIP_NOT_OURS;
+        }
+    }
+
+    /// Called when the activity resumes: the listener missed every change made while this
+    /// application was in the background, and now the description is readable again. A clear
+    /// deferred while in the background runs here, once the clip is proven still ours.
+    static void verifyClipOwnershipOnResume(Context context) {
+        if (android.os.Build.VERSION.SDK_INT < 24 || context == null) {
+            return;
+        }
+        synchronized (STAGED_CLIP_FILES) {
+            // The listener is delivered only while focused, so a change counted while in the
+            // background (ours or a failed publish) may never have been consumed. A stale count
+            // would swallow the next foreign copy and keep a clip that is no longer ours owned.
+            expectedClipChanges = 0;
+        }
+        try {
+            android.content.ClipboardManager clipboard = (android.content.ClipboardManager)
+                    context.getSystemService(Context.CLIPBOARD_SERVICE);
+            if (clipboard == null) {
+                return;
+            }
+            ClipboardContent pending;
+            synchronized (STAGED_CLIP_FILES) {
+                pending = pendingClipClear;
+            }
+            if (verifyClipOwnership(clipboard) == CLIP_OURS && pending != null) {
+                clearOwnedClip(clipboard, pending);
+            }
+        } catch (Throwable t) {
+            com.codename1.io.Log.e(t);
+        }
+    }
+
+    /// Called when the activity gains window focus. On Android 10 and later the clipboard
+    /// can be read only by the focused application, and focus arrives after onResume, so the
+    /// check made there can answer "unknown" and leave a deferred clear pending. This retries
+    /// it once the description is readable. The change counter is not reset here: focus can
+    /// return without a resume (a dialog or the notification shade), while the listener kept
+    /// running.
+    static void verifyClipOwnershipOnFocus(Context context) {
+        if (android.os.Build.VERSION.SDK_INT < 24 || context == null) {
+            return;
+        }
+        retryPendingClipClear(context);
+    }
+
+    private static void retryPendingClipClear(Context context) {
+        try {
+            ClipboardContent pending;
+            synchronized (STAGED_CLIP_FILES) {
+                pending = pendingClipClear;
+            }
+            if (pending == null) {
+                return;
+            }
+            android.content.ClipboardManager clipboard = (android.content.ClipboardManager)
+                    context.getSystemService(Context.CLIPBOARD_SERVICE);
+            if (clipboard != null && verifyClipOwnership(clipboard) == CLIP_OURS) {
+                clearOwnedClip(clipboard, pending);
+            }
+        } catch (Throwable t) {
+            com.codename1.io.Log.e(t);
+        }
+    }
+
+    /// Clears the primary clip if `content` still owns it. Only called once the token was read
+    /// back and matched, which also means the description was readable and the clip-changed
+    /// callback for this clear will be delivered.
+    private static void clearOwnedClip(android.content.ClipboardManager clipboard, ClipboardContent content) {
+        synchronized (STAGED_CLIP_FILES) {
+            if (content == null || clipOwner != content) {
+                // A later copy (ours or another application's) replaced it.
+                pendingClipClear = null;
+                return;
+            }
+            clipOwner = null;
+            clipOwnerToken = null;
+            pendingClipClear = null;
+            // Our own replacement, not another application's copy. Counted only while the
+            // listener is installed, since otherwise no callback will consume it.
+            if (clipboardWatched) {
+                expectedClipChanges++;
+            }
+        }
+        boolean cleared = false;
+        if (android.os.Build.VERSION.SDK_INT >= 28) {
+            try {
+                // Reflective: the platform jar this port compiles against predates
+                // clearPrimaryClip (API 28).
+                clipboard.getClass().getMethod("clearPrimaryClip").invoke(clipboard);
+                cleared = true;
+            } catch (Throwable t) {
+                cleared = false;
+            }
+        }
+        if (!cleared) {
+            clipboard.setPrimaryClip(ClipData.newPlainText("", ""));
+        }
+    }
+
+    @Override
+    public void clearClipboardContent(final ClipboardContent content) {
+        if (getActivity() == null) {
+            return;
+        }
+        getActivity().runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                if (android.os.Build.VERSION.SDK_INT < 24) {
+                    // No token and no ownership below API 24, so nothing proves the clip is
+                    // still ours; clearing blind could wipe another application's copy.
+                    return;
+                }
+                android.content.ClipboardManager clipboard = (android.content.ClipboardManager)
+                        getActivity().getSystemService(Context.CLIPBOARD_SERVICE);
+                if (clipboard == null) {
+                    return;
+                }
+                int state = verifyClipOwnership(clipboard);
+                if (state == CLIP_UNKNOWN) {
+                    // In the background the clip cannot be read, so it may already be another
+                    // application's. Defer to the next resume (see pendingClipClear).
+                    synchronized (STAGED_CLIP_FILES) {
+                        if (content != null && clipOwner == content) {
+                            pendingClipClear = content;
+                        }
+                    }
+                    return;
+                }
+                if (state == CLIP_OURS) {
+                    clearOwnedClip(clipboard, content);
                 }
             }
         });
@@ -12168,7 +12427,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         }
                     }
                     // A clip somebody else published replaced ours, so what ours was carrying
-                    // is nobody's to paste any more.
+                    // is nobody's to paste any more, and a pending clear must not wipe theirs.
+                    synchronized (STAGED_CLIP_FILES) {
+                        clipOwner = null;
+                        clipOwnerToken = null;
+                        pendingClipClear = null;
+                    }
                     clipboardHolds(0);
                 }
             });
@@ -14070,27 +14334,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         Log.d(Display.getInstance().getProperty("AppName", "CodenameOne"), content);
     }
 
-    private boolean hasAndroidMarket() {
-        return hasAndroidMarket(getContext());
-    }
-
-    private static final String GooglePlayStorePackageNameOld = "com.google.market";
-    private static final String GooglePlayStorePackageNameNew = "com.android.vending";
 
     /**
      * Indicates whether this is a Google certified device which means that it
      * has Android market etc.
      */
     public static boolean hasAndroidMarket(Context activity) {
-        final PackageManager packageManager = activity.getPackageManager();
-        List<PackageInfo> packages = packageManager.getInstalledPackages(PackageManager.GET_UNINSTALLED_PACKAGES);
-        for (PackageInfo packageInfo : packages) {
-            if (packageInfo.packageName.equals(GooglePlayStorePackageNameOld) ||
-                    packageInfo.packageName.equals(GooglePlayStorePackageNameNew)) {
-                return true;
-            }
-        }
-        return false;
+        // A direct lookup of the two packages rather than a scan of every
+        // installed one: from API 30 getInstalledPackages() lists only what the
+        // manifest's <queries> names, and a scan answers false on a Google device
+        // as readily as on a de-Googled one. The builder declares these packages.
+        return GoogleServices.isPlayStoreInstalled(activity);
     }
 
     @Override
@@ -14106,8 +14360,21 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         boolean huawei = "huawei".equals(Display.getInstance().getProperty("cn1.push.transport", ""));
-        if (!hasAndroidMarket() && !huawei) {
-            Log.d("Codename One", "Device doesn't have Android market/google play can't register for push!");
+        if (!hasAlternativePushTransport() && !GoogleServices.isPlayServicesAvailable(getContext())) {
+            // Reported, not just logged: a PushClient waits for exactly one
+            // registration result, and returning in silence left it waiting for
+            // good on every device without Google Play services.
+            final String message = "Google Play services is not available on this device, and "
+                    + "the application was built with no other push transport";
+            Log.d("Codename One", message);
+            final com.codename1.push.PushCallback callback = getPushCallback();
+            if (callback != null) {
+                Display.getInstance().callSerially(new Runnable() {
+                    public void run() {
+                        callback.pushRegistrationError(message, 0);
+                    }
+                });
+            }
             return;
         }
         String id = "";
@@ -14129,10 +14396,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         registerPollingFallback();
     }
 
+    /// Whether the build compiled in a push transport other than Firebase
+    /// (Huawei Push Kit, UnifiedPush). The generated activity then chooses among
+    /// them at run time in registerForPush, so the Play services check above
+    /// must not decide for it.
+    private static boolean hasAlternativePushTransport() {
+        Display d = Display.getInstance();
+        if ("huawei".equals(d.getProperty("cn1.push.transport", ""))) {
+            return true;
+        }
+        String transports = d.getProperty("cn1.push.transports", "");
+        return transports.indexOf("huawei") > -1 || transports.indexOf("unifiedpush") > -1;
+    }
+
     @Override
     public void deregisterPush() {
-        boolean has = hasAndroidMarket()
-                || "huawei".equals(Display.getInstance().getProperty("cn1.push.transport", ""));
+        boolean has = hasAlternativePushTransport()
+                || GoogleServices.isPlayServicesAvailable(getContext());
         if (has) {
             ((CodenameOneActivity) getActivity()).stopReceivingPush();
             deregisterPushFromServer();
@@ -17825,16 +18105,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     private void invokeFirebaseTopic(String methodName, String topic) {
-        try {
-            Class<?> cls = Class.forName("com.google.firebase.messaging.FirebaseMessaging");
-            Object instance = cls.getMethod("getInstance").invoke(null);
-            cls.getMethod(methodName, String.class).invoke(instance, topic);
-        } catch (ClassNotFoundException notAvailable) {
-            com.codename1.io.Log.p("Firebase Cloud Messaging is not available; topic '" + topic
-                    + "' subscription must be handled server side");
-        } catch (Throwable t) {
-            com.codename1.io.Log.e(t);
-        }
+        GoogleServices.firebaseTopic(getContext(), methodName, topic);
     }
 
     @Override
@@ -18304,74 +18575,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public boolean isAttestationSupported() {
-        try {
-            Class.forName("com.google.android.play.core.integrity.IntegrityManagerFactory");
-            return true;
-        } catch(Throwable t) {
-            return false;
-        }
+        return GoogleServices.isPlayIntegritySupported(getContext());
     }
 
     @Override
     public AsyncResource<String> requestIntegrityToken(final String nonce) {
         final AsyncResource<String> result = new AsyncResource<String>();
-        try {
-            Context context = getContext();
-            Class factory = Class.forName("com.google.android.play.core.integrity.IntegrityManagerFactory");
-            Object manager = factory.getMethod("create", Context.class).invoke(null, context);
-            Class requestClass = Class.forName("com.google.android.play.core.integrity.IntegrityTokenRequest");
-            Object builder = requestClass.getMethod("builder").invoke(null);
-            builder = builder.getClass().getMethod("setNonce", String.class).invoke(builder, nonce);
-            Object request = builder.getClass().getMethod("build").invoke(builder);
-            Class managerClass = Class.forName("com.google.android.play.core.integrity.IntegrityManager");
-            Object task = managerClass.getMethod("requestIntegrityToken", requestClass).invoke(manager, request);
-
-            Class taskClass = Class.forName("com.google.android.gms.tasks.Task");
-            Class onSuccessClass = Class.forName("com.google.android.gms.tasks.OnSuccessListener");
-            Class onFailureClass = Class.forName("com.google.android.gms.tasks.OnFailureListener");
-            final Class responseClass = Class.forName("com.google.android.play.core.integrity.IntegrityTokenResponse");
-
-            Object successListener = java.lang.reflect.Proxy.newProxyInstance(
-                    onSuccessClass.getClassLoader(), new Class[] { onSuccessClass },
-                    new java.lang.reflect.InvocationHandler() {
-                        public Object invoke(Object proxy, java.lang.reflect.Method method, Object[] args) {
-                            try {
-                                Object response = args[0];
-                                Object token = responseClass.getMethod("token").invoke(response);
-                                // Tested rather than cast into the catch below: a
-                                // wrong type here is a bad token rather than a
-                                // failed call, and a reflective call's answer is
-                                // exactly the kind of value worth testing.
-                                if (token instanceof String) {
-                                    result.complete((String) token);
-                                } else {
-                                    result.error(new IllegalStateException(
-                                            "integrity token was not a string"));
-                                }
-                            } catch(Throwable t) {
-                                result.error(t);
-                            }
-                            return null;
-                        }
-                    });
-            Object failureListener = java.lang.reflect.Proxy.newProxyInstance(
-                    onFailureClass.getClassLoader(), new Class[] { onFailureClass },
-                    new java.lang.reflect.InvocationHandler() {
-                        public Object invoke(Object proxy, java.lang.reflect.Method method, Object[] args) {
-                            Throwable err = (args != null && args.length > 0 && args[0] instanceof Throwable)
-                                    ? (Throwable) args[0] : new RuntimeException("Play Integrity request failed");
-                            result.error(err);
-                            return null;
-                        }
-                    });
-            taskClass.getMethod("addOnSuccessListener", onSuccessClass).invoke(task, successListener);
-            taskClass.getMethod("addOnFailureListener", onFailureClass).invoke(task, failureListener);
-        } catch(ClassNotFoundException notBundled) {
-            result.error(new UnsupportedOperationException(
-                    "Google Play Integrity is not bundled. Enable the android.playIntegrity build hint."));
-        } catch(Throwable t) {
-            result.error(t);
-        }
+        GoogleServices.requestIntegrityToken(getContext(), nonce, result);
         return result;
     }
 
