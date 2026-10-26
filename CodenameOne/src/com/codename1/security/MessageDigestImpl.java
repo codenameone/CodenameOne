@@ -59,6 +59,12 @@ abstract class MessageDigestImpl {
         if ("SHA512".equals(a)) {
             return new Sha512Family(false);
         }
+        if ("KECCAK256".equals(a)) {
+            return new Keccak(32, (byte) 0x01);
+        }
+        if ("SHA3256".equals(a)) {
+            return new Keccak(32, (byte) 0x06);
+        }
         throw new CryptoException("unsupported hash algorithm: " + algorithm);
     }
 
@@ -733,6 +739,176 @@ abstract class MessageDigestImpl {
             }
             h0 += a; h1 += b; h2 += c; h3 += d;
             h4 += e; h5 += f; h6 += g; h7 += h;
+        }
+    }
+
+    // ===============================================================
+    // Keccak sponge over Keccak-f[1600] -- FIPS 202, with the original
+    // Keccak padding as an alternative domain byte.
+    //
+    // The two algorithms built on it differ in ONE byte: the first padding
+    // byte is 0x01 for the original Keccak (what Ethereum hashes with: block
+    // and transaction hashes, addresses, ABI selectors) and 0x06 for the
+    // standardised SHA3 (FIPS 202 appends the two domain bits 01 before the
+    // pad10*1). Everything else -- the permutation, the rate, the squeeze --
+    // is shared, so one class covers both.
+    static final class Keccak extends MessageDigestImpl {
+        private static final long[] RC = {
+            0x0000000000000001L, 0x0000000000008082L, 0x800000000000808aL, 0x8000000080008000L,
+            0x000000000000808bL, 0x0000000080000001L, 0x8000000080008081L, 0x8000000000008009L,
+            0x000000000000008aL, 0x0000000000000088L, 0x0000000080008009L, 0x000000008000000aL,
+            0x000000008000808bL, 0x800000000000008bL, 0x8000000000008089L, 0x8000000000008003L,
+            0x8000000000008002L, 0x8000000000000080L, 0x000000000000800aL, 0x800000008000000aL,
+            0x8000000080008081L, 0x8000000000008080L, 0x0000000080000001L, 0x8000000080008008L
+        };
+
+        // rho rotation offsets, indexed by lane x + 5 * y
+        private static final int[] ROT = {
+            0, 1, 62, 28, 27,
+            36, 44, 6, 55, 20,
+            3, 10, 43, 25, 39,
+            41, 45, 15, 21, 8,
+            18, 2, 61, 56, 14
+        };
+
+        // pi: lane (x, y) moves to (y, 2x + 3y), again indexed by x + 5 * y
+        private static final int[] PI = new int[25];
+
+        static {
+            for (int x = 0; x < 5; x++) {
+                for (int y = 0; y < 5; y++) {
+                    PI[x + 5 * y] = y + 5 * ((2 * x + 3 * y) % 5);
+                }
+            }
+        }
+
+        private final int outLen;
+        private final int rate;
+        private final byte domain;
+        private final long[] state = new long[25];
+        private final long[] scratch = new long[25];
+        private final byte[] buffer;
+        private int bufferLen;
+
+        Keccak(int outLen, byte domain) {
+            this.outLen = outLen;
+            this.rate = 200 - 2 * outLen;
+            this.domain = domain;
+            this.buffer = new byte[rate];
+        }
+
+        @Override
+        public void reset() {
+            for (int i = 0; i < 25; i++) {
+                state[i] = 0;
+            }
+            bufferLen = 0;
+        }
+
+        @Override
+        public int digestLength() {
+            return outLen;
+        }
+
+        @Override
+        void update(byte b) {
+            buffer[bufferLen++] = b;
+            if (bufferLen == rate) {
+                absorb();
+            }
+        }
+
+        @Override
+        void update(byte[] data, int offset, int length) {
+            int o = offset;
+            int remaining = length;
+            while (remaining > 0) {
+                int n = rate - bufferLen;
+                if (n > remaining) {
+                    n = remaining;
+                }
+                System.arraycopy(data, o, buffer, bufferLen, n);
+                bufferLen += n;
+                o += n;
+                remaining -= n;
+                if (bufferLen == rate) {
+                    absorb();
+                }
+            }
+        }
+
+        @Override
+        public byte[] digest() {
+            for (int i = bufferLen; i < rate; i++) {
+                buffer[i] = 0;
+            }
+            buffer[bufferLen] ^= domain;
+            buffer[rate - 1] ^= (byte) 0x80;
+            bufferLen = rate;
+            absorb();
+            byte[] out = new byte[outLen];
+            for (int i = 0; i < outLen; i++) {
+                out[i] = (byte) (state[i >> 3] >>> ((i & 7) << 3));
+            }
+            reset();
+            return out;
+        }
+
+        // XORs the full buffer into the state lane by lane (little endian) and
+        // runs the permutation.
+        private void absorb() {
+            int lanes = rate >> 3;
+            for (int i = 0; i < lanes; i++) {
+                int o = i << 3;
+                long v = 0;
+                for (int b = 7; b >= 0; b--) {
+                    v = (v << 8) | (buffer[o + b] & 0xffL);
+                }
+                state[i] ^= v;
+            }
+            bufferLen = 0;
+            permute();
+        }
+
+        private void permute() {
+            long[] a = state;
+            long[] b = scratch;
+            for (int round = 0; round < 24; round++) {
+                // theta
+                long c0 = a[0] ^ a[5] ^ a[10] ^ a[15] ^ a[20];
+                long c1 = a[1] ^ a[6] ^ a[11] ^ a[16] ^ a[21];
+                long c2 = a[2] ^ a[7] ^ a[12] ^ a[17] ^ a[22];
+                long c3 = a[3] ^ a[8] ^ a[13] ^ a[18] ^ a[23];
+                long c4 = a[4] ^ a[9] ^ a[14] ^ a[19] ^ a[24];
+                long d0 = c4 ^ rotl(c1, 1);
+                long d1 = c0 ^ rotl(c2, 1);
+                long d2 = c1 ^ rotl(c3, 1);
+                long d3 = c2 ^ rotl(c4, 1);
+                long d4 = c3 ^ rotl(c0, 1);
+                for (int y = 0; y < 25; y += 5) {
+                    a[y] ^= d0;
+                    a[y + 1] ^= d1;
+                    a[y + 2] ^= d2;
+                    a[y + 3] ^= d3;
+                    a[y + 4] ^= d4;
+                }
+                // rho and pi
+                for (int i = 0; i < 25; i++) {
+                    b[PI[i]] = rotl(a[i], ROT[i]);
+                }
+                // chi
+                for (int y = 0; y < 25; y += 5) {
+                    for (int x = 0; x < 5; x++) {
+                        a[y + x] = b[y + x] ^ (~b[y + (x + 1) % 5] & b[y + (x + 2) % 5]);
+                    }
+                }
+                // iota
+                a[0] ^= RC[round];
+            }
+        }
+
+        private static long rotl(long v, int s) {
+            return s == 0 ? v : (v << s) | (v >>> (64 - s));
         }
     }
 

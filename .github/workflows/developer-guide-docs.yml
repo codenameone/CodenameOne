@@ -17,6 +17,8 @@ on:
       # The Savor and Parley chapters, the same way; savor.yml and parley.yml
       # compile and test the samples.
       - 'scripts/savor/**'
+      # The Bastion chapters, the same way; bastion.yml compiles and tests it.
+      - 'scripts/bastion/**'
       - 'scripts/skirmish/**'
       - 'scripts/parley/**'
       - 'scripts/reel/**'
@@ -131,13 +133,14 @@ jobs:
               - 'Ports/JavaSE/**'
               - 'maven/core/**'
               - 'maven/javase/**'
-              # The Wayline, Savor and Parley chapters include these trees by tag, so a
+              # The Wayline, Savor, Parley and Bastion chapters include these trees by tag, so a
               # renamed or deleted tag there has to reach the snippet check.
               - 'scripts/wayline/**'
               - 'scripts/savor/**'
               - 'scripts/skirmish/**'
               - 'scripts/parley/**'
               - 'scripts/reel/**'
+              - 'scripts/bastion/**'
             workflow:
               - '.github/workflows/developer-guide-docs.yml'
 

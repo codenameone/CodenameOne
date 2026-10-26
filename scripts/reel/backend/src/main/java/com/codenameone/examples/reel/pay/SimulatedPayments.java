@@ -35,7 +35,7 @@ import java.io.IOException;
 ///   check digit.
 /// - `4000 0000 0000 0002` is declined when it is added.
 /// - `4000 0000 0000 0341` is accepted and then declined when it is charged,
-///   which is how a payment that fails at the end of a delivery is tried out.
+///   which is how a renewal that fails is tried out.
 /// - `4000 0000 0000 0119` is accepted and then cannot be charged at all: the
 ///   processor fails without saying whether it took the money, which is how
 ///   a payment nobody can vouch for is tried out.
@@ -140,8 +140,8 @@ public class SimulatedPayments implements PaymentProvider {
     /// A hold is a charge that has not been taken yet, and its reference
     /// refunds the way the charge's would. A card that fails when charged is
     /// held without complaint and fails when the hold is taken, as a hold that
-    /// lapsed while the order was on its way does: that is the failure an
-    /// order meets after checkout, and the one the tests have to reach.
+    /// lapsed before it was taken does: that is the failure a purchase
+    /// meets after checkout, and the one the tests have to reach.
     @Override
     public String authorize(String key, String customer, String token, long amountCents,
             String currency, String description) throws IOException {

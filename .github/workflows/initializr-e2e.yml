@@ -24,6 +24,7 @@ on:
       - 'scripts/skirmish/common/src/test/**'
       - 'scripts/parley/common/src/test/**'
       - 'scripts/reel/common/src/test/**'
+      - 'scripts/bastion/common/src/test/**'
   schedule:
     - cron: '17 3 * * *'
   workflow_dispatch:
@@ -43,7 +44,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        template: [BAREBONES, KOTLIN, WAYLINE, SAVOR, SKIRMISH, PARLEY, REEL]
+        template: [BAREBONES, KOTLIN, WAYLINE, SAVOR, SKIRMISH, PARLEY, BASTION, REEL]
     steps:
       - uses: actions/checkout@v6
 

@@ -292,6 +292,14 @@ public final class AuthorizationServerConfigurer extends SecurityConfigurer {
             if (session != null) {
                 session.setAttribute(OAuth2AuthorizationServer.AUTH_TIME,
                         Long.valueOf(clock.currentTimeMillis() / 1000L));
+                String methods = OAuth2AuthorizationServer.authMethods(authentication,
+                        secondFactor);
+                if (methods != null) {
+                    session.setAttribute(OAuth2AuthorizationServer.AUTH_METHODS, methods);
+                } else {
+                    // Not the earlier check's methods: this one replaced it.
+                    session.removeAttribute(OAuth2AuthorizationServer.AUTH_METHODS);
+                }
             }
         }
 

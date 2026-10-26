@@ -50,9 +50,9 @@ import java.util.Map;
 /// - **The setup is read back** when the app says the user returned: the
 ///   session's SetupIntent names the PaymentMethod Stripe saved, and its brand
 ///   and last four digits are all this server keeps beside its id.
-/// - **A delivery is charged** with a PaymentIntent that is `off_session` and
-///   confirmed in the same request, because the customer is in a car and not at a
-///   payment form.
+/// - **A renewal is charged** with a PaymentIntent that is `off_session` and
+///   confirmed in the same request, because the subscriber is not at a payment
+///   form when the period ends.
 /// - **A refund** returns a charge to the card.
 /// - **A card removed** in the app is detached from the customer, so Stripe
 ///   no longer offers it for a charge.

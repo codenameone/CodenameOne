@@ -84,7 +84,7 @@ public final class WalletForm {
 
     /// The wallet, to choose from for one purchase.
     ///
-    /// @param chosen the id of the method the delivery has now
+    /// @param chosen the id of the method the purchase has now
     public static void pick(Form previous, String chosen, Picked picked) {
         WalletForm wallet = new WalletForm(previous, chosen, picked);
         wallet.form.show();

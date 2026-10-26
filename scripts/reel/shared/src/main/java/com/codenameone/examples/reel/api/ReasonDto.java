@@ -20,8 +20,8 @@ package com.codenameone.examples.reel.api;
 
 import com.codename1.annotations.Mapped;
 
-/// Why an admin did something: rejected an application, cancelled a delivery,
-/// refunded one.
+/// Why an admin did something: rejected a title, suspended an account,
+/// refunded a purchase.
 @Mapped
 public record ReasonDto(String reason) {
 }

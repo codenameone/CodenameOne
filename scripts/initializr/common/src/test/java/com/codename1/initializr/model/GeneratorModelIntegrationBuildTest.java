@@ -278,7 +278,7 @@ public class GeneratorModelIntegrationBuildTest extends AbstractTest {
                                        String version) throws Exception {
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         GeneratorModel.createForPluginVersion(IDE.INTELLIJ, template, appName, packageName, options,
-                GeneratorModel.sinceFor(template))
+                template.isFullStack() ? GeneratorModel.templateSince(template) : GeneratorModel.MAVEN_LAYOUTS_SINCE)
                 .writeProjectZip(output);
         Path dir = Files.createTempDirectory("initializr-layout-" + appName + "-");
         unzipProject(output.toByteArray(), dir);

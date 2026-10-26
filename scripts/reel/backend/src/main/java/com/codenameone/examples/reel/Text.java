@@ -61,7 +61,7 @@ public final class Text {
     }
 
     /// The first letters of the first and last words of a name, in upper case
-    /// when they are ASCII letters: "Dana Courier" is "DD".
+    /// when they are ASCII letters: "Dana Viewer" is "DV".
     public static String initials(String name) {
         String text = name == null ? "" : name.trim();
         if (text.length() == 0) {

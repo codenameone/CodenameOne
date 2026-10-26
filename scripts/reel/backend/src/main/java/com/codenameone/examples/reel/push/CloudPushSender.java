@@ -33,9 +33,8 @@ import java.util.List;
 /// Apple, Huawei and the browsers on the app's behalf.
 ///
 /// The call to the service is made on a thread of its own, so the request that
-/// changed a delivery answers without waiting for it, and a refusal is logged and
-/// not thrown: the customer is still told over the live channel and on their next
-/// look at the delivery.
+/// caused it answers without waiting for it, and a refusal is logged and not
+/// thrown: the viewer still sees the change the next time the app reads it.
 public class CloudPushSender implements PushSender {
     private final CloudPush push;
 

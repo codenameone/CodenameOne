@@ -27,7 +27,7 @@ import java.util.Map;
 
 /// Keeps every notification instead of sending it, for the tests to read.
 ///
-/// What the `test` profile gets: a test signs a phone in, drives a delivery, and
+/// What the `test` profile gets: a test signs a phone in, drives a flow, and
 /// asks this what each device was sent. Refused on any profile that is not a
 /// development one.
 public class RecordingPushSender implements PushSender {

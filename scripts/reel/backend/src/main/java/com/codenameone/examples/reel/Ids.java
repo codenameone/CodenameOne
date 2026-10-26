@@ -30,7 +30,7 @@ public final class Ids {
     }
 
     /// A new identifier: 32 hex digits from 16 random bytes. Random and not a
-    /// counter, so the id of one delivery says nothing about the id of another, and
+    /// counter, so the id of one title says nothing about the id of another, and
     /// so no table needs a generated key, which every database spells its own way.
     public static String next() throws IOException {
         return hex(Crypto.randomBytes(16));

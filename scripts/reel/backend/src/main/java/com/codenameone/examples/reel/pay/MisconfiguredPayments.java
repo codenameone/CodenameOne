@@ -28,7 +28,7 @@ import java.io.IOException;
 /// The problem is logged when the server starts and again on every call,
 /// naming the settings to fix. Each call throws an `IOException`, as an outage
 /// of the processor would, so a customer is told payments are unavailable and no
-/// delivery is charged to a card nobody can reach.
+/// purchase is charged to a card nobody can reach.
 public class MisconfiguredPayments implements PaymentProvider {
     private final String provider;
     private final String problem;

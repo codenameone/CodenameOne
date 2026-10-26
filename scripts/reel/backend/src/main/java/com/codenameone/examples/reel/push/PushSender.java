@@ -28,7 +28,7 @@ import java.util.List;
 ///
 /// [com.codenameone.examples.reel.Services] chooses the implementation from
 /// `reel.push.provider`. A notification is a courtesy on top of what the
-/// app reads from the server, so sending one never fails the delivery it is about:
+/// app reads from the server, so sending one never fails the request it is about:
 /// an implementation logs what went wrong and returns.
 public interface PushSender {
     /// Sends `message` to every one of `targets`. Returns at once; the sending

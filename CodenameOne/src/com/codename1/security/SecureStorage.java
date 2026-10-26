@@ -53,7 +53,8 @@ import com.codename1.util.AsyncResource;
 ///   Team-ID-prefixed group identifier.
 /// - **Android** -- AES/CBC/PKCS7 ciphertext stored in `SharedPreferences`
 ///   with the key in the `AndroidKeyStore`, locked via
-///   `setUserAuthenticationRequired(true)`. The `BiometricPrompt` (API 29+)
+///   `setUserAuthenticationRequired(true)` below API 33, and on every level
+///   with [#setStrictBiometricBinding(boolean)]. The `BiometricPrompt` (API 29+)
 ///   or `FingerprintManager` (API 23-28) unlocks the cipher for one
 ///   operation per prompt.
 /// - **JavaSE simulator** -- backed by `java.util.prefs.Preferences`, gated
@@ -115,6 +116,42 @@ public class SecureStorage {
         r.error(new BiometricException(BiometricError.NOT_AVAILABLE,
                 "Secure storage is not available on this platform"));
         return r;
+    }
+
+    private boolean strictBiometricBinding;
+
+    /// Opts in to the strict binding for keys this storage creates from now
+    /// on. Off by default.
+    ///
+    /// On Android, the default key is user-authentication bound below API 33
+    /// only: on 33+ the keystore binding is skipped (FingerprintScanner #8,
+    /// where a bound key failed to recover for existing users), so there the
+    /// prompt guards the entry but the key itself would decrypt without one.
+    /// With this on, a key the storage creates is bound on every API level
+    /// and, on API 24+, invalidated when a biometric is enrolled -- so
+    /// entries fail with [BiometricError#KEY_REVOKED] after a new fingerprint
+    /// or face is added, exactly as this class's contract describes.
+    ///
+    /// It applies only to a key created after the call. A key that already
+    /// exists -- an installed app's, made under the old rules -- is kept and
+    /// used as it is, never deleted for being unbound, because deleting it
+    /// would destroy every entry the app stored. So call this once at
+    /// startup, before the first write, in an app that wants the binding
+    /// from its first install. Other platforms already bind their entries
+    /// (iOS `kSecAccessControlTouchIDCurrentSet`) and ignore it.
+    public void setStrictBiometricBinding(boolean strict) {
+        strictBiometricBinding = strict;
+    }
+
+    /// Whether [#setStrictBiometricBinding(boolean)] is on. This is the
+    /// policy for keys created from now on, not a statement about the key in
+    /// use: on Android a key that existed before the call (made unbound on
+    /// API 33+) is kept as it is, so an installed app that turned this on in
+    /// an update can answer true here while its entries still sit under an
+    /// unbound key. Do not report it to the user as "the stored data is bound
+    /// to the biometric" without that caveat.
+    public boolean isStrictBiometricBinding() {
+        return strictBiometricBinding;
     }
 
     /// Configures the iOS keychain access group for sharing entries between

@@ -80,6 +80,15 @@ public enum Template {
             "The messaging template is an app, a server and the contract module they share; "
                     + "an Initializr Gradle project is a single project.",
             new String[0], "/parley-modules.zip", "/parley-settings.properties"),
+    // A third of the same kind: a bank with a customer and an admin mode, and its
+    // server -- a ledger, transfers, cards, an exchange and the security around
+    // them. It is the project in scripts/bastion, and its resources come from
+    // `scripts/sync-initializr-template.py bastion`.
+    BASTION(false, "/bastion-src.zip", "/bastion-css.zip", "/bastion-pom.xml",
+            "com.codenameone.examples.bastion", "Bastion", "/bastion-preview.jpg",
+            "The banking template is an app, a server and the contract module they share; "
+                    + "an Initializr Gradle project is a single project.",
+            new String[0], "/bastion-modules.zip", "/bastion-settings.properties"),
     // The same kind of template as WAYLINE: a video streaming service (catalog,
     // player, creator studio, moderation, admin) and its server. It is the
     // project in scripts/reel, and its resources come from

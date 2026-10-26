@@ -213,15 +213,6 @@ SvLabel {
     background-color: transparent;
 }
 
-SvPrice {
-    color: var(--text);
-    font-family: "native:MainBold";
-    font-size: 4.4mm;
-    padding: 0;
-    margin: 0;
-    text-align: right;
-    background-color: transparent;
-}
 
 SvError {
     color: var(--danger);
@@ -911,11 +902,6 @@ SvThumb {
     margin: 0 3mm 0 0;
 }
 /* The same picture, filling the screen. */
-SvPicture {
-    background-color: var(--scrim);
-    padding: 0;
-    margin: 0;
-}
 /* What is fixed to the foot of a form of several steps. */
 SvFooter {
     background-color: var(--surface);
@@ -1305,11 +1291,6 @@ SvDeskChartAxis { color: var(--text-secondary-color); background-color: transpar
 
 SvMutedSmall { color: var(--text-muted); font-family: "native:MainRegular"; font-size: 2.1mm; padding: 0.3mm 0 0.3mm 0; margin: 0; background-color: transparent; }
 SvSheetTitle { color: var(--text); font-family: "native:MainBold"; font-size: 3.5mm; padding: 0; margin: 0; background-color: transparent; }
-/* THE KITCHEN'S QUEUE -- down the left on a wide screen, the order beside it. */
-SvQueuePane { background-color: var(--surface); border-right: 1px solid var(--line); padding: 0; margin: 0; }
-SvDetailPane { background-color: var(--surface-alt); padding: 0; margin: 0; }
-SvQueueRow { background-color: var(--surface); border-bottom: 1px solid var(--line); padding: 2.6mm 3mm 2.6mm 3mm; margin: 0; }
-SvQueueRow.pressed { background-color: var(--surface-alt); }
 SvQueueRowPicked { background-color: var(--brand-tint); border-bottom: 1px solid var(--line); padding: 2.6mm 3mm 2.6mm 3mm; margin: 0; }
 
 /* -------------------------------------------------------------- the reel */
@@ -1916,7 +1897,6 @@ RlProfileName {
     SvText { color: var(--text-dark); }
     SvMuted { color: var(--text-muted-dark); }
     SvLabel { color: var(--text-muted-dark); }
-    SvPrice { color: var(--text-dark); }
     SvError { color: var(--danger-dark); }
     SvNotice { color: var(--text-dark); background-color: var(--surface-alt-dark); }
     SvPrimary { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
@@ -2093,9 +2073,5 @@ RlProfileName {
     SvDeskChartAxis { color: var(--text-secondary-color-dark); }
     SvMutedSmall { color: var(--text-muted-dark); }
     SvSheetTitle { color: var(--text-dark); }
-    SvQueuePane { background-color: var(--surface-dark); border-right: 1px solid var(--line-dark); }
-    SvDetailPane { background-color: var(--surface-alt-dark); }
-    SvQueueRow { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
-    SvQueueRow.pressed { background-color: var(--surface-alt-dark); }
     SvQueueRowPicked { background-color: var(--brand-tint-dark); border-bottom: 1px solid var(--line-dark); }
 }

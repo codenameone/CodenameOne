@@ -166,6 +166,10 @@ include::Reel-Users-Guide.asciidoc[]
 
 include::Reel-Implementors-Guide.asciidoc[]
 
+include::Bastion-Users-Guide.asciidoc[]
+
+include::Bastion-Implementors-Guide.asciidoc[]
+
 = Device and platform services
 
 include::Push-Notifications.asciidoc[]

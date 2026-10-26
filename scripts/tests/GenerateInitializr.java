@@ -37,8 +37,8 @@ public class GenerateInitializr {
    // name and package, so the sample's tests compile in the download unchanged.
    for (Template template : Template.values()) {
     if (!GeneratorModel.isTemplateOffered(template)) {
-     // The page does not offer it at the pinned release; e2e-shipped.sh skips it.
-     Files.write(Paths.get(args[0],"SHIPPED-"+template.name()+".unoffered"),new byte[0]);
+     // Not on the site at this pin; e2e-shipped.sh reads the marker and skips it.
+     Files.write(Paths.get(args[0],"NOT-OFFERED-"+template.name()), new byte[0]);
      continue;
     }
     ProjectOptions options = new ProjectOptions(ProjectOptions.ThemeMode.LIGHT, ProjectOptions.Accent.DEFAULT,
@@ -90,12 +90,12 @@ public class GenerateInitializr {
    }
    // The full-stack templates, each in both of its layouts and in a colour scheme of
    // its own with an icon: an app, its server and the module they share.
-   for (Template template : new Template[] {Template.WAYLINE, Template.SAVOR, Template.SKIRMISH, Template.PARLEY, Template.REEL}) {
+   for (Template template : new Template[] {Template.WAYLINE, Template.SAVOR, Template.SKIRMISH, Template.PARLEY, Template.BASTION, Template.REEL}) {
     for (boolean full : new boolean[] {false, true}) {
      ProjectOptions options = ProjectOptions.defaults().forFullStack().withPlatformModules(full)
        .withScheme(0x0f766e, false).withIcon(new byte[] {(byte)0x89, 'P', 'N', 'G'});
      GeneratorModel model=GeneratorModel.createForPluginVersion(ide,template,"LauncherProbe",
-       "com.example.probe",options,GeneratorModel.sinceFor(template));
+       "com.example.probe",options,GeneratorModel.templateSince(template));
      try(OutputStream out=Files.newOutputStream(Paths.get(args[0],
        template.name()+"-"+(full ? "FULL" : "APP_WITH_BACKEND")+"-"+ide.name()+".zip"))) {
       model.writeProjectZip(out);

@@ -40,7 +40,7 @@ import java.util.List;
 /// The app registers its token when somebody signs in and removes it when they
 /// sign out. A token registered by a second account moves to it: the phone
 /// belongs to whoever signed in on it last, and the one before is not to be
-/// told about the new owner's deliveries.
+/// told about the new owner's account.
 @Component
 public class PushDevices {
     /// How many devices one account keeps. A new one past this replaces the

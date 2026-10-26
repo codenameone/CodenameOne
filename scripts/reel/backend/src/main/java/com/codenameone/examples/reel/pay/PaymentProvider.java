@@ -27,7 +27,7 @@ import java.io.IOException;
 /// The shape is the one real processors share. A customer is a *customer* of the
 /// processor; a card is saved to that customer once, in a *setup*, and comes
 /// back as a token; from then on the server charges the token with nobody
-/// present, which is what lets a delivery be paid for as it ends. The server keeps
+/// present, which is what lets a subscription renew on its own. The server keeps
 /// the token, a brand and four digits. It never keeps a card number, and with
 /// a hosted setup it never sees one.
 // tag::reel-payment-provider[]
@@ -90,8 +90,8 @@ public interface PaymentProvider {
     /// [#REFUND_PENDING] while the processor still does not know, or
     /// [#REFUND_FAILED] when the money did not go back.
     String refundStatus(String refundReference) throws IOException;
-    /// Holds `amountCents` on a saved card without taking it, for an order
-    /// that is paid for only once it arrives. Keyed as [#charge] is.
+    /// Holds `amountCents` on a saved card without taking it, for a purchase
+    /// that is paid for only once it completes. Keyed as [#charge] is.
     ///
     /// @return the processor's reference for the hold, for [#capture] or [#release]
     /// - `PaymentDeclinedException`: when the card was refused
