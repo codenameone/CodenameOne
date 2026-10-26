@@ -597,6 +597,16 @@ public class LinuxImplementation extends CodenameOneImplementation {
     private LinuxHardware hardware;
 
     @Override
+    public com.codename1.nfc.Nfc getNfc() {
+        if (nfc == null) {
+            nfc = new LinuxNfc();
+        }
+        return nfc;
+    }
+
+    private LinuxNfc nfc;
+
+    @Override
     public com.codename1.hardware.Hardware getHardware() {
         if (hardware == null) {
             hardware = new LinuxHardware();

@@ -187,6 +187,16 @@ temperature sensor at `0x48` and an EEPROM at `0x50` on I2C bus 1, loopback SPI,
 serial and CAN devices, two PWM channels, a watchdog and a backlight. Hardware code
 therefore runs, and can be unit tested, before a board is on the desk.
 
+==== NFC readers
+
+`Nfc.getInstance().readTag(options)` works with a USB contactless reader through
+PC/SC. The device needs the `pcscd` service and its `libpcsclite` library, which
+Codename One loads the first time NFC is used; without them `isSupported()`
+returns `false`. A card on the reader is reported as an ISO-DEP tag whose `getId()`
+is the UID the reader returns, and `getIsoDep().transceive(apdu)` exchanges APDUs
+with it. The connection stays open until the next `readTag` call. Reading NDEF,
+writing tags and host card emulation aren't available on Linux.
+
 === Headless devices with the backend
 
 A gateway, a sensor hub or a controller with no screen runs the

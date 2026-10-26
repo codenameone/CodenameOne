@@ -1214,4 +1214,18 @@ public final class LinuxNative {
     public static native void mdnsClose(int fd);
     public static native String hwList(int kind);
     public static native int hwBacklight(int op, int value);
+
+    /** True when libpcsclite loads and a PC/SC context can be established. */
+    public static native boolean nfcAvailable();
+    /**
+     * Blocks until a card is on a reader. Returns a card handle (positive), 0 on
+     * timeout, -1 on a PC/SC failure or -2 when nfcCancel() was called.
+     */
+    public static native long nfcWaitCard(int timeoutMs);
+    /** Wakes a pending nfcWaitCard() so it returns -2. */
+    public static native void nfcCancel();
+    /** Sends one APDU; returns the response including SW1 SW2, or null on failure. */
+    public static native byte[] nfcTransmit(long card, byte[] apdu);
+    /** Releases a card handle returned by nfcWaitCard(). */
+    public static native void nfcDisconnect(long card);
 }
