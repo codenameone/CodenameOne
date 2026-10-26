@@ -8284,6 +8284,13 @@ public class AndroidGradleBuilder extends Executor {
         }
         if (hasKotlinSources && kotlinVersion.length() == 0 && !builtInKotlin) {
             kotlinVersion = useGradle8 ? "1.9.22" : "1.7.22";
+            // A declared kotlinx-coroutines brings its own kotlin-stdlib (2.1 for
+            // coroutines 1.10), and a 1.9 compiler refuses that stdlib's metadata
+            // ("compiled with an incompatible version of Kotlin"), so the default
+            // compiler follows it. A version the project pinned is left alone.
+            if (useGradle8 && gradleProvidedLibraryDependencies.contains("kotlinx-coroutines-core")) {
+                kotlinVersion = KOTLIN_FOR_GRADLE_PROVIDED_COROUTINES;
+            }
         }
         String kotlinPluginApply = "";
         String kotlinRuntimeDependency = "";
@@ -12671,6 +12678,7 @@ public class AndroidGradleBuilder extends Executor {
     // against; Gradle then resolves the higher of that and what AndroidX asks for, never
     // an older androidx.collection without the ScatterSet the Compose runtime calls.
     private static final String[][] GRADLE_PROVIDED_LIBRARIES = {
+            // Raising this also raises KOTLIN_FOR_GRADLE_PROVIDED_COROUTINES.
             {"kotlinx/coroutines", "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2"},
             // The coroutines jar's debugger frames, outside its package; no coordinate
             // of its own, the line above already declares the jar.
@@ -12678,6 +12686,11 @@ public class AndroidGradleBuilder extends Executor {
             {"androidx/collection", "androidx.collection:collection:1.5.0"},
             {"androidx/annotation", "androidx.annotation:annotation:1.9.1"}
     };
+
+    /// The Kotlin compiler a Kotlin app gets by default when the coroutines entry of
+    /// GRADLE_PROVIDED_LIBRARIES is declared: the stdlib that coroutines version depends
+    /// on, or newer. Raise it together with that coordinate.
+    private static final String KOTLIN_FOR_GRADLE_PROVIDED_COROUTINES = "2.1.21";
 
     private String gradleProvidedLibraryDependencies = "";
 
