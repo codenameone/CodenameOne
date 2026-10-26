@@ -235,6 +235,20 @@ jobs:
       - name: Install clang and time
         run: bash scripts/ci/apt-get-install.sh clang time
 
+      # The suite's C build compiles ~7,000 translation units, several of them
+      # large, with full debug info. On ubuntu-24.04-arm it exhausted memory and
+      # the runner was shut down mid-build, twice at the same step; extra swap
+      # lets the peak spill instead of taking the machine down.
+      - name: Add swap (arm64)
+        if: matrix.arch == 'arm64'
+        run: |
+          free -m
+          sudo fallocate -l 12G /cn1-swapfile
+          sudo chmod 600 /cn1-swapfile
+          sudo mkswap /cn1-swapfile
+          sudo swapon /cn1-swapfile
+          free -m
+
       - name: Set up JDK 8
         uses: actions/setup-java@v5
         with: { distribution: 'temurin', java-version: '8' }

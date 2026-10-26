@@ -8284,12 +8284,31 @@ public class AndroidGradleBuilder extends Executor {
         }
         if (hasKotlinSources && kotlinVersion.length() == 0 && !builtInKotlin) {
             kotlinVersion = useGradle8 ? "1.9.22" : "1.7.22";
-            // A declared kotlinx-coroutines brings its own kotlin-stdlib (2.1 for
-            // coroutines 1.10), and a 1.9 compiler refuses that stdlib's metadata
-            // ("compiled with an incompatible version of Kotlin"), so the default
-            // compiler follows it. A version the project pinned is left alone.
-            if (useGradle8 && gradleProvidedLibraryDependencies.contains("kotlinx-coroutines-core")) {
-                kotlinVersion = KOTLIN_FOR_GRADLE_PROVIDED_COROUTINES;
+        }
+        // A declared kotlinx-coroutines brings its own kotlin-stdlib (2.1 for coroutines
+        // 1.10), and an older compiler refuses that stdlib's metadata ("compiled with an
+        // incompatible version of Kotlin"), so the compiler is raised to read it. That
+        // includes a pinned version: the Health Connect floor above pins 1.9.x, and no
+        // lower pin can compile against the stdlib the application itself shipped.
+        if (hasKotlinSources && kotlinVersion.length() > 0 && useGradle8
+                && gradleProvidedLibraryDependencies.contains("kotlinx-coroutines-core")) {
+            String comparable = HealthManifestFragments.numericVersionPrefix(kotlinVersion);
+            if (comparable == null
+                    || compareVersions(comparable, KOTLIN_FOR_GRADLE_PROVIDED_COROUTINES) < 0) {
+                if (request.getArg("android.topDependency", "").contains("kotlin-gradle-plugin")) {
+                    // The app's own kotlin-gradle-plugin line wins over ours, so only
+                    // the app can raise the compiler; say so instead of claiming to.
+                    log("WARNING: the application ships kotlinx-coroutines, whose kotlin-stdlib"
+                            + " needs Kotlin " + KOTLIN_FOR_GRADLE_PROVIDED_COROUTINES
+                            + " or newer, but android.topDependency pins its own"
+                            + " kotlin-gradle-plugin; raise it if :app:compileDebugKotlin"
+                            + " reports an incompatible Kotlin version");
+                } else {
+                    log("The application ships kotlinx-coroutines, whose kotlin-stdlib Kotlin "
+                            + kotlinVersion + " cannot read; compiling with Kotlin "
+                            + KOTLIN_FOR_GRADLE_PROVIDED_COROUTINES + " instead");
+                    kotlinVersion = KOTLIN_FOR_GRADLE_PROVIDED_COROUTINES;
+                }
             }
         }
         String kotlinPluginApply = "";
