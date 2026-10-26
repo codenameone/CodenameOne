@@ -19,6 +19,7 @@ on:
       - 'scripts/savor/**'
       - 'scripts/skirmish/**'
       - 'scripts/parley/**'
+      - 'scripts/hellocodenameone/common/src/main/kmp/**'
       # The API-name check derives the published pages from the javadoc's own
       # sources, and the guide links into the java.* compatibility classes --
       # java/util/List.html among them. A change that renames or deletes one
@@ -130,12 +131,13 @@ jobs:
               - 'Ports/JavaSE/**'
               - 'maven/core/**'
               - 'maven/javase/**'
-              # The Wayline, Savor and Parley chapters include these trees by tag, so a
+              # The Wayline, Savor, Parley and Kotlin Multiplatform chapters include these trees by tag, so a
               # renamed or deleted tag there has to reach the snippet check.
               - 'scripts/wayline/**'
               - 'scripts/savor/**'
               - 'scripts/skirmish/**'
               - 'scripts/parley/**'
+              - 'scripts/hellocodenameone/common/src/main/kmp/**'
             workflow:
               - '.github/workflows/developer-guide-docs.yml'
 

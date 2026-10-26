@@ -1673,6 +1673,7 @@ public class AndroidGradleBuilder extends Executor {
         extendAppCompatActivity = request.getArg("android.extendAppCompatActivity", "false").equals("true");
         // When using gradle 8 we need to strip kotlin files from user classes otherwise we get duplicate class errors
         stripKotlinFromUserClasses = useGradle8;
+        gradleProvidedLibraryDependencies = "";
         if (!request.getArg("android.java8", "true").equals("true")) {
             // Java 6 source level was produced by running retrolambda over the compiled
             // classes. Retrolambda is gone (it never supported the JDK 17 that Gradle 8
@@ -12513,12 +12514,33 @@ public class AndroidGradleBuilder extends Executor {
         for (String[] lib : GRADLE_PROVIDED_LIBRARIES) {
             File directory = new File(dummyClassesDir, lib[0].replace('/', File.separatorChar));
             if (directory.isDirectory()) {
-                log("Deleting directory " + directory + "; declaring " + lib[1] + " instead");
+                String coordinate = lib[1];
+                if (lib[0].equals("kotlinx/coroutines")) {
+                    // The version the application shipped, so a newer one is never
+                    // downgraded; the jar records it in this file.
+                    String shipped = readTrimmed(new File(dummyClassesDir,
+                            "META-INF" + File.separator + "kotlinx_coroutines_core.version"));
+                    if (shipped != null && shipped.length() > 0) {
+                        coordinate = coordinate.substring(0, coordinate.lastIndexOf(':') + 1) + shipped;
+                    }
+                }
+                log("Deleting directory " + directory + "; declaring " + coordinate + " instead");
                 delTree(directory, true);
-                deps.append("    implementation '").append(lib[1]).append("'\n");
+                deps.append("    implementation '").append(coordinate).append("'\n");
             }
         }
         return deps.toString();
+    }
+
+    private static String readTrimmed(File f) {
+        if (!f.isFile()) {
+            return null;
+        }
+        try {
+            return new String(java.nio.file.Files.readAllBytes(f.toPath()), "UTF-8").trim();
+        } catch (IOException ex) {
+            return null;
+        }
     }
 
     private void stripKotlin(File dummyClassesDir) {
