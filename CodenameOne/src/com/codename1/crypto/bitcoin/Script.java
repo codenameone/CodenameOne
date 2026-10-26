@@ -138,8 +138,8 @@ public final class Script {
             throw new IllegalArgumentException("multisig takes 1 <= m <= n <= 16");
         }
         Builder b = builder().number(m);
-        for (int iter = 0; iter < publicKeys.length; iter++) {
-            b.push(publicKeys[iter]);
+        for (byte[] key : publicKeys) {
+            b.push(key);
         }
         return b.number(publicKeys.length).op(OP_CHECKMULTISIG).build();
     }
@@ -342,8 +342,8 @@ public final class Script {
     @Override
     public int hashCode() {
         int h = 1;
-        for (int iter = 0; iter < program.length; iter++) {
-            h = h * 31 + program[iter];
+        for (byte programByte : program) {
+            h = h * 31 + programByte;
         }
         return h;
     }

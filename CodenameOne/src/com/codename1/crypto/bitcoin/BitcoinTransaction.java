@@ -115,8 +115,8 @@ public final class BitcoinTransaction {
         /// The witness stack items, in order.
         public List<byte[]> getWitness() {
             List<byte[]> out = new ArrayList<byte[]>();
-            for (int iter = 0; iter < witness.size(); iter++) {
-                out.add(Wire.copy(witness.get(iter)));
+            for (byte[] witnessItem : witness) {
+                out.add(Wire.copy(witnessItem));
             }
             return out;
         }
@@ -125,8 +125,8 @@ public final class BitcoinTransaction {
         public void setWitness(List<byte[]> items) {
             witness = new ArrayList<byte[]>();
             if (items != null) {
-                for (int iter = 0; iter < items.size(); iter++) {
-                    witness.add(Wire.copy(items.get(iter)));
+                for (byte[] item : items) {
+                    witness.add(Wire.copy(item));
                 }
             }
         }
@@ -163,10 +163,6 @@ public final class BitcoinTransaction {
         byte[] serialize() {
             return new Wire().u64(value).varBytes(scriptPubKey.raw()).toBytes();
         }
-    }
-
-    /// An empty version 2 transaction.
-    public BitcoinTransaction() {
     }
 
     /// Adds an input spending output `index` of the transaction `prevTxid` (display hex), with
@@ -230,8 +226,8 @@ public final class BitcoinTransaction {
 
     /// Tells whether any input carries witness data.
     public boolean hasWitness() {
-        for (int iter = 0; iter < inputs.size(); iter++) {
-            if (!inputs.get(iter).witness.isEmpty()) {
+        for (Input inputsElem : inputs) {
+            if (!inputsElem.witness.isEmpty()) {
                 return true;
             }
         }
@@ -249,20 +245,20 @@ public final class BitcoinTransaction {
             w.u8(0).u8(1);
         }
         w.varInt(inputs.size());
-        for (int iter = 0; iter < inputs.size(); iter++) {
-            Input in = inputs.get(iter);
+        for (Input inputsElem : inputs) {
+            Input in = inputsElem;
             w.bytes(in.outpoint()).varBytes(in.scriptSig.raw()).u32(in.sequence);
         }
         w.varInt(outputs.size());
-        for (int iter = 0; iter < outputs.size(); iter++) {
-            w.bytes(outputs.get(iter).serialize());
+        for (Output output : outputs) {
+            w.bytes(output.serialize());
         }
         if (withWitness) {
-            for (int iter = 0; iter < inputs.size(); iter++) {
-                List<byte[]> items = inputs.get(iter).witness;
+            for (Input inputsElem : inputs) {
+                List<byte[]> items = inputsElem.witness;
                 w.varInt(items.size());
-                for (int k = 0; k < items.size(); k++) {
-                    w.varBytes(items.get(k));
+                for (byte[] item : items) {
+                    w.varBytes(item);
                 }
             }
         }
@@ -337,14 +333,14 @@ public final class BitcoinTransaction {
             tx.outputs.add(new Output(value, Script.of(r.readVarBytes())));
         }
         if (witness) {
-            for (int iter = 0; iter < tx.inputs.size(); iter++) {
+            for (Input inputsElem : tx.inputs) {
                 long items = r.readVarInt();
                 checkCount(items, r);
                 List<byte[]> stack = new ArrayList<byte[]>();
                 for (long k = 0; k < items; k++) {
                     stack.add(r.readVarBytes());
                 }
-                tx.inputs.get(iter).witness = stack;
+                inputsElem.witness = stack;
             }
             if (!tx.hasWitness()) {
                 throw new IllegalArgumentException("SegWit flag with an empty witness");
@@ -406,8 +402,8 @@ public final class BitcoinTransaction {
             w.bytes(outputs.get(index).serialize());
         } else {
             w.varInt(outputs.size());
-            for (int iter = 0; iter < outputs.size(); iter++) {
-                w.bytes(outputs.get(iter).serialize());
+            for (Output output : outputs) {
+                w.bytes(output.serialize());
             }
         }
         w.u32(lockTime).u32(sighashType & 0xffffffffL);
@@ -473,9 +469,9 @@ public final class BitcoinTransaction {
             w.bytes(Hash.sha256(prevouts()));
             Wire amounts = new Wire();
             Wire scripts = new Wire();
-            for (int iter = 0; iter < spent.size(); iter++) {
-                amounts.u64(spent.get(iter).value);
-                scripts.varBytes(spent.get(iter).scriptPubKey.raw());
+            for (Output spentItem : spent) {
+                amounts.u64(spentItem.value);
+                scripts.varBytes(spentItem.scriptPubKey.raw());
             }
             w.bytes(Hash.sha256(amounts.toBytes()));
             w.bytes(Hash.sha256(scripts.toBytes()));
@@ -507,24 +503,24 @@ public final class BitcoinTransaction {
 
     private byte[] prevouts() {
         Wire w = new Wire();
-        for (int iter = 0; iter < inputs.size(); iter++) {
-            w.bytes(inputs.get(iter).outpoint());
+        for (Input inputsElem : inputs) {
+            w.bytes(inputsElem.outpoint());
         }
         return w.toBytes();
     }
 
     private byte[] sequences() {
         Wire w = new Wire();
-        for (int iter = 0; iter < inputs.size(); iter++) {
-            w.u32(inputs.get(iter).sequence);
+        for (Input inputsItem : inputs) {
+            w.u32(inputsItem.sequence);
         }
         return w.toBytes();
     }
 
     private byte[] allOutputs() {
         Wire w = new Wire();
-        for (int iter = 0; iter < outputs.size(); iter++) {
-            w.bytes(outputs.get(iter).serialize());
+        for (Output output : outputs) {
+            w.bytes(output.serialize());
         }
         return w.toBytes();
     }

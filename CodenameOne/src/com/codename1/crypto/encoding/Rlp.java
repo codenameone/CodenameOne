@@ -59,8 +59,8 @@ public final class Rlp {
             List l = (List) item;
             List<byte[]> parts = new ArrayList<byte[]>(l.size());
             int total = 0;
-            for (int i = 0; i < l.size(); i++) {
-                byte[] e = encode(l.get(i));
+            for (Object element : l) {
+                byte[] e = encode(element);
                 parts.add(e);
                 total += e.length;
             }
@@ -68,8 +68,7 @@ public final class Rlp {
             byte[] out = new byte[pre.length + total];
             System.arraycopy(pre, 0, out, 0, pre.length);
             int p = pre.length;
-            for (int i = 0; i < parts.size(); i++) {
-                byte[] e = parts.get(i);
+            for (byte[] e : parts) {
                 System.arraycopy(e, 0, out, p, e.length);
                 p += e.length;
             }

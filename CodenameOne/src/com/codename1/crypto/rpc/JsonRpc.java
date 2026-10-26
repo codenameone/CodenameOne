@@ -84,7 +84,7 @@ public class JsonRpc {
         try {
             parsed = Json.parse(reply);
         } catch (IllegalArgumentException e) {
-            throw new IOException("not a JSON-RPC response from " + url + ": " + e.getMessage());
+            throw new IOException("not a JSON-RPC response from " + url + ": " + e.getMessage(), e);
         }
         if (!(parsed instanceof Map)) {
             throw new IOException("not a JSON-RPC response from " + url);

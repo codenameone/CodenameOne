@@ -134,7 +134,7 @@ public final class Abi {
             }
             String word = s.substring(iter, end);
             boolean typePosition = iter > 0;
-            if (typePosition && (word.equals("uint") || word.equals("int"))) {
+            if (typePosition && ("uint".equals(word) || "int".equals(word))) {
                 out.append(word).append("256");
             } else {
                 out.append(word);
@@ -152,7 +152,7 @@ public final class Abi {
         try {
             return s.getBytes("UTF-8");
         } catch (java.io.UnsupportedEncodingException impossible) {
-            throw new IllegalStateException("UTF-8 is always supported");
+            throw new IllegalStateException("UTF-8 is always supported", impossible);
         }
     }
 
@@ -160,7 +160,7 @@ public final class Abi {
         try {
             return new String(b, "UTF-8");
         } catch (java.io.UnsupportedEncodingException impossible) {
-            throw new IllegalStateException("UTF-8 is always supported");
+            throw new IllegalStateException("UTF-8 is always supported", impossible);
         }
     }
 
@@ -259,16 +259,16 @@ public final class Abi {
         }
 
         private static Type elementary(String n) {
-            if (n.equals("address")) {
+            if ("address".equals(n)) {
                 return new Type(ADDRESS, 160, null, null, n);
             }
-            if (n.equals("bool")) {
+            if ("bool".equals(n)) {
                 return new Type(BOOL, 8, null, null, n);
             }
-            if (n.equals("string")) {
+            if ("string".equals(n)) {
                 return new Type(STRING, 0, null, null, n);
             }
-            if (n.equals("bytes")) {
+            if ("bytes".equals(n)) {
                 return new Type(BYTES, 0, null, null, n);
             }
             if (n.startsWith("bytes")) {
@@ -295,7 +295,7 @@ public final class Abi {
             try {
                 return Integer.parseInt(digits);
             } catch (NumberFormatException bad) {
-                throw new IllegalArgumentException("bad ABI type: " + type);
+                throw new IllegalArgumentException("bad ABI type: " + type, bad);
             }
         }
 
@@ -308,8 +308,8 @@ public final class Abi {
                 case FIXED_ARRAY:
                     return element.isDynamic();
                 case TUPLE:
-                    for (int iter = 0; iter < members.length; iter++) {
-                        if (members[iter].isDynamic()) {
+                    for (Type membersElem : members) {
+                        if (membersElem.isDynamic()) {
                             return true;
                         }
                     }
@@ -329,8 +329,8 @@ public final class Abi {
             }
             if (kind == TUPLE) {
                 int total = 0;
-                for (int iter = 0; iter < members.length; iter++) {
-                    total += members[iter].headSize();
+                for (Type membersElem : members) {
+                    total += membersElem.headSize();
                 }
                 return total;
             }
@@ -404,8 +404,8 @@ public final class Abi {
 
         private static byte[] heads(Type[] types, Object[] items) {
             int headLen = 0;
-            for (int iter = 0; iter < types.length; iter++) {
-                headLen += types[iter].headSize();
+            for (Type typesItem : types) {
+                headLen += typesItem.headSize();
             }
             java.io.ByteArrayOutputStream head = new java.io.ByteArrayOutputStream();
             java.io.ByteArrayOutputStream tail = new java.io.ByteArrayOutputStream();
@@ -490,9 +490,9 @@ public final class Abi {
         List<Object> decodeMembers(byte[] data, int start) {
             List<Object> out = new ArrayList<Object>();
             int pos = start;
-            for (int iter = 0; iter < members.length; iter++) {
-                out.add(members[iter].decode(data, start, pos));
-                pos += members[iter].headSize();
+            for (Type membersItem : members) {
+                out.add(membersItem.decode(data, start, pos));
+                pos += membersItem.headSize();
             }
             return out;
         }

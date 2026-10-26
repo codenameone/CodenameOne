@@ -57,7 +57,7 @@ public class EvmRpc extends JsonRpc {
             try {
                 return UInt256.parse((String) o);
             } catch (IllegalArgumentException e) {
-                throw new IOException(what + ": not a quantity: " + o);
+                throw new IOException(what + ": not a quantity: " + o, e);
             }
         }
         throw new IOException(what + ": expected a quantity");
@@ -67,7 +67,7 @@ public class EvmRpc extends JsonRpc {
         try {
             return quantity(o, what).longValueExact();
         } catch (ArithmeticException e) {
-            throw new IOException(what + ": out of range");
+            throw new IOException(what + ": out of range", e);
         }
     }
 
@@ -112,8 +112,8 @@ public class EvmRpc extends JsonRpc {
     public Map<?, ?> feeHistory(int blocks, String newestBlock, double[] rewardPercentiles) throws IOException {
         List<Object> p = new ArrayList<Object>();
         if (rewardPercentiles != null) {
-            for (int i = 0; i < rewardPercentiles.length; i++) {
-                p.add(Double.valueOf(rewardPercentiles[i]));
+            for (double rewardPercentilesItem : rewardPercentiles) {
+                p.add(Double.valueOf(rewardPercentilesItem));
             }
         }
         return asMap(call("eth_feeHistory", UInt256.valueOf(blocks).toQuantity(), newestBlock, p), "eth_feeHistory");

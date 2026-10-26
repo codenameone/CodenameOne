@@ -151,11 +151,11 @@ public final class SolanaAddress implements Comparable<SolanaAddress> {
             throw new IllegalArgumentException("at most 16 seeds");
         }
         Hash h = Hash.create(Hash.SHA256);
-        for (int i = 0; i < seeds.length; i++) {
-            if (seeds[i].length > MAX_SEED_LENGTH) {
+        for (byte[] seed : seeds) {
+            if (seed.length > MAX_SEED_LENGTH) {
                 throw new IllegalArgumentException("a seed is at most 32 bytes");
             }
-            h.update(seeds[i]);
+            h.update(seed);
         }
         if (bump != null) {
             h.update(bump);
@@ -201,7 +201,7 @@ public final class SolanaAddress implements Comparable<SolanaAddress> {
         try {
             return s.getBytes("UTF-8");
         } catch (java.io.UnsupportedEncodingException e) {
-            throw new IllegalStateException("UTF-8 is unavailable");
+            throw new IllegalStateException("UTF-8 is unavailable", e);
         }
     }
 
@@ -222,7 +222,7 @@ public final class SolanaAddress implements Comparable<SolanaAddress> {
     }
 
     /// Orders addresses by their bytes, unsigned.
-    public int compareTo(SolanaAddress o) {
+    public int compareTo(SolanaAddress o) { // NOPMD MissingOverride - Comparable implementation; @Override on it needs Java 6 source
         for (int i = 0; i < LENGTH; i++) {
             int d = (bytes[i] & 0xff) - (o.bytes[i] & 0xff);
             if (d != 0) {

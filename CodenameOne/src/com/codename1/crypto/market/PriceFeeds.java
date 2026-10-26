@@ -63,7 +63,7 @@ final class PriceFeeds {
             try {
                 return Double.parseDouble((String) o);
             } catch (NumberFormatException e) {
-                throw new java.io.IOException(what + ": not a number: " + o);
+                throw new java.io.IOException(what + ": not a number: " + o, e);
             }
         }
         throw new java.io.IOException(what + ": no price");

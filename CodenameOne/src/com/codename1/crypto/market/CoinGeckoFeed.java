@@ -93,7 +93,7 @@ public class CoinGeckoFeed implements PriceFeed {
         try {
             parsed = Json.parse(transport.send("GET", url.toString(), null, null));
         } catch (IllegalArgumentException e) {
-            throw new IOException("CoinGecko answered something that is not JSON");
+            throw new IOException("CoinGecko answered something that is not JSON", e);
         }
         Object coin = parsed instanceof Map ? ((Map<?, ?>) parsed).get(id) : null;
         if (!(coin instanceof Map)) {

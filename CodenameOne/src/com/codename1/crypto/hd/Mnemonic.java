@@ -225,7 +225,7 @@ public final class Mnemonic {
         try {
             return text.getBytes("UTF-8");
         } catch (java.io.UnsupportedEncodingException impossible) {
-            throw new IllegalStateException("UTF-8 is always supported");
+            throw new IllegalStateException("UTF-8 is always supported", impossible);
         }
     }
 

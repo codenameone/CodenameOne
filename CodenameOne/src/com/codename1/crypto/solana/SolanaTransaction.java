@@ -115,8 +115,8 @@ public final class SolanaTransaction {
     public byte[] serialize() {
         ShortVec w = new ShortVec();
         w.length(signatures.length);
-        for (int i = 0; i < signatures.length; i++) {
-            w.bytes(signatures[i]);
+        for (byte[] signature : signatures) {
+            w.bytes(signature);
         }
         w.bytes(messageBytes);
         return w.toBytes();

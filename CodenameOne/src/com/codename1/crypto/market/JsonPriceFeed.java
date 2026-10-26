@@ -88,17 +88,17 @@ public class JsonPriceFeed implements PriceFeed {
         try {
             node = Json.parse(transport.send("GET", url, null, null));
         } catch (IllegalArgumentException e) {
-            throw new IOException(name + " answered something that is not JSON");
+            throw new IOException(name + " answered something that is not JSON", e);
         }
-        for (int i = 0; i < path.length; i++) {
+        for (String pathItem : path) {
             if (node instanceof Map) {
-                node = ((Map<?, ?>) node).get(path[i]);
+                node = ((Map<?, ?>) node).get(pathItem);
             } else if (node instanceof List) {
                 int index;
                 try {
-                    index = Integer.parseInt(path[i]);
+                    index = Integer.parseInt(pathItem);
                 } catch (NumberFormatException e) {
-                    throw new IOException(name + ": " + path[i] + " indexes an array");
+                    throw new IOException(name + ": " + pathItem + " indexes an array", e);
                 }
                 List<?> l = (List<?>) node;
                 node = index >= 0 && index < l.size() ? l.get(index) : null;

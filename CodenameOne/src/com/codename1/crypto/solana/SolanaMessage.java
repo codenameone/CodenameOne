@@ -89,12 +89,10 @@ public final class SolanaMessage {
         List<SolanaAddress> order = new ArrayList<SolanaAddress>();
         List<boolean[]> flags = new ArrayList<boolean[]>();
         note(order, flags, payer, true, true);
-        for (int i = 0; i < instructions.size(); i++) {
-            Instruction ix = instructions.get(i);
+        for (Instruction ix : instructions) {
             note(order, flags, ix.getProgramId(), false, false);
             List<AccountMeta> metas = ix.getAccounts();
-            for (int j = 0; j < metas.size(); j++) {
-                AccountMeta m = metas.get(j);
+            for (AccountMeta m : metas) {
                 note(order, flags, m.getAddress(), m.isSigner(), m.isWritable());
             }
         }
@@ -115,8 +113,7 @@ public final class SolanaMessage {
             throw new IllegalArgumentException("a message names at most 256 accounts");
         }
         List<Compiled> compiled = new ArrayList<Compiled>();
-        for (int i = 0; i < instructions.size(); i++) {
-            Instruction ix = instructions.get(i);
+        for (Instruction ix : instructions) {
             List<AccountMeta> metas = ix.getAccounts();
             int[] idx = new int[metas.size()];
             for (int j = 0; j < idx.length; j++) {
@@ -149,23 +146,21 @@ public final class SolanaMessage {
         }
         w.u8(numRequiredSignatures).u8(numReadonlySigned).u8(numReadonlyUnsigned);
         w.length(accountKeys.size());
-        for (int i = 0; i < accountKeys.size(); i++) {
-            w.bytes(accountKeys.get(i).raw());
+        for (SolanaAddress accountKeysItem : accountKeys) {
+            w.bytes(accountKeysItem.raw());
         }
         w.bytes(recentBlockhash);
         w.length(instructions.size());
-        for (int i = 0; i < instructions.size(); i++) {
-            Compiled c = instructions.get(i);
+        for (Compiled c : instructions) {
             w.u8(c.program).length(c.accounts.length);
-            for (int j = 0; j < c.accounts.length; j++) {
-                w.u8(c.accounts[j]);
+            for (int account : c.accounts) {
+                w.u8(account);
             }
             w.length(c.data.length).bytes(c.data);
         }
         if (version != LEGACY) {
             w.length(lookups.size());
-            for (int i = 0; i < lookups.size(); i++) {
-                Lookup l = lookups.get(i);
+            for (Lookup l : lookups) {
                 w.bytes(l.table);
                 w.length(l.writable.length).bytes(l.writable);
                 w.length(l.readonly.length).bytes(l.readonly);
@@ -280,11 +275,9 @@ public final class SolanaMessage {
     /// - `IllegalStateException`: when an instruction names an account from a lookup table
     public List<Instruction> getInstructions() {
         List<Instruction> out = new ArrayList<Instruction>();
-        for (int i = 0; i < instructions.size(); i++) {
-            Compiled c = instructions.get(i);
+        for (Compiled c : instructions) {
             List<AccountMeta> metas = new ArrayList<AccountMeta>();
-            for (int j = 0; j < c.accounts.length; j++) {
-                int k = c.accounts[j];
+            for (int k : c.accounts) {
                 metas.add(new AccountMeta(key(k), isSigner(k), isWritable(k)));
             }
             out.add(new Instruction(key(c.program), metas, c.data));

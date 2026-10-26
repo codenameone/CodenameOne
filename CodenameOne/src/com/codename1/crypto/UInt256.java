@@ -442,8 +442,8 @@ public final class UInt256 implements Comparable<UInt256> {
     }
 
     private static boolean allZero(int[] l) {
-        for (int iter = 0; iter < l.length; iter++) {
-            if (l[iter] != 0) {
+        for (int limb : l) {
+            if (limb != 0) {
                 return false;
             }
         }

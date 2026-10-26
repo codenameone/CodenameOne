@@ -77,8 +77,7 @@ public final class EvmTransaction {
             this.address = address;
             this.storageKeys = new ArrayList<byte[]>();
             if (storageKeys != null) {
-                for (int iter = 0; iter < storageKeys.size(); iter++) {
-                    byte[] key = storageKeys.get(iter);
+                for (byte[] key : storageKeys) {
                     if (key.length != 32) {
                         throw new IllegalArgumentException("a storage key is 32 bytes");
                     }
@@ -104,8 +103,8 @@ public final class EvmTransaction {
 
         Object rlp() {
             List<Object> keys = new ArrayList<Object>();
-            for (int iter = 0; iter < storageKeys.size(); iter++) {
-                keys.add(storageKeys.get(iter));
+            for (byte[] storageKeysItem : storageKeys) {
+                keys.add(storageKeysItem);
             }
             List<Object> out = new ArrayList<Object>();
             out.add(address.toBytes());
@@ -202,8 +201,8 @@ public final class EvmTransaction {
         f.add(data);
         if (type != LEGACY) {
             List<Object> list = new ArrayList<Object>();
-            for (int iter = 0; iter < accessList.size(); iter++) {
-                list.add(accessList.get(iter).rlp());
+            for (AccessEntry accessListItem : accessList) {
+                list.add(accessListItem.rlp());
             }
             f.add(list);
         }
@@ -384,15 +383,15 @@ public final class EvmTransaction {
         if (type != LEGACY) {
             access = new ArrayList<AccessEntry>();
             List<?> entries = list(f.get(at++));
-            for (int iter = 0; iter < entries.size(); iter++) {
-                List<?> e = list(entries.get(iter));
+            for (Object entriesItem : entries) {
+                List<?> e = list(entriesItem);
                 if (e.size() != 2) {
                     throw new IllegalArgumentException("bad access list entry");
                 }
                 List<?> keys = list(e.get(1));
                 List<byte[]> keyList = new ArrayList<byte[]>();
-                for (int k = 0; k < keys.size(); k++) {
-                    keyList.add(bytes(keys.get(k)));
+                for (Object keysItem : keys) {
+                    keyList.add(bytes(keysItem));
                 }
                 access.add(new AccessEntry(EvmAddress.fromBytes(bytes(e.get(0))), keyList));
             }
@@ -532,8 +531,8 @@ public final class EvmTransaction {
             throw new IllegalArgumentException("integer too large");
         }
         long v = 0;
-        for (int iter = 0; iter < b.length; iter++) {
-            v = (v << 8) | (b[iter] & 0xff);
+        for (byte bItem : b) {
+            v = (v << 8) | (bItem & 0xff);
         }
         return v;
     }

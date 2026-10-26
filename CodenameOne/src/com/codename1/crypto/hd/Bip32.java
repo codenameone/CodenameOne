@@ -187,7 +187,7 @@ public final class Bip32 {
         Bip32 node = this;
         for (int iter = 0; iter < path.length(); iter++) {
             Bip32 next = node.child(path.get(iter));
-            if (node != this) {
+            if (node != this) { // NOPMD CompareObjectsWithEquals - identity: never destroy the receiver
                 node.destroy();
             }
             node = next;

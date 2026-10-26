@@ -20,6 +20,22 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
+import com.codename1.crypto.UInt256;
+import com.codename1.crypto.bitcoin.BitcoinAddress;
+import com.codename1.crypto.bitcoin.BitcoinNetwork;
+import com.codename1.crypto.encoding.Base58;
+import com.codename1.crypto.encoding.Bech32;
+import com.codename1.crypto.evm.Abi;
+import com.codename1.crypto.evm.EvmAddress;
+import com.codename1.crypto.evm.EvmTransaction;
+import com.codename1.crypto.hd.Bip32;
+import com.codename1.crypto.hd.Mnemonic;
+import com.codename1.crypto.hd.Slip10;
+import com.codename1.crypto.solana.Instruction;
+import com.codename1.crypto.solana.SolanaAddress;
+import com.codename1.crypto.solana.SolanaMessage;
+import com.codename1.crypto.solana.SolanaTransaction;
+import com.codename1.crypto.solana.SystemProgram;
 import com.codename1.security.CryptoEngine;
 import com.codename1.security.Ed25519;
 import com.codename1.security.Hash;
@@ -85,6 +101,7 @@ public final class CryptoChecks {
     }
 
     private static void vectors(String name) {
+        stack(name);
         Bulk.check(name + ".secp256k1", () -> {
             for (int k = 0; k < 12; k++) {
                 final int i = k;
@@ -171,6 +188,72 @@ public final class CryptoChecks {
                 final byte[] in = bytes(len + 800, len);
                 Bulk.p("keccak[" + len + "]", run(() -> Hash.keccak256(in)));
             }
+        });
+    }
+
+    /// The layers above the kernels: the long and BigInteger-free arithmetic in
+    /// UInt256, the encodings, HD derivation and the chain transaction formats.
+    /// Integer division by zero answers 0 on arm64 instead of throwing, so the
+    /// division and modulo cases include a zero divisor.
+    private static void stack(String name) {
+        Bulk.check(name + ".uint256", () -> {
+            UInt256 a = UInt256.parse("115792089237316195423570985008687907853269984665640564039457584007908834671663");
+            UInt256 b = UInt256.valueOf(0x7fffffffffffffffL);
+            Bulk.p("add", run(() -> a.add(b).toHex()));
+            Bulk.p("sub", run(() -> b.subtract(a).toHex()));
+            Bulk.p("mul", run(() -> a.multiply(b).toHex()));
+            Bulk.p("div", run(() -> a.divide(b).toString()));
+            Bulk.p("mod", run(() -> a.mod(b).toString()));
+            Bulk.p("div0", run(() -> a.divide(UInt256.ZERO).toString()));
+            Bulk.p("mod0", run(() -> a.mod(UInt256.ZERO).toString()));
+            Bulk.p("units", run(() -> UInt256.parseUnits("1234.000000000000000567", 18).formatUnits(18)));
+            Bulk.p("shift", run(() -> a.shiftRight(77).shiftLeft(3).toHex()));
+        });
+        Bulk.check(name + ".encoding", () -> {
+            for (final int len : new int[] {0, 1, 20, 32, 33}) {
+                final byte[] in = bytes(len + 900, len);
+                if (len > 0) {
+                    in[0] = 0;
+                }
+                Bulk.p("base58[" + len + "]", run(() -> Base58.encode(in)));
+                Bulk.p("bech32m[" + len + "]", run(() -> Bech32.encode("bc", in, Bech32.BECH32M)));
+            }
+            Bulk.p("base58.bad", run(() -> Base58.decode("0OIl")));
+        });
+        Bulk.check(name + ".hd", () -> {
+            final String words = Mnemonic.fromEntropy(bytes(31, 16));
+            Bulk.p("mnemonic", words);
+            final byte[] seed = Mnemonic.toSeed(words, "TREZOR");
+            Bulk.p("seed", run(() -> seed));
+            final Bip32 eth = Bip32.master(seed).derive("m/44'/60'/0'/0/7");
+            Bulk.p("bip32.xprv", run(() -> eth.toXprv()));
+            Bulk.p("bip32.neuter", run(() -> Bip32.master(seed).derive("m/84'/0'/0'").neuter().child(1).toXpub()));
+            Bulk.p("slip10", run(() -> Slip10.master(seed).derive("m/44'/501'/0'/0'").publicKey()));
+            Bulk.p("bad.mnemonic", run(() -> Mnemonic.toEntropy(words + " abandon")));
+        });
+        Bulk.check(name + ".chains", () -> {
+            final byte[] key = bytes(77, 32);
+            final EvmAddress to = EvmAddress.fromPrivateKey(bytes(78, 32));
+            Bulk.p("evm.address", run(() -> to.toChecksumString()));
+            final EvmTransaction tx = EvmTransaction.eip1559(1, 9, UInt256.parseUnits("2", 9),
+                    UInt256.parseUnits("40", 9), 21000, to, UInt256.parseUnits("0.5", 18),
+                    Abi.encodeCall("transfer(address,uint256)", to, UInt256.valueOf(5)));
+            Bulk.p("evm.signed", run(() -> tx.sign(key).encodeHex()));
+            Bulk.p("evm.sender", run(() -> tx.sign(key).sender().toChecksumString()));
+            final byte[] pub = Secp256k1.publicKey(key, true);
+            Bulk.p("btc.p2wpkh", run(() -> BitcoinAddress.p2wpkh(pub, BitcoinNetwork.MAINNET).toString()));
+            final byte[] xOnly = new byte[32];
+            System.arraycopy(pub, 1, xOnly, 0, 32);
+            Bulk.p("btc.p2tr", run(() -> BitcoinAddress.p2tr(xOnly, BitcoinNetwork.TESTNET).toString()));
+            final SolanaAddress from = SolanaAddress.fromPrivateKey(key);
+            final java.util.List<Instruction> ix = new java.util.ArrayList<Instruction>();
+            ix.add(SystemProgram.transfer(from, SolanaAddress.fromPrivateKey(bytes(79, 32)), 1500000000L));
+            Bulk.p("sol.tx", run(() -> {
+                SolanaTransaction t = new SolanaTransaction(SolanaMessage.compile(from, ix,
+                        Base58.encode(bytes(80, 32))));
+                t.sign(key);
+                return t.serialize();
+            }));
         });
     }
 }

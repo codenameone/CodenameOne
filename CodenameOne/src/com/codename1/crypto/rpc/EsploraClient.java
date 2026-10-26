@@ -27,7 +27,6 @@ import com.codename1.crypto.bitcoin.BitcoinTransaction;
 import com.codename1.crypto.encoding.Json;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -73,7 +72,7 @@ public class EsploraClient {
         try {
             return Json.parse(body);
         } catch (IllegalArgumentException e) {
-            throw new IOException("not JSON from " + base + path);
+            throw new IOException("not JSON from " + base + path, e);
         }
     }
 
@@ -81,8 +80,8 @@ public class EsploraClient {
     public List<Utxo> getUtxos(BitcoinAddress address) throws IOException {
         List<?> list = JsonRpc.asList(getJson("/address/" + address + "/utxo"), "utxo");
         List<Utxo> out = new ArrayList<Utxo>();
-        for (int i = 0; i < list.size(); i++) {
-            Map<?, ?> u = JsonRpc.asMap(list.get(i), "utxo");
+        for (Object listItem : list) {
+            Map<?, ?> u = JsonRpc.asMap(listItem, "utxo");
             Map<?, ?> status = u.get("status") instanceof Map ? (Map<?, ?>) u.get("status") : null;
             boolean confirmed = status != null && Boolean.TRUE.equals(status.get("confirmed"));
             long height = confirmed && status.get("block_height") instanceof Long
@@ -111,8 +110,7 @@ public class EsploraClient {
     public Map<String, Double> getFeeEstimates() throws IOException {
         Map<?, ?> m = JsonRpc.asMap(getJson("/fee-estimates"), "fee-estimates");
         Map<String, Double> out = new LinkedHashMap<String, Double>();
-        for (Iterator<?> it = m.entrySet().iterator(); it.hasNext();) {
-            Map.Entry<?, ?> e = (Map.Entry<?, ?>) it.next();
+        for (Map.Entry<?, ?> e : m.entrySet()) {
             if (e.getValue() instanceof Number) {
                 out.put(String.valueOf(e.getKey()), Double.valueOf(((Number) e.getValue()).doubleValue()));
             }
@@ -126,7 +124,7 @@ public class EsploraClient {
         try {
             return Long.parseLong(s);
         } catch (NumberFormatException e) {
-            throw new IOException("not a height: " + s);
+            throw new IOException("not a height: " + s, e);
         }
     }
 

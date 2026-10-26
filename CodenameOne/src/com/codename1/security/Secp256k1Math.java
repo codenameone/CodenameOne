@@ -112,8 +112,26 @@ final class Secp256k1Math {
     /// the same way; the code is repeated rather than called because a call
     /// with nineteen long arguments cost as much as the multiplication.
     static void mul(int[] r, int[] a, int[] b) {
-        long a0 = a[0], a1 = a[1], a2 = a[2], a3 = a[3], a4 = a[4], a5 = a[5], a6 = a[6], a7 = a[7], a8 = a[8], a9 = a[9];
-        long b0 = b[0], b1 = b[1], b2 = b[2], b3 = b[3], b4 = b[4], b5 = b[5], b6 = b[6], b7 = b[7], b8 = b[8], b9 = b[9];
+        long a0 = a[0];
+        long a1 = a[1];
+        long a2 = a[2];
+        long a3 = a[3];
+        long a4 = a[4];
+        long a5 = a[5];
+        long a6 = a[6];
+        long a7 = a[7];
+        long a8 = a[8];
+        long a9 = a[9];
+        long b0 = b[0];
+        long b1 = b[1];
+        long b2 = b[2];
+        long b3 = b[3];
+        long b4 = b[4];
+        long b5 = b[5];
+        long b6 = b[6];
+        long b7 = b[7];
+        long b8 = b[8];
+        long b9 = b[9];
         long c0 = a0 * b0;
         long c1 = a0 * b1 + a1 * b0;
         long c2 = a0 * b2 + a1 * b1 + a2 * b0;
@@ -210,8 +228,25 @@ final class Secp256k1Math {
 
     /// r = a * a, magnitude 1. r may alias a.
     static void sqr(int[] r, int[] a) {
-        long a0 = a[0], a1 = a[1], a2 = a[2], a3 = a[3], a4 = a[4], a5 = a[5], a6 = a[6], a7 = a[7], a8 = a[8], a9 = a[9];
-        long d0 = a0 << 1, d1 = a1 << 1, d2 = a2 << 1, d3 = a3 << 1, d4 = a4 << 1, d5 = a5 << 1, d6 = a6 << 1, d7 = a7 << 1, d8 = a8 << 1;
+        long a0 = a[0];
+        long a1 = a[1];
+        long a2 = a[2];
+        long a3 = a[3];
+        long a4 = a[4];
+        long a5 = a[5];
+        long a6 = a[6];
+        long a7 = a[7];
+        long a8 = a[8];
+        long a9 = a[9];
+        long d0 = a0 << 1;
+        long d1 = a1 << 1;
+        long d2 = a2 << 1;
+        long d3 = a3 << 1;
+        long d4 = a4 << 1;
+        long d5 = a5 << 1;
+        long d6 = a6 << 1;
+        long d7 = a7 << 1;
+        long d8 = a8 << 1;
         long c0 = a0 * a0;
         long c1 = d0 * a1;
         long c2 = d0 * a2 + a1 * a1;
@@ -332,8 +367,16 @@ final class Secp256k1Math {
 
     /// Brings r to magnitude 1 without fully reducing it.
     static void weak(int[] r) {
-        long t0 = r[0], t1 = r[1], t2 = r[2], t3 = r[3], t4 = r[4];
-        long t5 = r[5], t6 = r[6], t7 = r[7], t8 = r[8], t9 = r[9];
+        long t0 = r[0];
+        long t1 = r[1];
+        long t2 = r[2];
+        long t3 = r[3];
+        long t4 = r[4];
+        long t5 = r[5];
+        long t6 = r[6];
+        long t7 = r[7];
+        long t8 = r[8];
+        long t9 = r[9];
         t1 += t0 >> 26;
         t0 &= M26;
         t2 += t1 >> 26;
@@ -414,8 +457,16 @@ final class Secp256k1Math {
     static boolean isZero(int[] a) {
         // after a weak reduction the value is below 2^256 + 2^33, so it is
         // zero modulo p only as 0 or p itself
-        long t0 = a[0], t1 = a[1], t2 = a[2], t3 = a[3], t4 = a[4];
-        long t5 = a[5], t6 = a[6], t7 = a[7], t8 = a[8], t9 = a[9];
+        long t0 = a[0];
+        long t1 = a[1];
+        long t2 = a[2];
+        long t3 = a[3];
+        long t4 = a[4];
+        long t5 = a[5];
+        long t6 = a[6];
+        long t7 = a[7];
+        long t8 = a[8];
+        long t9 = a[9];
         t1 += t0 >> 26;
         t0 &= M26;
         t2 += t1 >> 26;

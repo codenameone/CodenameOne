@@ -74,9 +74,9 @@ public final class TypedData {
         this.message = message;
         if (!this.types.containsKey(DOMAIN)) {
             List<String[]> fields = new ArrayList<String[]>();
-            for (int iter = 0; iter < DOMAIN_FIELDS.length; iter++) {
-                if (domain.containsKey(DOMAIN_FIELDS[iter][0])) {
-                    fields.add(DOMAIN_FIELDS[iter]);
+            for (String[] domainField : DOMAIN_FIELDS) {
+                if (domain.containsKey(domainField[0])) {
+                    fields.add(domainField);
                 }
             }
             this.types.put(DOMAIN, fields);
@@ -104,8 +104,8 @@ public final class TypedData {
             }
             List<String[]> fields = new ArrayList<String[]>();
             List<?> l = (List<?>) members;
-            for (int iter = 0; iter < l.size(); iter++) {
-                Map<?, ?> f = map(l.get(iter), "member");
+            for (Object lItem : l) {
+                Map<?, ?> f = map(lItem, "member");
                 fields.add(new String[] {text(f.get("name")), text(f.get("type"))});
             }
             types.put(String.valueOf(e.getKey()), fields);
@@ -180,8 +180,8 @@ public final class TypedData {
         }
         found.add(base);
         List<String[]> fields = types.get(base);
-        for (int iter = 0; iter < fields.size(); iter++) {
-            collect(fields.get(iter)[1], found);
+        for (String[] fieldsItem : fields) {
+            collect(fieldsItem[1], found);
         }
     }
 
@@ -199,8 +199,7 @@ public final class TypedData {
         java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
         byte[] typeHash = Hash.keccak256(Abi.utf8(encodeType(type)));
         out.write(typeHash, 0, 32);
-        for (int iter = 0; iter < fields.size(); iter++) {
-            String[] f = fields.get(iter);
+        for (String[] f : fields) {
             byte[] enc = encodeValue(f[1], value.get(f[0]));
             out.write(enc, 0, 32);
         }
@@ -217,8 +216,8 @@ public final class TypedData {
                 throw new IllegalArgumentException(type + " takes " + size + " items");
             }
             java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
-            for (int iter = 0; iter < items.size(); iter++) {
-                out.write(encodeValue(element, items.get(iter)), 0, 32);
+            for (Object itemsItem : items) {
+                out.write(encodeValue(element, itemsItem), 0, 32);
             }
             return Hash.keccak256(out.toByteArray());
         }
@@ -229,10 +228,10 @@ public final class TypedData {
             }
             return hashStruct(type, strMap(map(value, type)));
         }
-        if (type.equals("string")) {
+        if ("string".equals(type)) {
             return Hash.keccak256(Abi.utf8(text(value)));
         }
-        if (type.equals("bytes")) {
+        if ("bytes".equals(type)) {
             return Hash.keccak256(value instanceof byte[] ? (byte[]) value
                     : com.codename1.crypto.encoding.Hex.decode(text(value)));
         }

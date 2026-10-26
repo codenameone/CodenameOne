@@ -164,7 +164,7 @@ public final class BitcoinAddress {
         try {
             payload = Base58Check.decode(address);
         } catch (IllegalArgumentException bad) {
-            throw new IllegalArgumentException("not a " + network + " address: " + address);
+            throw new IllegalArgumentException("not a " + network + " address: " + address, bad);
         }
         if (payload.length != 21) {
             throw new IllegalArgumentException("not a " + network + " address: " + address);
@@ -215,7 +215,7 @@ public final class BitcoinAddress {
     @Override
     public boolean equals(Object o) {
         return o instanceof BitcoinAddress && ((BitcoinAddress) o).text.equals(text)
-                && ((BitcoinAddress) o).network == network;
+                && ((BitcoinAddress) o).network == network; // NOPMD CompareObjectsWithEquals - networks are singleton constants
     }
 
     @Override

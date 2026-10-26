@@ -224,7 +224,8 @@ public final class Json {
             pos++;
             return out;
         }
-        while (true) {
+        boolean more = true;
+        while (more) {
             skip();
             if (pos >= text.length() || text.charAt(pos) != '"') {
                 throw error("expected a key");
@@ -236,11 +237,12 @@ public final class Json {
             skip();
             if (pos < text.length() && text.charAt(pos) == ',') {
                 pos++;
-                continue;
+            } else {
+                more = false;
             }
-            expect('}');
-            return out;
         }
+        expect('}');
+        return out;
     }
 
     private List<Object> array(int depth) {
@@ -251,16 +253,18 @@ public final class Json {
             pos++;
             return out;
         }
-        while (true) {
+        boolean more = true;
+        while (more) {
             out.add(value(depth + 1));
             skip();
             if (pos < text.length() && text.charAt(pos) == ',') {
                 pos++;
-                continue;
+            } else {
+                more = false;
             }
-            expect(']');
-            return out;
         }
+        expect(']');
+        return out;
     }
 
     private void expect(char c) {
@@ -358,8 +362,8 @@ public final class Json {
         try {
             if (integral) {
                 int len = n.length();
-                if (len < 19 || (len == 19 && n.charAt(0) != '-' && n.compareTo("9223372036854775807") <= 0)
-                        || (len == 20 && n.charAt(0) == '-' && n.compareTo("-9223372036854775808") <= 0)) {
+                if (len < 19 || (len == 19 && n.charAt(0) != '-' && "9223372036854775807".compareTo(n) >= 0)
+                        || (len == 20 && n.charAt(0) == '-' && "-9223372036854775808".compareTo(n) >= 0)) {
                     return Long.valueOf(Long.parseLong(n));
                 }
                 if (n.charAt(0) != '-') {
@@ -368,7 +372,7 @@ public final class Json {
             }
             return Double.valueOf(n);
         } catch (NumberFormatException bad) {
-            throw error("bad number");
+            throw new IllegalArgumentException("JSON bad number at offset " + pos, bad);
         }
     }
 }

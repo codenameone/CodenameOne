@@ -86,7 +86,7 @@ public final class Slip10 {
         Slip10 node = this;
         for (int iter = 0; iter < path.length(); iter++) {
             Slip10 next = node.child(path.get(iter));
-            if (node != this) {
+            if (node != this) { // NOPMD CompareObjectsWithEquals - identity: never destroy the receiver
                 node.destroy();
             }
             node = next;

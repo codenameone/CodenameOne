@@ -46,7 +46,7 @@ public final class DerivationPath {
             throw new IllegalArgumentException("null path");
         }
         String p = path.trim();
-        if (p.equals("m") || p.equals("M") || p.length() == 0) {
+        if ("m".equals(p) || "M".equals(p) || p.length() == 0) {
             return new DerivationPath(new long[0]);
         }
         if (p.startsWith("m/") || p.startsWith("M/")) {
@@ -127,8 +127,8 @@ public final class DerivationPath {
 
     /// Tells whether every index is hardened, which [Slip10] requires for Ed25519.
     public boolean isFullyHardened() {
-        for (int iter = 0; iter < indices.length; iter++) {
-            if (indices[iter] < HARDENED) {
+        for (long index : indices) {
+            if (index < HARDENED) {
                 return false;
             }
         }
@@ -139,12 +139,12 @@ public final class DerivationPath {
     @Override
     public String toString() {
         StringBuilder out = new StringBuilder("m");
-        for (int iter = 0; iter < indices.length; iter++) {
+        for (long index : indices) {
             out.append('/');
-            if (indices[iter] >= HARDENED) {
-                out.append(indices[iter] - HARDENED).append('\'');
+            if (index >= HARDENED) {
+                out.append(index - HARDENED).append('\'');
             } else {
-                out.append(indices[iter]);
+                out.append(index);
             }
         }
         return out.toString();
@@ -170,8 +170,8 @@ public final class DerivationPath {
     @Override
     public int hashCode() {
         int h = 17;
-        for (int iter = 0; iter < indices.length; iter++) {
-            h = h * 31 + (int) (indices[iter] ^ (indices[iter] >>> 32));
+        for (long index : indices) {
+            h = h * 31 + (int) (index ^ (index >>> 32));
         }
         return h;
     }

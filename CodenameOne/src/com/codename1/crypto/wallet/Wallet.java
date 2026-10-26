@@ -177,8 +177,7 @@ public final class Wallet {
         int inputs = psbt.getTransaction().getInputs().size();
         for (int i = 0; i < inputs; i++) {
             List<Psbt.Derivation> origins = psbt.getBip32Derivations(i);
-            for (int j = 0; j < origins.size(); j++) {
-                Psbt.Derivation d = origins.get(j);
+            for (Psbt.Derivation d : origins) {
                 if (d.getMasterFingerprint() != fp) {
                     continue;
                 }

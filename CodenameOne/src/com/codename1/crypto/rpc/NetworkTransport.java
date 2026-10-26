@@ -61,8 +61,8 @@ public class NetworkTransport implements RpcTransport {
         r.setReadResponseForErrors(true);
         r.setDuplicateSupported(true);
         r.setTimeout(timeout);
-        for (int i = 0; i < headers.size(); i++) {
-            r.addRequestHeader(headers.get(i)[0], headers.get(i)[1]);
+        for (String[] headersItem : headers) {
+            r.addRequestHeader(headersItem[0], headersItem[1]);
         }
         if (contentType != null) {
             r.setContentType(contentType);
@@ -90,7 +90,7 @@ public class NetworkTransport implements RpcTransport {
         try {
             return new String(data, "UTF-8");
         } catch (UnsupportedEncodingException e) {
-            throw new IOException("UTF-8 is unavailable");
+            throw new IOException("UTF-8 is unavailable", e);
         }
     }
 

@@ -103,8 +103,7 @@ public final class Psbt {
         }
         List<byte[][]> global = checkKeys(readMap(r), GLOBAL_KEY_SHAPES);
         byte[] unsigned = null;
-        for (int iter = 0; iter < global.size(); iter++) {
-            byte[][] kv = global.get(iter);
+        for (byte[][] kv : global) {
             if (kv[0].length == 1 && kv[0][0] == 0) {
                 unsigned = kv[1];
             }
@@ -120,9 +119,9 @@ public final class Psbt {
             }
         }
         Psbt p = new Psbt(tx);
-        for (int iter = 0; iter < global.size(); iter++) {
-            if (!(global.get(iter)[0].length == 1 && global.get(iter)[0][0] == 0)) {
-                p.global.add(global.get(iter));
+        for (byte[][] globalItem : global) {
+            if (!(globalItem[0].length == 1 && globalItem[0][0] == 0)) {
+                p.global.add(globalItem);
             }
         }
         for (int iter = 0; iter < tx.getInputs().size(); iter++) {
@@ -153,8 +152,8 @@ public final class Psbt {
     // Rejects a known typed key whose length its type does not allow; an unknown type is kept
     // as it is, which is what lets a newer PSBT pass through this reader unharmed.
     private static List<byte[][]> checkKeys(List<byte[][]> map, byte[] shapes) {
-        for (int iter = 0; iter < map.size(); iter++) {
-            byte[] key = map.get(iter)[0];
+        for (byte[][] mapElem : map) {
+            byte[] key = mapElem[0];
             int type = key[0] & 0xff;
             int shape = type < shapes.length ? shapes[type] : 0;
             boolean ok;
@@ -181,8 +180,8 @@ public final class Psbt {
             if (key.length == 0) {
                 return out;
             }
-            for (int iter = 0; iter < out.size(); iter++) {
-                if (java.util.Arrays.equals(out.get(iter)[0], key)) {
+            for (byte[][] outItem : out) {
+                if (java.util.Arrays.equals(outItem[0], key)) {
                     throw new IllegalArgumentException("duplicate PSBT key");
                 }
             }
@@ -195,11 +194,11 @@ public final class Psbt {
         Wire w = new Wire().bytes(MAGIC);
         w.varBytes(new byte[] {0}).varBytes(tx.serialize(false));
         writeMap(w, global);
-        for (int iter = 0; iter < inputMaps.size(); iter++) {
-            writeMap(w, inputMaps.get(iter));
+        for (List<byte[][]> inputMapsItem : inputMaps) {
+            writeMap(w, inputMapsItem);
         }
-        for (int iter = 0; iter < outputMaps.size(); iter++) {
-            writeMap(w, outputMaps.get(iter));
+        for (List<byte[][]> outputMapsItem : outputMaps) {
+            writeMap(w, outputMapsItem);
         }
         return w.toBytes();
     }
@@ -210,8 +209,8 @@ public final class Psbt {
     }
 
     private static void writeMap(Wire w, List<byte[][]> map) {
-        for (int iter = 0; iter < map.size(); iter++) {
-            w.varBytes(map.get(iter)[0]).varBytes(map.get(iter)[1]);
+        for (byte[][] mapElem : map) {
+            w.varBytes(mapElem[0]).varBytes(mapElem[1]);
         }
         w.u8(0);
     }
@@ -253,8 +252,8 @@ public final class Psbt {
     public void addBip32Derivation(int input, byte[] publicKey, int masterFingerprint, long[] path) {
         Wire w = new Wire();
         w.u8(masterFingerprint >>> 24).u8(masterFingerprint >>> 16).u8(masterFingerprint >>> 8).u8(masterFingerprint);
-        for (int iter = 0; iter < path.length; iter++) {
-            w.u32(path[iter]);
+        for (long pathElem : path) {
+            w.u32(pathElem);
         }
         put(inputMaps.get(input), Wire.concat(new byte[] {IN_BIP32_DERIVATION}, publicKey), w.toBytes());
     }
@@ -285,13 +284,13 @@ public final class Psbt {
     public List<Derivation> getBip32Derivations(int input) {
         List<Derivation> out = new ArrayList<Derivation>();
         List<byte[][]> map = inputMaps.get(input);
-        for (int iter = 0; iter < map.size(); iter++) {
-            byte[] k = map.get(iter)[0];
+        for (byte[][] mapElem : map) {
+            byte[] k = mapElem[0];
             int type = k[0] & 0xff;
             if (type != IN_BIP32_DERIVATION && type != IN_TAP_BIP32_DERIVATION) {
                 continue;
             }
-            Wire r = new Wire(map.get(iter)[1]);
+            Wire r = new Wire(mapElem[1]);
             if (type == IN_TAP_BIP32_DERIVATION) {
                 long leaves = r.readVarInt();
                 if (leaves > r.remaining() / 32) {
@@ -307,8 +306,8 @@ public final class Psbt {
             if (r.remaining() % 4 != 0) {
                 throw new IllegalArgumentException("malformed BIP-32 derivation");
             }
-            for (int p = 0; p < path.length; p++) {
-                path[p] = r.readU32();
+            for (int iter = 0; iter < path.length; iter++) {
+                path[iter] = r.readU32();
             }
             byte[] pub = new byte[k.length - 1];
             System.arraycopy(k, 1, pub, 0, pub.length);
@@ -322,8 +321,8 @@ public final class Psbt {
         Wire w = new Wire();
         w.varInt(0);
         w.u8(masterFingerprint >>> 24).u8(masterFingerprint >>> 16).u8(masterFingerprint >>> 8).u8(masterFingerprint);
-        for (int iter = 0; iter < path.length; iter++) {
-            w.u32(path[iter]);
+        for (long pathItem : path) {
+            w.u32(pathItem);
         }
         put(inputMaps.get(input), Wire.concat(new byte[] {IN_TAP_BIP32_DERIVATION}, xOnlyKey), w.toBytes());
     }
@@ -361,12 +360,12 @@ public final class Psbt {
     public List<byte[][]> getPartialSignatures(int input) {
         List<byte[][]> out = new ArrayList<byte[][]>();
         List<byte[][]> map = inputMaps.get(input);
-        for (int iter = 0; iter < map.size(); iter++) {
-            byte[] key = map.get(iter)[0];
+        for (byte[][] mapElem : map) {
+            byte[] key = mapElem[0];
             if (key[0] == IN_PARTIAL_SIG && key.length > 1) {
                 byte[] pub = new byte[key.length - 1];
                 System.arraycopy(key, 1, pub, 0, pub.length);
-                out.add(new byte[][] {pub, Wire.copy(map.get(iter)[1])});
+                out.add(new byte[][] {pub, Wire.copy(mapElem[1])});
             }
         }
         return out;
@@ -546,11 +545,11 @@ public final class Psbt {
                     return false;
                 }
                 Script.Builder b = Script.builder();
-                for (int iter = 0; iter < stack.size(); iter++) {
-                    if (stack.get(iter).length == 0) {
+                for (byte[] stackItem : stack) {
+                    if (stackItem.length == 0) {
                         b.op(Script.OP_0);
                     } else {
-                        b.push(stack.get(iter));
+                        b.push(stackItem);
                     }
                 }
                 scriptSig = b.build();
@@ -561,10 +560,10 @@ public final class Psbt {
             }
         }
         List<byte[][]> kept = new ArrayList<byte[][]>();
-        for (int iter = 0; iter < map.size(); iter++) {
-            int k = map.get(iter)[0][0] & 0xff;
+        for (byte[][] mapElem : map) {
+            int k = mapElem[0][0] & 0xff;
             if (k == IN_NON_WITNESS_UTXO || k == IN_WITNESS_UTXO || k > IN_TAP_MERKLE_ROOT) {
-                kept.add(map.get(iter));
+                kept.add(mapElem);
             }
         }
         map.clear();
@@ -574,8 +573,8 @@ public final class Psbt {
         }
         if (witness != null) {
             Wire w = new Wire().varInt(witness.size());
-            for (int iter = 0; iter < witness.size(); iter++) {
-                w.varBytes(witness.get(iter));
+            for (byte[] witnessItem : witness) {
+                w.varBytes(witnessItem);
             }
             put(map, new byte[] {IN_FINAL_SCRIPTWITNESS}, w.toBytes());
         }
@@ -638,9 +637,9 @@ public final class Psbt {
         List<byte[]> stack = new ArrayList<byte[]>();
         stack.add(new byte[0]);
         for (int k = 0; k < keys.size() && stack.size() <= m; k++) {
-            for (int s = 0; s < sigs.size(); s++) {
-                if (java.util.Arrays.equals(keys.get(k), sigs.get(s)[0])) {
-                    stack.add(sigs.get(s)[1]);
+            for (byte[][] sigsItem : sigs) {
+                if (java.util.Arrays.equals(keys.get(k), sigsItem[0])) {
+                    stack.add(sigsItem[1]);
                     break;
                 }
             }
@@ -703,9 +702,9 @@ public final class Psbt {
     }
 
     private static byte[] get(List<byte[][]> map, byte[] key) {
-        for (int iter = 0; iter < map.size(); iter++) {
-            if (java.util.Arrays.equals(map.get(iter)[0], key)) {
-                return map.get(iter)[1];
+        for (byte[][] mapItem : map) {
+            if (java.util.Arrays.equals(mapItem[0], key)) {
+                return mapItem[1];
             }
         }
         return null;

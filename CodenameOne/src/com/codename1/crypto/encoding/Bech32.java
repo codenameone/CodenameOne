@@ -106,9 +106,9 @@ public final class Bech32 {
     private static int polymod(byte[] values) {
         int chk = 1;
         int[] gen = {0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3};
-        for (int i = 0; i < values.length; i++) {
+        for (byte value : values) {
             int top = chk >>> 25;
-            chk = ((chk & 0x1ffffff) << 5) ^ (values[i] & 0xff);
+            chk = ((chk & 0x1ffffff) << 5) ^ (value & 0xff);
             for (int j = 0; j < 5; j++) {
                 if (((top >>> j) & 1) != 0) {
                     chk ^= gen[j];
@@ -193,8 +193,8 @@ public final class Bech32 {
         if (hr.length() + 1 + data.length + 6 > 90) {
             throw new IllegalArgumentException("Bech32 string too long");
         }
-        for (int i = 0; i < data.length; i++) {
-            if ((data[i] & 0xe0) != 0) {
+        for (byte datum : data) {
+            if ((datum & 0xe0) != 0) {
                 throw new IllegalArgumentException("Data value out of range");
             }
         }
@@ -202,8 +202,8 @@ public final class Bech32 {
         int mod = polymod(values) ^ k;
         StringBuilder sb = new StringBuilder(hr.length() + 1 + data.length + 6);
         sb.append(hr).append('1');
-        for (int i = 0; i < data.length; i++) {
-            sb.append(CHARSET.charAt(data[i]));
+        for (byte datum : data) {
+            sb.append(CHARSET.charAt(datum));
         }
         for (int i = 0; i < 6; i++) {
             sb.append(CHARSET.charAt((mod >>> (5 * (5 - i))) & 31));
@@ -302,8 +302,8 @@ public final class Bech32 {
         int maxv = (1 << toBits) - 1;
         byte[] out = new byte[(data.length * fromBits + toBits - 1) / toBits + 1];
         int len = 0;
-        for (int i = 0; i < data.length; i++) {
-            int v = data[i] & 0xff;
+        for (byte datum : data) {
+            int v = datum & 0xff;
             if ((v >>> fromBits) != 0) {
                 throw new IllegalArgumentException("Value out of range");
             }
