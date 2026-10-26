@@ -77,13 +77,10 @@ include::../demos/common/src/main/snippets/developer-guide/kotlin-multiplatform-
 
 ==== Gradle
 
-A Gradle application needs the Compose compiler plugin applied next to the
-Codename One plugin. The build stops with the line to add when it's missing:
-
-[source,kotlin]
-----
-include::../demos/common/src/main/snippets/developer-guide/kotlin-multiplatform-interop.kt[tag=kotlin-multiplatform-interop-kotlin-001,indent=0]
-----
+A Gradle application needs the Compose compiler plugin,
+`id("org.jetbrains.kotlin.plugin.compose")` at the application's Kotlin
+version, applied next to the Codename One plugin. The build stops with the
+line to add when it's missing.
 
 `convert-to-gradle` writes it for you. The Codename One settings plugin adds
 Google's Maven repository, limited to the `androidx.*` groups, which is where
@@ -106,7 +103,14 @@ A composition is shown in a `ComposeForm`, or embedded anywhere as a
 
 [source,kotlin]
 ----
-include::../demos/common/src/main/snippets/developer-guide/kotlin-multiplatform-interop.kt[tag=kotlin-multiplatform-interop-kotlin-002,indent=0]
+include::../../scripts/hellocodenameone/common/src/main/kmp/jvmMain/kotlin/com/codenameone/examples/hellocodenameone/kmp/GuideSnippets.kt[tag=kotlin-multiplatform-interop-kotlin-002,indent=0]
+----
+
+Or beside other components:
+
+[source,kotlin]
+----
+include::../../scripts/hellocodenameone/common/src/main/kmp/jvmMain/kotlin/com/codenameone/examples/hellocodenameone/kmp/GuideSnippets.kt[tag=kotlin-multiplatform-interop-kotlin-003,indent=0]
 ----
 
 Both live in `com.codename1.compose`. From Java, a `ComposeView` is created
@@ -126,7 +130,7 @@ for iOS, the watch, TV and the native desktop targets. Android runs the
 classes on ART and the simulator on the JVM.
 
 `androidx/compose/` is never relocated, not even when the
-xref:Android-Interop.asciidoc[Android compatibility layer] is active in the
+<<android-interop,Android compatibility layer>> is active in the
 same application: the Compose runtime the application was compiled against
 is the one it runs.
 

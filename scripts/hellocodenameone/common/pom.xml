@@ -566,8 +566,7 @@
                  build that does not used to name the libraries one by one, and
                  the one nobody had named was left out of the translation - the
                  application then failed in C, on the header of a class no
-                 source directory supplied. Kotlin's runtime is the exception:
-                 those builds stage it themselves. -->
+                 source directory supplied. -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-dependency-plugin</artifactId>
@@ -581,7 +580,13 @@
                         </goals>
                         <configuration>
                             <includeScope>runtime</includeScope>
-                            <excludeGroupIds>org.jetbrains.kotlin,org.jetbrains</excludeGroupIds>
+                            <!-- Nothing excluded, Kotlin's runtime included: these
+                                 builds must translate the stdlib the application was
+                                 compiled against (a Compose app needs 2.x classes such
+                                 as kotlin.coroutines.jvm.internal.SpillingKt). An
+                                 excludeGroupIds of org.jetbrains also matched
+                                 org.jetbrains.kotlinx as a prefix and dropped
+                                 kotlinx.coroutines. -->
                             <excludes>META-INF/**</excludes>
                             <outputDirectory>${project.build.directory}/translation-libs</outputDirectory>
                         </configuration>

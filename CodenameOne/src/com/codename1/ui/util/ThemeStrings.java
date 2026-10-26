@@ -233,7 +233,8 @@ final class ThemeStrings {
         }
         String s = new String(c, 0, n);
         t[i] = s;
-        if (++size * 2 > t.length) {
+        size++;
+        if (size * 2 > t.length) {
             grow();
         }
         return s;

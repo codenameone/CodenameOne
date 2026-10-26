@@ -15,7 +15,7 @@ TAG_RE = re.compile(r"(?:^|,)tag=([^,\]]+)")
 LISTING_DELIMITER_RE = re.compile(r"^-{4,}\s*$")
 TAG_BLOCK_RE = re.compile(r"// tag::([^\[]+)\[\]\n(.*?)\n// end::\1\[\]", re.S)
 JAVA_IDENTIFIER_RE = re.compile(r"^[A-Za-z_$][A-Za-z0-9_$]*\.java$")
-INCLUDE_ROOTS = ("../demos/", "../../scripts/wayline/", "../../scripts/savor/", "../../scripts/skirmish/", "../../scripts/parley/")
+INCLUDE_ROOTS = ("../demos/", "../../scripts/wayline/", "../../scripts/savor/", "../../scripts/skirmish/", "../../scripts/parley/", "../../scripts/hellocodenameone/")
 
 
 def parse_args():

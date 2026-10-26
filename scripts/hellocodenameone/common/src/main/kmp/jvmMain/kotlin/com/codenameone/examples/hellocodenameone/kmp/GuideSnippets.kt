@@ -20,24 +20,32 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-// Generated from docs/developer-guide source blocks. Edit the guide snippets here, not inline.
+package com.codenameone.examples.hellocodenameone.kmp
 
-// tag::kotlin-multiplatform-interop-kotlin-001[]
-plugins {
-    id("org.jetbrains.kotlin.plugin.compose") version "2.2.10"
-}
-// end::kotlin-multiplatform-interop-kotlin-001[]
+import com.codename1.compose.ComposeForm
+import com.codename1.compose.ComposeView
+import com.codename1.system.Lifecycle
+import com.codename1.ui.Form
+import com.codename1.ui.Label
+import com.codename1.ui.layouts.BorderLayout
+
+// The developer guide's entry-point examples (Kotlin-Multiplatform-Interop),
+// kept here so they compile with the rest of the Compose screens. Nothing
+// calls them.
 
 // tag::kotlin-multiplatform-interop-kotlin-002[]
 class MyApp : Lifecycle() {
     override fun runApp() {
-        ComposeForm { App() }.show()
+        ComposeForm { LayoutScreen() }.show()
     }
 }
 
-// Or beside other components:
-val form = Form("Mixed", BorderLayout())
-form.add(BorderLayout.NORTH, Label("Codename One"))
-form.add(BorderLayout.CENTER, ComposeView { Schedule() })
-form.show()
 // end::kotlin-multiplatform-interop-kotlin-002[]
+internal fun guideMixedForm() {
+    // tag::kotlin-multiplatform-interop-kotlin-003[]
+    val form = Form("Mixed", BorderLayout())
+    form.add(BorderLayout.NORTH, Label("Codename One"))
+    form.add(BorderLayout.CENTER, ComposeView { ListScreen() })
+    form.show()
+    // end::kotlin-multiplatform-interop-kotlin-003[]
+}

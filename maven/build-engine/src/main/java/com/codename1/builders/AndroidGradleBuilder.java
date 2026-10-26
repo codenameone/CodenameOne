@@ -2320,6 +2320,7 @@ public class AndroidGradleBuilder extends Executor {
         }
         if (stripKotlinFromUserClasses) {
             stripKotlin(dummyClassesDir);
+            gradleProvidedLibraryDependencies = stripGradleProvidedLibraries(dummyClassesDir);
         }
 
         File appDir = buildToolsVersionInt >= 27 ?
@@ -8467,6 +8468,7 @@ public class AndroidGradleBuilder extends Executor {
                 + "    "+compile+" fileTree(dir: 'libs', include: ['*.jar'])\n"
                 + request.getArg("android.supportv4Dep",supportV4Default) + "\n"
                 + kotlinRuntimeDependency
+                + gradleProvidedLibraryDependencies
                 + addNewlineIfMissing(additionalDependencies)
                 + addNewlineIfMissing(aiExtraGradleDependencies.toString())
                 + addNewlineIfMissing(request.getArg("android.gradleDep", ""))
@@ -12490,6 +12492,33 @@ public class AndroidGradleBuilder extends Executor {
             }
         }
         return false;
+    }
+
+    // Libraries a Compose application (src/main/kmp) carries in its own jar that the
+    // Android Gradle graph also supplies: AndroidX itself depends on all three. Left in
+    // userClasses.jar they fail checkDebugDuplicateClasses, so the classes are dropped
+    // and the coordinate is declared instead, at the version compose-compat was built
+    // against; Gradle then resolves the higher of that and what AndroidX asks for, never
+    // an older androidx.collection without the ScatterSet the Compose runtime calls.
+    private static final String[][] GRADLE_PROVIDED_LIBRARIES = {
+            {"kotlinx/coroutines", "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2"},
+            {"androidx/collection", "androidx.collection:collection:1.5.0"},
+            {"androidx/annotation", "androidx.annotation:annotation:1.9.1"}
+    };
+
+    private String gradleProvidedLibraryDependencies = "";
+
+    private String stripGradleProvidedLibraries(File dummyClassesDir) {
+        StringBuilder deps = new StringBuilder();
+        for (String[] lib : GRADLE_PROVIDED_LIBRARIES) {
+            File directory = new File(dummyClassesDir, lib[0].replace('/', File.separatorChar));
+            if (directory.isDirectory()) {
+                log("Deleting directory " + directory + "; declaring " + lib[1] + " instead");
+                delTree(directory, true);
+                deps.append("    implementation '").append(lib[1]).append("'\n");
+            }
+        }
+        return deps.toString();
     }
 
     private void stripKotlin(File dummyClassesDir) {
