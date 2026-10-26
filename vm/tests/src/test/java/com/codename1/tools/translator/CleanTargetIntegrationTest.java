@@ -2038,11 +2038,14 @@ class CleanTargetIntegrationTest {
         // four-core Linux runner a healthy build takes close to 30 minutes, and
         // one was stopped at 5,248 of 5,413 steps; it must not share the
         // ten-minute deadline used to detect a hung test executable either.
+        // The Compose screens added about 1,600 more (the Compose runtime and
+        // kotlinx.coroutines), and a healthy build then ran past 45 minutes at
+        // 7,024 of 7,025 steps.
         // This is a guard against a hang, not a performance budget: the perf
         // gate is what judges speed.
         ProcessBuilder builder = new ProcessBuilder("cmake", "--build", buildDir.toString());
         builder.directory(workingDir.toFile());
-        return runCommand(builder, 45, java.util.concurrent.TimeUnit.MINUTES);
+        return runCommand(builder, 80, java.util.concurrent.TimeUnit.MINUTES);
     }
 
     static String runCommand(List<String> command, Path workingDir) throws Exception {
