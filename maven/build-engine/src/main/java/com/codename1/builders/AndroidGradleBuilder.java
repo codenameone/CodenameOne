@@ -12672,6 +12672,9 @@ public class AndroidGradleBuilder extends Executor {
     // an older androidx.collection without the ScatterSet the Compose runtime calls.
     private static final String[][] GRADLE_PROVIDED_LIBRARIES = {
             {"kotlinx/coroutines", "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2"},
+            // The coroutines jar's debugger frames, outside its package; no coordinate
+            // of its own, the line above already declares the jar.
+            {"_COROUTINE", null},
             {"androidx/collection", "androidx.collection:collection:1.5.0"},
             {"androidx/annotation", "androidx.annotation:annotation:1.9.1"}
     };
@@ -12693,8 +12696,12 @@ public class AndroidGradleBuilder extends Executor {
                         coordinate = coordinate.substring(0, coordinate.lastIndexOf(':') + 1) + shipped;
                     }
                 }
-                log("Deleting directory " + directory + "; declaring " + coordinate + " instead");
                 delTree(directory, true);
+                if (coordinate == null) {
+                    log("Deleted directory " + directory);
+                    continue;
+                }
+                log("Deleted directory " + directory + "; declaring " + coordinate + " instead");
                 deps.append("    implementation '").append(coordinate).append("'\n");
             }
         }

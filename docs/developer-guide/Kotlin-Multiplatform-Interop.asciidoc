@@ -149,7 +149,7 @@ Codename One `Container`:
   in Compose.
 * **Frames come from the Codename One animation loop.** `ComposeHost` runs
   the `Recomposer` with a `BroadcastFrameClock` that `Form.registerAnimated`
-  ticks, so `withFrameNanos`, `animate*AsState` and `AnimatedVisibility` run
+  ticks, so `withFrameNanos`, `animateFloatAsState` and `AnimatedVisibility` run
   in step with every other Codename One animation, and an idle screen costs
   nothing.
 * **`Dispatchers.Main` is the EDT.** kotlinx.coroutines finds its main
@@ -186,7 +186,7 @@ Material 3:: `MaterialTheme` and `ColorScheme`, `Scaffold`, `Surface`,
 `AssistChip`, `FilterChip`, `Checkbox`, `Switch`, the progress indicators,
 dividers, `Icon` with `Icons.Filled`, `Icons.Outlined` and
 `Icons.AutoMirrored`.
-Animation:: `AnimatedVisibility`, `animate*AsState`,
+Animation:: `AnimatedVisibility`, `animateFloatAsState`, `animateDpAsState`, `animateColorAsState`,
 `rememberInfiniteTransition` with `animateFloat`.
 Images:: `Image` with `ImageVector` and `ContentScale`.
 
