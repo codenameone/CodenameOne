@@ -58,6 +58,16 @@
             <groupId>androidx.compose.runtime</groupId>
             <artifactId>runtime-desktop</artifactId>
             <version>${compose.runtime.version}</version>
+            <!-- The multiplatform root artifact: no classes, only Kotlin metadata
+                 trees (commonMain/, nativeMain/ ... *.knm) that every application
+                 then shipped as resources. The JVM classes are the
+                 kotlinx-coroutines-core-jvm dependency below. -->
+            <exclusions>
+                <exclusion>
+                    <groupId>org.jetbrains.kotlinx</groupId>
+                    <artifactId>kotlinx-coroutines-core</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <!-- The runtime declares these only in its Gradle module metadata, which
              Maven does not read; without them a translation is missing
