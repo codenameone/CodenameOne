@@ -32,8 +32,10 @@ serve() {
     fi
     kill -TERM $pid
     wait $pid 2>/dev/null
+    status=$?
     line=$(grep -m1 '^\[ALLOC:exit\] ' /tmp/census.log) \
-        || { echo "census.sh: no exit census; was the binary built with -DCN1_ALLOC_CENSUS?" >&2; exit 1; }
+        || { echo "census.sh: no exit census (server exit status $status); was the binary built with -DCN1_ALLOC_CENSUS?" >&2
+           tail -20 /tmp/census.log >&2; exit 1; }
     echo "$line" | awk '{print $2, $4}'
 }
 
