@@ -345,6 +345,10 @@ public class LinuxImplementation extends CodenameOneImplementation {
         }
     }
 
+    /// True on the embedded target (DRM/KMS or fbdev, no window system). Fixed at
+    /// build time: the native is a constant in each of the two display units.
+    static final boolean EMBEDDED = LinuxNative.isEmbeddedDisplay();
+
     @Override
     public void init(Object m) {
         // The class library (vm/JavaAPI) reaches the EDT, the log, secure
@@ -571,6 +575,16 @@ public class LinuxImplementation extends CodenameOneImplementation {
     // Android EncryptedSharedPreferences non-prompting store). Used by the
     // networking layer to read API keys / tokens at rest; see LinuxSecureStorage.
     private com.codename1.security.SecureStorage secureStorage;
+
+    private LinuxHardware hardware;
+
+    @Override
+    public com.codename1.hardware.Hardware getHardware() {
+        if (hardware == null) {
+            hardware = new LinuxHardware();
+        }
+        return hardware;
+    }
 
     @Override
     public com.codename1.security.SecureStorage getSecureStorage() {
@@ -2419,14 +2433,14 @@ public class LinuxImplementation extends CodenameOneImplementation {
      */
     @Override
     public boolean isNativeInputSupported() {
-        return true;
+        return !EMBEDDED;
     }
 
     private final LinuxTextInput lowLevelTextInput = new LinuxTextInput();
 
     @Override
     public boolean isTextInputSupported() {
-        return true;
+        return !EMBEDDED;
     }
 
     @Override
@@ -2458,7 +2472,7 @@ public class LinuxImplementation extends CodenameOneImplementation {
      */
     @Override
     public boolean isAsyncEditMode() {
-        return true;
+        return !EMBEDDED;
     }
 
     /**
@@ -2471,6 +2485,10 @@ public class LinuxImplementation extends CodenameOneImplementation {
      */
     @Override
     public void editString(final Component cmp, int maxSize, int constraint, String text, int initiatingKeycode) {
+        if (EMBEDDED) {
+            LinuxEmbeddedEditor.edit(cmp, maxSize, constraint, text);
+            return;
+        }
         lowLevelTextInput.stopCurrent();
         // Tapping straight from one field into another: finish the first cleanly
         // before overlaying the new one, so two controls never float at once.
@@ -3813,9 +3831,13 @@ public class LinuxImplementation extends CodenameOneImplementation {
     ///
     /// The list in that paragraph is now shorter by one: @desktopTitleBarMode is read here,
     /// because this port has a native menu bar to hand the commands to.
+    ///
+    /// The embedded target is the exception: an appliance panel has no window,
+    /// menu bar or title bar, and is driven by touch or a rotary encoder, so it
+    /// takes the mobile resource and theme layers.
     @Override
     public boolean isDesktop() {
-        return true;
+        return !EMBEDDED;
     }
 
 

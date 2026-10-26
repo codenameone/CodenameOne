@@ -106,7 +106,7 @@ int main(void) {
         enum = re.search(r'typedef enum\s*\{[^}]+\}\s*CN1EventType;', header).group(0)
         code = '#include <pthread.h>\n' + enum + '\n'
         if platform == 'Linux':
-            source = (native / 'cn1_linux_window.c').read_text()
+            source = (native / 'cn1_linux_events.c').read_text()
             queue = source[source.index('#define CN1_EVENT_RING'):source.index('/* ------------------------------------------------------------- globals */')]
             code += 'void cn1LinuxPushWindowEvent(int, int, int, int, int);\n' + queue
             code += '\n#define CAPACITY CN1_EVENT_RING\n#define push cn1LinuxPushWindowEvent\n#define pop cn1LinuxPopEvent\n'

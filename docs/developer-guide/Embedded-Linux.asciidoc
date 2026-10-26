@@ -1,0 +1,178 @@
+== Embedded Linux devices
+
+Codename One runs on embedded Linux boards -- Raspberry Pi, NXP i.MX, Rockchip,
+NVIDIA Jetson, BeagleBoard, RISC-V boards -- as the same single native binary the
+<<_working_with_the_native_linux_port,native Linux port>> builds, with the desktop
+layer swapped out. There is no X11, no Wayland compositor, no GTK and no JVM on the
+device: the application takes the screen directly through the kernel, reads touch,
+keys and rotary encoders straight from the input devices, and starts from boot as a
+service.
+
+The same source is also the phone, tablet and desktop companion application. A
+form, a theme, an entity model or a REST client written for the device builds for
+iOS and Android unchanged, and the simulator runs it on the desktop with a virtual
+board attached.
+
+=== Why use Codename One on a device
+
+* *One native executable.* ParparVM translates the application, Codename One and
+  the Java runtime it uses to C, and the board's compiler builds it. Nothing is
+  interpreted and nothing is compiled at start-up, so the first frame arrives in
+  tens of milliseconds and memory use stays flat.
+* *Java or Kotlin for the whole product.* The device UI, the companion application
+  and, with the <<_backend,backend>>, the server or the headless gateway share one
+  language, one build and one set of classes.
+* *A renderer that owns every pixel.* Codename One draws its own components, so the
+  user interface looks the same on a 3.5 inch SPI panel, a 10 inch HMI and a phone,
+  and it needs nothing from the board but a frame buffer.
+* *Hardware access in the core API.* GPIO, I2C, SPI, serial ports, PWM, CAN, the
+  watchdog and the backlight are `com.codename1.hardware`, implemented in the port,
+  with virtual devices in the simulator.
+
+=== Displays and the software fallback
+
+At start-up the port picks the first display back end that works, in this order,
+and every board renders through at least the last two:
+
+. *DRM/KMS* (`/dev/dri/card*`): a mode is set on the first connected output and
+  frames are flipped between two buffers, so there is no tearing. This is the path
+  on Raspberry Pi 4 and 5, i.MX 8, Rockchip and any board with a modern display
+  driver.
+. *fbdev* (`/dev/fb0`): the legacy frame buffer, at 32 or 16 bits per pixel, for
+  SPI panels and older kernels.
+. *Memory*: renders without a display, for tests, screenshots and benchmarks.
+
+Rendering is in software, by a renderer built into the port, which needs no GPU
+driver and is fast enough for a full-screen HMI at 60 frames per second on a
+Raspberry Pi class board. Text is drawn with FreeType and images are decoded with
+libpng and libjpeg; nothing of a desktop stack (X11, GLib, Cairo, Pango or
+FontConfig) is loaded, so the application starts in a few tens of milliseconds.
+Images are PNG or JPEG.
+
+Fonts are found by file name, without FontConfig: in the directories listed in
+`CN1_FONT_PATH`, then in a `fonts` directory beside the executable, then under
+`/usr/share/fonts` and `/usr/local/share/fonts`. The default face is DejaVu Sans,
+or Liberation, Noto, FreeFont, Roboto or Open Sans when DejaVu is absent. Fonts an
+application bundles are used as they are on every other platform.
+The `CN1_DISPLAY` environment variable forces a back end (`drm`, `fbdev`, `memory`
+or `headless`); the others are listed in the table below.
+
+.Environment variables read by the embedded port
+[cols="<1,<3",options="header"]
+|===
+|Variable |Effect
+
+|`CN1_DISPLAY` |`drm`, `fbdev`, `memory` or `headless`; by default the first that works
+|`CN1_DRM_DEVICE`, `CN1_FB_DEVICE` |The device node to use instead of the first found
+|`CN1_ROTATION` |`0`, `90`, `180` or `270`, for a panel mounted on its side
+|`CN1_DPI` |The panel's density, when the display does not report its size
+|`CN1_SIZE` |`800x480`: the size of a `memory` display
+|`CN1_CURSOR` |`1` draws a pointer for a mouse; touch panels have none by default
+|`CN1_TOUCH_SWAP_XY`, `CN1_TOUCH_INVERT_X`, `CN1_TOUCH_INVERT_Y` |Correct a touch controller mounted differently from its panel
+|`CN1_INPUT_NO_GRAB` |`1` leaves the input devices shared with other processes
+|`CN1_FONT_PATH` |Directories, separated by colons, searched for fonts before the system's
+|===
+
+Input comes from every `/dev/input/event*` device, including devices plugged in
+later: multi-touch panels (with pinch), mice, keyboards and rotary encoders, which
+move the focus like the arrow keys. Text fields open an on-screen keyboard, since
+a device seldom has a physical one. `SIGTERM` closes the application cleanly and the
+console is restored on exit.
+
+=== Building for a board
+
+Add the `linux.embedded` build hint to a native Linux build and name the board, and
+the builder picks the architecture, the display defaults and the libraries to link:
+
+[source,properties]
+----
+codename1.arg.linux.embedded=true
+codename1.arg.linux.embedded.board=rpi5
+----
+
+.Board profiles
+[cols="<1,<1,<3",options="header"]
+|===
+|`linux.embedded.board` |Architecture |Boards
+
+|`rpi5`, `rpi4`, `rpi3`, `rpi-zero2` |arm64 |Raspberry Pi 5, 4, 3 and Zero 2 W on a 64-bit OS
+|`rpi-armv7` |armv7 |Raspberry Pi on a 32-bit OS
+|`rpi-touch7` |arm64 |Raspberry Pi with the official 7 inch touch display
+|`imx8`, `imx6` |arm64, armv7 |NXP i.MX 8 and i.MX 6
+|`rk3588` |arm64 |Rockchip RK3588 boards (Orange Pi 5, Rock 5)
+|`jetson` |arm64 |NVIDIA Jetson
+|`beagleplay` |arm64 |BeagleBoard BeaglePlay
+|`visionfive2` |riscv64 |StarFive VisionFive 2
+|`generic-arm64`, `generic-armv7`, `generic-x64`, `generic-riscv64` |as named |Any other board
+|===
+
+`linux.embedded.display`, `linux.embedded.rotation` and `linux.embedded.dpi` set
+the defaults the binary starts with; the environment variables override them on the
+device. `linux.sysroot` points a cross build at a Yocto or Buildroot SDK sysroot, so
+the binary links against exactly the libraries the image carries.
+
+The device needs FreeType, libpng, libjpeg, zlib, a font and, for DRM/KMS, libdrm.
+OpenSSL 3 and libcurl are loaded only when the application first uses cryptography
+or the network. Raspberry Pi OS Lite has most of them; the
+`scripts/embedded/pios/setup-device.sh` script installs the rest and prepares the
+device to start the application at boot.
+
+=== Deploying to a device
+
+The `deploy-device` goal copies the binary to the device over SSH, installs it as a
+systemd service that starts at boot and restarts if it exits, and restarts it:
+
+[source,bash]
+----
+mvn cn1:deploy-device -Dcn1.device.host=pi.local -Dcn1.device.user=pi
+gradle cn1DeployDevice -Pcn1.device.host=pi.local -Pcn1.device.user=pi
+----
+
+It uses the system's `ssh` and `scp`, so keys, agents and `~/.ssh/config` aliases
+work as they do in a terminal. `cn1.device.env` passes environment variables to the
+service (`CN1_ROTATION=90,CN1_DISPLAY=fbdev`), and `cn1.device.logs=true` follows its
+log after the restart.
+
+For a production image, `scripts/embedded/yocto/meta-codenameone` is a Yocto layer
+and `scripts/embedded/buildroot/package/codenameone-app` a Buildroot package. Both
+build the translated application with the image's own toolchain and start it at
+boot.
+
+=== Hardware access
+
+`com.codename1.hardware.Hardware` is the entry point. On a device it drives the
+kernel's own interfaces -- the GPIO character device, i2c-dev, spidev, termios, sysfs
+PWM and backlight, SocketCAN and `/dev/watchdog` -- with no extra library. On a phone
+it reports no support, so the same code runs everywhere:
+
+[source,java]
+----
+Hardware hw = Hardware.getInstance();
+if (hw.isSupported(Hardware.FEATURE_GPIO)) {
+    GpioPin led = hw.openGpioOutput("gpiochip0", 17, false);
+    led.setHigh(true);
+    GpioPin button = hw.openGpioInput("gpiochip0", 27, GpioPin.BIAS_PULL_UP, GpioPin.EDGE_FALLING);
+    button.setListener((pin, rising, nanos) -> led.setHigh(!led.isHigh()));
+}
+I2cDevice sensor = hw.openI2c(1, 0x48);
+int raw = sensor.readRegister(0);
+----
+
+Listeners run on the event dispatch thread. Reads that wait for data -- a serial
+port, a CAN frame -- take a timeout and belong off the event dispatch thread.
+
+The simulator attaches a virtual board: `gpiochip0` with 32 lines, a TMP102
+temperature sensor at `0x48` and an EEPROM at `0x50` on I2C bus 1, loopback SPI,
+serial and CAN devices, two PWM channels, a watchdog and a backlight. Hardware code
+therefore runs, and can be unit tested, before a board is on the desk.
+
+=== Headless devices: the backend on a board
+
+A gateway, a sensor hub or a controller with no screen runs the
+<<_backend,backend>> instead: a native REST and WebSocket server, built the same way
+and as small. `Hardware.getInstance()` works there too, through the same kernel code
+as the UI port, and listener callbacks run on the pin's own thread. The device then
+serves its API, the phone application is the client, and both share the entity
+classes.
+
+include::embedded-benchmarks.adoc[]

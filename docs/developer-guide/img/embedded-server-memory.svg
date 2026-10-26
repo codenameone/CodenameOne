@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="612" viewBox="0 0 720 612" font-family="Helvetica, Arial, sans-serif">
+<rect width="100%" height="100%" fill="#0b132b"/>
+<text x="20" y="32" font-size="18" font-weight="bold" fill="#e0e6f0">Memory</text>
+<text x="20" y="54" font-size="13" fill="#8a96b0">Proportional set size in MB, lower is better</text>
+<rect x="150" y="68" width="12" height="12" fill="#3fb68b"/>
+<text x="168" y="79" font-size="12" fill="#e0e6f0">Idle</text>
+<rect x="210" y="68" width="12" height="12" fill="#5b7bd5"/>
+<text x="228" y="79" font-size="12" fill="#e0e6f0">Steady, 200 requests/s</text>
+<rect x="389" y="68" width="12" height="12" fill="#e0a458"/>
+<text x="407" y="79" font-size="12" fill="#e0e6f0">Peak load</text>
+<line x1="150.0" y1="96" x2="150.0" y2="582" stroke="#2a3350" stroke-width="0.8"/>
+<text x="150.0" y="598" font-size="11" fill="#8a96b0" text-anchor="middle">0</text>
+<line x1="246.0" y1="96" x2="246.0" y2="582" stroke="#2a3350" stroke-width="0.8"/>
+<text x="246.0" y="598" font-size="11" fill="#8a96b0" text-anchor="middle">50</text>
+<line x1="342.0" y1="96" x2="342.0" y2="582" stroke="#2a3350" stroke-width="0.8"/>
+<text x="342.0" y="598" font-size="11" fill="#8a96b0" text-anchor="middle">100</text>
+<line x1="438.0" y1="96" x2="438.0" y2="582" stroke="#2a3350" stroke-width="0.8"/>
+<text x="438.0" y="598" font-size="11" fill="#8a96b0" text-anchor="middle">150</text>
+<line x1="534.0" y1="96" x2="534.0" y2="582" stroke="#2a3350" stroke-width="0.8"/>
+<text x="534.0" y="598" font-size="11" fill="#8a96b0" text-anchor="middle">200</text>
+<line x1="630.0" y1="96" x2="630.0" y2="582" stroke="#2a3350" stroke-width="0.8"/>
+<text x="630.0" y="598" font-size="11" fill="#8a96b0" text-anchor="middle">250</text>
+<text x="140" y="139.5" font-size="13" fill="#e0e6f0" text-anchor="end" font-weight="bold">Codename One</text>
+<rect x="150" y="104" width="17.6" height="18" rx="2" fill="#3fb68b"/>
+<text x="173.6" y="117.0" font-size="12" fill="#e0e6f0">9.2 MB</text>
+<rect x="150" y="126" width="17.8" height="18" rx="2" fill="#5b7bd5"/>
+<text x="173.8" y="139.0" font-size="12" fill="#e0e6f0">9.2 MB</text>
+<rect x="150" y="148" width="44.1" height="18" rx="2" fill="#e0a458"/>
+<text x="200.1" y="161.0" font-size="12" fill="#e0e6f0">23 MB</text>
+<text x="140" y="217.5" font-size="13" fill="#e0e6f0" text-anchor="end" font-weight="normal">Rust, axum</text>
+<rect x="150" y="182" width="3.1" height="18" rx="2" fill="#3fb68b"/>
+<text x="159.1" y="195.0" font-size="12" fill="#e0e6f0">1.6 MB</text>
+<rect x="150" y="204" width="3.0" height="18" rx="2" fill="#5b7bd5"/>
+<text x="159.0" y="217.0" font-size="12" fill="#e0e6f0">1.6 MB</text>
+<rect x="150" y="226" width="4.2" height="18" rx="2" fill="#e0a458"/>
+<text x="160.2" y="239.0" font-size="12" fill="#e0e6f0">2.2 MB</text>
+<text x="140" y="295.5" font-size="13" fill="#e0e6f0" text-anchor="end" font-weight="normal">Go, net/http</text>
+<rect x="150" y="260" width="9.9" height="18" rx="2" fill="#3fb68b"/>
+<text x="165.9" y="273.0" font-size="12" fill="#e0e6f0">5.2 MB</text>
+<rect x="150" y="282" width="19.6" height="18" rx="2" fill="#5b7bd5"/>
+<text x="175.6" y="295.0" font-size="12" fill="#e0e6f0">10.2 MB</text>
+<rect x="150" y="304" width="22.3" height="18" rx="2" fill="#e0a458"/>
+<text x="178.3" y="317.0" font-size="12" fill="#e0e6f0">11.6 MB</text>
+<text x="140" y="373.5" font-size="13" fill="#e0e6f0" text-anchor="end" font-weight="normal">Node.js</text>
+<rect x="150" y="338" width="91.4" height="18" rx="2" fill="#3fb68b"/>
+<text x="247.4" y="351.0" font-size="12" fill="#e0e6f0">47.6 MB</text>
+<rect x="150" y="360" width="111.5" height="18" rx="2" fill="#5b7bd5"/>
+<text x="267.5" y="373.0" font-size="12" fill="#e0e6f0">58.1 MB</text>
+<rect x="150" y="382" width="135.6" height="18" rx="2" fill="#e0a458"/>
+<text x="291.6" y="395.0" font-size="12" fill="#e0e6f0">70.6 MB</text>
+<text x="140" y="451.5" font-size="13" fill="#e0e6f0" text-anchor="end" font-weight="normal">Python, FastAPI</text>
+<rect x="150" y="416" width="81.4" height="18" rx="2" fill="#3fb68b"/>
+<text x="237.4" y="429.0" font-size="12" fill="#e0e6f0">42.4 MB</text>
+<rect x="150" y="438" width="81.4" height="18" rx="2" fill="#5b7bd5"/>
+<text x="237.4" y="451.0" font-size="12" fill="#e0e6f0">42.4 MB</text>
+<rect x="150" y="460" width="84.4" height="18" rx="2" fill="#e0a458"/>
+<text x="240.4" y="473.0" font-size="12" fill="#e0e6f0">43.9 MB</text>
+<text x="140" y="529.5" font-size="13" fill="#e0e6f0" text-anchor="end" font-weight="normal">Spring Boot</text>
+<rect x="150" y="494" width="315.8" height="18" rx="2" fill="#3fb68b"/>
+<text x="471.8" y="507.0" font-size="12" fill="#e0e6f0">164 MB</text>
+<rect x="150" y="516" width="346.6" height="18" rx="2" fill="#5b7bd5"/>
+<text x="502.6" y="529.0" font-size="12" fill="#e0e6f0">181 MB</text>
+<rect x="150" y="538" width="471.6" height="18" rx="2" fill="#e0a458"/>
+<text x="627.6" y="551.0" font-size="12" fill="#e0e6f0">246 MB</text>
+</svg>

@@ -8618,6 +8618,12 @@ public abstract class CodenameOneImplementation {
     public com.codename1.nfc.Nfc getNfc() {
         return null;
     }
+    /// Returns the port-specific hardware entry point. Default implementation
+    /// returns {@code null}; ports with bus and pin access override this to
+    /// return a cached {@link com.codename1.hardware.Hardware} subclass.
+    public com.codename1.hardware.Hardware getHardware() {
+        return null;
+    }
 
     /// Returns the port-specific local calendar source, or null when the port
     /// has no device calendar integration.

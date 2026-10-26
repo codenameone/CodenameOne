@@ -1,0 +1,100 @@
+# Builds and runs the embedded Linux port (CN1_LINUX_EMBEDDED: DRM/KMS, fbdev or
+# memory display, evdev input, no GTK) the way scripts/embedded/README.md tells a
+# user to: translate scripts/embedded/demo with translate.sh, build it for arm64
+# with build-dist.sh in Containerfile.dev, and run it on the memory display.
+#
+# check-demo-run.py then fails the job when frame 60 is missing, wrong or blank,
+# or when the speed and memory the developer guide reports have slipped. The
+# generated stub file is checked against the natives too, since a native added to
+# LinuxNative without a stub breaks only the embedded link.
+name: Embedded Linux
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - 'Ports/LinuxPort/**'
+      - 'CodenameOne/src/**'
+      - 'vm/ByteCodeTranslator/src/**'
+      - 'vm/JavaAPI/src/**'
+      - 'maven/linux/**'
+      - 'scripts/embedded/**'
+      - '.github/workflows/embedded-linux.yml'
+  pull_request:
+    paths:
+      - 'Ports/LinuxPort/**'
+      - 'CodenameOne/src/**'
+      - 'vm/ByteCodeTranslator/src/**'
+      - 'vm/JavaAPI/src/**'
+      - 'maven/linux/**'
+      - 'scripts/embedded/**'
+      - '.github/workflows/embedded-linux.yml'
+
+concurrency:
+  group: embedded-linux-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  demo:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 75
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: The embedded stubs match the natives
+        run: python3 scripts/embedded/gen-embedded-stubs.py --check
+
+      - name: Set up JDK 8
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '8'
+          cache: 'maven'
+
+      # Retried: Maven Central answers 429 from the runner CDN edge (see
+      # linux-build-run.yml). This step only builds.
+      - name: Build core, the Linux port, JavaAPI and the translator
+        env:
+          RETRY_ATTEMPTS: '5'
+          RETRY_DELAY_SECONDS: '60'
+        run: |
+          cd maven
+          bash ../scripts/ci/retry.sh mvn -B -pl core,linux -am install \
+            -DskipTests -Dmaven.javadoc.skip=true -Plocal-dev-javase \
+            -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
+            -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+          cd ..
+          bash scripts/ci/retry.sh mvn -B -f vm/pom.xml -pl JavaAPI,ByteCodeTranslator -am package \
+            -DskipTests -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+
+      - name: Translate and build the demo for arm64
+        run: |
+          B="$RUNNER_TEMP/demo"
+          mkdir -p "$B/classes"
+          javac -source 1.8 -target 1.8 -cp maven/core/target/classes:maven/linux/target/classes \
+            -d "$B/classes" scripts/embedded/demo/src/EmbeddedDemo.java
+          scripts/embedded/translate.sh "$B/classes" EmbeddedDemo "$B/out"
+          scripts/embedded/build-dist.sh "$B/out" arm64
+
+      - name: Run the demo on the memory display
+        run: |
+          B="$RUNNER_TEMP/demo"
+          mkdir -p "$B/result"
+          docker run --rm -v "$B/out/build-arm64:/cn1:ro" -v "$B/result:/result" cn1-embedded-dev:arm64 \
+            bash -c 'cd /tmp && CN1_DISPLAY=memory CN1_SIZE=800x480 CN1_BENCH_SECONDS=10 \
+              CN1_SNAPSHOT=/result/frame60.png timeout 120 /cn1/EmbeddedDemo > /result/demo.log 2>&1'
+          python3 scripts/embedded/check-demo-run.py "$B/result/demo.log" "$B/result/frame60.png" \
+            "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the run
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: embedded-demo
+          path: ${{ runner.temp }}/demo/result
+          if-no-files-found: ignore

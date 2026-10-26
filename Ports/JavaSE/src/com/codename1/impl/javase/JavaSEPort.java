@@ -18623,6 +18623,22 @@ public class JavaSEPort extends CodenameOneImplementation {
         return nfc;
     }
 
+    private JavaSEHardware hardware;
+
+    /// The simulator's virtual board (see [JavaSEHardware]), so hardware code
+    /// runs with nothing attached. A desktop application built from this port
+    /// has no such board and reports no hardware.
+    @Override
+    public com.codename1.hardware.Hardware getHardware() {
+        if (!isSimulator()) {
+            return null;
+        }
+        if (hardware == null) {
+            hardware = new JavaSEHardware();
+        }
+        return hardware;
+    }
+
     @Override
     public com.codename1.calendar.LocalCalendarSource getLocalCalendarSource() {
         if (!isSimulator()) {
