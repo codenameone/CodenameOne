@@ -197,27 +197,46 @@ static const int cn1k_keccak_rot[25] = {
 
 #define CN1K_ROL64(x, n) ((n) == 0 ? (x) : (((x) << (n)) | ((x) >> (64 - (n)))))
 
+/*
+ * Every loop inside a round has a constant trip count and is unrolled outright: an iOS Release
+ * build compiles for size, and -Os otherwise keeps them rolled, six times slower than OpenSSL.
+ */
+#if defined(__clang__)
+#  define CN1K_UNROLL _Pragma("clang loop unroll(full)")
+#elif defined(__GNUC__)
+#  define CN1K_UNROLL _Pragma("GCC unroll 25")
+#else
+#  define CN1K_UNROLL
+#endif
+
 static void cn1k_keccak_f(uint64_t *s) {
     uint64_t b[25], c[5], d;
     int round, x, y;
     for (round = 0; round < 24; round++) {
+        CN1K_UNROLL
         for (x = 0; x < 5; x++) {
             c[x] = s[x] ^ s[x + 5] ^ s[x + 10] ^ s[x + 15] ^ s[x + 20];
         }
+        CN1K_UNROLL
         for (x = 0; x < 5; x++) {
             d = c[(x + 4) % 5] ^ CN1K_ROL64(c[(x + 1) % 5], 1);
+            CN1K_UNROLL
             for (y = 0; y < 25; y += 5) {
                 s[y + x] ^= d;
             }
         }
         /* rho and pi: lane (x, y) moves to (y, 2x + 3y) */
+        CN1K_UNROLL
         for (x = 0; x < 5; x++) {
+            CN1K_UNROLL
             for (y = 0; y < 5; y++) {
                 int from = x + 5 * y;
                 b[y + 5 * ((2 * x + 3 * y) % 5)] = CN1K_ROL64(s[from], cn1k_keccak_rot[from]);
             }
         }
+        CN1K_UNROLL
         for (y = 0; y < 25; y += 5) {
+            CN1K_UNROLL
             for (x = 0; x < 5; x++) {
                 s[y + x] = b[y + x] ^ (~b[y + (x + 1) % 5] & b[y + (x + 2) % 5]);
             }

@@ -1,0 +1,33 @@
+{
+  "_comment": "Lowest core/reference ratio each row may report before crypto-bench.yml fails. Floors guard against regression; they sit below the measured ratios by the noise of a shared CI runner, and a row the run does not print (a reference the runner lacks) is reported and skipped.",
+  "jvm": {
+    "secp256k1.pubkey": 1.3,
+    "secp256k1.sign": 1.2,
+    "secp256k1.verify": 0.9,
+    "secp256k1.verify.u": 0.95,
+    "secp256k1.verify.dec": 1.05,
+    "keccak256.1k": 0.9,
+    "sha256.1k": 0.85,
+    "pbkdf2.sha512.bip39": 1.1,
+    "ripemd160.1k": 1.1,
+    "ed25519.pubkey": 0.85,
+    "ed25519.sign": 0.85,
+    "ed25519.verify": 0.85,
+    "ed25519.sign.jdk": 4.0,
+    "ed25519.verify.jdk": 3.0,
+    "schnorr.sign": 0.85,
+    "schnorr.verify": 0.9
+  },
+  "native": {
+    "secp256k1.pubkey": 0.85,
+    "secp256k1.sign": 0.85,
+    "secp256k1.verify": 0.85,
+    "schnorr.sign": 0.85,
+    "schnorr.verify": 0.85,
+    "ed25519.sign.openssl": 1.3,
+    "ed25519.verify.openssl": 1.3,
+    "ed25519.sign.sodium": 0.8,
+    "ed25519.verify.sodium": 0.8,
+    "keccak256.1k.openssl": 0.8
+  }
+}

@@ -1,9 +1,15 @@
+import com.codename1.security.Ed25519;
 import com.codename1.security.Hash;
+import com.codename1.security.Schnorr;
 import com.codename1.security.Pbkdf2;
 import com.codename1.security.Secp256k1;
 import org.bouncycastle.asn1.x9.X9ECParameters;
 import org.bouncycastle.crypto.ec.CustomNamedCurves;
 import org.bouncycastle.crypto.digests.KeccakDigest;
+import org.bouncycastle.crypto.digests.RIPEMD160Digest;
+import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters;
+import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters;
+import org.bouncycastle.crypto.signers.Ed25519Signer;
 import org.bouncycastle.crypto.digests.SHA256Digest;
 import org.bouncycastle.crypto.digests.SHA512Digest;
 import org.bouncycastle.crypto.generators.PKCS5S2ParametersGenerator;
@@ -73,5 +79,70 @@ public final class JvmBench {
         row("pbkdf2.sha512.bip39", i -> Pbkdf2.hmacSha512(mn, salt, 2048, 64), i -> {
             PKCS5S2ParametersGenerator g = new PKCS5S2ParametersGenerator(new SHA512Digest());
             g.init(mn, salt, 2048); g.generateDerivedParameters(512); });
+        row("ripemd160.1k", i -> Hash.ripemd160(kb), i -> {
+            RIPEMD160Digest d = new RIPEMD160Digest(); d.update(kb, 0, kb.length); d.doFinal(out, 0); });
+
+        final byte[] seed = Hash.sha256("ed25519".getBytes());
+        final byte[] edPub = Ed25519.publicKey(seed);
+        final byte[] msg = hash;
+        final byte[] edSig = Ed25519.sign(seed, msg);
+        final Ed25519PrivateKeyParameters bEdPriv = new Ed25519PrivateKeyParameters(seed, 0);
+        final Ed25519PublicKeyParameters bEdPub = bEdPriv.generatePublicKey();
+        if (!java.util.Arrays.equals(edPub, bEdPub.getEncoded())) {
+            throw new IllegalStateException("Ed25519 public key differs from BouncyCastle");
+        }
+        row("ed25519.pubkey", i -> Ed25519.publicKey(seed), i -> new Ed25519PrivateKeyParameters(seed, 0).generatePublicKey());
+        row("ed25519.sign", i -> Ed25519.sign(seed, edPub, msg), i -> {
+            Ed25519Signer sg = new Ed25519Signer(); sg.init(true, bEdPriv); sg.update(msg, 0, msg.length); sg.generateSignature(); });
+        row("ed25519.verify", i -> Ed25519.verify(msg, edSig, edPub), i -> {
+            Ed25519Signer sg = new Ed25519Signer(); sg.init(false, new Ed25519PublicKeyParameters(edPub, 0));
+            sg.update(msg, 0, msg.length); sg.verifySignature(edSig); });
+
+        jdkEd25519(seed, edPub, msg, edSig);
+
+        // BouncyCastle has no BIP-340; the reference is BC's ECDSA on the same curve,
+        // which costs about the same multiplications
+        final byte[] xonly = Schnorr.publicKey(priv);
+        final byte[] schSig = Schnorr.sign(msg, priv, null);
+        row("schnorr.sign", i -> Schnorr.sign(msg, priv, null), i -> {
+            ECDSASigner sg = new ECDSASigner(new HMacDSAKCalculator(new SHA256Digest()));
+            sg.init(true, bPriv); sg.generateSignature(hash); });
+        row("schnorr.verify", i -> Schnorr.verify(msg, schSig, xonly), i -> {
+            ECDSASigner sg = new ECDSASigner(); sg.init(false, bPub); sg.verifySignature(hash, r, s); });
+    }
+
+    /// The JDK's own EdDSA (Java 15 and later), the other reference a JVM
+    /// developer reaches for; skipped on an older runtime.
+    static void jdkEd25519(byte[] seed, byte[] edPub, byte[] msg, byte[] edSig) {
+        final java.security.PrivateKey jPriv;
+        final java.security.PublicKey jPub;
+        try {
+            java.security.KeyFactory kf = java.security.KeyFactory.getInstance("Ed25519");
+            // PKCS#8 and X.509 wrappings of the raw keys (RFC 8410)
+            byte[] p8 = concat(Hash.fromHex("302e020100300506032b657004220420"), seed);
+            byte[] x509 = concat(Hash.fromHex("302a300506032b6570032100"), edPub);
+            jPriv = kf.generatePrivate(new java.security.spec.PKCS8EncodedKeySpec(p8));
+            jPub = kf.generatePublic(new java.security.spec.X509EncodedKeySpec(x509));
+        } catch (java.security.GeneralSecurityException noEdDsa) {
+            System.out.println("# the JDK has no Ed25519; its rows are skipped");
+            return;
+        }
+        row("ed25519.sign.jdk", i -> Ed25519.sign(seed, edPub, msg), i -> {
+            try {
+                java.security.Signature sg = java.security.Signature.getInstance("Ed25519");
+                sg.initSign(jPriv); sg.update(msg); sg.sign();
+            } catch (java.security.GeneralSecurityException e) { throw new IllegalStateException(e); } });
+        row("ed25519.verify.jdk", i -> Ed25519.verify(msg, edSig, edPub), i -> {
+            try {
+                java.security.Signature sg = java.security.Signature.getInstance("Ed25519");
+                sg.initVerify(jPub); sg.update(msg); sg.verify(edSig);
+            } catch (java.security.GeneralSecurityException e) { throw new IllegalStateException(e); } });
+    }
+
+    static byte[] concat(byte[] a, byte[] b) {
+        byte[] c = new byte[a.length + b.length];
+        System.arraycopy(a, 0, c, 0, a.length);
+        System.arraycopy(b, 0, c, a.length, b.length);
+        return c;
     }
 }
