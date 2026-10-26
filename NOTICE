@@ -238,6 +238,10 @@ scripts/crypto-kernels/amalgamate.py from two upstream projects, carried
 verbatim apart from the include flattening and the static linkage the script
 applies. ParparVM compiles it into an application that uses the elliptic-curve
 or Keccak APIs of com.codename1.security.
+The same sources are compiled by Ports/Android/crypto-jni/build.sh into
+maven/build-engine/src/main/resources/com/codename1/builders/android-crypto/
+jniLibs/<abi>/libcn1crypto.so, which the Android builder adds to an
+application that uses those APIs.
 
 libsecp256k1 (https://github.com/bitcoin-core/secp256k1) is distributed under
 the MIT license, reproduced in full at the top of the generated file:

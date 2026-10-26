@@ -22,7 +22,7 @@ fi
 SEC="$REPO/CodenameOne/src/com/codename1/security"
 "$JAVAC" -nowarn -encoding ASCII -d "$WORK/classes" -cp "$BC_JAR" \
     "$REPO/CodenameOne/src/com/codename1/impl/SharedWithBackend.java" \
-    "$SEC/CryptoException.java" "$SEC/CryptoEngine.java" "$SEC/MessageDigestImpl.java" "$SEC/Hash.java" \
+    "$SEC/CryptoException.java" "$SEC/CryptoEngine.java" "$SEC/NativeCryptoEngine.java" "$SEC/NativeCryptoKernels.java" "$SEC/MessageDigestImpl.java" "$SEC/Hash.java" \
     "$SEC/Hmac.java" "$SEC/Pbkdf2.java" "$SEC/Secp256k1.java" "$SEC/Secp256k1Math.java" "$SEC/Schnorr.java" \
     "$SEC/Ed25519.java" "$SEC/Ed25519Math.java" "$HERE/src/JvmBench.java"
 echo "# jvm: $("$JAVA" -version 2>&1 | head -1); BouncyCastle $BC_VERSION"

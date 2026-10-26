@@ -19049,6 +19049,26 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return androidAes(transformation, key, iv, aad, ciphertext, javax.crypto.Cipher.DECRYPT_MODE);
     }
 
+    /// The C crypto kernels when the build put `libcn1crypto.so` in the application (it does for
+    /// an application that uses the elliptic-curve or `com.codename1.crypto` APIs), otherwise the
+    /// default engine. The library is JNI over the same kernels the ParparVM targets compile in,
+    /// bound by name to `NativeCryptoKernels`' natives, so once it is loaded the shared
+    /// `NativeCryptoEngine` drives it exactly as on iOS.
+    ///
+    /// Loading is the probe, and any failure keeps the Java engine: the library is absent from an
+    /// application that never used the API, and it is linked for API 21, so an older device
+    /// refuses it.
+    @Override
+    public com.codename1.security.CryptoEngine createCryptoEngine() {
+        com.codename1.security.CryptoEngine fallback = super.createCryptoEngine();
+        try {
+            System.loadLibrary("cn1crypto");
+        } catch (Throwable notThere) {
+            return fallback;
+        }
+        return com.codename1.security.NativeCryptoEngine.create(fallback);
+    }
+
     /// PBKDF2 through the JCE, over the password **bytes** the caller supplied.
     ///
     /// Not `SecretKeyFactory` with a `PBEKeySpec`, which takes a `char[]` and encodes it with

@@ -19,6 +19,8 @@ import org.bouncycastle.crypto.params.ECPublicKeyParameters;
 import org.bouncycastle.crypto.signers.ECDSASigner;
 import org.bouncycastle.crypto.signers.HMacDSAKCalculator;
 import java.math.BigInteger;
+import com.codename1.security.CryptoEngine;
+import com.codename1.security.NativeCryptoEngine;
 
 /// Ops/sec of the core secp256k1 and hash kernels next to BouncyCastle on the same JVM.
 /// Prints one line per operation: name, core ops/s, reference ops/s, ratio.
@@ -46,7 +48,45 @@ public final class JvmBench {
         System.out.printf("%-22s core=%12.0f ref=%12.0f ratio=%6.2f%n", name, c, b, c / b);
     }
 
+    /// `-Dbench.kernels=<library>` loads that JNI library (Android's `libcn1crypto.so`) and runs
+    /// every core row on the native kernels instead of the Java engine -- after checking that the
+    /// two agree byte for byte on deterministic outputs, so a broken binding cannot post a number.
+    static void installKernels(String library) {
+        byte[] k = Hash.sha256("kernels".getBytes());
+        byte[] m = Hash.sha256("kernel message".getBytes());
+        byte[] kb = new byte[1000];
+        for (int i = 0; i < kb.length; i++) kb[i] = (byte) (i * 7);
+        String javaAnswer = answers(k, m, kb);
+        System.loadLibrary(library);
+        CryptoEngine engine = NativeCryptoEngine.create(null);
+        if (!(engine instanceof NativeCryptoEngine)) {
+            throw new IllegalStateException(library + " loaded but the kernels answer unavailable");
+        }
+        CryptoEngine.install(engine);
+        String nativeAnswer = answers(k, m, kb);
+        if (!javaAnswer.equals(nativeAnswer)) {
+            throw new IllegalStateException("kernels disagree with the Java engine:\n" + javaAnswer + "\n" + nativeAnswer);
+        }
+        System.out.println("# core rows on the native kernels (" + library + "), which match the Java engine");
+    }
+
+    static String answers(byte[] k, byte[] m, byte[] kb) {
+        byte[] pub = Secp256k1.publicKey(k, true);
+        Secp256k1.EcdsaSignature sig = Secp256k1.sign(m, k);
+        byte[] edPub = Ed25519.publicKey(k);
+        byte[] edSig = Ed25519.sign(k, edPub, kb);
+        byte[] sch = Schnorr.sign(m, k, m);
+        return Hash.toHex(pub) + Hash.toHex(Secp256k1.publicKey(k, false)) + Hash.toHex(sig.r()) + Hash.toHex(sig.s())
+                + Secp256k1.verify(m, sig, pub) + Hash.toHex(edPub) + Hash.toHex(edSig)
+                + Ed25519.verify(kb, edSig, edPub) + Hash.toHex(sch) + Schnorr.verify(m, sch, Schnorr.publicKey(k))
+                + Hash.toHex(Hash.keccak256(kb));
+    }
+
     public static void main(String[] a) {
+        String kernels = System.getProperty("bench.kernels");
+        if (kernels != null && kernels.length() > 0) {
+            installKernels(kernels);
+        }
         final byte[] priv = Hash.sha256("bench".getBytes());
         final byte[] hash = Hash.sha256("message".getBytes());
         final byte[] pub = Secp256k1.publicKey(priv, true);
