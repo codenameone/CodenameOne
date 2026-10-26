@@ -64,6 +64,18 @@ public final class CoseKey {
         this.publicKey = publicKey;
     }
 
+    /// The key a COSE_Key encodes, as another relying party stored it: what a
+    /// migration of passkeys reads.
+    ///
+    /// - [WebAuthnException]: when it is not CBOR, or not a key of a supported
+    /// algorithm
+    public static CoseKey parse(byte[] coseKey) {
+        if (coseKey == null || coseKey.length == 0) {
+            throw invalid("The credential's public key is empty");
+        }
+        return of(Cbor.decode(coseKey));
+    }
+
     /// The key a CBOR map decodes to.
     ///
     /// - [WebAuthnException]: when it is not a key of a supported algorithm
