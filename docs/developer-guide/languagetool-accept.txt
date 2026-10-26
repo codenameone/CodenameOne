@@ -838,3 +838,6 @@ coturn
 unconfigured
 Sepolia
 ntfy
+# Identity migration: password hash formats read by ModularPbkdf2PasswordEncoder.
+passlib
+Werkzeug

@@ -937,11 +937,11 @@ What the provider promises:
   refresh instead of starting their own.
 * **Never an expired token.** If a refresh fails after the token expired,
   `getToken()` throws `TokenAcquisitionException`.
-* **Backoff, not retries in place.** A failure the endpoint may recover from
+* **A cooldown, not retries in place.** A failure the endpoint may recover from
   (a 5xx, a 429, an unreachable host) puts the provider in a cooldown that
   doubles with each failure, up to a minute, with jitter. Calls during it fail
   at once rather than holding a request thread. A refused grant
-  (`invalid_client`, `invalid_grant`) isn't retryable, and the exception says
+  (`invalid_client`, `invalid_grant`) is never retried, and the exception says
   so.
 * **No secrets in errors.** An exception names the endpoint, the HTTP status
   and the OAuth error code. It never includes the client secret, the
@@ -1693,7 +1693,7 @@ The `MigrationReport` lists every record with one outcome:
   to someone else.
 * `NOT_CARRIED`: state no migration moves, listed in the table below.
 
-A passkey works on the new server only if it has the same relying party ID
+A passkey works on the new server only if it has the same relying-party ID
 (the domain) as the old one. That's a rule of WebAuthn, not of this
 migration.
 
@@ -1732,7 +1732,7 @@ same keys under the same `kid`:
 
 | Passkeys
 | Yes
-| Credential ID, public key, counter and user handle. Same relying party ID
+| Credential ID, public key, counter and user handle. Same relying-party ID
   only.
 
 | TOTP secrets
