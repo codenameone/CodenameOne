@@ -106,6 +106,24 @@ public class DelegatingPasswordEncoder implements PasswordEncoder {
         return delegate.matches(rawPassword, extractEncodedPassword(prefixEncodedPassword));
     }
 
+    /// Whether `prefixEncodedPassword` names an id this encoder has a delegate
+    /// for. A value it does not is refused by [#matches(CharSequence, String)]
+    /// through the default for matches, which by default throws; a migration asks
+    /// this first, so it can report the row instead of importing a password nobody
+    /// can sign in with.
+    public boolean isSupported(String prefixEncodedPassword) {
+        String id = extractId(prefixEncodedPassword);
+        PasswordEncoder delegate = id == null ? null : idToPasswordEncoder.get(id);
+        if (delegate instanceof ModularPbkdf2PasswordEncoder) {
+            // One id covers a framework's every format, and only PBKDF2 is
+            // read: Werkzeug's scrypt or Django's argon2 under the same id
+            // would otherwise be imported as a hash nobody can sign in with.
+            return ((ModularPbkdf2PasswordEncoder) delegate).isReadable(
+                    extractEncodedPassword(prefixEncodedPassword));
+        }
+        return delegate != null;
+    }
+
     @Override
     public boolean upgradeEncoding(String prefixEncodedPassword) {
         String id = extractId(prefixEncodedPassword);
