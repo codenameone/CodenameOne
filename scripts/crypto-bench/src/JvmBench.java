@@ -1,9 +1,12 @@
 import com.codename1.security.Hash;
+import com.codename1.security.Pbkdf2;
 import com.codename1.security.Secp256k1;
 import org.bouncycastle.asn1.x9.X9ECParameters;
 import org.bouncycastle.crypto.ec.CustomNamedCurves;
 import org.bouncycastle.crypto.digests.KeccakDigest;
 import org.bouncycastle.crypto.digests.SHA256Digest;
+import org.bouncycastle.crypto.digests.SHA512Digest;
+import org.bouncycastle.crypto.generators.PKCS5S2ParametersGenerator;
 import org.bouncycastle.crypto.params.ECDomainParameters;
 import org.bouncycastle.crypto.params.ECPrivateKeyParameters;
 import org.bouncycastle.crypto.params.ECPublicKeyParameters;
@@ -65,5 +68,10 @@ public final class JvmBench {
             KeccakDigest d = new KeccakDigest(256); d.update(kb, 0, kb.length); d.doFinal(out, 0); });
         row("sha256.1k", i -> Hash.sha256(kb), i -> {
             SHA256Digest d = new SHA256Digest(); d.update(kb, 0, kb.length); d.doFinal(out, 0); });
+        byte[] mn = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about".getBytes();
+        byte[] salt = "mnemonic".getBytes();
+        row("pbkdf2.sha512.bip39", i -> Pbkdf2.hmacSha512(mn, salt, 2048, 64), i -> {
+            PKCS5S2ParametersGenerator g = new PKCS5S2ParametersGenerator(new SHA512Digest());
+            g.init(mn, salt, 2048); g.generateDerivedParameters(512); });
     }
 }

@@ -458,6 +458,7 @@ abstract class MessageDigestImpl {
         private int h6;
         private int h7;
         private final int[] w = new int[64];
+        private final int[] state = new int[8];
 
         Sha256Family(boolean truncated) {
             this.truncated = truncated;
@@ -509,6 +510,17 @@ abstract class MessageDigestImpl {
                      | (block[o + i * 4 + 2] & 0xff) << 8
                      | (block[o + i * 4 + 3] & 0xff);
             }
+            int[] st = state;
+            st[0] = h0; st[1] = h1; st[2] = h2; st[3] = h3;
+            st[4] = h4; st[5] = h5; st[6] = h6; st[7] = h7;
+            compress(st, w);
+            h0 = st[0]; h1 = st[1]; h2 = st[2]; h3 = st[3];
+            h4 = st[4]; h5 = st[5]; h6 = st[6]; h7 = st[7];
+        }
+
+        /// One SHA-256 compression of the block whose sixteen big-endian
+        /// words are in `w[0..15]` (w has room for 64) into `st[0..7]`.
+        static void compress(int[] st, int[] w) {
             for (int i = 16; i < 64; i++) {
                 int v15 = w[i - 15];
                 int s0 = ((v15 >>> 7) | (v15 << 25)) ^ ((v15 >>> 18) | (v15 << 14)) ^ (v15 >>> 3);
@@ -516,14 +528,14 @@ abstract class MessageDigestImpl {
                 int s1 = ((v2 >>> 17) | (v2 << 15)) ^ ((v2 >>> 19) | (v2 << 13)) ^ (v2 >>> 10);
                 w[i] = w[i - 16] + s0 + w[i - 7] + s1;
             }
-            int a = h0;
-            int b = h1;
-            int c = h2;
-            int d = h3;
-            int e = h4;
-            int f = h5;
-            int g = h6;
-            int h = h7;
+            int a = st[0];
+            int b = st[1];
+            int c = st[2];
+            int d = st[3];
+            int e = st[4];
+            int f = st[5];
+            int g = st[6];
+            int h = st[7];
             for (int i = 0; i < 64; i++) {
                 int s1 = ((e >>> 6) | (e << 26)) ^ ((e >>> 11) | (e << 21)) ^ ((e >>> 25) | (e << 7));
                 int ch = (e & f) ^ (~e & g);
@@ -536,8 +548,8 @@ abstract class MessageDigestImpl {
                 d = c; c = b; b = a;
                 a = t1 + t2;
             }
-            h0 += a; h1 += b; h2 += c; h3 += d;
-            h4 += e; h5 += f; h6 += g; h7 += h;
+            st[0] += a; st[1] += b; st[2] += c; st[3] += d;
+            st[4] += e; st[5] += f; st[6] += g; st[7] += h;
         }
     }
 
@@ -581,6 +593,7 @@ abstract class MessageDigestImpl {
         private int bufferLen;
         private long byteCount; // we cap message length at 2^63-1 bytes which is plenty
         private final long[] w = new long[80];
+        private final long[] state = new long[8];
 
         Sha512Family(boolean truncated) {
             this.truncated = truncated;
@@ -702,6 +715,17 @@ abstract class MessageDigestImpl {
                      | ((long) (block[p + 6] & 0xff) << 8)
                      | ((long) (block[p + 7] & 0xff));
             }
+            long[] st = state;
+            st[0] = h0; st[1] = h1; st[2] = h2; st[3] = h3;
+            st[4] = h4; st[5] = h5; st[6] = h6; st[7] = h7;
+            compress(st, w);
+            h0 = st[0]; h1 = st[1]; h2 = st[2]; h3 = st[3];
+            h4 = st[4]; h5 = st[5]; h6 = st[6]; h7 = st[7];
+        }
+
+        /// One SHA-512 compression of the block whose sixteen big-endian
+        /// words are in `w[0..15]` (w has room for 80) into `st[0..7]`.
+        static void compress(long[] st, long[] w) {
             for (int i = 16; i < 80; i++) {
                 long v15 = w[i - 15];
                 long s0 = ((v15 >>> 1) | (v15 << 63))
@@ -713,14 +737,14 @@ abstract class MessageDigestImpl {
                         ^ (v2 >>> 6);
                 w[i] = w[i - 16] + s0 + w[i - 7] + s1;
             }
-            long a = h0;
-            long b = h1;
-            long c = h2;
-            long d = h3;
-            long e = h4;
-            long f = h5;
-            long g = h6;
-            long h = h7;
+            long a = st[0];
+            long b = st[1];
+            long c = st[2];
+            long d = st[3];
+            long e = st[4];
+            long f = st[5];
+            long g = st[6];
+            long h = st[7];
             for (int i = 0; i < 80; i++) {
                 long s1 = ((e >>> 14) | (e << 50))
                         ^ ((e >>> 18) | (e << 46))
@@ -737,8 +761,8 @@ abstract class MessageDigestImpl {
                 d = c; c = b; b = a;
                 a = t1 + t2;
             }
-            h0 += a; h1 += b; h2 += c; h3 += d;
-            h4 += e; h5 += f; h6 += g; h7 += h;
+            st[0] += a; st[1] += b; st[2] += c; st[3] += d;
+            st[4] += e; st[5] += f; st[6] += g; st[7] += h;
         }
     }
 
