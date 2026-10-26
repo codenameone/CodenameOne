@@ -99,23 +99,29 @@ public final class Secp256k1 {
     private static final int LIMB_MASK = 0xffff;
     private static final int LIMB_BITS = 16;
 
-    private static final Modulus FP = new Modulus(limbs(
-            "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F"));
     private static final Modulus FN = new Modulus(limbs(
             "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141"));
 
     private static final int[] ZERO = new int[LIMBS];
-    private static final int[] SEVEN = small(7);
-    // 3 * b, the constant the complete addition formulas multiply by
-    private static final int[] B3 = small(21);
-    // (p + 1) / 4 == (p >> 2) + 1 since p == 3 (mod 4): the square root exponent
-    private static final int[] SQRT_EXP = addSmall(shiftRight(FP.m, 2), 1);
     private static final int[] N_HALF = shiftRight(FN.m, 1);
 
-    private static final Pt G = Pt.affine(
-            limbs("79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798"),
-            limbs("483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8"));
-    private static final Pt[] G_TABLE = table(G);
+    // p, for the recovery id's "R.x was reduced by n" case
+    private static final int[] P_LIMBS = limbs(
+            "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F");
+
+    // the GLV decomposition k = k1 + k2 lambda (mod n) with |k1|, |k2| < 2^128:
+    // c1 = round(k g1 / 2^384), c2 = round(k g2 / 2^384),
+    // k2 = c1 (-b1) + c2 (-b2), k1 = k - k2 lambda
+    private static final int[] GLV_G1 = limbs(
+            "3086D221A7D46BCDE86C90E49284EB153DAA8A1471E8CA7FE893209A45DBB031");
+    private static final int[] GLV_G2 = limbs(
+            "E4437ED6010E88286F547FA90ABFE4C4221208AC9DF506C61571B4AE8AC47F71");
+    private static final int[] GLV_MINUS_B1 = limbs(
+            "00000000000000000000000000000000E4437ED6010E88286F547FA90ABFE4C3");
+    private static final int[] GLV_MINUS_B2 = limbs(
+            "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE8A280AC50774346DD765CDA83DB1562C");
+    private static final int[] GLV_MINUS_LAMBDA = limbs(
+            "AC9C52B33FA3CF1F5AD9E3FD77ED9BA4A880B9FC8EC739C2E0CFC810B51283CF");
 
     private Secp256k1() {
     }
@@ -146,9 +152,9 @@ public final class Secp256k1 {
     /// - `CryptoException`: if the private key is not valid
     public static byte[] publicKey(byte[] privateKey, boolean compressed) {
         int[] d = privateScalar(privateKey);
-        Pt q = mul(G_TABLE, d);
+        int[][] q = mulGen(d);
         wipe(d);
-        return serialize(q, compressed);
+        return serialize(q[0], q[1], compressed);
     }
 
     /// Tells whether the bytes encode a point on the curve, in either SEC 1
@@ -163,7 +169,8 @@ public final class Secp256k1 {
     ///
     /// - `CryptoException`: if the key is not a point on the curve
     public static byte[] convertPublicKey(byte[] publicKey, boolean compressed) {
-        return serialize(parseOrThrow(publicKey), compressed);
+        int[][] q = parseOrThrow(publicKey);
+        return serialize(q[0], q[1], compressed);
     }
 
     /// Adds a tweak to a private key modulo the curve order: the private
@@ -206,15 +213,17 @@ public final class Secp256k1 {
     /// - `CryptoException`: if the key is not on the curve, the tweak is not
     ///   less than `n`, or the result is the point at infinity
     public static byte[] publicKeyTweakAdd(byte[] publicKey, byte[] tweak, boolean compressed) {
-        Pt q = parseOrThrow(publicKey);
+        int[][] q = parseOrThrow(publicKey);
         int[] t = tweakScalar(tweak);
-        Pt tg = mul(G_TABLE, t);
-        Pt sum = new Pt();
-        add(q, tg, sum);
-        if (sum.isInfinity()) {
+        if (isZero(t)) {
+            return serialize(q[0], q[1], compressed);
+        }
+        int[][] tg = mulGen(t);
+        int[][] sum = addPoints(q, tg);
+        if (sum == null) {
             throw new CryptoException("tweak produces the point at infinity");
         }
-        return serialize(sum, compressed);
+        return serialize(sum[0], sum[1], compressed);
     }
 
     /// Adds two public keys as curve points.
@@ -224,12 +233,11 @@ public final class Secp256k1 {
     /// - `CryptoException`: if either key is not on the curve or the sum is
     ///   the point at infinity
     public static byte[] publicKeyAdd(byte[] a, byte[] b, boolean compressed) {
-        Pt sum = new Pt();
-        add(parseOrThrow(a), parseOrThrow(b), sum);
-        if (sum.isInfinity()) {
+        int[][] sum = addPoints(parseOrThrow(a), parseOrThrow(b));
+        if (sum == null) {
             throw new CryptoException("sum is the point at infinity");
         }
-        return serialize(sum, compressed);
+        return serialize(sum[0], sum[1], compressed);
     }
 
     // ----------------------------------------------------------------
@@ -310,27 +318,45 @@ public final class Secp256k1 {
         if (signature == null) {
             throw new CryptoException("signature must not be null");
         }
-        Pt q = parseOrThrow(publicKey);
+        int[][] q = parseOrThrow(publicKey);
         int[] r = toLimbs(signature.r, 0);
         int[] s = toLimbs(signature.s, 0);
         if (!isValidScalar(r) || !isValidScalar(s) || lessThan(N_HALF, s)) {
             return false;
         }
         int[] z = FN.reduce(toLimbs(hash, 0));
-        int[] w = new int[LIMBS];
-        FN.inv(s, w);
+        int[] w = scalarInverse(s);
         int[] u1 = new int[LIMBS];
         int[] u2 = new int[LIMBS];
         FN.mul(z, w, u1);
         FN.mul(r, w, u2);
-        Pt sum = new Pt();
-        add(mul(G_TABLE, u1), mul(table(q), u2), sum);
-        int[] x = new int[LIMBS];
-        int[] y = new int[LIMBS];
-        if (!toAffine(sum, x, y)) {
+        Secp256k1Math.Gej sum = new Secp256k1Math.Gej();
+        doubleMul(sum, q, u2, u1);
+        if (sum.inf) {
             return false;
         }
-        return equal(FN.reduce(x), r);
+        // R.x == r without leaving Jacobian coordinates: x = X / Z^2, so
+        // compare r Z^2 with X, and (r + n) Z^2 when r + n is still below p
+        int[] z2 = new int[10];
+        Secp256k1Math.sqr(z2, sum.z);
+        int[] xr = fieldOf(r);
+        int[] t = new int[10];
+        Secp256k1Math.mul(t, xr, z2);
+        if (Secp256k1Math.equal(t, sum.x)) {
+            return true;
+        }
+        int[] rn = new int[LIMBS];
+        long carry = 0;
+        for (int i = 0; i < LIMBS; i++) {
+            long v = (long) r[i] + FN.m[i] + carry;
+            rn[i] = (int) (v & LIMB_MASK);
+            carry = v >> LIMB_BITS;
+        }
+        if (carry != 0 || !lessThan(rn, P_LIMBS)) {
+            return false;
+        }
+        Secp256k1Math.mul(t, fieldOf(rn), z2);
+        return Secp256k1Math.equal(t, sum.x);
     }
 
     /// Recovers the public key that made a signature, from the signature's
@@ -379,29 +405,30 @@ public final class Secp256k1 {
                 x[i] = (int) (sum & LIMB_MASK);
                 carry = sum >> LIMB_BITS;
             }
-            if (carry != 0 || !lessThan(x, FP.m)) {
+            if (carry != 0 || !lessThan(x, P_LIMBS)) {
                 return null;
             }
         }
-        int[] y = new int[LIMBS];
-        if (!solveY(x, (recId & 1) != 0, y)) {
+        int[] fx = fieldOf(x);
+        int[] fy = Secp256k1Math.liftY(fx, (recId & 1) != 0);
+        if (fy == null) {
             return null;
         }
-        Pt rp = Pt.affine(x, y);
         int[] z = FN.reduce(toLimbs(hash, 0));
-        int[] rInv = new int[LIMBS];
-        FN.inv(r, rInv);
+        int[] rInv = scalarInverse(r);
         int[] u1 = new int[LIMBS];
         int[] u2 = new int[LIMBS];
         FN.mul(z, rInv, u1);
         FN.sub(ZERO, u1, u1);
         FN.mul(s, rInv, u2);
-        Pt q = new Pt();
-        add(mul(G_TABLE, u1), mul(table(rp), u2), q);
-        if (q.isInfinity()) {
+        Secp256k1Math.Gej q = new Secp256k1Math.Gej();
+        doubleMul(q, new int[][] {fx, fy}, u2, u1);
+        int[] qx = new int[10];
+        int[] qy = new int[10];
+        if (!Secp256k1Math.toAffine(new Secp256k1Math.Ctx(), q, qx, qy)) {
             return null;
         }
-        return serialize(q, compressed);
+        return serialize(qx, qy, compressed);
     }
 
     /// An ECDSA signature: `r` and `s` as 32-byte big-endian integers, and
@@ -506,18 +533,15 @@ public final class Secp256k1 {
     // One RFC 6979 candidate. Returns null when r or s came out zero, which
     // the caller answers with the next candidate.
     private static EcdsaSignature signWithNonce(int[] z, int[] d, int[] nonce) {
-        Pt rp = mul(G_TABLE, nonce);
-        int[] rx = new int[LIMBS];
-        int[] ry = new int[LIMBS];
-        if (!toAffine(rp, rx, ry)) {
-            return null;
-        }
+        int[][] rp = mulGen(nonce);
+        byte[] rxBytes = new byte[32];
+        Secp256k1Math.toBytes(rp[0], rxBytes, 0);
+        int[] rx = toLimbs(rxBytes, 0);
         int[] r = FN.reduce(rx);
         if (isZero(r)) {
             return null;
         }
-        int[] kInv = new int[LIMBS];
-        FN.inv(nonce, kInv);
+        int[] kInv = scalarInverse(nonce);
         int[] s = new int[LIMBS];
         FN.mul(r, d, s);
         FN.add(s, z, s);
@@ -526,7 +550,7 @@ public final class Secp256k1 {
         if (isZero(s)) {
             return null;
         }
-        int recId = (ry[0] & 1) | (lessThan(rx, FN.m) ? 0 : 2);
+        int recId = (rp[1][0] & 1) | (lessThan(rx, FN.m) ? 0 : 2);
         if (lessThan(N_HALF, s)) {
             FN.sub(ZERO, s, s);
             recId ^= 1;
@@ -581,54 +605,49 @@ public final class Secp256k1 {
         return t;
     }
 
-    private static Pt parseOrThrow(byte[] publicKey) {
-        Pt p = parse(publicKey);
+    private static int[][] parseOrThrow(byte[] publicKey) {
+        int[][] p = parse(publicKey);
         if (p == null) {
             throw new CryptoException("not a secp256k1 public key");
         }
         return p;
     }
 
-    // null when the bytes are not a point on the curve in either SEC 1 form
-    private static Pt parse(byte[] key) {
+    // {x, y} normalized, or null when the bytes are not a point on the curve
+    // in either SEC 1 form
+    private static int[][] parse(byte[] key) {
         if (key == null) {
             return null;
         }
         if (key.length == COMPRESSED_PUBLIC_KEY_LENGTH && (key[0] == 2 || key[0] == 3)) {
-            int[] x = toLimbs(key, 1);
-            if (!lessThan(x, FP.m)) {
+            if (!Secp256k1Math.isCanonical(key, 1)) {
                 return null;
             }
-            int[] y = new int[LIMBS];
-            if (!solveY(x, key[0] == 3, y)) {
+            int[] x = new int[10];
+            Secp256k1Math.fromBytes(x, key, 1);
+            int[] y = Secp256k1Math.liftY(x, key[0] == 3);
+            if (y == null) {
                 return null;
             }
-            return Pt.affine(x, y);
+            return new int[][] {x, y};
         }
         if (key.length == UNCOMPRESSED_PUBLIC_KEY_LENGTH && key[0] == 4) {
-            int[] x = toLimbs(key, 1);
-            int[] y = toLimbs(key, 33);
-            if (!lessThan(x, FP.m) || !lessThan(y, FP.m)) {
+            if (!Secp256k1Math.isCanonical(key, 1) || !Secp256k1Math.isCanonical(key, 33)) {
                 return null;
             }
-            int[] rhs = new int[LIMBS];
-            curveRhs(x, rhs);
-            int[] lhs = new int[LIMBS];
-            FP.mul(y, y, lhs);
-            if (!equal(lhs, rhs)) {
+            int[] x = new int[10];
+            int[] y = new int[10];
+            Secp256k1Math.fromBytes(x, key, 1);
+            Secp256k1Math.fromBytes(y, key, 33);
+            if (!Secp256k1Math.onCurve(x, y)) {
                 return null;
             }
-            return Pt.affine(x, y);
+            return new int[][] {x, y};
         }
         return null;
     }
 
-    private static byte[] serialize(Pt p, boolean compressed) {
-        int[] x = new int[LIMBS];
-        int[] y = new int[LIMBS];
-        if (!toAffine(p, x, y)) {
-            throw new CryptoException("point at infinity has no encoding");
-        }
+    private static byte[] serialize(int[] x, int[] y, boolean compressed) {
         byte[] out;
         if (compressed) {
             out = new byte[COMPRESSED_PUBLIC_KEY_LENGTH];
@@ -636,37 +655,149 @@ public final class Secp256k1 {
         } else {
             out = new byte[UNCOMPRESSED_PUBLIC_KEY_LENGTH];
             out[0] = 4;
-            toBytes(y, out, 33);
+            Secp256k1Math.toBytes(y, out, 33);
         }
-        toBytes(x, out, 1);
+        Secp256k1Math.toBytes(x, out, 1);
         return out;
     }
 
-    // x^3 + 7
-    private static void curveRhs(int[] x, int[] out) {
-        int[] t = new int[LIMBS];
-        FP.mul(x, x, t);
-        FP.mul(t, x, t);
-        FP.add(t, SEVEN, out);
+    // ----------------------------------------------------------------
+    // bridges to Secp256k1Math
+
+    // k G for 0 < k < n, as normalized {x, y}; constant time
+    private static int[][] mulGen(int[] k) {
+        int[] w = words(k);
+        int[] x = new int[10];
+        int[] y = new int[10];
+        Secp256k1Math.mulGen(w, x, y);
+        wipe(w);
+        return new int[][] {x, y};
     }
 
-    // y with the requested parity such that y^2 == x^3 + 7; false when x is
-    // not the abscissa of a curve point
-    private static boolean solveY(int[] x, boolean odd, int[] yOut) {
-        int[] rhs = new int[LIMBS];
-        curveRhs(x, rhs);
-        int[] y = new int[LIMBS];
-        FP.pow(rhs, SQRT_EXP, y);
-        int[] check = new int[LIMBS];
-        FP.mul(y, y, check);
-        if (!equal(check, rhs)) {
-            return false;
+    // a + b for public points, or null for the point at infinity
+    private static int[][] addPoints(int[][] a, int[][] b) {
+        Secp256k1Math.Ctx c = new Secp256k1Math.Ctx();
+        Secp256k1Math.Gej r = Secp256k1Math.Gej.affine(a[0], a[1]);
+        Secp256k1Math.addGe(c, r, r, b[0], b[1]);
+        int[] x = new int[10];
+        int[] y = new int[10];
+        if (!Secp256k1Math.toAffine(c, r, x, y)) {
+            return null;
         }
-        if (((y[0] & 1) == 1) != odd) {
-            FP.sub(ZERO, y, y);
+        return new int[][] {x, y};
+    }
+
+    // r = u q + v G for public data, splitting both scalars by the curve's
+    // endomorphism so the doubling chain is 129 steps long, not 256
+    private static void doubleMul(Secp256k1Math.Gej r, int[][] q, int[] u, int[] v) {
+        int[][] su = split(u);
+        int[][] sv = split(v);
+        Secp256k1Math.ecmult(r, q[0], q[1], su[0], su[2][0] != 0, su[1], su[2][1] != 0,
+                sv[0], sv[2][0] != 0, sv[1], sv[2][1] != 0);
+    }
+
+    // {k1 words, k2 words, {k1 negative, k2 negative}} with
+    // k == k1 + k2 lambda (mod n) and |k1|, |k2| < 2^128
+    private static int[][] split(int[] k) {
+        int[] c1 = mulShift384(k, GLV_G1);
+        int[] c2 = mulShift384(k, GLV_G2);
+        int[] t1 = new int[LIMBS];
+        int[] t2 = new int[LIMBS];
+        FN.mul(c1, GLV_MINUS_B1, t1);
+        FN.mul(c2, GLV_MINUS_B2, t2);
+        int[] k2 = new int[LIMBS];
+        FN.add(t1, t2, k2);
+        int[] k1 = new int[LIMBS];
+        FN.mul(k2, GLV_MINUS_LAMBDA, k1);
+        FN.add(k1, k, k1);
+        int n1 = 0;
+        int n2 = 0;
+        if (lessThan(N_HALF, k1)) {
+            FN.sub(ZERO, k1, k1);
+            n1 = 1;
         }
-        System.arraycopy(y, 0, yOut, 0, LIMBS);
-        return true;
+        if (lessThan(N_HALF, k2)) {
+            FN.sub(ZERO, k2, k2);
+            n2 = 1;
+        }
+        return new int[][] {words(k1), words(k2), {n1, n2}};
+    }
+
+    // round(a b / 2^384) for 256-bit a and b
+    private static int[] mulShift384(int[] a, int[] b) {
+        long[] c = new long[2 * LIMBS + 1];
+        for (int i = 0; i < LIMBS; i++) {
+            long ai = a[i];
+            for (int j = 0; j < LIMBS; j++) {
+                c[i + j] += ai * b[j];
+            }
+        }
+        for (int i = 0; i < 2 * LIMBS; i++) {
+            c[i + 1] += c[i] >> LIMB_BITS;
+            c[i] &= LIMB_MASK;
+        }
+        int[] out = new int[LIMBS];
+        long carry = (c[23] >> 15) & 1;
+        for (int i = 0; i < 8; i++) {
+            long v = c[24 + i] + carry;
+            out[i] = (int) (v & LIMB_MASK);
+            carry = v >> LIMB_BITS;
+        }
+        out[8] = (int) carry;
+        return out;
+    }
+
+    // 16-bit limbs to eight 32-bit words
+    private static int[] words(int[] limbs) {
+        int[] w = new int[8];
+        for (int i = 0; i < 8; i++) {
+            w[i] = limbs[2 * i] | (limbs[2 * i + 1] << 16);
+        }
+        return w;
+    }
+
+    // a reduced 256-bit value as a field element
+    private static int[] fieldOf(int[] limbs) {
+        byte[] b = new byte[32];
+        toBytes(limbs, b, 0);
+        int[] f = new int[10];
+        Secp256k1Math.fromBytes(f, b, 0);
+        return f;
+    }
+
+    // 1 / s mod n by safegcd; constant time
+    private static int[] scalarInverse(int[] s) {
+        int[] s30 = new int[9];
+        long acc = 0;
+        int bits = 0;
+        int o = 0;
+        for (int i = 0; i < LIMBS; i++) {
+            acc |= ((long) s[i]) << bits;
+            bits += LIMB_BITS;
+            if (bits >= 30) {
+                s30[o++] = (int) (acc & 0x3FFFFFFF);
+                acc >>>= 30;
+                bits -= 30;
+            }
+        }
+        s30[o] = (int) acc;
+        int[] inv = Secp256k1Math.modInverse(s30, Secp256k1Math.N30, Secp256k1Math.N_INV30);
+        int[] out = new int[LIMBS];
+        acc = 0;
+        bits = 0;
+        o = 0;
+        for (int i = 0; i < 9; i++) {
+            acc |= ((long) inv[i]) << bits;
+            bits += 30;
+            while (bits >= LIMB_BITS && o < LIMBS) {
+                out[o++] = (int) (acc & LIMB_MASK);
+                acc >>>= LIMB_BITS;
+                bits -= LIMB_BITS;
+            }
+        }
+        wipe(s30);
+        wipe(inv);
+        return out;
     }
 
     private static void checkLength(byte[] data, int length, String what) {
@@ -703,13 +834,6 @@ public final class Secp256k1 {
         return toLimbs(Hash.fromHex(hex), 0);
     }
 
-    private static int[] small(int v) {
-        int[] out = new int[LIMBS];
-        out[0] = v & LIMB_MASK;
-        out[1] = v >>> LIMB_BITS;
-        return out;
-    }
-
     // 32 big-endian bytes to limbs
     private static int[] toLimbs(byte[] in, int off) {
         int[] out = new int[LIMBS];
@@ -726,28 +850,6 @@ public final class Secp256k1 {
             out[o] = (byte) (a[i] >>> 8);
             out[o + 1] = (byte) a[i];
         }
-    }
-
-    private static int[] addSmall(int[] a, int c) {
-        int[] out = new int[LIMBS];
-        int carry = c;
-        for (int i = 0; i < LIMBS; i++) {
-            int v = a[i] + carry;
-            out[i] = v & LIMB_MASK;
-            carry = v >>> LIMB_BITS;
-        }
-        return out;
-    }
-
-    private static int[] subSmall(int[] a, int c) {
-        int[] out = new int[LIMBS];
-        int borrow = c;
-        for (int i = 0; i < LIMBS; i++) {
-            int v = a[i] - borrow;
-            out[i] = v & LIMB_MASK;
-            borrow = (v >> 31) & 1;
-        }
-        return out;
     }
 
     // a >> bits, for 0 < bits < 16
@@ -801,8 +903,6 @@ public final class Secp256k1 {
         // 2^256 - m, little endian, klen limbs long (3 for p, 9 for n)
         private final int[] k = new int[LIMBS];
         private final int klen;
-        // m - 2, the exponent that inverts by Fermat
-        private final int[] minusTwo;
 
         Modulus(int[] m) {
             this.m = m;
@@ -819,7 +919,6 @@ public final class Secp256k1 {
                 }
             }
             klen = len;
-            minusTwo = subSmall(m, 2);
         }
 
         // out = a * b mod m. out may be a or b.
@@ -865,28 +964,6 @@ public final class Secp256k1 {
                 out[i] = (int) (s & LIMB_MASK);
                 carry = s >> LIMB_BITS;
             }
-        }
-
-        // out = a^(m-2) == 1/a mod m (0 maps to 0). out may be a.
-        void inv(int[] a, int[] out) {
-            pow(a, minusTwo, out);
-        }
-
-        // out = base^exp mod m by square-and-multiply over the bits of exp.
-        // Every exponent used here is a public constant, so the branch on
-        // its bits leaks nothing about base. out may be base.
-        void pow(int[] base, int[] exp, int[] out) {
-            int[] b = new int[LIMBS];
-            System.arraycopy(base, 0, b, 0, LIMBS);
-            int[] r = new int[LIMBS];
-            r[0] = 1;
-            for (int bit = 255; bit >= 0; bit--) {
-                mul(r, r, r);
-                if (((exp[bit >> 4] >> (bit & 15)) & 1) != 0) {
-                    mul(r, b, r);
-                }
-            }
-            System.arraycopy(r, 0, out, 0, LIMBS);
         }
 
         // v mod m for any v < 2^256 (one conditional subtraction, since
@@ -963,157 +1040,5 @@ public final class Secp256k1 {
                 out[i] = (t[i] & mask) | ((int) c[i] & ~mask);
             }
         }
-    }
-
-    // ----------------------------------------------------------------
-    // the curve, in homogeneous projective coordinates (X : Y : Z) with
-    // x = X / Z and y = Y / Z; the point at infinity is (0 : 1 : 0)
-
-    private static final class Pt {
-        final int[] x = new int[LIMBS];
-        final int[] y = new int[LIMBS];
-        final int[] z = new int[LIMBS];
-
-        static Pt infinity() {
-            Pt p = new Pt();
-            p.y[0] = 1;
-            return p;
-        }
-
-        static Pt affine(int[] x, int[] y) {
-            Pt p = new Pt();
-            System.arraycopy(x, 0, p.x, 0, LIMBS);
-            System.arraycopy(y, 0, p.y, 0, LIMBS);
-            p.z[0] = 1;
-            return p;
-        }
-
-        void set(Pt o) {
-            System.arraycopy(o.x, 0, x, 0, LIMBS);
-            System.arraycopy(o.y, 0, y, 0, LIMBS);
-            System.arraycopy(o.z, 0, z, 0, LIMBS);
-        }
-
-        boolean isInfinity() {
-            return isZero(z);
-        }
-    }
-
-    // out = p + q by the complete addition law for y^2 = x^3 + b (Renes,
-    // Costello and Batina, 2016, with a = 0 and b3 = 3b):
-    //
-    //   X3 = (X1 Y2 + X2 Y1)(Y1 Y2 - b3 Z1 Z2) - b3 (Y1 Z2 + Y2 Z1)(X1 Z2 + X2 Z1)
-    //   Y3 = (Y1 Y2 + b3 Z1 Z2)(Y1 Y2 - b3 Z1 Z2) + 3 b3 X1 X2 (X1 Z2 + X2 Z1)
-    //   Z3 = (Y1 Z2 + Y2 Z1)(Y1 Y2 + b3 Z1 Z2) + 3 X1 X2 (X1 Y2 + X2 Y1)
-    //
-    // It is correct for every pair of inputs -- p == q, p == -q, either one
-    // the point at infinity -- so it doubles as the doubling and there is no
-    // branch for the ladder to leak through. A dedicated doubling formula
-    // would save about a third of the multiplications; this keeps one
-    // formula. out may be p or q.
-    private static void add(Pt p, Pt q, Pt out) {
-        int[] t0 = new int[LIMBS];
-        int[] t1 = new int[LIMBS];
-        int[] t2 = new int[LIMBS];
-        int[] t3 = new int[LIMBS];
-        int[] t4 = new int[LIMBS];
-        int[] t5 = new int[LIMBS];
-        int[] t6 = new int[LIMBS];
-        int[] t7 = new int[LIMBS];
-        FP.mul(p.x, q.x, t0);         // X1 X2
-        FP.mul(p.y, q.y, t1);         // Y1 Y2
-        FP.mul(p.z, q.z, t2);         // Z1 Z2
-        FP.add(p.x, p.y, t3);
-        FP.add(q.x, q.y, t4);
-        FP.mul(t3, t4, t3);
-        FP.add(t0, t1, t4);
-        FP.sub(t3, t4, t3);           // X1 Y2 + X2 Y1
-        FP.add(p.y, p.z, t4);
-        FP.add(q.y, q.z, t5);
-        FP.mul(t4, t5, t4);
-        FP.add(t1, t2, t5);
-        FP.sub(t4, t5, t4);           // Y1 Z2 + Y2 Z1
-        FP.add(p.x, p.z, t5);
-        FP.add(q.x, q.z, t6);
-        FP.mul(t5, t6, t5);
-        FP.add(t0, t2, t6);
-        FP.sub(t5, t6, t5);           // X1 Z2 + X2 Z1
-        FP.add(t0, t0, t6);
-        FP.add(t6, t0, t0);           // 3 X1 X2
-        FP.mul(B3, t2, t2);           // b3 Z1 Z2
-        FP.add(t1, t2, t6);           // Y1 Y2 + b3 Z1 Z2
-        FP.sub(t1, t2, t1);           // Y1 Y2 - b3 Z1 Z2
-        FP.mul(B3, t5, t5);           // b3 (X1 Z2 + X2 Z1)
-        FP.mul(t3, t1, t2);
-        FP.mul(t4, t5, t7);
-        FP.sub(t2, t7, out.x);
-        FP.mul(t6, t1, t1);
-        FP.mul(t0, t5, t7);
-        FP.add(t1, t7, out.y);
-        FP.mul(t4, t6, t6);
-        FP.mul(t0, t3, t7);
-        FP.add(t6, t7, out.z);
-    }
-
-    // the multiples 0..15 of p, for mul
-    private static Pt[] table(Pt p) {
-        Pt[] t = new Pt[16];
-        t[0] = Pt.infinity();
-        t[1] = new Pt();
-        t[1].set(p);
-        for (int i = 2; i < t.length; i++) {
-            t[i] = new Pt();
-            add(t[i - 1], p, t[i]);
-        }
-        return t;
-    }
-
-    // scalar * p, where table is table(p) and 0 <= scalar < 2^256, by a
-    // fixed window of four bits: 64 windows, each four doublings and one
-    // addition of the table entry the window selects. The entry is read with
-    // a constant-time scan of the whole table, so neither the sequence of
-    // operations nor the memory addresses touched depend on the scalar.
-    private static Pt mul(Pt[] table, int[] scalar) {
-        Pt r = Pt.infinity();
-        Pt t = new Pt();
-        for (int w = 63; w >= 0; w--) {
-            add(r, r, r);
-            add(r, r, r);
-            add(r, r, r);
-            add(r, r, r);
-            int digit = (scalar[w >> 2] >> ((w & 3) << 2)) & 0xf;
-            select(table, digit, t);
-            add(r, t, r);
-        }
-        return r;
-    }
-
-    // out = table[index] without indexing by index
-    private static void select(Pt[] table, int index, Pt out) {
-        wipe(out.x);
-        wipe(out.y);
-        wipe(out.z);
-        for (int e = 0; e < table.length; e++) {
-            // -1 when e == index, else 0
-            int mask = ((e ^ index) - 1) >> 31;
-            Pt entry = table[e];
-            for (int i = 0; i < LIMBS; i++) {
-                out.x[i] |= entry.x[i] & mask;
-                out.y[i] |= entry.y[i] & mask;
-                out.z[i] |= entry.z[i] & mask;
-            }
-        }
-    }
-
-    // false for the point at infinity
-    private static boolean toAffine(Pt p, int[] xOut, int[] yOut) {
-        if (p.isInfinity()) {
-            return false;
-        }
-        int[] zInv = new int[LIMBS];
-        FP.inv(p.z, zInv);
-        FP.mul(p.x, zInv, xOut);
-        FP.mul(p.y, zInv, yOut);
-        return true;
     }
 }

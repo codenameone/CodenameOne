@@ -762,31 +762,10 @@ abstract class MessageDigestImpl {
             0x8000000080008081L, 0x8000000000008080L, 0x0000000080000001L, 0x8000000080008008L
         };
 
-        // rho rotation offsets, indexed by lane x + 5 * y
-        private static final int[] ROT = {
-            0, 1, 62, 28, 27,
-            36, 44, 6, 55, 20,
-            3, 10, 43, 25, 39,
-            41, 45, 15, 21, 8,
-            18, 2, 61, 56, 14
-        };
-
-        // pi: lane (x, y) moves to (y, 2x + 3y), again indexed by x + 5 * y
-        private static final int[] PI = new int[25];
-
-        static {
-            for (int x = 0; x < 5; x++) {
-                for (int y = 0; y < 5; y++) {
-                    PI[x + 5 * y] = y + 5 * ((2 * x + 3 * y) % 5);
-                }
-            }
-        }
-
         private final int outLen;
         private final int rate;
         private final byte domain;
         private final long[] state = new long[25];
-        private final long[] scratch = new long[25];
         private final byte[] buffer;
         private int bufferLen;
 
@@ -822,6 +801,11 @@ abstract class MessageDigestImpl {
         void update(byte[] data, int offset, int length) {
             int o = offset;
             int remaining = length;
+            while (bufferLen == 0 && remaining >= rate) {
+                absorb(data, o);
+                o += rate;
+                remaining -= rate;
+            }
             while (remaining > 0) {
                 int n = rate - bufferLen;
                 if (n > remaining) {
@@ -857,58 +841,140 @@ abstract class MessageDigestImpl {
         // XORs the full buffer into the state lane by lane (little endian) and
         // runs the permutation.
         private void absorb() {
-            int lanes = rate >> 3;
-            for (int i = 0; i < lanes; i++) {
-                int o = i << 3;
-                long v = 0;
-                for (int b = 7; b >= 0; b--) {
-                    v = (v << 8) | (buffer[o + b] & 0xffL);
-                }
-                state[i] ^= v;
-            }
+            absorb(buffer, 0);
             bufferLen = 0;
+        }
+
+        private void absorb(byte[] src, int off) {
+            int lanes = rate >> 3;
+            long[] st = state;
+            for (int i = 0; i < lanes; i++) {
+                int o = off + (i << 3);
+                st[i] ^= (src[o] & 0xffL) | (src[o + 1] & 0xffL) << 8 | (src[o + 2] & 0xffL) << 16
+                        | (src[o + 3] & 0xffL) << 24 | (src[o + 4] & 0xffL) << 32 | (src[o + 5] & 0xffL) << 40
+                        | (src[o + 6] & 0xffL) << 48 | (long) src[o + 7] << 56;
+            }
             permute();
         }
 
+        // Keccak-f[1600] with the 25 lanes in locals and each round's theta,
+        // rho, pi and chi written out lane by lane: no array traffic and no
+        // index tables inside the 24 rounds.
         private void permute() {
-            long[] a = state;
-            long[] b = scratch;
-            for (int round = 0; round < 24; round++) {
-                // theta
-                long c0 = a[0] ^ a[5] ^ a[10] ^ a[15] ^ a[20];
-                long c1 = a[1] ^ a[6] ^ a[11] ^ a[16] ^ a[21];
-                long c2 = a[2] ^ a[7] ^ a[12] ^ a[17] ^ a[22];
-                long c3 = a[3] ^ a[8] ^ a[13] ^ a[18] ^ a[23];
-                long c4 = a[4] ^ a[9] ^ a[14] ^ a[19] ^ a[24];
-                long d0 = c4 ^ rotl(c1, 1);
-                long d1 = c0 ^ rotl(c2, 1);
-                long d2 = c1 ^ rotl(c3, 1);
-                long d3 = c2 ^ rotl(c4, 1);
-                long d4 = c3 ^ rotl(c0, 1);
-                for (int y = 0; y < 25; y += 5) {
-                    a[y] ^= d0;
-                    a[y + 1] ^= d1;
-                    a[y + 2] ^= d2;
-                    a[y + 3] ^= d3;
-                    a[y + 4] ^= d4;
-                }
-                // rho and pi
-                for (int i = 0; i < 25; i++) {
-                    b[PI[i]] = rotl(a[i], ROT[i]);
-                }
-                // chi
-                for (int y = 0; y < 25; y += 5) {
-                    for (int x = 0; x < 5; x++) {
-                        a[y + x] = b[y + x] ^ (~b[y + (x + 1) % 5] & b[y + (x + 2) % 5]);
-                    }
-                }
-                // iota
-                a[0] ^= RC[round];
-            }
+        long[] st = state;
+        long a0 = st[0], a1 = st[1], a2 = st[2], a3 = st[3], a4 = st[4], a5 = st[5], a6 = st[6], a7 = st[7], a8 = st[8], a9 = st[9], a10 = st[10], a11 = st[11], a12 = st[12], a13 = st[13], a14 = st[14], a15 = st[15], a16 = st[16], a17 = st[17], a18 = st[18], a19 = st[19], a20 = st[20], a21 = st[21], a22 = st[22], a23 = st[23], a24 = st[24];
+        for (int round = 0; round < 24; round++) {
+            long c0 = a0 ^ a5 ^ a10 ^ a15 ^ a20;
+            long c1 = a1 ^ a6 ^ a11 ^ a16 ^ a21;
+            long c2 = a2 ^ a7 ^ a12 ^ a17 ^ a22;
+            long c3 = a3 ^ a8 ^ a13 ^ a18 ^ a23;
+            long c4 = a4 ^ a9 ^ a14 ^ a19 ^ a24;
+            long d0 = c4 ^ ((c1 << 1) | (c1 >>> 63));
+            long d1 = c0 ^ ((c2 << 1) | (c2 >>> 63));
+            long d2 = c1 ^ ((c3 << 1) | (c3 >>> 63));
+            long d3 = c2 ^ ((c4 << 1) | (c4 >>> 63));
+            long d4 = c3 ^ ((c0 << 1) | (c0 >>> 63));
+            long b0 = (a0 ^ d0);
+            long t1 = a1 ^ d1;
+            long b10 = (t1 << 1) | (t1 >>> 63);
+            long t2 = a2 ^ d2;
+            long b20 = (t2 << 62) | (t2 >>> 2);
+            long t3 = a3 ^ d3;
+            long b5 = (t3 << 28) | (t3 >>> 36);
+            long t4 = a4 ^ d4;
+            long b15 = (t4 << 27) | (t4 >>> 37);
+            long t5 = a5 ^ d0;
+            long b16 = (t5 << 36) | (t5 >>> 28);
+            long t6 = a6 ^ d1;
+            long b1 = (t6 << 44) | (t6 >>> 20);
+            long t7 = a7 ^ d2;
+            long b11 = (t7 << 6) | (t7 >>> 58);
+            long t8 = a8 ^ d3;
+            long b21 = (t8 << 55) | (t8 >>> 9);
+            long t9 = a9 ^ d4;
+            long b6 = (t9 << 20) | (t9 >>> 44);
+            long t10 = a10 ^ d0;
+            long b7 = (t10 << 3) | (t10 >>> 61);
+            long t11 = a11 ^ d1;
+            long b17 = (t11 << 10) | (t11 >>> 54);
+            long t12 = a12 ^ d2;
+            long b2 = (t12 << 43) | (t12 >>> 21);
+            long t13 = a13 ^ d3;
+            long b12 = (t13 << 25) | (t13 >>> 39);
+            long t14 = a14 ^ d4;
+            long b22 = (t14 << 39) | (t14 >>> 25);
+            long t15 = a15 ^ d0;
+            long b23 = (t15 << 41) | (t15 >>> 23);
+            long t16 = a16 ^ d1;
+            long b8 = (t16 << 45) | (t16 >>> 19);
+            long t17 = a17 ^ d2;
+            long b18 = (t17 << 15) | (t17 >>> 49);
+            long t18 = a18 ^ d3;
+            long b3 = (t18 << 21) | (t18 >>> 43);
+            long t19 = a19 ^ d4;
+            long b13 = (t19 << 8) | (t19 >>> 56);
+            long t20 = a20 ^ d0;
+            long b14 = (t20 << 18) | (t20 >>> 46);
+            long t21 = a21 ^ d1;
+            long b24 = (t21 << 2) | (t21 >>> 62);
+            long t22 = a22 ^ d2;
+            long b9 = (t22 << 61) | (t22 >>> 3);
+            long t23 = a23 ^ d3;
+            long b19 = (t23 << 56) | (t23 >>> 8);
+            long t24 = a24 ^ d4;
+            long b4 = (t24 << 14) | (t24 >>> 50);
+            a0 = b0 ^ (~b1 & b2);
+            a1 = b1 ^ (~b2 & b3);
+            a2 = b2 ^ (~b3 & b4);
+            a3 = b3 ^ (~b4 & b0);
+            a4 = b4 ^ (~b0 & b1);
+            a5 = b5 ^ (~b6 & b7);
+            a6 = b6 ^ (~b7 & b8);
+            a7 = b7 ^ (~b8 & b9);
+            a8 = b8 ^ (~b9 & b5);
+            a9 = b9 ^ (~b5 & b6);
+            a10 = b10 ^ (~b11 & b12);
+            a11 = b11 ^ (~b12 & b13);
+            a12 = b12 ^ (~b13 & b14);
+            a13 = b13 ^ (~b14 & b10);
+            a14 = b14 ^ (~b10 & b11);
+            a15 = b15 ^ (~b16 & b17);
+            a16 = b16 ^ (~b17 & b18);
+            a17 = b17 ^ (~b18 & b19);
+            a18 = b18 ^ (~b19 & b15);
+            a19 = b19 ^ (~b15 & b16);
+            a20 = b20 ^ (~b21 & b22);
+            a21 = b21 ^ (~b22 & b23);
+            a22 = b22 ^ (~b23 & b24);
+            a23 = b23 ^ (~b24 & b20);
+            a24 = b24 ^ (~b20 & b21);
+            a0 ^= RC[round];
         }
-
-        private static long rotl(long v, int s) {
-            return s == 0 ? v : (v << s) | (v >>> (64 - s));
+        st[0] = a0;
+        st[1] = a1;
+        st[2] = a2;
+        st[3] = a3;
+        st[4] = a4;
+        st[5] = a5;
+        st[6] = a6;
+        st[7] = a7;
+        st[8] = a8;
+        st[9] = a9;
+        st[10] = a10;
+        st[11] = a11;
+        st[12] = a12;
+        st[13] = a13;
+        st[14] = a14;
+        st[15] = a15;
+        st[16] = a16;
+        st[17] = a17;
+        st[18] = a18;
+        st[19] = a19;
+        st[20] = a20;
+        st[21] = a21;
+        st[22] = a22;
+        st[23] = a23;
+        st[24] = a24;
         }
     }
 
