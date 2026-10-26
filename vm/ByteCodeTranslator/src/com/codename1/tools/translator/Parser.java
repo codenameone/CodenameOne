@@ -1672,6 +1672,7 @@ public class Parser extends ClassVisitor {
                 verifyNativeMethods(handWrittenNativeSources);
 
                 generateClassAndMethodIndexHeader(outputDirectory);
+                RuntimeLowering.pruneCulledSynthetics(outputDirectory);
 
                 boolean concatenate = "true".equals(Util.getProperty("concatenateFiles", "false"));
                 ConcatenatingFileOutputStream cos = concatenate ? new ConcatenatingFileOutputStream(outputDirectory) : null;
