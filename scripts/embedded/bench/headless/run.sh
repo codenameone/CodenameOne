@@ -82,8 +82,13 @@ run_one() {
     sleep 2
     pids=$(tree $pid)
     idle=$(memory $pids)
-    # Huge pages explain a footprint that differs between hosts; print them beside it.
-    echo "# $name $mode thp=$(cat /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null) anon_huge_kb=$(awk '/AnonHugePages/{s+=$2} END{print s+0}' /proc/$pid/smaps_rollup 2>/dev/null)" >&2
+    # Where the idle footprint lives, largest mappings first, so a footprint that
+    # differs between hosts can be traced to a region (heap, stacks, libc, binary).
+    if [ "$name" = codenameone ]; then
+        awk '/^[0-9a-f]+-[0-9a-f]+ /{m=$6; if(m=="") m="[anon " $1 "]"} /^Pss:/{p[m]+=$2} END{for(k in p) if(p[k]>=64) print p[k], k}' /proc/$pid/smaps 2>/dev/null \
+            | sort -rn | head -12 | sed "s/^/# $mode smaps_kb /" >&2
+        echo "# $mode threads=$(ls /proc/$pid/task 2>/dev/null | wc -l)" >&2
+    fi
     fp=$(footprint $pids)
 
     c0=$(cpu_ticks $(tree $pid))

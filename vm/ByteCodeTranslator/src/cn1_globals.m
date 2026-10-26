@@ -3171,14 +3171,7 @@ static void* cn1BlockOsAlloc(size_t bytes) {
     return cn1BlockWinMap(bytes);
 #else
     void* mem = mmap(NULL, bytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
-    if(mem == MAP_FAILED) {
-        return NULL;
-    }
-#if defined(__linux__) && defined(MADV_NOHUGEPAGE)
-    // As for the heap window: a block is touched as it is used, not all at once.
-    madvise(mem, bytes, MADV_NOHUGEPAGE);
-#endif
-    return mem;
+    return mem == MAP_FAILED ? NULL : mem;
 #endif
 }
 
@@ -9454,13 +9447,6 @@ static void* cn1HeapWindowCarve(size_t sz) {
             if(raw == MAP_FAILED) {
                 continue;
             }
-#if defined(__linux__) && defined(MADV_NOHUGEPAGE)
-            // The window is sparse: a few 64KB pages touched far apart. With
-            // transparent huge pages set to "always", each first touch in a 2MB
-            // span faults in the whole 2MB, which inflated the backend's idle
-            // footprint by about 4MB on CI. Opt the window out.
-            madvise(raw, (size_t)want + slack, MADV_NOHUGEPAGE);
-#endif
             // 64KB alignment is not optional: the page resolve masks an object
             // address down to its page, so a misaligned window would hand back
             // pages whose header is not where the mask says it is.
