@@ -621,26 +621,104 @@ public class IOSAppExtensionSigningPreflightTest {
     }
 
     @Test
-    public void theSurfacesScanReadsTheStagedClasses() throws Exception {
+    public void theSurfacesScanCountsClassReferencesOnly() throws Exception {
+        // A CONSTANT_Class naming the package: the app uses it.
+        assertTrue(IOSProvisioningPreflight.classReferencesSurfaces(
+                classFile(7, "com/codename1/surfaces/ExternalSurfaces")));
+        // A field or method descriptor naming it (NameAndType's descriptor).
+        assertTrue(IOSProvisioningPreflight.classReferencesSurfaces(
+                classFile(12, "(Lcom/codename1/surfaces/SurfaceKind;)V")));
+        // A descriptor of the class's OWN method, named from method_info rather than from the
+        // pool: implementing a getter that returns a surfaces type is a use.
+        assertTrue(IOSProvisioningPreflight.classReferencesSurfaces(
+                classFile(1, "()Lcom/codename1/surfaces/spi/SurfaceBridge;")));
+        // An array class.
+        assertTrue(IOSProvisioningPreflight.classReferencesSurfaces(
+                classFile(7, "[Lcom/codename1/surfaces/SurfaceKind;")));
+        // A string literal that only spells the package is not a use, and a false match here
+        // would refuse a build that does not generate the extension at all.
+        assertFalse(IOSProvisioningPreflight.classReferencesSurfaces(
+                classFile(8, "com/codename1/surfaces/ExternalSurfaces")));
+        assertFalse(IOSProvisioningPreflight.classReferencesSurfaces(
+                classFile(7, "com/example/app/Main")));
+        // Malformed input answers false rather than throwing.
+        assertFalse(IOSProvisioningPreflight.classReferencesSurfaces(new byte[] {1, 2, 3}));
+        byte[] truncated = classFile(7, "com/codename1/surfaces/ExternalSurfaces");
+        byte[] cut = new byte[truncated.length - 20];
+        System.arraycopy(truncated, 0, cut, 0, cut.length);
+        assertFalse(IOSProvisioningPreflight.classReferencesSurfaces(cut));
+    }
+
+    @Test
+    public void theSurfacesScanReadsTheStagedJar() throws Exception {
         File uses = tmp.newFile("uses.jar");
         writeJar(uses, "com/example/app/Main.class",
-                "....Lcom/codename1/surfaces/ExternalSurfaces;....");
+                classFile(7, "com/codename1/surfaces/ExternalSurfaces"));
         assertTrue(IOSProvisioningPreflight.referencesSurfaces(uses));
 
-        // A bundled copy of the package itself is not a use of it.
-        File bundled = tmp.newFile("bundled.jar");
-        writeJar(bundled, "com/codename1/surfaces/ExternalSurfaces.class",
-                "com/codename1/surfaces/SurfaceKind");
-        assertFalse(IOSProvisioningPreflight.referencesSurfaces(bundled));
+        File not = tmp.newFile("not.jar");
+        writeJar(not, "com/example/app/Main.class",
+                classFile(8, "com/codename1/surfaces/ExternalSurfaces"));
+        assertFalse(IOSProvisioningPreflight.referencesSurfaces(not));
 
+        File corrupt = tmp.newFile("corrupt.jar");
+        write(corrupt, "not a zip");
+        assertFalse(IOSProvisioningPreflight.referencesSurfaces(corrupt));
         assertFalse(IOSProvisioningPreflight.referencesSurfaces(new File(tmp.getRoot(), "none.jar")));
     }
 
-    private static void writeJar(File jar, String entry, String contents) throws Exception {
+    @Test
+    public void aWidgetProfileForAnotherAppIdIsRefused() throws Exception {
+        // Most plausibly the app's own profile configured for the extension by mistake.
+        File app = profile("PROD", "ABCD1234.com.example.app", GROUP);
+        Properties p = settings(app);
+        p.setProperty("codename1.ios.appext.CN1Widgets.provision", app.getAbsolutePath());
+        List<IOSProvisioningPreflight.Problem> problems = checkWidgets(p, true);
+        assertEquals(1, problems.size());
+        assertTrue(problems.get(0).fatal);
+        assertTrue(problems.get(0).message,
+                problems.get(0).message.contains("com.example.app.CN1Widgets"));
+    }
+
+    /// A minimal class file whose constant pool holds one UTF-8 entry and one entry of `tag`
+    /// pointing at it (1: none): 7 CONSTANT_Class, 8 CONSTANT_String, 12 NameAndType (as its descriptor).
+    private static byte[] classFile(int tag, String utf8) throws Exception {
+        java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+        java.io.DataOutputStream out = new java.io.DataOutputStream(bytes);
+        out.writeInt(0xCAFEBABE);
+        out.writeShort(0);
+        out.writeShort(52);
+        out.writeShort(tag == 12 ? 4 : tag == 1 ? 2 : 3);
+        out.writeByte(1);
+        out.writeUTF(utf8);
+        if (tag == 1) {
+            // Only the UTF-8 entry, as a member descriptor sits in the pool.
+        } else if (tag == 12) {
+            out.writeByte(1);
+            out.writeUTF("run");
+            out.writeByte(12);
+            out.writeShort(2);
+            out.writeShort(1);
+        } else {
+            out.writeByte(tag);
+            out.writeShort(1);
+        }
+        out.writeShort(0x21);
+        out.writeShort(0);
+        out.writeShort(0);
+        out.writeShort(0);
+        out.writeShort(0);
+        out.writeShort(0);
+        out.writeShort(0);
+        out.flush();
+        return bytes.toByteArray();
+    }
+
+    private static void writeJar(File jar, String entry, byte[] contents) throws Exception {
         ZipOutputStream zip = new ZipOutputStream(new FileOutputStream(jar));
         try {
             zip.putNextEntry(new ZipEntry(entry));
-            zip.write(contents.getBytes("UTF-8"));
+            zip.write(contents);
             zip.closeEntry();
         } finally {
             zip.close();

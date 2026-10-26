@@ -494,6 +494,21 @@ final class IOSProvisioningPreflight {
         }
         String name = "CN1Widgets";
         if (hasOwnProfileSetting(settings, name, release)) {
+            // Only a profile given as a local PATH can be read; a hosted URL or base64 blob is
+            // judged by the server. The App Group is not checked here: it comes from
+            // surfaces.json, which is a resource of the app rather than a setting.
+            Profile ext = extensionProfileFromPath(settings, name, release);
+            String bundleId = generatedExtensionBundleId(settings, "ios.surfaces", packageName,
+                    name);
+            if (ext != null && ext.applicationIdentifier != null
+                    && !profileCoversBundleId(ext.applicationIdentifier, bundleId)) {
+                problems.add(new Problem("The provisioning profile configured for the " + name
+                        + " extension (\"" + ext.name + "\", App ID "
+                        + appIdPattern(ext.applicationIdentifier) + ") cannot sign its bundle ID \""
+                        + bundleId + "\". Generate a profile for the App ID " + bundleId
+                        + " (with App Groups) and configure that one instead; the Certificate "
+                        + "Wizard does this for you.", true));
+            }
             return problems;
         }
         Profile appProfile = appProfile(settings, release);
@@ -523,27 +538,58 @@ final class IOSProvisioningPreflight {
         return problems;
     }
 
-    /// Whether any class in `jar` outside the surfaces package itself names
-    /// `com/codename1/surfaces/` -- the signal IPhoneBuilder sets `usesSurfaces` from. The staged
-    /// jar carries the app and its cn1libs but not the core, so the package's own classes are only
-    /// there when a library bundles them, and those are skipped. A jar that cannot be read answers
-    /// false: this is a preflight, and an IO error is not a signing problem.
+    /// The extension profile configured for this build type as a local path, or null when there
+    /// is none or it cannot be read.
+    private static Profile extensionProfileFromPath(Properties settings, String name,
+            boolean release) {
+        String qualifier = release ? "release" : "debug";
+        String[] keys = {
+            "codename1.ios." + qualifier + ".appext." + name + ".provision",
+            "codename1.ios.appext." + name + ".provision"
+        };
+        for (String key : keys) {
+            String value = trimmed(settings.getProperty(key));
+            if (value == null || value.isEmpty()) {
+                continue;
+            }
+            String resolved = resolvePlaceholders(value, settings);
+            File file = new File(resolved);
+            if (resolved.indexOf("${") >= 0 || !file.isFile()) {
+                return null;
+            }
+            try {
+                return parse(readFile(file));
+            } catch (Exception ex) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    /// Whether any class in `jar` REFERENCES a type in `com.codename1.surfaces` -- the signal
+    /// IPhoneBuilder sets `usesSurfaces` from, which is its class-reference callback. So this reads
+    /// the constant pool and counts only CONSTANT_Class names and descriptors (including those of
+    /// the class's own fields and methods), never a string literal that merely spells the package: a false match here is
+    /// a fatal refusal. The staged jar carries the app and its cn1libs but not the core.
+    ///
+    /// A missing surfaces.json is deliberately not reported here: the builder refuses that with
+    /// its own message, and this check cannot read the app's resources.
+    ///
+    /// A jar or class that cannot be read answers false: this is a preflight, and the server
+    /// refuses the same build before Xcode runs, so a miss costs a late failure, never a wrong one.
     static boolean referencesSurfaces(File jar) {
         if (jar == null || !jar.isFile()) {
             return false;
         }
-        byte[] needle = "com/codename1/surfaces/".getBytes(StandardCharsets.US_ASCII);
         try (ZipFile zip = new ZipFile(jar)) {
             Enumeration<? extends ZipEntry> entries = zip.entries();
             while (entries.hasMoreElements()) {
                 ZipEntry entry = entries.nextElement();
-                String entryName = entry.getName();
-                if (entry.isDirectory() || !entryName.endsWith(".class")
-                        || entryName.startsWith("com/codename1/surfaces/")) {
+                if (entry.isDirectory() || !entry.getName().endsWith(".class")) {
                     continue;
                 }
                 try (InputStream in = zip.getInputStream(entry)) {
-                    if (indexOf(readAll(in), needle, 0) >= 0) {
+                    if (classReferencesSurfaces(readAll(in))) {
                         return true;
                     }
                 }
@@ -552,6 +598,81 @@ final class IOSProvisioningPreflight {
             return false;
         }
         return false;
+    }
+
+    private static final String SURFACES_PACKAGE = "com/codename1/surfaces/";
+
+    /// Walks one class file's constant pool. Malformed input answers false.
+    static boolean classReferencesSurfaces(byte[] b) {
+        try {
+            if (b.length < 10 || (b[0] & 0xff) != 0xCA || (b[1] & 0xff) != 0xFE) {
+                return false;
+            }
+            int count = u2(b, 8);
+            String[] utf8 = new String[count];
+            int[] classIdx = new int[count];
+            boolean[] literal = new boolean[count];
+            int nClass = 0;
+            int p = 10;
+            for (int i = 1; i < count; i++) {
+                int tag = b[p] & 0xff;
+                switch (tag) {
+                    case 1: {
+                        int len = u2(b, p + 1);
+                        utf8[i] = new String(b, p + 3, len, StandardCharsets.UTF_8);
+                        p += 3 + len;
+                        break;
+                    }
+                    case 7:
+                        classIdx[nClass++] = u2(b, p + 1);
+                        p += 3;
+                        break;
+                    case 8:
+                        literal[u2(b, p + 1)] = true;
+                        p += 3;
+                        break;
+                    case 16: case 19: case 20:
+                        p += 3;
+                        break;
+                    case 15:
+                        p += 4;
+                        break;
+                    case 3: case 4: case 9: case 10: case 11: case 12: case 17: case 18:
+                        p += 5;
+                        break;
+                    case 5: case 6:
+                        p += 9;
+                        i++;
+                        break;
+                    default:
+                        return false;
+                }
+            }
+            for (int i = 0; i < nClass; i++) {
+                String name = utf8[classIdx[i]];
+                // An array class is spelled as a descriptor, "[Lcom/...;".
+                if (name != null && (name.startsWith(SURFACES_PACKAGE)
+                        || name.indexOf("L" + SURFACES_PACKAGE) >= 0)) {
+                    return true;
+                }
+            }
+            // Every descriptor -- of a referenced member, and of this class's own fields and
+            // methods, whose descriptors sit in the pool but are named from field_info and
+            // method_info rather than from a pool entry -- is a UTF-8 entry no string literal
+            // points at. A literal that happens to be shaped like a descriptor is skipped too.
+            for (int i = 1; i < count; i++) {
+                if (utf8[i] != null && !literal[i] && utf8[i].indexOf("L" + SURFACES_PACKAGE) >= 0) {
+                    return true;
+                }
+            }
+            return false;
+        } catch (RuntimeException ex) {
+            return false;
+        }
+    }
+
+    private static int u2(byte[] b, int p) {
+        return ((b[p] & 0xff) << 8) | (b[p + 1] & 0xff);
     }
 
     private static List<Problem> checkDocumentProvider(Properties settings, boolean release) {
