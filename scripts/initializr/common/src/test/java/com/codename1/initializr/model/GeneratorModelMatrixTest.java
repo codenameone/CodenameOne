@@ -446,7 +446,12 @@ public class GeneratorModelMatrixTest extends AbstractTest {
             assertContains(settings, "codename1.arg.android.playIntegrity=true", label + "the template's Android hint");
         } else {
             assertContains(settings, "codename1.arg.android.xapplication_attr=", label + "the template's Android hint");
-            if (!game) {
+            if (video) {
+                // Streaming asks for no location; a creator picks videos and posters
+                // from the library.
+                assertContains(settings, "codename1.arg.ios.NSPhotoLibraryUsageDescription=",
+                        label + "the template's iOS photo library prompt");
+            } else if (!game) {
                 assertContains(settings, "codename1.arg.ios.NSLocationWhenInUseUsageDescription=",
                         label + "the template's iOS location prompt");
             }
