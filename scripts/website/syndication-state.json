@@ -2990,6 +2990,27 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-10-25T01:01:05+00:00"
+      },
+      "devto": {
+        "id": 4916759,
+        "url": "https://dev.to/codenameone/thymeleaf-spring-mvc-and-htmx-for-native-java-backends-3kma",
+        "syndicated_at": "2026-10-25T17:22:45+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/@Codename_One/thymeleaf-spring-mvc-and-htmx-for-native-java-backends-4bd026ed1b8a?postPublishedType=initial",
+        "syndicated_at": "2026-10-25T18:02:24+00:00"
+      }
+    },
+    "headless-css-builds": {
+      "hashnode": {
+        "url": "https://debugagent.com/build-your-app-theme-without-a-display-server",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6adea61db9713d2de3ba4be7",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-10-26T01:01:08+00:00"
       }
     }
   }

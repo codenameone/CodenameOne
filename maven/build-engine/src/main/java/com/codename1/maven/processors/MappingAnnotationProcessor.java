@@ -79,6 +79,11 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
     public static final String XML_ELEMENT_DESC = "Lcom/codename1/annotations/XmlElement;";
     public static final String XML_ATTRIBUTE_DESC = "Lcom/codename1/annotations/XmlAttribute;";
     public static final String XML_TRANSIENT_DESC = "Lcom/codename1/annotations/XmlTransient;";
+    public static final String JSON_CREATOR_DESC = "Lcom/codename1/annotations/JsonCreator;";
+    public static final String JSON_STRICT_DESC = "Lcom/codename1/annotations/JsonStrict;";
+    public static final String JSON_OMIT_NULL_DESC = "Lcom/codename1/annotations/JsonOmitNull;";
+    public static final String JSON_FORMAT_DESC = "Lcom/codename1/annotations/JsonFormat;";
+    public static final String JSON_ADAPTER_DESC = "Lcom/codename1/annotations/JsonAdapter;";
 
     static final String BOOTSTRAP_BINARY = "cn1app.MapperBootstrap";
     static final String BOOTSTRAP_SIMPLE = "MapperBootstrap";
@@ -125,9 +130,25 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
                     + cls.getBinaryName() + " is abstract or an interface");
             return;
         }
-        if (!isRecord && !hasPublicNoArgConstructor(cls)) {
+        MethodInfo creator = null;
+        for (MethodInfo m : cls.getMethods()) {
+            if (m.getAnnotation(JSON_CREATOR_DESC) == null) continue;
+            if (creator != null) {
+                ctx.error(cls, "@Mapped class " + cls.getBinaryName()
+                        + " declares more than one @JsonCreator (" + creator.getName()
+                        + " and " + m.getName() + "); keep exactly one");
+                return;
+            }
+            creator = m;
+        }
+        if (creator != null && isRecord) {
+            ctx.error(cls, "@JsonCreator on record " + cls.getBinaryName()
+                    + " is not supported; a record is read through its canonical constructor");
+            return;
+        }
+        if (!isRecord && creator == null && !hasPublicNoArgConstructor(cls)) {
             ctx.error(cls, "@Mapped class " + cls.getBinaryName()
-                    + " must declare a public no-arg constructor for fromJson / fromXml");
+                    + " must declare a public no-arg constructor (or a @JsonCreator) for fromJson / fromXml");
             return;
         }
 
@@ -140,6 +161,14 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
                 ? mc.mapperSimpleName
                 : mc.packageName + "." + mc.mapperSimpleName;
         mc.isRecord = isRecord;
+        mc.strict = cls.getClassAnnotation(JSON_STRICT_DESC) != null;
+        boolean classOmitNull = cls.getClassAnnotation(JSON_OMIT_NULL_DESC) != null;
+        mc.typeParams = classTypeParams(cls.getSignature());
+        String selfAdapter = adapterOf(cls.getClassAnnotation(JSON_ADAPTER_DESC));
+        if (selfAdapter != null) {
+            if (!validAdapter(cls, mc.binaryName, null, selfAdapter, ctx)) return;
+            mc.classAdapter = selfAdapter;
+        }
 
         AnnotationValues xmlRoot = cls.getClassAnnotation(XML_ROOT_DESC);
         if (xmlRoot != null) {
@@ -174,7 +203,10 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
                 boolean needsSetter = !(probeKind.kind == PropertyTypeKind.Kind.PROPERTY
                         || probeKind.kind == PropertyTypeKind.Kind.LIST_PROPERTY);
                 String setter = needsSetter ? findSetter(cls, f) : null;
-                if (needsSetter && setter == null) {
+                // A @JsonCreator class sets what it needs through the creator, so a
+                // getter alone is enough: the field is written, and read only if the
+                // creator takes it.
+                if (needsSetter && setter == null && creator == null) {
                     ctx.getLog().debug("cn1: @Mapped skipping private field "
                             + f.getName() + " on " + cls.getBinaryName()
                             + " (no matching getter/setter)");
@@ -186,6 +218,7 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
             }
             MappedField mf = new MappedField();
             mf.name = f.getName();
+            mf.helper = mf.name;
             mf.kind = PropertyTypeKind.of(f);
             // The base classifier never reflects, so an enum-typed field
             // arrives here as REFERENCE (and a List<Enum> as a LIST whose
@@ -201,6 +234,34 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
             mf.useAccessor = useAccessor;
             mf.getterName = getterName;
             mf.setterName = setterName;
+            mf.descriptor = f.getDescriptor();
+            if (creator != null && ((useAccessor && setterName == null
+                    && mf.kind.kind != PropertyTypeKind.Kind.PROPERTY
+                    && mf.kind.kind != PropertyTypeKind.Kind.LIST_PROPERTY)
+                    || (!useAccessor && f.isFinal()))) {
+                mf.readOnly = true;
+            }
+            String desc = f.getDescriptor();
+            if (desc.startsWith("[") && !"[B".equals(desc)) {
+                if (desc.startsWith("[[")) {
+                    ctx.error(cls, "@Mapped field " + mf.name + " on " + mc.binaryName
+                            + " is a multi-dimensional array (" + desc
+                            + "); only one-dimensional arrays map to JSON");
+                    continue;
+                }
+                PropertyTypeKind ek = kindForDescriptor(desc.substring(1), ctx);
+                if (ek.kind == PropertyTypeKind.Kind.UNSUPPORTED
+                        || ek.kind == PropertyTypeKind.Kind.BYTE_ARRAY) {
+                    ctx.error(cls, "@Mapped field " + mf.name + " on " + mc.binaryName
+                            + " is an array of an unsupported element type (" + desc + ")");
+                    continue;
+                }
+                mf.kind = ek;
+                mf.isArray = true;
+            }
+            if (f.getSignature() != null) {
+                mf.typeRef = parseTypeSignature(f.getSignature());
+            }
             if (isRecord) {
                 if (mf.kind.kind == PropertyTypeKind.Kind.PROPERTY
                         || mf.kind.kind == PropertyTypeKind.Kind.LIST_PROPERTY) {
@@ -220,10 +281,21 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
             if (jp != null) {
                 String v = jp.getString("value");
                 if (v != null && v.length() > 0) mf.jsonName = v;
+                mf.aliases = stringList(jp.get("aliases"));
+                mf.required = jp.getBoolOrDefault("required", false);
             }
             if (f.getAnnotation(JSON_IGNORE_DESC) != null) {
                 mf.includeInJson = false;
             }
+            mf.omitNull = classOmitNull || f.getAnnotation(JSON_OMIT_NULL_DESC) != null;
+            if (mf.isArray && mf.includeInXml) {
+                // The XML form has no representation of an array yet; the field is
+                // JSON only rather than written as something unreadable.
+                ctx.getLog().warn("cn1: @Mapped array field " + mf.name + " on "
+                        + mc.binaryName + " is mapped to JSON only, not XML");
+                mf.includeInXml = false;
+            }
+            if (!checkJsonOptions(cls, mc, mf, f, ctx)) continue;
             AnnotationValues xe = f.getAnnotation(XML_ELEMENT_DESC);
             if (xe != null) {
                 String v = xe.getString("value");
@@ -251,11 +323,18 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
             mc.fields.add(mf);
         }
 
+        if (creator != null && !bindCreator(cls, mc, creator, ctx)) return;
         accepted.put(mc.binaryName, mc);
     }
 
     @Override
     public void finish(ProcessorContext ctx) throws ProcessingException {
+        for (MappedClass mc : accepted.values()) {
+            mc.specs.clear();
+        }
+        for (MappedClass mc : accepted.values()) {
+            assignSpecs(mc, mc, ctx, 0);
+        }
         if (ctx.hasErrors()) return;
         if (accepted.isEmpty()) return;
 
@@ -310,6 +389,9 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
 
     private static String writeStmt(MappedField f, boolean isRecord, String rhsExpr) {
         if (isRecord) return recordLocal(f) + " = " + rhsExpr + ";";
+        // `_p_`, not `_`: a creator parameter called `v` would otherwise be the
+        // `_v` every read already declares.
+        if (f.viaLocal) return "_p_" + f.name + " = " + rhsExpr + ";";
         if (f.useAccessor) return "o." + f.setterName + "(" + rhsExpr + ");";
         return "o." + f.name + " = " + rhsExpr + ";";
     }
@@ -332,6 +414,7 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
     /// the field's value (records-only: the locals are later fed to the
     /// canonical constructor in declaration order).
     private static String fieldType(MappedField f) {
+        if (f.isArray) return descriptorToJava(f.descriptor);
         switch (f.kind.kind) {
             case STRING:     return "String";
             case INT:        return "int";
@@ -367,7 +450,7 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
         sb.append("@SuppressWarnings({\"all\"})\n");
         sb.append("public final class ").append(mc.mapperSimpleName)
                 .append(" implements com.codename1.mapping.Mapper<").append(mc.binaryName).append(">");
-        boolean direct = canWriteDirectly(mc);
+        boolean direct = mc.classAdapter != null || canWriteDirectly(mc);
         if (direct) {
             sb.append(", com.codename1.mapping.Mapper.Direct<").append(mc.binaryName).append(">");
         }
@@ -396,16 +479,29 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
 
         boolean isRecord = mc.isRecord;
 
+        // One instance per adapter class, called directly: no reflection, and
+        // a direct reference keeps the adapter alive through ParparVM and R8.
+        java.util.TreeSet<String> adapters = new java.util.TreeSet<String>();
+        collectAdapters(mc, adapters);
+        for (MappedClass sp : mc.specs) collectAdapters(sp, adapters);
+        for (String a : adapters) {
+            sb.append("    private static final ").append(a).append(' ').append(adapterConst(a))
+              .append(" = new ").append(a).append("();\n\n");
+        }
+
         // toMap() -- reads are identical in shape regardless of record-ness;
         // `readExpr` picks between `o.name` (POJO) and `o.name()` (record).
         sb.append("    public java.util.Map<String, Object> toMap(").append(mc.binaryName).append(" o) {\n");
-        sb.append("        java.util.LinkedHashMap<String, Object> m = new java.util.LinkedHashMap<String, Object>();\n");
-        sb.append("        if (o == null) return m;\n");
-        for (MappedField f : mc.fields) {
-            if (!f.includeInJson) continue;
-            emitFieldToMap(sb, f, isRecord);
+        if (mc.classAdapter != null) {
+            sb.append("        if (o == null) return new java.util.LinkedHashMap<String, Object>();\n");
+            sb.append("        Object _t = ").append(adapterConst(mc.classAdapter)).append(".toJson(o);\n");
+            sb.append("        if (_t instanceof java.util.Map) return (java.util.Map<String, Object>) _t;\n");
+            sb.append("        throw new IllegalStateException(\"@JsonAdapter ").append(escape(mc.classAdapter))
+              .append(" writes ").append(escape(mc.binaryName))
+              .append(" as a JSON value that is not an object; serialise it with Mappers.toJson\");\n");
+        } else {
+            emitToMapBody(sb, mc);
         }
-        sb.append("        return m;\n");
         sb.append("    }\n\n");
 
         // toJson() -- the same properties, appended in order instead of going
@@ -417,53 +513,62 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
             sb.append("    public void toJson(").append(mc.binaryName)
               .append(" o, StringBuilder out) {\n");
             sb.append("        if (o == null) { out.append(\"null\"); return; }\n");
-            sb.append("        out.append('{');\n");
-            boolean firstProp = true;
-            for (MappedField f : mc.fields) {
-                if (!f.includeInJson) continue;
-                // jsonEscape THEN escape: the inner one makes the key valid JSON, the
-                // outer one makes it a valid Java literal. escape() alone only did the
-                // second, so a @JsonProperty containing a quote compiled fine and then
-                // emitted "a"b" -- unparseable, where the map path escapes it properly
-                // because JSONWriter writes the key through writeString.
-                sb.append("        out.append(\"").append(firstProp ? "" : ",")
-                  .append("\\\"").append(escape(jsonEscape(f.jsonName))).append("\\\":\");\n");
-                emitFieldToJson(sb, f, isRecord);
-                firstProp = false;
+            if (mc.classAdapter != null) {
+                sb.append("        com.codename1.mapping.Mappers.appendJsonRaw(out, ")
+                  .append(adapterConst(mc.classAdapter)).append(".toJson(o));\n");
+            } else {
+                // A property that may be left out (@JsonOmitNull) makes the comma a
+                // run-time decision; without one, the separators stay literals and
+                // the output is exactly what it always was.
+                boolean runtimeComma = false;
+                for (MappedField f : mc.fields) {
+                    if (f.includeInJson && f.omitNull
+                            && (isSpecial(f) || omitCond(f, isRecord) != null)) {
+                        runtimeComma = true;
+                    }
+                }
+                if (runtimeComma) sb.append("        boolean _first = true;\n");
+                sb.append("        out.append('{');\n");
+                boolean firstProp = true;
+                for (MappedField f : mc.fields) {
+                    if (!f.includeInJson) continue;
+                    emitDirectProperty(sb, f, isRecord, firstProp, runtimeComma);
+                    firstProp = false;
+                }
+                sb.append("        out.append('}');\n");
             }
-            sb.append("        out.append('}');\n");
             sb.append("    }\n\n");
         }
 
         // fromMap() -- POJO mutates an instance in-place; record accumulates
-        // per-component locals and feeds them to the canonical constructor.
+        // per-component locals and feeds them to the canonical constructor;
+        // a @JsonCreator class collects its parameters the same way.
         sb.append("    public ").append(mc.binaryName)
                 .append(" fromMap(java.util.Map<String, Object> m) {\n");
-        if (isRecord) {
-            for (MappedField f : mc.fields) {
-                sb.append("        ").append(fieldType(f)).append(" ")
-                        .append(recordLocal(f)).append(" = ").append(defaultLiteral(f.kind)).append(";\n");
-            }
-            sb.append("        if (m == null) return ");
-            appendRecordCtorCall(sb, mc);
-            sb.append(";\n");
-            for (MappedField f : mc.fields) {
-                if (!f.includeInJson) continue;
-                emitFieldFromMap(sb, f, true);
-            }
-            sb.append("        return ");
-            appendRecordCtorCall(sb, mc);
-            sb.append(";\n");
+        if (mc.classAdapter != null) {
+            sb.append("        if (m == null) return null;\n");
+            sb.append("        try { return (").append(mc.binaryName).append(") ")
+              .append(adapterConst(mc.classAdapter)).append(".fromJson(m); }\n");
+            sb.append("        catch (IllegalArgumentException _x) { throw com.codename1.mapping.JsonValues.at(\"$\", _x); }\n");
         } else {
-            sb.append("        ").append(mc.binaryName).append(" o = new ").append(mc.binaryName).append("();\n");
-            sb.append("        if (m == null) return o;\n");
-            for (MappedField f : mc.fields) {
-                if (!f.includeInJson) continue;
-                emitFieldFromMap(sb, f, false);
-            }
-            sb.append("        return o;\n");
+            emitReadBody(sb, mc, true);
         }
         sb.append("    }\n\n");
+
+        // Specialisations of generic classes used with concrete type arguments.
+        for (int i = 0; i < mc.specs.size(); i++) {
+            MappedClass sp = mc.specs.get(i);
+            sb.append("    private static java.util.Map<String, Object> _sToMap_").append(i)
+              .append('(').append(sp.binaryName).append(" o) {\n");
+            emitToMapBody(sb, sp);
+            sb.append("    }\n\n");
+            sb.append("    private static ").append(sp.binaryName).append(" _sFromMap_").append(i)
+              .append("(java.util.Map<String, Object> m) {\n");
+            emitReadBody(sb, sp, true);
+            sb.append("    }\n\n");
+            emitClassHelpers(sb, sp);
+        }
+        emitClassHelpers(sb, mc);
 
         // writeXml()
         sb.append("    public void writeXml(").append(mc.binaryName)
@@ -478,30 +583,7 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
         // readXml() -- same fork as fromMap.
         sb.append("    public ").append(mc.binaryName)
                 .append(" readXml(com.codename1.xml.Element root) {\n");
-        if (isRecord) {
-            for (MappedField f : mc.fields) {
-                sb.append("        ").append(fieldType(f)).append(" ")
-                        .append(recordLocal(f)).append(" = ").append(defaultLiteral(f.kind)).append(";\n");
-            }
-            sb.append("        if (root == null) return ");
-            appendRecordCtorCall(sb, mc);
-            sb.append(";\n");
-            for (MappedField f : mc.fields) {
-                if (!f.includeInXml) continue;
-                emitFieldFromXml(sb, f, true);
-            }
-            sb.append("        return ");
-            appendRecordCtorCall(sb, mc);
-            sb.append(";\n");
-        } else {
-            sb.append("        ").append(mc.binaryName).append(" o = new ").append(mc.binaryName).append("();\n");
-            sb.append("        if (root == null) return o;\n");
-            for (MappedField f : mc.fields) {
-                if (!f.includeInXml) continue;
-                emitFieldFromXml(sb, f, false);
-            }
-            sb.append("        return o;\n");
-        }
+        emitReadBody(sb, mc, false);
         sb.append("    }\n\n");
 
         // textOf helper -- inlined per-mapper to keep each generated class
@@ -581,6 +663,7 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
     private static boolean canWriteDirectly(MappedClass mc) {
         for (MappedField f : mc.fields) {
             if (!f.includeInJson) continue;
+            if (isSpecial(f)) continue;
             switch (f.kind.kind) {
                 case STRING: case INT: case LONG: case SHORT: case BYTE: case CHAR:
                 case DOUBLE: case FLOAT: case BOOLEAN: case ENUM: case DATE:
@@ -810,10 +893,25 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
     // ---------------------------------------------------------------
 
     private static void emitFieldFromMap(StringBuilder sb, MappedField f, boolean isRecord) {
-        String key = "\"" + escape(f.jsonName) + "\"";
         sb.append("        {\n");
-        sb.append("            Object _v = m.get(").append(key).append(");\n");
+        sb.append("            Object _v = ").append(lookupExpr(f)).append(";\n");
+        if (f.required) {
+            // Present under any of its names, even as an explicit null, is
+            // enough: only an absent member is refused.
+            sb.append("            if (!(").append(presentExpr(f))
+              .append(")) throw new IllegalArgumentException(\"$.").append(escape(f.jsonName))
+              .append(": required member is missing\");\n");
+        }
         sb.append("            if (_v != null) {\n");
+        if (isSpecial(f)) {
+            sb.append("                try { ").append(writeStmt(f, isRecord, "_r_" + f.helper + "(_v)")).append(" }\n");
+            sb.append("                catch (IllegalArgumentException _x) { throw com.codename1.mapping.JsonValues.at(")
+              .append(pathLiteral(f)).append(", _x); }\n");
+            sb.append("            }\n");
+            emitExplicitNull(sb, f, isRecord);
+            sb.append("        }\n");
+            return;
+        }
         switch (f.kind.kind) {
             case STRING:
                 sb.append("                ").append(writeStmt(f, isRecord, "_v.toString()")).append("\n");
@@ -843,7 +941,10 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
                 sb.append("                ").append(writeStmt(f, isRecord, "(_v instanceof Boolean) ? ((Boolean) _v).booleanValue() : Boolean.parseBoolean(_v.toString())")).append("\n");
                 break;
             case DATE:
-                sb.append("                ").append(writeStmt(f, isRecord, "new java.util.Date(((Number) _v).longValue())")).append("\n");
+                // Either shape: epoch millis, or an ISO-8601 string.
+                sb.append("                try { ").append(writeStmt(f, isRecord, "com.codename1.mapping.JsonValues.toDate(_v)")).append(" }\n");
+                sb.append("                catch (IllegalArgumentException _x) { throw com.codename1.mapping.JsonValues.at(")
+                  .append(pathLiteral(f)).append(", _x); }\n");
                 break;
             case BYTE_ARRAY:
                 sb.append("                ").append(writeStmt(f, isRecord, "com.codename1.util.Base64.decode(_v.toString().getBytes())")).append("\n");
@@ -864,7 +965,9 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
             case REFERENCE:
                 sb.append("                com.codename1.mapping.Mapper _nm = com.codename1.mapping.Mappers.get(").append(f.kind.binaryName).append(".class);\n");
                 sb.append("                if (_nm != null && _v instanceof java.util.Map) {\n");
-                sb.append("                    ").append(writeStmt(f, isRecord, "(" + f.kind.binaryName + ") _nm.fromMap((java.util.Map) _v)")).append("\n");
+                sb.append("                    try { ").append(writeStmt(f, isRecord, "(" + f.kind.binaryName + ") _nm.fromMap((java.util.Map) _v)")).append(" }\n");
+                sb.append("                    catch (IllegalArgumentException _x) { throw com.codename1.mapping.JsonValues.at(")
+                  .append(pathLiteral(f)).append(", _x); }\n");
                 sb.append("                }\n");
                 break;
             case LIST: case LIST_PROPERTY:
@@ -905,8 +1008,14 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
                     sb.append("                    com.codename1.mapping.Mapper _nm = com.codename1.mapping.Mappers.get(").append(f.kind.elementBinaryName).append(".class);\n");
                     if (f.kind.kind == PropertyTypeKind.Kind.LIST) {
                         sb.append("                    java.util.ArrayList<").append(f.kind.elementBinaryName).append("> _l = new java.util.ArrayList<").append(f.kind.elementBinaryName).append(">();\n");
-                        sb.append("                    for (Object _e : (java.util.List) _v) {\n");
-                        sb.append("                        if (_nm != null && _e instanceof java.util.Map) { _l.add((").append(f.kind.elementBinaryName).append(") _nm.fromMap((java.util.Map) _e)); }\n");
+                        sb.append("                    java.util.List _src = (java.util.List) _v;\n");
+                        sb.append("                    for (int _i = 0; _i < _src.size(); _i++) {\n");
+                        sb.append("                        Object _e = _src.get(_i);\n");
+                        sb.append("                        if (_nm != null && _e instanceof java.util.Map) {\n");
+                        sb.append("                            try { _l.add((").append(f.kind.elementBinaryName).append(") _nm.fromMap((java.util.Map) _e)); }\n");
+                        sb.append("                            catch (IllegalArgumentException _x) { throw com.codename1.mapping.JsonValues.at(\"$.")
+                          .append(escape(f.jsonName)).append("[\" + _i + \"]\", _x); }\n");
+                        sb.append("                        }\n");
                         sb.append("                    }\n");
                         sb.append("                    ").append(writeStmt(f, isRecord, "_l")).append("\n");
                     } else {
@@ -922,7 +1031,34 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
                 break;
         }
         sb.append("            }\n");
+        emitExplicitNull(sb, f, isRecord);
         sb.append("        }\n");
+    }
+
+    /// A member present as an explicit null, matching the backend codecs: a
+    /// reference field becomes null (an absent member keeps what the
+    /// constructor set), a primitive keeps its value unless it is required,
+    /// in which case the body is refused.
+    private static void emitExplicitNull(StringBuilder sb, MappedField f, boolean isRecord) {
+        if (!f.nullClears) return;
+        String body;
+        if (isPrimitiveDesc(f.descriptor) && !f.isArray) {
+            if (!f.required) return;
+            body = "throw new IllegalArgumentException(\"$." + escape(f.jsonName)
+                    + ": expected a value, got null\");";
+        } else if (f.adapter != null) {
+            // The adapter is handed the null, as the server's codec does.
+            body = "try { " + writeStmt(f, isRecord, "_r_" + f.helper + "(null)")
+                    + " } catch (IllegalArgumentException _x) { throw com.codename1.mapping.JsonValues.at("
+                    + pathLiteral(f) + ", _x); }";
+        } else if (f.kind.kind == PropertyTypeKind.Kind.PROPERTY && !isSpecial(f)) {
+            body = readExpr(f, isRecord) + ".set(null);";
+        } else if (f.kind.kind == PropertyTypeKind.Kind.LIST_PROPERTY && !isSpecial(f)) {
+            body = readExpr(f, isRecord) + ".clear();";
+        } else {
+            body = writeStmt(f, isRecord, "null");
+        }
+        sb.append("            else if (").append(presentExpr(f)).append(") { ").append(body).append(" }\n");
     }
 
     /// Emits a loop that converts a `List` of JSON values into enum
@@ -1439,6 +1575,926 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
     }
 
     // ---------------------------------------------------------------
+    // JSON options: generation
+    // ---------------------------------------------------------------
+
+    /// A field whose JSON form is produced and read by private helpers
+    /// (`_j_<field>` / `_r_<field>`) rather than inline: an adapter, a format,
+    /// an array, an adapted list element or a resolved generic class. Both
+    /// writers call the same `_j_` helper and render its tree, so the direct
+    /// and the map path agree by construction.
+    static boolean isSpecial(MappedField f) {
+        return f.isArray || f.adapter != null || f.elemAdapter != null
+                || f.format != null || f.specIndex >= 0;
+    }
+
+    private static void collectAdapters(MappedClass mc, java.util.Set<String> out) {
+        if (mc.classAdapter != null) out.add(mc.classAdapter);
+        for (MappedField f : mc.fields) {
+            if (!f.includeInJson) continue;
+            if (f.adapter != null) out.add(f.adapter);
+            if (f.elemAdapter != null) out.add(f.elemAdapter);
+        }
+    }
+
+    private static String adapterConst(String adapter) {
+        return "_A_" + adapter.replace('.', '_').replace('$', '_');
+    }
+
+    /// The null test a `@JsonOmitNull` property is written under, or null when
+    /// its value can never be null (a primitive) or omission does not apply.
+    private static String omitCond(MappedField f, boolean isRecord) {
+        if (!f.omitNull) return null;
+        String read = readExpr(f, isRecord);
+        switch (f.kind.kind) {
+            case PROPERTY:
+                return read + ".get() != null";
+            case LIST_PROPERTY:
+                return null;
+            default:
+                if (f.descriptor != null && f.descriptor.length() == 1) return null;
+                return read + " != null";
+        }
+    }
+
+    private static void emitToMapBody(StringBuilder sb, MappedClass mc) {
+        sb.append("        java.util.LinkedHashMap<String, Object> m = new java.util.LinkedHashMap<String, Object>();\n");
+        sb.append("        if (o == null) return m;\n");
+        for (MappedField f : mc.fields) {
+            if (!f.includeInJson) continue;
+            if (isSpecial(f)) {
+                sb.append("        { Object _t = _j_").append(f.helper).append("(o); ")
+                  .append(f.omitNull ? "if (_t != null) " : "")
+                  .append("m.put(\"").append(escape(f.jsonName)).append("\", _t); }\n");
+                continue;
+            }
+            String cond = omitCond(f, mc.isRecord);
+            if (cond != null) sb.append("        if (").append(cond).append(") {\n");
+            emitFieldToMap(sb, f, mc.isRecord);
+            if (cond != null) sb.append("        }\n");
+        }
+        sb.append("        return m;\n");
+    }
+
+    private static void emitDirectProperty(StringBuilder sb, MappedField f, boolean isRecord,
+                                           boolean firstProp, boolean runtimeComma) {
+        String keyLit = escape(jsonEscape(f.jsonName));
+        if (isSpecial(f)) {
+            sb.append("        {\n");
+            sb.append("            Object _t = _j_").append(f.helper).append("(o);\n");
+            if (f.omitNull) sb.append("            if (_t != null) {\n");
+            emitKey(sb, keyLit, firstProp, runtimeComma, "            ");
+            sb.append("            com.codename1.mapping.Mappers.appendJsonRaw(out, _t);\n");
+            if (f.omitNull) sb.append("            }\n");
+            sb.append("        }\n");
+            return;
+        }
+        String cond = omitCond(f, isRecord);
+        if (cond != null) sb.append("        if (").append(cond).append(") {\n");
+        emitKey(sb, keyLit, firstProp, runtimeComma, "        ");
+        emitFieldToJson(sb, f, isRecord);
+        if (cond != null) sb.append("        }\n");
+    }
+
+    private static void emitKey(StringBuilder sb, String keyLit, boolean firstProp,
+                                boolean runtimeComma, String ind) {
+        if (runtimeComma) {
+            sb.append(ind).append("out.append(_first ? \"\\\"").append(keyLit)
+              .append("\\\":\" : \",\\\"").append(keyLit).append("\\\":\");\n");
+            sb.append(ind).append("_first = false;\n");
+            return;
+        }
+        // jsonEscape THEN escape: the inner one makes the key valid JSON, the
+        // outer one makes it a valid Java literal. escape() alone only did the
+        // second, so a @JsonProperty containing a quote compiled fine and then
+        // emitted "a"b" -- unparseable, where the map path escapes it properly
+        // because JSONWriter writes the key through writeString.
+        sb.append(ind).append("out.append(\"").append(firstProp ? "" : ",")
+          .append("\\\"").append(keyLit).append("\\\":\");\n");
+    }
+
+    /// The body of `fromMap` (`json`) or `readXml`: a POJO is filled in place,
+    /// a record and a `@JsonCreator` class collect locals and construct once.
+    private static void emitReadBody(StringBuilder sb, MappedClass mc, boolean json) {
+        String src = json ? "m" : "root";
+        // Before these options a JSON null was dropped by the parser, so a
+        // field kept its value. Telling null from absent is opt-in, so a
+        // class that uses none of the new options reads exactly as before.
+        for (MappedField f : mc.fields) {
+            f.nullClears = mc.strict || f.required || f.adapter != null;
+        }
+        if (mc.isRecord) {
+            for (MappedField f : mc.fields) {
+                sb.append("        ").append(fieldType(f)).append(" ")
+                        .append(recordLocal(f)).append(" = ")
+                        .append(f.isArray ? "null" : defaultLiteral(f.kind)).append(";\n");
+            }
+            sb.append("        if (").append(src).append(" == null) return ");
+            appendRecordCtorCall(sb, mc);
+            sb.append(";\n");
+            if (json) emitStrictCheck(sb, mc);
+            for (MappedField f : mc.fields) {
+                emitRead(sb, f, true, json);
+            }
+            sb.append("        return ");
+            appendRecordCtorCall(sb, mc);
+            sb.append(";\n");
+            return;
+        }
+        if (mc.creatorCall != null) {
+            for (String name : mc.creatorParams) {
+                MappedField f = mc.field(name);
+                sb.append("        ").append(descriptorToJava(f.descriptor)).append(" _p_").append(f.name)
+                  .append(" = ").append(defaultForDescriptor(f.descriptor)).append(";\n");
+            }
+            sb.append("        if (").append(src).append(" == null) return null;\n");
+            if (json) emitStrictCheck(sb, mc);
+            for (String name : mc.creatorParams) {
+                emitRead(sb, mc.field(name), false, json);
+            }
+            sb.append("        ").append(mc.binaryName).append(" o = ").append(mc.creatorCall).append('(');
+            for (int i = 0; i < mc.creatorParams.size(); i++) {
+                if (i > 0) sb.append(", ");
+                sb.append("_p_").append(mc.creatorParams.get(i));
+            }
+            sb.append(");\n");
+            for (MappedField f : mc.fields) {
+                if (f.viaLocal || f.readOnly) continue;
+                emitRead(sb, f, false, json);
+            }
+            sb.append("        return o;\n");
+            return;
+        }
+        sb.append("        ").append(mc.binaryName).append(" o = new ").append(mc.binaryName).append("();\n");
+        sb.append("        if (").append(src).append(" == null) return o;\n");
+        if (json) emitStrictCheck(sb, mc);
+        for (MappedField f : mc.fields) {
+            emitRead(sb, f, false, json);
+        }
+        sb.append("        return o;\n");
+    }
+
+    private static void emitRead(StringBuilder sb, MappedField f, boolean isRecord, boolean json) {
+        if (json) {
+            if (f.includeInJson) emitFieldFromMap(sb, f, isRecord);
+        } else {
+            if (f.includeInXml) emitFieldFromXml(sb, f, isRecord);
+        }
+    }
+
+    private static void emitStrictCheck(StringBuilder sb, MappedClass mc) {
+        if (!mc.strict) return;
+        sb.append("        for (java.util.Iterator _ki = m.keySet().iterator(); _ki.hasNext(); ) {\n");
+        sb.append("            Object _k = _ki.next();\n");
+        sb.append("            if (!_known").append(mc.prefix)
+          .append("(_k)) throw new IllegalArgumentException(\"$.\" + _k + \": unknown member\");\n");
+        sb.append("        }\n");
+    }
+
+    /// The lookup of a member under its primary name, else the first alias
+    /// present.
+    private static String lookupExpr(MappedField f) {
+        String key = "\"" + escape(f.jsonName) + "\"";
+        if (f.aliases.isEmpty()) return "m.get(" + key + ")";
+        StringBuilder b = new StringBuilder();
+        b.append("m.containsKey(").append(key).append(") ? m.get(").append(key).append(") : ");
+        for (String a : f.aliases) {
+            String ak = "\"" + escape(a) + "\"";
+            b.append("m.containsKey(").append(ak).append(") ? m.get(").append(ak).append(") : ");
+        }
+        b.append("null");
+        return b.toString();
+    }
+
+    private static String presentExpr(MappedField f) {
+        StringBuilder b = new StringBuilder();
+        b.append("m.containsKey(\"").append(escape(f.jsonName)).append("\")");
+        for (String a : f.aliases) {
+            b.append(" || m.containsKey(\"").append(escape(a)).append("\")");
+        }
+        return b.toString();
+    }
+
+    /// The path of the member read, under the name the body actually used:
+    /// a value taken from an alias is reported under that alias.
+    private static String pathLiteral(MappedField f) {
+        String primary = "\"$." + escape(f.jsonName) + "\"";
+        if (f.aliases.isEmpty()) return primary;
+        StringBuilder b = new StringBuilder("(m.containsKey(\"").append(escape(f.jsonName))
+                .append("\") ? ").append(primary);
+        for (String a : f.aliases) {
+            b.append(" : m.containsKey(\"").append(escape(a)).append("\") ? \"$.")
+             .append(escape(a)).append('"');
+        }
+        return b.append(" : ").append(primary).append(')').toString();
+    }
+
+    private static void emitClassHelpers(StringBuilder sb, MappedClass mc) {
+        if (mc.strict) {
+            sb.append("    private static boolean _known").append(mc.prefix).append("(Object k) {\n");
+            sb.append("        return false");
+            for (MappedField f : mc.fields) {
+                if (!f.includeInJson) continue;
+                sb.append("\n            || \"").append(escape(f.jsonName)).append("\".equals(k)");
+                for (String a : f.aliases) {
+                    sb.append("\n            || \"").append(escape(a)).append("\".equals(k)");
+                }
+            }
+            sb.append(";\n    }\n\n");
+        }
+        for (MappedField f : mc.fields) {
+            if (!f.includeInJson || !isSpecial(f)) continue;
+            emitWriteHelper(sb, mc, f);
+            emitReadHelper(sb, f);
+        }
+    }
+
+    private static boolean isPrimitiveDesc(String desc) {
+        return desc != null && desc.length() == 1;
+    }
+
+    private static boolean isNumberKind(PropertyTypeKind k) {
+        switch (k.kind) {
+            case INT: case LONG: case SHORT: case BYTE: case DOUBLE: case FLOAT:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private static void emitWriteHelper(StringBuilder sb, MappedClass mc, MappedField f) {
+        String jt = descriptorToJava(f.descriptor);
+        sb.append("    private static Object _j_").append(f.helper).append('(')
+          .append(mc.binaryName).append(" o) {\n");
+        sb.append("        ").append(jt).append(" _x = ").append(readExpr(f, mc.isRecord)).append(";\n");
+        boolean listLike = !f.isArray && f.adapter == null && f.elemAdapter != null;
+        // An adapter decides what null is, as on the server: it is called.
+        if (!isPrimitiveDesc(f.descriptor) && f.adapter == null) {
+            // A null list is [] on every other path; keep that unless the
+            // property is to be left out instead.
+            sb.append("        if (_x == null) return ")
+              .append(listLike && !f.omitNull ? "new java.util.ArrayList<Object>()" : "null").append(";\n");
+        }
+        if (f.adapter != null) {
+            sb.append("        return ").append(adapterConst(f.adapter)).append(".toJson((")
+              .append(f.adapterCast).append(") _x);\n");
+        } else if (f.specIndex >= 0) {
+            sb.append("        return _sToMap_").append(f.specIndex).append("((")
+              .append(f.kind.binaryName).append(") _x);\n");
+        } else if (f.format != null && f.kind.kind == PropertyTypeKind.Kind.DATE) {
+            if ("STRING".equals(f.format)) {
+                sb.append("        return com.codename1.mapping.JsonValues.formatIso((java.util.Date) _x);\n");
+            } else {
+                sb.append("        return Long.valueOf(((java.util.Date) _x).getTime());\n");
+            }
+        } else if (f.format != null) {
+            sb.append("        return String.valueOf(_x);\n");
+        } else if (listLike) {
+            String e = f.kind.elementBinaryName;
+            sb.append("        java.util.ArrayList<Object> _l = new java.util.ArrayList<Object>();\n");
+            sb.append("        for (java.util.Iterator _it = ((java.util.List) _x).iterator(); _it.hasNext(); ) {\n");
+            sb.append("            Object _e = _it.next();\n");
+            sb.append("            _l.add(").append(adapterConst(f.elemAdapter))
+              .append(".toJson((").append(e).append(") _e));\n");
+            sb.append("        }\n");
+            sb.append("        return _l;\n");
+        } else {
+            String ej = f.kind.binaryName;
+            boolean prim = isPrimitiveName(ej);
+            boolean mapped = f.elemAdapter == null && f.kind.kind == PropertyTypeKind.Kind.REFERENCE;
+            sb.append("        java.util.ArrayList<Object> _l = new java.util.ArrayList<Object>(_x.length);\n");
+            if (mapped) {
+                sb.append("        com.codename1.mapping.Mapper _nm = com.codename1.mapping.Mappers.get(")
+                  .append(ej).append(".class);\n");
+            }
+            sb.append("        for (int _i = 0; _i < _x.length; _i++) {\n");
+            sb.append("            ").append(ej).append(" _ex = ").append(prim ? "" : "(" + ej + ") ")
+              .append("_x[_i];\n");
+            sb.append("            _l.add(").append(elementToTree(f, ej, prim)).append(");\n");
+            sb.append("        }\n");
+            sb.append("        return _l;\n");
+        }
+        sb.append("    }\n\n");
+    }
+
+    private static String elementToTree(MappedField f, String ej, boolean prim) {
+        if (f.elemAdapter != null) {
+            return adapterConst(f.elemAdapter) + ".toJson(_ex)";
+        }
+        if (prim) {
+            if ("char".equals(ej)) return "String.valueOf(_ex)";
+            return boxOf(ej) + ".valueOf(_ex)";
+        }
+        switch (f.kind.kind) {
+            case ENUM:
+                return "_ex == null ? null : _ex.name()";
+            case DATE:
+                return "_ex == null ? null : Long.valueOf(_ex.getTime())";
+            case REFERENCE:
+                return "_ex == null ? null : (_nm == null ? (Object) _ex : _nm.toMap(_ex))";
+            default:
+                return "_ex";
+        }
+    }
+
+    private static void emitReadHelper(StringBuilder sb, MappedField f) {
+        String jt = descriptorToJava(f.descriptor);
+        sb.append("    private static ").append(jt).append(" _r_").append(f.helper).append("(Object _v) {\n");
+        if (f.adapter != null) {
+            sb.append("        return (").append(jt).append(") ").append(adapterConst(f.adapter))
+              .append(".fromJson(_v);\n");
+        } else if (f.specIndex >= 0) {
+            sb.append("        if (!(_v instanceof java.util.Map)) throw new IllegalArgumentException(\"expected a JSON object\");\n");
+            sb.append("        return _sFromMap_").append(f.specIndex)
+              .append("((java.util.Map<String, Object>) _v);\n");
+        } else if (f.format != null && f.kind.kind == PropertyTypeKind.Kind.DATE) {
+            sb.append("        return com.codename1.mapping.JsonValues.toDate(_v);\n");
+        } else if (f.format != null) {
+            String prim = primitiveOfNumberKind(f.kind);
+            String expr = numberFromTree(prim, "_v");
+            if (isPrimitiveDesc(f.descriptor)) {
+                sb.append("        return ").append(expr).append(";\n");
+            } else {
+                sb.append("        return ").append(boxOf(prim)).append(".valueOf(").append(expr).append(");\n");
+            }
+        } else {
+            boolean list = !f.isArray;
+            String ej = list ? f.kind.elementBinaryName : f.kind.binaryName;
+            boolean prim = isPrimitiveName(ej);
+            boolean mapped = !list && f.elemAdapter == null && f.kind.kind == PropertyTypeKind.Kind.REFERENCE
+                    && !"java.lang.Object".equals(ej);
+            sb.append("        if (!(_v instanceof java.util.List)) throw new IllegalArgumentException(\"expected a JSON array\");\n");
+            sb.append("        java.util.List _src = (java.util.List) _v;\n");
+            if (list) {
+                sb.append("        java.util.ArrayList<").append(ej).append("> _a = new java.util.ArrayList<")
+                  .append(ej).append(">();\n");
+            } else {
+                sb.append("        ").append(ej).append("[] _a = new ").append(ej).append("[_src.size()];\n");
+            }
+            if (mapped) {
+                sb.append("        com.codename1.mapping.Mapper _nm = com.codename1.mapping.Mappers.get(")
+                  .append(ej).append(".class);\n");
+            }
+            sb.append("        for (int _i = 0; _i < _src.size(); _i++) {\n");
+            sb.append("            Object _e = _src.get(_i);\n");
+            sb.append("            try {\n");
+            if (list) {
+                sb.append("                _a.add((").append(ej).append(") ")
+                  .append(adapterConst(f.elemAdapter)).append(".fromJson(_e));\n");
+            } else if (f.elemAdapter == null && f.kind.kind == PropertyTypeKind.Kind.ENUM) {
+                sb.append("                ").append(ej).append(" _ev = null;\n");
+                sb.append("                if (_e instanceof String) { try { _ev = ").append(ej)
+                  .append(".valueOf((String) _e); } catch (IllegalArgumentException _ex) { _ev = null; } }\n");
+                sb.append("                _a[_i] = _ev;\n");
+            } else {
+                sb.append("                _a[_i] = ").append(elementFromTree(f, ej, prim)).append(";\n");
+            }
+            sb.append("            } catch (IllegalArgumentException _x) {\n");
+            sb.append("                throw com.codename1.mapping.JsonValues.at(\"$[\" + _i + \"]\", _x);\n");
+            sb.append("            }\n");
+            sb.append("        }\n");
+            sb.append("        return _a;\n");
+        }
+        sb.append("    }\n\n");
+    }
+
+    private static String elementFromTree(MappedField f, String ej, boolean prim) {
+        if (f.elemAdapter != null) {
+            return "(" + ej + ") " + adapterConst(f.elemAdapter) + ".fromJson(_e)";
+        }
+        if (prim) {
+            if ("boolean".equals(ej)) return "Boolean.TRUE.equals(_e) || \"true\".equals(_e)";
+            if ("char".equals(ej)) {
+                return "(_e == null || _e.toString().length() == 0) ? '\\0' : _e.toString().charAt(0)";
+            }
+            if ("int".equals(ej) || "short".equals(ej) || "byte".equals(ej)) {
+                String box = "int".equals(ej) ? "Integer" : "short".equals(ej) ? "Short" : "Byte";
+                return "(" + ej + ") com.codename1.mapping.JsonValues.toIntegral(_e, "
+                        + box + ".MIN_VALUE, " + box + ".MAX_VALUE)";
+            }
+            if ("long".equals(ej)) {
+                return "com.codename1.mapping.JsonValues.toIntegral(_e, Long.MIN_VALUE, Long.MAX_VALUE)";
+            }
+            return numberFromTree(ej, "_e");
+        }
+        switch (f.kind.kind) {
+            case DATE:
+                return "_e == null ? null : com.codename1.mapping.JsonValues.toDate(_e)";
+            case REFERENCE:
+                if ("java.lang.Object".equals(ej)) return "_e";
+                // A null element stays null; anything else that is not an
+                // object is refused, as the server's codec refuses it.
+                return "_e == null ? null : (" + ej + ") com.codename1.mapping.JsonValues.object(_nm, _e)";
+            default:
+                return scalarElement(ej, "_e");
+        }
+    }
+
+    private static String numberFromTree(String prim, String var) {
+        String l = "com.codename1.mapping.JsonValues.toLong(" + var + ")";
+        String d = "com.codename1.mapping.JsonValues.toDouble(" + var + ")";
+        if ("long".equals(prim)) return l;
+        if ("double".equals(prim)) return d;
+        if ("float".equals(prim)) return "(float) " + d;
+        return "(" + prim + ") " + l;
+    }
+
+    private static String primitiveOfNumberKind(PropertyTypeKind k) {
+        switch (k.kind) {
+            case INT: return "int";
+            case LONG: return "long";
+            case SHORT: return "short";
+            case BYTE: return "byte";
+            case DOUBLE: return "double";
+            default: return "float";
+        }
+    }
+
+    private static boolean isPrimitiveName(String n) {
+        return "int".equals(n) || "long".equals(n) || "short".equals(n) || "byte".equals(n)
+                || "char".equals(n) || "double".equals(n) || "float".equals(n) || "boolean".equals(n);
+    }
+
+    private static String boxOf(String prim) {
+        if ("int".equals(prim)) return "Integer";
+        if ("char".equals(prim)) return "Character";
+        return Character.toUpperCase(prim.charAt(0)) + prim.substring(1);
+    }
+
+    /// The Java source spelling of an (erased) descriptor.
+    static String descriptorToJava(String desc) {
+        int dims = 0;
+        while (desc.charAt(dims) == '[') dims++;
+        String base = desc.substring(dims);
+        String t;
+        switch (base.charAt(0)) {
+            case 'I': t = "int"; break;
+            case 'J': t = "long"; break;
+            case 'S': t = "short"; break;
+            case 'B': t = "byte"; break;
+            case 'C': t = "char"; break;
+            case 'D': t = "double"; break;
+            case 'F': t = "float"; break;
+            case 'Z': t = "boolean"; break;
+            default: t = base.substring(1, base.length() - 1).replace('/', '.');
+        }
+        StringBuilder b = new StringBuilder(t);
+        for (int i = 0; i < dims; i++) b.append("[]");
+        return b.toString();
+    }
+
+    /// The default a `@JsonCreator` parameter takes when its member is absent:
+    /// the type's own default, so a boxed parameter gets null, not zero.
+    private static String defaultForDescriptor(String desc) {
+        if (desc.length() != 1) return "null";
+        switch (desc.charAt(0)) {
+            case 'Z': return "false";
+            case 'J': return "0L";
+            case 'F': return "0.0f";
+            case 'D': return "0.0";
+            case 'C': return "'\\0'";
+            default: return "0";
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // JSON options: analysis (aliases, required, strict, omit-null,
+    // format, adapters, creators, generics, arrays)
+    // ---------------------------------------------------------------
+
+    /// Reads `@JsonFormat` and `@JsonAdapter` for one field and validates the
+    /// combination against its type. Every shape this cannot generate is a
+    /// build error naming the class and field; nothing is skipped silently.
+    private boolean checkJsonOptions(AnnotatedClass cls, MappedClass mc, MappedField mf,
+                                     FieldInfo f, ProcessorContext ctx) {
+        String where = mc.binaryName + "." + mf.name;
+        String fieldAdapter = adapterOf(f.getAnnotation(JSON_ADAPTER_DESC));
+        if (fieldAdapter != null) {
+            if (mf.descriptor.length() == 1) {
+                ctx.error(cls, "@JsonAdapter on " + where + ": a primitive field cannot take an"
+                        + " adapter; declare it with its boxed type");
+                return false;
+            }
+            if (mf.kind.kind == PropertyTypeKind.Kind.PROPERTY
+                    || mf.kind.kind == PropertyTypeKind.Kind.LIST_PROPERTY) {
+                ctx.error(cls, "@JsonAdapter on " + where + ": a Property / ListProperty field"
+                        + " cannot take an adapter");
+                return false;
+            }
+            if (!validAdapter(cls, mc.binaryName, mf.name, fieldAdapter, ctx)) return false;
+            mf.adapter = fieldAdapter;
+            mf.adapterCast = descriptorToJava(mf.descriptor);
+        } else if (mf.kind.kind == PropertyTypeKind.Kind.REFERENCE) {
+            String a = classAdapterOf(mf.kind.binaryName, ctx);
+            if (a != null) {
+                if (!validAdapter(cls, mc.binaryName, mf.name, a, ctx)) return false;
+                if (mf.isArray) {
+                    mf.elemAdapter = a;
+                } else {
+                    mf.adapter = a;
+                    mf.adapterCast = mf.kind.binaryName;
+                }
+            }
+        } else if ((mf.kind.kind == PropertyTypeKind.Kind.LIST
+                || mf.kind.kind == PropertyTypeKind.Kind.LIST_PROPERTY)
+                && !mf.elementIsEnum && !isScalarBinary(mf.kind.elementBinaryName)) {
+            String a = classAdapterOf(mf.kind.elementBinaryName, ctx);
+            if (a != null) {
+                if (mf.kind.kind == PropertyTypeKind.Kind.LIST_PROPERTY) {
+                    ctx.error(cls, "@JsonAdapter on element type " + mf.kind.elementBinaryName
+                            + " of " + where + ": a ListProperty cannot use an adapted element;"
+                            + " declare a java.util.List");
+                    return false;
+                }
+                if (!validAdapter(cls, mc.binaryName, mf.name, a, ctx)) return false;
+                mf.elemAdapter = a;
+            }
+        }
+
+        AnnotationValues fa = f.getAnnotation(JSON_FORMAT_DESC);
+        String fmt = fa == null ? null : enumName(fa.get("value"));
+        if (fmt == null || "DEFAULT".equals(fmt)) return true;
+        if (mf.adapter != null) {
+            ctx.error(cls, "@JsonFormat on " + where + " cannot be combined with @JsonAdapter;"
+                    + " the adapter decides the JSON form");
+            return false;
+        }
+        boolean date = !mf.isArray && mf.kind.kind == PropertyTypeKind.Kind.DATE;
+        boolean number = false;
+        if (!mf.isArray) {
+            switch (mf.kind.kind) {
+                case INT: case LONG: case SHORT: case BYTE: case DOUBLE: case FLOAT:
+                    number = true;
+                    break;
+                default:
+                    break;
+            }
+        }
+        if ("STRING".equals(fmt) && !(date || number)) {
+            ctx.error(cls, "@JsonFormat(STRING) on " + where + ": only a java.util.Date or a"
+                    + " numeric field (primitive or boxed) has a string form; the field is "
+                    + describe(mf));
+            return false;
+        }
+        if ("NUMBER".equals(fmt) && !date) {
+            ctx.error(cls, "@JsonFormat(NUMBER) on " + where + ": only a java.util.Date has a"
+                    + " number form other than its default; the field is " + describe(mf));
+            return false;
+        }
+        mf.format = fmt;
+        return true;
+    }
+
+    private static String describe(MappedField mf) {
+        return (mf.isArray ? "an array of " : "") + mf.kind.kind + " (" + mf.descriptor + ")";
+    }
+
+    /// Binds a `@JsonCreator` constructor or static factory: each parameter
+    /// names, through its own `@JsonProperty`, the JSON member it receives, and
+    /// the field of that name supplies its type and options.
+    private boolean bindCreator(AnnotatedClass cls, MappedClass mc, MethodInfo creator,
+                                ProcessorContext ctx) {
+        String where = "@JsonCreator " + mc.binaryName + "."
+                + (creator.isConstructor() ? mc.simpleName : creator.getName());
+        if (!creator.isPublic()) {
+            ctx.error(cls, where + " must be public");
+            return false;
+        }
+        if (!creator.isConstructor()) {
+            if (!creator.isStatic()) {
+                ctx.error(cls, where + " must be a constructor or a static factory method");
+                return false;
+            }
+            if (!creator.getDescriptor().endsWith(")L" + cls.getInternalName() + ";")) {
+                ctx.error(cls, where + " must return " + mc.binaryName);
+                return false;
+            }
+        }
+        List<String> params = parameterDescriptors(creator.getDescriptor());
+        List<Map<String, AnnotationValues>> pa = creator.getParameterAnnotations();
+        for (int i = 0; i < params.size(); i++) {
+            Map<String, AnnotationValues> anns = (pa != null && i < pa.size()) ? pa.get(i) : null;
+            AnnotationValues jp = anns == null ? null : anns.get(JSON_PROPERTY_DESC);
+            String name = jp == null ? null : jp.getString("value");
+            if (name == null || name.length() == 0) {
+                ctx.error(cls, where + ": parameter " + i + " must carry @JsonProperty"
+                        + " naming the JSON member it receives");
+                return false;
+            }
+            MappedField match = null;
+            for (MappedField f : mc.fields) {
+                if (f.includeInJson && name.equals(f.jsonName)) {
+                    match = f;
+                    break;
+                }
+            }
+            if (match == null) {
+                ctx.error(cls, where + ": parameter " + i + " names JSON member \"" + name
+                        + "\", which no JSON field of " + mc.binaryName + " declares");
+                return false;
+            }
+            if (match.viaLocal) {
+                ctx.error(cls, where + ": JSON member \"" + name + "\" is taken by two parameters");
+                return false;
+            }
+            if (!params.get(i).equals(match.descriptor)) {
+                ctx.error(cls, where + ": parameter " + i + " (\"" + name + "\") is "
+                        + params.get(i) + " but field " + match.name + " is " + match.descriptor);
+                return false;
+            }
+            if (jp.getBoolOrDefault("required", false)) match.required = true;
+            if (match.aliases.isEmpty()) match.aliases = stringList(jp.get("aliases"));
+            match.viaLocal = true;
+            mc.creatorParams.add(match.name);
+        }
+        mc.creatorCall = creator.isConstructor()
+                ? "new " + mc.binaryName
+                : mc.binaryName + "." + creator.getName();
+        return true;
+    }
+
+    private static List<String> parameterDescriptors(String desc) {
+        List<String> out = new ArrayList<String>();
+        int i = 1;
+        while (desc.charAt(i) != ')') {
+            int start = i;
+            while (desc.charAt(i) == '[') i++;
+            if (desc.charAt(i) == 'L') {
+                i = desc.indexOf(';', i) + 1;
+            } else {
+                i++;
+            }
+            out.add(desc.substring(start, i));
+        }
+        return out;
+    }
+
+    /// The adapter class a `@JsonAdapter` names, or null.
+    private static String adapterOf(AnnotationValues av) {
+        if (av == null) return null;
+        Object v = av.get("value");
+        if (v instanceof org.objectweb.asm.Type) {
+            return ((org.objectweb.asm.Type) v).getClassName();
+        }
+        return v == null ? null : v.toString();
+    }
+
+    /// The class-level `@JsonAdapter` of `binaryName`, or null.
+    private static String classAdapterOf(String binaryName, ProcessorContext ctx) {
+        if (binaryName == null || isScalarBinary(binaryName)) return null;
+        AnnotatedClass c = ctx.lookupWithDependencies(binaryName.replace('.', '/'));
+        return c == null ? null : adapterOf(c.getClassAnnotation(JSON_ADAPTER_DESC));
+    }
+
+    /// The generated mapper holds one instance per adapter class and calls it
+    /// directly, so the class must be instantiable from generated code.
+    private static boolean validAdapter(AnnotatedClass cls, String owner, String field,
+                                        String adapter, ProcessorContext ctx) {
+        String where = field == null ? owner : owner + "." + field;
+        AnnotatedClass a = ctx.lookupWithDependencies(adapter.replace('.', '/'));
+        if (a == null) {
+            ctx.error(cls, "@JsonAdapter(" + adapter + ") on " + where
+                    + ": the adapter class cannot be found on the compile classpath");
+            return false;
+        }
+        if (!a.isPublic() || a.isAbstract() || a.isInterface() || !hasPublicNoArgConstructor(a)) {
+            ctx.error(cls, "@JsonAdapter(" + adapter + ") on " + where
+                    + ": the adapter must be a public concrete class with a public no-arg constructor");
+            return false;
+        }
+        return true;
+    }
+
+    private static String enumName(Object v) {
+        if (v instanceof String[] && ((String[]) v).length == 2) return ((String[]) v)[1];
+        return null;
+    }
+
+    private static List<String> stringList(Object v) {
+        List<String> out = new ArrayList<String>();
+        if (v instanceof List) {
+            for (Object o : (List<?>) v) {
+                if (o != null && o.toString().length() > 0) out.add(o.toString());
+            }
+        }
+        return out;
+    }
+
+    /// Classifies an element descriptor (`I`, `Ljava/lang/String;`, ...),
+    /// upgrading an enum the way field classification does. Anything that is
+    /// not a scalar, an enum, a date or a class reference is unsupported.
+    private static PropertyTypeKind kindForDescriptor(String desc, ProcessorContext ctx) {
+        PropertyTypeKind k = PropertyTypeKind.of(desc, null);
+        if (k.kind == PropertyTypeKind.Kind.REFERENCE && isEnumType(k.binaryName, ctx)) {
+            return PropertyTypeKind.enumType(k.binaryName);
+        }
+        switch (k.kind) {
+            case PROPERTY: case LIST_PROPERTY: case LIST:
+                return PropertyTypeKind.scalar("?");
+            default:
+                return k;
+        }
+    }
+
+    private static PropertyTypeKind kindForBinary(String binary, ProcessorContext ctx) {
+        PropertyTypeKind k = PropertyTypeKind.scalar(binary);
+        if (k.kind != PropertyTypeKind.Kind.UNSUPPORTED) return k;
+        if (isEnumType(binary, ctx)) return PropertyTypeKind.enumType(binary);
+        return PropertyTypeKind.reference(binary);
+    }
+
+    /// The names of a class's type parameters, read from its generic signature
+    /// (`<T:Ljava/lang/Object;>Ljava/lang/Object;` gives `[T]`).
+    static List<String> classTypeParams(String sig) {
+        List<String> names = new ArrayList<String>();
+        if (sig == null || !sig.startsWith("<")) return names;
+        int i = 1;
+        while (sig.charAt(i) != '>') {
+            int colon = sig.indexOf(':', i);
+            names.add(sig.substring(i, colon));
+            i = colon;
+            while (sig.charAt(i) == ':') {
+                i++;
+                if (sig.charAt(i) == ':') continue;
+                int[] p = { i };
+                parseType(sig, p);
+                i = p[0];
+            }
+        }
+        return names;
+    }
+
+    static TypeRef parseTypeSignature(String sig) {
+        try {
+            return parseType(sig, new int[] { 0 });
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    private static TypeRef parseType(String s, int[] p) {
+        TypeRef t = new TypeRef();
+        while (s.charAt(p[0]) == '[') {
+            t.dims++;
+            p[0]++;
+        }
+        char c = s.charAt(p[0]);
+        if (c == 'T') {
+            int e = s.indexOf(';', p[0]);
+            t.var = s.substring(p[0] + 1, e);
+            p[0] = e + 1;
+            return t;
+        }
+        if (c == 'L') {
+            p[0]++;
+            StringBuilder name = new StringBuilder();
+            while (true) {
+                char ch = s.charAt(p[0]);
+                if (ch == ';') {
+                    p[0]++;
+                    break;
+                }
+                if (ch == '<') {
+                    p[0]++;
+                    t.args.clear();
+                    while (s.charAt(p[0]) != '>') {
+                        char a = s.charAt(p[0]);
+                        if (a == '*') {
+                            p[0]++;
+                            TypeRef w = new TypeRef();
+                            w.binary = "java.lang.Object";
+                            t.args.add(w);
+                        } else {
+                            if (a == '+' || a == '-') p[0]++;
+                            t.args.add(parseType(s, p));
+                        }
+                    }
+                    p[0]++;
+                    continue;
+                }
+                if (ch == '.') {
+                    name.append('$');
+                } else {
+                    name.append(ch == '/' ? '.' : ch);
+                }
+                p[0]++;
+            }
+            t.binary = name.toString();
+            return t;
+        }
+        p[0]++;
+        t.binary = String.valueOf(c);
+        return t;
+    }
+
+    private static boolean hasVar(TypeRef t) {
+        if (t.var != null) return true;
+        for (TypeRef a : t.args) {
+            if (hasVar(a)) return true;
+        }
+        return false;
+    }
+
+    private static TypeRef subst(TypeRef t, Map<String, TypeRef> sub) {
+        if (t.var != null) {
+            TypeRef r = sub.get(t.var);
+            if (r == null) return t;
+            TypeRef c = r.copy();
+            c.dims += t.dims;
+            return c;
+        }
+        TypeRef c = new TypeRef();
+        c.binary = t.binary;
+        c.dims = t.dims;
+        for (TypeRef a : t.args) c.args.add(subst(a, sub));
+        return c;
+    }
+
+    /// Resolves every field of a generic `@Mapped` class used with concrete
+    /// type arguments (`Page<User> page`) into a specialised copy, which the
+    /// owner's mapper reads and writes with private methods of its own. A use
+    /// whose arguments are not all concrete keeps the raw behaviour.
+    private void assignSpecs(MappedClass owner, MappedClass cls, ProcessorContext ctx, int depth) {
+        for (MappedField f : cls.fields) {
+            if (!f.includeInJson || f.isArray || f.adapter != null) continue;
+            if (f.kind.kind != PropertyTypeKind.Kind.REFERENCE || f.typeRef == null
+                    || f.typeRef.args.isEmpty() || f.typeRef.dims != 0 || hasVar(f.typeRef)) continue;
+            MappedClass gen = accepted.get(f.kind.binaryName);
+            if (gen == null || gen.classAdapter != null
+                    || gen.typeParams.size() != f.typeRef.args.size()) continue;
+            if (depth > 4) {
+                ctx.error(cls.binaryName + "." + f.name + ": generic @Mapped types nest more than"
+                        + " five levels deep");
+                return;
+            }
+            Map<String, TypeRef> sub = new LinkedHashMap<String, TypeRef>();
+            for (int i = 0; i < gen.typeParams.size(); i++) {
+                sub.put(gen.typeParams.get(i), f.typeRef.args.get(i));
+            }
+            int idx = owner.specs.size();
+            MappedClass sp = specialize(gen, sub, idx, cls.binaryName + "." + f.name, ctx);
+            if (sp == null) return;
+            f.specIndex = idx;
+            owner.specs.add(sp);
+            assignSpecs(owner, sp, ctx, depth + 1);
+        }
+    }
+
+    private MappedClass specialize(MappedClass gen, Map<String, TypeRef> sub, int idx,
+                                   String use, ProcessorContext ctx) {
+        MappedClass sp = gen.copyHeader();
+        sp.prefix = "s" + idx + "_";
+        for (MappedField f : gen.fields) {
+            MappedField c = f.copy();
+            c.specIndex = -1;
+            c.helper = sp.prefix + c.name;
+            if (c.typeRef != null && hasVar(c.typeRef) && c.adapter == null && c.format == null) {
+                TypeRef r = subst(c.typeRef, sub);
+                if (r.var != null) {
+                    sp.fields.add(c);
+                    continue;
+                }
+                String where = gen.binaryName + "." + f.name + " (as used by " + use + ")";
+                if (r.dims > 1) {
+                    ctx.error(where + " resolves to a multi-dimensional array");
+                    return null;
+                }
+                TypeRef base = r.copy();
+                base.dims = 0;
+                boolean list = r.dims == 0 && ("java.util.List".equals(base.binary)
+                        || "java.util.ArrayList".equals(base.binary));
+                if (r.dims == 1) {
+                    c.isArray = true;
+                    c.kind = kindForBinary(base.binary, ctx);
+                    c.elemAdapter = classAdapterOf(base.binary, ctx);
+                    c.typeRef = null;
+                } else if (list) {
+                    TypeRef e = base.args.isEmpty() ? null : base.args.get(0);
+                    String eb = (e == null || e.var != null || e.dims != 0) ? "java.lang.String" : e.binary;
+                    c.kind = PropertyTypeKind.list(eb);
+                    c.elementIsEnum = isEnumType(eb, ctx);
+                    c.elemAdapter = c.elementIsEnum ? null : classAdapterOf(eb, ctx);
+                    c.typeRef = null;
+                } else {
+                    c.kind = kindForBinary(base.binary, ctx);
+                    if (c.kind.kind == PropertyTypeKind.Kind.REFERENCE) {
+                        c.adapter = classAdapterOf(base.binary, ctx);
+                        c.adapterCast = base.binary;
+                    }
+                    c.typeRef = base;
+                }
+                if (c.kind.kind == PropertyTypeKind.Kind.UNSUPPORTED
+                        || c.kind.kind == PropertyTypeKind.Kind.BYTE_ARRAY && c.isArray) {
+                    ctx.error(where + " resolves to an unsupported type " + base.binary);
+                    return null;
+                }
+            }
+            sp.fields.add(c);
+        }
+        return sp;
+    }
+
+    // ---------------------------------------------------------------
     // Accumulator types
     // ---------------------------------------------------------------
 
@@ -1454,6 +2510,64 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
         /// (`new T(_a, _b, ...)` vs `o.a = ...; o.b = ...`).
         boolean isRecord;
         final List<MappedField> fields = new ArrayList<MappedField>();
+        /// `@JsonStrict`: an undeclared member is refused on read.
+        boolean strict;
+        /// Class-level `@JsonAdapter` of this class itself, or null.
+        String classAdapter;
+        /// Names of the class's type parameters, in order.
+        List<String> typeParams = new ArrayList<String>();
+        /// Field names the `@JsonCreator` takes, in parameter order.
+        final List<String> creatorParams = new ArrayList<String>();
+        /// `new pkg.Type` or `pkg.Type.factory`, or null without a creator.
+        String creatorCall;
+        /// Prefix of the private helpers generated for this class: empty for
+        /// the mapper's own class, `sN_` for a specialisation.
+        String prefix = "";
+        /// Specialisations of generic classes this mapper's fields use; the
+        /// index is a field's `specIndex`.
+        final List<MappedClass> specs = new ArrayList<MappedClass>();
+
+        MappedClass copyHeader() {
+            MappedClass c = new MappedClass();
+            c.binaryName = binaryName;
+            c.packageName = packageName;
+            c.simpleName = simpleName;
+            c.mapperBinaryName = mapperBinaryName;
+            c.mapperSimpleName = mapperSimpleName;
+            c.xmlRootName = xmlRootName;
+            c.isRecord = isRecord;
+            c.strict = strict;
+            c.classAdapter = classAdapter;
+            c.typeParams = typeParams;
+            c.creatorParams.addAll(creatorParams);
+            c.creatorCall = creatorCall;
+            return c;
+        }
+
+        MappedField field(String name) {
+            for (MappedField f : fields) {
+                if (f.name.equals(name)) return f;
+            }
+            return null;
+        }
+    }
+
+    /// A parsed generic type signature: a type variable, or a class with
+    /// type arguments, either with array dimensions.
+    static final class TypeRef {
+        String var;
+        String binary;
+        int dims;
+        final List<TypeRef> args = new ArrayList<TypeRef>();
+
+        TypeRef copy() {
+            TypeRef c = new TypeRef();
+            c.var = var;
+            c.binary = binary;
+            c.dims = dims;
+            for (TypeRef a : args) c.args.add(a.copy());
+            return c;
+        }
     }
 
     static final class MappedField {
@@ -1482,5 +2596,67 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
         /// `true` when this field is a `List<E>` whose element type `E`
         /// is a Java enum -- elements serialise as their `name()`.
         boolean elementIsEnum;
+        /// The field's descriptor (its erased type).
+        String descriptor;
+        /// `@JsonProperty(aliases)`: other names accepted on read.
+        List<String> aliases = new ArrayList<String>();
+        /// `@JsonProperty(required = true)`.
+        boolean required;
+        /// An explicit JSON null clears the field rather than leaving it as
+        /// constructed: `@JsonStrict` classes and required members only.
+        boolean nullClears;
+        /// `@JsonOmitNull` on the field or its class.
+        boolean omitNull;
+        /// `STRING` or `NUMBER` from `@JsonFormat`, or null.
+        String format;
+        /// The adapter converting the whole value, or null, and the type its
+        /// value is cast to before `toJson`.
+        String adapter;
+        String adapterCast;
+        /// The class-level adapter of a list or array element type, or null.
+        String elemAdapter;
+        /// A one-dimensional array; `kind` then describes the ELEMENT.
+        boolean isArray;
+        /// Parsed generic signature, or null.
+        TypeRef typeRef;
+        /// Index into the owner mapper's specialisations, or -1.
+        int specIndex = -1;
+        /// Received by the `@JsonCreator`: read into a local, not the instance.
+        boolean viaLocal;
+        /// Written, but never set on read (no setter, or a final field, in a
+        /// class built by a `@JsonCreator` that does not take it).
+        boolean readOnly;
+        /// Suffix of this field's private helper methods.
+        String helper;
+
+        MappedField copy() {
+            MappedField c = new MappedField();
+            c.name = name;
+            c.kind = kind;
+            c.jsonName = jsonName;
+            c.xmlName = xmlName;
+            c.xmlAttribute = xmlAttribute;
+            c.includeInJson = includeInJson;
+            c.includeInXml = includeInXml;
+            c.useAccessor = useAccessor;
+            c.getterName = getterName;
+            c.setterName = setterName;
+            c.elementIsEnum = elementIsEnum;
+            c.descriptor = descriptor;
+            c.aliases = aliases;
+            c.required = required;
+            c.omitNull = omitNull;
+            c.format = format;
+            c.adapter = adapter;
+            c.adapterCast = adapterCast;
+            c.elemAdapter = elemAdapter;
+            c.isArray = isArray;
+            c.typeRef = typeRef;
+            c.specIndex = specIndex;
+            c.viaLocal = viaLocal;
+            c.readOnly = readOnly;
+            c.helper = helper;
+            return c;
+        }
     }
 }

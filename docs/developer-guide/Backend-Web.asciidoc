@@ -176,7 +176,8 @@ app and the server reads the same on both sides:
   `transient` ones. A public field is used directly; any other through its
   `getX` (or `isX`) and `setX` methods, and is left out when it has neither.
 * `@JsonProperty("due_at")` renames a field and `@JsonIgnore` leaves one out, both
-  from `com.codename1.annotations`.
+  from `com.codename1.annotations`. The options in <<backend-json-contract>>
+  shape the rest.
 * A `record` is written from its accessors and read through its canonical
   constructor, so it needs no constructor without arguments. A component the body
   leaves out, or one marked `@JsonIgnore`, is passed its default: `null`, `0` or
@@ -191,7 +192,12 @@ app and the server reads the same on both sides:
   through that codec; a value of any other class of yours is answered 500 rather
   than written as its `toString()`, so declare the field with its type.
 * A body's unknown members are ignored and absent ones leave the field as the
-  constructor set it, as a Spring Boot application does.
+  constructor set it, as a Spring Boot application does. An explicit `null` sets a
+  field to `null`, and leaves a primitive at its default.
+* A generic class is written and read through the type arguments it's used with:
+  a method returning `Page<Order>` gets a codec that knows `Page`'s `List<T>`
+  holds orders.
+* An array is a JSON array, of any element type a field may have.
 
 A body the codec can't read -- a string where a number belongs, an enum name that
 doesn't exist -- is answered 400 with where it was and what was expected:
@@ -203,10 +209,130 @@ $.items[2].due: expected a number or an ISO-8601 date, got true
 Two objects that refer to each other, such as an order whose lines point back at
 it, would be written forever, so a response that nests more than 64 objects deep
 is answered 500 with a message naming the class; mark the field that points back
-`@JsonIgnore`. The build refuses what it can't write a codec for, and says why: a
-field typed by a type variable, such as `List<T>` in a generic `Page<T>`; a body
-class other than a record with no constructor without arguments; an interface;
-and an array other than `byte[]`.
+`@JsonIgnore`. The same limit refuses a body nested deeper than that with 400.
+`cn1.json.maxDepth` in `application.properties` moves it. The build refuses what
+it can't write a codec for, and says why: a generic class used without its type
+arguments, such as a raw `Page`; a body class other than a record with neither a
+constructor without arguments nor a `@JsonCreator`; an interface; and an array
+of more than one dimension, which a `List` of arrays replaces.
+
+[[backend-json-contract]]
+==== Shaping the JSON contract
+
+An API that outlives one release needs more say over its JSON than a field name.
+These annotations, from `com.codename1.annotations`, are read at build time by the
+server's codecs and by the app's `@Mapped` mappers alike, so a class shared by
+both keeps one contract:
+
+[cols="1,3", options="header"]
+|===
+| Annotation | Effect
+
+| `@JsonProperty(value = "order_id", aliases = {"orderId"})`
+| Writes the field as `order_id` and reads it from any of the names. An alias is
+  the way to rename a member without breaking clients that still send the old
+  name.
+
+| `@JsonProperty(required = true)`
+| A body that leaves the member out is answered 400:
+  `$.order_id: required member is missing`. An explicit `null` is present, so it's
+  accepted for an object and refused for a primitive, which can't hold it.
+
+| `@JsonStrict` on a class
+| A member the class doesn't declare is answered 400 with its path,
+  `$.lines[0].colour: unknown member`, where the default ignores it.
+
+| `@JsonOmitNull` on a class or a field
+| A `null` member is left out of the JSON instead of written as `null`.
+
+| `@JsonFormat(JsonFormat.Shape.STRING)` on a field
+| A number is written in quotes, which a JavaScript client needs for a `long`
+  past 2^53. A `Date` is written as an ISO-8601 instant in UTC,
+  `2025-03-01T09:30:00.000Z`. Reading accepts either form, so a field can change
+  format without breaking its old clients.
+
+| `@JsonAdapter(MoneyAdapter.class)` on a field or a class
+| Hands the value to your own `JsonTypeAdapter`. On a class, it applies wherever
+  the class appears.
+
+| `@JsonCreator` on a constructor or a static factory
+| Reads an immutable class through it. Each parameter names its member with
+  `@JsonProperty`, because a compiled class doesn't keep parameter names.
+|===
+
+An immutable class keeps its fields `final` and is read through its creator:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/contract/Point.java[tag=backend-json-creator,indent=0]
+----
+
+An adapter converts between a type and the parsed form of JSON: `null`, a
+`String`, a `Boolean`, a `Number`, a `Map` for an object and a `List` for an
+array. It's for the types the codecs don't map themselves, such as an amount kept
+in cents and sent as a decimal string:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/contract/MoneyAdapter.java[tag=backend-json-adapter,indent=0]
+----
+
+The adapter needs a public constructor without arguments. The build creates one
+instance of it and calls it directly, so nothing is looked up by name at run time
+and a native build keeps the class. An `IllegalArgumentException` it throws is
+answered 400, with the member's path in front of its message.
+
+==== Coming from Jackson
+
+A Spring controller maps JSON through Jackson's `ObjectMapper` at run time. The
+backend does the same work at build time, so most of what an `ObjectMapper` call
+did becomes a declaration:
+
+[cols="1,2", options="header"]
+|===
+| Jackson | Codename One backend
+
+| `mapper.readValue(body, Order.class)` in a handler
+| Declare the parameter `@RequestBody Order order`.
+
+| `mapper.writeValueAsString(order)` for a response
+| Return the `Order`.
+
+| `@JsonProperty`, `@JsonIgnore`, `@JsonCreator`
+| The annotations of the same names in `com.codename1.annotations`.
+
+| `@JsonAlias`
+| `@JsonProperty(aliases = ...)`.
+
+| `@JsonInclude(Include.NON_NULL)`
+| `@JsonOmitNull`.
+
+| `FAIL_ON_UNKNOWN_PROPERTIES`
+| `@JsonStrict` on the classes that want it. Unknown members are ignored by
+  default, as Spring Boot configures Jackson.
+
+| `@JsonFormat(shape = STRING)`
+| `@JsonFormat(JsonFormat.Shape.STRING)`. Dates are ISO-8601, never a pattern.
+
+| `@JsonSerialize` and `@JsonDeserialize` with custom serializers
+| `@JsonAdapter` and a `JsonTypeAdapter`.
+
+| `JsonNode`, `mapper.readTree(text)`
+| `Json.parse(text)`, which answers a `Map`, a `List`, a `String`, a `Long`, a
+  `Double`, a `Boolean` or `null`, nested to whatever depth the document has.
+
+| `ObjectNode` built by hand for a response
+| A `Map` or `List` returned from the method, or written with `Json.write(value)`.
+
+| `@JsonTypeInfo` and `@JsonSubTypes`
+| No equivalent. A subclass is written with its own fields, but a body is read
+  as the declared class. Read a polymorphic body as a `Map` and choose the class
+  yourself.
+|===
+
+A field whose type has no codec, such as a JDK class the server doesn't map,
+fails the build and names the field. Give it a `@JsonAdapter`, or declare it as
+the value it travels as.
 
 A method that throws is answered 500 with the body `internal error`, and the
 exception is logged. The message isn't sent to the client, because an exception
