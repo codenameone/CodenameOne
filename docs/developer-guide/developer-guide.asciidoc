@@ -162,6 +162,10 @@ include::Parley-Users-Guide.asciidoc[]
 
 include::Parley-Implementors-Guide.asciidoc[]
 
+include::Bastion-Users-Guide.asciidoc[]
+
+include::Bastion-Implementors-Guide.asciidoc[]
+
 = Device and platform services
 
 include::Push-Notifications.asciidoc[]
@@ -254,6 +258,8 @@ include::On-Device-Debugging.asciidoc[]
 
 include::On-Device-Debugging-Android.asciidoc[]
 
+include::Android-Without-Google-Play.asciidoc[]
+
 = Build, sign and ship
 
 include::Build-Hints.asciidoc[]
@@ -271,6 +277,8 @@ include::Working-With-Javascript.asciidoc[]
 include::Android-Interop.asciidoc[]
 
 include::Unity-Interop.asciidoc[]
+
+include::Desktop-Interop.asciidoc[]
 
 include::Working-with-Mac-OS-X.asciidoc[]
 

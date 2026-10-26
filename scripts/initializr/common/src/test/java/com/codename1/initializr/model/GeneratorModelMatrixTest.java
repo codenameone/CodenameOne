@@ -109,7 +109,8 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 if (template.isFullStack() && type == ProjectOptions.ProjectType.APP) {
                     // An app with its server is not offered without the server.
                     assertRefused(GeneratorModel.createForPluginVersion(IDE.INTELLIJ, template, "NoServer",
-                            "com.acme.noserver", mavenOptions(type, false), FULL_STACK_VERSION),
+                            "com.acme.noserver", mavenOptions(type, false),
+                            GeneratorModel.templateSince(template)),
                             "an app and its server", template + " must refuse to leave its server out");
                     continue;
                 }
@@ -373,6 +374,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
     private void assertFullStackProject(Template template, Map<String, byte[]> entries, byte[] zipData,
                                         String packageName, String mainClassName, String label) throws IOException {
         boolean rides = template == Template.WAYLINE;
+        boolean bank = template == Template.BASTION;
         boolean game = template == Template.SKIRMISH;
         String name = template.SOURCE_MAIN_CLASS;
         String upper = template.name();
@@ -388,12 +390,12 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         // project once got the ride-hailing accounts and chapters.
         String readme = getText(entries, "README.md");
         boolean chat = template == Template.PARLEY;
-        assertContains(readme, game ? "card battler" : rides ? "ride-hailing app" : chat ? "messaging app" : "food-delivery app",
+        assertContains(readme, game ? "card battler" : rides ? "ride-hailing app" : chat ? "messaging app" : bank ? "working bank" : "food-delivery app",
                 label + "README names the app");
         if (!game) {
-            assertContains(readme, (rides ? "`rider@" : chat ? "`alice@" : "`customer@") + artifact + ".example`",
+            assertContains(readme, (rides ? "`rider@" : chat ? "`alice@" : bank ? "`customer2@" : "`customer@") + artifact + ".example`",
                     label + "README lists the template's own demo accounts");
-            assertFalse(readme.indexOf(rides || chat ? "courier@" : "rider@") >= 0,
+            assertFalse(readme.indexOf(rides || chat || bank ? "courier@" : "rider@") >= 0,
                     label + "README carries no other template's accounts");
             assertFalse(chat && readme.indexOf("rider@") >= 0, label + "README carries no ride-hailing accounts");
         }
@@ -414,15 +416,15 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertContains(getText(entries, "backend/pom.xml"), "<goal>generate-annotation-stubs</goal>",
                 label + "the server generates its half of the contract");
 
-        assertContains(getText(entries, "shared/src/main/java/" + packagePath + (game ? "/api/AccountApi.java" : rides ? "/api/RiderApi.java" : chat ? "/api/MessageApi.java" : "/api/OrderApi.java")),
+        assertContains(getText(entries, "shared/src/main/java/" + packagePath + (game ? "/api/AccountApi.java" : rides ? "/api/RiderApi.java" : chat ? "/api/MessageApi.java" : bank ? "/api/BankingApi.java" : "/api/OrderApi.java")),
                 "package " + packageName + ".api;", label + "the contract moves to the project's package");
         assertContains(getText(entries, "backend/src/main/java/" + packagePath + "/SecurityConfig.java"),
                 "package " + packageName + ";", label + "the server moves to the project's package");
-        assertNotNull(entries.get("backend/src/main/resources/db/migration/" + (game ? "V1__game.sql" : "V1__accounts.sql")),
+        assertNotNull(entries.get("backend/src/main/resources/db/migration/" + (game ? "V1__game.sql" : bank ? "V4__accounts.sql" : "V1__accounts.sql")),
                 label + "the server keeps its migrations");
-        assertNotNull(entries.get("backend/src/test/java/" + packagePath + (game ? "/GameSocketTest.java" : rides ? "/RideFlowTest.java" : chat ? "/MessagingTest.java" : "/OrderFlowTest.java")),
+        assertNotNull(entries.get("backend/src/test/java/" + packagePath + (game ? "/GameSocketTest.java" : rides ? "/RideFlowTest.java" : chat ? "/MessagingTest.java" : bank ? "/LedgerTest.java" : "/OrderFlowTest.java")),
                 label + "the server keeps its tests");
-        assertNotNull(entries.get("common/src/main/java/" + packagePath + (game ? "/ui/HomeForm.java" : rides ? "/rider/RiderForm.java" : chat ? "/ui/ChatForm.java" : "/customer/CustomerForm.java")),
+        assertNotNull(entries.get("common/src/main/java/" + packagePath + (game ? "/ui/HomeForm.java" : rides ? "/rider/RiderForm.java" : chat ? "/ui/ChatForm.java" : bank ? "/ui/HomeForm.java" : "/customer/CustomerForm.java")),
                 label + "the app's screens move to the project's package");
         if (!game) {
             assertNotNull(entries.get("common/src/main/l10n/Bundle.properties"), label + "the app keeps its bundle");
@@ -435,18 +437,37 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertTrue(unixMode(zipData, "backend/server.sh") == 0100755, label + "server.sh must extract executable");
 
         String settings = getText(entries, "common/codenameone_settings.properties");
-        assertContains(settings, "codename1.arg.android.xapplication_attr=", label + "the template's Android hint");
-        if (!game) {
-            assertContains(settings, "codename1.arg.ios.NSLocationWhenInUseUsageDescription=",
-                    label + "the template's iOS location prompt");
+        if (bank) {
+            // The bank needs no location and no cleartext exception; its hints are
+            // the hardening ones.
+            assertContains(settings, "codename1.arg.ios.detectJailbreak=true", label + "the template's iOS hardening");
+            assertContains(settings, "codename1.arg.android.playIntegrity=true", label + "the template's Android hint");
+        } else {
+            assertContains(settings, "codename1.arg.android.xapplication_attr=", label + "the template's Android hint");
+            if (!game) {
+                assertContains(settings, "codename1.arg.ios.NSLocationWhenInUseUsageDescription=",
+                        label + "the template's iOS location prompt");
+            }
+            assertContains(settings, "codename1.arg.ios.includePush=", label + "the template's iOS push hint");
         }
-        assertContains(settings, "codename1.arg.ios.includePush=", label + "the template's iOS push hint");
         assertContains(settings, "codename1.arg.java.version=17", label + "a full-stack project is Java 17");
         assertContains(getText(entries, "README.md"), game ? "## The game and its server" : "## The app and its server",
                 label + "README should explain the app and its server");
 
+        // The demo template ships the agent skill like every app, and the skill's
+        // demo guide is how an agent finds this very demo's upstream source, so the
+        // template's name survives there -- and only there.
+        assertNotNull(entries.get(".agent-skills/codename-one/references/demos.md"),
+                label + "a demo project ships the skill's demo guide");
+        assertNotNull(entries.get(".agent-skills/codename-one/references/compatibility.md"),
+                label + "a demo project ships the skill's compatibility guide");
+        assertContains(getText(entries, ".agent-skills/codename-one/references/demos.md"), "scripts/" + lower,
+                label + "the demo guide still points at this demo's source");
         for (Map.Entry<String, byte[]> entry : entries.entrySet()) {
             String path = entry.getKey();
+            if (GeneratorModel.isAgentSkillPath(path)) {
+                continue;
+            }
             assertFalse(path.indexOf(lower) >= 0 || path.indexOf(name) >= 0,
                     label + "the template's name is still in the path " + path);
             if (path.endsWith(".png") || path.endsWith(".jar") || path.endsWith(".res") || path.endsWith(".ttf")
@@ -480,6 +501,10 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 ProjectOptions.BuildTool.MAVEN, ProjectOptions.ProjectType.APP_WITH_BACKEND);
         assertRefused(GeneratorModel.createForPluginVersion(IDE.INTELLIJ, Template.WAYLINE, "NoJava8",
                 "com.acme.nojava8", java8, FULL_STACK_VERSION), "Java 17", "A full-stack template is Java 17");
+        // Bastion's app calls framework API newer than the other templates need.
+        assertRefused(GeneratorModel.createForPluginVersion(IDE.INTELLIJ, Template.BASTION, "TooOld",
+                "com.acme.tooold", mavenOptions(ProjectOptions.ProjectType.APP_WITH_BACKEND, false),
+                FULL_STACK_VERSION), GeneratorModel.BASTION_SINCE, "Bastion must refuse a release before its own");
         ProjectOptions forced = java8.withBuild(ProjectOptions.BuildTool.GRADLE, ProjectOptions.ProjectType.APP)
                 .forFullStack();
         assertTrue(!forced.isGradle() && forced.projectType == ProjectOptions.ProjectType.APP_WITH_BACKEND
@@ -644,10 +669,38 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 "SameApp", "com.acme.same", mavenOptions(ProjectOptions.ProjectType.APP_WITH_BACKEND, false));
         for (String path : minimalWithBackend.keySet()) {
             if (!minimal.containsKey(path)) {
-                assertTrue(path.startsWith("backend/"), "From the gate App + backend adds only backend/: " + path);
+                // The module, and the shortcuts that start it.
+                assertTrue(path.startsWith("backend/") || "run-server.sh".equals(path)
+                                || "run-server.bat".equals(path)
+                                || ".idea/runConfigurations/Run_Server.xml".equals(path),
+                        "From the gate App + backend adds only backend/ and its shortcuts: " + path);
             }
         }
         assertNotNull(minimalWithBackend.get("backend/pom.xml"), "From the gate App + backend has the backend module");
+        assertNull(minimal.get("run-server.sh"), "An app with no server has no server shortcut");
+        assertContains(getText(minimalWithBackend, "run-server.sh"), GeneratorModel.SERVER_MAVEN_ARGS,
+                "run-server.sh starts the server through the reactor");
+        assertContains(getText(minimalWithBackend, "run-server.bat"), GeneratorModel.SERVER_MAVEN_ARGS,
+                "run-server.bat starts the server through the reactor");
+        // Every IDE hands each goal or argument entry to Maven as ONE argument,
+        // so a multi-word entry is a single unknown option and no goal runs.
+        String intellij = getText(minimalWithBackend, ".idea/runConfigurations/Run_Server.xml");
+        String[] words = GeneratorModel.tokens("-Dcn1.backend.jvmArgs=-Dcn1.profile=dev "
+                + GeneratorModel.SERVER_MAVEN_ARGS);
+        for (int i = 0; i < words.length; i++) {
+            assertContains(intellij, "<option value=\"" + words[i] + "\" />",
+                    "IntelliJ's Run Server passes " + words[i] + " as an argument of its own");
+        }
+        Map<String, byte[]> vscode = mavenEntries(LAYOUTS_VERSION, Template.BAREBONES, IDE.VS_CODE,
+                "SameApp", "com.acme.same", mavenOptions(ProjectOptions.ProjectType.APP_WITH_BACKEND, false));
+        assertContains(getText(vscode, ".vscode/tasks.json"), "\"-pl\", \"backend\", \"-am\"",
+                "VS Code's Run Server passes each argument as an element of its own");
+        Map<String, byte[]> netbeans = mavenEntries(LAYOUTS_VERSION, Template.BAREBONES, IDE.NETBEANS,
+                "SameApp", "com.acme.same", mavenOptions(ProjectOptions.ProjectType.APP_WITH_BACKEND, false));
+        assertContains(getText(netbeans, "nbactions.xml"), "<goal>-pl</goal>",
+                "NetBeans' Run Server builds only the server and what it needs");
+        assertContains(getText(minimalWithBackend, "README.md"), "./run-server.sh",
+                "the README starts the server with the launcher");
     }
 
     private static final String[] PLATFORM_DIRS = {"android/", "ios/", "javase/", "javascript/", "linux/", "win/"};
@@ -658,7 +711,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         String mainClassName = "Mvn" + template.ordinal() + type.ordinal() + (allModules ? 1 : 0) + ide.ordinal() + "App";
         String packageName = "com.acme.m" + template.ordinal() + ".t" + type.ordinal() + ".i" + ide.ordinal();
         String label = template + "/" + type + "/" + (allModules ? "full" : "minimal") + "/" + ide + ": ";
-        String version = template.isFullStack() ? FULL_STACK_VERSION : LAYOUTS_VERSION;
+        String version = template.isFullStack() ? GeneratorModel.templateSince(template) : LAYOUTS_VERSION;
         byte[] zipData = mavenZip(version, template, ide, mainClassName, packageName,
                 mavenOptions(type, allModules));
         Map<String, byte[]> entries = readZipEntries(zipData);
@@ -962,6 +1015,9 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 ".agent-skills/codename-one/references/ai-and-speech.md",
                 ".agent-skills/codename-one/references/backend.md",
                 ".agent-skills/codename-one/references/full-stack-loop.md",
+                ".agent-skills/codename-one/references/demos.md",
+                ".agent-skills/codename-one/references/compatibility.md",
+                ".agent-skills/codename-one/references/flutter-to-cn1.md",
                 ".agent-skills/codename-one/tools/README.md",
                 ".agent-skills/codename-one/tools/IsApiSupported.java",
                 ".agent-skills/codename-one/tools/IsCssValid.java"

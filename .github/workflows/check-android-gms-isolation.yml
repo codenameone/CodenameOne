@@ -1,0 +1,47 @@
+name: Check Android Play services isolation
+
+# Codename One applications run on Android without Google Play services
+# (GrapheneOS, CalyxOS, /e/OS, LineageOS without GApps, Huawei). There the Play
+# services libraries are still in the APK but the service behind them is not, so
+# every call into them has to sit behind GoogleServices.isPlayServicesAvailable.
+# This holds the Android port to that: only the guarded proxies listed in
+# scripts/android-gms-isolation-allowlist.txt may name a Google Play type.
+#
+# Pure source scan, seconds, no build. Its own workflow so the paths filter can
+# be exactly the inputs it reads.
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - master
+    paths:
+      - 'Ports/Android/src/**'
+      - 'scripts/check-android-gms-isolation.py'
+      - 'scripts/android-gms-isolation-allowlist.txt'
+      - '.github/workflows/check-android-gms-isolation.yml'
+  push:
+    branches:
+      - master
+    paths:
+      - 'Ports/Android/src/**'
+      - 'scripts/check-android-gms-isolation.py'
+      - 'scripts/android-gms-isolation-allowlist.txt'
+      - '.github/workflows/check-android-gms-isolation.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check-android-gms-isolation:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Google Play types only in guarded proxies
+        shell: bash
+        run: scripts/check-android-gms-isolation.py

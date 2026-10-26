@@ -152,6 +152,9 @@ public final class Mappers {
         }
         try {
             JSONParser p = new JSONParser();
+            // An explicit null must reach the mapper: a `required` member sent as
+            // null is present, and only an absent one is refused.
+            p.setIncludeNullsInstance(true);
             Map<String, Object> root = p.parseJSON(new StringReader(json));
             return m.fromMap(root);
         } catch (IOException ioe) {
@@ -171,6 +174,9 @@ public final class Mappers {
         }
         try {
             JSONParser p = new JSONParser();
+            // An explicit null must reach the mapper: a `required` member sent as
+            // null is present, and only an absent one is refused.
+            p.setIncludeNullsInstance(true);
             Map<String, Object> root = p.parseJSON(json);
             return m.fromMap(root);
         } catch (IOException ioe) {

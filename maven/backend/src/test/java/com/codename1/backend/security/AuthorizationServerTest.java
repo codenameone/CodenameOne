@@ -50,6 +50,7 @@ import com.codename1.backend.security.oauth2.server.authorization.AuthorizationS
 import com.codename1.backend.security.oauth2.server.authorization.AuthorizationServerSettings;
 import com.codename1.backend.security.oauth2.server.authorization.InMemoryOAuth2AuthorizationService;
 import com.codename1.backend.security.oauth2.server.authorization.InMemoryRegisteredClientRepository;
+import com.codename1.backend.security.oauth2.server.authorization.OAuth2AuthorizationServer;
 import com.codename1.backend.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import com.codename1.backend.security.oauth2.server.authorization.OAuth2TokenContext;
 import com.codename1.backend.security.oauth2.server.authorization.RegisteredClient;
@@ -129,6 +130,25 @@ class AuthorizationServerTest {
                 refused(device, 401, "login_required");
             }
         }
+    }
+
+    @Test
+    void authenticationMethodsNameHowTheUserSignedIn() {
+        java.util.List<GrantedAuthority> none = java.util.Collections.emptyList();
+        Authentication password = UsernamePasswordAuthenticationToken.authenticated(
+                new User("ada", "", none), null, none);
+        assertEquals("pwd", OAuth2AuthorizationServer.authMethods(password, false));
+        assertEquals("pwd otp mfa", OAuth2AuthorizationServer.authMethods(password, true));
+        com.codename1.backend.security.webauthn.PublicKeyCredentialUserEntity ada =
+                new com.codename1.backend.security.webauthn.PublicKeyCredentialUserEntity(
+                        "ada", new byte[] {1, 2, 3}, "Ada");
+        assertEquals("hwk user mfa", OAuth2AuthorizationServer.authMethods(
+                new com.codename1.backend.security.webauthn.WebAuthnAuthentication(
+                        ada, none, new byte[] {9}, true), false));
+        assertEquals("hwk", OAuth2AuthorizationServer.authMethods(
+                new com.codename1.backend.security.webauthn.WebAuthnAuthentication(
+                        ada, none, new byte[] {9}, false), false));
+        assertNull(OAuth2AuthorizationServer.authMethods(null, true));
     }
 
     @Test
@@ -582,6 +602,8 @@ class AuthorizationServerTest {
             assertEquals("app", id.getClaimAsString("azp"));
             assertEquals("nonce-7", id.getClaimAsString("nonce"));
             assertEquals(before, id.getClaimAsLong("auth_time").longValue());
+            // How: a password and nothing else.
+            assertEquals(Arrays.asList("pwd"), id.getClaimAsStringList("amr"));
             assertEquals("ada", id.getClaimAsString("preferred_username"));
             // at_hash: the left half of the access token's SHA-256.
             byte[] digest = com.codename1.backend.Crypto.sha256(

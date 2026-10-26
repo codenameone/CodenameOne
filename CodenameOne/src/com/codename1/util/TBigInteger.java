@@ -1358,7 +1358,7 @@ class TBigInteger {
         }
 
         // From now on: (m > 1)
-        TBigInteger res = TDivision.modInverseMontgomery(abs().mod(m), m);
+        TBigInteger res = TDivision.modInverseEuclid(abs().mod(m), m);
         if (res.sign == 0) {
             throw new ArithmeticException("BigInteger not invertible.");
         }

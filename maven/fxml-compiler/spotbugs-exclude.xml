@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+    <!--
+        The shared style classes are copied from javafx-compat, where the
+        device runs them, and are written for that runtime: a value and a
+        selector take the arrays they are given and hand out no copies,
+        because a device cannot afford one per value and every caller is the
+        parser or the reader that just made the array. The same classes are
+        analysed, with the same reasoning, in javafx-compat.
+    -->
+    <Match>
+        <Or>
+            <Class name="com.codename1.fxml.css.CssValue"/>
+            <Class name="com.codename1.fxml.css.CssSelector"/>
+            <Class name="com.codename1.fxml.css.CssSheetData"/>
+        </Or>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!--
+        The value parser answers null for a list of gradient stops it could
+        not read, with the reason in error(); an empty array would be a
+        gradient without stops, which is a different thing. Copied from
+        javafx-compat like the classes above.
+    -->
+    <Match>
+        <Class name="com.codename1.fxml.css.CssValueParser"/>
+        <Method name="stops"/>
+        <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
+    </Match>
+
+    <!--
+        null is "the class path has no such class", which every caller
+        tests; an empty array would be a class file of no bytes.
+    -->
+    <Match>
+        <Class name="com.codename1.fxml.ClassModel"/>
+        <Method name="bytes"/>
+        <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
+    </Match>
+
+    <!--
+        These fields are filled by the reader that creates the object, before
+        anything else sees it: a class's name by the ASM visitor that reads
+        its file (ClassModel.read answers only what visit() named), a
+        document's root by the SAX handler (FxmlDocument.parse answers null
+        instead of a document without one), and the handler's locator by the
+        parser, which SAX requires to call setDocumentLocator first.
+    -->
+    <Match>
+        <Or>
+            <Class name="com.codename1.fxml.ClassModel$Info"/>
+            <Class name="com.codename1.fxml.FxmlDocument"/>
+            <Class name="com.codename1.fxml.FxmlDocument$1"/>
+        </Or>
+        <Bug pattern="UWF_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR"/>
+    </Match>
+</FindBugsFilter>

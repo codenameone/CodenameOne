@@ -8,3 +8,9 @@
     index.html
     ...
 // end::backend-web-hosting-layout[]
+
+// tag::backend-web-validation-errors[]
+{"status":400,"error":"Bad Request","errors":[
+  {"field":"title","code":"NotBlank","message":"must not be blank"},
+  {"field":"tags[1].name","code":"Size","message":"size must be between 1 and 20"}]}
+// end::backend-web-validation-errors[]

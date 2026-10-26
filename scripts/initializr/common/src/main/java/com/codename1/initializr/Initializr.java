@@ -56,7 +56,6 @@ import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.UITimer;
-import com.codename1.util.StringUtil;
 
 public class Initializr extends Lifecycle {
     private boolean darkMode;
@@ -140,7 +139,7 @@ public class Initializr extends Lifecycle {
         final TemplatePreviewPanel previewPanel = new TemplatePreviewPanel(selectedTemplate[0]);
 
         // Mutable subtitle labels so panel headers reflect the current selection.
-        final Label ideSubtitle = panelSubtitle(IDE.INTELLIJ.name());
+        final Label ideSubtitle = panelSubtitle(ideLabel(IDE.INTELLIJ));
         final Label localeSubtitle = panelSubtitle("No bundles");
         final Label javaSubtitle = panelSubtitle(ProjectOptions.JavaVersion.JAVA_17.label);
         final Label buildSubtitle = panelSubtitle(ProjectOptions.BuildTool.MAVEN.label);
@@ -195,7 +194,7 @@ public class Initializr extends Lifecycle {
                 previewPanel.setTemplate(selectedTemplate[0]);
                 previewPanel.setOptions(options);
 
-                ideSubtitle.setText(formatEnumLabel(selectedIde[0].name()));
+                ideSubtitle.setText(ideLabel(selectedIde[0]));
                 localeSubtitle.setText(includeLocalizationBundles[0]
                         ? "Bundles . " + previewLanguage[0].label
                         : "No bundles");
@@ -421,8 +420,9 @@ public class Initializr extends Lifecycle {
                         + "unique. Unique package identifiers are critical for app store submissions because "
                         + "they distinguish your app from others and prevent install/update conflicts."));
         fields.add(packageError);
-        fields.add(labeledField(GeneratorModel.isTemplateOffered(Template.WAYLINE) ? "Start from" : "Language",
-                languageSelector));
+        // The selector labels its own groups when it offers the complete apps.
+        fields.add(GeneratorModel.isTemplateOffered(Template.WAYLINE) ? languageSelector
+                : labeledField("Language", languageSelector));
 
         Container bodyWrap = new Container(new BorderLayout());
         bodyWrap.setUIID("InitializrPanelBody");
@@ -433,41 +433,86 @@ public class Initializr extends Lifecycle {
         return panel;
     }
 
-    /// What the project starts as: an empty app in Java or in Kotlin, or -- once the
-    /// plugin the Initializr generates against can build it -- the ride-hailing,
-    /// the food-delivery or the messaging app with its server.
-    private Container createLanguageSelector(Template[] selectedTemplate, Runnable onSelectionChanged) {
-        boolean fullStack = GeneratorModel.isTemplateOffered(Template.WAYLINE);
-        Container selector = new Container(new GridLayout(fullStack ? 5 : 1, fullStack ? 1 : 2));
-        selector.setUIID("InitializrChoicesGrid");
-        ButtonGroup group = new ButtonGroup();
-        Template[] languages = fullStack
-                ? new Template[] {Template.BAREBONES, Template.KOTLIN, Template.WAYLINE, Template.SAVOR,
-                    Template.SKIRMISH, Template.PARLEY}
-                : new Template[] {Template.BAREBONES, Template.KOTLIN};
-        String[] labels = fullStack
-                ? new String[] {"Empty app, Java", "Empty app, Kotlin", "Ride-hailing app with its server, Java",
-                    "Food delivery app with its server, Java",
-                    "Card battle game with its server, Java", "Messaging app with its server, Java"}
-                : new String[] {"Java", "Kotlin"};
-        for (int i = 0; i < languages.length; i++) {
-            final Template template = languages[i];
-            RadioButton button = new RadioButton(labels[i]);
-            button.setToggle(true);
-            button.setUIID("InitializrChoice");
-            group.add(button);
-            selector.add(button);
-            if (template == selectedTemplate[0]) {
-                button.setSelected(true);
+    /// One of the page's toggle choices, which paints as chosen while it has focus.
+    ///
+    /// A toggle button that has focus paints its focus (`.selected`) style when the
+    /// display renders selection, and a desktop browser always does: it is not a
+    /// pure-touch display. A click gives the button focus, so the option just chosen
+    /// was painted as if it were not chosen until something else took focus. The
+    /// simulator is pure touch and never showed it. ChoiceSelectionTest clicks every
+    /// choice that way.
+    static RadioButton choice(String label) {
+        RadioButton button = new RadioButton(label) {
+            @Override
+            public Style getStyle() {
+                Style style = super.getStyle();
+                return isSelected() && hasFocus() ? getPressedStyle() : style;
             }
-            button.addActionListener(evt -> {
-                if (button.isSelected()) {
-                    selectedTemplate[0] = template;
-                    onSelectionChanged.run();
-                }
-            });
+        };
+        button.setToggle(true);
+        button.setUIID("InitializrChoice");
+        return button;
+    }
+
+    /// What the project starts as: an empty app in Java or in Kotlin, or -- once the
+    /// plugin the Initializr generates against can build it -- one of the complete
+    /// apps with its server. Two groups, so the list says what each choice is in a
+    /// word or two instead of six bars that all ended in "with its server, Java".
+    private Container createLanguageSelector(Template[] selectedTemplate, Runnable onSelectionChanged) {
+        ButtonGroup group = new ButtonGroup();
+        Container empty = new Container(new GridLayout(1, 2));
+        empty.setUIID("InitializrChoicesGrid");
+        addTemplateChoice(empty, group, Template.BAREBONES, "Java", selectedTemplate, onSelectionChanged);
+        addTemplateChoice(empty, group, Template.KOTLIN, "Kotlin", selectedTemplate, onSelectionChanged);
+        if (!GeneratorModel.isTemplateOffered(Template.WAYLINE)) {
+            return empty;
         }
-        return selector;
+        Template[] apps = {Template.WAYLINE, Template.SAVOR, Template.SKIRMISH, Template.PARLEY,
+            Template.BASTION};
+        int offered = 0;
+        for (Template app : apps) {
+            if (GeneratorModel.isTemplateOffered(app)) {
+                offered++;
+            }
+        }
+        Container complete = new Container(new GridLayout((offered + 1) / 2, 2));
+        complete.setUIID("InitializrChoicesGrid");
+        for (Template app : apps) {
+            if (!GeneratorModel.isTemplateOffered(app)) {
+                continue;
+            }
+            addTemplateChoice(complete, group, app, templateTitle(app), selectedTemplate, onSelectionChanged);
+        }
+        SpanLabel hint = new SpanLabel("A complete app is the app, its server and the API module they share, "
+                + "with demo accounts. Start the server with run-server, then the app with run.");
+        hint.setUIID("InitializrTip");
+        hint.setTextUIID("InitializrTip");
+        return BoxLayout.encloseY(labeledField("Empty app", empty),
+                labeledField("Complete app with its server (Java)", complete), hint);
+    }
+
+    private void addTemplateChoice(Container parent, ButtonGroup group, final Template template, String label,
+                                   Template[] selectedTemplate, Runnable onSelectionChanged) {
+        RadioButton button = choice(label);
+        group.add(button);
+        parent.add(button);
+        if (template == selectedTemplate[0]) {
+            button.setSelected(true);
+        }
+        button.addActionListener(evt -> {
+            if (button.isSelected()) {
+                selectedTemplate[0] = template;
+                onSelectionChanged.run();
+            }
+        });
+    }
+
+    /// What a full-stack template is, in a few words.
+    static String templateTitle(Template template) {
+        return template == Template.SAVOR ? "Food delivery" : template == Template.SKIRMISH ? "Card battle game"
+                : template == Template.PARLEY ? "Messaging" : template == Template.WAYLINE ? "Ride hailing"
+                : template == Template.BASTION ? "Banking"
+                : template.IS_KOTLIN ? "Empty app, Kotlin" : "Empty app, Java";
     }
 
     /// The colour schemes a full-stack template is offered in. The first is the
@@ -512,9 +557,7 @@ public class Initializr extends Lifecycle {
         ButtonGroup group = new ButtonGroup();
         for (int i = 0; i < SCHEME_COLORS.length; i++) {
             final int color = SCHEME_COLORS[i];
-            RadioButton button = new RadioButton(SCHEME_LABELS[i]);
-            button.setToggle(true);
-            button.setUIID("InitializrChoice");
+            RadioButton button = choice(SCHEME_LABELS[i]);
             // The template's own colour is painted when the template is known.
             button.setIcon(swatch(color < 0 ? 0 : color));
             if (color < 0) {
@@ -552,9 +595,7 @@ public class Initializr extends Lifecycle {
         selector.setUIID("InitializrChoicesGrid");
         ButtonGroup group = new ButtonGroup();
         for (IDE ide : IDE.values()) {
-            RadioButton button = new RadioButton(formatEnumLabel(ide.name()));
-            button.setToggle(true);
-            button.setUIID("InitializrChoice");
+            RadioButton button = choice(ideLabel(ide));
             group.add(button);
             selector.add(button);
             if (ide == selectedIde[0]) {
@@ -609,10 +650,8 @@ public class Initializr extends Lifecycle {
         ProjectOptions.JavaVersion[] versions = {ProjectOptions.JavaVersion.JAVA_17, ProjectOptions.JavaVersion.JAVA_8};
         for (int i = 0; i < versions.length; i++) {
             final ProjectOptions.JavaVersion version = versions[i];
-            RadioButton button = new RadioButton(labels[i]);
+            RadioButton button = choice(labels[i]);
             buttons[i] = button;
-            button.setToggle(true);
-            button.setUIID("InitializrChoice");
             group.add(button);
             selector.add(button);
             if (version == javaVersion[0]) {
@@ -669,10 +708,8 @@ public class Initializr extends Lifecycle {
         ButtonGroup typeGroup = new ButtonGroup();
         final RadioButton[] typeButtons = new RadioButton[ProjectOptions.ProjectType.values().length];
         for (ProjectOptions.ProjectType type : ProjectOptions.ProjectType.values()) {
-            RadioButton button = new RadioButton(type.label);
+            RadioButton button = choice(type.label);
             typeButtons[type.ordinal()] = button;
-            button.setToggle(true);
-            button.setUIID("InitializrChoice");
             typeGroup.add(button);
             types.add(button);
             if (type == projectType[0]) {
@@ -703,9 +740,7 @@ public class Initializr extends Lifecycle {
             if (tool == ProjectOptions.BuildTool.GRADLE && !GeneratorModel.isGradleOffered()) {
                 continue;
             }
-            RadioButton button = new RadioButton(tool.label);
-            button.setToggle(true);
-            button.setUIID("InitializrChoice");
+            RadioButton button = choice(tool.label);
             toolGroup.add(button);
             tools.add(button);
             if (tool == buildTool[0]) {
@@ -1047,11 +1082,10 @@ public class Initializr extends Lifecycle {
         return ProjectOptions.PreviewLanguage.ENGLISH;
     }
 
-    private String formatEnumLabel(String text) {
-        if ("DEFAULT".equals(text)) {
-            return "Clean";
-        }
-        return StringUtil.replaceAll(text, "_", " ");
+    /// The name an IDE goes by, not its constant.
+    static String ideLabel(IDE ide) {
+        return ide == IDE.INTELLIJ ? "IntelliJ IDEA" : ide == IDE.NETBEANS ? "NetBeans"
+                : ide == IDE.VS_CODE ? "VS Code" : "Eclipse";
     }
 
     // ---------- theme sync ----------
@@ -1178,12 +1212,9 @@ public class Initializr extends Lifecycle {
         String safePackage = packageName == null ? "" : packageName.trim();
         return "App      " + safeApp + "\n"
                 + "Package  " + safePackage + "\n"
-                + (template == Template.SKIRMISH ? "Template CARD-BATTLE GAME + SERVER\n"
-                : template == Template.PARLEY ? "Template MESSAGING APP + SERVER\n"
-                : template == Template.SAVOR ? "Template FOOD-DELIVERY APP + SERVER\n"
-                        : template.isFullStack() ? "Template RIDE-HAILING APP + SERVER\n" : "")
-                + "Language " + (template.IS_KOTLIN ? "KOTLIN" : "JAVA") + "\n"
-                + "IDE      " + ide.name() + "\n"
+                + (template.isFullStack() ? "Template " + templateTitle(template) + " and its server\n" : "")
+                + "Language " + (template.IS_KOTLIN ? "Kotlin" : "Java") + "\n"
+                + "IDE      " + ideLabel(ide) + "\n"
                 + "Build    " + options.buildTool.label
                 + (options.isGradle() || GeneratorModel.isMavenLayoutChoiceOffered()
                         ? " (" + options.projectType.label
@@ -1192,7 +1223,7 @@ public class Initializr extends Lifecycle {
                                         ? ", all modules" : "") + ")"
                         : "") + "\n"
                 + "Java     " + options.javaVersion.label + "\n"
-                + "Bundles  " + (options.includeLocalizationBundles ? "INCLUDED" : "NONE") + "\n"
+                + "Bundles  " + (options.includeLocalizationBundles ? "Included" : "None") + "\n"
                 + "Preview  " + options.previewLanguage.label;
     }
 

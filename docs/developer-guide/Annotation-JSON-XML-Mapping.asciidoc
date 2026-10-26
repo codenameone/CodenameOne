@@ -44,7 +44,21 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 | Annotation             | Purpose
 
 | `@JsonProperty("k")`   | Rename the JSON key. Default: the field name.
+                           `aliases` lists other keys it's read from, and
+                           `required = true` refuses JSON that leaves it out.
 | `@JsonIgnore`          | Omit the field from JSON.
+| `@JsonOmitNull`        | Leave the field out of JSON while it's `null`.
+                           On the class, for every field.
+| `@JsonFormat(STRING)`  | Write a number in quotes, or a `Date` as an
+                           ISO-8601 instant. Either form is read back.
+| `@JsonAdapter(A.class)`| Convert the value with your own
+                           `JsonTypeAdapter`. On a class, wherever the class
+                           appears.
+| `@JsonStrict`          | On the class: refuse JSON with a member it
+                           doesn't declare.
+| `@JsonCreator`         | On a constructor or static factory: build an
+                           immutable class from JSON through it, each
+                           parameter named with `@JsonProperty`.
 | `@XmlElement("name")`  | Rename the XML element. Default: the field name.
 | `@XmlAttribute("name")`| Lift the field into an XML attribute rather
                            than a nested child element. Only valid for
@@ -63,9 +77,24 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 | `Property<T, ?>`      | `T` must be a scalar or another `@Mapped` type.
 | `ListProperty<T, ?>`  | Same rules as `Property`.
 | `java.util.List<T>`   | Read from the field's generic signature.
+| Arrays                | One dimension, of any type above; a JSON array.
+                          XML leaves them out.
+| Generic classes       | A field `Page<User>` of a `@Mapped` class
+                          `Page<T>` maps its `T` members as `User`.
 | Nested `@Mapped` ref. | Recursive serialization through the registered
                           nested mapper.
 |===
+
+The server's generated JSON codecs read the same annotations, so a class shared
+by the app and its backend has one JSON contract on both sides. JSON that breaks
+it, such as a missing required member or a value of the wrong type, is refused
+with an `IllegalArgumentException` that names where it was:
+`$.items[2].id: required member is missing`. A member that's absent leaves the
+field as the constructor set it. An explicit `null` sets the field to `null` in
+a `@JsonStrict` class, on a `required` member and through an adapter, which is
+handed the `null`, as the server does in every class. Elsewhere the app keeps
+reading an explicit `null` as it always has, like an absent member, so a class
+that uses none of these options maps exactly as before.
 
 === Round-trip
 

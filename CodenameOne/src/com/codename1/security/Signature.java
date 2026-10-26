@@ -59,7 +59,7 @@ public final class Signature {
     /// Signs `data` with the given algorithm and private key.
     public static byte[] sign(String algorithm, PrivateKey key, byte[] data) {
         try {
-            return Util.cryptoSign(algorithm, key.getAlgorithm(), key.getEncoded(), data);
+            return Util.cryptoSign(algorithm, key.getAlgorithm(), key.signingForm(), data);
         } catch (RuntimeException re) {
             throw new CryptoException(re.getMessage(), re);
         }

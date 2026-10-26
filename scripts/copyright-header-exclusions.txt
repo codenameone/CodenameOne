@@ -200,6 +200,7 @@ Ports/CLDC11/src/java/text/DateFormatSymbols.java | Codename One contribution wh
 Ports/CLDC11/src/java/text/Format.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
 Ports/CLDC11/src/java/text/ParseException.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
 Ports/CLDC11/src/java/text/SimpleDateFormat.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
+Ports/CLDC11/src/java/util/Comparator.java | Apache Software Foundation (Harmony-derived) source retaining its original Apache-2.0 notice
 maven/cn1app-archetype/src/main/resources/archetype-resources/common/src/test/java/MyFirstTest.java | Archetype template copied into user projects, which carries no Codename One header by design
 maven/cn1lib-archetype/src/main/resources/archetype-resources/common/src/test/java/FilechooserTest.java | Archetype template copied into user projects, which carries no Codename One header by design
 maven/build-engine/src/main/java/com/codename1/builders/Base64.java | Apache Software Foundation (Harmony-derived) source retaining its original Apache-2.0 notice
@@ -247,6 +248,7 @@ vm/JavaAPI/src/java/text/Format.java | Codename One contribution whose copyright
 vm/JavaAPI/src/java/text/ParseException.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
 vm/JavaAPI/src/java/text/SimpleDateFormat.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
 maven/build-engine/src/main/java/com/codename1/builders/util/JSONSanitizer.java | Adapted from the OWASP JSON Sanitizer (Apache-2.0), whose documentation it keeps verbatim
+maven/android-compat/src/main/java/android/hardware/SensorMath.java | Rewritten from the static methods of AOSP android.hardware.SensorManager, Apache-2.0, retaining its original notice; adapted to the Codename One runtime
 maven/android-compat/src/main/java/androidx/constraintlayout/core/ArrayLinkedVariables.java | Vendored AOSP androidx.constraintlayout (constraintlayout-core 1.0.4 sources, Google Maven), Apache-2.0, retaining its original notice; adapted to the Codename One runtime
 maven/android-compat/src/main/java/androidx/constraintlayout/core/ArrayRow.java | Vendored AOSP androidx.constraintlayout (constraintlayout-core 1.0.4 sources, Google Maven), Apache-2.0, retaining its original notice; adapted to the Codename One runtime
 maven/android-compat/src/main/java/androidx/constraintlayout/core/Cache.java | Vendored AOSP androidx.constraintlayout (constraintlayout-core 1.0.4 sources, Google Maven), Apache-2.0, retaining its original notice; adapted to the Codename One runtime
@@ -367,6 +369,7 @@ vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/tree/TableSwi
 vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/tree/TryCatchBlockNode.java | Rewrite of ASM org.objectweb.asm.tree.TryCatchBlockNode for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
 vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/tree/TypeInsnNode.java | Rewrite of ASM org.objectweb.asm.tree.TypeInsnNode for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
 vm/ByteCodeTranslator/src/com/codename1/tools/translator/classfile/tree/VarInsnNode.java | Rewrite of ASM org.objectweb.asm.tree.VarInsnNode for ParparVM, retaining ASM's BSD-3-Clause notice (INRIA, France Telecom)
+maven/swing-compat/src/main/java/com/codename1/desktopcompat/javax/swing/GroupLayout.java | Adapted from CodenameOne/src/com/codename1/ui/layouts/GroupLayout.java (Oracle GPLv2 + Classpath-exception group layout), retaining its original Oracle notice
 
 maven/dart-transpiler/src/test/resources/golden/counter/expected/FlutterRegistry.java | Transpiler golden fixture: expected generated output, compared byte for byte
 maven/dart-transpiler/src/test/resources/golden/counter/expected/MainLib.java | Transpiler golden fixture: expected generated output, compared byte for byte
@@ -397,7 +400,6 @@ vm/JavaAPI/src/com/codename1/impl/zip/JZlib.java | JZlib, Copyright ymnk, JCraft
 vm/JavaAPI/src/com/codename1/impl/zip/StaticTree.java | JZlib, Copyright ymnk, JCraft Inc., BSD license; generated relocation retains original notice
 vm/JavaAPI/src/com/codename1/impl/zip/Tree.java | JZlib, Copyright ymnk, JCraft Inc., BSD license; generated relocation retains original notice
 vm/JavaAPI/src/com/codename1/impl/zip/ZStream.java | JZlib, Copyright ymnk, JCraft Inc., BSD license; generated relocation retains original notice
-Ports/CLDC11/src/java/util/Comparator.java | Apache Software Foundation (Harmony-derived) source retaining its original Apache-2.0 notice
 Ports/CLDC11/src/java/lang/Iterable.java | Apache Harmony source retaining its original Apache-2.0 notice
 Ports/CLDC11/src/java/util/Arrays.java | Apache Harmony source retaining its original Apache-2.0 notice
 Ports/CLDC11/src/java/util/Collection.java | Apache Harmony source retaining its original Apache-2.0 notice
@@ -419,3 +421,8 @@ Ports/CLDC11/src/java/util/Collections.java | Apache Harmony class library sourc
 vm/JavaAPI/src/java/io/ByteArrayOutputStream.java | Apache Harmony class library source retaining its original Apache-2.0 notice
 vm/JavaAPI/src/java/lang/CharSequence.java | Apache Harmony class library source retaining its original Apache-2.0 notice
 vm/JavaAPI/src/java/util/Objects.java | Apache Harmony class library source retaining its original Apache-2.0 notice
+CodenameOne/src/com/codename1/util/BigDecimal.java | Bouncy Castle derived source with its original provenance note
+CodenameOne/src/com/codename1/util/TBigDecimal.java | Apache Harmony source retaining its original Apache-2.0 notice
+CodenameOne/src/com/codename1/util/TBigInteger.java | Apache Harmony source retaining its original Apache-2.0 notice
+CodenameOne/src/com/codename1/util/TBitLevel.java | Apache Harmony source retaining its original Apache-2.0 notice
+CodenameOne/src/com/codename1/util/TDivision.java | Apache Harmony source retaining its original Apache-2.0 notice

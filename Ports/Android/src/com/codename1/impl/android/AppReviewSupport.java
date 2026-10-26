@@ -58,10 +58,13 @@ class AppReviewSupport {
     static boolean isSupported() {
         try {
             Class.forName(FACTORY);
-            return true;
         } catch (Throwable t) {
             return false;
         }
+        // The review flow is served by the Play Store app, which a de-Googled
+        // device does not have; reporting support there only set up a request
+        // that was certain to fail.
+        return GoogleServices.isPlayStoreInstalled(AndroidNativeUtil.getContext());
     }
 
     /**

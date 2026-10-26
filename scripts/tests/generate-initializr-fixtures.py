@@ -87,11 +87,22 @@ FULL_STACK = {
     'SAVOR': ('api/OrderApi.java', 'customer/CustomerForm.java'),
     'SKIRMISH': ('api/AccountApi.java', 'ui/HomeForm.java'),
     'PARLEY': ('api/ConversationApi.java', 'ui/CallScreen.java'),
+    'BASTION': ('api/BankingApi.java', 'ui/HomeForm.java'),
+}
+
+
+# A build hint each template's settings carry and a plain project's do not.
+TEMPLATE_HINT = {
+    'WAYLINE': 'codename1.arg.ios.NSLocationWhenInUseUsageDescription=',
+    'SAVOR': 'codename1.arg.ios.NSLocationWhenInUseUsageDescription=',
+    'SKIRMISH': None,
+    'PARLEY': 'codename1.arg.ios.NSLocationWhenInUseUsageDescription=',
+    'BASTION': 'codename1.arg.ios.detectJailbreak=true',
 }
 
 
 FIRST_FULL_STACK = next(iter(FULL_STACK))
-LAUNCHERS = ('build.sh', 'build.bat', 'run.sh', 'run.bat', 'mvnw', 'mvnw.cmd', 'backend/server.sh')
+LAUNCHERS = ('build.sh', 'build.bat', 'run.sh', 'run.bat', 'mvnw', 'mvnw.cmd', 'backend/server.sh', 'run-server.sh', 'run-server.bat')
 
 
 def same_launchers(archive, twin):
@@ -126,7 +137,7 @@ def check_full_stack_fixture(archive, z, template):
     assert ('javase/pom.xml' in names) == full, archive.name
     for name in ['shared/src/main/java/com/example/probe/' + contract,
                  'backend/src/main/java/com/example/probe/SecurityConfig.java',
-                 'backend/src/main/resources/db/migration/' + ('V1__game.sql' if rules else 'V1__accounts.sql'),
+                 'backend/src/main/resources/db/migration/' + ('V1__game.sql' if rules else 'V4__accounts.sql' if template == 'BASTION' else 'V1__accounts.sql'),
                  'backend/server.sh',
                  'common/src/main/java/com/example/probe/LauncherProbe.java',
                  'common/src/main/java/com/example/probe/' + screen]:
@@ -139,10 +150,14 @@ def check_full_stack_fixture(archive, z, template):
                      and 'Initializr Theme Overrides' not in css), archive.name
     assert z.read('common/icon.png') == b'\x89PNG', archive.name
     settings = z.read('common/codenameone_settings.properties').decode()
-    assert rules or 'codename1.arg.ios.NSLocationWhenInUseUsageDescription=' in settings, archive.name
+    assert TEMPLATE_HINT[template] is None or TEMPLATE_HINT[template] in settings, archive.name
     assert ('## The game and its server' if rules else '## The app and its server') in z.read('README.md').decode(), \
         archive.name
     for name in names:
+        # The agent skill names the demos on purpose (GeneratorModel.isAgentSkillPath):
+        # it is how an agent finds this demo's upstream source.
+        if name.startswith('.agent-skills/') or name in ('AGENTS.md', '.claude/skills/codename-one/SKILL.md'):
+            continue
         assert token not in name.lower(), (archive.name, name)
         if name.endswith(('.png', '.jar', '.res', '.ttf', '.glb')):
             continue
@@ -179,14 +194,20 @@ with tempfile.TemporaryDirectory(prefix='cn1-generator-') as directory:
     java += [sources / 'com/codename1/initializr/WebsiteThemeNative.java', root / 'scripts/tests/GenerateInitializr.java']
     cp = os.pathsep.join(map(str, deps))
     subprocess.run(['javac', '--release', '8', '-encoding', 'UTF-8', '-cp', cp, '-d', str(classes)] + list(map(str, java)), check=True)
+    shipped = '--shipped' in sys.argv[2:]
     subprocess.run(['java', '-Djava.awt.headless=true', '-cp', cp + os.pathsep + str(classes) + os.pathsep + str(resources),
-                    'com.codename1.initializr.model.GenerateInitializr', str(output)], check=True, timeout=60)
+                    'com.codename1.initializr.model.GenerateInitializr', str(output)] + (['shipped'] if shipped else []),
+                   check=True, timeout=60)
+    if shipped:
+        # Only the downloads; scripts/initializr/e2e-shipped.sh checks and runs them.
+        print('Wrote the shipped downloads to', output)
+        sys.exit(0)
     maven_settings = zipfile.ZipFile(output / 'INTELLIJ-JAVA_17.zip').read('common/codenameone_settings.properties')
     for archive in sorted(output.glob('*.zip')):
         with zipfile.ZipFile(archive) as z:
             assert z.testzip() is None
             for entry in z.infolist():
-                executable = ('build.sh', 'run.sh', 'mvnw', 'gradlew', 'backend/server.sh')
+                executable = ('build.sh', 'run.sh', 'mvnw', 'gradlew', 'backend/server.sh', 'run-server.sh')
                 expected = 0o100755 if entry.filename in executable else 0o100644
                 assert entry.create_system == 3 and entry.external_attr >> 16 == expected, entry.filename
             if archive.name.startswith('GRADLE-'):

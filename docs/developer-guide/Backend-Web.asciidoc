@@ -176,7 +176,8 @@ app and the server reads the same on both sides:
   `transient` ones. A public field is used directly; any other through its
   `getX` (or `isX`) and `setX` methods, and is left out when it has neither.
 * `@JsonProperty("due_at")` renames a field and `@JsonIgnore` leaves one out, both
-  from `com.codename1.annotations`.
+  from `com.codename1.annotations`. The options in <<backend-json-contract>>
+  shape the rest.
 * A `record` is written from its accessors and read through its canonical
   constructor, so it needs no constructor without arguments. A component the body
   leaves out, or one marked `@JsonIgnore`, is passed its default: `null`, `0` or
@@ -191,7 +192,12 @@ app and the server reads the same on both sides:
   through that codec; a value of any other class of yours is answered 500 rather
   than written as its `toString()`, so declare the field with its type.
 * A body's unknown members are ignored and absent ones leave the field as the
-  constructor set it, as a Spring Boot application does.
+  constructor set it, as a Spring Boot application does. An explicit `null` sets a
+  field to `null`, and leaves a primitive at its default.
+* A generic class is written and read through the type arguments it's used with:
+  a method returning `Page<Order>` gets a codec that knows `Page`'s `List<T>`
+  holds orders.
+* An array is a JSON array, of any element type a field may have.
 
 A body the codec can't read -- a string where a number belongs, an enum name that
 doesn't exist -- is answered 400 with where it was and what was expected:
@@ -203,10 +209,130 @@ $.items[2].due: expected a number or an ISO-8601 date, got true
 Two objects that refer to each other, such as an order whose lines point back at
 it, would be written forever, so a response that nests more than 64 objects deep
 is answered 500 with a message naming the class; mark the field that points back
-`@JsonIgnore`. The build refuses what it can't write a codec for, and says why: a
-field typed by a type variable, such as `List<T>` in a generic `Page<T>`; a body
-class other than a record with no constructor without arguments; an interface;
-and an array other than `byte[]`.
+`@JsonIgnore`. The same limit refuses a body nested deeper than that with 400.
+`cn1.json.maxDepth` in `application.properties` moves it. The build refuses what
+it can't write a codec for, and says why: a generic class used without its type
+arguments, such as a raw `Page`; a body class other than a record with neither a
+constructor without arguments nor a `@JsonCreator`; an interface; and an array
+of more than one dimension, which a `List` of arrays replaces.
+
+[[backend-json-contract]]
+==== Shaping the JSON contract
+
+An API that outlives one release needs more say over its JSON than a field name.
+These annotations, from `com.codename1.annotations`, are read at build time by the
+server's codecs and by the app's `@Mapped` mappers alike, so a class shared by
+both keeps one contract:
+
+[cols="1,3", options="header"]
+|===
+| Annotation | Effect
+
+| `@JsonProperty(value = "order_id", aliases = {"orderId"})`
+| Writes the field as `order_id` and reads it from any of the names. An alias is
+  the way to rename a member without breaking clients that still send the old
+  name.
+
+| `@JsonProperty(required = true)`
+| A body that leaves the member out is answered 400:
+  `$.order_id: required member is missing`. An explicit `null` is present, so it's
+  accepted for an object and refused for a primitive, which can't hold it.
+
+| `@JsonStrict` on a class
+| A member the class doesn't declare is answered 400 with its path,
+  `$.lines[0].colour: unknown member`, where the default ignores it.
+
+| `@JsonOmitNull` on a class or a field
+| A `null` member is left out of the JSON instead of written as `null`.
+
+| `@JsonFormat(JsonFormat.Shape.STRING)` on a field
+| A number is written in quotes, which a JavaScript client needs for a `long`
+  past 2^53. A `Date` is written as an ISO-8601 instant in UTC,
+  `2025-03-01T09:30:00.000Z`. Reading accepts either form, so a field can change
+  format without breaking its old clients.
+
+| `@JsonAdapter(MoneyAdapter.class)` on a field or a class
+| Hands the value to your own `JsonTypeAdapter`. On a class, it applies wherever
+  the class appears.
+
+| `@JsonCreator` on a constructor or a static factory
+| Reads an immutable class through it. Each parameter names its member with
+  `@JsonProperty`, because a compiled class doesn't keep parameter names.
+|===
+
+An immutable class keeps its fields `final` and is read through its creator:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/contract/Point.java[tag=backend-json-creator,indent=0]
+----
+
+An adapter converts between a type and the parsed form of JSON: `null`, a
+`String`, a `Boolean`, a `Number`, a `Map` for an object and a `List` for an
+array. It's for the types the codecs don't map themselves, such as an amount kept
+in cents and sent as a decimal string:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/contract/MoneyAdapter.java[tag=backend-json-adapter,indent=0]
+----
+
+The adapter needs a public constructor without arguments. The build creates one
+instance of it and calls it directly, so nothing is looked up by name at run time
+and a native build keeps the class. An `IllegalArgumentException` it throws is
+answered 400, with the member's path in front of its message.
+
+==== Coming from Jackson
+
+A Spring controller maps JSON through Jackson's `ObjectMapper` at run time. The
+backend does the same work at build time, so most of what an `ObjectMapper` call
+did becomes a declaration:
+
+[cols="1,2", options="header"]
+|===
+| Jackson | Codename One backend
+
+| `mapper.readValue(body, Order.class)` in a handler
+| Declare the parameter `@RequestBody Order order`.
+
+| `mapper.writeValueAsString(order)` for a response
+| Return the `Order`.
+
+| `@JsonProperty`, `@JsonIgnore`, `@JsonCreator`
+| The annotations of the same names in `com.codename1.annotations`.
+
+| `@JsonAlias`
+| `@JsonProperty(aliases = ...)`.
+
+| `@JsonInclude(Include.NON_NULL)`
+| `@JsonOmitNull`.
+
+| `FAIL_ON_UNKNOWN_PROPERTIES`
+| `@JsonStrict` on the classes that want it. Unknown members are ignored by
+  default, as Spring Boot configures Jackson.
+
+| `@JsonFormat(shape = STRING)`
+| `@JsonFormat(JsonFormat.Shape.STRING)`. Dates are ISO-8601, never a pattern.
+
+| `@JsonSerialize` and `@JsonDeserialize` with custom serializers
+| `@JsonAdapter` and a `JsonTypeAdapter`.
+
+| `JsonNode`, `mapper.readTree(text)`
+| `Json.parse(text)`, which answers a `Map`, a `List`, a `String`, a `Long`, a
+  `Double`, a `Boolean` or `null`, nested to whatever depth the document has.
+
+| `ObjectNode` built by hand for a response
+| A `Map` or `List` returned from the method, or written with `Json.write(value)`.
+
+| `@JsonTypeInfo` and `@JsonSubTypes`
+| No equivalent. A subclass is written with its own fields, but a body is read
+  as the declared class. Read a polymorphic body as a `Map` and choose the class
+  yourself.
+|===
+
+A field whose type has no codec, such as a JDK class the server doesn't map,
+fails the build and names the field. Give it a `@JsonAdapter`, or declare it as
+the value it travels as.
 
 A method that throws is answered 500 with the body `internal error`, and the
 exception is logged. The message isn't sent to the client, because an exception
@@ -253,6 +379,48 @@ for any other body. A body that isn't text -- an upload, an image,
 `getBodyBytes()`. `getBody()` returns text only for a text type, JSON, XML or a
 form, after checking that it's valid UTF-8, and refuses a binary body rather
 than hand the handler garbled characters.
+
+==== Large uploads and downloads
+
+A binary body can be larger than 8 MB when `CN1_HTTP_MAX_SPOOLED_BODY_MB` raises
+its limit. Such a body is never held in memory whole. Up to
+`CN1_HTTP_SPOOL_THRESHOLD_KB` (1024 by default) it stays on the heap, and past
+that the server writes it to a temporary file as it arrives. The file is deleted
+from the directory as soon as it's created, so a crash leaves nothing behind.
+`CN1_HTTP_SPOOL_DIR` chooses the directory, the system temporary directory
+otherwise. A body over the limit is answered 413, over HTTP/1.1 and HTTP/2
+alike. JSON, forms, XML and compressed bodies keep the 8 MB limit, because a
+handler reads those whole anyway.
+
+Read such a body with `getBodyStream()`, which reads the file or the memory
+without the handler knowing which. `getBodyLength()` gives its size without
+reading it. A multipart upload is spooled the same way, and each
+`HttpServer.Part` has `getInputStream()` and `getLength()` for it:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/Streaming.java[tag=backend-web-upload-stream,indent=0]
+----
+
+The body is valid until the request ends. A handler that needs it later copies
+it somewhere of its own.
+
+A response is streamed with `HttpServer.Response.stream`. The writer runs after
+the headers are sent and writes as much as it likes: chunked on HTTP/1.1, DATA
+frames on HTTP/2. A write blocks while the client is slow, so a slow client
+slows the writer rather than filling memory, and a client that goes away makes
+the next write throw.
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/Streaming.java[tag=backend-web-download-stream,indent=0]
+----
+
+The server doesn't run the writer for a `HEAD` request, a status without a
+body, or a client that left before the headers went out. A writer that holds
+something open until it runs, such as a connection or a file, should also
+implement `java.io.Closeable`. In those cases the server calls `close()`
+instead.
 
 ==== Compression
 
@@ -334,6 +502,157 @@ an encoded escape sequence and a symbolic link out of the tree are all refused.
 Conditional requests and ranges are honoured, and where the platform supports it
 the file is sent from the page cache to the socket without passing through the
 process.
+
+[[backend-web-errors]]
+==== When a method throws
+
+A method that throws answers 500 with a body that reveals nothing about the
+failure, unless something handles the exception first. A
+`ResponseStatusException` chooses its own status. For anything else, write a
+handler:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/advice/NotesWithHandler.java[tag=backend-web-exception-handler,indent=0]
+----
+
+A handler on a controller answers for that controller's routes. A
+`@ControllerAdvice` (or `@RestControllerAdvice`) bean holds handlers for every
+controller, and `basePackages` narrows it to some:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/advice/ApiErrors.java[tag=backend-web-controller-advice,indent=0]
+----
+
+A handler takes, in any order, the exception, the `HttpServer.Request` and the
+`HandlerMethod` that failed. It returns an `HttpServer.Response` for full
+control of status, headers and body; or a `String`, a `Map`, a `List`, a
+`Json.Writable` or nothing, sent with its `@ResponseStatus`, or 200 without
+one, as Spring does. A handler returning a null `Response` declines, and the
+next one is asked.
+
+The build decides which handler answers, in this order:
+
+. The controller's own handlers. Among those that apply, the one naming the
+  closest superclass of the thrown exception.
+. Each advice, in `@Order` order and then by bean name, choosing its own
+  closest match the same way.
+. A `ValidationException` that nothing handled answers 400 with its field
+  errors, as the next section shows.
+. Anything else answers as before: the status of a
+  `ResponseStatusException`, otherwise a plain 500.
+
+Two kinds of failure skip every handler. An `Error` is never handled. A
+failure that belongs to security, `AccessDeniedException` or
+`AuthenticationException` and their subclasses (CSRF failures among them),
+goes straight back to the security chain, so a handler for `Exception` can't
+turn a 403 into a 200 by accident.
+
+Two handlers in one class for the same exception, a handler that takes an
+argument it can't be given, or one returning a type it can't send all fail the
+build, naming the method.
+
+[[backend-web-validation]]
+==== Validating input
+
+Constraints from `com.codename1.backend.validation` declare what valid input
+looks like. Put `@Valid` on a `@RequestBody` or `@ModelAttribute` parameter to
+check the object's fields, and put a constraint directly on a `@RequestParam`,
+`@PathVariable` or `@RequestHeader`:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/advice/NewNote.java[tag=backend-web-validation-model,indent=0]
+----
+
+The controller asks for the checks on its parameters:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/advice/ValidatedNotes.java[tag=backend-web-validation-controller,indent=0]
+----
+
+The constraints are `@NotNull`, `@NotBlank`, `@NotEmpty`, `@Size`, `@Min` and
+`@Max`. `@Valid` on a field descends into its value, or into each element of a
+collection or array. The build writes every check as code, so a constraint on a
+type that can't carry it, such as `@Min` on a `String`, fails the build.
+
+The checks run after binding and before the method, so invalid input never
+reaches it. They throw a `ValidationException`, which a handler from the
+previous section may answer. Unhandled, it answers 400:
+
+[source,json]
+----
+include::../demos/common/src/main/snippets/developer-guide/backend-web.txt[tag=backend-web-validation-errors,indent=0]
+----
+
+Field paths are stable: they use the JSON property names, `[n]` for an
+element, and the annotation's name for a parameter. A `@Valid @ModelAttribute`
+form followed by a `BindingResult` parameter records the errors there instead,
+and the method decides what to render.
+
+There is no `@Pattern`: the backend's class library has no regular
+expressions. Check such a value in the method and throw a `ValidationException`
+of your own; it's answered the same way.
+
+[[backend-web-interceptors]]
+==== Around every request
+
+A bean implementing `HandlerInterceptor` runs around every controller method,
+for work that's not security: auditing, metrics, cleaning up after a request.
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/advice/Audit.java[tag=backend-web-interceptor,indent=0]
+----
+
+A request passes through these stages in order:
+
+. The security filter chain: authentication, CSRF and the URL rules. A request
+  it refuses never reaches an interceptor.
+. Route selection. A request that matches no route isn't intercepted.
+. Each interceptor's `preHandle`, in `@Order` order. One that returns a
+  response answers with it, and the controller method doesn't run.
+. Binding, validation, and the method with its method security.
+. The exception handlers, when the stage before threw.
+. Each `postHandle`, in reverse order, when the method returned normally.
+. Each `afterCompletion`, in reverse order, for every interceptor whose
+  `preHandle` let the request through. It runs on success, after a later
+  interceptor refused, after a binding or validation failure, and after a
+  failure nothing handled, which it receives as `failure`.
+
+Because interceptors run inside the security chain and never see the failures
+security owns, an interceptor can't let through a request security refused.
+
+[[backend-web-servlet-equivalents]]
+==== Coming from Servlets and Spring MVC
+
+The backend has no Servlet container. The usual extension points map as
+follows:
+
+[cols="1,2",options="header"]
+|===
+|Servlet or Spring MVC |Backend
+
+|`Filter` doing authentication, CSRF or access rules
+|A `SecurityFilterChain` bean, or a `SecurityFilter` added to it
+
+|`Filter` or `HandlerInterceptor` doing anything else
+|A `HandlerInterceptor` bean
+
+|`@ExceptionHandler`, `@ControllerAdvice`, `@RestControllerAdvice`
+|The same annotations, resolved at build time
+
+|`HandlerExceptionResolver`
+|An `ExceptionResolver` bean
+
+|`@Valid` with Bean Validation
+|`@Valid` and the constraints in `com.codename1.backend.validation`
+
+|`HttpServletResponse` headers and status
+|Return an `HttpServer.Response`
+|===
 
 [[backend-hosting-the-app]]
 ==== Hosting the app in the browser
@@ -764,6 +1083,63 @@ The local Java SE runtime speaks HTTP/1.1 only, so there a client that requires
 HTTP/2 fails every request with an exception that says so. It reads PKCS#12
 archives, and PEM keys in unencrypted PKCS#8 or RSA form. The packaged server also
 reads encrypted PEM keys. A PKCS#12 archive works the same in both.
+
+==== Streaming a request
+
+`Web.request` holds the whole response in memory. `Web.open` (or
+`WebClient.open`) returns a `Web.Exchange` instead, which sends the request body
+as it's written and reads the response as it arrives. The length is the body's
+size, `Web.UNKNOWN_LENGTH` for a body of unknown size, or `Web.NO_BODY`:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/Streaming.java[tag=backend-web-exchange,indent=0]
+----
+
+Write and close the request body first, then read the status, the headers and
+the response body, all from one thread. Each direction buffers a fixed window,
+so a slow peer slows its producer. `close()` ends the exchange in any state.
+Before the response has been read to its end it cancels the exchange, closing
+the connection instead of draining it, so always close it in a `finally`. An
+exchange never follows a redirect, because a streamed body can't be sent twice.
+
+==== Forwarding to another service
+
+`HttpProxy` forwards a request to another server and streams the answer back,
+the way a gateway in front of an internal service would:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/Streaming.java[tag=backend-web-proxy-create,indent=0]
+----
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/Streaming.java[tag=backend-web-proxy-forward,indent=0]
+----
+
+The response body is streamed back as it arrives, and a binary upload is
+streamed up from wherever it lives, a spooled one included. A text or compressed
+request body is read whole on arrival, under the 8 MB limit, and forwarded
+decompressed. Every end-to-end header goes
+through, a repeated one such as `Set-Cookie` line by line. The hop-by-hop
+headers (`Connection`, `Keep-Alive`, `Proxy-*`, `TE`, `Trailer`,
+`Transfer-Encoding`, `Upgrade`) and any header a `Connection` field names are
+removed in both directions. `X-Forwarded-For`, `X-Forwarded-Proto` and
+`X-Forwarded-Host` are added unless `setForwardedHeaders(false)` turns them off.
+
+Only the target's host is reached, plus the hosts named with `allowHost`, over
+`http` and `https`. Redirects are passed back to the client.
+`setFollowRedirects(n)` follows up to `n` hops itself, for a request without a
+body and only to allowed hosts. A hop to another host doesn't carry the
+client's `Authorization` and `Cookie` headers.
+
+Failures go both ways. A client that disconnects cancels the upstream exchange.
+An upstream that fails before answering is a `502`. Once the status has been
+sent, a later upstream failure aborts the client's response, closing the
+HTTP/1.1 connection or resetting the HTTP/2 stream, so the client sees a
+truncated response and never one that looks complete. `setClient` gives the
+proxy a `WebClient` for its timeouts and client certificate.
 
 A static binary in a `scratch` image has no certificate store. Copy a
 `ca-certificates.crt` into the image and name it in `CURL_CA_BUNDLE` or

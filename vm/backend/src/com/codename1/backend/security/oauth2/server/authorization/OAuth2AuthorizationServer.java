@@ -74,6 +74,13 @@ public final class OAuth2AuthorizationServer {
     private static final long REUSE_GRACE_MILLIS = 10000;
     /// Session attribute holding the last completed credential check, in epoch seconds.
     public static final String AUTH_TIME = "cn1.security.oauth2.authTime";
+    /// Session attribute holding how the last completed credential check was
+    /// made: RFC 8176 method names separated by spaces, such as `pwd otp mfa`.
+    /// A grant made in the session carries them as its `amr` attribute, and the
+    /// ID token as its `amr` claim, so a resource server can tell a passkey
+    /// sign-in from a password one. A token customizer copies the attribute
+    /// into an access token that needs it.
+    public static final String AUTH_METHODS = "cn1.security.oauth2.authMethods";
     private static final String DEVICE_TICKET = "cn1.security.oauth2.deviceTicket";
     /// The attribute of a grant that holds the resource servers it is for.
     private static final String RESOURCE = "resource";
@@ -246,7 +253,7 @@ public final class OAuth2AuthorizationServer {
         m.put("revocation_endpoint_auth_methods_supported", list("client_secret_basic",
                 "client_secret_post", "none"));
         m.put("code_challenge_methods_supported", list("S256"));
-        m.put("claims_supported", list("sub", "iss", "aud", "exp", "iat", "auth_time", "nonce",
+        m.put("claims_supported", list("sub", "iss", "aud", "exp", "iat", "auth_time", "amr", "nonce",
                 "at_hash", "preferred_username", "name", "email", "email_verified"));
         m.put("authorization_response_iss_parameter_supported", Boolean.TRUE);
         Map<String, Object> headers = new LinkedHashMap<String, Object>();
@@ -469,7 +476,14 @@ public final class OAuth2AuthorizationServer {
         if (nonce != null) {
             attributes.put("nonce", nonce);
         }
-        attributes.put("auth_time", Long.valueOf(authTime(request, now)));
+        long authTime = authTime(request);
+        if (authTime >= 0) {
+            attributes.put("auth_time", Long.valueOf(authTime));
+        }
+        List<Object> amr = authMethods(request);
+        if (amr != null) {
+            attributes.put("amr", amr);
+        }
         attributes.put("authorities", authorities(authentication));
         if (!resources.isEmpty()) {
             attributes.put(RESOURCE, new ArrayList<Object>(resources));
@@ -491,18 +505,61 @@ public final class OAuth2AuthorizationServer {
         return redirect(OAuth2Parameters.append(redirectUri, answer));
     }
 
-    /// When this session completed a credential check, in epoch seconds.
-    /// Authentication supplied without a session has no stored sign-in time.
-    private static long authTime(HttpServer.Request request, long now) {
+    /// When this session completed a credential check, in epoch seconds, or
+    /// -1 when that is not known: authentication supplied without a session,
+    /// or a session that recorded no sign-in time. Unknown is answered as
+    /// unknown -- the grant then carries no `auth_time` -- never as "now",
+    /// which would make every freshness check (`max_age`, a step-up) pass
+    /// for a sign-in of any age.
+    private static long authTime(HttpServer.Request request) {
         HttpSession session = request.getSession(false);
-        if (session == null) {
-            return now / 1000L;
-        }
-        Object known = session.getAttribute(AUTH_TIME);
+        Object known = session == null ? null : session.getAttribute(AUTH_TIME);
         if (known instanceof Number) {
             return ((Number) known).longValue();
         }
-        return now / 1000L;
+        return -1L;
+    }
+
+    /// How this session's credential check was made, as RFC 8176 `amr`
+    /// values, or null when the session recorded none.
+    private static List<Object> authMethods(HttpServer.Request request) {
+        HttpSession session = request.getSession(false);
+        Object known = session == null ? null : session.getAttribute(AUTH_METHODS);
+        if (!(known instanceof String) || ((String) known).length() == 0) {
+            return null;
+        }
+        List<Object> out = new ArrayList<Object>();
+        String text = (String) known;
+        int at = 0;
+        while (at < text.length()) {
+            int end = text.indexOf(' ', at);
+            if (end < 0) {
+                end = text.length();
+            }
+            if (end > at) {
+                out.add(text.substring(at, end));
+            }
+            at = end + 1;
+        }
+        return out;
+    }
+
+    /// The RFC 8176 `amr` values for a completed sign-in, space separated:
+    /// `hwk` for a passkey (and `user` plus `mfa` when the authenticator
+    /// verified the user), otherwise `pwd`, with `otp` and `mfa` added when a
+    /// second factor was passed. A kind of sign-in it does not know -- a
+    /// remember-me cookie, say -- answers null and nothing is recorded.
+    ///
+    /// @param secondFactor whether the sign-in passed a second factor
+    public static String authMethods(Authentication authentication, boolean secondFactor) {
+        if (authentication instanceof com.codename1.backend.security.webauthn.WebAuthnAuthentication) {
+            return ((com.codename1.backend.security.webauthn.WebAuthnAuthentication) authentication)
+                    .isUserVerified() ? "hwk user mfa" : "hwk";
+        }
+        if (authentication instanceof com.codename1.backend.security.UsernamePasswordAuthenticationToken) {
+            return secondFactor ? "pwd otp mfa" : "pwd";
+        }
+        return null;
     }
 
     private static List<Object> authorities(Authentication authentication) {
@@ -990,6 +1047,10 @@ public final class OAuth2AuthorizationServer {
             Object authTime = authorization.getAttribute("auth_time");
             if (authTime instanceof Number) {
                 id.claim("auth_time", Long.valueOf(((Number) authTime).longValue()));
+            }
+            Object amr = authorization.getAttribute("amr");
+            if (amr instanceof List && !((List) amr).isEmpty()) {
+                id.claim("amr", new ArrayList<Object>((List) amr));
             }
             Object nonce = authorization.getAttribute("nonce");
             if (nonce instanceof String) {
@@ -1479,7 +1540,14 @@ public final class OAuth2AuthorizationServer {
             return new Verification(Verification.INVALID);
         }
         Map<String, Object> attributes = new LinkedHashMap<String, Object>();
-        attributes.put("auth_time", Long.valueOf(authTime(request, now)));
+        long authTime = authTime(request);
+        if (authTime >= 0) {
+            attributes.put("auth_time", Long.valueOf(authTime));
+        }
+        List<Object> amr = authMethods(request);
+        if (amr != null) {
+            attributes.put("amr", amr);
+        }
         attributes.put("authorities", authorities(authentication));
         Object resource = authorization.getAttribute(RESOURCE);
         if (resource != null) {

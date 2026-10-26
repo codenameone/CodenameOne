@@ -809,11 +809,24 @@ Juwal
 Fruitopia
 Kharrat
 Cinemachine
+
+# -----------------------------------------------------------------------------
+# Desktop compatibility chapter (Desktop-Interop.asciidoc and its measured
+# tables): the SwingX component set and the CPU architecture of the test machine.
+SwingX
+aarch64
+
 # -----------------------------------------------------------------------------
 # The sample application the Wayline chapters walk through.
 Parley
 Savor
 Wayline
+# The sample application the Bastion chapters walk through, and the units its ledger keeps coins in.
+Bastion
+satoshi
+gwei
+wei
+cleartext
 Lousberg
 Elda
 prekey
@@ -823,3 +836,5 @@ callee
 signalling
 coturn
 unconfigured
+Sepolia
+ntfy

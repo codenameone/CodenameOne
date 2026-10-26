@@ -37,7 +37,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import static com.codename1.ui.CN.*;
@@ -78,6 +80,18 @@ public class GeneratorModel {
     /// neither offered nor generated for a release before this one.
     static final String FULL_STACK_SINCE = "7.0.277";
 
+    /// The first release whose framework has what the banking template's app calls:
+    /// timed clipboard clearing, the P-256 key and signature API it signs requests
+    /// with, and the `BigDecimal` arithmetic its ledger rounds with. Against an
+    /// older release its download does not compile, so it is neither offered nor
+    /// generated there.
+    static final String BASTION_SINCE = "7.0.280";
+
+    /// The first release a template can be generated against.
+    static String templateSince(Template template) {
+        return template == Template.BASTION ? BASTION_SINCE : FULL_STACK_SINCE;
+    }
+
     /// The brand colour of the full-stack template as it ships: the `--brand` its
     /// theme.css declares, which is what the UI paints the icon with when no other
     /// colour is chosen. GeneratorModelMatrixTest holds the two together.
@@ -85,6 +99,9 @@ public class GeneratorModel {
 
     /// The food-delivery template's `--brand`, held to its theme.css the same way.
     public static final int SAVOR_BRAND = 0x7ac943;
+
+    /// The banking template's `--brand`, held to its theme.css the same way.
+    public static final int BASTION_BRAND = 0x1f3a8a;
 
     /// The card-battle template's accent, used for its icon: it has no `--brand`.
     public static final int SKIRMISH_BRAND = 0xc8862f;
@@ -98,6 +115,9 @@ public class GeneratorModel {
         if (template == Template.PARLEY) {
             return PARLEY_BRAND;
         }
+        if (template == Template.BASTION) {
+            return BASTION_BRAND;
+        }
         return template == Template.SAVOR ? SAVOR_BRAND
                 : template == Template.SKIRMISH ? SKIRMISH_BRAND : FULL_STACK_BRAND;
     }
@@ -105,7 +125,7 @@ public class GeneratorModel {
     /// Whether `template` can be generated at [CN1_PLUGIN_VERSION]: the UI offers
     /// only the templates this answers true for.
     public static boolean isTemplateOffered(Template template) {
-        return !template.isFullStack() || isVersionAtLeast(CN1_PLUGIN_VERSION, FULL_STACK_SINCE);
+        return !template.isFullStack() || isVersionAtLeast(CN1_PLUGIN_VERSION, templateSince(template));
     }
 
     /// The plugin version a download is generated against.
@@ -716,6 +736,9 @@ public class GeneratorModel {
         copyZipEntriesToMap(template.SOURCE_ZIP, mergedEntries, ZipEntryType.TEMPLATE_SOURCE);
         addLocalizationEntries(mergedEntries);
         addLauncherTelemetry(mergedEntries);
+        if (includesBackendModule()) {
+            addServerLaunchers(mergedEntries);
+        }
         addCustomIcon(mergedEntries);
         applyColorScheme(mergedEntries);
         validateGeneratedPomCoordinates(mergedEntries);
@@ -968,6 +991,9 @@ public class GeneratorModel {
             if (!isVersionAtLeast(pluginVersion, FULL_STACK_SINCE)) {
                 throw new IOException("This template shares a contract module between the app and its server, "
                         + "which needs Codename One " + FULL_STACK_SINCE + " or newer.");
+            }
+            if (!isVersionAtLeast(pluginVersion, templateSince(template))) {
+                throw new IOException("This template needs Codename One " + templateSince(template) + " or newer.");
             }
             if (options.projectType != ProjectOptions.ProjectType.APP_WITH_BACKEND) {
                 throw new IOException("This template is an app and its server; choose \""
@@ -1496,6 +1522,12 @@ public class GeneratorModel {
         return replaced;
     }
 
+    /// The skill's files and the two pointers to it: [#addAgentSkillEntries(Map)].
+    static boolean isAgentSkillPath(String targetPath) {
+        return targetPath.startsWith(AGENT_SKILL_TARGET_PREFIX) || CLAUDE_SKILL_STUB_PATH.equals(targetPath)
+                || "AGENTS.md".equals(targetPath);
+    }
+
     private byte[] applyDataReplacements(String targetPath, byte[] sourceData) throws IOException {
         if (!isTextFile(targetPath)) {
             return sourceData;
@@ -1506,10 +1538,19 @@ public class GeneratorModel {
             // Ahead of the replacements below, which the template's hints get too.
             content = (content.endsWith("\n") ? content : content + "\n") + readResourceToString(template.SETTINGS);
         }
+        // The agent skill names the demo applications (Wayline, Savor, ...) on purpose,
+        // so an agent can go and read them; renaming the template's own name inside it
+        // would turn "read Wayline's map code" into a pointer at a demo that does not
+        // exist. It still gets the generic placeholders below.
+        boolean agentSkillFile = isAgentSkillPath(targetPath);
         content = StringUtil.replaceAll(content, "com.example.myapp", packageName);
-        content = StringUtil.replaceAll(content, template.SOURCE_PACKAGE, packageName);
+        if (!agentSkillFile) {
+            content = StringUtil.replaceAll(content, template.SOURCE_PACKAGE, packageName);
+        }
         content = StringUtil.replaceAll(content, "MyAppName", appName);
-        content = StringUtil.replaceAll(content, template.SOURCE_MAIN_CLASS, appName);
+        if (!agentSkillFile) {
+            content = StringUtil.replaceAll(content, template.SOURCE_MAIN_CLASS, appName);
+        }
         content = StringUtil.replaceAll(content, "myappname", toLowerCaseInvariant(appName));
         // The name in capitals is how an environment variable spells a setting
         // that starts with it: myappname.payments.key is read from
@@ -1827,12 +1868,14 @@ public class GeneratorModel {
             // washed out to white, and in dark mode barely lifted off the
             // near-black surface. The stock values are these same mixes of the
             // stock brand, so every scheme keeps the template's proportions.
-            css = setCssVariable(css, "--brand-tint", toCssColor(lightenColor(brand, 0.92f)));
-            css = setCssVariable(css, "--brand-tint-dark", toCssColor(mixColor(DARK_SURFACE, brand, 0.16f)));
+            // Bastion's theme has no tint (its selected states are the brand
+            // itself), so these two are set only where the template declares them.
+            css = setDeclaredCssVariable(css, "--brand-tint", toCssColor(lightenColor(brand, 0.92f)));
+            css = setDeclaredCssVariable(css, "--brand-tint-dark", toCssColor(mixColor(DARK_SURFACE, brand, 0.16f)));
         }
         if (!effective.roundedButtons) {
             css = setCssVariable(css, "--radius", "0.6mm");
-            css = setCssVariable(css, "--radius-small", "0.4mm");
+            css = setDeclaredCssVariable(css, "--radius-small", "0.4mm");
         }
         return css;
     }
@@ -1848,6 +1891,13 @@ public class GeneratorModel {
             throw new IOException("Refusing to generate project: theme.css does not declare " + name);
         }
         return css.substring(0, at) + name + ": " + value + css.substring(end);
+    }
+
+    /// `css` with `name` given `value` when the stylesheet declares it, and
+    /// unchanged when it does not: for the variables only some templates have.
+    /// Everything a scheme always needs goes through [#setCssVariable] instead.
+    private static String setDeclaredCssVariable(String css, String name, String value) throws IOException {
+        return css.indexOf(name + ":") < 0 ? css : setCssVariable(css, name, value);
     }
 
     /// Near-black or white, whichever reads on `color`.
@@ -1969,9 +2019,11 @@ public class GeneratorModel {
         }
         if (mavenLayoutsEnabled() && includesBackendModule()) {
             out.append("## Backend\n\n")
-                    .append("`backend/` is the app's server. Run it with ")
-                    .append("`./mvnw -pl backend -Dcodename1.platform=backend cn1:backend` and package it as a native ")
-                    .append("binary with `./mvnw -pl backend -Dcodename1.platform=backend cn1:backend-package`.\n\n");
+                    .append("`backend/` is the app's server. Start it with `./run-server.sh` (`run-server.bat` on ")
+                    .append("Windows), or \"Run Server\" in your IDE, which runs ")
+                    .append("`./mvnw ").append(SERVER_MAVEN_ARGS).append("`. ")
+                    .append("Package it as a native binary with ")
+                    .append("`./mvnw -pl backend -am -Dcodename1.platform=backend package cn1:backend-package`.\n\n");
         }
         if (template == Template.SKIRMISH) {
             out.append("## The game and its server\n\n")
@@ -1983,9 +2035,13 @@ public class GeneratorModel {
                     .append("- `backend/` is the server.\n")
                     .append("- `common/` is the app.\n\n")
                     .append("Start the server, then, in a second terminal, the app:\n\n```\n")
-                    .append("CN1_PROFILE=dev backend/server.sh run\n")
+                    .append("./run-server.sh\n")
                     .append("./run.sh\n```\n\n")
+                    .append("On Windows: `run-server.bat`, then `run.bat`. Your IDE's run menu has both: ")
+                    .append("\"Run Server\" and the simulator.\n\n")
                     .append("`./mvnw -pl backend -am -Dcodename1.platform=backend test` runs the server's tests.\n\n");
+        } else if (template == Template.BASTION) {
+            appendBankSection(out, toLowerCaseInvariant(appName));
         } else if (template.isFullStack()) {
             boolean food = template == Template.SAVOR;
             boolean chat = template == Template.PARLEY;
@@ -2013,10 +2069,13 @@ public class GeneratorModel {
                     .append("- `common/` is the app. `src/main/css/theme.css` opens with the colours and corner ")
                     .append("radius every screen takes its look from.\n\n")
                     .append("Start the server, then, in a second terminal, the app:\n\n```\n")
-                    .append("CN1_PROFILE=dev backend/server.sh run\n")
+                    .append("./run-server.sh\n")
                     .append("./run.sh\n```\n\n")
-                    .append("`server.sh` is a few lines of shell around Maven; on Windows run what it runs, ")
-                    .append("with `mvnw.cmd`, or use a Unix shell such as Git Bash or WSL.\n\n")
+                    .append("On Windows: `run-server.bat`, then `run.bat`. Your IDE's run menu has both: ")
+                    .append("\"Run Server\" and the simulator.\n\n")
+                    .append("`backend/server.sh` does more -- a native build, the browser version -- and is a few ")
+                    .append("lines of shell around Maven; on Windows run what it runs with `mvnw.cmd`, or use Git ")
+                    .append("Bash or WSL.\n\n")
                     .append("On the `dev` profile the server creates demonstration accounts, all with the ")
                     .append("password `").append(lower).append("-demo`: ")
                     .append(chat
@@ -2095,6 +2154,39 @@ public class GeneratorModel {
                 .append(options.isGradle() ? "`gradle.properties`" : "`pom.xml`").append(".\n\n");
     }
 
+    /// The README section of the banking template: what the project is, how to run
+    /// it and the accounts its development profile creates.
+    private static void appendBankSection(StringBuilder out, String lower) {
+        out.append("## The app and its server\n\n")
+                .append("This project is a working bank: a customer and an admin mode in one app, chosen by the ")
+                .append("role of whoever signs in, and the server they talk to.\n\n")
+                .append("- `shared/` is the contract: the REST interfaces and the objects they carry. The app's ")
+                .append("client and the server's dispatcher are both generated from it, so the two cannot drift.\n")
+                .append("- `backend/` is the server: the double-entry ledger, sign-in with a second factor and ")
+                .append("passkeys, transfers with signed requests and limits, cards, the exchange, the audit chain ")
+                .append("and the database migrations.\n")
+                .append("- `common/` is the app. `src/main/css/theme.css` opens with the colours and corner ")
+                .append("radius every screen takes its look from.\n\n")
+                .append("Start the server, then, in a second terminal, the app:\n\n```\n")
+                .append("CN1_PROFILE=dev backend/server.sh run\n")
+                .append("./run.sh\n```\n\n")
+                .append("`server.sh` is a few lines of shell around Maven; on Windows run what it runs, ")
+                .append("with `mvnw.cmd`, or use a Unix shell such as Git Bash or WSL.\n\n")
+                .append("On the `dev` profile the server creates demonstration accounts, all with the ")
+                .append("password `").append(lower).append("-demo-password`: `customer@").append(lower)
+                .append(".example` and `customer2@").append(lower).append(".example`, customers with money in ")
+                .append("their checking accounts, and `admin@").append(lower).append(".example`. ")
+                .append("Deposits, card spending and the coins are simulated; the passwords, authenticator codes, ")
+                .append("passkeys, device keys and request signatures are real.\n\n")
+                .append("`./mvnw -pl backend -am -Dcodename1.platform=backend test` runs the server's tests.\n\n")
+                .append("`backend/server.sh run --web` also builds the app for the browser and serves it at ")
+                .append("`http://localhost:8080/`.\n\n")
+                .append("Two chapters of the developer guide, at https://www.codenameone.com/developer-guide/, ")
+                .append("cover the sample this project started as: \"A bank that shows its locks\" walks through ")
+                .append("it as a customer and an admin see it, and \"Building on the sample\" explains how it is ")
+                .append("built and what to change.\n\n");
+    }
+
     private void appendIdeSection(StringBuilder out) {
         if (ide == IDE.INTELLIJ) {
             out.append("## IntelliJ Users\n\n")
@@ -2117,6 +2209,96 @@ public class GeneratorModel {
         }
         out.append("## VS Code Users\n\n")
                 .append("Open the project folder in VS Code and make sure Java + Maven extensions are installed.\n\n");
+    }
+
+    /// What starts the server of a Maven app with a `backend/` module, from the
+    /// project root. `-am` and `compile` build the reactor modules it depends on --
+    /// `shared`, for a full-stack template -- which `-pl backend` alone never does:
+    /// on a fresh download that failed resolving a `shared` jar nothing had built.
+    static final String SERVER_MAVEN_ARGS = "-pl backend -am -Dcodename1.platform=backend compile cn1:backend";
+
+    /// The profile a server started from the IDE or a launcher runs on: the one
+    /// with an in-memory database and demonstration accounts. The IDE entries set
+    /// it as a system property because none of the four can set an environment
+    /// variable portably; a system property wins over `CN1_PROFILE`, so a
+    /// developer who wants another profile from the IDE edits the entry, while
+    /// run-server.sh/.bat honour an exported `CN1_PROFILE`.
+    private static final String SERVER_PROFILE_ARG = "-Dcn1.backend.jvmArgs=-Dcn1.profile=dev";
+
+    /// The shortcuts that start the server: `run-server.sh` and `run-server.bat`
+    /// beside `run.sh`, and a "Run Server" entry in the IDE's own run menu. Before
+    /// these a download had no way to start its server short of reading the
+    /// README, and the command the README gave did not work.
+    private void addServerLaunchers(Map<String, byte[]> entries) throws IOException {
+        copySingleTextEntryToMap("run-server.sh", "#!/usr/bin/env sh\n"
+                + "# Starts the server in backend/ on http://localhost:8080 (PORT changes it).\n"
+                + "# CN1_PROFILE picks its settings; the default, dev, needs nothing installed.\n"
+                + "cd \"$(dirname \"$0\")\" || exit 1\n"
+                + "CN1_PROFILE=\"${CN1_PROFILE:-dev}\" exec ./mvnw -B " + SERVER_MAVEN_ARGS + " \"$@\"\n",
+                entries, ZipEntryType.COMMON);
+        copySingleTextEntryToMap("run-server.bat", "@echo off\r\n"
+                + "rem Starts the server in backend\\ on http://localhost:8080 (PORT changes it).\r\n"
+                + "rem CN1_PROFILE picks its settings; the default, dev, needs nothing installed.\r\n"
+                + "setlocal\r\n"
+                + "cd /d \"%~dp0\"\r\n"
+                + "if \"%CN1_PROFILE%\"==\"\" set CN1_PROFILE=dev\r\n"
+                + "call mvnw.cmd -B " + SERVER_MAVEN_ARGS + " %*\r\n",
+                entries, ZipEntryType.COMMON);
+        String label = "Run Server";
+        String args = SERVER_PROFILE_ARG + " " + SERVER_MAVEN_ARGS;
+        if (ide == IDE.INTELLIJ) {
+            copySingleTextEntryToMap(".idea/runConfigurations/Run_Server.xml",
+                    intellijMavenRunConfiguration(label, args), entries, ZipEntryType.COMMON);
+        } else if (ide == IDE.VS_CODE) {
+            copySingleTextEntryToMap(".vscode/tasks.json",
+                    vscodeTasks(new String[][] {{label, "-B " + args}}, "./mvnw", ".\\\\mvnw.cmd"),
+                    entries, ZipEntryType.COMMON);
+        } else if (ide == IDE.ECLIPSE) {
+            copySingleTextEntryToMap(appName + " - Run Server.launch", eclipseServerLaunch(), entries,
+                    ZipEntryType.COMMON);
+        } else if (ide == IDE.NETBEANS && entries.containsKey("nbactions.xml")) {
+            String actions = new String(entries.get("nbactions.xml"), "UTF-8");
+            int end = actions.lastIndexOf("</actions>");
+            if (end < 0) {
+                throw new IOException("Refusing to generate project: nbactions.xml has no </actions>");
+            }
+            String action = "    <action>\n"
+                    + "        <actionName>CUSTOM-Run Server</actionName>\n"
+                    + "        <displayName>Run Server</displayName>\n"
+                    // NetBeans passes goal tokens to Maven as they are, which is
+                    // how -pl and -am reach it: an action has no element for them.
+                    + "        <goals>\n"
+                    + "            <goal>-pl</goal>\n"
+                    + "            <goal>backend</goal>\n"
+                    + "            <goal>-am</goal>\n"
+                    + "            <goal>compile</goal>\n"
+                    + "            <goal>cn1:backend</goal>\n"
+                    + "        </goals>\n"
+                    + "        <properties>\n"
+                    + "            <codename1.platform>backend</codename1.platform>\n"
+                    + "            <cn1.backend.jvmArgs>-Dcn1.profile=dev</cn1.backend.jvmArgs>\n"
+                    + "        </properties>\n"
+                    + "    </action>\n";
+            entries.put("nbactions.xml", (actions.substring(0, end) + action + actions.substring(end))
+                    .getBytes("UTF-8"));
+        }
+    }
+
+    private String eclipseServerLaunch() {
+        return "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n"
+                + "<launchConfiguration type=\"org.eclipse.m2e.Maven2LaunchConfigurationType\">\n"
+                + "    <stringAttribute key=\"M2_GOALS\" value=\"-pl backend -am compile cn1:backend\"/>\n"
+                + "    <booleanAttribute key=\"M2_NON_RECURSIVE\" value=\"false\"/>\n"
+                + "    <booleanAttribute key=\"M2_OFFLINE\" value=\"false\"/>\n"
+                + "    <listAttribute key=\"M2_PROPERTIES\">\n"
+                + "        <listEntry value=\"codename1.platform=backend\"/>\n"
+                + "        <listEntry value=\"cn1.backend.jvmArgs=-Dcn1.profile=dev\"/>\n"
+                + "    </listAttribute>\n"
+                + "    <stringAttribute key=\"M2_RUNTIME\" value=\"EMBEDDED\"/>\n"
+                + "    <booleanAttribute key=\"M2_SKIP_TESTS\" value=\"true\"/>\n"
+                + "    <stringAttribute key=\"org.eclipse.jdt.launching.WORKING_DIRECTORY\" "
+                + "value=\"${project_loc:" + toLowerCaseInvariant(appName) + "}\"/>\n"
+                + "</launchConfiguration>\n";
     }
 
     /// The goals a Maven backend-only project's IDE files offer, as {label, goal}.
@@ -2163,7 +2345,7 @@ public class GeneratorModel {
                 + "          </option>\n"
                 + "          <option name=\"goals\">\n"
                 + "            <list>\n"
-                + "              <option value=\"" + goal + "\" />\n"
+                + goalOptions(goal)
                 + "              <option value=\"-e\" />\n"
                 + "            </list>\n"
                 + "          </option>\n"
@@ -2181,7 +2363,42 @@ public class GeneratorModel {
                 + "</component>\n";
     }
 
-    /// A VS Code tasks.json running each {label, argument} through `command`.
+    /// One `<option>` per token: IntelliJ hands each entry of the goals list to
+    /// Maven as a single argument, so "-pl backend compile" in one entry would be
+    /// one unknown option, not three.
+    private static String goalOptions(String goals) {
+        StringBuilder out = new StringBuilder();
+        String[] tokens = tokens(goals);
+        for (int i = 0; i < tokens.length; i++) {
+            out.append("              <option value=\"").append(tokens[i]).append("\" />\n");
+        }
+        return out.toString();
+    }
+
+    /// The space separated words of `text`.
+    static String[] tokens(String text) {
+        List<String> out = new ArrayList<String>();
+        int start = 0;
+        int len = text.length();
+        while (start < len) {
+            while (start < len && text.charAt(start) == ' ') {
+                start++;
+            }
+            int end = start;
+            while (end < len && text.charAt(end) != ' ') {
+                end++;
+            }
+            if (end > start) {
+                out.add(text.substring(start, end));
+            }
+            start = end;
+        }
+        return out.toArray(new String[out.size()]);
+    }
+
+    /// A VS Code tasks.json running each {label, arguments} through `command`. A
+    /// shell task quotes an `args` element that holds a space, so each word is an
+    /// element of its own.
     private static String vscodeTasks(String[][] tasks, String command, String windowsCommand) {
         StringBuilder json = new StringBuilder();
         json.append("{\n  \"version\": \"2.0.0\",\n  \"tasks\": [\n");
@@ -2191,7 +2408,12 @@ public class GeneratorModel {
                     .append("      \"type\": \"shell\",\n")
                     .append("      \"command\": \"").append(command).append("\",\n")
                     .append("      \"windows\": { \"command\": \"").append(windowsCommand).append("\" },\n")
-                    .append("      \"args\": [\"").append(tasks[i][1]).append("\"],\n")
+                    .append("      \"args\": [");
+            String[] words = tokens(tasks[i][1]);
+            for (int w = 0; w < words.length; w++) {
+                json.append(w > 0 ? ", " : "").append('"').append(words[w]).append('"');
+            }
+            json.append("],\n")
                     .append("      \"problemMatcher\": []\n")
                     .append("    }").append(i + 1 < tasks.length ? "," : "").append('\n');
         }
@@ -2705,6 +2927,8 @@ public class GeneratorModel {
                 || path.endsWith(".launch")
                 || path.endsWith(".css")
                 || path.endsWith(".xsd")
+                // A migration's comments can name the app's settings (Bastion's do).
+                || path.endsWith(".sql")
                 || path.endsWith(".md")
                 || path.endsWith(".txt")
                 || path.endsWith(".adoc")

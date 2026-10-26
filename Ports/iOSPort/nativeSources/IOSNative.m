@@ -974,6 +974,33 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardString___R_java_lang_St
 #endif
 }
 
+#if !TARGET_OS_OSX && !TARGET_OS_WATCH && !TARGET_OS_TV
+/// The options the next setClipboardContent publishes with, armed by restrictClipboard; nil
+/// when that publish is an ordinary one. They have to go out on the SAME setItems call as the
+/// content: publishing first and restricting after left a window in which Universal Clipboard
+/// could already have synced a sensitive clip to the user's other devices.
+static NSDictionary* cn1PendingClipboardOptions = nil;
+#endif
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_restrictClipboard___int_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT expireSeconds) {
+#if !TARGET_OS_OSX && !TARGET_OS_WATCH && !TARGET_OS_TV
+    POOL_BEGIN();
+    NSMutableDictionary *options = [NSMutableDictionary dictionary];
+    options[UIPasteboardOptionLocalOnly] = @YES;
+    if (expireSeconds > 0) {
+        options[UIPasteboardOptionExpirationDate] = [NSDate dateWithTimeIntervalSinceNow:expireSeconds];
+    }
+#if !__has_feature(objc_arc)
+    [cn1PendingClipboardOptions release];
+#endif
+    cn1PendingClipboardOptions = [options copy];
+    POOL_END();
+    return expireSeconds > 0 ? JAVA_TRUE : JAVA_FALSE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+
 void com_codename1_impl_ios_IOSNative_setClipboardString___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT str) {
 #if TARGET_OS_OSX
     POOL_BEGIN();
@@ -1416,7 +1443,16 @@ void com_codename1_impl_ios_IOSNative_setClipboardContent___java_lang_String_jav
     // Whatever the alternatives were not able to ride on, which is the whole payload when
     // the content named no files at all.
     if ([item count] > 0) [items addObject:item];
-    [UIPasteboard generalPasteboard].items = items;
+    if (cn1PendingClipboardOptions != nil) {
+        // Local only and expiring from the first moment the clip exists; see restrictClipboard.
+        [[UIPasteboard generalPasteboard] setItems:items options:cn1PendingClipboardOptions];
+#if !__has_feature(objc_arc)
+        [cn1PendingClipboardOptions release];
+#endif
+        cn1PendingClipboardOptions = nil;
+    } else {
+        [UIPasteboard generalPasteboard].items = items;
+    }
     [cn1PendingClipboardExtras removeAllObjects];
     POOL_END();
 #endif
@@ -4459,9 +4495,81 @@ void com_codename1_impl_ios_IOSNative_lockOrientation___boolean(CN1_THREAD_STATE
 #endif
 }
 
+#if !TARGET_OS_OSX && !TARGET_OS_WATCH && !TARGET_OS_TV
+// Tells UIKit that the root controller's supportedInterfaceOrientations
+// answer changed. Changing orientationLock alone changes nothing UIKit can
+// see: since iOS 16 it caches the mask and re-reads it only when asked, so an
+// unlock after a lock (issue #6089, a lock held across the native camera)
+// left autorotation off until the process was restarted. Must run on the
+// main thread.
+static void cn1RefreshSupportedOrientations(void) {
+    UIViewController *root = [CodenameOne_GLViewController instance];
+    if (root == nil) {
+        return;
+    }
+    if (@available(iOS 16.0, *)) {
+        [root setNeedsUpdateOfSupportedInterfaceOrientations];
+        // While a native modal (the camera, a picker) is up it owns the
+        // interface orientation, and UIKit re-reads the root's mask when it
+        // is dismissed. A geometry request now would rotate under it.
+        if (root.presentedViewController != nil) {
+            return;
+        }
+#if TARGET_OS_MACCATALYST
+        // A Mac window has no interface orientation to request, and the
+        // iOS geometry preferences are refused there.
+        return;
+#endif
+        UIWindowScene *scene = root.view.window.windowScene;
+        if (scene == nil) {
+            return;
+        }
+        // Ask for the orientation the device is physically held in, when it
+        // is known and allowed, so the interface follows the hand at once
+        // instead of waiting for the next physical rotation.
+        UIInterfaceOrientationMask wanted = 0;
+        switch ([[UIDevice currentDevice] orientation]) {
+            case UIDeviceOrientationPortrait:
+                wanted = UIInterfaceOrientationMaskPortrait;
+                break;
+            case UIDeviceOrientationPortraitUpsideDown:
+                wanted = UIInterfaceOrientationMaskPortraitUpsideDown;
+                break;
+            // Device and interface landscape are mirrored.
+            case UIDeviceOrientationLandscapeLeft:
+                wanted = UIInterfaceOrientationMaskLandscapeRight;
+                break;
+            case UIDeviceOrientationLandscapeRight:
+                wanted = UIInterfaceOrientationMaskLandscapeLeft;
+                break;
+            default:
+                break;
+        }
+        UIInterfaceOrientationMask allowed = [root supportedInterfaceOrientations]
+                & [[UIApplication sharedApplication] supportedInterfaceOrientationsForWindow:root.view.window];
+        if ((wanted & allowed) == 0) {
+            return;
+        }
+        UIWindowSceneGeometryPreferencesIOS *prefs =
+                [[UIWindowSceneGeometryPreferencesIOS alloc] initWithInterfaceOrientations:wanted];
+        [scene requestGeometryUpdateWithPreferences:prefs errorHandler:^(NSError *error) {
+            NSLog(@"CN1: orientation geometry request failed: %@", error);
+        }];
+        [prefs release];
+    } else {
+        [UIViewController attemptRotationToDeviceOrientation];
+    }
+}
+#endif
+
 void com_codename1_impl_ios_IOSNative_unlockOrientation__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject)
 {
     orientationLock = 0;
+#if !TARGET_OS_OSX && !TARGET_OS_WATCH && !TARGET_OS_TV
+    dispatch_async(dispatch_get_main_queue(), ^{
+        cn1RefreshSupportedOrientations();
+    });
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_lockScreen__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject)

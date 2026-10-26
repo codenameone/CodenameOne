@@ -1039,7 +1039,7 @@ class TBigDecimal {
         if (smallValue < 0) {
             smallValue = ~smallValue;
         }
-        return 32 - numberOfLeadingZeros(smallValue);
+        return 32 - TBitLevel.numberOfLeadingZeros(smallValue);
     }
 
     /// Returns a new `BigDecimal` whose value is `this + augend`.

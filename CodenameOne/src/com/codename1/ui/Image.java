@@ -1469,6 +1469,13 @@ public class Image implements ActionSource {
     public Graphics getGraphics() {
         Graphics g = new Graphics(Display.impl.getNativeGraphics(image));
         rgbCache = null;    // the cache will become invalid
+        // So do the scaled copies. A port that cannot draw an image at a size
+        // draws scaled(w, h) instead, which is a copy this image keeps -- at
+        // the image's own size too. An image drawn on again after it had been
+        // shown once went on showing the copy made the first time: on the
+        // native Linux port a picture that was drawn in steps stayed as it was
+        // after the first one, until the collector happened to drop the copy.
+        scaleCache = null;
         return g;
     }
 

@@ -460,7 +460,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             if (relationship != null) {
                 // Element collections and relationships keep their own column
                 // format; a @Temporal there would be silently ignored.
-                if(f.getAnnotation("Lcom/codename1/annotations/db/Temporal;")!=null) { ctx.error(cls,"@Temporal applies to a single java.util.Date field, not a relationship or collection: "+fieldPath.path);continue; }
+                if(f.getAnnotation("Lcom/codename1/annotations/db/Temporal;")!=null) { ctx.error(cls,"@Temporal applies to a single date or time field, not a relationship or collection: "+fieldPath.path);continue; }
                 if(fieldPath.prefix.length()>0) { ctx.error(cls,"Relationships inside embeddables are not supported: "+fieldPath.path);continue; }
                 relationship.declaringType=fieldPath.declaringType;relationship.index=ec.relations.size(); ec.relations.add(relationship); continue; }
             PersistedField pf = new PersistedField();
@@ -489,15 +489,41 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                 // parameters all take the path a @Convert field already takes.
                 Object value=temporal.get("value");
                 boolean day=value instanceof String[] && "DATE".equals(((String[])value)[1]);
+                String javaTime=JAVA_TIME_TYPES.get(f.getDescriptor());
                 if(conversion!=null) ctx.error(cls,"@Temporal cannot be combined with @Convert: "+pf.fieldName);
-                else if(!"Ljava/util/Date;".equals(f.getDescriptor())) ctx.error(cls,"@Temporal requires a java.util.Date field: "+pf.fieldName);
+                else if(!"Ljava/util/Date;".equals(f.getDescriptor()) && javaTime==null) ctx.error(cls,"@Temporal requires a java.util.Date, Instant, LocalDate or LocalDateTime field: "+pf.fieldName);
                 else if(f.getAnnotation(ID_DESC)!=null || pf.version || ec.embeddedId!=null && pf.fieldName.startsWith(ec.embeddedId+".")) ctx.error(cls,"Identifier and version fields cannot be @Temporal: "+pf.fieldName);
+                // A LocalDate has no time to keep and the other two have no
+                // single day to be: the type already says which column it is.
+                else if(javaTime!=null && day!="LocalDate".equals(javaTime)) ctx.error(cls,"@Temporal("+(day?"DATE":"TIMESTAMP")+") does not hold a java.time."+javaTime+": "+pf.fieldName);
                 else {
-                    pf.converter="com.codename1.impl.orm.TemporalConverter."+(day?"Day":"Timestamp");
-                    pf.domainType="java.util.Date";
+                    pf.converter=javaTime==null?"com.codename1.impl.orm.TemporalConverter."+(day?"Day":"Timestamp")
+                            :"com.codename1.impl.orm.JavaTimeConverter."+javaTime+(day?"Day":"Timestamp");
+                    pf.domainType=javaTime==null?"java.util.Date":"java.time."+javaTime;
                     pf.kind=PropertyTypeKind.scalar("java.lang.String");
                     pf.temporal=day?1:2;
                 }
+            } else if(conversion==null && JAVA_TIME_TYPES.containsKey(f.getDescriptor())) {
+                // java.time takes Date's portable default, a number in an integer
+                // column, through a built-in converter: an Instant reads what a
+                // long or a Date of milliseconds wrote.
+                String javaTime=JAVA_TIME_TYPES.get(f.getDescriptor());
+                if(f.getAnnotation(ID_DESC)!=null || ec.embeddedId!=null && pf.fieldName.startsWith(ec.embeddedId+".")) { ctx.error(cls,"Identifier fields cannot be java.time values: "+pf.fieldName);continue; }
+                else if(pf.version) { ctx.error(cls,"Version fields cannot be java.time values: "+pf.fieldName);continue; }
+                else {
+                    pf.converter="com.codename1.impl.orm.JavaTimeConverter."+javaTime+("LocalDate".equals(javaTime)?"EpochDay":"Millis");
+                    pf.domainType="java.time."+javaTime;
+                    pf.kind=PropertyTypeKind.scalar("java.lang.Long");
+                }
+            }
+            // A java.time field with no converter by now was refused above; it
+            // must not go on to be reported again as a relationship.
+            if(pf.converter==null && JAVA_TIME_TYPES.containsKey(f.getDescriptor())) continue;
+            // A Property holds its value through generated accessors that know
+            // only the scalar types; a converter has no hook there.
+            if(pf.kind.kind==PropertyTypeKind.Kind.PROPERTY && pf.kind.elementBinaryName!=null && pf.kind.elementBinaryName.startsWith("java.time.")) {
+                ctx.error(cls,"A Property of "+pf.kind.elementBinaryName+" is not supported; declare a plain java.time field instead: "+pf.fieldName);
+                continue;
             }
             AnnotatedClass enumClass = pf.kind.kind == PropertyTypeKind.Kind.REFERENCE ? findType(pf.kind.binaryName,ctx) : null;
             if (pf.kind.kind == PropertyTypeKind.Kind.REFERENCE && enumClass != null && enumClass.isEnum())
@@ -1133,6 +1159,15 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
             out.append(c);
         }
         return out.toString().toLowerCase(java.util.Locale.ROOT);
+    }
+
+    /// The java.time field types the ORM maps, by descriptor, to the simple name
+    /// JavaTimeConverter's nested converters start with.
+    private static final java.util.Map<String,String> JAVA_TIME_TYPES=new java.util.HashMap<String,String>();
+    static {
+        JAVA_TIME_TYPES.put("Ljava/time/Instant;","Instant");
+        JAVA_TIME_TYPES.put("Ljava/time/LocalDate;","LocalDate");
+        JAVA_TIME_TYPES.put("Ljava/time/LocalDateTime;","LocalDateTime");
     }
 
     /// Whether a declared column type holds a @Temporal value of the given kind

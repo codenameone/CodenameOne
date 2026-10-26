@@ -10631,6 +10631,9 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public void copyToClipboard(Object obj) {
+        // Whatever is copied now replaces the last restricted copy, expiry and all: a plain
+        // copy has no expiry, so a clear scheduled for it must not be skipped as if it had.
+        clipboardExpires = false;
         if(obj instanceof com.codename1.ui.ClipboardContent) {
             com.codename1.ui.ClipboardContent content = (com.codename1.ui.ClipboardContent)obj;
             // Every representation, now, including any registered as a provider. The pasteboard
@@ -10664,6 +10667,14 @@ public class IOSImplementation extends CodenameOneImplementation {
                     nativeInstance.addClipboardRepresentation(offered[iter], bytes);
                 }
             }
+            // Armed BEFORE the publish so the clip goes out local only and expiring on the
+            // very same pasteboard write; restricting it afterwards left a window in which
+            // Universal Clipboard could sync a sensitive value to the user's other devices.
+            if(content.isSensitive() || content.getClearAfter() > 0) {
+                // Rounded up, so a short time still expires rather than meaning "never".
+                clipboardExpires = nativeInstance.restrictClipboard(content.getClearAfter() <= 0 ? 0
+                        : (content.getClearAfter() + 999) / 1000);
+            }
             nativeInstance.setClipboardContent(
                     clipboardText(content, com.codename1.ui.ClipboardContent.MIME_TEXT),
                     clipboardText(content, com.codename1.ui.ClipboardContent.MIME_HTML),
@@ -10683,6 +10694,19 @@ public class IOSImplementation extends CodenameOneImplementation {
         nativeInstance.setClipboardString(null);
         super.copyToClipboard(obj);
     }
+
+    @Override
+    public void clearClipboardContent(com.codename1.ui.ClipboardContent content) {
+        // On iOS the pasteboard expires it by itself (restrictClipboard), even if this
+        // application is suspended by then; clearing here as well could only wipe something
+        // copied since. macOS has no expiry, so there the default clear runs.
+        if(!clipboardExpires) {
+            super.clearClipboardContent(content);
+        }
+    }
+
+    /// Whether the last restricted copy was given a pasteboard expiry date.
+    private boolean clipboardExpires;
 
     /// True when setClipboardContent already has an argument for this type, so it must not be
     /// published a second time beside itself.
