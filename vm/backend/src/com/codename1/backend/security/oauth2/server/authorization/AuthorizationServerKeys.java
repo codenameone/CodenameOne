@@ -50,6 +50,21 @@ import java.util.List;
 /// openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out signing.pem
 /// ```
 ///
+/// A key brought over from another authorization server keeps the `kid` its
+/// tokens already carry, or none of them would find their key. Name the ids in
+/// the same order as the files; an empty entry keeps the derived id:
+///
+/// ```
+/// cn1.security.authorizationserver.jwk.keys=/etc/acme/new.pem,/etc/acme/legacy.pem
+/// cn1.security.authorizationserver.jwk.key-ids=,legacy-2024-rsa
+/// ```
+///
+/// A key whose private half stayed behind -- the old provider's public JWK Set
+/// or a public PEM -- can still verify the tokens it signed. List it under
+/// `cn1.security.authorizationserver.jwk.verification-keys`: it is published
+/// and verifies, and never signs. A `.json` file is read as a JWK Set and keeps
+/// each key's `kid`; any other file is a public key PEM under its derived id.
+///
 /// On a development profile with no key set, a key is made when the server
 /// starts and a warning says so: every restart then invalidates every token.
 /// Anywhere else a missing key stops the server from starting.
@@ -72,6 +87,12 @@ import java.util.List;
 public final class AuthorizationServerKeys {
     /// The setting that lists the key files, separated by commas.
     public static final String KEYS = "cn1.security.authorizationserver.jwk.keys";
+    /// The `kid` of each key in [#KEYS], in the same order; an empty entry keeps
+    /// the id derived from the public key.
+    public static final String KEY_IDS = "cn1.security.authorizationserver.jwk.key-ids";
+    /// Public keys that verify and are published, and never sign.
+    public static final String VERIFICATION_KEYS =
+            "cn1.security.authorizationserver.jwk.verification-keys";
 
     private AuthorizationServerKeys() {
     }
@@ -83,20 +104,20 @@ public final class AuthorizationServerKeys {
     public static JwkSource load(Config config) throws IOException {
         String listed = config.get(KEYS);
         final List<Jwk> keys = new ArrayList<Jwk>();
-        if (listed != null) {
-            int start = 0;
-            while (start <= listed.length()) {
-                int comma = listed.indexOf(',', start);
-                int end = comma < 0 ? listed.length() : comma;
-                String path = listed.substring(start, end).trim();
-                if (path.length() > 0) {
-                    keys.add(usable(Jwk.ofPrivateKey(KeyFiles.readPrivateKey(path)), path));
-                }
-                if (comma < 0) {
-                    break;
-                }
-                start = comma + 1;
+        List<String> paths = entries(listed);
+        List<String> ids = entries(config.get(KEY_IDS));
+        if (ids.size() > paths.size()) {
+            throw new IllegalStateException(KEY_IDS + " names " + ids.size() + " ids for "
+                    + paths.size() + " keys in " + KEYS);
+        }
+        for (int iter = 0 ; iter < paths.size() ; iter++) {
+            String path = paths.get(iter);
+            if (path.length() == 0) {
+                continue;
             }
+            Jwk key = Jwk.ofPrivateKey(KeyFiles.readPrivateKey(path));
+            String id = iter < ids.size() ? ids.get(iter) : "";
+            keys.add(usable(id.length() == 0 ? key : key.withKeyId(id), path));
         }
         if (keys.isEmpty()) {
             if (!config.isDevelopmentProfile()) {
@@ -110,7 +131,55 @@ public final class AuthorizationServerKeys {
                     + "verifying when this process ends. Development only.");
             keys.add(usable(Jwk.ofPrivateKey(Crypto.generateRsaKey(2048)), "the generated key"));
         }
+        for (String path : entries(config.get(VERIFICATION_KEYS))) {
+            if (path.length() == 0) {
+                continue;
+            }
+            if (path.endsWith(".json")) {
+                for (Jwk key : JwkSet.parse(KeyFiles.read(path)).getKeys()) {
+                    keys.add(verifying(key, path));
+                }
+            } else {
+                // Read as either kind, so a private key is refused by name rather than
+                // as a file that failed to parse.
+                keys.add(verifying(Jwk.ofPem(KeyFiles.read(path)), path));
+            }
+        }
         return of(keys);
+    }
+
+    /// The comma-separated entries of a setting, trimmed, empty ones kept so that
+    /// a list of ids lines up with its list of files.
+    private static List<String> entries(String listed) {
+        List<String> out = new ArrayList<String>();
+        if (listed == null || listed.trim().length() == 0) {
+            return out;
+        }
+        int start = 0;
+        while (true) {
+            int comma = listed.indexOf(',', start);
+            int end = comma < 0 ? listed.length() : comma;
+            out.add(listed.substring(start, end).trim());
+            if (comma < 0) {
+                return out;
+            }
+            start = comma + 1;
+        }
+    }
+
+    /// A public key brought along to verify tokens it signed elsewhere.
+    private static Jwk verifying(Jwk key, String where) {
+        String algorithm = algorithm(key);
+        if (algorithm == null) {
+            throw new IllegalStateException("The authorization server verifies with an RSA or "
+                    + "a P-256 key, and " + where + " holds one that is neither");
+        }
+        if (key.isPrivate()) {
+            throw new IllegalStateException(VERIFICATION_KEYS + " takes public keys, and " + where
+                    + " holds a private one; list it in " + KEYS + " to sign with it");
+        }
+        return key.withUse("sig").withAlgorithm(
+                key.getAlgorithm() == null ? algorithm : key.getAlgorithm());
     }
 
     /// A source of exactly these keys, the signing one first.

@@ -106,6 +106,16 @@ public class DelegatingPasswordEncoder implements PasswordEncoder {
         return delegate.matches(rawPassword, extractEncodedPassword(prefixEncodedPassword));
     }
 
+    /// Whether `prefixEncodedPassword` names an id this encoder has a delegate
+    /// for. A value it does not is refused by [#matches(CharSequence, String)]
+    /// through the default for matches, which by default throws; a migration asks
+    /// this first, so it can report the row instead of importing a password nobody
+    /// can sign in with.
+    public boolean isSupported(String prefixEncodedPassword) {
+        String id = extractId(prefixEncodedPassword);
+        return id != null && idToPasswordEncoder.containsKey(id);
+    }
+
     @Override
     public boolean upgradeEncoding(String prefixEncodedPassword) {
         String id = extractId(prefixEncodedPassword);
