@@ -71,6 +71,10 @@ public class DeployDeviceMojo extends AbstractMojo {
     private String environment;
 
     /** Streams the service's log after the restart. */
+    /** The backend profile the service runs under ({@code CN1_PROFILE}); empty for none. */
+    @Parameter(property = "cn1.device.profile", defaultValue = "device")
+    private String profile;
+
     @Parameter(property = "cn1.device.logs", defaultValue = "false")
     private boolean logs;
 
@@ -85,7 +89,7 @@ public class DeployDeviceMojo extends AbstractMojo {
         }
         try {
             new DeviceDeployer(MavenLog.of(getLog())).host(host).user(user).port(port).binary(bin)
-                    .remoteDir(remoteDir).service(service).environment(environment).followLogs(logs).deploy();
+                    .remoteDir(remoteDir).service(service).environment(environment).profile(profile).followLogs(logs).deploy();
         } catch (BuildException ex) {
             throw new MojoExecutionException(ex.getMessage(), ex);
         }

@@ -155,6 +155,13 @@ work as they do in a terminal. `cn1.device.env` passes environment variables to 
 service (`CN1_ROTATION=90,CN1_DISPLAY=fbdev`), and `cn1.device.logs=true` follows its
 log after the restart.
 
+A project's `backend` module can run in the cloud and on a board, and each side
+usually needs some controllers the other doesn't. The deployed service runs with
+`CN1_PROFILE=device`, so `@Profile("device")` beans and
+`application-device.properties` are active only on the board, and
+`@Profile("!device")` keeps cloud-only beans off it. `cn1.device.profile` names a
+different profile, and an empty value sets none.
+
 For a production image, `scripts/embedded/yocto/meta-codenameone` is a Yocto layer
 and `scripts/embedded/buildroot/package/codenameone-app` a Buildroot package. Both
 build the translated application with the image's own toolchain and start it at

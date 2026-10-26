@@ -53,6 +53,7 @@ public final class DeviceDeployer {
     private String remoteDir = "/opt/codenameone";
     private String service;
     private String environment = "";
+    private String profile = "device";
     private boolean followLogs;
 
     public DeviceDeployer(Log log) {
@@ -94,6 +95,16 @@ public final class DeviceDeployer {
     /// `Environment=` line: `CN1_ROTATION=90`, `CN1_DISPLAY=fbdev`, ...
     public DeviceDeployer environment(String environment) {
         this.environment = environment == null ? "" : environment;
+        return this;
+    }
+
+    /// The backend profile the unit runs under, `device` by default: a backend
+    /// deployed to a board starts its `@Profile("device")` beans and reads
+    /// `application-device.properties`, while the same project packaged for the
+    /// cloud runs its own. An explicit `CN1_PROFILE` in [#environment(String)]
+    /// wins; null or empty sets none. A UI application ignores it.
+    public DeviceDeployer profile(String profile) {
+        this.profile = profile == null ? "" : profile.trim();
         return this;
     }
 
@@ -161,7 +172,11 @@ public final class DeviceDeployer {
                 .append("Restart=always\nRestartSec=1\n")
                 .append("StandardInput=tty\nTTYPath=/dev/tty1\nTTYReset=yes\nTTYVHangup=yes\n")
                 .append("StandardOutput=journal\nStandardError=journal\n");
-        for (String pair : environment.split("[,\\s]+")) {
+        String pairs = environment;
+        if (!profile.isEmpty() && !(" " + environment.replace(',', ' ')).contains(" CN1_PROFILE=")) {
+            pairs = environment + " CN1_PROFILE=" + profile;
+        }
+        for (String pair : pairs.split("[,\\s]+")) {
             if (pair.contains("=")) {
                 // Quoted, with systemd's specifier and escape characters doubled,
                 // so a value reaches the program exactly as written.

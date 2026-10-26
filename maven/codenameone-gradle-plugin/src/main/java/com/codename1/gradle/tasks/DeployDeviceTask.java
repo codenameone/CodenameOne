@@ -51,7 +51,9 @@ public abstract class DeployDeviceTask extends DefaultTask {
             new DeviceDeployer(new GradleLog(getLogger())).host(deviceProperty("host")).user(deviceProperty("user"))
                     .port(port == null ? 22 : Integer.parseInt(port)).binary(bin)
                     .remoteDir(dir == null ? "/opt/codenameone" : dir).service(deviceProperty("service"))
-                    .environment(deviceProperty("env")).followLogs("true".equals(deviceProperty("logs"))).deploy();
+                    .environment(deviceProperty("env"))
+                    .profile(deviceProperty("profile") == null ? "device" : deviceProperty("profile"))
+                    .followLogs("true".equals(deviceProperty("logs"))).deploy();
         } catch (BuildException ex) {
             throw new GradleException(ex.getMessage(), ex);
         } catch (NumberFormatException ex) {

@@ -102,6 +102,13 @@ class DeviceDeployerTest {
         assertTrue(script.contains("ExecStart=/opt/app/demo"));
         assertTrue(script.contains("Environment=\"CN1_ROTATION=90\"\n"));
         assertTrue(script.contains("Environment=\"CN1_DISPLAY=fbdev\"\n"));
+        assertTrue(script.contains("Environment=\"CN1_PROFILE=device\"\n"), "a board runs the device role");
+        String chosen = new DeviceDeployer(new NullLog()).remoteDir("/opt/app").environment("CN1_PROFILE=kiosk")
+                .installScript("demo", "/opt/app/demo");
+        assertTrue(chosen.contains("Environment=\"CN1_PROFILE=kiosk\"\n") && !chosen.contains("CN1_PROFILE=device"));
+        String none = new DeviceDeployer(new NullLog()).remoteDir("/opt/app").profile("")
+                .installScript("demo", "/opt/app/demo");
+        assertTrue(!none.contains("CN1_PROFILE"));
         assertTrue(script.contains("systemctl restart -- demo.service"));
         File f = new File(dir, "install.sh");
         Files.write(f.toPath(), script.getBytes(StandardCharsets.UTF_8));
