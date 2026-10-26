@@ -31,6 +31,7 @@ import java.util.Map;
 
 import com.codename1.backend.Base64Url;
 import com.codename1.backend.ByteSink;
+import com.codename1.backend.Cache;
 import com.codename1.backend.Crypto;
 import com.codename1.backend.Database;
 import com.codename1.backend.Db;
@@ -227,6 +228,7 @@ public class SelfTest {
         rotatedCaBundlesAreReRead();
         futures();
         jsonCodec();
+        cache();
 
         System.out.println("passed=" + passed + " failed=" + failures.size());
         for(int iter = 0 ; iter < failures.size() ; iter++) {
@@ -247,6 +249,83 @@ public class SelfTest {
     /// work on ParparVM.
     /// What the build's generated JSON codecs call, on the translated runtime:
     /// the typed reads, the refusal messages with their paths, and the dates.
+    /**
+     * The application cache on the translated runtime: the same contract
+     * CacheTest pins on the JVM -- one load per key under concurrency, expiry
+     * on a controlled clock, LRU eviction, and removal notifications.
+     */
+    private static void cache() throws Exception {
+        final long[] now = new long[] {1000};
+        final List removals = new ArrayList();
+        Cache.Clock clock = new Cache.Clock() {
+            public long millis() {
+                return now[0];
+            }
+        };
+        Cache.RemovalListener listener = new Cache.RemovalListener() {
+            public void removed(Object key, Object value, int cause) {
+                synchronized (removals) {
+                    removals.add(key + "=" + value + ":" + cause);
+                }
+            }
+        };
+        Cache c = Cache.builder("selftest").maximumSize(2).expireAfterWriteMillis(100)
+                .clock(clock).removalListener(listener).build();
+        c.put("a", "1");
+        c.put("b", "2");
+        c.getIfPresent("a");
+        c.put("c", "3");
+        check("cache evicts the least recently used", "null", String.valueOf(c.getIfPresent("b")));
+        check("cache notifies a size eviction", "[b=2:" + Cache.SIZE + "]", removals.toString());
+        now[0] += 100;
+        check("cache expires after write", "null", String.valueOf(c.getIfPresent("a")));
+        check("cache size counts live entries", "0", String.valueOf(c.size()));
+
+        final Cache shared = Cache.builder("selftest.shared").build();
+        final int[] loads = new int[1];
+        final Cache.Loader slow = new Cache.Loader() {
+            public Object load(Object key) throws Exception {
+                synchronized (loads) {
+                    loads[0]++;
+                }
+                Thread.sleep(300);
+                return "v";
+            }
+        };
+        final String[] got = new String[6];
+        Thread[] threads = new Thread[got.length];
+        for (int i = 0; i < threads.length; i++) {
+            final int at = i;
+            threads[i] = new Thread(new Runnable() {
+                public void run() {
+                    got[at] = String.valueOf(shared.get("k", slow));
+                }
+            });
+            threads[i].start();
+        }
+        for (int i = 0; i < threads.length; i++) {
+            threads[i].join(10000);
+        }
+        check("concurrent cache callers share one load", "1", String.valueOf(loads[0]));
+        StringBuilder all = new StringBuilder();
+        for (int i = 0; i < got.length; i++) {
+            all.append(got[i]);
+        }
+        check("every concurrent caller gets the loaded value", "vvvvvv", all.toString());
+
+        final Cache failing = Cache.builder("selftest.failing").build();
+        checkThrows("a failed load is rethrown", new Body() {
+            public void run() throws Exception {
+                failing.get("k", new Cache.Loader() {
+                    public Object load(Object key) throws Exception {
+                        throw new IOException("down");
+                    }
+                });
+            }
+        });
+        check("a failed load stores nothing", "0", String.valueOf(failing.size()));
+    }
+
     private static void jsonCodec() throws Exception {
         JsonCodec.Path root = JsonCodec.Path.ROOT;
         check("codec: a whole number", "42", String.valueOf(JsonCodec.readLong(
