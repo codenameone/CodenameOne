@@ -245,7 +245,7 @@ outbox.flush(message -> {
 
 `postToServer` stands for the application's own request: `Rest` on a client,
 `Web` on the backend, or anything else that can carry bytes. A message stays at
-the head of the queue until the transport answers `DELIVERED`. While it is
+the head of the queue until the transport answers `DELIVERED`. While it's
 retried, with a backoff that doubles up to five minutes by default, nothing
 overtakes it. `REJECTED` drops a message the server will never accept.
 
@@ -260,7 +260,7 @@ failures.
 === Device identity and mutual TLS
 
 A fleet server has to know which device is calling, and a shared password
-compiled into every unit is not an answer. Instead, each device generates its own
+compiled into every unit isn't an answer. Instead, each device generates its own
 key pair on first boot and asks a certificate authority for a client
 certificate. The key never leaves the device. The request is a PKCS#10
 certificate signing request, which `com.codename1.security.CertificateRequest`
@@ -291,5 +291,44 @@ Android and in the simulator. A headless device on the backend signs the
 request with `Crypto.sign` and presents the certificate through
 `WebClient.setClientCertificate`. Keep the private key in `SecureStorage`, or in
 a file only the application's user can read on a board without one.
+
+=== One project from the phone to the cloud
+
+A connected product is seldom one program: it's a device, the phone application
+that controls it and often a cloud service that sees every unit. In Codename One
+all three are targets of one project, laid out like any full-stack application:
+
+* `shared` holds the entities, the DTOs and the API contract that every side
+compiles against, so a change that breaks the wire format breaks the build.
+* `common` is the user interface. It builds for phones and desktops, and for a
+board with a screen through the Linux target.
+* `backend` is the server. It builds for the cloud and for a board, with the
+`device` profile choosing the controllers that run on the board.
+
+These pieces combine into five common shapes:
+
+. *A phone controls a device with a screen.* A kiosk or a panel runs the UI and a
+small backend on the board. The phone finds it with Bonjour and uses its REST
+API, while the board's own screen talks to the same API locally. A QR code shown
+on the panel (`com.codename1.qrcode.QrCode`) carries the pairing token.
+. *A phone talks to a headless device.* A gateway runs only the backend and the
+hardware API, and pushes live readings to the phone over a WebSocket. Where there
+is no network, Bluetooth LE carries the same messages, and an NFC tag on the case
+starts the pairing.
+. *A device reports to the cloud.* The device backend writes its readings through
+the ORM, and an outbox in the same transaction forwards them to the cloud backend
+when the link is up. Both sides share the entity classes.
+. *A fleet.* Many devices enroll with their own certificates and report to one
+cloud backend, which knows each one by its TLS handshake. The phone and web
+dashboards are clients of the cloud, not of the devices. MQTT
+(`com.codename1.io.mqtt`) suits fleets that already run a broker.
+. *A chain.* The phone talks to the device directly when both are on the same
+network and through the cloud when they aren't. It tries the address Bonjour
+found first and falls back to the cloud relay, and the API is the same either
+way because both backends implement the shared contract.
+
+Each standard is folded into the build only when the application uses it: an
+application that never browses Bonjour or opens a Bluetooth connection carries
+none of that code.
 
 include::embedded-benchmarks.adoc[]
