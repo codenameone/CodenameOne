@@ -243,9 +243,19 @@ if [ "${CN1_BACKEND_CHECKED_CASTS:-1}" = "0" ]; then CAST_OPT=""; fi
 # their dependencies; a fully static build needs static versions, which is why this
 # is a switch rather than an assumption.
 CURL_LIB="-lcurl -lssl -lcrypto -lnghttp2"
+CURL_CFLAGS=""
+# On Linux libcurl is opened on the first outbound request instead (see
+# CN1_BACKEND_CURL_DLOPEN in cn1_backend_web.c), so an idle server never maps it.
+if [ "$(uname -s)" = "Linux" ]; then
+    CURL_LIB="-lssl -lcrypto -lnghttp2 -ldl"
+    # Not on CN1_BACKEND_CFLAGS: those travel to package.sh, whose static link
+    # keeps -lcurl and has no libcurl to open.
+    CURL_CFLAGS="-DCN1_BACKEND_CURL_DLOPEN"
+fi
 SSL_FLAGS=""
 if [ "${CN1_BACKEND_HTTPS:-1}" = "0" ]; then
     CURL_LIB=""
+    CURL_CFLAGS=""
 else
     # macOS ships libcrypto but not its headers; Homebrew's OpenSSL is the usual
     # source. On Linux the distro's -dev package puts them where clang looks.
@@ -290,7 +300,7 @@ if [ "${CN1_BACKEND_DEAD_STRIP:-1}" = "0" ]; then GC_CFLAGS=""; GC_LDFLAGS=""; f
 # -fwrapv -fno-strict-aliasing -fno-builtin-fmod(f) are MANDATORY for generated C
 # (Java wrapping arithmetic; clang -O3 provably miscompiles without them).
 $CC -O3 -w -fwrapv -fno-strict-aliasing -fno-builtin-fmod -fno-builtin-fmodf -ffp-contract=off $GC_CFLAGS \
-    $CN1_BACKEND_CFLAGS $EXTRA $SSL_FLAGS -I"$SRCDIR" "$SRCDIR"/*.c "$SRCDIR"/*.S \
+    $CN1_BACKEND_CFLAGS $CURL_CFLAGS $EXTRA $SSL_FLAGS -I"$SRCDIR" "$SRCDIR"/*.c "$SRCDIR"/*.S \
     -lm -lpthread $CURL_LIB $GC_LDFLAGS -o "$OUTBIN" \
     2> "$WORK/cc.log" || { echo "COMPILE FAILED"; tail -40 "$WORK/cc.log"; exit 1; }
 echo "built $OUTBIN (workdir $WORK)"

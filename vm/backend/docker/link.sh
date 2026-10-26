@@ -51,8 +51,11 @@ if [ "${CN1_LINK_MODE:-static}" = "static" ]; then
         -o "/out/$OUT_NAME"
 else
     # shellcheck disable=SC2086
-    clang $COMMON -I. ${CN1_EXTRA_CFLAGS} *.c $ASM_SOURCES \
-        -lcurl -lnghttp2 -lssl -lcrypto -lz -lm -lpthread \
+    # libcurl is opened on the first outbound request (CN1_BACKEND_CURL_DLOPEN
+    # in cn1_backend_web.c), so a server that never calls out never maps it or
+    # the TLS stack the distribution built it against.
+    clang $COMMON -DCN1_BACKEND_CURL_DLOPEN -I. ${CN1_EXTRA_CFLAGS} *.c $ASM_SOURCES \
+        -lnghttp2 -lssl -lcrypto -lz -lm -lpthread -ldl \
         $GC $STRIP \
         -o "/out/$OUT_NAME"
 fi

@@ -44,7 +44,71 @@
 #include <unistd.h> /* CN1_RESUME_THREAD expands to usleep */
 #include <poll.h>
 #endif
+#ifdef CN1_BACKEND_CURL_DLOPEN
+/* The type-checking wrappers are macros named after the functions, and the
+ * functions below become macros of their own. */
+#define CURL_DISABLE_TYPECHECK 1
+#endif
 #include <curl/curl.h>
+#ifdef CN1_BACKEND_CURL_DLOPEN
+/*
+ * libcurl is opened on the first outbound request instead of at start-up. A
+ * server that never calls out (most of them) then never maps libcurl and its TLS
+ * stack: on Debian that is GnuTLS, p11-kit, Kerberos, GMP, Nettle and Hogweed,
+ * about 5.5MB of an idle server's 13MB proportional set size. Set by the dynamic
+ * Linux links only; a static link has nothing to open and keeps -lcurl.
+ */
+#include <dlfcn.h>
+#define CN1_CURL_FUNCTIONS(X) \
+    X(curl_global_init) X(curl_easy_init) X(curl_easy_cleanup) X(curl_easy_setopt) \
+    X(curl_easy_getinfo) X(curl_easy_perform) X(curl_easy_pause) X(curl_easy_strerror) \
+    X(curl_multi_init) X(curl_multi_cleanup) X(curl_multi_setopt) X(curl_multi_add_handle) \
+    X(curl_multi_remove_handle) X(curl_multi_info_read) X(curl_multi_socket_action) \
+    X(curl_slist_append) X(curl_slist_free_all) X(curl_version_info)
+#define CN1_CURL_POINTER(name) static __typeof__(name)* cn1p_##name;
+CN1_CURL_FUNCTIONS(CN1_CURL_POINTER)
+/* Only Web.initialiseCurlOnce calls this, under its monitor, and every other
+ * entry point runs after it succeeded, so the pointers need no synchronisation. */
+static int cn1CurlLoad(void) {
+    void* library;
+    if (cn1p_curl_global_init != NULL) {
+        return 1;
+    }
+    library = dlopen("libcurl.so.4", RTLD_NOW | RTLD_LOCAL);
+    if (library == NULL) {
+        library = dlopen("libcurl.so", RTLD_NOW | RTLD_LOCAL);
+    }
+    if (library == NULL) {
+        return 0;
+    }
+#define CN1_CURL_RESOLVE(name) \
+    if ((*(void**) (&cn1p_##name) = dlsym(library, #name)) == NULL) { \
+        cn1p_curl_global_init = NULL; \
+        return 0; \
+    }
+    CN1_CURL_FUNCTIONS(CN1_CURL_RESOLVE)
+#undef CN1_CURL_RESOLVE
+    return 1;
+}
+#define curl_global_init (*cn1p_curl_global_init)
+#define curl_easy_init (*cn1p_curl_easy_init)
+#define curl_easy_cleanup (*cn1p_curl_easy_cleanup)
+#define curl_easy_setopt (*cn1p_curl_easy_setopt)
+#define curl_easy_getinfo (*cn1p_curl_easy_getinfo)
+#define curl_easy_perform (*cn1p_curl_easy_perform)
+#define curl_easy_pause (*cn1p_curl_easy_pause)
+#define curl_easy_strerror (*cn1p_curl_easy_strerror)
+#define curl_multi_init (*cn1p_curl_multi_init)
+#define curl_multi_cleanup (*cn1p_curl_multi_cleanup)
+#define curl_multi_setopt (*cn1p_curl_multi_setopt)
+#define curl_multi_add_handle (*cn1p_curl_multi_add_handle)
+#define curl_multi_remove_handle (*cn1p_curl_multi_remove_handle)
+#define curl_multi_info_read (*cn1p_curl_multi_info_read)
+#define curl_multi_socket_action (*cn1p_curl_multi_socket_action)
+#define curl_slist_append (*cn1p_curl_slist_append)
+#define curl_slist_free_all (*cn1p_curl_slist_free_all)
+#define curl_version_info (*cn1p_curl_version_info)
+#endif
 /* For the ALPN answer of a connection libcurl made through OpenSSL; see
    cn1WebRequireH2Prereq. Both packaging targets link OpenSSL, and this file is
    compiled only when TLS is (build.sh drops it with CN1_BACKEND_HTTPS=0). */
@@ -578,6 +642,11 @@ static void cn1WebFreeSecret(char* secret, size_t length) {
 }
 
 JAVA_INT com_codename1_backend_Web_globalInitImpl___R_int(CODENAME_ONE_THREAD_STATE) {
+#ifdef CN1_BACKEND_CURL_DLOPEN
+    if (!cn1CurlLoad()) {
+        return (JAVA_INT)CURLE_FAILED_INIT;
+    }
+#endif
     return (JAVA_INT)curl_global_init(CURL_GLOBAL_DEFAULT);
 }
 

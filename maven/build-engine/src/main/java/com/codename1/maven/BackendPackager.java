@@ -1008,8 +1008,15 @@ public class BackendPackager {
                 command.add(file.getAbsolutePath());
             }
         }
-        command.addAll(Arrays.asList("-lm", "-lpthread",
-                "-lcurl", "-lssl", "-lcrypto", "-lnghttp2"));
+        command.addAll(Arrays.asList("-lm", "-lpthread", "-lssl", "-lcrypto", "-lnghttp2"));
+        if (System.getProperty("os.name", "").startsWith("Linux")) {
+            // libcurl is opened on the first outbound request (cn1_backend_web.c),
+            // so an idle server never maps it or the TLS stack it was built with.
+            command.add("-DCN1_BACKEND_CURL_DLOPEN");
+            command.add("-ldl");
+        } else {
+            command.add("-lcurl");
+        }
         command.add(deadStripFlag(System.getProperty("os.name", "")));
         command.add("-o");
         command.add(binary.getAbsolutePath());
