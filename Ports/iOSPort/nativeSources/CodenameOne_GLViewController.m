@@ -3371,6 +3371,7 @@ static CodenameOne_GLViewController *sharedSingleton;
 }
 
 #elif !TARGET_OS_OSX && !TARGET_OS_WATCH
+#define CN1_PUBLISH_VIEW_SIZE_FROM_LAYOUT 1
 // Defined further down, beside the drawing code that reads it.
 extern bool lockDrawing;
 
@@ -3391,6 +3392,18 @@ extern bool lockDrawing;
 // size, so it does not reach this either.
 - (void)viewDidLayoutSubviews {
     [super viewDidLayoutSubviews];
+    [self cn1PublishViewSizeIfChanged];
+}
+
+// The other half of #6080. With the app in landscape, presenting the
+// portrait-only camera sends this (covered) controller a
+// viewWillTransitionToSize: to portrait, which publishes the portrait size.
+// Its view is not in the window while the modal is up, so it is never laid out
+// portrait; when the user stays in landscape and the modal is dismissed, the
+// bounds are what they were before the camera opened, nothing changed, and no
+// layout pass runs to correct the published size. viewDidAppear and the
+// transition's completion therefore re-read the real bounds as well.
+- (void)cn1PublishViewSizeIfChanged {
     // The same reason viewWillTransitionToSize: gives: iOS lays the view out
     // at the opposite orientation for its background snapshot.
     if (isAppSuspended || self.view == nil) {
@@ -3681,6 +3694,9 @@ bool lockDrawing;
             screenSizeChanged(displayWidth, displayHeight);
         }
     }
+#endif
+#ifdef CN1_PUBLISH_VIEW_SIZE_FROM_LAYOUT
+    [self cn1PublishViewSizeIfChanged];
 #endif
     [self becomeFirstResponder];
     [self updateCanvas:animated];
@@ -4956,6 +4972,15 @@ BOOL prefersStatusBarHidden = NO;
     
     screenSizeChanged(displayWidth, displayHeight);
     repaintUI();
+#ifdef CN1_PUBLISH_VIEW_SIZE_FROM_LAYOUT
+    // A size announced to a covered controller may never become its bounds
+    // (#6080, see cn1PublishViewSizeIfChanged); settle on the real ones.
+    if (coordinator != nil) {
+        [coordinator animateAlongsideTransition:nil completion:^(id context) {
+            [self cn1PublishViewSizeIfChanged];
+        }];
+    }
+#endif
     
     if ( currentActionSheet != nil ){
         [CN1View beginAnimations:nil context:nil];
