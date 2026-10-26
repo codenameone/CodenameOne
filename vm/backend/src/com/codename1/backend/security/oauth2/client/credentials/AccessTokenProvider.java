@@ -60,6 +60,7 @@ public final class AccessTokenProvider {
     private long maxBackoffMillis = 60000;
 
     private AccessToken current;
+    private long currentFetchedAt;
     private boolean refreshing;
     private int failures;
     private long nextAttemptAt;
@@ -103,7 +104,7 @@ public final class AccessTokenProvider {
             boolean mine = false;
             synchronized (this) {
                 long now = clock.currentTimeMillis();
-                if (current != null && now < current.getExpiresAtMillis() - refreshSkewMillis) {
+                if (current != null && now < current.getExpiresAtMillis() - skew()) {
                     return current;
                 }
                 boolean usable = current != null && !current.isExpired(now);
@@ -163,9 +164,18 @@ public final class AccessTokenProvider {
         current = null;
     }
 
+    /// The skew, but never more than half the current token's lifetime: a
+    /// token issued for no longer than the skew would otherwise be refreshed
+    /// on every call. Called with the monitor held.
+    private long skew() {
+        long half = (current.getExpiresAtMillis() - currentFetchedAt) / 2;
+        return half > 0 && half < refreshSkewMillis ? half : refreshSkewMillis;
+    }
+
     private AccessToken refresh() {
         AccessToken fresh = null;
         TokenAcquisitionException failure = null;
+        Error fatal = null;
         try {
             fresh = grant.fetch();
         } catch (TokenAcquisitionException err) {
@@ -173,8 +183,16 @@ public final class AccessTokenProvider {
         } catch (RuntimeException err) {
             // A grant's own bug, or a signing failure: reported without its
             // message, which the provider cannot vouch for.
+            // Not even as the cause: a stack trace prints the cause's message.
             failure = new TokenAcquisitionException("The grant failed: "
-                    + err.getClass().getName(), -1, null, false, err);
+                    + err.getClass().getName(), -1, null, false, null);
+        } catch (Error err) {
+            // Recorded like any failure, so the flag below is cleared and the
+            // waiters woken; otherwise the provider would wait on a refresh
+            // that ended long ago until the process restarts. Then rethrown.
+            fatal = err;
+            failure = new TokenAcquisitionException("The grant failed: "
+                    + err.getClass().getName(), -1, null, false, null);
         }
         synchronized (this) {
             refreshing = false;
@@ -182,6 +200,7 @@ public final class AccessTokenProvider {
             long now = clock.currentTimeMillis();
             if (fresh != null) {
                 current = fresh;
+                currentFetchedAt = now;
                 failures = 0;
                 lastFailure = null;
                 nextAttemptAt = 0;
@@ -190,6 +209,9 @@ public final class AccessTokenProvider {
             failures++;
             lastFailure = failure;
             nextAttemptAt = now + backoff(failures);
+            if (fatal != null) {
+                throw fatal;
+            }
             if (current != null && !current.isExpired(now)) {
                 return current;
             }

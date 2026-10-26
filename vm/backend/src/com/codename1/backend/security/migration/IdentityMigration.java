@@ -24,6 +24,7 @@ package com.codename1.backend.security.migration;
 
 import com.codename1.backend.Base64Url;
 import com.codename1.backend.Crypto;
+import com.codename1.backend.security.SecuritySchema;
 import com.codename1.backend.security.core.userdetails.User;
 import com.codename1.backend.security.core.userdetails.UserDetailsManager;
 import com.codename1.backend.security.crypto.DelegatingPasswordEncoder;
@@ -38,7 +39,9 @@ import com.codename1.backend.security.webauthn.WebAuthnException;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 /// Moves the accounts of another identity store into this server's stores,
@@ -96,7 +99,12 @@ public final class IdentityMigration {
     private String passwordPrefix;
     private boolean dryRun;
     private MigrationReport report;
-    private final Set<String> seenUsers = new HashSet<String>();
+    /// The user names this run imported, by their folded key.
+    private final Map<String, String> seenUsers = new HashMap<String, String>();
+    /// Rows refused because their name differs only in case from another
+    /// user's. The stores fold A-Z, so anything attached to such a name would
+    /// land on that other account.
+    private final Set<String> caseCollisions = new HashSet<String>();
     private final Set<String> seenCredentials = new HashSet<String>();
 
     /// @param users where the accounts are created
@@ -161,10 +169,26 @@ public final class IdentityMigration {
                     "the row has no username");
             return;
         }
-        if (!seenUsers.add(username) || users.userExists(username)) {
-            r.add("user", username, MigrationReport.Outcome.SKIPPED, "the user already exists");
+        String key = SecuritySchema.usernameKey(username);
+        String other = seenUsers.get(key);
+        if (other == null && users.userExists(username)) {
+            other = users.loadUserByUsername(username).getUsername();
+        }
+        if (other != null) {
+            if (other.equals(username)) {
+                r.add("user", username, MigrationReport.Outcome.SKIPPED, "the user already exists");
+            } else {
+                // A store that tells Admin from admin is common (Django is
+                // one); this server does not. Nothing of this row is imported,
+                // or its owner's links and keys would sign in as the other.
+                caseCollisions.add(username);
+                r.add("user", username, MigrationReport.Outcome.SKIPPED, "differs only in case "
+                        + "from the user " + other + ", and user names here ignore case; "
+                        + "nothing of this user is imported");
+            }
             return;
         }
+        seenUsers.put(key, username);
         String reason = null;
         String stored;
         if (passwordHash == null || passwordHash.length() == 0) {
@@ -328,8 +352,17 @@ public final class IdentityMigration {
         return r;
     }
 
+    /// Whether `username`, spelled exactly so, is a user records may attach to.
     private boolean userKnown(String username) {
-        return seenUsers.contains(username) || users.userExists(username);
+        if (caseCollisions.contains(username)) {
+            return false;
+        }
+        String imported = seenUsers.get(SecuritySchema.usernameKey(username));
+        if (imported != null) {
+            return imported.equals(username);
+        }
+        return users.userExists(username)
+                && username.equals(users.loadUserByUsername(username).getUsername());
     }
 
     /// A hash of 32 random bytes nobody ever saw: a valid value no password matches.

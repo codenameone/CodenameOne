@@ -100,7 +100,7 @@ public final class JwtBearerGrant implements AccessTokenGrant {
         private String subject;
         private String audience;
         private Set<String> scopes = new LinkedHashSet<String>();
-        private boolean scopesInAssertion = true;
+        private boolean scopesInAssertion;
         private long assertionLifetimeSeconds = 3600;
         private TokenEndpoint.Transport transport;
         private Clock clock;
@@ -137,9 +137,10 @@ public final class JwtBearerGrant implements AccessTokenGrant {
             return this;
         }
 
-        /// Where the scopes go: a `scope` claim in the assertion (true, the
-        /// default, as Google expects) or a `scope` form parameter (false, as RFC
-        /// 7523 section 2.1 describes).
+        /// Where the scopes go: a `scope` form parameter (false, the default,
+        /// as RFC 7521 section 4.1 and RFC 6749 section 3.3 define it) or a
+        /// `scope` claim in the assertion (true, as Google expects; the Google
+        /// builder sets it).
         public Builder scopesInAssertion(boolean inAssertion) {
             this.scopesInAssertion = inAssertion;
             return this;

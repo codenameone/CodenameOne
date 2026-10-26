@@ -178,6 +178,10 @@ public final class AuthorizationServerKeys {
             throw new IllegalStateException(VERIFICATION_KEYS + " takes public keys, and " + where
                     + " holds a private one; list it in " + KEYS + " to sign with it");
         }
+        if (key.getUse() != null && !"sig".equals(key.getUse())) {
+            throw new IllegalStateException(where + " holds a key for use \"" + key.getUse()
+                    + "\"; only signature keys verify tokens");
+        }
         return key.withUse("sig").withAlgorithm(
                 key.getAlgorithm() == null ? algorithm : key.getAlgorithm());
     }

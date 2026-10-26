@@ -262,6 +262,59 @@ class IdentityMigrationTest {
         rotated.setProperty(AuthorizationServerKeys.VERIFICATION_KEYS, rsa.getPath());
         assertThrows(IllegalStateException.class,
                 () -> AuthorizationServerKeys.load(Config.of(rotated, "prod")));
+        // A key the set declares for encryption never verifies.
+        Files.write(oldSet.toPath(), ("{\"keys\":[" + publicJwk(oldKey.withUse("enc")) + "]}")
+                .getBytes("UTF-8"));
+        rotated.setProperty(AuthorizationServerKeys.VERIFICATION_KEYS, oldSet.getPath());
+        assertEquals(1, AuthorizationServerKeys.load(Config.of(rotated, "prod")).getKeys().size());
+    }
+
+    @Test
+    @DisplayName("A name that differs only in case attaches nothing to the other account")
+    void caseCollision() {
+        InMemoryUserDetailsManager users = new InMemoryUserDetailsManager();
+        InMemoryFederatedIdentityRepository links = new InMemoryFederatedIdentityRepository();
+        InMemoryTotpRepository totp = new InMemoryTotpRepository();
+        IdentityMigration migration = new IdentityMigration(users, passwords());
+        migration.setFederatedIdentities(links);
+        migration.setTotp(totp);
+        migration.user("admin", "{django}" + DJANGO, Arrays.asList("ROLE_ADMIN"), true);
+        migration.user("Admin", "{django}" + DJANGO, Arrays.asList("ROLE_USER"), true);
+        migration.federatedIdentity("google", "attacker", "Admin");
+        migration.totp("Admin", "12345678901234567890".getBytes());
+        MigrationReport report = migration.finish();
+        assertEquals(1, report.count(MigrationReport.Outcome.MIGRATED), report.toString());
+        assertEquals(3, report.count(MigrationReport.Outcome.SKIPPED), report.toString());
+        assertTrue(report.toString().contains("differs only in case"), report.toString());
+        assertEquals(null, links.findUsername("google", "attacker"));
+        assertEquals(null, totp.find("admin"));
+
+        // The same against a user that was already there.
+        IdentityMigration later = new IdentityMigration(users, passwords());
+        later.setFederatedIdentities(links);
+        later.federatedIdentity("google", "attacker", "ADMIN");
+        assertEquals(1, later.finish().count(MigrationReport.Outcome.SKIPPED));
+        assertEquals(null, links.findUsername("google", "attacker"));
+
+        // And in a dry run, where nothing is created to collide with.
+        IdentityMigration dry = new IdentityMigration(new InMemoryUserDetailsManager(), passwords());
+        dry.setDryRun(true);
+        dry.user("admin", null, null, true);
+        dry.user("Admin", null, null, true);
+        assertEquals(1, dry.finish().count(MigrationReport.Outcome.SKIPPED));
+    }
+
+    @Test
+    @DisplayName("A hash in a format the id's encoder cannot read needs a reset, not a silent import")
+    void unreadableFormatUnderAKnownId() {
+        InMemoryUserDetailsManager users = new InMemoryUserDetailsManager();
+        IdentityMigration migration = new IdentityMigration(users, passwords());
+        migration.setPasswordPrefix("werkzeug");
+        migration.user("flask", "scrypt:32768:8:1$salt$00ff", null, true);
+        migration.user("django", "{django}argon2$argon2id$v=19$m=102400,t=2,p=8$c2FsdA$aGFzaA", null,
+                true);
+        MigrationReport report = migration.finish();
+        assertEquals(2, report.count(MigrationReport.Outcome.NEEDS_ACTION), report.toString());
     }
 
     private static String publicJwk(Jwk key) {

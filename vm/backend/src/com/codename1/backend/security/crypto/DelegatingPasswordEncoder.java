@@ -113,7 +113,15 @@ public class DelegatingPasswordEncoder implements PasswordEncoder {
     /// can sign in with.
     public boolean isSupported(String prefixEncodedPassword) {
         String id = extractId(prefixEncodedPassword);
-        return id != null && idToPasswordEncoder.containsKey(id);
+        PasswordEncoder delegate = id == null ? null : idToPasswordEncoder.get(id);
+        if (delegate instanceof ModularPbkdf2PasswordEncoder) {
+            // One id covers a framework's every format, and only PBKDF2 is
+            // read: Werkzeug's scrypt or Django's argon2 under the same id
+            // would otherwise be imported as a hash nobody can sign in with.
+            return ((ModularPbkdf2PasswordEncoder) delegate).isReadable(
+                    extractEncodedPassword(prefixEncodedPassword));
+        }
+        return delegate != null;
     }
 
     @Override

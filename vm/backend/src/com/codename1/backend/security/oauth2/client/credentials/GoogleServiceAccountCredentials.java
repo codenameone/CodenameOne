@@ -139,7 +139,9 @@ public final class GoogleServiceAccountCredentials {
     /// A builder preset for this account, for a subject (domain-wide delegation),
     /// a transport or a clock.
     public JwtBearerGrant.Builder builder() {
-        return JwtBearerGrant.builder(tokenUri, clientEmail, key).audience(tokenUri);
+        // Google reads the scopes from the assertion, not from the form.
+        return JwtBearerGrant.builder(tokenUri, clientEmail, key).audience(tokenUri)
+                .scopesInAssertion(true);
     }
 
     @Override

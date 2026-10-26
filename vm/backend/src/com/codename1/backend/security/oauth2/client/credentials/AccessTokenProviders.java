@@ -46,6 +46,7 @@ import java.util.Set;
 /// | `issuer`, `subject`, `audience` | `jwt_bearer` claims; `audience` is also sent by `client_credentials` |
 /// | `google-json` | path of a Google service-account key file |
 /// | `scopes` | space- or comma-separated scopes |
+/// | `scopes-in-assertion` | `jwt_bearer`: true sends the scopes as an assertion claim instead of a form parameter (false) |
 /// | `refresh-skew` | seconds before expiry a token stops being used (60) |
 /// | `max-backoff` | longest pause between failed exchanges, in seconds (60) |
 ///
@@ -93,7 +94,9 @@ public final class AccessTokenProviders {
             built = JwtBearerGrant.builder(required(config, p + "token-uri"),
                     required(config, p + "issuer"), key(config, p))
                     .subject(config.get(p + "subject")).audience(config.get(p + "audience"))
-                    .scopes(scopes).build();
+                    .scopes(scopes)
+                    .scopesInAssertion(config.getBoolean(p + "scopes-in-assertion", false))
+                    .build();
         } else if ("google_service_account".equals(grant)) {
             built = GoogleServiceAccountCredentials.fromFile(required(config, p + "google-json"))
                     .builder().subject(config.get(p + "subject")).scopes(scopes).build();

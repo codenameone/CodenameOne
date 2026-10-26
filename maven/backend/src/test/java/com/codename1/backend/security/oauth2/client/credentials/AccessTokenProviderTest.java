@@ -195,11 +195,11 @@ class AccessTokenProviderTest {
             FakeEndpoint endpoint = new FakeEndpoint();
             FakeClock clock = new FakeClock();
             JwtBearerGrant.builder(TOKEN_URI, "svc@example.iam", Jwk.ofPrivateKey(KeyFiles.privateKey(key[0])))
-                    .subject("ada@example.com").scopes("s1", "s2").transport(endpoint).clock(clock)
-                    .build().fetch();
+                    .subject("ada@example.com").scopes("s1", "s2").scopesInAssertion(true)
+                    .transport(endpoint).clock(clock).build().fetch();
             Map<String, String> sent = form(endpoint.forms.get(0));
             assertEquals(JwtBearerGrant.GRANT_TYPE, sent.get("grant_type"));
-            assertFalse(sent.containsKey("scope"), "scopes go in the assertion by default");
+            assertFalse(sent.containsKey("scope"), "scopes asked to go in the assertion");
             Jwt jwt = DefaultJwtDecoder.withPublicKey(KeyFiles.publicKey(key[1])).build()
                     .decode(sent.get("assertion"));
             assertEquals(key[2], jwt.getHeaders().get("alg"));
@@ -211,9 +211,12 @@ class AccessTokenProviderTest {
             assertEquals(iat + 3600, jwt.getClaimAsLong("exp").longValue());
         }
         FakeEndpoint endpoint = new FakeEndpoint();
-        JwtBearerGrant.builder(TOKEN_URI, "svc", rsaKey()).scopes("s1").scopesInAssertion(false)
+        JwtBearerGrant.builder(TOKEN_URI, "svc", rsaKey()).scopes("s1")
                 .transport(endpoint).build().fetch();
+        // RFC 7521 section 4.1: by default the scope is a form parameter.
         assertEquals("s1", form(endpoint.forms.get(0)).get("scope"));
+        assertEquals(null, verifier(KeyFixtures.RSA_PUBLIC_PEM, "key-1").decode(
+                form(endpoint.forms.get(0)).get("assertion")).getClaimAsString("scope"));
     }
 
     @Test
@@ -426,6 +429,42 @@ class AccessTokenProviderTest {
         });
         TokenAcquisitionException err = assertThrows(TokenAcquisitionException.class, provider::getToken);
         assertFalse(err.getMessage().contains(SECRET));
-        assertSame(IllegalStateException.class, err.getCause().getClass());
+        // Not even as the cause, which a stack trace would print.
+        assertEquals(null, err.getCause());
+    }
+
+    @Test
+    @DisplayName("an Error from the grant is rethrown and does not leave the provider waiting on it")
+    void errorDoesNotWedge() {
+        final int[] calls = {0};
+        FakeClock clock = new FakeClock();
+        AccessTokenProvider provider = new AccessTokenProvider(() -> {
+            if (calls[0]++ == 0) {
+                throw new StackOverflowError();
+            }
+            return new AccessToken("t", "Bearer", clock.now.get() + 3600000L, null);
+        });
+        provider.setClock(clock);
+        assertThrows(StackOverflowError.class, provider::getToken);
+        clock.advanceSeconds(10);
+        assertEquals("t", provider.getTokenValue());
+    }
+
+    @Test
+    @DisplayName("a token living no longer than the skew is reused for half its life")
+    void shortLivedToken() {
+        final int[] calls = {0};
+        FakeClock clock = new FakeClock();
+        AccessTokenProvider provider = new AccessTokenProvider(() -> {
+            calls[0]++;
+            return new AccessToken("t" + calls[0], "Bearer", clock.now.get() + 60000L, null);
+        });
+        provider.setClock(clock);
+        provider.getToken();
+        clock.advanceSeconds(29);
+        assertEquals("t1", provider.getTokenValue());
+        clock.advanceSeconds(2);
+        assertEquals("t2", provider.getTokenValue());
+        assertEquals(2, calls[0]);
     }
 }
