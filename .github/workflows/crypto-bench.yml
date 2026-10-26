@@ -11,6 +11,12 @@ name: Crypto benchmarks
 #
 # Each fails when a ratio drops below scripts/crypto-bench/floors.json. The
 # tables land in the job summary.
+#
+# android-kernels holds the committed libcn1crypto.so files to the sources
+# they were built from: they are prebuilt (Ports/Android/crypto-jni/build.sh,
+# NDK r28+), so a kernel change that is not followed by a rebuild would ship
+# old C behind new Java. Their speed on ART is measured by
+# scripts/crypto-bench/android-run.sh and reported, not gated.
 
 permissions:
   contents: read
@@ -26,6 +32,9 @@ on:
       - 'vm/ByteCodeTranslator/src/cn1_crypto_kernels*'
       - 'scripts/crypto-bench/**'
       - 'scripts/crypto-kernels/**'
+      - 'Ports/Android/crypto-jni/**'
+      - 'maven/build-engine/src/main/resources/com/codename1/builders/android-crypto/**'
+      - 'scripts/check-android-crypto-kernels.sh'
       - '.github/workflows/crypto-bench.yml'
   push:
     branches:
@@ -36,6 +45,9 @@ on:
       - 'vm/ByteCodeTranslator/src/cn1_crypto_kernels*'
       - 'scripts/crypto-bench/**'
       - 'scripts/crypto-kernels/**'
+      - 'Ports/Android/crypto-jni/**'
+      - 'maven/build-engine/src/main/resources/com/codename1/builders/android-crypto/**'
+      - 'scripts/check-android-crypto-kernels.sh'
       - '.github/workflows/crypto-bench.yml'
 
 concurrency:
@@ -43,6 +55,14 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  android-kernels:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - name: The prebuilt Android kernels match their sources
+        shell: bash
+        run: scripts/check-android-crypto-kernels.sh
+
   jvm:
     runs-on: ubuntu-24.04
     steps:
