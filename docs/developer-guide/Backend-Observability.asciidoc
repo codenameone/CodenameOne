@@ -299,7 +299,7 @@ recorded with status 500.
 runtime (`jvm` or `native`) and, for each metric, its kind, unit, attributes,
 temporality, Micrometer name and whether this server measures it.
 
-==== Unavailable is not zero
+==== An unmeasured metric is absent, not zero
 
 A metric a server can't measure isn't reported as `0`. Its instrument isn't registered, or reads
 no value, so it's absent from the JSON view, the Prometheus scrape and the OTLP

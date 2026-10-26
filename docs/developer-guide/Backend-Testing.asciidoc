@@ -255,7 +255,7 @@ behind `MockMvc`. Nothing else is created: no other controller, repository,
 scheduled job or bean is constructed, so a bean whose constructor needs a database
 or a remote service can't slow the test down or break it.
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/testing/GreetingSliceTest.java[tag=backend-test-web-slice,indent=0]
 ----
@@ -270,7 +270,7 @@ build error too.
 `includes` lists, with no web layer (its environment is `NONE`). It runs against
 its own database, an in-memory SQLite one unless its `database` attribute names a
 file or a URL, and the test's own settings can't point it at a shared one by
-accident. Each test method runs in a transaction that is rolled back when it
+accident. Each test method runs in a transaction that rolls back when it
 returns, whether it passed or failed, so tests can't see each other's rows;
 `rollback = false` keeps what a test wrote. A test can inject a repository
 interface the application never implements and gets the generated one.
@@ -297,7 +297,7 @@ compiled:
   `cn1.otel.endpoint` at its `getEndpoint()`, turn `TELEMETRY` on, and
   `await` the export requests the server sends to `/v1/traces` or `/v1/metrics`.
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/testing/ManagedServerTest.java[tag=backend-test-management-contract,indent=0]
 ----
