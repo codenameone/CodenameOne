@@ -1129,7 +1129,7 @@ const jvm = {
     return cls.classObject;
   },
   // JVMS 5.5 step 7: initializing a class also initializes every
-  // superinterface (direct or inherited, through the superclass chain too)
+  // superinterface (direct or inherited through other interfaces; the superclass chain's own are initialized by the baseClass call before this walk)
   // that declares a non-abstract, non-static method -- a default method. Such
   // a method runs against an instance whose class never named the interface
   // in a GETSTATIC, and the translator elides the init guard on a static read
