@@ -171,6 +171,10 @@ public final class Hmac {
 
     /// One-shot HMAC-SHA-256 (recommended default).
     public static byte[] sha256(byte[] key, byte[] data) {
+        byte[] fast = key == null || data == null ? null : CryptoEngine.get().hmac(Hash.SHA256, key, data);
+        if (fast != null) {
+            return fast;
+        }
         return create(Hash.SHA256, key).doFinal(data);
     }
 
@@ -181,6 +185,10 @@ public final class Hmac {
 
     /// One-shot HMAC-SHA-512.
     public static byte[] sha512(byte[] key, byte[] data) {
+        byte[] fast = key == null || data == null ? null : CryptoEngine.get().hmac(Hash.SHA512, key, data);
+        if (fast != null) {
+            return fast;
+        }
         return create(Hash.SHA512, key).doFinal(data);
     }
 

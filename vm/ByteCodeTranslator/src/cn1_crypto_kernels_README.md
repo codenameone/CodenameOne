@@ -8,7 +8,11 @@ libraries, both inlined into `cn1_crypto_kernels_amalgamation.h`:
 - **ed25519-donna** (public domain): Ed25519 per RFC 8032, hashing through the SHA-512 in
   `cn1_crypto_kernels.c`.
 
-Keccak-256 and SHA-512 are our own code in `cn1_crypto_kernels.c`.
+Keccak-256, SHA-256, SHA-512, RIPEMD-160, HMAC and PBKDF2 are our own code in
+`cn1_crypto_kernels.c`. SHA-256 and SHA-512 use the CPU's SHA instructions where it has
+them (ARMv8 SHA-256 and ARMv8.2 SHA-512, x86 SHA-NI), chosen once per process from what the
+CPU reports, and fall back to unrolled portable C. PBKDF2 lays the fixed-padding block out once,
+so each iteration is two compressions.
 
 ## When it is compiled
 

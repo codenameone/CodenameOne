@@ -39,7 +39,9 @@ import com.codename1.crypto.solana.SystemProgram;
 import com.codename1.security.CryptoEngine;
 import com.codename1.security.Ed25519;
 import com.codename1.security.Hash;
+import com.codename1.security.Hmac;
 import com.codename1.security.NativeCryptoEngine;
+import com.codename1.security.Pbkdf2;
 import com.codename1.security.Schnorr;
 import com.codename1.security.Secp256k1;
 
@@ -188,6 +190,20 @@ public final class CryptoChecks {
                 final byte[] in = bytes(len + 800, len);
                 Bulk.p("keccak[" + len + "]", run(() -> Hash.keccak256(in)));
             }
+        });
+        Bulk.check(name + ".sha2", () -> {
+            // every padding boundary of both block sizes, and a key past each block size
+            for (final int len : new int[] {0, 1, 55, 56, 63, 64, 65, 111, 112, 127, 128, 129, 200, 1000}) {
+                final byte[] in = bytes(len + 900, len);
+                Bulk.p("sha256[" + len + "]", run(() -> Hash.sha256(in)));
+                Bulk.p("sha512[" + len + "]", run(() -> Hash.sha512(in)));
+                Bulk.p("ripemd160[" + len + "]", run(() -> Hash.ripemd160(in)));
+                Bulk.p("hmac256[" + len + "]", run(() -> Hmac.sha256(in, bytes(len, 37))));
+                Bulk.p("hmac512[" + len + "]", run(() -> Hmac.sha512(in, bytes(len, 37))));
+            }
+            Bulk.p("pbkdf2-512", run(() -> Pbkdf2.hmacSha512(bytes(1, 48), bytes(2, 14), 2048, 64)));
+            Bulk.p("pbkdf2-512-long", run(() -> Pbkdf2.hmacSha512(bytes(3, 200), bytes(4, 300), 3, 150)));
+            Bulk.p("pbkdf2-256", run(() -> Pbkdf2.hmacSha256(bytes(5, 70), bytes(6, 16), 1000, 70)));
         });
     }
 

@@ -252,3 +252,63 @@ JNIEXPORT void JNICALL NS(keccak256)(JNIEnv *env, jclass cls, jbyteArray data, j
             NULL, ARG(0), (JAVA_INT) off, (JAVA_INT) len, ARG(1));
     cn1j_release(env, &pins, pins.n);
 }
+
+JNIEXPORT void JNICALL NS(sha256)(JNIEnv *env, jclass cls, jbyteArray data, jint off, jint len,
+        jbyteArray out) {
+    PIN2(data, out);
+    if (!cn1j_pin(env, &pins)) {
+        return;
+    }
+    com_codename1_security_NativeCryptoKernels_sha256___byte_1ARRAY_int_int_byte_1ARRAY(
+            NULL, ARG(0), (JAVA_INT) off, (JAVA_INT) len, ARG(1));
+    cn1j_release(env, &pins, pins.n);
+}
+
+JNIEXPORT void JNICALL NS(sha512)(JNIEnv *env, jclass cls, jbyteArray data, jint off, jint len,
+        jbyteArray out) {
+    PIN2(data, out);
+    if (!cn1j_pin(env, &pins)) {
+        return;
+    }
+    com_codename1_security_NativeCryptoKernels_sha512___byte_1ARRAY_int_int_byte_1ARRAY(
+            NULL, ARG(0), (JAVA_INT) off, (JAVA_INT) len, ARG(1));
+    cn1j_release(env, &pins, pins.n);
+}
+
+JNIEXPORT void JNICALL NS(ripemd160)(JNIEnv *env, jclass cls, jbyteArray data, jint off, jint len,
+        jbyteArray out) {
+    PIN2(data, out);
+    if (!cn1j_pin(env, &pins)) {
+        return;
+    }
+    com_codename1_security_NativeCryptoKernels_ripemd160___byte_1ARRAY_int_int_byte_1ARRAY(
+            NULL, ARG(0), (JAVA_INT) off, (JAVA_INT) len, ARG(1));
+    cn1j_release(env, &pins, pins.n);
+}
+
+JNIEXPORT void JNICALL NS(hmac)(JNIEnv *env, jclass cls, jint bits, jbyteArray key, jbyteArray data, jint off,
+        jint len, jbyteArray out) {
+    PIN3(key, data, out);
+    if (!cn1j_pin(env, &pins)) {
+        return;
+    }
+    com_codename1_security_NativeCryptoKernels_hmac___int_byte_1ARRAY_byte_1ARRAY_int_int_byte_1ARRAY(
+            NULL, (JAVA_INT) bits, ARG(0), ARG(1), (JAVA_INT) off, (JAVA_INT) len, ARG(2));
+    cn1j_release(env, &pins, pins.n);
+}
+
+/*
+ * The whole derivation runs with the three arrays pinned: a BIP-39 seed is about a third of a
+ * millisecond, short enough to hold a critical section, and copying would leave the password in
+ * a native buffer as well.
+ */
+JNIEXPORT void JNICALL NS(pbkdf2)(JNIEnv *env, jclass cls, jint bits, jbyteArray password, jbyteArray salt,
+        jint iterations, jbyteArray out) {
+    PIN3(password, salt, out);
+    if (!cn1j_pin(env, &pins)) {
+        return;
+    }
+    com_codename1_security_NativeCryptoKernels_pbkdf2___int_byte_1ARRAY_byte_1ARRAY_int_byte_1ARRAY(
+            NULL, (JAVA_INT) bits, ARG(0), ARG(1), (JAVA_INT) iterations, ARG(2));
+    cn1j_release(env, &pins, pins.n);
+}

@@ -158,4 +158,26 @@ public class CryptoEngine {
     public byte[] keccak256(byte[] data) {
         return null;
     }
+
+    /// SHA-256 of `length` bytes of `data` from `offset`, or `null` to hash
+    /// in Java. The range is already validated.
+    public byte[] sha256(byte[] data, int offset, int length) {
+        return null;
+    }
+
+    /// SHA-512 of a range of `data`, or `null` to hash in Java.
+    public byte[] sha512(byte[] data, int offset, int length) {
+        return null;
+    }
+
+    /// RIPEMD-160 of a range of `data`, or `null` to hash in Java.
+    public byte[] ripemd160(byte[] data, int offset, int length) {
+        return null;
+    }
+
+    /// HMAC over `hashAlgorithm` ([Hash#SHA256] or [Hash#SHA512]), or `null`
+    /// to compute it in Java. Neither array is null.
+    public byte[] hmac(String hashAlgorithm, byte[] key, byte[] data) {
+        return null;
+    }
 }

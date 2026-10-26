@@ -20,6 +20,7 @@
 #include <secp256k1_schnorrsig.h>
 #include <secp256k1_extrakeys.h>
 #include <openssl/evp.h>
+#include <openssl/hmac.h>
 #ifdef HAVE_SODIUM
 #include <sodium.h>
 #endif
@@ -34,6 +35,11 @@ JAVA_VOID K(ed25519PublicKey___byte_1ARRAY_byte_1ARRAY)(CODENAME_ONE_THREAD_STAT
 JAVA_VOID K(ed25519Sign___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY)(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT, JAVA_OBJECT, JAVA_OBJECT, JAVA_OBJECT);
 JAVA_INT K(ed25519Verify___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_R_int)(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT, JAVA_OBJECT, JAVA_OBJECT);
 JAVA_VOID K(keccak256___byte_1ARRAY_int_int_byte_1ARRAY)(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT, JAVA_INT, JAVA_INT, JAVA_OBJECT);
+JAVA_VOID K(sha256___byte_1ARRAY_int_int_byte_1ARRAY)(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT, JAVA_INT, JAVA_INT, JAVA_OBJECT);
+JAVA_VOID K(sha512___byte_1ARRAY_int_int_byte_1ARRAY)(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT, JAVA_INT, JAVA_INT, JAVA_OBJECT);
+JAVA_VOID K(ripemd160___byte_1ARRAY_int_int_byte_1ARRAY)(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT, JAVA_INT, JAVA_INT, JAVA_OBJECT);
+JAVA_VOID K(hmac___int_byte_1ARRAY_byte_1ARRAY_int_int_byte_1ARRAY)(CODENAME_ONE_THREAD_STATE, JAVA_INT, JAVA_OBJECT, JAVA_OBJECT, JAVA_INT, JAVA_INT, JAVA_OBJECT);
+JAVA_VOID K(pbkdf2___int_byte_1ARRAY_byte_1ARRAY_int_byte_1ARRAY)(CODENAME_ONE_THREAD_STATE, JAVA_INT, JAVA_OBJECT, JAVA_OBJECT, JAVA_INT, JAVA_OBJECT);
 JAVA_BOOLEAN K(schnorrSign___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_R_boolean)(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT, JAVA_OBJECT, JAVA_OBJECT, JAVA_OBJECT);
 JAVA_INT K(schnorrVerify___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_R_int)(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT, JAVA_OBJECT, JAVA_OBJECT);
 
@@ -165,6 +171,40 @@ static void o_keccak(void) {
     sink += EVP_Digest(kb, sizeof(kb), kout, &len, ossl_keccak, NULL);
 }
 
+/* SHA-256, SHA-512 and RIPEMD-160 of 1 KiB; HMAC-SHA-512 of 37 bytes under a 32-byte chain code
+ * (one BIP-32 step); PBKDF2-HMAC-SHA-512 with 2048 iterations (one BIP-39 seed) */
+static unsigned char hout[64], bip39pw[48], bip39salt[16] = "mnemonicTREZOR";
+static Arr aHout, aHout32, aHout20, aHout64, aPw, aSalt, aChain, aData37;
+static void c_sha256(void) { K(sha256___byte_1ARRAY_int_int_byte_1ARRAY)(0, &aKb, 0, 1024, &aHout32); }
+static void o_sha256(void) { unsigned int l = 32; sink += EVP_Digest(kb, 1024, hout, &l, EVP_sha256(), NULL); }
+static void c_sha512(void) { K(sha512___byte_1ARRAY_int_int_byte_1ARRAY)(0, &aKb, 0, 1024, &aHout64); }
+static void o_sha512(void) { unsigned int l = 64; sink += EVP_Digest(kb, 1024, hout, &l, EVP_sha512(), NULL); }
+static const EVP_MD *ossl_rmd;
+static void c_rmd(void) { K(ripemd160___byte_1ARRAY_int_int_byte_1ARRAY)(0, &aKb, 0, 1024, &aHout20); }
+static void o_rmd(void) { unsigned int l = 20; sink += EVP_Digest(kb, 1024, hout, &l, ossl_rmd, NULL); }
+static void c_hmac(void) { K(hmac___int_byte_1ARRAY_byte_1ARRAY_int_int_byte_1ARRAY)(0, 512, &aChain, &aData37, 0, 37, &aHout64); }
+static void o_hmac(void) {
+    unsigned int l = 64;
+    sink += HMAC(EVP_sha512(), priv, 32, kb, 37, hout, &l) != NULL;
+}
+static void c_pbkdf2(void) { K(pbkdf2___int_byte_1ARRAY_byte_1ARRAY_int_byte_1ARRAY)(0, 512, &aPw, &aSalt, 2048, &aHout64); }
+static void o_pbkdf2(void) {
+    sink += PKCS5_PBKDF2_HMAC((const char*) bip39pw, 48, bip39salt, 14, 2048, EVP_sha512(), 64, hout);
+}
+
+static int same(const char *what, op_fn mine, op_fn theirs, int n) {
+    unsigned char a[64];
+    mine();
+    memcpy(a, hout, 64);
+    memset(hout, 0, 64);
+    theirs();
+    if (memcmp(a, hout, (size_t) n) != 0) {
+        fprintf(stderr, "%s differs from OpenSSL\n", what);
+        return 0;
+    }
+    return 1;
+}
+
 int main(void) {
     for (int i = 0; i < (int) sizeof(kb); i++) {
         kb[i] = (unsigned char) (i * 29 + 1);
@@ -256,6 +296,26 @@ int main(void) {
             }
         }
         row("keccak256.1k.openssl", c_keccak, o_keccak);
+    }
+    for (int i = 0; i < 48; i++) {
+        bip39pw[i] = (unsigned char) ('a' + i % 26);
+    }
+    aHout32 = mk(hout, 32); aHout64 = mk(hout, 64); aHout20 = mk(hout, 20); aHout = aHout64;
+    aPw = mk(bip39pw, 48); aSalt = mk(bip39salt, 14); aChain = mk(priv, 32); aData37 = mk(kb, 37);
+    ossl_rmd = EVP_MD_fetch(NULL, "RIPEMD-160", NULL);
+    if (!same("SHA-256", c_sha256, o_sha256, 32) || !same("SHA-512", c_sha512, o_sha512, 64)
+            || !same("HMAC-SHA-512", c_hmac, o_hmac, 64) || !same("PBKDF2", c_pbkdf2, o_pbkdf2, 64)) {
+        return 3;
+    }
+    row("sha256.1k.openssl", c_sha256, o_sha256);
+    row("sha512.1k.openssl", c_sha512, o_sha512);
+    row("hmac.sha512.bip32.openssl", c_hmac, o_hmac);
+    row("pbkdf2.sha512.bip39.openssl", c_pbkdf2, o_pbkdf2);
+    if (ossl_rmd != NULL) {
+        if (!same("RIPEMD-160", c_rmd, o_rmd, 20)) {
+            return 3;
+        }
+        row("ripemd160.1k.openssl", c_rmd, o_rmd);
     }
     return 0;
 }

@@ -58,7 +58,13 @@ public class NativeCryptoEngine extends CryptoEngine {
 
     @Override
     public byte[] pbkdf2(String hashAlgorithm, byte[] password, byte[] salt, int iterations, int length) {
-        return next.pbkdf2(hashAlgorithm, password, salt, iterations, length);
+        int bits = bits(hashAlgorithm);
+        if (bits == 0) {
+            return next.pbkdf2(hashAlgorithm, password, salt, iterations, length);
+        }
+        byte[] out = new byte[length];
+        NativeCryptoKernels.pbkdf2(bits, password, salt, iterations, out);
+        return out;
     }
 
     @Override
@@ -186,6 +192,60 @@ public class NativeCryptoEngine extends CryptoEngine {
         byte[] out = new byte[32];
         NativeCryptoKernels.keccak256(data, 0, data.length, out);
         return out;
+    }
+
+    @Override
+    public byte[] sha256(byte[] data, int offset, int length) {
+        if (!inRange(data, offset, length)) {
+            return null;
+        }
+        byte[] out = new byte[32];
+        NativeCryptoKernels.sha256(data, offset, length, out);
+        return out;
+    }
+
+    @Override
+    public byte[] sha512(byte[] data, int offset, int length) {
+        if (!inRange(data, offset, length)) {
+            return null;
+        }
+        byte[] out = new byte[64];
+        NativeCryptoKernels.sha512(data, offset, length, out);
+        return out;
+    }
+
+    @Override
+    public byte[] ripemd160(byte[] data, int offset, int length) {
+        if (!inRange(data, offset, length)) {
+            return null;
+        }
+        byte[] out = new byte[20];
+        NativeCryptoKernels.ripemd160(data, offset, length, out);
+        return out;
+    }
+
+    @Override
+    public byte[] hmac(String hashAlgorithm, byte[] key, byte[] data) {
+        int bits = bits(hashAlgorithm);
+        if (bits == 0 || key == null || data == null) {
+            return null;
+        }
+        byte[] out = new byte[bits / 8];
+        NativeCryptoKernels.hmac(bits, key, data, 0, data.length, out);
+        return out;
+    }
+
+    /// 256 or 512 for the SHA-2 hashes the kernels implement, 0 for anything
+    /// else.
+    private static int bits(String hashAlgorithm) {
+        if (Hash.SHA512.equals(hashAlgorithm)) {
+            return 512;
+        }
+        return Hash.SHA256.equals(hashAlgorithm) ? 256 : 0;
+    }
+
+    private static boolean inRange(byte[] data, int offset, int length) {
+        return data != null && offset >= 0 && length >= 0 && length <= data.length - offset;
     }
 
     /// Whether `y` (the low 255 bits, little endian) is below

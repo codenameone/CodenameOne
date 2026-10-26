@@ -188,6 +188,10 @@ public final class Hash {
 
     /// One-shot SHA-256 hash (recommended general-purpose hash).
     public static byte[] sha256(byte[] data) {
+        byte[] fast = data == null ? null : CryptoEngine.get().sha256(data, 0, data.length);
+        if (fast != null) {
+            return fast;
+        }
         return create(SHA256).digest(data);
     }
 
@@ -198,6 +202,10 @@ public final class Hash {
 
     /// One-shot SHA-512 hash.
     public static byte[] sha512(byte[] data) {
+        byte[] fast = data == null ? null : CryptoEngine.get().sha512(data, 0, data.length);
+        if (fast != null) {
+            return fast;
+        }
         return create(SHA512).digest(data);
     }
 
@@ -212,6 +220,10 @@ public final class Hash {
 
     /// One-shot RIPEMD-160 hash.
     public static byte[] ripemd160(byte[] data) {
+        byte[] fast = data == null ? null : CryptoEngine.get().ripemd160(data, 0, data.length);
+        if (fast != null) {
+            return fast;
+        }
         return create(RIPEMD160).digest(data);
     }
 

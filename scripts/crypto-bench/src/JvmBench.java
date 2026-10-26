@@ -1,5 +1,6 @@
 import com.codename1.security.Ed25519;
 import com.codename1.security.Hash;
+import com.codename1.security.Hmac;
 import com.codename1.security.Schnorr;
 import com.codename1.security.Pbkdf2;
 import com.codename1.security.Secp256k1;
@@ -12,6 +13,8 @@ import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters;
 import org.bouncycastle.crypto.signers.Ed25519Signer;
 import org.bouncycastle.crypto.digests.SHA256Digest;
 import org.bouncycastle.crypto.digests.SHA512Digest;
+import org.bouncycastle.crypto.macs.HMac;
+import org.bouncycastle.crypto.params.KeyParameter;
 import org.bouncycastle.crypto.generators.PKCS5S2ParametersGenerator;
 import org.bouncycastle.crypto.params.ECDomainParameters;
 import org.bouncycastle.crypto.params.ECPrivateKeyParameters;
@@ -79,7 +82,18 @@ public final class JvmBench {
         return Hash.toHex(pub) + Hash.toHex(Secp256k1.publicKey(k, false)) + Hash.toHex(sig.r()) + Hash.toHex(sig.s())
                 + Secp256k1.verify(m, sig, pub) + Hash.toHex(edPub) + Hash.toHex(edSig)
                 + Ed25519.verify(kb, edSig, edPub) + Hash.toHex(sch) + Schnorr.verify(m, sch, Schnorr.publicKey(k))
-                + Hash.toHex(Hash.keccak256(kb));
+                + Hash.toHex(Hash.keccak256(kb)) + hashes(kb, 0) + hashes(kb, 1) + hashes(kb, 63) + hashes(kb, 64)
+                + hashes(kb, 111) + hashes(kb, 112) + hashes(kb, 128) + hashes(kb, 1000)
+                + Hash.toHex(Pbkdf2.hmacSha512(k, m, 3, 100)) + Hash.toHex(Pbkdf2.hmacSha256(kb, m, 5, 70))
+                + Hash.toHex(Hmac.sha512(kb, m)) + Hash.toHex(Hmac.sha256(kb, m));
+    }
+
+    /// Every hash the kernels route, of a prefix of `kb` and under a key of that length.
+    static String hashes(byte[] kb, int n) {
+        byte[] d = new byte[n];
+        System.arraycopy(kb, 0, d, 0, n);
+        return Hash.toHex(Hash.sha256(d)) + Hash.toHex(Hash.sha512(d)) + Hash.toHex(Hash.ripemd160(d))
+                + Hash.toHex(Hmac.sha512(d, kb)) + Hash.toHex(Hmac.sha256(d, kb));
     }
 
     public static void main(String[] a) {
@@ -97,7 +111,7 @@ public final class JvmBench {
         final ECPublicKeyParameters bPub = new ECPublicKeyParameters(dom.getG().multiply(bPriv.getD()).normalize(), dom);
         final BigInteger r = new BigInteger(1, sig.r()), s = new BigInteger(1, sig.s());
         final byte[] kb = new byte[1024];
-        final byte[] out = new byte[32];
+        final byte[] out = new byte[64];
 
         row("secp256k1.pubkey", i -> Secp256k1.publicKey(priv, true), i -> dom.getG().multiply(bPriv.getD()).normalize().getEncoded(true));
         row("secp256k1.sign", i -> Secp256k1.sign(hash, priv), i -> {
@@ -114,6 +128,12 @@ public final class JvmBench {
             KeccakDigest d = new KeccakDigest(256); d.update(kb, 0, kb.length); d.doFinal(out, 0); });
         row("sha256.1k", i -> Hash.sha256(kb), i -> {
             SHA256Digest d = new SHA256Digest(); d.update(kb, 0, kb.length); d.doFinal(out, 0); });
+        row("sha512.1k", i -> Hash.sha512(kb), i -> {
+            SHA512Digest d = new SHA512Digest(); d.update(kb, 0, kb.length); d.doFinal(out, 0); });
+        byte[] chain = Hash.sha256("chain".getBytes());
+        byte[] step = new byte[37];
+        row("hmac.sha512.bip32", i -> Hmac.sha512(chain, step), i -> {
+            HMac h = new HMac(new SHA512Digest()); h.init(new KeyParameter(chain)); h.update(step, 0, 37); h.doFinal(out, 0); });
         byte[] mn = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about".getBytes();
         byte[] salt = "mnemonic".getBytes();
         row("pbkdf2.sha512.bip39", i -> Pbkdf2.hmacSha512(mn, salt, 2048, 64), i -> {

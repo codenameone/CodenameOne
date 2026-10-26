@@ -62,4 +62,16 @@ final class NativeCryptoKernels {
     static native int ed25519Verify(byte[] message, byte[] signature, byte[] publicKey);
 
     static native void keccak256(byte[] data, int offset, int length, byte[] out);
+
+    static native void sha256(byte[] data, int offset, int length, byte[] out);
+
+    static native void sha512(byte[] data, int offset, int length, byte[] out);
+
+    static native void ripemd160(byte[] data, int offset, int length, byte[] out);
+
+    /// HMAC-SHA-256 (`bits` 256) or HMAC-SHA-512 (`bits` 512).
+    static native void hmac(int bits, byte[] key, byte[] data, int offset, int length, byte[] out);
+
+    /// PBKDF2 with HMAC-SHA-256 or -512, filling all of `out`.
+    static native void pbkdf2(int bits, byte[] password, byte[] salt, int iterations, byte[] out);
 }
