@@ -190,9 +190,9 @@ public final class AccessTokenProvider {
             // Recorded like any failure, so the flag below is cleared and the
             // waiters woken; otherwise the provider would wait on a refresh
             // that ended long ago until the process restarts. Then rethrown.
+            // Nothing allocated here: an OutOfMemoryError would fail again
+            // before the flag below is cleared. The failure is built after it.
             fatal = err;
-            failure = new TokenAcquisitionException("The grant failed: "
-                    + err.getClass().getName(), -1, null, false, null);
         }
         synchronized (this) {
             refreshing = false;
@@ -207,6 +207,10 @@ public final class AccessTokenProvider {
                 return fresh;
             }
             failures++;
+            if (fatal != null) {
+                failure = new TokenAcquisitionException("The grant failed: "
+                        + fatal.getClass().getName(), -1, null, false, null);
+            }
             lastFailure = failure;
             nextAttemptAt = now + backoff(failures);
             if (fatal != null) {
