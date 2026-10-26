@@ -376,6 +376,30 @@ public class ByteCodeTranslator {
         }
     }
 
+    /**
+     * True when the application uses the elliptic-curve or Keccak APIs of com.codename1.security
+     * (or com.codename1.crypto), and so gets libsecp256k1 and ed25519-donna compiled in. Set by
+     * the platform builders from their class scan.
+     */
+    static boolean isCryptoKernelsEnabled() {
+        return "true".equals(Util.getProperty("cn1.cryptoKernels", "false"));
+    }
+
+    /// Emits the native crypto kernels. `cn1_crypto_kernels.c` always goes out: it defines every
+    /// `NativeCryptoKernels` entry point, as stubs that answer "not available" unless the
+    /// amalgamation sits beside it, which it detects with `__has_include`. The amalgamation
+    /// (about 4 MB of vendored C) is emitted only for an application that uses the APIs, so every
+    /// other application compiles the stubs and links none of it.
+    private static void emitCryptoKernels(File srcRoot) throws IOException {
+        copyRuntimeResource(srcRoot, "cn1_crypto_kernels.c");
+        File amalgamation = new File(srcRoot, "cn1_crypto_kernels_amalgamation.h");
+        if (isCryptoKernelsEnabled()) {
+            copyVendoredResource(srcRoot, "cn1_crypto_kernels_amalgamation.h");
+        } else {
+            deleteIfPresent(amalgamation);
+        }
+    }
+
     /// Removes a file this run decided not to emit, and says so if it cannot.
     ///
     /// Silence here would be the failure the caller is trying to avoid: the stale file would be
@@ -550,6 +574,7 @@ public class ByteCodeTranslator {
         // com.codename1.db links regardless of how the translator was invoked.
         copyRuntimeResource(srcRoot, "cn1_db_sqlite_impl.h");
         emitBundledSqlite(srcRoot);
+        emitCryptoKernels(srcRoot);
         copyRuntimeResource(srcRoot, "xmlvm.h");
 
         // Win32 POSIX compatibility shim. Always emitted; both files are gated on
@@ -949,6 +974,7 @@ public class ByteCodeTranslator {
         // com.codename1.db links regardless of how the translator was invoked.
         copyRuntimeResource(srcRoot, "cn1_db_sqlite_impl.h");
         emitBundledSqlite(srcRoot);
+        emitCryptoKernels(srcRoot);
 
         Parser.writeOutput(srcRoot);
 

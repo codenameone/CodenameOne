@@ -203,6 +203,10 @@ public final class Hash {
 
     /// One-shot Keccak-256 hash (Ethereum's hash, see [#KECCAK256]).
     public static byte[] keccak256(byte[] data) {
+        byte[] fast = CryptoEngine.get().keccak256(data);
+        if (fast != null) {
+            return fast;
+        }
         return create(KECCAK256).digest(data);
     }
 

@@ -79,6 +79,7 @@ public final class Backend {
         // First, so code in another package reaching for the internals while
         // anything below initializes still finds them.
         com.codename1.impl.backend.BackendAccess.install(new Access());
+        Crypto.installCryptoEngine();
     }
 
     private final HttpServer server;

@@ -55,6 +55,27 @@ public final class Crypto {
     private Crypto() {
     }
 
+    /// Installs the server's [com.codename1.security.CryptoEngine]: PBKDF2
+    /// through the native derivation [#pbkdf2(String, byte[], byte[], int, int)]
+    /// uses, and secp256k1, Schnorr, Ed25519 and Keccak through the C kernels
+    /// when the build linked them. Called once, as the backend loads.
+    public static void installCryptoEngine() {
+        com.codename1.security.CryptoEngine.install(
+                com.codename1.security.NativeCryptoEngine.create(new ServerEngine()));
+    }
+
+    private static final class ServerEngine extends com.codename1.security.CryptoEngine {
+        @Override
+        public byte[] pbkdf2(String hashAlgorithm, byte[] password, byte[] salt, int iterations, int length) {
+            try {
+                return Crypto.pbkdf2(hashAlgorithm, password, salt, iterations, length);
+            } catch (IOException err) {
+                // the portable derivation answers instead
+                return null;
+            }
+        }
+    }
+
     public static byte[] sha256(byte[] data) {
         return sha256Impl(data);
     }

@@ -152,6 +152,10 @@ public final class Secp256k1 {
     ///
     /// - `CryptoException`: if the private key is not valid
     public static byte[] publicKey(byte[] privateKey, boolean compressed) {
+        byte[] fast = CryptoEngine.get().secpPublicKey(privateKey, compressed);
+        if (fast != null) {
+            return fast;
+        }
         int[] d = privateScalar(privateKey);
         int[][] q = mulGen(d);
         wipe(d);
@@ -191,6 +195,10 @@ public final class Secp256k1 {
     ///
     /// - `CryptoException`: if either input is out of range or the sum is zero
     public static byte[] privateKeyTweakAdd(byte[] privateKey, byte[] tweak) {
+        byte[] fast = CryptoEngine.get().secpPrivateKeyTweakAdd(privateKey, tweak);
+        if (fast != null) {
+            return fast;
+        }
         int[] d = privateScalar(privateKey);
         int[] t = tweakScalar(tweak);
         int[] sum = new int[LIMBS];
@@ -214,6 +222,10 @@ public final class Secp256k1 {
     /// - `CryptoException`: if the key is not on the curve, the tweak is not
     ///   less than `n`, or the result is the point at infinity
     public static byte[] publicKeyTweakAdd(byte[] publicKey, byte[] tweak, boolean compressed) {
+        byte[] fast = CryptoEngine.get().secpPublicKeyTweakAdd(publicKey, tweak, compressed);
+        if (fast != null) {
+            return fast;
+        }
         int[][] q = parseOrThrow(publicKey);
         int[] t = tweakScalar(tweak);
         if (isZero(t)) {
@@ -261,6 +273,10 @@ public final class Secp256k1 {
     /// - `CryptoException`: if the hash is not 32 bytes or the key is not valid
     public static EcdsaSignature sign(byte[] hash, byte[] privateKey) {
         checkLength(hash, HASH_LENGTH, "hash");
+        byte[] fast = CryptoEngine.get().secpSign(hash, privateKey);
+        if (fast != null) {
+            return EcdsaSignature.fromCompact(slice(fast, 0, 64), fast[64]);
+        }
         int[] d = privateScalar(privateKey);
         int[] z = FN.reduce(toLimbs(hash, 0));
         byte[] zBytes = new byte[HASH_LENGTH];
@@ -318,6 +334,10 @@ public final class Secp256k1 {
         checkLength(hash, HASH_LENGTH, "hash");
         if (signature == null) {
             throw new CryptoException("signature must not be null");
+        }
+        int fast = CryptoEngine.get().secpVerify(hash, signature.toCompact(), publicKey);
+        if (fast >= 0) {
+            return fast == 1;
         }
         int[][] q = parseOrThrow(publicKey);
         int[] r = toLimbs(signature.r, 0);
@@ -389,6 +409,10 @@ public final class Secp256k1 {
         int recId = signature.recoveryId;
         if (recId < 0) {
             throw new CryptoException("signature carries no recovery id");
+        }
+        byte[] fast = CryptoEngine.get().secpRecover(hash, signature.toCompact(), recId, compressed);
+        if (fast != null) {
+            return fast;
         }
         int[] r = toLimbs(signature.r, 0);
         int[] s = toLimbs(signature.s, 0);
@@ -666,6 +690,10 @@ public final class Secp256k1 {
     // BIP-340 Schnorr signatures, reached through Schnorr
 
     static byte[] xOnlyPublicKey(byte[] privateKey) {
+        byte[] fast = CryptoEngine.get().schnorrPublicKey(privateKey);
+        if (fast != null) {
+            return fast;
+        }
         int[] d = privateScalar(privateKey);
         int[][] p = mulGen(d);
         wipe(d);
@@ -680,6 +708,10 @@ public final class Secp256k1 {
         }
         if (auxRand != null) {
             checkLength(auxRand, 32, "auxiliary randomness");
+        }
+        byte[] fast = CryptoEngine.get().schnorrSign(message, privateKey, auxRand);
+        if (fast != null) {
+            return fast;
         }
         int[] d = privateScalar(privateKey);
         int[][] p = mulGen(d);
@@ -729,6 +761,10 @@ public final class Secp256k1 {
         checkLength(xOnlyKey, 32, "x-only public key");
         if (signature == null || signature.length != 64) {
             return false;
+        }
+        int fast = CryptoEngine.get().schnorrVerify(message, signature, xOnlyKey);
+        if (fast >= 0) {
+            return fast == 1;
         }
         if (!Secp256k1Math.isCanonical(xOnlyKey, 0) || !Secp256k1Math.isCanonical(signature, 0)) {
             return false;

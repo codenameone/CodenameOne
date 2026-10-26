@@ -157,7 +157,19 @@ class BulkConformanceIntegrationTest {
             }
         }
         Path outputDir = Files.createDirectories(work.resolve("output"));
-        CleanTargetIntegrationTest.runTranslator(classesDir, outputDir, "BulkApp");
+        // CryptoChecks compares the native crypto kernels with the Java engine, so
+        // this translation links them, as a builder does for an application using them.
+        String originalKernels = System.getProperty("cn1.cryptoKernels");
+        System.setProperty("cn1.cryptoKernels", "true");
+        try {
+            CleanTargetIntegrationTest.runTranslator(classesDir, outputDir, "BulkApp");
+        } finally {
+            if (originalKernels == null) {
+                System.clearProperty("cn1.cryptoKernels");
+            } else {
+                System.setProperty("cn1.cryptoKernels", originalKernels);
+            }
+        }
         Path distDir = outputDir.resolve("dist");
         Path cmakeLists = distDir.resolve("CMakeLists.txt");
         assertTrue(Files.exists(cmakeLists), "Translator should emit a CMake project");
@@ -283,6 +295,16 @@ class BulkConformanceIntegrationTest {
         "com/codename1/security/CryptoException.java",
         "com/codename1/security/MessageDigestImpl.java",
         "com/codename1/security/Hash.java",
+        "com/codename1/security/CryptoEngine.java",
+        "com/codename1/security/NativeCryptoEngine.java",
+        "com/codename1/security/NativeCryptoKernels.java",
+        "com/codename1/security/Secp256k1.java",
+        "com/codename1/security/Secp256k1Math.java",
+        "com/codename1/security/Schnorr.java",
+        "com/codename1/security/Ed25519.java",
+        "com/codename1/security/Ed25519Math.java",
+        "com/codename1/security/Pbkdf2.java",
+        "com/codename1/security/Hmac.java",
     };
 
     /// `CodenameOne/src`: `-Dbulk.repo` names the checkout, otherwise it is

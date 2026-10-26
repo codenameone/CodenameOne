@@ -87,6 +87,12 @@ public final class Crypto {
     private Crypto() {
     }
 
+    /// Installs the server's [com.codename1.security.CryptoEngine]. The JVM
+    /// runs the portable Java engine, which is already its fastest path, so
+    /// this installs nothing; the ParparVM build links the C kernels here.
+    public static void installCryptoEngine() {
+    }
+
     public static byte[] sha256(byte[] data) {
         if (data == null) {
             return null;

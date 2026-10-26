@@ -4,6 +4,7 @@
 # size limits.
 vm/ByteCodeTranslator/src/cn1_sqlite3_amalgamation.h linguist-vendored linguist-generated -diff
 vm/ByteCodeTranslator/src/cn1_sqlite3.h             linguist-vendored linguist-generated -diff
+vm/ByteCodeTranslator/src/cn1_crypto_kernels_amalgamation.h linguist-vendored linguist-generated -diff
 Ports/JavaScriptPort/src/main/webapp/js/sqlite3mc.js              linguist-vendored -diff
 Ports/JavaScriptPort/src/main/webapp/js/sqlite3-opfs-async-proxy.js linguist-vendored -diff
 

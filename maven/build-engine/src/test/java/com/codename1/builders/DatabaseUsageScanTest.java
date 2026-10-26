@@ -149,6 +149,34 @@ class DatabaseUsageScanTest {
         assertFalse(usage.usesDatabaseCipher(), "but calls no factory that configures a key");
     }
 
+    @Test
+    void anApplicationUsingTheCurveApisGetsTheCryptoKernels() throws IOException {
+        writeClass("com/example/Wallet.class", "com/codename1/security/Secp256k1");
+        assertTrue(executor.scanForDatabaseUsage(root).usesCryptoKernels(),
+                "a reference to Secp256k1 links the native kernels");
+    }
+
+    @Test
+    void theFrameworksOwnCryptoClassesDoNotChargeTheKernels() throws IOException {
+        // Every port names NativeCryptoEngine to install it, and the curve classes name each
+        // other; none of that says the application signs anything.
+        writeClass("com/codename1/impl/ios/IOSImplementation.class",
+                "com/codename1/security/NativeCryptoEngine", "com/codename1/security/Ed25519");
+        writeClass("com/codename1/security/Schnorr.class", "com/codename1/security/Secp256k1");
+        writeClass("com/codename1/crypto/encoding/Hex.class", "com/codename1/crypto/encoding/Base58");
+        writeClass("com/example/Hasher.class", "com/codename1/security/Hash");
+        writeClassWithStringLiteral("com/example/Chatty.class", "com/codename1/security/Ed25519");
+        assertFalse(executor.scanForDatabaseUsage(root).usesCryptoKernels(),
+                "only framework classes, Hash and a string literal name the curve types");
+    }
+
+    @Test
+    void theCryptoPackageChargesTheKernels() throws IOException {
+        writeClass("com/example/Pay.class", "com/codename1/crypto/evm/EvmAddress");
+        assertTrue(executor.scanForDatabaseUsage(root).usesCryptoKernels(),
+                "com.codename1.crypto is built on the curves");
+    }
+
     /** A real class carrying the given text as a constant, and referring to nothing. */
     private void writeClassWithStringLiteral(String path, String literal) throws IOException {
         writeClassWithStringLiteral(org.objectweb.asm.Opcodes.V1_8, path, literal);

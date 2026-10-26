@@ -56,6 +56,11 @@ public final class Ed25519 {
     ///
     /// - `CryptoException`: if the seed is not 32 bytes
     public static byte[] publicKey(byte[] privateKey) {
+        byte[] fast = privateKey != null && privateKey.length == 32
+                ? CryptoEngine.get().ed25519PublicKey(privateKey) : null;
+        if (fast != null) {
+            return fast;
+        }
         byte[] h = expand(privateKey);
         byte[] a = new byte[32];
         System.arraycopy(h, 0, a, 0, 32);
