@@ -47,6 +47,30 @@ class TrustModifier {
         }
     }
 
+    /// A socket factory that presents `chainPem` with its private key, and
+    /// checks the server as the default context does unless `insecure` asked
+    /// for the same trust-everything manager as relaxHostChecking.
+    static SSLSocketFactory clientCertificateFactory(String chainPem, String keyAlgorithm, byte[] pkcs8,
+            boolean insecure) throws java.io.IOException, java.security.GeneralSecurityException {
+        java.util.Collection<? extends java.security.cert.Certificate> certificates =
+                java.security.cert.CertificateFactory.getInstance("X.509").generateCertificates(
+                        new java.io.ByteArrayInputStream(chainPem.getBytes("US-ASCII")));
+        java.security.PrivateKey key = java.security.KeyFactory.getInstance(keyAlgorithm)
+                .generatePrivate(new java.security.spec.PKCS8EncodedKeySpec(pkcs8));
+        // An in-memory store holding the one entry; the password protects nothing.
+        char[] password = new char[0];
+        java.security.KeyStore store = java.security.KeyStore.getInstance(java.security.KeyStore.getDefaultType());
+        store.load(null, null);
+        store.setKeyEntry("client", key, password,
+                certificates.toArray(new java.security.cert.Certificate[certificates.size()]));
+        javax.net.ssl.KeyManagerFactory keys = javax.net.ssl.KeyManagerFactory.getInstance(
+                javax.net.ssl.KeyManagerFactory.getDefaultAlgorithm());
+        keys.init(store, password);
+        SSLContext ctx = SSLContext.getInstance("TLS");
+        ctx.init(keys.getKeyManagers(), insecure ? new TrustManager[]{new AlwaysTrustManager()} : null, null);
+        return ctx.getSocketFactory();
+    }
+
     private static class AlwaysTrustManager implements X509TrustManager {
 
         @Override

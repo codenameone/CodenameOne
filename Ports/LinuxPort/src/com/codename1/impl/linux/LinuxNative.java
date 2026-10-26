@@ -679,6 +679,12 @@ public final class LinuxNative {
     /// A method other than the GET or POST [#httpSetMethod] selects.
     public static native void httpSetCustomMethod(long connection, String method);
 
+    /// Presents a client certificate: the PEM chain and the PEM private key.
+    public static native void httpSetClientCertificate(long connection, String chainPem, String keyPem);
+
+    /// Skips checking the server's certificate and host name.
+    public static native void httpSetInsecure(long connection, boolean insecure);
+
     public static native void httpSetConnectTimeout(long connection, int millis);
 
     /// How long the transfer may sit without receiving anything.

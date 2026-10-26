@@ -13,6 +13,8 @@
 /// - [Signature] -- RSA and ECDSA digital signatures.
 /// - [KeyGenerator] / [KeyPair] / [SecretKey] / [PublicKey] / [PrivateKey] --
 ///   key material containers and generators.
+/// - [CertificateRequest] -- PKCS#10 certificate signing requests, for enrolling
+///   a device in mutual TLS.
 /// - [Jwt] -- JSON Web Token signing and verification (HS, RS and ES families).
 /// - [Otp] -- RFC 4226/6238 HOTP and TOTP one-time passwords, compatible with
 ///   standard authenticator apps.

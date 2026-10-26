@@ -232,6 +232,8 @@ public class ConnectionRequest implements IOProgressListener {
     private boolean collectPublicKeyDigests;
     /// A flag that turns off checking for invalid certificates.
     private boolean insecure;
+    private String clientCertificateChain;
+    private com.codename1.security.PrivateKey clientCertificateKey;
     /// The request body can be used instead of arguments to pass JSON data to a restful request,
     /// it can't be used in a get request and will fail if you have arguments
     private String requestBody;
@@ -682,6 +684,51 @@ public class ConnectionRequest implements IOProgressListener {
     ///
     public void setInsecure(boolean insecure) {
         this.insecure = insecure;
+    }
+
+    /// True when this platform can present a client certificate, see
+    /// [#setClientCertificate(String, com.codename1.security.PrivateKey)].
+    ///
+    /// #### Returns
+    ///
+    /// true on the JavaSE, Android and Linux ports
+    public static boolean isClientCertificateSupported() {
+        return Util.getImplementation().isClientCertificateSupported();
+    }
+
+    /// Presents a client certificate during the TLS handshake: mutual TLS, where
+    /// the server knows the device by its certificate instead of a password or a
+    /// token. The certificate is typically what a certificate authority issued
+    /// for a [com.codename1.security.CertificateRequest] the device signed with
+    /// the same key.
+    ///
+    /// #### Parameters
+    ///
+    /// - `certificateChainPem`: the device certificate in PEM, optionally followed
+    ///   by the intermediate certificates that lead to the authority; null to
+    ///   present none
+    ///
+    /// - `key`: the private key of the device certificate, `EC` or `RSA`
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalStateException`: when the platform cannot present one, see
+    ///   [#isClientCertificateSupported()]; sending the request without it would
+    ///   only fail later and less clearly
+    public void setClientCertificate(String certificateChainPem, com.codename1.security.PrivateKey key) {
+        if (certificateChainPem == null) {
+            clientCertificateChain = null;
+            clientCertificateKey = null;
+            return;
+        }
+        if (key == null || certificateChainPem.indexOf("-----BEGIN CERTIFICATE-----") < 0) {
+            throw new IllegalArgumentException("A client certificate needs a PEM certificate and its private key");
+        }
+        if (!isClientCertificateSupported()) {
+            throw new IllegalStateException("This platform cannot present a client certificate");
+        }
+        clientCertificateChain = certificateChainPem;
+        clientCertificateKey = key;
     }
 
     /// This method will return a valid value for only some of the responses and only after the response was processed
@@ -1250,6 +1297,10 @@ public class ConnectionRequest implements IOProgressListener {
         }
         if (insecure) {
             impl.setInsecure(connection, insecure);
+        }
+        if (clientCertificateChain != null) {
+            impl.setClientCertificate(connection, clientCertificateChain, clientCertificateKey.getAlgorithm(),
+                    clientCertificateKey.getEncoded(), insecure);
         }
         impl.setConnectionId(connection, id);
 

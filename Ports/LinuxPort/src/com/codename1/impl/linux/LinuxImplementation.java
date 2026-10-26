@@ -3115,6 +3115,30 @@ public class LinuxImplementation extends CodenameOneImplementation {
         LinuxNative.httpSetCustomMethod(((LinuxHttpConnection) connection).peer, method);
     }
 
+    @Override
+    public void setInsecure(Object connection, boolean insecure) {
+        LinuxNative.httpSetInsecure(((LinuxHttpConnection) connection).peer, insecure);
+    }
+
+    @Override
+    public boolean isClientCertificateSupported() {
+        return true;
+    }
+
+    /// libcurl takes the key as PEM, so the PKCS#8 bytes are wrapped here.
+    @Override
+    public void setClientCertificate(Object connection, String certificateChainPem, String keyAlgorithm,
+            byte[] privateKeyPkcs8, boolean insecure) {
+        String body = java.util.Base64.getEncoder().encodeToString(privateKeyPkcs8);
+        StringBuilder pem = new StringBuilder("-----BEGIN PRIVATE KEY-----\n");
+        for (int i = 0; i < body.length(); i += 64) {
+            pem.append(body.substring(i, Math.min(body.length(), i + 64))).append('\n');
+        }
+        pem.append("-----END PRIVATE KEY-----\n");
+        LinuxNative.httpSetClientCertificate(((LinuxHttpConnection) connection).peer, certificateChainPem,
+                pem.toString());
+    }
+
     /// True: [#setReadTimeout(Object, int)] is honoured, so a caller that checks
     /// this before setting one gets the timeout it asked for.
     @Override

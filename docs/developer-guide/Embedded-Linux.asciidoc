@@ -207,4 +207,82 @@ When another device already uses the name, the second one gets a numeric suffix,
 `Hall Thermostat (2)`. Discovery listeners on the backend run on the discovery
 thread, because a server has no event dispatch thread.
 
+=== Working through a flaky link
+
+A device in a field, a truck or a basement loses its network for minutes or
+days and has to keep working. `com.codename1.io.outbox.Outbox` is a queue of
+outgoing messages kept in the application's own database. The device enqueues
+what it has to report, and the outbox sends it in order once the link is back.
+The same class works in a UI application and on the backend.
+
+The table sits in the database of the ORM session the outbox was opened on. An
+`enqueue` inside one of that session's transactions belongs to the transaction,
+so a reading and the message announcing it commit together or not at all:
+
+[source,java,role=cn1-no-try]
+----
+Outbox outbox = Outbox.open(session, "readings@" + deviceId);
+
+session.beginTransaction();
+session.persist(reading);
+outbox.enqueue("/v1/readings", body);
+session.commitTransaction();
+
+// From a timer, or when the network comes back:
+outbox.flush(message -> {
+    int status = postToServer(message.getTopic(), message.getKey(), message.getPayload());
+    return status < 300 ? Outbox.DELIVERED
+            : status < 500 ? Outbox.REJECTED : Outbox.RETRY;
+});
+----
+
+`postToServer` stands for the application's own request: `Rest` on a client,
+`Web` on the backend, or anything else that can carry bytes. A message stays at
+the head of the queue until the transport answers `DELIVERED`. While it is
+retried, with a backoff that doubles up to five minutes by default, nothing
+overtakes it. `REJECTED` drops a message the server will never accept.
+
+Delivery is at least once. If the acknowledgement is lost, the same message goes
+out again with the same `getKey()`, so the server records the keys it has applied
+and acknowledges a repeat without applying it twice. When many devices report to
+one server, put the device identity in the outbox name, which is the first half of
+every key. `setCapacity(limit, true)` bounds a telemetry queue by discarding the
+oldest readings. `setMaxAttempts` gives up on a message after that many
+failures.
+
+=== Device identity and mutual TLS
+
+A fleet server has to know which device is calling, and a shared password
+compiled into every unit is not an answer. Instead, each device generates its own
+key pair on first boot and asks a certificate authority for a client
+certificate. The key never leaves the device. The request is a PKCS#10
+certificate signing request, which `com.codename1.security.CertificateRequest`
+builds:
+
+[source,java,role=cn1-no-try]
+----
+KeyPair keys = KeyGenerator.ec(256);
+byte[] csr = new CertificateRequest(keys.getPublicKey().getEncoded(), "EC")
+        .commonName(deviceId)
+        .dnsName(deviceId + ".local")
+        .sign(data -> Signature.sign(Signature.SHA256_WITH_ECDSA, keys.getPrivateKey(), data));
+String pem = CertificateRequest.toPem(csr);
+// Send pem to the enrollment endpoint, store the certificate it returns.
+----
+
+From then on the device presents the certificate on every request, and the server
+identifies it from the TLS handshake:
+
+[source,java,role=cn1-no-try]
+----
+ConnectionRequest request = new ConnectionRequest(fleetUrl + "/v1/readings", true);
+request.setClientCertificate(certificatePem, keys.getPrivateKey());
+----
+
+`ConnectionRequest.isClientCertificateSupported()` is true on Linux devices, on
+Android and in the simulator. A headless device on the backend signs the
+request with `Crypto.sign` and presents the certificate through
+`WebClient.setClientCertificate`. Keep the private key in `SecureStorage`, or in
+a file only the application's user can read on a board without one.
+
 include::embedded-benchmarks.adoc[]

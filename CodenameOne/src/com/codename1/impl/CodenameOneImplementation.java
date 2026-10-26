@@ -10597,6 +10597,32 @@ public abstract class CodenameOneImplementation {
 
     }
 
+    /// True when [#setClientCertificate(Object, String, String, byte[], boolean)]
+    /// is implemented.
+    public boolean isClientCertificateSupported() {
+        return false;
+    }
+
+    /// Presents a client certificate on this connection's TLS handshake.
+    ///
+    /// #### Parameters
+    ///
+    /// - `connection`: the connection from `connect`
+    ///
+    /// - `certificateChainPem`: one or more PEM certificates, the device's first
+    ///
+    /// - `keyAlgorithm`: `EC` or `RSA`
+    ///
+    /// - `privateKeyPkcs8`: the private key, PKCS#8 DER
+    ///
+    /// - `insecure`: the request also asked not to check the server, see
+    ///   [#setInsecure(Object, boolean)]; a port that replaces the socket factory
+    ///   for the certificate has to keep that choice
+    public void setClientCertificate(Object connection, String certificateChainPem, String keyAlgorithm,
+            byte[] privateKeyPkcs8, boolean insecure) {
+        throw new IllegalStateException("This platform cannot present a client certificate");
+    }
+
     /// Checks if this platform supports read timeout in network connections.
     ///
     /// #### Returns
