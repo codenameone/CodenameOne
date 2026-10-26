@@ -7,7 +7,7 @@ The same workload ran in each framework: an 800 by 480 pixel gauge (a filled arc
 sweeps, a needle and a bold percentage) redrawn for every frame, capped at 60 frames
 per second, rendered in software into memory. Each ran three times for ten seconds,
 from a cold start and then a warm one, in the same Debian bookworm arm64 container on
-an Apple silicon host. The table shows the median. A board is slower than that host
+an Apple Silicon host. The table shows the median. A board is slower than that host
 and its storage is slower still, so read the columns against each other rather than
 as a board's figures.
 
@@ -40,7 +40,7 @@ as a board's figures.
   it. Codename One's executable is 7.7 MB of it; the rest is the C library, FreeType,
   libpng, libjpeg, libdrm, libepoxy and the font. OpenSSL and libcurl are loaded only
   when an application first uses them, and this one doesn't. Qt's executable is 0.1 MB of 73;
-  the rest is Qt Core, Gui and Widgets, their dependencies and the platform plugins.
+  the rest is the Qt Core, GUI and Widgets modules, their dependencies and the platform plugins.
 * *Codename One draws more*: its form has a title bar, a button, a slider and a
   label around the gauge; the others draw only the gauge.
 * *JavaFX* runs on a JDK 25 runtime cut down with `jlink` to the modules it uses, with

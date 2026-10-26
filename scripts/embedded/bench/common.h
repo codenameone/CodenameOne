@@ -52,14 +52,21 @@ static long bench_cpu_ticks(void) {
     if (!p) return 0;
     p += 2;
     for (i = 0; i < 11 && p; i++) { p = strchr(p, ' '); if (p) p++; }
-    if (p) sscanf(p, "%ld %ld", &ut, &st);
+    /* strtol, not sscanf: glibc 2.38 headers redirect the scanf family to
+     * __isoc23_* symbols an older target libc lacks, failing the link. */
+    if (p) { char* e; ut = strtol(p, &e, 10); st = strtol(e, 0, 10); }
     return ut + st;
 }
 
 static long bench_rss_kb(void) {
     long size = 0, rss = 0;
     FILE* f = fopen("/proc/self/statm", "r");
-    if (f) { if (fscanf(f, "%ld %ld", &size, &rss) != 2) rss = 0; fclose(f); }
+    char line[128];
+    if (f) {
+        if (fgets(line, sizeof(line), f)) { char* e; size = strtol(line, &e, 10); rss = strtol(e, 0, 10); }
+        fclose(f);
+    }
+    (void) size;
     return rss * (sysconf(_SC_PAGESIZE) / 1024);
 }
 

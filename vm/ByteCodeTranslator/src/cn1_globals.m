@@ -1185,10 +1185,17 @@ int cn1UsableCpuCount(void) {
         }
         FILE* f = fopen("/sys/fs/cgroup/cpu.max", "r");
         if(f != NULL) {
-            char quota[32];
+            // fgets + strtol, never fscanf: glibc 2.38 headers redirect it
+            // to __isoc23_fscanf, which the target libc lacks (link error).
+            char line[64];
             long period = 0;
-            if(fscanf(f, "%31s %ld", quota, &period) == 2 && period > 0 && strcmp(quota, "max") != 0) {
-                long q = atol(quota);
+            char* end = NULL;
+            long q = 0;
+            if(fgets(line, sizeof(line), f) != NULL && strncmp(line, "max", 3) != 0) {
+                q = strtol(line, &end, 10);
+                period = strtol(end, NULL, 10);
+            }
+            if(period > 0) {
                 if(q > 0) {
                     int limit = (int)((q + period - 1) / period);
                     if(limit > 0 && (n <= 0 || limit < n)) {
@@ -3164,7 +3171,14 @@ static void* cn1BlockOsAlloc(size_t bytes) {
     return cn1BlockWinMap(bytes);
 #else
     void* mem = mmap(NULL, bytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
-    return mem == MAP_FAILED ? NULL : mem;
+    if(mem == MAP_FAILED) {
+        return NULL;
+    }
+#if defined(__linux__) && defined(MADV_NOHUGEPAGE)
+    // As for the heap window: a block is touched as it is used, not all at once.
+    madvise(mem, bytes, MADV_NOHUGEPAGE);
+#endif
+    return mem;
 #endif
 }
 
@@ -9440,6 +9454,13 @@ static void* cn1HeapWindowCarve(size_t sz) {
             if(raw == MAP_FAILED) {
                 continue;
             }
+#if defined(__linux__) && defined(MADV_NOHUGEPAGE)
+            // The window is sparse: a few 64KB pages touched far apart. With
+            // transparent huge pages set to "always", each first touch in a 2MB
+            // span faults in the whole 2MB, which inflated the backend's idle
+            // footprint by about 4MB on CI. Opt the window out.
+            madvise(raw, (size_t)want + slack, MADV_NOHUGEPAGE);
+#endif
             // 64KB alignment is not optional: the page resolve masks an object
             // address down to its page, so a misaligned window would hand back
             // pages whose header is not where the mask says it is.

@@ -830,3 +830,21 @@ callee
 signalling
 coturn
 unconfigured
+# Embedded Linux: boards, build systems, kernel interfaces, libraries, toolkits.
+Avahi
+Rockchip
+Jetson
+fbdev
+libpng
+libjpeg
+libdrm
+libepoxy
+Noto
+Yocto
+Buildroot
+sysroot
+systemd
+spidev
+termios
+sysfs
+Slint

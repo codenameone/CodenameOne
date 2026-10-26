@@ -82,6 +82,8 @@ run_one() {
     sleep 2
     pids=$(tree $pid)
     idle=$(memory $pids)
+    # Huge pages explain a footprint that differs between hosts; print them beside it.
+    echo "# $name $mode thp=$(cat /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null) anon_huge_kb=$(awk '/AnonHugePages/{s+=$2} END{print s+0}' /proc/$pid/smaps_rollup 2>/dev/null)" >&2
     fp=$(footprint $pids)
 
     c0=$(cpu_ticks $(tree $pid))

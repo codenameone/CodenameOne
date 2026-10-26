@@ -197,7 +197,7 @@ Devices, phones and servers on one network find each other over multicast DNS
 Buildroot image needs no Avahi. The backend has the same protocol as
 `com.codename1.backend.Discovery`:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/DiscoverySnippets.java[tag=backend-discovery,indent=0]
 ----

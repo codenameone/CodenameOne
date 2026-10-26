@@ -248,7 +248,7 @@ final class BuildHintsDesktop {
                 .type(HintType.INT)
                 .def("0")
                 .platform("linux")
-                .doc("Panel density for `linux.embedded` when the display does not report its "
+                .doc("Panel density for `linux.embedded` when the display doesn't report its "
                         + "physical size; 0 uses what the panel reports."));
 
         h.add(new Hint("linux.sysroot")
