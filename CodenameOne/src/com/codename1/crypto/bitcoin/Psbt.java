@@ -22,6 +22,7 @@
  */
 package com.codename1.crypto.bitcoin;
 
+import com.codename1.crypto.encoding.Base64;
 import com.codename1.security.Hash;
 import com.codename1.security.Schnorr;
 import com.codename1.security.Secp256k1;
@@ -137,7 +138,7 @@ public final class Psbt {
 
     /// Reads a Base64 PSBT, the form wallets exchange.
     public static Psbt fromBase64(String base64) {
-        return parse(Base64Codec.decode(base64));
+        return parse(Base64.decode(base64));
     }
 
     // Key shapes of the typed keys BIP-174 and BIP-371 define, indexed by type: 1 means the
@@ -204,7 +205,7 @@ public final class Psbt {
 
     /// The Base64 PSBT.
     public String toBase64() {
-        return Base64Codec.encode(serialize());
+        return Base64.encode(serialize());
     }
 
     private static void writeMap(Wire w, List<byte[][]> map) {
@@ -623,67 +624,5 @@ public final class Psbt {
             }
         }
         map.add(new byte[][] {key, Wire.copy(value)});
-    }
-
-    /// Standard Base64 with padding, the PSBT text form.
-    static final class Base64Codec {
-        private static final String ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
-        private Base64Codec() {
-        }
-
-        static String encode(byte[] in) {
-            StringBuilder out = new StringBuilder((in.length + 2) / 3 * 4);
-            for (int iter = 0; iter < in.length; iter += 3) {
-                int b0 = in[iter] & 0xff;
-                int b1 = iter + 1 < in.length ? in[iter + 1] & 0xff : 0;
-                int b2 = iter + 2 < in.length ? in[iter + 2] & 0xff : 0;
-                out.append(ALPHABET.charAt(b0 >> 2));
-                out.append(ALPHABET.charAt(((b0 & 3) << 4) | (b1 >> 4)));
-                out.append(iter + 1 < in.length ? ALPHABET.charAt(((b1 & 15) << 2) | (b2 >> 6)) : '=');
-                out.append(iter + 2 < in.length ? ALPHABET.charAt(b2 & 63) : '=');
-            }
-            return out.toString();
-        }
-
-        static byte[] decode(String text) {
-            StringBuilder clean = new StringBuilder();
-            for (int iter = 0; iter < text.length(); iter++) {
-                char c = text.charAt(iter);
-                if (c != ' ' && c != '\n' && c != '\r' && c != '\t') {
-                    clean.append(c);
-                }
-            }
-            String s = clean.toString();
-            if (s.length() % 4 != 0) {
-                throw new IllegalArgumentException("bad Base64 length");
-            }
-            int pad = s.endsWith("==") ? 2 : (s.endsWith("=") ? 1 : 0);
-            byte[] out = new byte[s.length() / 4 * 3 - pad];
-            int o = 0;
-            for (int iter = 0; iter < s.length(); iter += 4) {
-                int v = 0;
-                for (int k = 0; k < 4; k++) {
-                    char c = s.charAt(iter + k);
-                    int d;
-                    if (c == '=') {
-                        if (iter + 4 != s.length() || k < 4 - pad) {
-                            throw new IllegalArgumentException("bad Base64 padding");
-                        }
-                        d = 0;
-                    } else {
-                        d = ALPHABET.indexOf(c);
-                        if (d < 0) {
-                            throw new IllegalArgumentException("bad Base64 character");
-                        }
-                    }
-                    v = (v << 6) | d;
-                }
-                for (int k = 0; k < 3 && o < out.length; k++) {
-                    out[o++] = (byte) (v >> (16 - 8 * k));
-                }
-            }
-            return out;
-        }
     }
 }

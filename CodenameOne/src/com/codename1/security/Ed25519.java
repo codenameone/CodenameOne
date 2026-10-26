@@ -50,6 +50,15 @@ public final class Ed25519 {
     private Ed25519() {
     }
 
+    /// Whether 32 bytes are the encoding of a point on the curve. Solana's program-derived
+    /// addresses are exactly the hashes for which this answers `false`.
+    public static boolean isOnCurve(byte[] point) {
+        if (point == null || point.length != PUBLIC_KEY_LENGTH) {
+            return false;
+        }
+        return Ed25519Math.decode(new Ed25519Math.P3(), point, 0);
+    }
+
     /// The public key of a 32-byte seed.
     ///
     /// #### Throws
