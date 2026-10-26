@@ -236,21 +236,9 @@ The table sits in the database of the ORM session the outbox was opened on. An
 `enqueue` inside one of that session's transactions belongs to the transaction,
 so a reading and the message announcing it commit together or not at all:
 
-[source,java,role=cn1-no-try]
+[source,java]
 ----
-Outbox outbox = Outbox.open(session, "readings@" + deviceId);
-
-session.beginTransaction();
-session.persist(reading);
-outbox.enqueue("/v1/readings", body);
-session.commitTransaction();
-
-// From a timer, or when the network comes back:
-outbox.flush(message -> {
-    int status = postToServer(message.getTopic(), message.getKey(), message.getPayload());
-    return status < 300 ? Outbox.DELIVERED
-            : status < 500 ? Outbox.REJECTED : Outbox.RETRY;
-});
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/EmbeddedLinuxConnectedSnippet.java[tag=embedded-linux-outbox,indent=0]
 ----
 
 `postToServer` stands for the application's own request: `Rest` on a client,
@@ -276,24 +264,17 @@ certificate. The key never leaves the device. The request is a PKCS#10
 certificate signing request, which `com.codename1.security.CertificateRequest`
 builds:
 
-[source,java,role=cn1-no-try]
+[source,java]
 ----
-KeyPair keys = KeyGenerator.ec(256);
-byte[] csr = new CertificateRequest(keys.getPublicKey().getEncoded(), "EC")
-        .commonName(deviceId)
-        .dnsName(deviceId + ".local")
-        .sign(data -> Signature.sign(Signature.SHA256_WITH_ECDSA, keys.getPrivateKey(), data));
-String pem = CertificateRequest.toPem(csr);
-// Send pem to the enrollment endpoint, store the certificate it returns.
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/EmbeddedLinuxConnectedSnippet.java[tag=embedded-linux-csr,indent=0]
 ----
 
 From then on the device presents the certificate on every request, and the server
 identifies it from the TLS handshake:
 
-[source,java,role=cn1-no-try]
+[source,java]
 ----
-ConnectionRequest request = new ConnectionRequest(fleetUrl + "/v1/readings", true);
-request.setClientCertificate(certificatePem, keys.getPrivateKey());
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/EmbeddedLinuxConnectedSnippet.java[tag=embedded-linux-mtls,indent=0]
 ----
 
 `ConnectionRequest.isClientCertificateSupported()` is true on Linux devices, on
