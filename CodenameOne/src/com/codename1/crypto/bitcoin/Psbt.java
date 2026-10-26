@@ -23,8 +23,8 @@
 package com.codename1.crypto.bitcoin;
 
 import com.codename1.crypto.encoding.Base64;
+import com.codename1.crypto.hd.DerivationPath;
 import com.codename1.security.Hash;
-import com.codename1.security.Schnorr;
 import com.codename1.security.Secp256k1;
 import java.util.ArrayList;
 import java.util.List;
@@ -55,6 +55,7 @@ public final class Psbt {
     static final int IN_FINAL_SCRIPTSIG = 0x07;
     static final int IN_FINAL_SCRIPTWITNESS = 0x08;
     static final int IN_TAP_KEY_SIG = 0x13;
+    static final int IN_TAP_BIP32_DERIVATION = 0x16;
     static final int IN_TAP_INTERNAL_KEY = 0x17;
     static final int IN_TAP_MERKLE_ROOT = 0x18;
 
@@ -278,6 +279,84 @@ public final class Psbt {
         return null;
     }
 
+    /// The BIP-32 origins recorded for an input's keys, both the ECDSA kind and the Taproot
+    /// kind (BIP-371, whose public keys are 32-byte x-only). A wallet signs the inputs whose
+    /// master fingerprint is its own.
+    public List<Derivation> getBip32Derivations(int input) {
+        List<Derivation> out = new ArrayList<Derivation>();
+        List<byte[][]> map = inputMaps.get(input);
+        for (int iter = 0; iter < map.size(); iter++) {
+            byte[] k = map.get(iter)[0];
+            int type = k[0] & 0xff;
+            if (type != IN_BIP32_DERIVATION && type != IN_TAP_BIP32_DERIVATION) {
+                continue;
+            }
+            Wire r = new Wire(map.get(iter)[1]);
+            if (type == IN_TAP_BIP32_DERIVATION) {
+                long leaves = r.readVarInt();
+                if (leaves > r.remaining() / 32) {
+                    throw new IllegalArgumentException("malformed Taproot derivation");
+                }
+                for (long leaf = 0; leaf < leaves; leaf++) {
+                    r.read(32);
+                }
+            }
+            byte[] fp = r.read(4);
+            int fingerprint = ((fp[0] & 0xff) << 24) | ((fp[1] & 0xff) << 16) | ((fp[2] & 0xff) << 8) | (fp[3] & 0xff);
+            long[] path = new long[r.remaining() / 4];
+            if (r.remaining() % 4 != 0) {
+                throw new IllegalArgumentException("malformed BIP-32 derivation");
+            }
+            for (int p = 0; p < path.length; p++) {
+                path[p] = r.readU32();
+            }
+            byte[] pub = new byte[k.length - 1];
+            System.arraycopy(k, 1, pub, 0, pub.length);
+            out.add(new Derivation(pub, fingerprint, DerivationPath.of(path)));
+        }
+        return out;
+    }
+
+    /// Records the Taproot (BIP-371) origin of an input's x-only key, for a key-path spend.
+    public void addTapBip32Derivation(int input, byte[] xOnlyKey, int masterFingerprint, long[] path) {
+        Wire w = new Wire();
+        w.varInt(0);
+        w.u8(masterFingerprint >>> 24).u8(masterFingerprint >>> 16).u8(masterFingerprint >>> 8).u8(masterFingerprint);
+        for (int iter = 0; iter < path.length; iter++) {
+            w.u32(path[iter]);
+        }
+        put(inputMaps.get(input), Wire.concat(new byte[] {IN_TAP_BIP32_DERIVATION}, xOnlyKey), w.toBytes());
+    }
+
+    /// One key origin: a public key, the fingerprint of the master it descends from and the
+    /// path from that master.
+    public static final class Derivation {
+        private final byte[] publicKey;
+        private final int fingerprint;
+        private final DerivationPath path;
+
+        Derivation(byte[] publicKey, int fingerprint, DerivationPath path) {
+            this.publicKey = publicKey;
+            this.fingerprint = fingerprint;
+            this.path = path;
+        }
+
+        /// The public key, 33 or 65 bytes, or 32 x-only bytes for a Taproot origin.
+        public byte[] getPublicKey() {
+            return Wire.copy(publicKey);
+        }
+
+        /// The master key fingerprint.
+        public int getMasterFingerprint() {
+            return fingerprint;
+        }
+
+        /// The derivation path from the master.
+        public DerivationPath getPath() {
+            return path;
+        }
+    }
+
     /// The signatures collected for an input: `{publicKey, signature}` pairs.
     public List<byte[][]> getPartialSignatures(int input) {
         List<byte[][]> out = new ArrayList<byte[][]>();
@@ -302,6 +381,17 @@ public final class Psbt {
     ///
     /// - `IllegalStateException`: when the input lacks the UTXO (or the scripts) it needs
     public boolean sign(int input, byte[] privateKey) {
+        BitcoinKey key = BitcoinKey.fromPrivateKey(privateKey);
+        try {
+            return sign(input, key);
+        } finally {
+            key.destroy();
+        }
+    }
+
+    /// Signs one input with a key that may live elsewhere, such as a wallet or a hardware
+    /// device; see [#sign(int, byte[])] for what is signed.
+    public boolean sign(int input, BitcoinKey key) {
         List<byte[][]> map = inputMaps.get(input);
         BitcoinTransaction.Output spent = getSpentOutput(input);
         if (spent == null) {
@@ -312,7 +402,7 @@ public final class Psbt {
         int sighash = typeBytes == null ? -1 : (int) new Wire(typeBytes).readU32();
         if (spk.isP2tr()) {
             byte[] merkle = get(map, new byte[] {IN_TAP_MERKLE_ROOT});
-            byte[] internal = Taproot.internalKey(privateKey);
+            byte[] internal = key.getInternalKey();
             if (!java.util.Arrays.equals(Taproot.outputKey(internal, merkle), spk.getWitnessProgram())) {
                 return false;
             }
@@ -325,23 +415,17 @@ public final class Psbt {
                 }
                 all.add(o);
             }
-            byte[] tweaked = Taproot.tweakPrivateKey(privateKey, merkle);
-            try {
-                byte[] sig = Schnorr.sign(tx.taprootSighash(input, all, type), tweaked,
-                        com.codename1.security.SecureRandom.bytes(32));
-                if (type != BitcoinTransaction.SIGHASH_DEFAULT) {
-                    sig = Wire.concat(sig, new byte[] {(byte) type});
-                }
-                put(map, new byte[] {IN_TAP_KEY_SIG}, sig);
-                put(map, new byte[] {IN_TAP_INTERNAL_KEY}, internal);
-            } finally {
-                Wif.wipe(tweaked);
+            byte[] sig = key.signTaproot(tx.taprootSighash(input, all, type), merkle);
+            if (type != BitcoinTransaction.SIGHASH_DEFAULT) {
+                sig = Wire.concat(sig, new byte[] {(byte) type});
             }
+            put(map, new byte[] {IN_TAP_KEY_SIG}, sig);
+            put(map, new byte[] {IN_TAP_INTERNAL_KEY}, internal);
             return true;
         }
         int type = sighash < 0 ? BitcoinTransaction.SIGHASH_ALL : sighash;
-        byte[] compressed = Secp256k1.publicKey(privateKey, true);
-        byte[] uncompressed = Secp256k1.publicKey(privateKey, false);
+        byte[] compressed = key.getPublicKey();
+        byte[] uncompressed = key.getUncompressedPublicKey();
         Script redeem = script(map, IN_REDEEM_SCRIPT);
         Script witnessScript = script(map, IN_WITNESS_SCRIPT);
         Script inner = spk;
@@ -385,16 +469,27 @@ public final class Psbt {
             }
             sighashBytes = tx.legacySighash(input, inner, type);
         }
-        put(map, Wire.concat(new byte[] {IN_PARTIAL_SIG}, pub), BitcoinTransaction.ecdsa(sighashBytes, privateKey,
-                type));
+        Secp256k1.EcdsaSignature es = key.signEcdsa(sighashBytes);
+        put(map, Wire.concat(new byte[] {IN_PARTIAL_SIG}, pub),
+                Wire.concat(Der.encode(es.r(), es.s()), new byte[] {(byte) type}));
         return true;
     }
 
     /// Signs every input the key belongs to, answering how many.
     public int signAll(byte[] privateKey) {
+        BitcoinKey key = BitcoinKey.fromPrivateKey(privateKey);
+        try {
+            return signAll(key);
+        } finally {
+            key.destroy();
+        }
+    }
+
+    /// Signs every input a key belongs to, answering how many.
+    public int signAll(BitcoinKey key) {
         int n = 0;
         for (int iter = 0; iter < inputMaps.size(); iter++) {
-            if (getSpentOutput(iter) != null && sign(iter, privateKey)) {
+            if (getSpentOutput(iter) != null && sign(iter, key)) {
                 n++;
             }
         }
