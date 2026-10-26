@@ -86,8 +86,7 @@ the builder picks the architecture, the display defaults and the libraries to li
 
 [source,properties]
 ----
-codename1.arg.linux.embedded=true
-codename1.arg.linux.embedded.board=rpi5
+include::../demos/common/src/main/snippets/developer-guide/embedded-linux.properties[tag=embedded-linux-properties-001,indent=0]
 ----
 
 .Board profiles
@@ -124,11 +123,10 @@ systemd service that starts at boot and restarts if it exits, and restarts it:
 
 [source,bash]
 ----
-mvn cn1:deploy-device -Dcn1.device.host=pi.local -Dcn1.device.user=pi
-gradle cn1DeployDevice -Pcn1.device.host=pi.local -Pcn1.device.user=pi
+include::../demos/common/src/main/snippets/developer-guide/embedded-linux.sh[tag=embedded-linux-bash-001,indent=0]
 ----
 
-It uses the system's `ssh` and `scp`, so keys, agents and `~/.ssh/config` aliases
+It uses the system's `ssh`, so keys, agents and `~/.ssh/config` aliases
 work as they do in a terminal. `cn1.device.env` passes environment variables to the
 service (`CN1_ROTATION=90,CN1_DISPLAY=fbdev`), and `cn1.device.logs=true` follows its
 log after the restart.
@@ -147,15 +145,7 @@ it reports no support, so the same code runs everywhere:
 
 [source,java]
 ----
-Hardware hw = Hardware.getInstance();
-if (hw.isSupported(Hardware.FEATURE_GPIO)) {
-    GpioPin led = hw.openGpioOutput("gpiochip0", 17, false);
-    led.setHigh(true);
-    GpioPin button = hw.openGpioInput("gpiochip0", 27, GpioPin.BIAS_PULL_UP, GpioPin.EDGE_FALLING);
-    button.setListener((pin, rising, nanos) -> led.setHigh(!led.isHigh()));
-}
-I2cDevice sensor = hw.openI2c(1, 0x48);
-int raw = sensor.readRegister(0);
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/EmbeddedLinuxJava001Snippet.java[tag=embedded-linux-java-001,indent=0]
 ----
 
 Listeners run on the event dispatch thread. Reads that wait for data -- a serial

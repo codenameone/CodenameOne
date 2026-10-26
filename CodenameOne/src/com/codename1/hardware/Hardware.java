@@ -35,16 +35,24 @@ package com.codename1.hardware;
 ///
 /// ```java
 /// Hardware hw = Hardware.getInstance();
-/// if (hw.isSupported(Hardware.FEATURE_GPIO)) {
-///     final GpioPin led = hw.openGpioOutput("gpiochip0", 17, false);
-///     led.setHigh(true);
+/// try {
+///     if (hw.isSupported(Hardware.FEATURE_GPIO)) {
+///         final GpioPin led = hw.openGpioOutput("gpiochip0", 17, false);
+///         led.setHigh(true);
 ///
-///     GpioPin button = hw.openGpioInput("gpiochip0", 27, GpioPin.BIAS_PULL_UP, GpioPin.EDGE_FALLING);
-///     button.setListener(new GpioListener() {
-///         public void edgeDetected(GpioPin pin, boolean rising, long timestampNanos) {
-///             led.setHigh(!led.isHigh());
-///         }
-///     });
+///         GpioPin button = hw.openGpioInput("gpiochip0", 27, GpioPin.BIAS_PULL_UP, GpioPin.EDGE_FALLING);
+///         button.setListener(new GpioListener() {
+///             public void edgeDetected(GpioPin pin, boolean rising, long timestampNanos) {
+///                 try {
+///                     led.setHigh(!led.isHigh());
+///                 } catch (HardwareException e) {
+///                     Log.e(e);
+///                 }
+///             }
+///         });
+///     }
+/// } catch (HardwareException e) {
+///     Log.e(e);
 /// }
 /// ```
 ///

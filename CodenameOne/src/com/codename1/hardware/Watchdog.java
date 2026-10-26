@@ -29,8 +29,12 @@ package com.codename1.hardware;
 /// healthy, so a hung event dispatch thread causes a reset:
 ///
 /// ```java
-/// final Watchdog wd = Hardware.getInstance().openWatchdog(15);
-/// UITimer.timer(5000, true, form, () -> wd.kickQuietly());
+/// try {
+///     final Watchdog wd = Hardware.getInstance().openWatchdog(15);
+///     UITimer.timer(5000, true, Display.getInstance().getCurrent(), () -> wd.kickQuietly());
+/// } catch (HardwareException e) {
+///     Log.e(e);
+/// }
 /// ```
 @com.codename1.impl.SharedWithBackend
 public final class Watchdog {

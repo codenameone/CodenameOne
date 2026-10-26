@@ -76,6 +76,8 @@ jobs:
           JDK_8_HOME: ${{ env.JAVA_HOME }}
           CN1_BACKEND_DEMO: demo/bench
           CN1_BACKEND_ENGINE: docker
+          # The bench demo needs neither the shared contract nor demo/common.
+          CN1_BACKEND_STANDALONE_DEMO: "1"
         run: |
           mkdir -p "$RUNNER_TEMP/dist"
           ./package.sh Bench com.demo glibc-arm64

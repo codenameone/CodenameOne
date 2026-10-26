@@ -37,7 +37,7 @@ import java.util.List;
 /// systemd service: the Maven `deploy-device` goal and the Gradle
 /// `cn1DeployDevice` task are both this class.
 ///
-/// It drives the system's own `ssh` and `scp`, so keys, agents, `~/.ssh/config`
+/// It drives the system's own `ssh`, so keys, agents, `~/.ssh/config`
 /// host aliases and jump hosts work exactly as they do in a terminal; nothing
 /// here stores a credential. The binary goes to `remoteDir`, a unit named after
 /// the service is written to `/etc/systemd/system` and the service is
