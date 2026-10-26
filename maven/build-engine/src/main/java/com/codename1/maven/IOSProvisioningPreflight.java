@@ -555,7 +555,7 @@ final class IOSProvisioningPreflight {
             String resolved = resolvePlaceholders(value, settings);
             File file = new File(resolved);
             if (resolved.indexOf("${") >= 0 || !file.isFile()) {
-                return null;
+                continue;
             }
             try {
                 return parse(readFile(file));
@@ -660,6 +660,9 @@ final class IOSProvisioningPreflight {
             // methods, whose descriptors sit in the pool but are named from field_info and
             // method_info rather than from a pool entry -- is a UTF-8 entry no string literal
             // points at. A literal that happens to be shaped like a descriptor is skipped too.
+            // That also counts a generic Signature naming the package (a List of a surfaces type);
+            // such an app is using surfaces in every sense that matters, and the server-side
+            // refusal is the same either way.
             for (int i = 1; i < count; i++) {
                 if (utf8[i] != null && !literal[i] && utf8[i].indexOf("L" + SURFACES_PACKAGE) >= 0) {
                     return true;
