@@ -54,8 +54,18 @@ else
     # libcurl is opened on the first outbound request (CN1_BACKEND_CURL_DLOPEN
     # in cn1_backend_web.c), so a server that never calls out never maps it or
     # the TLS stack the distribution built it against.
-    clang $COMMON -DCN1_BACKEND_CURL_DLOPEN -I. ${CN1_EXTRA_CFLAGS} *.c $ASM_SOURCES \
-        -lnghttp2 -lssl -lcrypto -lz -lm -lpthread -ldl \
+    #
+    # The allocation-census build keeps -lcurl: with libcurl opened lazily its
+    # exit census came back empty on CI (exit status 0, nothing on stderr) while
+    # the same sources print it on macOS. Idle memory is measured on the shipped
+    # build, so the census does not need the saving.
+    CURL_DLOPEN="-DCN1_BACKEND_CURL_DLOPEN"
+    CURL_LINK="-ldl"
+    case " ${CN1_EXTRA_CFLAGS} " in
+        *CN1_ALLOC_CENSUS*) CURL_DLOPEN=""; CURL_LINK="-lcurl" ;;
+    esac
+    clang $COMMON $CURL_DLOPEN -I. ${CN1_EXTRA_CFLAGS} *.c $ASM_SOURCES \
+        $CURL_LINK -lnghttp2 -lssl -lcrypto -lz -lm -lpthread \
         $GC $STRIP \
         -o "/out/$OUT_NAME"
 fi
