@@ -1198,6 +1198,14 @@ public final class LinuxNative {
     public static native int hwWatchdogOpen(int timeoutSeconds);
     public static native int hwWatchdogKick(int handle);
     public static native void hwClose(int handle, boolean disarm);
+
+    // ---- multicast DNS (cn1_linux_mdns.c), the socket under LinuxMdns. Each
+    // returns a value >= 0 or -errno.
+    public static native int mdnsOpen();
+    public static native int mdnsSend(int fd, byte[] packet, int length);
+    public static native int mdnsReceive(int fd, byte[] buffer, int timeoutMs);
+    public static native String mdnsHostInfo();
+    public static native void mdnsClose(int fd);
     public static native String hwList(int kind);
     public static native int hwBacklight(int op, int value);
 }

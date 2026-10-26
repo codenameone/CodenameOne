@@ -3,7 +3,7 @@
 
 === Compared with the alternatives
 
-The same workload ran in each framework: an 800x480 gauge (a filled arc that
+The same workload ran in each framework: an 800 by 480 pixel gauge (a filled arc that
 sweeps, a needle and a bold percentage) redrawn for every frame, capped at 60 frames
 per second, rendered in software into memory. Each ran three times for ten seconds,
 from a cold start and then a warm one, in the same Debian bookworm arm64 container on
@@ -11,7 +11,7 @@ an Apple silicon host. The table shows the median. A board is slower than that h
 and its storage is slower still, so read the columns against each other rather than
 as a board's figures.
 
-.The gauge workload, software rendering, 800x480 (median of three runs)
+.The gauge workload, software rendering, 800 by 480 (median of three runs)
 [cols="<2,>1,>1,>1,>1,>1,>1,>1",options="header"]
 |===
 |Framework |First frame, cold (ms) |First frame, warm (ms) |Frames per second |CPU (%) |Memory, PSS (MB) |Memory, private (MB) |Files mapped (MB)
@@ -35,11 +35,11 @@ as a board's figures.
   Chromium summed over its whole tree of processes.
 * *Files mapped* is every distinct file the process has mapped mid-run, counted once
   at its full size: the executable, every shared library including the C library,
-  plugins loaded at run time, fonts and locale data. It is what has to be on the
-  device for the application to run, whether or not the board image already carries
+  plugins loaded at run time, fonts and locale data. That's what has to be on the
+  device for the application to run, whether the board image already carries
   it. Codename One's executable is 7.7 MB of it; the rest is the C library, FreeType,
   libpng, libjpeg, libdrm, libepoxy and the font. OpenSSL and libcurl are loaded only
-  when an application first uses them, and this one does not. Qt's executable is 0.1 MB of 73;
+  when an application first uses them, and this one doesn't. Qt's executable is 0.1 MB of 73;
   the rest is Qt Core, Gui and Widgets, their dependencies and the platform plugins.
 * *Codename One draws more*: its form has a title bar, a button, a slider and a
   label around the gauge; the others draw only the gauge.
@@ -48,7 +48,7 @@ as a board's figures.
   is the same rendering path as a board without a GPU, minus the display. Gluon does
   not publish its embedded (Monocle) builds, so this is the closest public build.
   Its CPU includes the JIT compiler warming up, which is why it varies between runs.
-* *Chromium's* CPU covers its start-up as well, so it is an upper bound.
+* *Chromium's* CPU covers its start-up as well, an upper bound.
 * *Slint* missed frames under the harness's 16 ms pacing loop, not for lack of CPU.
 
 Codename One and Slint start fastest, Codename One uses the least memory, Slint
@@ -57,13 +57,13 @@ rate and CPU. Codename One and Slint need far less on disk than Qt. JavaFX, the 
 way to put a Java UI on a board, needs about six times Codename One's memory and
 seven times its disk, and a kiosk browser about twenty times both.
 
-image::img/embedded-gui-fps.svg["Bar chart of frames per second on the gauge workload: Codename One 57.5, Slint 51, Qt 62, JavaFX 61.5, Chromium 60",scaledwidth=90%]
+image::img/embedded-gui-fps.svg["Bar chart of frames per second on the gauge workload: Codename One: 57.5, Slint 51, Qt 62, JavaFX 61.5, Chromium 60",scaledwidth=90%]
 
-image::img/embedded-gui-first-frame.svg["Bar chart of milliseconds to the first frame from a cold start: Codename One 46, Slint 45, Qt 73, JavaFX 327, Chromium 717",scaledwidth=90%]
+image::img/embedded-gui-first-frame.svg["Bar chart of milliseconds to the first frame from a cold start: Codename One: 46, Slint 45, Qt 73, JavaFX 327, Chromium 717",scaledwidth=90%]
 
-image::img/embedded-gui-memory.svg["Bar chart of memory while animating, PSS in MB: Codename One 18, Slint 23, Qt 23, JavaFX 118, Chromium 409",scaledwidth=90%]
+image::img/embedded-gui-memory.svg["Bar chart of memory while animating, PSS in MB: Codename One: 18, Slint 23, Qt 23, JavaFX 118, Chromium 409",scaledwidth=90%]
 
-flutter-pi and Android (AOSP) are not in the table: flutter-pi needs an OpenGL ES
+The table leaves out flutter-pi and Android (AOSP): flutter-pi needs an OpenGL ES
 GPU and AOSP needs a board support package, so neither runs in this harness.
 
 .What each option offers
@@ -121,9 +121,9 @@ about 23 MB at peak load, against Go's 12 MB and Rust's 2 MB. Against the manage
 runtimes, it starts 33 times faster than Spring Boot, uses an eighteenth of its
 memory and serves over 11 times its peak.
 
-image::img/embedded-server-throughput.svg["Bar chart of peak JSON requests per second on two cores: Codename One 379,930, Rust 290,204, Go 178,930, Node.js 63,488, Spring Boot 33,322, Python 6,684",scaledwidth=90%]
+image::img/embedded-server-throughput.svg["Bar chart of peak JSON requests per second on two cores: Codename One: 379,930, Rust 290,204, Go 178,930, Node.js 63,488, Spring Boot 33,322, Python 6,684",scaledwidth=90%]
 
-image::img/embedded-server-start.svg["Bar chart of milliseconds from launch to the first answered request: Codename One 40, Rust 35, Go 48, Node.js 147, Python 270, Spring Boot 1,340",scaledwidth=90%]
+image::img/embedded-server-start.svg["Bar chart of milliseconds from launch to the first answered request: Codename One: 40, Rust 35, Go 48, Node.js 147, Python 270, Spring Boot 1,340",scaledwidth=90%]
 
 image::img/embedded-server-memory.svg["Bar chart of memory idle, at 200 requests per second and at peak load, in MB, for each runtime",scaledwidth=90%]
 

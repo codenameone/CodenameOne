@@ -226,6 +226,16 @@ final class BuildHintsDesktop {
                         + "framebuffer), `kms`, `fbdev`, `memory` or `headless`. `CN1_DISPLAY` on the "
                         + "device overrides it."));
 
+        h.add(new Hint("linux.embedded.renderer")
+                .group(HintGroup.LINUX)
+                .type(HintType.STRING)
+                .platform("linux")
+                .doc("Renderer for `linux.embedded`: `gpu` draws with OpenGL ES 2 on a GBM surface "
+                        + "over KMS, `software` with the CPU. Defaults to the board profile's choice, "
+                        + "`gpu` for boards with a reliable Mesa driver. A `gpu` build links libgbm, "
+                        + "libEGL and libGLESv2 and still falls back to software on a device where "
+                        + "they find no GPU."));
+
         h.add(new Hint("linux.embedded.rotation")
                 .group(HintGroup.LINUX)
                 .type(HintType.INT)

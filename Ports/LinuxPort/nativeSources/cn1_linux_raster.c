@@ -38,6 +38,9 @@
 #ifdef CN1_LINUX_EMBEDDED
 
 #include "cn1_linux_raster.h"
+#ifdef CN1_EMBEDDED_GPU
+#include "cn1_linux_gpu.h"
+#endif
 #include <math.h>
 #include <png.h>
 #include <stdio.h>
@@ -55,12 +58,6 @@
  * unclamped NaN or 1e300 would otherwise walk a loop for ever. */
 #define CN1R_FAR 1.0e6
 
-struct cn1r_surface {
-    int width;
-    int height;
-    int stride;
-    uint32_t* data;
-};
 
 enum { CN1R_SOLID = 0, CN1R_SURFACE = 1 };
 
@@ -288,7 +285,13 @@ cairo_surface_t* cn1r_image_surface_create(cairo_format_t format, int width, int
 }
 
 unsigned char* cn1r_image_surface_get_data(cairo_surface_t* s) {
-    return s ? (unsigned char*) s->data : 0;
+    if (s == 0) {
+        return 0;
+    }
+    cn1r_surface_flush(s);
+    /* The caller may write through the pointer: a texture made before is stale. */
+    s->version++;
+    return (unsigned char*) s->data;
 }
 
 int cn1r_image_surface_get_stride(cairo_surface_t* s) {
@@ -305,17 +308,32 @@ int cn1r_image_surface_get_height(cairo_surface_t* s) {
 
 void cn1r_surface_destroy(cairo_surface_t* s) {
     if (s) {
+#ifdef CN1_EMBEDDED_GPU
+        if (s->texture != 0) {
+            cn1GpuForgetTexture(s->texture);
+        }
+#endif
         free(s->data);
         free(s);
     }
 }
 
+/* Cairo's contract: after flush, data holds everything drawn. On the GPU window
+ * that means reading it back. */
 void cn1r_surface_flush(cairo_surface_t* s) {
+#ifdef CN1_EMBEDDED_GPU
+    if (s != 0 && s->gpu && s->gpuDirty) {
+        cn1GpuSync(s);
+    }
+#else
     (void) s;
+#endif
 }
 
 void cn1r_surface_mark_dirty(cairo_surface_t* s) {
-    (void) s;
+    if (s != 0) {
+        s->version++;
+    }
 }
 
 cairo_status_t cn1r_surface_status(cairo_surface_t* s) {
@@ -350,6 +368,7 @@ cairo_status_t cn1r_surface_write_to_png_stream(cairo_surface_t* s, cairo_write_
     if (s == 0 || write == 0) {
         return CAIRO_STATUS_WRITE_ERROR;
     }
+    cn1r_surface_flush(s);
     row = (unsigned char*) malloc((size_t) s->width * 4);
     if (row == 0) {
         return CAIRO_STATUS_NO_MEMORY;
@@ -1074,18 +1093,26 @@ static void cn1rRow(cairo_t* cr, int y, int x0, int x1, const float* cov, unsign
     uint32_t* row = dst->data + (size_t) y * (size_t) dst->width;
     int op = cr->state.op;
     int x;
+    /* OVER may scale the source by the operation's alpha. SOURCE and CLEAR
+     * cannot: as in Cairo, the alpha of paint_with_alpha or of a mask is
+     * coverage to them, so they keep dst * (1 - alpha * coverage). */
+    unsigned weight = 255;
+    if (op != CAIRO_OPERATOR_OVER && alpha != 255) {
+        weight = alpha;
+        alpha = 255;
+    }
     if (clip != 0 && clip->mask != 0) {
         mask = clip->mask + (size_t) (y - clip->y0) * (size_t) (clip->x1 - clip->x0) - clip->x0;
     }
     if (src->kind == CN1R_SOLID) {
         uint32_t pixel = alpha == 255 ? src->pixel : cn1rScale(src->pixel, alpha);
-        if (cov == 0 && mask == 0 && (op == CAIRO_OPERATOR_SOURCE || (pixel >> 24) == 255)) {
+        if (cov == 0 && mask == 0 && weight == 255 && (op == CAIRO_OPERATOR_SOURCE || (pixel >> 24) == 255)) {
             for (x = x0; x < x1; x++) {
                 row[x] = pixel;
             }
             return;
         }
-        int store = mask == 0 && (op == CAIRO_OPERATOR_SOURCE || (pixel >> 24) == 255);
+        int store = mask == 0 && weight == 255 && (op == CAIRO_OPERATOR_SOURCE || (pixel >> 24) == 255);
         for (x = x0; x < x1; x++) {
             unsigned c = 255;
             if (cov != 0) {
@@ -1110,6 +1137,9 @@ static void cn1rRow(cairo_t* cr, int y, int x0, int x1, const float* cov, unsign
             }
             if (mask != 0) {
                 c = (c * mask[x] + 127) / 255;
+            }
+            if (weight != 255) {
+                c = (c * weight + 127) / 255;
             }
             if (c != 0) {
                 row[x] = cn1rBlend(op, pixel, row[x], c);
@@ -1140,9 +1170,12 @@ static void cn1rRow(cairo_t* cr, int y, int x0, int x1, const float* cov, unsign
             }
             if (mask != 0) {
                 c = (c * mask[x] + 127) / 255;
-                if (c == 0) {
-                    continue;
-                }
+            }
+            if (weight != 255) {
+                c = (c * weight + 127) / 255;
+            }
+            if (c == 0) {
+                continue;
             }
             if (exact || nearest) {
                 texel = cn1rTexel(s, (int) floor(sx), (int) floor(sy));
@@ -1399,6 +1432,129 @@ static int cn1rPixelRect(cairo_t* cr, int* x0, int* y0, int* x1, int* y1) {
     return 1;
 }
 
+
+/* ------------------------------------------------------------------- gpu */
+
+#ifdef CN1_EMBEDDED_GPU
+/*
+ * The GPU back end (cn1_linux_gpu.h). Each operation is reduced to what the CPU
+ * path would composite -- a device rectangle, the source and the coverage the
+ * scan computes -- and handed over whole. The coverage is the CPU's own, folded
+ * with the clip's mask, so both paths antialias a shape identically.
+ */
+static __thread unsigned char* cn1rGpuCov = 0;
+static __thread size_t cn1rGpuCovCapacity = 0;
+
+/* A zeroed mask of n bytes, reused between operations; NULL if out of memory. */
+static unsigned char* cn1rGpuMask(size_t n) {
+    if (n > cn1rGpuCovCapacity) {
+        size_t capacity = cn1rGpuCovCapacity == 0 ? 65536 : cn1rGpuCovCapacity;
+        unsigned char* grown;
+        while (capacity < n) {
+            capacity *= 2;
+        }
+        grown = (unsigned char*) realloc(cn1rGpuCov, capacity);
+        if (grown == 0) {
+            return 0;
+        }
+        cn1rGpuCov = grown;
+        cn1rGpuCovCapacity = capacity;
+    }
+    memset(cn1rGpuCov, 0, n);
+    return cn1rGpuCov;
+}
+
+static void cn1rGpuSource(cairo_t* cr, CN1GpuSource* g) {
+    cairo_pattern_t* p = cr->state.source;
+    memset(g, 0, sizeof(*g));
+    if (p->kind == CN1R_SOLID) {
+        g->solid = 1;
+        g->pixel = p->pixel;
+    } else {
+        g->surface = p->surface;
+        g->toSource = p->toSource;
+        g->filter = p->filter;
+    }
+}
+
+typedef struct {
+    unsigned char* mask;
+    int x0, y0, w;
+    const CN1RClip* clip;
+} CN1RGpuCtx;
+
+static void cn1rGpuRow(void* ctx, int y, int rx0, int rx1, const float* cov, float constant) {
+    CN1RGpuCtx* g = (CN1RGpuCtx*) ctx;
+    unsigned char* row = g->mask + (size_t) (y - g->y0) * (size_t) g->w - g->x0;
+    const unsigned char* clip = 0;
+    int x;
+    if (g->clip != 0 && g->clip->mask != 0) {
+        clip = g->clip->mask + (size_t) (y - g->clip->y0) * (size_t) (g->clip->x1 - g->clip->x0) - g->clip->x0;
+    }
+    for (x = rx0; x < rx1; x++) {
+        float f = cov != 0 ? cov[x - rx0] : constant;
+        unsigned v = f <= 0 ? 0 : f >= 1 ? 255 : (unsigned) (f * 255 + 0.5f);
+        if (clip != 0) {
+            v = (v * clip[x] + 127) / 255;
+        }
+        row[x] = (unsigned char) v;
+    }
+}
+
+/* A device rectangle at full coverage, under the clip. */
+static void cn1rGpuRect(cairo_t* cr, int x0, int y0, int x1, int y1, unsigned alpha) {
+    CN1RClip* clip = cr->state.clip;
+    CN1GpuSource src;
+    if (x1 <= x0 || y1 <= y0) {
+        return;
+    }
+    cn1rGpuSource(cr, &src);
+    if (clip != 0 && clip->mask != 0) {
+        int w = x1 - x0, y;
+        int cw = clip->x1 - clip->x0;
+        unsigned char* mask = cn1rGpuMask((size_t) w * (size_t) (y1 - y0));
+        if (mask == 0) {
+            return;
+        }
+        /* cn1rBounds keeps the rectangle inside the clip's bounds. */
+        for (y = y0; y < y1; y++) {
+            memcpy(mask + (size_t) (y - y0) * (size_t) w,
+                   clip->mask + (size_t) (y - clip->y0) * (size_t) cw + (x0 - clip->x0), (size_t) w);
+        }
+        cn1GpuDraw(cr->target, x0, y0, x1, y1, &src, alpha, cr->state.op, mask, w);
+    } else {
+        cn1GpuDraw(cr->target, x0, y0, x1, y1, &src, alpha, cr->state.op, 0, 0);
+    }
+}
+
+/* A path's edges, scanned into a mask over their bounds. */
+static void cn1rGpuEdges(cairo_t* cr, CN1REdges* e, int rule) {
+    int x0, y0, x1, y1;
+    CN1RGpuCtx ctx;
+    CN1GpuSource src;
+    cn1rBounds(cr, &x0, &y0, &x1, &y1);
+    cn1rNarrow(&x0, &y0, &x1, &y1, e->minX, e->minY, e->maxX, e->maxY);
+    if (cr->state.source->kind == CN1R_SURFACE) {
+        cairo_pattern_t* p = cr->state.source;
+        cn1rNarrow(&x0, &y0, &x1, &y1, p->bx0, p->by0, p->bx1, p->by1);
+    }
+    if (x1 <= x0 || y1 <= y0) {
+        return;
+    }
+    ctx.mask = cn1rGpuMask((size_t) (x1 - x0) * (size_t) (y1 - y0));
+    if (ctx.mask == 0) {
+        return;
+    }
+    ctx.x0 = x0;
+    ctx.y0 = y0;
+    ctx.w = x1 - x0;
+    ctx.clip = cr->state.clip;
+    cn1rScan(e, rule, x0, y0, x1, y1, cn1rGpuRow, &ctx);
+    cn1rGpuSource(cr, &src);
+    cn1GpuDraw(cr->target, x0, y0, x1, y1, &src, 255, cr->state.op, ctx.mask, ctx.w);
+}
+#endif /* CN1_EMBEDDED_GPU */
+
 static void cn1rFillEdges(cairo_t* cr, CN1REdges* e, int rule, unsigned alpha) {
     int x0, y0, x1, y1;
     CN1RFillCtx ctx;
@@ -1430,6 +1586,13 @@ void cn1r_fill(cairo_t* cr) {
             cairo_pattern_t* p = cr->state.source;
             cn1rNarrow(&x0, &y0, &x1, &y1, p->bx0, p->by0, p->bx1, p->by1);
         }
+#ifdef CN1_EMBEDDED_GPU
+        if (cr->target->gpu) {
+            cn1rGpuRect(cr, x0, y0, x1, y1, 255);
+            cn1r_new_path(cr);
+            return;
+        }
+#endif
         for (y = y0; y < y1; y++) {
             if (x1 > x0) {
                 cn1rRow(cr, y, x0, x1, 0, 255);
@@ -1439,9 +1602,15 @@ void cn1r_fill(cairo_t* cr) {
         CN1REdges e;
         cn1rEdgesInit(&e);
         cn1rPathEdges(cr, &e);
+#ifdef CN1_EMBEDDED_GPU
+        if (cr->target->gpu) {
+            cn1rGpuEdges(cr, &e, cr->state.fillRule);
+        } else
+#endif
         cn1rFillEdges(cr, &e, cr->state.fillRule, 255);
         free(e.edges);
     }
+    cr->target->version++;
     cn1r_new_path(cr);
 }
 
@@ -1453,8 +1622,14 @@ void cn1r_stroke(cairo_t* cr) {
     }
     cn1rEdgesInit(&e);
     cn1rStrokeEdges(cr, &e);
+#ifdef CN1_EMBEDDED_GPU
+    if (cr->target->gpu) {
+        cn1rGpuEdges(cr, &e, CAIRO_FILL_RULE_WINDING);
+    } else
+#endif
     cn1rFillEdges(cr, &e, CAIRO_FILL_RULE_WINDING, 255);
     free(e.edges);
+    cr->target->version++;
     cn1r_new_path(cr);
 }
 
@@ -1470,6 +1645,13 @@ void cn1r_paint_with_alpha(cairo_t* cr, double alpha) {
         cairo_pattern_t* p = cr->state.source;
         cn1rNarrow(&x0, &y0, &x1, &y1, p->bx0, p->by0, p->bx1, p->by1);
     }
+    cr->target->version++;
+#ifdef CN1_EMBEDDED_GPU
+    if (cr->target->gpu) {
+        cn1rGpuRect(cr, x0, y0, x1, y1, a);
+        return;
+    }
+#endif
     for (y = y0; y < y1; y++) {
         if (x1 > x0) {
             cn1rRow(cr, y, x0, x1, 0, a);
@@ -1583,7 +1765,38 @@ void cn1r_mask_a8(cairo_t* cr, const unsigned char* mask, int pitch, int width, 
     if (y > y0) y0 = y;
     if (x + width < x1) x1 = x + width;
     if (y + height < y1) y1 = y + height;
-    if (x1 <= x0 || !cn1rEnsureCov(x1 - x0)) {
+    if (x1 <= x0 || y1 <= y0) {
+        return;
+    }
+    cr->target->version++;
+#ifdef CN1_EMBEDDED_GPU
+    if (cr->target->gpu) {
+        CN1RClip* clip = cr->state.clip;
+        CN1GpuSource src;
+        const unsigned char* m = mask + (size_t) (y0 - y) * (size_t) pitch + (x0 - x);
+        cn1rGpuSource(cr, &src);
+        if (clip != 0 && clip->mask != 0) {
+            int w = x1 - x0, cw = clip->x1 - clip->x0, i;
+            unsigned char* folded = cn1rGpuMask((size_t) w * (size_t) (y1 - y0));
+            if (folded == 0) {
+                return;
+            }
+            for (row = y0; row < y1; row++) {
+                const unsigned char* g = m + (size_t) (row - y0) * (size_t) pitch;
+                const unsigned char* c = clip->mask + (size_t) (row - clip->y0) * (size_t) cw + (x0 - clip->x0);
+                unsigned char* o = folded + (size_t) (row - y0) * (size_t) w;
+                for (i = 0; i < w; i++) {
+                    o[i] = (unsigned char) ((g[i] * c[i] + 127) / 255);
+                }
+            }
+            cn1GpuDraw(cr->target, x0, y0, x1, y1, &src, 255, cr->state.op, folded, w);
+        } else {
+            cn1GpuDraw(cr->target, x0, y0, x1, y1, &src, 255, cr->state.op, m, pitch);
+        }
+        return;
+    }
+#endif
+    if (!cn1rEnsureCov(x1 - x0)) {
         return;
     }
     for (row = y0; row < y1; row++) {

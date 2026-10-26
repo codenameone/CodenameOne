@@ -86,6 +86,25 @@ typedef struct {
 } cairo_matrix_t;
 
 typedef struct cn1r_surface cairo_surface_t;
+
+/*
+ * Not Cairo: the surface itself, visible to the GPU renderer (cn1_linux_gpu.c),
+ * which keeps an image's texture beside its pixels. Every write to the pixels
+ * goes through the renderer or is announced (mark_dirty, get_data), and each
+ * one advances `version`, so a texture is uploaded again exactly when the
+ * pixels it was made from changed.
+ */
+struct cn1r_surface {
+    int width;
+    int height;
+    int stride;
+    uint32_t* data;
+    unsigned version;           /* advanced by every change to data */
+    unsigned texture;           /* GPU texture made from data, 0 for none */
+    unsigned textureVersion;    /* the version that texture was made from */
+    int gpu;                    /* drawn by the GPU: the window, in a GPU build */
+    int gpuDirty;               /* the GPU holds drawing data has not seen */
+};
 typedef struct cn1r_context cairo_t;
 typedef struct cn1r_pattern cairo_pattern_t;
 typedef cairo_status_t (*cairo_write_func_t)(void* closure, const unsigned char* data, unsigned int length);

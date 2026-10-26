@@ -8470,6 +8470,13 @@ static void cn1BibopExitReport(void) {
     // that no cycle can start, because starting one means winning IDLE -> RUNNING.
     // Polling gcCurrentlyRunning instead left the window this replaces -- a collector
     // preempted between its check and setting that flag.
+    // The allocation totals FIRST, before the freeze and every walk: they are
+    // counters, read in microseconds and needing no quiescent heap, while a
+    // server's other threads can finish exiting the process at any point after
+    // this starts -- a backend's main returns as soon as its reactor stops, so a
+    // second exit() races this one. Printed after the accounting line, they were
+    // lost on every server exit.
+    cn1AllocCensus("exit");
     set_static_java_lang_System_gcShouldLoop(JAVA_FALSE);
     {
         // BOUNDED: a diagnostic must not turn a hung collector into a hung exit. On
@@ -8502,10 +8509,6 @@ static void cn1BibopExitReport(void) {
         malloc_zone_print(0, 0);
     }
 #endif
-    // The allocation totals before the live walk: they are counters, printed in
-    // microseconds, while the walk visits every slot and a server's other threads
-    // can finish exiting the process before it ends.
-    cn1AllocCensus("exit");
     cn1LiveCensus("exit");
 #ifdef CN1_ALLOC_CENSUS
     cn1CapacityHistogram();

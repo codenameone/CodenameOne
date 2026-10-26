@@ -10,6 +10,7 @@ memory display, evdev input, no GTK). The user documentation is the developer gu
 | `translate.sh` | Translates compiled application classes into the CMake project the board builds, from this checkout's own build output, with no build service. |
 | `build-dist.sh` | Builds that project for `arm64`, `arm`, `amd64` or `riscv64` in a container (`Containerfile.dev`), strips the binary and keeps its symbols beside it. |
 | `gen-embedded-stubs.py` | Generates `Ports/LinuxPort/nativeSources/cn1_linux_embedded_stubs.c`, the natives the embedded build leaves out; `--check` is the CI form. |
+| `gpu-check/` | Draws every kind of operation with the GPU renderer and the software one, on Mesa's llvmpipe in the dev image, and fails on any differing pixel (`check-gpu.sh`). |
 | `demo/` | `EmbeddedDemo`, a small HMI that is also the benchmark workload (`CN1_BENCH_SECONDS`). |
 | `bench/` | The same workload in Slint, Qt, JavaFX and a Chromium kiosk, and the harness that runs all of them. |
 | `pios/setup-device.sh` | Prepares Raspberry Pi OS Lite to start an application at boot. |
@@ -32,6 +33,10 @@ CN1_DISPLAY=memory CN1_SIZE=800x480 CN1_BENCH_SECONDS=10 $B/out/build-arm64/Embe
 
 `CN1_SNAPSHOT=/tmp/shot.ppm` writes frame 60 (or `CN1_SNAPSHOT_FRAME`) to a file,
 which is how the memory display is checked without a screen.
+
+For the GPU renderer, build with `CN1_CMAKE_ARGS=-DCN1_EMBEDDED_GPU=ON` and, on a
+machine without a GPU, run with `LIBGL_ALWAYS_SOFTWARE=1`; `check-demo-run.py
+--reference` then holds its frame to the software build's.
 
 ## Benchmarks
 

@@ -81,7 +81,7 @@ fi
 RUNTIME_RESOURCES="$WORK/runtime-resources"
 mkdir -p "$RUNTIME_RESOURCES"
 for f in cn1_globals.h cn1_globals.m nativeMethods.m cn1_intrinsics.h cn1_sqlite3.c \
-         cn1_process.h cn1_process_vm.h cn1_hardware_impl.h \
+         cn1_process.h cn1_process_vm.h cn1_hardware_impl.h cn1_mdns_impl.h \
          cn1_virtual_thread.h cn1_virtual_thread.c cn1_virtual_thread_asm.S; do
     cp "$REPO/vm/ByteCodeTranslator/src/$f" "$RUNTIME_RESOURCES/$f"
 done

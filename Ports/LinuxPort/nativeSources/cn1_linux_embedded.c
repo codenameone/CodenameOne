@@ -96,6 +96,9 @@
 #include <xf86drm.h>
 #include <xf86drmMode.h>
 #endif
+#ifdef CN1_EMBEDDED_GPU
+#include "cn1_linux_gpu.h"
+#endif
 
 /* Board-profile defaults (LinuxNativeBuilder, EmbeddedBoardProfile). The display
  * arrives as a bare token, CN1_DEFAULT_DISPLAY_NAME=kms, because a quoted string
@@ -433,6 +436,8 @@ static int cn1DrmTryCard(const char* path) {
     return 0;
 }
 
+static int cn1KmsDumbBuffers(void);
+
 static int cn1InitKms(void) {
     char path[64];
     const char* dev = getenv("CN1_DRM_DEVICE");
@@ -446,6 +451,21 @@ static int cn1InitKms(void) {
         }
         if (cn1DrmFd < 0) return -1;
     }
+    cn1DrmSavedCrtc = drmModeGetCrtc(cn1DrmFd, cn1DrmCrtc);
+#ifdef CN1_EMBEDDED_GPU
+    /* The GPU renderer scans out its own buffers; the dumb buffers below are the
+     * software renderer's, and its fallback when the device has no usable GPU. */
+    if (cn1GpuInitKms(cn1DrmFd, cn1DrmCrtc, cn1DrmConnector, &cn1DrmMode, cn1PhysW, cn1PhysH, cn1Rotation) == 0) {
+        return 0;
+    }
+    fprintf(stderr, "CN1: no usable GPU on %s, using the software renderer\n", dev != 0 && *dev ? dev : "the DRM device");
+#endif
+    return cn1KmsDumbBuffers();
+}
+
+/* Two dumb buffers the CPU writes and the display scans out, shown alternately. */
+static int cn1KmsDumbBuffers(void) {
+    int i;
     for (i = 0; i < 2; i++) {
         if (cn1DrmCreateBuffer(&cn1Buf[i], cn1PhysW, cn1PhysH) != 0) {
             close(cn1DrmFd);
@@ -454,7 +474,6 @@ static int cn1InitKms(void) {
         }
     }
     cn1BufCount = 2;
-    cn1DrmSavedCrtc = drmModeGetCrtc(cn1DrmFd, cn1DrmCrtc);
     if (drmModeSetCrtc(cn1DrmFd, cn1DrmCrtc, cn1Buf[0].fbId, 0, 0, &cn1DrmConnector, 1, &cn1DrmMode) != 0) {
         /* Not DRM master: a compositor owns the screen. */
         close(cn1DrmFd);
@@ -564,7 +583,14 @@ static void cn1Blit(CN1Scanout* b, CN1EmbRect r) {
     if (b->map == 0 || r.w <= 0 || r.h <= 0) {
         return;
     }
+#ifdef CN1_EMBEDDED_GPU
+    /* cn1Present has just read the damage back from the GPU; get_data would
+     * read the whole window again and mark its texture stale. */
+    src = cn1WindowG.surface->gpu ? (const unsigned char*) cn1WindowG.surface->data
+            : cairo_image_surface_get_data(cn1WindowG.surface);
+#else
     src = cairo_image_surface_get_data(cn1WindowG.surface);
+#endif
     srcStride = cairo_image_surface_get_stride(cn1WindowG.surface);
     if (cn1Rotation == 0 && b->bpp == 32 && cn1FbRedOffset == 16) {
         for (y = 0; y < r.h; y++) {
@@ -623,11 +649,23 @@ static void cn1Present(CN1EmbRect damage) {
     CN1Scanout* b;
     CN1EmbRect copy;
     int i, target;
+#ifdef CN1_EMBEDDED_GPU
+    int gpu = cn1WindowG.surface != 0 && cn1WindowG.surface->gpu;
+    if (gpu && cn1GpuScansOut()) {
+        /* Only the EDT gets here: the cursor moves on its own plane. */
+        cn1GpuPresent();
+        return;
+    }
+#endif
     if (cn1BufCount == 0 || cn1WindowG.surface == 0) {
         return;
     }
     damage = cn1RectClip(damage, cn1LogicalW, cn1LogicalH);
     pthread_mutex_lock(&cn1PresentLock);
+#ifdef CN1_EMBEDDED_GPU
+    /* Offscreen GPU: only what is copied out below is read back. */
+    if (!gpu)
+#endif
     cairo_surface_flush(cn1WindowG.surface);
     for (i = 0; i < cn1BufCount; i++) {
         cn1Buf[i].stale = cn1RectUnion(cn1Buf[i].stale, damage);
@@ -645,6 +683,11 @@ static void cn1Present(CN1EmbRect damage) {
         b->cursor.w = 0;
     }
     copy = cn1RectClip(copy, cn1LogicalW, cn1LogicalH);
+#ifdef CN1_EMBEDDED_GPU
+    if (gpu) {
+        cn1GpuReadRect(cn1WindowG.surface, copy.x, copy.y, copy.w, copy.h);
+    }
+#endif
     cn1Blit(b, copy);
     b->stale.w = 0;
     b->stale.h = 0;
@@ -667,6 +710,9 @@ static void cn1Present(CN1EmbRect damage) {
 }
 
 static void cn1RestoreScreen(void) {
+#ifdef CN1_EMBEDDED_GPU
+    cn1GpuShutdown();
+#endif
 #ifdef CN1_EMBEDDED_HAS_DRM
     if (cn1DrmFd >= 0) {
         cn1KmsWaitFlip();
@@ -869,6 +915,17 @@ static void cn1HandleKey(int code, int value) {
 }
 
 static void cn1MoveCursor(void) {
+#ifdef CN1_EMBEDDED_GPU
+    if (cn1CursorEnabled && cn1GpuScansOut()) {
+        int px, py;
+        cn1ToPhysical(cn1CursorX, cn1CursorY, &px, &py);
+        if (!cn1GpuCursor(1, px, py)) {
+            fprintf(stderr, "CN1: the display has no cursor plane; the pointer is not drawn\n");
+            cn1CursorEnabled = 0;
+        }
+        return;
+    }
+#endif
     if (cn1CursorEnabled) {
         CN1EmbRect none = { 0, 0, 0, 0 };
         cn1Present(none);
@@ -1195,6 +1252,12 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_initDisplay___java_lang_String_in
     }
     if (cn1Output == OUT_HEADLESS && strcmp(want, "memory") == 0 && cn1InitMemory() == 0) {
         cn1Output = OUT_MEMORY;
+#ifdef CN1_EMBEDDED_GPU
+        /* Rendered by the GPU and read back: what CI checks the GPU renderer with. */
+        if (cn1GpuInitOffscreen() != 0) {
+            fprintf(stderr, "CN1: no usable GPU, using the software renderer\n");
+        }
+#endif
     }
     if (cn1Output == OUT_HEADLESS && strcmp(want, "headless") != 0 && strcmp(want, "auto") != 0
             && strcmp(want, "memory") != 0) {
@@ -1211,11 +1274,32 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_initDisplay___java_lang_String_in
         cn1Dpi = 96;
     }
     cn1ResizeBackBuffer(cn1LogicalW, cn1LogicalH);
+#ifdef CN1_EMBEDDED_GPU
+    if (cn1GpuActive() && cn1GpuAttachWindow(cn1WindowG.surface) != 0) {
+        int scansOut = cn1GpuScansOut();
+        fprintf(stderr, "CN1: the GPU cannot render the window, using the software renderer\n");
+        cn1GpuShutdown();
+        cn1WindowG.surface->gpu = 0;
+#ifdef CN1_EMBEDDED_HAS_DRM
+        if (scansOut && cn1KmsDumbBuffers() != 0) {
+            cn1Output = OUT_HEADLESS;
+        }
+#else
+        (void) scansOut;
+#endif
+    }
+#endif
     atexit(cn1AtExit);
     {
         static const char* names[] = { "headless", "memory", "fbdev", "kms" };
-        fprintf(stderr, "CN1: embedded display %s %dx%d rotation %d dpi %d\n",
-                names[cn1Output], cn1LogicalW, cn1LogicalH, cn1Rotation, cn1Dpi);
+        const char* renderer = "software";
+#ifdef CN1_EMBEDDED_GPU
+        if (cn1WindowG.surface != 0 && cn1WindowG.surface->gpu) {
+            renderer = "gpu";
+        }
+#endif
+        fprintf(stderr, "CN1: embedded display %s %dx%d rotation %d dpi %d renderer %s\n",
+                names[cn1Output], cn1LogicalW, cn1LogicalH, cn1Rotation, cn1Dpi, renderer);
     }
     if (cn1Output == OUT_KMS || cn1Output == OUT_FBDEV) {
         cn1ConsoleGraphics();
@@ -1230,6 +1314,11 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_initDisplay___java_lang_String_in
         cn1CursorX = cn1LogicalW / 2;
         cn1CursorY = cn1LogicalH / 2;
         cn1CursorEnabled = cn1EnvInt("CN1_CURSOR", cn1HasPointer && !cn1HasTouch ? 1 : 0);
+#ifdef CN1_EMBEDDED_GPU
+        if (cn1GpuScansOut()) {
+            cn1MoveCursor();
+        }
+#endif
     }
     {
         CN1EmbRect all = { 0, 0, cn1LogicalW, cn1LogicalH };

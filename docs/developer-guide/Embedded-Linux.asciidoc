@@ -53,7 +53,7 @@ Fonts are found by file name, without FontConfig: in the directories listed in
 `CN1_FONT_PATH`, then in a `fonts` directory beside the executable, then under
 `/usr/share/fonts` and `/usr/local/share/fonts`. The default face is DejaVu Sans,
 or Liberation, Noto, FreeFont, Roboto or Open Sans when DejaVu is absent. Fonts an
-application bundles are used as they are on every other platform.
+application bundles work the same as on every other platform.
 The `CN1_DISPLAY` environment variable forces a back end (`drm`, `fbdev`, `memory`
 or `headless`); the others are listed in the table below.
 
@@ -65,7 +65,7 @@ or `headless`); the others are listed in the table below.
 |`CN1_DISPLAY` |`drm`, `fbdev`, `memory` or `headless`; by default the first that works
 |`CN1_DRM_DEVICE`, `CN1_FB_DEVICE` |The device node to use instead of the first found
 |`CN1_ROTATION` |`0`, `90`, `180` or `270`, for a panel mounted on its side
-|`CN1_DPI` |The panel's density, when the display does not report its size
+|`CN1_DPI` |The panel's density, when the display doesn't report its size
 |`CN1_SIZE` |`800x480`: the size of a `memory` display
 |`CN1_CURSOR` |`1` draws a pointer for a mouse; touch panels have none by default
 |`CN1_TOUCH_SWAP_XY`, `CN1_TOUCH_INVERT_X`, `CN1_TOUCH_INVERT_Y` |Correct a touch controller mounted differently from its panel
@@ -78,6 +78,30 @@ later: multi-touch panels (with pinch), mice, keyboards and rotary encoders, whi
 move the focus like the arrow keys. Text fields open an on-screen keyboard, since
 a device seldom has a physical one. `SIGTERM` closes the application cleanly and the
 console is restored on exit.
+
+=== GPU rendering
+
+Boards with a dependable OpenGL ES 2 driver can draw through the GPU instead.
+The same renderer still decides what every operation covers -- shapes, clips,
+glyphs and antialiasing are computed exactly as in software -- and the GPU then
+composites the result: fills, gradients, images and text become textured quads,
+images are uploaded once and kept on the GPU, and the finished frame is flipped
+to the display with no copy. The pointer moves on the display's cursor plane.
+Frames are identical to the software renderer's; the CPU time a frame costs is
+what drops, which matters most for large images, full-screen animation and
+high-resolution panels.
+
+The `linux.embedded.renderer` build hint chooses: `gpu` or `software`. Without
+it, the board profile decides: `gpu` for the Raspberry Pi profiles, `imx8`,
+`imx6`, `rk3588`, `jetson` and `generic-x64`, and `software` for the rest. A
+`software` build links no GPU library at all.
+
+A `gpu` build never fails to show a picture for want of a GPU. When the device
+has no usable driver, or the driver can't draw the window, the application logs
+the reason and continues with the software renderer. The first log line names the
+renderer in use (`renderer gpu` or `renderer software`). The device needs Mesa's
+GBM, EGL and GLES 2 libraries (`libgbm1`, `libegl1`, `libgles2` on Debian and
+Raspberry Pi OS), or the board vendor's equivalents.
 
 === Building for a board
 
@@ -156,7 +180,7 @@ temperature sensor at `0x48` and an EEPROM at `0x50` on I2C bus 1, loopback SPI,
 serial and CAN devices, two PWM channels, a watchdog and a backlight. Hardware code
 therefore runs, and can be unit tested, before a board is on the desk.
 
-=== Headless devices: the backend on a board
+=== Headless devices with the backend
 
 A gateway, a sensor hub or a controller with no screen runs the
 <<_server_side_backend,backend>> instead: a native REST and WebSocket server, built the same way
@@ -164,5 +188,23 @@ and as small. `Hardware.getInstance()` works there too, through the same kernel 
 as the UI port, and listener callbacks run on the pin's own thread. The device then
 serves its API, the phone application is the client, and both share the entity
 classes.
+
+=== Finding each other on the network
+
+Devices, phones and servers on one network find each other over multicast DNS
+(Bonjour), so nobody types an address. The Linux port implements
+`BonjourBrowser` and `BonjourPublisher` itself, on a plain UDP socket, so a
+Buildroot image needs no Avahi. The backend has the same protocol as
+`com.codename1.backend.Discovery`:
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/DiscoverySnippets.java[tag=backend-discovery,indent=0]
+----
+
+A phone, a Mac or a Linux desktop sees the device in its own Bonjour browser too.
+When another device already uses the name, the second one gets a numeric suffix,
+`Hall Thermostat (2)`. Discovery listeners on the backend run on the discovery
+thread, because a server has no event dispatch thread.
 
 include::embedded-benchmarks.adoc[]

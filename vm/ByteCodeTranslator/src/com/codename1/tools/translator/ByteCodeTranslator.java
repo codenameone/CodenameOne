@@ -552,6 +552,8 @@ public class ByteCodeTranslator {
         // The kernel bus and pin access the Linux port and the backend both wrap
         // (com.codename1.impl.KernelHardware). Only their wrappers include it.
         copyRuntimeResource(srcRoot, "cn1_hardware_impl.h");
+        // The multicast DNS socket behind com.codename1.impl.MdnsEngine, wrapped the same way.
+        copyRuntimeResource(srcRoot, "cn1_mdns_impl.h");
         emitBundledSqlite(srcRoot);
         copyRuntimeResource(srcRoot, "xmlvm.h");
 
@@ -954,6 +956,8 @@ public class ByteCodeTranslator {
         // The kernel bus and pin access the Linux port and the backend both wrap
         // (com.codename1.impl.KernelHardware). Only their wrappers include it.
         copyRuntimeResource(srcRoot, "cn1_hardware_impl.h");
+        // The multicast DNS socket behind com.codename1.impl.MdnsEngine, wrapped the same way.
+        copyRuntimeResource(srcRoot, "cn1_mdns_impl.h");
         emitBundledSqlite(srcRoot);
 
         Parser.writeOutput(srcRoot);
@@ -1601,6 +1605,8 @@ public class ByteCodeTranslator {
         // generated project can be configured either way.
         writer.append("option(CN1_LINUX_EMBEDDED \"Embedded Linux: DRM/KMS or fbdev, no GTK\" ")
                 .append(Boolean.getBoolean("cn1.linux.embedded") ? "ON" : "OFF").append(")\n");
+        writer.append("option(CN1_EMBEDDED_GPU \"Embedded Linux: GPU renderer, GLES 2 over GBM/EGL\" ")
+                .append(Boolean.getBoolean("cn1.linux.embedded.gpu") ? "ON" : "OFF").append(")\n");
         writer.append("if(CN1_LINUX_EMBEDDED)\n");
         // cn1_linux_text.c (Pango) is replaced by cn1_linux_text_ft.c, and Cairo by
         // the renderer in cn1_linux_raster.c: the desktop stack mapped 23 MB of
@@ -1629,6 +1635,21 @@ public class ByteCodeTranslator {
         writer.append("    else()\n");
         writer.append("        get_target_property(cn1_srcs ${PROJECT_NAME} SOURCES)\n");
         writer.append("        list(FILTER cn1_srcs EXCLUDE REGEX \"/cn1_linux_gl\\\\.c$\")\n");
+        writer.append("        set_property(TARGET ${PROJECT_NAME} PROPERTY SOURCES ${cn1_srcs})\n");
+        writer.append("    endif()\n");
+        // The GPU renderer (cn1_linux_gpu.c): GLES 2 on a GBM surface over KMS.
+        // Only when the build asks for it -- the linux.embedded.renderer hint or a
+        // board profile that defaults to it -- and then its libraries are
+        // required, so a sysroot without them fails the build instead of shipping
+        // a binary that quietly renders in software.
+        writer.append("    if(CN1_EMBEDDED_GPU)\n");
+        writer.append("        pkg_check_modules(CN1GPU REQUIRED gbm egl glesv2 libdrm)\n");
+        writer.append("        target_compile_definitions(${PROJECT_NAME} PRIVATE CN1_EMBEDDED_GPU)\n");
+        writer.append("        target_include_directories(${PROJECT_NAME} PRIVATE ${CN1GPU_INCLUDE_DIRS})\n");
+        writer.append("        list(APPEND CN1EMB_LIBS ${CN1GPU_LIBRARIES})\n");
+        writer.append("    else()\n");
+        writer.append("        get_target_property(cn1_srcs ${PROJECT_NAME} SOURCES)\n");
+        writer.append("        list(FILTER cn1_srcs EXCLUDE REGEX \"/cn1_linux_gpu\\\\.c$\")\n");
         writer.append("        set_property(TARGET ${PROJECT_NAME} PROPERTY SOURCES ${cn1_srcs})\n");
         writer.append("    endif()\n");
         writer.append("    if(CN1GST_FOUND)\n");

@@ -111,6 +111,13 @@ ios.NSLocalNetworkUsageDescription=Discover other instances of MyApp on this Wi-
 
 The comma-separated values are expanded into the Info.plist array at build time.
 
+==== Linux and embedded devices
+
+The Linux desktop and embedded targets answer and browse on their own UDP socket
+and need no Avahi or other system service. A headless device running the backend
+uses `com.codename1.backend.Discovery`, which speaks the same protocol, so a phone
+application finds it with `BonjourBrowser`.
+
 ==== Android requirements
 
 The pipeline adds `CHANGE_WIFI_MULTICAST_STATE` automatically. `NsdManager` does the rest; there is no runtime permission prompt.

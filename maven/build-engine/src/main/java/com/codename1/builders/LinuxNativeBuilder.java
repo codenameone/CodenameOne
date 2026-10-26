@@ -228,6 +228,13 @@ public class LinuxNativeBuilder extends Executor {
                 + ";CN1_DEFAULT_DPI=" + dpi;
     }
 
+    /// True when the embedded build compiles the GPU renderer: the
+    /// `linux.embedded.renderer` hint, or the board profile's default.
+    static boolean isGpuRenderer(BuildRequest request, EmbeddedBoardProfile profile) {
+        return EmbeddedBoardProfile.RENDERER_GPU.equals(EmbeddedBoardProfile.normalizeRenderer(
+                request.getArg("linux.embedded.renderer", null), profile.renderer));
+    }
+
     private static int parseIntOr(String value, int def) {
         if (value == null || value.trim().isEmpty()) {
             return def;
@@ -251,7 +258,8 @@ public class LinuxNativeBuilder extends Executor {
         // A board implies its architecture; linux.arch still wins when given.
         String arch = normalizeArch(request.getArg("linux.arch", embedded ? board.arch : ARCH_X64));
         if (embedded) {
-            log("Embedded Linux target, board profile " + board.name + " (" + board.description + ")");
+            log("Embedded Linux target, board profile " + board.name + " (" + board.description + "), "
+                    + (isGpuRenderer(request, board) ? "GPU" : "software") + " renderer");
         }
         log("Building native Linux app for arch=" + arch + " (triple " + targetTriple(arch, isMuslRequested(request)) + ")");
 
@@ -502,6 +510,7 @@ public class LinuxNativeBuilder extends Executor {
         configure.add("-DCMAKE_ASM_COMPILER=" + cc);
         if (embedded) {
             configure.add("-DCN1_EXTRA_DEFINES=" + embeddedDefines(request, board));
+            configure.add("-DCN1_EMBEDDED_GPU=" + (isGpuRenderer(request, board) ? "ON" : "OFF"));
         }
         // A board's own sysroot (Yocto SDK, Buildroot staging, a Pi OS image's
         // root): headers and pkg-config data for the target architecture.

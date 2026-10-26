@@ -2,11 +2,15 @@
 # the libraries the embedded port links (no GTK). build-dist.sh builds it once
 # per architecture. Debian bookworm matches Raspberry Pi OS and most vendor
 # BSPs' glibc; a binary built here runs on bookworm or newer.
+# libgbm-dev is the GPU renderer's (linux.embedded.renderer=gpu); the Mesa
+# runtime lets the same image run that renderer with no GPU, on llvmpipe, which
+# is how CI checks it.
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential cmake pkg-config binutils \
         libfreetype-dev libpng-dev libjpeg-dev libssl-dev libcurl4-openssl-dev \
-        libdrm-dev libegl-dev libgles-dev libepoxy-dev \
+        libdrm-dev libegl-dev libgles-dev libepoxy-dev libgbm-dev \
+        libegl-mesa0 libgles2 libgl1-mesa-dri \
         libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
         libnghttp2-dev zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*

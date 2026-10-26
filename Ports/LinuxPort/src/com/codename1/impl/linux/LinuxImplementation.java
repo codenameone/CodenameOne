@@ -348,14 +348,15 @@ public class LinuxImplementation extends CodenameOneImplementation {
     /// True on the embedded target (DRM/KMS or fbdev, no window system). Fixed at
     /// build time: the native is a constant in each of the two display units.
     /// The port's JVM unit tests run with no native library; they exercise the
-    /// desktop behaviour, so a missing native reads as "not embedded".
+    /// desktop behaviour, so a missing native reads as "not embedded". Caught as
+    /// LinkageError: the device class library has no UnsatisfiedLinkError.
     private static final class Embedded {
         static final boolean VALUE = query();
 
         private static boolean query() {
             try {
                 return LinuxNative.isEmbeddedDisplay();
-            } catch (UnsatisfiedLinkError notLinked) {
+            } catch (LinkageError notLinked) {
                 return false;
             }
         }
@@ -587,6 +588,11 @@ public class LinuxImplementation extends CodenameOneImplementation {
     // Android EncryptedSharedPreferences non-prompting store). Used by the
     // networking layer to read API keys / tokens at rest; see LinuxSecureStorage.
     private com.codename1.security.SecureStorage secureStorage;
+
+    @Override
+    protected com.codename1.io.bonjour.BonjourPlatform createBonjourPlatform() {
+        return new LinuxBonjourPlatform();
+    }
 
     private LinuxHardware hardware;
 
