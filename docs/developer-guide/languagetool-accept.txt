@@ -841,3 +841,6 @@ ntfy
 composables
 Skia
 kotlinc
+# Identity migration: password hash formats read by ModularPbkdf2PasswordEncoder.
+passlib
+Werkzeug
