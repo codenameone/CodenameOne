@@ -1,0 +1,108 @@
+[[crypto-wallets]]
+== Crypto wallets
+
+The `com.codename1.crypto` packages hold everything a wallet, an exchange or a payment backend needs to work with Ethereum and the other EVM chains, Bitcoin, and Solana. That covers recovery phrases and key derivation, addresses, transactions, signing, the node APIs that broadcast transactions and read balances, and price feeds. There are no third-party libraries to add, and the same classes run in the app and in a Codename One backend.
+
+The heavy parts run as native code wherever the platform allows it: secp256k1, Schnorr, Ed25519, the hashes and the PBKDF2 behind a recovery phrase. Elsewhere they fall back to an optimized pure-Java engine. A benchmark in CI compares every kernel against libsecp256k1, libsodium, OpenSSL and BouncyCastle on the same machine, and fails a build that falls behind.
+
+The packages, from the bottom up:
+
+[cols="1,3",options="header"]
+|===
+| Package | What it holds
+| `crypto.encoding` | Hex, Base58 and Base58Check, Bech32 and Bech32m, RLP, Base64
+| `crypto.hd` | BIP-39 recovery phrases (`Mnemonic`), BIP-32 and SLIP-10 key derivation, `DerivationPath`
+| `crypto.evm` | `EvmAddress` (EIP-55), legacy, EIP-2930 and EIP-1559 transactions, EIP-191 and EIP-712 signing, the Solidity ABI
+| `crypto.bitcoin` | P2PKH, P2SH, P2WPKH, P2WSH and Taproot addresses, scripts, transactions, PSBT, WIF
+| `crypto.solana` | Addresses and program-derived addresses, legacy and v0 messages, transactions, System, Token and Compute Budget instructions
+| `crypto.wallet` | The `Signer` interface, `SeedSigner`, `VaultSigner`, and the `Wallet` entry point
+| `crypto.rpc` | JSON-RPC for EVM nodes, Esplora for Bitcoin, Solana JSON-RPC
+| `crypto.market` | `PriceFeed`, CoinGecko, any JSON price API, and a caching decorator
+|===
+
+=== From a recovery phrase to a wallet
+
+A wallet starts as a recovery phrase. Every key on every chain is derived from it, so the phrase is the only thing a user ever needs to back up.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/CryptoWalletSnippets.java[tag=crypto-mnemonic,indent=0]
+----
+
+`Mnemonic.isValid` checks the words against the English list and verifies the checksum the last word carries, so a typo is caught before it turns into an empty wallet with a different address.
+
+`Wallet` answers addresses on the paths other wallets use. A phrase restored here shows the same accounts it shows in MetaMask, Electrum, Sparrow or Phantom:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/CryptoWalletSnippets.java[tag=crypto-addresses,indent=0]
+----
+
+For Bitcoin, the purpose picks the address type: `Wallet.BIP44` for legacy `1...` addresses, `BIP49` for P2SH-wrapped SegWit, `BIP84` for native SegWit `bc1q...` and `BIP86` for Taproot `bc1p...`. The same network object also selects testnet, signet, or regtest.
+
+=== Sending a transaction
+
+The pattern is the same on every chain. You read what the transaction needs from a node, build it, sign it on the device, and hand the signed bytes back to the node. Private keys never leave the `Signer`.
+
+The node clients are blocking calls over an `RpcTransport`. In the app that's `NetworkTransport`, which goes through the `NetworkManager` queue and keeps the UI responsive when called from the EDT. In a backend, `com.codename1.backend.WebRpcTransport` does the same over the backend's HTTP client. A provider's API key goes in a header: `new NetworkTransport().header("Authorization", "Bearer ...")`.
+
+==== Ethereum and EVM chains
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/CryptoWalletSnippets.java[tag=crypto-evm-send,indent=0]
+----
+
+Amounts are `UInt256`, an exact unsigned 256-bit integer, so wei never passes through a `double`. `parseUnits("0.01", 18)` and `formatUnits(18)` convert to and from the decimal amount a person reads. `suggestFees` sets the fee cap at twice the next base fee plus the tip, which stays valid through several full blocks. The chain ID comes from the node and goes into the signature, so a transaction signed for one chain can't be replayed on another.
+
+Token transfers, contract calls and EIP-712 typed data use the same flow. Look at `Erc20`, `Abi` and `TypedData` in `crypto.evm`, and at `Wallet.signTypedData` and `Wallet.personalSign` for sign-in messages.
+
+==== Bitcoin
+
+A Bitcoin transaction spends earlier outputs ("coins") rather than debiting a balance, and a signer has to know the value of each coin it signs for. A PSBT (BIP-174) carries that information, and it's also the format hardware wallets and multisig co-signers exchange:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/CryptoWalletSnippets.java[tag=crypto-btc-send,indent=0]
+----
+
+`EsploraClient` speaks the REST API of mempool.space and Blockstream, or of your own Esplora server. `getFeeEstimates` returns sats per virtual byte by confirmation target. Multiply that by the size of the transaction to get `feeSats`. Every output the snippet doesn't spend is paid as a fee, so a real wallet adds a change output back to one of its own addresses.
+
+`Wallet.signPsbt(psbt)` signs any input whose BIP-32 origin matches the wallet's own fingerprint. That lets a PSBT built elsewhere, by a coordinator or a watch-only wallet, be signed without being told which keys to use. Taproot inputs are signed with BIP-340 Schnorr signatures automatically.
+
+==== Solana
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/CryptoWalletSnippets.java[tag=crypto-sol-send,indent=0]
+----
+
+Amounts are in lamports (a billionth of a SOL). A blockhash expires after about a minute, so fetch it right before signing. `TokenProgram` builds SPL token transfers, and `SolanaAddress.associatedTokenAddress` finds the account a token is held in. `ComputeBudget.setComputeUnitPrice` adds a priority fee when the network is busy.
+
+=== Prices
+
+`PriceFeed` answers one question: the price of one asset in another. `CoinGeckoFeed` works without a key at the public rate limit, and takes a demo or pro key for more. `JsonPriceFeed` turns any JSON price API into a feed from a URL template and the path to the price. Wrap either in `CachingPriceFeed`, so a screen that prices twenty balances makes one request:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/CryptoWalletSnippets.java[tag=crypto-price,indent=0]
+----
+
+A cached quote stays fresh for the first window. After that it's still returned when a refresh fails, until the second window ends. That keeps a balance screen useful through a brief outage without showing a price that's hours old.
+
+=== Where the keys live
+
+Whoever holds the recovery phrase holds the funds. Decide where it lives before you write the first screen.
+
+*On the device, in a vault.* `VaultSigner` keeps the phrase sealed in a vault (see "Vaults: One password, every device" in the security chapter) and opens it only while the vault is unlocked, by biometrics or the vault password. It works anywhere `Wallet` expects a signer:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/CryptoWalletSnippets.java[tag=crypto-vault,indent=0]
+----
+
+This is the model for a self-custody wallet. A lost device loses nothing as long as the user kept the phrase, and `revealMnemonic` shows it again for a backup. A signer whose vault is locked throws rather than signing, so a stolen, locked phone can't move funds.
+
+*On a server, behind your own controls.* An exchange or a custodial app derives its deposit addresses and signs its withdrawals in the backend, where the same classes run. Keep the phrase out of the database and the source tree: load it from a secret store or an HSM at startup, and keep withdrawals behind an approval step. The Bastion sample does exactly this. Its implementor's guide walks through hot and deposit wallets, confirmation depth and reorg handling.
+
+`SeedSigner` holds the derived master key in memory. Call `destroy()` when you're done with it, and the key bytes are overwritten. Strings can't be wiped, which is why `VaultSigner.revealMnemonic` answers a `char[]`.
