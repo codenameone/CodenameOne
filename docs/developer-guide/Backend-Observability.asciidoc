@@ -126,54 +126,219 @@ temporality. `cn1.otel.metrics.enabled=false` turns metrics off while leaving
 traces on. The management endpoints described below record and serve the same
 metrics whether anything exports them or not.
 
-==== What the server records
+==== The metric schema
 
-[cols="3,1,2", options="header"]
+The metrics the server records about itself have a published schema. Their names,
+units and attributes are stable, so a dashboard or an alert written against them
+keeps working when the server is upgraded, and it works the same against a server
+running on the JVM and a packaged native one. Each metric has one of three
+availabilities: *always*, *database* (when the server has a database pool), or
+*JVM* (the packaged server has no equivalent).
+
+[cols="3,2,3,1,3", options="header"]
 |===
-| Instrument | Kind | Attributes
+| Instrument | Kind | Attributes | Measured | Micrometer equivalent
 
-| `http.server.request.duration`, in milliseconds
-| histogram
-| `http.route` (the route template), `http.request.method`,
-  `http.response.status_code`
+| `http.server.request.duration`
+| histogram, ms
+| `http.route`, `http.request.method`, `http.response.status_code`
+| always
+| `http.server.requests`
 
 | `http.server.active_requests`
 | gauge
-|
+| 
+| always
+| `http.server.requests.active`
 
 | `http.server.open_connections`
 | gauge
-|
+| 
+| always
+| `tomcat.connections.current`
 
 | `cn1.server.websocket_connections`
 | gauge
-|
+| 
+| always
+| none
 
-| `cn1.server.requests_served`, `cn1.server.connections_refused`
-| gauge
-|
+| `cn1.server.requests_served`
+| gauge, cumulative
+| 
+| always
+| none
 
-| `db.client.connection.count`, `db.client.connection.idle`
+| `cn1.server.connections_refused`
+| gauge, cumulative
+| 
+| always
+| none
+
+| `db.client.connection.count`
 | gauge
-| (when the server has a database)
+| 
+| database
+| `hikaricp.connections`
+
+| `db.client.connection.idle`
+| gauge
+| 
+| database
+| `hikaricp.connections.idle`
+
+| `db.client.connection.max`
+| gauge
+| 
+| database
+| `hikaricp.connections.max`
+
+| `db.client.connection.pending_requests`
+| gauge
+| 
+| database
+| `hikaricp.connections.pending`
+
+| `db.client.connection.timeouts`
+| gauge, cumulative
+| 
+| database
+| `hikaricp.connections.timeout`
 
 | `cn1.task.queue_depth`
 | gauge
 | `cn1.executor`
+| always
+| `executor.queued`
 
-| `cn1.scheduler.run.duration`, in milliseconds
-| histogram
-| `cn1.job`, `cn1.outcome` (`success` or `failure`)
-
-| `process.runtime.memory.used`, `process.uptime`
+| `cn1.task.active`
 | gauge
-|
+| `cn1.executor`
+| always
+| `executor.active`
+
+| `cn1.task.completed`
+| gauge, cumulative
+| `cn1.executor`
+| always
+| `executor.completed`
+
+| `cn1.task.pool_size`
+| gauge
+| `cn1.executor`
+| always
+| `executor.pool.size`
+
+| `cn1.scheduler.run.duration`
+| histogram, ms
+| `cn1.job`, `cn1.outcome`
+| always
+| `tasks.scheduled.execution`
+
+| `process.runtime.memory.used`
+| gauge, bytes
+| 
+| always
+| `jvm.memory.used`
+
+| `process.runtime.memory.committed`
+| gauge, bytes
+| 
+| always
+| `jvm.memory.committed`
+
+| `process.runtime.memory.limit`
+| gauge, bytes
+| 
+| JVM
+| `jvm.memory.max`
+
+| `process.uptime`
+| gauge, seconds
+| 
+| always
+| `process.uptime`
+
+| `jvm.thread.count`
+| gauge
+| 
+| JVM
+| `jvm.threads.live`
+
+| `jvm.class.count`
+| gauge
+| 
+| JVM
+| `jvm.classes.loaded`
+
+| `jvm.cpu.count`
+| gauge
+| 
+| JVM
+| `system.cpu.count`
+
+| `cn1.jvm.gc.collections`
+| gauge, cumulative
+| 
+| JVM
+| `jvm.gc.pause` (count)
+
+| `cn1.jvm.gc.time`
+| gauge, cumulative, ms
+| 
+| JVM
+| `jvm.gc.pause` (total)
 |===
 
 The route attribute is the template -- `GET /notes/{id}` is recorded as
 `/notes/{id}` -- so a server's metric count doesn't grow with the ids its clients
 ask for. A request that fails, whether in a handler or in the session store, is
 recorded with status 500.
+
+`GET /manage/schema` returns this table for the running server as JSON: its
+runtime (`jvm` or `native`) and, for each metric, its kind, unit, attributes,
+temporality, Micrometer name and whether this server measures it.
+
+==== Unavailable is not zero
+
+A metric a server can't measure isn't reported as `0`. Its instrument isn't registered, or reads
+no value, so it's absent from the JSON view, the Prometheus scrape and the OTLP
+export, and `/manage/schema` lists it with `"available": false` and the reason.
+On a packaged server that means the JVM-only rows above; on a server with no
+database it means the pool rows. A gauge whose source can't be read at collection
+time is likewise left out rather than written as zero. An alert on "thread count is
+0" therefore never fires on a native server by accident: query the series' absence
+instead, or read the schema.
+
+The schema also lists, under `unmeasured`, the Micrometer meters a Spring Boot
+dashboard commonly reads that neither runtime reports, each with its reason:
+`jvm.gc.pause` as a per-pause histogram, `jvm.gc.memory.allocated` and
+`jvm.gc.memory.promoted`, per-pool `jvm.memory.used`, `jvm.buffer.memory.used`,
+`jvm.threads.states`, `process.cpu.usage`, `system.cpu.usage`,
+`system.load.average.1m`, `process.files.open`, `hikaricp.connections.usage`,
+`hikaricp.connections.acquire` and `logback.events`.
+
+==== Moving a Spring Boot dashboard
+
+The Micrometer column says which series to switch to. In Prometheus form a name's
+dots become underscores, so a panel on `hikaricp_connections_active` reads
+`db_client_connection_count - db_client_connection_idle`, one on
+`http_server_requests_seconds_count` reads `http_server_request_duration_count`,
+and `tomcat_connections_current_connections` becomes
+`http_server_open_connections`. Two differences to adjust for:
+
+* **Units.** Durations are milliseconds, not seconds, so a latency threshold of
+  `0.5` becomes `500`, and histogram buckets are in milliseconds.
+* **Attribute names.** Requests carry the OpenTelemetry attributes
+  `http.route`, `http.request.method` and `http.response.status_code` rather than
+  Micrometer's `uri`, `method` and `status`.
+
+`vm/backend/dashboards/backend-overview.json` in the Codename One repository is a
+Grafana dashboard written against the schema: request rate, latency percentiles,
+errors, connections, the database pool, executors, scheduled jobs, memory and
+uptime. Import it and pick the Prometheus data source that scrapes
+`/manage/prometheus`. It uses only metrics every runtime measures, so its panels
+are filled on the JVM and on a packaged server alike.
 
 ==== Managed beans
 
@@ -262,6 +427,9 @@ load balancer and for an operator:
 
 ----
 GET  /manage/health        public; 503 while starting or draining
+GET  /manage/health/liveness   public; 200 while the process serves at all
+GET  /manage/health/readiness  public; 503 while starting or draining
+GET  /manage/schema        the metric schema, as JSON
 GET  /manage/metrics       every metric, as JSON
 GET  /manage/prometheus    every metric, in the Prometheus text format
 GET  /manage/jobs          the scheduled jobs and their last runs
@@ -291,7 +459,9 @@ still fail to start.
   links the endpoints into a packaged server.
 
 | `cn1.management.token`
-| The bearer token every endpoint but health requires. Outside a development
+| The bearer token every endpoint but health and the probes requires, sent as
+  `Authorization: Bearer <token>`. A missing or wrong token is answered with 401, and an operation on a server
+  that has no token set with 403. Outside a development
   profile the server refuses to start with the endpoints on and no token, since
   the metrics and managed beans would be readable by anyone who can reach the
   port.
@@ -321,6 +491,23 @@ to turn on, and the error says that the key belongs in the module's
 On a development profile without a token, the read-only views are open to anyone
 who can reach the port, which is a laptop. An operation needs the token on every
 profile, because it changes the running server.
+
+==== Probes and draining
+
+The two probes follow the split Kubernetes and Spring Boot's
+`/actuator/health/liveness` and `/actuator/health/readiness` make. Liveness says
+the process is running and answering, and stays 200 while it starts and drains;
+point a liveness probe at it, so a slow start or a drain never gets the container
+restarted. Readiness is 503 until start-up finishes and again from the moment the
+server begins to stop; point a readiness probe or a load balancer health check at
+it. `/manage/health` answers as readiness does, with the state in the body.
+
+When the server is told to stop (SIGTERM, or the platform's equivalent), it turns
+readiness to 503, stops accepting new connections, lets the requests in flight
+finish within `cn1.server.shutdownTimeoutMillis`, runs the exporters' last export,
+and exits. Give the platform's termination grace period a few seconds more than
+that timeout. The probes need no token on any profile, since a load balancer has
+none to send.
 
 Health answers 503 while the server drains, so a load balancer stops sending it
 new requests before it stops accepting them. The Prometheus view turns each name

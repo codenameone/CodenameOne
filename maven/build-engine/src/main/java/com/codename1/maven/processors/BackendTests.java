@@ -114,7 +114,7 @@ public final class BackendTests {
             throw new BuildExecutionException("Could not scan the compiled classes: "
                     + err.getMessage(), err);
         }
-        if (!compiled && !mentions(tests, BackendTestGenerator.BACKEND_TEST)) {
+        if (!compiled && !mentionsAny(tests, BackendTestGenerator.TEST_ANNOTATIONS)) {
             return 0;
         }
         Map<String, AnnotatedClass> index = new LinkedHashMap<String, AnnotatedClass>(main);
@@ -138,6 +138,15 @@ public final class BackendTests {
             throw new BuildFailureException(sb.toString());
         }
         return count;
+    }
+
+    private static boolean mentionsAny(Map<String, AnnotatedClass> classes, String[] descriptors) {
+        for (String d : descriptors) {
+            if (mentions(classes, d)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean mentions(Map<String, AnnotatedClass> classes, String descriptor) {
