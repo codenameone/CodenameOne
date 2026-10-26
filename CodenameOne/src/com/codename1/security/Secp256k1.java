@@ -1045,14 +1045,6 @@ public final class Secp256k1 {
         return acc == 0;
     }
 
-    private static boolean equal(int[] a, int[] b) {
-        int acc = 0;
-        for (int i = 0; i < LIMBS; i++) {
-            acc |= a[i] ^ b[i];
-        }
-        return acc == 0;
-    }
-
     // 0 < v < n
     private static boolean isValidScalar(int[] v) {
         return !isZero(v) && lessThan(v, FN.m);

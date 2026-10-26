@@ -56,6 +56,27 @@ public class CryptoEngine {
         installed = engine == null ? PORTABLE : engine;
     }
 
+    /// Fills `out` with bytes from the platform's CSPRNG, answering `false` when this engine
+    /// has no source. Every installed engine has one: the client's draws on the port, the
+    /// backend's on the server runtime.
+    public boolean randomBytes(byte[] out) {
+        return false;
+    }
+
+    /// Fresh secure random bytes from the installed engine. Shared code, which cannot reach
+    /// the client's [SecureRandom], draws its nonces and entropy here.
+    ///
+    /// #### Throws
+    ///
+    /// - `CryptoException`: when no engine with a random source is installed
+    public static byte[] random(int length) {
+        byte[] out = new byte[length];
+        if (!installed.randomBytes(out)) {
+            throw new CryptoException("no secure random source is installed");
+        }
+        return out;
+    }
+
     /// PBKDF2 (RFC 8018) with HMAC over `hashAlgorithm` ([Hash#SHA256] or
     /// [Hash#SHA512]), or `null` to use the Java derivation. The arguments
     /// are already validated.

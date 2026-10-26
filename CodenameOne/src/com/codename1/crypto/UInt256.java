@@ -360,7 +360,7 @@ public final class UInt256 implements Comparable<UInt256> {
     public byte[] toBytes32() {
         byte[] out = new byte[32];
         for (int iter = 0; iter < 32; iter++) {
-            out[31 - iter] = (byte) (limbs[iter >> 2] >>> ((iter & 3) * 8));
+            out[31 - iter] = (byte) ((limbs[iter >> 2] >> ((iter & 3) * 8)) & 0xff);
         }
         return out;
     }

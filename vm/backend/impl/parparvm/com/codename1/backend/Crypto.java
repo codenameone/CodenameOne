@@ -66,6 +66,16 @@ public final class Crypto {
 
     private static final class ServerEngine extends com.codename1.security.CryptoEngine {
         @Override
+        public boolean randomBytes(byte[] out) {
+            byte[] r = randomBytesImpl(out.length);
+            if (r == null) {
+                return false;
+            }
+            System.arraycopy(r, 0, out, 0, out.length);
+            return true;
+        }
+
+        @Override
         public byte[] pbkdf2(String hashAlgorithm, byte[] password, byte[] salt, int iterations, int length) {
             try {
                 return Crypto.pbkdf2(hashAlgorithm, password, salt, iterations, length);

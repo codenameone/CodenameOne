@@ -22,6 +22,7 @@ on:
       - master
     paths:
       - 'CodenameOne/src/com/codename1/security/**'
+      - 'CodenameOne/src/com/codename1/crypto/**'
       - 'vm/ByteCodeTranslator/src/cn1_crypto_kernels*'
       - 'scripts/crypto-bench/**'
       - 'scripts/crypto-kernels/**'
@@ -31,6 +32,7 @@ on:
       - master
     paths:
       - 'CodenameOne/src/com/codename1/security/**'
+      - 'CodenameOne/src/com/codename1/crypto/**'
       - 'vm/ByteCodeTranslator/src/cn1_crypto_kernels*'
       - 'scripts/crypto-bench/**'
       - 'scripts/crypto-kernels/**'

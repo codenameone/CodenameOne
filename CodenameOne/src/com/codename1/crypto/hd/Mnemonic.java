@@ -24,7 +24,6 @@ package com.codename1.crypto.hd;
 
 import com.codename1.security.Hash;
 import com.codename1.security.Pbkdf2;
-import com.codename1.security.SecureRandom;
 
 /// BIP-39 mnemonic sentences: the 12 to 24 English words a wallet shows as its backup, and
 /// the 64-byte seed [Bip32] and [Slip10] derive every key from.
@@ -44,7 +43,7 @@ public final class Mnemonic {
     private Mnemonic() {
     }
 
-    /// A new mnemonic over fresh entropy from [SecureRandom].
+    /// A new mnemonic over fresh entropy from the platform CSPRNG.
     ///
     /// #### Parameters
     ///
@@ -53,7 +52,7 @@ public final class Mnemonic {
         if (strengthBits < 128 || strengthBits > 256 || strengthBits % 32 != 0) {
             throw new IllegalArgumentException("strength is 128 to 256 bits, a multiple of 32");
         }
-        byte[] entropy = SecureRandom.bytes(strengthBits / 8);
+        byte[] entropy = com.codename1.security.CryptoEngine.random(strengthBits / 8);
         try {
             return fromEntropy(entropy);
         } finally {

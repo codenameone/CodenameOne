@@ -190,10 +190,6 @@ final class Ed25519Math {
         long f7 = f[7];
         long f8 = f[8];
         long f9 = f[9];
-        long f1_19 = 19 * f1;
-        long f2_19 = 19 * f2;
-        long f3_19 = 19 * f3;
-        long f4_19 = 19 * f4;
         long f5_19 = 19 * f5;
         long f6_19 = 19 * f6;
         long f7_19 = 19 * f7;

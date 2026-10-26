@@ -40,6 +40,12 @@ public class PortCryptoEngine extends CryptoEngine {
     }
 
     @Override
+    public boolean randomBytes(byte[] out) {
+        SecureRandom.fill(out);
+        return true;
+    }
+
+    @Override
     public byte[] pbkdf2(String hashAlgorithm, byte[] password, byte[] salt, int iterations, int length) {
         return impl.pbkdf2(hashAlgorithm, password, salt, iterations, length);
     }

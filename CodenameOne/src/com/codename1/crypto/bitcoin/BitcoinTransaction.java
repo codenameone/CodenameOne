@@ -26,7 +26,6 @@ import com.codename1.crypto.encoding.Hex;
 import com.codename1.security.Hash;
 import com.codename1.security.Schnorr;
 import com.codename1.security.Secp256k1;
-import com.codename1.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -579,7 +578,7 @@ public final class BitcoinTransaction {
             int sighashType) {
         byte[] tweaked = Taproot.tweakPrivateKey(privateKey, merkleRoot);
         try {
-            byte[] sig = Schnorr.sign(taprootSighash(index, spent, sighashType), tweaked, SecureRandom.bytes(32));
+            byte[] sig = Schnorr.sign(taprootSighash(index, spent, sighashType), tweaked, com.codename1.security.CryptoEngine.random(32));
             if (sighashType != SIGHASH_DEFAULT) {
                 byte[] withType = new byte[65];
                 System.arraycopy(sig, 0, withType, 0, 64);

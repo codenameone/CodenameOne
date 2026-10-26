@@ -26,26 +26,26 @@ package com.codename1.crypto.hd;
 /// server and the device read it without a resource lookup.
 @com.codename1.impl.SharedWithBackend
 final class Bip39English {
-    private static String[] words;
 
     private Bip39English() {
     }
 
     static String[] words() {
-        if (words == null) {
-            String[] out = new String[2048];
-            int n = 0;
-            int start = 0;
-            int len = ALL.length();
-            for (int iter = 0; iter <= len; iter++) {
-                if (iter == len || ALL.charAt(iter) == ' ') {
-                    out[n++] = ALL.substring(start, iter);
-                    start = iter + 1;
-                }
+        return WORDS;
+    }
+
+    private static String[] split() {
+        String[] out = new String[2048];
+        int n = 0;
+        int start = 0;
+        int len = ALL.length();
+        for (int iter = 0; iter <= len; iter++) {
+            if (iter == len || ALL.charAt(iter) == ' ') {
+                out[n++] = ALL.substring(start, iter);
+                start = iter + 1;
             }
-            words = out;
         }
-        return words;
+        return out;
     }
 
     private static final String ALL =
@@ -200,4 +200,7 @@ final class Bip39English {
             + "wife wild will win window wine wing wink winner winter wire wisdom wise wish witness wolf "
             + "woman wonder wood wool word work world worry worth wrap wreck wrestle wrist write wrong "
             + "yard year yellow you young youth zebra zero zone zoo";
+
+    // After ALL, so the split sees it assigned.
+    private static final String[] WORDS = split();
 }

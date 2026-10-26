@@ -29,7 +29,6 @@ import com.codename1.crypto.hd.Mnemonic;
 import com.codename1.crypto.hd.Slip10;
 import com.codename1.security.Ed25519;
 import com.codename1.security.Schnorr;
-import com.codename1.security.SecureRandom;
 import com.codename1.security.Secp256k1;
 
 /// A [Signer] over a BIP-39 seed held in memory. Each key is derived when it is needed and
@@ -131,7 +130,7 @@ public final class SeedSigner implements Signer {
         byte[] tweaked = null;
         try {
             tweaked = Taproot.tweakPrivateKey(priv, merkleRoot);
-            return Schnorr.sign(sighash, tweaked, SecureRandom.bytes(32));
+            return Schnorr.sign(sighash, tweaked, com.codename1.security.CryptoEngine.random(32));
         } finally {
             wipe(priv);
             wipe(tweaked);

@@ -52,6 +52,11 @@ public class NativeCryptoEngine extends CryptoEngine {
     }
 
     @Override
+    public boolean randomBytes(byte[] out) {
+        return next.randomBytes(out);
+    }
+
+    @Override
     public byte[] pbkdf2(String hashAlgorithm, byte[] password, byte[] salt, int iterations, int length) {
         return next.pbkdf2(hashAlgorithm, password, salt, iterations, length);
     }

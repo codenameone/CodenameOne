@@ -23,6 +23,7 @@
 package com.codename1.crypto.solana;
 
 /// Solana's wire helpers: the compact-u16 length prefix ("short vec") and a growable buffer.
+@com.codename1.impl.SharedWithBackend
 final class ShortVec {
     private byte[] buf = new byte[128];
     private int len;

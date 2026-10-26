@@ -93,7 +93,7 @@ public abstract class BitcoinKey {
             byte[] tweaked = Taproot.tweakPrivateKey(key, merkleRoot);
             try {
                 return com.codename1.security.Schnorr.sign(sighash, tweaked,
-                        com.codename1.security.SecureRandom.bytes(32));
+                        com.codename1.security.CryptoEngine.random(32));
             } finally {
                 Wif.wipe(tweaked);
             }
