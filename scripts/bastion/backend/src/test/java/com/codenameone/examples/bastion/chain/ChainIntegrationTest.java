@@ -101,7 +101,7 @@ class ChainIntegrationTest {
         until("the float arrives", () -> balanceQuietly(chain.hotWallet()) > before);
 
         // A withdrawal of 0.4 ETH to an outside address, past its cooling-off.
-        String outside = "0x" + Hex32.encode(new byte[] {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+        String outside = "0x" + com.codename1.crypto.encoding.Hex.encode(new byte[] {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
                 13, 14, 15, 16, 17, 18, 19, 20});
         CryptoAddress to = new CryptoAddress();
         to.setId("chaintest-address");
@@ -222,7 +222,7 @@ class ChainIntegrationTest {
     }
 
     private static long balance(String address) throws Exception {
-        return Wei.toGwei(Wei.parseQuantity((String) rpc("eth_getBalance", address, "latest")));
+        return Chain.gwei(com.codename1.crypto.UInt256.parse((String) rpc("eth_getBalance", address, "latest")));
     }
 
     private static Object rpc(String method, Object... params) throws Exception {

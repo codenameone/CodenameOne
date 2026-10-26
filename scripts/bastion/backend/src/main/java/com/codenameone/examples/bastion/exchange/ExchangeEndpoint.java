@@ -36,7 +36,7 @@ import com.codenameone.examples.bastion.api.TickerDto;
 import com.codenameone.examples.bastion.api.TradeDto;
 import com.codenameone.examples.bastion.audit.Audit;
 import com.codenameone.examples.bastion.chain.Chain;
-import com.codenameone.examples.bastion.chain.EthAddress;
+import com.codename1.crypto.evm.EvmAddress;
 import com.codenameone.examples.bastion.domain.ChainTransfer;
 import com.codenameone.examples.bastion.api.ChainTransferDto;
 import com.codenameone.examples.bastion.api.DepositAddressDto;
@@ -301,7 +301,7 @@ public class ExchangeEndpoint implements ExchangeApiServer {
             return new DepositAddressDto(false, asset, "", "", 0, 0);
         }
         String address = chain.depositAddress(owner).getAddress();
-        return new DepositAddressDto(true, asset, EthAddress.checksum(address), chain.network(),
+        return new DepositAddressDto(true, asset, EvmAddress.parse(address).toChecksumString(), chain.network(),
                 chain.chainId(), chain.confirmations());
     }
 

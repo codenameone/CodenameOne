@@ -18,18 +18,18 @@
  */
 package com.codenameone.examples.bastion.chain;
 
-import com.codename1.backend.Json;
-import com.codename1.backend.Web;
+import com.codename1.backend.WebRpcTransport;
+import com.codename1.crypto.UInt256;
+import com.codename1.crypto.encoding.Hex;
+import com.codename1.crypto.rpc.EvmRpc;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
 
-/// A JSON-RPC client for an Ethereum node: the handful of calls a custodian
-/// needs, nothing that would let the node hold a key.
+/// The framework's [EvmRpc] over the backend's web client, with the two rules
+/// a custodian adds.
 ///
 /// Every signature is made here, in the bank, and the node only ever sees
 /// finished raw transactions (`eth_sendRawTransaction`). Never point this at
@@ -37,100 +37,45 @@ import java.util.concurrent.atomic.AtomicInteger;
 /// `personal_*`: the node is a public, untrusted relay. Its answers are
 /// untrusted too -- the watchers cross-check what matters (a receipt's block
 /// hash against the canonical block at that height, a transaction's `to` and
-/// `value` against what was signed).
-public class EthRpc {
-    private final String url;
-    private final AtomicInteger nextId = new AtomicInteger(1);
-
+/// `value` against what was signed). A node's refusal arrives as a
+/// [com.codename1.crypto.rpc.RpcException].
+public class EthRpc extends EvmRpc {
     public EthRpc(String url) {
+        super(new WebRpcTransport(), checked(url));
+    }
+
+    private static String checked(String url) {
         if (!url.startsWith("https://") && !url.startsWith("http://127.0.0.1")
                 && !url.startsWith("http://localhost")) {
             // A node answer decides when deposits are credited: plain HTTP to
             // anything but this machine lets the network forge them.
             throw new IllegalArgumentException("the node must be reached over HTTPS");
         }
-        this.url = url;
-    }
-
-    public long chainId() throws IOException {
-        return Wei.parseLong((String) call("eth_chainId"));
-    }
-
-    public long blockNumber() throws IOException {
-        return Wei.parseLong((String) call("eth_blockNumber"));
-    }
-
-    /// The next nonce for `address`, counting transactions still pending.
-    public long pendingNonce(String address) throws IOException {
-        return Wei.parseLong((String) call("eth_getTransactionCount", address, "pending"));
-    }
-
-    public byte[] balance(String address) throws IOException {
-        return Wei.parseQuantity((String) call("eth_getBalance", address, "latest"));
+        return url;
     }
 
     /// The block at `number` with full transactions, or null past the head.
     @SuppressWarnings("unchecked")
     public Map<String, Object> block(long number) throws IOException {
-        return (Map<String, Object>) call("eth_getBlockByNumber", Wei.quantity(number), Boolean.TRUE);
+        return (Map<String, Object>) call("eth_getBlockByNumber", UInt256.valueOf(number).toQuantity(),
+                Boolean.TRUE);
     }
 
     /// The receipt of `txHash`, or null while it is not mined.
     @SuppressWarnings("unchecked")
     public Map<String, Object> receipt(String txHash) throws IOException {
-        return (Map<String, Object>) call("eth_getTransactionReceipt", txHash);
+        return (Map<String, Object>) getTransactionReceipt(txHash);
     }
 
     /// The base fee of the next block, in wei.
-    @SuppressWarnings("unchecked")
-    public byte[] nextBaseFee() throws IOException {
-        Map<String, Object> history = (Map<String, Object>) call("eth_feeHistory", "0x1", "latest",
-                new ArrayList<Object>());
-        List<Object> fees = (List<Object>) history.get("baseFeePerGas");
-        return Wei.parseQuantity((String) fees.get(fees.size() - 1));
+    public UInt256 nextBaseFee() throws IOException {
+        Map<?, ?> history = feeHistory(1, "latest", null);
+        List<?> fees = (List<?>) history.get("baseFeePerGas");
+        return UInt256.parse((String) fees.get(fees.size() - 1));
     }
 
-    /// The node's suggested priority fee, in wei.
-    public byte[] priorityFee() throws IOException {
-        return Wei.parseQuantity((String) call("eth_maxPriorityFeePerGas"));
-    }
-
-    /// Broadcasts a signed transaction and answers its hash.
+    /// Broadcasts signed bytes and answers their hash.
     public String sendRaw(byte[] raw) throws IOException {
-        return (String) call("eth_sendRawTransaction", "0x" + Hex32.encode(raw));
-    }
-
-    private Object call(String method, Object... params) throws IOException {
-        Map<String, Object> request = new HashMap<String, Object>();
-        request.put("jsonrpc", "2.0");
-        request.put("method", method);
-        List<Object> list = new ArrayList<Object>();
-        for (Object p : params) {
-            list.add(p);
-        }
-        request.put("params", list);
-        int id = nextId.getAndIncrement();
-        request.put("id", Integer.valueOf(id));
-        Web.Result result = Web.postJson(url, Json.write(request), null);
-        if (!result.isSuccess()) {
-            throw new IOException(method + ": the node answered HTTP " + result.getStatus());
-        }
-        Map answer = Json.parseObject(result.getBodyAsString());
-        Object error = answer.get("error");
-        if (error instanceof Map) {
-            Object message = ((Map) error).get("message");
-            throw new NodeException(method, message == null ? "error" : String.valueOf(message));
-        }
-        return answer.get("result");
-    }
-
-    /// The node refused a call; for `eth_sendRawTransaction` its message says
-    /// why (nonce too low, underpriced, insufficient funds).
-    public static class NodeException extends IOException {
-        private static final long serialVersionUID = 1L;
-
-        public NodeException(String method, String message) {
-            super(method + ": " + message);
-        }
+        return (String) call("eth_sendRawTransaction", "0x" + Hex.encode(raw));
     }
 }

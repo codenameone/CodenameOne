@@ -20,6 +20,11 @@ package com.codenameone.examples.bastion.chain;
 
 import java.time.Instant;
 import com.codename1.backend.annotations.Component;
+import com.codename1.crypto.UInt256;
+import com.codename1.crypto.encoding.Hex;
+import com.codename1.crypto.evm.EvmAddress;
+import com.codename1.crypto.evm.EvmTransaction;
+import com.codename1.crypto.rpc.RpcException;
 import com.codename1.backend.annotations.PostConstruct;
 import com.codename1.backend.annotations.Scheduled;
 import com.codename1.backend.annotations.Transactional;
@@ -170,7 +175,7 @@ public class Chain {
             throw new IllegalStateException("the node is on chain " + actual
                     + ", bastion.chain.id says " + expectedChainId);
         }
-        signer = new SeedSigner(Hex32.decode(seedHex));
+        signer = new SeedSigner(Hex.decode(seedHex));
         // The cursor exists before the first address is handed out. Made
         // lazily by the first scan instead, it would start at the head of
         // that moment, and a deposit sent between the address being shown
@@ -235,8 +240,8 @@ public class Chain {
                 owed += a.getBalance();
             }
         }
-        return new CustodyDto(true, ASSET, expectedChainId, EthAddress.checksum(signer.hotAddress()),
-                Wei.toGwei(rpc.balance(signer.hotAddress())), custody(), owed, transit);
+        return new CustodyDto(true, ASSET, expectedChainId, EvmAddress.parse(signer.hotAddress()).toChecksumString(),
+                gwei(rpc.getBalance(EvmAddress.parse(signer.hotAddress()))), custody(), owed, transit);
     }
 
     // ------------------------------------------------------------- deposits
@@ -299,15 +304,16 @@ public class Chain {
             for (Object o : (List<Object>) block.get("transactions")) {
                 Map<String, Object> tx = (Map<String, Object>) o;
                 String to = (String) tx.get("to");
-                if (to == null) {
+                if (to == null || !EvmAddress.isValid(to)) {
                     continue;
                 }
-                DepositAddress d = depositAt(to.toLowerCase());
+                // Canonical form through EvmAddress, not toLowerCase(): the fold is
+                // locale sensitive and a node-supplied value is protocol text.
+                DepositAddress d = depositAt(EvmAddress.parse(to).toLowerCaseString());
                 if (d == null) {
                     continue;
                 }
-                byte[] value = Wei.parseQuantity((String) tx.get("value"));
-                long gwei = Wei.toGwei(value);
+                long gwei = gwei(UInt256.parse((String) tx.get("value")));
                 if (gwei <= 0) {
                     continue;
                 }
@@ -377,12 +383,12 @@ public class Chain {
         if (transfers.findById(entryId) != null) {
             return;
         }
-        if (!EthAddress.valid(to.getAddress())) {
+        if (!EvmAddress.isValid(to.getAddress())) {
             // CryptoWallets checks this when the address is added; an address
             // added while the chain was simulated may predate the check.
             throw new IllegalArgumentException("not an Ethereum address");
         }
-        ChainTransfer t = row(entryId, OUT, owner, EthAddress.normalize(to.getAddress()), gwei, QUEUED);
+        ChainTransfer t = row(entryId, OUT, owner, EvmAddress.parse(to.getAddress()).toLowerCaseString(), gwei, QUEUED);
         t.setReference(to.getId());
         transfers.insert(t);
     }
@@ -459,36 +465,35 @@ public class Chain {
         }
         String from = OUT.equals(t.getDirection()) ? signer.hotAddress() : t.getAddress();
         long nonce = nextNonce(from);
-        byte[] priority = rpc.priorityFee();
+        UInt256 priority = rpc.maxPriorityFeePerGas();
         // Twice the next base fee plus the tip: enough to survive several
         // full blocks of rising fees; unused headroom is not charged.
-        byte[] maxFee = add(Wei.mulSmall(rpc.nextBaseFee(), 2), priority);
-        byte[] value = Wei.fromGwei(t.getAmount());
-        String to = OUT.equals(t.getDirection()) ? t.getAddress() : signer.hotAddress();
-        Eip1559Tx tx;
+        UInt256 maxFee = rpc.nextBaseFee().multiply(2).add(priority);
+        UInt256 value = fromGwei(t.getAmount());
+        EvmAddress to = EvmAddress.parse(OUT.equals(t.getDirection()) ? t.getAddress() : signer.hotAddress());
+        EvmTransaction tx;
         byte[] signature;
         if (SWEEP.equals(t.getDirection())) {
             // A sweep sends everything but its own fee.
-            Eip1559Tx probe = new Eip1559Tx(expectedChainId, nonce, priority, maxFee, TRANSFER_GAS,
-                    to, value, null);
-            long feeGwei = ceilGwei(probe.maxCost());
+            long feeGwei = ceilGwei(maxFee.multiply(TRANSFER_GAS));
             long send = t.getAmount() - feeGwei;
             if (send <= 0) {
                 finish(t, FAILED, "too little to pay its own fee");
                 return;
             }
-            tx = new Eip1559Tx(expectedChainId, nonce, priority, maxFee, TRANSFER_GAS, to,
-                    Wei.fromGwei(send), null);
+            tx = EvmTransaction.eip1559(expectedChainId, nonce, priority, maxFee, TRANSFER_GAS, to,
+                    fromGwei(send), null);
             signature = signer.signWithDeposit(depositIndex(t.getAddress()), tx.signingHash());
             t.setAmount(send);
         } else {
-            tx = new Eip1559Tx(expectedChainId, nonce, priority, maxFee, TRANSFER_GAS, to, value, null);
+            tx = EvmTransaction.eip1559(expectedChainId, nonce, priority, maxFee, TRANSFER_GAS, to, value, null);
             signature = signer.signWithHot(tx.signingHash());
         }
-        byte[] raw = tx.raw(signature);
+        EvmTransaction signed = tx.withSignature(signature);
         // Saved before any broadcast, and only over the QUEUED row it was
         // made from: a second worker's signature is dropped here, unsent.
-        transfers.signed(t.getId(), QUEUED, SIGNED, nonce, Hex32.encode(raw), Eip1559Tx.hash(raw),
+        transfers.signed(t.getId(), QUEUED, SIGNED, nonce, Hex.encode(signed.encode()),
+                "0x" + Hex.encode(signed.hash()),
                 t.getAmount(), Instant.now());
     }
 
@@ -497,7 +502,7 @@ public class Chain {
     /// yet seen by the node must not have its nonce given to another.
     @Transactional(readOnly = true)
     private long nextNonce(String from) throws IOException {
-        long next = rpc.pendingNonce(from);
+        long next = rpc.getTransactionCount(EvmAddress.parse(from), "pending");
         for (String status : new String[] {SIGNED, BROADCAST}) {
             for (ChainTransfer t : transfers.findByStatusOrderByCreatedAtAsc(status)) {
                 String sender = OUT.equals(t.getDirection()) ? signer.hotAddress() : t.getAddress();
@@ -512,8 +517,8 @@ public class Chain {
     @Transactional(rollbackFor = Exception.class)
     private void broadcast(ChainTransfer t) throws IOException {
         try {
-            rpc.sendRaw(Hex32.decode(t.getRaw()));
-        } catch (EthRpc.NodeException refused) {
+            rpc.sendRaw(Hex.decode(t.getRaw()));
+        } catch (RpcException refused) {
             String m = String.valueOf(refused.getMessage());
             // The node already has it: from an earlier broadcast whose answer
             // was lost. Anything else stays SIGNED and is retried; the same
@@ -540,8 +545,8 @@ public class Chain {
             if (System.currentTimeMillis() - t.getBroadcastAt().toEpochMilli() > rebroadcastMillis) {
                 // Dropped from a node's pool: send the same bytes again.
                 try {
-                    rpc.sendRaw(Hex32.decode(t.getRaw()));
-                } catch (EthRpc.NodeException ignored) {
+                    rpc.sendRaw(Hex.decode(t.getRaw()));
+                } catch (RpcException ignored) {
                     // "already known" and "nonce too low" both mean wait.
                 }
                 t.setBroadcastAt(Instant.now());
@@ -549,7 +554,7 @@ public class Chain {
             }
             return;
         }
-        long mined = Wei.parseLong((String) receipt.get("blockNumber"));
+        long mined = UInt256.parse((String) receipt.get("blockNumber")).longValueExact();
         if (rpc.blockNumber() - mined + 1 < confirmations) {
             return;
         }
@@ -560,9 +565,9 @@ public class Chain {
             // (same nonce, same bytes) or its receipt will disappear.
             return;
         }
-        long gasUsed = Wei.parseLong((String) receipt.get("gasUsed"));
-        byte[] price = Wei.parseQuantity((String) receipt.get("effectiveGasPrice"));
-        long fee = ceilGwei(Wei.mulSmall(price, gasUsed));
+        long gasUsed = UInt256.parse((String) receipt.get("gasUsed")).longValueExact();
+        UInt256 price = UInt256.parse((String) receipt.get("effectiveGasPrice"));
+        long fee = ceilGwei(price.multiply(gasUsed));
         t.setBlockNumber(mined);
         t.setBlockHash((String) receipt.get("blockHash"));
         t.setFee(fee);
@@ -627,9 +632,9 @@ public class Chain {
         if (owed > held) {
             return "the ledger owes " + owed + " gwei and the chain holds " + held;
         }
-        long hot = Wei.toGwei(rpc.balance(signer.hotAddress()));
-        long worstFee = ceilGwei(Wei.mulSmall(Wei.mulSmall(rpc.nextBaseFee(), 2), TRANSFER_GAS))
-                + ceilGwei(Wei.mulSmall(rpc.priorityFee(), TRANSFER_GAS));
+        long hot = gwei(rpc.getBalance(EvmAddress.parse(signer.hotAddress())));
+        long worstFee = ceilGwei(rpc.nextBaseFee().multiply(2).multiply(TRANSFER_GAS))
+                + ceilGwei(rpc.maxPriorityFeePerGas().multiply(TRANSFER_GAS));
         if (hot < t.getAmount() + worstFee) {
             return "the hot wallet holds " + hot + " gwei; this needs " + (t.getAmount() + worstFee);
         }
@@ -649,7 +654,7 @@ public class Chain {
             if (sweeping(d.getAddress())) {
                 continue;
             }
-            long gwei = Wei.toGwei(rpc.balance(d.getAddress()));
+            long gwei = gwei(rpc.getBalance(EvmAddress.parse(d.getAddress())));
             if (gwei < sweepMinimumGwei) {
                 continue;
             }
@@ -686,9 +691,9 @@ public class Chain {
     /// proof an auditor can check against any block explorer.
     @Transactional(readOnly = true)
     public long custody() throws IOException {
-        long onChain = Wei.toGwei(rpc.balance(signer.hotAddress()));
+        long onChain = gwei(rpc.getBalance(EvmAddress.parse(signer.hotAddress())));
         for (DepositAddress d : deposits.findAll()) {
-            onChain += Wei.toGwei(rpc.balance(d.getAddress()));
+            onChain += gwei(rpc.getBalance(EvmAddress.parse(d.getAddress())));
         }
         return onChain;
     }
@@ -762,22 +767,20 @@ public class Chain {
         return deposits.findAll();
     }
 
-    static long ceilGwei(byte[] wei) {
-        long g = Wei.toGwei(wei);
-        return Wei.hasDust(wei) ? g + 1 : g;
+    private static final UInt256 GWEI = UInt256.valueOf(1000000000L);
+
+    /// Whole gwei in `wei`, rounded down.
+    static long gwei(UInt256 wei) {
+        return wei.divide(GWEI).longValueExact();
     }
 
-    static byte[] add(byte[] a, byte[] b) {
-        int n = Math.max(a.length, b.length) + 1;
-        byte[] out = new byte[n];
-        int carry = 0;
-        for (int iter = 0; iter < n; iter++) {
-            int x = iter < a.length ? a[a.length - 1 - iter] & 0xff : 0;
-            int y = iter < b.length ? b[b.length - 1 - iter] & 0xff : 0;
-            int sum = x + y + carry;
-            out[n - 1 - iter] = (byte) sum;
-            carry = sum >> 8;
-        }
-        return Wei.trim(out);
+    static UInt256 fromGwei(long gwei) {
+        return UInt256.valueOf(gwei).multiply(GWEI);
+    }
+
+    /// Whole gwei in `wei`, rounded up: a fee is never under-counted.
+    static long ceilGwei(UInt256 wei) {
+        long g = gwei(wei);
+        return wei.mod(GWEI).isZero() ? g : g + 1;
     }
 }

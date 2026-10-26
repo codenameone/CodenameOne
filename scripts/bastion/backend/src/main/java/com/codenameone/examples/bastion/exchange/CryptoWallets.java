@@ -92,10 +92,10 @@ public class CryptoWallets {
             // (EIP-55): a mistyped mixed-case address is refused here rather
             // than sent to an address nobody holds. Stored in the canonical
             // checksummed form so the duplicate check below compares like with like.
-            if (!com.codenameone.examples.bastion.chain.EthAddress.valid(address)) {
+            if (!com.codename1.crypto.evm.EvmAddress.isValid(address)) {
                 throw Refused.with(400, "not-address", "That is not an address");
             }
-            address = com.codenameone.examples.bastion.chain.EthAddress.normalize(address);
+            address = com.codename1.crypto.evm.EvmAddress.parse(address).toLowerCaseString();
         }
         // Behind the customer's profile row: two of these at once would each
         // count the rows before the other inserted and together pass the cap.
