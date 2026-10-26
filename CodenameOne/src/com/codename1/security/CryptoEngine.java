@@ -64,7 +64,7 @@ public class CryptoEngine {
     }
 
     /// Fresh secure random bytes from the installed engine. Shared code, which cannot reach
-    /// the client's [SecureRandom], draws its nonces and entropy here.
+    /// the client's `SecureRandom`, draws its nonces and entropy here.
     ///
     /// #### Throws
     ///

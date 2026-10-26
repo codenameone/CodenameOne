@@ -28,7 +28,7 @@ import java.io.IOException;
 /// this package are written against this interface alone, so the same [EvmRpc],
 /// [EsploraClient] and [SolanaRpc] run in an application and on the backend:
 ///
-/// - in an application, [NetworkTransport] sends through the `NetworkManager`;
+/// - in an application, `NetworkTransport` sends through the `NetworkManager`;
 /// - on the backend, `com.codename1.backend.WebRpcTransport` sends through its `WebClient`.
 ///
 /// A test passes its own implementation that answers recorded replies.
