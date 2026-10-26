@@ -90,6 +90,17 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/C
 
 A cached quote stays fresh for the first window. After that it's still returned when a refresh fails, until the second window ends. That keeps a balance screen useful through a brief outage without showing a price that's hours old.
 
+=== Verifying many signatures at once
+
+A backend that scans a block for deposits, or an indexer that checks every transaction it stores, verifies thousands of signatures at a time. `CryptoBatch` takes them as arrays and answers one `boolean` per entry:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/CryptoWalletSnippets.java[tag=crypto-batch,indent=0]
+----
+
+With native kernels the whole batch crosses into native code once and runs on every CPU core, which makes it several times faster than the same calls in a loop. `verifySchnorr`, `verifyEd25519`, `sha256` and `keccak256` work the same way. Every entry gets exactly the answer a single call would give, and a malformed entry, such as a key that doesn't parse, is invalid rather than an exception, so one bad entry never stops the rest.
+
 === Where the keys live
 
 Whoever holds the recovery phrase holds the funds. Decide where it lives before you write the first screen.

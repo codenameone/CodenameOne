@@ -32,3 +32,11 @@ python3 scripts/crypto-kernels/amalgamate.py "$TMPDIR/secp256k1" "$TMPDIR/ed2551
 
 The script records both commits in the header of the generated file. Never edit the
 amalgamation by hand.
+
+## Batches
+
+`NativeCryptoKernels.batch` verifies or hashes a whole `CryptoBatch` in one call and cuts it
+into contiguous chunks, one per core: `dispatch_apply_f` on Apple, pthreads on Linux and
+Android, Win32 threads on Windows. A batch too small to pay for a thread runs inline. Each
+entry gets the single-call answer; the Ed25519 batch equation is deliberately not used, since it
+can accept a signature with a small-order component that the single verify rejects.

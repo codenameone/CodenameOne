@@ -1490,3 +1490,225 @@ JAVA_VOID com_codename1_security_NativeCryptoKernels_pbkdf2___int_byte_1ARRAY_by
     }
 #endif
 }
+
+/* ------------------------------------------------------------------ batches, across the cores
+ *
+ * One call verifies or hashes a whole batch. The items are independent, so the batch is cut into
+ * contiguous chunks and the chunks run on every core: libdispatch on Apple, threads elsewhere.
+ * Every item gets exactly the single-item answer -- in particular there is no Ed25519 batch
+ * equation, which can accept a signature with a small-order component that a single verify
+ * refuses. The worker threads touch only the flat buffers they are handed, never the VM.
+ */
+#ifdef CN1_CRYPTO_KERNELS
+#if defined(__APPLE__)
+#  include <dispatch/dispatch.h>
+#  include <sys/sysctl.h>
+#elif defined(_WIN32)
+#  ifndef WIN32_LEAN_AND_MEAN
+#    define WIN32_LEAN_AND_MEAN
+#  endif
+#  include <windows.h>
+#else
+#  include <pthread.h>
+#  include <unistd.h>
+#endif
+
+#define CN1K_BATCH_ECDSA 1
+#define CN1K_BATCH_SCHNORR 2
+#define CN1K_BATCH_ED25519 3
+#define CN1K_BATCH_SHA256 11
+#define CN1K_BATCH_KECCAK256 12
+#define CN1K_BATCH_TODO 2   /* a result byte the Java side left for the kernels */
+#define CN1K_MAX_CHUNKS 64
+
+typedef struct {
+    int alg;
+    const unsigned char *msgs;
+    const JAVA_INT *msgOff;
+    const unsigned char *sigs;
+    const unsigned char *keys;
+    const JAVA_INT *keyOff;
+    unsigned char *results;
+    size_t count;
+    size_t chunks;
+} cn1k_batch;
+
+static void cn1k_batch_item(const cn1k_batch *b, size_t i) {
+    const unsigned char *m = b->msgs + b->msgOff[i];
+    size_t mlen = (size_t) (b->msgOff[i + 1] - b->msgOff[i]);
+    const secp256k1_context *ctx = secp256k1_context_static;
+    switch (b->alg) {
+        case CN1K_BATCH_ECDSA: {
+            secp256k1_pubkey pk;
+            secp256k1_ecdsa_signature sig;
+            if (b->results[i] != CN1K_BATCH_TODO) {
+                return;
+            }
+            if (!secp256k1_ec_pubkey_parse(ctx, &pk, b->keys + b->keyOff[i],
+                                           (size_t) (b->keyOff[i + 1] - b->keyOff[i]))) {
+                b->results[i] = 0xff;
+            } else if (!secp256k1_ecdsa_signature_parse_compact(ctx, &sig, b->sigs + 64 * i)) {
+                b->results[i] = 0;
+            } else {
+                b->results[i] = secp256k1_ecdsa_verify(ctx, &sig, m, &pk) ? 1 : 0;
+            }
+            return;
+        }
+        case CN1K_BATCH_SCHNORR: {
+            secp256k1_xonly_pubkey xpk;
+            if (b->results[i] != CN1K_BATCH_TODO) {
+                return;
+            }
+            b->results[i] = secp256k1_xonly_pubkey_parse(ctx, &xpk, b->keys + 32 * i)
+                    && secp256k1_schnorrsig_verify(ctx, b->sigs + 64 * i, m, mlen, &xpk) ? 1 : 0;
+            return;
+        }
+        case CN1K_BATCH_ED25519:
+            if (b->results[i] != CN1K_BATCH_TODO) {
+                return;
+            }
+            b->results[i] = ed25519_sign_open_cn1(m, mlen, b->keys + 32 * i, b->sigs + 64 * i) == 0 ? 1 : 0;
+            return;
+        case CN1K_BATCH_SHA256:
+            cn1k_sha256(m, mlen, b->results + 32 * i);
+            return;
+        default:
+            cn1k_keccak256(m, mlen, b->results + 32 * i);
+            return;
+    }
+}
+
+static void cn1k_batch_chunk(void *arg, size_t c) {
+    const cn1k_batch *b = (const cn1k_batch*) arg;
+    size_t from = c * b->count / b->chunks, to = (c + 1) * b->count / b->chunks, i;
+    for (i = from; i < to; i++) {
+        cn1k_batch_item(b, i);
+    }
+}
+
+static size_t cn1k_cores(void) {
+    long n;
+#if defined(__APPLE__)
+    int v = 0;
+    size_t sz = sizeof(v);
+    n = sysctlbyname("hw.activecpu", &v, &sz, NULL, 0) == 0 ? v : 1;
+#elif defined(_WIN32)
+    SYSTEM_INFO si;
+    GetSystemInfo(&si);
+    n = (long) si.dwNumberOfProcessors;
+#else
+    n = sysconf(_SC_NPROCESSORS_ONLN);
+#endif
+    return n < 1 ? 1 : (size_t) n;
+}
+
+#if !defined(__APPLE__)
+typedef struct {
+    cn1k_batch *b;
+    size_t c;
+} cn1k_batch_arg;
+
+#  if defined(_WIN32)
+static DWORD WINAPI cn1k_batch_thread(LPVOID p) {
+    cn1k_batch_chunk(((cn1k_batch_arg*) p)->b, ((cn1k_batch_arg*) p)->c);
+    return 0;
+}
+#  else
+static void *cn1k_batch_thread(void *p) {
+    cn1k_batch_chunk(((cn1k_batch_arg*) p)->b, ((cn1k_batch_arg*) p)->c);
+    return NULL;
+}
+#  endif
+#endif
+
+/* `work` is a rough cost of the whole batch in hash blocks; below a few hundred a thread costs more
+ * than it saves. */
+static void cn1k_batch_run(cn1k_batch *b, size_t work) {
+    size_t chunks = cn1k_cores();
+    if (chunks > b->count) {
+        chunks = b->count;
+    }
+    if (work < 512) {
+        chunks = 1;
+    }
+    if (chunks > CN1K_MAX_CHUNKS) {
+        chunks = CN1K_MAX_CHUNKS;
+    }
+    b->chunks = chunks < 1 ? 1 : chunks;
+    if (b->chunks == 1) {
+        cn1k_batch_chunk(b, 0);
+        return;
+    }
+#if defined(__APPLE__)
+    dispatch_apply_f(b->chunks, dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), b, cn1k_batch_chunk);
+#else
+    {
+        cn1k_batch_arg args[CN1K_MAX_CHUNKS];
+#  if defined(_WIN32)
+        HANDLE threads[CN1K_MAX_CHUNKS];
+#  else
+        pthread_t threads[CN1K_MAX_CHUNKS];
+#  endif
+        int started[CN1K_MAX_CHUNKS];
+        size_t c;
+        for (c = 1; c < b->chunks; c++) {
+            args[c].b = b;
+            args[c].c = c;
+#  if defined(_WIN32)
+            threads[c] = CreateThread(NULL, 0, cn1k_batch_thread, &args[c], 0, NULL);
+            started[c] = threads[c] != NULL;
+#  else
+            started[c] = pthread_create(&threads[c], NULL, cn1k_batch_thread, &args[c]) == 0;
+#  endif
+            if (!started[c]) {
+                cn1k_batch_chunk(b, c);
+            }
+        }
+        cn1k_batch_chunk(b, 0);
+        for (c = 1; c < b->chunks; c++) {
+            if (started[c]) {
+#  if defined(_WIN32)
+                WaitForSingleObject(threads[c], INFINITE);
+                CloseHandle(threads[c]);
+#  else
+                pthread_join(threads[c], NULL);
+#  endif
+            }
+        }
+    }
+#endif
+}
+#endif
+
+#define CN1K_INTS(a) ((const JAVA_INT*) CN1_ARRAY_DATA(a))
+
+/*
+ * Verifies or hashes `count` items. Messages are the slices msgOff[i]..msgOff[i+1] of msgs.
+ * Signatures are 64 bytes each; keys are keyOff slices (ECDSA) or 32 bytes each, and both are null
+ * for a hash batch. A verify writes 1, 0 or 0xff ("decide in Java") over each result byte that
+ * holds 2 and leaves the others alone; a hash writes 32 bytes per item. NativeCryptoEngine has
+ * checked every offset and length.
+ */
+JAVA_VOID com_codename1_security_NativeCryptoKernels_batch___int_byte_1ARRAY_int_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_1ARRAY_byte_1ARRAY_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_INT alg, JAVA_OBJECT msgs, JAVA_OBJECT msgOff, JAVA_OBJECT sigs,
+        JAVA_OBJECT keys, JAVA_OBJECT keyOff, JAVA_OBJECT results, JAVA_INT count) {
+#ifdef CN1_CRYPTO_KERNELS
+    cn1k_batch b;
+    size_t work;
+    if (count <= 0) {
+        return;
+    }
+    b.alg = alg;
+    b.msgs = CN1K_BYTES(msgs);
+    b.msgOff = CN1K_INTS(msgOff);
+    b.sigs = sigs == JAVA_NULL ? NULL : CN1K_BYTES(sigs);
+    b.keys = keys == JAVA_NULL ? NULL : CN1K_BYTES(keys);
+    b.keyOff = keyOff == JAVA_NULL ? NULL : CN1K_INTS(keyOff);
+    b.results = CN1K_BYTES(results);
+    b.count = (size_t) count;
+    /* a verify is worth a few hundred compressions; a hash is its length in blocks */
+    work = alg < CN1K_BATCH_SHA256 ? (size_t) count * 400
+            : (size_t) (b.msgOff[count] - b.msgOff[0]) / 64 + (size_t) count;
+    cn1k_batch_run(&b, work);
+#endif
+}

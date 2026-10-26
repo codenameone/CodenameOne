@@ -36,6 +36,7 @@ import com.codename1.crypto.solana.SolanaAddress;
 import com.codename1.crypto.solana.SolanaMessage;
 import com.codename1.crypto.solana.SolanaTransaction;
 import com.codename1.crypto.solana.SystemProgram;
+import com.codename1.security.CryptoBatch;
 import com.codename1.security.CryptoEngine;
 import com.codename1.security.Ed25519;
 import com.codename1.security.Hash;
@@ -190,6 +191,67 @@ public final class CryptoChecks {
                 final byte[] in = bytes(len + 800, len);
                 Bulk.p("keccak[" + len + "]", run(() -> Hash.keccak256(in)));
             }
+        });
+        Bulk.check(name + ".batch", () -> {
+            // large enough to be cut into chunks over the cores; malformed entries mixed in
+            final int n = 40;
+            final byte[][] hashes = new byte[n][];
+            final Secp256k1.EcdsaSignature[] sigs = new Secp256k1.EcdsaSignature[n];
+            final byte[][] keys = new byte[n][];
+            final byte[][] msgs = new byte[n][];
+            final byte[][] edSigs = new byte[n][];
+            final byte[][] edKeys = new byte[n][];
+            final byte[][] schSigs = new byte[n][];
+            final byte[][] schKeys = new byte[n][];
+            for (int i = 0; i < n; i++) {
+                byte[] priv = bytes(i + 1000, 32);
+                hashes[i] = bytes(i + 1100, 32);
+                sigs[i] = Secp256k1.sign(hashes[i], priv);
+                keys[i] = Secp256k1.publicKey(priv, i % 2 == 0);
+                msgs[i] = bytes(i + 1200, i * 5);
+                edKeys[i] = Ed25519.publicKey(priv);
+                edSigs[i] = Ed25519.sign(priv, edKeys[i], msgs[i]);
+                schKeys[i] = Schnorr.publicKey(priv);
+                schSigs[i] = Schnorr.sign(msgs[i], priv, null);
+                if (i % 7 == 3) {
+                    hashes[i] = flip(hashes[i], 2);
+                    edSigs[i] = flip(edSigs[i], 5);
+                    schSigs[i] = flip(schSigs[i], 5);
+                }
+            }
+            keys[5] = flip(keys[5], 9);
+            keys[6] = new byte[20];
+            sigs[8] = null;
+            edKeys[9] = new byte[31];
+            edSigs[11][63] |= 0x10;
+            msgs[12] = null;
+            final StringBuilder sb = new StringBuilder();
+            boolean[][] all = {CryptoBatch.verifySecp256k1(hashes, sigs, keys),
+                CryptoBatch.verifyEd25519(msgs, edSigs, edKeys), CryptoBatch.verifySchnorr(msgs, schSigs, schKeys)};
+            for (boolean[] r : all) {
+                for (boolean b : r) {
+                    sb.append(b ? '1' : '0');
+                }
+                sb.append('/');
+            }
+            Bulk.p("verify", sb.toString());
+            final byte[][] in = new byte[300][];
+            for (int i = 0; i < in.length; i++) {
+                in[i] = i == 17 ? null : bytes(i + 1300, 150 + i % 90);
+            }
+            byte[][] sha = CryptoBatch.sha256(in);
+            byte[][] kec = CryptoBatch.keccak256(in);
+            byte[] fold = new byte[0];
+            for (int i = 0; i < in.length; i++) {
+                if (in[i] != null) {
+                    byte[] both = new byte[fold.length + 64];
+                    System.arraycopy(fold, 0, both, 0, fold.length);
+                    System.arraycopy(sha[i], 0, both, fold.length, 32);
+                    System.arraycopy(kec[i], 0, both, fold.length + 32, 32);
+                    fold = Hash.sha256(both);
+                }
+            }
+            Bulk.p("hashes", Hash.toHex(fold) + (sha[17] == null && kec[17] == null));
         });
         Bulk.check(name + ".sha2", () -> {
             // every padding boundary of both block sizes, and a key past each block size

@@ -312,3 +312,56 @@ JNIEXPORT void JNICALL NS(pbkdf2)(JNIEnv *env, jclass cls, jint bits, jbyteArray
             NULL, (JAVA_INT) bits, ARG(0), ARG(1), (JAVA_INT) iterations, ARG(2));
     cn1j_release(env, &pins, pins.n);
 }
+
+/*
+ * A batch can run for many milliseconds on worker threads, too long for a critical region, so its
+ * arrays are taken with Get<Type>ArrayElements instead, which leaves the collector free. The
+ * inputs are released without copying back; only the results are written to the Java array.
+ */
+typedef struct { void *data; int length; } cn1j_arr;
+
+JNIEXPORT void JNICALL NS(batch)(JNIEnv *env, jclass cls, jint alg, jbyteArray msgs, jintArray msgOff,
+        jbyteArray sigs, jbyteArray keys, jintArray keyOff, jbyteArray results, jint count) {
+    cn1j_arr a[6];
+    jarray java[6];
+    int kinds[6] = { 0, 1, 0, 0, 1, 0 };   /* 1 for an int array */
+    int i, ok = 1;
+    java[0] = msgs; java[1] = msgOff; java[2] = sigs; java[3] = keys; java[4] = keyOff; java[5] = results;
+    for (i = 0; i < 6; i++) {
+        a[i].data = NULL;
+        a[i].length = 0;
+    }
+    for (i = 0; i < 6; i++) {
+        if (java[i] == NULL) {
+            continue;
+        }
+        a[i].length = (int) (*env)->GetArrayLength(env, java[i]);
+        a[i].data = kinds[i] ? (void*) (*env)->GetIntArrayElements(env, (jintArray) java[i], NULL)
+                             : (void*) (*env)->GetByteArrayElements(env, (jbyteArray) java[i], NULL);
+        if (a[i].data == NULL) {
+            ok = 0;
+            break;
+        }
+    }
+    if (ok) {
+        com_codename1_security_NativeCryptoKernels_batch___int_byte_1ARRAY_int_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_1ARRAY_byte_1ARRAY_int(
+                NULL, (JAVA_INT) alg, &a[0], &a[1], java[2] == NULL ? JAVA_NULL : &a[2],
+                java[3] == NULL ? JAVA_NULL : &a[3], java[4] == NULL ? JAVA_NULL : &a[4], &a[5], (JAVA_INT) count);
+    }
+    for (i = 5; i >= 0; i--) {
+        if (a[i].data == NULL) {
+            continue;
+        }
+        if (kinds[i]) {
+            (*env)->ReleaseIntArrayElements(env, (jintArray) java[i], (jint*) a[i].data, JNI_ABORT);
+        } else {
+            (*env)->ReleaseByteArrayElements(env, (jbyteArray) java[i], (jbyte*) a[i].data, i == 5 ? 0 : JNI_ABORT);
+        }
+    }
+    if (!ok && !(*env)->ExceptionCheck(env)) {
+        jclass oom = (*env)->FindClass(env, "java/lang/OutOfMemoryError");
+        if (oom != NULL) {
+            (*env)->ThrowNew(env, oom, "could not reach an array for the crypto kernels");
+        }
+    }
+}

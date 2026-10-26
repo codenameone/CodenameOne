@@ -346,6 +346,7 @@ class BulkConformanceIntegrationTest {
         "com/codename1/crypto/wallet/Signer.java",
         "com/codename1/crypto/wallet/Wallet.java",
         "com/codename1/security/Base32.java",
+        "com/codename1/security/CryptoBatch.java",
         "com/codename1/security/CryptoEngine.java",
         "com/codename1/security/CryptoException.java",
         "com/codename1/security/Ed25519.java",

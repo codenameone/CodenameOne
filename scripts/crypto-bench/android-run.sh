@@ -26,7 +26,7 @@ fi
 SEC="$REPO/CodenameOne/src/com/codename1/security"
 "$J17/bin/javac" -nowarn -encoding ASCII --release 8 -d "$WORK/classes" -cp "$BC_JAR" \
     "$REPO/CodenameOne/src/com/codename1/impl/SharedWithBackend.java" \
-    "$SEC/CryptoException.java" "$SEC/CryptoEngine.java" "$SEC/NativeCryptoEngine.java" \
+    "$SEC/CryptoException.java" "$SEC/CryptoBatch.java" "$SEC/CryptoEngine.java" "$SEC/NativeCryptoEngine.java" \
     "$SEC/NativeCryptoKernels.java" "$SEC/MessageDigestImpl.java" "$SEC/Hash.java" \
     "$SEC/Hmac.java" "$SEC/Pbkdf2.java" "$SEC/Secp256k1.java" "$SEC/Secp256k1Math.java" "$SEC/Schnorr.java" \
     "$SEC/Ed25519.java" "$SEC/Ed25519Math.java" "$HERE/src/JvmBench.java"

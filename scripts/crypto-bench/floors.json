@@ -18,7 +18,9 @@
     "schnorr.sign": 0.85,
     "schnorr.verify": 0.9,
     "sha512.1k": 0.9,
-    "hmac.sha512.bip32": 1.0
+    "hmac.sha512.bip32": 1.0,
+    "batch.secp256k1.verify": 0.9,
+    "batch.ed25519.verify": 0.85
   },
   "native": {
     "secp256k1.pubkey": 0.85,
@@ -35,6 +37,9 @@
     "sha512.1k.openssl": 0.5,
     "hmac.sha512.bip32.openssl": 1.2,
     "pbkdf2.sha512.bip39.openssl": 0.5,
-    "ripemd160.1k.openssl": 1.0
+    "ripemd160.1k.openssl": 1.0,
+    "batch.secp256k1.verify": 1.8,
+    "batch.ed25519.verify.openssl": 3.0,
+    "batch.sha256.merkle.openssl": 1.5
   }
 }

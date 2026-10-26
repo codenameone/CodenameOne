@@ -74,4 +74,11 @@ final class NativeCryptoKernels {
 
     /// PBKDF2 with HMAC-SHA-256 or -512, filling all of `out`.
     static native void pbkdf2(int bits, byte[] password, byte[] salt, int iterations, byte[] out);
+
+    /// A batch over the cores: `algorithm` is a [CryptoEngine] `BATCH_`
+    /// constant, or 11 for SHA-256 and 12 for Keccak-256 (null signatures and
+    /// keys). Messages and ECDSA keys are slices given by offset arrays one
+    /// longer than `count`; see `cn1_crypto_kernels.c` for the result bytes.
+    static native void batch(int algorithm, byte[] messages, int[] messageOffsets, byte[] signatures,
+            byte[] keys, int[] keyOffsets, byte[] results, int count);
 }

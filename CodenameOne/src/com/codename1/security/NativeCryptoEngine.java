@@ -235,6 +235,107 @@ public class NativeCryptoEngine extends CryptoEngine {
         return out;
     }
 
+    @Override
+    public void verifyBatch(int algorithm, byte[][] messages, byte[][] signatures, byte[][] publicKeys,
+            byte[] results) {
+        int n = results.length;
+        boolean ecdsa = algorithm == BATCH_SECP256K1;
+        long messageBytes = 0;
+        long keyBytes = 0;
+        int todo = 0;
+        for (int i = 0; i < n; i++) {
+            if (results[i] != CryptoBatch.TODO) {
+                continue;
+            }
+            if (ecdsa && (messages[i].length != 32 || !isPublicKeyLength(publicKeys[i]))) {
+                results[i] = CryptoBatch.JAVA;
+                continue;
+            }
+            if (algorithm == BATCH_ED25519) {
+                // the same refusals as ed25519Verify, entry by entry
+                if (!Ed25519Math.isCanonicalScalar(signatures[i], 32)) {
+                    results[i] = 0;
+                    continue;
+                }
+                if (!isOrdinaryEdwardsKey(publicKeys[i])) {
+                    results[i] = CryptoBatch.JAVA;
+                    continue;
+                }
+            }
+            messageBytes += messages[i].length;
+            keyBytes += publicKeys[i].length;
+            todo++;
+        }
+        if (todo == 0 || messageBytes > Integer.MAX_VALUE / 2 || keyBytes > Integer.MAX_VALUE / 2) {
+            return;
+        }
+        // every entry keeps its slot; one the engine is not to verify is an empty slice
+        byte[] msgs = new byte[(int) messageBytes];
+        int[] msgOff = new int[n + 1];
+        byte[] sigs = new byte[64 * n];
+        byte[] keys = new byte[ecdsa ? (int) keyBytes : 32 * n];
+        int[] keyOff = ecdsa ? new int[n + 1] : null;
+        int mo = 0;
+        int ko = 0;
+        for (int i = 0; i < n; i++) {
+            msgOff[i] = mo;
+            if (ecdsa) {
+                keyOff[i] = ko;
+            }
+            if (results[i] != CryptoBatch.TODO) {
+                continue;
+            }
+            System.arraycopy(messages[i], 0, msgs, mo, messages[i].length);
+            mo += messages[i].length;
+            System.arraycopy(signatures[i], 0, sigs, 64 * i, 64);
+            if (ecdsa) {
+                System.arraycopy(publicKeys[i], 0, keys, ko, publicKeys[i].length);
+                ko += publicKeys[i].length;
+            } else {
+                System.arraycopy(publicKeys[i], 0, keys, 32 * i, 32);
+            }
+        }
+        msgOff[n] = mo;
+        if (ecdsa) {
+            keyOff[n] = ko;
+        }
+        NativeCryptoKernels.batch(algorithm, msgs, msgOff, sigs, keys, keyOff, results, n);
+    }
+
+    @Override
+    public byte[][] hashBatch(String algorithm, byte[][] inputs) {
+        int kind = Hash.SHA256.equals(algorithm) ? 11 : Hash.KECCAK256.equals(algorithm) ? 12 : 0;
+        int n = inputs.length;
+        long total = 0;
+        for (int i = 0; i < n; i++) {
+            total += inputs[i] == null ? 0 : inputs[i].length;
+        }
+        if (kind == 0 || n == 0 || total > Integer.MAX_VALUE / 2 || 32L * n > Integer.MAX_VALUE / 2) {
+            return null;
+        }
+        byte[] msgs = new byte[(int) total];
+        int[] off = new int[n + 1];
+        int o = 0;
+        for (int i = 0; i < n; i++) {
+            off[i] = o;
+            if (inputs[i] != null) {
+                System.arraycopy(inputs[i], 0, msgs, o, inputs[i].length);
+                o += inputs[i].length;
+            }
+        }
+        off[n] = o;
+        byte[] digests = new byte[32 * n];
+        NativeCryptoKernels.batch(kind, msgs, off, null, null, null, digests, n);
+        byte[][] out = new byte[n][];
+        for (int i = 0; i < n; i++) {
+            if (inputs[i] != null) {
+                out[i] = new byte[32];
+                System.arraycopy(digests, 32 * i, out[i], 0, 32);
+            }
+        }
+        return out;
+    }
+
     /// 256 or 512 for the SHA-2 hashes the kernels implement, 0 for anything
     /// else.
     private static int bits(String hashAlgorithm) {

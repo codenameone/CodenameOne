@@ -40,6 +40,7 @@ JAVA_VOID K(sha512___byte_1ARRAY_int_int_byte_1ARRAY)(CODENAME_ONE_THREAD_STATE,
 JAVA_VOID K(ripemd160___byte_1ARRAY_int_int_byte_1ARRAY)(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT, JAVA_INT, JAVA_INT, JAVA_OBJECT);
 JAVA_VOID K(hmac___int_byte_1ARRAY_byte_1ARRAY_int_int_byte_1ARRAY)(CODENAME_ONE_THREAD_STATE, JAVA_INT, JAVA_OBJECT, JAVA_OBJECT, JAVA_INT, JAVA_INT, JAVA_OBJECT);
 JAVA_VOID K(pbkdf2___int_byte_1ARRAY_byte_1ARRAY_int_byte_1ARRAY)(CODENAME_ONE_THREAD_STATE, JAVA_INT, JAVA_OBJECT, JAVA_OBJECT, JAVA_INT, JAVA_OBJECT);
+JAVA_VOID K(batch___int_byte_1ARRAY_int_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_1ARRAY_byte_1ARRAY_int)(CODENAME_ONE_THREAD_STATE, JAVA_INT, JAVA_OBJECT, JAVA_OBJECT, JAVA_OBJECT, JAVA_OBJECT, JAVA_OBJECT, JAVA_OBJECT, JAVA_INT);
 JAVA_BOOLEAN K(schnorrSign___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_R_boolean)(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT, JAVA_OBJECT, JAVA_OBJECT, JAVA_OBJECT);
 JAVA_INT K(schnorrVerify___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_R_int)(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT, JAVA_OBJECT, JAVA_OBJECT);
 
@@ -88,7 +89,7 @@ static void row(const char *name, op_fn core, op_fn ref) {
     }
     qsort(c, 5, sizeof(double), cmp);
     qsort(b, 5, sizeof(double), cmp);
-    printf("%-22s core=%12.0f ref=%12.0f ratio=%6.2f\n", name, c[2], b[2], c[2] / b[2]);
+    printf("%-28s core=%12.0f ref=%12.0f ratio=%6.2f\n", name, c[2], b[2], c[2] / b[2]);
     fflush(stdout);
 }
 
@@ -190,6 +191,109 @@ static void o_hmac(void) {
 static void c_pbkdf2(void) { K(pbkdf2___int_byte_1ARRAY_byte_1ARRAY_int_byte_1ARRAY)(0, 512, &aPw, &aSalt, 2048, &aHout64); }
 static void o_pbkdf2(void) {
     sink += PKCS5_PBKDF2_HMAC((const char*) bip39pw, 48, bip39salt, 14, 2048, EVP_sha512(), 64, hout);
+}
+
+/* Batches of 1024 signatures and 4096 Merkle nodes (64 bytes each), against the reference called
+ * once per item on one core: the ratio is what spreading a batch over the cores buys. */
+#define BATCH 1024
+#define LEAVES 4096
+static unsigned char bmsg[32 * BATCH], bsig[64 * BATCH], bkey[33 * BATCH], bres[32 * LEAVES], bleaves[64 * LEAVES];
+static unsigned char bedmsg[32 * BATCH], bedsig[64 * BATCH], bedkey[32 * BATCH];
+static int bmoff[BATCH + 1], bkoff[BATCH + 1], bloff[LEAVES + 1];
+static Arr aBmsg, aBmoff, aBsig, aBkey, aBkoff, aBres, aBedmsg, aBedsig, aBedkey, aBleaves, aBloff, aBhres;
+static void todo(void) { memset(bres, 2, BATCH); }
+static void c_batch_verify(void) {
+    todo();
+    K(batch___int_byte_1ARRAY_int_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_1ARRAY_byte_1ARRAY_int)(0, 1, &aBmsg, &aBmoff, &aBsig, &aBkey, &aBkoff, &aBres, BATCH);
+}
+static void r_batch_verify(void) {
+    for (int i = 0; i < BATCH; i++) {
+        secp256k1_pubkey p;
+        secp256k1_ecdsa_signature s;
+        secp256k1_ec_pubkey_parse(ref_ctx, &p, bkey + 33 * i, 33);
+        secp256k1_ecdsa_signature_parse_compact(ref_ctx, &s, bsig + 64 * i);
+        sink += secp256k1_ecdsa_verify(ref_ctx, &s, bmsg + 32 * i, &p);
+    }
+}
+static void c_batch_ed(void) {
+    todo();
+    K(batch___int_byte_1ARRAY_int_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_1ARRAY_byte_1ARRAY_int)(0, 3, &aBedmsg, &aBmoff, &aBedsig, &aBedkey, JAVA_NULL, &aBres, BATCH);
+}
+static void o_batch_ed(void) {
+    for (int i = 0; i < BATCH; i++) {
+        EVP_PKEY *pk = EVP_PKEY_new_raw_public_key(EVP_PKEY_ED25519, NULL, bedkey + 32 * i, 32);
+        EVP_MD_CTX *ctx = EVP_MD_CTX_new();
+        EVP_DigestVerifyInit(ctx, NULL, NULL, NULL, pk);
+        sink += EVP_DigestVerify(ctx, bedsig + 64 * i, 64, bedmsg + 32 * i, 32);
+        EVP_MD_CTX_free(ctx);
+        EVP_PKEY_free(pk);
+    }
+}
+static void c_batch_sha(void) {
+    K(batch___int_byte_1ARRAY_int_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_1ARRAY_byte_1ARRAY_int)(0, 11, &aBleaves, &aBloff, JAVA_NULL, JAVA_NULL, JAVA_NULL, &aBhres, LEAVES);
+}
+static void o_batch_sha(void) {
+    for (int i = 0; i < LEAVES; i++) {
+        unsigned int l = 32;
+        sink += EVP_Digest(bleaves + 64 * i, 64, bres + 32 * i, &l, EVP_sha256(), NULL);
+    }
+}
+
+static int batches(void) {
+    for (int i = 0; i < BATCH; i++) {
+        unsigned char k[32];
+        Arr ak = mk(k, 32), am = mk(bmsg + 32 * i, 32), as = mk(sig65, 65), ap = mk(bkey + 33 * i, 33);
+        Arr ae = mk(bedkey + 32 * i, 32), aes = mk(bedsig + 64 * i, 64), aem = mk(bedmsg + 32 * i, 32);
+        for (int j = 0; j < 32; j++) {
+            k[j] = (unsigned char) (i * 31 + j * 7 + 1);
+            bmsg[32 * i + j] = (unsigned char) (i * 13 + j);
+            bedmsg[32 * i + j] = (unsigned char) (i * 5 + j * 3);
+        }
+        K(secpPublicKey___byte_1ARRAY_byte_1ARRAY_R_boolean)(0, &ak, &ap);
+        K(secpSign___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_R_boolean)(0, &am, &ak, &as);
+        memcpy(bsig + 64 * i, sig65, 64);
+        K(ed25519PublicKey___byte_1ARRAY_byte_1ARRAY)(0, &ak, &ae);
+        K(ed25519Sign___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY)(0, &ak, &ae, &aem, &aes);
+        bmoff[i] = 32 * i;
+        bkoff[i] = 33 * i;
+    }
+    bmoff[BATCH] = 32 * BATCH;
+    bkoff[BATCH] = 33 * BATCH;
+    for (int i = 0; i < 64 * LEAVES; i++) {
+        bleaves[i] = (unsigned char) (i * 7 + 3);
+    }
+    for (int i = 0; i <= LEAVES; i++) {
+        bloff[i] = 64 * i;
+    }
+    aBmsg = mk(bmsg, sizeof(bmsg)); aBmoff = mk(bmoff, BATCH + 1); aBsig = mk(bsig, sizeof(bsig));
+    aBkey = mk(bkey, sizeof(bkey)); aBkoff = mk(bkoff, BATCH + 1); aBres = mk(bres, BATCH);
+    aBedmsg = mk(bedmsg, sizeof(bedmsg)); aBedsig = mk(bedsig, sizeof(bedsig)); aBedkey = mk(bedkey, sizeof(bedkey));
+    aBleaves = mk(bleaves, sizeof(bleaves)); aBloff = mk(bloff, LEAVES + 1); aBhres = mk(bres, sizeof(bres));
+    c_batch_verify();
+    for (int i = 0; i < BATCH; i++) {
+        if (bres[i] != 1) {
+            fprintf(stderr, "batch ECDSA entry %d answered %d\n", i, bres[i]);
+            return 0;
+        }
+    }
+    c_batch_ed();
+    for (int i = 0; i < BATCH; i++) {
+        if (bres[i] != 1) {
+            fprintf(stderr, "batch Ed25519 entry %d answered %d\n", i, bres[i]);
+            return 0;
+        }
+    }
+    c_batch_sha();
+    for (int i = 0; i < LEAVES; i += 97) {
+        unsigned char d[32];
+        unsigned int l = 32;
+        EVP_Digest(bleaves + 64 * i, 64, d, &l, EVP_sha256(), NULL);
+        if (memcmp(d, bres + 32 * i, 32) != 0) {
+            fprintf(stderr, "batch SHA-256 entry %d differs from OpenSSL\n", i);
+            return 0;
+        }
+    }
+    return 1;
 }
 
 static int same(const char *what, op_fn mine, op_fn theirs, int n) {
@@ -317,5 +421,12 @@ int main(void) {
         }
         row("ripemd160.1k.openssl", c_rmd, o_rmd);
     }
+    if (!batches()) {
+        return 3;
+    }
+    printf("# batch rows: all cores against the reference on one\n");
+    row("batch.secp256k1.verify", c_batch_verify, r_batch_verify);
+    row("batch.ed25519.verify.openssl", c_batch_ed, o_batch_ed);
+    row("batch.sha256.merkle.openssl", c_batch_sha, o_batch_sha);
     return 0;
 }

@@ -46,6 +46,8 @@ import com.codename1.crypto.solana.SolanaTransaction;
 import com.codename1.crypto.solana.SystemProgram;
 import com.codename1.crypto.wallet.VaultSigner;
 import com.codename1.crypto.wallet.Wallet;
+import com.codename1.security.CryptoBatch;
+import com.codename1.security.Secp256k1;
 import com.codename1.security.vault.Vault;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -164,5 +166,19 @@ public class CryptoWalletSnippets {
         Wallet wallet = new Wallet(new VaultSigner(vault, "main"));
         // end::crypto-vault[]
         return wallet;
+    }
+
+    /** Checks every signature of a block of deposits in one call. */
+    public int countValid(byte[][] hashes, Secp256k1.EcdsaSignature[] signatures, byte[][] publicKeys) {
+        // tag::crypto-batch[]
+        boolean[] valid = CryptoBatch.verifySecp256k1(hashes, signatures, publicKeys);
+        int good = 0;
+        for (boolean v : valid) {
+            if (v) {
+                good++;
+            }
+        }
+        // end::crypto-batch[]
+        return good;
     }
 }

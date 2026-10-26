@@ -159,6 +159,32 @@ public class CryptoEngine {
         return null;
     }
 
+    /// [#verifyBatch] of ECDSA over secp256k1.
+    public static final int BATCH_SECP256K1 = 1;
+
+    /// [#verifyBatch] of BIP-340 Schnorr signatures.
+    public static final int BATCH_SCHNORR = 2;
+
+    /// [#verifyBatch] of Ed25519 signatures.
+    public static final int BATCH_ED25519 = 3;
+
+    /// Verifies a batch of signatures of one algorithm ([#BATCH_SECP256K1],
+    /// [#BATCH_SCHNORR], [#BATCH_ED25519]). Only the entries whose result
+    /// byte is 2 are to be verified: the engine writes 1 (valid), 0
+    /// (invalid) or `0xff` (verify this one in Java) over them, and leaves
+    /// any it does not reach at 2, which the caller also verifies in Java.
+    /// Those entries have non-null arrays; signatures are 64 bytes, messages
+    /// 32 for ECDSA, keys 32 except for ECDSA's SEC1 keys.
+    public void verifyBatch(int algorithm, byte[][] messages, byte[][] signatures, byte[][] publicKeys,
+            byte[] results) {
+    }
+
+    /// The digests of `inputs` under [Hash#SHA256] or [Hash#KECCAK256], a
+    /// `null` for each `null` input, or `null` to hash them in Java.
+    public byte[][] hashBatch(String algorithm, byte[][] inputs) {
+        return null;
+    }
+
     /// SHA-256 of `length` bytes of `data` from `offset`, or `null` to hash
     /// in Java. The range is already validated.
     public byte[] sha256(byte[] data, int offset, int length) {

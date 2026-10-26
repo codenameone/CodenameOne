@@ -22,6 +22,7 @@ import org.bouncycastle.crypto.params.ECPublicKeyParameters;
 import org.bouncycastle.crypto.signers.ECDSASigner;
 import org.bouncycastle.crypto.signers.HMacDSAKCalculator;
 import java.math.BigInteger;
+import com.codename1.security.CryptoBatch;
 import com.codename1.security.CryptoEngine;
 import com.codename1.security.NativeCryptoEngine;
 
@@ -85,7 +86,33 @@ public final class JvmBench {
                 + Hash.toHex(Hash.keccak256(kb)) + hashes(kb, 0) + hashes(kb, 1) + hashes(kb, 63) + hashes(kb, 64)
                 + hashes(kb, 111) + hashes(kb, 112) + hashes(kb, 128) + hashes(kb, 1000)
                 + Hash.toHex(Pbkdf2.hmacSha512(k, m, 3, 100)) + Hash.toHex(Pbkdf2.hmacSha256(kb, m, 5, 70))
-                + Hash.toHex(Hmac.sha512(kb, m)) + Hash.toHex(Hmac.sha256(kb, m));
+                + Hash.toHex(Hmac.sha512(kb, m)) + Hash.toHex(Hmac.sha256(kb, m)) + batch(k, m, kb);
+    }
+
+    /// The batch forms over a mix of good and broken entries, and a hash batch.
+    static String batch(byte[] k, byte[] m, byte[] kb) {
+        int n = 64;
+        byte[][] hs = new byte[n][], ks = new byte[n][], ms = new byte[n][], es = new byte[n][], eks = new byte[n][];
+        Secp256k1.EcdsaSignature[] ss = new Secp256k1.EcdsaSignature[n];
+        for (int i = 0; i < n; i++) {
+            byte[] p = Hash.sha256(new byte[] {(byte) i, k[0]});
+            hs[i] = Hash.sha256(p);
+            ss[i] = Secp256k1.sign(hs[i], p);
+            ks[i] = Secp256k1.publicKey(p, i % 2 == 0);
+            ms[i] = new byte[i];
+            eks[i] = Ed25519.publicKey(p);
+            es[i] = Ed25519.sign(p, eks[i], ms[i]);
+            if (i % 5 == 1) {
+                hs[i] = m;
+                es[i] = Ed25519.sign(p, eks[i], m);
+            }
+        }
+        StringBuilder sb = new StringBuilder();
+        for (boolean b : CryptoBatch.verifySecp256k1(hs, ss, ks)) sb.append(b ? '1' : '0');
+        for (boolean b : CryptoBatch.verifyEd25519(ms, es, eks)) sb.append(b ? '1' : '0');
+        for (byte[] d : CryptoBatch.sha256(ms)) sb.append(Hash.toHex(d));
+        for (byte[] d : CryptoBatch.keccak256(ms)) sb.append(Hash.toHex(d));
+        return sb.toString();
     }
 
     /// Every hash the kernels route, of a prefix of `kb` and under a key of that length.
@@ -169,6 +196,23 @@ public final class JvmBench {
             sg.init(true, bPriv); sg.generateSignature(hash); });
         row("schnorr.verify", i -> Schnorr.verify(msg, schSig, xonly), i -> {
             ECDSASigner sg = new ECDSASigner(); sg.init(false, bPub); sg.verifySignature(hash, r, s); });
+
+        // 256 signatures a call: on the native kernels the batch is spread over the cores
+        final int n = 256;
+        final byte[][] hs = new byte[n][], ks = new byte[n][], ms = new byte[n][], es = new byte[n][], eks = new byte[n][];
+        final Secp256k1.EcdsaSignature[] ss = new Secp256k1.EcdsaSignature[n];
+        for (int i = 0; i < n; i++) {
+            hs[i] = hash; ks[i] = pub; ss[i] = sig; ms[i] = msg; es[i] = edSig; eks[i] = edPub;
+        }
+        row("batch.secp256k1.verify", i -> CryptoBatch.verifySecp256k1(hs, ss, ks), i -> {
+            for (int j = 0; j < n; j++) {
+                ECDSASigner sg = new ECDSASigner(); sg.init(false, bPub); sg.verifySignature(hash, r, s);
+            } });
+        row("batch.ed25519.verify", i -> CryptoBatch.verifyEd25519(ms, es, eks), i -> {
+            for (int j = 0; j < n; j++) {
+                Ed25519Signer sg = new Ed25519Signer(); sg.init(false, new Ed25519PublicKeyParameters(edPub, 0));
+                sg.update(msg, 0, msg.length); sg.verifySignature(edSig);
+            } });
     }
 
     /// The JDK's own EdDSA (Java 15 and later), the other reference a JVM
