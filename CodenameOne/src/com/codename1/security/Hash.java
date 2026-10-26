@@ -31,6 +31,10 @@ package com.codename1.security;
 /// - [#SHA256]           -- 256 bit (SHA-2 family, recommended general-purpose hash)
 /// - [#SHA384]           -- 384 bit (SHA-2 family)
 /// - [#SHA512]           -- 512 bit (SHA-2 family)
+/// - [#SHA3_256]         -- 256 bit (SHA-3, FIPS 202)
+/// - [#KECCAK256]        -- 256 bit original Keccak, the hash Ethereum uses
+///   for addresses, transaction hashes and ABI selectors. It is NOT SHA3-256:
+///   the two differ in the padding byte and give different digests.
 ///
 /// #### Quick example
 ///
@@ -74,6 +78,14 @@ public final class Hash {
     /// SHA-512 algorithm identifier (512-bit digest, SHA-2 family).
     public static final String SHA512 = "SHA-512";
 
+    /// SHA3-256 algorithm identifier (256-bit digest, FIPS 202).
+    public static final String SHA3_256 = "SHA3-256";
+
+    /// Keccak-256 algorithm identifier (256-bit digest). This is the original
+    /// Keccak submission with the `0x01` padding byte, as used throughout
+    /// Ethereum; standardised SHA3-256 pads with `0x06` and is [#SHA3_256].
+    public static final String KECCAK256 = "KECCAK-256";
+
     private final MessageDigestImpl impl;
 
     private Hash(MessageDigestImpl impl) {
@@ -85,7 +97,8 @@ public final class Hash {
     /// #### Parameters
     ///
     /// - `algorithm`: one of [#MD5], [#SHA1], [#SHA224], [#SHA256], [#SHA384],
-    ///   [#SHA512] -- case insensitive, with or without the dash
+    ///   [#SHA512], [#SHA3_256], [#KECCAK256] -- case insensitive, with or
+    ///   without the dash
     ///
     /// #### Returns
     ///
@@ -182,6 +195,11 @@ public final class Hash {
     /// One-shot SHA-512 hash.
     public static byte[] sha512(byte[] data) {
         return create(SHA512).digest(data);
+    }
+
+    /// One-shot Keccak-256 hash (Ethereum's hash, see [#KECCAK256]).
+    public static byte[] keccak256(byte[] data) {
+        return create(KECCAK256).digest(data);
     }
 
     // ----------------------------------------------------------------

@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="400" viewBox="0 0 880 400">
+  <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#333333"/></marker><marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#3c8d5a"/></marker></defs>
+  <rect x="0" y="0" width="880" height="400" fill="#ffffff"/>
+  <text xml:space="preserve" x="440" y="24" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#222222">The audit chain</text>
+  <text xml:space="preserve" x="440" y="43" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">Every security and money event is a row whose hash covers its fields and the hash of the row before it. Changing,</text>
+  <text xml:space="preserve" x="440" y="57" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">removing or inserting a row breaks every link after it, and Verify the audit log reports the first broken one.</text>
+  <rect x="30" y="80" width="195" height="150" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1.5"/>
+  <text xml:space="preserve" x="40" y="98" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" text-anchor="start" fill="#4a6fa5">seq 41</text>
+  <text xml:space="preserve" x="40" y="114" font-family="Menlo, Consolas, monospace" font-size="9.5" text-anchor="start" fill="#333333">prevHash  9f3c..e1</text>
+  <text xml:space="preserve" x="40" y="128" font-family="Menlo, Consolas, monospace" font-size="9.5" text-anchor="start" fill="#333333">at        1792...</text>
+  <text xml:space="preserve" x="40" y="142" font-family="Menlo, Consolas, monospace" font-size="9.5" text-anchor="start" fill="#333333">actor     customer@...</text>
+  <text xml:space="preserve" x="40" y="156" font-family="Menlo, Consolas, monospace" font-size="9.5" text-anchor="start" fill="#333333">action    SIGN_IN</text>
+  <text xml:space="preserve" x="40" y="170" font-family="Menlo, Consolas, monospace" font-size="9.5" text-anchor="start" fill="#333333">subject   mfa</text>
+  <text xml:space="preserve" x="40" y="184" font-family="Menlo, Consolas, monospace" font-size="9.5" text-anchor="start" fill="#333333">hash      a71b..04</text>
+  <line x1="225" y1="180" x2="244" y2="108" stroke="#3c8d5a" stroke-width="1.3" marker-end="url(#g)"/>
+  <rect x="245" y="80" width="195" height="150" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1.5"/>
+  <text xml:space="preserve" x="255" y="98" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" text-anchor="start" fill="#4a6fa5">seq 42</text>
+  <text xml:space="preserve" x="255" y="114" font-family="Menlo, Consolas, monospace" font-size="9.5" text-anchor="start" fill="#333333">prevHash  a71b..04</text>
+  <text xml:space="preserve" x="255" y="128" font-family="Menlo, Consolas, monospace" font-size="9.5" text-anchor="start" fill="#333333">at        1792...</text>
+  <text xml:space="preserve" x="255" y="142" font-family="Menlo, Consolas, monospace" font-size="9.5" text-anchor="start" fill="#333333">actor     customer@...</text>
+  <text xml:space="preserve" x="255" y="156" font-family="Menlo, Consolas, monospace" font-size="9.5" text-anchor="start" fill="#333333">action    DEVICE_ADD</text>
+  <text xml:space="preserve" x="255" y="170" font-family="Menlo, Consolas, monospace" font-size="9.5" text-anchor="start" fill="#333333">subject   dev 7c..</text>
+  <text xml:space="preserve" x="255" y="184" font-family="Menlo, Consolas, monospace" font-size="9.5" text-anchor="start" fill="#333333">hash      5d20..b9</text>
+  <line x1="440" y1="180" x2="459" y2="108" stroke="#3c8d5a" stroke-width="1.3" marker-end="url(#g)"/>
+  <rect x="460" y="80" width="195" height="150" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1.5"/>
+  <text xml:space="preserve" x="470" y="98" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" text-anchor="start" fill="#4a6fa5">seq 43</text>
+  <text xml:space="preserve" x="470" y="114" font-family="Menlo, Consolas, monospace" font-size="9.5" text-anchor="start" fill="#333333">prevHash  5d20..b9</text>
+  <text xml:space="preserve" x="470" y="128" font-family="Menlo, Consolas, monospace" font-size="9.5" text-anchor="start" fill="#333333">at        1792...</text>
+  <text xml:space="preserve" x="470" y="142" font-family="Menlo, Consolas, monospace" font-size="9.5" text-anchor="start" fill="#333333">actor     customer@...</text>
+  <text xml:space="preserve" x="470" y="156" font-family="Menlo, Consolas, monospace" font-size="9.5" text-anchor="start" fill="#333333">action    TRANSFER</text>
+  <text xml:space="preserve" x="470" y="170" font-family="Menlo, Consolas, monospace" font-size="9.5" text-anchor="start" fill="#333333">subject   tx 31..</text>
+  <text xml:space="preserve" x="470" y="184" font-family="Menlo, Consolas, monospace" font-size="9.5" text-anchor="start" fill="#333333">hash      c4e8..72</text>
+  <rect x="690" y="80" width="165" height="92" rx="4" fill="#ffffff" stroke="#b5652a" stroke-width="1.5"/>
+  <text xml:space="preserve" x="700" y="98" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" text-anchor="start" fill="#b5652a">audit_head</text>
+  <text xml:space="preserve" x="700" y="114" font-family="Menlo, Consolas, monospace" font-size="9.5" text-anchor="start" fill="#333333">seq   43</text>
+  <text xml:space="preserve" x="700" y="128" font-family="Menlo, Consolas, monospace" font-size="9.5" text-anchor="start" fill="#333333">hash  c4e8..72</text>
+  <text xml:space="preserve" x="700" y="142" font-family="Menlo, Consolas, monospace" font-size="9.5" text-anchor="start" fill="#333333">locked by each append</text>
+  <line x1="655" y1="205" x2="690" y2="150" stroke="#b5652a" stroke-width="1.3" marker-end="url(#a)"/>
+  <rect x="30" y="250" width="400" height="120" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1.5"/>
+  <text xml:space="preserve" x="40" y="268" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" text-anchor="start" fill="#4a6fa5">hash = sha256 of length-prefixed fields</text>
+  <text xml:space="preserve" x="40" y="284" font-family="Arial, sans-serif" font-size="10" text-anchor="start" fill="#333333">prevHash | seq | at | actor | action | subject</text>
+  <text xml:space="preserve" x="40" y="298.5" font-family="Arial, sans-serif" font-size="10" text-anchor="start" fill="#333333">| detail | address</text>
+  <text xml:space="preserve" x="40" y="313" font-family="Arial, sans-serif" font-size="10" text-anchor="start" fill="#333333">Length prefixes keep "ab"+"c" and "a"+"bc" apart.</text>
+  <text xml:space="preserve" x="40" y="327.5" font-family="Arial, sans-serif" font-size="10" text-anchor="start" fill="#333333">Genesis: the chain starts from a fixed hash.</text>
+  <rect x="450" y="250" width="405" height="120" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1.5"/>
+  <text xml:space="preserve" x="460" y="268" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" text-anchor="start" fill="#4a6fa5">Append and verify (audit/Audit.java)</text>
+  <text xml:space="preserve" x="460" y="284" font-family="Arial, sans-serif" font-size="10" text-anchor="start" fill="#333333">append: lock audit_head, link to its hash, insert,</text>
+  <text xml:space="preserve" x="460" y="298.5" font-family="Arial, sans-serif" font-size="10" text-anchor="start" fill="#333333">advance the head -- in the caller's transaction, so a</text>
+  <text xml:space="preserve" x="460" y="313" font-family="Arial, sans-serif" font-size="10" text-anchor="start" fill="#333333">rolled-back transfer leaves no audit row behind.</text>
+  <text xml:space="preserve" x="460" y="327.5" font-family="Arial, sans-serif" font-size="10" text-anchor="start" fill="#333333">verify: walk from genesis, recompute every hash, and</text>
+  <text xml:space="preserve" x="460" y="342" font-family="Arial, sans-serif" font-size="10" text-anchor="start" fill="#333333">check the last row is the head.</text>
+</svg>

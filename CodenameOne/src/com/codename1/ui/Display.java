@@ -6225,16 +6225,38 @@ public final class Display extends CN1Constants {
     /// image objects be used to copy
     public void copyToClipboard(Object obj) {
         if (obj instanceof ClipboardContent) {
-            forgetProvidedValues((ClipboardContent) obj);
+            copyToClipboard((ClipboardContent) obj);
+            return;
         }
+        clipboardCopies++;
         impl.copyToClipboard(obj);
     }
+
+    /// Counts the copies made through this class, so a scheduled clear can tell whether the
+    /// content it was set up for is still the latest one this application copied.
+    private int clipboardCopies;
 
     /// Copies a set of alternative clipboard representations. The first entry should normally be
     /// `text/plain`; richer consumers can negotiate HTML, RTF, Markdown, AsciiDoc, or custom MIME data.
     public void copyToClipboard(ClipboardContent content) {
         forgetProvidedValues(content);
+        clipboardCopies++;
         impl.copyToClipboard(content);
+        if (content != null && content.getClearAfter() > 0) {
+            final int copy = clipboardCopies;
+            final ClipboardContent copied = content;
+            setTimeout(content.getClearAfter(), new Runnable() {
+                @Override
+                public void run() {
+                    // Only while nothing else was copied through this application since: a
+                    // later copy is the user's, and clearing it would throw away what they
+                    // just asked for.
+                    if (copy == clipboardCopies) {
+                        impl.clearClipboardContent(copied);
+                    }
+                }
+            });
+        }
     }
 
     /// Ends the previous transfer's memory of what its providers produced.

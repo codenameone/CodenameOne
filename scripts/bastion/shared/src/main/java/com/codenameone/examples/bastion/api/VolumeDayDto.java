@@ -1,0 +1,35 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
+package com.codenameone.examples.bastion.api;
+
+import com.codename1.annotations.Mapped;
+
+/// Ledger activity on the UTC day starting at `day` in one asset: the
+/// entries that moved it and their total debits. An entry that moves two
+/// assets -- a trade -- counts in both rows, so `dayEntries` is the number of
+/// distinct entries that day across every asset, the same on each of the
+/// day's rows; a count per day reads it once rather than summing `entries`.
+@Mapped
+public record VolumeDayDto(
+        long day,
+        String asset,
+        int entries,
+        int dayEntries,
+        long volume) {
+}

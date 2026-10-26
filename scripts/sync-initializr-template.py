@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Keep an Initializr full-stack template aligned with its sample (--write to update).
 
-    python3 scripts/sync-initializr-template.py wayline|savor|skirmish|parley [--write]
+    python3 scripts/sync-initializr-template.py wayline|savor|skirmish|parley|bastion [--write]
 
 scripts/<name> is the project CI builds and tests. The Initializr offers the same
 project as a template, from five resources this script derives from it:
@@ -48,7 +48,7 @@ import zipfile
 root = Path(__file__).resolve().parents[1]
 # The samples the Initializr offers as full-stack templates. Each is a project
 # under scripts/ whose Java package is com.codenameone.examples.<name>.
-SAMPLES = ('wayline', 'savor', 'skirmish', 'parley')
+SAMPLES = ('wayline', 'savor', 'skirmish', 'parley', 'bastion')
 args = [a for a in sys.argv[1:] if not a.startswith('--')]
 if len(args) != 1 or args[0] not in SAMPLES:
     raise SystemExit('usage: sync-initializr-template.py ' + '|'.join(SAMPLES) + ' [--write]')
@@ -59,7 +59,7 @@ resources = root / 'scripts/initializr/common/src/main/resources'
 # What the generator rewrites as text; the rest is copied as bytes.
 # Exactly the files the generator rewrites too (GeneratorModel.isTextFile): a
 # `myappname` written into any other would stay in the generated project.
-TEXT = ('.java', '.xml', '.properties', '.css', '.sh', '.md', '.json', '.txt')
+TEXT = ('.java', '.xml', '.properties', '.css', '.sh', '.md', '.json', '.txt', '.sql')
 
 HEADER = re.compile(r'\A/\*\n \* Copyright \(c\) .*?\*/\n', re.S)
 HASH_HEADER = re.compile(r'\A((?:#!.*\n)?)(?:#\n)?# Copyright \(c\) .*?(?=^[^#]|\Z)', re.S | re.M)

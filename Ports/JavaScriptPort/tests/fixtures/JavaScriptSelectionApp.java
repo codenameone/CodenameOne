@@ -207,6 +207,22 @@ public class JavaScriptSelectionApp extends Lifecycle {
                 if (query.indexOf("handoff=true") >= 0) second.startEditingAsync();
             }));
             form.addAll(new Button("Initial focus"), first, second, check, stop, status);
+        } else if (query.indexOf("review=selectionsignin") >= 0) {
+            // Text selection on for the whole form, as a screen with a copyable value has it,
+            // and fields that use the legacy editor. Typing and then pressing a button at once
+            // lost the typed text: the press that opened a field closed it again, and the
+            // button's action read the model before the field had committed.
+            form.getTextSelection().setEnabled(true);
+            TextArea copyable = new TextArea("Copyable reference ABC-123");
+            copyable.setEditable(false);
+            copyable.setTextSelectionEnabled(true);
+            final TextField email = new TextField("", "E-mail", 20, TextArea.EMAILADDR);
+            email.setName("signinEmail");
+            final TextField password = new TextField("", "Password", 20, TextArea.PASSWORD);
+            password.setName("signinPassword");
+            Button submit = new Button("Submit sign-in");
+            submit.addActionListener(e -> status.setText("Submitted " + email.getText() + "|" + password.getText()));
+            form.addAll(copyable, email, password, submit, status);
         } else if (query.indexOf("review=multitouch") >= 0) {
             Label label = new Label("Pinch promoted label");
             TextArea area = new TextArea("Pinch native editor", 2, 24);

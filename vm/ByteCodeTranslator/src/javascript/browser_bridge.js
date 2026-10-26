@@ -4358,6 +4358,129 @@
     }
   });
 
+  // Passkeys for com.codename1.impl.html5.HTML5WebAuthn. The options and the
+  // credential travel as WebAuthn JSON -- binary members as base64url -- which is
+  // what a relying party sends and expects, so they pass through unchanged
+  // around the ceremony. Answers { status, text }: 0 and the credential JSON,
+  // 1 for a dismissed sheet (NotAllowedError, which the browser also uses for
+  // a timeout and gives no way to tell apart), 2 and "Name:message".
+  function cn1WebAuthnFromB64(text) {
+    var b64 = String(text).replace(/-/g, '+').replace(/_/g, '/');
+    while (b64.length % 4) {
+      b64 += '=';
+    }
+    var raw = global.atob(b64);
+    var out = new Uint8Array(raw.length);
+    for (var i = 0; i < raw.length; i++) {
+      out[i] = raw.charCodeAt(i);
+    }
+    return out.buffer;
+  }
+
+  function cn1WebAuthnToB64(buffer) {
+    if (buffer == null) {
+      return null;
+    }
+    var bytes = new Uint8Array(buffer);
+    var raw = '';
+    for (var i = 0; i < bytes.length; i++) {
+      raw += String.fromCharCode(bytes[i]);
+    }
+    return global.btoa(raw).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  function cn1WebAuthnIds(list) {
+    if (!list) {
+      return list;
+    }
+    return list.map(function(entry) {
+      var copy = {};
+      for (var key in entry) {
+        copy[key] = entry[key];
+      }
+      copy.id = cn1WebAuthnFromB64(entry.id);
+      return copy;
+    });
+  }
+
+  function cn1WebAuthnCredentialJson(credential) {
+    if (typeof credential.toJSON === 'function') {
+      return credential.toJSON();
+    }
+    var r = credential.response;
+    var response = { clientDataJSON: cn1WebAuthnToB64(r.clientDataJSON) };
+    if (r.attestationObject) {
+      response.attestationObject = cn1WebAuthnToB64(r.attestationObject);
+      if (typeof r.getTransports === 'function') {
+        response.transports = r.getTransports();
+      }
+    }
+    if (r.authenticatorData) {
+      response.authenticatorData = cn1WebAuthnToB64(r.authenticatorData);
+      response.signature = cn1WebAuthnToB64(r.signature);
+      response.userHandle = cn1WebAuthnToB64(r.userHandle);
+    }
+    return {
+      id: credential.id,
+      rawId: cn1WebAuthnToB64(credential.rawId),
+      type: credential.type,
+      authenticatorAttachment: credential.authenticatorAttachment || null,
+      response: response,
+      clientExtensionResults: typeof credential.getClientExtensionResults === 'function'
+        ? credential.getClientExtensionResults() : {}
+    };
+  }
+
+  hostBridge.register('__cn1_webauthn__', function(request) {
+    var nav = global.navigator || (global.window && global.window.navigator);
+    var available = !!(nav && nav.credentials && typeof global.PublicKeyCredential === 'function');
+    var op = request && request.op;
+    if (op === 'supported') {
+      return available;
+    }
+    if (!available) {
+      return { status: 2, text: 'NotSupportedError:This browser has no passkey support' };
+    }
+    var publicKey;
+    try {
+      var parsed = JSON.parse(request.options);
+      publicKey = {};
+      var source = parsed.publicKey || parsed;
+      for (var key in source) {
+        publicKey[key] = source[key];
+      }
+      publicKey.challenge = cn1WebAuthnFromB64(source.challenge);
+      if (op === 'create') {
+        publicKey.user = {
+          id: cn1WebAuthnFromB64(source.user.id),
+          name: source.user.name,
+          displayName: source.user.displayName
+        };
+        publicKey.excludeCredentials = cn1WebAuthnIds(source.excludeCredentials);
+      } else if (op === 'get') {
+        publicKey.allowCredentials = cn1WebAuthnIds(source.allowCredentials);
+      } else {
+        return { status: 2, text: 'invalid_options:Unknown ceremony ' + op };
+      }
+    } catch (err) {
+      return { status: 2, text: 'invalid_options:' + (err && err.message || err) };
+    }
+    var ceremony = op === 'create' ? nav.credentials.create({ publicKey: publicKey })
+      : nav.credentials.get({ publicKey: publicKey });
+    return ceremony.then(function(credential) {
+      if (!credential) {
+        return { status: 1, text: '' };
+      }
+      return { status: 0, text: JSON.stringify(cn1WebAuthnCredentialJson(credential)) };
+    }, function(error) {
+      var name = error && error.name || 'transport_error';
+      if (name === 'NotAllowedError') {
+        return { status: 1, text: '' };
+      }
+      return { status: 2, text: name + ':' + (error && error.message || '') };
+    });
+  });
+
   hostBridge.register('__cn1_copy_to_clipboard__', function(request) {
     var text = (request && request.text != null) ? String(request.text) : '';
     var nav = global.navigator || (global.window && global.window.navigator);

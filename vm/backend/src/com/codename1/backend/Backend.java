@@ -26,6 +26,7 @@ import com.codename1.backend.metrics.MetricReader;
 import com.codename1.backend.orm.EntityDefinition;
 import com.codename1.backend.orm.EntityManager;
 import com.codename1.impl.backend.BackendApplication;
+import com.codename1.impl.backend.JsonCodec;
 import com.codename1.impl.backend.Management;
 import com.codename1.impl.backend.RequestSecurity;
 import com.codename1.impl.backend.WiringEnvironment;
@@ -2216,6 +2217,9 @@ public final class Backend {
                         }
                     };
                 }
+                JsonCodec.setMaxDepth(config.getInt(
+                        JsonCodec.MAX_DEPTH_SETTING,
+                        JsonCodec.MAX_DEPTH));
                 Cors cors = Cors.fromConfig(config);
                 if (cors != null) {
                     // Whether a request arrives over TLS, for telling a same-origin

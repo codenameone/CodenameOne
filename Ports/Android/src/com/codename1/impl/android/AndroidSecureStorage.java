@@ -1546,8 +1546,19 @@ public final class AndroidSecureStorage extends SecureStorage {
             // Skip setUserAuthenticationRequired on API 33+ per
             // FingerprintScanner #8; the BiometricPrompt still authenticates
             // the user, but the keystore no longer ties the key lifetime to
-            // biometric enrolment (which caused recovery failures).
-            if (Build.VERSION.SDK_INT < 33) {
+            // biometric enrolment (which caused recovery failures). That stays
+            // the default so installed apps keep working on update. An app
+            // that opts in with setStrictBiometricBinding gets a key bound on
+            // every level and revoked by a new enrolment (API 24+); the prompt
+            // carries the cipher as its CryptoObject, which a per-use bound key
+            // needs. Only a key created here is affected: an existing key is
+            // never deleted for being unbound, which would wipe its entries.
+            if (isStrictBiometricBinding()) {
+                b.setUserAuthenticationRequired(true);
+                if (Build.VERSION.SDK_INT >= 24) {
+                    b.setInvalidatedByBiometricEnrollment(true);
+                }
+            } else if (Build.VERSION.SDK_INT < 33) {
                 b.setUserAuthenticationRequired(true);
             }
             keyGenerator.init(b.build());
