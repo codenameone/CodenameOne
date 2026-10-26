@@ -22,7 +22,7 @@
  */
 package com.codename1.crypto.encoding;
 
-import java.math.BigInteger;
+import com.codename1.crypto.UInt256;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -91,17 +91,17 @@ public final class Rlp {
         return encode(longBytes(value));
     }
 
-    /// Encodes a non-negative integer as a minimal big-endian byte string (zero is the empty string).
+    /// Encodes a 256-bit quantity as a minimal big-endian byte string (zero is the empty string).
     ///
     /// #### Parameters
     ///
-    /// - `value`: a value of zero or more
+    /// - `value`: the quantity
     ///
     /// #### Returns
     ///
     /// the RLP bytes
-    public static byte[] encodeBigInteger(BigInteger value) {
-        return encode(bigBytes(value));
+    public static byte[] encodeQuantity(UInt256 value) {
+        return encode(value.toMinimalBytes());
     }
 
     /// Returns the minimal big-endian bytes of a non-negative long, empty for zero.
@@ -127,31 +127,6 @@ public final class Rlp {
             value >>>= 8;
         }
         return out;
-    }
-
-    /// Returns the minimal big-endian bytes of a non-negative integer, empty for zero.
-    ///
-    /// #### Parameters
-    ///
-    /// - `value`: a value of zero or more
-    ///
-    /// #### Returns
-    ///
-    /// the unpadded bytes, for use as an RLP string item
-    public static byte[] bigBytes(BigInteger value) {
-        if (value.signum() < 0) {
-            throw new IllegalArgumentException("Negative value");
-        }
-        if (value.signum() == 0) {
-            return new byte[0];
-        }
-        byte[] b = value.toByteArray();
-        if (b[0] == 0) {
-            byte[] t = new byte[b.length - 1];
-            System.arraycopy(b, 1, t, 0, t.length);
-            return t;
-        }
-        return b;
     }
 
     /// Decodes one RLP item that must span the whole input.

@@ -2,7 +2,7 @@ package com.codename1.crypto.encoding;
 
 import org.junit.jupiter.api.Test;
 
-import java.math.BigInteger;
+import com.codename1.crypto.UInt256;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -259,10 +259,10 @@ class EncodingTest {
         assertEquals("80", Hex.encode(Rlp.encodeLong(0)));
         assertEquals("0f", Hex.encode(Rlp.encodeLong(15)));
         assertEquals("820400", Hex.encode(Rlp.encodeLong(1024)));
-        assertEquals("820400", Hex.encode(Rlp.encodeBigInteger(BigInteger.valueOf(1024))));
-        assertEquals("80", Hex.encode(Rlp.encodeBigInteger(BigInteger.ZERO)));
+        assertEquals("820400", Hex.encode(Rlp.encodeQuantity(UInt256.valueOf(1024))));
+        assertEquals("80", Hex.encode(Rlp.encodeQuantity(UInt256.ZERO)));
         assertEquals("8180", Hex.encode(Rlp.encodeLong(128)));
-        assertEquals("88ffffffffffffffff", Hex.encode(Rlp.encodeBigInteger(BigInteger.ONE.shiftLeft(64).subtract(BigInteger.ONE))));
+        assertEquals("88ffffffffffffffff", Hex.encode(Rlp.encodeQuantity(UInt256.ONE.shiftLeft(64).subtract(UInt256.ONE))));
         List<Object> empty = new ArrayList<Object>();
         List<Object> one = new ArrayList<Object>();
         one.add(empty);
@@ -336,6 +336,5 @@ class EncodingTest {
     void rlp_rejectsUnsupportedItems() {
         assertThrows(IllegalArgumentException.class, () -> Rlp.encode("string"));
         assertThrows(IllegalArgumentException.class, () -> Rlp.encodeLong(-1));
-        assertThrows(IllegalArgumentException.class, () -> Rlp.encodeBigInteger(BigInteger.valueOf(-1)));
     }
 }
