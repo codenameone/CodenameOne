@@ -20,7 +20,7 @@ board attached.
   interpreted and nothing is compiled at start-up, so the first frame arrives in
   tens of milliseconds and memory use stays flat.
 * *Java or Kotlin for the whole product.* The device UI, the companion application
-  and, with the <<_backend,backend>>, the server or the headless gateway share one
+  and, with the <<_server_side_backend,backend>>, the server or the headless gateway share one
   language, one build and one set of classes.
 * *A renderer that owns every pixel.* Codename One draws its own components, so the
   user interface looks the same on a 3.5 inch SPI panel, a 10 inch HMI and a phone,
@@ -159,7 +159,7 @@ therefore runs, and can be unit tested, before a board is on the desk.
 === Headless devices: the backend on a board
 
 A gateway, a sensor hub or a controller with no screen runs the
-<<_backend,backend>> instead: a native REST and WebSocket server, built the same way
+<<_server_side_backend,backend>> instead: a native REST and WebSocket server, built the same way
 and as small. `Hardware.getInstance()` works there too, through the same kernel code
 as the UI port, and listener callbacks run on the pin's own thread. The device then
 serves its API, the phone application is the client, and both share the entity

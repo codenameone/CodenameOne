@@ -347,7 +347,19 @@ public class LinuxImplementation extends CodenameOneImplementation {
 
     /// True on the embedded target (DRM/KMS or fbdev, no window system). Fixed at
     /// build time: the native is a constant in each of the two display units.
-    static final boolean EMBEDDED = LinuxNative.isEmbeddedDisplay();
+    /// The port's JVM unit tests run with no native library; they exercise the
+    /// desktop behaviour, so a missing native reads as "not embedded".
+    private static final class Embedded {
+        static final boolean VALUE = query();
+
+        private static boolean query() {
+            try {
+                return LinuxNative.isEmbeddedDisplay();
+            } catch (UnsatisfiedLinkError notLinked) {
+                return false;
+            }
+        }
+    }
 
     @Override
     public void init(Object m) {
@@ -2433,14 +2445,14 @@ public class LinuxImplementation extends CodenameOneImplementation {
      */
     @Override
     public boolean isNativeInputSupported() {
-        return !EMBEDDED;
+        return !Embedded.VALUE;
     }
 
     private final LinuxTextInput lowLevelTextInput = new LinuxTextInput();
 
     @Override
     public boolean isTextInputSupported() {
-        return !EMBEDDED;
+        return !Embedded.VALUE;
     }
 
     @Override
@@ -2472,7 +2484,7 @@ public class LinuxImplementation extends CodenameOneImplementation {
      */
     @Override
     public boolean isAsyncEditMode() {
-        return !EMBEDDED;
+        return !Embedded.VALUE;
     }
 
     /**
@@ -2485,7 +2497,7 @@ public class LinuxImplementation extends CodenameOneImplementation {
      */
     @Override
     public void editString(final Component cmp, int maxSize, int constraint, String text, int initiatingKeycode) {
-        if (EMBEDDED) {
+        if (Embedded.VALUE) {
             LinuxEmbeddedEditor.edit(cmp, maxSize, constraint, text);
             return;
         }
@@ -3837,7 +3849,7 @@ public class LinuxImplementation extends CodenameOneImplementation {
     /// takes the mobile resource and theme layers.
     @Override
     public boolean isDesktop() {
-        return !EMBEDDED;
+        return !Embedded.VALUE;
     }
 
 
