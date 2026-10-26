@@ -1,6 +1,6 @@
 # The demo applications: where to learn idiomatic Codename One
 
-Codename One ships four complete, production-shaped applications. Each is an app
+Codename One ships five complete, production-shaped applications. Each is an app
 **and** its server, written by the Codename One team, tested end to end, and kept
 building against the current framework. When you are unsure how something is
 "meant" to be done -- a screen, a navigation pattern, a live channel, a REST
@@ -21,7 +21,7 @@ pattern.** Copy the shape, not the domain.
   It explains *why* the code is laid out the way it is -- read it before making a
   structural change modeled on a demo.
 
-All four share this layout, which is itself the first best practice (Skirmish adds a
+All five share this layout, which is itself the first best practice (Skirmish adds a
 `rules` module, the deterministic game simulation the app, server and tests all compile):
 
 | Module | Holds |
@@ -41,13 +41,16 @@ README of each lists the demo accounts.
 | `scripts/wayline` | Ride hailing: rider, driver, admin | Role-based start screens, maps and live markers (`map/`), bottom sheets, wallet and card entry (`pay/`), admin dashboards and charts (`admin/`, `ui/Chart.java`), the reference implementation of the shared-contract full-stack pattern |
 | `scripts/savor` | Food delivery: customer, merchant, courier, admin | Catalog/menu browsing, cart and checkout (`customer/`), merchant order queues and menu editing (`merchant/`), two state machines (order + delivery) mirrored between `shared` enums and the server |
 | `scripts/parley` | End-to-end encrypted messenger with calls | Chat UI and media (`chat/`, `ui/ChatForm.java`), crypto with core APIs (`crypto/`), WebRTC calls (`com.codename1.webrtc`, `ui/CallScreen.java`), local store (`store/`), push and WebSocket delivery |
+| `scripts/bastion` | Security-hardened bank and crypto exchange: customer, staff console | Security end to end: sealed key storage, biometric/PIN app lock, certificate pinning, secure windows (`security/`), device-key request signing, passkeys, TOTP and step-up (`security/RequestSigner.java`, server `money/RequestSigning.java`, `account/`), a Security Center that reports each protection's live state (`ui/SecurityCenterForm.java`); a double-entry ledger with idempotency and conditional updates (server `ledger/`), a hash-chained audit log (`audit/`), accounting reports and PDF printing (`books/`, `ui/Printout.java`), an order-matching exchange (`exchange/`), and real Ether custody on an Ethereum node (server `chain/`). Its implementor's guide ends with a security checklist |
 | `scripts/skirmish` | Real-time 3D card battler | Games: `GameView`/3D rendering (`battle/`), a deterministic `rules` module shared by app, server and tests, replays, in-app purchases and rewarded ads (`engage/`), matchmaking over sockets, in-app editors (`forge/`) |
 
 ## Patterns the app demos share (copy these)
 
 Wayline, Savor and Parley follow all of these. Skirmish is a game and differs:
 its socket is `net/GameLink.java` rather than `live/LiveChannel.java`, and it has
-no `Prefs`, `Telemetry` or l10n bundles.
+no `Prefs`, `Telemetry` or l10n bundles. Bastion has no live channel or
+`Telemetry` (a bank sends no analytics and pulls its data on demand), and its
+`net/Guard.java` adds the pinning and host allow-list every request goes through.
 
 - **Thin entry class.** `<pkg>/<App>.java` extends `Lifecycle`; configuration in
   `AppConfig`, preferences in `Prefs`, opt-in analytics in `Telemetry`.

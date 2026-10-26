@@ -162,6 +162,10 @@ include::Parley-Users-Guide.asciidoc[]
 
 include::Parley-Implementors-Guide.asciidoc[]
 
+include::Bastion-Users-Guide.asciidoc[]
+
+include::Bastion-Implementors-Guide.asciidoc[]
+
 = Device and platform services
 
 include::Push-Notifications.asciidoc[]

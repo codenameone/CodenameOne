@@ -2646,6 +2646,12 @@ public class AndroidGradleBuilder extends Executor {
         if (playServicesAds) {
             minSDK = maxInt("21", minSDK);
         }
+        if (playIntegrity) {
+            // com.google.android.play:integrity declares minSdk 21 in its own manifest, so
+            // an application left at the default floor of 19 failed the manifest merger
+            // ("uses-sdk:minSdkVersion 19 cannot be smaller than version 21").
+            minSDK = maxInt("21", minSDK);
+        }
         if (googleAdUnitId != null && googleAdUnitId.length() > 0) {
             minSDK = maxInt("9", minSDK);
             if (!userXapplication.contains("com.google.android.gms.version")) {

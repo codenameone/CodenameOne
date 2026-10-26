@@ -1410,6 +1410,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                                 currentEditingField = ta;
                                 currentInputField = el;
                                 isEditing = true;
+                                editingSessionCount++;
                                 // Browser focus bypasses editStringImpl(), which normally
                                 // registers the session for form-level editing APIs.
                                 setFocusedEditingText(ta);
@@ -1870,6 +1871,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                         public void run() {
                             donePressed = false;
                             isEditing = true;
+                            editingSessionCount++;
                             inputEl.getStyle().setProperty("color", HTML5Graphics.color(ta.getStyle().getFgColor()));
                     
                             Font f = ta.getSelectedStyle().getFont();
@@ -2780,6 +2782,15 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 // clears the flag after Display.pointerPressed returns, then
                 // runs any release that onMouseUp deferred while waiting.
                 final PressSlot press = beginPressInFlight();
+                // The edit this press ends is the one open NOW, read before any JSO call
+                // yields. The runnable below is queued on the EDT behind those yields, and
+                // by the time it runs, this same click's release may already have opened
+                // the field it landed on -- it used to close that session again at once.
+                // With text selection on the form (which adds work to every press) it did
+                // so on nearly every click: the field blurred under the first keystrokes,
+                // the next session's commit replayed a stale value over the model, and
+                // typed characters were lost.
+                final int sessionAtPress = isEditing ? editingSessionCount : -1;
                 if (nativeEventListener != null) {
                     CancelableEvent cevt = (CancelableEvent)evt;
                     nativeEventListener.handleEvent(evt);
@@ -2825,7 +2836,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 callSerially(new Runnable() {
                     public void run() {
                         
-                        if (isEditing){
+                        if (isEditing && editingSessionCount == sessionAtPress){
                             finishTextEditing();
                         } 
                     }
@@ -5219,6 +5230,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
         if (JavaScriptInputCoordinator.shouldInstallKeyboard(isPhoneOrTablet_())) {
             HTML5Keyboard.install();
         }
+        // Passkeys through the page's navigator.credentials.
+        HTML5WebAuthn.install();
         // Set the locale
         installBeforeUnload();
         
@@ -6953,6 +6966,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private native static void scroll_();
     
     private boolean isEditing=false;
+    /// Counts editing sessions, so that work queued for one session cannot end the next.
+    /// See onMouseDown: its "a press elsewhere ends the edit" runnable was queued before
+    /// the same click's release had opened a new session, and ran after it.
+    private int editingSessionCount;
     
     /**
      * Text field that is used for editing.
@@ -7714,6 +7731,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
         text = origText;
         isEditing=true;
+        editingSessionCount++;
         
         // This Hack is specifically to work around an issue on iOS Safari
         // where the "touch" event circumvents the editing process, causing
@@ -8022,6 +8040,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 }
             }
             
+            final HTMLInputElement focusedInputEl = inputEl;
             final FocusListener focusListener = new FocusListener() {
 
                 @Override
@@ -8031,7 +8050,15 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
                 @Override
                 public void focusLost(Component cmpnt) {
-                    
+                    // Commit the value now, not only in the completion callback below. Focus
+                    // moves inside Form.pointerPressed, so this runs before the release of the
+                    // same click; the callback is queued, and a button whose action reads the
+                    // field (a sign-in form's "Sign in") could fire first and read the model
+                    // as it was before anything was typed.
+                    String value = focusedInputEl.getValue();
+                    if (value != null && !value.equals(ta.getText())) {
+                        ta.setText(value);
+                    }
                     finishTextEditing();
                 }
                 
