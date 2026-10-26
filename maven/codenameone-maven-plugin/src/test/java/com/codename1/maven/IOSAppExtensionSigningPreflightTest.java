@@ -567,4 +567,83 @@ public class IOSAppExtensionSigningPreflightTest {
         assertTrue(IOSProvisioningPreflight.profileCoversBundleId(null, "com.example.app"));
         assertTrue(IOSProvisioningPreflight.profileCoversBundleId("", "com.example.app"));
     }
+
+    // ---- CN1Widgets, generated whenever a class names com.codename1.surfaces (#6008) ----
+
+    private static List<IOSProvisioningPreflight.Problem> checkWidgets(Properties p,
+            boolean usesSurfaces) {
+        return IOSProvisioningPreflight.checkGeneratedExtensions(p, true, usesSurfaces);
+    }
+
+    @Test
+    public void surfacesWithOnlyTheAppProfileAreRefused() throws Exception {
+        Properties p = settings(profile("PROD", "ABCD1234.com.example.app", GROUP));
+        List<IOSProvisioningPreflight.Problem> problems = checkWidgets(p, true);
+        assertEquals(1, problems.size());
+        assertTrue(problems.get(0).fatal);
+        String message = problems.get(0).message;
+        assertTrue(message, message.contains("com.example.app.CN1Widgets"));
+        assertTrue(message, message.contains("App Groups"));
+        assertTrue(message, message.contains("codename1.ios.release.appext.CN1Widgets.provision"));
+        assertTrue(message, message.contains("ios.appext.CN1Widgets.provisioningURL"));
+        assertTrue(message, message.contains("Certificate Wizard"));
+    }
+
+    @Test
+    public void surfacesWithAWidgetProfileAreAccepted() throws Exception {
+        Properties p = settings(profile("PROD", "ABCD1234.com.example.app", GROUP));
+        p.setProperty("codename1.ios.appext.CN1Widgets.provision",
+                profile("Widgets", "ABCD1234.com.example.app.CN1Widgets", GROUP).getAbsolutePath());
+        assertTrue(checkWidgets(p, true).isEmpty());
+
+        Properties hinted = settings(profile("PROD2", "ABCD1234.com.example.app", GROUP));
+        hinted.setProperty("codename1.arg.ios.appext.CN1Widgets.provisioningURL",
+                "https://example.com/widgets.mobileprovision");
+        assertTrue(checkWidgets(hinted, true).isEmpty());
+    }
+
+    @Test
+    public void anAppThatNeverNamesSurfacesIsNotAskedForAWidgetProfile() throws Exception {
+        Properties p = settings(profile("PROD", "ABCD1234.com.example.app", GROUP));
+        assertTrue(checkWidgets(p, false).isEmpty());
+        // ios.surfaces.extension=false skips the target, so there is nothing to sign either.
+        p.setProperty("codename1.arg.ios.surfaces.extension", "false");
+        assertTrue(checkWidgets(p, true).isEmpty());
+    }
+
+    @Test
+    public void automaticSigningTargetsAreNotChecked() {
+        // ios-source is an Xcode project the developer signs (automatically or otherwise), and the
+        // simulator signs nothing: the preflight never runs for either.
+        assertFalse(IOSProvisioningPreflight.appliesTo("ios", "ios-source"));
+        assertFalse(IOSProvisioningPreflight.appliesTo("ios", "ios-simulator"));
+        assertTrue(IOSProvisioningPreflight.appliesTo("ios", "ios-device"));
+    }
+
+    @Test
+    public void theSurfacesScanReadsTheStagedClasses() throws Exception {
+        File uses = tmp.newFile("uses.jar");
+        writeJar(uses, "com/example/app/Main.class",
+                "....Lcom/codename1/surfaces/ExternalSurfaces;....");
+        assertTrue(IOSProvisioningPreflight.referencesSurfaces(uses));
+
+        // A bundled copy of the package itself is not a use of it.
+        File bundled = tmp.newFile("bundled.jar");
+        writeJar(bundled, "com/codename1/surfaces/ExternalSurfaces.class",
+                "com/codename1/surfaces/SurfaceKind");
+        assertFalse(IOSProvisioningPreflight.referencesSurfaces(bundled));
+
+        assertFalse(IOSProvisioningPreflight.referencesSurfaces(new File(tmp.getRoot(), "none.jar")));
+    }
+
+    private static void writeJar(File jar, String entry, String contents) throws Exception {
+        ZipOutputStream zip = new ZipOutputStream(new FileOutputStream(jar));
+        try {
+            zip.putNextEntry(new ZipEntry(entry));
+            zip.write(contents.getBytes("UTF-8"));
+            zip.closeEntry();
+        } finally {
+            zip.close();
+        }
+    }
 }

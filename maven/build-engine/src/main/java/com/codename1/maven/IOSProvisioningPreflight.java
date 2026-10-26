@@ -434,8 +434,9 @@ final class IOSProvisioningPreflight {
      * build and an Xcode failure minutes into a cloud one, naming a bundle id the developer never
      * typed.</p>
      *
-     * <p>Only the document provider is checked here. The other generated extensions (the Wallet
-     * pair, CN1Widgets, CN1MatterSetup) have exactly this shape and could join the table below,
+     * <p>The document provider is checked here, and CN1Widgets by
+     * {@link #checkGeneratedExtensions(Properties, boolean, boolean)}. The other generated
+     * extensions (the Wallet pair, CN1MatterSetup) have exactly this shape and could join them,
      * but each one turns a late cloud failure into an early local one for projects that build
      * today, so they are left for a change that can be verified against real projects rather than
      * folded in as a side effect.</p>
@@ -463,6 +464,97 @@ final class IOSProvisioningPreflight {
     /// feature behind a hint the developer set deliberately, having first
     /// obtained a capability Apple grants by hand.
     static List<Problem> checkGeneratedExtensions(Properties settings, boolean release) {
+        return checkGeneratedExtensions(settings, release, false);
+    }
+
+    /// The same, plus the CN1Widgets WidgetKit target when `usesSurfaces` says the app references
+    /// `com.codename1.surfaces` (see [#referencesSurfaces]).
+    ///
+    /// Unlike the document provider, nothing in the settings enables CN1Widgets: the builder
+    /// generates it whenever a class names the surfaces package, so the caller has to scan the
+    /// staged classes for the same signal. Issue #6008 is the real-project evidence the note above
+    /// asked for -- an app supplying only its own profile ran a whole cloud build to have Xcode
+    /// report that profile's App ID "does not match the bundle ID <package>.CN1Widgets", a
+    /// message that names neither the extension's hint nor the Certificate Wizard.
+    ///
+    /// No wildcard exemption, for the reason the document provider gives: the widget target
+    /// always declares the App Group its timeline travels through, and a wildcard App ID cannot
+    /// carry App Groups.
+    static List<Problem> checkGeneratedExtensions(Properties settings, boolean release,
+            boolean usesSurfaces) {
+        List<Problem> problems = checkDocumentProvider(settings, release);
+        if (settings == null || !usesSurfaces
+                || "false".equals(trimmed(settings.getProperty("codename1.arg.ios.surfaces.extension")))) {
+            // ios.surfaces.extension=false skips the whole iOS lowering: no target, nothing to sign.
+            return problems;
+        }
+        String packageName = trimmed(settings.getProperty("codename1.packageName"));
+        if (packageName == null || packageName.isEmpty()) {
+            return problems;
+        }
+        String name = "CN1Widgets";
+        if (hasOwnProfileSetting(settings, name, release)) {
+            return problems;
+        }
+        Profile appProfile = appProfile(settings, release);
+        if (appProfile == null || appProfile.applicationIdentifier == null) {
+            // check() reports a missing or unreadable app profile as itself.
+            return problems;
+        }
+        String bundleId = generatedExtensionBundleId(settings, "ios.surfaces", packageName, name);
+        String buildType = release ? "release" : "debug";
+        problems.add(new Problem("This app uses com.codename1.surfaces (home-screen widgets or "
+                + "live activities), so the iOS build adds the " + name + " WidgetKit extension, "
+                + "and no provisioning profile is configured for it. The profile this build signs "
+                + "with (\"" + appProfile.name + "\", App ID "
+                + appIdPattern(appProfile.applicationIdentifier) + ") cannot sign it: Xcode would "
+                + "fail with: Provisioning profile \"" + appProfile.name + "\" has app ID \""
+                + appIdPattern(appProfile.applicationIdentifier) + "\", which does not match the "
+                + "bundle ID \"" + bundleId + "\".\n"
+                + "Create an App ID for " + bundleId + " with the App Groups capability in the "
+                + "Apple Developer portal, generate a provisioning profile for it against the same "
+                + "certificate as the app, and supply it in one of these ways:\n"
+                + "  1. Set codename1.ios." + buildType + ".appext." + name + ".provision="
+                + "{path to the .mobileprovision} in codenameone_settings.properties.\n"
+                + "  2. Host the profile and name its URL in codename1.arg.ios.appext." + name
+                + ".provisioningURL.\n"
+                + "The Certificate Wizard does all of this for you. To build without widgets, set "
+                + "codename1.arg.ios.surfaces.extension=false.", true));
+        return problems;
+    }
+
+    /// Whether any class in `jar` outside the surfaces package itself names
+    /// `com/codename1/surfaces/` -- the signal IPhoneBuilder sets `usesSurfaces` from. The staged
+    /// jar carries the app and its cn1libs but not the core, so the package's own classes are only
+    /// there when a library bundles them, and those are skipped. A jar that cannot be read answers
+    /// false: this is a preflight, and an IO error is not a signing problem.
+    static boolean referencesSurfaces(File jar) {
+        if (jar == null || !jar.isFile()) {
+            return false;
+        }
+        byte[] needle = "com/codename1/surfaces/".getBytes(StandardCharsets.US_ASCII);
+        try (ZipFile zip = new ZipFile(jar)) {
+            Enumeration<? extends ZipEntry> entries = zip.entries();
+            while (entries.hasMoreElements()) {
+                ZipEntry entry = entries.nextElement();
+                String entryName = entry.getName();
+                if (entry.isDirectory() || !entryName.endsWith(".class")
+                        || entryName.startsWith("com/codename1/surfaces/")) {
+                    continue;
+                }
+                try (InputStream in = zip.getInputStream(entry)) {
+                    if (indexOf(readAll(in), needle, 0) >= 0) {
+                        return true;
+                    }
+                }
+            }
+        } catch (IOException ex) {
+            return false;
+        }
+        return false;
+    }
+
+    private static List<Problem> checkDocumentProvider(Properties settings, boolean release) {
         List<Problem> problems = new ArrayList<Problem>();
         if (settings == null) {
             return problems;
@@ -507,7 +599,8 @@ final class IOSProvisioningPreflight {
             // neither is something to refuse a build over here.
             return problems;
         }
-        String bundleId = generatedExtensionBundleId(settings, packageName, name);
+        String bundleId = generatedExtensionBundleId(settings, "ios.documentProvider", packageName,
+                name);
         if (profileCoversBundleId(appProfile.applicationIdentifier, bundleId)) {
             // No wildcard exemption here, unlike the folder-driven check above. A wildcard App ID
             // does cover the bundle id, but this extension always declares
@@ -588,7 +681,7 @@ final class IOSProvisioningPreflight {
                 // report, not this one's.
                 return null;
             }
-            String bundleId = generatedExtensionBundleId(settings,
+            String bundleId = generatedExtensionBundleId(settings, "ios.documentProvider",
                     trimmed(settings.getProperty("codename1.packageName")), name);
             if (!profileCoversBundleId(profile.applicationIdentifier, bundleId)) {
                 // A profile for a DIFFERENT App ID that happens to grant the same group. It is
@@ -624,9 +717,9 @@ final class IOSProvisioningPreflight {
     /// the profile against the default would reject the profile issued for the real identifier
     /// and accept one issued for a target that is not being built -- the failure moving to Xcode,
     /// after the archive, which is what this whole class exists to prevent.
-    private static String generatedExtensionBundleId(Properties settings, String packageName,
-                                                     String name) {
-        String override = settings.getProperty("codename1.arg.ios.documentProvider.buildSettings."
+    private static String generatedExtensionBundleId(Properties settings, String hintPrefix,
+                                                     String packageName, String name) {
+        String override = settings.getProperty("codename1.arg." + hintPrefix + ".buildSettings."
                 + "PRODUCT_BUNDLE_IDENTIFIER");
         if (override != null) {
             String resolved = resolvePlaceholders(override.trim(), settings);
@@ -1492,13 +1585,17 @@ final class IOSProvisioningPreflight {
 
     private static byte[] readFile(File f) throws IOException {
         try (InputStream is = new FileInputStream(f)) {
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            byte[] buffer = new byte[8192];
-            int amount;
-            while ((amount = is.read(buffer)) > -1) {
-                baos.write(buffer, 0, amount);
-            }
-            return baos.toByteArray();
+            return readAll(is);
         }
+    }
+
+    private static byte[] readAll(InputStream is) throws IOException {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        byte[] buffer = new byte[8192];
+        int amount;
+        while ((amount = is.read(buffer)) > -1) {
+            baos.write(buffer, 0, amount);
+        }
+        return baos.toByteArray();
     }
 }
