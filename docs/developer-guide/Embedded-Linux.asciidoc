@@ -236,7 +236,7 @@ The table sits in the database of the ORM session the outbox was opened on. An
 `enqueue` inside one of that session's transactions belongs to the transaction,
 so a reading and the message announcing it commit together or not at all:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/EmbeddedLinuxConnectedSnippet.java[tag=embedded-linux-outbox,indent=0]
 ----
@@ -264,7 +264,7 @@ certificate. The key never leaves the device. The request is a PKCS#10
 certificate signing request, which `com.codename1.security.CertificateRequest`
 builds:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/EmbeddedLinuxConnectedSnippet.java[tag=embedded-linux-csr,indent=0]
 ----
@@ -272,7 +272,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 From then on the device presents the certificate on every request, and the server
 identifies it from the TLS handshake:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/EmbeddedLinuxConnectedSnippet.java[tag=embedded-linux-mtls,indent=0]
 ----
