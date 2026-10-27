@@ -1,0 +1,162 @@
+id=7 name='Ann' email=None tags=[] score=1.5
+User(id=7, name='Ann', email=None, tags=[], score=1.5)
+7 int [] 1.5
+{'id': 7, 'name': 'Ann', 'email': None, 'tags': [], 'score': 1.5}
+{"id":7,"name":"Ann","email":null,"tags":[],"score":1.5}
+{
+  "id": 7,
+  "name": "Ann",
+  "email": null,
+  "tags": [],
+  "score": 1.5
+}
+['id', 'name']
+True False
+['id', 'name', 'email', 'tags', 'score']
+True False
+i=12 f=1.5 s='x' b=True
+i=3 f=2.0 s='y' b=False
+i=1 f=3.0 s='z' b=False
+1 [('int_parsing', ('id',), 'Input should be a valid integer, unable to parse string as an integer')]
+1 [('missing', ('id',), 'Field required')]
+1 [('int_from_float', ('id',), 'Input should be a valid integer, got a number with a fractional part')]
+1 [('string_type', ('name',), 'Input should be a valid string')]
+1 [('list_type', ('tags',), 'Input should be a valid list')]
+1 [('string_type', ('tags', 0), 'Input should be a valid string')]
+1 [('float_parsing', ('score',), 'Input should be a valid number, unable to parse string as a number')]
+2 [('int_type', ('id',), 'Input should be a valid integer'), ('string_type', ('name',), 'Input should be a valid string')]
+1 [('bool_parsing', ('b',), 'Input should be a valid boolean, unable to interpret input')]
+1 [('bool_parsing', ('b',), 'Input should be a valid boolean, unable to interpret input')]
+3 [('int_type', ('i',), 'Input should be a valid integer'), ('float_type', ('f',), 'Input should be a valid number'), ('bool_type', ('b',), 'Input should be a valid boolean')]
+1 [('model_type', (), 'Input should be a valid dictionary or instance of User')]
+1 [('missing', ('name',), 'Field required')]
+OK id=1 name='q' email=None tags=[] score=1.5
+2 [('int_parsing', ('id',), 'Input should be a valid integer, unable to parse string as an integer'), ('missing', ('name',), 'Field required')]
+1 validation error for User
+id
+  Input should be a valid integer, unable to parse string as an integer [type=int_parsing, input_value='x', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.14/v/int_parsing
+{'type': 'int_parsing', 'loc': ('id',), 'msg': 'Input should be a valid integer, unable to parse string as an integer', 'input': 'x', 'url': 'https://errors.pydantic.dev/2.14/v/int_parsing'}
+True User
+['json_invalid']
+age=5 name='abc' code='AB1' ratio=0.5 qty=10 items=[]
+1 [('greater_than', ('age',), 'Input should be greater than 0')]
+1 [('less_than_equal', ('age',), 'Input should be less than or equal to 120')]
+1 [('string_too_short', ('name',), 'String should have at least 2 characters')]
+1 [('string_too_long', ('name',), 'String should have at most 5 characters')]
+1 [('string_pattern_mismatch', ('code',), "String should match pattern '^[A-Z]{2}\\d+$'")]
+1 [('less_than', ('ratio',), 'Input should be less than 1')]
+1 [('greater_than_equal', ('ratio',), 'Input should be greater than or equal to 0')]
+1 [('multiple_of', ('qty',), 'Input should be a multiple of 5')]
+{'gt': 0} {'min_length': 2}
+xs=[1] ys=['a'] n=3 m=2 k='hello'
+1 [('too_short', ('xs',), 'List should have at least 1 item after validation, not 0')]
+1 [('too_long', ('xs',), 'List should have at most 2 items after validation, not 3')]
+1 [('too_short', ('ys',), 'List should have at least 1 item after validation, not 0')]
+1 [('greater_than', ('n',), 'Input should be greater than 0')]
+1 [('greater_than_equal', ('m',), 'Input should be greater than or equal to 2')]
+1 [('string_too_short', ('k',), 'String should have at least 2 characters')]
+first_name='Z' age=0 Z
+first_name='Y' age=0
+{'first_name': 'Z', 'age': 0} {'firstName': 'Z', 'age': 0}
+{"firstName":"Z","age":0}
+1 [('missing', ('firstName',), 'Field required')]
+1 [('missing', ('firstName',), 'Field required')]
+first_name='x'
+2 [('extra_forbidden', ('b',), 'Extra inputs are not permitted'), ('extra_forbidden', ('c',), 'Extra inputs are not permitted')]
+a=1 b=[1] c='x' [1] {'b': [1], 'c': 'x'} {'a': 1, 'b': [1], 'c': 'x'}
+a=1 {'a': 1}
+[('frozen_instance', ('a',), 'Instance is frozen')]
+True True
+s='hello'
+a=5 {'a'}
+ValueError "Mut" object has no field "zzz"
+a=5
+1 [('int_parsing', ('a',), 'Input should be a valid integer, unable to parse string as an integer')]
+name='n' addr=Addr(city='X', zip=None) others=[Addr(city='Y', zip='1')] by_name={'k': Addr(city='Z', zip=None)}
+{'name': 'n', 'addr': {'city': 'X', 'zip': None}, 'others': [{'city': 'Y', 'zip': '1'}], 'by_name': {'k': {'city': 'Z', 'zip': None}}}
+{'name': 'n', 'addr': {'city': 'X'}, 'others': [{'city': 'Y', 'zip': '1'}], 'by_name': {'k': {'city': 'Z'}}}
+{"name":"n","addr":{"city":"X","zip":null},"others":[{"city":"Y","zip":"1"}],"by_name":{"k":{"city":"Z","zip":null}}}
+X Addr
+4 [('missing', ('addr', 'city'), 'Field required'), ('string_type', ('others', 0, 'city'), 'Input should be a valid string'), ('model_type', ('others', 1), 'Input should be a valid dictionary or instance of Addr'), ('missing', ('by_name', 'k', 'city'), 'Field required')]
+1 [('model_type', ('addr',), 'Input should be a valid dictionary or instance of Addr')]
+a='5' b=None c='x' d=<Color.RED: 'r'> e=<Num.ONE: 1> f=None g=1 a=5 b=None c='x' d=<Color.RED: 'r'> e=<Num.ONE: 1> f=None g=1 a=5 b=None c='x' d=<Color.RED: 'r'> e=<Num.ONE: 1> f=None g=1 a='abc' b=None c='x' d=<Color.RED: 'r'> e=<Num.ONE: 1> f=None g=1
+a=1 b=3 c='y' d=<Color.BLUE: 'b'> e=<Num.TWO: 2> f=[1, 2] g=1
+{'a': 1, 'b': None, 'c': 'x', 'd': <Color.BLUE: 'b'>, 'e': <Num.ONE: 1>, 'f': None, 'g': 1} {'a': 1, 'b': None, 'c': 'x', 'd': 'b', 'e': 1, 'f': None, 'g': 1}
+2 [('int_type', ('a', 'int'), 'Input should be a valid integer'), ('string_type', ('a', 'str'), 'Input should be a valid string')]
+1 [('int_parsing', ('b',), 'Input should be a valid integer, unable to parse string as an integer')]
+1 [('literal_error', ('c',), "Input should be 'x' or 'y'")]
+1 [('enum', ('d',), "Input should be 'r' or 'b'")]
+1 [('enum', ('e',), 'Input should be 1 or 2')]
+2 [('list_type', ('f', 'list[int]'), 'Input should be a valid list'), ('int_parsing', ('f', 'int'), 'Input should be a valid integer, unable to parse string as an integer')]
+1 [('literal_error', ('g',), 'Input should be 1, 2 or 3')]
+True (1,) (3, '4') (1, 2) {'a': 1} True
+True
+[1, 2] [1]
+1 [('missing', ('t2', 1), 'Field required')]
+1 [('too_long', ('t2',), 'Tuple should have at most 2 items after validation, not 3')]
+1 [('int_parsing', ('d', 'a'), 'Input should be a valid integer, unable to parse string as an integer')]
+1 [('dict_type', ('d',), 'Input should be a valid dictionary')]
+1 [('int_parsing', ('ss', 0), 'Input should be a valid integer, unable to parse string as an integer')]
+when=datetime.datetime(2024, 3, 5, 10, 20, 30) day=datetime.date(2024, 3, 6) gap=datetime.timedelta(seconds=90)
+{"when":"2024-03-05T10:20:30","day":"2024-03-06","gap":"PT1M30S"}
+{'when': '2024-03-05T10:20:30', 'day': '2024-03-06', 'gap': 'PT1M30S'}
+when=datetime.datetime(2020, 1, 2, 3, 4, 5) day=datetime.date(2021, 2, 3) gap=datetime.timedelta(seconds=30)
+True
+1 [('datetime_from_date_parsing', ('when',), 'Input should be a valid datetime or date, input is too short')]
+1 [('datetime_type', ('when',), 'Input should be a valid datetime')]
+[('date_from_datetime_parsing', ('day',))]
+[('date_from_datetime_parsing', ('day',))]
+name='BOB' age=20 tags=['a', 'b']
+1 [('value_error', ('age',), 'Value error, too young')]
+2 [('value_error', ('name',), 'Value error, bad name'), ('int_parsing', ('age',), 'Input should be a valid integer, unable to parse string as an integer')]
+1 validation error for V
+age
+  Value error, too young [type=value_error, input_value=3, input_type=int]
+    For further information visit https://errors.pydantic.dev/2.14/v/value_error
+a=1 b=2 total=3
+a=3 b=4 total=7
+1 [('value_error', (), 'Value error, a must not exceed b')]
+2 [('int_parsing', ('a',), 'Input should be a valid integer, unable to parse string as an integer'), ('int_parsing', ('b',), 'Input should be a valid integer, unable to parse string as an integer')]
+1 [('assertion_error', ('n',), 'Assertion failed, n must be even')]
+n=4
+a=4 b='100'
+1 [('int_parsing', ('a',), 'Input should be a valid integer, unable to parse string as an integer')]
+w=2 h=3 area=6
+6 {'w': 'w=2', 'h': 3, 'area': 6} {"w":"w=2","h":3,"area":6}
+{'name': 'n', 'addr': {'city': 'X', 'zip': '9'}}
+{'name': 'n', 'addr': {'city': 'X', 'zip': '9'}}
+{'name': 'n', 'addr': {'city': 'X'}, 'others': [{'city': 'Z', 'zip': None}]}
+{'addr': {'city': 'X'}}
+{'name': 'n', 'addr': {'city': 'X', 'zip': '9'}, 'others': [{'city': 'Y'}, {'city': 'Z'}]}
+{'id': 1, 'name': 'a'}
+other n True
+True False
+id='no' name='check' email=None tags=[] score=1.5
+{'properties': {'id': {'title': 'Id', 'type': 'integer'}, 'name': {'title': 'Name', 'type': 'string'}, 'email': {'anyOf': [{'type': 'string'}, {'type': 'null'}], 'default': None, 'title': 'Email'}, 'tags': {'default': [], 'items': {'type': 'string'}, 'title': 'Tags', 'type': 'array'}, 'score': {'default': 1.5, 'title': 'Score', 'type': 'number'}}, 'required': ['id', 'name'], 'title': 'User', 'type': 'object'}
+{'properties': {'age': {'exclusiveMinimum': 0, 'maximum': 120, 'title': 'Age', 'type': 'integer'}, 'name': {'maxLength': 5, 'minLength': 2, 'title': 'Name', 'type': 'string'}, 'code': {'default': 'AB1', 'pattern': '^[A-Z]{2}\\d+$', 'title': 'Code', 'type': 'string'}, 'ratio': {'default': 0.5, 'exclusiveMaximum': 1, 'minimum': 0, 'title': 'Ratio', 'type': 'number'}, 'qty': {'default': 10, 'multipleOf': 5, 'title': 'Qty', 'type': 'integer'}, 'items': {'items': {'type': 'integer'}, 'title': 'Items', 'type': 'array'}}, 'required': ['age', 'name'], 'title': 'P', 'type': 'object'}
+{'$defs': {'Addr': {'properties': {'city': {'title': 'City', 'type': 'string'}, 'zip': {'anyOf': [{'type': 'string'}, {'type': 'null'}], 'default': None, 'title': 'Zip'}}, 'required': ['city'], 'title': 'Addr', 'type': 'object'}}, 'properties': {'name': {'title': 'Name', 'type': 'string'}, 'addr': {'$ref': '#/$defs/Addr'}, 'others': {'default': [], 'items': {'$ref': '#/$defs/Addr'}, 'title': 'Others', 'type': 'array'}, 'by_name': {'additionalProperties': {'$ref': '#/$defs/Addr'}, 'default': {}, 'title': 'By Name', 'type': 'object'}}, 'required': ['name', 'addr'], 'title': 'Person', 'type': 'object'}
+{'$defs': {'Color': {'enum': ['r', 'b'], 'title': 'Color', 'type': 'string'}, 'Num': {'enum': [1, 2], 'title': 'Num', 'type': 'integer'}}, 'properties': {'a': {'anyOf': [{'type': 'integer'}, {'type': 'string'}], 'title': 'A'}, 'b': {'anyOf': [{'type': 'integer'}, {'type': 'null'}], 'default': None, 'title': 'B'}, 'c': {'default': 'x', 'enum': ['x', 'y'], 'title': 'C', 'type': 'string'}, 'd': {'$ref': '#/$defs/Color', 'default': 'r'}, 'e': {'$ref': '#/$defs/Num', 'default': 1}, 'f': {'anyOf': [{'items': {'type': 'integer'}, 'type': 'array'}, {'type': 'integer'}, {'type': 'null'}], 'default': None, 'title': 'F'}, 'g': {'default': 1, 'enum': [1, 2, 3], 'title': 'G', 'type': 'integer'}}, 'required': ['a'], 'title': 'U', 'type': 'object'}
+{'additionalProperties': False, 'properties': {'a': {'title': 'A', 'type': 'integer'}}, 'required': ['a'], 'title': 'Forbid', 'type': 'object'}
+[1, 2] [1, 2, 3]
+2 [('int_parsing', (0,), 'Input should be a valid integer, unable to parse string as an integer'), ('int_type', (2,), 'Input should be a valid integer')]
+{'a': 1.5}
+None 4
+[1, 2] b'[1,2]'
+id=1 name='t' email=None tags=[] score=1.5
+[{'id': 1, 'name': 't', 'email': None, 'tags': [], 'score': 1.5}]
+{'items': {'type': 'integer'}, 'type': 'array'}
+6
+1 [('greater_than', (), 'Input should be greater than 5')]
+['a', 'b'] ['a', 'b'] ["a","b"]
+root=['c']
+1 [('list_type', (), 'Input should be a valid list')]
+pw=SecretStr('**********') hunter2 {"pw":"**********"}
+v=1 kids=[Tree(v=2, kids=[Tree(v=3, kids=[], parent=None)], parent=None)] parent=None
+{'v': 1, 'kids': [{'v': 2, 'kids': [{'v': 3, 'kids': [], 'parent': None}], 'parent': None}], 'parent': None}
+1 [('int_parsing', ('kids', 0, 'v'), 'Input should be a valid integer, unable to parse string as an integer')]
+a=1 6 {'a': 1}
+id=2 name='c' ['id', 'name']
+1 [('missing', ('id',), 'Field required')]
+True
+id=1 name='c'

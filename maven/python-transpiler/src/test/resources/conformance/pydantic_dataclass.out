@@ -1,0 +1,3 @@
+Pt(x=3, y=1.5, tags=['a']) 3 1.5
+True
+[('int_parsing', (0,), 'Input should be a valid integer, unable to parse string as an integer'), ('float_type', (1,), 'Input should be a valid number')]
