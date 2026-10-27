@@ -172,6 +172,27 @@ public class NativeModalRotationTest extends BaseTest {
             }
         }, "the device to start the landscape case in landscape", new Runnable() {
             public void run() {
+                // Unlocked, as the reporter's app is: under a landscape lock
+                // UIKit keeps the interface landscape even with the portrait-only
+                // modal up, so the covered view is never told portrait and the
+                // bug cannot happen. The device itself stays landscape.
+                CN.unlockOrientation();
+                UITimer.timer(UNDER_MODAL_SETTLE_MS, false, form, new Runnable() {
+                    public void run() {
+                        presentOverLandscape(form);
+                    }
+                });
+            }
+        });
+    }
+
+    private void presentOverLandscape(final Form form) {
+        poll(form, POLL_ATTEMPTS, new Condition() {
+            public boolean holds() {
+                return modal.getViewPixelWidth() > modal.getViewPixelHeight();
+            }
+        }, "the unlocked view to stay landscape", new Runnable() {
+            public void run() {
                 modal.presentPortraitOnlyModal();
                 poll(form, POLL_ATTEMPTS, new Condition() {
                     public boolean holds() {
