@@ -1219,6 +1219,9 @@ void ed25519_randombytes_unsafe_cn1(void *p, size_t len) {
     memset(p, 0, len);
 }
 
+/* the GPU batches' CPU half; it reads the libraries' internals, so it follows the amalgamation */
+#include "cn1_crypto_gpu_host.h"
+
 /* ------------------------------------------------------------------ Keccak-256 */
 
 static const uint64_t cn1k_keccak_rc[24] = {
@@ -2211,46 +2214,35 @@ static size_t cn1k_cores_query(void) {
 
 #if !defined(__APPLE__)
 typedef struct {
-    cn1k_batch *b;
+    void *arg;
+    void (*fn)(void*, size_t);
     size_t c;
-} cn1k_batch_arg;
+} cn1k_par_arg;
 
 #  if defined(_WIN32)
-static DWORD WINAPI cn1k_batch_thread(LPVOID p) {
-    cn1k_batch_chunk(((cn1k_batch_arg*) p)->b, ((cn1k_batch_arg*) p)->c);
+static DWORD WINAPI cn1k_par_thread(LPVOID p) {
+    ((cn1k_par_arg*) p)->fn(((cn1k_par_arg*) p)->arg, ((cn1k_par_arg*) p)->c);
     return 0;
 }
 #  else
-static void *cn1k_batch_thread(void *p) {
-    cn1k_batch_chunk(((cn1k_batch_arg*) p)->b, ((cn1k_batch_arg*) p)->c);
+static void *cn1k_par_thread(void *p) {
+    ((cn1k_par_arg*) p)->fn(((cn1k_par_arg*) p)->arg, ((cn1k_par_arg*) p)->c);
     return NULL;
 }
 #  endif
 #endif
 
-/* `work` is a rough cost of the whole batch in hash blocks; below a few hundred a thread costs more
- * than it saves. */
-static void cn1k_batch_run(cn1k_batch *b, size_t work) {
-    size_t chunks = work < 512 ? 1 : cn1k_cores();
-    if (chunks > b->count) {
-        chunks = b->count;
-    }
-    if (work < 512) {
-        chunks = 1;
-    }
-    if (chunks > CN1K_MAX_CHUNKS) {
-        chunks = CN1K_MAX_CHUNKS;
-    }
-    b->chunks = chunks < 1 ? 1 : chunks;
-    if (b->chunks == 1) {
-        cn1k_batch_chunk(b, 0);
+/* fn(arg, c) for every c below chunks, on as many threads; the caller's thread takes chunk 0 */
+static void cn1k_parallel(size_t chunks, void *arg, void (*fn)(void*, size_t)) {
+    if (chunks <= 1) {
+        fn(arg, 0);
         return;
     }
 #if defined(__APPLE__)
-    dispatch_apply_f(b->chunks, dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), b, cn1k_batch_chunk);
+    dispatch_apply_f(chunks, dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), arg, fn);
 #else
     {
-        cn1k_batch_arg args[CN1K_MAX_CHUNKS];
+        cn1k_par_arg args[CN1K_MAX_CHUNKS];
 #  if defined(_WIN32)
         HANDLE threads[CN1K_MAX_CHUNKS];
 #  else
@@ -2258,21 +2250,22 @@ static void cn1k_batch_run(cn1k_batch *b, size_t work) {
 #  endif
         int started[CN1K_MAX_CHUNKS];
         size_t c;
-        for (c = 1; c < b->chunks; c++) {
-            args[c].b = b;
+        for (c = 1; c < chunks; c++) {
+            args[c].arg = arg;
+            args[c].fn = fn;
             args[c].c = c;
 #  if defined(_WIN32)
-            threads[c] = CreateThread(NULL, 0, cn1k_batch_thread, &args[c], 0, NULL);
+            threads[c] = CreateThread(NULL, 0, cn1k_par_thread, &args[c], 0, NULL);
             started[c] = threads[c] != NULL;
 #  else
-            started[c] = pthread_create(&threads[c], NULL, cn1k_batch_thread, &args[c]) == 0;
+            started[c] = pthread_create(&threads[c], NULL, cn1k_par_thread, &args[c]) == 0;
 #  endif
             if (!started[c]) {
-                cn1k_batch_chunk(b, c);
+                fn(arg, c);
             }
         }
-        cn1k_batch_chunk(b, 0);
-        for (c = 1; c < b->chunks; c++) {
+        fn(arg, 0);
+        for (c = 1; c < chunks; c++) {
             if (started[c]) {
 #  if defined(_WIN32)
                 WaitForSingleObject(threads[c], INFINITE);
@@ -2285,6 +2278,22 @@ static void cn1k_batch_run(cn1k_batch *b, size_t work) {
     }
 #endif
 }
+
+/* `work` is a rough cost of the whole batch in hash blocks; below a few hundred a thread costs more
+ * than it saves. */
+static void cn1k_batch_run(cn1k_batch *b, size_t work) {
+    size_t chunks = work < 512 ? 1 : cn1k_cores();
+    if (chunks > b->count) {
+        chunks = b->count;
+    }
+    if (chunks > CN1K_MAX_CHUNKS) {
+        chunks = CN1K_MAX_CHUNKS;
+    }
+    b->chunks = chunks < 1 ? 1 : chunks;
+    cn1k_parallel(b->chunks, b, cn1k_batch_chunk);
+}
+
+#include "cn1_crypto_gpu_batch.h"
 #endif
 
 #define CN1K_INTS(a) ((const JAVA_INT*) CN1_ARRAY_DATA(a))
@@ -2318,7 +2327,7 @@ JAVA_VOID com_codename1_security_NativeCryptoKernels_batch___int_byte_1ARRAY_int
     /* a verify is worth a few hundred compressions; a hash is its length in blocks */
     work = alg < CN1K_BATCH_SHA256 ? (size_t) count * 400
             : (size_t) (b.msgOff[count] - b.msgOff[0]) / 64 + (size_t) count;
-    cn1k_batch_run(&b, work);
+    cn1g_batch(&b, work);
 #endif
 }
 
@@ -2345,7 +2354,7 @@ JAVA_VOID com_codename1_security_NativeCryptoKernels_batchPacked___int_byte_1ARR
     b.keyStride = (size_t) keyLen;
     b.results = CN1K_BYTES(results);
     b.count = (size_t) count;
-    cn1k_batch_run(&b, alg < CN1K_BATCH_SHA256 ? (size_t) count * 400
+    cn1g_batch(&b, alg < CN1K_BATCH_SHA256 ? (size_t) count * 400
             : (size_t) count * ((size_t) msgLen / 64 + 1));
 #endif
 }

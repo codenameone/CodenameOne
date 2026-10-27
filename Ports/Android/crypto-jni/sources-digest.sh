@@ -6,4 +6,6 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$HERE/../../.." && pwd)"
 cat "$REPO/vm/ByteCodeTranslator/src/cn1_crypto_kernels.c" \
     "$REPO/vm/ByteCodeTranslator/src/cn1_crypto_kernels_amalgamation.h" \
+    "$REPO"/vm/ByteCodeTranslator/src/cn1_crypto_gpu.h \
+    $(ls "$REPO"/vm/ByteCodeTranslator/src/cn1_crypto_gpu_*.h | LC_ALL=C sort) \
     "$HERE/cn1_globals.h" "$HERE/cn1_crypto_jni.c" "$HERE/build.sh" | shasum -a 256 | cut -d' ' -f1

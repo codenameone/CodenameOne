@@ -12,6 +12,12 @@ name: Crypto benchmarks
 # Each fails when a ratio drops below scripts/crypto-bench/floors.json. The
 # tables land in the job summary.
 #
+# gpu runs the GPU batches on Mesa's lavapipe, a Vulkan driver on the CPU,
+# result for result against the CPU batches -- correctness, not speed: on a
+# runner it is slower than the CPU kernels it is checked against. It also holds
+# the committed SPIR-V and MSL to the kernel source (scripts/crypto-gpu/gen.py
+# --check) and the hand-declared Vulkan subset to the real headers.
+#
 # android-kernels holds the committed libcn1crypto.so files to the sources
 # they were built from: they are prebuilt (Ports/Android/crypto-jni/build.sh,
 # NDK r28+), so a kernel change that is not followed by a rebuild would ship
@@ -30,6 +36,8 @@ on:
       - 'CodenameOne/src/com/codename1/security/**'
       - 'CodenameOne/src/com/codename1/crypto/**'
       - 'vm/ByteCodeTranslator/src/cn1_crypto_kernels*'
+      - 'vm/ByteCodeTranslator/src/cn1_crypto_gpu*'
+      - 'scripts/crypto-gpu/**'
       - 'scripts/crypto-bench/**'
       - 'scripts/crypto-kernels/**'
       - 'Ports/Android/crypto-jni/**'
@@ -43,6 +51,8 @@ on:
       - 'CodenameOne/src/com/codename1/security/**'
       - 'CodenameOne/src/com/codename1/crypto/**'
       - 'vm/ByteCodeTranslator/src/cn1_crypto_kernels*'
+      - 'vm/ByteCodeTranslator/src/cn1_crypto_gpu*'
+      - 'scripts/crypto-gpu/**'
       - 'scripts/crypto-bench/**'
       - 'scripts/crypto-kernels/**'
       - 'Ports/Android/crypto-jni/**'
@@ -62,6 +72,26 @@ jobs:
       - name: The prebuilt Android kernels match their sources
         shell: bash
         run: scripts/check-android-crypto-kernels.sh
+
+  gpu:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - name: The generated shaders match the kernel source
+        shell: bash
+        run: scripts/crypto-gpu/gen.py --check
+      - name: Install Vulkan, its headers and lavapipe
+        shell: bash
+        run: sudo apt-get update -q && sudo apt-get install -y -q clang libvulkan-dev mesa-vulkan-drivers
+      - name: The hand-declared Vulkan subset matches vulkan_core.h
+        shell: bash
+        run: clang -std=c11 -fsyntax-only -I vm/ByteCodeTranslator/src scripts/crypto-gpu/vulkan-abi-check.c
+      - name: GPU batches against CPU batches on lavapipe
+        shell: bash
+        env:
+          CC: clang
+          CN1_CRYPTO_GPU_ALLOW_CPU_DEVICE: '1'
+        run: scripts/crypto-gpu/batch-check.sh 2048 --require-gpu | tee -a "$GITHUB_STEP_SUMMARY"
 
   jvm:
     runs-on: ubuntu-24.04

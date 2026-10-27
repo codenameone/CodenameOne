@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Builds libcn1crypto.so -- the ParparVM crypto kernels (libsecp256k1, ed25519-donna, Keccak) behind
-# JNI entry points for com.codename1.security.NativeCryptoKernels -- for the four Android ABIs, into
+# Builds libcn1crypto.so -- the ParparVM crypto kernels (libsecp256k1, ed25519-donna, Keccak, and the
+# Vulkan batches, whose loader is opened at run time) behind JNI entry points for
+# com.codename1.security.NativeCryptoKernels -- for the four Android ABIs, into
 # the build engine's resources. The Android builder copies them into an application's jniLibs only
 # when the application uses the crypto API (Executor.DatabaseUsage.usesCryptoKernels).
 #
@@ -33,6 +34,7 @@ WORK="$(mktemp -d "${TMPDIR:-/tmp}/cn1-crypto-jni.XXXXXX")"
 # that sits beside this directory's shim rather than beside the ParparVM runtime's header.
 cp "$REPO/vm/ByteCodeTranslator/src/cn1_crypto_kernels.c" \
    "$REPO/vm/ByteCodeTranslator/src/cn1_crypto_kernels_amalgamation.h" \
+   "$REPO"/vm/ByteCodeTranslator/src/cn1_crypto_gpu.h "$REPO"/vm/ByteCodeTranslator/src/cn1_crypto_gpu_*.h \
    "$HERE/cn1_globals.h" "$HERE/cn1_crypto_jni.c" "$WORK/"
 
 API=21

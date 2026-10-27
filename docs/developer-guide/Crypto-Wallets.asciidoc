@@ -101,6 +101,10 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/C
 
 With native kernels the whole batch crosses into native code once and runs on every CPU core, which makes it several times faster than the same calls in a loop. `verifySchnorr`, `verifyEd25519`, `sha256` and `keccak256` work the same way. Every entry gets exactly the answer a single call would give, and a malformed entry, such as a key that doesn't parse, is invalid rather than an exception, so one bad entry never stops the rest.
 
+For the largest batches, every method also has a packed form that takes flat arrays at a fixed stride: 32-byte hashes one after another, 64-byte signatures one after another, and the public keys likewise, with one result byte per entry. On a native target the kernels read those arrays in place, so nothing is copied and no object is created per entry. Allocate them with `Simd.get().allocByte(int)` and they're also aligned for the vector units.
+
+On iOS, macOS, Android, Windows and Linux, a large enough batch is shared between the CPU cores and the GPU, through Metal on Apple platforms and Vulkan elsewhere. The split follows the measured speed of each: the CPU and the GPU work on their parts at the same time, and a device whose GPU is slower than its CPU keeps the whole batch on the CPU. The GPU only ever sees public data, meaning signatures, public keys and messages, and never a private key. Your code doesn't change, and the results are the same either way.
+
 === Where the keys live
 
 Whoever holds the recovery phrase holds the funds. Decide where it lives before you write the first screen.
