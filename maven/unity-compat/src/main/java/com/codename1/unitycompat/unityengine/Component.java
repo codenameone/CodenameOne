@@ -24,7 +24,7 @@ package com.codename1.unitycompat.unityengine;
 
 /// `UnityEngine.Component`: something attached to a [GameObject].
 @SuppressWarnings("PMD.MethodNamingConventions") // C# member names: translated code binds to them by name
-public class Component extends Object {
+public class Component extends Object { // NOPMD ExtendsObject - UnityEngine.Object, not java.lang.Object
     GameObject gameObject;
 
     public GameObject get_gameObject() {

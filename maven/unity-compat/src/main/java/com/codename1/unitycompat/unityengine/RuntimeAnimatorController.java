@@ -34,7 +34,7 @@ package com.codename1.unitycompat.unityengine;
 /// Only the first layer of a controller is run, and a state plays one clip:
 /// a blend tree plays its first.
 @SuppressWarnings("PMD.MethodNamingConventions") // C# member names: translated code binds to them by name
-public class RuntimeAnimatorController extends Object {
+public class RuntimeAnimatorController extends Object { // NOPMD ExtendsObject - UnityEngine.Object, not java.lang.Object
     /// Parameter types, by the numbers a controller file uses.
     public static final int FLOAT = 1;
     public static final int INT = 3;

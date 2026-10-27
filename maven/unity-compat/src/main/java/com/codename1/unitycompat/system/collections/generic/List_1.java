@@ -32,7 +32,7 @@ import com.codename1.unitycompat.system.Struct;
 
 /// `System.Collections.Generic.List<T>`. Elements are `Object`: the
 /// translator boxes a primitive and copies a struct on the way in.
-@SuppressWarnings("PMD.MethodNamingConventions") // C# member names: translated code binds to them by name
+@SuppressWarnings({"PMD.MethodNamingConventions", "PMD.ClassNamingConventions"}) // C# member and type names: translated code binds to them by name
 public class List_1 implements ICollection_1 {
     private Object[] items;
     private int size;
