@@ -91,6 +91,83 @@ public final class Typed {
         throw mismatch(o);
     }
 
+    private static final String[] CHARS = new String[256];
+
+    /// The one-character string of code point `cp`, as iterating a string
+    /// yields it: shared below 256, so a loop over Latin-1 text allocates
+    /// nothing.
+    public static String ch(int cp) {
+        if (cp < 256) {
+            String s = CHARS[cp];
+            if (s == null) {
+                s = String.valueOf((char) cp);
+                CHARS[cp] = s;
+            }
+            return s;
+        }
+        return new String(Character.toChars(cp));
+    }
+
+    /// `len(s)`: code points, which Java's UTF-16 length overcounts by one
+    /// per surrogate pair.
+    public static long slen(String s) {
+        int n = s.length();
+        long r = n;
+        for (int i = 0; i < n; i++) {
+            char c = s.charAt(i);
+            if (c >= 0xD800 && c < 0xDC00 && i + 1 < n) {
+                char d = s.charAt(i + 1);
+                if (d >= 0xDC00 && d < 0xE000) {
+                    r--;
+                    i++;
+                }
+            }
+        }
+        return r;
+    }
+
+    /// Int `o` modulo 2^64: its low 64 bits, as two's complement keeps them.
+    public static long low64(Object o) {
+        if (o instanceof PyInt) {
+            return ((PyInt) o).toBig().longValue();
+        }
+        return toLong(o);
+    }
+
+    /// The int a typed function returned in place of its `long` result:
+    /// a big int, a bool, or a `Long.MIN_VALUE` (the marker itself).
+    private static final ThreadLocal<Object> RETURNED = new ThreadLocal<Object>();
+
+    /// Returns int `o` from a typed function whose result is a `long`: the
+    /// marker, with `o` left for the caller's `take`.
+    public static long retBig(Object o) {
+        RETURNED.set(o);
+        return Long.MIN_VALUE;
+    }
+
+    /// `retBig` for an int that may be a `Long` that fits.
+    public static long retObj(Object o) {
+        if (o instanceof Long) {
+            long v = ((Long) o).longValue();
+            if (v != Long.MIN_VALUE) {
+                return v;
+            }
+        }
+        return retBig(o);
+    }
+
+    /// The int behind a `Long.MIN_VALUE` a typed function returned.
+    public static Object take() {
+        Object o = RETURNED.get();
+        RETURNED.set(null);
+        return o;
+    }
+
+    /// A typed function's `long` result as an object.
+    public static Object unret(long v) {
+        return v != Long.MIN_VALUE ? Long.valueOf(v) : take();
+    }
+
     public static double asFloat(Object o) {
         if (o instanceof Double) {
             return ((Double) o).doubleValue();
@@ -332,6 +409,12 @@ public final class Typed {
     /// `l.extend(other)` for two lists.
     public static Object extend(PyList l, PyList other) {
         nzl(l).extend(nzl(other));
+        return Py.NONE;
+    }
+
+    /// `l.extend([v] * n)`.
+    public static Object extendRepeat(PyList l, Object v, Object n) {
+        nzl(l).extendRepeat(v, Py.index(n));
         return Py.NONE;
     }
 

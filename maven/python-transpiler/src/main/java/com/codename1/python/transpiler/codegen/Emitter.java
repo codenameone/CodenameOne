@@ -287,6 +287,10 @@ public final class Emitter {
             + "    private static void noop(Object v) {\n"
             + "    }\n";
 
+    Scope moduleScope() {
+        return moduleScope;
+    }
+
     boolean moduleScopeHasStarImport() {
         return moduleScope.hasStarImport;
     }
@@ -3039,6 +3043,10 @@ public final class Emitter {
 
     /// A fresh inline cache for one attribute access. Never shared between two
     /// accesses, unlike `hoist`: each site caches what ITS receivers look like.
+    String attrSite(String attr) {
+        return site(attr);
+    }
+
     private String site(String attr) {
         String f = "S" + (++sites);
         fields.append("    private static final AttrSite ").append(f).append(" = new AttrSite(")

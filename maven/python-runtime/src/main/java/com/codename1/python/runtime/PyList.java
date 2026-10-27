@@ -203,6 +203,14 @@ public final class PyList extends PyObject {
         if (iterable instanceof PyList) {
             PyList o = (PyList) iterable;
             int n = o.size;
+            if (o.ints != null && intsOrEmpty()) {
+                // One copy, into an array of the exact size when this list
+                // was empty: no element by element growth.
+                long[] l = intRoom(n);
+                System.arraycopy(o.ints, 0, l, size, n);
+                size += n;
+                return;
+            }
             for (int i = 0; i < n; i++) {
                 append(o.get(i));
             }
@@ -212,6 +220,43 @@ public final class PyList extends PyObject {
         for (Object v = Py.next(it); v != null; v = Py.next(it)) {
             append(v);
         }
+    }
+
+    /// Whether ints may go into the unboxed `ints` storage.
+    private boolean intsOrEmpty() {
+        return ints != null || floats == null && size == 0 && items == NO_ITEMS; //NOPMD CompareObjectsWithEquals
+    }
+
+    /// `ints`, with room for `n` more after `size`.
+    private long[] intRoom(int n) {
+        long[] l = ints;
+        if (l == null || l.length - size < n) {
+            long[] g = new long[l == null ? n : Math.max(size + n, size * 2 + 4)];
+            if (l != null) {
+                System.arraycopy(l, 0, g, 0, size);
+            }
+            ints = g;
+            l = g;
+        }
+        return l;
+    }
+
+    /// `extend([v] * n)`, without the intermediate list.
+    public void extendRepeat(Object v, long n) {
+        if (n <= 0) {
+            return;
+        }
+        if (v instanceof Long && n <= Integer.MAX_VALUE - size && intsOrEmpty()) {
+            long x = ((Long) v).longValue();
+            long[] l = intRoom((int) n);
+            int end = size + (int) n;
+            for (int i = size; i < end; i++) {
+                l[i] = x;
+            }
+            size = end;
+            return;
+        }
+        extend(new PyList(new Object[] {v}).mul(Long.valueOf(n)));
     }
 
     public void insert(long index, Object v) {

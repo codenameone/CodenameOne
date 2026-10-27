@@ -97,6 +97,8 @@ final class Infer {
     /// Globals bound once, by `import math`: calls of its functions on
     /// numbers are typed (see `MATH_FNS`) and run as `PyMath` directly.
     final Set<String> mathNames = new HashSet<String>();
+    /// The globals only `import struct` binds.
+    final Set<String> structNames = new HashSet<String>();
     /// `math` functions typed code calls, with their arity.
     static final Map<String, Integer> MATH_FNS = new HashMap<String, Integer>();
     /// `math` constants, all floats.
@@ -185,6 +187,9 @@ final class Infer {
                     if ("math".equals(a.name) && stable(n)) {
                         mathNames.add(n);
                     }
+                    if ("struct".equals(a.name) && stable(n)) {
+                        structNames.add(n);
+                    }
                 }
             }
         }
@@ -192,6 +197,12 @@ final class Infer {
         for (Layouts.Cls k : layouts.classes.values()) {
             definite.put(k, initDefinite(k, new HashSet<Layouts.Cls>()));
         }
+    }
+
+    /// Whether `e` is the `struct` module, as `isMath` is for `math`.
+    boolean isStruct(Expr e, Scope sc) {
+        return e instanceof Name && structNames.contains(((Name) e).id)
+                && sc.resolve(((Name) e).id) == Scope.Binding.GLOBAL;
     }
 
     /// Whether `e` is the `math` module, through a global only `import math`
@@ -975,6 +986,14 @@ final class Infer {
         if (t.k == Ty.K.LIST) {
             return elem(t);
         }
+        if (t.k == Ty.K.STR && !t.opt) {
+            // A str yields one-character strs.
+            return Ty.STR;
+        }
+        if (t.k == Ty.K.BOT) {
+            // Nothing reaches the iterable yet; a later pass decides.
+            return Ty.BOT;
+        }
         escape(t);
         return Ty.DYN;
     }
@@ -1637,6 +1656,12 @@ final class Infer {
                     && (args.get(0).k == Ty.K.INT || args.get(0).k == Ty.K.FLOAT
                     || args.get(0).k == Ty.K.STR || args.get(0).k == Ty.K.BOOL)) {
                 return Ty.STR;
+            }
+            if (simple && args.size() == 1 && args.get(0).k == Ty.K.BOT
+                    && ("ord".equals(n) || "abs".equals(n) || "float".equals(n) || "str".equals(n))) {
+                // Nothing reaches the argument yet: a later pass decides,
+                // where DYN now would stay DYN for good.
+                return Ty.BOT;
             }
             if (simple && "ord".equals(n) && args.size() == 1 && args.get(0).k == Ty.K.STR && !args.get(0).opt) {
                 return Ty.INT;

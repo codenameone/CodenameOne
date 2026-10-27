@@ -113,9 +113,16 @@ public final class PyStr extends PyObject {
         }
         int off = 0;
         for (int i = 0; i < cp; i++) {
-            off += Character.isHighSurrogate(s.charAt(off)) && off + 1 < s.length() ? 2 : 1;
+            off += pairAt(s, off) ? 2 : 1;
         }
         return off;
+    }
+
+    /// Whether a surrogate pair, one code point, starts at offset `i`; a
+    /// lone surrogate is a code point of its own.
+    static boolean pairAt(String s, int i) {
+        return i + 1 < s.length() && Character.isHighSurrogate(s.charAt(i))
+                && Character.isLowSurrogate(s.charAt(i + 1));
     }
 
     int offset(int cp) {
@@ -129,7 +136,7 @@ public final class PyStr extends PyObject {
         }
         int cp = 0;
         for (int i = 0; i < off; i++) {
-            if (!Character.isLowSurrogate(s.charAt(i)) || i == 0) {
+            if (i == 0 || !pairAt(s, i - 1)) {
                 cp++;
             }
         }
@@ -192,9 +199,14 @@ public final class PyStr extends PyObject {
                 sb.append("\\r");
             } else if (c == '\t') {
                 sb.append("\\t");
-            } else if (c < 0x20 || c == 0x7f) {
+            } else if (c < 0x20 || c >= 0x7f && c <= 0xa0 || c == 0xad) {
+                // C0 and C1 controls and the two unprintable Latin-1 spaces.
                 sb.append("\\x");
                 hex(sb, c, 2);
+            } else if (c >= 0xD800 && c < 0xE000 && !pairAt(s, i) && (i == 0 || !pairAt(s, i - 1))) {
+                // A lone surrogate is not printable.
+                sb.append('\\').append('u');
+                hex(sb, c, 4);
             } else {
                 sb.append(c);
             }

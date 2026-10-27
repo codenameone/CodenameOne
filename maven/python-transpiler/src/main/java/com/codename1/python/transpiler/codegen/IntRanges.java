@@ -487,6 +487,19 @@ final class IntRanges {
     }
 
     private Iv call(Call c, Map<String, Iv> env) {
+        if (c.func instanceof Name && c.args.size() == 1 && c.keywords.isEmpty() && !(c.args.get(0) instanceof Starred)
+                && sc.resolve(((Name) c.func).id) == Scope.Binding.BUILTIN) {
+            switch (((Name) c.func).id) {
+                case "ord":
+                    // A code point, or an exception.
+                    return new Iv(BigInteger.ZERO, BigInteger.valueOf(0x10FFFF));
+                case "len":
+                    // OverflowError past sys.maxsize.
+                    return new Iv(BigInteger.ZERO, BigInteger.valueOf(Long.MAX_VALUE));
+                default:
+                    break;
+            }
+        }
         Infer.Fn f = inlinable(c);
         if (f != null) {
             Map<String, Iv> b = new HashMap<String, Iv>();
