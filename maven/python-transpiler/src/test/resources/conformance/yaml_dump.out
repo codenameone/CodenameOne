@@ -1,0 +1,676 @@
+== None
+null
+...
+<<
+== True
+true
+...
+<<
+== False
+false
+...
+<<
+== 0
+0
+...
+<<
+== 42
+42
+...
+<<
+== -7
+-7
+...
+<<
+== 100000000000000000000
+100000000000000000000
+...
+<<
+== 3.14
+3.14
+...
+<<
+== -0.5
+-0.5
+...
+<<
+== 1e+16
+1.0e+16
+...
+<<
+== 1e-07
+1.0e-07
+...
+<<
+== 1.0
+1.0
+...
+<<
+== inf
+.inf
+...
+<<
+== -inf
+-.inf
+...
+<<
+== nan
+.nan
+...
+<<
+== 'plain'
+plain
+...
+<<
+== ''
+''
+<<
+== ' lead'
+' lead'
+<<
+== 'trail '
+'trail '
+<<
+== 'a: b'
+'a: b'
+<<
+== 'a #b'
+'a #b'
+<<
+== '#c'
+'#c'
+<<
+== '- x'
+'- x'
+<<
+== '-'
+'-'
+<<
+== '?'
+'?'
+<<
+== '? x'
+'? x'
+<<
+== ':'
+':'
+<<
+== 'x:'
+'x:'
+<<
+== 'yes'
+'yes'
+<<
+== 'No'
+'No'
+<<
+== 'on'
+'on'
+<<
+== 'null'
+'null'
+<<
+== '~'
+'~'
+<<
+== 'true'
+'true'
+<<
+== '123'
+'123'
+<<
+== '1.5'
+'1.5'
+<<
+== '0x1f'
+'0x1f'
+<<
+== '1e3'
+1e3
+...
+<<
+== '2001-01-01'
+'2001-01-01'
+<<
+== '1:30'
+'1:30'
+<<
+== '<<'
+'<<'
+<<
+== '='
+'='
+<<
+== '@at'
+'@at'
+<<
+== '`tick'
+'`tick'
+<<
+== '%pct'
+'%pct'
+<<
+== '!bang'
+'!bang'
+<<
+== '&amp'
+'&amp'
+<<
+== '*star'
+'*star'
+<<
+== '|pipe'
+'|pipe'
+<<
+== '>gt'
+'>gt'
+<<
+== "'q'"
+'''q'''
+<<
+== '"dq"'
+'"dq"'
+<<
+== "a'b"
+a'b
+...
+<<
+== 'a"b'
+a"b
+...
+<<
+== '[x]'
+'[x]'
+<<
+== '{x}'
+'{x}'
+<<
+== 'a,b'
+a,b
+...
+<<
+== 'tab\there'
+"tab\there"
+<<
+== 'nl\nx'
+'nl
+
+  x'
+<<
+== 'two\n\nlines'
+'two
+
+
+  lines'
+<<
+== 'end\n'
+'end
+
+  '
+<<
+== '\nstart'
+'
+
+  start'
+<<
+== 'caf\xe9'
+"caf\xE9"
+<<
+== '\u4e2d\u6587'
+"\u4E2D\u6587"
+<<
+== 'bell\x07'
+"bell\a"
+<<
+== 'nul\x00'
+"nul\0"
+<<
+== '---'
+'---'
+<<
+== '...'
+'...'
+<<
+== '--- x'
+'--- x'
+<<
+== 'a  b'
+a  b
+...
+<<
+== 'a\n b'
+"a\n b"
+<<
+== ' '
+' '
+<<
+== 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+...
+<<
+== 'word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word '
+'word word word word word word word word word word word word word word word word word
+  word word word word word word word word word word word word word '
+<<
+== '\u2028sep'
+"\Lsep"
+<<
+== '\x85next'
+"\Nnext"
+<<
+== unicode allowed
+café 中文 😀
+...
+<<
+== unicode escaped
+"caf\xE9 \u4E2D\u6587 \U0001F600"
+<<
+== bytes
+!!binary |
+  AAFiaW5hcnkgZGF0YSBoZXJl
+<<
+== date
+2020-02-29
+...
+<<
+== datetime
+2020-02-29 12:30:45
+...
+<<
+== datetime micro
+2020-02-29 12:30:45.123456
+...
+<<
+== datetime tz
+2020-02-29 12:30:45+00:00
+...
+<<
+== default
+'123': numeric key
+flag: true
+long key kkkkkkkkkkkkkkkkkkkk: v
+matrix:
+- - 1
+  - 2
+- - 3
+  - 4
+name: demo
+nested:
+  empty_dict: {}
+  empty_list: []
+  x: 1
+  y:
+  - 1
+  - 2
+  - z: null
+none: null
+tags:
+- a
+- b
+- c
+text: 'multi
+
+  line'
+version: 1.5
+<<
+== unsorted
+name: demo
+version: 1.5
+tags:
+- a
+- b
+- c
+nested:
+  x: 1
+  y:
+  - 1
+  - 2
+  - z: null
+  empty_list: []
+  empty_dict: {}
+matrix:
+- - 1
+  - 2
+- - 3
+  - 4
+flag: true
+text: 'multi
+
+  line'
+none: null
+'123': numeric key
+long key kkkkkkkkkkkkkkkkkkkk: v
+<<
+== flow
+{'123': numeric key, flag: true, long key kkkkkkkkkkkkkkkkkkkk: v, matrix: [[1, 2],
+    [3, 4]], name: demo, nested: {empty_dict: {}, empty_list: [], x: 1, y: [1, 2,
+      {z: null}]}, none: null, tags: [a, b, c], text: 'multi
+
+    line', version: 1.5}
+<<
+== flow none
+'123': numeric key
+flag: true
+long key kkkkkkkkkkkkkkkkkkkk: v
+matrix:
+- [1, 2]
+- [3, 4]
+name: demo
+nested:
+  empty_dict: {}
+  empty_list: []
+  x: 1
+  y:
+  - 1
+  - 2
+  - {z: null}
+none: null
+tags: [a, b, c]
+text: 'multi
+
+  line'
+version: 1.5
+<<
+== indent4
+'123': numeric key
+flag: true
+long key kkkkkkkkkkkkkkkkkkkk: v
+matrix:
+-   - 1
+    - 2
+-   - 3
+    - 4
+name: demo
+nested:
+    empty_dict: {}
+    empty_list: []
+    x: 1
+    y:
+    - 1
+    - 2
+    -   z: null
+none: null
+tags:
+- a
+- b
+- c
+text: 'multi
+
+    line'
+version: 1.5
+<<
+== width20
+k: alpha beta gamma delta
+  epsilon zeta eta theta
+  iota kappa lambda
+<<
+== width flow
+[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+  13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
+  23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
+  33, 34, 35, 36, 37, 38, 39]
+<<
+== explicit start
+---
+- a
+- b
+- c
+<<
+== explicit both
+---
+a: 1
+...
+<<
+== version
+%YAML 1.1
+---
+a: 1
+<<
+== list of dicts
+- a: 1
+  b: 2
+- c:
+  - 1
+  - 2
+- []
+- - []
+- - {}
+<<
+== list in list
+- - 1
+  - - 2
+    - 3
+- - - 4
+<<
+== tuple
+- 1
+- 2
+- - 3
+  - 4
+<<
+== set
+!!set
+1: null
+2: null
+3: null
+<<
+== set flow
+{s: !!set {a: null, b: null}}
+<<
+== mixed keys
+1: 4
+b: 2
+null: 3
+<<
+== int keys
+1: a
+2: b
+3: c
+<<
+== tuple key
+? - 1
+  - 2
+: t
+<<
+== complex key
+? kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk
+: 1
+? 'multi
+
+  line'
+: 2
+<<
+== dict in flow
+[{a: [1, {b: 2}]}]
+<<
+== long plain
+- 'word word word word word word word word word word word word word word word word
+  word word word word word word word word word word word word word word word word
+  word word word word word word word word '
+<<
+== long quoted
+k: 'it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s
+  it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s it''s
+  it''s it''s it''s '
+<<
+== long dq
+k: "tab\t tab\t tab\t tab\t tab\t tab\t tab\t tab\t tab\t tab\t tab\t tab\t tab\t\
+  \ tab\t tab\t tab\t tab\t tab\t tab\t tab\t tab\t tab\t tab\t tab\t tab\t tab\t\
+  \ tab\t tab\t tab\t tab\t "
+<<
+== aliases
+a: &id001
+- 1
+- 2
+b: *id001
+c:
+  d: *id001
+<<
+== alias order
+- &id002
+  n: 1
+- &id001
+  n: 2
+- *id001
+- *id002
+<<
+== recursive
+&id001
+- 1
+- *id001
+<<
+== date alias
+- &id001 2020-01-01
+- *id001
+<<
+== no alias
+a:
+- 1
+- 2
+b:
+- 1
+- 2
+<<
+== dump
+a: !!python/tuple
+- 1
+- 2
+b:
+- 1
+- 2
+<<
+== dump flow
+{a: x, b: [1, 2]}
+<<
+== dump_all
+a: 1
+---
+- 1
+- 2
+--- plain
+--- 5
+...
+<<
+== safe_dump_all
+--- 1
+--- two
+---
+- 3
+<<
+== dump_all explicit
+---
+a: 1
+...
+---
+b: 2
+...
+<<
+== dump scalar dumper
+hello
+...
+<<
+== default_style
+"a": "b"
+"c":
+- !!int "1"
+- "d"
+<<
+== default_style sq
+'a': 'b'
+'c':
+- !!int '1'
+- 'd'
+<<
+== default_style lit
+"a": |-
+  b
+  c
+"d": |-
+  x
+<<
+== default_style fold
+"a": >-
+  b c d
+"d": >-
+  x
+<<
+bytes
+b'caf\xc3\xa9\n...\n'
+None
+k:
+- 1
+- 2
+== custom rep
+list:
+- !point
+  x: 3
+  y: 4
+p: !point
+  x: 1
+  y: 2
+<<
+== literal rep
+a: |
+  one
+  two
+b: single
+c: |-
+  x
+  y
+<<
+== flow seq rep
+t: !seq3 [1, 2, 3]
+<<
+== indented lists
+a:
+  - 1
+  - 2
+  - b:
+      - 3
+c: 1
+<<
+RepresenterError ('cannot represent an object',
+== yamlobject
+!Obj
+a: 1
+b:
+- 2
+- 3
+<<
+Obj 5 text
+0 True
+0 True
+0 True
+1 True
+1 True
+1 True
+2 True
+2 True
+2 True
+3 True
+3 True
+3 True
+4 True
+4 True
+4 True
+5 True
+5 True
+5 True
+6 True
+6 True
+6 True
+7 True
+7 True
+7 True
+8 True
+8 True
+8 True
+9 True
+9 True
+9 True
+== tuples dump
+t: !!python/tuple
+- 1
+- 2
+<<
+{'t': (1, 2)}
