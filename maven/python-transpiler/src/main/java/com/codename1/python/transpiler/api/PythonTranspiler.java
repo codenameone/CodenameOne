@@ -60,6 +60,13 @@ public final class PythonTranspiler {
     /// those; a module of its own with the same name wins.
     private static final String STDLIB = "/com/codename1/python/stdlib/";
 
+    /// Where the popular third-party packages live (`requests`, `pydantic`,
+    /// `attrs`, `yaml`, `dateutil`, `numpy`...): the package's public API
+    /// written for this runtime, found the same way as the standard library
+    /// and after it. The real packages build methods with `exec` or call C,
+    /// neither of which a translated program can do.
+    private static final String SITE = "/com/codename1/python/site/";
+
     private PythonTranspiler() {
     }
 
@@ -283,6 +290,9 @@ public final class PythonTranspiler {
 
     private static String resource(String path) {
         InputStream in = PythonTranspiler.class.getResourceAsStream(STDLIB + path);
+        if (in == null) {
+            in = PythonTranspiler.class.getResourceAsStream(SITE + path);
+        }
         if (in == null) {
             return null;
         }
