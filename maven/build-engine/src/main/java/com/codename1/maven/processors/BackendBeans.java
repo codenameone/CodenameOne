@@ -464,6 +464,14 @@ final class BackendBeans {
     /// to the field of the entry point that holds its one instance.
     final Map<String, String> repositories = new LinkedHashMap<String, String>();
     int requestSlots;
+
+    /// Which slot counter a scoped bean draws from: 0 request, 1 session, 2 lazy.
+    private static int slotKind(Bean b) {
+        if (REQUEST.equals(b.scope)) {
+            return 0;
+        }
+        return SESSION.equals(b.scope) ? 1 : 2;
+    }
     int sessionSlots;
     int lazySlots;
     /// The package the entry point is written into.
@@ -477,6 +485,12 @@ final class BackendBeans {
     private Set<String> testConfigurations;
     private List<String[]> testMocks;
     private Set<String> testWeaveable;
+    /// A slice's whole application, resolved, whose scoped and lazy slot
+    /// numbers this model keeps; null outside a slice.
+    private BackendBeans slotSource;
+    /// What a slice's test is told when it injects a bean the slice left out;
+    /// null outside a slice.
+    String sliceHint;
     /// Sources this pass compiled, by binary name, so tests can read them.
     final Map<String, String> sources = new LinkedHashMap<String, String>();
 
@@ -531,7 +545,22 @@ final class BackendBeans {
                                  Set<String> configurations, List<String[]> mocks,
                                  Set<String> weaveable, String entryPackage)
             throws ProcessingException {
+        return forTests(ctx, scope, configurations, mocks, weaveable, entryPackage, null, null);
+    }
+
+    /// [#forTests] for a slice: `slotSource` is the whole application, and the
+    /// stand-ins the main build compiled index scope storage by ITS slots, so a
+    /// slice that numbered only its own scoped beans would hand one bean
+    /// another's instance. `hint` ends the error for an injection the slice
+    /// cannot satisfy.
+    static BackendBeans forTests(ProcessorContext ctx, Set<String> scope,
+                                 Set<String> configurations, List<String[]> mocks,
+                                 Set<String> weaveable, String entryPackage,
+                                 BackendBeans slotSource, String hint)
+            throws ProcessingException {
         BackendBeans out = new BackendBeans(ctx);
+        out.slotSource = slotSource;
+        out.sliceHint = hint;
         out.testScope = scope;
         out.testConfigurations = configurations;
         out.testMocks = mocks;
@@ -2085,6 +2114,39 @@ final class BackendBeans {
                 b.slot = lazySlots++;
             }
         }
+        if (slotSource != null) {
+            // A slice keeps the whole application's slot for a bean both have, so
+            // the generated scope code agrees; a scoped bean only the slice has (a
+            // test configuration's) gets a fresh slot above the whole range, never
+            // one a remapped bean may also be given.
+            int request = slotSource.requestSlots;
+            int session = slotSource.sessionSlots;
+            int lazy = slotSource.lazySlots;
+            for (Bean b : beans) {
+                if (b.slot < 0) {
+                    continue;
+                }
+                int kind = slotKind(b);
+                Bean match = null;
+                for (Bean whole : slotSource.beans) {
+                    if (whole.slot >= 0 && whole.name.equals(b.name) && slotKind(whole) == kind) {
+                        match = whole;
+                    }
+                }
+                if (match != null) {
+                    b.slot = match.slot;
+                } else if (kind == 0) {
+                    b.slot = request++;
+                } else if (kind == 1) {
+                    b.slot = session++;
+                } else {
+                    b.slot = lazy++;
+                }
+            }
+            requestSlots = request;
+            sessionSlots = session;
+            lazySlots = lazy;
+        }
         for (Bean b : beans) {
             checkAccessibility(b);
             AnnotatedClass where = b.cls != null && ctx.lookup(b.type) != null ? b.cls
@@ -2360,8 +2422,9 @@ final class BackendBeans {
         if (matches.isEmpty()) {
             if (p.required) {
                 ctx.error(where, p.where + " needs a " + p.type.getClassName() + ", and no "
-                        + "bean has that type. Annotate the implementing class @Component, "
-                        + "or declare a @Bean method returning one.");
+                        + "bean has that type. " + (sliceHint != null ? sliceHint
+                        : "Annotate the implementing class @Component, "
+                        + "or declare a @Bean method returning one."));
             }
             return;
         }

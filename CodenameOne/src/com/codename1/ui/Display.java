@@ -6082,6 +6082,47 @@ public final class Display extends CN1Constants {
         return impl.createMedia(uri, isVideo, onCompletion);
     }
 
+    /// Creates the platform player for a streaming request. Applications call
+    /// `com.codename1.media.StreamRequest#create()`, which checks support first.
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: the stream to play
+    ///
+    /// #### Returns
+    ///
+    /// the media, or null when the platform cannot create a player
+    ///
+    /// #### Throws
+    ///
+    /// - `java.io.IOException`: if the stream cannot be opened
+    public Media createStreamingMedia(com.codename1.media.StreamRequest request) throws IOException {
+        return impl.createStreamingMedia(request);
+    }
+
+    /// Answers whether the platform player can play streams protected by a scheme.
+    ///
+    /// #### Parameters
+    ///
+    /// - `scheme`: the protection scheme
+    ///
+    /// #### Returns
+    ///
+    /// true when the scheme is supported
+    public boolean isDrmSupported(com.codename1.media.DrmScheme scheme) {
+        return impl.isDrmSupported(scheme);
+    }
+
+    /// Answers whether the platform player can attach HTTP headers to the manifest
+    /// and segment requests of a stream.
+    ///
+    /// #### Returns
+    ///
+    /// true when stream request headers are supported
+    public boolean isStreamHeadersSupported() {
+        return impl.isStreamHeadersSupported();
+    }
+
     /// Creates media asynchronously.
     ///
     /// #### Parameters

@@ -95,6 +95,11 @@ public final class Gauge extends Instrument {
                 return new java.util.ArrayList();
             }
         }
-        return single(point(null, read()));
+        double value = read();
+        // No point rather than NaN: a reading that failed, or a figure the
+        // server does not have (a pool gauge with no database), is absent from
+        // every view. NaN in a Prometheus scrape or an OTLP point reads as a
+        // measurement, and a dashboard cannot tell it from one.
+        return Double.isNaN(value) ? new java.util.ArrayList() : single(point(null, value));
     }
 }

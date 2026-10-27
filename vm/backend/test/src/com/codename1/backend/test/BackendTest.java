@@ -77,6 +77,31 @@ public @interface BackendTest {
     /// class of the test class is added without being listed.
     Class<?>[] classes() default {};
 
+    /// The production features to start the test's application with. None by
+    /// default: a test application has no management endpoints, MCP endpoint or
+    /// OpenTelemetry exporters, whatever the module's settings ask for, so a test
+    /// that does not exercise them does not pay for them. Name the ones a test
+    /// verifies, or [Feature#AS_PACKAGED] for the set the packaged server is
+    /// built with.
+    Feature[] features() default {};
+
+    /// A production feature [#features] can add to the test's application.
+    enum Feature {
+        /// The management endpoints, at `cn1.management.path` and with
+        /// `cn1.management.token`, as a test's settings give them. Turning them
+        /// on also has the server record its own metrics.
+        MANAGEMENT,
+        /// The OpenTelemetry exporters, for traces and metrics, sending where
+        /// the test's `cn1.otel.*` settings point -- an [OtlpTestCollector], say.
+        TELEMETRY,
+        /// The MCP endpoint, with the application's `@McpTool` methods.
+        MCP,
+        /// Each of the above the module's build links into the packaged server:
+        /// what `cn1.management.enabled`, `cn1.otel.enabled` or
+        /// `@OpenTelemetry`, and `cn1.mcp.enabled` or an `@McpTool` turn on.
+        AS_PACKAGED
+    }
+
     /// How a [BackendTest] reaches the application.
     enum WebEnvironment {
         /// In process, through [MockMvc]: no request crosses a socket.

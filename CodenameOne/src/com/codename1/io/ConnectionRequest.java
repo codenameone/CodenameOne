@@ -3714,7 +3714,10 @@ public class ConnectionRequest implements IOProgressListener {
                     if (getDestinationFile() != null) {
                         String file = getDestinationFile();
                         FileSystemStorage fs = FileSystemStorage.getInstance();
-                        if (fs.exists(file)) {
+                        // An empty entry is a download still being written by
+                        // another request for the same URL, or one that failed:
+                        // loading it would hand back an image of no bytes.
+                        if (fs.exists(file) && fs.getLength(file) > 0) {
                             try {
                                 EncodedImage img = EncodedImage.create(fs.openInputStream(file), (int) fs.getLength(file));
                                 CallbackDispatcher.dispatchSuccess(onSuccess, img);
@@ -3727,7 +3730,7 @@ public class ConnectionRequest implements IOProgressListener {
                     } else if (getDestinationStorage() != null) {
                         String file = getDestinationStorage();
                         Storage fs = Storage.getInstance();
-                        if (fs.exists(file)) {
+                        if (fs.exists(file) && fs.entrySize(file) > 0) {
                             try {
                                 EncodedImage img = EncodedImage.create(fs.createInputStream(file), fs.entrySize(file));
                                 CallbackDispatcher.dispatchSuccess(onSuccess, img);

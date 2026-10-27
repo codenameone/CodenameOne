@@ -90,12 +90,22 @@ final class BackendTestSupport {
 
     /** Builds one demo into `binary`. Returns null on success, or the reason. */
     static String build(String mainClass, String demoDir, Path binary, Path jdk8) throws Exception {
+        return build(mainClass, demoDir, binary, jdk8, false);
+    }
+
+    /// As [#build(String, String, Path, Path)]; `standalone` builds a demo that needs
+    /// neither the shared contract nor demo/common (CN1_BACKEND_STANDALONE_DEMO).
+    static String build(String mainClass, String demoDir, Path binary, Path jdk8, boolean standalone)
+            throws Exception {
         ProcessBuilder build = new ProcessBuilder("./build.sh", mainClass, "com.demo",
                 binary.toString());
         build.directory(backendDir().toFile());
         build.environment().put("JDK_8_HOME", jdk8.toString());
         build.environment().put("JAVA_HOME", jdk8.toString());
         build.environment().put("CN1_BACKEND_DEMO", demoDir);
+        if (standalone) {
+            build.environment().put("CN1_BACKEND_STANDALONE_DEMO", "1");
+        }
         build.redirectErrorStream(true);
         Process p = build.start();
         boolean[] timedOut = new boolean[1];

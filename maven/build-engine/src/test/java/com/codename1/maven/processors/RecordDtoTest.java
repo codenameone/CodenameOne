@@ -246,6 +246,13 @@ public class RecordDtoTest {
         contract.put("com.example.Kind", PKG + "public enum Kind { STANDARD, XL }\n");
         contract.put("com.example.Place", PKG + "import com.codename1.annotations.Mapped;\n"
                 + "@Mapped public record Place(double lat, double lng, String label) { }\n");
+        // Components named after the generated mapper's own locals (`_kids`,
+        // `_i`, `_e`, `_ch`, `_v`): a record's components are gathered in
+        // locals too, and these once redeclared them, so the module failed to
+        // build on the generated source.
+        contract.put("com.example.Household", PKG + "import com.codename1.annotations.Mapped;\n"
+                + "@Mapped public record Household(java.util.List<String> kids, int i, String e,\n"
+                + "        String ch, String v, String m, String o) { }\n");
         contract.put("com.example.Ride", PKG + "import com.codename1.annotations.Mapped;\n"
                 + "@Mapped public record Ride(String id, Kind kind, Place pickup,\n"
                 + "        java.util.List<Place> stops, long fareCents, boolean cash,\n"
