@@ -117,6 +117,37 @@ int main(void) {
         printf("%s sha256 paired vs single, 0..300 bytes\n", bad ? "FAIL" : "ok  ");
         failures += bad;
     }
+    {
+        /* the widest group each hash runs in a batch, every lane against a single hash */
+        int sha;
+        for (sha = 0; sha <= 1; sha++) {
+            cn1k_group_fn fn;
+            size_t width = cn1k_group_width(sha, &fn), len, j;
+            int bad = 0;
+            for (len = 0; width > 1 && len <= 300; len++) {
+                const unsigned char *in[8];
+                unsigned char got[8][32], ref[32], *out[8];
+                for (j = 0; j < width; j++) {
+                    in[j] = million + 7 * j + len % 5;
+                    out[j] = got[j];
+                }
+                fn(in, len, out);
+                for (j = 0; j < width; j++) {
+                    if (sha) {
+                        cn1k_sha256(in[j], len, ref);
+                    } else {
+                        cn1k_keccak256_c(in[j], len, ref);
+                    }
+                    if (memcmp(ref, got[j], 32) != 0) {
+                        bad++;
+                    }
+                }
+            }
+            printf("%s %s groups of %d vs single, 0..300 bytes\n", bad ? "FAIL" : "ok  ",
+                   sha ? "sha256" : "keccak", (int) width);
+            failures += bad;
+        }
+    }
     free(million);
     printf("%s (%d failing)\n", failures ? "FAILED" : "PASSED", failures);
     return failures ? 1 : 0;

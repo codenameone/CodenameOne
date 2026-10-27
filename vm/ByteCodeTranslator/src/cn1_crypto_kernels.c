@@ -143,25 +143,21 @@ static inline uint32x4_t vsha256su1q_u32(uint32x4_t a, uint32x4_t b, uint32x4_t 
 #    if !defined(__ARM_FEATURE_SHA3)
 static inline uint64x2_t veor3q_u64(uint64x2_t a, uint64x2_t b, uint64x2_t c) {
     uint64x2_t r;
-    __asm__(".arch_extension sha3
-	eor3 %0.16b, %1.16b, %2.16b, %3.16b" : "=w"(r) : "w"(a), "w"(b), "w"(c));
+    __asm__(".arch_extension sha3\n\teor3 %0.16b, %1.16b, %2.16b, %3.16b" : "=w"(r) : "w"(a), "w"(b), "w"(c));
     return r;
 }
 static inline uint64x2_t vrax1q_u64(uint64x2_t a, uint64x2_t b) {
     uint64x2_t r;
-    __asm__(".arch_extension sha3
-	rax1 %0.2d, %1.2d, %2.2d" : "=w"(r) : "w"(a), "w"(b));
+    __asm__(".arch_extension sha3\n\trax1 %0.2d, %1.2d, %2.2d" : "=w"(r) : "w"(a), "w"(b));
     return r;
 }
 static inline uint64x2_t vbcaxq_u64(uint64x2_t a, uint64x2_t b, uint64x2_t c) {
     uint64x2_t r;
-    __asm__(".arch_extension sha3
-	bcax %0.16b, %1.16b, %2.16b, %3.16b" : "=w"(r) : "w"(a), "w"(b), "w"(c));
+    __asm__(".arch_extension sha3\n\tbcax %0.16b, %1.16b, %2.16b, %3.16b" : "=w"(r) : "w"(a), "w"(b), "w"(c));
     return r;
 }
 /* the rotation is an immediate, so this one has to be a macro */
-#      define vxarq_u64(a, b, imm) __extension__ ({ uint64x2_t r_;         __asm__(".arch_extension sha3
-	xar %0.2d, %1.2d, %2.2d, %3" : "=w"(r_) : "w"(a), "w"(b), "i"(imm)); r_; })
+#      define vxarq_u64(a, b, imm) __extension__ ({ uint64x2_t r_;         __asm__(".arch_extension sha3\n\txar %0.2d, %1.2d, %2.2d, %3" : "=w"(r_) : "w"(a), "w"(b), "i"(imm)); r_; })
 #    endif
 #    if !defined(__ARM_FEATURE_SHA512)
 static inline uint64x2_t vsha512hq_u64(uint64x2_t a, uint64x2_t b, uint64x2_t w) {
@@ -602,6 +598,20 @@ static int cn1k_x86_has_sha(void) {
     }
     __get_cpuid(1, &a, &b, &c, &d);
     return (c & (1u << 19)) != 0;   /* SSE4.1 */
+}
+
+/* AVX2 needs the CPU to have it AND the OS to save the YMM registers (OSXSAVE, XCR0 bits 1-2). */
+static int cn1k_x86_has_avx2(void) {
+    unsigned int a, b, c, d, lo, hi;
+    if (!__get_cpuid(1, &a, &b, &c, &d) || (c & (1u << 27)) == 0) {
+        return 0;
+    }
+    __asm__ volatile("xgetbv" : "=a"(lo), "=d"(hi) : "c"(0));
+    (void) hi;
+    if ((lo & 6u) != 6u || !__get_cpuid_count(7, 0, &a, &b, &c, &d)) {
+        return 0;
+    }
+    return (b & (1u << 5)) != 0;
 }
 #endif
 
@@ -1469,6 +1479,246 @@ static void cn1k_keccak256_pair(const unsigned char *a, const unsigned char *b, 
     cn1k_keccak256(b, len, outB);
 }
 
+
+/* ------------------------------------------------------------------ hashes in groups
+ *
+ * A batch of equal-length inputs hashes several at a time where the vector unit can: two Keccak
+ * states per permutation and two SHA-256 streams on ARM, four Keccak states and eight SHA-256
+ * lanes in AVX2 on x86 (SHA-256 only where the CPU has no SHA instructions, which are faster than
+ * eight lanes). Each function hashes  inputs of one length; n is the group's width.
+ */
+typedef void (*cn1k_group_fn)(const unsigned char *const *in, size_t len, unsigned char *const *out);
+
+#ifdef CN1K_ARM64
+static void cn1k_keccak_group2(const unsigned char *const *in, size_t len, unsigned char *const *out) {
+    cn1k_keccak256x2_arm(in[0], in[1], len, out[0], out[1]);
+}
+static void cn1k_sha256_group2(const unsigned char *const *in, size_t len, unsigned char *const *out) {
+    cn1k_sha256_pair(in[0], in[1], len, out[0], out[1]);
+}
+#endif
+
+#ifdef CN1K_X86
+#define CN1K_ROL4(v, n) _mm256_or_si256(_mm256_slli_epi64((v), (n)), _mm256_srli_epi64((v), 64 - (n)))
+/* one Keccak-f[1600] round over four states, one per 64-bit lane */
+#define CN1K_KECCAK_ROUND4(s, rc) do { \
+    __m256i c0, c1, c2, c3, c4, d0, d1, d2, d3, d4, b[25]; \
+    c0 = _mm256_xor_si256(_mm256_xor_si256(_mm256_xor_si256(s[0], s[5]), _mm256_xor_si256(s[10], s[15])), s[20]); \
+    c1 = _mm256_xor_si256(_mm256_xor_si256(_mm256_xor_si256(s[1], s[6]), _mm256_xor_si256(s[11], s[16])), s[21]); \
+    c2 = _mm256_xor_si256(_mm256_xor_si256(_mm256_xor_si256(s[2], s[7]), _mm256_xor_si256(s[12], s[17])), s[22]); \
+    c3 = _mm256_xor_si256(_mm256_xor_si256(_mm256_xor_si256(s[3], s[8]), _mm256_xor_si256(s[13], s[18])), s[23]); \
+    c4 = _mm256_xor_si256(_mm256_xor_si256(_mm256_xor_si256(s[4], s[9]), _mm256_xor_si256(s[14], s[19])), s[24]); \
+    d0 = _mm256_xor_si256(c4, CN1K_ROL4(c1, 1)); \
+    d1 = _mm256_xor_si256(c0, CN1K_ROL4(c2, 1)); \
+    d2 = _mm256_xor_si256(c1, CN1K_ROL4(c3, 1)); \
+    d3 = _mm256_xor_si256(c2, CN1K_ROL4(c4, 1)); \
+    d4 = _mm256_xor_si256(c3, CN1K_ROL4(c0, 1)); \
+    b[0] = _mm256_xor_si256(s[0], d0); \
+    b[16] = CN1K_ROL4(_mm256_xor_si256(s[5], d0), 36); \
+    b[7] = CN1K_ROL4(_mm256_xor_si256(s[10], d0), 3); \
+    b[23] = CN1K_ROL4(_mm256_xor_si256(s[15], d0), 41); \
+    b[14] = CN1K_ROL4(_mm256_xor_si256(s[20], d0), 18); \
+    b[10] = CN1K_ROL4(_mm256_xor_si256(s[1], d1), 1); \
+    b[1] = CN1K_ROL4(_mm256_xor_si256(s[6], d1), 44); \
+    b[17] = CN1K_ROL4(_mm256_xor_si256(s[11], d1), 10); \
+    b[8] = CN1K_ROL4(_mm256_xor_si256(s[16], d1), 45); \
+    b[24] = CN1K_ROL4(_mm256_xor_si256(s[21], d1), 2); \
+    b[20] = CN1K_ROL4(_mm256_xor_si256(s[2], d2), 62); \
+    b[11] = CN1K_ROL4(_mm256_xor_si256(s[7], d2), 6); \
+    b[2] = CN1K_ROL4(_mm256_xor_si256(s[12], d2), 43); \
+    b[18] = CN1K_ROL4(_mm256_xor_si256(s[17], d2), 15); \
+    b[9] = CN1K_ROL4(_mm256_xor_si256(s[22], d2), 61); \
+    b[5] = CN1K_ROL4(_mm256_xor_si256(s[3], d3), 28); \
+    b[21] = CN1K_ROL4(_mm256_xor_si256(s[8], d3), 55); \
+    b[12] = CN1K_ROL4(_mm256_xor_si256(s[13], d3), 25); \
+    b[3] = CN1K_ROL4(_mm256_xor_si256(s[18], d3), 21); \
+    b[19] = CN1K_ROL4(_mm256_xor_si256(s[23], d3), 56); \
+    b[15] = CN1K_ROL4(_mm256_xor_si256(s[4], d4), 27); \
+    b[6] = CN1K_ROL4(_mm256_xor_si256(s[9], d4), 20); \
+    b[22] = CN1K_ROL4(_mm256_xor_si256(s[14], d4), 39); \
+    b[13] = CN1K_ROL4(_mm256_xor_si256(s[19], d4), 8); \
+    b[4] = CN1K_ROL4(_mm256_xor_si256(s[24], d4), 14); \
+    s[0] = _mm256_xor_si256(b[0], _mm256_andnot_si256(b[1], b[2])); \
+    s[1] = _mm256_xor_si256(b[1], _mm256_andnot_si256(b[2], b[3])); \
+    s[2] = _mm256_xor_si256(b[2], _mm256_andnot_si256(b[3], b[4])); \
+    s[3] = _mm256_xor_si256(b[3], _mm256_andnot_si256(b[4], b[0])); \
+    s[4] = _mm256_xor_si256(b[4], _mm256_andnot_si256(b[0], b[1])); \
+    s[5] = _mm256_xor_si256(b[5], _mm256_andnot_si256(b[6], b[7])); \
+    s[6] = _mm256_xor_si256(b[6], _mm256_andnot_si256(b[7], b[8])); \
+    s[7] = _mm256_xor_si256(b[7], _mm256_andnot_si256(b[8], b[9])); \
+    s[8] = _mm256_xor_si256(b[8], _mm256_andnot_si256(b[9], b[5])); \
+    s[9] = _mm256_xor_si256(b[9], _mm256_andnot_si256(b[5], b[6])); \
+    s[10] = _mm256_xor_si256(b[10], _mm256_andnot_si256(b[11], b[12])); \
+    s[11] = _mm256_xor_si256(b[11], _mm256_andnot_si256(b[12], b[13])); \
+    s[12] = _mm256_xor_si256(b[12], _mm256_andnot_si256(b[13], b[14])); \
+    s[13] = _mm256_xor_si256(b[13], _mm256_andnot_si256(b[14], b[10])); \
+    s[14] = _mm256_xor_si256(b[14], _mm256_andnot_si256(b[10], b[11])); \
+    s[15] = _mm256_xor_si256(b[15], _mm256_andnot_si256(b[16], b[17])); \
+    s[16] = _mm256_xor_si256(b[16], _mm256_andnot_si256(b[17], b[18])); \
+    s[17] = _mm256_xor_si256(b[17], _mm256_andnot_si256(b[18], b[19])); \
+    s[18] = _mm256_xor_si256(b[18], _mm256_andnot_si256(b[19], b[15])); \
+    s[19] = _mm256_xor_si256(b[19], _mm256_andnot_si256(b[15], b[16])); \
+    s[20] = _mm256_xor_si256(b[20], _mm256_andnot_si256(b[21], b[22])); \
+    s[21] = _mm256_xor_si256(b[21], _mm256_andnot_si256(b[22], b[23])); \
+    s[22] = _mm256_xor_si256(b[22], _mm256_andnot_si256(b[23], b[24])); \
+    s[23] = _mm256_xor_si256(b[23], _mm256_andnot_si256(b[24], b[20])); \
+    s[24] = _mm256_xor_si256(b[24], _mm256_andnot_si256(b[20], b[21])); \
+    s[0] = _mm256_xor_si256(s[0], _mm256_set1_epi64x((long long) (rc))); \
+} while (0)
+
+__attribute__((target("avx2")))
+static void cn1k_keccak_absorb4(__m256i *s, const unsigned char *const *in, size_t at) {
+    int i, r;
+    for (i = 0; i < 17; i++) {
+        s[i] = _mm256_xor_si256(s[i], _mm256_set_epi64x((long long) cn1k_le64(in[3] + at + 8 * i),
+                (long long) cn1k_le64(in[2] + at + 8 * i), (long long) cn1k_le64(in[1] + at + 8 * i),
+                (long long) cn1k_le64(in[0] + at + 8 * i)));
+    }
+    for (r = 0; r < 24; r++) {
+        CN1K_KECCAK_ROUND4(s, cn1k_keccak_rc[r]);
+    }
+}
+
+__attribute__((target("avx2")))
+static void cn1k_keccak_group4(const unsigned char *const *in, size_t len, unsigned char *const *out) {
+    __m256i s[25];
+    unsigned char last[4][136];
+    const unsigned char *tails[4];
+    uint64_t lanes[4][4];
+    size_t at = 0;
+    int i, j;
+    for (i = 0; i < 25; i++) {
+        s[i] = _mm256_setzero_si256();
+    }
+    for (; len - at >= 136; at += 136) {
+        cn1k_keccak_absorb4(s, in, at);
+    }
+    for (j = 0; j < 4; j++) {
+        memset(last[j], 0, 136);
+        memcpy(last[j], in[j] + at, len - at);
+        last[j][len - at] = 0x01;
+        last[j][135] |= 0x80;
+        tails[j] = last[j];
+    }
+    cn1k_keccak_absorb4(s, tails, 0);
+    for (i = 0; i < 4; i++) {
+        _mm256_storeu_si256((__m256i*) lanes[i], s[i]);
+    }
+    for (j = 0; j < 4; j++) {
+        for (i = 0; i < 32; i++) {
+            out[j][i] = (unsigned char) (lanes[i >> 3][j] >> (8 * (i & 7)));
+        }
+    }
+}
+
+#define CN1K_ROR8(x, n) _mm256_or_si256(_mm256_srli_epi32((x), (n)), _mm256_slli_epi32((x), 32 - (n)))
+
+/* Compresses one 64-byte block of each of eight inputs, lane j holding input j. */
+__attribute__((target("avx2")))
+static void cn1k_sha256_x8_block(__m256i *st, const unsigned char *const *p) {
+    const __m256i swap = _mm256_set_epi8(12, 13, 14, 15, 8, 9, 10, 11, 4, 5, 6, 7, 0, 1, 2, 3,
+                                         12, 13, 14, 15, 8, 9, 10, 11, 4, 5, 6, 7, 0, 1, 2, 3);
+    __m256i w[16], a = st[0], b = st[1], c = st[2], d = st[3], e = st[4], f = st[5], g = st[6], h = st[7];
+    int i;
+    for (i = 0; i < 16; i++) {
+        uint32_t v[8];
+        int j;
+        for (j = 0; j < 8; j++) {
+            memcpy(&v[j], p[j] + 4 * i, 4);
+        }
+        w[i] = _mm256_shuffle_epi8(_mm256_loadu_si256((const __m256i*) v), swap);
+    }
+    for (i = 0; i < 64; i++) {
+        __m256i t1, t2, wi;
+        if (i < 16) {
+            wi = w[i];
+        } else {
+            __m256i w15 = w[(i - 15) & 15], w2 = w[(i - 2) & 15];
+            __m256i s0 = _mm256_xor_si256(_mm256_xor_si256(CN1K_ROR8(w15, 7), CN1K_ROR8(w15, 18)),
+                                          _mm256_srli_epi32(w15, 3));
+            __m256i s1 = _mm256_xor_si256(_mm256_xor_si256(CN1K_ROR8(w2, 17), CN1K_ROR8(w2, 19)),
+                                          _mm256_srli_epi32(w2, 10));
+            wi = _mm256_add_epi32(_mm256_add_epi32(w[i & 15], s0), _mm256_add_epi32(w[(i - 7) & 15], s1));
+            w[i & 15] = wi;
+        }
+        t1 = _mm256_add_epi32(_mm256_add_epi32(h, _mm256_xor_si256(_mm256_xor_si256(CN1K_ROR8(e, 6),
+                CN1K_ROR8(e, 11)), CN1K_ROR8(e, 25))),
+                _mm256_add_epi32(_mm256_xor_si256(_mm256_and_si256(e, f), _mm256_andnot_si256(e, g)),
+                _mm256_add_epi32(_mm256_set1_epi32((int) cn1k_sha256_k[i]), wi)));
+        t2 = _mm256_add_epi32(_mm256_xor_si256(_mm256_xor_si256(CN1K_ROR8(a, 2), CN1K_ROR8(a, 13)),
+                CN1K_ROR8(a, 22)), _mm256_xor_si256(_mm256_and_si256(a, _mm256_xor_si256(b, c)),
+                _mm256_and_si256(b, c)));
+        h = g; g = f; f = e; e = _mm256_add_epi32(d, t1);
+        d = c; c = b; b = a; a = _mm256_add_epi32(t1, t2);
+    }
+    st[0] = _mm256_add_epi32(st[0], a); st[1] = _mm256_add_epi32(st[1], b);
+    st[2] = _mm256_add_epi32(st[2], c); st[3] = _mm256_add_epi32(st[3], d);
+    st[4] = _mm256_add_epi32(st[4], e); st[5] = _mm256_add_epi32(st[5], f);
+    st[6] = _mm256_add_epi32(st[6], g); st[7] = _mm256_add_epi32(st[7], h);
+}
+
+__attribute__((target("avx2")))
+static void cn1k_sha256_group8(const unsigned char *const *in, size_t len, unsigned char *const *out) {
+    __m256i st[8];
+    unsigned char tail[8][128];
+    const unsigned char *p[8];
+    uint32_t lanes[8][8];
+    size_t whole = len / 64, rest = len % 64, padded = rest < 56 ? 64 : 128, blk;
+    int i, j;
+    for (i = 0; i < 8; i++) {
+        st[i] = _mm256_set1_epi32((int) cn1k_sha256_iv[i]);
+    }
+    for (blk = 0; blk < whole; blk++) {
+        for (j = 0; j < 8; j++) {
+            p[j] = in[j] + 64 * blk;
+        }
+        cn1k_sha256_x8_block(st, p);
+    }
+    for (j = 0; j < 8; j++) {
+        memcpy(tail[j], in[j] + whole * 64, rest);
+        tail[j][rest] = 0x80;
+        memset(tail[j] + rest + 1, 0, padded - rest - 9);
+        cn1k_put_be64(tail[j] + padded - 8, (uint64_t) len * 8);
+    }
+    for (blk = 0; blk < padded / 64; blk++) {
+        for (j = 0; j < 8; j++) {
+            p[j] = tail[j] + 64 * blk;
+        }
+        cn1k_sha256_x8_block(st, p);
+    }
+    for (i = 0; i < 8; i++) {
+        _mm256_storeu_si256((__m256i*) lanes[i], st[i]);
+    }
+    for (j = 0; j < 8; j++) {
+        for (i = 0; i < 8; i++) {
+            cn1k_put_be32(out[j] + 4 * i, lanes[i][j]);
+        }
+    }
+}
+#endif
+
+/* The widest group the CPU runs for a hash batch, and its function; 1 hashes one at a time. */
+static size_t cn1k_group_width(int sha, cn1k_group_fn *fn) {
+    *fn = NULL;
+#ifdef CN1K_ARM64
+    if (sha && cn1k_sha256_blocks() == cn1k_sha256_blocks_arm) {
+        *fn = cn1k_sha256_group2;
+        return 2;
+    }
+    if (!sha && cn1k_keccak_select() == cn1k_keccak256_arm) {
+        *fn = cn1k_keccak_group2;
+        return 2;
+    }
+#endif
+#ifdef CN1K_X86
+    if (cn1k_x86_has_avx2() && !(sha && cn1k_sha256_blocks() == cn1k_sha256_blocks_x86)) {
+        *fn = sha ? cn1k_sha256_group8 : cn1k_keccak_group4;
+        return sha ? 8 : 4;
+    }
+#endif
+    return 1;
+}
+
 /* ------------------------------------------------------------------ the secp256k1 context */
 
 #if defined(__APPLE__)
@@ -1891,31 +2141,41 @@ static void cn1k_batch_item(const cn1k_batch *b, size_t i) {
 
 static void cn1k_batch_chunk(void *arg, size_t c) {
     const cn1k_batch *b = (const cn1k_batch*) arg;
-    size_t from = c * b->count / b->chunks, to = (c + 1) * b->count / b->chunks, i;
+    size_t from = c * b->count / b->chunks, to = (c + 1) * b->count / b->chunks, i = from;
     if (b->alg == CN1K_BATCH_KECCAK256 || b->alg == CN1K_BATCH_SHA256) {
-        /* two inputs of one length go through the vector or SHA unit together */
-        for (i = from; i + 1 < to; i += 2) {
-            const unsigned char *m0 = b->msgOff ? b->msgs + b->msgOff[i] : b->msgs + i * b->msgStride;
-            const unsigned char *m1 = b->msgOff ? b->msgs + b->msgOff[i + 1] : m0 + b->msgStride;
-            size_t l0 = b->msgOff ? (size_t) (b->msgOff[i + 1] - b->msgOff[i]) : b->msgStride;
-            size_t l1 = b->msgOff ? (size_t) (b->msgOff[i + 2] - b->msgOff[i + 1]) : b->msgStride;
-            if (l0 != l1) {
-                cn1k_batch_item(b, i);
-                i--;
-                continue;
+        cn1k_group_fn fn;
+        size_t width = cn1k_group_width(b->alg == CN1K_BATCH_SHA256, &fn);
+        while (width > 1 && i < to) {
+            /* the longest run of equal lengths from i, up to the group's width */
+            const unsigned char *in[8];
+            unsigned char *out[8];
+            size_t n = 0, len = b->msgOff ? (size_t) (b->msgOff[i + 1] - b->msgOff[i]) : b->msgStride;
+            if (to - i < width) {
+                break;
             }
-            if (b->alg == CN1K_BATCH_SHA256) {
-                cn1k_sha256_pair(m0, m1, l0, b->results + 32 * i, b->results + 32 * (i + 1));
+            while (n < width) {
+                size_t k = i + n;
+                if (b->msgOff && (size_t) (b->msgOff[k + 1] - b->msgOff[k]) != len) {
+                    break;
+                }
+                in[n] = b->msgOff ? b->msgs + b->msgOff[k] : b->msgs + k * b->msgStride;
+                out[n] = b->results + 32 * k;
+                n++;
+            }
+            if (n == width) {
+                fn(in, len, out);
+                i += width;
             } else {
-                cn1k_keccak256_pair(m0, m1, l0, b->results + 32 * i, b->results + 32 * (i + 1));
+                cn1k_batch_item(b, i);
+                i++;
             }
         }
-        if (i < to) {
+        for (; i < to; i++) {
             cn1k_batch_item(b, i);
         }
         return;
     }
-    for (i = from; i < to; i++) {
+    for (; i < to; i++) {
         cn1k_batch_item(b, i);
     }
 }
