@@ -1,0 +1,231 @@
+== Writing applications and backends in Python
+
+Python source builds as a Codename One application. The build translates each
+module to Java, compiles it with the rest of the project, and from there it
+goes wherever Java goes: iOS, Android, the JavaScript port, the desktop ports,
+the simulator, and native server binaries built on the Codename One backend.
+
+No Python interpreter ships with the application. Each module becomes a Java
+class, each function a method, and a small runtime supplies Python's object
+model, its built-in types and the standard library modules applications use.
+Annotated code is compiled to unboxed Java arithmetic, so a typed numeric loop
+runs at the speed of the equivalent Java.
+
+Two things follow from compiling ahead of time rather than interpreting:
+
+* The program is known in full at build time. A module imported by a
+  name computed while the program runs, `exec`, `eval` and `compile` of a
+  string, frame introspection and C extension modules are build errors that
+  name the file and the line. None of them reaches a device as a hidden failure.
+* Packages that CPython implements in C -- `numpy`, `pydantic`'s core,
+  `yaml`'s scanner -- are provided as Codename One implementations of the same
+  public API. Pure Python packages are translated like your own code.
+
+=== Adding Python to a project
+
+Put the sources in `common/src/main/python`, or import an existing Python
+project into a Codename One application:
+
+[source,bash]
+----
+mvn cn1:import-python-project -Dsource=/path/to/my-python-app
+----
+
+The import copies the `.py` files, adds the Python runtime dependency and the
+`transpile-python` goal to the common module, records the entry module and
+makes the application's main class run it. Build and run the project as usual
+afterwards; the translation runs in `generate-sources`. Gradle projects get the
+same step as the `transpilePython` task.
+
+The goal reads these properties:
+
+[cols="1,3",options="header"]
+|===
+| Property | Meaning
+| `cn1.python.sourceDir` | The Python sources, `src/main/python` by default.
+| `cn1.python.mainModule` | The module run as `+__main__+` when the application starts.
+| `cn1.python.outputDir` | Where the generated Java goes.
+| `cn1.python.skip` | `true` skips the step.
+|===
+
+=== Calling Codename One and Java from Python
+
+Any class on the project's class path is importable under the `java.` prefix:
+
+[source,python]
+----
+from java.com.codename1.ui import Form, Button, Label, TextField, Dialog
+from java.com.codename1.ui.layouts import BoxLayout
+
+
+def main():
+    form = Form("Hello Python", BoxLayout.y())
+    name = TextField("", "Your name")
+    out = Label("Hello, world!")
+
+    def on_greet(event):
+        out.setText(f"Hello, {name.getText().strip()}!")
+        form.revalidate()
+
+    button = Button("Greet")
+    button.addActionListener(on_greet)
+    form.add(name).add(button).add(out)
+    form.show()
+
+
+main()
+----
+
+A Python function or lambda passed where Java expects a listener or another
+single-method interface becomes an implementation of that interface. Overloads
+are chosen at build time when the argument types are known, and otherwise by
+the runtime from the values passed.
+
+Values cross the boundary as follows:
+
+[cols="1,1",options="header"]
+|===
+| Python | Java
+| `int` | `long`, or `BigInteger` past 64 bits
+| `float` | `double`
+| `bool` | `boolean`
+| `str` | `String`
+| `bytes` | `byte[]`
+| `None` | `null`
+| `list`, `dict` | `java.util.List`, `java.util.Map`
+|===
+
+Java collections behave as their Python counterparts in Python code: `len`,
+indexing, `in` and iteration work on an `ArrayList` or a `HashMap`, and a
+Java exception arrives as a Python exception whose message names the Java
+type.
+
+To call into Python from Java, import the module through the runtime and call
+its attributes:
+
+[source,java]
+----
+PythonModules.registerAll();
+PyModule pricing = Py.importModule("pricing");
+Object total = Py.call(Py.getattr(pricing, "total"), cart);
+----
+
+=== Libraries
+
+The standard library modules applications use most are included: `json`, `re`,
+`datetime`, `decimal`, `fractions`, `collections`, `itertools`, `functools`,
+`dataclasses`, `enum`, `typing`, `inspect`, `asyncio`, `logging`, `pathlib`,
+`os.path`, `csv`, `struct`, `hashlib`, `base64`, `uuid`, `random`,
+`statistics`, `heapq`, `bisect`, `textwrap`, `string`, `tomllib` and others.
+
+These third party packages are provided, each tested against the output of
+the real package:
+
+[cols="1,3",options="header"]
+|===
+| Package | Notes
+| `requests`, `httpx` | Over Codename One's network stack.
+| `pydantic` | Models, fields, validators, `TypeAdapter`, JSON round trips.
+| `attrs`, `python-dateutil`, `PyYAML` |
+| `numpy` | `ndarray` of `float64`, `int64` and `bool` with broadcasting,
+  views, fancy indexing, ufuncs, reductions, sorting and `numpy.linalg`. The
+  kernels are Java loops over primitive arrays. `numpy.random` draws from
+  Python's generator, so its streams differ from NumPy's.
+| `flask`, `fastapi`, `uvicorn` | See <<python-backends,Python backends>>.
+| `typing_extensions`, `six`, `tabulate`, `idna`, `packaging` |
+|===
+
+Import other pure Python packages by copying their sources into the source
+directory; they translate like the application's own modules.
+
+[[python-backends]]
+=== Python backends
+
+A Flask or FastAPI application builds into a single native server executable.
+The application starts the server the way it always does:
+
+[source,python]
+----
+from flask import Flask, jsonify
+
+app = Flask(__name__)
+
+
+@app.get("/fib/<int:n>")
+def fib(n):
+    a, b = 0, 1
+    for _ in range(n):
+        a, b = b, a + b
+    return jsonify({"n": n, "fib": str(a)})
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=8080)
+----
+
+`app.run()` and `uvicorn.run(app)` are lowered onto the Codename One backend's
+HTTP server, so the same file still runs under CPython for development:
+
+[source,bash]
+----
+scripts/python-backend/build.sh scripts/python-backend/samples/flask-todo ./todo-server
+./todo-server
+----
+
+Routing, converters, JSON bodies, `abort`, error handlers and the default
+error pages of Flask, and FastAPI's path, query, body and header parameters,
+dependencies, `response_model` and OpenAPI generation are supported. Flask
+sessions, templates, file uploads and streaming responses aren't, nor are
+FastAPI WebSockets and middleware.
+
+=== Compared with CPython and PyPy
+
+The same programs, run on one Apple silicon Mac, with
+`scripts/python-compare/compare.py`. Codename One rows are native binaries.
+
+Startup, a program that prints one line:
+
+[cols="1,1,1",options="header"]
+|===
+| | Wall time (ms) | Peak memory (MB)
+| CPython 3.14 | 21.2 | 14.4
+| PyPy 3.11 | 20.4 | 29.2
+| Codename One | 7.6 | 8.7
+|===
+
+CPU kernels, fastest round in milliseconds:
+
+[cols="1,1,1,1",options="header"]
+|===
+| Kernel | CPython 3.14 | PyPy 3.11 | Codename One
+| nbody | 785.9 | 63.7 | 90.1
+| richards | 653.9 | 40.3 | 44.7
+| fannkuch | 2691.2 | 612.5 | 731.8
+| spectral_norm | 734.5 | 11.7 | 11.1
+| dicts_strings | 397.5 | 145.0 | 211.2
+|===
+
+PyPy's JIT and Codename One's ahead of time compilation land close to each
+other, from twice to sixty times as fast as CPython. Codename One gets there
+without a warm-up and with a third of PyPy's memory on the numeric kernels.
+
+The Flask sample above, measured with `ab -n 20000 -c 8`:
+
+[cols="1,1,1,1",options="header"]
+|===
+| | First response (ms) | Requests per second | Deployed size (MB)
+| CPython 3.14 | 97 | 687 | 82.0
+| PyPy 3.11 | 200 | 674 | 137.7
+| Codename One | 61 | 16,332 | 22.7
+|===
+
+The deployed size is the interpreter's installation plus Flask and its
+dependencies, against the one executable. CPython and PyPy serve with
+Werkzeug's threaded server, which is what `app.run()` starts; a production
+CPython deployment behind a WSGI server with several worker processes serves
+more, using a full interpreter's memory per worker. The Codename One server
+idles at 27 MB and its heap grew to 395 MB under this load, where it stayed.
+
+Where an application needs CPython instead: packages with C extensions that
+have no Codename One implementation (for example `pandas`, `scipy` or `torch`),
+and code that builds source text and runs it with `exec`.
