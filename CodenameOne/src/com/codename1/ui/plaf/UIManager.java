@@ -2709,6 +2709,9 @@ public class UIManager {
         }
     }
 
+    /// Scratch for `normalizeBoundColorValue`, which always produces 6 digits.
+    private static final char[] HEX_COLOR_BUFFER = new char[6];
+
     /// `loadTheme` stores color theme entries as plain hex strings (no `#`,
     /// lowercase). User-supplied overrides may use either form, so trim a
     /// leading `#` and lowercase the value before assigning it to a bound
@@ -2719,40 +2722,34 @@ public class UIManager {
             return null;
         }
         String value = raw.trim();
-        if (value.length() == 0) {
+        int len = value.length();
+        int start = len > 0 && value.charAt(0) == '#' ? 1 : 0;
+        int digits = len - start;
+        if (digits != 3 && digits != 6) {
             return null;
         }
-        if (value.charAt(0) == '#') {
-            value = value.substring(1);
-        }
-        if (value.length() == 3) {
-            char r = value.charAt(0);
-            char g = value.charAt(1);
-            char b = value.charAt(2);
-            value = "" + r + r + g + g + b + b;
-        }
-        if (value.length() != 6) {
-            return null;
-        }
-        boolean upper = false;
-        for (int i = 0; i < 6; i++) {
-            char c = value.charAt(i);
-            boolean hex = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
-            if (!hex) {
+        // One pass into a reused buffer: validate, expand the 3-digit form and
+        // fold hex digits by hand, since toLowerCase() is locale sensitive.
+        // Themes are installed from one thread at a time, as the rest of
+        // UIManager assumes.
+        char[] c = HEX_COLOR_BUFFER;
+        boolean changed = start != 0 || digits == 3;
+        for (int i = 0; i < digits; i++) {
+            char x = value.charAt(start + i);
+            if (x >= 'A' && x <= 'F') {
+                x = (char) (x + 32);
+                changed = true;
+            } else if (!((x >= '0' && x <= '9') || (x >= 'a' && x <= 'f'))) {
                 return null;
             }
-            upper |= c >= 'A' && c <= 'F';
+            if (digits == 3) {
+                c[2 * i] = x;
+                c[2 * i + 1] = x;
+            } else {
+                c[i] = x;
+            }
         }
-        if (!upper) {
-            return value;
-        }
-        // Hex digits, folded by hand: toLowerCase() is locale sensitive.
-        char[] c = new char[6];
-        for (int i = 0; i < 6; i++) {
-            char x = value.charAt(i);
-            c[i] = x >= 'A' && x <= 'F' ? (char) (x + ('a' - 'A')) : x;
-        }
-        return new String(c);
+        return changed ? new String(c) : value;
     }
 
     private Map<String, String> parseCache() {

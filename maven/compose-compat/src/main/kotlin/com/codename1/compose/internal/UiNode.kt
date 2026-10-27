@@ -550,7 +550,8 @@ internal open class UiNode : Container(NodeLayout) {
         val clip = clipBox()
         if (clip >= 0) {
             g.pushClip()
-            g.clipRect(x + boxes[clip * 4], y + boxes[clip * 4 + 1], boxes[clip * 4 + 2], boxes[clip * 4 + 3])
+            clipTo(g, (chain[clip] as ClipElement).shape, x + boxes[clip * 4], y + boxes[clip * 4 + 1],
+                boxes[clip * 4 + 2], boxes[clip * 4 + 3])
         }
         paintContent(g)
         if (clip >= 0) {
@@ -569,6 +570,22 @@ internal open class UiNode : Container(NodeLayout) {
     /// Paints what is inside the content box; containers paint their children.
     protected open fun paintContent(g: Graphics) {
         super.paint(g)
+    }
+
+    /// Clips to `shape`, as Compose does: a card's children stay inside its
+    /// rounded corners. `setClip(Shape)` replaces the clip, so the path is
+    /// first cut to the clip in force, or a card scrolled under a bar would
+    /// paint over it.
+    private fun clipTo(g: Graphics, shape: Shape, cx: Int, cy: Int, cw: Int, ch: Int) {
+        val o = Painting.outline(shape, cw, ch)
+        if (o is androidx.compose.ui.graphics.Outline.Rounded && g.isShapeClipSupported) {
+            val path = Painting.roundedPath(o, cx.toFloat(), cy.toFloat())
+            if (path.intersect(g.clipX, g.clipY, g.clipWidth, g.clipHeight)) {
+                g.setClip(path)
+                return
+            }
+        }
+        g.clipRect(cx, cy, cw, ch)
     }
 
     private fun clipBox(): Int {
