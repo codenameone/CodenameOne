@@ -50,7 +50,7 @@ import java.util.List;
 /// hardware key store signs with its own call, and a headless device on the
 /// backend with `com.codename1.backend.Crypto`:
 ///
-/// ```java
+/// ```java {class="cn1-no-try"}
 /// byte[] key = Crypto.generateEcKey(Crypto.P256);
 /// byte[] csr = new CertificateRequest(Der.publicKeyOf(key), "EC")
 ///         .commonName(deviceId)

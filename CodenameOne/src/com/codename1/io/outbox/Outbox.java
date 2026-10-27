@@ -44,7 +44,7 @@ import java.util.List;
 /// commit together or not at all. That is the point of keeping the queue there
 /// rather than in a file of its own.
 ///
-/// ```java
+/// ```java {class="cn1-no-try"}
 /// Outbox outbox = Outbox.open(session, "readings@" + deviceId);
 /// session.beginTransaction();
 /// session.persist(reading);
