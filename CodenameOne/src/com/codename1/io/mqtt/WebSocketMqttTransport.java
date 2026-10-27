@@ -41,6 +41,7 @@ final class WebSocketMqttTransport implements MqttTransport {
         this.timeout = timeout;
     }
 
+    @Override
     public void open(final Handler h) {
         if (!WebSocket.isSupported()) {
             h.closed("WebSockets are not supported on this platform");
@@ -84,6 +85,7 @@ final class WebSocketMqttTransport implements MqttTransport {
 
     private void fail(final Handler h, final String reason) {
         CN.callSerially(new Runnable() {
+            @Override
             public void run() {
                 if (!closed.get()) {
                     h.closed(reason);
@@ -92,6 +94,7 @@ final class WebSocketMqttTransport implements MqttTransport {
         });
     }
 
+    @Override
     public void send(byte[] data) throws IOException {
         if (socket == null || closed.get()) {
             throw new IOException("Not connected");
@@ -99,6 +102,7 @@ final class WebSocketMqttTransport implements MqttTransport {
         socket.send(data);
     }
 
+    @Override
     public void close() {
         closed.set(true);
         if (socket != null) {

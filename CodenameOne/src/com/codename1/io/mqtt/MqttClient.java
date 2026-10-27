@@ -74,12 +74,15 @@ public final class MqttClient {
     }
 
     private static final class NoListener implements MqttListener {
+        @Override
         public void connected() {
         }
 
+        @Override
         public void messageArrived(String topic, byte[] payload, boolean retained) {
         }
 
+        @Override
         public void connectionLost(String reason) {
         }
     }
@@ -146,18 +149,21 @@ public final class MqttClient {
             startTicker();
         }
         t.open(new MqttTransport.Handler() {
+            @Override
             public void opened() {
                 if (gen == generation) {
                     onOpened();
                 }
             }
 
+            @Override
             public void received(byte[] data, int len) {
                 if (gen == generation) {
                     onReceived(data, len);
                 }
             }
 
+            @Override
             public void closed(String reason) {
                 if (gen == generation) {
                     fail(reason);
@@ -185,7 +191,9 @@ public final class MqttClient {
             try {
                 port = Integer.parseInt(hp.substring(colon + 1));
             } catch (NumberFormatException e) {
-                throw new IllegalArgumentException("Bad port in " + uri);
+                IllegalArgumentException err = new IllegalArgumentException("Bad port in " + uri);
+                err.initCause(e);
+                throw err;
             }
             hp = hp.substring(0, colon);
         }
@@ -326,8 +334,8 @@ public final class MqttClient {
     }
 
     private boolean idInUse(int id) {
-        for (int i = 0; i < inFlight.size(); i++) {
-            if (inFlight.get(i).getPacketId() == id) {
+        for (MqttPacket pending : inFlight) {
+            if (pending.getPacketId() == id) {
                 return true;
             }
         }
@@ -440,8 +448,7 @@ public final class MqttClient {
     private void deliver(MqttPacket p) {
         boolean claimed = false;
         ArrayList<Route> snapshot = new ArrayList<Route>(routes);
-        for (int i = 0; i < snapshot.size(); i++) {
-            Route r = snapshot.get(i);
+        for (Route r : snapshot) {
             if (MqttTopic.matches(r.filter, p.getTopic())) {
                 claimed = true;
                 r.listener.messageArrived(p.getTopic(), p.getPayload(), p.isRetain());
@@ -504,6 +511,7 @@ public final class MqttClient {
         final AtomicBoolean stop = new AtomicBoolean();
         tickerStop = stop;
         Thread t = new Thread(new Runnable() {
+            @Override
             public void run() {
                 while (!stop.get()) {
                     try {
@@ -515,6 +523,7 @@ public final class MqttClient {
                         return;
                     }
                     CN.callSerially(new Runnable() {
+                        @Override
                         public void run() {
                             if (!stop.get()) {
                                 tickNow();

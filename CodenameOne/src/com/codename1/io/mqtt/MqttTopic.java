@@ -85,7 +85,9 @@ public final class MqttTopic {
                     throw new IllegalArgumentException("Topic is longer than 65535 bytes");
                 }
             } catch (java.io.UnsupportedEncodingException e) {
-                throw new IllegalArgumentException("UTF-8 is not available");
+                IllegalArgumentException err = new IllegalArgumentException("UTF-8 is not available");
+                err.initCause(e);
+                throw err;
             }
         }
     }
@@ -137,10 +139,7 @@ public final class MqttTopic {
                     return true;
                 }
                 // "a/#" also matches "a": the parent level.
-                if (lastTopicLevel && fe + 2 == fn && filter.charAt(fe + 1) == '#') {
-                    return true;
-                }
-                return false;
+                return lastTopicLevel && fe + 2 == fn && filter.charAt(fe + 1) == '#';
             }
             fi = fe + 1;
             ti = te + 1;

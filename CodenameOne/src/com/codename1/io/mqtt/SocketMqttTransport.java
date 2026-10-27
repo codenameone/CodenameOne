@@ -46,16 +46,19 @@ final class SocketMqttTransport implements MqttTransport {
         this.timeout = timeout;
     }
 
+    @Override
     public void open(final Handler h) {
         if (!Socket.isSupported()) {
             h.closed("Sockets are not supported on this platform");
             return;
         }
         Socket.connect(host, port, new SocketConnection(timeout) {
+            @Override
             public void connectionError(int errorCode, String message) {
                 post(h, null, 0, "Connect failed: " + message);
             }
 
+            @Override
             public void connectionEstablished(InputStream is, OutputStream os) {
                 in = is;
                 out = os;
@@ -64,6 +67,7 @@ final class SocketMqttTransport implements MqttTransport {
                     return;
                 }
                 CN.callSerially(new Runnable() {
+                    @Override
                     public void run() {
                         if (!closed.get()) {
                             h.opened();
@@ -94,6 +98,7 @@ final class SocketMqttTransport implements MqttTransport {
 
     private void post(final Handler h, final byte[] data, final int len, final String reason) {
         CN.callSerially(new Runnable() {
+            @Override
             public void run() {
                 if (closed.get()) {
                     return;
@@ -107,8 +112,10 @@ final class SocketMqttTransport implements MqttTransport {
         });
     }
 
+    @Override
     public void send(byte[] data) throws IOException {
-        OutputStream o = out;
+        // The connection's own stream, closed by close(); send only borrows it.
+        OutputStream o = out; // NOPMD CloseResource
         if (o == null) {
             throw new IOException("Not connected");
         }
@@ -116,6 +123,7 @@ final class SocketMqttTransport implements MqttTransport {
         o.flush();
     }
 
+    @Override
     public void close() {
         closed.set(true);
         closeStreams();
