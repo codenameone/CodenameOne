@@ -99,7 +99,7 @@ public class RecordMappingTest {
         String generated = invokeGenerateMapperSource(proc);
         assertNotNull("expected generated source for Pet record", generated);
         assertTrue("fromMap should construct via canonical ctor: " + generated,
-                generated.contains("new com.example.Pet(_name, _age)"));
+                generated.contains("new com.example.Pet(__name, __age)"));
         assertTrue("toMap should read via record accessor o.name(): " + generated,
                 generated.contains("o.name()"));
         assertTrue("toMap should read via record accessor o.age(): " + generated,

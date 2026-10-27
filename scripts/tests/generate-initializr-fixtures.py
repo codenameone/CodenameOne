@@ -87,6 +87,7 @@ FULL_STACK = {
     'SAVOR': ('api/OrderApi.java', 'customer/CustomerForm.java'),
     'SKIRMISH': ('api/AccountApi.java', 'ui/HomeForm.java'),
     'PARLEY': ('api/ConversationApi.java', 'ui/CallScreen.java'),
+    'REEL': ('api/CatalogApi.java', 'ui/WelcomeForm.java'),
     'BASTION': ('api/BankingApi.java', 'ui/HomeForm.java'),
 }
 
@@ -98,6 +99,7 @@ TEMPLATE_HINT = {
     'SKIRMISH': None,
     'PARLEY': 'codename1.arg.ios.NSLocationWhenInUseUsageDescription=',
     'BASTION': 'codename1.arg.ios.detectJailbreak=true',
+    'REEL': None,
 }
 
 
@@ -162,7 +164,10 @@ def check_full_stack_fixture(archive, z, template):
         if name.endswith(('.png', '.jar', '.res', '.ttf', '.glb')):
             continue
         text = z.read(name).decode('utf-8', 'replace')
-        assert token not in text.lower() and 'myappname' not in text.lower(), (archive.name, name)
+        # The name's three spellings, as GeneratorModelMatrixTest checks them, not a
+        # case-folded search: folded, "reel" is inside "hasMoreElements".
+        assert not any(t in text for t in (token, token.capitalize(), token.upper())), (archive.name, name)
+        assert 'myappname' not in text.lower(), (archive.name, name)
 
 
 with tempfile.TemporaryDirectory(prefix='cn1-generator-') as directory:

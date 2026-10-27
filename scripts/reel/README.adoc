@@ -1,0 +1,184 @@
+= Reel
+
+A video streaming service and its server, in one Maven project and one language.
+A viewer picks a profile, browses the catalog, watches with resume, chapters and
+downloads, and pays for a plan or rents a title; a creator uploads and packages
+video and submits titles for review; a moderator approves, rejects and takes down
+what is published; and an administrator runs the service. Which of these a person
+sees is decided by the roles the server gives their account.
+
+The same project is a subscription service, a creator platform or an academy:
+an administrator switches presets and features (ads, rentals, downloads,
+uploads, courses, quizzes and polls) without a rebuild.
+
+It is a sample of how a Codename One application and a Codename One Backend fit
+together, and of the streaming and DRM API (`com.codename1.media.StreamRequest`).
+
+== Start here
+
+Two chapters of the developer guide cover this project:
+
+* https://www.codenameone.com/developer-guide/#reel-users-guide[The user's guide]
+  (link:../../docs/developer-guide/Reel-Users-Guide.asciidoc[source]) shows the
+  application as a viewer, a creator, a moderator and an administrator see it.
+* https://www.codenameone.com/developer-guide/#reel-implementors-guide[The implementor's guide]
+  (link:../../docs/developer-guide/Reel-Implementors-Guide.asciidoc[source])
+  explains how it is built and what to change to make it yours: DRM license
+  services, billing, ads, the packaging worker and the database.
+
+To see it running first, the commands under <<Running it>> are all it takes.
+
+== The modules
+
+[cols="1,4"]
+|===
+| `shared`
+| The contract: the data classes both sides exchange and the `@RestClient`
+  interfaces that name every call. The app's build generates a client from them
+  and the server's build generates the interfaces it implements, so a change the
+  other side did not follow is a compile error.
+
+| `common`
+| The application: sign-in and profiles, the catalog, the player (ads,
+  chapters, quizzes, polls and branches on the timeline), downloads, plans and
+  rentals, the creator studio, the moderation queue and the admin console.
+  Styled in `src/main/css/theme.css`. The text is in `src/main/l10n`, in
+  English, Spanish, French, German and Hebrew; the translations are
+  machine-generated samples that no native speaker has reviewed.
+  What it reports to Codename One analytics, once the user has agreed, is all
+  in `Telemetry`.
+
+| `backend`
+| The server: accounts, households and profiles, devices and concurrent
+  streams, playback sessions with heartbeats, media and license tokens, DRM key
+  delivery, plans, coupons, rentals and invoices, ad decisioning and
+  impressions, uploads, packaging jobs, moderation with keyword and frame
+  blocklists, recommendations, sharing alerts and push notifications.
+  The schema is the migration scripts in `src/main/resources/db/migration`, and
+  the same server runs on SQLite, PostgreSQL, MySQL and MariaDB.
+
+| `tools/packager`
+| A command line tool (needs `ffmpeg`) that packages video into AES-128 HLS and
+  ClearKey CENC, and the worker that does it for uploads.
+|===
+
+There are no platform modules: `common` builds the application for the
+simulator, the desktop, Android, iOS and the browser itself.
+
+== Running it
+
+The video is not in the repository. Fetch and package the Blender open movies
+once (`--small` keeps a minute of each):
+
+[source,bash]
+----
+tools/fetch-demo-media.sh --small
+----
+
+Without it every screen still works; only the picture is missing. Then start
+the server on the development profile, which needs nothing else installed:
+
+[source,bash]
+----
+CN1_PROFILE=dev backend/server.sh run
+----
+
+and run the application in the simulator, from another terminal:
+
+[source,bash]
+----
+mvn verify -Psimulator -DskipTests -Dcodename1.platform=javase
+----
+
+The development profile creates these accounts, all with the password
+`reel-demo`, the plans, two ad campaigns and the catalog:
+
+[cols="2,3"]
+|===
+| `viewer@reel.example`, `viewer2@reel.example` | watch
+| `viewer3@reel.example` | a viewer with a sharing alert and a flag
+| `creator@reel.example` | owns the uploaded titles
+| `moderator@reel.example` | reviews what creators submit
+| `admin@reel.example` | runs the service
+|===
+
+On a phone, set the server's address on the welcome screen: `localhost` on a
+phone is the phone.
+
+=== In a browser, with nothing installed
+
+[source,bash]
+----
+backend/server.sh web
+CN1_PROFILE=dev backend/server.sh run
+----
+
+Then open `http://localhost:8080/`. `server.sh run --web` does both in one step.
+
+== What is real and what is simulated
+
+Every packaged video is AES-128 HLS and ClearKey CENC, with keys the server
+holds and hands out only against a session's license token; that is what the
+demo plays everywhere. Widevine and FairPlay need a license service of your
+own: set `reel.drm.widevine.url` or `reel.drm.fairplay.url` and the server
+forwards the challenge to it. Unset, the scheme is not offered, and a device
+that needs it is told so before playback starts.
+
+Payments are simulated on a development profile: `4242 4242 4242 4242` is
+accepted, `4000 0000 0000 0002` is declined, and no money moves. With
+`reel.payments.provider=stripe` and `REEL_PAYMENTS_STRIPE_SECRET` set, cards are
+added on Stripe's own page. Store purchases are verified with the store except
+on a development profile.
+
+Push notifications go through the Codename One push service with
+`reel.push.app` and `reel.push.key`; on a development profile they are printed
+on the console.
+
+`backend/application.properties` lists every setting a deployment supplies,
+each also read from the environment in upper case with `_` for every dot.
+
+== Tests
+
+[source,bash]
+----
+mvn -pl shared,backend -Dcodename1.platform=backend test   # <1>
+mvn -pl shared,backend -Dcodename1.platform=backend test -Dcn1.backend.compiledTests=true   # <2>
+./run-e2e.sh   # <3>
+./check-template.sh   # <4>
+./run-web-e2e.sh   # <5>
+----
+<1> The server's tests, on the JVM.
+<2> The same tests again, translated to a native binary, which is how the server
+    ships.
+<3> Starts the server on the `test` profile and runs the application's tests
+    against it in the simulator: they sign in and pick a profile, browse and
+    play, upload and submit a title, moderate it and administer the service,
+    and compare the screens in `screenshots/`. Pass `--native` to run them against the compiled
+    server. On Linux they then run a second time with the simulator as a desktop
+    window, where the admin console is laid out side by side under the
+    platform's own theme.
+<4> Generates a project from the Initializr template, under another name and
+    package, and builds it.
+<5> Builds the browser version of the application, starts the server hosting
+    it, and drives it in a headless browser: the application loads from the
+    server, signs in as the demo viewer, picks a profile and reaches the home
+    screen, then signs out and signs in as the demo admin. Needs Node with Playwright and its Chromium (`npm ci` and
+    `npx playwright install chromium` in `scripts/`). Screenshots and logs go
+    to `target/web-e2e`.
+
+`.github/workflows/reel.yml` runs all five, and builds the application for
+Android and iOS through `scripts/build-android-app.sh` and
+`scripts/build-ios-app.sh` with `CN1_APP_DIR=scripts/reel`.
+
+== The Initializr template
+
+`scripts/sync-initializr-template.py reel --write` copies this project into the
+Initializr's resources; without `--write` it fails when they differ, which is what
+CI runs. Change the project here, never the copies.
+
+== Licence
+
+Reel is released under MIT No Attribution (see `LICENSE`), not under the
+GPLv2 with Classpath Exception that covers Codename One itself. Take any of it
+into your own application, under any licence, with no notice to keep. The same
+holds for everything Initializr writes into a generated project.
