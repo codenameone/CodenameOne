@@ -33,6 +33,10 @@
  * a scan of the application's classes). Without it every entry point is a stub and available()
  * answers false, so the Java side keeps its own implementation and nothing else changes.
  */
+#if defined(_WIN32) && !defined(_CRT_RAND_S)
+/* rand_s is declared only when this is defined before the first stdlib.h, which cn1_globals.h is */
+#  define _CRT_RAND_S
+#endif
 #include "cn1_globals.h"
 #include <string.h>
 #include <stdint.h>
@@ -1728,7 +1732,6 @@ static size_t cn1k_group_width(int sha, cn1k_group_fn *fn) {
 #  include <stdlib.h>
 static void cn1k_random(unsigned char *out, size_t len) { arc4random_buf(out, len); }
 #elif defined(_WIN32)
-#  define _CRT_RAND_S
 #  include <stdlib.h>
 static void cn1k_random(unsigned char *out, size_t len) {
     size_t i;
