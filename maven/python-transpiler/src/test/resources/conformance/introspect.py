@@ -42,3 +42,23 @@ try:
     delattr(z, "q")
 except AttributeError as e:
     print(e)
+
+
+def _gen():
+    try:
+        yield 1
+    finally:
+        pass
+
+
+async def _coro():
+    return 1
+
+
+async def _agen():
+    yield 1
+
+
+for _f in (_gen, _coro, _agen, len, lambda: 0):
+    print(inspect.isgeneratorfunction(_f), inspect.iscoroutinefunction(_f),
+          inspect.isasyncgenfunction(_f) if hasattr(inspect, "isasyncgenfunction") else None)

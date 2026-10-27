@@ -8,3 +8,8 @@ True True
 <class '__main__.T'> __main__
 frozen q
 frozen q
+True False False
+False True False
+False False True
+False False False
+False False False

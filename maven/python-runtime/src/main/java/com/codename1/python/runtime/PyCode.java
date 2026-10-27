@@ -80,7 +80,7 @@ final class PyCode extends PyObject {
             case "co_qualname":
                 return f.getAttrOrNull("__qualname__");
             case "co_flags":
-                return Py.of((long) ((f.varArgs ? 0x04 : 0) | (f.varKw ? 0x08 : 0)));
+                return Py.of((long) ((f.varArgs ? 0x04 : 0) | (f.varKw ? 0x08 : 0) | f.kindFlags));
             case "co_filename":
                 return "<python>";
             default:

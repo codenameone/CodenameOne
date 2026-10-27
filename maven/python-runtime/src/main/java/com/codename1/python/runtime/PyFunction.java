@@ -306,9 +306,18 @@ public final class PyFunction extends PyObject {
         }
     }
 
+    int kindFlags;
+
     /// Sets `__qualname__` where it is not just the name.
     public PyFunction qual(String q) {
         qualname = q;
+        return this;
+    }
+
+    /// Marks a generator, coroutine or async generator function with the
+    /// `co_flags` bit CPython gives it (0x20, 0x80, 0x200).
+    public PyFunction kind(int flags) {
+        kindFlags = flags;
         return this;
     }
 

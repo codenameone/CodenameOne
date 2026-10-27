@@ -1862,6 +1862,11 @@ public final class Emitter {
         if (!q.equals(name)) {
             r.append(".qual(").append(javaString(q)).append(")");
         }
+        if (generator) {
+            // co_flags' CO_GENERATOR, CO_COROUTINE or CO_ASYNC_GENERATOR,
+            // which inspect reads.
+            r.append(".kind(").append(async && fs.yields ? 0x200 : async ? 0x80 : 0x20).append(")");
+        }
         return r.toString();
     }
 

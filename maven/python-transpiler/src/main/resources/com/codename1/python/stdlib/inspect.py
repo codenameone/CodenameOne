@@ -310,6 +310,10 @@ def isgeneratorfunction(obj):
     return bool(getattr(obj, "__code__", None) and obj.__code__.co_flags & 0x20)
 
 
+def isasyncgenfunction(obj):
+    return bool(getattr(obj, "__code__", None) and obj.__code__.co_flags & 0x200)
+
+
 def isawaitable(obj):
     return hasattr(obj, "__await__")
 

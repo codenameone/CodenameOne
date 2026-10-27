@@ -330,8 +330,7 @@ def _missing(ctx, loc):
 
 def _run_dep(sub, subvals, ctx):
     r = sub.call(**subvals)
-    # duck-typed: inspect.isgeneratorfunction is not reliable on the transpiler
-    if sub.is_gen or (hasattr(r, "__next__") and hasattr(r, "throw") and hasattr(r, "send")):
+    if sub.is_gen:
         r2 = next(r)
         ctx.cleanups.append(r)
         return r2
