@@ -35,6 +35,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -71,6 +72,16 @@ import org.objectweb.asm.Type;
 /// the one the main build used.
 final class BackendTestGenerator {
     static final String BACKEND_TEST = "Lcom/codename1/backend/test/BackendTest;";
+    static final String WEB_MVC_TEST = "Lcom/codename1/backend/test/WebMvcTest;";
+    static final String DATA_JPA_TEST = "Lcom/codename1/backend/test/DataJpaTest;";
+    /// Every annotation that makes a class a backend test, the whole application
+    /// first and then the slices.
+    static final String[] TEST_ANNOTATIONS = {BACKEND_TEST, WEB_MVC_TEST, DATA_JPA_TEST};
+    /// The setting a `@DataJpaTest` points at its declared database.
+    static final String DATASOURCE_URL = "cn1.datasource.url";
+    static final int SLICE_NONE = 0;
+    static final int SLICE_WEB = 1;
+    static final int SLICE_DATA = 2;
     static final String TEST_CONFIGURATION = "Lcom/codename1/backend/test/TestConfiguration;";
     static final String MOCKITO_BEAN = "Lcom/codename1/backend/test/MockitoBean;";
     static final String LOCAL_SERVER_PORT = "Lcom/codename1/backend/test/LocalServerPort;";
@@ -97,6 +108,8 @@ final class BackendTestGenerator {
     static final String MAIN_CLASS = "cn1app.BackendTestMain";
 
     private static final String[] WEB_ENVIRONMENTS = {"MOCK", "RANDOM_PORT", "DEFINED_PORT", "NONE"};
+    /// BackendTest.Feature's names; AS_PACKAGED stands for the rest as the build has them.
+    private static final String[] FEATURES = {"MANAGEMENT", "TELEMETRY", "MCP", "AS_PACKAGED"};
 
     private final ProcessorContext ctx;
     private final Set<String> mainClasses;
@@ -131,6 +144,17 @@ final class BackendTestGenerator {
         /// The wiring this class's context starts; set once its key's beans are resolved.
         String wiringBinary;
         BackendBeans model;
+        /// [#SLICE_NONE], [#SLICE_WEB] or [#SLICE_DATA].
+        int slice;
+        /// The application classes a slice wires; empty for the whole application.
+        final Set<String> sliceScope = new TreeSet<String>();
+        /// The annotation as the build reports it, `@WebMvcTest` and so on.
+        String annotationName = "@BackendTest";
+        /// Whether each test method runs in a transaction that is rolled back.
+        boolean rollback;
+        /// The production features the application starts with: MANAGEMENT,
+        /// TELEMETRY and MCP, AS_PACKAGED already expanded.
+        final Set<String> features = new TreeSet<String>();
     }
 
     private BackendTestGenerator(ProcessorContext ctx, Set<String> mainClasses,
@@ -232,12 +256,46 @@ final class BackendTestGenerator {
         Spec spec = new Spec();
         spec.test = cls;
         AnnotatedClass declaring = backendTestOf(cls);
-        AnnotationValues a = declaring.getClassAnnotation(BACKEND_TEST);
-        Object env = a.get("webEnvironment");
-        String envName = BackendBeans.enumName(env, "MOCK");
-        for (int i = 0; i < WEB_ENVIRONMENTS.length; i++) {
-            if (WEB_ENVIRONMENTS[i].equals(envName)) {
-                spec.webEnvironment = i;
+        String descriptor = testAnnotation(declaring);
+        int carried = 0;
+        for (String t : TEST_ANNOTATIONS) {
+            if (declaring.getClassAnnotation(t) != null) {
+                carried++;
+            }
+        }
+        if (carried > 1) {
+            ctx.error(declaring, declaring.getSourceName() + " carries more than one of "
+                    + "@BackendTest, @WebMvcTest and @DataJpaTest; a test class runs against "
+                    + "one application.");
+            return null;
+        }
+        AnnotationValues a = declaring.getClassAnnotation(descriptor);
+        if (BACKEND_TEST.equals(descriptor)) {
+            Object env = a.get("webEnvironment");
+            String envName = BackendBeans.enumName(env, "MOCK");
+            for (int i = 0; i < WEB_ENVIRONMENTS.length; i++) {
+                if (WEB_ENVIRONMENTS[i].equals(envName)) {
+                    spec.webEnvironment = i;
+                }
+            }
+            if (!features(spec, a.get("features"))) {
+                return null;
+            }
+        } else if (WEB_MVC_TEST.equals(descriptor)) {
+            spec.slice = SLICE_WEB;
+            spec.annotationName = "@WebMvcTest";
+            spec.webEnvironment = 0;
+            if (!webSlice(spec, cls, a)) {
+                return null;
+            }
+        } else {
+            spec.slice = SLICE_DATA;
+            spec.annotationName = "@DataJpaTest";
+            // NONE: the test calls the repositories itself, and makes no requests.
+            spec.webEnvironment = 3;
+            spec.rollback = a.getBoolOrDefault("rollback", true);
+            if (!includes(spec, cls, a.get("includes"))) {
+                return null;
             }
         }
         spec.profile = a.getStringOrDefault("profile", "test").trim();
@@ -247,11 +305,27 @@ final class BackendTestGenerator {
                 String p = String.valueOf(o);
                 int eq = p.indexOf('=');
                 if (eq <= 0) {
-                    ctx.error(cls, "@BackendTest property \"" + p + "\" is not key=value.");
+                    ctx.error(cls, spec.annotationName + " property \"" + p
+                            + "\" is not key=value.");
                     return null;
                 }
                 spec.properties.add(p.substring(0, eq).trim());
                 spec.properties.add(p.substring(eq + 1).trim());
+            }
+        }
+        if (spec.slice == SLICE_DATA) {
+            // The declared database, in the top layer with the test's own
+            // settings, so neither the module's settings nor the environment's
+            // DATABASE_URL points a persistence test at a database that outlives it.
+            String database = a.getStringOrDefault("database", ":memory:").trim();
+            if (database.length() == 0) {
+                ctx.error(cls, "@DataJpaTest(database) is empty; name a database URL, or "
+                        + "leave it out for an in-memory one.");
+                return null;
+            }
+            if (!spec.properties.contains(DATASOURCE_URL)) {
+                spec.properties.add(DATASOURCE_URL);
+                spec.properties.add(database);
             }
         }
         Object listed = a.get("classes");
@@ -261,7 +335,8 @@ final class BackendTestGenerator {
                     String internal = ((Type) o).getInternalName();
                     AnnotatedClass config = ctx.lookup(internal);
                     if (config == null || config.getClassAnnotation(TEST_CONFIGURATION) == null) {
-                        ctx.error(cls, "@BackendTest(classes) lists " + internal.replace('/', '.')
+                        ctx.error(cls, spec.annotationName + "(classes) lists "
+                                + internal.replace('/', '.')
                                 + ", which is not a @TestConfiguration of this module's tests.");
                         return null;
                     }
@@ -314,6 +389,8 @@ final class BackendTestGenerator {
         // A test that injects the database starts one the application alone may
         // not: sharing a context started without it would hand that test null.
         key.append('|').append(testInjectsDatabase(spec));
+        key.append('|').append(spec.slice).append(spec.sliceScope).append('|')
+           .append(spec.features).append('|').append(spec.rollback);
         spec.key = key.toString();
         return spec;
     }
@@ -322,8 +399,166 @@ final class BackendTestGenerator {
     /// the nearest superclass, since the annotation is inherited -- or null.
     private AnnotatedClass backendTestOf(AnnotatedClass cls) {
         for (AnnotatedClass c : hierarchy(cls)) {
-            if (c.getClassAnnotation(BACKEND_TEST) != null) {
+            if (testAnnotation(c) != null) {
                 return c;
+            }
+        }
+        return null;
+    }
+
+    /// Reads `@BackendTest(features)` into `spec`.
+    private boolean features(Spec spec, Object listed) {
+        if (!(listed instanceof List)) {
+            return true;
+        }
+        for (Object o : (List<?>) listed) {
+            String name = BackendBeans.enumName(o, null);
+            if (name == null || !java.util.Arrays.asList(FEATURES).contains(name)) {
+                ctx.error(spec.test, "@BackendTest(features) names " + name
+                        + ", which is not a BackendTest.Feature.");
+                return false;
+            }
+            spec.features.add(name);
+        }
+        return true;
+    }
+
+    /// The features `spec` starts its application with, AS_PACKAGED expanded to
+    /// what the packaged server's entry point links.
+    private Set<String> features(Spec spec, BackendSettings settings) {
+        Set<String> out = new TreeSet<String>(spec.features);
+        if (out.remove("AS_PACKAGED")) {
+            if (settings.management) {
+                out.add("MANAGEMENT");
+            }
+            if (settings.mcp || spec.model.hasTools()) {
+                out.add("MCP");
+            }
+            if ("true".equals(settings.values.get(BackendSettings.TELEMETRY_KEY))
+                    || telemetryClass() != null) {
+                out.add("TELEMETRY");
+            }
+        }
+        return out;
+    }
+
+    /// The application class carrying `@OpenTelemetry`, or null.
+    private AnnotationValues telemetryClass() {
+        for (String internal : mainClasses) {
+            AnnotationValues a = mainAnnotation(internal,
+                    RestControllerAnnotationProcessor.OPEN_TELEMETRY);
+            if (a != null) {
+                return a;
+            }
+        }
+        return null;
+    }
+
+    /// The service name the exporters report, as a Java expression.
+    private String telemetryServiceName() {
+        AnnotationValues a = telemetryClass();
+        String name = a == null ? "" : a.getStringOrDefault("serviceName", "").trim();
+        return name.length() == 0 ? "null" : quote(name);
+    }
+
+    /// An application class's annotation, or null when the class is not one of
+    /// the main build's.
+    private AnnotationValues mainAnnotation(String internal, String descriptor) {
+        AnnotatedClass c = mainClasses.contains(internal) ? ctx.lookup(internal) : null;
+        return c == null ? null : c.getClassAnnotation(descriptor);
+    }
+
+    private boolean isController(String internal) {
+        return mainAnnotation(internal, BackendBeans.REST_CONTROLLER) != null
+                || mainAnnotation(internal, BackendBeans.MVC_CONTROLLER) != null;
+    }
+
+    /// Whether `internal` is, or inherits, `type`.
+    private boolean isA(String internal, String type) {
+        Set<String> seen = new HashSet<String>();
+        List<String> todo = new ArrayList<String>();
+        todo.add(internal);
+        while (!todo.isEmpty()) {
+            String n = todo.remove(todo.size() - 1);
+            if (n == null || !seen.add(n)) {
+                continue;
+            }
+            if (n.equals(type)) {
+                return true;
+            }
+            AnnotatedClass c = ctx.lookupWithDependencies(n);
+            if (c != null) {
+                todo.add(c.getSuperInternalName());
+                todo.addAll(c.getInterfaceInternalNames());
+            }
+        }
+        return false;
+    }
+
+    /// The scope of a `@WebMvcTest`: the controllers it names (every one when
+    /// it names none), the advice and the request hooks, and its includes.
+    private boolean webSlice(Spec spec, AnnotatedClass cls, AnnotationValues a) {
+        List<Object> named = new ArrayList<Object>();
+        for (String attr : new String[] {"value", "controllers"}) {
+            Object listed = a.get(attr);
+            if (listed instanceof List) {
+                named.addAll((List<?>) listed);
+            }
+        }
+        for (Object o : named) {
+            if (!(o instanceof Type)) {
+                continue;
+            }
+            String internal = ((Type) o).getInternalName();
+            if (!isController(internal)) {
+                ctx.error(cls, "@WebMvcTest names " + internal.replace('/', '.')
+                        + ", which is not a @RestController or @Controller of this module.");
+                return false;
+            }
+            spec.sliceScope.add(internal);
+        }
+        for (String internal : mainClasses) {
+            if (named.isEmpty() && isController(internal)) {
+                spec.sliceScope.add(internal);
+            }
+            if (mainAnnotation(internal, BackendExceptionHandlers.CONTROLLER_ADVICE) != null
+                    || mainAnnotation(internal, BackendExceptionHandlers.REST_CONTROLLER_ADVICE)
+                    != null
+                    || isA(internal, BackendWiringWriter.INTERCEPTOR_TYPE)
+                    || isA(internal, BackendWiringWriter.RESOLVER_TYPE)) {
+                spec.sliceScope.add(internal);
+            }
+        }
+        return includes(spec, cls, a.get("includes"));
+    }
+
+    /// Adds a slice's `includes` to its scope; each must be an application class.
+    private boolean includes(Spec spec, AnnotatedClass cls, Object listed) {
+        if (!(listed instanceof List)) {
+            return true;
+        }
+        for (Object o : (List<?>) listed) {
+            if (!(o instanceof Type)) {
+                continue;
+            }
+            String internal = ((Type) o).getInternalName();
+            if (!mainClasses.contains(internal)) {
+                ctx.error(cls, spec.annotationName + "(includes) lists "
+                        + internal.replace('/', '.') + ", which is not a class of this module's "
+                        + "application; a test bean belongs in a @TestConfiguration.");
+                return false;
+            }
+            spec.sliceScope.add(internal);
+        }
+        return true;
+    }
+
+    /// The backend test annotation `cls` itself carries, or null. A class
+    /// carrying two is refused by [#spec].
+    private static String testAnnotation(AnnotatedClass cls) {
+        for (String a : TEST_ANNOTATIONS) {
+            if (cls.getClassAnnotation(a) != null) {
+                return a;
             }
         }
         return null;
@@ -385,8 +620,22 @@ final class BackendTestGenerator {
         Set<String> wiringNames = new LinkedHashSet<String>();
         for (List<Spec> group : byKey.values()) {
             Spec first = group.get(0);
-            Set<String> scope = new LinkedHashSet<String>(mainClasses);
+            Set<String> scope = new LinkedHashSet<String>(first.slice == SLICE_NONE
+                    ? mainClasses : first.sliceScope);
             scope.addAll(first.configurations);
+            BackendBeans whole = null;
+            String hint = null;
+            if (first.slice != SLICE_NONE) {
+                whole = wholeApplication();
+                if (whole == null) {
+                    return;
+                }
+                hint = "A " + first.annotationName + " wires " + (first.slice == SLICE_WEB
+                        ? "the controllers, their advice and request hooks" : "the repositories")
+                        + " and nothing else: list the class in " + first.annotationName
+                        + "(includes), replace it with a @MockitoBean, or declare it in a "
+                        + "@TestConfiguration.";
+            }
             Set<String> weaveable = new LinkedHashSet<String>(first.configurations);
             for (Spec spec : group) {
                 for (AnnotatedClass c : hierarchy(spec.test)) {
@@ -396,7 +645,7 @@ final class BackendTestGenerator {
                 }
             }
             BackendBeans model = BackendBeans.forTests(ctx, scope, first.configurations,
-                    first.mocks, weaveable, entryPackage);
+                    first.mocks, weaveable, entryPackage, whole, hint);
             if (ctx.hasErrors()) {
                 return;
             }
@@ -434,13 +683,53 @@ final class BackendTestGenerator {
                 simple = base + n;
             }
             String binary = BackendBeans.qualify(pkg, simple);
-            sources.put(binary, new BackendWiringWriter(model).write(pkg, simple, routers, sockets,
-                    routes, true));
+            List<BackendWiringWriter.Router> sliceRouters = routers;
+            Map<String, String> sliceSockets = sockets;
+            List<String[]> sliceRoutes = routes;
+            if (first.slice != SLICE_NONE) {
+                // Only the routes of the controllers the slice has; a router names
+                // its controller bean, which a slice that left it out cannot build.
+                sliceRouters = new ArrayList<BackendWiringWriter.Router>();
+                for (BackendWiringWriter.Router r : routers) {
+                    if (first.sliceScope.contains(r.controllerBinary.replace('.', '/'))) {
+                        sliceRouters.add(r);
+                    }
+                }
+                sliceSockets = new LinkedHashMap<String, String>();
+                for (Map.Entry<String, String> e : sockets.entrySet()) {
+                    if (first.sliceScope.contains(e.getValue().replace('.', '/'))) {
+                        sliceSockets.put(e.getKey(), e.getValue());
+                    }
+                }
+                sliceRoutes = new ArrayList<String[]>();
+                for (String[] r : routes) {
+                    if (first.sliceScope.contains(r[3].replace('.', '/'))) {
+                        sliceRoutes.add(r);
+                    }
+                }
+            }
+            sources.put(binary, new BackendWiringWriter(model).write(pkg, simple, sliceRouters,
+                    sliceSockets, sliceRoutes, true));
             for (Spec spec : group) {
                 spec.wiringBinary = binary;
                 spec.model = model;
             }
         }
+    }
+
+    /// The whole application, resolved once, for the slot numbers a slice keeps.
+    private BackendBeans wholeApplication;
+
+    private BackendBeans wholeApplication() throws ProcessingException {
+        if (wholeApplication == null) {
+            wholeApplication = BackendBeans.forTests(ctx, new LinkedHashSet<String>(mainClasses),
+                    new TreeSet<String>(), new ArrayList<String[]>(), new TreeSet<String>(),
+                    entryPackage);
+            if (ctx.hasErrors()) {
+                return null;
+            }
+        }
+        return wholeApplication;
     }
 
     /// `pkg.Name` to `pkg.NameCn1TestContext`, a nested class's `$` written `_`.
@@ -542,7 +831,24 @@ final class BackendTestGenerator {
             // named only here: a test application without one links none of it.
             sb.append("        com.codename1.impl.backend.BackendAccess.get().security(builder);\n");
         }
+        Set<String> features = features(spec, settings);
+        if (features.contains("TELEMETRY")) {
+            // The exporters as the generated main installs them, named only by a
+            // test that asked: one that did not links none of OTLP.
+            String name = telemetryServiceName();
+            sb.append("        builder.tracing(new com.codename1.backend.otel.OtlpTracer(")
+              .append(name).append("))\n               .metrics(new com.codename1.backend.otel."
+                      + "OtlpMetricExporter(").append(name).append("));\n");
+        }
+        if (features.contains("MANAGEMENT")) {
+            sb.append("        com.codename1.impl.backend.BackendAccess.get().management(builder);\n");
+        }
+        if (features.contains("MCP")) {
+            sb.append("        com.codename1.impl.backend.BackendAccess.get().mcp(builder, null);\n");
+        }
         sb.append("    }\n\n");
+        sb.append("    public boolean rollsBack() {\n        return ").append(spec.rollback)
+          .append(";\n    }\n\n");
         sb.append("    public String[] securityContext(String method) {\n");
         Set<String> described = new LinkedHashSet<String>();
         for (AnnotatedClass c : methodHierarchy(spec.test)) {
@@ -597,6 +903,14 @@ final class BackendTestGenerator {
     /// EntityManager -- which starts one even when the application has nothing
     /// that needs it: the field would otherwise be filled with null instead of the
     /// development profile's in-memory database.
+    /// Whether a test field of type `internal` is filled with a repository: a
+    /// `@Repository` interface no bean of the application implements.
+    private boolean repositoryField(String internal) {
+        AnnotatedClass c = ctx.lookupWithDependencies(internal);
+        return c != null && c.isInterface()
+                && c.getClassAnnotation(RepositoryGenerator.REPOSITORY) != null;
+    }
+
     private boolean testInjectsDatabase(Spec spec) {
         for (AnnotatedClass c : hierarchy(spec.test)) {
             for (FieldInfo f : c.getFields()) {
@@ -606,7 +920,8 @@ final class BackendTestGenerator {
                 }
                 Type t = Type.getType(f.getDescriptor());
                 if (t.getSort() == Type.OBJECT && (BackendBeans.DATASOURCE_TYPE.equals(t.getInternalName())
-                        || BackendBeans.ENTITIES_TYPE.equals(t.getInternalName()))) {
+                        || BackendBeans.ENTITIES_TYPE.equals(t.getInternalName())
+                        || repositoryField(t.getInternalName()))) {
                     return true;
                 }
             }
@@ -658,6 +973,21 @@ final class BackendTestGenerator {
             }
         }
         AnnotationValues qualifier = f.getAnnotation(BackendBeans.QUALIFIER);
+        if (!mock && qualifier == null && repositoryField(type)) {
+            boolean implemented = false;
+            for (BackendBeans.Bean b : spec.model.beans) {
+                implemented |= b.types.contains(type);
+            }
+            if (!implemented) {
+                // As the application's own beans get one: the factory the ORM's
+                // bootstrap registered, over a session that forwards to the
+                // calling thread's transaction -- the test method's, in a
+                // @DataJpaTest.
+                return "com.codename1.orm.repository.Repositories.create(" + source
+                        + ".class, new com.codename1.impl.backend.TransactionSession("
+                        + "environment.backend().getEntityManager()))";
+            }
+        }
         String wanted = qualifier == null ? null : qualifier.getStringOrDefault("value", "");
         List<BackendBeans.Bean> candidates = new ArrayList<BackendBeans.Bean>();
         for (BackendBeans.Bean b : spec.model.beans) {
@@ -844,7 +1174,19 @@ final class BackendTestGenerator {
             for (MethodInfo b : beforeEach) {
                 sb.append("            ").append(call(owners.get(b), b, pkg, "test")).append(";\n");
             }
-            sb.append("            ").append(call(owners.get(m), m, pkg, "test")).append(";\n");
+            if (spec != null && spec.rollback) {
+                // The test method alone in the transaction, as the JUnit
+                // extension runs it: the @BeforeEach methods above and the
+                // @AfterEach ones below see the database as it was.
+                sb.append("            final ").append(testType).append(" body = test;\n");
+                sb.append("            com.codename1.impl.backend.test.TestTransactions.rollingBack("
+                        + "new com.codename1.impl.backend.test.TestTransactions.Body() {\n"
+                        + "                public void run() throws Throwable {\n"
+                        + "                    ").append(call(owners.get(m), m, pkg, "body"))
+                  .append(";\n                }\n            });\n");
+            } else {
+                sb.append("            ").append(call(owners.get(m), m, pkg, "test")).append(";\n");
+            }
             sb.append("        } catch (Throwable err) {\n").append(RETHROW_UNRECOVERABLE)
               .append("            failure = err;\n        }\n");
             if (who != null) {
@@ -1052,6 +1394,30 @@ final class BackendTestGenerator {
     /// subclass's interfaces' default hooks, then the subclass's own -- where all
     /// interfaces after all classes ran a subclass-level interface hook ahead of
     /// the base class setup it may depend on.
+    /// Interfaces read off the test classpath, misses included, for [#interfaceClass].
+    private final Map<String, AnnotatedClass> libraryInterfaces = new java.util.HashMap<String, AnnotatedClass>();
+
+    /// A test class's interface: one of the module's, or one a library ships.
+    /// The pass's dependency index is empty unless another processor asked for
+    /// one, so a library's is read here, once.
+    private AnnotatedClass interfaceClass(String name) {
+        AnnotatedClass own = ctx.lookup(name);
+        if (own != null) {
+            return own;
+        }
+        if (!libraryInterfaces.containsKey(name)) {
+            AnnotatedClass read = null;
+            try {
+                read = com.codename1.maven.annotations.DependencyClasses.read(
+                        ctx.getCompileClasspath(), name);
+            } catch (ProcessingException unreadable) {
+                read = null;
+            }
+            libraryInterfaces.put(name, read);
+        }
+        return libraryInterfaces.get(name);
+    }
+
     private List<AnnotatedClass> methodHierarchy(AnnotatedClass cls) {
         List<AnnotatedClass> out = new ArrayList<AnnotatedClass>();
         Set<String> visited = new LinkedHashSet<String>();
@@ -1060,7 +1426,10 @@ final class BackendTestGenerator {
             java.util.ArrayDeque<String> pending = new java.util.ArrayDeque<String>(c.getInterfaceInternalNames());
             while (!pending.isEmpty() && visited.size() < 64) {
                 String name = pending.removeFirst();
-                AnnotatedClass i = visited.add(name) ? ctx.lookup(name) : null;
+                // From the dependencies too: a contract a test library ships
+                // as an interface of default @Test methods runs compiled as it
+                // runs under JUnit.
+                AnnotatedClass i = visited.add(name) ? interfaceClass(name) : null;
                 if (i != null) {
                     out.add(i);
                     pending.addAll(i.getInterfaceInternalNames());
