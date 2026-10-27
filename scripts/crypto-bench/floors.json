@@ -1,5 +1,5 @@
 {
-  "_comment": "Lowest core/reference ratio each row may report before crypto-bench.yml fails. Floors guard against regression; they sit below the measured ratios by the noise of a shared CI runner, and a row the run does not print (a reference the runner lacks) is reported and skipped.",
+  "_comment": "Lowest core/reference ratio each row may report before crypto-bench.yml fails. Floors guard against regression; they sit below the measured ratios by the noise of a shared CI runner, and a row the run does not print (a reference the runner lacks) is reported and skipped. The native batch rows pit every core of the runner against the reference on one, so they also measure the runner's core count and SMT: batch.secp256k1.verify read 2.15 and 1.74 on two runners with our side unchanged, and its floor sits below that spread.",
   "jvm": {
     "secp256k1.pubkey": 1.3,
     "secp256k1.sign": 1.2,
@@ -38,7 +38,8 @@
     "hmac.sha512.bip32.openssl": 1.2,
     "pbkdf2.sha512.bip39.openssl": 0.5,
     "ripemd160.1k.openssl": 1.0,
-    "batch.secp256k1.verify": 1.8,
+    "batch.secp256k1.verify": 1.4,
+    "batch.packed.secp256k1.verify": 1.4,
     "batch.ed25519.verify.openssl": 3.0,
     "batch.sha256.merkle.openssl": 1.5
   }
