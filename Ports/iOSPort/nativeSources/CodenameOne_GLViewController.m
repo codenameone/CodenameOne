@@ -3395,14 +3395,13 @@ extern bool lockDrawing;
     [self cn1PublishViewSizeIfChanged];
 }
 
-// The other half of #6080. With the app in landscape, presenting the
-// portrait-only camera sends this (covered) controller a
-// viewWillTransitionToSize: to portrait, which publishes the portrait size.
-// Its view is not in the window while the modal is up, so it is never laid out
-// portrait; when the user stays in landscape and the modal is dismissed, the
-// bounds are what they were before the camera opened, nothing changed, and no
-// layout pass runs to correct the published size. viewDidAppear and the
-// transition's completion therefore re-read the real bounds as well.
+// The other half of #6080. With the app in landscape, a stale size can be
+// published around the portrait-only camera covering this view -- possibly a
+// portrait viewWillTransitionToSize:, or updateCanvas: swapping the bounds to
+// match a scene that still reports portrait; the device log did not say. The view itself
+// never leaves landscape, so when the user stays in landscape its bounds never
+// change and no layout pass runs to correct the published size. viewDidAppear
+// and the transition's completion therefore re-read the real bounds as well.
 - (void)cn1PublishViewSizeIfChanged {
     // The same reason viewWillTransitionToSize: gives: iOS lays the view out
     // at the opposite orientation for its background snapshot.
@@ -3422,6 +3421,10 @@ extern bool lockDrawing;
     if (dw <= 1 && dh <= 1) {
         return;
     }
+    // Rare by construction (a rotation normally publishes first), so it is
+    // worth a line: it names the stale size the next time #6080 recurs.
+    CN1Log(@"CN1: view is %dx%d px but the published size was %dx%d; republishing",
+          newW, newH, displayWidth, displayHeight);
     [[self renderingView] updateFrameBufferSize:newW h:newH];
     [[self renderingView] deleteFramebuffer];
     displayWidth = newW;
@@ -3695,11 +3698,21 @@ bool lockDrawing;
         }
     }
 #endif
-#ifdef CN1_PUBLISH_VIEW_SIZE_FROM_LAYOUT
-    [self cn1PublishViewSizeIfChanged];
-#endif
     [self becomeFirstResponder];
     [self updateCanvas:animated];
+#ifdef CN1_PUBLISH_VIEW_SIZE_FROM_LAYOUT
+    // After the portrait-only camera closes over a landscape app that stayed
+    // landscape, the reported display was portrait while the view's bounds
+    // were landscape (#6080 case 3), and since the bounds never change no
+    // layout pass corrects it. Which publication went stale is not pinned
+    // down: updateCanvas: itself sizes through cn1OrientationCorrectSize,
+    // which swaps the bounds if the scene still reports portrait at this
+    // moment. So the bounds are re-read once the dismissal has settled, after
+    // updateCanvas:, and cn1PublishViewSizeIfChanged logs any correction.
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self cn1PublishViewSizeIfChanged];
+    });
+#endif
     // Re-install / bring the status-bar tap proxy to the front. Native peers
     // (browsers, video, etc.) added after viewDidLoad can obscure it or push
     // sibling scroll views into the hierarchy.
@@ -4965,8 +4978,11 @@ BOOL prefersStatusBarHidden = NO;
     [[self renderingView] updateFrameBufferSize:(int)(size.width * scaleValue) h:(int)(size.height * scaleValue)];
     [[self renderingView] deleteFramebuffer];
 
-    displayWidth = (int)size.width * scaleValue;
-    displayHeight = (int)size.height * scaleValue;
+    // Scale before truncating, as cn1PublishViewSizeIfChanged does: a
+    // fractional point width would otherwise disagree with it by more than
+    // its tolerance and republish after every resize.
+    displayWidth = (int)(size.width * scaleValue);
+    displayHeight = (int)(size.height * scaleValue);
     
     lockDrawing = NO;
     
