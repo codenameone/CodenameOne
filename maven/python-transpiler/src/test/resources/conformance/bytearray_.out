@@ -1,0 +1,19 @@
+bytearray(b'hello') 5 104 bytearray(b'el') 111 [104, 101] bytearray(b'') bytearray(b'\x00\x00\x00') bytearray(b'AB') bytearray(b'hi')
+bytearray(b'hello!??\x01') 2 62 bytearray(b'hello!??\x01')
+bytearray(b'HEYlo!??!') bytearray(b'HEYLO!??!') 3 1 bytearray(b'HEYLo!??!') [bytearray(b'HEY'), bytearray(b'o!??!')] HEYlo!??!
+True True b'HEYlo!??!' b'xHEYlo!??!' bytearray(b'HEYlo!??!x') bytearray(b'HEYlo!??!HEYlo!??!') True True 4845596c6f213f3f21
+bytearray(b'!??!olYEH') False bytearray(b'\xde\xad\xbe\xef') bytearray(b'olYEH') True
+bytearray(b'') False True b'xyz' b'a-b'
+bytearray(b'XdY') True bytearray
+3 88 b'dY' [88, 100, 89] False 3 B 1 False b'XdY'
+bytearray(b'Zzz') True [90, 122] 5a7a7a
+b'abc' True
+ValueError operation forbidden on released memoryview object
+TypeError unhashable type: 'bytearray'
+TypeError string argument without an encoding
+ValueError byte must be in range(0, 256)
+IndexError pop from empty bytearray
+ValueError value not found in bytearray
+TypeError cannot modify read-only memory
+TypeError memoryview: a bytes-like object is required, not 'str'
+IndexError bytearray index out of range

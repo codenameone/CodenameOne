@@ -1,0 +1,12 @@
+[1, 2, 3, 4] 4 4 True Stack
+Stack [1, 2, 3, 4, 5] 15 [5, 4, 3, 2, 1] [1, 2, 3, 4, 5] [2, 3]
+1 3 {'a': 1, 'xyz': 3} {'a': 1, 'xyz': 3} [('a', 1), ('xyz', 3)] True
+set k v
+<V> V 1
+100.0 212.0 101.0 True True 100.0
+red RED! True reddish 3 [Color('red')] True 1
+6 True False 7 12 0x6 6 6
+(3, 4) 3 4 2 True True
+3 4
+['a', 'b'] 2 True ['a', 'b', 'c']
+TypeError type 'bool' is not an acceptable base type

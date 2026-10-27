@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+    <!-- The syntax tree records everything the source says, including what
+         the emitter does not use yet (annotations, return annotations,
+         positional-only markers, `yield from`, a scope's own name). A later
+         pass reads them (typed signatures for Java callers come from the
+         annotations), so dropping a field to satisfy the analysis would only
+         mean putting it back. -->
+    <Match>
+        <Or>
+            <Class name="~com\.codename1\.python\.transpiler\.ast\.Node\$.*"/>
+            <Class name="com.codename1.python.transpiler.ast.Scope"/>
+        </Or>
+        <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD"/>
+    </Match>
+    <!-- The tree is built once by the parser and handed from pass to pass;
+         the passes own it and copying the lists between them would only
+         cost time. -->
+    <Match>
+        <Package name="~com\.codename1\.python\.transpiler\..*"/>
+        <Or>
+            <Bug pattern="EI_EXPOSE_REP"/>
+            <Bug pattern="EI_EXPOSE_REP2"/>
+        </Or>
+    </Match>
+</FindBugsFilter>

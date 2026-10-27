@@ -1,0 +1,23 @@
+True True ReferenceType True None True True
+cannot create weak reference to 'int' object
+cannot create weak reference to 'str' object
+cannot create weak reference to 'tuple' object
+cannot create weak reference to 'list' object
+cannot create weak reference to 'dict' object
+cannot create weak reference to 'NoneType' object
+ True True
+a hi a Node(a)
+a2
+hi a True
+2 ['x', 'y'] Node(a) none True [('x', Node(a)), ('y', Node(b))]
+Node(b) 1 Node(c) ['q', 'x']
+2 1 True False False [1, 2] 0
+2 True False ['a', 'c']
+True True
+finalized c
+False None
+main done
+registered last, runs first
+bye second?
+bye first!
+a finalized at exit

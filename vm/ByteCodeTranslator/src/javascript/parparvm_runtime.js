@@ -6417,6 +6417,15 @@ bindNative(["cn1_java_lang_String_releaseNSString_long"], function() { return nu
 // The Java substring constructor is the portable fallback for this optional C fusion.
 bindNative(["cn1_java_lang_String_cn1SubstringFused_int_int_R_java_lang_String"], function() { return null; });
 function cn1FusedConcatArg(x) { return x == null ? "null" : jvm.toNativeString(x); }
+// Reached only for Latin-1 byte[]-backed Strings (see cn1FusedConcatN): unreachable here, bound for reachability.
+bindNative(["cn1_java_lang_String_cn1FusedJoin_java_lang_String_java_lang_Object_1ARRAY_int_int_R_java_lang_String"], function(sep, parts, n) {
+  let out = "";
+  for (let i = 0; i < (n | 0); i++) {
+    if (i > 0) { out += cn1FusedConcatArg(sep); }
+    out += cn1FusedConcatArg(parts[i]);
+  }
+  return createJavaString(out);
+});
 bindNative(["cn1_java_lang_String_cn1FusedConcat2_java_lang_String_java_lang_String_R_java_lang_String"], function(a, b) {
   return createJavaString(cn1FusedConcatArg(a) + cn1FusedConcatArg(b));
 });

@@ -228,3 +228,19 @@ file is distributed under the GNU General Public License version 2 with the
 keeps OpenJDK's notice:
 
   Copyright (c) 1996, 2013, Oracle and/or its affiliates. All rights reserved.
+
+================================================================================
+FDLIBM erf and erfc
+================================================================================
+
+The class com.codename1.python.runtime.Erf, in maven/python-runtime, is a Java
+rewrite of s_erf.c from Sun Microsystems' FDLIBM, the C library the platform
+math libraries derive their erf and erfc from, so that Python's math.erf and
+math.erfc agree with CPython's. It retains FDLIBM's notice:
+
+  Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+
+  Developed at SunPro, a Sun Microsystems, Inc. business.
+  Permission to use, copy, modify, and distribute this
+  software is freely granted, provided that this notice
+  is preserved.

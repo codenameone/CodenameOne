@@ -112,6 +112,8 @@
           exactly the JDK the plugin is built with.
         -->
         <module>dart-transpiler</module>
+        <!-- Java 8 like dart-transpiler; its runtime is in flutter-modules. -->
+        <module>python-transpiler</module>
         <module>sqlite-jdbc</module>
         <!-- The backend runtime, after sqlite-jdbc because it depends on it. -->
         <module>backend</module>
@@ -712,6 +714,7 @@
             <modules>
                 <module>dart-runtime</module>
                 <module>flutter-runtime</module>
+                <module>python-runtime</module>
             </modules>
         </profile>
 

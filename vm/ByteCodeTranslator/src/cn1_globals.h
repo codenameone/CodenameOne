@@ -3643,7 +3643,11 @@ static inline JAVA_BOOLEAN cn1_array_access_in_bounds(JAVA_OBJECT array, JAVA_IN
     return array != JAVA_NULL && index >= 0 && index < ((JAVA_ARRAY)array)->length;
 }
 
-static inline JAVA_BOOLEAN cn1_array_access_validate(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index) {
+/* Out of line: inlined, the two exception constructions made every array
+ * element helper below too big for clang to inline, and each element access
+ * was a call (a Python attribute read, one Object[] load, profiled as a third
+ * of its own cost). `inline` stays so a file that never calls it does not warn. */
+static inline CN1_CLINIT_ATTR JAVA_BOOLEAN cn1_array_access_validate(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array, JAVA_INT index) {
     if (array == JAVA_NULL) {
         throwException(threadStateData, __NEW_java_lang_NullPointerException(threadStateData));
         return JAVA_FALSE;

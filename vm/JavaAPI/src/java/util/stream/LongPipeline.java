@@ -300,7 +300,7 @@ final class LongPipeline implements LongStream {
         Iterator<Long> it = boxed.iterator();
         try {
             while (it.hasNext()) {
-                all.add(it.next());
+                addNext(all, it);
             }
             long[] out = new long[all.size()];
             for (int i = 0; i < out.length; i++) {
@@ -534,6 +534,12 @@ final class LongPipeline implements LongStream {
     // are Longs by construction, so the cast cannot fail anyway.
     private static long unboxNext(Iterator<Long> it) {
         return it.next().longValue();
+    }
+
+    // Outside the caller's try: the element cast javac inserts must not sit
+    // under a catch, because a failed cast does not throw on ParparVM.
+    private static void addNext(List<Long> all, Iterator<Long> it) {
+        all.add(it.next());
     }
 
     private static long unboxAt(List<Long> all, int i) {

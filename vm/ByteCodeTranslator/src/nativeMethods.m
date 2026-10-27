@@ -1904,6 +1904,47 @@ static JAVA_OBJECT cn1ConcatFallback(CODENAME_ONE_THREAD_STATE, JAVA_ARRAY_BYTE*
     return so;
 }
 
+// String.join over Latin-1 Strings. cn1JoinLatin1 has checked every part and
+// summed the length (total fits an int), so this only copies bytes.
+JAVA_OBJECT java_lang_String_cn1FusedJoin___java_lang_String_java_lang_Object_1ARRAY_int_int_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT sep, JAVA_OBJECT parts, JAVA_INT n, JAVA_INT total) {
+    JAVA_ARRAY_BYTE* dst;
+    JAVA_OBJECT so = cn1FusedLatin1Begin(threadStateData, total, &dst);
+    int fused = so != JAVA_NULL;
+    if(!fused) {
+        enteringNativeAllocations();
+        JAVA_ARRAY dat = (JAVA_ARRAY)allocArray(threadStateData, total, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
+        dst = (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA(dat);
+        so = __NEW_java_lang_String(threadStateData);
+        java_lang_String___INIT____(threadStateData, so);
+        ((struct obj__java_lang_String*)so)->java_lang_String_value = (JAVA_OBJECT)dat;
+        ((struct obj__java_lang_String*)so)->java_lang_String_count = total;
+    }
+    // Pointers are taken only now: the allocation above may run a collection.
+    JAVA_OBJECT* items = (JAVA_OBJECT*) CN1_ARRAY_DATA((JAVA_ARRAY)parts);
+    JAVA_ARRAY_BYTE* sp = CN1_SB_PTR(sep);
+    int sl = CN1_SB_LEN(sep);
+    int o = 0;
+    // Short parts (words, separators) are copied by a loop: a memcpy call
+    // costs more than the bytes it moves.
+    for(int q = 0 ; q < n ; q++) {
+        if(q > 0) {
+            if(sl > 16) { memcpy(dst + o, sp, sl); } else { for(int i = 0 ; i < sl ; i++) dst[o + i] = sp[i]; }
+            o += sl;
+        }
+        JAVA_OBJECT it = items[q];
+        int l = CN1_SB_LEN(it);
+        JAVA_ARRAY_BYTE* ip = CN1_SB_PTR(it);
+        if(l > 16) { memcpy(dst + o, ip, l); } else { for(int i = 0 ; i < l ; i++) dst[o + i] = ip[i]; }
+        o += l;
+    }
+    if(fused) {
+        cn1FusedLatin1End(so, total);
+    } else {
+        finishedNativeAllocations();
+    }
+    return so;
+}
+
 JAVA_OBJECT java_lang_String_cn1FusedConcat2___java_lang_String_java_lang_String_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT a, JAVA_OBJECT b) {
     JAVA_ARRAY_BYTE* p[2] = { CN1_SB_PTR(a), CN1_SB_PTR(b) };
     int l[2] = { CN1_SB_LEN(a), CN1_SB_LEN(b) };

@@ -1,0 +1,191 @@
+name: Python benchmark
+
+# Runs the kernels in scripts/python-bench/kernels twice -- by CPython and
+# transpiled to Java by Codename One -- checks that both compute the same
+# result, and gates the ours/CPython ratio of compute time, process wall time
+# and peak memory against scripts/python-bench/baseline/ratios.json.
+#
+# Two arms: the JVM (the simulator and desktop targets) and ParparVM (the
+# native translation iOS and the native desktop targets ship), each gated on
+# its own baseline. The ParparVM arm also runs the conformance programs as
+# native executables, where a bad cast is a crash rather than an exception.
+# Android and JavaScript join as the Python support grows.
+#
+# It also runs the transpiler's conformance tests, which need the Java 17
+# runtime and so cannot run in pr.yml's JDK 8 reactor.
+
+on:
+  pull_request:
+    paths:
+      - 'maven/python-transpiler/**'
+      - 'maven/python-runtime/**'
+      - 'scripts/python-bench/**'
+      - '.github/workflows/python-bench.yml'
+      # The ParparVM arm translates and compiles with these.
+      - 'vm/ByteCodeTranslator/**'
+      - 'vm/JavaAPI/**'
+      - 'vm/selfhost/compile-dist.sh'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # Pinned, like flutter-bench's FLUTTER_REF: the ratios are against this
+  # interpreter, and moving it is a deliberate re-baseline.
+  CPYTHON_VERSION: '3.13.9'
+
+jobs:
+  # JDK 8 for the core (the container bakes both JDKs and cn1-binaries, as
+  # flutter-bench's framework job explains), JDK 17 for the runtime.
+  framework:
+    name: framework
+    runs-on: ubuntu-latest
+    container: ghcr.io/codenameone/codenameone/pr-ci-container:latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Link cn1-binaries
+        run: ln -s /opt/cn1-binaries ../cn1-binaries
+
+      - name: Build the core and the transpiler on JDK 8
+        run: |
+          cd maven
+          JAVA_HOME="$JAVA_HOME_8" bash ../scripts/ci/retry.sh mvn -B -q install -DskipTests \
+              -Dmaven.javadoc.skip=true -Dmaven.source.skip=true \
+              -Dmaven.repo.local="$GITHUB_WORKSPACE/m2" \
+              -pl core,python-transpiler -am
+
+      # Without -am: core was installed above, and re-resolving it here would
+      # rebuild it on the wrong JDK.
+      - name: Build the runtime and run the conformance tests on JDK 17
+        run: |
+          cd maven
+          JAVA_HOME="$JAVA_HOME_17" bash ../scripts/ci/retry.sh mvn -B install \
+              -Dmaven.javadoc.skip=true -Dmaven.source.skip=true \
+              -Dmaven.repo.local="$GITHUB_WORKSPACE/m2" \
+              -pl python-runtime,python-transpiler
+
+      - name: Build the ParparVM translator and its class library on JDK 8
+        run: |
+          JAVA_HOME="$JAVA_HOME_8" bash scripts/ci/retry.sh mvn -B -q install -DskipTests \
+              -Dmaven.javadoc.skip=true -Dmaven.source.skip=true \
+              -Dmaven.repo.local="$GITHUB_WORKSPACE/m2" \
+              -f vm/pom.xml -pl JavaAPI,ByteCodeTranslator -am
+
+      - name: Pack the repository
+        run: tar -C "$GITHUB_WORKSPACE" -czf framework-m2.tgz m2
+
+      - name: Upload the repository
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-bench-framework
+          path: framework-m2.tgz
+          retention-days: 1
+
+  measure:
+    name: jvm
+    needs: framework
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up CPython
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.CPYTHON_VERSION }}
+
+      - name: Download the framework
+        uses: actions/download-artifact@v4
+        with:
+          name: python-bench-framework
+
+      - name: Unpack the framework
+        run: tar -xzf framework-m2.tgz
+
+      - name: Measure and gate
+        run: |
+          repo="$GITHUB_WORKSPACE/m2/com/codenameone"
+          python3 scripts/python-bench/run_bench.py \
+              --java-home "$JAVA_HOME" \
+              --runtime-jar "$repo/codenameone-python-runtime/8.0-SNAPSHOT/codenameone-python-runtime-8.0-SNAPSHOT.jar" \
+              --core-jar "$repo/codenameone-core/8.0-SNAPSHOT/codenameone-core-8.0-SNAPSHOT.jar" \
+              --transpiler-cp "$repo/codenameone-python-transpiler/8.0-SNAPSHOT/codenameone-python-transpiler-8.0-SNAPSHOT.jar" \
+              --json python-bench.json --check | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-bench-report
+          path: python-bench.json
+
+  parparvm:
+    name: parparvm
+    needs: framework
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      PYBENCH_M2: ${{ github.workspace }}/m2
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install clang
+        run: |
+          bash scripts/ci/apt-get-update.sh
+          sudo apt-get install -y clang time
+
+      # The translator runs on JDK 8, the generated Java compiles on JDK 17.
+      - name: Set up JDK 8
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: '8'
+
+      - name: Remember JDK 8
+        run: echo "JDK_8_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Remember JDK 17
+        run: echo "JAVA17_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+
+      - name: Set up CPython
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.CPYTHON_VERSION }}
+
+      - name: Download the framework
+        uses: actions/download-artifact@v4
+        with:
+          name: python-bench-framework
+
+      - name: Unpack the framework
+        run: tar -xzf framework-m2.tgz
+
+      - name: Conformance, natively
+        run: scripts/python-bench/conformance_parparvm.sh
+
+      - name: Measure and gate
+        run: |
+          python3 scripts/python-bench/parparvm_table.py --json python-bench-parparvm.json --check \
+              | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-bench-parparvm-report
+          path: python-bench-parparvm.json

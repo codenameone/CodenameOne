@@ -6364,7 +6364,12 @@ public class BytecodeMethod implements SignatureSet {
                                     }
                                 }
                                 if(frameless) {
-                                    // No frame to release -- the operand stack is a method-local array.
+                                    // No frame to release -- the operand stack is a method-local array. The
+                                    // try-block stack still has to be unwound: a return after several try
+                                    // blocks that end on one label runs a single END_TRY, which pops one.
+                                    if(hasTryCatch) {
+                                        sb.append("    CN1_FRAMELESS_TRY_RETURN();\n");
+                                    }
                                     sb.append("    return ").append(retVal).append(";\n");
                                 } else if(hasTryCatch) {
                                     sb.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, methodBlockOffset); return ").append(retVal).append(";\n");
@@ -6429,7 +6434,12 @@ public class BytecodeMethod implements SignatureSet {
                                         }
                                     }
                                     if(frameless) {
-                                        // No frame to release -- the operand stack is a method-local array.
+                                        // No frame to release -- the operand stack is a method-local array. The
+                                        // try-block stack still has to be unwound: a return after several try
+                                        // blocks that end on one label runs a single END_TRY, which pops one.
+                                        if(hasTryCatch) {
+                                            sb.append("    CN1_FRAMELESS_TRY_RETURN();\n");
+                                        }
                                         sb.append("    return ").append(retVal).append(";\n");
                                     } else if(hasTryCatch) {
                                         sb.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, methodBlockOffset); return ").append(retVal).append(";\n");
