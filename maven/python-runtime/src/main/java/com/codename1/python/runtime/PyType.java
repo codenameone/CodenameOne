@@ -703,6 +703,11 @@ public final class PyType extends PyObject {
             if ("__doc__".equals(attr)) {
                 return Py.NONE;
             }
+            if ("__hash__".equals(attr)) {
+                // Instances hash by identity without an entry for it; a class
+                // that defines __eq__ alone is unhashable (PyInstance.hash).
+                return lookup("__eq__") != null ? Py.NONE : Builtins.OBJECT_HASH;
+            }
             return null;
         }
         // Reading a function through the class gives the plain function;

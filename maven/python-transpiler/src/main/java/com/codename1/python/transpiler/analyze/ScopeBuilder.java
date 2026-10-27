@@ -124,6 +124,12 @@ public final class ScopeBuilder {
             target(a.target);
         } else if (s instanceof AnnAssign) {
             AnnAssign a = (AnnAssign) s;
+            if (hasLambda(a.annotation)) {
+                // The emitter evaluates an annotation that builds a lambda
+                // (`Annotated[int, AfterValidator(lambda v: ...)]`), so the
+                // lambda needs its scope like any other.
+                expr(a.annotation);
+            }
             if (a.value != null) {
                 expr(a.value);
                 target(a.target);
@@ -254,6 +260,43 @@ public final class ScopeBuilder {
         for (Pattern q : p.kwdPatterns) {
             pattern(q);
         }
+    }
+
+    private static boolean hasLambda(Expr e) {
+        if (e instanceof Lambda) {
+            return true;
+        }
+        if (e instanceof Call) {
+            Call c = (Call) e;
+            if (hasLambda(c.func)) {
+                return true;
+            }
+            for (Expr x : c.args) {
+                if (hasLambda(x)) {
+                    return true;
+                }
+            }
+            for (Keyword k : c.keywords) {
+                if (hasLambda(k.value)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        if (e instanceof Subscript) {
+            return hasLambda(((Subscript) e).value) || hasLambda(((Subscript) e).index);
+        }
+        if (e instanceof TupleExpr) {
+            for (Expr x : ((TupleExpr) e).elts) {
+                if (hasLambda(x)) {
+                    return true;
+                }
+            }
+        }
+        if (e instanceof BinOp) {
+            return hasLambda(((BinOp) e).left) || hasLambda(((BinOp) e).right);
+        }
+        return false;
     }
 
     private void argDefaults(Arguments a) {

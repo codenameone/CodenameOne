@@ -92,6 +92,9 @@ public final class Builtins {
     });
 
     public static final Object LEN = PyBuiltin.positional("len", a -> PyInt.of(Py.len(one("len", a))));
+    /// `object.__hash__`, which the object type reads without defining it.
+    static final Object OBJECT_HASH = PyBuiltin.positional("__hash__", a -> Py.of((long) System.identityHashCode(a[0])));
+
     public static final Object REPR = PyBuiltin.positional("repr", a -> Py.str(Py.toRepr(one("repr", a))));
     public static final Object ASCII = PyBuiltin.positional("ascii", a -> Py.str(asciiOnly(Py.toRepr(one("ascii", a)))));
     public static final Object HASH = PyBuiltin.positional("hash", a -> PyInt.of(Py.hashOf(one("hash", a))));

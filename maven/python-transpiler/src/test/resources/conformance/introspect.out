@@ -1,0 +1,10 @@
+typing.Annotated[int, F([('gt', 0)])] typing.Annotated[int, F([('ge', 2)])] typing.Annotated[str, F([('n', -1), ('pattern', 'x')])]
+42
+{'x': typing.Annotated[int, F([('ge', 3)])], 'return': typing.Annotated[int, F([])]}
+dict True
+1 ('x',) None
+(x: Annotated[int, F([('ge', 3)])]) -> Annotated[int, F([])] ['x']
+True True
+<class '__main__.T'> __main__
+frozen q
+frozen q

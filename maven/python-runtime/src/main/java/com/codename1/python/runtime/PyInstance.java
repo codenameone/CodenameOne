@@ -231,6 +231,11 @@ public class PyInstance extends PyObject {
 
     @Override
     public void delAttr(String name) {
+        Object da = cls.lookup("__delattr__");
+        if (da != null && !(da instanceof PyBuiltin)) {
+            Py.obj(da).call(new Object[] {this, name}, Py.NO_KW);
+            return;
+        }
         Object clsAttr = cls.lookup(name);
         if (clsAttr instanceof PyInstance) {
             Object del = ((PyInstance) clsAttr).cls.lookup("__delete__");

@@ -1975,6 +1975,18 @@ public final class Py {
         return d;
     }
 
+    /// What `type(name, bases, ns)` made, given the `__module__` of the
+    /// calling module when `ns` did not name one.
+    public static Object typeModule(Object made, PyModule caller) {
+        if (made instanceof PyType && !((PyType) made).dict.containsKey("__module__")) {
+            Object n = caller.getAttrOrNull("__name__");
+            if (n != null) {
+                ((PyType) made).dict.put("__module__", n);
+            }
+        }
+        return made;
+    }
+
     public static boolean isinstance(Object o, Object t) {
         if (t instanceof PyTuple) {
             Object[] items = ((PyTuple) t).items;

@@ -340,6 +340,18 @@ public final class PyFunction extends PyObject {
                 return attrs;
             case "__defaults__":
                 return defaults.length == 0 ? Py.NONE : PyTuple.of(defaults);
+            case "__code__":
+                return new PyCode(this);
+            case "__kwdefaults__": {
+                PyDict kd = new PyDict();
+                int kwBase = positional + (varArgs ? 1 : 0);
+                for (int p = 0; p < kwOnly; p++) {
+                    if (kwDefaults != null && kwDefaults[p] != null) {
+                        kd.setItem(Py.str(params[kwBase + p]), kwDefaults[p]);
+                    }
+                }
+                return kd.len() == 0 ? Py.NONE : kd;
+            }
             case "__annotations__":
                 PyDict d = new PyDict();
                 if (annotationThunk != null) {

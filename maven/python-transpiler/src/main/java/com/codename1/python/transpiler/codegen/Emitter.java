@@ -109,6 +109,9 @@ public final class Emitter {
 
     private final String file;
     private final String moduleName;
+    /// Set while the plain call inside a `type(name, bases, ns)` wrapper is
+    /// emitted, so it is not wrapped twice.
+    private boolean inTypeCall;
     private final boolean isPackage;
     private final String className;
     private final String packageName;
@@ -737,6 +740,36 @@ public final class Emitter {
         if (a instanceof ListExpr) {
             for (Expr e : ((ListExpr) a).elts) {
                 if (!evaluable(e)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        if (a instanceof UnaryOp) {
+            return evaluable(((UnaryOp) a).operand);
+        }
+        if (a instanceof Starred) {
+            return evaluable(((Starred) a).value);
+        }
+        if (a instanceof Lambda) {
+            // `Annotated[int, AfterValidator(lambda v: ...)]`: the body runs
+            // later, in its own scope; only its creation is evaluated here.
+            return ((Lambda) a).scope != null;
+        }
+        if (a instanceof Call) {
+            // `Annotated[int, Field(gt=0)]`, `conint(ge=2)`: libraries read
+            // these annotations at run time, so they are evaluated as written.
+            Call c = (Call) a;
+            if (!evaluable(c.func)) {
+                return false;
+            }
+            for (Expr e : c.args) {
+                if (!evaluable(e)) {
+                    return false;
+                }
+            }
+            for (Keyword k : c.keywords) {
+                if (!evaluable(k.value)) {
                     return false;
                 }
             }
@@ -2286,6 +2319,17 @@ public final class Emitter {
     }
 
     private String call(Call c) {
+        if (!inTypeCall && c.func instanceof Name && "type".equals(((Name) c.func).id) && c.args.size() == 3
+                && c.keywords.isEmpty() && sc.resolve("type") == Scope.Binding.BUILTIN) {
+            // `type(name, bases, ns)` takes __module__ from the caller's
+            // globals, which only the call site knows.
+            inTypeCall = true;
+            try {
+                return "Py.typeModule(" + call(c) + ", M)";
+            } finally {
+                inTypeCall = false;
+            }
+        }
         if (c.func instanceof Name && c.args.isEmpty() && c.keywords.isEmpty()) {
             String fn = ((Name) c.func).id;
             if (("globals".equals(fn) || "locals".equals(fn)) && sc.resolve(fn) == Scope.Binding.BUILTIN) {

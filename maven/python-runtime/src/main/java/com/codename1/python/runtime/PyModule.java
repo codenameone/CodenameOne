@@ -165,6 +165,11 @@ public final class PyModule extends PyObject {
         if ("__name__".equals(n)) {
             return Py.str(name);
         }
+        if ("__dict__".equals(n)) {
+            // A snapshot, as globals() is: reading names through it works,
+            // writing through it does not reach the module.
+            return globals();
+        }
         return null;
     }
 
