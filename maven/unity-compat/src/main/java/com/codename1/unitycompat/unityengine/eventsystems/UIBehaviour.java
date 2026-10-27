@@ -27,5 +27,6 @@ import com.codename1.unitycompat.unityengine.MonoBehaviour;
 /// `UnityEngine.EventSystems.UIBehaviour`: what every user interface
 /// component derives from. It adds nothing a script can use; it is here
 /// because the classes that derive from it say so in their signatures.
+@SuppressWarnings("PMD.AbstractClassWithoutAnyMethod") // abstract in C#, so never instantiated here either
 public abstract class UIBehaviour extends MonoBehaviour {
 }

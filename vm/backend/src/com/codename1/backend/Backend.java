@@ -1799,6 +1799,8 @@ public final class Backend {
         /// waiting. Tests want this; a process wants [#run].
         public Backend start() throws Exception {
             claimProcess();
+            // Before the application's started() callback, which may open a pin.
+            BoardHardware.install();
             Backend running = null;
             try {
                 running = startOnce();

@@ -25,7 +25,8 @@
 
 /*
  * Render-stack internals for the GTK3 translation units (window / graphics /
- * text / image). Pulls in GTK + Cairo + Pango + GdkPixbuf, so only the rendering
+ * text / image). Pulls in GTK + Cairo + Pango + GdkPixbuf (on the embedded
+ * target, the port's own renderer instead), so only the rendering
  * units include it (the POSIX io/net/socket units include the GTK-free
  * cn1_linux.h instead).
  *
@@ -37,17 +38,26 @@
  */
 
 #include "cn1_linux.h"
+#ifdef CN1_LINUX_EMBEDDED
+/* The embedded target draws with its own renderer (cn1_linux_raster.c) and
+ * FreeType (cn1_linux_text_ft.c), and decodes with libpng and libjpeg
+ * (cn1_linux_codec.c): no Cairo, Pango, GdkPixbuf or GLib. */
+#include "cn1_linux_raster.h"
+#else
 #include <gtk/gtk.h>
 #include <cairo.h>
 #include <pango/pangocairo.h>
 #include <gdk-pixbuf/gdk-pixbuf.h>
+#endif
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+#ifndef CN1_LINUX_EMBEDDED
 /* Shared source decoding for main and secondary window pointer events. */
 int cn1LinuxPointerSourceFlag(GdkEvent* event);
+#endif
 
 /*
  * A drawing target: a Cairo context over a backing image surface. The on-screen
@@ -86,6 +96,11 @@ typedef struct CN1Graphics {
     int flushX, flushY, flushW, flushH;
 } CN1Graphics;
 
+#ifdef CN1_LINUX_EMBEDDED
+/* A FreeType face at a size; defined in cn1_linux_text_ft.c, the only unit that
+ * looks inside it. */
+typedef struct CN1Font CN1Font;
+#else
 /* A resolved Pango font description + a metrics snapshot for fast char widths. */
 typedef struct CN1Font {
     PangoFontDescription* desc;
@@ -93,6 +108,7 @@ typedef struct CN1Font {
     int ascent;
     int height;
 } CN1Font;
+#endif
 
 /* A decoded image: an ARGB32 Cairo surface; getImageGraphics wraps it lazily. */
 typedef struct CN1Image {
@@ -102,8 +118,14 @@ typedef struct CN1Image {
     CN1Graphics* mutableGraphics; /* non-NULL once getImageGraphics was called */
 } CN1Image;
 
+#ifdef CN1_LINUX_EMBEDDED
+/* Decodes PNG or JPEG bytes into a new ARGB32 surface; NULL when the bytes are
+ * neither or are damaged (cn1_linux_codec.c). */
+cairo_surface_t* cn1LinuxDecodeImage(const unsigned char* bytes, size_t length);
+#else
 /* The shared PangoContext (created once over the default font map). */
 PangoContext* cn1LinuxPangoContext(void);
+#endif
 
 /* Applies g->color/alpha as the current Cairo source. */
 void cn1LinuxApplySource(CN1Graphics* g);
@@ -118,6 +140,7 @@ CN1Graphics* cn1LinuxWindowGraphics(void);
 /* Encodes an ARGB32 Cairo surface to PNG bytes; caller g_free()s *outData. */
 int cn1LinuxSurfaceToPng(cairo_surface_t* surface, unsigned char** outData, int* outLen);
 
+#ifndef CN1_LINUX_EMBEDDED
 /* Native-peer overlay management (defined in cn1_linux_window.c). The GtkFixed
  * sits in a pass-through GtkOverlay over the Cairo drawing area; these place /
  * move / remove a native widget tracking a lightweight PeerComponent. Must run
@@ -142,6 +165,8 @@ gboolean cn1LinuxTextInputFilter(int slot, GdkEventKey* event);
 CN1Graphics* cn1LinuxDesktopGraphics(int slot);
 GtkWidget* cn1LinuxDesktopWidget(int slot);
 GtkWidget* cn1LinuxDesktopFixed(int slot);
+
+#endif /* !CN1_LINUX_EMBEDDED: the embedded target has no GTK widgets */
 
 /* Runs fn(arg) on the GTK main loop and blocks the caller until done (inline in
  * headless mode). For GTK calls the EDT must not make directly. */

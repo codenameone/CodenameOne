@@ -34,7 +34,7 @@ import UnityEngine.Vector2;
 /// draw list can be worked out with no image loaded -- which is what lets
 /// that half run where there is no display.
 @SuppressWarnings("PMD.MethodNamingConventions") // C# member names: translated code binds to them by name
-public final class Sprite extends Object {
+public final class Sprite extends Object { // NOPMD ExtendsObject - UnityEngine.Object, not java.lang.Object
     final String resource;
     /// The rectangle of the image this sprite is, in pixels from the
     /// image's top left. A sheet's sprites differ only in this.

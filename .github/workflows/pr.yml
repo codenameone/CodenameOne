@@ -783,7 +783,7 @@ jobs:
           # SpotBugs run that silently stops running is not mistaken for clean.
           QUALITY_REPORT_REQUIRED_SPOTBUGS: core-unittests:android:ios:ByteCodeTranslator:codenameone-maven-plugin:build-engine:project-model:codenameone-gradle-plugin:build-hint-catalog:build-hint-tools:backend:backend-test:javac:android-res-compiler:android-compat:swing-compat:javafx-compat:compose-compat:fxml-compiler:desktop-compat-runtime
           # PMD and Checkstyle run on the core and on the backend runtime, and each
-          # must produce its report: without one, the forbidden-rule gate below it
+          # must produce its report: without one, the PMD gate below it
           # has nothing to read and passes.
           QUALITY_REPORT_REQUIRED_PMD: core-unittests:backend:backend-test:backend-parparvm
           QUALITY_REPORT_REQUIRED_CHECKSTYLE: core-unittests:backend:backend-test

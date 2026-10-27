@@ -35,6 +35,9 @@
 ///   derivation, deterministic low-S signing, verification and public key
 ///   recovery. A server can sign a chain transaction, or check the signature
 ///   a wallet made on the device, with the class the device used.
+/// - [CertificateRequest] -- PKCS#10 certificate signing requests. A headless
+///   device enrolls for its mutual TLS client certificate with it, signing
+///   through [com.codename1.backend.Crypto].
 ///
 /// A server reaches for these to verify a second factor and for little else.
 /// What a request path computes -- a password hash, a token's signature, a

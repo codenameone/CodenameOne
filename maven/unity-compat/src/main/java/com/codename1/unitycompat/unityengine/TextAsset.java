@@ -31,7 +31,7 @@ package com.codename1.unitycompat.unityengine;
 /// decoded as UTF-8 if its text is asked for; any other is kept as its
 /// text, a byte order mark left out, and encoded as UTF-8 if its bytes are.
 @SuppressWarnings("PMD.MethodNamingConventions") // C# member names: translated code binds to them by name
-public final class TextAsset extends Object {
+public final class TextAsset extends Object { // NOPMD ExtendsObject - UnityEngine.Object, not java.lang.Object
     private String text;
     private byte[] bytes;
 

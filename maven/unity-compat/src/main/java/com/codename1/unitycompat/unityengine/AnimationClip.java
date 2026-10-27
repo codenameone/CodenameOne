@@ -35,7 +35,7 @@ package com.codename1.unitycompat.unityengine;
 /// its ancestors down from the one holding the [Animator] -- and a kind,
 /// one of the constants here.
 @SuppressWarnings("PMD.MethodNamingConventions") // C# member names: translated code binds to them by name
-public final class AnimationClip extends Object {
+public final class AnimationClip extends Object { // NOPMD ExtendsObject - UnityEngine.Object, not java.lang.Object
     /// The transform's local position.
     public static final int POSITION_X = 0;
     public static final int POSITION_Y = 1;

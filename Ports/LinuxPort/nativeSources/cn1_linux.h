@@ -182,6 +182,11 @@ const unsigned char* cn1LinuxFindResource(const char* name, int* lenOut);
  */
 void cn1LinuxStubOnce(const char* tag);
 
+/* Converts SIGSEGV/SIGBUS in translated code into a Java exception and dumps a
+ * native backtrace on abort (cn1_linux_faults.c). Idempotent; honours
+ * CN1_LINUX_NO_FAULT_HANDLER. Called first thing by each display's initDisplay. */
+void cn1LinuxInstallFaultHandlers(void);
+
 /* Writes one line to stderr (and the journal) -- the nativeLog backing. */
 void cn1LinuxLog(const char* message);
 

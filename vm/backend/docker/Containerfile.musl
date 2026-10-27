@@ -23,7 +23,9 @@ FROM alpine:3.20
 
 ARG CURL_VER=8.7.1
 
-RUN apk add --no-cache clang lld musl-dev openssl-dev openssl-libs-static \
+# linux-headers: the hardware API (cn1_hardware_impl.h) includes the kernel's
+# GPIO, I2C, SPI, CAN and watchdog UAPI headers, which musl-dev does not carry.
+RUN apk add --no-cache clang lld musl-dev linux-headers openssl-dev openssl-libs-static \
         zlib-dev zlib-static nghttp2-dev nghttp2-static pkgconf curl tar make
 
 RUN cd /tmp \

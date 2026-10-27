@@ -209,6 +209,14 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     public SessionImpl(SqlAccess sql) {
         this(sql, Models.snapshot());
     }
+
+    /// The connection this session writes through. The outbox
+    /// (`com.codename1.io.outbox`) keeps its table here so that a message
+    /// enqueued inside a transaction commits or rolls back with it.
+    public SqlAccess sqlAccess() {
+        check();
+        return sql;
+    }
     public SessionImpl(SqlAccess sql, Map<String, EntityModel<?>> models) {
         if (sql == null || models == null) {
             throw new IllegalArgumentException("sql/models is null");

@@ -24,5 +24,5 @@ package com.codename1.unitycompat.unityengine;
 
 /// `UnityEngine.ScriptableObject`: an asset that is an object of a class
 /// and belongs to no scene. A tile of a tilemap is one.
-public class ScriptableObject extends Object {
+public class ScriptableObject extends Object { // NOPMD ExtendsObject - UnityEngine.Object, not java.lang.Object
 }

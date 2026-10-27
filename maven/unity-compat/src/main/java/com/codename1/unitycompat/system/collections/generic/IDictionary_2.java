@@ -26,7 +26,7 @@ package com.codename1.unitycompat.system.collections.generic;
 /// script reaches a dictionary through it: the members below, the count
 /// of [ICollection_1], and the constructor of [Dictionary_2] that copies
 /// one. `Keys` and `Values` are read from the dictionary itself.
-@SuppressWarnings("PMD.MethodNamingConventions") // C# member names: translated code binds to them by name
+@SuppressWarnings({"PMD.MethodNamingConventions", "PMD.ClassNamingConventions"}) // C# member and type names: translated code binds to them by name
 public interface IDictionary_2 extends ICollection_1 {
     void Add(Object key, Object value);
 

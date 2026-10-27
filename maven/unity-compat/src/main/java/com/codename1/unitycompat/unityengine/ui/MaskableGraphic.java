@@ -24,5 +24,6 @@ package com.codename1.unitycompat.unityengine.ui;
 
 /// `UnityEngine.UI.MaskableGraphic`: a graphic a mask can clip. Masks are
 /// not implemented; the class is the base Unity gives [Text].
+@SuppressWarnings("PMD.AbstractClassWithoutAnyMethod") // abstract in C#, so never instantiated here either
 public abstract class MaskableGraphic extends Graphic {
 }

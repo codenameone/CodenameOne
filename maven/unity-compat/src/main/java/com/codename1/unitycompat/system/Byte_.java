@@ -24,7 +24,7 @@ package com.codename1.unitycompat.system;
 
 /// The methods of `System.Byte`. A C# `byte` is unsigned and a JVM `byte`
 /// is not, so the value is masked on the way in.
-@SuppressWarnings("PMD.MethodNamingConventions") // C# member names: translated code binds to them by name
+@SuppressWarnings({"PMD.MethodNamingConventions", "PMD.ClassNamingConventions"}) // C# member and type names: translated code binds to them by name
 public final class Byte_ {
     private Byte_() {
     }
