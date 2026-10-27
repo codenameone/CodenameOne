@@ -74,8 +74,9 @@ public final class PythonProjectBuilder {
     }
 
     /// The jars and class directories `from java.<package> import <Class>`
-    /// resolves against: the project's compile class path. The JDK's own
-    /// classes are always found. The project's own Java sources are not
+    /// resolves against: the project's compile class path, whose
+    /// `java-runtime` supplies the device's `java.*`. The project's own Java
+    /// sources are not
     /// compiled yet when Python is transpiled, so they cannot be imported.
     public PythonProjectBuilder classPath(java.util.List<File> entries) {
         this.classPath = entries;

@@ -41,7 +41,8 @@ mkdir -p "$W/src" "$W/gen/com/pybench" "$W/jclasses" "$W/javaapi" "$W/out"
 SRC_DIR="${PY_SOURCES:-$HERE/kernels}"
 cp "$SRC_DIR/$K.py" "$W/src/"
 [ -f "$HERE/kernels/_harness.py" ] && cp "$HERE/kernels/_harness.py" "$W/src/"
-"$J17/bin/java" -cp "$TRANSPILER" com.codename1.python.transpiler.api.Main "$W/src" "$W/gen" "$K"
+# Java imports resolve against JavaAPI, the class library the binary links.
+"$J17/bin/java" -cp "$TRANSPILER" com.codename1.python.transpiler.api.Main -cp "$JAVAAPI:$CORE" "$W/src" "$W/gen" "$K"
 cat > "$W/gen/com/pybench/PyBench.java" <<JAVA
 package com.pybench;
 

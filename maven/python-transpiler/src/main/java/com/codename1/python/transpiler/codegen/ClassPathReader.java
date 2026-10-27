@@ -95,8 +95,14 @@ public final class ClassPathReader implements AutoCloseable {
     }
 
     private final List<Object> roots = new ArrayList<Object>();
+    /// Whether the class path carries a class library of its own (an
+    /// application's `java-runtime`, ParparVM's `JavaAPI`): then `java.*`
+    /// resolves there alone, and an API the device lacks is reported at the
+    /// import instead of being bridged from the host JDK.
+    private final boolean ownClassLibrary;
     private final Map<String, ClassInfo> cache = new HashMap<String, ClassInfo>();
     private FileSystem jrt;
+    private ZipFile rtJar;
 
     public ClassPathReader(List<File> classPath) throws IOException {
         for (File f : classPath) {
@@ -106,6 +112,7 @@ public final class ClassPathReader implements AutoCloseable {
                 roots.add(new ZipFile(f));
             }
         }
+        ownClassLibrary = fromRoots("java/lang/Object.class") != null;
     }
 
     /// The class with internal name `name` (`java/util/List`), or null.
@@ -127,6 +134,17 @@ public final class ClassPathReader implements AutoCloseable {
     }
 
     private byte[] bytes(String path) throws IOException {
+        byte[] b = fromRoots(path);
+        if (b != null) {
+            return b;
+        }
+        if (!ownClassLibrary && (path.startsWith("java/") || path.startsWith("javax/"))) {
+            return jdkClass(path);
+        }
+        return null;
+    }
+
+    private byte[] fromRoots(String path) throws IOException {
         for (Object r : roots) {
             if (r instanceof File) {
                 File f = new File((File) r, path);
@@ -143,16 +161,31 @@ public final class ClassPathReader implements AutoCloseable {
                 }
             }
         }
-        if (path.startsWith("java/") || path.startsWith("javax/")) {
-            if (jrt == null) {
+        return null;
+    }
+
+    /// A JDK class: from the module image on JDK 9 and newer, from `rt.jar`
+    /// on JDK 8.
+    private byte[] jdkClass(String path) throws IOException {
+        if (jrt == null && rtJar == null) {
+            File rt = new File(System.getProperty("java.home"), "lib/rt.jar");
+            if (rt.isFile()) {
+                rtJar = new ZipFile(rt);
+            } else {
                 jrt = FileSystems.getFileSystem(URI.create("jrt:/"));
             }
-            Path p = jrt.getPath("modules", "java.base", path);
-            if (Files.isRegularFile(p)) {
-                return Files.readAllBytes(p);
+        }
+        if (rtJar != null) {
+            ZipEntry e = rtJar.getEntry(path);
+            if (e == null) {
+                return null;
+            }
+            try (InputStream in = rtJar.getInputStream(e)) {
+                return readAll(in);
             }
         }
-        return null;
+        Path p = jrt.getPath("modules", "java.base", path);
+        return Files.isRegularFile(p) ? Files.readAllBytes(p) : null;
     }
 
     private static byte[] readAll(InputStream in) throws IOException {
@@ -240,6 +273,9 @@ public final class ClassPathReader implements AutoCloseable {
             if (r instanceof ZipFile) {
                 ((ZipFile) r).close();
             }
+        }
+        if (rtJar != null) {
+            rtJar.close();
         }
     }
 }

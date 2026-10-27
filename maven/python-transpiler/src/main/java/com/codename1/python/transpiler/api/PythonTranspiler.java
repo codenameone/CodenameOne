@@ -72,8 +72,10 @@ public final class PythonTranspiler {
     /// @param sources relative `.py` path to source text
     /// @param mainModule the module run as `__main__`, or null for a library
     /// @param classPath the jars and class directories a program's
-    ///        `from java.<package> import <Class>` resolves against; the
-    ///        JDK's own classes are always found
+    ///        `from java.<package> import <Class>` resolves against. When it
+    ///        carries a class library (an application's `java-runtime`),
+    ///        `java.*` resolves there alone, so an API the device lacks is a
+    ///        build error; otherwise `java.*` comes from the running JDK
     public static Map<String, String> transpile(Map<String, String> sources, String mainModule,
             List<java.io.File> classPath) {
         Map<String, String> out = new LinkedHashMap<String, String>();
