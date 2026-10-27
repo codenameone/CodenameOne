@@ -179,6 +179,76 @@ public class CryptoEngine {
             byte[] results) {
     }
 
+    /// Runs a [CryptoBatch] asynchronous call off the calling thread. The default starts a
+    /// thread for it; an engine whose platform has a better place for long work overrides this.
+    /// The task runs the same batch the synchronous form does, start to finish.
+    ///
+    /// #### Parameters
+    ///
+    /// - `task`: the whole batch, including the delivery of its result
+    public void runInBackground(Runnable task) {
+        new Thread(task, "CryptoBatch").start();
+    }
+
+    /// Hands the result of an asynchronous [CryptoBatch] call to the application. The default
+    /// runs it on the thread that computed the batch, which is what a server wants; the client's
+    /// engine runs it on the EDT, so a callback can touch the UI.
+    ///
+    /// #### Parameters
+    ///
+    /// - `result`: the call to the application's callback
+    public void deliver(Runnable result) {
+        result.run();
+    }
+
+    /// The size in 32-bit words of one GPU record of [#BATCH_SECP256K1], [#BATCH_SCHNORR] or
+    /// [#BATCH_ED25519]. For an engine that runs the multiplications of a batch on a GPU: see
+    /// [#gpuRecord].
+    ///
+    /// #### Parameters
+    ///
+    /// - `algorithm`: one of the batch algorithms
+    ///
+    /// #### Returns
+    ///
+    /// 49 for ECDSA, 40 for the other two
+    protected static int gpuRecordWords(int algorithm) {
+        return algorithm == BATCH_SECP256K1 ? 49 : 40;
+    }
+
+    /// Prepares one entry of a packed batch for the GPU kernels the native ports run (the same
+    /// kernels as WGSL, in the JavaScript port's `js/cn1_crypto_gpu.js`): everything a
+    /// verification does before its scalar multiplication, parsing, decompression, the
+    /// challenge hash and the inverse, leaving a record of [#gpuRecordWords] words at `at` of
+    /// `rec`. The kernel's answer for that record is the verification's answer.
+    ///
+    /// #### Parameters
+    ///
+    /// - `algorithm`: one of the batch algorithms
+    ///
+    /// - `messages`: the packed messages, the entry's at `msgOff`, `msgLen` bytes (32 for ECDSA)
+    ///
+    /// - `signatures`: the packed signatures, the entry's 64 bytes at `sigOff`
+    ///
+    /// - `keys`: the packed public keys, the entry's at `keyOff`, `keyLen` bytes
+    ///
+    /// #### Returns
+    ///
+    /// 0 when the entry is invalid without a multiplication, 2 when the record is the kernel's
+    /// to decide
+    protected static int gpuRecord(int algorithm, byte[] messages, int msgOff, int msgLen, byte[] signatures,
+            int sigOff, byte[] keys, int keyOff, int keyLen, int[] rec, int at) {
+        switch (algorithm) {
+            case BATCH_SECP256K1:
+                return Secp256k1.gpuRecordEcdsa(messages, msgOff, signatures, sigOff, keys, keyOff, keyLen, rec, at);
+            case BATCH_SCHNORR:
+                return Secp256k1.gpuRecordSchnorr(messages, msgOff, msgLen, signatures, sigOff, keys, keyOff, rec,
+                        at);
+            default:
+                return Ed25519.gpuRecord(messages, msgOff, msgLen, signatures, sigOff, keys, keyOff, rec, at);
+        }
+    }
+
     /// [#verifyBatch] over packed arrays: entry `i` is `messageLength` bytes
     /// of `messages` from `messageLength * i`, 64 bytes of `signatures` from
     /// `64 * i` and `keyLength` bytes of `keys` from `keyLength * i`. The same

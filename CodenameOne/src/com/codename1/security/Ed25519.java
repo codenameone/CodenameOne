@@ -182,6 +182,45 @@ public final class Ed25519 {
         return diff == 0;
     }
 
+    /// The GPU record of a verification, up to its multiplication, as the GPU kernel reads it and
+    /// word for word what the native hosts' C prep writes (see `Secp256k1.gpuRecordEcdsa`): s,
+    /// k = H(R || A || M), -A.x, A.y and R, 40 little-endian words. Answers 0 for an entry that
+    /// is invalid without a multiplication, or 2 when the record is the kernel's to decide.
+    static int gpuRecord(byte[] msg, int msgOff, int msgLen, byte[] sig, int sigOff, byte[] key, int keyOff,
+            int[] rec, int at) {
+        if (!Ed25519Math.isCanonicalScalar(sig, sigOff + 32)) {
+            return 0;
+        }
+        Ed25519Math.P3 a = new Ed25519Math.P3();
+        if (!Ed25519Math.decode(a, key, keyOff)) {
+            return 0;
+        }
+        Hash d = Hash.create(Hash.SHA512);
+        d.update(sig, sigOff, 32);
+        d.update(key, keyOff, 32);
+        d.update(msg, msgOff, msgLen);
+        byte[] k = Ed25519Math.reduce64(d.digest());
+        byte[] b = new byte[32];
+        leWords(sig, sigOff + 32, rec, at);
+        leWords(k, 0, rec, at + 8);
+        int[] nx = Ed25519Math.fe();
+        Ed25519Math.neg(nx, a.x);
+        Ed25519Math.toBytes(b, 0, nx);
+        leWords(b, 0, rec, at + 16);
+        Ed25519Math.toBytes(b, 0, a.y);
+        leWords(b, 0, rec, at + 24);
+        leWords(sig, sigOff, rec, at + 32);
+        return 2;
+    }
+
+    private static void leWords(byte[] b, int off, int[] rec, int at) {
+        for (int i = 0; i < 8; i++) {
+            int o = off + 4 * i;
+            rec[at + i] = (b[o] & 0xff) | ((b[o + 1] & 0xff) << 8) | ((b[o + 2] & 0xff) << 16)
+                    | ((b[o + 3] & 0xff) << 24);
+        }
+    }
+
     // SHA-512 of the seed, the scalar half clamped
     private static byte[] expand(byte[] privateKey) {
         if (privateKey == null || privateKey.length != PRIVATE_KEY_LENGTH) {

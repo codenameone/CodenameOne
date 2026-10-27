@@ -993,6 +993,104 @@ public final class Secp256k1 {
     }
 
     // ----------------------------------------------------------------
+    // GPU records: a verification up to its scalar multiplication, laid out as the GPU kernels
+    // (vm/ByteCodeTranslator/src/cn1_crypto_gpu_kernels.h) read it -- eight little-endian 32-bit
+    // words per 256-bit value -- and word for word what the native hosts' C prep writes
+    // (cn1_crypto_gpu_host.h). Each answers 0 for an entry that is invalid without a
+    // multiplication, or 2 when the record at `at` of `rec` is the kernel's to decide.
+
+    /// ECDSA: u1, u2, Q.x, Q.y, r, r + n and whether r + n is below p; 49 words.
+    static int gpuRecordEcdsa(byte[] hash, int hashOff, byte[] sig, int sigOff, byte[] key, int keyOff,
+            int keyLen, int[] rec, int at) {
+        byte[] k = new byte[keyLen];
+        System.arraycopy(key, keyOff, k, 0, keyLen);
+        int[][] q = parse(k);
+        if (q == null) {
+            return 0;
+        }
+        int[] r = toLimbs(sig, sigOff);
+        int[] s = toLimbs(sig, sigOff + 32);
+        if (!isValidScalar(r) || !isValidScalar(s) || lessThan(N_HALF, s)) {
+            return 0;
+        }
+        int[] z = FN.reduce(toLimbs(hash, hashOff));
+        int[] w = scalarInverse(s);
+        int[] u = new int[LIMBS];
+        FN.mul(z, w, u);
+        scalarWords(u, rec, at);
+        FN.mul(r, w, u);
+        scalarWords(u, rec, at + 8);
+        fieldWords(q[0], rec, at + 16);
+        fieldWords(q[1], rec, at + 24);
+        fieldWords(fieldOf(r), rec, at + 32);
+        int[] rn = new int[LIMBS];
+        long carry = 0;
+        for (int i = 0; i < LIMBS; i++) {
+            long v = (long) r[i] + FN.m[i] + carry;
+            rn[i] = (int) (v & LIMB_MASK);
+            carry = v >> LIMB_BITS;
+        }
+        boolean twice = carry == 0 && lessThan(rn, P_LIMBS);
+        for (int i = 0; i < 8; i++) {
+            rec[at + 40 + i] = 0;
+        }
+        if (twice) {
+            fieldWords(fieldOf(rn), rec, at + 40);
+        }
+        rec[at + 48] = twice ? 1 : 0;
+        return 2;
+    }
+
+    /// BIP-340: s, -e, P.x, P.y (even), r; 40 words.
+    static int gpuRecordSchnorr(byte[] msg, int msgOff, int msgLen, byte[] sig, int sigOff, byte[] key,
+            int keyOff, int[] rec, int at) {
+        if (!Secp256k1Math.isCanonical(key, keyOff) || !Secp256k1Math.isCanonical(sig, sigOff)) {
+            return 0;
+        }
+        int[] px = new int[10];
+        Secp256k1Math.fromBytes(px, key, keyOff);
+        int[] py = Secp256k1Math.liftY(px, false);
+        if (py == null) {
+            return 0;
+        }
+        int[] s = toLimbs(sig, sigOff + 32);
+        if (!lessThan(s, FN.m)) {
+            return 0;
+        }
+        int[] e = FN.reduce(toLimbs(taggedHash(TAG_CHALLENGE, slice(sig, sigOff, 32), slice(key, keyOff, 32),
+                slice(msg, msgOff, msgLen)), 0));
+        FN.sub(ZERO, e, e);
+        scalarWords(s, rec, at);
+        scalarWords(e, rec, at + 8);
+        fieldWords(px, rec, at + 16);
+        fieldWords(py, rec, at + 24);
+        int[] rx = new int[10];
+        Secp256k1Math.fromBytes(rx, sig, sigOff);
+        fieldWords(rx, rec, at + 32);
+        return 2;
+    }
+
+    // 16-bit limbs, least significant first, to 32-bit words
+    private static void scalarWords(int[] limbs, int[] rec, int at) {
+        for (int i = 0; i < 8; i++) {
+            rec[at + i] = limbs[2 * i] | (limbs[2 * i + 1] << 16);
+        }
+    }
+
+    private static void fieldWords(int[] fe, int[] rec, int at) {
+        int[] n = new int[10];
+        Secp256k1Math.set(n, fe);
+        Secp256k1Math.normalize(n);
+        byte[] b = new byte[32];
+        Secp256k1Math.toBytes(n, b, 0);
+        for (int i = 0; i < 8; i++) {
+            int o = 28 - 4 * i;
+            rec[at + i] = ((b[o] & 0xff) << 24) | ((b[o + 1] & 0xff) << 16) | ((b[o + 2] & 0xff) << 8)
+                    | (b[o + 3] & 0xff);
+        }
+    }
+
+    // ----------------------------------------------------------------
     // 256-bit integers as limbs
 
     private static int[] limbs(String hex) {

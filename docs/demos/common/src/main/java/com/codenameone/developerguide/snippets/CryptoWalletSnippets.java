@@ -49,6 +49,8 @@ import com.codename1.crypto.wallet.Wallet;
 import com.codename1.security.CryptoBatch;
 import com.codename1.security.Secp256k1;
 import com.codename1.security.vault.Vault;
+import com.codename1.ui.Label;
+import com.codename1.util.Simd;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -180,5 +182,42 @@ public class CryptoWalletSnippets {
         }
         // end::crypto-batch[]
         return good;
+    }
+
+    /** Scans a block without blocking the EDT, and shows the count when it is done. */
+    public void countValidAsync(byte[][] hashes, Secp256k1.EcdsaSignature[] signatures, byte[][] publicKeys,
+            final Label status) {
+        // tag::crypto-batch-async[]
+        CryptoBatch.verifySecp256k1Async(hashes, signatures, publicKeys, new CryptoBatch.Callback<boolean[]>() {
+            public void done(boolean[] valid, Throwable error) {
+                // on the EDT: safe to update the UI
+                if (error != null) {
+                    status.setText("Scan failed: " + error.getMessage());
+                    return;
+                }
+                int good = 0;
+                for (boolean v : valid) {
+                    if (v) {
+                        good++;
+                    }
+                }
+                status.setText(good + " of " + valid.length + " deposits verified");
+            }
+        });
+        // end::crypto-batch-async[]
+    }
+
+    /** The packed form: fixed-stride arrays, filled in place, one result byte per entry. */
+    public void verifyPacked(int count) {
+        // tag::crypto-batch-packed[]
+        Simd simd = Simd.get();
+        byte[] hashes = simd.allocByte(32 * count);
+        byte[] signatures = simd.allocByte(64 * count);
+        byte[] publicKeys = simd.allocByte(33 * count);
+        byte[] results = simd.allocByte(count);
+        // ... fill entry i at 32 * i, 64 * i and 33 * i ...
+        CryptoBatch.verifySecp256k1(hashes, signatures, publicKeys, 33, results, count);
+        // results[i] is 1 for a valid entry and 0 for any other
+        // end::crypto-batch-packed[]
     }
 }

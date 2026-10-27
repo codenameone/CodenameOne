@@ -1,0 +1,21 @@
+# native: Apple clang version 21.0.0 (clang-2100.3.34.2); CFLAGS=-O3 -fwrapv -fno-strict-aliasing -ffp-contract=off -mllvm -inline-threshold=50; libsecp256k1 1b4181f93f7a53639223ced4c347d0d0d2c2ff9c; OpenSSL 3.6.3 9 Jun 2026 (Library: OpenSSL 3.6.3 9 Jun 2026)
+secp256k1.pubkey             core=       95819 ref=       93050 ratio=  1.03
+secp256k1.sign               core=       60770 ref=       59453 ratio=  1.02
+secp256k1.verify             core=       50857 ref=       50302 ratio=  1.01
+schnorr.sign                 core=       46180 ref=       44659 ratio=  1.03
+schnorr.verify               core=       48394 ref=       47835 ratio=  1.01
+ed25519.sign.openssl         core=      105161 ref=       43155 ratio=  2.44
+ed25519.verify.openssl       core=       39129 ref=       17521 ratio=  2.23
+keccak256.1k.openssl         core=      614062 ref=      647427 ratio=  0.95
+sha256.1k.openssl            core=     1675236 ref=     1507576 ratio=  1.11
+sha512.1k.openssl            core=     1055920 ref=      834025 ratio=  1.27
+hmac.sha512.bip32.openssl    core=     2174970 ref=      889725 ratio=  2.44
+pbkdf2.sha512.bip39.openssl  core=        2105 ref=        1679 ratio=  1.25
+ripemd160.1k.openssl         core=      429239 ref=      318439 ratio=  1.35
+# batch rows: all cores against the reference on one
+batch.secp256k1.verify       core=         333 ref=          45 ratio=  7.46
+batch.ed25519.verify.openssl core=         261 ref=          17 ratio= 15.62
+batch.sha256.merkle.openssl  core=        7164 ref=        1053 ratio=  6.80
+batch.packed.secp256k1.verify core=         374 ref=          45 ratio=  8.28
+batch.keccak256.merkle.openssl core=        5613 ref=         796 ratio=  7.06
+keccak256.64B.pair.openssl   core=     3608957 ref=     1627793 ratio=  2.22

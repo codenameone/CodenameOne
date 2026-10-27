@@ -178,8 +178,9 @@ int main(int argc, char **argv) {
         double cr = cn1g_cpu_rate[a], gr = cn1g_gpu_rate[a];
         double minShare = a <= CN1G_KERNEL_KECCAK256 ? CN1G_MIN_GPU_HASH_BYTES : CN1G_MIN_GPU_VERIFY;
         if (gr > 0 && cr > 0) {
-            printf("gpu-row %-9s gpu/cpu %5.2f  speedup %5.2f  crossover %.0f %s\n", NAMES[a], gr / cr,
-                   bestCpu[a] / bestShared[a], minShare * (gr + cr) / gr, a <= CN1G_KERNEL_KECCAK256 ? "bytes" : "entries");
+            printf("gpu-row %-9s gpu/cpu %5.2f  speedup %5.2f  crossover %.0f %s  cpu %.0f/s  gpu %.0f/s\n",
+                   NAMES[a], gr / cr, bestCpu[a] / bestShared[a], minShare * (gr + cr) / gr,
+                   a <= CN1G_KERNEL_KECCAK256 ? "bytes" : "entries", cr * 1000, gr * 1000); /* rates are per ms */
         } else {
             printf("gpu-row %-9s no GPU measurement: no device, or no batch reached its minimum\n", NAMES[a]);
         }

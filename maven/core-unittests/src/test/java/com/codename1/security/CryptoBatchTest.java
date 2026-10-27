@@ -286,4 +286,100 @@ class CryptoBatchTest {
         assertThrows(CryptoException.class, () -> CryptoBatch.verifyEd25519(new byte[2][], new byte[1][], new byte[2][]));
         assertThrows(CryptoException.class, () -> CryptoBatch.sha256(null));
     }
+
+    // waits for one asynchronous answer and checks where the engine ran and delivered it
+    private static final class Answer<T> implements CryptoBatch.Callback<T> {
+        final java.util.concurrent.CountDownLatch done = new java.util.concurrent.CountDownLatch(1);
+        T result;
+        Throwable error;
+        Thread thread;
+
+        public void done(T result, Throwable error) {
+            this.result = result;
+            this.error = error;
+            this.thread = Thread.currentThread();
+            done.countDown();
+        }
+
+        T await() throws InterruptedException {
+            assertTrue(done.await(60, java.util.concurrent.TimeUnit.SECONDS), "the callback never ran");
+            assertNull(error);
+            return result;
+        }
+    }
+
+    @Test
+    void asyncFormsAnswerAsTheSynchronousOnesOffTheCallingThread() throws Exception {
+        final java.util.List<Thread> ran = new java.util.ArrayList<Thread>();
+        final java.util.List<Runnable> delivered = new java.util.ArrayList<Runnable>();
+        CryptoEngine.install(new CryptoEngine() {
+            @Override
+            public void runInBackground(Runnable task) {
+                Thread t = new Thread(task);
+                synchronized (ran) {
+                    ran.add(t);
+                }
+                t.start();
+            }
+
+            @Override
+            public void deliver(Runnable result) {
+                synchronized (delivered) {
+                    delivered.add(result);
+                }
+                result.run();
+            }
+        });
+        byte[][] msgs = new byte[N][];
+        byte[][] sigs = new byte[N][];
+        byte[][] keys = new byte[N][];
+        for (int i = 0; i < N; i++) {
+            byte[] seed = bytes(i + 500, 32);
+            msgs[i] = bytes(i + 600, 48);
+            keys[i] = Ed25519.publicKey(seed);
+            sigs[i] = Ed25519.sign(seed, keys[i], msgs[i]);
+        }
+        sigs[4] = flip(sigs[4], 3);
+        Answer<boolean[]> arrays = new Answer<boolean[]>();
+        CryptoBatch.verifyEd25519Async(msgs, sigs, keys, arrays);
+        assertArrayEquals(CryptoBatch.verifyEd25519(msgs, sigs, keys), arrays.await());
+        assertNotSame(Thread.currentThread(), arrays.thread);
+
+        byte[] results = new byte[N];
+        Answer<byte[]> packed = new Answer<byte[]>();
+        CryptoBatch.verifyEd25519Async(pack(msgs, 48), 48, pack(sigs, 64), pack(keys, 32), results, N, packed);
+        assertSame(results, packed.await());
+        for (int i = 0; i < N; i++) {
+            assertEquals(i == 4 ? 0 : 1, results[i], "entry " + i);
+        }
+
+        byte[] in = bytes(9, 64 * N);
+        byte[] digests = new byte[32 * N];
+        Answer<byte[]> hashes = new Answer<byte[]>();
+        CryptoBatch.keccak256Async(in, 64, N, digests, hashes);
+        byte[] want = new byte[32 * N];
+        CryptoBatch.keccak256(in, 64, N, want);
+        assertArrayEquals(want, hashes.await());
+        synchronized (ran) {
+            assertEquals(3, ran.size());
+        }
+        synchronized (delivered) {
+            assertEquals(3, delivered.size());
+        }
+    }
+
+    @Test
+    void asyncFormsCheckTheirArgumentsBeforeReturning() {
+        final CryptoBatch.Callback<byte[]> never = new CryptoBatch.Callback<byte[]>() {
+            public void done(byte[] result, Throwable error) {
+                fail("a refused batch reached its callback");
+            }
+        };
+        assertThrows(CryptoException.class, () -> CryptoBatch.verifySecp256k1Async(new byte[32], new byte[64],
+                new byte[33], 34, new byte[1], 1, never));
+        assertThrows(CryptoException.class, () -> CryptoBatch.sha256Async(new byte[64], 64, 2, new byte[64], never));
+        assertThrows(CryptoException.class, () -> CryptoBatch.verifyEd25519Async(new byte[2][], new byte[1][],
+                new byte[2][], null));
+        assertThrows(CryptoException.class, () -> CryptoBatch.sha256Async(new byte[1][], null));
+    }
 }

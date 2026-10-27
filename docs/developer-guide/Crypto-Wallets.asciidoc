@@ -101,9 +101,164 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/C
 
 With native kernels the whole batch crosses into native code once and runs on every CPU core, which makes it several times faster than the same calls in a loop. `verifySchnorr`, `verifyEd25519`, `sha256` and `keccak256` work the same way. Every entry gets exactly the answer a single call would give, and a malformed entry, such as a key that doesn't parse, is invalid rather than an exception, so one bad entry never stops the rest.
 
-For the largest batches, every method also has a packed form that takes flat arrays at a fixed stride: 32-byte hashes one after another, 64-byte signatures one after another, and the public keys likewise, with one result byte per entry. On a native target the kernels read those arrays in place, so nothing is copied and no object is created per entry. Allocate them with `Simd.get().allocByte(int)` and they're also aligned for the vector units.
+For the largest batches, every method also has a packed form that takes flat arrays at a fixed stride: 32-byte hashes one after another, 64-byte signatures one after another, and the public keys likewise, with one result byte per entry. On a native target the kernels read those arrays in place, so nothing is copied and no object is created per entry. Allocate them with `Simd.get().allocByte(int)` and they're also aligned for the vector units:
 
-On iOS, macOS, Android, Windows and Linux, a large enough batch is shared between the CPU cores and the GPU, through Metal on Apple platforms and Vulkan elsewhere. The split follows the measured speed of each: the CPU and the GPU work on their parts at the same time, and a device whose GPU is slower than its CPU keeps the whole batch on the CPU. The GPU only ever sees public data, meaning signatures, public keys and messages, and never a private key. Your code doesn't change, and the results are the same either way.
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/CryptoWalletSnippets.java[tag=crypto-batch-packed,indent=0]
+----
+
+On iOS, macOS, Android, Windows and Linux, a large enough batch is shared between the CPU cores and the GPU, through Metal on Apple platforms and Vulkan elsewhere. The split follows the measured speed of each: the CPU and the GPU work on their parts at the same time, and a device whose GPU is slower than its CPU keeps the whole batch on the CPU. In a browser the GPU is reached through WebGPU, with the same kernels. The GPU only ever sees public data, meaning signatures, public keys and messages, and never a private key. Your code doesn't change, and the results are the same either way.
+
+==== Asynchronous batches
+
+Every `CryptoBatch` method has an asynchronous form with `Async` added to its name. It takes the same arguments plus a `CryptoBatch.Callback`, returns at once, and runs the batch on a background thread:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/CryptoWalletSnippets.java[tag=crypto-batch-async,indent=0]
+----
+
+In the app the callback runs on the EDT, so it can update the UI directly. In a backend it runs on the thread that did the work. The arguments are checked before the call returns, so a malformed batch, such as arrays of different lengths, throws right away instead of reaching the callback. The callback gets exactly what the synchronous form would have returned, or the exception it would have thrown. A packed form hands back the results array you passed in; until the callback runs, the batch owns its arrays, so don't change them.
+
+In a browser, use the asynchronous forms. A large batch there goes to the GPU through WebGPU, which answers only asynchronously. The synchronous form still works, but it holds the calling thread until the GPU is done, and on the EDT that means the UI waits too. When the browser has no WebGPU adapter, both forms run on the CPU. The GPU kernels are about 460 KB of JavaScript, and they're included only in apps that call `CryptoBatch`, loaded the first time a batch is large enough to use them.
+
+=== Performance
+
+Every operation is benchmarked against the library a project would otherwise use for it, in the same process run, on the same machine. The figures below are ratios: 2.00x means Codename One did twice the work of the reference library in the same time, and anything above 1.00x is faster. Ratios stay steady from one machine to the next where absolute speeds don't, so they're also what CI checks. A run fails when any ratio drops below the floor recorded for it in `scripts/crypto-bench/floors.json`.
+
+These numbers come from an Apple M4 Max (12 performance cores, 40-core GPU), and the Android ones from an arm64 API 36 emulator on the same machine.
+
+image::img/crypto-bench-ratios.svg[Codename One throughput as a multiple of the reference library's, on the JVM, native and Android,scaledwidth=100%]
+
+==== On the JVM
+
+The simulator, JavaSE desktop apps and the backend in development run the portable Java implementation. It's compared with BouncyCastle 1.84 and, for Ed25519, with the JDK's own provider, on JDK 25.
+
+[cols="3,2,2,1",options="header"]
+|===
+| Operation | Codename One (ops/s) | Reference (ops/s) | Ratio
+| secp256k1 public key | 30,583 | 17,391 | 1.76x
+| ECDSA sign | 24,109 | 16,220 | 1.49x
+| ECDSA verify | 14,252 | 12,748 | 1.12x
+| Schnorr sign | 15,297 | 16,051 | 0.95x
+| Schnorr verify | 14,299 | 12,816 | 1.12x
+| Ed25519 sign | 49,360 | 45,707 | 1.08x
+| Ed25519 verify | 17,293 | 16,865 | 1.03x
+| Ed25519 sign, against the JDK | 49,946 | 2,484 | 20.10x
+| Ed25519 verify, against the JDK | 7,599 | 2,469 | 3.08x
+| Keccak-256, 1 KB | 484,694 | 503,524 | 0.96x
+| SHA-256, 1 KB | 238,253 | 218,499 | 1.09x
+| SHA-512, 1 KB | 339,664 | 297,983 | 1.14x
+| RIPEMD-160, 1 KB | 139,370 | 96,919 | 1.44x
+| HMAC-SHA512 (a BIP-32 step) | 679,117 | 473,458 | 1.43x
+| BIP-39 seed (PBKDF2, 2048 rounds) | 802 | 558 | 1.44x
+|===
+
+==== Native targets
+
+On iOS, macOS, Windows, Linux and the production backend the same operations run as C, compared with Bitcoin Core's libsecp256k1 for the secp256k1 curve and OpenSSL 3.6 for everything else, both built with the same compiler and flags.
+
+[cols="3,2,2,1",options="header"]
+|===
+| Operation | Codename One (ops/s) | Reference (ops/s) | Ratio
+| secp256k1 public key | 95,819 | 93,050 | 1.03x
+| ECDSA sign | 60,770 | 59,453 | 1.02x
+| ECDSA verify | 50,857 | 50,302 | 1.01x
+| Schnorr sign | 46,180 | 44,659 | 1.03x
+| Schnorr verify | 48,394 | 47,835 | 1.01x
+| Ed25519 sign | 105,161 | 43,155 | 2.44x
+| Ed25519 verify | 39,129 | 17,521 | 2.23x
+| Keccak-256, 1 KB | 614,062 | 647,427 | 0.95x
+| SHA-256, 1 KB | 1,675,236 | 1,507,576 | 1.11x
+| SHA-512, 1 KB | 1,055,920 | 834,025 | 1.27x
+| RIPEMD-160, 1 KB | 429,239 | 318,439 | 1.35x
+| HMAC-SHA512 (a BIP-32 step) | 2,174,970 | 889,725 | 2.44x
+| BIP-39 seed (PBKDF2, 2048 rounds) | 2,105 | 1,679 | 1.25x
+|===
+
+A batch runs on every core, so it's measured against the reference library verifying the same entries one at a time, which is what an application without `CryptoBatch` would do. The figures are batches of 1,024 signatures, or Merkle levels of 4,096 nodes, per second:
+
+[cols="3,2,2,1",options="header"]
+|===
+| Batch | Codename One | Reference, one at a time | Ratio
+| ECDSA verify | 333 | 45 | 7.46x
+| ECDSA verify, packed | 374 | 45 | 8.28x
+| Ed25519 verify | 261 | 17 | 15.62x
+| SHA-256 Merkle level | 7,164 | 1,053 | 6.80x
+| Keccak-256 Merkle level | 5,613 | 796 | 7.06x
+|===
+
+==== Android
+
+Android has no curve secp256k1 in its platform, so apps there would otherwise ship BouncyCastle. The table shows both the native kernels and the portable Java implementation, each against BouncyCastle on the same device.
+
+[cols="3,2,2,2",options="header"]
+|===
+| Operation | Native kernels | Portable Java | BouncyCastle on ART
+| secp256k1 public key | 116,210 (8.44x) | 45,203 (3.40x) | 13,770
+| ECDSA sign | 71,125 (5.00x) | 31,338 (2.12x) | 14,232
+| ECDSA verify | 59,615 (6.00x) | 16,757 (1.67x) | 9,940
+| Schnorr verify | 60,243 (5.97x) | 17,163 (1.69x) | 10,094
+| Ed25519 sign | 117,185 (1.70x) | 53,194 (0.77x) | 69,038
+| Ed25519 verify | 39,721 (1.44x) | 19,633 (0.72x) | 27,571
+| Keccak-256, 1 KB | 762,149 (1.96x) | 384,908 (0.98x) | 388,709
+| SHA-256, 1 KB | 292,535 (1.08x) | 287,546 (1.08x) | 270,445
+| BIP-39 seed | 1,037 (1.36x) | 1,033 (1.36x) | 761
+|===
+
+SHA-256 and the BIP-39 seed go through the platform's own native implementation in both columns, which is why they match.
+
+==== The GPU
+
+A GPU verifies signatures in parallel by the thousand, but each entry first needs some preparation on the CPU, and the GPU's work has to be dispatched and collected. A batch is therefore split, with the CPU cores and the GPU each taking a share in proportion to their measured speed, and a batch smaller than the crossover stays on the CPU. With Metal on the M4 Max:
+
+[cols="2,2,2,2,2",options="header"]
+|===
+| Kernel | CPU, every core | GPU alone | Both together | Crossover
+| ECDSA verify | 373,000/s | 181,000/s | 1.02x the CPU alone | 784 entries
+| Schnorr verify | 258,000/s | 233,000/s | 1.13x | 539 entries
+| Ed25519 verify | 250,000/s | 216,000/s | 1.63x | 552 entries
+| Keccak-256 | 7.1 GB/s | 3.6 GB/s | 1.01x | 3 MB
+|===
+
+On a desktop-class CPU the gain is modest, because twelve cores with vector units are already fast. The GPU matters more where the CPU is weaker relative to it, as on phones, tablets and in the browser. SHA-256 stays on the CPU on Apple silicon, whose SHA instructions outrun the GPU.
+
+==== In the browser
+
+The JavaScript port runs the portable Java implementation, translated to JavaScript. Large batches go to the GPU through WebGPU and arrive through the asynchronous forms. In headless Chromium on the same machine, with batches of 4,096 signatures:
+
+[cols="3,2,2,1",options="header"]
+|===
+| Batch | WebGPU | Portable Java | Ratio
+| ECDSA verify | 1,046/s | 178/s | 5.9x
+| Schnorr verify | 1,860/s | 180/s | 10.3x
+| Ed25519 verify | 1,721/s | 179/s | 9.6x
+| SHA-256 | 34.4 MB/s | 5.7 MB/s | 6.0x
+| Keccak-256 | 149.8 MB/s | 1.4 MB/s | 109x
+|===
+
+In the browser most of the time a WebGPU batch takes is the preparation in JavaScript, not the GPU work. The kernels alone verify about 174,000 ECDSA, 162,000 Schnorr and 211,000 Ed25519 signatures a second there.
+
+The chart puts the platforms side by side for a batch of signatures, on a logarithmic scale:
+
+image::img/crypto-bench-batch.svg[Signatures verified per second in a batch on each platform,scaledwidth=100%]
+
+==== Running the benchmarks
+
+The harnesses are in `scripts/crypto-bench` and `scripts/crypto-gpu` of the Codename One repository:
+
+[source,bash]
+----
+scripts/crypto-bench/jvm-run.sh            # JVM, against BouncyCastle and the JDK
+scripts/crypto-bench/native/run.sh         # C, against libsecp256k1 and OpenSSL
+scripts/crypto-bench/android-run.sh        # an attached device or emulator
+scripts/crypto-gpu/batch-check.sh          # the GPU split, with its crossover
+scripts/crypto-gpu/js-batch-check.sh       # WebGPU in headless Chromium
+python3 scripts/crypto-bench/gate.py jvm <output>   # hold a run to its floors
+----
+
+Each prints the compiler, JDK and reference library versions above its numbers. `scripts/crypto-bench/charts.py` draws the two charts above from the saved results.
 
 === Where the keys live
 

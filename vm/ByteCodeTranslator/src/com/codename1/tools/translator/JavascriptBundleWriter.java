@@ -1849,15 +1849,31 @@ final class JavascriptBundleWriter {
      * databases do not open, discovered by a user. Those are not symmetrical.</p>
      */
     static Set<String> optionalAssetsToSkip(File outputDirectory) {
-        int usesSqlite = translatedOutputReferences(outputDirectory, sqliteNativePrefix());
-        if (usesSqlite != REFERENCE_ABSENT) {
-            return Collections.emptySet();
-        }
         Set<String> skip = new HashSet<String>();
-        for (String name : SQLITE_ASSETS) {
-            skip.add(name);
+        if (translatedOutputReferences(outputDirectory, sqliteNativePrefix()) == REFERENCE_ABSENT) {
+            for (String name : SQLITE_ASSETS) {
+                skip.add(name);
+            }
+        }
+        if (translatedOutputReferences(outputDirectory, cryptoGpuNativePrefix()) == REFERENCE_ABSENT) {
+            skip.add(CRYPTO_GPU_ASSET);
         }
         return skip;
+    }
+
+    /**
+     * The WebGPU kernels of {@code CryptoBatch}, about 460 KB of WGSL and tables. The GPU natives
+     * of {@code HTML5CryptoEngine} are reached only through the batch entry points of
+     * {@code CryptoEngine}, which only {@code CryptoBatch} calls, so an application that never
+     * runs a batch keeps none of them and does not need the file. The same fail-toward-shipping
+     * rule as the SQLite engine applies; a batch whose kernels are missing would only be slower,
+     * since {@code port.js} falls back to the CPU when the file does not load.
+     */
+    static final String CRYPTO_GPU_ASSET = "cn1_crypto_gpu.js";
+
+    /** The identifier prefix the GPU natives of {@code HTML5CryptoEngine} are emitted under. */
+    static String cryptoGpuNativePrefix() {
+        return "cn1_" + JavascriptNameUtil.sanitizeClassName("com/codename1/impl/html5/HTML5CryptoEngine") + "_gpu";
     }
 
     /** The marker appears in the emitted application. */

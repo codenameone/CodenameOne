@@ -29,7 +29,7 @@
 #ifndef CN1_CRYPTO_GPU_SHADERS_H
 #define CN1_CRYPTO_GPU_SHADERS_H
 
-#define CN1G_SOURCES_SHA256 "4af838b6ae44e7f4d1354a481ce9c9b5a968a6ef02f3af94280e033634618a06"
+#define CN1G_SOURCES_SHA256 "2d5e33ba1c11c3855c89213781866a908cc3d442a35546ecf801a15499f5f2c9"
 
 static const char cn1g_msl_source[] =
     "#include <metal_stdlib>\n"

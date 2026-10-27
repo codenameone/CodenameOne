@@ -1,0 +1,6 @@
+CN1-CRYPTO ecdsa n=4096 agree=409/409 valid=3520 gpuPerSec=1046 cpuPerSec=178
+CN1-CRYPTO schnorr n=4096 agree=409/409 valid=3520 gpuPerSec=1860 cpuPerSec=180
+CN1-CRYPTO ed25519 n=4096 agree=409/409 valid=3520 gpuPerSec=1721 cpuPerSec=179
+CN1-CRYPTO sha256 n=32768 agree=32768/32768 gpuMBps=34.377 cpuMBps=5.713
+CN1-CRYPTO keccak256 n=32768 agree=32768/32768 gpuMBps=149.785 cpuMBps=1.373
+CN1-CRYPTO-DONE

@@ -25,8 +25,8 @@ package com.codename1.security;
 import com.codename1.impl.CodenameOneImplementation;
 
 /// The client's default [CryptoEngine]: PBKDF2 goes to the port's native
-/// derivation ([CodenameOneImplementation#pbkdf2]) and everything else runs
-/// in Java. A port with more native kernels subclasses it.
+/// derivation ([CodenameOneImplementation#pbkdf2]), everything else runs
+/// in Java, and the asynchronous [CryptoBatch] calls answer on the EDT. A port with more native kernels subclasses it.
 public class PortCryptoEngine extends CryptoEngine {
     private final CodenameOneImplementation impl;
 
@@ -43,6 +43,12 @@ public class PortCryptoEngine extends CryptoEngine {
     public boolean randomBytes(byte[] out) {
         SecureRandom.fill(out);
         return true;
+    }
+
+    /// Runs the callback of an asynchronous [CryptoBatch] call on the EDT.
+    @Override
+    public void deliver(Runnable result) {
+        com.codename1.ui.Display.getInstance().callSerially(result);
     }
 
     @Override
