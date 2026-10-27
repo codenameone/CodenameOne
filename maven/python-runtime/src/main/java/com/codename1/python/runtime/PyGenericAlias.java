@@ -77,7 +77,7 @@ final class PyGenericAlias extends PyObject {
             return null;
         }
         PyGenericAlias g = (PyGenericAlias) o;
-        return Py.bool(g.origin == origin && Py.eqBool(g.args, args));
+        return Py.bool(g.origin == origin && Py.eqBool(g.args, args)); // NOPMD CompareObjectsWithEquals - identity is meant
     }
 
     @Override

@@ -67,7 +67,7 @@ public final class JavaInteropGenerator {
     /// Every public class whose instances the bridge dispatches on.
     private final Set<String> universe = new LinkedHashSet<String>();
     private final Map<String, Integer> adapters = new LinkedHashMap<String, Integer>();
-    private final StringBuilder adapterCode = new StringBuilder();
+    private final StringBuilder adapterCode = new StringBuilder(); // NOPMD AvoidStringBufferField - the generator's output
 
     private JavaInteropGenerator(ClassPathReader cp) {
         this.cp = cp;

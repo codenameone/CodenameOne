@@ -107,8 +107,8 @@ public final class PyJavaObject extends PyObject {
     @Override
     public Object iter() {
         final java.util.Iterator it;
-        if (value instanceof java.lang.Iterable) {
-            it = ((java.lang.Iterable) value).iterator();
+        if (value instanceof Iterable) {
+            it = ((Iterable) value).iterator();
         } else if (value instanceof java.util.Map) {
             it = ((java.util.Map) value).keySet().iterator();
         } else if (value instanceof java.util.Iterator) {
@@ -116,12 +116,21 @@ public final class PyJavaObject extends PyObject {
         } else {
             return super.iter();
         }
-        return new PyJavaIter(new PyJavaIter.Source() {
-            @Override
-            public Object next() {
-                return it.hasNext() ? JavaBridge.toPy(it.next()) : null;
-            }
-        });
+        return new PyJavaIter(new IteratorSource(it));
+    }
+
+    /// Python iteration over a Java iterator.
+    private static final class IteratorSource implements PyJavaIter.Source {
+        private final java.util.Iterator it;
+
+        IteratorSource(java.util.Iterator it) {
+            this.it = it;
+        }
+
+        @Override
+        public Object next() {
+            return it.hasNext() ? JavaBridge.toPy(it.next()) : null;
+        }
     }
 
     @Override

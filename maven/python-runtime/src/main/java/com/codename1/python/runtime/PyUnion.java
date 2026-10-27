@@ -54,9 +54,9 @@ final class PyUnion extends PyObject {
             }
             return;
         }
-        Object v = t == Py.NONE ? Py.NONE_TYPE : t;
+        Object v = t == Py.NONE ? Py.NONE_TYPE : t; // NOPMD CompareObjectsWithEquals - identity is meant
         for (Object o : out) {
-            if (o == v || Py.eqBool(o, v)) {
+            if (o == v || Py.eqBool(o, v)) { // NOPMD CompareObjectsWithEquals - identity is meant
                 return;
             }
         }
@@ -65,10 +65,10 @@ final class PyUnion extends PyObject {
 
     /// How a type reads inside an alias: `int`, `mod.Cls`, `None`.
     static String typeRepr(Object t) {
-        if (t == Py.NONE || t == Py.NONE_TYPE) {
+        if (t == Py.NONE || t == Py.NONE_TYPE) { // NOPMD CompareObjectsWithEquals - identity is meant
             return "None";
         }
-        if (t == Py.ELLIPSIS) {
+        if (t == Py.ELLIPSIS) { // NOPMD CompareObjectsWithEquals - identity is meant
             return "...";
         }
         if (t instanceof PyType) {

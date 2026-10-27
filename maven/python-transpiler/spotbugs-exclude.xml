@@ -23,4 +23,15 @@
             <Bug pattern="EI_EXPOSE_REP2"/>
         </Or>
     </Match>
+    <!-- null is "no such class file", which every caller tests for; an empty
+         array would be a class file that failed to parse instead. -->
+    <Match>
+        <Class name="com.codename1.python.transpiler.codegen.ClassPathReader"/>
+        <Or>
+            <Method name="bytes"/>
+            <Method name="fromRoots"/>
+            <Method name="jdkClass"/>
+        </Or>
+        <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
+    </Match>
 </FindBugsFilter>

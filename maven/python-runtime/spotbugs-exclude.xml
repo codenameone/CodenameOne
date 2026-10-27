@@ -90,4 +90,17 @@
         <Method name="get"/>
         <Bug pattern="MS_EXPOSE_REP"/>
     </Match>
+    <!-- Identity is the right equality for a request: it adds only the
+         headers it received and its failure, and ConnectionRequest's own
+         equals is what the network queue uses to recognise duplicates. -->
+    <Match>
+        <Class name="com.codename1.python.runtime.Cn1Http$Request"/>
+        <Bug pattern="EQ_DOESNT_OVERRIDE_EQUALS"/>
+    </Match>
+    <!-- Read by the BackendServer class the transpiler generates for an
+         application that serves HTTP, which is not part of this module. -->
+    <Match>
+        <Class name="com.codename1.python.runtime.PyServer$Response"/>
+        <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD"/>
+    </Match>
 </FindBugsFilter>

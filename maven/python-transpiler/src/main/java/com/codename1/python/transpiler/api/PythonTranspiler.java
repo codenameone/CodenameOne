@@ -103,7 +103,7 @@ public final class PythonTranspiler {
             try (com.codename1.python.transpiler.codegen.ClassPathReader cp =
                     new com.codename1.python.transpiler.codegen.ClassPathReader(classPath)) {
                 interop = com.codename1.python.transpiler.codegen.JavaInteropGenerator.generate(trees, cp, PACKAGE);
-            } catch (java.io.IOException e) {
+            } catch (IOException e) {
                 throw new IllegalStateException("cannot read the class path: " + e.getMessage(), e);
             }
         }
@@ -122,7 +122,7 @@ public final class PythonTranspiler {
             try (com.codename1.python.transpiler.codegen.ClassPathReader cp =
                     new com.codename1.python.transpiler.codegen.ClassPathReader(classPath)) {
                 server = cp.find("com/codename1/backend/HttpServer") != null;
-            } catch (java.io.IOException e) {
+            } catch (IOException e) {
                 throw new IllegalStateException("cannot read the class path: " + e.getMessage(), e);
             }
         }
@@ -186,7 +186,7 @@ public final class PythonTranspiler {
             List<String> imported = new ArrayList<String>();
             String own = "";
             for (Map.Entry<String, Node.Module> e : trees.entrySet()) {
-                if (e.getValue() == tree) {
+                if (e.getValue() == tree) { // NOPMD CompareObjectsWithEquals - identity is meant
                     own = e.getKey();
                     break;
                 }
@@ -337,26 +337,24 @@ public final class PythonTranspiler {
     }
 
     private static String resource(String path) {
-        InputStream in = PythonTranspiler.class.getResourceAsStream(STDLIB + path);
-        if (in == null) {
-            in = PythonTranspiler.class.getResourceAsStream(SITE + path);
-        }
-        if (in == null) {
+        String s = read(STDLIB + path);
+        return s != null ? s : read(SITE + path);
+    }
+
+    private static String read(String resource) {
+        InputStream found = PythonTranspiler.class.getResourceAsStream(resource); // NOPMD CloseResource - closed by the try below
+        if (found == null) {
             return null;
         }
-        try {
-            try {
-                ByteArrayOutputStream b = new ByteArrayOutputStream();
-                byte[] buf = new byte[8192];
-                for (int n = in.read(buf); n > 0; n = in.read(buf)) {
-                    b.write(buf, 0, n);
-                }
-                return new String(b.toByteArray(), StandardCharsets.UTF_8);
-            } finally {
-                in.close();
+        try (InputStream in = found) {
+            ByteArrayOutputStream b = new ByteArrayOutputStream();
+            byte[] buf = new byte[8192];
+            for (int n = in.read(buf); n > 0; n = in.read(buf)) {
+                b.write(buf, 0, n);
             }
+            return new String(b.toByteArray(), StandardCharsets.UTF_8);
         } catch (IOException e) {
-            throw new IllegalStateException("cannot read the standard library module " + path, e);
+            throw new IllegalStateException("cannot read the standard library module " + resource, e);
         }
     }
 

@@ -129,7 +129,7 @@ final class NumPy {
     }
 
     private static boolean isFloatScalar(Object v) {
-        return v instanceof Double || Py.typeOf(v) == Py.FLOAT_TYPE;
+        return v instanceof Double || Py.typeOf(v) == Py.FLOAT_TYPE; // NOPMD CompareObjectsWithEquals - identity is meant
     }
 
     private static void setScalar(NdBuf b, int i, Object v) {
@@ -216,7 +216,7 @@ final class NumPy {
         int[] idx = new int[shape.length];
         int[] pos = {doff, soff};
         int[][] st = {dst2, sst};
-        if (dst == src) {
+        if (dst == src) { // NOPMD CompareObjectsWithEquals - identity is meant
             // Overlapping views: read everything before writing anything.
             NdBuf tmp = copy(src.kind, shape, src, soff, sst);
             src = tmp;

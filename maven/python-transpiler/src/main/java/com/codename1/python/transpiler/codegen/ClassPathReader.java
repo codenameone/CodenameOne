@@ -72,16 +72,14 @@ public final class ClassPathReader implements AutoCloseable {
 
     /// One class.
     public static final class ClassInfo {
-        public final String name;
         public final int access;
         public final String superName;
         public final List<String> interfaces;
         public final List<Member> fields;
         public final List<Member> methods;
 
-        ClassInfo(String name, int access, String superName, List<String> interfaces, List<Member> fields,
+        ClassInfo(int access, String superName, List<String> interfaces, List<Member> fields,
                 List<Member> methods) {
-            this.name = name;
             this.access = access;
             this.superName = superName;
             this.interfaces = interfaces;
@@ -152,7 +150,7 @@ public final class ClassPathReader implements AutoCloseable {
                     return Files.readAllBytes(f.toPath());
                 }
             } else {
-                ZipFile z = (ZipFile) r;
+                ZipFile z = (ZipFile) r; // NOPMD CloseResource - a class path root, closed by close()
                 ZipEntry e = z.getEntry(path);
                 if (e != null) {
                     try (InputStream in = z.getInputStream(e)) {
@@ -236,7 +234,7 @@ public final class ClassPathReader implements AutoCloseable {
             }
         }
         int access = in.readUnsignedShort();
-        String name = utf[classIdx[in.readUnsignedShort()]];
+        in.readUnsignedShort(); // this_class: the caller already knows the name
         int sup = in.readUnsignedShort();
         String superName = sup == 0 ? null : utf[classIdx[sup]];
         int ni = in.readUnsignedShort();
@@ -246,7 +244,7 @@ public final class ClassPathReader implements AutoCloseable {
         }
         List<Member> fields = members(in, utf);
         List<Member> methods = members(in, utf);
-        return new ClassInfo(name, access, superName, interfaces, fields, methods);
+        return new ClassInfo(access, superName, interfaces, fields, methods);
     }
 
     private static List<Member> members(DataInputStream in, String[] utf) throws IOException {

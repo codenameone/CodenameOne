@@ -164,9 +164,8 @@ public abstract class JavaBridge {
         if (v instanceof PyDict) {
             PyDict d = (PyDict) v;
             java.util.LinkedHashMap r = new java.util.LinkedHashMap();
-            Object[] keys = d.keyArray();
-            for (int i = 0; i < keys.length; i++) {
-                r.put(toJava(keys[i]), toJava(d.getItem(keys[i])));
+            for (Object k : d.keyArray()) {
+                r.put(toJava(k), toJava(d.getItem(k)));
             }
             return r;
         }

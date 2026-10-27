@@ -61,17 +61,7 @@ public final class Cn1Http extends PyHttp {
             r.addRequestHeader(headers[i], headers[i + 1]);
         }
         if (body != null) {
-            r.setRequestBody(new Data() {
-                @Override
-                public void appendTo(OutputStream output) throws IOException {
-                    output.write(body);
-                }
-
-                @Override
-                public long getSize() {
-                    return body.length;
-                }
-            });
+            r.setRequestBody(new Body(body));
         }
         NetworkManager.getInstance().addToQueueAndWait(r);
         if (r.failure != null && r.getResponseCode() <= 0) {
@@ -86,6 +76,25 @@ public final class Cn1Http extends PyHttp {
         byte[] data = r.getResponseData();
         return new Response(status, reason == null ? "" : reason, url, r.headers.toArray(new String[0]),
                 data == null ? new byte[0] : data);
+    }
+
+    /// A request body held in memory.
+    private static final class Body implements Data {
+        private final byte[] bytes;
+
+        Body(byte[] bytes) {
+            this.bytes = bytes;
+        }
+
+        @Override
+        public void appendTo(OutputStream output) throws IOException {
+            output.write(bytes);
+        }
+
+        @Override
+        public long getSize() {
+            return bytes.length;
+        }
     }
 
     /// Keeps what Python needs: every header as received, and the failure
