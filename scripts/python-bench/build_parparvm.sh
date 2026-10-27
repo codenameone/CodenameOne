@@ -12,6 +12,10 @@
 #   JAVA_HOME=$JAVA17_HOME mvn -Dmaven.repo.local=$(pwd)/../.m2-repo -pl python-runtime install -DskipTests
 #   mvn -Dmaven.repo.local=$(pwd)/../.m2-repo -f ../vm/pom.xml -pl JavaAPI,ByteCodeTranslator -am install -DskipTests
 #
+# PY_EXTRA_FILES names more modules the program imports (space separated),
+# and PY_JAVA_SOURCES a directory of Java sources the Python calls into --
+# the hot spots an application moves to Java (see common/java_hotspots.py).
+#
 # Output: scripts/python-bench/target/<kernel>/<kernel> (and the translated
 # sources beside it). Needs JAVA17_HOME (javac for the generated code, which is
 # Java 17) and JDK_8_HOME or JAVA_HOME (the translator), and clang.
@@ -41,8 +45,15 @@ mkdir -p "$W/src" "$W/gen/com/pybench" "$W/jclasses" "$W/javaapi" "$W/out"
 SRC_DIR="${PY_SOURCES:-$HERE/kernels}"
 cp "$SRC_DIR/$K.py" "$W/src/"
 [ -f "$HERE/kernels/_harness.py" ] && cp "$HERE/kernels/_harness.py" "$W/src/"
+for f in ${PY_EXTRA_FILES:-}; do cp "$f" "$W/src/"; done
+APPCP=""
+if [ -n "${PY_JAVA_SOURCES:-}" ]; then
+    mkdir -p "$W/appclasses"
+    "$J17/bin/javac" -nowarn --release 8 -d "$W/appclasses" $(find "$PY_JAVA_SOURCES" -name '*.java')
+    APPCP=":$W/appclasses"
+fi
 # Java imports resolve against JavaAPI, the class library the binary links.
-"$J17/bin/java" -cp "$TRANSPILER" com.codename1.python.transpiler.api.Main -cp "$JAVAAPI:$CORE" "$W/src" "$W/gen" "$K"
+"$J17/bin/java" -cp "$TRANSPILER" com.codename1.python.transpiler.api.Main -cp "$JAVAAPI:$CORE$APPCP" "$W/src" "$W/gen" "$K"
 cat > "$W/gen/com/pybench/PyBench.java" <<JAVA
 package com.pybench;
 
@@ -61,6 +72,7 @@ JAVA
 # The file system the runtime reaches through core's FileSystemStorage, over
 # the host's files (hostfs/): the real class would bring the UI with it.
 "$J17/bin/javac" -nowarn --release 17 -d "$W/jclasses" $(find "$HERE/hostfs" -name '*.java')
+[ -n "$APPCP" ] && cp -R "$W/appclasses/." "$W/jclasses/"
 "$J17/bin/javac" -nowarn --release 17 -cp "$W/jclasses" -d "$W/jclasses" $(find "$W/gen" -name '*.java')
 "$J8/bin/java" -Xmx4g -cp "$TRANSLATOR" com.codename1.tools.translator.ByteCodeTranslator \
     clean "$W/javaapi;$W/jclasses" "$W/out" PyBench com.pybench PyBench 1.0 clean none \

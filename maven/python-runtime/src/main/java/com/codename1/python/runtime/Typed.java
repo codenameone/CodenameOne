@@ -317,6 +317,17 @@ public final class Typed {
         return Py.NONE;
     }
 
+    /// `l.extend(other)` for two lists.
+    public static Object extend(PyList l, PyList other) {
+        nzl(l).extend(nzl(other));
+        return Py.NONE;
+    }
+
+    /// `ord(s)`: TypeError unless `s` is one character.
+    public static Object ord(String s) {
+        return Builtins.ord(s);
+    }
+
     public static boolean truthy(String s) {
         return s != null && s.length() != 0;
     }

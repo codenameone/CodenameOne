@@ -927,7 +927,7 @@ public final class Builtins {
         return v;
     }
 
-    private static Object ord(Object x) {
+    static Object ord(Object x) {
         if (!(x instanceof String) || PyStr.codePoints((String) x) != 1) {
             throw Py.typeError("ord() expected a character, but string of length "
                     + (x instanceof String ? PyStr.codePoints((String) x) : 0) + " found");

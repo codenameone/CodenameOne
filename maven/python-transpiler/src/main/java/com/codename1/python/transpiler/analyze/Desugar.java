@@ -23,6 +23,7 @@
  */
 package com.codename1.python.transpiler.analyze;
 
+import com.codename1.python.transpiler.ast.Node.AnnAssign;
 import com.codename1.python.transpiler.ast.Node.Assign;
 import com.codename1.python.transpiler.ast.Node.Call;
 import com.codename1.python.transpiler.ast.Node.ClassDef;
@@ -94,6 +95,8 @@ import java.util.List;
 /// ```
 public final class Desugar {
     private int counter;
+    /// Whether the block being rewritten is a function's own scope.
+    private boolean inFunction;
 
     private Desugar() {
     }
@@ -113,6 +116,12 @@ public final class Desugar {
                 i += r.size() - 1;
             } else if (s instanceof Try && ((Try) s).star) {
                 body.set(i, exceptStar((Try) s));
+            } else if (inFunction && s instanceof AnnAssign && ((AnnAssign) s).value != null) {
+                // CPython never evaluates the annotation of a function's
+                // local (PEP 526), so `x: int = v` there is `x = v`; as a
+                // plain assignment it also takes the typed path.
+                AnnAssign a = (AnnAssign) s;
+                body.set(i, assign(a.target, a.value, a));
             }
         }
     }
@@ -138,9 +147,15 @@ public final class Desugar {
             block(t.orelse);
             block(t.finalbody);
         } else if (s instanceof FunctionDef) {
+            boolean saved = inFunction;
+            inFunction = true;
             block(((FunctionDef) s).body);
+            inFunction = saved;
         } else if (s instanceof ClassDef) {
+            boolean saved = inFunction;
+            inFunction = false;
             block(((ClassDef) s).body);
+            inFunction = saved;
         } else if (s instanceof Match) {
             for (MatchCase c : ((Match) s).cases) {
                 block(c.body);
@@ -383,7 +398,7 @@ public final class Desugar {
         return new Name(id).at(at.line, at.col);
     }
 
-    private static Stmt assign(Name target, Expr value, com.codename1.python.transpiler.ast.Node at) {
+    private static Stmt assign(Expr target, Expr value, com.codename1.python.transpiler.ast.Node at) {
         return new Assign(Collections.<Expr>singletonList(target), value).at(at.line, at.col);
     }
 }

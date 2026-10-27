@@ -326,20 +326,14 @@ public final class StdModules {
         m.setAttr("tau", Py.ofFloat(2 * Math.PI));
         m.setAttr("inf", Py.ofFloat(Double.POSITIVE_INFINITY));
         m.setAttr("nan", Py.ofFloat(Double.NaN));
-        m.setAttr("sqrt", PyBuiltin.positional("sqrt", a -> {
-            double x = Py.asDouble(a[0]);
-            if (x < 0) {
-                throw Py.valueError("math domain error");
-            }
-            return Py.ofFloat(Math.sqrt(x));
-        }));
-        fn1(m, "sin", Math::sin);
-        fn1(m, "cos", Math::cos);
-        fn1(m, "tan", Math::tan);
-        fn1(m, "asin", com.codename1.util.MathUtil::asin);
-        fn1(m, "acos", com.codename1.util.MathUtil::acos);
+        fn1(m, "sqrt", PyMath::sqrt);
+        fn1(m, "sin", PyMath::sin);
+        fn1(m, "cos", PyMath::cos);
+        fn1(m, "tan", PyMath::tan);
+        fn1(m, "asin", PyMath::asin);
+        fn1(m, "acos", PyMath::acos);
         fn1(m, "atan", com.codename1.util.MathUtil::atan);
-        fn1(m, "exp", com.codename1.util.MathUtil::exp);
+        fn1(m, "exp", PyMath::exp);
         fn1(m, "fabs", Math::abs);
         fn1(m, "degrees", Math::toDegrees);
         fn1(m, "radians", Math::toRadians);
@@ -366,8 +360,7 @@ public final class StdModules {
             }
             return Py.ofFloat(r);
         }));
-        m.setAttr("log10", PyBuiltin.positional("log10",
-                a -> Py.ofFloat(com.codename1.util.MathUtil.log10(Py.asDouble(a[0])))));
+        fn1(m, "log10", PyMath::log10);
         m.setAttr("log2", PyBuiltin.positional("log2",
                 a -> Py.ofFloat(com.codename1.util.MathUtil.log(Py.asDouble(a[0])) / com.codename1.util.MathUtil.log(2))));
         m.setAttr("floor", PyBuiltin.positional("floor", a -> a[0] instanceof PyInt ? a[0]
@@ -386,7 +379,7 @@ public final class StdModules {
             double s = Py.asDouble(a[1]);
             return Py.ofFloat(s < 0 || s == 0 && 1 / s < 0 ? -x : x);
         }));
-        m.setAttr("fmod", PyBuiltin.positional("fmod", a -> Py.ofFloat(Py.asDouble(a[0]) % Py.asDouble(a[1]))));
+        m.setAttr("fmod", PyBuiltin.positional("fmod", a -> Py.ofFloat(PyMath.fmod(Py.asDouble(a[0]), Py.asDouble(a[1])))));
         m.setAttr("gcd", PyBuiltin.positional("gcd", a -> {
             com.codename1.util.BigInteger g = com.codename1.util.BigInteger.ZERO;
             for (int i = 0; i < a.length; i++) {

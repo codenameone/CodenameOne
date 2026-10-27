@@ -90,6 +90,29 @@ final class Infer {
     /// Stable global name -> the function or class it is bound to, once.
     final Map<String, Fn> globalFns = new HashMap<String, Fn>();
     final Map<String, Layouts.Cls> globalClasses = new HashMap<String, Layouts.Cls>();
+    /// The type a call of an expression function (see `exprBody`) has at
+    /// that call site, from the argument types there; where it is narrower
+    /// than the function's own return type, typed code relabels the result.
+    final Map<Call, Ty> siteRet = new HashMap<Call, Ty>();
+    /// Globals bound once, by `import math`: calls of its functions on
+    /// numbers are typed (see `MATH_FNS`) and run as `PyMath` directly.
+    final java.util.Set<String> mathNames = new HashSet<String>();
+    /// `math` functions typed code calls, with their arity.
+    static final Map<String, Integer> MATH_FNS = new HashMap<String, Integer>();
+    /// `math` constants, all floats.
+    static final java.util.Set<String> MATH_CONSTS = new HashSet<String>();
+
+    static {
+        String[] unary = {"sqrt", "sin", "cos", "tan", "asin", "acos", "atan", "exp", "fabs", "log", "log10"};
+        for (String f : unary) {
+            MATH_FNS.put(f, Integer.valueOf(1));
+        }
+        MATH_FNS.put("fmod", Integer.valueOf(2));
+        MATH_FNS.put("atan2", Integer.valueOf(2));
+        for (String c : new String[] {"pi", "e", "tau", "inf", "nan"}) {
+            MATH_CONSTS.add(c);
+        }
+    }
     final Map<String, Ty> globals = new HashMap<String, Ty>();
     /// Field name -> type, per declaring class.
     final Map<Layouts.Cls, Map<String, Ty>> fields = new LinkedHashMap<Layouts.Cls, Map<String, Ty>>();
@@ -155,12 +178,95 @@ final class Infer {
                 if (k != null && stable(((ClassDef) s).name)) {
                     globalClasses.put(((ClassDef) s).name, k);
                 }
+            } else if (s instanceof Import) {
+                for (Alias a : ((Import) s).names) {
+                    String n = a.asname != null ? a.asname : a.name;
+                    if ("math".equals(a.name) && stable(n)) {
+                        mathNames.add(n);
+                    }
+                }
             }
         }
         markOpen(body);
         for (Layouts.Cls k : layouts.classes.values()) {
             definite.put(k, initDefinite(k, new HashSet<Layouts.Cls>()));
         }
+    }
+
+    /// Whether `e` is the `math` module, through a global only `import math`
+    /// binds.
+    boolean isMath(Expr e, Scope sc) {
+        return e instanceof Name && mathNames.contains(((Name) e).id)
+                && sc.resolve(((Name) e).id) == Scope.Binding.GLOBAL;
+    }
+
+    /// Whether `c` is a `math` function typed code runs, on the right number
+    /// of plain positional arguments.
+    boolean isMathCall(Call c, Scope sc) {
+        if (!(c.func instanceof Attribute) || !c.keywords.isEmpty() || anyStarred(c.args)) {
+            return false;
+        }
+        Attribute a = (Attribute) c.func;
+        Integer n = MATH_FNS.get(a.attr);
+        return n != null && n.intValue() == c.args.size() && isMath(a.value, sc);
+    }
+
+    /// The return type of expression function `f` called with `args`, or
+    /// null. Helpers such as `def i32(v): return ((v + B) & M) - B` are
+    /// shared by every caller, and one caller passing an untyped value
+    /// makes the parameter, and so the result, untyped for all of them. The
+    /// body is plain arithmetic on its parameters and global constants, so
+    /// its type at one call follows from that call's arguments alone.
+    private Ty siteType(Fn f, List<Ty> args) {
+        Expr body = exprBody(f.def);
+        if (body == null) {
+            return null;
+        }
+        for (Ty t : args) {
+            if (t.opt || t.k != Ty.K.INT && t.k != Ty.K.FLOAT && t.k != Ty.K.BOOL) {
+                return null;
+            }
+        }
+        Fn site = new Fn(f.def, null);
+        for (int i = 0; i < args.size(); i++) {
+            site.params[i] = args.get(i);
+            site.locals.put(site.names.get(i), args.get(i));
+        }
+        Ty t = type(body, site, f.def.scope);
+        return !t.opt && (t.k == Ty.K.INT || t.k == Ty.K.FLOAT || t.k == Ty.K.BOOL) ? t : null;
+    }
+
+    /// The returned expression of a function whose body is only `return
+    /// <arithmetic>` (after an optional docstring), the arithmetic made of
+    /// operators, constants, its parameters and global names; else null.
+    static Expr exprBody(FunctionDef d) {
+        List<Stmt> b = d.body;
+        int i = 0;
+        if (b.size() == 2 && b.get(0) instanceof ExprStmt && ((ExprStmt) b.get(0)).value instanceof Constant) {
+            i = 1;
+        }
+        if (b.size() != i + 1 || !(b.get(i) instanceof Return) || ((Return) b.get(i)).value == null) {
+            return null;
+        }
+        Expr e = ((Return) b.get(i)).value;
+        return arithmetic(e, d.scope) ? e : null;
+    }
+
+    private static boolean arithmetic(Expr e, Scope sc) {
+        if (e instanceof Constant) {
+            return true;
+        }
+        if (e instanceof Name) {
+            Scope.Binding r = sc.resolve(((Name) e).id);
+            return r == Scope.Binding.GLOBAL || sc.params.contains(((Name) e).id);
+        }
+        if (e instanceof BinOp) {
+            return arithmetic(((BinOp) e).left, sc) && arithmetic(((BinOp) e).right, sc);
+        }
+        if (e instanceof UnaryOp) {
+            return arithmetic(((UnaryOp) e).operand, sc);
+        }
+        return false;
     }
 
     private boolean stable(String n) {
@@ -1082,6 +1188,9 @@ final class Infer {
         }
         if (e instanceof Attribute) {
             Attribute a = (Attribute) e;
+            if (MATH_CONSTS.contains(a.attr) && isMath(a.value, sc)) {
+                return Ty.FLOAT;
+            }
             if (a.value instanceof Name && globalClasses.containsKey(((Name) a.value).id)
                     && sc.resolve(((Name) a.value).id) == Scope.Binding.GLOBAL) {
                 // `Cls.attr` as a value: a method taken off the class runs
@@ -1373,6 +1482,12 @@ final class Infer {
                 if (f != null) {
                     callFn(f, args, 0, simple && args.size() <= f.params.length
                             && args.size() >= f.params.length - f.def.args.defaults.size());
+                    Ty site = simple && args.size() == f.params.length ? siteType(f, args) : null;
+                    if (site != null) {
+                        siteRet.put(c, site);
+                        return site;
+                    }
+                    siteRet.remove(c);
                     return f.ret;
                 }
                 if (open.contains(k)) {
@@ -1402,6 +1517,14 @@ final class Infer {
                 }
                 return Ty.inst(k, false);
             }
+        }
+        if (isMathCall(c, sc)) {
+            boolean numbers = true;
+            for (Expr x : c.args) {
+                Ty t = type(x, fn, sc);
+                numbers &= (t.k == Ty.K.INT || t.k == Ty.K.FLOAT) && !t.opt;
+            }
+            return numbers ? Ty.FLOAT : Ty.DYN;
         }
         if (c.func instanceof Attribute) {
             Attribute a = (Attribute) c.func;
@@ -1491,6 +1614,14 @@ final class Infer {
             if (simple && "float".equals(n) && args.size() == 1
                     && (args.get(0).k == Ty.K.INT || args.get(0).k == Ty.K.FLOAT) && !args.get(0).opt) {
                 return Ty.FLOAT;
+            }
+            if (simple && "str".equals(n) && args.size() == 1 && !args.get(0).opt
+                    && (args.get(0).k == Ty.K.INT || args.get(0).k == Ty.K.FLOAT
+                    || args.get(0).k == Ty.K.STR || args.get(0).k == Ty.K.BOOL)) {
+                return Ty.STR;
+            }
+            if (simple && "ord".equals(n) && args.size() == 1 && args.get(0).k == Ty.K.STR && !args.get(0).opt) {
+                return Ty.INT;
             }
             if (simple && "abs".equals(n) && args.size() == 1 && !args.get(0).opt
                     && (args.get(0).k == Ty.K.INT || args.get(0).k == Ty.K.FLOAT)) {

@@ -86,10 +86,12 @@ final class Layouts {
 
     static {
         // A class that customises attribute access itself is left alone.
+        // `__slots__` is not on the list: it fixes the attribute set, which
+        // is what a layout is, and the generic instance does not enforce it
+        // either, so the two paths agree.
         FORBIDDEN.add("__setattr__");
         FORBIDDEN.add("__getattribute__");
         FORBIDDEN.add("__delattr__");
-        FORBIDDEN.add("__slots__");
         FORBIDDEN.add("__dict__");
         FORBIDDEN.add("__class__");
         FORBIDDEN.add("__new__");

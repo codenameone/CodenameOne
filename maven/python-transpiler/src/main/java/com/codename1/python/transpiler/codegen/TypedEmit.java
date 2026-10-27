@@ -1410,6 +1410,9 @@ final class TypedEmit {
         }
         if (e instanceof Attribute) {
             Attribute a = (Attribute) e;
+            if (Infer.MATH_CONSTS.contains(a.attr) && in.isMath(a.value, sc)) {
+                return new E(mathConstant(a.attr), Ty.FLOAT);
+            }
             E r = expr(a.value);
             Ty ft = fieldTy(r, a.attr);
             String p = path(a);
@@ -1506,7 +1509,7 @@ final class TypedEmit {
             E l = expr(s.value);
             E i = expr(s.index);
             if (l.t.k != Ty.K.LIST || !(i.t.k == Ty.K.INT || i.t.k == Ty.K.BOOL)) {
-                throw new Unsupported("subscript of " + l.t);
+                throw new Unsupported("subscript of " + l.t + " by " + i.t);
             }
             Ty el = in.elem(l.t);
             if (el.k == Ty.K.BOT) {
@@ -1867,6 +1870,20 @@ final class TypedEmit {
         int ind = preInd;
         indent(pre, ind);
         pre.append(jt(t)).append(' ').append(r).append(";\n");
+        if (!f.toString().contains("break " + fast + ";")) {
+            // Nothing in the fast path can leave it (no operand that may be
+            // a big int, no operation that may overflow): the generic
+            // fallback would be unreachable, which javac rejects.
+            for (String line : f.toString().split("\n")) {
+                if (!line.isEmpty()) {
+                    indent(pre, ind);
+                    pre.append(line).append('\n');
+                }
+            }
+            indent(pre, ind);
+            pre.append(r).append(" = ").append(v).append(";\n");
+            return new E(r, t);
+        }
         indent(pre, ind);
         pre.append(done).append(": {\n");
         indent(pre, ind + 1);
@@ -2342,10 +2359,9 @@ final class TypedEmit {
                     List<E> a = args(c);
                     calls.add(f);
                     String lcall = longCall(f, a);
-                    if (lcall != null) {
-                        return result(f, lcall);
-                    }
-                    return result(f, typed.get(f) + "(" + argList(f, 0, a) + ")");
+                    E r = lcall != null ? result(f, lcall) : result(f, typed.get(f) + "(" + argList(f, 0, a) + ")");
+                    Ty site = in.siteRet.get(c);
+                    return site == null || site.k == r.t.k ? r : relabel(r, site);
                 }
                 Layouts.Cls k = in.globalClasses.get(n);
                 if (k != null) {
@@ -2374,6 +2390,17 @@ final class TypedEmit {
                 return builtin(n, args(c));
             }
             throw new Unsupported("call of " + n);
+        }
+        if (in.isMathCall(c, sc)) {
+            StringBuilder sb = new StringBuilder("PyMath.").append(((Attribute) c.func).attr).append('(');
+            for (int i = 0; i < c.args.size(); i++) {
+                E x = expr(c.args.get(i));
+                if (x.t.opt || x.t.k != Ty.K.INT && x.t.k != Ty.K.FLOAT) {
+                    throw new Unsupported("math of " + x.t);
+                }
+                sb.append(i == 0 ? "" : ", ").append(toD(x));
+            }
+            return new E(sb.append(')').toString(), Ty.FLOAT);
         }
         if (c.func instanceof Attribute) {
             Attribute a = (Attribute) c.func;
@@ -2427,6 +2454,34 @@ final class TypedEmit {
         throw new Unsupported("call");
     }
 
+    /// A call's result known, at this call site, to be `t` (`Infer.siteRet`)
+    /// though the function returns something wider.
+    private E relabel(E r, Ty t) {
+        switch (t.k) {
+            case INT:
+                return new E(r.t.k == Ty.K.DYN ? r.c : box(r), Ty.INT);
+            case FLOAT:
+                return new E("Typed.asFloat(" + box(r) + ")", Ty.FLOAT);
+            default:
+                return new E("Typed.asBool(" + box(r) + ")", Ty.BOOL);
+        }
+    }
+
+    private static String mathConstant(String n) {
+        switch (n) {
+            case "pi":
+                return "Math.PI";
+            case "e":
+                return "Math.E";
+            case "tau":
+                return "(2 * Math.PI)";
+            case "inf":
+                return "Double.POSITIVE_INFINITY";
+            default:
+                return "Double.NaN";
+        }
+    }
+
     private E construct(Layouts.Cls k, List<E> args) {
         Layouts.Cls o = Layouts.resolver(k, "__init__");
         if (o == null) {
@@ -2459,6 +2514,27 @@ final class TypedEmit {
                     return new E(toD(a.get(0)), Ty.FLOAT);
                 }
                 break;
+            case "str":
+                if (a.size() == 1 && !a.get(0).t.opt) {
+                    E x = a.get(0);
+                    switch (x.t.k) {
+                        case STR:
+                            return x;
+                        case BOOL:
+                            return new E("((" + x.c + ") ? \"True\" : \"False\")", Ty.STR);
+                        case INT:
+                        case FLOAT:
+                            return new E("Py.toStr(" + box(x) + ")", Ty.STR);
+                        default:
+                            break;
+                    }
+                }
+                break;
+            case "ord":
+                if (a.size() == 1 && a.get(0).t.k == Ty.K.STR && !a.get(0).t.opt) {
+                    return new E("Typed.ord(" + a.get(0).c + ")", Ty.INT);
+                }
+                break;
             case "abs":
                 if (a.size() == 1 && a.get(0).t.k == Ty.K.FLOAT) {
                     return new E("Math.abs(" + a.get(0).c + ")", Ty.FLOAT);
@@ -2470,7 +2546,7 @@ final class TypedEmit {
             default:
                 break;
         }
-        throw new Unsupported("builtin " + n);
+        throw new Unsupported("builtin " + n + (a.isEmpty() ? "" : " of " + a.get(0).t));
     }
 
     private E listMethod(E l, String m, List<E> a) {
@@ -2478,6 +2554,11 @@ final class TypedEmit {
             case "append":
                 if (a.size() == 1) {
                     return new E("Typed.append(" + l.c + ", " + box(a.get(0)) + ")", Ty.NONE);
+                }
+                break;
+            case "extend":
+                if (a.size() == 1 && a.get(0).t.k == Ty.K.LIST && !a.get(0).t.opt) {
+                    return new E("Typed.extend(" + l.c + ", " + a.get(0).c + ")", Ty.NONE);
                 }
                 break;
             case "pop":
