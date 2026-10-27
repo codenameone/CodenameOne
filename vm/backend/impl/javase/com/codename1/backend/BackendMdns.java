@@ -42,6 +42,8 @@ import java.util.concurrent.atomic.AtomicReference;
 /// phone exactly as the board will be.
 final class BackendMdns extends MdnsEngine {
     private static final int PORT = 5353;
+    // The mDNS multicast group is fixed by RFC 6762, not a deployment choice.
+    private static final String GROUP = "224.0.0.251"; // NOPMD AvoidUsingHardCodedIP
     private final AtomicReference<MulticastSocket> socket = new AtomicReference<MulticastSocket>();
 
     @Override
@@ -52,7 +54,7 @@ final class BackendMdns extends MdnsEngine {
             s.setReuseAddress(true);
             s.bind(new InetSocketAddress(PORT));
             s.setTimeToLive(255);
-            InetAddress group = InetAddress.getByName("224.0.0.251");
+            InetAddress group = InetAddress.getByName(GROUP);
             int joined = 0;
             for (NetworkInterface ni : usable()) {
                 try {
@@ -82,7 +84,7 @@ final class BackendMdns extends MdnsEngine {
             return -9;
         }
         try {
-            s.send(new DatagramPacket(packet, length, InetAddress.getByName("224.0.0.251"), PORT));
+            s.send(new DatagramPacket(packet, length, InetAddress.getByName(GROUP), PORT));
             return length;
         } catch (IOException e) {
             // A network that is down is not an error the engine can act on.
