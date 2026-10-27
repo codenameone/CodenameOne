@@ -153,6 +153,30 @@ final class AppSupport {
         });
         main.getJava().srcDir(svg.flatMap(TranscodeSvgTask::getOutputDirectory));
 
+        // Python: src/main/python transpiles to Java the main source set
+        // compiles, against codenameone-python-runtime, which only a project
+        // with Python sources gets as a dependency.
+        final File pythonDir = new File(layout.projectDir(), "src/main/python");
+        if (com.codename1.maven.PythonProjectBuilder.isPythonProject(pythonDir)) {
+            addFramework(project, "implementation", ext.getVersion(),
+                    com.codename1.maven.PythonProjectBuilder.RUNTIME_ARTIFACT);
+        }
+        final String pythonMain = AppSettings.read(layout.settingsFile())
+                .getProperty(com.codename1.maven.PythonProjectImporter.MAIN_MODULE_SETTING);
+        TaskProvider<com.codename1.gradle.tasks.TranspilePythonTask> python = project.getTasks().register(
+                "transpilePython", com.codename1.gradle.tasks.TranspilePythonTask.class, t -> {
+                    common(t, project, layout, ext, userProperties);
+                    t.setDescription("Transpiles the Python sources in src/main/python to Java");
+                    t.getPythonDirectory().set(pythonDir);
+                    t.getSources().from(project.fileTree(pythonDir, f -> f.include("**/*.py")));
+                    if (pythonMain != null) {
+                        t.getMainModule().set(pythonMain);
+                    }
+                    t.getJavaClassPath().from(project.getConfigurations().getByName("compileClasspath"));
+                    t.getOutputDirectory().set(new File(layout.buildDir(), "generated/sources/cn1-python"));
+                });
+        main.getJava().srcDir(python.flatMap(com.codename1.gradle.tasks.TranspilePythonTask::getOutputDirectory));
+
         registerGuiSources(project, layout, ext, userProperties, main);
 
         // Android compatibility: src/main/android (manifest, res/, assets/,

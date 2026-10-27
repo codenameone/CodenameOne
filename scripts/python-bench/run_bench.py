@@ -33,7 +33,7 @@ LAUNCHER = """
 public class BenchMain {
     public static void main(String[] args) {
         com.codename1.python.runtime.Py.setArgv("bench", args);
-        %s.PythonModules.runMain();
+        System.exit(%s.PythonModules.runMain());
     }
 }
 """ % GENERATED_PACKAGE

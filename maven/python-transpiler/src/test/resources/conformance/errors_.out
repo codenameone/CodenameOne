@@ -70,3 +70,8 @@ ValueError | Unknown format code 'q' for object of type 'int' | None None False
 ValueError | bytes must be in range(0, 256) | None None False
 ValueError | value not found in bytearray | None None False
 AttributeError | 'frozenset' object has no attribute 'add' | None None False
+SystemExit () None
+SystemExit (None,) None
+SystemExit (3,) 3
+SystemExit ('bye',) 'bye'
+SystemExit (1, 2) (1, 2)

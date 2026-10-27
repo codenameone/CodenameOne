@@ -175,3 +175,7 @@ show(lambda: f"{1:q}")
 show(lambda: bytes([256]))
 show(lambda: bytearray(b"ab").remove(99))
 show(lambda: frozenset([1]).add)
+
+for args in [(), (None,), (3,), ("bye",), (1, 2)]:
+    e = SystemExit(*args)
+    print("SystemExit", args, repr(e.code))

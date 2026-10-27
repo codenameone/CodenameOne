@@ -36,7 +36,7 @@ import java.util.TreeMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-/// Command line: `Main <source root> <output root> [main module]`.
+/// Command line: `Main [-cp <class path>] <source root> <output root> [main module]`.
 ///
 /// Transpiles every `.py` under the source root and writes the Java sources
 /// under the output root. Exit status is 0 on success, 1 when a source does
@@ -47,8 +47,19 @@ public final class Main {
     }
 
     public static void main(String[] args) throws IOException {
+        List<File> classPath = new ArrayList<File>();
+        if (args.length >= 2 && "-cp".equals(args[0])) {
+            for (String e : args[1].split(File.pathSeparator)) {
+                if (!e.isEmpty()) {
+                    classPath.add(new File(e));
+                }
+            }
+            String[] rest = new String[args.length - 2];
+            System.arraycopy(args, 2, rest, 0, rest.length);
+            args = rest;
+        }
         if (args.length < 2 || args.length > 3) {
-            System.err.println("usage: Main <source root> <output root> [main module]");
+            System.err.println("usage: Main [-cp <class path>] <source root> <output root> [main module]");
             System.exit(2);
             return;
         }
@@ -64,7 +75,7 @@ public final class Main {
         }
         Map<String, String> out;
         try {
-            out = PythonTranspiler.transpile(sources, args.length == 3 ? args[2] : null);
+            out = PythonTranspiler.transpile(sources, args.length == 3 ? args[2] : null, classPath);
         } catch (PythonSyntaxError e) {
             System.err.println(e.getMessage());
             System.exit(1);

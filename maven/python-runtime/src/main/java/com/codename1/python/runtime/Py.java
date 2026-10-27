@@ -1985,6 +1985,9 @@ public final class Py {
             }
             return false;
         }
+        if (t instanceof PyJavaClass) {
+            return ((PyJavaClass) t).isInstance(o);
+        }
         if (!(t instanceof PyType)) {
             throw typeError("isinstance() arg 2 must be a type, a tuple of types, or a union");
         }

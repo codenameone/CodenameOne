@@ -41,6 +41,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -98,14 +99,16 @@ class ConformanceTest {
         Path cls = work.resolve("classes");
         Files.createDirectories(cls);
         List<String> args = new ArrayList<String>();
-        for (Map.Entry<String, String> e : PythonTranspiler.transpile(sources, "main").entrySet()) {
+        String runtime = location(com.codename1.python.runtime.Py.class);
+        String core = location(com.codename1.io.Util.class);
+        // Programs may import Java classes: the JDK's, and the core's.
+        List<File> classPath = Collections.singletonList(new File(core));
+        for (Map.Entry<String, String> e : PythonTranspiler.transpile(sources, "main", classPath).entrySet()) {
             Path f = gen.resolve(e.getKey());
             Files.createDirectories(f.getParent());
             Files.write(f, e.getValue().getBytes(StandardCharsets.US_ASCII));
             args.add(f.toString());
         }
-        String runtime = location(com.codename1.python.runtime.Py.class);
-        String core = location(com.codename1.io.Util.class);
         args.add(0, "-nowarn");
         args.add(1, "--release");
         args.add(2, "17");

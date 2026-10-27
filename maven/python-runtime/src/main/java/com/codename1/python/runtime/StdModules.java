@@ -77,6 +77,27 @@ public final class StdModules {
     /// generated `runMain()` calls this when the main module finishes,
     /// whether or not it raised; a handler that raises is reported on
     /// stderr and the rest still run, as in CPython.
+    /// What a program that ended with `e` exits with, reporting it on stderr
+    /// as the interpreter does: a `SystemExit` with no code or None is 0,
+    /// with an int that int, with anything else 1 after printing it; any
+    /// other exception is printed and gives 1.
+    public static int exitStatus(PyException e) {
+        if (e.matches(Py.SYSTEM_EXIT)) {
+            Object code = Builtins.systemExitCode(e.value);
+            if (code == Py.NONE) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return 0;
+            }
+            if (Py.isInt(code)) {
+                return (int) Py.asLong(code);
+            }
+            System.err.println(Py.toStr(code));
+            return 1;
+        }
+        System.err.println("Traceback (most recent call last):");
+        System.err.println(e.getMessage());
+        return 1;
+    }
+
     public static void runExitHandlers() {
         while (!EXIT_CALLS.isEmpty()) {
             int last = EXIT_CALLS.size() - 1;

@@ -23,13 +23,13 @@
  */
 package com.codename1.python.runtime;
 
-/// A Java object handed to Python code that has no Python counterpart.
-///
-/// Python sees it as an opaque value: it can be stored, compared by identity,
-/// passed back to Java and printed. Calling its methods by name would need
-/// reflection, which ParparVM does not keep; the transpiler instead binds
-/// Java calls statically (see the interop contract in the developer guide).
+/// A Java object seen from Python. Its attributes are its public methods and
+/// fields; `==` and `hash` are the object's own `equals` and `hashCode`, and
+/// `str` its `toString`.
 public final class PyJavaObject extends PyObject {
+    private static final PyType TYPE = new PyType("java_object", new PyType[] {Py.OBJECT_TYPE}, null);
+
+    /// The Java object.
     public final Object value;
 
     public PyJavaObject(Object value) {
@@ -38,7 +38,25 @@ public final class PyJavaObject extends PyObject {
 
     @Override
     public PyType type() {
-        return Py.OBJECT_TYPE;
+        return TYPE;
+    }
+
+    /// The Java class's name, for messages.
+    public String javaClassName() {
+        return value.getClass().getName();
+    }
+
+    @Override
+    public Object getAttrOrNull(String name) {
+        JavaBridge b = JavaBridge.get();
+        Object v = b.getField(value, name);
+        if (v != null) {
+            return v;
+        }
+        if (b.hasMethod(value, name)) {
+            return new PyJavaMethod(b, null, value, name);
+        }
+        return super.getAttrOrNull(name);
     }
 
     @Override
@@ -48,12 +66,86 @@ public final class PyJavaObject extends PyObject {
 
     @Override
     public String repr() {
-        return "<java object " + value + ">";
+        return "<java object " + javaClassName() + ">";
+    }
+
+    @Override
+    public String str() {
+        return String.valueOf(value);
     }
 
     @Override
     public Object eq(Object o) {
         return o instanceof PyJavaObject ? Py.bool(value.equals(((PyJavaObject) o).value)) : null;
+    }
+
+    // A Java collection behaves as its Python counterpart: `len`, `in`,
+    // iteration and indexing. Elements cross as [JavaBridge#toPy] makes them.
+
+    @Override
+    public int len() {
+        if (value instanceof java.util.Collection) {
+            return ((java.util.Collection) value).size();
+        }
+        if (value instanceof java.util.Map) {
+            return ((java.util.Map) value).size();
+        }
+        return super.len();
+    }
+
+    @Override
+    public boolean contains(Object x) {
+        if (value instanceof java.util.Collection) {
+            return ((java.util.Collection) value).contains(JavaBridge.toJava(x));
+        }
+        if (value instanceof java.util.Map) {
+            return ((java.util.Map) value).containsKey(JavaBridge.toJava(x));
+        }
+        return super.contains(x);
+    }
+
+    @Override
+    public Object iter() {
+        final java.util.Iterator it;
+        if (value instanceof java.lang.Iterable) {
+            it = ((java.lang.Iterable) value).iterator();
+        } else if (value instanceof java.util.Map) {
+            it = ((java.util.Map) value).keySet().iterator();
+        } else if (value instanceof java.util.Iterator) {
+            it = (java.util.Iterator) value;
+        } else {
+            return super.iter();
+        }
+        return new PyJavaIter(new PyJavaIter.Source() {
+            @Override
+            public Object next() {
+                return it.hasNext() ? JavaBridge.toPy(it.next()) : null;
+            }
+        });
+    }
+
+    @Override
+    public Object getItem(Object key) {
+        if (value instanceof java.util.List && Py.isInt(key)) {
+            java.util.List l = (java.util.List) value;
+            long i = Py.asLong(key);
+            if (i < 0) {
+                i += l.size();
+            }
+            if (i < 0 || i >= l.size()) {
+                throw Py.error(Py.INDEX_ERROR, "list index out of range");
+            }
+            return JavaBridge.toPy(l.get((int) i));
+        }
+        if (value instanceof java.util.Map) {
+            java.util.Map m = (java.util.Map) value;
+            Object k = JavaBridge.toJava(key);
+            if (!m.containsKey(k)) {
+                throw Py.keyError(key);
+            }
+            return JavaBridge.toPy(m.get(k));
+        }
+        return super.getItem(key);
     }
 
     @Override

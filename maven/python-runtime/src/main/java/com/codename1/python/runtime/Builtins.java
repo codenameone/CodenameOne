@@ -379,6 +379,18 @@ public final class Builtins {
             Object[] args = exceptionArgs(a[0]);
             return args.length == 0 ? Py.NONE : args[0];
         }), null, null));
+        Py.SYSTEM_EXIT.define("code", new PyProperty(PyBuiltin.positional("code", a -> systemExitCode(a[0])),
+                null, null));
+    }
+
+    /// `SystemExit.code`: None without arguments, the argument with one, the
+    /// tuple of them with more.
+    static Object systemExitCode(Object exc) {
+        Object[] args = exceptionArgs(exc);
+        if (args.length == 0) {
+            return Py.NONE;
+        }
+        return args.length == 1 ? args[0] : new PyTuple(args);
     }
 
     /// OSError(errno, strerror[, filename[, winerror[, filename2]]]) keeps

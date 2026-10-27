@@ -48,7 +48,7 @@ package com.pybench;
 public class PyBench {
     public static void main(String[] args) {
         com.codename1.python.runtime.Py.setArgv("bench", args);
-        com.codename1.generated.python.PythonModules.runMain();
+        System.exit(com.codename1.generated.python.PythonModules.runMain());
     }
 }
 JAVA

@@ -143,6 +143,24 @@
                 </dependency>
             </dependencies>
         </profile>
+        <!-- Python: the .py modules in src/main/python are transpiled to Java
+             and run on every Codename One target (no Python install
+             required; JDK 17+). The transpile-python goal below is a no-op
+             without this directory. -->
+        <profile>
+            <id>python</id>
+            <activation>
+                <file>
+                    <exists>${basedir}/src/main/python</exists>
+                </file>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>codenameone-python-runtime</artifactId>
+                </dependency>
+            </dependencies>
+        </profile>
         <!-- Swing and JavaFX compatibility: a desktop application's java/,
              kotlin/ and resources/ placed in src/main/desktop build and run
              unchanged on every Codename One target. Both runtimes are on the
@@ -472,6 +490,14 @@
                         <phase>generate-sources</phase>
                         <goals>
                             <goal>compile-android-res</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <!-- Python sources (src/main/python) as generated Java source. -->
+                        <id>transpile-python</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>transpile-python</goal>
                         </goals>
                     </execution>
                     <execution>
