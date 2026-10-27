@@ -89,6 +89,10 @@ jobs:
           RETRY_DELAY_SECONDS: '60'
         run: |
           set -euo pipefail
+          # The build runs UpdateCodenameOne.jar from ~/.codenameone, as in
+          # every other workflow that builds the framework.
+          mkdir -p ~/.codenameone
+          cp maven/UpdateCodenameOne.jar ~/.codenameone/
           cd maven
           bash ../scripts/ci/retry.sh mvn -B -pl build-engine -am install \
             -DskipTests -Dmaven.javadoc.skip=true -Plocal-dev-javase
