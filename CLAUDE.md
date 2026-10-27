@@ -626,6 +626,28 @@ scripts/check-16k-page-alignment.py            # every tracked artifact
 scripts/check-16k-page-alignment.py --verbose  # list everything scanned
 ```
 
+**That gate reads tracked files only, and most of an app's natives are not
+tracked.** The builder writes Maven coordinates into the generated
+`build.gradle` -- `PlatformFeatureCatalog` entries and the play-services
+defaults -- and Gradle downloads them on the build machine. CameraX 1.3.4
+reached every `CodeScanner` app that way, 4 KB aligned, and Play refused the
+upload with every check green. `scripts/check-android-dependency-alignment.py`
+(`check-android-dependency-alignment.yml`) resolves that whole list with Gradle,
+**each catalog entry in its own configuration** -- pooled, Gradle's
+highest-version-wins upgrades an old pin to another entry's newer one and the
+old one reads clean -- and runs the same ELF check. It needs the network;
+`AndroidSixteenKbPageFloorTest` in build-engine is the offline half, a table of
+measured first-aligned versions. A new native dependency in the catalog needs
+both: run the script, then add the floor. The cloud builder (BuildDaemon) keeps
+its own catalog and runs the same script over its own list.
+
+```bash
+cd maven && mvn -pl build-engine test-compile dependency:build-classpath -Dmdep.outputFile=/tmp/cp
+java -cp build-engine/target/classes:build-engine/target/test-classes:$(cat /tmp/cp) \
+  com.codename1.builders.AndroidDependencyCoordinates /tmp/coords.txt
+cd .. && JAVA_HOME=<jdk17> scripts/check-android-dependency-alignment.py --coordinates /tmp/coords.txt
+```
+
 #### ParparVM native names are checked, and getting one wrong is silent
 
 ParparVM encodes the **whole Java signature in the C function name**. For
