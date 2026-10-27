@@ -46,7 +46,7 @@ import java.util.HashMap;
 /// were added in, with an entry added after a removal taking the slot most
 /// recently freed. A `HashMap` alone would hand them out by hash code,
 /// which for an object is whatever the virtual machine made up.
-@SuppressWarnings("PMD.MethodNamingConventions") // C# member names: translated code binds to them by name
+@SuppressWarnings({"PMD.MethodNamingConventions", "PMD.ClassNamingConventions"}) // C# member and type names: translated code binds to them by name
 public class Dictionary_2 implements IDictionary_2 {
     /// In `next`, a slot that holds an entry.
     private static final int LIVE = -2;

@@ -24,7 +24,7 @@ package com.codename1.unitycompat.system;
 
 /// The methods of `System.Int32`, which is the primitive `int` here and so
 /// cannot carry them itself. The value comes first.
-@SuppressWarnings("PMD.MethodNamingConventions") // C# member names: translated code binds to them by name
+@SuppressWarnings({"PMD.MethodNamingConventions", "PMD.ClassNamingConventions"}) // C# member and type names: translated code binds to them by name
 public final class Int32_ {
     private Int32_() {
     }

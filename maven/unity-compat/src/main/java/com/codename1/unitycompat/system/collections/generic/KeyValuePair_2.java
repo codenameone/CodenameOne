@@ -30,7 +30,7 @@ import com.codename1.unitycompat.system.Struct;
 /// dictionary, which is what a `foreach` over one hands out. A struct, so
 /// it follows the protocol the translator expects of one, written out by
 /// hand because the type comes from the base library.
-@SuppressWarnings("PMD.MethodNamingConventions") // C# member names: translated code binds to them by name
+@SuppressWarnings({"PMD.MethodNamingConventions", "PMD.ClassNamingConventions"}) // C# member and type names: translated code binds to them by name
 public final class KeyValuePair_2 implements Struct {
     Object key;
     Object value;

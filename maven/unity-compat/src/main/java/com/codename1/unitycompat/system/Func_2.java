@@ -25,7 +25,7 @@ package com.codename1.unitycompat.system;
 /// `System.Func`2`. Type arguments are erased, so every parameter is an
 /// `Object` and the generated subclass unboxes what the method it calls
 /// takes as a primitive.
-@SuppressWarnings("PMD.MethodNamingConventions") // C# member names: translated code binds to them by name
+@SuppressWarnings({"PMD.MethodNamingConventions", "PMD.ClassNamingConventions"}) // C# member and type names: translated code binds to them by name
 public abstract class Func_2 extends MulticastDelegate {
     public abstract Object Invoke(Object a0);
 

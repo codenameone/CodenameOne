@@ -24,7 +24,7 @@ package com.codename1.unitycompat.system;
 
 /// The methods of `System.Int64`, which is the primitive `long` here and so
 /// cannot carry them itself. The value comes first.
-@SuppressWarnings("PMD.MethodNamingConventions") // C# member names: translated code binds to them by name
+@SuppressWarnings({"PMD.MethodNamingConventions", "PMD.ClassNamingConventions"}) // C# member and type names: translated code binds to them by name
 public final class Int64_ {
     private Int64_() {
     }

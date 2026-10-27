@@ -20,8 +20,8 @@ name: Unity compatibility
 #                              built by the application's own Maven build and
 #                              staged for every target, then converted to
 #                              Gradle and staged again: the same entries
-#   static analysis            SpotBugs (zero findings), PMD (the forbidden
-#                              list) and Checkstyle (zero errors) over both
+#   static analysis            SpotBugs (zero findings), PMD (zero
+#                              findings) and Checkstyle (zero errors) over both
 #                              modules, enforced by the script PR CI uses for
 #                              the rest of the tree, and the ClassCastException
 #                              gate over the runtime, which ParparVM translates
@@ -180,7 +180,7 @@ jobs:
           rm -f cil-translator/target/spotbugsXml.xml cil-translator/target/pmd.xml cil-translator/target/checkstyle-result.xml
           rm -f unity-compat/target/spotbugsXml.xml unity-compat/target/pmd.xml unity-compat/target/checkstyle-result.xml
           xvfb-run -a mvn -B -Plocal-dev-javase -Dunity-compat -DskipTests -pl cil-translator,unity-compat verify
-      # The same script, with the same forbidden PMD list, that judges the rest
+      # The same script, with the same zero-findings PMD gate, that judges the rest
       # of the tree in pr.yml. PMD only writes a report, so this step is what
       # enforces it; every module named must have produced each report.
       - name: Enforce the quality gates
