@@ -100,8 +100,11 @@ async function run(failGpu) {
 try {
     await run(0);
     if (process.exitCode === 0) {
-        console.log("-- again, with the first three GPU dispatches failing");
-        await run(3);
+        // every dispatch fails, so each of the five kernels -- the hashes included -- must finish
+        // on the Java path. A hash batch failing part way (hashRestInJava) needs more than one
+        // dispatch, over 32 MB of input, and is left to code review.
+        console.log("-- again, with every GPU dispatch failing");
+        await run(1000000);
     }
 } finally {
     await browser.close();

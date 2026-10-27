@@ -271,9 +271,9 @@ The JavaScript port runs the portable Java implementation, translated to JavaScr
 | Keccak-256 | 174.8 MB/s | 1.9 MB/s | 92x
 |===
 
-In the browser most of the time a WebGPU batch takes is the preparation in JavaScript, not the GPU work, and the browser's figures move more from run to run than the native ones: across three runs SHA-256 on WebGPU ranged from 4 to 34 MB/s, and in the slowest it trailed the CPU. In every run the WebGPU answers matched the CPU's. The kernels alone verify about 174,000 ECDSA, 162,000 Schnorr and 211,000 Ed25519 signatures a second there.
+In the browser most of the time a WebGPU batch takes is the preparation in JavaScript, not the GPU work, and the browser's figures move more from run to run than the native ones: across three runs SHA-256 on WebGPU ranged from 4 to 34 MB/s, and in the slowest it trailed the CPU. In every run the WebGPU answers matched the CPU's. Given records prepared in advance, the kernels alone verified about 164,000 ECDSA, 119,000 Schnorr and 146,000 Ed25519 signatures a second there.
 
-The chart puts the platforms side by side for a batch of signatures, on a logarithmic scale:
+The chart puts the ways a signature can be verified side by side, on a logarithmic scale. They don't measure the same thing: the browser bars are batches on one JavaScript thread, the JVM and native bars are one signature at a time on one core, and the last bar is a native batch across every core and the GPU. Read it as what each setup delivers, not as one benchmark run across platforms.
 
 image::img/crypto-bench-batch.svg[Signatures verified per second in a batch on each platform,scaledwidth=100%]
 

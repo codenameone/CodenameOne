@@ -8023,7 +8023,7 @@ bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnLong_long_
 // takes the Java path instead of resuming the thread with a null it has to guess about.
 // --------------------------------------------------------------------------
 
-const cn1CryptoGpu = { opening: null, device: null, pipes: {}, tables: {}, lost: false };
+const cn1CryptoGpu = { opening: null, device: null, pipes: {}, tables: {}, lost: false, queue: Promise.resolve(null) };
 const CN1_CRYPTO_GPU_KERNELS = ["ecdsa", "schnorr", "ed25519", "sha256", "keccak256"];
 
 function cn1CryptoGpuOpen() {
@@ -8041,14 +8041,16 @@ function cn1CryptoGpuOpen() {
       }
       const adapter = await gpu.requestAdapter();
       if (!adapter) {
+        // no adapter now is not no adapter ever (a GPU process restarting); the next batch asks again
+        cn1CryptoGpu.opening = null;
         return false;
       }
       const device = await adapter.requestDevice();
       device.lost.then(function() {
         // forget this device, its pipelines and tables: the next batch asks for a new one, so a
         // GPU reset (a driver update, a backgrounded tab) does not end WebGPU for the page
-        cn1CryptoGpu.lost = true;
         if (cn1CryptoGpu.device === device) {
+          cn1CryptoGpu.lost = true;
           cn1CryptoGpu.device = null;
           cn1CryptoGpu.pipes = {};
           cn1CryptoGpu.tables = {};
@@ -8059,6 +8061,9 @@ function cn1CryptoGpuOpen() {
       cn1CryptoGpu.device = device;
       return true;
     } catch (err) {
+      // a rejected requestDevice is retried by the next batch too; a browser without
+      // navigator.gpu, above, is the one answer kept for the page's life
+      cn1CryptoGpu.opening = null;
       return false;
     }
   })();
@@ -8102,7 +8107,17 @@ function cn1CryptoGpuTable(name) {
 // or allocation failure through an error scope rather than by throwing -- the commands are then
 // dropped and the mapped read buffer still resolves, holding zeros -- so every dispatch runs in
 // one scope of each kind and a captured error answers null, never the zeros.
-async function cn1CryptoGpuRun(kernel, input, len, count, outWords) {
+// Error scopes are one stack per device, so two dispatches that awaited between their push and
+// pop would take each other's errors; every dispatch therefore waits for the one before it.
+function cn1CryptoGpuRun(kernel, input, len, count, outWords) {
+  const run = cn1CryptoGpu.queue.then(function() {
+    return cn1CryptoGpuRunNow(kernel, input, len, count, outWords);
+  });
+  cn1CryptoGpu.queue = run;
+  return run;
+}
+
+async function cn1CryptoGpuRunNow(kernel, input, len, count, outWords) {
   const owned = [];
   let scoped = 0;
   const device = cn1CryptoGpu.device;

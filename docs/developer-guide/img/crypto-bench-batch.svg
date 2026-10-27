@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="780" height="423" viewBox="0 0 780 423">
   <rect x="0" y="0" width="780" height="423" fill="#ffffff"/>
-  <text x="390" y="24" font-family="Arial, sans-serif" font-size="15" font-weight="bold" text-anchor="middle" fill="#222222">Signatures verified per second, by platform</text>
+  <text x="390" y="24" font-family="Arial, sans-serif" font-size="15" font-weight="bold" text-anchor="middle" fill="#222222">Five ways to verify signatures, from one browser thread to every core and the GPU</text>
   <rect x="190" y="40" width="12" height="12" fill="#2f6fb5"/>
   <text x="208" y="50" font-family="Arial, sans-serif" font-size="12" fill="#333333">Browser, portable Java</text>
   <rect x="190" y="58" width="12" height="12" fill="#e08a1e"/>

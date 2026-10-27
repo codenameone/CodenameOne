@@ -174,7 +174,7 @@ def main(argv):
         values.append([js[k]["cpu"] if k in js else None, js[k]["gpu"] if k in js else None,
                        jvm[j][0] if j in jvm else None, native[n][0] if n in native else None,
                        g["cpu"] * g["speedup"] if g else None])
-    batch = grouped_bars("Signatures verified per second, by platform", groups,
+    batch = grouped_bars("Five ways to verify signatures, from one browser thread to every core and the GPU", groups,
                          ["Browser, portable Java", "Browser, WebGPU",
                           "JVM, one core", "Native, one core", "Native, every core and the GPU"],
                          values, "signatures verified per second (log scale)", log=True, fmt=lambda v: "{:,.0f}".format(v),

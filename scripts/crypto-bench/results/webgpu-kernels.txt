@@ -1,0 +1,2 @@
+# webgpu-check.mjs --bench 65536, headless Chromium, Apple M4 Max: kernels alone, records prepared ahead
+{"checked":518,"bad":[],"compileMs":{"ecdsa":21,"schnorr":15,"ed25519":12,"sha256":3,"keccak256":4},"bench":{"ecdsa":164415,"schnorr":119330,"ed25519":145830},"adapter":""}
