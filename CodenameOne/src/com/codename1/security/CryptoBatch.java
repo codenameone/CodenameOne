@@ -92,6 +92,134 @@ public final class CryptoBatch {
         return hash(Hash.KECCAK256, inputs);
     }
 
+    /// The packed form of
+    /// [#verifySecp256k1(byte[][], Secp256k1.EcdsaSignature[], byte[][])], for
+    /// batches large enough that an object per entry matters. Entry `i` is the
+    /// 32-byte hash at `32 * i` of `hashes`, the 64-byte compact signature
+    /// (`r || s`) at `64 * i` of `signatures`, and the SEC1 public key of
+    /// `publicKeyLength` bytes (33 or 65) at `publicKeyLength * i` of
+    /// `publicKeys`. Writes 1 (valid) or 0 to each of the first `count` bytes
+    /// of `results`; a malformed entry is 0.
+    ///
+    /// On a native target the kernels read and write these arrays where they
+    /// are, without copying them, so a pipeline that fills them in place pays
+    /// nothing per entry outside the verification itself. Allocating them with
+    /// [com.codename1.util.Simd#allocByte(int)] aligns them for the vector
+    /// units and the GPU.
+    public static void verifySecp256k1(byte[] hashes, byte[] signatures, byte[] publicKeys, int publicKeyLength,
+            byte[] results, int count) {
+        if (publicKeyLength != 33 && publicKeyLength != 65) {
+            throw new CryptoException("publicKeyLength must be 33 or 65");
+        }
+        packed(hashes, 32, signatures, publicKeys, publicKeyLength, results, count);
+        prime(results, count);
+        CryptoEngine.get().verifyPacked(CryptoEngine.BATCH_SECP256K1, hashes, 32, signatures, publicKeys,
+                publicKeyLength, results, count);
+        for (int i = 0; i < count; i++) {
+            if (results[i] == TODO || results[i] == JAVA) {
+                try {
+                    results[i] = Secp256k1.verify(slice(hashes, 32, i),
+                            Secp256k1.EcdsaSignature.fromCompact(slice(signatures, 64, i), 0),
+                            slice(publicKeys, publicKeyLength, i)) ? (byte) 1 : 0;
+                } catch (CryptoException e) {
+                    results[i] = 0;
+                }
+            }
+        }
+    }
+
+    /// The packed form of [#verifySchnorr(byte[][], byte[][], byte[][])]:
+    /// entry `i` is the message of `messageLength` bytes at
+    /// `messageLength * i` of `messages`, the 64-byte signature at `64 * i` of
+    /// `signatures` and the 32-byte x-only key at `32 * i` of `publicKeys`.
+    /// Writes 1 or 0 to each of the first `count` bytes of `results`. See
+    /// [#verifySecp256k1(byte[], byte[], byte[], int, byte[], int)] on
+    /// allocating the arrays.
+    public static void verifySchnorr(byte[] messages, int messageLength, byte[] signatures, byte[] publicKeys,
+            byte[] results, int count) {
+        verifyPacked(CryptoEngine.BATCH_SCHNORR, messages, messageLength, signatures, publicKeys, results, count);
+    }
+
+    /// The packed form of [#verifyEd25519(byte[][], byte[][], byte[][])], laid
+    /// out as [#verifySchnorr(byte[], int, byte[], byte[], byte[], int)].
+    public static void verifyEd25519(byte[] messages, int messageLength, byte[] signatures, byte[] publicKeys,
+            byte[] results, int count) {
+        verifyPacked(CryptoEngine.BATCH_ED25519, messages, messageLength, signatures, publicKeys, results, count);
+    }
+
+    /// The SHA-256 of `count` inputs of `inputLength` bytes each, input `i` at
+    /// `inputLength * i` of `inputs` and its digest written at `32 * i` of
+    /// `digests`. A level of a Merkle tree is `inputLength` 64 over the level
+    /// below; `digests` may then be the next level's `inputs`.
+    public static void sha256(byte[] inputs, int inputLength, int count, byte[] digests) {
+        hashPacked(Hash.SHA256, inputs, inputLength, count, digests);
+    }
+
+    /// The Keccak-256 of `count` packed inputs, laid out as
+    /// [#sha256(byte[], int, int, byte[])].
+    public static void keccak256(byte[] inputs, int inputLength, int count, byte[] digests) {
+        hashPacked(Hash.KECCAK256, inputs, inputLength, count, digests);
+    }
+
+    private static void verifyPacked(int algorithm, byte[] messages, int messageLength, byte[] signatures,
+            byte[] publicKeys, byte[] results, int count) {
+        packed(messages, messageLength, signatures, publicKeys, 32, results, count);
+        prime(results, count);
+        CryptoEngine.get().verifyPacked(algorithm, messages, messageLength, signatures, publicKeys, 32,
+                results, count);
+        for (int i = 0; i < count; i++) {
+            if (results[i] == TODO || results[i] == JAVA) {
+                byte[] m = slice(messages, messageLength, i);
+                byte[] s = slice(signatures, 64, i);
+                byte[] k = slice(publicKeys, 32, i);
+                boolean ok = algorithm == CryptoEngine.BATCH_ED25519 ? Ed25519.verify(m, s, k) : schnorr(m, s, k);
+                results[i] = ok ? (byte) 1 : 0;
+            }
+        }
+    }
+
+    private static void hashPacked(String algorithm, byte[] inputs, int inputLength, int count, byte[] digests) {
+        if (inputs == null || digests == null) {
+            throw new CryptoException("the batch arrays must not be null");
+        }
+        if (count < 0 || inputLength < 0 || (long) inputLength * count > inputs.length
+                || 32L * count > digests.length) {
+            throw new CryptoException("the batch arrays are too short for count entries");
+        }
+        if (count == 0 || CryptoEngine.get().hashPacked(algorithm, inputs, inputLength, count, digests)) {
+            return;
+        }
+        boolean sha = Hash.SHA256.equals(algorithm);
+        for (int i = 0; i < count; i++) {
+            byte[] in = slice(inputs, inputLength, i);
+            System.arraycopy(sha ? Hash.sha256(in) : Hash.keccak256(in), 0, digests, 32 * i, 32);
+        }
+    }
+
+    private static void packed(byte[] messages, int messageLength, byte[] signatures, byte[] publicKeys,
+            int keyLength, byte[] results, int count) {
+        if (messages == null || signatures == null || publicKeys == null || results == null) {
+            throw new CryptoException("the batch arrays must not be null");
+        }
+        if (count < 0 || messageLength < 0 || (long) messageLength * count > messages.length
+                || 64L * count > signatures.length || (long) keyLength * count > publicKeys.length
+                || count > results.length) {
+            throw new CryptoException("the batch arrays are too short for count entries");
+        }
+    }
+
+    private static void prime(byte[] results, int count) {
+        for (int i = 0; i < count; i++) {
+            results[i] = TODO;
+        }
+    }
+
+    private static byte[] slice(byte[] packed, int length, int i) {
+        byte[] out = new byte[length];
+        System.arraycopy(packed, length * i, out, 0, length);
+        return out;
+    }
+
     /// A result byte the engine has still to decide.
     static final byte TODO = 2;
 

@@ -303,6 +303,33 @@ public class NativeCryptoEngine extends CryptoEngine {
     }
 
     @Override
+    public void verifyPacked(int algorithm, byte[] messages, int messageLength, byte[] signatures, byte[] keys,
+            int keyLength, byte[] results, int count) {
+        if (algorithm == BATCH_ED25519) {
+            // the same refusals as ed25519Verify, entry by entry, read in place
+            for (int i = 0; i < count; i++) {
+                if (!Ed25519Math.isCanonicalScalar(signatures, 64 * i + 32)) {
+                    results[i] = 0;
+                } else if (!isOrdinaryEdwardsKey(keys, 32 * i)) {
+                    results[i] = CryptoBatch.JAVA;
+                }
+            }
+        }
+        NativeCryptoKernels.batchPacked(algorithm, messages, messageLength, signatures, keys, keyLength, results,
+                count);
+    }
+
+    @Override
+    public boolean hashPacked(String algorithm, byte[] inputs, int inputLength, int count, byte[] digests) {
+        int kind = Hash.SHA256.equals(algorithm) ? 11 : Hash.KECCAK256.equals(algorithm) ? 12 : 0;
+        if (kind == 0) {
+            return false;
+        }
+        NativeCryptoKernels.batchPacked(kind, inputs, inputLength, null, null, 0, digests, count);
+        return true;
+    }
+
+    @Override
     public byte[][] hashBatch(String algorithm, byte[][] inputs) {
         int kind = Hash.SHA256.equals(algorithm) ? 11 : Hash.KECCAK256.equals(algorithm) ? 12 : 0;
         int n = inputs.length;
@@ -354,28 +381,32 @@ public class NativeCryptoEngine extends CryptoEngine {
     /// two values `y = 1` and `y = -1` aside, every point with `x = 0`;
     /// `y = 1` is checked separately.
     private static boolean isOrdinaryEdwardsKey(byte[] key) {
-        if ((key[31] & 0x7f) == 0x7f) {
+        return isOrdinaryEdwardsKey(key, 0);
+    }
+
+    private static boolean isOrdinaryEdwardsKey(byte[] key, int o) {
+        if ((key[o + 31] & 0x7f) == 0x7f) {
             for (int i = 30; i > 0; i--) {
-                if ((key[i] & 0xff) != 0xff) {
+                if ((key[o + i] & 0xff) != 0xff) {
                     return true;
                 }
             }
             // y >= 2^255 - 256: only y < 2^255 - 20 is ordinary
-            return (key[0] & 0xff) < 0xec;
+            return (key[o] & 0xff) < 0xec;
         }
-        if ((key[31] & 0x80) == 0) {
+        if ((key[o + 31] & 0x80) == 0) {
             return true;
         }
         // sign bit set: y = 1 would make x = 0 with a negative sign
-        if (key[0] != 1) {
+        if (key[o] != 1) {
             return true;
         }
         for (int i = 1; i < 31; i++) {
-            if (key[i] != 0) {
+            if (key[o + i] != 0) {
                 return true;
             }
         }
-        return (key[31] & 0x7f) != 0;
+        return (key[o + 31] & 0x7f) != 0;
     }
 
     private static boolean is(byte[] a, int length) {

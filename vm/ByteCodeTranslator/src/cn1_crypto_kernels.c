@@ -140,6 +140,29 @@ static inline uint32x4_t vsha256su1q_u32(uint32x4_t a, uint32x4_t b, uint32x4_t 
     return a;
 }
 #    endif
+#    if !defined(__ARM_FEATURE_SHA3)
+static inline uint64x2_t veor3q_u64(uint64x2_t a, uint64x2_t b, uint64x2_t c) {
+    uint64x2_t r;
+    __asm__(".arch_extension sha3
+	eor3 %0.16b, %1.16b, %2.16b, %3.16b" : "=w"(r) : "w"(a), "w"(b), "w"(c));
+    return r;
+}
+static inline uint64x2_t vrax1q_u64(uint64x2_t a, uint64x2_t b) {
+    uint64x2_t r;
+    __asm__(".arch_extension sha3
+	rax1 %0.2d, %1.2d, %2.2d" : "=w"(r) : "w"(a), "w"(b));
+    return r;
+}
+static inline uint64x2_t vbcaxq_u64(uint64x2_t a, uint64x2_t b, uint64x2_t c) {
+    uint64x2_t r;
+    __asm__(".arch_extension sha3
+	bcax %0.16b, %1.16b, %2.16b, %3.16b" : "=w"(r) : "w"(a), "w"(b), "w"(c));
+    return r;
+}
+/* the rotation is an immediate, so this one has to be a macro */
+#      define vxarq_u64(a, b, imm) __extension__ ({ uint64x2_t r_;         __asm__(".arch_extension sha3
+	xar %0.2d, %1.2d, %2.2d, %3" : "=w"(r_) : "w"(a), "w"(b), "i"(imm)); r_; })
+#    endif
 #    if !defined(__ARM_FEATURE_SHA512)
 static inline uint64x2_t vsha512hq_u64(uint64x2_t a, uint64x2_t b, uint64x2_t w) {
     __asm__(".arch_extension sha3\n\tsha512h %q0, %q1, %2.2d" : "+w"(a) : "w"(b), "w"(w));
@@ -412,6 +435,49 @@ static void cn1k_sha256_blocks_arm(uint32_t *h, const unsigned char *p, size_t n
     vst1q_u32(h + 4, s1);
 }
 
+/* Two independent streams through the same rounds. SHA256H and SHA256H2 each wait on the one before
+ * them, so a single stream leaves the unit idle between them; a second stream fills those slots
+ * and a batch of equal-length inputs hashes at close to twice the rate. */
+CN1K_ATTR_SHA2
+static void cn1k_sha256_blocks2_arm(uint32_t *h, const unsigned char *p, uint32_t *g, const unsigned char *q,
+                                    size_t n) {
+    uint32x4_t s0 = vld1q_u32(h), s1 = vld1q_u32(h + 4);
+    uint32x4_t r0 = vld1q_u32(g), r1 = vld1q_u32(g + 4);
+    while (n-- > 0) {
+        uint32x4_t a0 = s0, a1 = s1, b0 = r0, b1 = r1, w[4], v[4];
+        int i;
+        for (i = 0; i < 4; i++) {
+            w[i] = vreinterpretq_u32_u8(vrev32q_u8(vld1q_u8(p + 16 * i)));
+            v[i] = vreinterpretq_u32_u8(vrev32q_u8(vld1q_u8(q + 16 * i)));
+        }
+        for (i = 0; i < 16; i++) {
+            uint32x4_t k = vld1q_u32(cn1k_sha256_k + 4 * i);
+            uint32x4_t wk = vaddq_u32(w[i & 3], k), vk = vaddq_u32(v[i & 3], k);
+            uint32x4_t prevS = s0, prevR = r0;
+            if (i < 12) {
+                w[i & 3] = vsha256su1q_u32(vsha256su0q_u32(w[i & 3], w[(i + 1) & 3]),
+                                           w[(i + 2) & 3], w[(i + 3) & 3]);
+                v[i & 3] = vsha256su1q_u32(vsha256su0q_u32(v[i & 3], v[(i + 1) & 3]),
+                                           v[(i + 2) & 3], v[(i + 3) & 3]);
+            }
+            s0 = vsha256hq_u32(s0, s1, wk);
+            r0 = vsha256hq_u32(r0, r1, vk);
+            s1 = vsha256h2q_u32(s1, prevS, wk);
+            r1 = vsha256h2q_u32(r1, prevR, vk);
+        }
+        s0 = vaddq_u32(s0, a0);
+        s1 = vaddq_u32(s1, a1);
+        r0 = vaddq_u32(r0, b0);
+        r1 = vaddq_u32(r1, b1);
+        p += 64;
+        q += 64;
+    }
+    vst1q_u32(h, s0);
+    vst1q_u32(h + 4, s1);
+    vst1q_u32(g, r0);
+    vst1q_u32(g + 4, r1);
+}
+
 CN1K_ATTR_SHA512
 static void cn1k_sha512_blocks_arm(uint64_t *h, const unsigned char *p, size_t n) {
     uint64x2_t ab = vld1q_u64(h), cd = vld1q_u64(h + 2), ef = vld1q_u64(h + 4), gh = vld1q_u64(h + 6);
@@ -640,6 +706,38 @@ static void cn1k_sha256(const unsigned char *in, size_t len, unsigned char *out)
     uint32_t h[8];
     memcpy(h, cn1k_sha256_iv, sizeof(h));
     cn1k_sha256_run(h, 0, in, len, out);
+}
+
+/* SHA-256 of two inputs of one length; on two streams where the SHA instructions allow it. */
+static void cn1k_sha256_pair(const unsigned char *a, const unsigned char *b, size_t len,
+                             unsigned char *outA, unsigned char *outB) {
+#ifdef CN1K_ARM64
+    if (cn1k_sha256_blocks() == cn1k_sha256_blocks_arm) {
+        uint32_t h[8], g[8];
+        unsigned char ta[128], tb[128];
+        size_t whole = len / 64, rest = len % 64, padded = rest < 56 ? 64 : 128;
+        int i;
+        memcpy(h, cn1k_sha256_iv, sizeof(h));
+        memcpy(g, cn1k_sha256_iv, sizeof(g));
+        cn1k_sha256_blocks2_arm(h, a, g, b, whole);
+        memcpy(ta, a + whole * 64, rest);
+        memcpy(tb, b + whole * 64, rest);
+        ta[rest] = 0x80;
+        tb[rest] = 0x80;
+        memset(ta + rest + 1, 0, padded - rest - 9);
+        memset(tb + rest + 1, 0, padded - rest - 9);
+        cn1k_put_be64(ta + padded - 8, (uint64_t) len * 8);
+        cn1k_put_be64(tb + padded - 8, (uint64_t) len * 8);
+        cn1k_sha256_blocks2_arm(h, ta, g, tb, padded / 64);
+        for (i = 0; i < 8; i++) {
+            cn1k_put_be32(outA + 4 * i, h[i]);
+            cn1k_put_be32(outB + 4 * i, g[i]);
+        }
+        return;
+    }
+#endif
+    cn1k_sha256(a, len, outA);
+    cn1k_sha256(b, len, outB);
 }
 
 static void cn1k_sha512(const unsigned char *in, size_t len, unsigned char *out) {
@@ -1180,7 +1278,7 @@ static uint64_t cn1k_le64(const unsigned char *p) {
          | ((uint64_t) p[4] << 32) | ((uint64_t) p[5] << 40) | ((uint64_t) p[6] << 48) | ((uint64_t) p[7] << 56);
 }
 
-static void cn1k_keccak256(const unsigned char *in, size_t len, unsigned char *out) {
+static void cn1k_keccak256_c(const unsigned char *in, size_t len, unsigned char *out) {
     uint64_t s[25];
     unsigned char last[136];
     size_t i;
@@ -1204,6 +1302,171 @@ static void cn1k_keccak256(const unsigned char *in, size_t len, unsigned char *o
     for (i = 0; i < 32; i++) {
         out[i] = (unsigned char) (s[i >> 3] >> (8 * (i & 7)));
     }
+}
+
+/* Keccak on the ARMv8.2 SHA3 instructions: EOR3 folds the column parities, RAX1 the theta
+ * mix, XAR the theta-rho step and BCAX chi, so a round is about half the instructions of the
+ * portable one. They work on two 64-bit lanes, and the permutation below runs two independent
+ * states, one per lane: a single hash fills both lanes with the same state, a batch hashes two
+ * inputs for the price of one. */
+#ifdef CN1K_ARM64
+/* one Keccak-f[1600] round over two states, lane by lane in the two halves of each vector */
+#define CN1K_KECCAK_ROUND2(s, rc) do { \
+    uint64x2_t c0, c1, c2, c3, c4, d0, d1, d2, d3, d4, b[25]; \
+    c0 = veor3q_u64(veor3q_u64(s[0], s[5], s[10]), s[15], s[20]); \
+    c1 = veor3q_u64(veor3q_u64(s[1], s[6], s[11]), s[16], s[21]); \
+    c2 = veor3q_u64(veor3q_u64(s[2], s[7], s[12]), s[17], s[22]); \
+    c3 = veor3q_u64(veor3q_u64(s[3], s[8], s[13]), s[18], s[23]); \
+    c4 = veor3q_u64(veor3q_u64(s[4], s[9], s[14]), s[19], s[24]); \
+    d0 = vrax1q_u64(c4, c1); \
+    d1 = vrax1q_u64(c0, c2); \
+    d2 = vrax1q_u64(c1, c3); \
+    d3 = vrax1q_u64(c2, c4); \
+    d4 = vrax1q_u64(c3, c0); \
+    b[0] = veorq_u64(s[0], d0); \
+    b[16] = vxarq_u64(s[5], d0, 28); \
+    b[7] = vxarq_u64(s[10], d0, 61); \
+    b[23] = vxarq_u64(s[15], d0, 23); \
+    b[14] = vxarq_u64(s[20], d0, 46); \
+    b[10] = vxarq_u64(s[1], d1, 63); \
+    b[1] = vxarq_u64(s[6], d1, 20); \
+    b[17] = vxarq_u64(s[11], d1, 54); \
+    b[8] = vxarq_u64(s[16], d1, 19); \
+    b[24] = vxarq_u64(s[21], d1, 62); \
+    b[20] = vxarq_u64(s[2], d2, 2); \
+    b[11] = vxarq_u64(s[7], d2, 58); \
+    b[2] = vxarq_u64(s[12], d2, 21); \
+    b[18] = vxarq_u64(s[17], d2, 49); \
+    b[9] = vxarq_u64(s[22], d2, 3); \
+    b[5] = vxarq_u64(s[3], d3, 36); \
+    b[21] = vxarq_u64(s[8], d3, 9); \
+    b[12] = vxarq_u64(s[13], d3, 39); \
+    b[3] = vxarq_u64(s[18], d3, 43); \
+    b[19] = vxarq_u64(s[23], d3, 8); \
+    b[15] = vxarq_u64(s[4], d4, 37); \
+    b[6] = vxarq_u64(s[9], d4, 44); \
+    b[22] = vxarq_u64(s[14], d4, 25); \
+    b[13] = vxarq_u64(s[19], d4, 56); \
+    b[4] = vxarq_u64(s[24], d4, 50); \
+    s[0] = vbcaxq_u64(b[0], b[2], b[1]); \
+    s[1] = vbcaxq_u64(b[1], b[3], b[2]); \
+    s[2] = vbcaxq_u64(b[2], b[4], b[3]); \
+    s[3] = vbcaxq_u64(b[3], b[0], b[4]); \
+    s[4] = vbcaxq_u64(b[4], b[1], b[0]); \
+    s[5] = vbcaxq_u64(b[5], b[7], b[6]); \
+    s[6] = vbcaxq_u64(b[6], b[8], b[7]); \
+    s[7] = vbcaxq_u64(b[7], b[9], b[8]); \
+    s[8] = vbcaxq_u64(b[8], b[5], b[9]); \
+    s[9] = vbcaxq_u64(b[9], b[6], b[5]); \
+    s[10] = vbcaxq_u64(b[10], b[12], b[11]); \
+    s[11] = vbcaxq_u64(b[11], b[13], b[12]); \
+    s[12] = vbcaxq_u64(b[12], b[14], b[13]); \
+    s[13] = vbcaxq_u64(b[13], b[10], b[14]); \
+    s[14] = vbcaxq_u64(b[14], b[11], b[10]); \
+    s[15] = vbcaxq_u64(b[15], b[17], b[16]); \
+    s[16] = vbcaxq_u64(b[16], b[18], b[17]); \
+    s[17] = vbcaxq_u64(b[17], b[19], b[18]); \
+    s[18] = vbcaxq_u64(b[18], b[15], b[19]); \
+    s[19] = vbcaxq_u64(b[19], b[16], b[15]); \
+    s[20] = vbcaxq_u64(b[20], b[22], b[21]); \
+    s[21] = vbcaxq_u64(b[21], b[23], b[22]); \
+    s[22] = vbcaxq_u64(b[22], b[24], b[23]); \
+    s[23] = vbcaxq_u64(b[23], b[20], b[24]); \
+    s[24] = vbcaxq_u64(b[24], b[21], b[20]); \
+    s[0] = veorq_u64(s[0], vdupq_n_u64(rc)); \
+} while (0)
+
+CN1K_ATTR_SHA512
+static void cn1k_keccak_f2_arm(uint64x2_t *s) {
+    int round;
+    for (round = 0; round < 24; round++) {
+        CN1K_KECCAK_ROUND2(s, cn1k_keccak_rc[round]);
+    }
+}
+
+/* Absorbs one 136-byte block of each input into its lane. */
+CN1K_ATTR_SHA512
+static void cn1k_keccak_absorb2(uint64x2_t *s, const unsigned char *a, const unsigned char *b) {
+    int i;
+    for (i = 0; i < 17; i++) {
+        s[i] = veorq_u64(s[i], vcombine_u64(vcreate_u64(cn1k_le64(a + 8 * i)), vcreate_u64(cn1k_le64(b + 8 * i))));
+    }
+    cn1k_keccak_f2_arm(s);
+}
+
+/* Keccak-256 of two inputs of the same length. */
+CN1K_ATTR_SHA512
+static void cn1k_keccak256x2_arm(const unsigned char *a, const unsigned char *b, size_t len,
+                                 unsigned char *outA, unsigned char *outB) {
+    uint64x2_t s[25];
+    unsigned char lastA[136], lastB[136];
+    uint64_t lanes[8];
+    int i;
+    for (i = 0; i < 25; i++) {
+        s[i] = vdupq_n_u64(0);
+    }
+    while (len >= 136) {
+        cn1k_keccak_absorb2(s, a, b);
+        a += 136;
+        b += 136;
+        len -= 136;
+    }
+    memset(lastA, 0, sizeof(lastA));
+    memset(lastB, 0, sizeof(lastB));
+    memcpy(lastA, a, len);
+    memcpy(lastB, b, len);
+    lastA[len] = 0x01;
+    lastB[len] = 0x01;
+    lastA[135] |= 0x80;
+    lastB[135] |= 0x80;
+    cn1k_keccak_absorb2(s, lastA, lastB);
+    for (i = 0; i < 4; i++) {
+        vst1q_u64(lanes + 2 * i, s[i]);
+    }
+    for (i = 0; i < 32; i++) {
+        outA[i] = (unsigned char) (lanes[2 * (i >> 3)] >> (8 * (i & 7)));
+        outB[i] = (unsigned char) (lanes[2 * (i >> 3) + 1] >> (8 * (i & 7)));
+    }
+}
+
+static void cn1k_keccak256_arm(const unsigned char *in, size_t len, unsigned char *out) {
+    unsigned char spare[32];
+    cn1k_keccak256x2_arm(in, in, len, out, spare);
+}
+#endif
+
+typedef void (*cn1k_keccak_fn)(const unsigned char *in, size_t len, unsigned char *out);
+static cn1k_keccak_fn cn1k_keccak_impl = NULL;
+
+static cn1k_keccak_fn cn1k_keccak_select(void) {
+    cn1k_keccak_fn f = CN1K_PLOAD(&cn1k_keccak_impl, cn1k_keccak_fn);
+    if (f == NULL) {
+        f = cn1k_keccak256_c;
+#ifdef CN1K_ARM64
+        if (cn1k_arm_has("hw.optional.arm.FEAT_SHA3", 1ul << 17)) {
+            f = cn1k_keccak256_arm;
+        }
+#endif
+        CN1K_PSTORE(&cn1k_keccak_impl, f);
+    }
+    return f;
+}
+
+static void cn1k_keccak256(const unsigned char *in, size_t len, unsigned char *out) {
+    cn1k_keccak_select()(in, len, out);
+}
+
+/* Two inputs of one length at once where the vector unit can; one by one otherwise. */
+static void cn1k_keccak256_pair(const unsigned char *a, const unsigned char *b, size_t len,
+                                unsigned char *outA, unsigned char *outB) {
+#ifdef CN1K_ARM64
+    if (cn1k_keccak_select() == cn1k_keccak256_arm) {
+        cn1k_keccak256x2_arm(a, b, len, outA, outB);
+        return;
+    }
+#endif
+    cn1k_keccak256(a, len, outA);
+    cn1k_keccak256(b, len, outB);
 }
 
 /* ------------------------------------------------------------------ the secp256k1 context */
@@ -1574,14 +1837,16 @@ typedef struct {
     const unsigned char *sigs;
     const unsigned char *keys;
     const JAVA_INT *keyOff;
+    size_t msgStride;       /* packed batches: no offset arrays, a fixed length per entry */
+    size_t keyStride;
     unsigned char *results;
     size_t count;
     size_t chunks;
 } cn1k_batch;
 
 static void cn1k_batch_item(const cn1k_batch *b, size_t i) {
-    const unsigned char *m = b->msgs + b->msgOff[i];
-    size_t mlen = (size_t) (b->msgOff[i + 1] - b->msgOff[i]);
+    const unsigned char *m = b->msgOff ? b->msgs + b->msgOff[i] : b->msgs + i * b->msgStride;
+    size_t mlen = b->msgOff ? (size_t) (b->msgOff[i + 1] - b->msgOff[i]) : b->msgStride;
     const secp256k1_context *ctx = secp256k1_context_static;
     switch (b->alg) {
         case CN1K_BATCH_ECDSA: {
@@ -1590,8 +1855,8 @@ static void cn1k_batch_item(const cn1k_batch *b, size_t i) {
             if (b->results[i] != CN1K_BATCH_TODO) {
                 return;
             }
-            if (!secp256k1_ec_pubkey_parse(ctx, &pk, b->keys + b->keyOff[i],
-                                           (size_t) (b->keyOff[i + 1] - b->keyOff[i]))) {
+            if (!secp256k1_ec_pubkey_parse(ctx, &pk, b->keyOff ? b->keys + b->keyOff[i] : b->keys + i * b->keyStride,
+                                           b->keyOff ? (size_t) (b->keyOff[i + 1] - b->keyOff[i]) : b->keyStride)) {
                 b->results[i] = 0xff;
             } else if (!secp256k1_ecdsa_signature_parse_compact(ctx, &sig, b->sigs + 64 * i)) {
                 b->results[i] = 0;
@@ -1627,12 +1892,48 @@ static void cn1k_batch_item(const cn1k_batch *b, size_t i) {
 static void cn1k_batch_chunk(void *arg, size_t c) {
     const cn1k_batch *b = (const cn1k_batch*) arg;
     size_t from = c * b->count / b->chunks, to = (c + 1) * b->count / b->chunks, i;
+    if (b->alg == CN1K_BATCH_KECCAK256 || b->alg == CN1K_BATCH_SHA256) {
+        /* two inputs of one length go through the vector or SHA unit together */
+        for (i = from; i + 1 < to; i += 2) {
+            const unsigned char *m0 = b->msgOff ? b->msgs + b->msgOff[i] : b->msgs + i * b->msgStride;
+            const unsigned char *m1 = b->msgOff ? b->msgs + b->msgOff[i + 1] : m0 + b->msgStride;
+            size_t l0 = b->msgOff ? (size_t) (b->msgOff[i + 1] - b->msgOff[i]) : b->msgStride;
+            size_t l1 = b->msgOff ? (size_t) (b->msgOff[i + 2] - b->msgOff[i + 1]) : b->msgStride;
+            if (l0 != l1) {
+                cn1k_batch_item(b, i);
+                i--;
+                continue;
+            }
+            if (b->alg == CN1K_BATCH_SHA256) {
+                cn1k_sha256_pair(m0, m1, l0, b->results + 32 * i, b->results + 32 * (i + 1));
+            } else {
+                cn1k_keccak256_pair(m0, m1, l0, b->results + 32 * i, b->results + 32 * (i + 1));
+            }
+        }
+        if (i < to) {
+            cn1k_batch_item(b, i);
+        }
+        return;
+    }
     for (i = from; i < to; i++) {
         cn1k_batch_item(b, i);
     }
 }
 
+/* asked once: a sysctl per batch cost more than a small batch itself. Two threads racing here
+ * store the same answer. */
+static size_t cn1k_core_count = 0;
+
+static size_t cn1k_cores_query(void);
+
 static size_t cn1k_cores(void) {
+    if (cn1k_core_count == 0) {
+        cn1k_core_count = cn1k_cores_query();
+    }
+    return cn1k_core_count;
+}
+
+static size_t cn1k_cores_query(void) {
     long n;
 #if defined(__APPLE__)
     int v = 0;
@@ -1670,7 +1971,7 @@ static void *cn1k_batch_thread(void *p) {
 /* `work` is a rough cost of the whole batch in hash blocks; below a few hundred a thread costs more
  * than it saves. */
 static void cn1k_batch_run(cn1k_batch *b, size_t work) {
-    size_t chunks = cn1k_cores();
+    size_t chunks = work < 512 ? 1 : cn1k_cores();
     if (chunks > b->count) {
         chunks = b->count;
     }
@@ -1750,11 +2051,41 @@ JAVA_VOID com_codename1_security_NativeCryptoKernels_batch___int_byte_1ARRAY_int
     b.sigs = sigs == JAVA_NULL ? NULL : CN1K_BYTES(sigs);
     b.keys = keys == JAVA_NULL ? NULL : CN1K_BYTES(keys);
     b.keyOff = keyOff == JAVA_NULL ? NULL : CN1K_INTS(keyOff);
+    b.msgStride = 0;
+    b.keyStride = 32;
     b.results = CN1K_BYTES(results);
     b.count = (size_t) count;
     /* a verify is worth a few hundred compressions; a hash is its length in blocks */
     work = alg < CN1K_BATCH_SHA256 ? (size_t) count * 400
             : (size_t) (b.msgOff[count] - b.msgOff[0]) / 64 + (size_t) count;
     cn1k_batch_run(&b, work);
+#endif
+}
+
+/*
+ * The packed batch: the same items as above, entry i at i * msgLen of msgs and i * keyLen of keys,
+ * read straight out of the Java arrays -- on ParparVM a primitive array's storage is the C buffer
+ * itself, so nothing is copied on the way in or out. NativeCryptoEngine has checked the lengths.
+ */
+JAVA_VOID com_codename1_security_NativeCryptoKernels_batchPacked___int_byte_1ARRAY_int_byte_1ARRAY_byte_1ARRAY_int_byte_1ARRAY_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_INT alg, JAVA_OBJECT msgs, JAVA_INT msgLen, JAVA_OBJECT sigs,
+        JAVA_OBJECT keys, JAVA_INT keyLen, JAVA_OBJECT results, JAVA_INT count) {
+#ifdef CN1_CRYPTO_KERNELS
+    cn1k_batch b;
+    if (count <= 0) {
+        return;
+    }
+    b.alg = alg;
+    b.msgs = CN1K_BYTES(msgs);
+    b.msgOff = NULL;
+    b.sigs = sigs == JAVA_NULL ? NULL : CN1K_BYTES(sigs);
+    b.keys = keys == JAVA_NULL ? NULL : CN1K_BYTES(keys);
+    b.keyOff = NULL;
+    b.msgStride = (size_t) msgLen;
+    b.keyStride = (size_t) keyLen;
+    b.results = CN1K_BYTES(results);
+    b.count = (size_t) count;
+    cn1k_batch_run(&b, alg < CN1K_BATCH_SHA256 ? (size_t) count * 400
+            : (size_t) count * ((size_t) msgLen / 64 + 1));
 #endif
 }

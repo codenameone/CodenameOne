@@ -252,6 +252,52 @@ public final class CryptoChecks {
                 }
             }
             Bulk.p("hashes", Hash.toHex(fold) + (sha[17] == null && kec[17] == null));
+            // the packed forms over the same entries, read in place by the kernels
+            final int pn = 300;
+            byte[] ph = new byte[32 * pn];
+            byte[] pc = new byte[64 * pn];
+            byte[] pk = new byte[33 * pn];
+            byte[] pm = new byte[24 * pn];
+            byte[] pes = new byte[64 * pn];
+            byte[] pek = new byte[32 * pn];
+            byte[] pss = new byte[64 * pn];
+            byte[] psk = new byte[32 * pn];
+            for (int i = 0; i < pn; i++) {
+                byte[] priv = bytes(i % 40 + 1000, 32);
+                byte[] h = bytes(i + 1400, 32);
+                byte[] m = bytes(i + 1500, 24);
+                byte[] ek = Ed25519.publicKey(priv);
+                System.arraycopy(h, 0, ph, 32 * i, 32);
+                System.arraycopy(Secp256k1.sign(h, priv).toCompact(), 0, pc, 64 * i, 64);
+                System.arraycopy(Secp256k1.publicKey(priv, true), 0, pk, 33 * i, 33);
+                System.arraycopy(m, 0, pm, 24 * i, 24);
+                System.arraycopy(Ed25519.sign(priv, ek, m), 0, pes, 64 * i, 64);
+                System.arraycopy(ek, 0, pek, 32 * i, 32);
+                System.arraycopy(Schnorr.sign(m, priv, null), 0, pss, 64 * i, 64);
+                System.arraycopy(Schnorr.publicKey(priv), 0, psk, 32 * i, 32);
+                if (i % 11 == 4) {
+                    ph[32 * i] ^= 1;
+                    pes[64 * i + 3] ^= 1;
+                    pss[64 * i + 3] ^= 1;
+                }
+            }
+            pk[33 * 7 + 5] ^= 1;
+            pes[64 * 9 + 63] |= 0x10;
+            byte[] r1 = new byte[pn];
+            byte[] r2 = new byte[pn];
+            byte[] r3 = new byte[pn];
+            CryptoBatch.verifySecp256k1(ph, pc, pk, 33, r1, pn);
+            CryptoBatch.verifyEd25519(pm, 24, pes, pek, r2, pn);
+            CryptoBatch.verifySchnorr(pm, 24, pss, psk, r3, pn);
+            Bulk.p("packed.verify", Hash.toHex(Hash.sha256(r1)) + Hash.toHex(Hash.sha256(r2))
+                    + Hash.toHex(Hash.sha256(r3)) + r1[0] + r1[4] + r1[7] + r2[9] + r3[15]);
+            byte[] level = new byte[32 * pn];
+            CryptoBatch.sha256(pm, 24, pn, level);
+            byte[] up = new byte[32 * (pn / 2)];
+            CryptoBatch.sha256(level, 64, pn / 2, up);
+            byte[] kl = new byte[32 * pn];
+            CryptoBatch.keccak256(pc, 64, pn, kl);
+            Bulk.p("packed.hashes", Hash.toHex(Hash.sha256(up)) + Hash.toHex(Hash.sha256(kl)));
         });
         Bulk.check(name + ".sha2", () -> {
             // every padding boundary of both block sizes, and a key past each block size

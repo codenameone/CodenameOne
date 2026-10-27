@@ -41,6 +41,7 @@ JAVA_VOID K(ripemd160___byte_1ARRAY_int_int_byte_1ARRAY)(CODENAME_ONE_THREAD_STA
 JAVA_VOID K(hmac___int_byte_1ARRAY_byte_1ARRAY_int_int_byte_1ARRAY)(CODENAME_ONE_THREAD_STATE, JAVA_INT, JAVA_OBJECT, JAVA_OBJECT, JAVA_INT, JAVA_INT, JAVA_OBJECT);
 JAVA_VOID K(pbkdf2___int_byte_1ARRAY_byte_1ARRAY_int_byte_1ARRAY)(CODENAME_ONE_THREAD_STATE, JAVA_INT, JAVA_OBJECT, JAVA_OBJECT, JAVA_INT, JAVA_OBJECT);
 JAVA_VOID K(batch___int_byte_1ARRAY_int_1ARRAY_byte_1ARRAY_byte_1ARRAY_int_1ARRAY_byte_1ARRAY_int)(CODENAME_ONE_THREAD_STATE, JAVA_INT, JAVA_OBJECT, JAVA_OBJECT, JAVA_OBJECT, JAVA_OBJECT, JAVA_OBJECT, JAVA_OBJECT, JAVA_INT);
+JAVA_VOID K(batchPacked___int_byte_1ARRAY_int_byte_1ARRAY_byte_1ARRAY_int_byte_1ARRAY_int)(CODENAME_ONE_THREAD_STATE, JAVA_INT, JAVA_OBJECT, JAVA_INT, JAVA_OBJECT, JAVA_OBJECT, JAVA_INT, JAVA_OBJECT, JAVA_INT);
 JAVA_BOOLEAN K(schnorrSign___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_R_boolean)(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT, JAVA_OBJECT, JAVA_OBJECT, JAVA_OBJECT);
 JAVA_INT K(schnorrVerify___byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_R_int)(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT, JAVA_OBJECT, JAVA_OBJECT);
 
@@ -239,6 +240,29 @@ static void o_batch_sha(void) {
     }
 }
 
+static void c_batch_keccak(void) {
+    K(batchPacked___int_byte_1ARRAY_int_byte_1ARRAY_byte_1ARRAY_int_byte_1ARRAY_int)(0, 12, &aBleaves, 64, JAVA_NULL, JAVA_NULL, 0, &aBhres, LEAVES);
+}
+static void o_batch_keccak(void) {
+    for (int i = 0; i < LEAVES; i++) {
+        unsigned int l = 32;
+        sink += EVP_Digest(bleaves + 64 * i, 64, bres + 32 * i, &l, ossl_keccak, NULL);
+    }
+}
+static void c_packed_verify(void) {
+    todo();
+    K(batchPacked___int_byte_1ARRAY_int_byte_1ARRAY_byte_1ARRAY_int_byte_1ARRAY_int)(0, 1, &aBmsg, 32, &aBsig, &aBkey, 33, &aBres, BATCH);
+}
+/* one core, two 64-byte inputs per permutation where the vector unit allows it */
+static void c_keccak64x2(void) {
+    K(batchPacked___int_byte_1ARRAY_int_byte_1ARRAY_byte_1ARRAY_int_byte_1ARRAY_int)(0, 12, &aBleaves, 64, JAVA_NULL, JAVA_NULL, 0, &aBhres, 2);
+}
+static void o_keccak64x2(void) {
+    unsigned int l = 32;
+    sink += EVP_Digest(bleaves, 64, bres, &l, ossl_keccak, NULL);
+    sink += EVP_Digest(bleaves + 64, 64, bres + 32, &l, ossl_keccak, NULL);
+}
+
 static int batches(void) {
     for (int i = 0; i < BATCH; i++) {
         unsigned char k[32];
@@ -428,5 +452,10 @@ int main(void) {
     row("batch.secp256k1.verify", c_batch_verify, r_batch_verify);
     row("batch.ed25519.verify.openssl", c_batch_ed, o_batch_ed);
     row("batch.sha256.merkle.openssl", c_batch_sha, o_batch_sha);
+    row("batch.packed.secp256k1.verify", c_packed_verify, r_batch_verify);
+    if (ossl_keccak != NULL) {
+        row("batch.keccak256.merkle.openssl", c_batch_keccak, o_batch_keccak);
+        row("keccak256.64B.pair.openssl", c_keccak64x2, o_keccak64x2);
+    }
     return 0;
 }

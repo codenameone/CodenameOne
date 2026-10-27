@@ -365,3 +365,43 @@ JNIEXPORT void JNICALL NS(batch)(JNIEnv *env, jclass cls, jint alg, jbyteArray m
         }
     }
 }
+
+/* The packed batch, taken the same way as the batch above: four byte arrays, results copied back. */
+JNIEXPORT void JNICALL NS(batchPacked)(JNIEnv *env, jclass cls, jint alg, jbyteArray msgs, jint msgLen,
+        jbyteArray sigs, jbyteArray keys, jint keyLen, jbyteArray results, jint count) {
+    cn1j_arr a[4];
+    jbyteArray java[4];
+    int i, ok = 1;
+    java[0] = msgs; java[1] = sigs; java[2] = keys; java[3] = results;
+    for (i = 0; i < 4; i++) {
+        a[i].data = NULL;
+        a[i].length = 0;
+    }
+    for (i = 0; i < 4; i++) {
+        if (java[i] == NULL) {
+            continue;
+        }
+        a[i].length = (int) (*env)->GetArrayLength(env, java[i]);
+        a[i].data = (void*) (*env)->GetByteArrayElements(env, java[i], NULL);
+        if (a[i].data == NULL) {
+            ok = 0;
+            break;
+        }
+    }
+    if (ok) {
+        com_codename1_security_NativeCryptoKernels_batchPacked___int_byte_1ARRAY_int_byte_1ARRAY_byte_1ARRAY_int_byte_1ARRAY_int(
+                NULL, (JAVA_INT) alg, &a[0], (JAVA_INT) msgLen, java[1] == NULL ? JAVA_NULL : &a[1],
+                java[2] == NULL ? JAVA_NULL : &a[2], (JAVA_INT) keyLen, &a[3], (JAVA_INT) count);
+    }
+    for (i = 3; i >= 0; i--) {
+        if (a[i].data != NULL) {
+            (*env)->ReleaseByteArrayElements(env, java[i], (jbyte*) a[i].data, i == 3 ? 0 : JNI_ABORT);
+        }
+    }
+    if (!ok && !(*env)->ExceptionCheck(env)) {
+        jclass oom = (*env)->FindClass(env, "java/lang/OutOfMemoryError");
+        if (oom != NULL) {
+            (*env)->ThrowNew(env, oom, "could not reach an array for the crypto kernels");
+        }
+    }
+}

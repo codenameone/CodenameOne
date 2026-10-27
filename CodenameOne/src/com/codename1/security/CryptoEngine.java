@@ -179,6 +179,22 @@ public class CryptoEngine {
             byte[] results) {
     }
 
+    /// [#verifyBatch] over packed arrays: entry `i` is `messageLength` bytes
+    /// of `messages` from `messageLength * i`, 64 bytes of `signatures` from
+    /// `64 * i` and `keyLength` bytes of `keys` from `keyLength * i`. The same
+    /// result bytes as [#verifyBatch], and every range is already validated.
+    /// An engine that can should read the arrays in place.
+    public void verifyPacked(int algorithm, byte[] messages, int messageLength, byte[] signatures, byte[] keys,
+            int keyLength, byte[] results, int count) {
+    }
+
+    /// [#hashBatch] over packed arrays: digest `i` is of `inputLength` bytes of
+    /// `inputs` from `inputLength * i`, written at `32 * i` of `digests`.
+    /// Answers false to hash in Java. The ranges are already validated.
+    public boolean hashPacked(String algorithm, byte[] inputs, int inputLength, int count, byte[] digests) {
+        return false;
+    }
+
     /// The digests of `inputs` under [Hash#SHA256] or [Hash#KECCAK256], a
     /// `null` for each `null` input, or `null` to hash them in Java.
     public byte[][] hashBatch(String algorithm, byte[][] inputs) {

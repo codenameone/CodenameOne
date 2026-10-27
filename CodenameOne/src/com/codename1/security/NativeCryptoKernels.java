@@ -81,4 +81,12 @@ final class NativeCryptoKernels {
     /// longer than `count`; see `cn1_crypto_kernels.c` for the result bytes.
     static native void batch(int algorithm, byte[] messages, int[] messageOffsets, byte[] signatures,
             byte[] keys, int[] keyOffsets, byte[] results, int count);
+
+    /// [#batch] over packed arrays, read in place: entry `i` is
+    /// `messageLength` bytes of `messages` from `messageLength * i`, 64 bytes
+    /// of `signatures` from `64 * i` and `keyLength` bytes of `keys` from
+    /// `keyLength * i`. A hash batch passes null signatures and keys and
+    /// writes 32 bytes per entry to `results`.
+    static native void batchPacked(int algorithm, byte[] messages, int messageLength, byte[] signatures,
+            byte[] keys, int keyLength, byte[] results, int count);
 }

@@ -171,6 +171,116 @@ class CryptoBatchTest {
         }
     }
 
+    private static byte[] pack(byte[][] parts, int length) {
+        byte[] out = new byte[parts.length * length];
+        for (int i = 0; i < parts.length; i++) {
+            if (parts[i] != null) {
+                System.arraycopy(parts[i], 0, out, i * length, Math.min(length, parts[i].length));
+            }
+        }
+        return out;
+    }
+
+    @Test
+    void packedFormsMatchSingleVerify() {
+        byte[][] hashes = new byte[N][];
+        byte[][] compact = new byte[N][];
+        byte[][] keys = new byte[N][];
+        byte[][] msgs = new byte[N][];
+        byte[][] edSigs = new byte[N][];
+        byte[][] edKeys = new byte[N][];
+        byte[][] schSigs = new byte[N][];
+        byte[][] schKeys = new byte[N][];
+        for (int i = 0; i < N; i++) {
+            byte[] priv = bytes(i + 1, 32);
+            hashes[i] = bytes(i + 100, 32);
+            compact[i] = Secp256k1.sign(hashes[i], priv).toCompact();
+            keys[i] = Secp256k1.publicKey(priv, true);
+            byte[] seed = bytes(i + 200, 32);
+            msgs[i] = bytes(i + 300, 40);
+            edKeys[i] = Ed25519.publicKey(seed);
+            edSigs[i] = Ed25519.sign(seed, edKeys[i], msgs[i]);
+            schKeys[i] = Schnorr.publicKey(seed);
+            schSigs[i] = Schnorr.sign(msgs[i], seed, null);
+        }
+        hashes[3] = flip(hashes[3], 0);
+        keys[5] = keys[6];
+        keys[9] = flip(keys[9], 10);
+        compact[11] = new byte[64];
+        edSigs[2] = flip(edSigs[2], 1);
+        schSigs[2] = flip(schSigs[2], 1);
+        edSigs[9][63] |= 0x10;
+        edKeys[12] = new byte[32];
+        schKeys[12] = new byte[32];
+        byte[] ecdsa = new byte[N];
+        CryptoBatch.verifySecp256k1(pack(hashes, 32), pack(compact, 64), pack(keys, 33), 33, ecdsa, N);
+        byte[] ed = new byte[N + 3];
+        CryptoBatch.verifyEd25519(pack(msgs, 40), 40, pack(edSigs, 64), pack(edKeys, 32), ed, N);
+        byte[] sch = new byte[N];
+        CryptoBatch.verifySchnorr(pack(msgs, 40), 40, pack(schSigs, 64), pack(schKeys, 32), sch, N);
+        for (int i = 0; i < N; i++) {
+            boolean want;
+            try {
+                want = Secp256k1.verify(hashes[i], Secp256k1.EcdsaSignature.fromCompact(compact[i], 0), keys[i]);
+            } catch (CryptoException e) {
+                want = false;
+            }
+            assertEquals(want ? 1 : 0, ecdsa[i], "ecdsa entry " + i);
+            assertEquals(Ed25519.verify(msgs[i], edSigs[i], edKeys[i]) ? 1 : 0, ed[i], "ed25519 entry " + i);
+            try {
+                want = Schnorr.verify(msgs[i], schSigs[i], schKeys[i]);
+            } catch (CryptoException e) {
+                want = false;
+            }
+            assertEquals(want ? 1 : 0, sch[i], "schnorr entry " + i);
+        }
+        assertEquals(1, ecdsa[0]);
+        assertEquals(1, ed[0]);
+        assertEquals(1, sch[0]);
+        assertEquals(0, ecdsa[3] | ecdsa[5] | ecdsa[11] | ed[2] | ed[9] | ed[12] | sch[2] | sch[12]);
+        // past count nothing is written
+        assertEquals(0, ed[N] | ed[N + 1] | ed[N + 2]);
+    }
+
+    @Test
+    void packedHashesMatchSingleCalls() {
+        int n = 33;
+        byte[] in = bytes(7, 64 * n);
+        byte[] sha = new byte[32 * n];
+        byte[] kec = new byte[32 * n];
+        CryptoBatch.sha256(in, 64, n, sha);
+        CryptoBatch.keccak256(in, 64, n, kec);
+        for (int i = 0; i < n; i++) {
+            byte[] one = new byte[64];
+            System.arraycopy(in, 64 * i, one, 0, 64);
+            byte[] a = new byte[32];
+            byte[] b = new byte[32];
+            System.arraycopy(sha, 32 * i, a, 0, 32);
+            System.arraycopy(kec, 32 * i, b, 0, 32);
+            assertArrayEquals(Hash.sha256(one), a, "sha256 entry " + i);
+            assertArrayEquals(Hash.keccak256(one), b, "keccak entry " + i);
+        }
+        // a Merkle level in place: the digests of pairs become the next level's input
+        byte[] level = new byte[32 * 4];
+        CryptoBatch.sha256(sha, 64, 4, level);
+        byte[] pair = new byte[64];
+        System.arraycopy(sha, 64, pair, 0, 64);
+        byte[] second = new byte[32];
+        System.arraycopy(level, 32, second, 0, 32);
+        assertArrayEquals(Hash.sha256(pair), second);
+    }
+
+    @Test
+    void packedRangesAreChecked() {
+        assertThrows(CryptoException.class,
+                () -> CryptoBatch.verifySecp256k1(new byte[32], new byte[64], new byte[33], 34, new byte[1], 1));
+        assertThrows(CryptoException.class,
+                () -> CryptoBatch.verifySecp256k1(new byte[32], new byte[63], new byte[33], 33, new byte[1], 1));
+        assertThrows(CryptoException.class,
+                () -> CryptoBatch.verifyEd25519(new byte[10], 5, new byte[128], new byte[64], new byte[1], 2));
+        assertThrows(CryptoException.class, () -> CryptoBatch.sha256(new byte[64], 64, 2, new byte[64]));
+    }
+
     @Test
     void mismatchedArraysAreRefused() {
         assertThrows(CryptoException.class, () -> CryptoBatch.verifyEd25519(new byte[2][], new byte[1][], new byte[2][]));

@@ -78,6 +78,45 @@ int main(void) {
     cn1k_pbkdf2_sha512((const unsigned char *)"password", 8, (const unsigned char *)"salt", 4, 1, out, 64);
     check("pbkdf2-sha512 c=1", out, 64, "867f70cf1ade02cff3752599a3a53dc4af34c7a669815ae5d513554e1c8cf252"
                                         "c02d470a285a0501bad999bfe943c08f050235d7d68b1da55e63f73b60a57fce");
+    cn1k_keccak256((const unsigned char *)"abc", 3, out);
+    check("keccak256 abc", out, 32, "4e03657aea45a94fc7d47ba826c8d667c0d1e6e33a64a036ec44f58fa12d6c45");
+    {
+        /* the selected Keccak and the paired form against the portable one, over every padding case */
+        size_t len;
+        int bad = 0;
+        for (len = 0; len <= 700; len++) {
+            unsigned char ref0[32], ref1[32], got0[32], got1[32];
+            million[len] = (unsigned char) (len * 31);
+            cn1k_keccak256_c(million + 1, len, ref0);
+            cn1k_keccak256_c(million + 3 + len % 7, len, ref1);
+            cn1k_keccak256(million + 1, len, got0);
+            if (memcmp(ref0, got0, 32) != 0) {
+                bad++;
+            }
+            cn1k_keccak256_pair(million + 1, million + 3 + len % 7, len, got0, got1);
+            if (memcmp(ref0, got0, 32) != 0 || memcmp(ref1, got1, 32) != 0) {
+                bad++;
+            }
+        }
+        printf("%s keccak selected/paired vs portable, 0..700 bytes (%s)\n", bad ? "FAIL" : "ok  ",
+               cn1k_keccak_select() == cn1k_keccak256_c ? "portable" : "vector");
+        failures += bad;
+    }
+    {
+        size_t len;
+        int bad = 0;
+        for (len = 0; len <= 300; len++) {
+            unsigned char ref0[32], ref1[32], got0[32], got1[32];
+            cn1k_sha256(million + 2, len, ref0);
+            cn1k_sha256(million + 5, len, ref1);
+            cn1k_sha256_pair(million + 2, million + 5, len, got0, got1);
+            if (memcmp(ref0, got0, 32) != 0 || memcmp(ref1, got1, 32) != 0) {
+                bad++;
+            }
+        }
+        printf("%s sha256 paired vs single, 0..300 bytes\n", bad ? "FAIL" : "ok  ");
+        failures += bad;
+    }
     free(million);
     printf("%s (%d failing)\n", failures ? "FAILED" : "PASSED", failures);
     return failures ? 1 : 0;
