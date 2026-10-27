@@ -382,4 +382,35 @@ class CryptoBatchTest {
                 new byte[2][], null));
         assertThrows(CryptoException.class, () -> CryptoBatch.sha256Async(new byte[1][], null));
     }
+
+    @Test
+    void anAsyncBatchThatThrowsReachesItsCallbackOnceWithTheError() {
+        final Throwable[] thrown = {new IllegalStateException("kernel"), new OutOfMemoryError("batch")};
+        for (final Throwable t : thrown) {
+            CryptoEngine.install(new CryptoEngine() {
+                @Override
+                public void runInBackground(Runnable task) {
+                    task.run();
+                }
+
+                @Override
+                public boolean hashPacked(String algorithm, byte[] inputs, int inputLength, int count,
+                        byte[] digests) {
+                    if (t instanceof Error) {
+                        throw (Error) t;
+                    }
+                    throw (RuntimeException) t;
+                }
+            });
+            final java.util.List<Object[]> calls = new java.util.ArrayList<Object[]>();
+            CryptoBatch.sha256Async(new byte[64 * N], 64, N, new byte[32 * N], new CryptoBatch.Callback<byte[]>() {
+                public void done(byte[] result, Throwable error) {
+                    calls.add(new Object[] {result, error});
+                }
+            });
+            assertEquals(1, calls.size(), "callbacks for " + t);
+            assertNull(calls.get(0)[0]);
+            assertSame(t, calls.get(0)[1]);
+        }
+    }
 }

@@ -3,7 +3,7 @@
 
 The `com.codename1.crypto` packages hold everything a wallet, an exchange or a payment backend needs to work with Ethereum and the other EVM chains, Bitcoin, and Solana. That covers recovery phrases and key derivation, addresses, transactions, signing, the node APIs that broadcast transactions and read balances, and price feeds. There are no third-party libraries to add, and the same classes run in the app and in a Codename One backend.
 
-The heavy parts run as native code wherever the platform allows it: secp256k1, Schnorr, Ed25519, the hashes and the PBKDF2 behind a recovery phrase. Elsewhere they fall back to an optimized pure-Java engine. A benchmark in CI compares every kernel against libsecp256k1, libsodium, OpenSSL and BouncyCastle on the same machine, and fails a build that falls behind.
+The heavy parts run as native code wherever the platform allows it: secp256k1, Schnorr, Ed25519, the hashes and the PBKDF2 behind a recovery phrase. Elsewhere they fall back to an optimized pure-Java engine. A benchmark in CI compares every kernel against libsecp256k1, libsodium, OpenSSL and BouncyCastle on the same machine, and fails a pull request whose crypto changes fall behind.
 
 The packages, from the bottom up:
 
@@ -19,6 +19,30 @@ The packages, from the bottom up:
 | `crypto.rpc` | JSON-RPC for EVM nodes, Esplora for Bitcoin, Solana JSON-RPC
 | `crypto.market` | `PriceFeed`, CoinGecko, any JSON price API, and a caching decorator
 |===
+
+=== The building blocks
+
+A handful of algorithms do all the work underneath, and the names come up throughout this chapter and in every chain's documentation. You never call most of them directly, but knowing what each one is for makes the rest easier to follow, and it explains why their speed matters.
+
+*Elliptic curves and signatures.* A private key is a large random number. The public key is a point on an elliptic curve, computed from it in a way that's easy forward and infeasible to reverse. A signature proves that the holder of the private key approved a message, and anyone with the public key can check it.
+
+* *secp256k1* is the curve Bitcoin and Ethereum use. *ECDSA* is the signature scheme they sign transactions with. Ethereum also recovers the sender's public key from a signature, which is why an Ethereum transaction carries no sender address.
+* *Schnorr* signatures (BIP-340) are the newer scheme on the same curve, used by Bitcoin's Taproot addresses. They're simpler than ECDSA and can be combined, which is what makes multi-party Taproot spends compact.
+* *Ed25519* is a signature scheme on a different curve, Curve25519. Solana uses it, as do many protocols outside crypto currency. It was designed to be fast and hard to implement wrongly.
+
+Verifying is the expensive direction. A wallet signs a handful of transactions, but a node, an exchange or an indexer verifies every signature it receives, which is where batches and the GPU come in.
+
+*Hash functions.* A hash turns any input into a short fixed-size fingerprint. Changing one bit of the input changes the whole fingerprint, and nobody can find two inputs with the same one.
+
+* *SHA-256* is Bitcoin's hash: transaction IDs, block headers and the Merkle trees that commit to a block's transactions. Bitcoin addresses take *RIPEMD-160* of the SHA-256 of the public key, which gives a shorter 20-byte fingerprint.
+* *Keccak-256* is Ethereum's hash: addresses, transaction hashes, the selectors of contract functions and the keys of contract storage. It's the algorithm that became SHA-3, but with the original padding, so a SHA-3 library gives different answers.
+* *SHA-512* and *HMAC-SHA512* (a keyed hash) are what key derivation is built on.
+
+A *Merkle tree* hashes a list of items in pairs, then hashes the pairs, until one root remains. Changing any item changes the root, so a block header commits to all its transactions in 32 bytes. Building a level of one is a batch of independent hashes, which is what the Merkle rows in the benchmarks measure.
+
+*From a recovery phrase to keys.* *BIP-39* turns random bytes into a phrase of 12 or 24 words and back. It stretches the phrase into a 64-byte seed with *PBKDF2*, which runs HMAC-SHA512 2,048 times on purpose, so that guessing phrases is slow for an attacker. It's also the one step a user waits for when they restore a wallet. *BIP-32* derives a tree of keys from that seed, so one phrase yields every account on every chain, and *SLIP-10* does the same for Ed25519. A *derivation path* such as `m/44'/60'/0'/0/0` names one key in the tree.
+
+*Engines, kernels, and batches.* The public classes are plain Java and the same everywhere. Underneath, a *crypto engine* supplies the compute-heavy *kernels*, which are the signature and hash operations above. On iOS, macOS, Android, Windows, Linux and a production backend the engine is native C, which uses the processor's vector and hash instructions where it has them. On the JVM and in the browser it's an optimized pure-Java engine. A *batch* hands many independent operations to the engine at once, so it can spread them across every CPU core and, for large batches, the GPU.
 
 === From a recovery phrase to a wallet
 
@@ -119,7 +143,7 @@ Every `CryptoBatch` method has an asynchronous form with `Async` added to its na
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/CryptoWalletSnippets.java[tag=crypto-batch-async,indent=0]
 ----
 
-In the app the callback runs on the EDT, so it can update the UI directly. In a backend it runs on the thread that did the work. The arguments are checked before the call returns, so a malformed batch, such as arrays of different lengths, throws right away instead of reaching the callback. The callback gets exactly what the synchronous form would have returned, or the exception it would have thrown. A packed form hands back the results array you passed in; until the callback runs, the batch owns its arrays, so don't change them.
+In the app the callback runs on the EDT, so it can update the UI directly. In a backend it runs on the thread that did the work. The arguments are checked before the call returns, so a malformed batch, such as arrays of different lengths, throws right away instead of reaching the callback. The callback gets exactly what the synchronous form would have returned, or the exception it would have thrown. A packed form hands back the results array you passed in. The batch reads your arrays directly rather than copying them, so until the callback runs they belong to the batch: change one before then and you change what's being verified.
 
 In a browser, use the asynchronous forms. A large batch there goes to the GPU through WebGPU, which answers only asynchronously. The synchronous form still works, but it holds the calling thread until the GPU is done, and on the EDT that means the UI waits too. When the browser has no WebGPU adapter, both forms run on the CPU. The GPU kernels are about 460 KB of JavaScript, and they're included only in apps that call `CryptoBatch`, loaded the first time a batch is large enough to use them.
 
@@ -133,7 +157,7 @@ image::img/crypto-bench-ratios.svg[Codename One throughput as a multiple of the 
 
 ==== On the JVM
 
-The simulator, JavaSE desktop apps and the backend in development run the portable Java implementation. It's compared with BouncyCastle 1.84 and, for Ed25519, with the JDK's own provider, on JDK 25.
+The simulator, JavaSE desktop apps and the backend in development run the portable Java implementation. It's compared with BouncyCastle 1.84 and, for Ed25519, with the JDK's own provider, on JDK 25. CI runs the same benchmark on JDK 17.
 
 [cols="3,2,2,1",options="header"]
 |===
@@ -189,9 +213,11 @@ A batch runs on every core, so it's measured against the reference library verif
 | Keccak-256 Merkle level | 5,613 | 796 | 7.06x
 |===
 
+image::img/crypto-bench-multicore.svg[A native batch on every core as a multiple of the reference library called once per entry,scaledwidth=100%]
+
 ==== Android
 
-Android has no curve secp256k1 in its platform, so apps there would otherwise ship BouncyCastle. The table shows both the native kernels and the portable Java implementation, each against BouncyCastle on the same device.
+Android has no curve secp256k1 in its platform, so apps there would otherwise ship BouncyCastle. The table shows both the native kernels and the portable Java implementation, each against BouncyCastle on the same device. The two engines ran separately, each beside its own BouncyCastle run, so each ratio is against the BouncyCastle figure from its own run; the column shows the one from the native run, and the two agree to within 4%.
 
 [cols="3,2,2,2",options="header"]
 |===
@@ -204,10 +230,13 @@ Android has no curve secp256k1 in its platform, so apps there would otherwise sh
 | Ed25519 verify | 39,721 (1.44x) | 19,633 (0.72x) | 27,571
 | Keccak-256, 1 KB | 762,149 (1.96x) | 384,908 (0.98x) | 388,709
 | SHA-256, 1 KB | 292,535 (1.08x) | 287,546 (1.08x) | 270,445
+| RIPEMD-160, 1 KB | 214,766 (0.71x) | 205,703 (0.69x) | 304,410
 | BIP-39 seed | 1,037 (1.36x) | 1,033 (1.36x) | 761
 |===
 
-SHA-256 and the BIP-39 seed go through the platform's own native implementation in both columns, which is why they match.
+SHA-256 and the BIP-39 seed go through the platform's own native implementation in both columns, which is why they match. With the native kernels, RIPEMD-160 is the one row where BouncyCastle stays ahead; it's hashed once per Bitcoin address, so it's never the bottleneck. The portable Java column trails BouncyCastle on Ed25519 and RIPEMD-160 and matches it on Keccak-256.
+
+image::img/crypto-bench-android.svg[Both Android engines as a multiple of BouncyCastle on ART,scaledwidth=100%]
 
 ==== The GPU
 
@@ -222,7 +251,11 @@ A GPU verifies signatures in parallel by the thousand, but each entry first need
 | Keccak-256 | 7.1 GB/s | 3.6 GB/s | 1.01x | 3 MB
 |===
 
-On a desktop-class CPU the gain is modest, because twelve cores with vector units are already fast. The GPU matters more where the CPU is weaker relative to it, as on phones, tablets and in the browser. SHA-256 stays on the CPU on Apple silicon, whose SHA instructions outrun the GPU.
+The chart shows the signature rows; Keccak-256 is measured in bytes rather than signatures, so it appears only in the table.
+
+image::img/crypto-bench-gpu.svg[Signatures verified per second by the CPU, the GPU and both together,scaledwidth=100%]
+
+On this machine the gain is modest, because sixteen CPU cores with vector units are already fast. The split is worked out from the speeds measured on each device, so a GPU that's strong relative to its CPU takes a larger share, and one that's slower takes none. SHA-256 has no GPU row: in this run no SHA-256 batch reached the GPU's minimum size, so they all ran on the CPU.
 
 ==== In the browser
 
@@ -231,14 +264,14 @@ The JavaScript port runs the portable Java implementation, translated to JavaScr
 [cols="3,2,2,1",options="header"]
 |===
 | Batch | WebGPU | Portable Java | Ratio
-| ECDSA verify | 1,046/s | 178/s | 5.9x
-| Schnorr verify | 1,860/s | 180/s | 10.3x
-| Ed25519 verify | 1,721/s | 179/s | 9.6x
-| SHA-256 | 34.4 MB/s | 5.7 MB/s | 6.0x
-| Keccak-256 | 149.8 MB/s | 1.4 MB/s | 109x
+| ECDSA verify | 2,174/s | 255/s | 8.5x
+| Schnorr verify | 2,698/s | 258/s | 10.5x
+| Ed25519 verify | 2,070/s | 240/s | 8.6x
+| SHA-256 | 28.3 MB/s | 8.1 MB/s | 3.5x
+| Keccak-256 | 174.8 MB/s | 1.9 MB/s | 92x
 |===
 
-In the browser most of the time a WebGPU batch takes is the preparation in JavaScript, not the GPU work. The kernels alone verify about 174,000 ECDSA, 162,000 Schnorr and 211,000 Ed25519 signatures a second there.
+In the browser most of the time a WebGPU batch takes is the preparation in JavaScript, not the GPU work, and the browser's figures move more from run to run than the native ones: across three runs SHA-256 on WebGPU ranged from 4 to 34 MB/s, and in the slowest it trailed the CPU. In every run the WebGPU answers matched the CPU's. The kernels alone verify about 174,000 ECDSA, 162,000 Schnorr and 211,000 Ed25519 signatures a second there.
 
 The chart puts the platforms side by side for a batch of signatures, on a logarithmic scale:
 

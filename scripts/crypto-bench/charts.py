@@ -179,7 +179,42 @@ def main(argv):
                           "JVM, one core", "Native, one core", "Native, every core and the GPU"],
                          values, "signatures verified per second (log scale)", log=True, fmt=lambda v: "{:,.0f}".format(v),
                          width=780)
-    for name, text in (("crypto-bench-ratios.svg", ratios), ("crypto-bench-batch.svg", batch)):
+    groups, values = [], []
+    for label, k in (("ECDSA verify", "ecdsa"), ("Schnorr verify", "schnorr"), ("Ed25519 verify", "ed25519")):
+        g = metal.get(k)
+        if g:
+            groups.append(label)
+            values.append([g["cpu"], g["gpu"], g["cpu"] * g["speedup"]])
+    gpu = grouped_bars("Splitting a batch between the CPU and the GPU (Metal)", groups,
+                       ["CPU, every core", "GPU alone", "Both together"],
+                       values, "signatures verified per second", fmt=lambda v: "{:,.0f}".format(v))
+
+    java = rows(os.path.join(results, "android.txt"), "Java engine")
+    groups, values = [], []
+    for label, k in (("ECDSA sign", "secp256k1.sign"), ("ECDSA verify", "secp256k1.verify"),
+                     ("Schnorr verify", "schnorr.verify"), ("Ed25519 sign", "ed25519.sign"),
+                     ("Ed25519 verify", "ed25519.verify"), ("Keccak-256, 1 KB", "keccak256.1k"),
+                     ("RIPEMD-160, 1 KB", "ripemd160.1k"), ("BIP-39 seed", "pbkdf2.sha512.bip39")):
+        groups.append(label)
+        values.append([android[k][2] if k in android else None, java[k][2] if k in java else None])
+    droid = grouped_bars("Android: both engines against BouncyCastle on ART", groups,
+                         ["Native kernels", "Portable Java"],
+                         values, "times BouncyCastle's throughput", ref_line=1.0, fmt=lambda v: "%.2fx" % v)
+
+    groups, values = [], []
+    for label, k in (("ECDSA verify", "batch.secp256k1.verify"), ("ECDSA verify, packed", "batch.packed.secp256k1.verify"),
+                     ("Ed25519 verify", "batch.ed25519.verify.openssl"), ("SHA-256 Merkle level", "batch.sha256.merkle.openssl"),
+                     ("Keccak-256 Merkle level", "batch.keccak256.merkle.openssl")):
+        if k in native:
+            groups.append(label)
+            values.append([native[k][2]])
+    multi = grouped_bars("A native batch on every core, against one call at a time", groups,
+                         ["CryptoBatch, against the reference library in a loop"],
+                         values, "times the reference library's throughput", ref_line=1.0, fmt=lambda v: "%.2fx" % v)
+
+    for name, text in (("crypto-bench-ratios.svg", ratios), ("crypto-bench-batch.svg", batch),
+                       ("crypto-bench-gpu.svg", gpu), ("crypto-bench-android.svg", droid),
+                       ("crypto-bench-multicore.svg", multi)):
         with open(os.path.join(out, name), "w", newline="\n") as f:
             f.write(text)
         print("wrote " + os.path.relpath(os.path.join(out, name), ROOT))

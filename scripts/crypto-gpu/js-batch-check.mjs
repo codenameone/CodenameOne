@@ -57,7 +57,9 @@ const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PAT
     args: ["--enable-unsafe-webgpu", "--enable-features=Vulkan,WebGPU", "--use-angle=metal"] });
 const lines = [];
 let failed = false;
-try {
+// runs the app once; failGpu > 0 makes that many GPU dispatches fail, so the batches the GPU was
+// given finish on the Java path and must still agree
+async function run(failGpu) {
     const page = await browser.newPage();
     const done = new Promise(resolve => {
         page.on("console", msg => {
@@ -72,7 +74,9 @@ try {
         });
     });
     page.on("pageerror", e => console.log("page error: " + e));
-    await page.goto("http://127.0.0.1:" + server.address().port + "/?n=" + entries);
+    lines.length = 0;
+    await page.goto("http://127.0.0.1:" + server.address().port + "/?n=" + entries
+        + (failGpu > 0 ? "&cn1CryptoGpuFail=" + failGpu : ""));
     const hasGpu = await page.evaluate(async () => !!(navigator.gpu && await navigator.gpu.requestAdapter()));
     if (!hasGpu) {
         console.log("no WebGPU adapter in this browser");
@@ -90,6 +94,14 @@ try {
             failed = true;
         }
         process.exitCode = failed ? 1 : 0;
+    }
+    await page.close();
+}
+try {
+    await run(0);
+    if (process.exitCode === 0) {
+        console.log("-- again, with the first three GPU dispatches failing");
+        await run(3);
     }
 } finally {
     await browser.close();

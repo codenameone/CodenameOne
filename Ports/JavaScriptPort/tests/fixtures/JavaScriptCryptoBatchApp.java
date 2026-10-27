@@ -53,8 +53,9 @@ public class JavaScriptCryptoBatchApp extends Lifecycle {
         form.add(status);
         form.show();
         String query = com.codename1.ui.Display.getInstance().getProperty("browser.window.location.search", "");
-        int at = query.indexOf("n=");
-        final int n = at < 0 ? 4096 : Integer.parseInt(query.substring(at + 2));
+        int at = query.startsWith("?n=") ? 1 : query.indexOf("&n=") + 1;
+        int end = query.indexOf('&', at);
+        final int n = at <= 0 ? 4096 : Integer.parseInt(query.substring(at + 2, end < 0 ? query.length() : end));
         new Thread(new Runnable() {
             public void run() {
                 try {
@@ -127,14 +128,16 @@ public class JavaScriptCryptoBatchApp extends Lifecycle {
             long t2 = System.currentTimeMillis();
             int agree = 0;
             int valid = 0;
-            for (int i = 0; i < m; i++) {
-                agree += gpu[i] == cpu[i] ? 1 : 0;
+            // entry i repeats entry i % DISTINCT, which the CPU arm covers, so every GPU answer is
+            // held to the portable engine's -- not only the tenth the CPU arm ran
+            for (int i = 0; i < n; i++) {
+                agree += gpu[i] == cpu[i % DISTINCT] ? 1 : 0;
             }
             for (int i = 0; i < n; i++) {
                 valid += gpu[i];
             }
             System.out.println("CN1-CRYPTO " + (kernel == 0 ? "ecdsa" : kernel == 1 ? "schnorr" : "ed25519")
-                    + " n=" + n + " agree=" + agree + "/" + m + " valid=" + valid
+                    + " n=" + n + " agree=" + agree + "/" + n + " valid=" + valid
                     + " gpuPerSec=" + rate(n, t1 - t0) + " cpuPerSec=" + rate(m, t2 - t1));
             status.setText("kernel " + kernel + " done");
         }

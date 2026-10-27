@@ -8045,8 +8045,17 @@ function cn1CryptoGpuOpen() {
       }
       const device = await adapter.requestDevice();
       device.lost.then(function() {
+        // forget this device, its pipelines and tables: the next batch asks for a new one, so a
+        // GPU reset (a driver update, a backgrounded tab) does not end WebGPU for the page
         cn1CryptoGpu.lost = true;
+        if (cn1CryptoGpu.device === device) {
+          cn1CryptoGpu.device = null;
+          cn1CryptoGpu.pipes = {};
+          cn1CryptoGpu.tables = {};
+          cn1CryptoGpu.opening = null;
+        }
       });
+      cn1CryptoGpu.lost = false;
       cn1CryptoGpu.device = device;
       return true;
     } catch (err) {
@@ -8089,20 +8098,43 @@ function cn1CryptoGpuTable(name) {
   return cn1CryptoGpu.tables[name];
 }
 
-// one dispatch of count entries; answers the output words, or null
+// one dispatch of count entries; answers the output words, or null. WebGPU reports a validation
+// or allocation failure through an error scope rather than by throwing -- the commands are then
+// dropped and the mapped read buffer still resolves, holding zeros -- so every dispatch runs in
+// one scope of each kind and a captured error answers null, never the zeros.
 async function cn1CryptoGpuRun(kernel, input, len, count, outWords) {
+  const owned = [];
+  let scoped = 0;
+  const device = cn1CryptoGpu.device;
   try {
-    if (cn1CryptoGpu.lost) {
+    if (cn1CryptoGpu.lost || !device) {
       return null;
     }
-    const device = cn1CryptoGpu.device;
+    if (cn1CryptoGpu.failNext === undefined) {
+      // test hook: js-batch-check.mjs loads the page with ?cn1CryptoGpuFail=N (the worker's URL
+      // carries the page's query) to fail the first N dispatches and prove the Java fallback
+      const m = typeof self !== "undefined" && self.location
+          ? /[?&]cn1CryptoGpuFail=(\d+)/.exec(String(self.location.search)) : null;
+      cn1CryptoGpu.failNext = m ? parseInt(m[1], 10) : 0;
+    }
+    if (cn1CryptoGpu.failNext > 0) {
+      cn1CryptoGpu.failNext--;
+      return null;
+    }
+    device.pushErrorScope("validation");
+    device.pushErrorScope("out-of-memory");
+    scoped = 2;
     const pipe = await cn1CryptoGpuPipe(kernel);
     const outBytes = Math.max(16, outWords * 4);
     const inBuf = cn1CryptoGpuBuffer(input, GPUBufferUsage.STORAGE);
+    owned.push(inBuf);
     const outBuf = device.createBuffer({ size: outBytes, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC });
+    owned.push(outBuf);
     const read = device.createBuffer({ size: outBytes, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
+    owned.push(read);
     const uniform = cn1CryptoGpuBuffer(new Uint8Array(new Uint32Array([len, count, 0, 0]).buffer),
         GPUBufferUsage.UNIFORM);
+    owned.push(uniform);
     const entries = [
       { binding: 0, resource: { buffer: inBuf } },
       { binding: 1, resource: { buffer: outBuf } },
@@ -8121,16 +8153,26 @@ async function cn1CryptoGpuRun(kernel, input, len, count, outWords) {
     pass.end();
     encoder.copyBufferToBuffer(outBuf, 0, read, 0, outBytes);
     device.queue.submit([encoder.finish()]);
+    scoped = 0;
+    const memoryError = await device.popErrorScope();
+    const validationError = await device.popErrorScope();
+    if (memoryError || validationError) {
+      return null;
+    }
     await read.mapAsync(GPUMapMode.READ);
     const out = new Uint32Array(read.getMappedRange().slice(0, outWords * 4));
     read.unmap();
-    inBuf.destroy();
-    outBuf.destroy();
-    read.destroy();
-    uniform.destroy();
-    return out;
+    return cn1CryptoGpu.lost ? null : out;
   } catch (err) {
     return null;
+  } finally {
+    while (scoped > 0) {
+      scoped--;
+      try { await device.popErrorScope(); } catch (ignored) { /* the device went away */ }
+    }
+    for (let i = 0; i < owned.length; i++) {
+      try { owned[i].destroy(); } catch (ignored) { /* already gone with the device */ }
+    }
   }
 }
 

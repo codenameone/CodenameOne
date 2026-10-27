@@ -55,9 +55,6 @@ public class HTML5CryptoEngine extends PortCryptoEngine {
     private static final int K_SHA256 = 3;
     private static final int K_KECCAK256 = 4;
 
-    // 0 not yet asked, 1 available, 2 not available
-    private int gpu;
-
     /// Creates the engine over the browser port.
     ///
     /// #### Parameters
@@ -67,11 +64,10 @@ public class HTML5CryptoEngine extends PortCryptoEngine {
         super(impl);
     }
 
-    private boolean gpu() {
-        if (gpu == 0) {
-            gpu = gpuOpen() ? 1 : 2;
-        }
-        return gpu == 1;
+    // asked on every batch rather than remembered: port.js keeps the answer while its device lives
+    // and asks for a new one after a device loss, which a cached answer here would never see
+    private static boolean gpu() {
+        return gpuOpen();
     }
 
     @Override
@@ -142,7 +138,9 @@ public class HTML5CryptoEngine extends PortCryptoEngine {
 
     @Override
     public boolean hashPacked(String algorithm, byte[] inputs, int inputLength, int count, byte[] digests) {
-        if ((long) inputLength * count < MIN_GPU_HASH_BYTES || !gpu()) {
+        // an input past one dispatch's budget cannot be split across dispatches; the CPU takes it
+        if ((long) inputLength * count < MIN_GPU_HASH_BYTES || inputLength > MAX_HASH_BYTES_PER_DISPATCH
+                || !gpu()) {
             return false;
         }
         int kernel = Hash.SHA256.equals(algorithm) ? K_SHA256 : K_KECCAK256;
@@ -168,7 +166,7 @@ public class HTML5CryptoEngine extends PortCryptoEngine {
         return true;
     }
 
-    // whether the browser has a WebGPU device that compiles the kernels; asks once
+    // whether the browser has a WebGPU device; port.js opens it once and again after a loss
     private static native boolean gpuOpen();
 
     // runs count records of words each through a verify kernel, an answer per record

@@ -1,6 +1,6 @@
-CN1-CRYPTO ecdsa n=4096 agree=409/409 valid=3520 gpuPerSec=1046 cpuPerSec=178
-CN1-CRYPTO schnorr n=4096 agree=409/409 valid=3520 gpuPerSec=1860 cpuPerSec=180
-CN1-CRYPTO ed25519 n=4096 agree=409/409 valid=3520 gpuPerSec=1721 cpuPerSec=179
-CN1-CRYPTO sha256 n=32768 agree=32768/32768 gpuMBps=34.377 cpuMBps=5.713
-CN1-CRYPTO keccak256 n=32768 agree=32768/32768 gpuMBps=149.785 cpuMBps=1.373
+CN1-CRYPTO ecdsa n=4096 agree=4096/4096 valid=3520 gpuPerSec=2174 cpuPerSec=255
+CN1-CRYPTO schnorr n=4096 agree=4096/4096 valid=3520 gpuPerSec=2698 cpuPerSec=258
+CN1-CRYPTO ed25519 n=4096 agree=4096/4096 valid=3520 gpuPerSec=2070 cpuPerSec=240
+CN1-CRYPTO sha256 n=32768 agree=32768/32768 gpuMBps=28.337 cpuMBps=8.065
+CN1-CRYPTO keccak256 n=32768 agree=32768/32768 gpuMBps=174.75 cpuMBps=1.896
 CN1-CRYPTO-DONE

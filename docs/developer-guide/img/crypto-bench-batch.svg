@@ -12,10 +12,10 @@
   <rect x="190" y="112" width="12" height="12" fill="#c4473d"/>
   <text x="208" y="122" font-family="Arial, sans-serif" font-size="12" fill="#333333">Native, every core and the GPU</text>
   <text x="182" y="176" font-family="Arial, sans-serif" font-size="12" text-anchor="end" fill="#222222">ECDSA</text>
-  <rect x="190" y="140" width="32.6" height="11" fill="#2f6fb5"/>
-  <text x="226.6" y="149" font-family="Arial, sans-serif" font-size="10" fill="#333333">178</text>
-  <rect x="190" y="153" width="132.5" height="11" fill="#e08a1e"/>
-  <text x="326.5" y="162" font-family="Arial, sans-serif" font-size="10" fill="#333333">1,046</text>
+  <rect x="190" y="140" width="52.9" height="11" fill="#2f6fb5"/>
+  <text x="246.9" y="149" font-family="Arial, sans-serif" font-size="10" fill="#333333">255</text>
+  <rect x="190" y="153" width="173.8" height="11" fill="#e08a1e"/>
+  <text x="367.8" y="162" font-family="Arial, sans-serif" font-size="10" fill="#333333">2,174</text>
   <rect x="190" y="166" width="280.0" height="11" fill="#3a9b5c"/>
   <text x="474.0" y="175" font-family="Arial, sans-serif" font-size="10" fill="#333333">14,252</text>
   <rect x="190" y="179" width="351.8" height="11" fill="#8a5cc2"/>
@@ -23,10 +23,10 @@
   <rect x="190" y="192" width="465.4" height="11" fill="#c4473d"/>
   <text x="659.4" y="201" font-family="Arial, sans-serif" font-size="10" fill="#333333">380,460</text>
   <text x="182" y="255" font-family="Arial, sans-serif" font-size="12" text-anchor="end" fill="#222222">Schnorr</text>
-  <rect x="190" y="219" width="33.2" height="11" fill="#2f6fb5"/>
-  <text x="227.2" y="228" font-family="Arial, sans-serif" font-size="10" fill="#333333">180</text>
-  <rect x="190" y="232" width="165.0" height="11" fill="#e08a1e"/>
-  <text x="359.0" y="241" font-family="Arial, sans-serif" font-size="10" fill="#333333">1,860</text>
+  <rect x="190" y="219" width="53.5" height="11" fill="#2f6fb5"/>
+  <text x="247.5" y="228" font-family="Arial, sans-serif" font-size="10" fill="#333333">258</text>
+  <rect x="190" y="232" width="186.0" height="11" fill="#e08a1e"/>
+  <text x="380.0" y="241" font-family="Arial, sans-serif" font-size="10" fill="#333333">2,698</text>
   <rect x="190" y="245" width="280.2" height="11" fill="#3a9b5c"/>
   <text x="474.2" y="254" font-family="Arial, sans-serif" font-size="10" fill="#333333">14,299</text>
   <rect x="190" y="258" width="349.0" height="11" fill="#8a5cc2"/>
@@ -34,10 +34,10 @@
   <rect x="190" y="271" width="450.4" height="11" fill="#c4473d"/>
   <text x="644.4" y="280" font-family="Arial, sans-serif" font-size="10" fill="#333333">291,540</text>
   <text x="182" y="334" font-family="Arial, sans-serif" font-size="12" text-anchor="end" fill="#222222">Ed25519</text>
-  <rect x="190" y="298" width="32.9" height="11" fill="#2f6fb5"/>
-  <text x="226.9" y="307" font-family="Arial, sans-serif" font-size="10" fill="#333333">179</text>
-  <rect x="190" y="311" width="160.7" height="11" fill="#e08a1e"/>
-  <text x="354.7" y="320" font-family="Arial, sans-serif" font-size="10" fill="#333333">1,721</text>
+  <rect x="190" y="298" width="49.4" height="11" fill="#2f6fb5"/>
+  <text x="243.4" y="307" font-family="Arial, sans-serif" font-size="10" fill="#333333">240</text>
+  <rect x="190" y="311" width="171.1" height="11" fill="#e08a1e"/>
+  <text x="365.1" y="320" font-family="Arial, sans-serif" font-size="10" fill="#333333">2,070</text>
   <rect x="190" y="324" width="290.9" height="11" fill="#3a9b5c"/>
   <text x="484.9" y="333" font-family="Arial, sans-serif" font-size="10" fill="#333333">17,293</text>
   <rect x="190" y="337" width="337.0" height="11" fill="#8a5cc2"/>

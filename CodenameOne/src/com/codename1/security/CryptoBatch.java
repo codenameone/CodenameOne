@@ -45,7 +45,10 @@ package com.codename1.security;
 /// to the GPU through WebGPU, which answers only asynchronously, and the
 /// synchronous form holds its thread for that long. The arguments are checked
 /// before the call returns, so a malformed batch throws right away rather than
-/// reaching the callback.
+/// reaching the callback. The batch reads the arrays it was given, not a copy,
+/// so they belong to it until the callback runs: changing one before then
+/// changes the entries being verified. The callback runs exactly once, with the
+/// result or with whatever was thrown, an `Error` included.
 @com.codename1.impl.SharedWithBackend
 public final class CryptoBatch {
     private CryptoBatch() {
@@ -342,14 +345,16 @@ public final class CryptoBatch {
 
         public void run() {
             T result = null;
-            RuntimeException error = null;
+            Throwable error = null;
             try {
                 result = compute();
-            } catch (RuntimeException e) {
+            } catch (Throwable e) {
+                // an Error too (an OutOfMemoryError from a large batch, one thrown in a native):
+                // the callback is the only place the caller hears anything, so it hears everything
                 error = e;
             }
             final T r = result;
-            final RuntimeException err = error;
+            final Throwable err = error;
             CryptoEngine.get().deliver(new Runnable() {
                 @Override
                 public void run() {

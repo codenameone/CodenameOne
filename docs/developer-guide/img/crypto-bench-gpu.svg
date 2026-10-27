@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="309" viewBox="0 0 760 309">
+  <rect x="0" y="0" width="760" height="309" fill="#ffffff"/>
+  <text x="380" y="24" font-family="Arial, sans-serif" font-size="15" font-weight="bold" text-anchor="middle" fill="#222222">Splitting a batch between the CPU and the GPU (Metal)</text>
+  <rect x="190" y="40" width="12" height="12" fill="#2f6fb5"/>
+  <text x="208" y="50" font-family="Arial, sans-serif" font-size="12" fill="#333333">CPU, every core</text>
+  <rect x="190" y="58" width="12" height="12" fill="#e08a1e"/>
+  <text x="208" y="68" font-family="Arial, sans-serif" font-size="12" fill="#333333">GPU alone</text>
+  <rect x="190" y="76" width="12" height="12" fill="#3a9b5c"/>
+  <text x="208" y="86" font-family="Arial, sans-serif" font-size="12" fill="#333333">Both together</text>
+  <text x="182" y="127" font-family="Arial, sans-serif" font-size="12" text-anchor="end" fill="#222222">ECDSA verify</text>
+  <rect x="190" y="104" width="423.8" height="11" fill="#2f6fb5"/>
+  <text x="617.8" y="113" font-family="Arial, sans-serif" font-size="10" fill="#333333">373,000</text>
+  <rect x="190" y="117" width="205.6" height="11" fill="#e08a1e"/>
+  <text x="399.6" y="126" font-family="Arial, sans-serif" font-size="10" fill="#333333">181,000</text>
+  <rect x="190" y="130" width="432.2" height="11" fill="#3a9b5c"/>
+  <text x="626.2" y="139" font-family="Arial, sans-serif" font-size="10" fill="#333333">380,460</text>
+  <text x="182" y="180" font-family="Arial, sans-serif" font-size="12" text-anchor="end" fill="#222222">Schnorr verify</text>
+  <rect x="190" y="157" width="293.1" height="11" fill="#2f6fb5"/>
+  <text x="487.1" y="166" font-family="Arial, sans-serif" font-size="10" fill="#333333">258,000</text>
+  <rect x="190" y="170" width="264.7" height="11" fill="#e08a1e"/>
+  <text x="458.7" y="179" font-family="Arial, sans-serif" font-size="10" fill="#333333">233,000</text>
+  <rect x="190" y="183" width="331.2" height="11" fill="#3a9b5c"/>
+  <text x="525.2" y="192" font-family="Arial, sans-serif" font-size="10" fill="#333333">291,540</text>
+  <text x="182" y="233" font-family="Arial, sans-serif" font-size="12" text-anchor="end" fill="#222222">Ed25519 verify</text>
+  <rect x="190" y="210" width="284.0" height="11" fill="#2f6fb5"/>
+  <text x="478.0" y="219" font-family="Arial, sans-serif" font-size="10" fill="#333333">250,000</text>
+  <rect x="190" y="223" width="245.4" height="11" fill="#e08a1e"/>
+  <text x="439.4" y="232" font-family="Arial, sans-serif" font-size="10" fill="#333333">216,000</text>
+  <rect x="190" y="236" width="463.0" height="11" fill="#3a9b5c"/>
+  <text x="657.0" y="245" font-family="Arial, sans-serif" font-size="10" fill="#333333">407,500</text>
+  <line x1="190" y1="100" x2="190" y2="255" stroke="#888888"/>
+  <text x="440" y="287" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#555555">signatures verified per second</text>
+</svg>
