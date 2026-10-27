@@ -412,6 +412,19 @@ public final class Typed {
         return Py.NONE;
     }
 
+    /// `len(o)` where `f` is what the name `len` holds, for typed code,
+    /// which takes the result to be an int as the builtin's is.
+    public static long len(Object f, Object o) {
+        if (f == Builtins.LEN) { //NOPMD CompareObjectsWithEquals - identity is meant
+            return Py.len(o);
+        }
+        Object r = Py.call(f, o);
+        if (r instanceof Long) {
+            return ((Long) r).longValue();
+        }
+        throw Py.typeError("len was rebound to a function that does not return an int");
+    }
+
     /// `l.extend([v] * n)`.
     public static Object extendRepeat(PyList l, Object v, Object n) {
         nzl(l).extendRepeat(v, Py.index(n));

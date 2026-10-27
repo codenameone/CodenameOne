@@ -63,6 +63,7 @@ public final class AttrSite {
     private static final int I_LOWER = 4;
     private static final int I_SPLIT = 5;
     private static final int I_JOIN = 6;
+    private static final int I_CLEAR = 7;
 
     // Reads and calls. An entry with a null shape is a non-instance receiver
     // type (BUILTIN or NONE). All entries are valid only while getVersion is
@@ -147,6 +148,8 @@ public final class AttrSite {
                 return I_SPLIT;
             case "join":
                 return I_JOIN;
+            case "clear":
+                return I_CLEAR;
             default:
                 return I_NONE;
         }
@@ -369,6 +372,17 @@ public final class AttrSite {
     // ---- calls ---------------------------------------------------------------
 
     public Object call0(Object o) {
+        if (intrinsic == I_CLEAR && o != null) {
+            // Exact classes: a subclass may override clear.
+            if (o.getClass() == PyDict.class) {
+                ((PyDict) o).clear();
+                return Py.NONE;
+            }
+            if (o instanceof PyList) {
+                ((PyList) o).clear();
+                return Py.NONE;
+            }
+        }
         if (intrinsic != I_NONE && o instanceof String) {
             String v = ((String) o);
             if (intrinsic == I_UPPER) {

@@ -3830,6 +3830,12 @@ final class TypedEmit {
                     String l = "Typed.slen(" + a.get(0).c + ")";
                     return new E("Long.valueOf(" + l + ")", Ty.INT, l);
                 }
+                if (a.size() == 1 && a.get(0).t.k == Ty.K.DYN) {
+                    // The builtin's work without a call, unless the name
+                    // was rebound at run time.
+                    String l = "Typed.len(" + em.builtinRef("len") + ", " + a.get(0).c + ")";
+                    return new E("Long.valueOf(" + l + ")", Ty.INT, l);
+                }
                 break;
             case "float":
                 if (a.size() == 1 && !a.get(0).t.opt

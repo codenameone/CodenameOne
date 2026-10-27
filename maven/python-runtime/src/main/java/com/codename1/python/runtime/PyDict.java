@@ -293,13 +293,31 @@ public class PyDict extends PyObject {
     }
 
     public void clear() {
-        keys = new Object[8];
-        values = new Object[8];
-        hashes = new long[8];
-        index = newIndex(16);
+        if (keys.length <= KEEP_ON_CLEAR) {
+            // A dict cleared and refilled, a cache or a window, keeps its
+            // capacity as Java's HashMap does: refilling it would otherwise
+            // regrow it from eight entries, a dozen arrays of garbage each
+            // time.
+            for (int i = 0; i < used; i++) {
+                keys[i] = null;
+                values[i] = null;
+            }
+            int[] ix = index;
+            for (int i = 0; i < ix.length; i++) {
+                ix[i] = EMPTY;
+            }
+        } else {
+            keys = new Object[8];
+            values = new Object[8];
+            hashes = new long[8];
+            index = newIndex(16);
+        }
         used = 0;
         size = 0;
     }
+
+    /// The largest entry capacity `clear` keeps.
+    private static final int KEEP_ON_CLEAR = 1 << 17;
 
     /// `dict.update(other)` for a mapping or an iterable of pairs.
     public void update(Object other) {

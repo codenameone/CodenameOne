@@ -112,19 +112,37 @@ final class IntRanges {
     private final List<Map<String, Iv>> bound = new ArrayList<Map<String, Iv>>();
 
     IntRanges(Infer in, Infer.Fn fn) {
+        this(in, fn, null, null);
+    }
+
+    /// The analysis of `fn` with the int parameters in `params` known to
+    /// hold only values in their intervals (see `TypedEmit.paramRanges`);
+    /// when `sites` is not null, it receives the interval of every argument
+    /// of every direct call of a module function the analysis follows.
+    IntRanges(Infer in, Infer.Fn fn, Map<String, Iv> params, Map<Call, Iv[]> sites) {
         this.in = in;
         this.fn = fn;
         this.sc = fn.def.scope;
+        this.sites = sites;
         for (Map.Entry<String, Ty> e : fn.locals.entrySet()) {
             if (e.getValue().k == Ty.K.INT && !e.getValue().opt && !sc.params.contains(e.getKey())) {
                 ints.add(e.getKey());
             }
         }
-        if (!ints.isEmpty()) {
-            Map<String, Iv> env = new HashMap<String, Iv>();
+        Map<String, Iv> env = new HashMap<String, Iv>();
+        if (params != null) {
+            for (Map.Entry<String, Iv> e : params.entrySet()) {
+                ints.add(e.getKey());
+                store(e.getKey(), e.getValue(), env);
+            }
+        }
+        if (!ints.isEmpty() || sites != null) {
             run(fn.def.body, env, new Loop());
         }
     }
+
+    /// Where call arguments are recorded, or null.
+    private final Map<Call, Iv[]> sites;
 
     /// The locals held in a Java `long`.
     Set<String> longLocals() {
@@ -221,6 +239,17 @@ final class IntRanges {
 
     private Map<String, Iv> stmt(Stmt s, Map<String, Iv> env, Loop loop) {
         walrus(s, env);
+        record(s, env);
+        Map<String, Iv> r = stmt0(s, env, loop);
+        if (r != null && (s instanceof Assign || s instanceof AugAssign || s instanceof ExprStmt)) {
+            // The statement completed, so every list it indexed by a local
+            // took that index: the local is within a list's bounds.
+            indexed(s, r);
+        }
+        return r;
+    }
+
+    private Map<String, Iv> stmt0(Stmt s, Map<String, Iv> env, Loop loop) {
         if (s instanceof Assign) {
             Assign a = (Assign) s;
             Iv v = eval(a.value, env);
@@ -243,15 +272,18 @@ final class IntRanges {
         }
         if (s instanceof If) {
             If i = (If) s;
-            return join(run(i.body, new HashMap<String, Iv>(env), loop),
-                    run(i.orelse, new HashMap<String, Iv>(env), loop));
+            Map<String, Iv> at = new HashMap<String, Iv>(env);
+            indexed(i.test, at);
+            Map<String, Iv> t = refine(i.test, at, true);
+            Map<String, Iv> f = refine(i.test, at, false);
+            return join(t == null ? null : run(i.body, t, loop), f == null ? null : run(i.orelse, f, loop));
         }
         if (s instanceof For) {
             return forLoop((For) s, env);
         }
         if (s instanceof While) {
             While w = (While) s;
-            Map<String, Iv> out = loop(w.body, env, null, null, null);
+            Map<String, Iv> out = loop(w.body, env, null, null, null, forever(w.test) ? null : w.test);
             return run(w.orelse, out, loop);
         }
         if (s instanceof Return || s instanceof Raise) {
@@ -309,7 +341,7 @@ final class IntRanges {
         } else {
             top(TypedEmit.assigned(Collections.<Stmt>singletonList(f)), env);
         }
-        Map<String, Iv> out = loop(f.body, env, target, tv, trips);
+        Map<String, Iv> out = loop(f.body, env, target, tv, trips, null);
         return run(f.orelse, out, new Loop());
     }
 
@@ -322,9 +354,10 @@ final class IntRanges {
     /// value after `trips - 1` passes, and one more pass must confirm that
     /// it grows by that same interval and nothing else moves. Whatever fails
     /// that is unbounded.
-    private Map<String, Iv> loop(List<Stmt> body, Map<String, Iv> entry, String target, Iv tv, BigInteger trips) {
+    private Map<String, Iv> loop(List<Stmt> body, Map<String, Iv> entry, String target, Iv tv, BigInteger trips,
+            Expr test) {
         Map<String, Iv> head = new HashMap<String, Iv>(entry);
-        Map<String, Iv> exit = new HashMap<String, Iv>(entry);
+        Map<String, Iv> exit = test == null ? new HashMap<String, Iv>(entry) : leave(test, entry);
         Map<String, Iv> prevDelta = new HashMap<String, Iv>();
         Map<String, Iv> widened = new HashMap<String, Iv>();
         for (int pass = 0;; pass++) {
@@ -332,9 +365,16 @@ final class IntRanges {
             if (target != null) {
                 store(target, tv, in0);
             }
+            if (test != null) {
+                // The test runs before every pass, and the body runs only
+                // where it held.
+                record(test, in0);
+                indexed(test, in0);
+                in0 = refine(test, in0, true);
+            }
             Loop l = new Loop();
-            Map<String, Iv> out = join(run(body, in0, l), l.cont);
-            exit = join(join(exit, out), l.brk);
+            Map<String, Iv> out = in0 == null ? null : join(run(body, in0, l), l.cont);
+            exit = join(join(exit, test == null ? out : out == null ? null : leave(test, out)), l.brk);
             Map<String, Iv> delta = new HashMap<String, Iv>();
             Set<String> growing = new HashSet<String>();
             if (out != null) {
@@ -371,13 +411,276 @@ final class IntRanges {
                             e0.hi.add(d.hi.max(BigInteger.ZERO).multiply(k))));
                     widened.put(n, d);
                 } else if (pass >= 2) {
-                    next.put(n, Iv.TOP);
+                    // Each moving bound jumps to the next width a value is
+                    // held in, then to unbounded: a test or an index that
+                    // bounds it keeps it there, and the passes end.
+                    next.put(n, widen(head.get(n), next.get(n)));
                     widened.remove(n);
                 }
             }
             prevDelta = delta;
             head = next;
         }
+    }
+
+    private static final BigInteger[] LOWS = {BigInteger.valueOf(Integer.MIN_VALUE), LONG_MIN};
+    private static final BigInteger[] HIGHS = {BigInteger.valueOf(Integer.MAX_VALUE), LONG_MAX};
+
+    /// `now`, past `before`, with each bound that moved out to a threshold.
+    static Iv widen(Iv before, Iv now) {
+        if (before == null || now == null) {
+            return Iv.TOP;
+        }
+        BigInteger lo = now.lo;
+        if (lo != null && (before.lo == null || lo.compareTo(before.lo) < 0)) {
+            BigInteger t = null;
+            for (BigInteger x : LOWS) {
+                if (x.compareTo(lo) <= 0) {
+                    t = x;
+                    break;
+                }
+            }
+            lo = t;
+        }
+        BigInteger hi = now.hi;
+        if (hi != null && (before.hi == null || hi.compareTo(before.hi) > 0)) {
+            BigInteger t = null;
+            for (BigInteger x : HIGHS) {
+                if (x.compareTo(hi) >= 0) {
+                    t = x;
+                    break;
+                }
+            }
+            hi = t;
+        }
+        return new Iv(lo, hi);
+    }
+
+    // ---- refinement ------------------------------------------------------
+
+    /// What a list index can be: a Java array holds at most 2^31 - 1 items.
+    private static final Iv INDEX = new Iv(BigInteger.valueOf(-Integer.MAX_VALUE),
+            BigInteger.valueOf(Integer.MAX_VALUE - 1));
+
+    private static boolean forever(Expr test) {
+        return test instanceof Constant && ((Constant) test).kind == Constant.Kind.TRUE;
+    }
+
+    /// The state leaving a while loop through its test.
+    private Map<String, Iv> leave(Expr test, Map<String, Iv> env) {
+        Map<String, Iv> at = new HashMap<String, Iv>(env);
+        indexed(test, at);
+        return refine(test, at, false);
+    }
+
+    /// `env` where `test` is `truth`; null when it cannot be.
+    private Map<String, Iv> refine(Expr test, Map<String, Iv> env, boolean truth) {
+        if (env == null) {
+            return null;
+        }
+        if (test instanceof UnaryOp && "not".equals(((UnaryOp) test).op)) {
+            return refine(((UnaryOp) test).operand, env, !truth);
+        }
+        if (test instanceof BoolOp && ((BoolOp) test).isAnd == truth) {
+            // Every operand of a true `and` held; of a false `or`, none did.
+            Map<String, Iv> r = env;
+            for (Expr v : ((BoolOp) test).values) {
+                r = refine(v, r, truth);
+                if (r == null) {
+                    return null;
+                }
+            }
+            return r;
+        }
+        if (!(test instanceof Compare) || ((Compare) test).ops.size() != 1) {
+            return env;
+        }
+        Compare c = (Compare) test;
+        String op = c.ops.get(0);
+        if (!truth) {
+            op = negate(op);
+        }
+        if (op == null) {
+            return env;
+        }
+        Map<String, Iv> r = new HashMap<String, Iv>(env);
+        Expr l = c.left;
+        Expr rt = c.comparators.get(0);
+        Iv lv = eval(l, env);
+        Iv rv = eval(rt, env);
+        if (!narrow(l, op, rv, r) || !narrow(rt, flip(op), lv, r)) {
+            return null;
+        }
+        return r;
+    }
+
+    private static String negate(String op) {
+        switch (op) {
+            case "<":
+                return ">=";
+            case "<=":
+                return ">";
+            case ">":
+                return "<=";
+            case ">=":
+                return "<";
+            case "==":
+                return "!=";
+            case "!=":
+                return "==";
+            default:
+                return null;
+        }
+    }
+
+    private static String flip(String op) {
+        switch (op) {
+            case "<":
+                return ">";
+            case "<=":
+                return ">=";
+            case ">":
+                return "<";
+            case ">=":
+                return "<=";
+            default:
+                return op;
+        }
+    }
+
+    /// Narrows local `e` to the values that make `e op other` true; false
+    /// when none can.
+    private boolean narrow(Expr e, String op, Iv other, Map<String, Iv> env) {
+        if (!(e instanceof Name) || !ints.contains(((Name) e).id) || sc.resolve(((Name) e).id) != Scope.Binding.LOCAL) {
+            return true;
+        }
+        String n = ((Name) e).id;
+        Iv v = env.get(n);
+        if (v == null) {
+            v = Iv.TOP;
+        }
+        BigInteger lo = v.lo;
+        BigInteger hi = v.hi;
+        switch (op) {
+            case "<":
+                hi = min(hi, other.hi == null ? null : other.hi.subtract(BigInteger.ONE));
+                break;
+            case "<=":
+                hi = min(hi, other.hi);
+                break;
+            case ">":
+                lo = max(lo, other.lo == null ? null : other.lo.add(BigInteger.ONE));
+                break;
+            case ">=":
+                lo = max(lo, other.lo);
+                break;
+            case "==":
+                lo = max(lo, other.lo);
+                hi = min(hi, other.hi);
+                break;
+            default:
+                return true;
+        }
+        if (lo != null && hi != null && lo.compareTo(hi) > 0) {
+            return false;
+        }
+        env.put(n, new Iv(lo, hi));
+        return true;
+    }
+
+    private static BigInteger min(BigInteger a, BigInteger b) {
+        return a == null ? b : b == null ? a : a.min(b);
+    }
+
+    private static BigInteger max(BigInteger a, BigInteger b) {
+        return a == null ? b : b == null ? a : a.max(b);
+    }
+
+    /// Narrows every int local that `o` certainly used as a list or str
+    /// index (not under a branch of `and`, `or` or a conditional) to the
+    /// indexes such a sequence has.
+    private void indexed(Object o, Map<String, Iv> env) {
+        if (env == null || o instanceof Lambda || o instanceof Comp) {
+            return;
+        }
+        if (o instanceof BoolOp) {
+            indexed(((BoolOp) o).values.get(0), env);
+            return;
+        }
+        if (o instanceof IfExp) {
+            indexed(((IfExp) o).test, env);
+            return;
+        }
+        if (o instanceof Subscript) {
+            Subscript x = (Subscript) o;
+            if (x.value instanceof Name && x.index instanceof Name && sequence(((Name) x.value).id)) {
+                narrowTo(((Name) x.index).id, INDEX, env);
+            }
+        }
+        Infer.children(o, c -> indexed(c, env));
+    }
+
+    /// Whether local `n` is always a list or a str.
+    private boolean sequence(String n) {
+        if (sc.resolve(n) != Scope.Binding.LOCAL) {
+            return false;
+        }
+        Ty t = fn.locals.get(n);
+        return t != null && !t.opt && (t.k == Ty.K.LIST || t.k == Ty.K.STR);
+    }
+
+    private void narrowTo(String n, Iv by, Map<String, Iv> env) {
+        if (!ints.contains(n) || sc.resolve(n) != Scope.Binding.LOCAL) {
+            return;
+        }
+        Iv v = env.get(n);
+        if (v == null) {
+            v = Iv.TOP;
+        }
+        BigInteger lo = max(v.lo, by.lo);
+        BigInteger hi = min(v.hi, by.hi);
+        if (lo != null && hi != null && lo.compareTo(hi) > 0) {
+            return;
+        }
+        env.put(n, new Iv(lo, hi));
+    }
+
+    // ---- call sites ------------------------------------------------------
+
+    /// Records the arguments of the calls `o` makes, as evaluated in `env`.
+    private void record(Object o, Map<String, Iv> env) {
+        if (sites == null || env == null || !bound.isEmpty() || o instanceof Lambda || o instanceof FunctionDef
+                || o instanceof ClassDef || o instanceof Comp) {
+            return;
+        }
+        if (o instanceof Stmt && !(o instanceof Assign || o instanceof AugAssign || o instanceof ExprStmt
+                || o instanceof Return)) {
+            // Compound statements: their parts are recorded as they run.
+            if (o instanceof If) {
+                record(((If) o).test, env);
+            } else if (o instanceof For) {
+                record(((For) o).iter, env);
+            }
+            return;
+        }
+        if (o instanceof Call) {
+            Call c = (Call) o;
+            if (c.func instanceof Name && c.keywords.isEmpty() && sc.resolve(((Name) c.func).id) == Scope.Binding.GLOBAL
+                    && in.globalFns.containsKey(((Name) c.func).id)) {
+                Iv[] a = new Iv[c.args.size()];
+                for (int i = 0; i < a.length; i++) {
+                    a[i] = c.args.get(i) instanceof Starred ? Iv.TOP : eval(c.args.get(i), env);
+                }
+                Iv[] old = sites.get(c);
+                if (old != null && old.length == a.length) {
+                    for (int i = 0; i < a.length; i++) {
+                        a[i] = a[i].join(old[i]);
+                    }
+                }
+                sites.put(c, a);
+            }
+        }
+        Infer.children(o, x -> record(x, env));
     }
 
     /// How much `b` moved to become `a`, per bound; null when either is
