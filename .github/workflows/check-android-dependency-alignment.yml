@@ -100,7 +100,8 @@ jobs:
             -Dsurefire.failIfNoSpecifiedTests=false -Plocal-dev-javase
           mvn -B -q -pl build-engine test-compile dependency:build-classpath \
             -Dmdep.outputFile="$RUNNER_TEMP/build-engine.cp" -Plocal-dev-javase
-          java -cp "build-engine/target/classes:build-engine/target/test-classes:$(cat "$RUNNER_TEMP/build-engine.cp")" \
+          java -Dcn1.builders.src=build-engine/src/main/java/com/codename1/builders \
+            -cp "build-engine/target/classes:build-engine/target/test-classes:$(cat "$RUNNER_TEMP/build-engine.cp")" \
             com.codename1.builders.AndroidDependencyCoordinates "$RUNNER_TEMP/android-coordinates.txt"
           wc -l "$RUNNER_TEMP/android-coordinates.txt"
 
