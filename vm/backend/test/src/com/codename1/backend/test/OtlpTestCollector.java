@@ -51,7 +51,7 @@ public final class OtlpTestCollector {
     private final List<byte[]> bodies = new ArrayList<byte[]>();
 
     private OtlpTestCollector(int port) throws IOException {
-        server = HttpServer.start("127.0.0.1", port, 64, 2, new HttpServer.Handler() { //NOPMD AvoidUsingHardCodedIP - the test collector binds loopback only
+        server = HttpServer.start("127.0.0.1", port, 64, 2, new HttpServer.Handler() { // NOPMD AvoidUsingHardCodedIP - the test collector binds loopback only
             @Override
             public HttpServer.Response handle(HttpServer.Request request) {
                 record(request.getTarget(), request.getBodyBytes());

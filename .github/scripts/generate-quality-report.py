@@ -485,7 +485,7 @@ def parse_pmd() -> Optional[AnalysisReport]:
             root = ET.parse(report_path).getroot()
         except ET.ParseError:
             # Unreadable is not clean. Reported as a finding of its own so the
-            # forbidden-rule gate below cannot mistake it for an empty report.
+            # PMD gate below cannot mistake it for an empty report.
             findings.append(Finding(severity="P1", location=str(report_path),
                                     message="PMD report could not be parsed",
                                     rule="UnparseableReport"))
