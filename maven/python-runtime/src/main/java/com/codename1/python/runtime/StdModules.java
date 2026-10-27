@@ -61,6 +61,19 @@ public final class StdModules {
             PyModule.registerModule(NumPy.module());
             return true;
         }
+        if ("_cn1server".equals(name)) {
+            PyModule m = new PyModule("_cn1server", new String[0]);
+            m.setAttr("serve", PyBuiltin.positional("serve", a -> {
+                if (a.length != 3) {
+                    throw Py.typeError("serve(dispatch, host, port)");
+                }
+                PyServer.get().serve(a[0], a[1] == Py.NONE ? null : Py.toStr(a[1]), //NOPMD CompareObjectsWithEquals - identity is meant
+                        (int) Py.asLong(a[2]));
+                return Py.NONE;
+            }));
+            PyModule.registerModule(m);
+            return true;
+        }
         if ("_cn1http".equals(name)) {
             PyModule.registerModule(http());
             return true;
