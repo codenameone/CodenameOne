@@ -105,7 +105,7 @@ final class MathFunctions {
         return MathUtil.log(u) * x / (u - 1.0);
     }
 
-    private static double sinh(double x) {
+    static double sinh(double x) {
         if (x == 0) {
             // Keeps the sign of a zero, as the C library does.
             return x;
@@ -120,12 +120,12 @@ final class MathFunctions {
         return x < 0 ? -r : r;
     }
 
-    private static double cosh(double x) {
+    static double cosh(double x) {
         double e = MathUtil.exp(Math.abs(x));
         return (e + 1 / e) / 2;
     }
 
-    private static double tanh(double x) {
+    static double tanh(double x) {
         if (x == 0) {
             // Keeps the sign of a zero, as the C library does.
             return x;

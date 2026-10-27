@@ -123,6 +123,19 @@ public final class PySlice extends PyObject {
         if ("step".equals(name)) {
             return step;
         }
+        if ("indices".equals(name)) {
+            return PyBuiltin.positional("indices", a -> {
+                if (a.length != 1) {
+                    throw Py.typeError("slice.indices() takes exactly one argument (" + a.length + " given)");
+                }
+                long n = Py.asLong(a[0]);
+                if (n < 0) {
+                    throw Py.valueError("length should not be negative");
+                }
+                int[] r = indices((int) n);
+                return new PyTuple(new Object[] {Py.of((long) r[0]), Py.of((long) r[1]), Py.of((long) r[2])});
+            });
+        }
         return super.getAttrOrNull(name);
     }
 

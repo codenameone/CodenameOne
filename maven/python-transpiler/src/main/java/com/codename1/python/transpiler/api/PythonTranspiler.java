@@ -163,7 +163,14 @@ public final class PythonTranspiler {
         while (!work.isEmpty()) {
             Node.Module tree = work.pop();
             List<String> imported = new ArrayList<String>();
-            imports(tree.body, imported);
+            String own = "";
+            for (Map.Entry<String, Node.Module> e : trees.entrySet()) {
+                if (e.getValue() == tree) {
+                    own = e.getKey();
+                    break;
+                }
+            }
+            imports(tree.body, imported, moduleOf(own), own.endsWith("__init__.py"));
             if (opens.contains(tree)) {
                 // The builtin open() is io.open, written in Python.
                 imported.add("io");
@@ -229,8 +236,9 @@ public final class PythonTranspiler {
         return stem.replace('/', '.');
     }
 
-    /// Every absolute module name `body` imports, at any depth.
-    private static void imports(List<Node.Stmt> body, List<String> out) {
+    /// Every module name `body` imports, at any depth, with relative imports
+    /// resolved against `self` (a package when `pkg`).
+    private static void imports(List<Node.Stmt> body, List<String> out, String self, boolean pkg) {
         for (Node.Stmt s : body) {
             if (s instanceof Node.Import) {
                 for (Node.Alias a : ((Node.Import) s).names) {
@@ -238,25 +246,44 @@ public final class PythonTranspiler {
                 }
             } else if (s instanceof Node.ImportFrom) {
                 Node.ImportFrom f = (Node.ImportFrom) s;
-                if (f.level == 0 && f.module != null) {
-                    out.add(f.module);
+                String from = f.level == 0 ? f.module : relative(self, pkg, f.level, f.module);
+                if (from != null && !from.isEmpty()) {
+                    out.add(from);
                     for (Node.Alias a : f.names) {
                         // `from pkg import sub` may name a submodule.
                         if (!"*".equals(a.name)) {
-                            out.add(f.module + "." + a.name);
+                            out.add(from + "." + a.name);
                         }
                     }
                 }
             } else if (s instanceof Node.FunctionDef) {
-                imports(((Node.FunctionDef) s).body, out);
+                imports(((Node.FunctionDef) s).body, out, self, pkg);
             } else if (s instanceof Node.ClassDef) {
-                imports(((Node.ClassDef) s).body, out);
+                imports(((Node.ClassDef) s).body, out, self, pkg);
             } else {
                 for (List<Node.Stmt> b : bodiesOf(s)) {
-                    imports(b, out);
+                    imports(b, out, self, pkg);
                 }
             }
         }
+    }
+
+    /// The absolute name of `from <dots><module> import`, or null when it
+    /// climbs out of the top-level package (the emitter reports that).
+    private static String relative(String self, boolean pkg, int level, String module) {
+        String base = self;
+        int up = pkg ? level - 1 : level;
+        for (int i = 0; i < up; i++) {
+            int dot = base.lastIndexOf('.');
+            if (dot < 0) {
+                return null;
+            }
+            base = base.substring(0, dot);
+        }
+        if (module == null) {
+            return base;
+        }
+        return base.isEmpty() ? module : base + "." + module;
     }
 
     private static List<List<Node.Stmt>> bodiesOf(Node.Stmt s) {
@@ -343,6 +370,9 @@ public final class PythonTranspiler {
         sb.append("        registered = true;\n");
         if (interop) {
             sb.append("        JavaInterop.register();\n");
+        }
+        if (classes.containsKey("_cn1_http")) {
+            sb.append("        com.codename1.python.runtime.Cn1Http.installDefault();\n");
         }
         for (String cls : classes.values()) {
             sb.append("        ").append(cls).append(".register();\n");

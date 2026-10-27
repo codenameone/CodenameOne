@@ -34,7 +34,14 @@ import java.util.List;
 
 /// HTTP through Codename One's `ConnectionRequest`: the platform's own
 /// client on every target, with its proxy, certificate and cookie handling.
-final class Cn1Http extends PyHttp {
+public final class Cn1Http extends PyHttp {
+    /// Makes this the client unless a host installed its own first.
+    public static void installDefault() {
+        if (!installed()) {
+            install(new Cn1Http());
+        }
+    }
+
     @Override
     public Response send(String method, String url, String[] headers, final byte[] body, int timeoutMillis,
             boolean followRedirects) throws IOException {

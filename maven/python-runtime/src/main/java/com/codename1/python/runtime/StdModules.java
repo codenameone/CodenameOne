@@ -57,6 +57,10 @@ public final class StdModules {
             PyModule.registerModule(fileSystem());
             return true;
         }
+        if ("_cn1np".equals(name)) {
+            PyModule.registerModule(NumPy.module());
+            return true;
+        }
         if ("_cn1http".equals(name)) {
             PyModule.registerModule(http());
             return true;

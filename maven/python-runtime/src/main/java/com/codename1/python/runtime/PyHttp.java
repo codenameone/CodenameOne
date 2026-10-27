@@ -34,12 +34,19 @@ import java.io.IOException;
 public abstract class PyHttp {
     private static PyHttp current;
 
-    /// The client in use.
+    /// The client in use. A build that bundles `requests` or `httpx`
+    /// installs Codename One's from its generated registry
+    /// ([Cn1Http#installDefault()]); nothing names it otherwise, so a
+    /// program without HTTP does not link the network stack.
     public static PyHttp get() {
         if (current == null) {
-            current = new Cn1Http();
+            throw Py.error(Py.OS_ERROR, "no HTTP client is installed");
         }
         return current;
+    }
+
+    static boolean installed() {
+        return current != null;
     }
 
     /// Replaces the client, for a host that is not a Codename One

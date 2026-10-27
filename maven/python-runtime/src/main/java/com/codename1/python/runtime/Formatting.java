@@ -544,6 +544,11 @@ final class Formatting {
             if (i < n && fmt.charAt(i) == '.') {
                 i++;
                 StringBuilder pr = new StringBuilder(".");
+                if (i < n && fmt.charAt(i) == '*') {
+                    // `%.*f`: the precision is the next argument.
+                    pr.append(Math.max(0, Py.asLong(items[ai++])));
+                    i++;
+                }
                 while (i < n && Character.isDigit(fmt.charAt(i))) {
                     pr.append(fmt.charAt(i++));
                 }
