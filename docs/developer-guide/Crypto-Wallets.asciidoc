@@ -28,14 +28,14 @@ A handful of algorithms do all the work underneath, and the names come up throug
 
 * *secp256k1* is the curve Bitcoin and Ethereum use. *ECDSA* is the signature scheme they sign transactions with. Ethereum also recovers the sender's public key from a signature, which is why an Ethereum transaction carries no sender address.
 * *Schnorr* signatures (BIP-340) are the newer scheme on the same curve, used by Bitcoin's Taproot addresses. They're simpler than ECDSA and can be combined, which is what makes multi-party Taproot spends compact.
-* *Ed25519* is a signature scheme on a different curve, Curve25519. Solana uses it, as do many protocols outside crypto currency. It was designed to be fast and hard to implement wrongly.
+* *Ed25519* is a signature scheme on a different curve, Curve25519. Solana uses it, as do many protocols outside cryptocurrency. It was designed to be fast and hard to implement wrongly.
 
 Verifying is the expensive direction. A wallet signs a handful of transactions, but a node, an exchange or an indexer verifies every signature it receives, which is where batches and the GPU come in.
 
 *Hash functions.* A hash turns any input into a short fixed-size fingerprint. Changing one bit of the input changes the whole fingerprint, and nobody can find two inputs with the same one.
 
 * *SHA-256* is Bitcoin's hash: transaction IDs, block headers and the Merkle trees that commit to a block's transactions. Bitcoin addresses take *RIPEMD-160* of the SHA-256 of the public key, which gives a shorter 20-byte fingerprint.
-* *Keccak-256* is Ethereum's hash: addresses, transaction hashes, the selectors of contract functions and the keys of contract storage. It's the algorithm that became SHA-3, but with the original padding, so a SHA-3 library gives different answers.
+* *Keccak-256* is Ethereum's hash: addresses, transaction hashes, the selectors of contract functions and the keys of contract storage. It's the algorithm that became SHA-3, but with the original padding, so SHA-3 libraries give different answers.
 * *SHA-512* and *HMAC-SHA512* (a keyed hash) are what key derivation is built on.
 
 A *Merkle tree* hashes a list of items in pairs, then hashes the pairs, until one root remains. Changing any item changes the root, so a block header commits to all its transactions in 32 bytes. Building a level of one is a batch of independent hashes, which is what the Merkle rows in the benchmarks measure.
@@ -90,7 +90,7 @@ A Bitcoin transaction spends earlier outputs ("coins") rather than debiting a ba
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/CryptoWalletSnippets.java[tag=crypto-btc-send,indent=0]
 ----
 
-`EsploraClient` speaks the REST API of mempool.space and Blockstream, or of your own Esplora server. `getFeeEstimates` returns sats per virtual byte by confirmation target. Multiply that by the size of the transaction to get `feeSats`. Every output the snippet doesn't spend is paid as a fee, so a real wallet adds a change output back to one of its own addresses.
+`EsploraClient` speaks the REST API of `mempool.space` and `blockstream.info`, or of your own Esplora server. `getFeeEstimates` returns sats per virtual byte by confirmation target. Multiply that by the size of the transaction to get `feeSats`. Every output the snippet doesn't spend is paid as a fee, so a real wallet adds a change output back to one of its own addresses.
 
 `Wallet.signPsbt(psbt)` signs any input whose BIP-32 origin matches the wallet's own fingerprint. That lets a PSBT built elsewhere, by a coordinator or a watch-only wallet, be signed without being told which keys to use. Taproot inputs are signed with BIP-340 Schnorr signatures automatically.
 
@@ -143,7 +143,7 @@ Every `CryptoBatch` method has an asynchronous form with `Async` added to its na
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/CryptoWalletSnippets.java[tag=crypto-batch-async,indent=0]
 ----
 
-In the app the callback runs on the EDT, so it can update the UI directly. In a backend it runs on the thread that did the work. The arguments are checked before the call returns, so a malformed batch, such as arrays of different lengths, throws right away instead of reaching the callback. The callback gets exactly what the synchronous form would have returned, or the exception it would have thrown. A packed form hands back the results array you passed in. The batch reads your arrays directly rather than copying them, so until the callback runs they belong to the batch: change one before then and you change what's being verified.
+In the app the callback runs on the EDT and can update the UI directly. In a backend it runs on the thread that did the work. The arguments are checked before the call returns, so a malformed batch, such as arrays of different lengths, throws right away instead of reaching the callback. The callback gets exactly what the synchronous form would have returned, or the exception it would have thrown. A packed form hands back the results array you passed in. The batch reads your arrays directly rather than copying them, so until the callback runs they belong to the batch: change one before then and you change what's being verified.
 
 In a browser, use the asynchronous forms. A large batch there goes to the GPU through WebGPU, which answers only asynchronously. The synchronous form still works, but it holds the calling thread until the GPU is done, and on the EDT that means the UI waits too. When the browser has no WebGPU adapter, both forms run on the CPU. The GPU kernels are about 460 KB of JavaScript, and they're included only in apps that call `CryptoBatch`, loaded the first time a batch is large enough to use them.
 
@@ -219,7 +219,7 @@ image::img/crypto-bench-multicore.svg["A native batch on every core as a multipl
 
 ==== Android
 
-Android has no curve secp256k1 in its platform, so apps there would otherwise ship BouncyCastle. The table shows both the native kernels and the portable Java implementation, each against BouncyCastle on the same device. The two engines ran separately, each beside its own BouncyCastle run, so each ratio is against the BouncyCastle figure from its own run; the column shows the one from the native run, and the two agree to within 4%.
+Android has no curve secp256k1 in its platform, so apps there would otherwise ship BouncyCastle. The table shows both the native kernels and the portable Java implementation, each against BouncyCastle on the same device. The two engines ran in turn, each beside its own BouncyCastle run, so each ratio is against the BouncyCastle figure from its own run; the column shows the one from the native run, and the two agree to within 4%.
 
 [cols="3,2,2,2",options="header"]
 |===
@@ -273,7 +273,7 @@ The JavaScript port runs the portable Java implementation, translated to JavaScr
 | Keccak-256 | 174.8 MB/s | 1.9 MB/s | 92x
 |===
 
-In the browser most of the time a WebGPU batch takes is the preparation in JavaScript, not the GPU work, and the browser's figures move more from run to run than the native ones: across three runs SHA-256 on WebGPU ranged from 4 to 34 MB/s, and in the slowest it trailed the CPU. The answers never differed: the first run compared a sample of the signatures, and the later runs compared every entry and every hash. Given records prepared in advance, the kernels alone verified about 164,000 ECDSA, 119,000 Schnorr and 146,000 Ed25519 signatures a second there.
+In the browser most of the time a WebGPU batch takes is the preparation in JavaScript, not the GPU work, and the browser's figures move more from run to run than the native ones: across three runs SHA-256 on WebGPU ranged from 4 to 34 MB/s, and in the slowest it trailed the CPU. The answers never differed: the first run compared a sample of the signatures, and the runs after it compared every entry and every hash. Given records prepared in advance, the kernels alone verified about 164,000 ECDSA, 119,000 Schnorr and 146,000 Ed25519 signatures a second there.
 
 The chart puts the ways a signature can be verified side by side, on a logarithmic scale. They don't measure the same thing: the browser bars are batches on one JavaScript thread, the JVM and native bars are one signature at a time on one core, and the last bar is a native batch across every core and the GPU. Read it as what each setup delivers, not as one benchmark run across platforms.
 
