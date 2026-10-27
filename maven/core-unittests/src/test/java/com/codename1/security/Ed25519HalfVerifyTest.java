@@ -132,6 +132,57 @@ class Ed25519HalfVerifyTest {
     }
 
     @Test
+    void divstepInverseMatchesFermat() {
+        // random inputs take about 450 divsteps; that 600 always suffice rests
+        // on libsecp256k1's proven bound of 590, not on this test
+        BigInteger p = BigInteger.ONE.shiftLeft(255).subtract(BigInteger.valueOf(19));
+        Random rnd = new Random(11);
+        BigInteger[] edges = {BigInteger.ZERO, BigInteger.ONE, BigInteger.valueOf(2), p.subtract(BigInteger.ONE),
+            p.subtract(BigInteger.valueOf(2)), BigInteger.ONE.shiftLeft(254), BigInteger.ONE.shiftLeft(255).subtract(BigInteger.ONE),
+            BigInteger.valueOf(19), p.shiftRight(1)};
+        for (int trial = 0; trial < 50000; trial++) {
+            int[] z = new int[10];
+            if (trial < edges.length) {
+                Ed25519Math.fromBytes(z, le(edges[trial]), 0);
+                if (trial == 6) {
+                    // 2^255 - 1 does not fit fromBytes; build it as p + 18
+                    Ed25519Math.fromBytes(z, le(p.subtract(BigInteger.ONE)), 0);
+                    z[0] += 19;
+                }
+            } else {
+                for (int i = 0; i < 10; i++) {
+                    int bound = i % 2 == 0 ? 1 << 26 : 1 << 25;
+                    z[i] = trial % 5 == 0 ? bound - 1 : rnd.nextInt(bound);
+                }
+                if (trial % 17 == 0) {
+                    // unreduced limbs, as products and sums leave them
+                    for (int i = 0; i < 10; i++) {
+                        z[i] = rnd.nextInt(1 << 27) - (1 << 26);
+                    }
+                }
+            }
+            int[] a = new int[10];
+            int[] b = new int[10];
+            Ed25519Math.invertFermat(a, z);
+            Ed25519Math.invertDivsteps(b, z);
+            byte[] ba = new byte[32];
+            byte[] bb = new byte[32];
+            Ed25519Math.toBytes(ba, 0, a);
+            Ed25519Math.toBytes(bb, 0, b);
+            assertArrayEquals(ba, bb, "trial " + trial);
+        }
+    }
+
+    private static byte[] le(BigInteger v) {
+        byte[] out = new byte[32];
+        byte[] be = v.toByteArray();
+        for (int i = 0; i < be.length && i < 32; i++) {
+            out[i] = be[be.length - 1 - i];
+        }
+        return out;
+    }
+
+    @Test
     void karatsubaProductMatchesRef10() {
         // both paths on every machine: mul picks one of them by architecture
         Random rnd = new Random(5);

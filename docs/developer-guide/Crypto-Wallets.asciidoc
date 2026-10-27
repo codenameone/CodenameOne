@@ -153,7 +153,7 @@ Every operation is benchmarked against the library a project would otherwise use
 
 These numbers come from an Apple M4 Max (12 performance cores, 40-core GPU), and the Android ones from an arm64 API 36 emulator on the same machine.
 
-image::img/crypto-bench-ratios.svg[Codename One throughput as a multiple of the reference library's, on the JVM, native and Android,scaledwidth=100%]
+image::img/crypto-bench-ratios.svg["Codename One throughput as a multiple of the reference library's, on the JVM, native and Android",scaledwidth=100%]
 
 ==== On the JVM
 
@@ -215,7 +215,7 @@ A batch runs on every core, so it's measured against the reference library verif
 | Keccak-256 Merkle level | 5,613 | 796 | 7.06x
 |===
 
-image::img/crypto-bench-multicore.svg[A native batch on every core as a multiple of the reference library called once per entry,scaledwidth=100%]
+image::img/crypto-bench-multicore.svg["A native batch on every core as a multiple of the reference library called once per entry",scaledwidth=100%]
 
 ==== Android
 
@@ -238,7 +238,7 @@ Android has no curve secp256k1 in its platform, so apps there would otherwise sh
 
 SHA-256 and the BIP-39 seed go through the platform's own native implementation in both columns, which is why they match. With the native kernels, RIPEMD-160 is the one row where BouncyCastle stays ahead; it's hashed once per Bitcoin address, so it's never the bottleneck. The portable Java column trails BouncyCastle on Ed25519 and RIPEMD-160 and matches it on Keccak-256.
 
-image::img/crypto-bench-android.svg[Both Android engines as a multiple of BouncyCastle on ART,scaledwidth=100%]
+image::img/crypto-bench-android.svg["Both Android engines as a multiple of BouncyCastle on ART",scaledwidth=100%]
 
 ==== The GPU
 
@@ -255,7 +255,7 @@ A GPU verifies signatures in parallel by the thousand, but each entry first need
 
 The chart shows the signature rows; Keccak-256 is measured in bytes rather than signatures, so it appears only in the table.
 
-image::img/crypto-bench-gpu.svg[Signatures verified per second by the CPU, the GPU and both together,scaledwidth=100%]
+image::img/crypto-bench-gpu.svg["Signatures verified per second by the CPU, the GPU and both together",scaledwidth=100%]
 
 On this machine the gain is modest, because sixteen CPU cores with vector units are already fast. The split is worked out from the speeds measured on each device, so a GPU that's strong relative to its CPU takes a larger share, and one that's slower takes none. SHA-256 has no GPU row: in this run no SHA-256 batch reached the GPU's minimum size, so they all ran on the CPU.
 
@@ -277,7 +277,7 @@ In the browser most of the time a WebGPU batch takes is the preparation in JavaS
 
 The chart puts the ways a signature can be verified side by side, on a logarithmic scale. They don't measure the same thing: the browser bars are batches on one JavaScript thread, the JVM and native bars are one signature at a time on one core, and the last bar is a native batch across every core and the GPU. Read it as what each setup delivers, not as one benchmark run across platforms.
 
-image::img/crypto-bench-batch.svg[Signatures verified per second in a batch on each platform,scaledwidth=100%]
+image::img/crypto-bench-batch.svg["Signatures verified per second in a batch on each platform",scaledwidth=100%]
 
 ==== Running the benchmarks
 

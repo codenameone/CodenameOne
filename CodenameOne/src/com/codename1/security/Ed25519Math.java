@@ -430,11 +430,213 @@ final class Ed25519Math {
     }
 
     static void invert(int[] out, int[] z) {
+        invertDivsteps(out, z);
+    }
+
+    // z^(p - 2), by 254 squarings: the reference the divstep inverse is
+    // tested against, and a quarter of what publicKey cost while it was the
+    // inverse
+    static void invertFermat(int[] out, int[] z) {
         int[] t = fe();
         int[] z11 = fe();
         pow250(t, z11, z);
         sqrN(t, t, 5);
         mul(out, t, z11);
+    }
+
+    // ------------------------------------------------------------------
+    // constant-time inversion by divsteps (Bernstein and Yang, "Fast
+    // constant-time gcd computation and modular inversion", 2019)
+    //
+    // Each step of
+    //   delta > 0 and g odd: (delta, f, g) -> (1 - delta, g, (g - f) / 2)
+    //   otherwise:           (delta, f, g) -> (1 + delta, f, (g + (g mod 2) f) / 2)
+    // depends only on delta and the low bits of f and g, so 30 steps are run
+    // on the low words alone, recording what they did to f and g as a matrix
+    // [u v; q r] scaled by 2^30, and the matrix is then applied once to the
+    // full values. Starting from f = p, g = z and d = 0, e = 1, the steps keep
+    // f = d z and g = e z (mod p); after enough of them g is 0 and f is +1 or
+    // -1, so f d is the inverse. delta starts at 1/2 rather than the paper's
+    // 1, and is carried here as 2 delta; with that start 590 steps suffice for
+    // inputs below 2^256 (the bound libsecp256k1 established by exhaustive
+    // hull computation, doc/safegcd_implementation.md), so 20 rounds of 30
+    // do. Every round runs the same instructions whatever z is.
+
+    private static final int M30 = (1 << 30) - 1;
+    private static final int DIVSTEP_ROUNDS = 20;
+    // p = 2^255 - 19 in nine signed 30-bit limbs, and 1 / p mod 2^30
+    private static final int[] P30 = {M30 - 18, M30, M30, M30, M30, M30, M30, M30, (1 << 15) - 1};
+    private static final int P_INV30 = inverse30(P30[0]);
+
+    private static int inverse30(int x) {
+        // Newton: each step doubles the number of correct low bits
+        int y = x;
+        for (int i = 0; i < 5; i++) {
+            y *= 2 - x * y;
+        }
+        return y & M30;
+    }
+
+    static void invertDivsteps(int[] out, int[] z) {
+        byte[] zb = new byte[32];
+        toBytes(zb, 0, z);
+        int[] f = new int[9];
+        int[] g = new int[9];
+        int[] d = new int[9];
+        int[] e = new int[9];
+        int[] t = new int[9];
+        System.arraycopy(P30, 0, f, 0, 9);
+        long acc = 0;
+        int accBits = 0;
+        int w = 0;
+        for (int i = 0; i < 32; i++) {
+            acc |= ((long) (zb[i] & 0xff)) << accBits;
+            accBits += 8;
+            if (accBits >= 30) {
+                g[w++] = (int) acc & M30;
+                acc >>>= 30;
+                accBits -= 30;
+            }
+        }
+        g[8] = (int) acc;
+        e[0] = 1;
+        // 2 delta, for delta = 1/2
+        int delta = 1;
+        int[] m = new int[4];
+        for (int round = 0; round < DIVSTEP_ROUNDS; round++) {
+            delta = divsteps30(delta, f[0], g[0], m);
+            applyToFg(f, g, t, m);
+            applyToDe(d, e, t, m);
+        }
+        // f is +1 or -1; the inverse is f d, which lies within 21 p of zero
+        // because d started at 0 and e at 1 and each round adds less than p:
+        // a different start needs the 32 p margin below rechecked
+        int neg = f[8] >> 31;
+        long c = 0;
+        for (int i = 0; i < 9; i++) {
+            // (d xor neg) - neg negates d when f = -1; then add 32 p
+            c += (long) ((d[i] ^ neg) - neg) + 32L * P30[i];
+            t[i] = (int) c & M30;
+            c >>= 30;
+        }
+        t[8] += (int) c << 30;
+        // t < 2^261: fold the bits at and above 2^255 back in as 19 each, twice
+        for (int pass = 0; pass < 2; pass++) {
+            int hi = t[8] >>> 15;
+            t[8] &= (1 << 15) - 1;
+            c = 19L * hi;
+            for (int i = 0; i < 9; i++) {
+                c += t[i];
+                t[i] = (int) c & M30;
+                c >>= 30;
+            }
+            t[8] += (int) c << 30;
+        }
+        for (int i = 0; i < 32; i++) {
+            int bit = 8 * i;
+            int wi = bit / 30;
+            int sh = bit % 30;
+            int v = t[wi] >>> sh;
+            if (sh > 22 && wi < 8) {
+                v |= t[wi + 1] << (30 - sh);
+            }
+            zb[i] = (byte) v;
+        }
+        fromBytes(out, zb, 0);
+        for (int i = 0; i < 32; i++) {
+            zb[i] = 0;
+        }
+    }
+
+    // 30 divsteps on the low words of f and g, with delta given and returned
+    // doubled; m receives u, v, q, r
+    private static int divsteps30(int delta, int f, int g, int[] m) {
+        int u = 1;
+        int v = 0;
+        int q = 0;
+        int r = 1;
+        for (int i = 0; i < 30; i++) {
+            // all ones when delta > 0 and g is odd
+            int swap = (-delta >> 31) & -(g & 1);
+            // on a swap: delta = -delta, (f, g) = (g, -f), (u, v, q, r) = (q, r, -u, -v)
+            int x = (f ^ g) & swap;
+            f ^= x;
+            g ^= x;
+            g = (g ^ swap) - swap;
+            x = (u ^ q) & swap;
+            u ^= x;
+            q ^= x;
+            q = (q ^ swap) - swap;
+            x = (v ^ r) & swap;
+            v ^= x;
+            r ^= x;
+            r = (r ^ swap) - swap;
+            delta = ((delta ^ swap) - swap) + 2;
+            // g is now even plus, when odd, f; f is always odd
+            int odd = -(g & 1);
+            g += f & odd;
+            q += u & odd;
+            r += v & odd;
+            g >>= 1;
+            u <<= 1;
+            v <<= 1;
+        }
+        m[0] = u;
+        m[1] = v;
+        m[2] = q;
+        m[3] = r;
+        return delta;
+    }
+
+    // (f, g) = ([u v; q r] (f, g)) / 2^30, exactly
+    private static void applyToFg(int[] f, int[] g, int[] t, int[] m) {
+        long u = m[0];
+        long v = m[1];
+        long q = m[2];
+        long r = m[3];
+        long cf = u * f[0] + v * g[0];
+        long cg = q * f[0] + r * g[0];
+        cf >>= 30;
+        cg >>= 30;
+        for (int i = 1; i < 9; i++) {
+            cf += u * f[i] + v * g[i];
+            cg += q * f[i] + r * g[i];
+            t[i - 1] = (int) cf & M30;
+            g[i - 1] = (int) cg & M30;
+            cf >>= 30;
+            cg >>= 30;
+        }
+        t[8] = (int) cf;
+        g[8] = (int) cg;
+        System.arraycopy(t, 0, f, 0, 9);
+    }
+
+    // (d, e) = ([u v; q r] (d, e) + (md, me) p) / 2^30, with md and me making
+    // the sums divisible by 2^30; each round grows the values by at most p
+    private static void applyToDe(int[] d, int[] e, int[] t, int[] m) {
+        long u = m[0];
+        long v = m[1];
+        long q = m[2];
+        long r = m[3];
+        long cd = u * d[0] + v * e[0];
+        long ce = q * d[0] + r * e[0];
+        long md = (-((int) cd * P_INV30)) & M30;
+        long me = (-((int) ce * P_INV30)) & M30;
+        cd += md * P30[0];
+        ce += me * P30[0];
+        cd >>= 30;
+        ce >>= 30;
+        for (int i = 1; i < 9; i++) {
+            cd += u * d[i] + v * e[i] + md * P30[i];
+            ce += q * d[i] + r * e[i] + me * P30[i];
+            t[i - 1] = (int) cd & M30;
+            e[i - 1] = (int) ce & M30;
+            cd >>= 30;
+            ce >>= 30;
+        }
+        t[8] = (int) cd;
+        e[8] = (int) ce;
+        System.arraycopy(t, 0, d, 0, 9);
     }
 
     // z^((p - 5) / 8) = z^(2^252 - 3)
@@ -747,7 +949,10 @@ final class Ed25519Math {
     }
 
     // ------------------------------------------------------------------
-    // fixed-base multiplication: BASE[i][j] = (j + 1) 256^i B
+    // fixed-base multiplication: BASE[i][j] = (j + 1) 16^i B. One row per
+    // signed radix-16 digit, so a multiplication is 64 table additions and no
+    // doublings, where ref10's 32 rows need two passes with 4 doublings
+    // between them. That trade costs a 61 KB table, built once.
 
     private static final class BaseTable {
         static final int[][] FLAT = flatten(build());
@@ -769,15 +974,15 @@ final class Ed25519Math {
 
         private static Precomp[][] build() {
             Ctx c = new Ctx();
-            Precomp[][] t = new Precomp[32][8];
+            Precomp[][] t = new Precomp[64][8];
             P3 row = new P3();
             copy(row.x, BX);
             copy(row.y, BY);
             one(row.z);
             mul(row.t, row.x, row.y);
-            P3[] pts = new P3[256];
+            P3[] pts = new P3[512];
             Cached cr = new Cached();
-            for (int i = 0; i < 32; i++) {
+            for (int i = 0; i < 64; i++) {
                 toCached(cr, row);
                 P3 acc = row;
                 for (int j = 0; j < 8; j++) {
@@ -789,7 +994,7 @@ final class Ed25519Math {
                     }
                 }
                 P3 next = row;
-                for (int k = 0; k < 8; k++) {
+                for (int k = 0; k < 4; k++) {
                     P3 d = new P3();
                     dbl(c, d, next);
                     next = d;
@@ -797,7 +1002,7 @@ final class Ed25519Math {
                 row = next;
             }
             Precomp[] flat = toPrecomp(pts);
-            for (int i = 0; i < 32; i++) {
+            for (int i = 0; i < 64; i++) {
                 for (int j = 0; j < 8; j++) {
                     t[i][j] = flat[i * 8 + j];
                 }
@@ -893,18 +1098,9 @@ final class Ed25519Math {
         e[63] = (byte) (e[63] + carry);
         Ctx c = new Ctx();
         Precomp t = new Precomp();
-        P3 s = new P3();
         r.identity();
-        for (int i = 1; i < 64; i += 2) {
-            select(t, i / 2, e[i]);
-            madd(c, r, r, t);
-        }
-        dbl(c, s, r);
-        dbl(c, r, s);
-        dbl(c, s, r);
-        dbl(c, r, s);
-        for (int i = 0; i < 64; i += 2) {
-            select(t, i / 2, e[i]);
+        for (int i = 0; i < 64; i++) {
+            select(t, i, e[i]);
             madd(c, r, r, t);
         }
         for (int i = 0; i < 64; i++) {
