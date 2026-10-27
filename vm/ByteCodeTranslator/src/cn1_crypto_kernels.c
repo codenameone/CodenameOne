@@ -98,20 +98,66 @@ typedef struct {
 #  elif defined(__linux__)
 #    include <sys/auxv.h>
 #  endif
-/* clang names the extensions bare, GCC with a leading plus */
+/* clang names the extensions bare, GCC with a leading plus. GCC 12's arm_neon.h declares the
+ * SHA-256 intrinsics under "+crypto" (AES and SHA-2 together, which every core with one has) and
+ * refuses to inline them into a function that asks for "+sha2" alone; its SHA-512 ones sit under
+ * "arch=armv8.2-a+sha3", and the function has to ask for exactly that. */
 #  if defined(__ARM_FEATURE_SHA2)
 #    define CN1K_ATTR_SHA2
 #  elif defined(__clang__)
 #    define CN1K_ATTR_SHA2 __attribute__((target("sha2")))
 #  else
-#    define CN1K_ATTR_SHA2 __attribute__((target("+sha2")))
+#    define CN1K_ATTR_SHA2 __attribute__((target("+crypto")))
 #  endif
 #  if defined(__ARM_FEATURE_SHA512)
 #    define CN1K_ATTR_SHA512
 #  elif defined(__clang__)
 #    define CN1K_ATTR_SHA512 __attribute__((target("sha3")))
 #  else
-#    define CN1K_ATTR_SHA512 __attribute__((target("+sha3")))
+#    define CN1K_ATTR_SHA512 __attribute__((target("arch=armv8.2-a+sha3")))
+#  endif
+/* clang before 16 (Apple clang before 15) declares the SHA intrinsics only when the whole
+ * translation unit is compiled for the extension, so a target attribute alone leaves them
+ * undeclared -- Debian 12's clang 14 fails here. Those compilers get the same instructions as
+ * inline assembly; the assembler directive enables the extension for that one instruction. */
+#  if defined(__clang__) && ((defined(__apple_build_version__) && __clang_major__ < 15) \
+        || (!defined(__apple_build_version__) && __clang_major__ < 16))
+#    if !defined(__ARM_FEATURE_SHA2)
+static inline uint32x4_t vsha256hq_u32(uint32x4_t a, uint32x4_t b, uint32x4_t w) {
+    __asm__(".arch_extension sha2\n\tsha256h %q0, %q1, %2.4s" : "+w"(a) : "w"(b), "w"(w));
+    return a;
+}
+static inline uint32x4_t vsha256h2q_u32(uint32x4_t a, uint32x4_t b, uint32x4_t w) {
+    __asm__(".arch_extension sha2\n\tsha256h2 %q0, %q1, %2.4s" : "+w"(a) : "w"(b), "w"(w));
+    return a;
+}
+static inline uint32x4_t vsha256su0q_u32(uint32x4_t a, uint32x4_t b) {
+    __asm__(".arch_extension sha2\n\tsha256su0 %0.4s, %1.4s" : "+w"(a) : "w"(b));
+    return a;
+}
+static inline uint32x4_t vsha256su1q_u32(uint32x4_t a, uint32x4_t b, uint32x4_t c) {
+    __asm__(".arch_extension sha2\n\tsha256su1 %0.4s, %1.4s, %2.4s" : "+w"(a) : "w"(b), "w"(c));
+    return a;
+}
+#    endif
+#    if !defined(__ARM_FEATURE_SHA512)
+static inline uint64x2_t vsha512hq_u64(uint64x2_t a, uint64x2_t b, uint64x2_t w) {
+    __asm__(".arch_extension sha3\n\tsha512h %q0, %q1, %2.2d" : "+w"(a) : "w"(b), "w"(w));
+    return a;
+}
+static inline uint64x2_t vsha512h2q_u64(uint64x2_t a, uint64x2_t b, uint64x2_t w) {
+    __asm__(".arch_extension sha3\n\tsha512h2 %q0, %q1, %2.2d" : "+w"(a) : "w"(b), "w"(w));
+    return a;
+}
+static inline uint64x2_t vsha512su0q_u64(uint64x2_t a, uint64x2_t b) {
+    __asm__(".arch_extension sha3\n\tsha512su0 %0.2d, %1.2d" : "+w"(a) : "w"(b));
+    return a;
+}
+static inline uint64x2_t vsha512su1q_u64(uint64x2_t a, uint64x2_t b, uint64x2_t c) {
+    __asm__(".arch_extension sha3\n\tsha512su1 %0.2d, %1.2d, %2.2d" : "+w"(a) : "w"(b), "w"(c));
+    return a;
+}
+#    endif
 #  endif
 #elif (defined(__x86_64__) || defined(__i386__)) && (defined(__clang__) || defined(__GNUC__))
 #  include <immintrin.h>
