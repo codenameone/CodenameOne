@@ -44,6 +44,8 @@ import kotlinx.cinterop.autoreleasepool
 import kotlinx.cinterop.cstr
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.toCValues
+import kotlinx.cinterop.toKString
+import platform.posix.getenv
 
 /// The whole iOS application: a delegate whose window shows the composition.
 /// An executable rather than a framework inside an Xcode project, so the build
@@ -55,8 +57,10 @@ class AppDelegate @OverrideInit constructor() : UIResponder(), UIApplicationDele
     private var mainWindow: UIWindow? = null
 
     override fun application(application: UIApplication, didFinishLaunchingWithOptions: Map<Any?, *>?): Boolean {
+        // run_bench.sh launches with SIMCTL_CHILD_KMPBENCH_PERF=1 for the runtime measurements.
+        val perf = getenv("KMPBENCH_PERF")?.toKString() == "1"
         val w = UIWindow(frame = UIScreen.mainScreen.bounds)
-        w.rootViewController = ComposeUIViewController { App() }
+        w.rootViewController = ComposeUIViewController { App(perf = perf) }
         w.makeKeyAndVisible()
         mainWindow = w
         // After the launch method returns, as the Codename One side prints its

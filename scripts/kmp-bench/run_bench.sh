@@ -81,7 +81,15 @@ cp "$HERE/app/cmp/Info.plist" "$CMP_APP/Info.plist"
 codesign -s - --force "$CMP_APP" > /dev/null 2>&1
 
 stripped() { cp "$1" "$WORK/strip.tmp"; strip "$WORK/strip.tmp" 2>/dev/null || true; stat -f %z "$WORK/strip.tmp"; }
-bundle() { du -sk "$1" | awk '{print $1 * 1024}'; }
+# The bundle as shipped: a copy of the .app with its executable stripped.
+bundle() {
+  rm -rf "$WORK/bundle.tmp"; cp -R "$1" "$WORK/bundle.tmp"
+  strip "$WORK/bundle.tmp/$2" 2>/dev/null || true
+  du -sk "$WORK/bundle.tmp" | awk '{print $1 * 1024}'
+}
+# Bytes of everything in the bundle but the executable (fonts, theme, plists).
+resources() { find "$1" -type f ! -path "$1/$2" -exec stat -f %z {} + | awk '{s += $1} END {print s + 0}'; }
+largest() { find "$1" -type f ! -path "$1/$2" -exec stat -f '%z %N' {} + | sort -rn | head -5 | sed "s|$1/||"; }
 
 if [ -z "$DEVICE" ]; then
   DEVICE="$(xcrun simctl list devices available | sed -n 's/.*iPhone 17 Pro (\([0-9A-F-]*\)).*/\1/p' | head -1)"
@@ -135,27 +143,67 @@ for side in cn1 cmp; do
   xcrun simctl install "$DEVICE" "$app"
   eval "STARTS_$side=\"\$(measure \"\$id\" \"\$side\" \"\$exe\")\""
 done
+# Runtime measurements (app/shared/commonMain/kotlin/keynote/Perf.kt): one
+# launch per run with KMPBENCH_PERF=1, values in microseconds, collected as one
+# "name=v1,v2,..." line per measure.
+perf() {
+  local id="$1" name="$2"
+  for i in $(seq 1 "$RUNS"); do
+    xcrun simctl terminate "$DEVICE" "$id" 2>/dev/null || true
+    local log="$WORK/$name-perf$i.log"
+    ( SIMCTL_CHILD_KMPBENCH_PERF=1 timeout 180 xcrun simctl launch --console-pty "$DEVICE" "$id" > "$log" 2>&1 || true ) &
+    for _ in $(seq 1 1700); do grep -q "KMPBENCH perf-done" "$log" 2>/dev/null && break; sleep 0.1; done
+    grep -q "KMPBENCH perf-done" "$log" || { echo "$name perf run $i did not finish; see $log" >&2; exit 1; }
+    xcrun simctl terminate "$DEVICE" "$id" 2>/dev/null || true
+  done
+  cat "$WORK/$name"-perf[0-9]*.log | tr -d '\r' | awk '{ for (j = 1; j < NF; j++) if ($j == "KMPBENCH") break }
+      j < NF && $(j + 1) !~ /^(perf-done|perf-start|first-frame)$/ {
+      v[$(j + 1)] = v[$(j + 1)] (v[$(j + 1)] == "" ? "" : ",") $(j + 2) } END { for (k in v) print k "=" v[k] }' > "$WORK/$name-perf.txt"
+}
+perf $CN1_ID cn1; perf $CMP_ID cmp
 CN1_RSS="$(footprint_bytes $CN1_ID Bench.app/Bench)"; CMP_RSS="$(footprint_bytes $CMP_ID Keynote.app/Keynote)"
 
 python3 - "$WORK" <<EOF
 import json, statistics, sys
 work = sys.argv[1]
-def side(starts, exe, bundle, rss):
+def perfvals(name):
+    out = {}
+    for line in open(work + "/" + name + "-perf.txt"):
+        k, v = line.strip().split("=")
+        out[k] = statistics.median([int(x) for x in v.split(",")])
+    return out
+def side(starts, exe, bundle, rss, res, perf):
     s = [int(x) for x in starts.split()]
     warm = s[1:] or s
     return {"cold_start_ms": s[0], "warm_start_median_ms": statistics.median(warm), "starts_ms": s,
-            "executable_stripped_bytes": exe, "bundle_bytes": bundle, "footprint_bytes": rss}
-r = {"codename_one": side("$STARTS_cn1", $(stripped "$CN1_EXE"), $(bundle "$CN1_APP"), ${CN1_RSS:-0}),
-     "compose_multiplatform": side("$STARTS_cmp", $(stripped "$CMP_EXE"), $(bundle "$CMP_APP"), ${CMP_RSS:-0})}
+            "executable_stripped_bytes": exe, "bundle_bytes": bundle, "bundle_without_executable_bytes": res,
+            "footprint_bytes": rss, "perf_median_of_runs_us": perfvals(perf)}
+r = {"codename_one": side("$STARTS_cn1", $(stripped "$CN1_EXE"), $(bundle "$CN1_APP" Bench), ${CN1_RSS:-0},
+                         $(resources "$CN1_APP" Bench), "cn1"),
+     "compose_multiplatform": side("$STARTS_cmp", $(stripped "$CMP_EXE"), $(bundle "$CMP_APP" Keynote), ${CMP_RSS:-0},
+                         $(resources "$CMP_APP" Keynote), "cmp")}
 json.dump(r, open(work + "/results.json", "w"), indent=2)
 mb = lambda b: "%.1f MB" % (b / 1048576.0)
 rows = [("Cold start", lambda x: "%d ms" % x["cold_start_ms"]),
         ("Warm start (median)", lambda x: "%d ms" % x["warm_start_median_ms"]),
         ("Executable, stripped", lambda x: mb(x["executable_stripped_bytes"])),
-        ("App bundle", lambda x: mb(x["bundle_bytes"])),
+        ("App bundle, executable stripped", lambda x: mb(x["bundle_bytes"])),
+        ("Bundle without executable", lambda x: mb(x["bundle_without_executable_bytes"])),
         ("Physical footprint", lambda x: mb(x["footprint_bytes"]))]
+ms = lambda k: (lambda x: "%.2f ms" % (x["perf_median_of_runs_us"][k] / 1000.0))
+rows += [("Recomposition, day change to drawn (median)", ms("recompose-median-us")),
+         ("Recomposition, day change to drawn (p95)", ms("recompose-p95-us")),
+         ("Scroll, work per frame (median)", ms("scroll-work-median-us")),
+         ("Scroll, work per frame (p95)", ms("scroll-work-p95-us")),
+         ("Scroll, frame interval (median)", ms("scroll-frame-median-us")),
+         ("Scroll, frame interval (p95)", ms("scroll-frame-p95-us")),
+         ("Scroll, frames over 2x median", lambda x: "%d of %d" % (x["perf_median_of_runs_us"]["scroll-jank-frames"],
+                                                               x["perf_median_of_runs_us"]["scroll-frames"]))]
 md = ["| | Codename One | Compose Multiplatform |", "|---|---|---|"]
 md += ["| %s | %s | %s |" % (n, f(r["codename_one"]), f(r["compose_multiplatform"])) for n, f in rows]
 open(work + "/results.md", "w").write("\n".join(md) + "\n")
 print("\n".join(md))
 EOF
+echo "== Largest files besides the executable"
+echo "-- Codename One"; largest "$CN1_APP" Bench
+echo "-- Compose Multiplatform"; largest "$CMP_APP" Keynote

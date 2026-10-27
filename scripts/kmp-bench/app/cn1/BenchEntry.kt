@@ -30,7 +30,9 @@ import keynote.App
 /// Shows the application and prints the marker the harness times start-up
 /// against, once the first frame with content has been painted.
 fun start() {
-    val form = ComposeForm { App() }
+    // run_bench.sh launches with SIMCTL_CHILD_KMPBENCH_PERF=1 for the runtime measurements.
+    val perf = System.getenv("KMPBENCH_PERF") == "1"
+    val form = ComposeForm { App(perf = perf) }
     form.show()
     CN.callSerially {
         println("KMPBENCH first-frame " + System.currentTimeMillis())

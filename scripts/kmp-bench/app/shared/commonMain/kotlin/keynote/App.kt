@@ -44,6 +44,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -100,6 +103,12 @@ class AppState {
     var selected by mutableStateOf<Session?>(null)
     val favorites = mutableStateListOf<Int>()
 
+    // Benchmark hooks (Perf.kt); unused in a normal launch.
+    var list: LazyListState? = null
+    var tick by mutableIntStateOf(0)
+    var drawnSeq = 0
+    var drawnAt = 0L
+
     fun toggleFavorite(id: Int) {
         if (!favorites.remove(id)) favorites.add(id)
     }
@@ -108,12 +117,13 @@ class AppState {
 private val Brand = Color(0xFF7F52FF)
 
 @Composable
-fun App(state: AppState = remember { AppState() }) {
+fun App(state: AppState = remember { AppState() }, perf: Boolean = false) {
     val dark = isSystemInDarkTheme()
     val scheme = if (dark) darkColorScheme(primary = Color(0xFFB9A4FF), secondaryContainer = Color(0xFF3A2D6B))
     else lightColorScheme(primary = Brand, secondaryContainer = Color(0xFFE9E1FF))
     MaterialTheme(colorScheme = scheme) {
         val sessions by remember { Programme.load() }.collectAsState(emptyList())
+        if (perf && sessions.isNotEmpty()) LaunchedEffect(Unit) { runPerf(state) }
         val selected = state.selected
         if (selected != null) {
             SessionDetail(selected, state.favorites.contains(selected.id), { state.toggleFavorite(selected.id) }) {
@@ -167,19 +177,27 @@ private fun Schedule(sessions: List<Session>, state: AppState) {
             it.day == state.day && (q.isEmpty() || it.title.contains(q, ignoreCase = true) ||
                 it.speaker.name.contains(q, ignoreCase = true))
         }
-        SessionList(visible, state, empty = "No session matches \"$q\".")
+        val listState = rememberLazyListState()
+        state.list = listState
+        Box(Modifier.weight(1f)) {
+            SessionList(visible, state, empty = "No session matches \"$q\".", listState = listState)
+        }
+        // Drawn after the list in every frame that follows a benchmark step.
+        val seq = state.tick
+        Box(Modifier.size(1.dp).drawBehind { state.drawnAt = nowNanos(); state.drawnSeq = seq })
     }
 }
 
 @Composable
-private fun SessionList(sessions: List<Session>, state: AppState, empty: String) {
+private fun SessionList(sessions: List<Session>, state: AppState, empty: String,
+                        listState: LazyListState = rememberLazyListState()) {
     if (sessions.isEmpty()) {
         Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
             Text(empty, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         return
     }
-    LazyColumn(Modifier.fillMaxSize().testTag("list"), contentPadding = PaddingValues(16.dp, 8.dp),
+    LazyColumn(Modifier.fillMaxSize().testTag("list"), state = listState, contentPadding = PaddingValues(16.dp, 8.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
         items(sessions, key = { it.id }) { s ->
             SessionCard(s, state.favorites.contains(s.id), { state.toggleFavorite(s.id) }) { state.selected = s }
