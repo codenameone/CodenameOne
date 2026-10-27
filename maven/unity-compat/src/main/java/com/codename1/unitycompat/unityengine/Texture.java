@@ -24,7 +24,7 @@ package com.codename1.unitycompat.unityengine;
 
 /// `UnityEngine.Texture`: an image, known here by its size alone.
 @SuppressWarnings("PMD.MethodNamingConventions") // C# member names: translated code binds to them by name
-public class Texture extends Object {
+public class Texture extends Object { // NOPMD ExtendsObject - UnityEngine.Object, not java.lang.Object
     int width;
     int height;
 

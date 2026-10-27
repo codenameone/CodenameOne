@@ -23,7 +23,7 @@
 package com.codename1.unitycompat.system;
 
 /// `System.IEquatable<T>`.
-@SuppressWarnings("PMD.MethodNamingConventions") // C# member names: translated code binds to them by name
+@SuppressWarnings({"PMD.MethodNamingConventions", "PMD.ClassNamingConventions"}) // C# member and type names: translated code binds to them by name
 public interface IEquatable_1 {
     boolean Equals(Object other);
 }

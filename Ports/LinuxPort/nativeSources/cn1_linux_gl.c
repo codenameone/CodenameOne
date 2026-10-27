@@ -41,7 +41,11 @@
 #include <epoxy/egl.h>
 #include <epoxy/gl.h>
 #include <EGL/eglext.h>
+#ifdef CN1_LINUX_EMBEDDED
+#include "cn1_linux_raster.h"
+#else
 #include <cairo.h>
+#endif
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>

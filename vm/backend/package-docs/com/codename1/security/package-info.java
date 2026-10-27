@@ -40,6 +40,9 @@
 /// - [Pbkdf2] -- the key derivation behind a BIP-39 recovery phrase.
 /// - [CryptoBatch] -- many verifications or hashes in one call: the deposits
 ///   of a block an exchange scans. Each entry gets the single call's answer.
+/// - [CertificateRequest] -- PKCS#10 certificate signing requests. A headless
+///   device enrolls for its mutual TLS client certificate with it, signing
+///   through [com.codename1.backend.Crypto].
 ///
 /// Where native kernels are compiled in -- a packaged ParparVM server -- the
 /// curves, the hashes and the batches run in C through [CryptoEngine], a

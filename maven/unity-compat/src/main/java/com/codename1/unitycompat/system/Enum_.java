@@ -30,7 +30,7 @@ package com.codename1.unitycompat.system;
 /// so is this: `IsDefined`, `HasFlag` and `CompareTo` refuse a value of
 /// another enum, where `GetName` reads the number out of any enum or
 /// integer.
-@SuppressWarnings("PMD.MethodNamingConventions") // C# member names: translated code binds to them by name
+@SuppressWarnings({"PMD.MethodNamingConventions", "PMD.ClassNamingConventions"}) // C# member and type names: translated code binds to them by name
 public final class Enum_ {
     private Enum_() {
     }

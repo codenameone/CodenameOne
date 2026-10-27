@@ -183,6 +183,11 @@ public final class ServerSocket {
 
     private static final ThreadLocal THREAD_READ_BUFFER = new ThreadLocal();
 
+    /// Java SE twin of the probe-free park: a readiness wait with no deadline.
+    public static boolean parkUntilReadable(int fd) throws IOException {
+        return awaitReadable(fd, -1);
+    }
+
     /// Java SE twin of the readiness wait. See the translated version for why the
     /// shared code asks for this rather than juggling deadlines.
     ///

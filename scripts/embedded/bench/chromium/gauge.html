@@ -1,0 +1,31 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>gauge</title>
+<style>html,body{margin:0;background:#101820;overflow:hidden}</style></head>
+<body><canvas id="c" width="800" height="480"></canvas>
+<script>
+// The benchmark gauge as a kiosk page: a 2D canvas redrawn every animation
+// frame, in a Chromium started without a GPU, as on a board without one.
+const g = document.getElementById('c').getContext('2d');
+let angle = 0, frames = 0, first = true;
+const secs = Number(new URLSearchParams(location.search).get('s') || 10);
+const start = performance.now();
+function frame() {
+  angle += 0.04;
+  const w = 800, h = 480, cx = w / 2, cy = h / 2, r = Math.min(w, h) / 2 - 10;
+  g.fillStyle = '#101820'; g.fillRect(0, 0, w, h);
+  g.fillStyle = '#2a3a4a'; g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.fill();
+  const sweep = Math.floor((Math.sin(angle) + 1) * 135);
+  const a0 = -225 * Math.PI / 180, a1 = -(225 - sweep) * Math.PI / 180;
+  g.fillStyle = '#33aaff'; g.beginPath(); g.moveTo(cx, cy); g.arc(cx, cy, r, a0, a1); g.fill();
+  g.fillStyle = '#101820'; g.beginPath(); g.arc(cx, cy, r - 24, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = '#fff'; g.lineWidth = 1; g.beginPath(); g.moveTo(cx, cy);
+  g.lineTo(cx + Math.cos(-a1) * (r - 30), cy - Math.sin(-a1) * (r - 30)); g.stroke();
+  g.fillStyle = '#fff'; g.font = 'bold 28px sans-serif'; g.textAlign = 'center';
+  g.fillText(Math.floor(sweep * 100 / 270) + ' %', cx, cy + r / 3);
+  frames++;
+  if (first) { first = false; console.log('CN1BENCH first_frame_epoch_ms=' + Date.now()); }
+  if (performance.now() - start < secs * 1000) requestAnimationFrame(frame);
+  else console.log('CN1BENCH fps=' + Math.floor(frames * 1000 / (performance.now() - start)) + ' frames=' + frames);
+}
+requestAnimationFrame(frame);
+</script></body></html>

@@ -27,5 +27,6 @@ import com.codename1.unitycompat.system.collections.IEnumerator;
 
 /// `System.Collections.Generic.IEnumerator<T>`. Erased, `Current` has the
 /// same shape as the non-generic one, so the two are one method.
+@SuppressWarnings("PMD.ClassNamingConventions") // C# type names: the translator binds to them by name
 public interface IEnumerator_1 extends IEnumerator, IDisposable {
 }

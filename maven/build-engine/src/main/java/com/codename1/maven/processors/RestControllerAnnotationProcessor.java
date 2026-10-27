@@ -1802,6 +1802,9 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
               .append("String[] bound) throws Exception {\n");
             emitRoute(sb, route, i, c);
             sb.append("    }\n\n");
+            if (usesEncoder(route)) {
+                emitEncoder(sb, route, i);
+            }
         }
         if (local) {
             sb.append("    public com.codename1.backend.HttpServer.Response resolve(\n")
@@ -1932,11 +1935,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
               .append(";\n");
             sb.append(pad).append("return result == null ? request.respond(404, \"text/plain\", EMPTY)\n");
             sb.append(pad).append("        : request.respondJson(").append(route.status)
-              .append(", new com.codename1.backend.Json.Writable() {\n");
-            sb.append(pad).append("            public void writeTo(com.codename1.backend.ByteSink out) {\n");
-            appendIndented(sb, route.codecWrite, pad + "                ");
-            sb.append(pad).append("            }\n");
-            sb.append(pad).append("        });\n");
+              .append(", result, CN1_ENCODER").append(index).append(");\n");
         } else {
             // Everything else is JSON. respondJson writes into the connection's own
             // Response, so a route that returns a value still allocates only that value.
@@ -2739,6 +2738,33 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             sb.append(pad).append(code, start, end).append('\n');
             start = end + 1;
         }
+    }
+
+    /// True exactly when emitRoute answers through CN1_ENCODER<index>: the same
+    /// tests in the same order as its branches, so the field and its one use
+    /// cannot disagree.
+    private static boolean usesEncoder(Route route) {
+        return !route.view && !"void".equals(route.returnJavaType)
+                && !isResponseType(route.returnJavaType)
+                && !"java.lang.String".equals(route.returnJavaType)
+                && route.codecWrite != null;
+    }
+
+    /// The route's codec as a static `Json.Encoder`. It used to be an anonymous
+    /// Writable built around the result on every request: one object per
+    /// response, which with the result itself was all a small JSON route
+    /// allocated. The encoder is handed the value instead, so it is made once.
+    private static void emitEncoder(StringBuilder sb, Route route, int index) {
+        String type = BackendJsonCodecs.source(route.returnJavaType);
+        sb.append("    private static final com.codename1.backend.Json.Encoder CN1_ENCODER")
+          .append(index).append(" =\n");
+        sb.append("            new com.codename1.backend.Json.Encoder() {\n");
+        sb.append("        @SuppressWarnings(\"unchecked\")\n");
+        sb.append("        public void write(Object cn1Value, com.codename1.backend.ByteSink out) {\n");
+        sb.append("            final ").append(type).append(" result = (").append(type)
+          .append(") cn1Value;\n");
+        appendIndented(sb, route.codecWrite, "            ");
+        sb.append("        }\n    };\n\n");
     }
 
     private static void emitRouterHelpers(StringBuilder sb) {

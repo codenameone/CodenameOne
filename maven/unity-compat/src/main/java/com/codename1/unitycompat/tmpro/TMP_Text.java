@@ -34,7 +34,7 @@ import com.codename1.unitycompat.unityengine.ui.MaskableGraphic;
 /// platform's font at the size asked for. The font asset, its material,
 /// outlines, gradients, character and line spacing, and rich text tags
 /// are not read; tags are drawn as written.
-@SuppressWarnings("PMD.MethodNamingConventions") // C# member names: translated code binds to them by name
+@SuppressWarnings({"PMD.MethodNamingConventions", "PMD.ClassNamingConventions"}) // C# member and type names: translated code binds to them by name
 public abstract class TMP_Text extends MaskableGraphic {
     private String text = "";
     private float fontSize = 36f;

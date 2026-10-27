@@ -602,6 +602,11 @@ public class ByteCodeTranslator {
         // the engine is present and as stubs when it is not, so an application that references
         // com.codename1.db links regardless of how the translator was invoked.
         copyRuntimeResource(srcRoot, "cn1_db_sqlite_impl.h");
+        // The kernel bus and pin access the Linux port and the backend both wrap
+        // (com.codename1.impl.KernelHardware). Only their wrappers include it.
+        copyRuntimeResource(srcRoot, "cn1_hardware_impl.h");
+        // The multicast DNS socket behind com.codename1.impl.MdnsEngine, wrapped the same way.
+        copyRuntimeResource(srcRoot, "cn1_mdns_impl.h");
         emitBundledSqlite(srcRoot);
         emitCryptoKernels(srcRoot, false);
         copyRuntimeResource(srcRoot, "xmlvm.h");
@@ -1002,6 +1007,11 @@ public class ByteCodeTranslator {
         // the engine is present and as stubs when it is not, so an application that references
         // com.codename1.db links regardless of how the translator was invoked.
         copyRuntimeResource(srcRoot, "cn1_db_sqlite_impl.h");
+        // The kernel bus and pin access the Linux port and the backend both wrap
+        // (com.codename1.impl.KernelHardware). Only their wrappers include it.
+        copyRuntimeResource(srcRoot, "cn1_hardware_impl.h");
+        // The multicast DNS socket behind com.codename1.impl.MdnsEngine, wrapped the same way.
+        copyRuntimeResource(srcRoot, "cn1_mdns_impl.h");
         emitBundledSqlite(srcRoot);
         emitCryptoKernels(srcRoot, true);
 
@@ -1649,14 +1659,84 @@ public class ByteCodeTranslator {
      */
     private static void writeLinuxLinkSet(Writer writer) throws IOException {
         writer.append("find_package(PkgConfig REQUIRED)\n");
+        // The embedded target owns the screen through DRM/KMS or fbdev with no window
+        // system (cn1_linux_embedded.c). It drops every GTK unit -- the generated
+        // cn1_linux_embedded_stubs.c answers "unsupported" for their natives -- and
+        // links GL and GStreamer only when the sysroot has them. Defaulted from
+        // -Dcn1.linux.embedded at translation, and still a cache option so the same
+        // generated project can be configured either way.
+        writer.append("option(CN1_LINUX_EMBEDDED \"Embedded Linux: DRM/KMS or fbdev, no GTK\" ")
+                .append(Boolean.getBoolean("cn1.linux.embedded") ? "ON" : "OFF").append(")\n");
+        writer.append("option(CN1_EMBEDDED_GPU \"Embedded Linux: GPU renderer, GLES 2 over GBM/EGL\" ")
+                .append(Boolean.getBoolean("cn1.linux.embedded.gpu") ? "ON" : "OFF").append(")\n");
+        writer.append("if(CN1_LINUX_EMBEDDED)\n");
+        // cn1_linux_text.c (Pango) is replaced by cn1_linux_text_ft.c, and Cairo by
+        // the renderer in cn1_linux_raster.c: the desktop stack mapped 23 MB of
+        // libraries (X11, GLib, HarfBuzz, FontConfig...) into an application that
+        // draws into a framebuffer, and every cold start read them from storage.
+        writer.append("    foreach(cn1_gtk_unit window desktopwindow edit browser peer print services text_input widgets text)\n");
+        writer.append("        list(FILTER TRANSLATOR_SOURCES EXCLUDE REGEX \"/cn1_linux_${cn1_gtk_unit}\\\\.c$\")\n");
+        writer.append("    endforeach()\n");
+        writer.append("    pkg_check_modules(CN1DEPS REQUIRED freetype2 libpng libjpeg zlib)\n");
+        // libcrypto is loaded on first use (cn1_linux_crypto.c): headers only.
+        writer.append("    pkg_check_modules(CN1CRYPTO REQUIRED libcrypto>=3)\n");
+        writer.append("    pkg_check_modules(CN1CURL REQUIRED libcurl)\n");
+        writer.append("    pkg_check_modules(CN1DRM libdrm)\n");
+        writer.append("    pkg_check_modules(CN1GL epoxy egl glesv2)\n");
+        writer.append("    pkg_check_modules(CN1GST gstreamer-1.0 gstreamer-app-1.0 gstreamer-video-1.0)\n");
+        writer.append("    set_property(TARGET ${PROJECT_NAME} PROPERTY SOURCES ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS} ${TRANSLATOR_ASM_SOURCES})\n");
+        writer.append("    target_compile_definitions(${PROJECT_NAME} PRIVATE CN1_LINUX_EMBEDDED)\n");
+        writer.append("    set(CN1EMB_LIBS ${CN1DEPS_LIBRARIES})\n");
+        writer.append("    if(CN1DRM_FOUND)\n");
+        writer.append("        target_compile_definitions(${PROJECT_NAME} PRIVATE CN1_EMBEDDED_HAS_DRM)\n");
+        writer.append("        list(APPEND CN1EMB_LIBS ${CN1DRM_LIBRARIES})\n");
+        writer.append("    endif()\n");
+        writer.append("    if(CN1GL_FOUND)\n");
+        writer.append("        target_compile_definitions(${PROJECT_NAME} PRIVATE CN1_EMBEDDED_HAS_GL)\n");
+        writer.append("        list(APPEND CN1EMB_LIBS ${CN1GL_LIBRARIES})\n");
+        writer.append("    else()\n");
+        writer.append("        get_target_property(cn1_srcs ${PROJECT_NAME} SOURCES)\n");
+        writer.append("        list(FILTER cn1_srcs EXCLUDE REGEX \"/cn1_linux_gl\\\\.c$\")\n");
+        writer.append("        set_property(TARGET ${PROJECT_NAME} PROPERTY SOURCES ${cn1_srcs})\n");
+        writer.append("    endif()\n");
+        // The GPU renderer (cn1_linux_gpu.c): GLES 2 on a GBM surface over KMS.
+        // Only when the build asks for it -- the linux.embedded.renderer hint or a
+        // board profile that defaults to it -- and then its libraries are
+        // required, so a sysroot without them fails the build instead of shipping
+        // a binary that quietly renders in software.
+        writer.append("    if(CN1_EMBEDDED_GPU)\n");
+        writer.append("        pkg_check_modules(CN1GPU REQUIRED gbm egl glesv2 libdrm)\n");
+        writer.append("        target_compile_definitions(${PROJECT_NAME} PRIVATE CN1_EMBEDDED_GPU)\n");
+        writer.append("        target_include_directories(${PROJECT_NAME} PRIVATE ${CN1GPU_INCLUDE_DIRS})\n");
+        writer.append("        list(APPEND CN1EMB_LIBS ${CN1GPU_LIBRARIES})\n");
+        writer.append("    else()\n");
+        writer.append("        get_target_property(cn1_srcs ${PROJECT_NAME} SOURCES)\n");
+        writer.append("        list(FILTER cn1_srcs EXCLUDE REGEX \"/cn1_linux_gpu\\\\.c$\")\n");
+        writer.append("        set_property(TARGET ${PROJECT_NAME} PROPERTY SOURCES ${cn1_srcs})\n");
+        writer.append("    endif()\n");
+        writer.append("    if(CN1GST_FOUND)\n");
+        writer.append("        target_compile_definitions(${PROJECT_NAME} PRIVATE CN1_EMBEDDED_HAS_GST)\n");
+        writer.append("    else()\n");
+        writer.append("        get_target_property(cn1_srcs ${PROJECT_NAME} SOURCES)\n");
+        writer.append("        list(FILTER cn1_srcs EXCLUDE REGEX \"/cn1_linux_(media|video)\\\\.c$\")\n");
+        writer.append("        set_property(TARGET ${PROJECT_NAME} PROPERTY SOURCES ${cn1_srcs})\n");
+        writer.append("    endif()\n");
+        writer.append("    target_include_directories(${PROJECT_NAME} PRIVATE ${CN1DEPS_INCLUDE_DIRS} ${CN1CRYPTO_INCLUDE_DIRS} ${CN1CURL_INCLUDE_DIRS} ${CN1DRM_INCLUDE_DIRS} ${CN1GL_INCLUDE_DIRS} ${CN1GST_INCLUDE_DIRS})\n");
+        writer.append("    target_compile_options(${PROJECT_NAME} PRIVATE ${CN1DEPS_CFLAGS_OTHER} ${CN1CURL_CFLAGS_OTHER})\n");
+        // --as-needed: a library the code ends up not calling is not loaded at
+        // start. Passed through target_link_libraries, which places it before the
+        // libraries on the line and works with the project's CMake 3.10 floor.
+        writer.append("    target_link_libraries(${PROJECT_NAME} -Wl,--as-needed ${CN1EMB_LIBS} m pthread dl)\n");
+        writer.append("else()\n");
         // Core GTK3 stack -- LINKED. The shipped binary requires only these (plus
         // libc/libm/pthread/dl) at runtime. Splitting the GLES probe out keeps a
         // clear error if only the GL bits are missing.
         writer.append("pkg_check_modules(CN1DEPS REQUIRED\n");
         writer.append("    gtk+-3.0 cairo pango pangocairo gdk-pixbuf-2.0 glib-2.0 gobject-2.0 gio-2.0\n");
-        writer.append("    fontconfig freetype2\n");
-        // libcrypto backs the port's crypto bridge (cn1_linux_crypto.c).
-        writer.append("    libcrypto)\n");
+        writer.append("    fontconfig freetype2)\n");
+        // libcrypto backs the port's crypto bridge (cn1_linux_crypto.c), which
+        // loads it on first use: headers only, like libcurl below.
+        writer.append("pkg_check_modules(CN1CRYPTO REQUIRED libcrypto>=3)\n");
         // HTTP resolves the libcurl.so.4 ABI by name. Direct linking imports the
         // build distro's CURL_OPENSSL_4 tags, absent on Alma/RHEL's libcurl.
         // Keep its headers/compiler flags, but do not link CN1CURL_LIBRARIES.
@@ -1672,12 +1752,13 @@ public class ByteCodeTranslator {
         writer.append("pkg_check_modules(CN1OPT REQUIRED\n");
         writer.append("    gstreamer-1.0 gstreamer-app-1.0 gstreamer-video-1.0\n");
         writer.append("    webkit2gtk-4.1 libsecret-1 libnotify libgeoclue-2.0)\n");
-        writer.append("target_include_directories(${PROJECT_NAME} PRIVATE ${CN1DEPS_INCLUDE_DIRS} ${CN1CURL_INCLUDE_DIRS} ${CN1GL_INCLUDE_DIRS} ${CN1OPT_INCLUDE_DIRS})\n");
+        writer.append("target_include_directories(${PROJECT_NAME} PRIVATE ${CN1DEPS_INCLUDE_DIRS} ${CN1CRYPTO_INCLUDE_DIRS} ${CN1CURL_INCLUDE_DIRS} ${CN1GL_INCLUDE_DIRS} ${CN1OPT_INCLUDE_DIRS})\n");
         writer.append("target_compile_options(${PROJECT_NAME} PRIVATE ${CN1DEPS_CFLAGS_OTHER} ${CN1CURL_CFLAGS_OTHER} ${CN1GL_CFLAGS_OTHER} ${CN1OPT_CFLAGS_OTHER})\n");
         // libm/pthread back the translated runtime + GC; dl is required for the
         // dlopen() of the optional libs above. Note: CN1OPT_LIBRARIES is
         // deliberately NOT linked.
         writer.append("target_link_libraries(${PROJECT_NAME} ${CN1DEPS_LIBRARIES} ${CN1GL_LIBRARIES} m pthread dl)\n");
+        writer.append("endif()\n");
 
         // Dead-strip unreferenced functions/data, matching the Windows port's
         // /OPT:REF + /OPT:ICF. The translator emits a C function per reachable

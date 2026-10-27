@@ -94,6 +94,18 @@ enumeration of all objects.
 cursor. That thread bumps `bumpIndex` without the page lock, which is only sound
 because nothing else does.
 
+**Under `CN1_VIRTUAL_THREADS` the owner is the CARRIER, not the virtual thread.**
+Allocation reads `CN1_BIBOP_CUR(t)`, which for a virtual thread is an alias
+`cn1ResumeVirtualThreadOn` points at its carrier's `bibopCurrent` on every resume
+(HotSpot's carrier TLAB). Each virtual thread holding its own part-filled pages
+measured 263KB per connection; a carrier's pages are shared by every virtual
+thread it runs. R5 still holds because a carrier runs one virtual thread at a time
+and stays `threadActive` across the resume, so each array has a single writer.
+The collector reads only each thread's OWN `bibopCurrent` (grace list, retire,
+root refresh); a virtual thread's own array stays empty, so every owned page is
+seen exactly once, through its carrier. Code that walks pages per thread must use
+`bibopCurrent`, and code that allocates must use `CN1_BIBOP_CUR`.
+
 ### R6. Only a RETIRED (non-owned) page may reach the sweep.
 
 Already checked under `CN1_BIBOP_VALIDATE` at the sweep entry, with the comment
