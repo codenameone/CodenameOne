@@ -12,7 +12,7 @@
 #
 #   e2e-shipped.sh [--require-latest] [--no-ui] [TEMPLATE ...]
 #
-# TEMPLATE is BAREBONES, KOTLIN, WAYLINE, SAVOR, SKIRMISH, PARLEY or BASTION; all of them
+# TEMPLATE is BAREBONES, KOTLIN, WAYLINE, SAVOR, SKIRMISH, PARLEY, BASTION or REEL; all of them
 # by default. Every other check of the templates builds them against this
 # checkout's 8.0-SNAPSHOT, which no developer has: the generated pom names the
 # release the Initializr pins, and that is the only thing this script builds
@@ -59,7 +59,7 @@ for arg in "$@"; do
     *) TEMPLATES+=("$arg") ;;
   esac
 done
-[ ${#TEMPLATES[@]} -gt 0 ] || TEMPLATES=(BAREBONES KOTLIN WAYLINE SAVOR SKIRMISH PARLEY BASTION)
+[ ${#TEMPLATES[@]} -gt 0 ] || TEMPLATES=(BAREBONES KOTLIN WAYLINE SAVOR SKIRMISH PARLEY BASTION REEL)
 
 log() { echo "[e2e-shipped] $*" >&2; }
 fail() { echo "[e2e-shipped] FAIL: $*" >&2; exit 1; }
@@ -73,12 +73,15 @@ since() {
 }
 FULL_STACK_SINCE="$(since FULL_STACK_SINCE)"
 BASTION_SINCE="$(since BASTION_SINCE)"
-[ -n "$FULL_STACK_SINCE" ] && [ -n "$BASTION_SINCE" ] || fail "could not read the template floors from $GENERATOR"
+REEL_SINCE="$(since REEL_SINCE)"
+[ -n "$FULL_STACK_SINCE" ] && [ -n "$BASTION_SINCE" ] && [ -n "$REEL_SINCE" ] || fail "could not read the template floors from $GENERATOR"
 # The oldest release a template's generated code compiles against: Bastion
-# calls framework API that first shipped in BASTION_SINCE.
+# calls framework API that first shipped in BASTION_SINCE, Reel the protected
+# playback API of REEL_SINCE.
 template_since() {
   case "$1" in
     BASTION) echo "$BASTION_SINCE" ;;
+    REEL) echo "$REEL_SINCE" ;;
     *) echo "$FULL_STACK_SINCE" ;;
   esac
 }

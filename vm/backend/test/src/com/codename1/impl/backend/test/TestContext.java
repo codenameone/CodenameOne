@@ -72,6 +72,11 @@ public interface TestContext {
     /// The names of the mock beans, reset after each test.
     String[] mockBeans();
 
+    /// Whether each test method runs in a transaction that is rolled back
+    /// afterwards, as a `@DataJpaTest`'s do; its `@BeforeEach` and `@AfterEach`
+    /// methods run outside it.
+    boolean rollsBack();
+
     /// Fills the test instance's `@Autowired`, `@LocalServerPort` and
     /// `@MockitoBean` fields.
     void inject(Object test, TestEnvironment environment) throws Exception;

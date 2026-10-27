@@ -35,14 +35,18 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.codename1.backend.metrics.MetricSchema;
 import com.codename1.backend.metrics.Metrics;
 
 /// The server's management endpoints: health for the load balancer, metrics for
 /// a scraper, and the jobs and managed beans for an operator.
 ///
 /// ```java
-///   GET  /manage/health          public; 503 while draining
+///   GET  /manage/health          public; 503 while starting or draining
+///   GET  /manage/health/readiness  public; the same answer, for a readiness probe
+///   GET  /manage/health/liveness   public; 200 for as long as the process serves
 ///   GET  /manage/metrics         every metric, as JSON
+///   GET  /manage/schema          the built-in metrics' schema, and what this runtime lacks
 ///   GET  /manage/prometheus      every metric, in the Prometheus text format
 ///   GET  /manage/jobs            the scheduled jobs and their last runs
 ///   GET  /manage/managed         the managed beans, with their attributes' values
@@ -219,8 +223,12 @@ public final class Management implements HttpServer.Handler {
             return null;
         }
         String method = request.getMethod();
-        if ("/health".equals(rest) && ("GET".equals(method) || "HEAD".equals(method))) {
+        if (("/health".equals(rest) || "/health/readiness".equals(rest))
+                && ("GET".equals(method) || "HEAD".equals(method))) {
             return health(request);
+        }
+        if ("/health/liveness".equals(rest) && ("GET".equals(method) || "HEAD".equals(method))) {
+            return liveness(request);
         }
         if (rest.length() == 0) {
             return null;
@@ -234,6 +242,9 @@ public final class Management implements HttpServer.Handler {
         if ("GET".equals(method) || "HEAD".equals(method)) {
             if ("/metrics".equals(rest)) {
                 return request.respondJson(200, Metrics.snapshot());
+            }
+            if ("/schema".equals(rest)) {
+                return request.respondJson(200, MetricSchema.describe());
             }
             if ("/prometheus".equals(rest)) {
                 return request.respond(200, "text/plain; version=0.0.4; charset=utf-8",
@@ -314,6 +325,16 @@ public final class Management implements HttpServer.Handler {
             out.put("status", "STARTING");
         }
         return request.respondJson(up ? 200 : 503, out);
+    }
+
+    /// Whether the process should be left running, as a liveness probe asks:
+    /// UP while it starts, serves and drains. A draining server is finishing its
+    /// requests, and a probe that restarted it then would cut them off; readiness
+    /// is what takes it out of the load balancer.
+    private HttpServer.Response liveness(HttpServer.Request request) {
+        Map out = new LinkedHashMap();
+        out.put("status", "UP");
+        return request.respondJson(200, out);
     }
 
     private boolean authorized(HttpServer.Request request, boolean operation) {

@@ -455,6 +455,10 @@ public final class OtlpMetricExporter implements MetricReader {
             if (instrument.getUnit().length() > 0) {
                 metric.put("unit", instrument.getUnit());
             }
+            if (Metrics.unmeasured(instrument)) {
+                // Nothing to measure on this server (MetricSchema): absent, not zero.
+                continue;
+            }
             List points = instrument.points();
             List dataPoints = new ArrayList(points.size());
             for (Object entry : points) {

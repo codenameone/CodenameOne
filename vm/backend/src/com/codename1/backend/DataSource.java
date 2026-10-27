@@ -93,6 +93,12 @@ public final class DataSource {
     private boolean closed;
     /// Slots reserved by borrowers opening a connection outside the monitor.
     private int opening;
+    /// Borrowers waiting for a connection right now, and borrows that gave up
+    /// waiting since the pool opened. The pool's saturation, which the open and
+    /// idle counts cannot show: a full pool nobody waits for is busy, and one with
+    /// a queue is too small.
+    private int pending;
+    private long timeouts;
 
     private DataSource(String url, String describedAs, int maxSize, int busyTimeoutMillis,
                        long borrowTimeoutMillis, Dialect dialect, boolean owns) {
@@ -258,9 +264,16 @@ public final class DataSource {
                 : AsyncTask.deadline(System.currentTimeMillis(), borrowTimeoutMillis);
         boolean virtual = VirtualThread.isVirtual();
         long nap = 1;
+        // A virtual thread naps OUTSIDE the monitor, so its place in the queue is
+        // given back when it comes back in rather than around the nap.
+        boolean napping = false;
         while (true) {
             boolean reserved = false;
             synchronized (this) {
+                if (napping) {
+                    napping = false;
+                    pending--;
+                }
                 // Checked before the idle list rather than only when it is
                 // empty: close() can run while a borrower still holds a
                 // connection, and that borrower's finally releases afterwards,
@@ -296,11 +309,13 @@ public final class DataSource {
                     }
                     long left = deadline - System.currentTimeMillis();
                     if (left <= 0) {
+                        timeouts++;
                         throw new IOException("No database connection became free within "
                                 + borrowTimeoutMillis + "ms; the pool holds " + maxSize
                                 + " and they are all in use. Either the work holding them is "
                                 + "too slow or " + Config.DATASOURCE_POOL_SIZE + " is too low.");
                     }
+                    pending++;
                     if (!virtual) {
                         try {
                             wait(deadline == Long.MAX_VALUE ? 0 : left);
@@ -308,9 +323,12 @@ public final class DataSource {
                             Thread.currentThread().interrupt();
                             throw new IOException("Interrupted while waiting for a database "
                                     + "connection", err);
+                        } finally {
+                            pending--;
                         }
                         continue;
                     }
+                    napping = true;
                 }
             }
             if (reserved) {
@@ -318,7 +336,14 @@ public final class DataSource {
             }
             // A virtual thread, outside the monitor: give the host back.
             long now = System.currentTimeMillis();
-            HttpServer.napUntil(Math.min(deadline, now + nap));
+            try {
+                HttpServer.napUntil(Math.min(deadline, now + nap));
+            } catch (RuntimeException err) {
+                synchronized (this) {
+                    pending--;
+                }
+                throw err;
+            }
             nap = Math.min(20, nap * 2);
         }
     }
@@ -539,6 +564,18 @@ public final class DataSource {
     /// How many are open and free right now.
     public synchronized int getIdleCount() {
         return idle.size();
+    }
+
+    /// How many borrowers are waiting for a connection right now, because every
+    /// one the pool may hold is in use.
+    public synchronized int getPendingCount() {
+        return pending;
+    }
+
+    /// How many borrows gave up since the pool opened, because no connection
+    /// became free within the borrow timeout.
+    public synchronized long getTimeoutCount() {
+        return timeouts;
     }
 
     /// Closes every connection. Borrowed ones are closed as they come back.

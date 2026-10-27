@@ -836,6 +836,9 @@ callee
 signalling
 coturn
 unconfigured
+Widevine
+blocklist
+blocklists
 Sepolia
 ntfy
 composables
