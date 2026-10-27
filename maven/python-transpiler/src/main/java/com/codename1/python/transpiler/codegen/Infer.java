@@ -152,6 +152,7 @@ final class Infer {
 
     private void collect(List<Stmt> body) {
         countBindings(body);
+        intConstants(body);
         for (Layouts.Cls k : layouts.classes.values()) {
             fields.put(k, new LinkedHashMap<String, Ty>());
             for (String f : k.fields) {
@@ -267,6 +268,23 @@ final class Infer {
             return arithmetic(((UnaryOp) e).operand, sc);
         }
         return false;
+    }
+
+    /// Module globals bound once, at the top level, to an int literal (`M32 =
+    /// 0xFFFFFFFF`): their value is known wherever a function reads them.
+    final Map<String, java.math.BigInteger> intConsts = new HashMap<String, java.math.BigInteger>();
+
+    private void intConstants(List<Stmt> body) {
+        for (Stmt s : body) {
+            if (s instanceof Assign && ((Assign) s).targets.size() == 1
+                    && ((Assign) s).targets.get(0) instanceof Name) {
+                String n = ((Name) ((Assign) s).targets.get(0)).id;
+                java.math.BigInteger v = IntRanges.literal(((Assign) s).value);
+                if (v != null && stable(n)) {
+                    intConsts.put(n, v);
+                }
+            }
+        }
     }
 
     private boolean stable(String n) {

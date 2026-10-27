@@ -110,6 +110,16 @@ final class TypedEmit {
     /// Shadowed locals with no Object variable at all: read boxed only on a
     /// slow path.
     private Set<String> longOnly = new HashSet<String>();
+    /// The int ranges of the function being emitted, and the locals they
+    /// put in a Java `long` (see `IntRanges`).
+    private IntRanges ranges;
+    private Set<String> longLocals = new HashSet<String>();
+    /// The Java code of each parameter of the expression functions being
+    /// inlined, innermost last, and whether it is the exact value (true) or
+    /// only the value modulo 2^64.
+    private final List<Map<String, String[]>> inlined = new ArrayList<Map<String, String[]>>();
+    /// An expression `expr` must lower without trying `wrapped` first.
+    private Expr plainExpr;
     /// Locals whose previous list a new one may be written into (see
     /// ListRecycling).
     private Set<String> recycled = new HashSet<String>();
@@ -560,6 +570,8 @@ final class TypedEmit {
         nonNull = new HashSet<String>();
         shadow = new HashMap<String, String>();
         longOnly = new HashSet<String>();
+        ranges = new IntRanges(in, f);
+        longLocals = ranges.longLocals();
         if (!f.def.scope.cells.isEmpty() || f.def.scope.hasYield || f.def.isAsync || !f.def.decorators.isEmpty()
                 || f.def.args.vararg != null || f.def.args.kwarg != null || !f.def.args.kwonly.isEmpty()) {
             throw new Unsupported("signature");
@@ -590,7 +602,10 @@ final class TypedEmit {
         }
         b.append(") {\n");
         for (Map.Entry<String, Ty> e : f.locals.entrySet()) {
-            if (declared.add(e.getKey())) {
+            if (longLocals.contains(e.getKey())) {
+                declared.add(e.getKey());
+                b.append("        long ").append(var(e.getKey())).append(" = 0L;\n");
+            } else if (declared.add(e.getKey())) {
                 b.append("        ").append(jt(e.getValue())).append(' ').append(var(e.getKey())).append(" = ")
                         .append(zero(e.getValue())).append(";\n");
             }
@@ -906,8 +921,12 @@ final class TypedEmit {
                     .append("L) {\n");
             String tn = ((Name) f.target).id;
             boolean counter = vt.k == Ty.K.INT && !inBody.contains(tn);
-            boolean unboxed = counter && !longOnly.contains(tn) && !readOutside(tn, f);
-            if (unboxed) {
+            boolean unboxed = counter && !longOnly.contains(tn) && !readOutside(tn, f)
+                    && !longLocals.contains(tn);
+            if (longLocals.contains(tn)) {
+                indent(b, ind + 2);
+                b.append(v).append(" = ").append(i).append(";\n");
+            } else if (unboxed) {
                 // Read nowhere but in this body: no boxed copy at all.
                 longOnly.add(tn);
             } else if (longOnly.contains(tn)) {
@@ -982,6 +1001,12 @@ final class TypedEmit {
             switch (sc.resolve(n)) {
                 case LOCAL:
                     indent(b, ind);
+                    if (longLocals.contains(n)) {
+                        // The analysis proved every value it holds fits.
+                        b.append(var(n)).append(" = ").append(v.lc != null ? v.lc : "Typed.toLong(" + box(v) + ")")
+                                .append(";\n");
+                        return;
+                    }
                     b.append(var(n)).append(" = ").append(conv(v, localType(n))).append(";\n");
                     forgetPathsOf(n);
                     if (longOnly.contains(n)) {
@@ -1081,6 +1106,10 @@ final class TypedEmit {
 
     private void augAssign(AugAssign a, StringBuilder b, int ind) {
         Expr t = a.target;
+        if (t instanceof Name && longLocals.contains(((Name) t).id)) {
+            store(t, expr(new BinOp(t, a.op, a.value)), b, ind);
+            return;
+        }
         if (t instanceof Name) {
             E cur0 = expr(t);
             E r = binop(a.op, cur0, expr(a.value), a.value);
@@ -1262,7 +1291,7 @@ final class TypedEmit {
     }
 
     /// Every local `body` may store into.
-    private static Set<String> assigned(List<Stmt> body) {
+    static Set<String> assigned(List<Stmt> body) {
         List<String> out = new ArrayList<String>();
         for (Stmt s : body) {
             collectStores(s, out);
@@ -1378,6 +1407,13 @@ final class TypedEmit {
     }
 
     E expr(Expr e) {
+        if (e != plainExpr && (e instanceof BinOp || e instanceof UnaryOp || e instanceof IfExp //NOPMD CompareObjectsWithEquals
+                || e instanceof Call && ranges.inlinable((Call) e) != null)) {
+            E w = wrapped(e);
+            if (w != null) {
+                return w;
+            }
+        }
         if (e instanceof Constant) {
             Constant c = (Constant) e;
             switch (c.kind) {
@@ -1600,6 +1636,9 @@ final class TypedEmit {
                 Ty t = localType(n);
                 if (sc.deleted.contains(n)) {
                     throw new Unsupported("deleted " + n);
+                }
+                if (longLocals.contains(n)) {
+                    return new E("Long.valueOf(" + var(n) + ")", Ty.INT, var(n));
                 }
                 String l = shadow.get(n);
                 if (l != null) {
@@ -2387,7 +2426,13 @@ final class TypedEmit {
                 throw new Unsupported("list of " + x.t);
             }
             if (b == Scope.Binding.BUILTIN && !em.moduleScopeHasStarImport()) {
-                return builtin(n, args(c));
+                if (TYPED_BUILTINS.contains(n) && c.keywords.isEmpty()) {
+                    E r = builtin(n, args(c));
+                    if (r != null) {
+                        return r;
+                    }
+                }
+                return genericCall(em.builtinRef(n), c);
             }
             throw new Unsupported("call of " + n);
         }
@@ -2464,6 +2509,239 @@ final class TypedEmit {
                 return new E("Typed.asFloat(" + box(r) + ")", Ty.FLOAT);
             default:
                 return new E("Typed.asBool(" + box(r) + ")", Ty.BOOL);
+        }
+    }
+
+    // ---- int arithmetic in a Java long -----------------------------------
+
+    /// `e` as a `long`, when `IntRanges` proves its value fits in one; or
+    /// null. The result is then computed modulo 2^64 (`mod64`), which is
+    /// the exact value however large the intermediate values are.
+    private E wrapped(Expr e) {
+        IntRanges.Iv r = ranges.eval(e, null);
+        if (!r.fitsLong()) {
+            return null;
+        }
+        String c = mod64(e);
+        if (c == null) {
+            return null;
+        }
+        if (pre != null && !plain(c)) {
+            String t = fresh();
+            indent(pre, preInd);
+            pre.append("long ").append(t).append(" = ").append(c).append(";\n");
+            c = t;
+        }
+        return new E("Long.valueOf(" + c + ")", Ty.INT, c);
+    }
+
+    /// Whether `e`, an int expression, provably fits in a `long`.
+    private boolean fits(Expr e) {
+        return ranges.eval(e, null).fitsLong();
+    }
+
+    /// Java `long` code for int expression `e` modulo 2^64, or null. Only
+    /// `+ - * & | ^ ~ <<` commute with that reduction; anything else
+    /// (`>>`, `//`, `%`) needs the exact value of its operands.
+    private String mod64(Expr e) {
+        if (e instanceof Constant) {
+            if (((Constant) e).kind != Constant.Kind.INT) {
+                return null;
+            }
+            java.math.BigInteger v = IntRanges.parse(((Constant) e).text);
+            return v == null ? null : lit(v);
+        }
+        if (e instanceof Name) {
+            return nameLong((Name) e);
+        }
+        if (e instanceof UnaryOp) {
+            UnaryOp u = (UnaryOp) e;
+            String o = mod64(u.operand);
+            if (o == null) {
+                return null;
+            }
+            switch (u.op) {
+                case "+":
+                    return o;
+                case "-":
+                    return "(-" + o + ")";
+                case "~":
+                    return "(~" + o + ")";
+                default:
+                    return null;
+            }
+        }
+        if (e instanceof BinOp) {
+            return binLong((BinOp) e);
+        }
+        if (e instanceof Call) {
+            Infer.Fn f = ranges.inlinable((Call) e);
+            if (f != null) {
+                return inline(f, (Call) e);
+            }
+        }
+        if (e instanceof IfExp && inlined.isEmpty()) {
+            IfExp x = (IfExp) e;
+            String a = mod64(x.body);
+            String b = mod64(x.orelse);
+            return a == null || b == null ? null : "(" + testExpr(x.test) + " ? " + a + " : " + b + ")";
+        }
+        return generic(e);
+    }
+
+    /// An int expression the long arithmetic cannot follow (a subscript, a
+    /// call) whose value is known to fit: computed as before and unboxed.
+    private String generic(Expr e) {
+        if (!inlined.isEmpty() || !fits(e)) {
+            return null;
+        }
+        Expr saved = plainExpr;
+        plainExpr = e;
+        try {
+            E v = expr(e);
+            if (v.t.k != Ty.K.INT) {
+                return null;
+            }
+            return v.lc != null ? v.lc : "Typed.toLong(" + box(v) + ")";
+        } finally {
+            plainExpr = saved;
+        }
+    }
+
+    private static String lit(java.math.BigInteger v) {
+        long l = v.longValue();
+        return l < 0 ? "(" + l + "L)" : l + "L";
+    }
+
+    private String nameLong(Name nm) {
+        String n = nm.id;
+        if (!inlined.isEmpty()) {
+            String[] p = inlined.get(inlined.size() - 1).get(n);
+            if (p != null) {
+                return p[0];
+            }
+            java.math.BigInteger c = in.intConsts.get(n);
+            return c == null ? null : lit(c);
+        }
+        if (subst != null && subst.containsKey(n)) {
+            // Inside an out-of-line slow path, where locals are parameters.
+            E v = subst.get(n);
+            return v.t.k != Ty.K.INT ? null : v.lc != null ? v.lc : "Typed.toLong(" + box(v) + ")";
+        }
+        switch (sc.resolve(n)) {
+            case LOCAL:
+                if (longLocals.contains(n)) {
+                    if (!sc.params.contains(n) && !da.safe.contains(nm)) {
+                        return null;
+                    }
+                    return var(n);
+                }
+                return generic(nm);
+            case GLOBAL: {
+                java.math.BigInteger c = in.intConsts.get(n);
+                return c != null ? lit(c) : generic(nm);
+            }
+            default:
+                return null;
+        }
+    }
+
+    /// Whether `e` is known exactly, not only modulo 2^64, by `mod64`.
+    private boolean exact(Expr e) {
+        if (!inlined.isEmpty() && e instanceof Name) {
+            String[] p = inlined.get(inlined.size() - 1).get(((Name) e).id);
+            if (p != null) {
+                return "exact".equals(p[1]);
+            }
+        }
+        return fits(e);
+    }
+
+    private String binLong(BinOp b) {
+        switch (b.op) {
+            case "+":
+            case "-":
+            case "*":
+            case "&":
+            case "|":
+            case "^": {
+                String l = mod64(b.left);
+                String r = l == null ? null : mod64(b.right);
+                return r == null ? null : "(" + l + " " + b.op + " " + r + ")";
+            }
+            case "<<": {
+                java.math.BigInteger c = IntRanges.literal(b.right);
+                if (c == null || c.signum() < 0 || c.bitLength() > 7) {
+                    return null;
+                }
+                String l = mod64(b.left);
+                if (l == null) {
+                    return null;
+                }
+                return c.intValue() >= 64 ? "0L" : "(" + l + " << " + c.intValue() + ")";
+            }
+            case ">>": {
+                java.math.BigInteger c = IntRanges.literal(b.right);
+                if (c == null || c.signum() < 0 || c.bitLength() > 7) {
+                    return null;
+                }
+                int k = c.intValue();
+                if (exact(b.left)) {
+                    String l = mod64(b.left);
+                    return l == null ? null : "(" + l + " >> " + Math.min(k, 63) + ")";
+                }
+                if (k >= 1 && ranges.eval(b.left, null).fitsUnsigned64()) {
+                    // In [0, 2^64): its 64 bits read unsigned are the value.
+                    String l = mod64(b.left);
+                    return l == null ? null : k >= 64 ? "0L" : "(" + l + " >>> " + k + ")";
+                }
+                return null;
+            }
+            case "%":
+            case "//": {
+                IntRanges.Iv d = ranges.eval(b.right, null);
+                boolean nonZero = d.lo != null && d.lo.signum() > 0 || d.hi != null && d.hi.signum() < 0;
+                if (!nonZero || !exact(b.left) || !exact(b.right)) {
+                    return null;
+                }
+                String l = mod64(b.left);
+                String r = l == null ? null : mod64(b.right);
+                if (r == null) {
+                    return null;
+                }
+                return ("%".equals(b.op) ? "Math.floorMod(" : "Math.floorDiv(") + l + ", " + r + ")";
+            }
+            default:
+                return null;
+        }
+    }
+
+    /// The body of expression function `f` in place of the call `c`.
+    private String inline(Infer.Fn f, Call c) {
+        Map<String, String[]> p = new HashMap<String, String[]>();
+        Map<String, IntRanges.Iv> pr = new HashMap<String, IntRanges.Iv>();
+        for (int i = 0; i < c.args.size(); i++) {
+            Expr a = c.args.get(i);
+            String code = mod64(a);
+            if (code == null) {
+                return null;
+            }
+            if (pre != null && !plain(code)) {
+                String t = fresh();
+                indent(pre, preInd);
+                pre.append("long ").append(t).append(" = ").append(code).append(";\n");
+                code = t;
+            }
+            p.put(f.names.get(i), new String[] {code, exact(a) ? "exact" : "mod"});
+            pr.put(f.names.get(i), ranges.eval(a, null));
+        }
+        inlined.add(p);
+        ranges.push(pr);
+        try {
+            return mod64(Infer.exprBody(f.def));
+        } finally {
+            ranges.pop();
+            inlined.remove(inlined.size() - 1);
         }
     }
 
@@ -2546,7 +2824,37 @@ final class TypedEmit {
             default:
                 break;
         }
-        throw new Unsupported("builtin " + n + (a.isEmpty() ? "" : " of " + a.get(0).t));
+        return null;
+    }
+
+    /// The builtins `builtin` lowers; any other is called as Python calls it.
+    private static final Set<String> TYPED_BUILTINS = new HashSet<String>(Arrays.asList("len", "float", "str", "ord",
+            "abs"));
+
+    /// A call of `f` with the arguments of `c` boxed, keywords included:
+    /// what the generic code does, with an untyped result. Reached for
+    /// builtins that have no typed lowering (`print`, `sorted`, ...), so one
+    /// such call no longer leaves the whole function untyped.
+    private E genericCall(String f, Call c) {
+        StringBuilder a = new StringBuilder();
+        for (Expr x : c.args) {
+            if (x instanceof Starred) {
+                throw new Unsupported("starred argument");
+            }
+            a.append(a.length() == 0 ? "" : ", ").append(box(expr(x)));
+        }
+        if (c.keywords.isEmpty()) {
+            return new E("Py.call(" + f + (a.length() == 0 ? "" : ", " + a) + ")", Ty.DYN);
+        }
+        StringBuilder names = new StringBuilder();
+        for (Keyword kw : c.keywords) {
+            if (kw.arg == null) {
+                throw new Unsupported("** argument");
+            }
+            a.append(a.length() == 0 ? "" : ", ").append(box(expr(kw.value)));
+            names.append(names.length() == 0 ? "" : ", ").append(Emitter.javaString(kw.arg));
+        }
+        return new E("Py.callKw(" + f + ", new Object[] {" + a + "}, new String[] {" + names + "})", Ty.DYN);
     }
 
     private E listMethod(E l, String m, List<E> a) {

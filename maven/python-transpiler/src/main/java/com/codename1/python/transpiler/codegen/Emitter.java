@@ -389,13 +389,18 @@ public final class Emitter {
                 if (moduleScope.hasStarImport) {
                     return "dyn(" + javaString(n) + ")";
                 }
-                String f = builtins.get(n);
-                if (f == null) {
-                    f = "B" + builtins.size() + "_" + mangle(n);
-                    builtins.put(n, f);
-                }
-                return "b(" + f + ", " + javaString(n) + ")";
+                return builtinRef(n);
         }
+    }
+
+    /// The builtin `n`, read through its lazily bound field.
+    String builtinRef(String n) {
+        String f = builtins.get(n);
+        if (f == null) {
+            f = "B" + builtins.size() + "_" + mangle(n);
+            builtins.put(n, f);
+        }
+        return "b(" + f + ", " + javaString(n) + ")";
     }
 
     void storeName(String n, String value, StringBuilder out, int ind) {

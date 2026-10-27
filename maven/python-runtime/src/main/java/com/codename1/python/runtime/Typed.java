@@ -79,6 +79,18 @@ public final class Typed {
         throw mismatch(o);
     }
 
+    /// An int the compiler proved fits in 64 bits, as a `long`. Ints in
+    /// that range are always held as a `Long`.
+    public static long toLong(Object o) {
+        if (o instanceof Long) {
+            return ((Long) o).longValue();
+        }
+        if (o instanceof Boolean) {
+            return ((Boolean) o).booleanValue() ? 1L : 0L;
+        }
+        throw mismatch(o);
+    }
+
     public static double asFloat(Object o) {
         if (o instanceof Double) {
             return ((Double) o).doubleValue();
