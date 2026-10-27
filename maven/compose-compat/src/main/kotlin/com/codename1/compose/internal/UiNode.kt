@@ -582,8 +582,12 @@ internal open class UiNode : Container(NodeLayout) {
             val path = Painting.roundedPath(o, cx.toFloat(), cy.toFloat())
             if (path.intersect(g.clipX, g.clipY, g.clipWidth, g.clipHeight)) {
                 g.setClip(path)
-                return
+            } else {
+                // The clip in force misses the outline (it may still meet a
+                // corner the rounding cuts off): nothing is visible.
+                g.clipRect(0, 0, 0, 0)
             }
+            return
         }
         g.clipRect(cx, cy, cw, ch)
     }
