@@ -86,6 +86,11 @@
                                         <containsregexp expression="^@(com\.codename1\.impl\.)?SharedWithBackend\s*$"/>
                                     </fileset>
                                 </copy>
+                                <!-- impl/parparvm's ClassLibraryHost extends the class
+                                     library's JdkHost, which the JDK this module compiles
+                                     against does not have. -->
+                                <copy file="${project.basedir}/../../vm/JavaAPI/src/com/codename1/impl/JdkHost.java"
+                                      tofile="${backend.shared.dir}/com/codename1/impl/JdkHost.java"/>
                             </target>
                         </configuration>
                     </execution>

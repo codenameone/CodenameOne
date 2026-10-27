@@ -562,6 +562,30 @@ public abstract class MediaManager {
         return Display.getInstance().createMedia(uri, isVideo, onCompletion);
     }
 
+    /// Answers whether this platform can play streams protected by a DRM scheme.
+    /// See [StreamRequest].
+    ///
+    /// #### Parameters
+    ///
+    /// - `scheme`: the protection scheme
+    ///
+    /// #### Returns
+    ///
+    /// true when [StreamRequest#create()] can play a stream protected by the scheme
+    public static boolean isDrmSupported(DrmScheme scheme) {
+        return Display.getInstance().isDrmSupported(scheme);
+    }
+
+    /// Answers whether this platform can attach HTTP headers to the requests a
+    /// stream's player makes. See [StreamRequest#addHeader(String, String)].
+    ///
+    /// #### Returns
+    ///
+    /// true when stream request headers are supported
+    public static boolean isStreamHeadersSupported() {
+        return Display.getInstance().isStreamHeadersSupported();
+    }
+
     /// Creates a Media from a given URI asynchronously.
     ///
     /// #### Parameters

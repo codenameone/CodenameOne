@@ -23,6 +23,7 @@ on:
       - 'scripts/savor/common/src/test/**'
       - 'scripts/skirmish/common/src/test/**'
       - 'scripts/parley/common/src/test/**'
+      - 'scripts/reel/common/src/test/**'
       - 'scripts/bastion/common/src/test/**'
   schedule:
     - cron: '17 3 * * *'
@@ -43,7 +44,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        template: [BAREBONES, KOTLIN, WAYLINE, SAVOR, SKIRMISH, PARLEY, BASTION]
+        template: [BAREBONES, KOTLIN, WAYLINE, SAVOR, SKIRMISH, PARLEY, BASTION, REEL]
     steps:
       - uses: actions/checkout@v6
 

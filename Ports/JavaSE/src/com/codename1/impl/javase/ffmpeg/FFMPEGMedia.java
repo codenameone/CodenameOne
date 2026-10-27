@@ -402,6 +402,12 @@ public final class FFMPEGMedia {
             }
             command.add("-i");
             command.add(source);
+            // The frame size is the probe's. A stream with several variants
+            // (an HLS master playlist) may decode at another resolution than
+            // the one probed; scaling keeps every frame the size the reader
+            // expects instead of reading rows at the wrong stride.
+            command.add("-s");
+            command.add(probeData.width + "x" + probeData.height);
             command.add("-f");
             command.add("rawvideo");
             command.add("-pix_fmt");

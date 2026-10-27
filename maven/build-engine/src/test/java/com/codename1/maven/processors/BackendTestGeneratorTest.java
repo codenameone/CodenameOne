@@ -951,6 +951,206 @@ public class BackendTestGeneratorTest {
         invoke(test,"works");
     }
 
+    /// The application with a component no slice may build: its constructor
+    /// throws, so a context that wires it fails to start.
+    private static Map<String, String> applicationWithAService() {
+        Map<String, String> s = application();
+        s.put("com.example.Mailer", MAIN + "@Component public class Mailer {\n"
+                + "    public Mailer() { throw new IllegalStateException(\"no mail server in a test\"); }\n"
+                + "}\n");
+        return s;
+    }
+
+    private static final String SLICE_IMPORTS = "package com.example;\n"
+            + "import com.codename1.backend.annotations.*;\n"
+            + "import com.codename1.backend.test.*;\n"
+            + "import static com.codename1.backend.test.MockMvcRequestBuilders.*;\n"
+            + "import static com.codename1.backend.test.MockMvcResultMatchers.*;\n";
+
+    @Test
+    public void aWebSliceWiresTheControllerAndNothingElse() throws Exception {
+        File classes = mainBuild(applicationWithAService());
+        Map<String, String> t = new LinkedHashMap<String, String>();
+        t.put("com.example.ApiSliceTest", SLICE_IMPORTS
+                + "@WebMvcTest(controllers = Api.class, includes = {Greeter.class, SystemClock.class})\n"
+                + "public class ApiSliceTest {\n"
+                + "    @Autowired private MockMvc mvc;\n"
+                + "    @org.junit.jupiter.api.Test\n"
+                + "    void greets() throws Exception {\n"
+                + "        mvc.perform(get(\"/greet/{name}\", \"Ada\")).andExpect(content().string(\"Hello, Ada\"));\n"
+                + "    }\n"
+                + "}\n");
+        File tests = testBuild(classes, t);
+        URLClassLoader loader = new URLClassLoader(new URL[] {tests.toURI().toURL(),
+                classes.toURI().toURL()}, getClass().getClassLoader());
+        try {
+            TestContext context = (TestContext) loader.loadClass(
+                    "com.example.ApiSliceTestCn1TestContext").newInstance();
+            assertEquals(0, context.webEnvironment());
+            assertFalse(context.requiresDataSource());
+            assertFalse(context.rollsBack());
+            // Starts although Mailer cannot be built: the slice never names it.
+            TestEnvironment env = TestContexts.acquire(context);
+            Object test = loader.loadClass("com.example.ApiSliceTest").newInstance();
+            context.inject(test, env);
+            invoke(test, "greets");
+        } finally {
+            loader.close();
+        }
+    }
+
+    @Test
+    public void aWebSliceMissingADependencyFailsTheBuildWithTheWayOut() throws Exception {
+        File classes = mainBuild(applicationWithAService());
+        Map<String, String> t = new LinkedHashMap<String, String>();
+        t.put("com.example.ThinSliceTest", SLICE_IMPORTS
+                + "@WebMvcTest(Api.class)\n"
+                + "public class ThinSliceTest {\n"
+                + "    @Autowired private MockMvc mvc;\n"
+                + "}\n");
+        try {
+            testBuild(classes, t);
+            fail("a slice without the controller's dependencies was accepted");
+        } catch (BuildFailureException expected) {
+            assertTrue(expected.getMessage(), expected.getMessage().contains("@WebMvcTest(includes)"));
+            assertTrue(expected.getMessage(), expected.getMessage().contains("@MockitoBean"));
+        }
+    }
+
+    @Test
+    public void aWebSliceNamingANonControllerIsABuildError() throws Exception {
+        File classes = mainBuild(application());
+        Map<String, String> t = new LinkedHashMap<String, String>();
+        t.put("com.example.WrongSliceTest", SLICE_IMPORTS
+                + "@WebMvcTest(Greeter.class)\n"
+                + "public class WrongSliceTest {\n"
+                + "}\n");
+        try {
+            testBuild(classes, t);
+            fail("a slice of a component was accepted");
+        } catch (BuildFailureException expected) {
+            assertTrue(expected.getMessage(), expected.getMessage().contains(
+                    "com.example.Greeter, which is not a @RestController"));
+        }
+    }
+
+    @Test
+    public void aDataSliceRollsEachTestBackAndUsesItsDeclaredDatabase() throws Throwable {
+        File classes = mainBuild(applicationWithAService());
+        Map<String, String> t = new LinkedHashMap<String, String>();
+        t.put("com.example.StoreTest", SLICE_IMPORTS
+                + "@DataJpaTest\n"
+                + "public class StoreTest {\n"
+                + "    @Autowired com.codename1.backend.DataSource db;\n"
+                + "    @org.junit.jupiter.api.Test\n"
+                + "    void writes() throws Exception {\n"
+                + "        db.execute(\"INSERT INTO notes(body) VALUES (?)\", new Object[] {\"draft\"});\n"
+                + "        if (db.query(\"SELECT body FROM notes\", new Object[0]).size() != 1) {\n"
+                + "            throw new AssertionError(\"the write is not visible inside its test\");\n"
+                + "        }\n"
+                + "    }\n"
+                + "}\n");
+        File tests = testBuild(classes, t, true);
+        URLClassLoader loader = new URLClassLoader(new URL[] {tests.toURI().toURL(),
+                classes.toURI().toURL()}, getClass().getClassLoader());
+        try {
+            TestContext context = (TestContext) loader.loadClass(
+                    "com.example.StoreTestCn1TestContext").newInstance();
+            assertTrue(context.rollsBack());
+            assertEquals(3, context.webEnvironment());
+            assertTrue(Arrays.asList(context.properties()).contains(":memory:"));
+            TestEnvironment env = TestContexts.acquire(context);
+            final Object test = loader.loadClass("com.example.StoreTest").newInstance();
+            context.inject(test, env);
+            com.codename1.backend.DataSource db = env.backend().getDataSource();
+            db.execute("CREATE TABLE notes(body TEXT)", new Object[0]);
+            for (int i = 0; i < 2; i++) {
+                com.codename1.impl.backend.test.TestTransactions.rollingBack(
+                        new com.codename1.impl.backend.test.TestTransactions.Body() {
+                            @Override
+                            public void run() throws Throwable {
+                                invoke(test, "writes");
+                            }
+                        });
+            }
+            assertEquals("a rolled back test left its row", 0,
+                    db.query("SELECT body FROM notes", new Object[0]).size());
+            // The compiled runner wraps the same method the same way.
+            java.lang.reflect.Field failed = com.codename1.impl.backend.test.TestRun.class
+                    .getDeclaredField("failed");
+            failed.setAccessible(true);
+            int failuresBefore = failed.getInt(null);
+            loader.loadClass("com.example.StoreTestCn1TestRunner").getMethod("run").invoke(null);
+            assertEquals("the compiled run of the test failed", failuresBefore, failed.getInt(null));
+            assertEquals("the compiled run left its row", 0,
+                    db.query("SELECT body FROM notes", new Object[0]).size());
+        } finally {
+            loader.close();
+        }
+    }
+
+    @Test
+    public void featuresAreWiredOnlyWhenATestAsksForThem() throws Exception {
+        File classes = mainBuild(application());
+        Map<String, String> t = new LinkedHashMap<String, String>();
+        String props = "properties = {\"cn1.management.token=s3cret\",\n"
+                + "                \"cn1.otel.endpoint=http://127.0.0.1:9/\"}";
+        t.put("com.example.PlainFeaturesTest", SLICE_IMPORTS
+                + "@BackendTest(webEnvironment = BackendTest.WebEnvironment.RANDOM_PORT, " + props + ")\n"
+                + "public class PlainFeaturesTest { }\n");
+        t.put("com.example.ManagedTest", SLICE_IMPORTS
+                + "@BackendTest(webEnvironment = BackendTest.WebEnvironment.RANDOM_PORT,\n"
+                + "        features = {BackendTest.Feature.MANAGEMENT, BackendTest.Feature.TELEMETRY},\n"
+                + "        " + props + ")\n"
+                + "public class ManagedTest implements ManagementContract {\n"
+                + "    @Autowired TestRestTemplate rest;\n"
+                + "    public TestRestTemplate managementClient() { return rest; }\n"
+                + "    public String managementToken() { return \"s3cret\"; }\n"
+                + "}\n");
+        File tests = testBuild(classes, t, true);
+        URLClassLoader loader = new URLClassLoader(new URL[] {tests.toURI().toURL(),
+                classes.toURI().toURL()}, getClass().getClassLoader());
+        try {
+            TestEnvironment plain = TestContexts.acquire((TestContext) loader.loadClass(
+                    "com.example.PlainFeaturesTestCn1TestContext").newInstance());
+            assertEquals("a test that did not ask has management endpoints", 404,
+                    status(plain.port(), "/manage/schema", "s3cret"));
+            assertNull("a test that did not ask has an exporter", plain.backend().getTracer());
+            TestContext context = (TestContext) loader.loadClass(
+                    "com.example.ManagedTestCn1TestContext").newInstance();
+            TestEnvironment env = TestContexts.acquire(context);
+            assertTrue(String.valueOf(env.backend().getTracer()), env.backend().getTracer()
+                    instanceof com.codename1.backend.otel.OtlpTracer);
+            assertEquals(401, status(env.port(), "/manage/schema", null));
+            assertEquals(401, status(env.port(), "/manage/schema", "wrong"));
+            assertEquals(200, status(env.port(), "/manage/schema", "s3cret"));
+            assertEquals(200, status(env.port(), "/manage/health/liveness", null));
+            // The shared contract, through the compiled runner: its four tests
+            // are the interface's default methods.
+            java.lang.reflect.Field failed = com.codename1.impl.backend.test.TestRun.class
+                    .getDeclaredField("failed");
+            failed.setAccessible(true);
+            int failuresBefore = failed.getInt(null);
+            loader.loadClass("com.example.ManagedTestCn1TestRunner").getMethod("run").invoke(null);
+            assertEquals("the management contract failed", failuresBefore, failed.getInt(null));
+        } finally {
+            loader.close();
+        }
+    }
+
+    private static int status(int port, String path, String token) throws Exception {
+        java.net.HttpURLConnection c = (java.net.HttpURLConnection) new URL(
+                "http://127.0.0.1:" + port + path).openConnection();
+        if (token != null) {
+            c.setRequestProperty("Authorization", "Bearer " + token);
+        }
+        try {
+            return c.getResponseCode();
+        } finally {
+            c.disconnect();
+        }
+    }
+
     private static void invoke(Object test, String name) throws Exception {
         java.lang.reflect.Method m = test.getClass().getDeclaredMethod(name);
         m.setAccessible(true);

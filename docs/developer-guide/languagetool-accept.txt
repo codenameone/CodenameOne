@@ -836,5 +836,11 @@ callee
 signalling
 coturn
 unconfigured
+Widevine
+blocklist
+blocklists
 Sepolia
 ntfy
+# Identity migration: password hash formats read by ModularPbkdf2PasswordEncoder.
+passlib
+Werkzeug
