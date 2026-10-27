@@ -1,0 +1,120 @@
+# Holds the Codename One backend to its headless benchmark results.
+#
+# Builds the bench demo (vm/backend/demo/bench) twice: as shipped, and with the
+# allocation census compiled in. The census run counts what each request
+# allocates, exactly. The shipped binary then takes turns with Rust's axum and
+# Go's net/http on the same two cores of an arm64 runner, through
+# scripts/embedded/bench/headless/run.sh, the harness behind the developer
+# guide's tables. gate.py judges speed against Rust from the same job and memory
+# and allocation absolutely; its docstring says why, and where the limits live.
+#
+# The job uploads the raw results, the census and charts drawn from this run, so
+# the guide's numbers can be refreshed from a CI machine rather than a laptop.
+name: Backend performance gate
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - 'vm/backend/**'
+      - 'vm/ByteCodeTranslator/src/**'
+      - 'vm/JavaAPI/src/**'
+      - 'scripts/embedded/bench/charts.py'
+      - 'scripts/embedded/bench/headless/**'
+      - '.github/workflows/backend-performance.yml'
+  pull_request:
+    paths:
+      - 'vm/backend/**'
+      - 'vm/ByteCodeTranslator/src/**'
+      - 'vm/JavaAPI/src/**'
+      - 'scripts/embedded/bench/charts.py'
+      - 'scripts/embedded/bench/headless/**'
+      - '.github/workflows/backend-performance.yml'
+
+concurrency:
+  group: backend-performance-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    # Four cores: the servers get 0-1 and the load generator 2-3.
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 90
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 8
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '8'
+          cache: 'maven'
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Go, Rust, oha and the comparison servers; cached, since none of it
+      # depends on this repository's code.
+      - name: Build the benchmark image
+        uses: docker/build-push-action@v6
+        with:
+          context: scripts/embedded/bench/headless
+          file: scripts/embedded/bench/headless/Containerfile
+          tags: cn1-headless:ci
+          load: true
+          cache-from: type=gha,scope=backend-performance
+          cache-to: type=gha,mode=max,scope=backend-performance
+
+      - name: Build the bench demo, shipped and with the census
+        working-directory: vm/backend
+        env:
+          JDK_8_HOME: ${{ env.JAVA_HOME }}
+          CN1_BACKEND_DEMO: demo/bench
+          CN1_BACKEND_ENGINE: docker
+          # The bench demo needs neither the shared contract nor demo/common.
+          CN1_BACKEND_STANDALONE_DEMO: "1"
+        run: |
+          mkdir -p "$RUNNER_TEMP/dist"
+          ./package.sh Bench com.demo glibc-arm64
+          cp target/dist/bench-linux-glibc-arm64 "$RUNNER_TEMP/dist/bench"
+          CN1_BACKEND_CFLAGS="-DCN1_ALLOC_CENSUS -DCN1_HEAP_HISTOGRAM" \
+            ./package.sh Bench com.demo glibc-arm64
+          cp target/dist/bench-linux-glibc-arm64 "$RUNNER_TEMP/dist/bench-census"
+
+      - name: Count what a request allocates
+        run: |
+          mkdir -p "$RUNNER_TEMP/out"
+          docker run --rm -v "$RUNNER_TEMP/dist:/dist:ro" \
+            -v "$GITHUB_WORKSPACE/scripts/embedded/bench/headless/census.sh:/census.sh:ro" \
+            cn1-headless:ci /census.sh /dist/bench-census 200000 | tee "$RUNNER_TEMP/out/census.txt"
+
+      # Privileged so run.sh can drop the page cache before each cold start.
+      - name: Run the comparison
+        run: |
+          docker run --rm --privileged -e RUNTIMES="codenameone rust go" \
+            -v "$RUNNER_TEMP/dist:/dist:ro" \
+            -v "$GITHUB_WORKSPACE/scripts/embedded/bench/headless/run.sh:/bench/run.sh:ro" \
+            cn1-headless:ci /bench/run.sh /dist/bench 3 | tee "$RUNNER_TEMP/out/results.txt"
+
+      - name: Draw the charts
+        run: |
+          mkdir -p "$RUNNER_TEMP/out/img"
+          python3 scripts/embedded/bench/charts.py "$RUNNER_TEMP/out/img" "$RUNNER_TEMP/out/results.txt"
+
+      - name: Judge the results
+        run: |
+          python3 scripts/embedded/bench/headless/gate.py "$RUNNER_TEMP/out/results.txt" \
+            "$(cat "$RUNNER_TEMP/out/census.txt")" "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-performance
+          path: ${{ runner.temp }}/out
+          if-no-files-found: ignore

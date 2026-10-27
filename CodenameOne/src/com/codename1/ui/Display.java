@@ -665,6 +665,7 @@ public final class Display extends CN1Constants {
                 newEdt.start();
             }
             impl.postInit();
+            com.codename1.hardware.Hardware.install(impl.getHardware());
             INSTANCE.setCommandBehavior(commandBehaviour);
         } else {
             impl.confirmControlView();
@@ -6867,6 +6868,13 @@ public final class Display extends CN1Constants {
     /// not implement NFC.
     public com.codename1.nfc.Nfc getNfc() {
         return impl.getNfc();
+    }
+    /// Returns the platform hardware entry point (GPIO, I2C, SPI, serial, PWM,
+    /// CAN, watchdog, backlight). Prefer
+    /// {@link com.codename1.hardware.Hardware#getInstance()} in application code,
+    /// which substitutes an unsupported stub when the port returns `null`.
+    public com.codename1.hardware.Hardware getHardware() {
+        return impl.getHardware();
     }
 
     /// Returns the active port's local device-calendar source. Applications

@@ -2377,6 +2377,10 @@ struct ThreadLocalData* cn1CreateThreadLocalData(JAVA_BOOLEAN bindToCallingOsThr
         return NULL;
     }
     i->threadId = nativeThreadId;
+#ifdef CN1_VIRTUAL_THREADS
+    // Its own pages until a carrier lends it theirs (cn1ResumeVirtualThreadOn).
+    i->bibopCur = i->bibopCurrent;
+#endif
     i->tryBlockOffset = 0;
     i->nativeBuffers = NULL;
     
@@ -2737,6 +2741,26 @@ void cn1RetireVirtualThread(struct cn1VirtualThread* vt) {
         unlockCriticalSection();
     }
     cn1VirtualThreadFree(vt);
+}
+
+/**
+ * Lend the carrier's pages, then run. Re-pointed at EVERY resume, not once: a
+ * virtual thread can be resumed by a different carrier each time, and must never
+ * allocate into the pages of one that is running something else. The carrier's own
+ * pointer is taken rather than its array, so a virtual thread resumed from inside
+ * another shares that one's carrier.
+ *
+ * Nothing here needs the collector's cooperation. The carrier is inside a native
+ * call with threadActive raised for the whole of the run, so it is never held while
+ * the virtual thread allocates on its behalf; and the virtual thread's own array is
+ * never written, so the collector, which reads only own arrays, sees nothing move.
+ */
+void cn1ResumeVirtualThreadOn(CODENAME_ONE_THREAD_STATE, struct cn1VirtualThread* vt) {
+    struct ThreadLocalData* state = (struct ThreadLocalData*)cn1VirtualThreadState(vt);
+    if(state != 0) {
+        state->bibopCur = threadStateData->bibopCur;
+    }
+    cn1VirtualThreadResume(vt);
 }
 #endif /* CN1_VIRTUAL_THREADS -- see the capability gate in cn1_virtual_thread.h */
 

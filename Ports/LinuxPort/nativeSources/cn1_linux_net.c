@@ -162,6 +162,12 @@ typedef struct {
     /* Whether the callback has seen the connection up, so its first call after
      * connecting restarts the idle clock. */
     int sawConnect;
+    /* ConnectionRequest.setClientCertificate: the PEM chain and the PEM private
+     * key, handed to libcurl as blobs so the key never touches the disk. */
+    char* clientCert;
+    char* clientKey;
+    /* ConnectionRequest.setInsecure. */
+    int insecure;
 } CN1Http;
 
 static void cn1HttpEnsureResp(CN1Http* c, int extra) {
@@ -316,8 +322,30 @@ static void cn1HttpPerform(CN1Http* c) {
             curl_easy_setopt(c->easy, CURLOPT_CUSTOMREQUEST, c->method);
         }
     }
-    if (c->connectTimeoutMs > 0) {
-        curl_easy_setopt(c->easy, CURLOPT_CONNECTTIMEOUT_MS, c->connectTimeoutMs);
+    if (c->insecure) {
+        curl_easy_setopt(c->easy, CURLOPT_SSL_VERIFYPEER, 0L);
+        curl_easy_setopt(c->easy, CURLOPT_SSL_VERIFYHOST, 0L);
+    }
+    if (c->clientCert != 0 && c->clientKey != 0) {
+#if LIBCURL_VERSION_NUM >= 0x074700
+        struct curl_blob cert;
+        struct curl_blob key;
+        cert.data = c->clientCert;
+        cert.len = strlen(c->clientCert);
+        cert.flags = CURL_BLOB_COPY;
+        key.data = c->clientKey;
+        key.len = strlen(c->clientKey);
+        key.flags = CURL_BLOB_COPY;
+        curl_easy_setopt(c->easy, CURLOPT_SSLCERTTYPE, "PEM");
+        curl_easy_setopt(c->easy, CURLOPT_SSLCERT_BLOB, &cert);
+        curl_easy_setopt(c->easy, CURLOPT_SSLKEYTYPE, "PEM");
+        curl_easy_setopt(c->easy, CURLOPT_SSLKEY_BLOB, &key);
+#else
+        /* libcurl before 7.71 takes certificates only from files. Sending the
+         * request without the certificate would look like a server refusal, so
+         * fail it here instead. */
+        curl_easy_setopt(c->easy, CURLOPT_URL, "cn1-client-certificate-needs-libcurl-7.71:");
+#endif
     }
     if (c->readTimeoutMs > 0) {
         /* An idle limit, not a deadline: a large download must not be cut off for
@@ -388,6 +416,39 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_httpSetCustomMethod___long_java_l
     free(c->method);
     /* Kept even for GET and POST: an explicit one overrides the post flag. */
     c->method = m == 0 ? 0 : strdup(m);
+}
+
+/* Overwrites a secret before freeing it. */
+static void cn1HttpFreeSecret(char* secret) {
+    if (secret != 0) {
+        volatile char* p = secret;
+        while (*p != 0) {
+            *p++ = 0;
+        }
+        free(secret);
+    }
+}
+
+JAVA_VOID com_codename1_impl_linux_LinuxNative_httpSetClientCertificate___long_java_lang_String_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG connection, JAVA_OBJECT chainPem, JAVA_OBJECT keyPem) {
+    CN1Http* c = (CN1Http*) (intptr_t) connection;
+    const char* chain;
+    const char* key;
+    if (!c || chainPem == JAVA_NULL || keyPem == JAVA_NULL) {
+        return;
+    }
+    chain = stringToUTF8(threadStateData, chainPem);
+    key = stringToUTF8(threadStateData, keyPem);
+    free(c->clientCert);
+    cn1HttpFreeSecret(c->clientKey);
+    c->clientCert = chain == 0 ? 0 : strdup(chain);
+    c->clientKey = key == 0 ? 0 : strdup(key);
+}
+
+JAVA_VOID com_codename1_impl_linux_LinuxNative_httpSetInsecure___long_boolean(CODENAME_ONE_THREAD_STATE, JAVA_LONG connection, JAVA_BOOLEAN insecure) {
+    CN1Http* c = (CN1Http*) (intptr_t) connection;
+    if (c) {
+        c->insecure = insecure ? 1 : 0;
+    }
 }
 
 JAVA_VOID com_codename1_impl_linux_LinuxNative_httpSetConnectTimeout___long_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG connection, JAVA_INT millis) {
@@ -566,5 +627,7 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_httpClose___long(CODENAME_ONE_THR
     free(c->url);
     free(c->statusMessage);
     free(c->method);
+    free(c->clientCert);
+    cn1HttpFreeSecret(c->clientKey);
     free(c);
 }

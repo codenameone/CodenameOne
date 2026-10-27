@@ -96,6 +96,10 @@ extern JAVA_OBJECT allocArray(CODENAME_ONE_THREAD_STATE, int length, struct claz
 extern int sqlite3_key(sqlite3 *db, const void *pKey, int nKey);
 extern int sqlite3_rekey(sqlite3 *db, const void *pKey, int nKey);
 #else
+/* The bundled header declares both unconditionally (non-static), so the shims take other names and
+ * the calls below are renamed onto them. */
+#define sqlite3_key cn1_db_sqlite3_key_unavailable
+#define sqlite3_rekey cn1_db_sqlite3_rekey_unavailable
 static int sqlite3_key(sqlite3 *db, const void *pKey, int nKey) {
     (void)db;
     (void)pKey;

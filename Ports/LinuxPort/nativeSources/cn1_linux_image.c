@@ -143,6 +143,64 @@ JAVA_LONG com_codename1_impl_linux_LinuxNative_createImageFromARGB___int_1ARRAY_
     return (JAVA_LONG) (intptr_t) cn1WrapSurface(cn1SurfaceFromArgb(px, width, height));
 }
 
+#ifdef CN1_LINUX_EMBEDDED
+/* Reads a whole file; the decoder works on bytes. */
+static unsigned char* cn1ReadFile(const char* path, size_t* length) {
+    FILE* f = fopen(path, "rb");
+    unsigned char* data = 0;
+    size_t size = 0, capacity = 0, n;
+    if (f == 0) {
+        return 0;
+    }
+    for (;;) {
+        if (size == capacity) {
+            size_t grown = capacity == 0 ? 65536 : capacity * 2;
+            unsigned char* more = (unsigned char*) realloc(data, grown);
+            if (more == 0) {
+                free(data);
+                fclose(f);
+                return 0;
+            }
+            data = more;
+            capacity = grown;
+        }
+        n = fread(data + size, 1, capacity - size, f);
+        size += n;
+        if (n == 0) {
+            break;
+        }
+    }
+    fclose(f);
+    *length = size;
+    return data;
+}
+
+JAVA_LONG com_codename1_impl_linux_LinuxNative_createImageFromFile___java_lang_String_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT path) {
+    const char* p = path == JAVA_NULL ? 0 : stringToUTF8(threadStateData, path);
+    unsigned char* bytes;
+    size_t length = 0;
+    cairo_surface_t* s;
+    if (!p || (bytes = cn1ReadFile(p, &length)) == 0) {
+        return 0;
+    }
+    s = cn1LinuxDecodeImage(bytes, length);
+    free(bytes);
+    return s ? (JAVA_LONG) (intptr_t) cn1WrapSurface(s) : 0;
+}
+
+JAVA_LONG com_codename1_impl_linux_LinuxNative_createImageFromBytes___byte_1ARRAY_int_int_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT data, JAVA_INT offset, JAVA_INT length) {
+    cairo_surface_t* s;
+    if (data == JAVA_NULL || length <= 0) {
+        return 0;
+    }
+    /* Never read outside the array, whatever the caller passed. */
+    if (offset < 0 || length > ((JAVA_ARRAY) data)->length - offset) {
+        return 0;
+    }
+    s = cn1LinuxDecodeImage((unsigned char*) CN1_ARRAY_DATA(data) + offset, (size_t) length);
+    return s ? (JAVA_LONG) (intptr_t) cn1WrapSurface(s) : 0;
+}
+#else
 static CN1Image* cn1ImageFromPixbuf(GdkPixbuf* pixbuf) {
     cairo_surface_t* s;
     cairo_t* cr;
@@ -199,6 +257,8 @@ JAVA_LONG com_codename1_impl_linux_LinuxNative_createImageFromBytes___byte_1ARRA
     g_object_unref(pix);
     return (JAVA_LONG) (intptr_t) img;
 }
+
+#endif /* CN1_LINUX_EMBEDDED */
 
 JAVA_LONG com_codename1_impl_linux_LinuxNative_createMutableImage___int_int_int_R_long(CODENAME_ONE_THREAD_STATE, JAVA_INT width, JAVA_INT height, JAVA_INT fillColor) {
     cairo_surface_t* s = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, width > 0 ? width : 1, height > 0 ? height : 1);

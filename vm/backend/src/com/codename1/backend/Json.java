@@ -385,6 +385,19 @@ public final class Json {
         void writeTo(ByteSink out);
     }
 
+    /// Writes values of one type as JSON, shared by every request that answers
+    /// with that type.
+    ///
+    /// The stateless counterpart of [Writable]. A Writable carries the value it
+    /// writes, so a route answering with a codec had to allocate one per request
+    /// to hold that value; an Encoder is handed the value instead, so a generated
+    /// route keeps ONE in a static field and a request allocates only what the
+    /// method returned. See `HttpServer.Request.respondJson(int, Object, Encoder)`.
+    public interface Encoder {
+        /// Writes `value`, never null, into `out`.
+        void write(Object value, ByteSink out);
+    }
+
     /// One JSON string, escaped, straight into `out`.
     ///
     /// Public because generated code calls it. A codec that knows its field types

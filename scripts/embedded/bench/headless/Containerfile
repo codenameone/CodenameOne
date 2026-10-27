@@ -1,0 +1,26 @@
+# The headless (GUI-free) comparison: the same two-route HTTP service in each
+# runtime, built and run on the same Debian bookworm arm64 base as the Codename
+# One backend binary. oha drives the load.
+FROM debian:bookworm
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential ca-certificates curl procps util-linux python3 python3-venv \
+        nodejs maven \
+    && rm -rf /var/lib/apt/lists/*
+RUN curl -sSL https://go.dev/dl/go1.25.3.linux-arm64.tar.gz | tar xz -C /usr/local
+RUN curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.90.0
+RUN mkdir -p /opt/jdk && curl -sSL "https://api.adoptium.net/v3/binary/latest/21/ga/linux/aarch64/jdk/hotspot/normal/eclipse" \
+        | tar xz -C /opt/jdk --strip-components=1
+ENV PATH=/root/.cargo/bin:/usr/local/go/bin:$PATH JAVA_HOME=/opt/jdk
+RUN cargo install oha --version 1.10.0 --locked -q
+RUN python3 -m venv /opt/py && /opt/py/bin/pip install -q fastapi==0.120.0 uvicorn==0.38.0
+# The servers one directory at a time and the scripts last, so editing a script
+# does not rebuild every server (CI caches these layers).
+COPY go /bench/go
+RUN cd /bench/go && CGO_ENABLED=0 go build -ldflags="-s -w" -o gobench .
+COPY rust /bench/rust
+RUN cd /bench/rust && cargo build --release -q
+COPY spring /bench/spring
+RUN cd /bench/spring && mvn -q -B package -DskipTests
+COPY node /bench/node
+COPY python /bench/python
+COPY run.sh census.sh /bench/
