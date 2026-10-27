@@ -19,7 +19,10 @@
 package com.codenameone.examples.bastion.net;
 
 import com.codenameone.examples.bastion.AppConfig;
+import com.codename1.impl.javase.JavaSEPort;
 import com.codename1.io.ConnectionRequest;
+import com.codename1.io.Util;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -32,6 +35,14 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 /// What the network guard lets through.
 class GuardTest {
+    /// A ConnectionRequest asks the implementation about the platform as
+    /// it is built, so this class installs one itself rather than relying
+    /// on whichever test happened to run before it.
+    @BeforeAll
+    static void port() {
+        Util.setImplementation(new JavaSEPort());
+    }
+
     @Test
     void cleartextAndUnlistedHostsAreRefused() {
         withDevelopment(() -> {
