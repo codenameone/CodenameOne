@@ -1,0 +1,147 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="763" viewBox="0 0 760 763" font-family="Helvetica, Arial, sans-serif">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="150" y="24" font-size="16" font-weight="bold" fill="#202124">Run time per workload (lower is better, log scale)</text>
+<rect x="150" y="36" width="12" height="12" fill="#9aa0a6"/>
+<text x="168" y="47" font-size="12" fill="#202124">CPython</text>
+<rect x="350" y="36" width="12" height="12" fill="#f9ab00"/>
+<text x="368" y="47" font-size="12" fill="#202124">PyPy</text>
+<rect x="550" y="36" width="12" height="12" fill="#a142f4"/>
+<text x="568" y="47" font-size="12" fill="#202124">GraalPy</text>
+<rect x="150" y="58" width="12" height="12" fill="#1a73e8"/>
+<text x="168" y="69" font-size="12" fill="#202124">Codename One</text>
+<rect x="350" y="58" width="12" height="12" fill="#0b8043"/>
+<text x="368" y="69" font-size="12" fill="#202124">Codename One, hot spot in Java</text>
+<line x1="150.0" y1="80" x2="150.0" y2="733" stroke="#e8eaed"/>
+<text x="150.0" y="749" font-size="11" fill="#5f6368" text-anchor="middle">1 ms</text>
+<line x1="256.0" y1="80" x2="256.0" y2="733" stroke="#e8eaed"/>
+<text x="256.0" y="749" font-size="11" fill="#5f6368" text-anchor="middle">10 ms</text>
+<line x1="362.0" y1="80" x2="362.0" y2="733" stroke="#e8eaed"/>
+<text x="362.0" y="749" font-size="11" fill="#5f6368" text-anchor="middle">100 ms</text>
+<line x1="468.0" y1="80" x2="468.0" y2="733" stroke="#e8eaed"/>
+<text x="468.0" y="749" font-size="11" fill="#5f6368" text-anchor="middle">1000 ms</text>
+<line x1="574.0" y1="80" x2="574.0" y2="733" stroke="#e8eaed"/>
+<text x="574.0" y="749" font-size="11" fill="#5f6368" text-anchor="middle">10k ms</text>
+<line x1="680.0" y1="80" x2="680.0" y2="733" stroke="#e8eaed"/>
+<text x="680.0" y="749" font-size="11" fill="#5f6368" text-anchor="middle">100k ms</text>
+<text x="142" y="110" font-size="12" fill="#202124" text-anchor="end">intArithmetic</text>
+<rect x="150" y="84" width="443.0" height="8" fill="#9aa0a6"/>
+<text x="597.0" y="91" font-size="9" fill="#5f6368">15125</text>
+<rect x="150" y="93" width="228.1" height="8" fill="#f9ab00"/>
+<text x="382.1" y="100" font-size="9" fill="#5f6368">142</text>
+<rect x="150" y="102" width="218.1" height="8" fill="#a142f4"/>
+<text x="372.1" y="109" font-size="9" fill="#5f6368">114</text>
+<rect x="150" y="111" width="343.9" height="8" fill="#1a73e8"/>
+<text x="497.9" y="118" font-size="9" fill="#5f6368">1754</text>
+<rect x="150" y="120" width="192.3" height="8" fill="#0b8043"/>
+<text x="346.3" y="127" font-size="9" fill="#5f6368">65</text>
+<text x="142" y="169" font-size="12" fill="#202124" text-anchor="end">longArithmetic</text>
+<rect x="150" y="143" width="431.8" height="8" fill="#9aa0a6"/>
+<text x="585.8" y="150" font-size="9" fill="#5f6368">11839</text>
+<rect x="150" y="152" width="395.7" height="8" fill="#f9ab00"/>
+<text x="549.7" y="159" font-size="9" fill="#5f6368">5410</text>
+<rect x="150" y="161" width="431.5" height="8" fill="#a142f4"/>
+<text x="585.5" y="168" font-size="9" fill="#5f6368">11762</text>
+<rect x="150" y="170" width="468.7" height="8" fill="#1a73e8"/>
+<text x="622.7" y="177" font-size="9" fill="#5f6368">26379</text>
+<rect x="150" y="179" width="170.5" height="8" fill="#0b8043"/>
+<text x="324.5" y="186" font-size="9" fill="#5f6368">41</text>
+<text x="142" y="228" font-size="12" fill="#202124" text-anchor="end">mathTranscendental</text>
+<rect x="150" y="202" width="319.1" height="8" fill="#9aa0a6"/>
+<text x="473.1" y="209" font-size="9" fill="#5f6368">1024</text>
+<rect x="150" y="211" width="241.9" height="8" fill="#f9ab00"/>
+<text x="395.9" y="218" font-size="9" fill="#5f6368">192</text>
+<rect x="150" y="220" width="261.4" height="8" fill="#a142f4"/>
+<text x="415.4" y="227" font-size="9" fill="#5f6368">292</text>
+<rect x="150" y="229" width="350.3" height="8" fill="#1a73e8"/>
+<text x="504.3" y="236" font-size="9" fill="#5f6368">2016</text>
+<rect x="150" y="238" width="239.3" height="8" fill="#0b8043"/>
+<text x="393.3" y="245" font-size="9" fill="#5f6368">181</text>
+<text x="142" y="287" font-size="12" fill="#202124" text-anchor="end">arraySequential</text>
+<rect x="150" y="261" width="344.5" height="8" fill="#9aa0a6"/>
+<text x="498.5" y="268" font-size="9" fill="#5f6368">1778</text>
+<rect x="150" y="270" width="161.9" height="8" fill="#f9ab00"/>
+<text x="315.9" y="277" font-size="9" fill="#5f6368">34</text>
+<rect x="150" y="279" width="150.3" height="8" fill="#a142f4"/>
+<text x="304.3" y="286" font-size="9" fill="#5f6368">26</text>
+<rect x="150" y="288" width="259.8" height="8" fill="#1a73e8"/>
+<text x="413.8" y="295" font-size="9" fill="#5f6368">282</text>
+<rect x="150" y="297" width="108.2" height="8" fill="#0b8043"/>
+<text x="262.2" y="304" font-size="9" fill="#5f6368">10</text>
+<text x="142" y="346" font-size="12" fill="#202124" text-anchor="end">arrayRandom</text>
+<rect x="150" y="320" width="388.9" height="8" fill="#9aa0a6"/>
+<text x="542.9" y="327" font-size="9" fill="#5f6368">4662</text>
+<rect x="150" y="329" width="263.8" height="8" fill="#f9ab00"/>
+<text x="417.8" y="336" font-size="9" fill="#5f6368">308</text>
+<rect x="150" y="338" width="254.6" height="8" fill="#a142f4"/>
+<text x="408.6" y="345" font-size="9" fill="#5f6368">252</text>
+<rect x="150" y="347" width="290.4" height="8" fill="#1a73e8"/>
+<text x="444.4" y="354" font-size="9" fill="#5f6368">550</text>
+<rect x="150" y="356" width="252.3" height="8" fill="#0b8043"/>
+<text x="406.3" y="363" font-size="9" fill="#5f6368">240</text>
+<text x="142" y="405" font-size="12" fill="#202124" text-anchor="end">objectAllocation</text>
+<rect x="150" y="379" width="288.6" height="8" fill="#9aa0a6"/>
+<text x="442.6" y="386" font-size="9" fill="#5f6368">528</text>
+<rect x="150" y="388" width="135.8" height="8" fill="#f9ab00"/>
+<text x="289.8" y="395" font-size="9" fill="#5f6368">19</text>
+<rect x="150" y="397" width="190.0" height="8" fill="#a142f4"/>
+<text x="344.0" y="404" font-size="9" fill="#5f6368">62</text>
+<rect x="150" y="406" width="194.4" height="8" fill="#1a73e8"/>
+<text x="348.4" y="413" font-size="9" fill="#5f6368">68</text>
+<rect x="150" y="415" width="129.3" height="8" fill="#0b8043"/>
+<text x="283.3" y="422" font-size="9" fill="#5f6368">17</text>
+<text x="142" y="464" font-size="12" fill="#202124" text-anchor="end">valueEscape</text>
+<rect x="150" y="438" width="308.0" height="8" fill="#9aa0a6"/>
+<text x="462.0" y="445" font-size="9" fill="#5f6368">805</text>
+<rect x="150" y="447" width="84.7" height="8" fill="#f9ab00"/>
+<text x="238.7" y="454" font-size="9" fill="#5f6368">6.3</text>
+<rect x="150" y="456" width="187.8" height="8" fill="#a142f4"/>
+<text x="341.8" y="463" font-size="9" fill="#5f6368">59</text>
+<rect x="150" y="465" width="218.1" height="8" fill="#1a73e8"/>
+<text x="372.1" y="472" font-size="9" fill="#5f6368">114</text>
+<rect x="150" y="474" width="74.1" height="8" fill="#0b8043"/>
+<text x="228.1" y="481" font-size="9" fill="#5f6368">5.0</text>
+<text x="142" y="523" font-size="12" fill="#202124" text-anchor="end">hashMapChurn</text>
+<rect x="150" y="497" width="233.9" height="8" fill="#9aa0a6"/>
+<text x="387.9" y="504" font-size="9" fill="#5f6368">161</text>
+<rect x="150" y="506" width="173.8" height="8" fill="#f9ab00"/>
+<text x="327.8" y="513" font-size="9" fill="#5f6368">44</text>
+<rect x="150" y="515" width="211.0" height="8" fill="#a142f4"/>
+<text x="365.0" y="522" font-size="9" fill="#5f6368">98</text>
+<rect x="150" y="524" width="223.1" height="8" fill="#1a73e8"/>
+<text x="377.1" y="531" font-size="9" fill="#5f6368">127</text>
+<rect x="150" y="533" width="139.7" height="8" fill="#0b8043"/>
+<text x="293.7" y="540" font-size="9" fill="#5f6368">21</text>
+<text x="142" y="582" font-size="12" fill="#202124" text-anchor="end">stringBuilding</text>
+<rect x="150" y="556" width="299.6" height="8" fill="#9aa0a6"/>
+<text x="453.6" y="563" font-size="9" fill="#5f6368">670</text>
+<rect x="150" y="565" width="157.3" height="8" fill="#f9ab00"/>
+<text x="311.3" y="572" font-size="9" fill="#5f6368">30</text>
+<rect x="150" y="574" width="196.0" height="8" fill="#a142f4"/>
+<text x="350.0" y="581" font-size="9" fill="#5f6368">71</text>
+<rect x="150" y="583" width="301.3" height="8" fill="#1a73e8"/>
+<text x="455.3" y="590" font-size="9" fill="#5f6368">695</text>
+<rect x="150" y="592" width="122.8" height="8" fill="#0b8043"/>
+<text x="276.8" y="599" font-size="9" fill="#5f6368">14</text>
+<text x="142" y="641" font-size="12" fill="#202124" text-anchor="end">recursion</text>
+<rect x="150" y="615" width="354.9" height="8" fill="#9aa0a6"/>
+<text x="508.9" y="622" font-size="9" fill="#5f6368">2228</text>
+<rect x="150" y="624" width="239.5" height="8" fill="#f9ab00"/>
+<text x="393.5" y="631" font-size="9" fill="#5f6368">182</text>
+<rect x="150" y="633" width="242.3" height="8" fill="#a142f4"/>
+<text x="396.3" y="640" font-size="9" fill="#5f6368">193</text>
+<rect x="150" y="642" width="270.3" height="8" fill="#1a73e8"/>
+<text x="424.3" y="649" font-size="9" fill="#5f6368">355</text>
+<rect x="150" y="651" width="205.9" height="8" fill="#0b8043"/>
+<text x="359.9" y="658" font-size="9" fill="#5f6368">88</text>
+<text x="142" y="700" font-size="12" fill="#202124" text-anchor="end">quicksort</text>
+<rect x="150" y="674" width="344.5" height="8" fill="#9aa0a6"/>
+<text x="498.5" y="681" font-size="9" fill="#5f6368">1780</text>
+<rect x="150" y="683" width="236.8" height="8" fill="#f9ab00"/>
+<text x="390.8" y="690" font-size="9" fill="#5f6368">171</text>
+<rect x="150" y="692" width="233.6" height="8" fill="#a142f4"/>
+<text x="387.6" y="699" font-size="9" fill="#5f6368">160</text>
+<rect x="150" y="701" width="277.0" height="8" fill="#1a73e8"/>
+<text x="431.0" y="708" font-size="9" fill="#5f6368">410</text>
+<rect x="150" y="710" width="206.8" height="8" fill="#0b8043"/>
+<text x="360.8" y="717" font-size="9" fill="#5f6368">89</text>
+</svg>

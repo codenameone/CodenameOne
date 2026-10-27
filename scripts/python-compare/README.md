@@ -25,5 +25,24 @@ python3 scripts/python-compare/compare.py \
   --cn1-server /tmp/flask-todo --out scripts/python-compare/RESULTS.md
 ```
 
-GraalPy is an optional arm (`--graalpy`). It is not in `RESULTS.md` because
-it was not installed on the machine that produced it.
+GraalPy is an optional arm (`--graalpy`); `RESULTS.md` includes it. Install
+Flask into it with `graalpy -m ensurepip` and `graalpy -m pip install flask`.
+
+## CommonWorkloads
+
+`common_compare.py` runs `com.bench.CommonWorkloads`, the benchmark every
+Codename One port runs, ported to Python in `scripts/python-bench/common`.
+Each workload runs in its own process, so the peak RSS is that workload's,
+and every checksum must equal Java's. Codename One runs twice: the Python as
+written, and the same executable calling the Java method for the hot spot.
+
+```bash
+C=scripts/python-bench/common
+PY_SOURCES=$C PY_EXTRA_FILES="$C/common_workloads.py $C/java_hotspots.py" \
+  PY_JAVA_SOURCES=vm/benchmarks/common/src/main/java \
+  scripts/python-bench/build_parparvm.sh common_bench
+python3 scripts/python-compare/common_compare.py \
+  --cn1 scripts/python-bench/target/common_bench/common_bench \
+  --cpython <python> --pypy <pypy3> --graalpy <graalpy> --json common.json
+python3 scripts/python-compare/render_charts.py common.json --out docs/developer-guide/img
+```

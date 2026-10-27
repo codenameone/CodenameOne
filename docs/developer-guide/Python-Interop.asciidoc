@@ -178,54 +178,194 @@ dependencies, `response_model` and OpenAPI generation are supported. Flask
 sessions, templates, file uploads and streaming responses aren't, nor are
 FastAPI WebSockets and middleware.
 
-=== Compared with CPython and PyPy
+=== Compared with CPython, PyPy and GraalPy
 
 The same programs, run on one Apple silicon Mac, with
-`scripts/python-compare/compare.py`. Codename One rows are native binaries.
+`scripts/python-compare/compare.py`. Codename One rows are native binaries;
+GraalPy is the Community edition, 25.4, on its own JVM.
 
 Startup, a program that prints one line:
 
 [cols="1,1,1",options="header"]
 |===
 | | Wall time (ms) | Peak memory (MB)
-| CPython 3.14 | 21.2 | 14.4
-| PyPy 3.11 | 20.4 | 29.2
-| Codename One | 7.6 | 8.7
+| CPython 3.14 | 20.3 | 14.3
+| PyPy 3.11 | 18.2 | 29.2
+| GraalPy 3.13 | 34.9 | 116.6
+| Codename One | 5.9 | 8.7
 |===
 
-CPU kernels, fastest round in milliseconds:
+CPU kernels, fastest round in milliseconds, then the process's peak memory in
+MB:
 
-[cols="1,1,1,1",options="header"]
+[cols="2,1,1,1,1,1,1,1,1",options="header"]
 |===
-| Kernel | CPython 3.14 | PyPy 3.11 | Codename One
-| nbody | 785.9 | 63.7 | 90.1
-| richards | 653.9 | 40.3 | 44.7
-| fannkuch | 2691.2 | 612.5 | 731.8
-| spectral_norm | 734.5 | 11.7 | 11.1
-| dicts_strings | 397.5 | 145.0 | 211.2
+| Kernel 2+| CPython 3.14 2+| PyPy 3.11 2+| GraalPy 3.13 2+| Codename One
+| nbody | 776.0 | 15 | 62.7 | 32 | 192.5 | 234 | 89.2 | 10
+| richards | 634.8 | 16 | 39.9 | 34 | 146.5 | 260 | 44.7 | 11
+| fannkuch | 2652.3 | 15 | 604.7 | 33 | 541.2 | 244 | 723.4 | 10
+| spectral_norm | 729.4 | 15 | 12.0 | 32 | 7.4 | 248 | 11.1 | 10
+| dicts_strings | 404.2 | 63 | 141.5 | 87 | 274.4 | 383 | 208.6 | 127
 |===
 
-PyPy's JIT and Codename One's ahead of time compilation land close to each
-other, from twice to sixty times as fast as CPython. Codename One gets there
-without a warm-up and with a third of PyPy's memory on the numeric kernels.
+The two JITs and Codename One's ahead of time compilation land within a small
+factor of each other, from three to sixty times as fast as CPython. PyPy is
+the fastest on most kernels and GraalPy on two of them; Codename One gets
+close without a warm-up and in a third of PyPy's memory and a twentieth of
+GraalPy's on the numeric kernels.
 
 The Flask sample above, measured with `ab -n 20000 -c 8`:
 
-[cols="1,1,1,1",options="header"]
+[cols="1,1,1,1,1,1",options="header"]
 |===
-| | First response (ms) | Requests per second | Deployed size (MB)
-| CPython 3.14 | 97 | 687 | 82.0
-| PyPy 3.11 | 200 | 674 | 137.7
-| Codename One | 61 | 16,332 | 22.7
+| | First response (ms) | Requests per second | Idle memory (MB) | Memory after load (MB) | Deployed size (MB)
+| CPython 3.14 | 85 | 685 | 39.0 | 24.5 | 82.0
+| PyPy 3.11 | 196 | 688 | 65.3 | 88.7 | 137.7
+| GraalPy 3.13 | 609 | 561 | 325.7 | 931.0 | 343.1
+| Codename One | 58 | 13,564 | 26.8 | 423.4 | 22.7
 |===
 
 The deployed size is the interpreter's installation plus Flask and its
-dependencies, against the one executable. CPython and PyPy serve with
+dependencies, against the one executable. CPython, PyPy and GraalPy serve with
 Werkzeug's threaded server, which is what `app.run()` starts; a production
 CPython deployment behind a WSGI server with several worker processes serves
-more, using a full interpreter's memory per worker. The Codename One server
-idles at 27 MB and its heap grew to 395 MB under this load, where it stayed.
+more, using a full interpreter's memory per worker. The Codename One server's
+heap grows under load and stays at that size, which is the memory after load
+column; it isn't a leak, and it doesn't grow further on longer runs.
 
 Where an application needs CPython instead: packages with C extensions that
 have no Codename One implementation (for example `pandas`, `scipy` or `torch`),
 and code that builds source text and runs it with `exec`.
+
+=== Performance and Java hot spots
+
+The comparisons above are Python programs written for Python. The workloads
+below are the ones every Codename One port is measured with,
+`com.bench.CommonWorkloads`, ported line by line to Python in
+`scripts/python-bench/common`. Each one returns a checksum, and every runtime
+has to return the checksum Java returns, so all five columns compute the same
+thing. The Python port reproduces Java's 32 and 64-bit wrap-around with masks,
+since a Python `int` never overflows.
+
+Five ways to run them, each workload in a process of its own so that the peak
+memory column belongs to that workload alone
+(`scripts/python-compare/common_compare.py`):
+
+* CPython 3.14, PyPy 3.11 and GraalPy 3.13 (Community, 25.4) running the
+  Python source.
+* Codename One, the same Python compiled to a native executable.
+* Codename One with the hot spot in Java: the same executable, where the
+  Python calls the Java method for the workload instead of its own loop.
+
+image::img/python-perf-time.svg["Run time of each CommonWorkloads benchmark on CPython, PyPy, GraalPy and Codename One, with and without a Java hot spot"]
+
+image::img/python-perf-rss.svg["Peak memory of each CommonWorkloads benchmark on CPython, PyPy, GraalPy and Codename One, with and without a Java hot spot"]
+
+[cols="2,1,1,1,1,1,1,1,1,1,1",options="header"]
+|===
+| Workload 2+| CPython (ms, MB) 2+| PyPy 2+| GraalPy 2+| Codename One 2+| Hot spot in Java
+| `intArithmetic` | 15125 | 15 | 142 | 32 | 114 | 353 | 1754 | 86 | 65 | 11
+| `longArithmetic` | 11839 | 15 | 5410 | 42 | 11762 | 259 | 26379 | 135 | 41 | 11
+| `mathTranscendental` | 1024 | 15 | 192 | 32 | 292 | 343 | 2016 | 93 | 181 | 11
+| `arraySequential` | 1778 | 382 | 34 | 154 | 26 | 331 | 282 | 273 | 10 | 42
+| `arrayRandom` | 4662 | 199 | 308 | 93 | 252 | 248 | 550 | 105 | 240 | 27
+| `objectAllocation` | 528 | 15 | 19 | 63 | 62 | 344 | 68 | 133 | 17 | 192
+| `valueEscape` | 805 | 15 | 6.3 | 32 | 59 | 331 | 114 | 91 | 5.0 | 11
+| `hashMapChurn` | 161 | 26 | 44 | 78 | 98 | 243 | 127 | 127 | 21 | 30
+| `stringBuilding` | 670 | 15 | 30 | 40 | 71 | 257 | 695 | 86 | 14 | 86
+| `recursion` | 2228 | 15 | 182 | 57 | 193 | 280 | 355 | 11 | 88 | 11
+| `quicksort` | 1780 | 84 | 171 | 58 | 160 | 268 | 410 | 114 | 89 | 17
+|===
+
+What the numbers say:
+
+* **Python as written.** Compiled ahead of time, Codename One runs seven of
+  these eleven workloads 4 to 9 times faster than CPython, without a warm-up
+  and in less memory than GraalPy. PyPy and GraalPy are faster still on most of
+  them: a JIT watches the program run and specializes the loop for the values
+  it sees, which a compiler that runs before the program can't do.
+* **Where Codename One is slowest.** Arithmetic that leaves 64 bits
+  (`longArithmetic` masks the result of a multiplication that needs 128) runs
+  on arbitrary precision integers, and code the compiler can't type, such as
+  the string loop in `stringBuilding` and the `struct` call in
+  `mathTranscendental`, runs on the generic object path. Those are the long
+  blue bars, and the workloads where CPython keeps up or wins.
+* **Hot spot in Java.** Moving the measured hot spot into a Java method made
+  each of these workloads the fastest of the five runs, and usually the
+  smallest in memory as well because the loop then runs on unboxed `int`,
+  `long` and `double` values and arrays.
+
+==== Tuning a hot spot in Java
+
+A profile usually shows a handful of functions that dominate the run time.
+Any of them can be rewritten as a Java method in the same project and called
+from Python like any other Java class. The rest of the program stays Python.
+
+The integer kernel in Python:
+
+[source,python]
+----
+M32 = 0xFFFFFFFF
+
+def i32(v: int) -> int:
+    return ((v + 0x80000000) & M32) - 0x80000000
+
+def int_arithmetic() -> int:
+    a: int = 0x12345678
+    b: int = i32(0x9E3779B9)
+    checksum: int = 0
+    for _ in range(40000000):
+        a = i32((a * 1103515245 + 12345) ^ ((b & M32) >> 3))
+        b = i32((b + a) * 5 - (a << 7))
+        checksum += (a ^ b) & 0xFFFF
+    return checksum + a + b
+----
+
+The same function in Java, under `common/src/main/java`:
+
+[source,java]
+----
+package com.bench;
+
+public final class CommonWorkloads {
+    public static long intArithmetic() {
+        int a = 0x12345678;
+        int b = 0x9E3779B9;
+        long checksum = 0;
+        for (int i = 0; i < 40000000; i++) {
+            a = (a * 1103515245 + 12345) ^ (b >>> 3);
+            b = (b + a) * 5 - (a << 7);
+            checksum += (a ^ b) & 0xFFFF;
+        }
+        return checksum + a + b;
+    }
+}
+----
+
+And the Python that calls it:
+
+[source,python]
+----
+from java.com.bench import CommonWorkloads
+
+checksum = CommonWorkloads.intArithmetic()
+----
+
+The Java `int` wraps by itself, so the masks disappear and the loop compiles
+to a few machine instructions. In the run above that took the workload from
+1.75 seconds to 65 milliseconds, faster than PyPy and GraalPy, in 11 MB.
+
+Guidelines for choosing what to move:
+
+* Measure first. Only a loop that dominates a profile is worth a second
+  language.
+* Move whole loops, not single operations. Every call across the boundary
+  converts its arguments, so a Java method called once per element gains
+  little; one called once per batch gains the most.
+* Pass primitive values and Java arrays where possible. A Python `list` passed
+  to Java arrives as a `java.util.List` of boxed values.
+* Annotate the Python that stays. Codename One compiles functions whose
+  parameters and locals have known types (`int`, `float`, `bool`, `str`,
+  lists of them and classes with `__slots__`) to typed Java code. The rest
+  takes the generic path, which is the one that CPython-like timings come
+  from.
