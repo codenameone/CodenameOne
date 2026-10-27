@@ -36,8 +36,12 @@ import java.util.List;
 /// Built, signed and serialized locally, so a node receives finished bytes and never a key:
 ///
 /// ```java
+/// long nonce = 0;
+/// UInt256 tip = UInt256.parseUnits("1", 9);           // 1 gwei
+/// UInt256 maxFee = UInt256.parseUnits("30", 9);
+/// byte[] privateKey = SecureRandom.bytes(32);
 /// EvmTransaction tx = EvmTransaction.eip1559(1, nonce, tip, maxFee, 21000,
-///         EvmAddress.parse("0x..."), UInt256.parseUnits("0.01", 18), null);
+///         EvmAddress.parse("0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed"), UInt256.parseUnits("0.01", 18), null);
 /// byte[] raw = tx.sign(privateKey).encode();   // eth_sendRawTransaction
 /// ```
 ///

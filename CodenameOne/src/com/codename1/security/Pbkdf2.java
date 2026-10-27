@@ -35,6 +35,8 @@ package com.codename1.security;
 /// the work.
 ///
 /// ```java
+/// byte[] mnemonicUtf8 = Mnemonic.generate(128).getBytes("UTF-8");
+/// byte[] saltUtf8 = "mnemonic".getBytes("UTF-8");    // "mnemonic" + passphrase
 /// byte[] seed = Pbkdf2.hmacSha512(mnemonicUtf8, saltUtf8, 2048, 64);
 /// ```
 @com.codename1.impl.SharedWithBackend

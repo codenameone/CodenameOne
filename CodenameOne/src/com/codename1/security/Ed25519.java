@@ -32,6 +32,7 @@ package com.codename1.security;
 ///
 /// ```java
 /// byte[] seed = SecureRandom.bytes(32);
+/// byte[] message = "hello".getBytes();
 /// byte[] pub = Ed25519.publicKey(seed);
 /// byte[] sig = Ed25519.sign(seed, pub, message);
 /// boolean ok = Ed25519.verify(message, sig, pub);
@@ -171,15 +172,14 @@ public final class Ed25519 {
         byte[] k = Ed25519Math.reduce64(d.digest());
         byte[] s = new byte[32];
         System.arraycopy(signature, 32, s, 0, 32);
+        // R is compared as a point rather than as the encoding of [s]B - [k]A:
+        // decode accepts only canonical encodings, which encode answers, so
+        // the two agree on every input
         Ed25519Math.P3 r = new Ed25519Math.P3();
-        Ed25519Math.doubleMulVar(r, k, a, s);
-        byte[] enc = new byte[32];
-        Ed25519Math.encode(enc, 0, r);
-        int diff = 0;
-        for (int i = 0; i < 32; i++) {
-            diff |= enc[i] ^ signature[i];
+        if (!Ed25519Math.decode(r, signature, 0)) {
+            return false;
         }
-        return diff == 0;
+        return Ed25519Math.verifyHalf(k, s, a, r);
     }
 
     /// The GPU record of a verification, up to its multiplication, as the GPU kernel reads it and

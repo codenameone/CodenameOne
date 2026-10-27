@@ -46,10 +46,13 @@ import java.util.List;
 /// - Solana: `m/44'/501'/account'/0'`, as Phantom and Solflare derive
 ///
 /// ```java
+/// String words = Mnemonic.generate(128);
 /// Wallet w = Wallet.fromMnemonic(words, "");
 /// EvmAddress eth = w.getEvmAddress(0, 0);
 /// BitcoinAddress btc = w.getBitcoinAddress(BitcoinNetwork.MAINNET, Wallet.BIP84, 0, 0, 0);
 /// SolanaAddress sol = w.getSolanaAddress(0);
+/// EvmTransaction tx = EvmTransaction.eip1559(1, 0, UInt256.parseUnits("1", 9),
+///         UInt256.parseUnits("30", 9), 21000, eth, UInt256.ZERO, null);
 /// EvmTransaction signed = w.signEvmTransaction(tx, Wallet.evmPath(0, 0));
 /// ```
 @com.codename1.impl.SharedWithBackend

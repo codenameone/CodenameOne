@@ -29,6 +29,11 @@ import java.util.List;
 /// *token contract* with value 0 and this call data; the recipient is inside it.
 ///
 /// ```java
+/// EvmAddress recipient = EvmAddress.parse("0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed");
+/// EvmAddress usdc = EvmAddress.parse("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
+/// long nonce = 0;
+/// UInt256 tip = UInt256.parseUnits("1", 9);
+/// UInt256 maxFee = UInt256.parseUnits("30", 9);
 /// byte[] data = Erc20.transfer(recipient, UInt256.parseUnits("25", 6));  // 25 USDC
 /// EvmTransaction tx = EvmTransaction.eip1559(1, nonce, tip, maxFee, 65000, usdc, UInt256.ZERO, data);
 /// ```

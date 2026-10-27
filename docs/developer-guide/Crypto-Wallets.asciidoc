@@ -179,6 +179,8 @@ The simulator, JavaSE desktop apps and the backend in development run the portab
 | BIP-39 seed (PBKDF2, 2048 rounds) | 802 | 558 | 1.44x
 |===
 
+Ed25519 verification rewrites its check with two scalars of half the length, found by a lattice reduction, so the multiplication needs half the doublings. The rewrite gives exactly the answer of the direct check for every input, including keys with a small-order component. On x86-64 the field multiplication also takes a Karatsuba split, which needs 75 products instead of 100. arm64 has the registers to keep the direct form faster, so each architecture gets the form that's faster on it. The CI runners are x86-64, and they're held to the same floors.
+
 ==== Native targets
 
 On iOS, macOS, Windows, Linux and the production backend the same operations run as C, compared with Bitcoin Core's libsecp256k1 for the secp256k1 curve and OpenSSL 3.6 for everything else, both built with the same compiler and flags.
@@ -283,12 +285,7 @@ The harnesses are in `scripts/crypto-bench` and `scripts/crypto-gpu` of the Code
 
 [source,bash]
 ----
-scripts/crypto-bench/jvm-run.sh            # JVM, against BouncyCastle and the JDK
-scripts/crypto-bench/native/run.sh         # C, against libsecp256k1 and OpenSSL
-scripts/crypto-bench/android-run.sh        # an attached device or emulator
-scripts/crypto-gpu/batch-check.sh          # the GPU split, with its crossover
-scripts/crypto-gpu/js-batch-check.sh       # WebGPU in headless Chromium
-python3 scripts/crypto-bench/gate.py jvm <output>   # hold a run to its floors
+include::../demos/common/src/main/snippets/developer-guide/crypto-wallets.sh[tag=crypto-wallets-bash-001,indent=0]
 ----
 
 Each prints the compiler, JDK and reference library versions above its numbers. `scripts/crypto-bench/charts.py` draws the two charts above from the saved results.

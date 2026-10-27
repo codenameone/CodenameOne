@@ -34,6 +34,7 @@ import java.util.Map;
 ///
 /// ```java
 /// // Coinbase: {"data":{"amount":"67187.33","base":"BTC","currency":"USD"}}
+/// RpcTransport transport = new NetworkTransport();
 /// PriceFeed coinbase = new JsonPriceFeed(transport,
 ///         "https://api.coinbase.com/v2/prices/{BASE}-{QUOTE}/spot", "data.amount", "coinbase");
 /// // Kraken: {"result":{"XXBTZUSD":{"c":["67187.30000","0.01"]}}} -- the pair key varies, so

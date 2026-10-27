@@ -35,6 +35,10 @@ import java.util.Map;
 ///
 /// ```java
 /// SolanaRpc sol = new SolanaRpc(new NetworkTransport(), SolanaRpc.DEVNET);
+/// Wallet wallet = Wallet.fromMnemonic(Mnemonic.generate(128), "");
+/// SolanaAddress me = wallet.getSolanaAddress(0);
+/// List<Instruction> instructions = new ArrayList<Instruction>();
+/// instructions.add(SystemProgram.transfer(me, me, 1000000L));
 /// SolanaMessage m = SolanaMessage.compile(me, instructions, sol.getLatestBlockhash());
 /// SolanaTransaction tx = new SolanaTransaction(m);
 /// wallet.signSolanaTransaction(tx, 0);

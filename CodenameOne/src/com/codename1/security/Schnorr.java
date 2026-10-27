@@ -29,6 +29,8 @@ package com.codename1.security;
 /// even y is meant. A private key is the same 32 bytes as for [Secp256k1].
 ///
 /// ```java
+/// byte[] privateKey = SecureRandom.bytes(32);
+/// byte[] messageHash = Hash.sha256("hello".getBytes());
 /// byte[] pub = Schnorr.publicKey(privateKey);
 /// byte[] sig = Schnorr.sign(messageHash, privateKey, SecureRandom.bytes(32));
 /// boolean ok = Schnorr.verify(messageHash, sig, pub);

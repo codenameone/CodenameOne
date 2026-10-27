@@ -35,6 +35,8 @@ import java.util.TreeSet;
 /// meta-transactions are signed as.
 ///
 /// ```java
+/// String jsonFromTheDapp = "{...}";           // the eth_signTypedData_v4 argument
+/// byte[] privateKey = SecureRandom.bytes(32);
 /// TypedData doc = TypedData.fromJson(jsonFromTheDapp);
 /// byte[] signature = doc.sign(privateKey);      // r || s || v
 /// ```

@@ -36,6 +36,7 @@ import com.codename1.util.AsyncResource;
 ///
 /// ```java
 /// Vault vault = Vault.named("wallet");
+/// char[] password = "what the user typed".toCharArray();
 /// vault.unlockWithPassword(password).get();
 /// VaultSigner.store(vault, "main", Mnemonic.generate(256), "").get();
 /// Wallet wallet = new Wallet(new VaultSigner(vault, "main"));

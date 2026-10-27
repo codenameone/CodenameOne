@@ -31,7 +31,10 @@ import java.util.List;
 /// The Solidity contract ABI: function selectors, call data and return values.
 ///
 /// ```java
+/// EvmAddress recipient = EvmAddress.parse("0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed");
+/// UInt256 amount = UInt256.parseUnits("25", 6);
 /// byte[] data = Abi.encodeCall("transfer(address,uint256)", recipient, amount);
+/// byte[] returned = new byte[32];                   // what eth_call answered
 /// List<Object> out = Abi.decode("(uint256)", returned);   // [UInt256]
 /// ```
 ///

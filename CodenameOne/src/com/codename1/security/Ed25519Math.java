@@ -110,6 +110,15 @@ final class Ed25519Math {
     }
 
     static void mul(int[] h, int[] f, int[] g) {
+        if (KARATSUBA) {
+            kmul(h, f, g);
+        } else {
+            mul10(h, f, g);
+        }
+    }
+
+    // ref10's schoolbook product
+    static void mul10(int[] h, int[] f, int[] g) {
         long f0 = f[0];
         long f1 = f[1];
         long f2 = f[2];
@@ -154,6 +163,148 @@ final class Ed25519Math {
         long h7 = f0 * g7 + f1 * g6 + f2 * g5 + f3 * g4 + f4 * g3 + f5 * g2 + f6 * g1 + f7 * g0 + f8 * g9By19 + f9 * g8By19;
         long h8 = f0 * g8 + f1By2 * g7 + f2 * g6 + f3By2 * g5 + f4 * g4 + f5By2 * g3 + f6 * g2 + f7By2 * g1 + f8 * g0 + f9By2 * g9By19;
         long h9 = f0 * g9 + f1 * g8 + f2 * g7 + f3 * g6 + f4 * g5 + f5 * g4 + f6 * g3 + f7 * g2 + f8 * g1 + f9 * g0;
+        long c;
+        c = h0 >> 26; h1 += c; h0 -= c << 26;
+        c = h4 >> 26; h5 += c; h4 -= c << 26;
+        c = h1 >> 25; h2 += c; h1 -= c << 25;
+        c = h5 >> 25; h6 += c; h5 -= c << 25;
+        c = h2 >> 26; h3 += c; h2 -= c << 26;
+        c = h6 >> 26; h7 += c; h6 -= c << 26;
+        c = h3 >> 25; h4 += c; h3 -= c << 25;
+        c = h7 >> 25; h8 += c; h7 -= c << 25;
+        c = h4 >> 26; h5 += c; h4 -= c << 26;
+        c = h8 >> 26; h9 += c; h8 -= c << 26;
+        c = h9 >> 25; h0 += c * 19; h9 -= c << 25;
+        c = h0 >> 26; h1 += c; h0 -= c << 26;
+        h[0] = (int) h0;
+        h[1] = (int) h1;
+        h[2] = (int) h2;
+        h[3] = (int) h3;
+        h[4] = (int) h4;
+        h[5] = (int) h5;
+        h[6] = (int) h6;
+        h[7] = (int) h7;
+        h[8] = (int) h8;
+        h[9] = (int) h9;
+    }
+
+    // On x86 HotSpot, ref10's 100 products (plus 9 by 19) are bound by the
+    // one 64-bit multiplier and by register spills, while arm64 has the
+    // registers to keep them all live; the C kernels choose the same way with
+    // cpuid. kmul is Karatsuba over the two halves of the limbs: 75 products.
+    private static final boolean KARATSUBA = isX86();
+
+    private static boolean isX86() {
+        String arch = System.getProperty("os.arch");
+        return "amd64".equals(arch) || "x86_64".equals(arch) || "x86".equals(arch)
+                || "i386".equals(arch) || "i686".equals(arch);
+    }
+
+    // The high five limbs sit 127 bits above the low five, at the low
+    // limbs' weights once its even limbs are doubled (x5 is worth 2^128 =
+    // 2^127 * 2), so both halves multiply with ref10's odd-by-odd doubling.
+    // The cross term then lands half a bit off on its even columns and the
+    // high-by-high term on all of them; each such column is a sum of products
+    // with a doubled factor, hence even, and is halved exactly. 2^255 = 19.
+    // With every input limb up to four times its carried bound the largest
+    // intermediate stays below 2^62.5; callers pass sums of at most three.
+    static void kmul(int[] h, int[] f, int[] g) {
+        long f0 = f[0];
+        long f1 = f[1];
+        long f2 = f[2];
+        long f3 = f[3];
+        long f4 = f[4];
+        long f5 = f[5];
+        long f6 = f[6];
+        long f7 = f[7];
+        long f8 = f[8];
+        long f9 = f[9];
+        long g0 = g[0];
+        long g1 = g[1];
+        long g2 = g[2];
+        long g3 = g[3];
+        long g4 = g[4];
+        long g5 = g[5];
+        long g6 = g[6];
+        long g7 = g[7];
+        long g8 = g[8];
+        long g9 = g[9];
+        long fh0 = f5 << 1;
+        long gh0 = g5 << 1;
+        long fh1 = f6;
+        long gh1 = g6;
+        long fh2 = f7 << 1;
+        long gh2 = g7 << 1;
+        long fh3 = f8;
+        long gh3 = g8;
+        long fh4 = f9 << 1;
+        long gh4 = g9 << 1;
+        long fs0 = f0 + fh0;
+        long gs0 = g0 + gh0;
+        long fs1 = f1 + fh1;
+        long gs1 = g1 + gh1;
+        long fs2 = f2 + fh2;
+        long gs2 = g2 + gh2;
+        long fs3 = f3 + fh3;
+        long gs3 = g3 + gh3;
+        long fs4 = f4 + fh4;
+        long gs4 = g4 + gh4;
+        long l0 = f0 * g0;
+        long l1 = f0 * g1 + f1 * g0;
+        long l2 = f0 * g2 + f2 * g0 + ((f1 * g1) << 1);
+        long l3 = f0 * g3 + f1 * g2 + f2 * g1 + f3 * g0;
+        long l4 = f0 * g4 + f2 * g2 + f4 * g0 + ((f1 * g3 + f3 * g1) << 1);
+        long l5 = f1 * g4 + f2 * g3 + f3 * g2 + f4 * g1;
+        long l6 = f2 * g4 + f4 * g2 + ((f3 * g3) << 1);
+        long l7 = f3 * g4 + f4 * g3;
+        long l8 = f4 * g4;
+        long u0 = fh0 * gh0;
+        long u1 = fh0 * gh1 + fh1 * gh0;
+        long u2 = fh0 * gh2 + fh2 * gh0 + ((fh1 * gh1) << 1);
+        long u3 = fh0 * gh3 + fh1 * gh2 + fh2 * gh1 + fh3 * gh0;
+        long u4 = fh0 * gh4 + fh2 * gh2 + fh4 * gh0 + ((fh1 * gh3 + fh3 * gh1) << 1);
+        long u5 = fh1 * gh4 + fh2 * gh3 + fh3 * gh2 + fh4 * gh1;
+        long u6 = fh2 * gh4 + fh4 * gh2 + ((fh3 * gh3) << 1);
+        long u7 = fh3 * gh4 + fh4 * gh3;
+        long u8 = fh4 * gh4;
+        long m0 = fs0 * gs0;
+        long m1 = fs0 * gs1 + fs1 * gs0;
+        long m2 = fs0 * gs2 + fs2 * gs0 + ((fs1 * gs1) << 1);
+        long m3 = fs0 * gs3 + fs1 * gs2 + fs2 * gs1 + fs3 * gs0;
+        long m4 = fs0 * gs4 + fs2 * gs2 + fs4 * gs0 + ((fs1 * gs3 + fs3 * gs1) << 1);
+        long m5 = fs1 * gs4 + fs2 * gs3 + fs3 * gs2 + fs4 * gs1;
+        long m6 = fs2 * gs4 + fs4 * gs2 + ((fs3 * gs3) << 1);
+        long m7 = fs3 * gs4 + fs4 * gs3;
+        long m8 = fs4 * gs4;
+        m0 = (m0 - l0 - u0) >> 1;
+        m1 = (m1 - l1 - u1);
+        m2 = (m2 - l2 - u2) >> 1;
+        m3 = (m3 - l3 - u3);
+        m4 = (m4 - l4 - u4) >> 1;
+        m5 = (m5 - l5 - u5);
+        m6 = (m6 - l6 - u6) >> 1;
+        m7 = (m7 - l7 - u7);
+        m8 = (m8 - l8 - u8) >> 1;
+        u0 >>= 1;
+        u1 >>= 1;
+        u2 >>= 1;
+        u3 >>= 1;
+        u4 >>= 1;
+        u5 >>= 1;
+        u6 >>= 1;
+        u7 >>= 1;
+        u8 >>= 1;
+        long h0 = l0 + 19 * (u0 + m5);
+        long h1 = l1 + 19 * (u1 + m6);
+        long h2 = l2 + 19 * (u2 + m7);
+        long h3 = l3 + 19 * (u3 + m8);
+        long h4 = l4 + 19 * (u4);
+        long h5 = l5 + m0 + 19 * (u5);
+        long h6 = l6 + m1 + 19 * (u6);
+        long h7 = l7 + m2 + 19 * (u7);
+        long h8 = l8 + m3 + 19 * (u8);
+        long h9 = m4;
+
         long c;
         c = h0 >> 26; h1 += c; h0 -= c << 26;
         c = h4 >> 26; h5 += c; h4 -= c << 26;
@@ -735,11 +886,11 @@ final class Ed25519Math {
         }
         int carry = 0;
         for (int i = 0; i < 63; i++) {
-            e[i] += carry;
+            e[i] = (byte) (e[i] + carry);
             carry = (e[i] + 8) >> 4;
-            e[i] -= carry << 4;
+            e[i] = (byte) (e[i] - (carry << 4));
         }
-        e[63] += carry;
+        e[63] = (byte) (e[63] + carry);
         Ctx c = new Ctx();
         Precomp t = new Precomp();
         P3 s = new P3();
@@ -827,57 +978,306 @@ final class Ed25519Math {
         return naf;
     }
 
-    // r = b B - h A, for public scalars; r.t is left unset
-    static void doubleMulVar(P3 r, byte[] h, P3 a, byte[] b) {
-        Ctx c = new Ctx();
-        byte[] nh = wnaf(h, 5);
-        byte[] nb = wnaf(b, WINDOW_B);
-        Cached[] ta = new Cached[8];
-        P3 a2 = new P3();
-        dbl(c, a2, a);
-        Cached a2c = new Cached();
-        toCached(a2c, a2);
-        P3 run = a;
-        for (int i = 0; i < 8; i++) {
-            ta[i] = new Cached();
-            toCached(ta[i], run);
-            if (i < 7) {
-                P3 next = new P3();
-                add(c, next, run, a2c);
-                run = next;
+    // ------------------------------------------------------------------
+    // verification with half-length scalars
+    //
+    // [s]B = R + [k]A is checked as [u]B - [v1]R - [v0]A = O, where v0 = v1 k
+    // (mod 8L) and u = v1 s (mod L), with v1 odd and both v0 and v1 near 2^127.
+    // Both sides of the original equation are points of the full group of order
+    // 8L, so multiplying it by v1 is exact when v1 is odd and not a multiple of
+    // L, and taking v0 modulo 8L rather than L keeps [v1 k]A = [v0]A for a key
+    // with a small-order component too: the answer is the single verify's for
+    // every input, torsion included. With all four scalars about half length,
+    // the loop does about half the doublings. The short (v0, v1) is found by a
+    // binary Euclid on the lattice {(a, b) : a = b k mod 8L}.
+
+    private static final class HighBase {
+        // (2i + 1) 2^128 B for i in [0, 2^(WINDOW_B - 2))
+        static final Precomp[] ODD = build();
+
+        private static Precomp[] build() {
+            int n = 1 << (WINDOW_B - 2);
+            Ctx c = new Ctx();
+            P3 b = new P3();
+            copy(b.x, BX);
+            copy(b.y, BY);
+            one(b.z);
+            mul(b.t, b.x, b.y);
+            for (int i = 0; i < 128; i++) {
+                dbl(c, b, b);
+            }
+            P3 b2 = new P3();
+            dbl(c, b2, b);
+            Cached b2c = new Cached();
+            toCached(b2c, b2);
+            P3[] pts = new P3[n];
+            pts[0] = b;
+            for (int i = 1; i < n; i++) {
+                pts[i] = new P3();
+                add(c, pts[i], pts[i - 1], b2c);
+            }
+            return toPrecomp(pts);
+        }
+    }
+
+    // 8L in 32-bit little-endian words
+    private static final int[] EIGHT_L = {
+        0x5cf5d3ed << 3, (0x5812631a << 3) | (0x5cf5d3ed >>> 29),
+        (0xa2f79cd6 << 3) | (0x5812631a >>> 29), (0x14def9de << 3) | (0xa2f79cd6 >>> 29),
+        0x14def9de >>> 29, 0, 0, 0x10000000 << 3};
+
+    private static int bitLength(int[] x) {
+        for (int i = x.length - 1; i >= 0; i--) {
+            if (x[i] != 0) {
+                return 32 * i + 32 - Integer.numberOfLeadingZeros(x[i]);
             }
         }
-        Precomp[] tb = OddBase.ODD;
+        return 0;
+    }
+
+    // word j of b << sh
+    private static long shiftedWord(int[] b, int j, int words, int bits) {
+        int k = j - words;
+        long hi = k >= 0 && k < b.length ? b[k] & 0xffffffffL : 0;
+        if (bits == 0) {
+            return hi;
+        }
+        long lo = k - 1 >= 0 && k - 1 < b.length ? b[k - 1] & 0xffffffffL : 0;
+        return ((hi << bits) | (lo >>> (32 - bits))) & 0xffffffffL;
+    }
+
+    // out = a - (b << sh); true when that is negative, and out is then garbage
+    private static boolean subShifted(int[] out, int[] a, int[] b, int sh) {
+        int words = sh >>> 5;
+        int bits = sh & 31;
+        long borrow = 0;
+        for (int j = 0; j < a.length; j++) {
+            long d = (a[j] & 0xffffffffL) - shiftedWord(b, j, words, bits) - borrow;
+            out[j] = (int) d;
+            borrow = (d >>> 63);
+        }
+        return borrow != 0;
+    }
+
+    // a += b << sh
+    private static void addShifted(int[] a, int[] b, int sh) {
+        int words = sh >>> 5;
+        int bits = sh & 31;
+        long carry = 0;
+        for (int j = 0; j < a.length; j++) {
+            long d = (a[j] & 0xffffffffL) + shiftedWord(b, j, words, bits) + carry;
+            a[j] = (int) d;
+            carry = d >>> 32;
+        }
+    }
+
+    private static int compare(int[] a, int[] b) {
+        for (int i = a.length - 1; i >= 0; i--) {
+            if (a[i] != b[i]) {
+                return (a[i] & 0xffffffffL) < (b[i] & 0xffffffffL) ? -1 : 1;
+            }
+        }
+        return 0;
+    }
+
+    private static void toWords(int[] out, byte[] s) {
+        for (int i = 0; i < 8; i++) {
+            out[i] = (s[4 * i] & 0xff) | ((s[4 * i + 1] & 0xff) << 8)
+                    | ((s[4 * i + 2] & 0xff) << 16) | ((s[4 * i + 3] & 0xff) << 24);
+        }
+    }
+
+    private static void wordsToBytes(byte[] out, int[] w) {
+        for (int i = 0; i < 8; i++) {
+            out[4 * i] = (byte) w[i];
+            out[4 * i + 1] = (byte) (w[i] >>> 8);
+            out[4 * i + 2] = (byte) (w[i] >>> 16);
+            out[4 * i + 3] = (byte) (w[i] >>> 24);
+        }
+    }
+
+    // finds v0 = v1 k (mod 8L) with v1 odd and positive and both about 2^127;
+    // v0 goes to v0 (its magnitude) and its sign is the answer, true for negative
+    static boolean reduceBasis(byte[] k, byte[] v0, byte[] v1) {
+        // rows (r0, t0) and (r1, t1) with r = t k (mod 8L), r0 >= r1, t0 and t1
+        // of opposite signs (t1's is neg1) and r0 |t1| + r1 |t0| = 8L
+        int[] r0 = new int[8];
+        int[] r1 = new int[8];
+        int[] t0 = new int[8];
+        int[] t1 = new int[8];
+        int[] tmp = new int[8];
+        System.arraycopy(EIGHT_L, 0, r0, 0, 8);
+        toWords(r1, k);
+        t1[0] = 1;
+        boolean neg1 = false;
+        while (true) {
+            if (compare(r0, r1) < 0) {
+                int[] x = r0;
+                r0 = r1;
+                r1 = x;
+                x = t0;
+                t0 = t1;
+                t1 = x;
+                neg1 = !neg1;
+            }
+            if (bitLength(r1) <= 127) {
+                break;
+            }
+            int sh = bitLength(r0) - bitLength(r1);
+            if (subShifted(tmp, r0, r1, sh)) {
+                sh--;
+                subShifted(tmp, r0, r1, sh);
+            }
+            int[] x = r0;
+            r0 = tmp;
+            tmp = x;
+            addShifted(t0, t1, sh);
+        }
+        // a lattice row with an odd t: (r1, t1) when t1 is odd, otherwise the
+        // shorter of (r0, t0) and their sum (r0 + r1, t1 + t0), whose t is
+        // |t1| - |t0| with t1's sign; t0 is odd whenever t1 is even, because the
+        // rows' determinant is 8L and (k, 1) is in the lattice
+        boolean tNeg;
+        int[] r;
+        int[] t;
+        if ((t1[0] & 1) != 0) {
+            r = r1;
+            t = t1;
+            tNeg = neg1;
+        } else {
+            int[] sr = new int[8];
+            System.arraycopy(r0, 0, sr, 0, 8);
+            addShifted(sr, r1, 0);
+            int[] st = new int[8];
+            boolean stNeg;
+            if (compare(t1, t0) >= 0) {
+                subShifted(st, t1, t0, 0);
+                stNeg = neg1;
+            } else {
+                subShifted(st, t0, t1, 0);
+                stNeg = !neg1;
+            }
+            if (Math.max(bitLength(sr), bitLength(st)) < Math.max(bitLength(r0), bitLength(t0))) {
+                r = sr;
+                t = st;
+                tNeg = stNeg;
+            } else {
+                r = r0;
+                t = t0;
+                tNeg = !neg1;
+            }
+        }
+        // v1 is made positive by negating the row
+        boolean vNeg = tNeg;
+        // a k whose lattice has a very short even row, such as L - 1 with its
+        // (8, 8), has no short odd one; (k, 1) is always a row, and only costs
+        // the full length. Any row of 252 bits or fewer is still faster, and
+        // its v1 is below L, so never a multiple of it.
+        if (Math.max(bitLength(r), bitLength(t)) > 252) {
+            toWords(r, k);
+            for (int i = 0; i < 8; i++) {
+                t[i] = 0;
+            }
+            t[0] = 1;
+            vNeg = false;
+        }
+        wordsToBytes(v0, r);
+        wordsToBytes(v1, t);
+        return vNeg;
+    }
+
+    // whether [s]B = R + [k]A, for public inputs, with a and r decoded
+    static boolean verifyHalf(byte[] k, byte[] s, P3 a, P3 rp) {
+        byte[] v0 = new byte[32];
+        byte[] v1 = new byte[32];
+        boolean v0Neg = reduceBasis(k, v0, v1);
+        byte[] u = mulAdd(v1, s, new byte[32]);
+        byte[] uLo = new byte[32];
+        byte[] uHi = new byte[32];
+        System.arraycopy(u, 0, uLo, 0, 16);
+        System.arraycopy(u, 16, uHi, 0, 16);
+        byte[] nA = wnaf(v0, 5);
+        byte[] nR = wnaf(v1, 5);
+        byte[] nLo = wnaf(uLo, WINDOW_B);
+        byte[] nHi = wnaf(uHi, WINDOW_B);
+        Ctx c = new Ctx();
+        Cached[] ta = oddMultiples(c, a);
+        Cached[] tr = oddMultiples(c, rp);
+        Precomp[] tLo = OddBase.ODD;
+        Precomp[] tHi = HighBase.ODD;
         int top = 256;
-        while (top >= 0 && nh[top] == 0 && nb[top] == 0) {
+        while (top >= 0 && nA[top] == 0 && nR[top] == 0 && nLo[top] == 0 && nHi[top] == 0) {
             top--;
         }
-        r.identity();
-        // every operation here reads its input completely before writing,
-        // so they run in place; T is computed only when an addition reads it
+        P3 q = new P3();
+        q.identity();
+        // the sum is u B - v1 R - v0 A: the A digits are subtracted when v0 is
+        // positive, the R digits always
+        int signA = v0Neg ? 1 : -1;
         for (int i = top; i >= 0; i--) {
-            int dh = nh[i];
-            int db = nb[i];
-            dbl(c, r, r, dh != 0 || db != 0);
-            if (dh != 0) {
-                c.needT = db != 0;
-                if (dh > 0) {
-                    sub(c, r, r, ta[dh >> 1]);
-                } else {
-                    add(c, r, r, ta[(-dh) >> 1]);
-                }
+            int dA = nA[i] * signA;
+            int dR = -nR[i];
+            int dLo = nLo[i];
+            int dHi = nHi[i];
+            int left = (dA != 0 ? 1 : 0) + (dR != 0 ? 1 : 0) + (dLo != 0 ? 1 : 0) + (dHi != 0 ? 1 : 0);
+            dbl(c, q, q, left != 0);
+            if (dA != 0) {
+                c.needT = --left != 0;
+                addCached(c, q, ta, dA);
             }
-            if (db != 0) {
-                c.needT = false;
-                if (db > 0) {
-                    madd(c, r, r, tb[db >> 1]);
-                } else {
-                    msub(c, r, r, tb[(-db) >> 1]);
-                }
+            if (dR != 0) {
+                c.needT = --left != 0;
+                addCached(c, q, tr, dR);
+            }
+            if (dLo != 0) {
+                c.needT = --left != 0;
+                addPrecomp(c, q, tLo, dLo);
+            }
+            if (dHi != 0) {
+                c.needT = --left != 0;
+                addPrecomp(c, q, tHi, dHi);
             }
             c.needT = true;
         }
-        // r.t is stale when the last step skipped it; encode() reads X, Y, Z
+        int[] yz = fe();
+        sub(yz, q.y, q.z);
+        return isZero(q.x) && isZero(yz);
+    }
+
+    // P, 3P, ..., 15P
+    private static Cached[] oddMultiples(Ctx c, P3 p) {
+        Cached[] t = new Cached[8];
+        P3 p2 = new P3();
+        dbl(c, p2, p);
+        Cached p2c = new Cached();
+        toCached(p2c, p2);
+        P3 run = p;
+        for (int i = 0; i < 8; i++) {
+            t[i] = new Cached();
+            toCached(t[i], run);
+            if (i < 7) {
+                P3 next = new P3();
+                add(c, next, run, p2c);
+                run = next;
+            }
+        }
+        return t;
+    }
+
+    private static void addCached(Ctx c, P3 q, Cached[] t, int d) {
+        if (d > 0) {
+            add(c, q, q, t[d >> 1]);
+        } else {
+            sub(c, q, q, t[(-d) >> 1]);
+        }
+    }
+
+    private static void addPrecomp(Ctx c, P3 q, Precomp[] t, int d) {
+        if (d > 0) {
+            madd(c, q, q, t[d >> 1]);
+        } else {
+            msub(c, q, q, t[(-d) >> 1]);
+        }
     }
 
     // ------------------------------------------------------------------

@@ -34,6 +34,8 @@ import java.util.List;
 /// every signer has signed.
 ///
 /// ```java
+/// String fromCoordinator = "cHNidP8B...";     // the PSBT a coordinator sent
+/// byte[] privateKey = SecureRandom.bytes(32);
 /// Psbt psbt = Psbt.fromBase64(fromCoordinator);
 /// psbt.sign(0, privateKey);           // any input this key can sign
 /// psbt.finalizeAll();

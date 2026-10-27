@@ -38,6 +38,10 @@ import java.util.Map;
 ///
 /// ```java
 /// EvmRpc rpc = new EvmRpc(new NetworkTransport(), "https://ethereum-sepolia-rpc.publicnode.com");
+/// Wallet wallet = Wallet.fromMnemonic(Mnemonic.generate(128), "");
+/// EvmAddress me = wallet.getEvmAddress(0, 0);
+/// EvmAddress to = EvmAddress.parse("0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed");
+/// UInt256 value = UInt256.parseUnits("0.01", 18);
 /// long nonce = rpc.getTransactionCount(me, "pending");
 /// UInt256[] fees = rpc.suggestFees();
 /// EvmTransaction tx = EvmTransaction.eip1559(rpc.chainId(), nonce, fees[0], fees[1], 21000, to, value, null);

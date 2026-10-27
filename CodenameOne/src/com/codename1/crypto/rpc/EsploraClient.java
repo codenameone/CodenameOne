@@ -36,8 +36,11 @@ import java.util.Map;
 ///
 /// ```java
 /// EsploraClient btc = new EsploraClient(new NetworkTransport(), EsploraClient.MEMPOOL_TESTNET);
+/// BitcoinAddress address = BitcoinAddress.parse("tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx",
+///         BitcoinNetwork.TESTNET);
 /// List<EsploraClient.Utxo> coins = btc.getUtxos(address);
 /// double satPerVbyte = btc.getFeeEstimates().get("6");
+/// BitcoinTransaction signed = new BitcoinTransaction();   // signed through a Psbt
 /// String txid = btc.broadcast(signed);
 /// ```
 @com.codename1.impl.SharedWithBackend

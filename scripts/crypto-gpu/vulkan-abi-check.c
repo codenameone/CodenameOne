@@ -31,6 +31,11 @@
 #include <stdint.h>
 #include <vulkan/vulkan_core.h>
 #include "cn1_crypto_gpu.h"
+/* the kernel numbers cn1_crypto_gpu_host.h defines, which the Vulkan host orders its pipelines by */
+#define CN1G_KERNEL_SHA256 0
+#define CN1G_KERNEL_KECCAK256 1
+#define CN1G_KERNEL_ECDSA 2
+#define CN1G_KERNEL_SCHNORR 3
 #define CN1G_KERNEL_ED25519 4
 #include "cn1_crypto_gpu_vulkan.h"
 

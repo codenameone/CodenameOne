@@ -75,8 +75,9 @@ public class CryptoWalletSnippets {
     }
 
     /** One address per chain, on the standard derivation paths. */
-    public String[] addresses(Wallet wallet) {
+    public String[] addresses() {
         // tag::crypto-addresses[]
+        Wallet wallet = Wallet.fromMnemonic(Mnemonic.generate(128), "");
         EvmAddress eth = wallet.getEvmAddress(0, 0);            // m/44'/60'/0'/0/0
         BitcoinAddress btc = wallet.getBitcoinAddress(BitcoinNetwork.MAINNET,
                 Wallet.BIP84, 0, 0, 0);                         // m/84'/0'/0'/0/0, bc1q...
@@ -88,8 +89,10 @@ public class CryptoWalletSnippets {
     }
 
     /** Sends ether: nonce, fees and gas from the node, signed on the device. */
-    public String sendEther(Wallet wallet, String recipient) throws IOException {
+    public String sendEther() throws IOException {
         // tag::crypto-evm-send[]
+        Wallet wallet = Wallet.fromMnemonic(Mnemonic.generate(128), "");
+        String recipient = "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed";
         EvmRpc rpc = new EvmRpc(new NetworkTransport(), "https://ethereum-sepolia-rpc.publicnode.com");
         DerivationPath path = Wallet.evmPath(0, 0);
         EvmAddress from = wallet.getEvmAddress(path);
@@ -108,8 +111,11 @@ public class CryptoWalletSnippets {
     }
 
     /** Spends one native SegWit coin through a PSBT. */
-    public String sendBitcoin(Wallet wallet, String recipient, long feeSats) throws IOException {
+    public String sendBitcoin() throws IOException {
         // tag::crypto-btc-send[]
+        Wallet wallet = Wallet.fromMnemonic(Mnemonic.generate(128), "");
+        String recipient = "tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx";
+        long feeSats = 1500;
         BitcoinNetwork net = BitcoinNetwork.TESTNET;
         EsploraClient esplora = new EsploraClient(new NetworkTransport(), EsploraClient.MEMPOOL_TESTNET);
         DerivationPath path = Wallet.bitcoinPath(net, Wallet.BIP84, 0, 0, 0);
@@ -131,8 +137,10 @@ public class CryptoWalletSnippets {
     }
 
     /** Sends SOL with a recent blockhash. */
-    public String sendSol(Wallet wallet, String recipient) throws IOException {
+    public String sendSol() throws IOException {
         // tag::crypto-sol-send[]
+        Wallet wallet = Wallet.fromMnemonic(Mnemonic.generate(128), "");
+        String recipient = "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM";
         SolanaRpc rpc = new SolanaRpc(new NetworkTransport(), SolanaRpc.DEVNET);
         SolanaAddress from = wallet.getSolanaAddress(0);
 
@@ -148,8 +156,9 @@ public class CryptoWalletSnippets {
     }
 
     /** A price, cached so a list of balances asks once. */
-    public double priced(UInt256 weiBalance) throws IOException {
+    public double priced() throws IOException {
         // tag::crypto-price[]
+        UInt256 weiBalance = UInt256.parseUnits("1.5", 18);
         PriceFeed prices = new CachingPriceFeed(new CoinGeckoFeed(new NetworkTransport()),
                 60000, 600000);                                 // fresh 1 min, usable 10 min
         Quote q = prices.getQuote("ETH", "USD");
@@ -159,8 +168,10 @@ public class CryptoWalletSnippets {
     }
 
     /** Keeps the recovery phrase in a vault instead of in memory. */
-    public Wallet fromVault(Vault vault, String words) {
+    public Wallet fromVault() {
         // tag::crypto-vault[]
+        Vault vault = Vault.named("wallet");
+        String words = Mnemonic.generate(256);
         // Once, when the wallet is created or restored:
         VaultSigner.store(vault, "main", words, "");
 
@@ -171,8 +182,12 @@ public class CryptoWalletSnippets {
     }
 
     /** Checks every signature of a block of deposits in one call. */
-    public int countValid(byte[][] hashes, Secp256k1.EcdsaSignature[] signatures, byte[][] publicKeys) {
+    public int countValid() {
         // tag::crypto-batch[]
+        // A block's deposits; filled from the transactions being scanned.
+        byte[][] hashes = new byte[0][];
+        Secp256k1.EcdsaSignature[] signatures = new Secp256k1.EcdsaSignature[0];
+        byte[][] publicKeys = new byte[0][];
         boolean[] valid = CryptoBatch.verifySecp256k1(hashes, signatures, publicKeys);
         int good = 0;
         for (boolean v : valid) {
@@ -185,9 +200,12 @@ public class CryptoWalletSnippets {
     }
 
     /** Scans a block without blocking the EDT, and shows the count when it is done. */
-    public void countValidAsync(byte[][] hashes, Secp256k1.EcdsaSignature[] signatures, byte[][] publicKeys,
-            final Label status) {
+    public void countValidAsync() {
         // tag::crypto-batch-async[]
+        byte[][] hashes = new byte[0][];
+        Secp256k1.EcdsaSignature[] signatures = new Secp256k1.EcdsaSignature[0];
+        byte[][] publicKeys = new byte[0][];
+        final Label status = new Label("Scanning...");
         CryptoBatch.verifySecp256k1Async(hashes, signatures, publicKeys, new CryptoBatch.Callback<boolean[]>() {
             public void done(boolean[] valid, Throwable error) {
                 // on the EDT: safe to update the UI
@@ -208,8 +226,9 @@ public class CryptoWalletSnippets {
     }
 
     /** The packed form: fixed-stride arrays, filled in place, one result byte per entry. */
-    public void verifyPacked(int count) {
+    public void verifyPacked() {
         // tag::crypto-batch-packed[]
+        int count = 1024;
         Simd simd = Simd.get();
         byte[] hashes = simd.allocByte(32 * count);
         byte[] signatures = simd.allocByte(64 * count);
