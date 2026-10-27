@@ -950,62 +950,15 @@ def main() -> None:
 
     pmd = parse_pmd()
     if pmd:
-        forbidden_pmd_rules = {
-            "UnparseableReport",
-            "ClassWithOnlyPrivateConstructorsShouldBeFinal",
-            "CompareObjectsWithEquals",
-            "FormalParameterNamingConventions",
-            "LiteralsFirstInComparisons",
-            "LocalVariableNamingConventions",
-            "MethodNamingConventions",
-            "OneDeclarationPerLine",
-            "MissingOverride",
-            "ControlStatementBraces",
-            "UnnecessaryFullyQualifiedName",
-            "UseCollectionIsEmpty",
-            "UnusedPrivateField",
-            "UnnecessaryLocalBeforeReturn",
-            "PreserveStackTrace",
-            "CloseResource",
-            "AssignmentInOperand",
-            "EmptyControlStatement",
-            "ForLoopCanBeForeach",
-            "UnusedFormalParameter",
-            "SwitchStmtsShouldHaveDefault",
-            "UnconditionalIfStatement",
-            "SimplifyConditional",
-            "UselessOverridingMethod",
-            "UselessQualifiedThis",
-            "AvoidBranchingStatementAsLastInLoop",
-            "AvoidUsingVolatile",
-            "DoNotCallGarbageCollectionExplicitly",
-            "SuspiciousEqualsMethodName",
-            "UseUtilityClass",
-            "EmptyCatchBlock",
-            "SimplifyBooleanReturns",
-            "UnusedLocalVariable",
-            "UnnecessaryConstructor",
-            "UnnecessaryImport",
-            "AvoidStringBufferField",
-            "LogicInversion",
-            "DefaultLabelNotLastInSwitchStmt",
-            "SingularField",
-            "InstantiationToGetClass",
-            "UnnecessaryModifier",
-            "FinalFieldCouldBeStatic",
-            "AvoidInstanceofChecksInCatchClause",
-            "AvoidUsingOctalValues",
-            "NonThreadSafeSingleton",
-            "ComparisonWithNaN",
-            "DontUseFloatTypeForLoopIndices",
-            "MissingStaticMethodInNonInstantiatableClass",
-            "OverrideBothEqualsAndHashcode",
-            "UnnecessarySemicolon"
-        }
-        violations = [f for f in pmd.findings if f.rule in forbidden_pmd_rules]
-        if violations:
-            print("\n❌ Build failed due to forbidden PMD violations:")
-            for v in violations:
+        # Zero findings, like SpotBugs: ANY rule fails the build. This used to
+        # be a list of forbidden rules, and a rule nobody had listed
+        # (AvoidUsingHardCodedIP) reached master while the report showed it
+        # in red. An intentional exception is a `//NOPMD <Rule> - <reason>`
+        # on the line, never a gap in this gate. UnparseableReport is a
+        # finding too, so a corrupt report also fails here.
+        if pmd.findings:
+            print("\n\u274c Build failed due to PMD findings (the gate is zero findings):")
+            for v in pmd.findings:
                 print(f"  - {v.rule}: {v.location} - {v.message}")
             sys.exit(1)
 

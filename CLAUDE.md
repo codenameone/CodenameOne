@@ -136,7 +136,10 @@ any of them cannot skip it.
   `maven/cil-translator/`, `maven/unity-compat/`), scoped to the
   class or method it applies to and with a comment explaining why. Keep the
   generated report at zero rather than tolerating known noise.
-- PMD and Checkstyle still gate on their own lists in the same script.
+- **PMD is a zero-findings gate too**, in the same script: any rule fails the
+  build. An intentional exception is a `//NOPMD <Rule> - <reason>` on the line.
+  It once gated a fixed list of rules, and an unlisted one reached master.
+- Checkstyle gates on errors in the same script.
 
 To reproduce the SpotBugs gate locally:
 
@@ -443,12 +446,11 @@ The backend is held to the client's gates:
 - `///` markdown comments only, no `package.html`
   (`validate-java25-markdown-docs.sh` covers `vm/backend/src` and `impl/`);
   `package-info.java` per package; no since markers.
-- SpotBugs (zero findings, `maven/backend/spotbugs-exclude.xml`), PMD (the core's
-  forbidden list) and Checkstyle (zero errors) run in `maven/backend`'s `verify`,
+- SpotBugs (zero findings, `maven/backend/spotbugs-exclude.xml`), PMD (zero findings) and Checkstyle (zero errors) run in `maven/backend`'s `verify`,
   using the core's own `pmd.xml` and `checkstyle.xml`. Only two of the three
   fail a local build: SpotBugs, and Checkstyle through its `check` execution
   (`checkstyle-zero-errors`). **PMD writes `maven/backend/target/pmd.xml` and
-  judges nothing** -- its forbidden list lives in
+  judges nothing** -- the zero-findings gate lives in
   `.github/scripts/generate-quality-report.py`, which PR CI runs afterwards. A
   green `mvn verify` therefore says nothing about PMD: read the report. Both
   reports once sat at seven and fifteen findings behind green local builds.
