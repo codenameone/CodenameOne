@@ -1,0 +1,17 @@
+False True (<class 'str'>,) (<class 'int'>,) <class 'str'> <class 'bytes'>
+[('a', 1), ('b', 2)] [1, 2] ['a', 'b']
+[0, 1, 2] [(1, 'a'), (2, 'b')] ['1', '2']
+6 [(1, 2), (None, 3)]
+True True True
+b'abc' abc bytes str
+abc abc b'abc' b'x' q
+TypeError not expecting type '<class 'int'>'
+TypeError not expecting type '<class 'NoneType'>'
+hi
+b'A' 65 66 [65, 66]
+meta:A Meta Base
+meta:B 1 Meta
+KeyError ('inner',)
+reraised boom
+True True True
+a-b
