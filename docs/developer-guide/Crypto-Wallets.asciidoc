@@ -165,7 +165,7 @@ The simulator, JavaSE desktop apps and the backend in development run the portab
 | secp256k1 public key | 30,583 | 17,391 | 1.76x
 | ECDSA sign | 24,109 | 16,220 | 1.49x
 | ECDSA verify | 14,252 | 12,748 | 1.12x
-| Schnorr sign | 15,297 | 16,051 | 0.95x
+| Schnorr sign, with a `KeyPair` | 15,297 | 16,051 | 0.95x
 | Schnorr verify | 14,299 | 12,816 | 1.12x
 | Ed25519 sign | 49,360 | 45,707 | 1.08x
 | Ed25519 verify | 17,293 | 16,865 | 1.03x
@@ -191,7 +191,7 @@ On iOS, macOS, Windows, Linux and the production backend the same operations run
 | secp256k1 public key | 95,819 | 93,050 | 1.03x
 | ECDSA sign | 60,770 | 59,453 | 1.02x
 | ECDSA verify | 50,857 | 50,302 | 1.01x
-| Schnorr sign | 46,180 | 44,659 | 1.03x
+| Schnorr sign, one call against `keypair_create` and sign | 46,180 | 44,659 | 1.03x
 | Schnorr verify | 48,394 | 47,835 | 1.01x
 | Ed25519 sign | 105,161 | 43,155 | 2.44x
 | Ed25519 verify | 39,129 | 17,521 | 2.23x

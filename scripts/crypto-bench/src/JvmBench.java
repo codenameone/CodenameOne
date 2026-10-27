@@ -211,10 +211,14 @@ public final class JvmBench {
         jdkEd25519(seed, edPub, msg, edSig);
 
         // BouncyCastle has no BIP-340; the reference is BC's ECDSA on the same curve,
-        // which costs about the same multiplications
+        // which costs about the same multiplications. BC signs with a key whose
+        // parameters are prepared once, so the core signs through a KeyPair,
+        // which derives the public key once; Schnorr.sign(msg, priv, aux) derives
+        // it on every call and costs one more multiplication
         final byte[] xonly = Schnorr.publicKey(priv);
         final byte[] schSig = Schnorr.sign(msg, priv, null);
-        row("schnorr.sign", i -> Schnorr.sign(msg, priv, null), i -> {
+        final Schnorr.KeyPair schKeys = new Schnorr.KeyPair(priv);
+        row("schnorr.sign", i -> schKeys.sign(msg, null), i -> {
             ECDSASigner sg = new ECDSASigner(new HMacDSAKCalculator(new SHA256Digest()));
             sg.init(true, bPriv); sg.generateSignature(hash); });
         row("schnorr.verify", i -> Schnorr.verify(msg, schSig, xonly), i -> {

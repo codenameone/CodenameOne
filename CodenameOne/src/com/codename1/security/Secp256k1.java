@@ -713,13 +713,37 @@ public final class Secp256k1 {
         if (fast != null) {
             return fast;
         }
+        byte[] px = new byte[32];
+        int[] d = schnorrScalar(privateKey, px);
+        try {
+            return schnorrSignPrepared(message, d, px, auxRand);
+        } finally {
+            wipe(d);
+        }
+    }
+
+    // d with the sign BIP-340 signs with, negated when d G has an odd y, and
+    // the x-only key of d G into px. The caller wipes d
+    static int[] schnorrScalar(byte[] privateKey, byte[] px) {
         int[] d = privateScalar(privateKey);
         int[][] p = mulGen(d);
         if ((p[1][0] & 1) != 0) {
             FN.sub(ZERO, d, d);
         }
-        byte[] px = new byte[32];
         Secp256k1Math.toBytes(p[0], px, 0);
+        return d;
+    }
+
+    // signs with a scalar from schnorrScalar and the x-only key of that same
+    // scalar; d is left for the caller to wipe. A px that is not d's own key
+    // leaks d (BIP-340, "public key"), so only code that derived both reaches here
+    static byte[] schnorrSignPrepared(byte[] message, int[] d, byte[] px, byte[] auxRand) {
+        if (message == null) {
+            throw new CryptoException("message must not be null");
+        }
+        if (auxRand != null) {
+            checkLength(auxRand, 32, "auxiliary randomness");
+        }
         byte[] dBytes = new byte[32];
         toBytes(d, dBytes, 0);
         byte[] t = taggedHash(TAG_AUX, auxRand == null ? new byte[32] : auxRand, null, null);
@@ -750,7 +774,6 @@ public final class Secp256k1 {
             return sig;
         } finally {
             wipe(k);
-            wipe(d);
         }
     }
 

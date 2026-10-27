@@ -53,6 +53,29 @@ class SchnorrTest {
     };
 
     @Test
+    void aKeyPairSignsAsTheOneShotCallDoes() {
+        java.util.Random rnd = new java.util.Random(3);
+        for (int i = 0; i < 64; i++) {
+            byte[] priv = new byte[32];
+            byte[] msg = new byte[32];
+            byte[] aux = new byte[32];
+            rnd.nextBytes(priv);
+            priv[0] &= 0x7f;
+            priv[31] |= 1;
+            rnd.nextBytes(msg);
+            rnd.nextBytes(aux);
+            Schnorr.KeyPair keys = new Schnorr.KeyPair(priv);
+            assertArrayEquals(Schnorr.publicKey(priv), keys.getPublicKey());
+            assertArrayEquals(Schnorr.sign(msg, priv, aux), keys.sign(msg, aux));
+            assertArrayEquals(Schnorr.sign(msg, priv, null), keys.sign(msg, null));
+            // signing twice must leave the held scalar intact
+            assertArrayEquals(Schnorr.sign(msg, priv, aux), keys.sign(msg, aux));
+            keys.destroy();
+            assertThrows(CryptoException.class, () -> keys.sign(msg, aux));
+        }
+    }
+
+    @Test
     void everyStandardVector() {
         for (String[] v : VECTORS) {
             String at = "vector " + v[0];
