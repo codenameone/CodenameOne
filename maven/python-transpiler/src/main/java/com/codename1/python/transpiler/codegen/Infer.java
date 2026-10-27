@@ -96,11 +96,11 @@ final class Infer {
     final Map<Call, Ty> siteRet = new HashMap<Call, Ty>();
     /// Globals bound once, by `import math`: calls of its functions on
     /// numbers are typed (see `MATH_FNS`) and run as `PyMath` directly.
-    final java.util.Set<String> mathNames = new HashSet<String>();
+    final Set<String> mathNames = new HashSet<String>();
     /// `math` functions typed code calls, with their arity.
     static final Map<String, Integer> MATH_FNS = new HashMap<String, Integer>();
     /// `math` constants, all floats.
-    static final java.util.Set<String> MATH_CONSTS = new HashSet<String>();
+    static final Set<String> MATH_CONSTS = new HashSet<String>();
 
     static {
         String[] unary = {"sqrt", "sin", "cos", "tan", "asin", "acos", "atan", "exp", "fabs", "log", "log10"};
