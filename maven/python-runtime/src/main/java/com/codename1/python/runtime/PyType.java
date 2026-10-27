@@ -566,8 +566,7 @@ public final class PyType extends PyObject {
             return Py.obj(f).call(new Object[] {this, key}, Py.NO_KW);
         }
         if (factory != null) {
-            // `list[int]`: a generic alias, which is the type itself here.
-            return this;
+            return new PyGenericAlias(this, key);
         }
         throw Py.typeError("type '" + name + "' is not subscriptable");
     }
@@ -915,8 +914,12 @@ public final class PyType extends PyObject {
 
     @Override
     public Object or(Object o) {
-        // `int | None` in annotations evaluates to a union; keep it inert.
-        return new PyTuple(new Object[] {this, o});
+        return PyUnion.of(this, o);
+    }
+
+    @Override
+    public Object ror(Object o) {
+        return PyUnion.of(o, this);
     }
 
     private static PyType[] computeMro(PyType self, PyType[] bases) {

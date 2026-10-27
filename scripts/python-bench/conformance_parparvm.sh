@@ -10,7 +10,11 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
 CONF="$REPO/maven/python-transpiler/src/test/resources/conformance"
 progs="$*"
-[ -n "$progs" ] || progs=$(cd "$CONF" && ls *.py | sed 's/\.py$//')
+# http_* programs talk to ConformanceTest's server through the host's HTTP
+# client, which a bare native executable has none of (ConnectionRequest
+# needs the UI port): they run on the JVM only. The packages they test are
+# Python, so this binary runs the same code paths everywhere but the socket.
+[ -n "$progs" ] || progs=$(cd "$CONF" && ls *.py | sed 's/\.py$//' | grep -v '^http_')
 failed=0
 for p in $progs; do
     if ! PY_SOURCES="$CONF" "$HERE/build_parparvm.sh" "$p" > /dev/null 2>&1; then

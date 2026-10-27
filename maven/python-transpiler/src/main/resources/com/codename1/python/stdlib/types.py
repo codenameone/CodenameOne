@@ -41,8 +41,8 @@ BuiltinMethodType = type([].append)
 NoneType = type(None)
 NotImplementedType = type(NotImplemented)
 EllipsisType = type(...)
-GenericAlias = None
-UnionType = None
+GenericAlias = type(list[int])
+UnionType = type(int | str)
 
 
 class SimpleNamespace:

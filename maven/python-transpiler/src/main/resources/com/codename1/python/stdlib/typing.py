@@ -35,6 +35,8 @@ class _SpecialForm(_Final):
         self._getitem = getitem
 
     def __repr__(self):
+        if self._name == "Union":
+            return "<class 'typing.Union'>"
         return "typing." + self._name
 
     def __getitem__(self, params):
@@ -139,6 +141,13 @@ def _union(form, params):
                 flat.append(i)
     if len(flat) == 1:
         return flat[0]
+    if all(isinstance(i, (type, _RuntimeAlias)) for i in flat):
+        # Plain types make the runtime's own union, the object `int | None`
+        # evaluates to, so both spellings compare equal and answer isinstance.
+        result = flat[0]
+        for i in flat[1:]:
+            result = result | i
+        return result
     return _UnionGenericAlias(Union, tuple(flat), "Union")
 
 
@@ -483,7 +492,15 @@ def dataclass_transform(*, eq_default=True, order_default=False, kw_only_default
     return decorator
 
 
+_RuntimeUnion = type(int | str)
+_RuntimeAlias = type(list[int])
+
+
 def get_origin(tp):
+    if isinstance(tp, _RuntimeUnion):
+        return Union
+    if isinstance(tp, _RuntimeAlias):
+        return tp.__origin__
     if isinstance(tp, _AnnotatedAlias):
         return Annotated
     if isinstance(tp, (_GenericAlias, _SpecialGenericAlias)):
@@ -494,6 +511,8 @@ def get_origin(tp):
 
 
 def get_args(tp):
+    if isinstance(tp, (_RuntimeUnion, _RuntimeAlias)):
+        return tp.__args__
     if isinstance(tp, _AnnotatedAlias):
         return (tp.__origin__,) + tp.__metadata__
     if isinstance(tp, _CallableGenericAlias):
@@ -506,13 +525,112 @@ def get_args(tp):
     return ()
 
 
+class _HintParser:
+    """Evaluates a string annotation without eval: names, dotted names,
+    `X[...]`, `|`, `None`, `...` and string literals, which is the grammar
+    annotations are written in."""
+
+    def __init__(self, text, ns):
+        self.text = text
+        self.pos = 0
+        self.ns = ns
+
+    def _ws(self):
+        while self.pos < len(self.text) and self.text[self.pos] == " ":
+            self.pos += 1
+
+    def _peek(self):
+        self._ws()
+        return self.text[self.pos] if self.pos < len(self.text) else ""
+
+    def parse(self):
+        value = self._union()
+        if self._peek():
+            raise NameError("cannot evaluate annotation " + repr(self.text))
+        return value
+
+    def _union(self):
+        value = self._primary()
+        while self._peek() == "|":
+            self.pos += 1
+            value = Union[value, self._primary()]
+        return value
+
+    def _primary(self):
+        c = self._peek()
+        if c in ("'", '"'):
+            end = self.text.index(c, self.pos + 1)
+            inner = self.text[self.pos + 1:end]
+            self.pos = end + 1
+            return _HintParser(inner, self.ns).parse()
+        if self.text.startswith("...", self.pos):
+            self.pos += 3
+            return ...
+        if c == "[":
+            self.pos += 1
+            items = self._items("]")
+            return items
+        start = self.pos
+        while self.pos < len(self.text) and (self.text[self.pos].isalnum() or self.text[self.pos] in "_."):
+            self.pos += 1
+        name = self.text[start:self.pos]
+        if not name:
+            raise NameError("cannot evaluate annotation " + repr(self.text))
+        value = self._lookup(name)
+        while self._peek() == "[":
+            self.pos += 1
+            items = self._items("]")
+            value = value[items[0] if len(items) == 1 else tuple(items)]
+        return value
+
+    def _items(self, close):
+        items = []
+        while self._peek() != close:
+            items.append(self._union())
+            if self._peek() == ",":
+                self.pos += 1
+        self.pos += 1
+        return items
+
+    def _lookup(self, name):
+        parts = name.split(".")
+        if parts[0] == "None":
+            return None
+        if parts[0] in self.ns:
+            value = self.ns[parts[0]]
+        else:
+            import builtins
+            if not hasattr(builtins, parts[0]):
+                raise NameError("name '" + parts[0] + "' is not defined")
+            value = getattr(builtins, parts[0])
+        for p in parts[1:]:
+            value = getattr(value, p)
+        return value
+
+
+def _resolve_hint(value, ns):
+    if isinstance(value, str):
+        return _HintParser(value, ns).parse()
+    return value
+
+
 def get_type_hints(obj, globalns=None, localns=None, include_extras=False):
+    import sys
     hints = {}
     if isinstance(obj, type):
         for base in reversed(obj.__mro__):
-            hints.update(base.__dict__.get("__annotations__", {}))
+            ns = dict(globalns) if globalns is not None else dict(getattr(sys.modules.get(base.__module__), "__dict__", {}))
+            ns.setdefault(base.__name__, base)
+            if localns:
+                ns.update(localns)
+            for k, v in base.__dict__.get("__annotations__", {}).items():
+                hints[k] = _resolve_hint(v, ns)
     else:
-        hints.update(getattr(obj, "__annotations__", {}))
+        ns = dict(globalns) if globalns is not None else dict(getattr(obj, "__globals__", {}))
+        if localns:
+            ns.update(localns)
+        for k, v in getattr(obj, "__annotations__", {}).items():
+            hints[k] = _resolve_hint(v, ns)
     if not include_extras:
         for k, v in list(hints.items()):
             if isinstance(v, _AnnotatedAlias):
