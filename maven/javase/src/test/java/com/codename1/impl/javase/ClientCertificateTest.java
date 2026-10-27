@@ -99,7 +99,8 @@ class ClientCertificateTest {
         });
         accept.start();
 
-        SSLSocket client = (SSLSocket) TrustModifier.clientCertificateFactory(pem, "EC", key.getEncoded(), true)
+        SSLSocket client = (SSLSocket) TrustModifier.clientCertificateFactory(pem, "EC", key.getEncoded(),
+                serverTrust.getTrustManagers())
                 .createSocket("127.0.0.1", server.getLocalPort());
         try {
             client.startHandshake();

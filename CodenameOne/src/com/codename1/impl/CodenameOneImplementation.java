@@ -10597,7 +10597,7 @@ public abstract class CodenameOneImplementation {
 
     }
 
-    /// True when [#setClientCertificate(Object, String, String, byte[], boolean)]
+    /// True when [#setClientCertificate(Object, String, String, byte[])]
     /// is implemented.
     public boolean isClientCertificateSupported() {
         return false;
@@ -10615,11 +10615,10 @@ public abstract class CodenameOneImplementation {
     ///
     /// - `privateKeyPkcs8`: the private key, PKCS#8 DER
     ///
-    /// - `insecure`: the request also asked not to check the server, see
-    ///   [#setInsecure(Object, boolean)]; a port that replaces the socket factory
-    ///   for the certificate has to keep that choice
+    /// The server is always verified: `ConnectionRequest` refuses a client
+    /// certificate on an insecure request before this is called.
     public void setClientCertificate(Object connection, String certificateChainPem, String keyAlgorithm,
-            byte[] privateKeyPkcs8, boolean insecure) {
+            byte[] privateKeyPkcs8) {
         throw new IllegalStateException("This platform cannot present a client certificate");
     }
 

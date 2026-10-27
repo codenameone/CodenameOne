@@ -3138,7 +3138,7 @@ public class LinuxImplementation extends CodenameOneImplementation {
     /// libcurl takes the key as PEM, so the PKCS#8 bytes are wrapped here.
     @Override
     public void setClientCertificate(Object connection, String certificateChainPem, String keyAlgorithm,
-            byte[] privateKeyPkcs8, boolean insecure) {
+            byte[] privateKeyPkcs8) {
         String body = java.util.Base64.getEncoder().encodeToString(privateKeyPkcs8);
         StringBuilder pem = new StringBuilder("-----BEGIN PRIVATE KEY-----\n");
         for (int i = 0; i < body.length(); i += 64) {

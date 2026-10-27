@@ -52,6 +52,13 @@ MAX_PEAK_MB = 32.0
 MIN_RUNS = 2
 
 
+def warm_start(rows, runtime):
+    """The median start of the warm runs after the first round, as server_medians skips it."""
+    starts = [charts.number(fields[2]) for fields in rows if fields[0] == runtime][2:]
+    modes = [fields[1] for fields in rows if fields[0] == runtime][2:]
+    return charts.median([v for v, mode in zip(starts, modes) if mode == "warm"])
+
+
 def main():
     if len(sys.argv) < 3:
         print(__doc__)
@@ -87,9 +94,14 @@ def main():
         ceiling = rust[PEAK_P99] * MAX_P99_VS_RUST + P99_ALLOWANCE_MS
         check("peak p99 (Rust {:.2f} ms)".format(rust[PEAK_P99]), cn1[PEAK_P99], ceiling,
               cn1[PEAK_P99] <= ceiling, " ms")
-        ceiling = rust[START] * MAX_START_VS_RUST + START_ALLOWANCE_MS
-        check("start (Rust {:.0f} ms)".format(rust[START]), cn1[START], ceiling,
-              cn1[START] <= ceiling, " ms")
+        # Warm starts only. A cold start follows a page-cache drop and measures the
+        # runner's disk: Rust's swung from 36 to 192 ms within one job. The median
+        # of two cold and two warm runs is then the mean of one of each, and moved
+        # between 33 and 71 ms with no change to the server.
+        cn1_warm, rust_warm = warm_start(rows, "codenameone"), warm_start(rows, "rust")
+        ceiling = rust_warm * MAX_START_VS_RUST + START_ALLOWANCE_MS
+        check("warm start (Rust {:.0f} ms)".format(rust_warm), cn1_warm, ceiling,
+              cn1_warm <= ceiling, " ms")
         ceiling = rust[STEADY_CPU] * MAX_STEADY_CPU_VS_RUST + STEADY_CPU_ALLOWANCE
         check("steady CPU % (Rust {:.1f})".format(rust[STEADY_CPU]), cn1[STEADY_CPU], ceiling,
               cn1[STEADY_CPU] <= ceiling)

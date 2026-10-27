@@ -714,7 +714,9 @@ public class ConnectionRequest implements IOProgressListener {
     ///
     /// - `IllegalStateException`: when the platform cannot present one, see
     ///   [#isClientCertificateSupported()]; sending the request without it would
-    ///   only fail later and less clearly
+    ///   only fail later and less clearly. Sending a request that also has
+    ///   [#setInsecure(boolean)] on fails the same way: the server is always
+    ///   verified before the device proves who it is
     public void setClientCertificate(String certificateChainPem, com.codename1.security.PrivateKey key) {
         if (certificateChainPem == null) {
             clientCertificateChain = null;
@@ -1299,8 +1301,14 @@ public class ConnectionRequest implements IOProgressListener {
             impl.setInsecure(connection, insecure);
         }
         if (clientCertificateChain != null) {
+            if (insecure) {
+                // Mutual TLS proves who the device is to a server it has verified;
+                // with the server unchecked, anyone can collect the device's proof.
+                throw new IllegalStateException("A client certificate cannot be sent on an insecure request; "
+                        + "trust the server's certificate authority instead");
+            }
             impl.setClientCertificate(connection, clientCertificateChain, clientCertificateKey.getAlgorithm(),
-                    clientCertificateKey.getEncoded(), insecure);
+                    clientCertificateKey.getEncoded());
         }
         impl.setConnectionId(connection, id);
 

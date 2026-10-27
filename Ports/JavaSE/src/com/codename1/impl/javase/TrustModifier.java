@@ -69,11 +69,12 @@ class TrustModifier {
         }
     }
 
-    /// A socket factory that presents `chainPem` with its private key, and
-    /// checks the server as the default context does unless `insecure` asked
-    /// for the same trust-everything manager as relaxHostChecking.
+    /// A socket factory that presents `chainPem` with its private key. The server
+    /// is checked by `trust`, or by the platform's default trust store when it
+    /// is null; there is deliberately no trust-everything variant, so an
+    /// insecure request cannot also carry a client certificate.
     static SSLSocketFactory clientCertificateFactory(String chainPem, String keyAlgorithm, byte[] pkcs8,
-            boolean insecure) throws java.io.IOException, java.security.GeneralSecurityException {
+            TrustManager[] trust) throws java.io.IOException, java.security.GeneralSecurityException {
         java.util.Collection<? extends java.security.cert.Certificate> certificates =
                 java.security.cert.CertificateFactory.getInstance("X.509").generateCertificates(
                         new java.io.ByteArrayInputStream(chainPem.getBytes("US-ASCII")));
@@ -89,7 +90,7 @@ class TrustModifier {
                 javax.net.ssl.KeyManagerFactory.getDefaultAlgorithm());
         keys.init(store, password);
         SSLContext ctx = SSLContext.getInstance("TLS");
-        ctx.init(keys.getKeyManagers(), insecure ? new TrustManager[]{new AlwaysTrustManager()} : null, null);
+        ctx.init(keys.getKeyManagers(), trust, null);
         return ctx.getSocketFactory();
     }
 

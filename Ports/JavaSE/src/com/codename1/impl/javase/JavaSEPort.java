@@ -17789,11 +17789,11 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public void setClientCertificate(Object connection, String certificateChainPem, String keyAlgorithm,
-            byte[] privateKeyPkcs8, boolean insecure) {
+            byte[] privateKeyPkcs8) {
         if (connection instanceof HttpsURLConnection) {
             try {
                 ((HttpsURLConnection) connection).setSSLSocketFactory(TrustModifier.clientCertificateFactory(
-                        certificateChainPem, keyAlgorithm, privateKeyPkcs8, insecure));
+                        certificateChainPem, keyAlgorithm, privateKeyPkcs8, null));
             } catch (Exception ex) {
                 throw new IllegalStateException("Cannot use the client certificate: " + ex, ex);
             }
