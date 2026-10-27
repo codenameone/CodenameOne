@@ -28,7 +28,7 @@ package com.codename1.unitycompat.system.collections.generic;
 /// this interface and a key through its own, and both are one `Object`
 /// once erased, so a call meant for the pair would be answered about the
 /// key; left out, such a call is named when the project is built.
-@SuppressWarnings("PMD.MethodNamingConventions") // C# member names: translated code binds to them by name
+@SuppressWarnings({"PMD.MethodNamingConventions", "PMD.ClassNamingConventions"}) // C# member and type names: translated code binds to them by name
 public interface ICollection_1 extends IEnumerable_1 {
     int get_Count();
 
