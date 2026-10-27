@@ -102,6 +102,17 @@ final class Secp256k1Math {
         }
     }
 
+    // On x86 HotSpot the schoolbook product's 100 multiplications are bound by
+    // the one 64-bit multiplier and by register spills, while arm64 keeps them
+    // all live; Ed25519Math chooses its field product the same way.
+    private static final boolean KARATSUBA = isX86();
+
+    private static boolean isX86() {
+        String arch = System.getProperty("os.arch");
+        return "amd64".equals(arch) || "x86_64".equals(arch) || "x86".equals(arch)
+                || "i386".equals(arch) || "i686".equals(arch);
+    }
+
     /// r = a * b, magnitude 1. r may alias a or b.
     ///
     /// The 19 product columns (each below 2^63) reduce in place: column
@@ -132,25 +143,91 @@ final class Secp256k1Math {
         long b7 = b[7];
         long b8 = b[8];
         long b9 = b[9];
-        long c0 = a0 * b0;
-        long c1 = a0 * b1 + a1 * b0;
-        long c2 = a0 * b2 + a1 * b1 + a2 * b0;
-        long c3 = a0 * b3 + a1 * b2 + a2 * b1 + a3 * b0;
-        long c4 = a0 * b4 + a1 * b3 + a2 * b2 + a3 * b1 + a4 * b0;
-        long c5 = a0 * b5 + a1 * b4 + a2 * b3 + a3 * b2 + a4 * b1 + a5 * b0;
-        long c6 = a0 * b6 + a1 * b5 + a2 * b4 + a3 * b3 + a4 * b2 + a5 * b1 + a6 * b0;
-        long c7 = a0 * b7 + a1 * b6 + a2 * b5 + a3 * b4 + a4 * b3 + a5 * b2 + a6 * b1 + a7 * b0;
-        long c8 = a0 * b8 + a1 * b7 + a2 * b6 + a3 * b5 + a4 * b4 + a5 * b3 + a6 * b2 + a7 * b1 + a8 * b0;
-        long c9 = a0 * b9 + a1 * b8 + a2 * b7 + a3 * b6 + a4 * b5 + a5 * b4 + a6 * b3 + a7 * b2 + a8 * b1 + a9 * b0;
-        long c10 = a1 * b9 + a2 * b8 + a3 * b7 + a4 * b6 + a5 * b5 + a6 * b4 + a7 * b3 + a8 * b2 + a9 * b1;
-        long c11 = a2 * b9 + a3 * b8 + a4 * b7 + a5 * b6 + a6 * b5 + a7 * b4 + a8 * b3 + a9 * b2;
-        long c12 = a3 * b9 + a4 * b8 + a5 * b7 + a6 * b6 + a7 * b5 + a8 * b4 + a9 * b3;
-        long c13 = a4 * b9 + a5 * b8 + a6 * b7 + a7 * b6 + a8 * b5 + a9 * b4;
-        long c14 = a5 * b9 + a6 * b8 + a7 * b7 + a8 * b6 + a9 * b5;
-        long c15 = a6 * b9 + a7 * b8 + a8 * b7 + a9 * b6;
-        long c16 = a7 * b9 + a8 * b8 + a9 * b7;
-        long c17 = a8 * b9 + a9 * b8;
-        long c18 = a9 * b9;
+        long c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15, c16, c17, c18;
+        if (KARATSUBA) {
+            // 2^130 splits the limbs into halves of five, so a * b = L + (L + U - D) 2^130 + U 2^260
+            // with D = (a_lo - a_hi)(b_lo - b_hi): 75 products for 100. Limbs are never negative,
+            // so a difference of two is no larger than the larger of them and every product keeps
+            // the schoolbook bound. Each column's true value is the schoolbook column's, below
+            // 2^63; L + U - D may wrap on the way there and comes back exactly, as two's
+            // complement arithmetic does.
+            long da0 = a0 - a5;
+            long db0 = b0 - b5;
+            long da1 = a1 - a6;
+            long db1 = b1 - b6;
+            long da2 = a2 - a7;
+            long db2 = b2 - b7;
+            long da3 = a3 - a8;
+            long db3 = b3 - b8;
+            long da4 = a4 - a9;
+            long db4 = b4 - b9;
+            long l0 = a0 * b0;
+            long l1 = a0 * b1 + a1 * b0;
+            long l2 = a0 * b2 + a1 * b1 + a2 * b0;
+            long l3 = a0 * b3 + a1 * b2 + a2 * b1 + a3 * b0;
+            long l4 = a0 * b4 + a1 * b3 + a2 * b2 + a3 * b1 + a4 * b0;
+            long l5 = a1 * b4 + a2 * b3 + a3 * b2 + a4 * b1;
+            long l6 = a2 * b4 + a3 * b3 + a4 * b2;
+            long l7 = a3 * b4 + a4 * b3;
+            long l8 = a4 * b4;
+            long u0 = a5 * b5;
+            long u1 = a5 * b6 + a6 * b5;
+            long u2 = a5 * b7 + a6 * b6 + a7 * b5;
+            long u3 = a5 * b8 + a6 * b7 + a7 * b6 + a8 * b5;
+            long u4 = a5 * b9 + a6 * b8 + a7 * b7 + a8 * b6 + a9 * b5;
+            long u5 = a6 * b9 + a7 * b8 + a8 * b7 + a9 * b6;
+            long u6 = a7 * b9 + a8 * b8 + a9 * b7;
+            long u7 = a8 * b9 + a9 * b8;
+            long u8 = a9 * b9;
+            long d0 = da0 * db0;
+            long d1 = da0 * db1 + da1 * db0;
+            long d2 = da0 * db2 + da1 * db1 + da2 * db0;
+            long d3 = da0 * db3 + da1 * db2 + da2 * db1 + da3 * db0;
+            long d4 = da0 * db4 + da1 * db3 + da2 * db2 + da3 * db1 + da4 * db0;
+            long d5 = da1 * db4 + da2 * db3 + da3 * db2 + da4 * db1;
+            long d6 = da2 * db4 + da3 * db3 + da4 * db2;
+            long d7 = da3 * db4 + da4 * db3;
+            long d8 = da4 * db4;
+            c0 = l0;
+            c1 = l1;
+            c2 = l2;
+            c3 = l3;
+            c4 = l4;
+            c5 = l5 + l0 + u0 - d0;
+            c6 = l6 + l1 + u1 - d1;
+            c7 = l7 + l2 + u2 - d2;
+            c8 = l8 + l3 + u3 - d3;
+            c9 = l4 + u4 - d4;
+            c10 = l5 + u5 - d5 + u0;
+            c11 = l6 + u6 - d6 + u1;
+            c12 = l7 + u7 - d7 + u2;
+            c13 = l8 + u8 - d8 + u3;
+            c14 = u4;
+            c15 = u5;
+            c16 = u6;
+            c17 = u7;
+            c18 = u8;
+        } else {
+            c0 = a0 * b0;
+            c1 = a0 * b1 + a1 * b0;
+            c2 = a0 * b2 + a1 * b1 + a2 * b0;
+            c3 = a0 * b3 + a1 * b2 + a2 * b1 + a3 * b0;
+            c4 = a0 * b4 + a1 * b3 + a2 * b2 + a3 * b1 + a4 * b0;
+            c5 = a0 * b5 + a1 * b4 + a2 * b3 + a3 * b2 + a4 * b1 + a5 * b0;
+            c6 = a0 * b6 + a1 * b5 + a2 * b4 + a3 * b3 + a4 * b2 + a5 * b1 + a6 * b0;
+            c7 = a0 * b7 + a1 * b6 + a2 * b5 + a3 * b4 + a4 * b3 + a5 * b2 + a6 * b1 + a7 * b0;
+            c8 = a0 * b8 + a1 * b7 + a2 * b6 + a3 * b5 + a4 * b4 + a5 * b3 + a6 * b2 + a7 * b1 + a8 * b0;
+            c9 = a0 * b9 + a1 * b8 + a2 * b7 + a3 * b6 + a4 * b5 + a5 * b4 + a6 * b3 + a7 * b2 + a8 * b1 + a9 * b0;
+            c10 = a1 * b9 + a2 * b8 + a3 * b7 + a4 * b6 + a5 * b5 + a6 * b4 + a7 * b3 + a8 * b2 + a9 * b1;
+            c11 = a2 * b9 + a3 * b8 + a4 * b7 + a5 * b6 + a6 * b5 + a7 * b4 + a8 * b3 + a9 * b2;
+            c12 = a3 * b9 + a4 * b8 + a5 * b7 + a6 * b6 + a7 * b5 + a8 * b4 + a9 * b3;
+            c13 = a4 * b9 + a5 * b8 + a6 * b7 + a7 * b6 + a8 * b5 + a9 * b4;
+            c14 = a5 * b9 + a6 * b8 + a7 * b7 + a8 * b6 + a9 * b5;
+            c15 = a6 * b9 + a7 * b8 + a8 * b7 + a9 * b6;
+            c16 = a7 * b9 + a8 * b8 + a9 * b7;
+            c17 = a8 * b9 + a9 * b8;
+            c18 = a9 * b9;
+        }
         c11 += c10 >> 26;
         c10 &= M26;
         c12 += c11 >> 26;
