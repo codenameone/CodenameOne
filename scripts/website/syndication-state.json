@@ -3032,6 +3032,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-10-27T01:01:07+00:00"
+      },
+      "devto": {
+        "id": 4930304,
+        "url": "https://dev.to/codenameone/give-your-desktop-app-a-useful-title-bar-and-real-tools-199h",
+        "syndicated_at": "2026-10-27T19:01:49+00:00"
       }
     }
   }
