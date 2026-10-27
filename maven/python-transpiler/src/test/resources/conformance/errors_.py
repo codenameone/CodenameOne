@@ -179,3 +179,16 @@ show(lambda: frozenset([1]).add)
 for args in [(), (None,), (3,), ("bye",), (1, 2)]:
     e = SystemExit(*args)
     print("SystemExit", args, repr(e.code))
+
+
+# A subclass whose __init__ takes keywords: BaseException.__new__ ignores them.
+class KwError(IOError):
+    def __init__(self, *args, response=None):
+        super().__init__(*args)
+        self.response = response
+
+
+try:
+    raise KwError("msg", 2, response=3)
+except OSError as e:
+    print(type(e).__name__, e.args, e.response)

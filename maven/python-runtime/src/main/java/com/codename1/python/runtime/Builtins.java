@@ -336,7 +336,14 @@ public final class Builtins {
             }
             return Py.NONE;
         }));
-        b.define("__new__", new PyStaticMethod(PyBuiltin.positional("__new__", a -> {
+        // Keyword arguments are accepted and ignored, as CPython's are: they
+        // are for a subclass's __init__, and args holds the positional ones.
+        b.define("__new__", new PyStaticMethod(new PyBuiltin("__new__", (all, kw) -> {
+            Object[] a = all;
+            if (kw.length > 0) {
+                a = new Object[all.length - kw.length];
+                System.arraycopy(all, 0, a, 0, a.length);
+            }
             if (a.length == 0 || !(a[0] instanceof PyType)) {
                 throw Py.notATypeObject("BaseException", a);
             }

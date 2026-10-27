@@ -94,6 +94,22 @@ class ConformanceTest {
         } else {
             sources.put("main.py", read(program));
         }
+        // An http_ program talks to HttpTestServer, whose address it reads
+        // from the module _testbase.
+        HttpTestServer server = stem.startsWith("http_") ? new HttpTestServer(0) : null;
+        if (server != null) {
+            sources.put("_testbase.py", "BASE = \"http://127.0.0.1:" + server.port() + "\"\n");
+        }
+        try {
+            run(stem, sources, server != null);
+        } finally {
+            if (server != null) {
+                server.stop();
+            }
+        }
+    }
+
+    private static void run(String stem, Map<String, String> sources, boolean http) throws Exception {
         Path work = Files.createTempDirectory("py-conf-" + stem);
         Path gen = work.resolve("gen");
         Path cls = work.resolve("classes");
@@ -126,16 +142,30 @@ class ConformanceTest {
         Path fsRoot = work.resolve("fs");
         Files.createDirectories(fsRoot.resolve("home"));
         ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ByteArrayOutputStream err = new ByteArrayOutputStream();
         PrintStream saved = System.out;
+        PrintStream savedErr = System.err;
         String failure = null;
-        try (URLClassLoader loader = new URLClassLoader(urls, null)) {
+        try (URLClassLoader loader = new URLClassLoader(urls, ClassLoader.getPlatformClassLoader())) {
             System.setOut(new PrintStream(out, true, "UTF-8"));
+            System.setErr(new PrintStream(err, true, "UTF-8"));
             try {
                 Class<?> fsType = loader.loadClass("com.codename1.python.runtime.PyFileSystem");
                 Object fs = loader.loadClass(JvmFileSystem.class.getName()).getConstructor(String.class)
                         .newInstance(fsRoot.toString());
                 fsType.getMethod("install", fsType).invoke(null, fs);
-                loader.loadClass(PythonTranspiler.PACKAGE + ".PythonModules").getMethod("runMain").invoke(null);
+                if (http) {
+                    Class<?> httpType = loader.loadClass("com.codename1.python.runtime.PyHttp");
+                    httpType.getMethod("install", httpType)
+                            .invoke(null, loader.loadClass(JvmHttp.class.getName()).getConstructor().newInstance());
+                }
+                Object status = loader.loadClass(PythonTranspiler.PACKAGE + ".PythonModules").getMethod("runMain")
+                        .invoke(null);
+                // runMain reports an uncaught Python exception on stderr and
+                // answers the status the interpreter would exit with.
+                if (!Integer.valueOf(0).equals(status)) {
+                    failure = "exit status " + status + ":\n" + err.toString("UTF-8");
+                }
             } catch (InvocationTargetException e) {
                 failure = String.valueOf(e.getCause());
                 if (!failure.startsWith("com.codename1.python.runtime.PyException")) {
@@ -158,6 +188,7 @@ class ConformanceTest {
         } finally {
             System.out.flush();
             System.setOut(saved);
+            System.setErr(savedErr);
         }
         String expected = read(ROOT.resolve(stem + ".out"));
         String actual = out.toString("UTF-8");

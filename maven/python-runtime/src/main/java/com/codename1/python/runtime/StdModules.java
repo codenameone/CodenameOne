@@ -57,6 +57,10 @@ public final class StdModules {
             PyModule.registerModule(fileSystem());
             return true;
         }
+        if ("_cn1http".equals(name)) {
+            PyModule.registerModule(http());
+            return true;
+        }
         if ("builtins".equals(name)) {
             PyModule m = new PyModule("builtins", new String[0]);
             for (java.util.Map.Entry<String, Object> e : Builtins.NAMES.entrySet()) {
@@ -248,6 +252,44 @@ public final class StdModules {
         });
         fs(m, "size", (fs, a) -> PyInt.of(fs.size(Py.toStr(a[0]))));
         fs(m, "mtime", (fs, a) -> Py.ofFloat(fs.lastModified(Py.toStr(a[0])) / 1000.0));
+        return m;
+    }
+
+    /// `_cn1http`: `request(method, url, headers, body, timeout, redirects)`
+    /// over [PyHttp], answering `(status, reason, url, headers, body)` with
+    /// the headers a list of pairs. No response at all raises `OSError`.
+    private static PyModule http() {
+        PyModule m = new PyModule("_cn1http", new String[0]);
+        m.setAttr("request", PyBuiltin.positional("request", a -> {
+            if (!(a[2] instanceof PyList)) {
+                throw Py.typeError("headers must be a list of (name, value) pairs");
+            }
+            PyList hs = (PyList) a[2];
+            String[] headers = new String[hs.size() * 2];
+            for (int i = 0; i < hs.size(); i++) {
+                Object h = hs.get(i);
+                if (!(h instanceof PyTuple) || ((PyTuple) h).size() != 2) {
+                    throw Py.typeError("headers must be a list of (name, value) pairs");
+                }
+                PyTuple t = (PyTuple) h;
+                headers[2 * i] = Py.toStr(t.get(0));
+                headers[2 * i + 1] = Py.toStr(t.get(1));
+            }
+            byte[] body = a[3] == Py.NONE ? null : PyBytes.like(a[3]); //NOPMD CompareObjectsWithEquals - identity is meant
+            int timeout = a[4] == Py.NONE ? 0 : (int) Math.ceil(Py.asDouble(a[4]) * 1000); //NOPMD CompareObjectsWithEquals - identity is meant
+            PyHttp.Response r;
+            try {
+                r = PyHttp.get().send(Py.toStr(a[0]), Py.toStr(a[1]), headers, body, timeout, Py.isTrue(a[5]));
+            } catch (java.io.IOException e) {
+                throw Py.error(Py.OS_ERROR, String.valueOf(e.getMessage())); //NOPMD PreserveStackTrace - a Python exception has no Java cause
+            }
+            Object[] pairs = new Object[r.headers.length / 2];
+            for (int i = 0; i < pairs.length; i++) {
+                pairs[i] = new PyTuple(new Object[] {Py.str(r.headers[2 * i]), Py.str(r.headers[2 * i + 1])});
+            }
+            return new PyTuple(new Object[] {PyInt.of(r.status), Py.str(r.reason), Py.str(r.url), new PyList(pairs),
+                new PyBytes(r.body)});
+        }));
         return m;
     }
 

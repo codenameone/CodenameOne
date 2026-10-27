@@ -75,3 +75,4 @@ SystemExit (None,) None
 SystemExit (3,) 3
 SystemExit ('bye',) 'bye'
 SystemExit (1, 2) (1, 2)
+KwError ('msg', 2) 3
