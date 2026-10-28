@@ -97,8 +97,13 @@ with engine.connect() as conn:
     conn.rollback()
     print(conn.execute(select(func.count()).select_from(posts)).scalar())
     print(conn.execute(select(posts.c.title).order_by(posts.c.likes.desc())).first()[0])
-    r = conn.execute(insert(posts).values(title="r", likes=4).returning(posts.c.id, posts.c.likes))
-    print(tuple(r.one()))
+    if engine.dialect.insert_returning:
+        r = conn.execute(insert(posts).values(title="r", likes=4).returning(posts.c.id, posts.c.likes))
+        print(tuple(r.one()))
+    else:
+        # MySQL has no RETURNING; the generated key comes back on the result.
+        r = conn.execute(insert(posts).values(title="r", likes=4))
+        print((r.inserted_primary_key[0], 4))
     try:
         conn.execute(insert(users).values(id=1, name="dup"))
     except exc.IntegrityError:

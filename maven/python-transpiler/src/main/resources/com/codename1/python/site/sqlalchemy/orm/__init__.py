@@ -102,9 +102,16 @@ def _analyze_str(s):
     return _name_of(s), False, False
 
 
-def _sql_type(pytype):
+def _sql_type(pytype, tmap=None):
     if pytype is None:
         return None
+    if tmap:
+        # DeclarativeBase.type_annotation_map: {str: String(100)} is how a model
+        # gives every Mapped[str] a length, which MySQL's VARCHAR demands.
+        for k in tmap:
+            if k is pytype or (isinstance(pytype, str) and getattr(k, "__name__", None) == pytype):
+                v = tmap[k]
+                return v() if isinstance(v, type) else v
     if isinstance(pytype, str):
         t = _PY_NAMES.get(pytype)
     else:
@@ -117,13 +124,13 @@ class _MappedColumnSpec:
         self.args = args
         self.kw = kw
 
-    def _make(self, key, pytype, optional):
+    def _make(self, key, pytype, optional, tmap=None):
         args = list(self.args)
         name = key
         if args and isinstance(args[0], str):
             name = args.pop(0)
         if not any(_is_type(a) for a in args):
-            t = _sql_type(pytype)
+            t = _sql_type(pytype, tmap)
             if t is not None:
                 args.insert(0, t)
         kw = dict(self.kw)
@@ -611,6 +618,7 @@ class DeclarativeMeta(type):
 
 def _map_class(cls, ns, parent=None):
     ann = ns.get("__annotations__", {})
+    tmap = getattr(cls, "type_annotation_map", None)
     attrs = []
     rels = {}
     specs = []
@@ -628,14 +636,14 @@ def _map_class(cls, ns, parent=None):
             continue
         pyt, optional, is_list = _analyze(a)
         if isinstance(v, _MappedColumnSpec):
-            col = v._make(key, pyt, optional)
+            col = v._make(key, pyt, optional, tmap)
             specs.append((v, col))
         elif isinstance(v, Column):
             col = v
             if col.name is None:
                 col.name = col.key = key
         elif v is None and (isinstance(a, _MappedAnnotation) or (isinstance(a, str) and "Mapped" in a)):
-            t = _sql_type(pyt)
+            t = _sql_type(pyt, tmap)
             if t is None:
                 raise exc.ArgumentError("Could not locate SQLAlchemy type for %s.%s" % (cls.__name__, key))
             col = Column(key, t, nullable=optional)

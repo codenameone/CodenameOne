@@ -6,6 +6,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship,
 
 
 class Base(DeclarativeBase):
+    type_annotation_map = {str: String(200)}
     pass
 
 

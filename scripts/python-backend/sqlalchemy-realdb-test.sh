@@ -82,6 +82,17 @@ public class Reset {
             if ("postgresql".equals(db.dialect().getName())) {
                 db.execute("DROP SCHEMA public CASCADE", new Object[0]);
                 db.execute("CREATE SCHEMA public", new Object[0]);
+            } else if (db.dialect().getName().startsWith("m")) {
+                // MySQL and MariaDB: a database is the schema, and the URL's
+                // user owns it (MYSQL_USER is granted ALL on MYSQL_DATABASE).
+                String name = args[0];
+                int q = name.indexOf('?');
+                if (q >= 0) {
+                    name = name.substring(0, q);
+                }
+                name = name.substring(name.lastIndexOf('/') + 1);
+                db.execute("DROP DATABASE IF EXISTS `" + name + "`", new Object[0]);
+                db.execute("CREATE DATABASE `" + name + "`", new Object[0]);
             }
         } finally {
             db.close();

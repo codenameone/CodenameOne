@@ -402,6 +402,9 @@ class BinaryExpression(ColumnElement):
         self.type = Boolean() if op not in ("+", "-", "*", "/", "%") else left.type
 
     def _compile(self, ctx):
+        if self.op == "||" and getattr(ctx.dialect, "name", None) in ("mysql", "mariadb"):
+            # || is logical OR on MySQL; SQLAlchemy's MySQL compiler writes concat().
+            return "concat(%s, %s)" % (self.left._compile(ctx), self.right._compile(ctx))
         return "%s %s %s" % (self.left._compile(ctx), self.op, self.right._compile(ctx))
 
     def _tables(self, acc):
@@ -1480,7 +1483,9 @@ class Cast(ColumnElement):
     def _compile(self, ctx):
         cc = ctx.columns_clause
         ctx.columns_clause = False
-        out = "CAST(%s AS %s)" % (self.expr._compile(ctx), self.type.ddl())
+        cast_ddl = getattr(ctx.dialect, "cast_ddl", None)
+        typ = cast_ddl(self.type) if cast_ddl is not None else self.type.ddl()
+        out = "CAST(%s AS %s)" % (self.expr._compile(ctx), typ)
         ctx.columns_clause = cc
         return out
 
@@ -1553,6 +1558,10 @@ class _DML(ClauseElement):
     def _returning_sql(self, ctx):
         if not self._returning:
             return ""
+        if not getattr(ctx.dialect, "insert_returning", True):
+            # As SQLAlchemy's MySQL compiler: MySQL has no RETURNING at all, and
+            # sending it anyway answers with a syntax error from the server.
+            raise exc.CompileError("RETURNING is not supported by this dialect's statement compiler.")
         q = ctx.qualify
         ctx.qualify = False
         s = " RETURNING " + ", ".join(c._compile(ctx) for c in self._returning)
@@ -2124,6 +2133,24 @@ class MySQLDialect(_Dialect):
     insert_returning = False
     autoincrement_suffix = " AUTO_INCREMENT"
     _quote_char = "`"
+
+    def cast_ddl(self, t):
+        # MySQL's CAST takes CHAR, SIGNED, DECIMAL, DATE...; not VARCHAR or
+        # INTEGER. The names SQLAlchemy's MySQL compiler renders.
+        if isinstance(t, (String, Text)):
+            n = getattr(t, "length", None)
+            return "CHAR" if n is None else "CHAR(%d)" % n
+        if isinstance(t, Integer):
+            return "SIGNED INTEGER"
+        if isinstance(t, Numeric):
+            return "DECIMAL"
+        if isinstance(t, DateTime):
+            return "DATETIME"
+        if isinstance(t, Date):
+            return "DATE"
+        if isinstance(t, LargeBinary):
+            return "BINARY"
+        return t.ddl()
 
     def column_ddl(self, c, table):
         return _server_type(c.type, (
