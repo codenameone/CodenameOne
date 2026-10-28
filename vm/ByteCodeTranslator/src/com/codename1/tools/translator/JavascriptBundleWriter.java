@@ -1768,7 +1768,12 @@ final class JavascriptBundleWriter {
 
         SplashSettings(String appearance, String background, String text, String accent,
                 String darkBackground, String darkText, String darkAccent, String logo) {
-            this.appearance = appearance(appearance);
+            // With no appearance and no dark colour named, the splash stays light: an existing
+            // light app must not gain a dark loading screen ahead of its white first form just
+            // because the browser prefers dark. Naming any dark colour is what says the app has
+            // a dark appearance, and makes `auto` the default.
+            boolean darkNamed = notBlank(darkBackground) || notBlank(darkText) || notBlank(darkAccent);
+            this.appearance = appearance(appearance, darkNamed ? "auto" : "light");
             this.background = color("background", background, "#ffffff");
             this.text = color("textColor", text, "#666666");
             this.accent = color("accentColor", accent, "#0072ff");
@@ -1792,9 +1797,13 @@ final class JavascriptBundleWriter {
             return System.getProperty(SPLASH_PROPERTY_PREFIX + name);
         }
 
-        private static String appearance(String value) {
+        private static boolean notBlank(String v) {
+            return v != null && v.trim().length() > 0;
+        }
+
+        private static String appearance(String value, String def) {
             if (value == null || value.trim().length() == 0) {
-                return "auto";
+                return def;
             }
             String v = value.trim();
             if (v.equalsIgnoreCase("auto") || v.equalsIgnoreCase("light") || v.equalsIgnoreCase("dark")) {
@@ -1821,20 +1830,43 @@ final class JavascriptBundleWriter {
                     ok = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
                 }
             } else {
-                ok = true;
-                for (int i = 0; ok && i < v.length(); i++) {
-                    char c = v.charAt(i);
-                    ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
-                }
+                // A name has to be a real one: a misspelt name, or a keyword such as `inherit`,
+                // makes the variable invalid where it is used, and the page falls back to a
+                // transparent background with no error anywhere.
+                ok = CSS_COLOR_NAMES.indexOf("," + asciiLower(v) + ",") >= 0;
             }
             if (!ok) {
                 throw new IllegalArgumentException("javascript.splash." + hint
-                        + " must be a hex colour such as #1e1e1e or a CSS colour name, not '" + value + "'");
+                        + " must be a hex colour such as #1e1e1e or a CSS named colour, not '" + value + "'");
             }
             return v;
         }
 
-        /// `none` (or nothing) for no logo; otherwise a path inside the bundle. Restricted to
+        /// The CSS named colours (CSS Color Module Level 4), plus `transparent`.
+        private static final String CSS_COLOR_NAMES = ",transparent,aliceblue,antiquewhite,aqua,"
+                + "aquamarine,azure,beige,bisque,black,blanchedalmond,blue,blueviolet,brown,burlywood,"
+                + "cadetblue,chartreuse,chocolate,coral,cornflowerblue,cornsilk,crimson,cyan,darkblue,"
+                + "darkcyan,darkgoldenrod,darkgray,darkgreen,darkgrey,darkkhaki,darkmagenta,"
+                + "darkolivegreen,darkorange,darkorchid,darkred,darksalmon,darkseagreen,darkslateblue,"
+                + "darkslategray,darkslategrey,darkturquoise,darkviolet,deeppink,deepskyblue,dimgray,"
+                + "dimgrey,dodgerblue,firebrick,floralwhite,forestgreen,fuchsia,gainsboro,ghostwhite,"
+                + "gold,goldenrod,gray,green,greenyellow,grey,honeydew,hotpink,indianred,indigo,ivory,"
+                + "khaki,lavender,lavenderblush,lawngreen,lemonchiffon,lightblue,lightcoral,lightcyan,"
+                + "lightgoldenrodyellow,lightgray,lightgreen,lightgrey,lightpink,lightsalmon,"
+                + "lightseagreen,lightskyblue,lightslategray,lightslategrey,lightsteelblue,lightyellow,"
+                + "lime,limegreen,linen,magenta,maroon,mediumaquamarine,mediumblue,mediumorchid,"
+                + "mediumpurple,mediumseagreen,mediumslateblue,mediumspringgreen,mediumturquoise,"
+                + "mediumvioletred,midnightblue,mintcream,mistyrose,moccasin,navajowhite,navy,oldlace,"
+                + "olive,olivedrab,orange,orangered,orchid,palegoldenrod,palegreen,paleturquoise,"
+                + "palevioletred,papayawhip,peachpuff,peru,pink,plum,powderblue,purple,rebeccapurple,"
+                + "red,rosybrown,royalblue,saddlebrown,salmon,sandybrown,seagreen,seashell,sienna,"
+                + "silver,skyblue,slateblue,slategray,slategrey,snow,springgreen,steelblue,tan,teal,"
+                + "thistle,tomato,turquoise,violet,wheat,white,whitesmoke,yellow,yellowgreen,";
+
+        /// `none` (or nothing) for no logo; otherwise a path inside the bundle. The file is not
+        /// checked: the translator runs before the bundle is complete (the default icon is
+        /// written by the builder afterwards). A missing one costs nothing visible, since the
+        /// `<img>` carries `alt=""` and browsers draw nothing for an empty-alt image that fails. Restricted to
         /// plain path characters so it can go into a `src` attribute as it is, and never `..`
         /// or a scheme, so it cannot point the page at another origin.
         private static String logo(String value) {

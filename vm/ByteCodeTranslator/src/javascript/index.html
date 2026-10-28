@@ -19,6 +19,10 @@
   html {
     background: var(--cn1-splash-background, #ffffff);
   }
+  /* Set by the host's __cn1_hide_splash__ handler once the first form shows. */
+  html[data-cn1-started] {
+    background: none;
+  }
   #cn1-splash {
     color: var(--cn1-splash-text, #666666);
   }

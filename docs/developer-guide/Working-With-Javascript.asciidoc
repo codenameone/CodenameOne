@@ -271,8 +271,8 @@ Build hints set its look, so the settings survive every build instead of being e
 |Build hint |Default |Meaning
 
 |`javascript.splash.appearance`
-|`auto`
-|`auto` follows the browser's light/dark preference. `light` or `dark` always uses that set of colors, for an app with a single appearance.
+|`auto` once any dark color is set, otherwise `light`
+|`auto` follows the browser's light/dark preference. `light` or `dark` always uses that set of colors, for an app with a single appearance. An app that sets none of these hints keeps a light loading screen, so a light app never opens dark.
 
 |`javascript.splash.background`, `javascript.splash.textColor`, `javascript.splash.accentColor`
 |`#ffffff`, `#666666`, `#0072ff`
@@ -287,7 +287,7 @@ Build hints set its look, so the settings survive every build instead of being e
 |A different image, as a path relative to the bundle's `index.html`, or `none` for no image.
 |===
 
-Colors are hex values (`#rgb`, `#rrggbb`, with optional alpha) or CSS color names. The page applies them before it paints anything, and the background stays behind the app until the first form covers it, so a dark app no longer opens on a white page.
+Colors are hex values (`#rgb`, `#rrggbb`, with optional alpha) or CSS color names. The page applies them before it paints anything, and keeps the background until the first form is shown, so a dark app no longer opens on a white page.
 
 An app that lets the user choose its own appearance can have the next launch's loading screen match that choice, even when it differs from the browser's preference:
 

@@ -114,9 +114,10 @@ final class BuildHintsDesktop {
         h.add(new Hint("javascript.splash.appearance")
                 .group(HintGroup.JAVASCRIPT)
                 .values("SplashAppearance", "auto", "light", "dark")
-                .def("auto")
                 .platform("javascript")
-                .doc("Which colours the loading screen uses. `auto` (the default) follows the "
+                .doc("Which colours the loading screen uses. Defaults to `auto` when any "
+                        + "`javascript.splash.dark*` colour is set and to `light` otherwise, so an app "
+                        + "that never asked for a dark loading screen does not get one. `auto` follows the "
                         + "browser's light/dark preference, or the choice the app remembered with "
                         + "`Display.setProperty(\"platformHint.javascript.splashAppearance\", \"dark\")`. "
                         + "`light` and `dark` always use that set, for apps with one appearance."));

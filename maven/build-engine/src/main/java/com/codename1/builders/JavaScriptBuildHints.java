@@ -149,7 +149,8 @@ public final class JavaScriptBuildHints {
         // logo (or none). JavaScriptPwa writes the icon to this path after the translator runs,
         // from the same request.getIcon(); without an icon it writes a placeholder square, which
         // identifies nothing, so then there is no logo.
-        if (request.getArg("javascript.splash.logo", null) == null && request.getIcon() != null) {
+        String logo = request.getArg("javascript.splash.logo", null);
+        if ((logo == null || logo.trim().length() == 0) && request.getIcon() != null) {
             out.add("-Dcodename1.javascript.splash.logo=" + SPLASH_DEFAULT_LOGO);
         }
         return out;

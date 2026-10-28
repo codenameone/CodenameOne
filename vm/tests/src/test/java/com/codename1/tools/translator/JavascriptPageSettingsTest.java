@@ -91,9 +91,19 @@ class JavascriptPageSettingsTest {
     }
 
     @Test
-    void defaultSplashFollowsTheBrowserAndTheRememberedChoice() throws Exception {
+    void anAppThatAskedForNothingKeepsALightSplash() throws Exception {
+        // An existing light app must not open dark because the browser prefers dark.
         String html = JavascriptBundleWriter.applySplashSettings(template(),
                 JavascriptBundleWriter.SplashSettings.defaults());
+        assertFalse(html.contains("prefers-color-scheme"), html);
+        assertTrue(html.contains("--cn1-splash-background:#ffffff;"), html);
+        assertFalse(html.contains("__SPLASH_"), html);
+    }
+
+    @Test
+    void namingADarkColourFollowsTheBrowserAndTheRememberedChoice() throws Exception {
+        String html = JavascriptBundleWriter.applySplashSettings(template(),
+                new JavascriptBundleWriter.SplashSettings(null, null, null, null, "#1e1e1e", null, null, null));
         assertTrue(html.contains("@media (prefers-color-scheme: dark)"), html);
         assertTrue(html.contains(":root[data-cn1-appearance=\"dark\"]"), html);
         assertTrue(html.contains("localStorage.getItem(\"" + JavascriptBundleWriter.SPLASH_APPEARANCE_STORAGE_KEY + "\")"), html);
@@ -115,7 +125,7 @@ class JavascriptPageSettingsTest {
 
     @Test
     void splashValuesThatCouldEscapeTheirContextAreRejected() {
-        String[] badColors = {"red;}body{display:none", "#12", "#ggg", "rgb(0,0,0)", "url(x)"};
+        String[] badColors = {"red;}body{display:none", "#12", "#ggg", "rgb(0,0,0)", "url(x)", "blak", "inherit"};
         for (String bad : badColors) {
             assertThrows(IllegalArgumentException.class, () -> new JavascriptBundleWriter.SplashSettings(
                     null, bad, null, null, null, null, null, null), bad);
@@ -132,7 +142,8 @@ class JavascriptPageSettingsTest {
     @Test
     void splashInlineBlocksAreHashedIntoThePolicy() throws Exception {
         String html = JavascriptBundleWriter.applySplashSettings(template(),
-                JavascriptBundleWriter.SplashSettings.defaults());
+                new JavascriptBundleWriter.SplashSettings("auto", null, null, null, null, null, null, null));
+        assertTrue(JavascriptSecurityHeaders.hashesOf(html, "script").size() > 0, html);
         String csp = JavascriptSecurityHeaders.contentSecurityPolicy(html, "");
         for (String hash : JavascriptSecurityHeaders.hashesOf(html, "script")) {
             assertTrue(csp.contains(hash), csp);
