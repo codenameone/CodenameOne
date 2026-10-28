@@ -357,6 +357,21 @@ column types, so on a server database its numbers and dates come back as
 the text the server sent. SQLAlchemy's own drivers, such as `psycopg`, aren't
 used: the URL `postgresql+psycopg://` selects the backend's driver.
 
+==== Stack size
+
+Every request runs on a virtual thread with 1MB of C stack, because transpiled
+Python frames are large and `re` recurses. A handler that recurses deeper than
+that raises it with a build hint in `codenameone_settings.properties`, in bytes
+or with a `KB` or `MB` suffix:
+
+[source,properties]
+----
+include::../demos/common/src/main/snippets/developer-guide/python-backend.properties[tag=python-backend-properties-001,indent=0]
+----
+
+`CN1_HTTP_VT_STACK` can still raise it when the server starts, and the larger
+of the two applies.
+
 === Compared with CPython, PyPy and GraalPy
 
 The same programs, run on one Apple silicon Mac with
