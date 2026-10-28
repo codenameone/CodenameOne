@@ -103,4 +103,12 @@
         <Class name="com.codename1.python.runtime.PyServer$Response"/>
         <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD"/>
     </Match>
+    <!-- PySql.Result.types is written by the BackendDb the transpiler
+         generates into a backend application (from Database.columnTypes),
+         never inside this module; SQLite leaves it null. -->
+    <Match>
+        <Class name="com.codename1.python.runtime.PySql$Result"/>
+        <Field name="types"/>
+        <Bug pattern="UWF_UNWRITTEN_PUBLIC_OR_PROTECTED_FIELD"/>
+    </Match>
 </FindBugsFilter>
