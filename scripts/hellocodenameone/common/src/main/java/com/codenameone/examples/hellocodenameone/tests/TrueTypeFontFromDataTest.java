@@ -24,7 +24,7 @@ import java.io.InputStream;
 /// FontFace asynchronously, so the measuring half polls until the face is in. Assertion-only.
 public class TrueTypeFontFromDataTest extends BaseTest {
     // A Material icon codepoint: the default font has no glyph for it.
-    private static final String SAMPLE = "";
+    private static final String SAMPLE = "\ue87c\ue87c\ue87c";
     private Font font;
     private Font plain;
     private int attempts;
