@@ -93,13 +93,8 @@ class HttpServerHeadersAndStackTest {
 
     @Test
     void aStartThatFailsToBindDoesNotLatch() throws Exception {
-        HttpServer holder = HttpServer.start("127.0.0.1", 0, 16, 1, new HttpServer.Handler() {
-            public HttpServer.Response handle(HttpServer.Request request) {
-                return HttpServer.Response.text(200, "ok");
-            }
-        });
-        int taken = holder.getPort();
-        holder.stop(1000);
+        // The raise below is permanent for this JVM; the module runs each test
+        // class in its own fork (reuseForks=false), so no other class sees it.
         HttpServer blocker = HttpServer.start("127.0.0.1", 0, 16, 1, new HttpServer.Handler() {
             public HttpServer.Response handle(HttpServer.Request request) {
                 return HttpServer.Response.text(200, "ok");
@@ -120,6 +115,20 @@ class HttpServerHeadersAndStackTest {
         } finally {
             occupied.close();
         }
-        assertTrue(taken > 0);
+    }
+
+    @Test
+    void aStartAbandonedAfterBindDoesNotLatch() {
+        assertThrows(java.io.IOException.class, () -> HttpServer.start("127.0.0.1", 0, 16, 1,
+                new HttpServer.Handler() {
+                    public HttpServer.Response handle(HttpServer.Request request) {
+                        return HttpServer.Response.text(200, "ok");
+                    }
+                }, null, new HttpServer.WebSocketRoutes() {
+                    public void register(HttpServer.WebSocketRegistry registry) {
+                        throw new IllegalStateException("no routes");
+                    }
+                }));
+        HttpServer.requireVirtualThreadStack(384 * 1024);
     }
 }

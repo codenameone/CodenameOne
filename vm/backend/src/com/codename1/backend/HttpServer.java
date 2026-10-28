@@ -2711,6 +2711,11 @@ public final class HttpServer {
     /// goes out of its way to avoid -- a failed start is not a reason to take the
     /// process down with it.
     private static void abandonStart(ServerSocket listener, HttpServer server) {
+        // The caller never gets this server, so nothing will stop() it: give
+        // back the live count start() took, or every later stack raise is refused.
+        if (server.stopClaimed.compareAndSet(false, true)) {
+            LIVE_SERVERS.decrementAndGet();
+        }
         server.running = false;
         if (server.pollLoopsEnded(POLL_LOOP_JOIN_MILLIS)) {
             server.closePollers();
