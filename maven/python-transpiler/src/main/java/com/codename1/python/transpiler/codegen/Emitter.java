@@ -455,6 +455,21 @@ public final class Emitter {
 
     // ---- statements ------------------------------------------------------
 
+    /// Prefix of the comment that names the Python line the code after it
+    /// comes from. [com.codename1.python.transpiler.api.PythonTranspiler]
+    /// turns these into the line table the build later writes into the
+    /// class file, so a debugger and a stack trace show the Python source.
+    public static final String LINE_MARK = "/* line ";
+
+    static void lineMark(int line, StringBuilder out, int ind) {
+        if (line > 0) {
+            indent(out, ind);
+            // A block comment, which stays a comment wherever the statement
+            // is spliced, even inside an expression.
+            out.append(LINE_MARK).append(line).append(" */\n");
+        }
+    }
+
     private static void indent(StringBuilder out, int ind) {
         for (int i = 0; i < ind; i++) {
             out.append("    ");
@@ -474,6 +489,7 @@ public final class Emitter {
     }
 
     void stmt(Stmt s, StringBuilder out, int ind) {
+        lineMark(s.line, out, ind);
         if (s instanceof ExprStmt) {
             Expr v = ((ExprStmt) s).value;
             if (v instanceof Constant) {

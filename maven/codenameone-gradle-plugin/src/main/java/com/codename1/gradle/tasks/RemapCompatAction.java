@@ -97,6 +97,13 @@ public class RemapCompatAction implements Action<Task> {
 
     @Override
     public void execute(Task task) {
+        // Classes translated from Python get the Python file and lines, so
+        // a debugger and a stack trace show the Python source.
+        try {
+            com.codename1.maven.PythonLineMapper.apply(classesDir);
+        } catch (java.io.IOException ex) {
+            throw new GradleException("Could not map Python line numbers in " + classesDir, ex);
+        }
         Set<File> classpath = compileClasspath.getFiles();
         // By the jars alone, as the first test: with none there is nothing to
         // read the classes for.

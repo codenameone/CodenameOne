@@ -67,6 +67,14 @@ public class RemapCompatMojo extends AbstractCN1Mojo {
                 classpath.add(artifact.getFile());
             }
         }
+        // Classes translated from Python get the Python file and lines, so
+        // a debugger and a stack trace show the Python source.
+        File compiled = new File(project.getBuild().getOutputDirectory());
+        try {
+            PythonLineMapper.apply(compiled);
+        } catch (java.io.IOException ex) {
+            throw new MojoExecutionException("Could not map Python line numbers in " + compiled, ex);
+        }
         // By the jars alone: whether a desktop layer is also used can only be
         // read from the classes, and Kotlin's are not all in place yet.
         if (CompatLayers.active(classpath).isEmpty()) {

@@ -48,6 +48,36 @@ The goal reads these properties:
 | `cn1.python.skip` | `true` skips the step.
 |===
 
+=== Debugging
+
+The translated classes carry the Python source's file and line numbers in
+place of the generated Java's. A stack trace names the Python file and line:
+
+----
+com.codename1.python.runtime.PyException: ValueError: bad 6
+	at com.codename1.generated.python.py_app$2eutil.M_L1_Thing_boom(util.py:7)
+	at com.codename1.generated.python.py_main.lambda$exec$1(main.py:6)
+	at com.codename1.generated.python.py_main.exec(main.py:10)
+----
+
+The same lines reach a Java debugger attached to the simulator or to a server
+binary run on the JVM. Each class also carries a JSR-45 source map whose
+default stratum, `Python`, gives the file's path within the source directory,
+for example `app/util.py`. Breakpoints are set by Python line number, and a
+debugger that resolves sources through the source map opens the `.py` file.
+With `jdb`:
+
+[source,bash]
+----
+jdb -sourcepath common/src/main/python -classpath ... MyAppStub
+stop at com.codename1.generated.python.py_app$2eutil:6
+----
+
+The mapping is applied to the compiled classes by the build's `remap-compat`
+step (`cn1RemapCompat` in Gradle), so the generated Java in
+`target/generated-sources/python` still shows which Python line each
+statement came from, as a `/* line N */` comment above it.
+
 === Calling Codename One and Java from Python
 
 Any class on the project's class path is importable under the `java.` prefix:

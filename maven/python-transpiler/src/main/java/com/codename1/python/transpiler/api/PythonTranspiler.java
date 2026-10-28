@@ -147,6 +147,7 @@ public final class PythonTranspiler {
             // whole-program types, and is left out of the closed-world check.
             String java = new Emitter(path, module, isPackage, PACKAGE, cls, scope)
                     .closed(closed && !stdlib.contains(path)).emit(tree);
+            java = withLineMap(java, path.replace('\\', '/'));
             out.put(PACKAGE.replace('.', '/') + "/" + cls + ".java", java);
             classes.put(module, cls);
         }
@@ -426,6 +427,66 @@ public final class PythonTranspiler {
                 + "        server.awaitTermination();\n"
                 + "    }\n"
                 + "}\n";
+    }
+
+    /// The name of the constant that carries a module's line table: the
+    /// Python file, a newline, then `javaLine:pythonLine` pairs at every
+    /// line where the Python line changes. The build's class post-processing
+    /// (`PythonLineMapper` in build-engine) rewrites the class's line
+    /// numbers and source file from it and removes the constant.
+    public static final String LINE_MAP_FIELD = "$cn1PyLines";
+
+    /// Adds the line table, computed from the line comments the emitter
+    /// wrote before each statement, to the class declaration's own line so
+    /// that no line moves.
+    static String withLineMap(String java, String pyFile) {
+        StringBuilder pairs = new StringBuilder();
+        int line = 0;
+        int py = 0;
+        int last = -1;
+        int start = 0;
+        while (start < java.length()) {
+            int end = java.indexOf('\n', start);
+            if (end < 0) {
+                end = java.length();
+            }
+            line++;
+            int i = start;
+            while (i < end && java.charAt(i) == ' ') {
+                i++;
+            }
+            if (java.startsWith(Emitter.LINE_MARK, i)) {
+                int stop = java.indexOf(' ', i + Emitter.LINE_MARK.length());
+                py = Integer.parseInt(java.substring(i + Emitter.LINE_MARK.length(), stop));
+            } else if (py > 0 && py != last && i < end) {
+                pairs.append(pairs.length() == 0 ? "" : ",").append(line).append(':').append(py);
+                last = py;
+            }
+            start = end + 1;
+        }
+        String decl = "public final class ";
+        int at = java.indexOf(decl);
+        int brace = at < 0 ? -1 : java.indexOf("{\n", at);
+        if (brace < 0 || pairs.length() == 0) {
+            return java;
+        }
+        String value = pyFile + "\n" + pairs;
+        StringBuilder lit = new StringBuilder("\"");
+        for (int k = 0; k < value.length(); k++) {
+            char c = value.charAt(k);
+            if (c == '\n') {
+                lit.append("\\n");
+            } else if (c == '"' || c == '\\') {
+                lit.append('\\').append(c);
+            } else if (c < 0x20 || c > 0x7e) {
+                lit.append(String.format("\\u%04x", (int) c));
+            } else {
+                lit.append(c);
+            }
+        }
+        lit.append('"');
+        return java.substring(0, brace + 1) + " private static final String " + LINE_MAP_FIELD + " = " + lit + ";"
+                + java.substring(brace + 1);
     }
 
     private static String registry(Map<String, String> classes, String mainModule, boolean interop, boolean server) {

@@ -31,8 +31,10 @@ CORE=$(art com/codenameone codenameone-core 8.0-SNAPSHOT)
 RUNTIME=$(art com/codenameone codenameone-python-runtime 8.0-SNAPSHOT)
 TRANSPILER=$(art com/codenameone codenameone-python-transpiler 8.0-SNAPSHOT)
 BACKEND=$(art com/codenameone codenameone-backend 8.0-SNAPSHOT)
+ENGINE=$(art com/codenameone codenameone-build-engine 8.0-SNAPSHOT)
+ASM=$(art org/ow2/asm asm 9.8)
 JAVAAPI=$(art com/codename1/parparvm JavaAPI 1.0-SNAPSHOT)
-for j in "$CORE" "$RUNTIME" "$TRANSPILER" "$BACKEND" "$JAVAAPI"; do
+for j in "$CORE" "$RUNTIME" "$TRANSPILER" "$BACKEND" "$JAVAAPI" "$ENGINE" "$ASM"; do
     [ -f "$j" ] || { echo "missing $j -- install it (see the header of this script)" >&2; exit 1; }
 done
 
@@ -62,6 +64,8 @@ JAVA
 (cd "$CLASSES" && unzip -qo "$RUNTIME" 'com/*' && unzip -qo "$CORE" 'com/codename1/util/*')
 "$J17/bin/javac" -nowarn --release 17 -d "$CLASSES" $(find "$REPO/scripts/python-bench/hostfs" -name '*.java')
 "$J17/bin/javac" -nowarn --release 17 -cp "$CLASSES:$BACKEND" -d "$CLASSES" $(find "$GEN" -name '*.java')
+# Line numbers and source file of the Python, for stack traces and debuggers.
+"$J17/bin/java" -cp "$ENGINE:$ASM" com.codename1.maven.PythonLineMapper "$CLASSES"
 
 # The backend build compiles a demo directory with JDK 8; the application is
 # already compiled, so it is an empty one and the classes come in through

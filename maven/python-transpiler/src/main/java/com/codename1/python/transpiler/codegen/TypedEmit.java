@@ -1022,6 +1022,7 @@ final class TypedEmit {
         StringBuilder sb = new StringBuilder();
         try {
             boolean r = stmt0(s, sb, ind);
+            Emitter.lineMark(s.line, b, ind);
             if (pre != null) {
                 b.append(pre);
             }
