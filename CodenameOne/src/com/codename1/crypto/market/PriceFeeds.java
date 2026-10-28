@@ -57,7 +57,11 @@ final class PriceFeeds {
             return ((Number) o).doubleValue();
         }
         if (o instanceof com.codename1.io.JSONParser.RawJson) {
-            return Double.parseDouble(((com.codename1.io.JSONParser.RawJson) o).getJson());
+            try {
+                return Double.parseDouble(((com.codename1.io.JSONParser.RawJson) o).getJson());
+            } catch (NumberFormatException e) {
+                throw new java.io.IOException(what + ": not a number: " + o, e);
+            }
         }
         if (o instanceof com.codename1.crypto.UInt256) {
             return Double.parseDouble(o.toString());

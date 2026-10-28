@@ -165,7 +165,7 @@ CodenameOne/src/com/codename1/maps/providers/TiledProvider.java | Itiner.pl cont
 CodenameOne/src/com/codename1/processing/Evaluator.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
 CodenameOne/src/com/codename1/processing/EvaluatorFactory.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
 CodenameOne/src/com/codename1/processing/JSONContent.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
-CodenameOne/src/com/codename1/processing/PrettyPrinter.java | Sun Microsystems BSD-licensed source retaining its original notice
+CodenameOne/src/com/codename1/io/PrettyPrinter.java | Sun Microsystems BSD-licensed source retaining its original notice
 CodenameOne/src/com/codename1/processing/StructuredContent.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
 CodenameOne/src/com/codename1/ui/html/HTMLEventsListener.java | LWUIT (Oracle) source whose package siblings carry the Oracle header; it shipped without one, which is not ours to add
 CodenameOne/src/com/codename1/ui/layouts/GridBagConstraints.java | Apache Software Foundation (Harmony-derived) source retaining its original Apache-2.0 notice
