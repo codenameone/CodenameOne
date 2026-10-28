@@ -116,7 +116,7 @@ public final class EvmAddress {
         try {
             out = new EvmAddress(Hash.fromHex(hex));
         } catch (CryptoException notHex) {
-            throw new IllegalArgumentException("an address is 0x and 40 hex digits");
+            throw new IllegalArgumentException("an address is 0x and 40 hex digits", notHex);
         }
         boolean lower = false;
         boolean upper = false;

@@ -32,6 +32,7 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.Hashtable;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
 import java.util.Vector;
@@ -736,6 +737,20 @@ public class JSONParser implements JSONParseCallback {
     /// The JSON string
     public static String mapToJson(Map<String, ?> map) {
         return PrettyJson.print(map);
+    }
+
+    /// Converts a list to an indented JSON array, written the way [#mapToJson(Map)]
+    /// writes the values of a map.
+    ///
+    /// #### Parameters
+    ///
+    /// - `list`: the list to convert
+    ///
+    /// #### Returns
+    ///
+    /// the JSON string
+    public static String listToJson(List<?> list) {
+        return PrettyJson.printList(list, 0);
     }
 
     /// Convenience: parse a JSON object from a UTF-8 byte array. The
@@ -1907,7 +1922,7 @@ public class JSONParser implements JSONParseCallback {
             return sb.toString();
         }
 
-        private static String printList(java.util.List<?> v, int indent) {
+        static String printList(List<?> v, int indent) {
             int len = v.size();
             if (len == 0) {
                 return "[]";
