@@ -608,6 +608,12 @@ class DatabaseImpl extends Database {
         }
 
         @Override
+        protected boolean capturesColumnTypeBeforeRead() {
+            // sqlite3_column_type is undefined once a getter has converted the value.
+            return true;
+        }
+
+        @Override
         protected int columnType(int index) throws IOException {
             return IOSImplementation.nativeInstance.sqlCursorColumnType(stmt, index);
         }

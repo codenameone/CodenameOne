@@ -478,6 +478,19 @@ public abstract class AbstractDBCursor implements Cursor, CursorExt, Row, RowExt
         return cachedTypes[index];
     }
 
+    /// Whether the engine's answer to `columnType` can change once a getter has read the value,
+    /// so the type must be taken before every first read of a column on a row. True for the
+    /// SQLite C API, where `sqlite3_column_type` is undefined after a conversion. Off by
+    /// default because the capture is one more engine call per read; a cursor that answers
+    /// `columnType` reliably at any time is asked lazily, only when `getColumnType` is.
+    ///
+    /// #### Returns
+    ///
+    /// true to capture each column's type before its first read on a row
+    protected boolean capturesColumnTypeBeforeRead() {
+        return false;
+    }
+
     /// Returns the storage class of a value as one of the `Database.COLUMN_*` constants, or
     /// `Database.COLUMN_UNKNOWN` (the default) where the engine cannot say. Only called on an
     /// open cursor positioned on a row, with a valid index.
@@ -503,9 +516,11 @@ public abstract class AbstractDBCursor implements Cursor, CursorExt, Row, RowExt
         }
         checkColumn(index);
         anythingRead = true;
-        // Taken before the value is read: the read may convert it, after which the engine cannot
-        // say what it was.
-        cachedColumnType(index);
+        if (capturesColumnTypeBeforeRead()) {
+            // Taken before the value is read: the read may convert it, after which the engine
+            // cannot say what it was.
+            cachedColumnType(index);
+        }
         lastReadWasNull = isNullAt(index);
     }
 

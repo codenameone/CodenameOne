@@ -346,6 +346,16 @@ JAVA_LONG com_codename1_impl_windows_WindowsNative_loadTrueTypeFontFromMemory___
 }
 
 /*
+ * Whether fonts can be loaded from bytes on this system at all, which is what
+ * isTrueTypeStreamSupported reports: without IDWriteFactory5 every load from
+ * memory fails.
+ */
+JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_isFontMemoryLoadingSupported___R_boolean(
+        CODENAME_ONE_THREAD_STATE) {
+    return cn1dwFontMemorySupported() ? JAVA_TRUE : JAVA_FALSE;
+}
+
+/*
  * deriveTrueTypeFont produces a new peer at the requested pixel size and weight,
  * reusing the base font's family. weight carries the CN1 STYLE_* bits.
  *

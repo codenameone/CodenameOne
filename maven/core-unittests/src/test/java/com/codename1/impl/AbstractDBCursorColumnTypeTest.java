@@ -41,6 +41,11 @@ class AbstractDBCursorColumnTypeTest {
         int row = -1;
         boolean converted;
         int typeQueries;
+        boolean eager = true;
+
+        protected boolean capturesColumnTypeBeforeRead() {
+            return eager;
+        }
 
         protected void rewind() {
             row = -1;
@@ -169,6 +174,19 @@ class AbstractDBCursorColumnTypeTest {
         cursor.getString(0);
         cursor.first();
         assertEquals(Database.COLUMN_INTEGER, cursor.getColumnType(0));
+    }
+
+    @Test
+    void cursorThatDoesNotOptInIsAskedOnlyByGetColumnType() throws IOException {
+        ConvertingCursor cursor = new ConvertingCursor();
+        cursor.eager = false;
+        cursor.next();
+        cursor.getLong(0);
+        cursor.getLong(0);
+        assertEquals(0, cursor.typeQueries);
+        assertEquals(Database.COLUMN_INTEGER, cursor.getColumnType(0));
+        cursor.getColumnType(0);
+        assertEquals(1, cursor.typeQueries);
     }
 
     @Test

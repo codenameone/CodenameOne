@@ -2081,7 +2081,9 @@ public class WindowsImplementation extends CodenameOneImplementation {
 
     @Override
     public boolean isTrueTypeStreamSupported() {
-        return true;
+        // Asked of the system rather than assumed: without DirectWrite's in-memory
+        // loader every createTrueTypeFontFromData would answer null.
+        return WindowsNative.isFontMemoryLoadingSupported();
     }
 
     /// True when data starts with a TrueType (0x00010000 or 'true'), OpenType
