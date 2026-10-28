@@ -254,7 +254,7 @@ final class PyImage {
             try {
                 io.save(ci, bo, Py.toStr(a[1]), (float) Py.asDouble(a[2]));
             } catch (java.io.IOException e) {
-                throw Py.error(Py.OS_ERROR, String.valueOf(e.getMessage()));
+                throw Py.error(Py.OS_ERROR, String.valueOf(e.getMessage())); // NOPMD PreserveStackTrace - surfaced as a Python OSError
             }
             return new PyBytes(bo.toByteArray());
         }));
@@ -726,8 +726,7 @@ final class PyImage {
             return raw[rowStart + index * 2] & 0xff;
         }
         int bit = index * depth;
-        int v = (raw[rowStart + (bit >> 3)] & 0xff) >> (8 - depth - (bit & 7)) & ((1 << depth) - 1);
-        return v;
+        return (raw[rowStart + (bit >> 3)] & 0xff) >> (8 - depth - (bit & 7)) & ((1 << depth) - 1);
     }
 
     /// Unpacks unfiltered PNG rows into an image: gray to 1 band, RGB to 3,

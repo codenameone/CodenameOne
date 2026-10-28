@@ -284,7 +284,7 @@ public abstract class PyServer {
                 }
             }
         } catch (java.io.UnsupportedEncodingException e) {
-            throw Py.error(Py.OS_ERROR, "UTF-8 is unsupported");
+            throw Py.error(Py.OS_ERROR, "UTF-8 is unsupported"); // NOPMD PreserveStackTrace - surfaced as a Python OSError
         } finally {
             Gil.exit();
         }

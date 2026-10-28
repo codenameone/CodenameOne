@@ -2360,7 +2360,7 @@ public final class Emitter {
         return sb.append(")").toString();
     }
 
-    private static final java.util.Set<String> CLASS_FACTORIES = new java.util.HashSet<String>(java.util.Arrays.asList(
+    private static final Set<String> CLASS_FACTORIES = new HashSet<String>(Arrays.asList(
             "namedtuple", "NamedTuple", "TypedDict", "make_dataclass", "Enum", "IntEnum", "StrEnum", "Flag", "IntFlag"));
 
     /// A call of a functional class factory that names its class after the
