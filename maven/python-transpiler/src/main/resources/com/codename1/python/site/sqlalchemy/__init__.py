@@ -1,0 +1,1497 @@
+"""A SQLAlchemy 2.x subset for Codename One: Core over the DB-API ``sqlite3`` module.
+
+Only the SQLite dialect exists. Statements compile to SQL with ``?`` placeholders and run
+through ``sqlite3``; every result is fetched eagerly. The ORM lives in ``sqlalchemy.orm``
+and plugs in through two hooks: a mapped class carries ``__sa_mapper__`` (selecting it
+yields objects) and a relationship attribute answers ``_join_info()`` (joining on it).
+
+Unsupported: other dialects, connection pooling options, reflection, events, ``echo``
+output, subqueries/CTEs/unions, ``Enum``/``JSON``/``Numeric`` decimal handling.
+"""
+
+import datetime as _dt
+import sqlite3 as _sqlite3
+
+from . import exc
+
+__version__ = "2.0.0"
+
+
+# ----------------------------------------------------------------------------- types
+
+class TypeEngine:
+    _ddl = "NULL"
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def ddl(self):
+        return self._ddl
+
+    def bind(self, value):
+        return value
+
+    def result(self, value):
+        return value
+
+
+class NullType(TypeEngine):
+    _ddl = "NULL"
+
+
+class Integer(TypeEngine):
+    _ddl = "INTEGER"
+
+
+class BigInteger(Integer):
+    _ddl = "BIGINT"
+
+
+class SmallInteger(Integer):
+    _ddl = "SMALLINT"
+
+
+class String(TypeEngine):
+    _ddl = "VARCHAR"
+
+    def __init__(self, length=None, *args, **kwargs):
+        self.length = length
+
+    def ddl(self):
+        if self.length:
+            return "%s(%d)" % (self._ddl, self.length)
+        return self._ddl
+
+
+class Unicode(String):
+    pass
+
+
+class Text(String):
+    _ddl = "TEXT"
+
+
+class UnicodeText(Text):
+    pass
+
+
+class Float(TypeEngine):
+    _ddl = "FLOAT"
+
+    def result(self, value):
+        return None if value is None else float(value)
+
+
+class Numeric(Float):
+    _ddl = "NUMERIC"
+
+
+class Boolean(TypeEngine):
+    _ddl = "BOOLEAN"
+
+    def bind(self, value):
+        if value is None:
+            return None
+        return 1 if value else 0
+
+    def result(self, value):
+        return None if value is None else bool(value)
+
+
+def _num(s, a, b):
+    return int(s[a:b])
+
+
+class DateTime(TypeEngine):
+    _ddl = "DATETIME"
+
+    def bind(self, value):
+        if value is None or isinstance(value, str):
+            return value
+        return "%04d-%02d-%02d %02d:%02d:%02d.%06d" % (
+            value.year, value.month, value.day, value.hour, value.minute, value.second, value.microsecond)
+
+    def result(self, value):
+        if not isinstance(value, str):
+            return value
+        s = value.replace("T", " ")
+        micro = 0
+        if len(s) > 20 and s[19] == ".":
+            frac = (s[20:26] + "000000")[:6]
+            micro = int(frac)
+        hour = _num(s, 11, 13) if len(s) >= 13 else 0
+        minute = _num(s, 14, 16) if len(s) >= 16 else 0
+        second = _num(s, 17, 19) if len(s) >= 19 else 0
+        return _dt.datetime(_num(s, 0, 4), _num(s, 5, 7), _num(s, 8, 10), hour, minute, second, micro)
+
+
+class Date(TypeEngine):
+    _ddl = "DATE"
+
+    def bind(self, value):
+        if value is None or isinstance(value, str):
+            return value
+        return "%04d-%02d-%02d" % (value.year, value.month, value.day)
+
+    def result(self, value):
+        if not isinstance(value, str):
+            return value
+        return _dt.date(_num(value, 0, 4), _num(value, 5, 7), _num(value, 8, 10))
+
+
+class LargeBinary(TypeEngine):
+    _ddl = "BLOB"
+
+
+def _to_type(t):
+    if t is None:
+        return NullType()
+    if isinstance(t, type):
+        return t()
+    return t
+
+
+def _is_type(a):
+    if isinstance(a, TypeEngine):
+        return True
+    return isinstance(a, type) and issubclass(a, TypeEngine)
+
+
+# ----------------------------------------------------------------------------- compiler
+
+class _Ctx:
+    def __init__(self, qualify=True):
+        self.params = []
+        self.qualify = qualify
+        self.columns_clause = False
+
+
+class ClauseElement:
+    type = NullType()
+
+    def _compile(self, ctx):
+        raise NotImplementedError(type(self).__name__)
+
+    def _tables(self, acc):
+        pass
+
+    def __str__(self):
+        return self._compile(_Ctx())
+
+
+def _lit(value, typ=None):
+    if isinstance(value, ClauseElement):
+        return value
+    return BindParameter(value, typ)
+
+
+class ColumnElement(ClauseElement):
+    key = None
+    name = None
+
+    def __hash__(self):
+        return id(self)
+
+    def _op(self, op, other):
+        return BinaryExpression(self, op, _lit(other, self.type))
+
+    def __eq__(self, other):
+        if other is None:
+            return BinaryExpression(self, "IS", Null())
+        return self._op("=", other)
+
+    def __ne__(self, other):
+        if other is None:
+            return BinaryExpression(self, "IS NOT", Null())
+        return self._op("!=", other)
+
+    def __lt__(self, other):
+        return self._op("<", other)
+
+    def __le__(self, other):
+        return self._op("<=", other)
+
+    def __gt__(self, other):
+        return self._op(">", other)
+
+    def __ge__(self, other):
+        return self._op(">=", other)
+
+    def __add__(self, other):
+        return Grouping(self._op("+", other), self.type)
+
+    def __sub__(self, other):
+        return Grouping(self._op("-", other), self.type)
+
+    def __mul__(self, other):
+        return Grouping(self._op("*", other), self.type)
+
+    def __truediv__(self, other):
+        return Grouping(self._op("/", other), self.type)
+
+    def __mod__(self, other):
+        return Grouping(self._op("%", other), self.type)
+
+    def __neg__(self):
+        return UnaryExpression(self, "-", None, self.type)
+
+    def __invert__(self):
+        return not_(self)
+
+    def in_(self, values):
+        return InExpression(self, [_lit(v, self.type) for v in values], False)
+
+    def not_in(self, values):
+        return InExpression(self, [_lit(v, self.type) for v in values], True)
+
+    notin_ = not_in
+
+    def like(self, pattern, escape=None):
+        return self._op("LIKE", pattern)
+
+    def not_like(self, pattern, escape=None):
+        return self._op("NOT LIKE", pattern)
+
+    def ilike(self, pattern, escape=None):
+        return BinaryExpression(Function("lower", [self]), "LIKE", Function("lower", [_lit(pattern, self.type)]))
+
+    def startswith(self, s):
+        return self._op("LIKE", s + "%")
+
+    def endswith(self, s):
+        return self._op("LIKE", "%" + s)
+
+    def contains(self, s):
+        return self._op("LIKE", "%" + s + "%")
+
+    def between(self, lo, hi):
+        return and_(self >= lo, self <= hi)
+
+    def is_(self, other):
+        return BinaryExpression(self, "IS", _lit(other) if other is not None else Null())
+
+    def is_not(self, other):
+        return BinaryExpression(self, "IS NOT", _lit(other) if other is not None else Null())
+
+    isnot = is_not
+
+    def desc(self):
+        return UnaryExpression(self, None, "DESC", self.type)
+
+    def asc(self):
+        return UnaryExpression(self, None, "ASC", self.type)
+
+    def label(self, name):
+        return Label(name, self)
+
+
+class Null(ColumnElement):
+    def _compile(self, ctx):
+        return "NULL"
+
+
+def null():
+    return Null()
+
+
+class BindParameter(ColumnElement):
+    def __init__(self, value, typ=None):
+        self.value = value
+        self.type = _to_type(typ)
+
+    def _compile(self, ctx):
+        ctx.params.append(self.type.bind(self.value))
+        return "?"
+
+
+def literal(value, type_=None):
+    return BindParameter(value, type_)
+
+
+class BinaryExpression(ColumnElement):
+    def __init__(self, left, op, right):
+        self.left = left
+        self.op = op
+        self.right = right
+        self.type = Boolean() if op not in ("+", "-", "*", "/", "%") else left.type
+
+    def _compile(self, ctx):
+        return "%s %s %s" % (self.left._compile(ctx), self.op, self.right._compile(ctx))
+
+    def _tables(self, acc):
+        self.left._tables(acc)
+        self.right._tables(acc)
+
+    def __bool__(self):
+        if self.op == "=":
+            return self.left is self.right
+        if self.op == "!=":
+            return self.left is not self.right
+        raise TypeError("Boolean value of this clause is not defined")
+
+
+class Grouping(ColumnElement):
+    def __init__(self, elem, typ):
+        self.elem = elem
+        self.type = typ
+
+    def _compile(self, ctx):
+        return "(" + self.elem._compile(ctx) + ")"
+
+    def _tables(self, acc):
+        self.elem._tables(acc)
+
+
+class InExpression(ColumnElement):
+    def __init__(self, left, items, negate):
+        self.left = left
+        self.items = items
+        self.negate = negate
+        self.type = Boolean()
+
+    def _compile(self, ctx):
+        inner = ", ".join(i._compile(ctx) for i in self.items)
+        return "%s %sIN (%s)" % (self.left._compile(ctx), "NOT " if self.negate else "", inner)
+
+    def _tables(self, acc):
+        self.left._tables(acc)
+
+
+class UnaryExpression(ColumnElement):
+    def __init__(self, elem, prefix, suffix, typ=None):
+        self.elem = elem
+        self.prefix = prefix
+        self.suffix = suffix
+        self.type = typ if typ is not None else NullType()
+
+    def _compile(self, ctx):
+        s = self.elem._compile(ctx)
+        if self.prefix:
+            s = self.prefix + s if self.prefix == "-" else "%s (%s)" % (self.prefix, s)
+        if self.suffix:
+            s = s + " " + self.suffix
+        return s
+
+    def _tables(self, acc):
+        self.elem._tables(acc)
+
+
+def desc(col):
+    return col.desc()
+
+
+def asc(col):
+    return col.asc()
+
+
+class BooleanClauseList(ColumnElement):
+    def __init__(self, op, items):
+        self.op = op
+        self.items = list(items)
+        self.type = Boolean()
+
+    def _compile(self, ctx):
+        if len(self.items) == 1:
+            return self.items[0]._compile(ctx)
+        return "(" + (" %s " % self.op).join(i._compile(ctx) for i in self.items) + ")"
+
+    def _tables(self, acc):
+        for i in self.items:
+            i._tables(acc)
+
+
+def and_(*clauses):
+    return BooleanClauseList("AND", clauses)
+
+
+def or_(*clauses):
+    return BooleanClauseList("OR", clauses)
+
+
+def not_(clause):
+    return UnaryExpression(clause, "NOT", None, Boolean())
+
+
+def true():
+    return TextClause("1")
+
+
+def false():
+    return TextClause("0")
+
+
+class Label(ColumnElement):
+    def __init__(self, name, elem):
+        self.name = self.key = name
+        self.elem = elem
+        self.type = elem.type
+
+    def _compile(self, ctx):
+        if ctx.columns_clause:
+            ctx.columns_clause = False
+            s = self.elem._compile(ctx)
+            ctx.columns_clause = True
+            return "%s AS %s" % (s, self.name)
+        return self.name
+
+    def _tables(self, acc):
+        self.elem._tables(acc)
+
+
+class Function(ColumnElement):
+    def __init__(self, name, args):
+        self.name = self.key = name
+        self.args = [_lit(a) for a in args]
+        if name == "count":
+            self.type = Integer()
+        elif self.args and name in ("sum", "max", "min", "abs", "coalesce", "lower", "upper"):
+            self.type = self.args[0].type
+        elif name == "avg":
+            self.type = Float()
+        else:
+            self.type = NullType()
+
+    def _compile(self, ctx):
+        if not self.args and self.name == "count":
+            return "count(*)"
+        cc = ctx.columns_clause
+        ctx.columns_clause = False
+        s = "%s(%s)" % (self.name, ", ".join(a._compile(ctx) for a in self.args))
+        ctx.columns_clause = cc
+        return s
+
+    def _tables(self, acc):
+        for a in self.args:
+            a._tables(acc)
+
+
+class _FuncNamespace:
+    def __getattr__(self, name):
+        if name.startswith("__"):
+            raise AttributeError(name)
+
+        def make(*args):
+            return Function(name, args)
+        return make
+
+
+func = _FuncNamespace()
+
+
+class TextClause(ColumnElement):
+    def __init__(self, text_):
+        self.text = text_
+
+    def _compile(self, ctx):
+        return self.text
+
+    def _execute_on(self, conn, params, session=None):
+        if isinstance(params, list):
+            cur = conn._run(self.text, params, many=True)
+        else:
+            cur = conn._run(self.text, params if params is not None else {})
+        return CursorResult._from_cursor(cur, None)
+
+
+def text(sql):
+    return TextClause(sql)
+
+
+# ----------------------------------------------------------------------------- schema
+
+class ForeignKey:
+    def __init__(self, column, ondelete=None, onupdate=None, **kw):
+        self._spec = column
+        self.parent = None
+        self.ondelete = ondelete
+
+    def _target(self):
+        if isinstance(self._spec, Column):
+            return self._spec.table.name, self._spec.name
+        dot = self._spec.rfind(".")
+        return self._spec[:dot], self._spec[dot + 1:]
+
+    @property
+    def column(self):
+        tname, cname = self._target()
+        return self.parent.table.metadata.tables[tname].c[cname]
+
+    def references(self, table):
+        return self._target()[0] == table.name
+
+
+class Column(ColumnElement):
+    def __init__(self, *args, **kw):
+        self.name = None
+        self.type = None
+        self.foreign_keys = []
+        for a in args:
+            if isinstance(a, str):
+                self.name = a
+            elif isinstance(a, ForeignKey):
+                self.foreign_keys.append(a)
+                a.parent = self
+            elif _is_type(a):
+                self.type = _to_type(a)
+        if self.type is None:
+            self.type = Integer() if self.foreign_keys else NullType()
+        self.key = kw.get("key", self.name)
+        self.primary_key = kw.get("primary_key", False)
+        self.nullable = kw.get("nullable", not self.primary_key)
+        self.default = kw.get("default")
+        self.unique = kw.get("unique", False)
+        self.index = kw.get("index", False)
+        self.autoincrement = kw.get("autoincrement", "auto")
+        self.table = None
+
+    def _compile(self, ctx):
+        if ctx.qualify and self.table is not None:
+            return "%s.%s" % (self.table.name, self.name)
+        return self.name
+
+    def _tables(self, acc):
+        if self.table is not None:
+            _add_unique(acc, self.table)
+
+    def _default_value(self):
+        d = self.default
+        if callable(d):
+            try:
+                return d()
+            except TypeError:
+                return d(None)
+        return d
+
+
+def _add_unique(acc, item):
+    for x in acc:
+        if x is item:
+            return
+    acc.append(item)
+
+
+class ColumnCollection:
+    def __init__(self):
+        self._cols = []
+        self._by_key = {}
+
+    def _add(self, col):
+        self._cols.append(col)
+        self._by_key[col.key] = col
+
+    def __getattr__(self, name):
+        if name.startswith("_"):
+            raise AttributeError(name)
+        try:
+            return self._by_key[name]
+        except KeyError:
+            raise AttributeError(name)
+
+    def __getitem__(self, key):
+        if isinstance(key, int):
+            return self._cols[key]
+        return self._by_key[key]
+
+    def __iter__(self):
+        return iter(list(self._cols))
+
+    def __len__(self):
+        return len(self._cols)
+
+    def __contains__(self, key):
+        return key in self._by_key
+
+    def keys(self):
+        return [c.key for c in self._cols]
+
+    def values(self):
+        return list(self._cols)
+
+
+class FromClause(ClauseElement):
+    def join(self, right, onclause=None, isouter=False, full=False):
+        return Join(self, _from_obj(right), onclause, isouter)
+
+    def outerjoin(self, right, onclause=None, full=False):
+        return Join(self, _from_obj(right), onclause, True)
+
+
+class Table(FromClause):
+    def __init__(self, name, metadata, *args, **kw):
+        self.name = name
+        self.metadata = metadata
+        self.c = self.columns = ColumnCollection()
+        self.constraints = []
+        for a in args:
+            if isinstance(a, Column):
+                a.table = self
+                self.c._add(a)
+        metadata.tables[name] = self
+        metadata._order.append(self)
+
+    @property
+    def primary_key(self):
+        return [c for c in self.c if c.primary_key]
+
+    @property
+    def foreign_keys(self):
+        out = []
+        for c in self.c:
+            out.extend(c.foreign_keys)
+        return out
+
+    def _compile(self, ctx):
+        return self.name
+
+    def _tables(self, acc):
+        _add_unique(acc, self)
+
+    def _all_tables(self):
+        return [self]
+
+    def _create_sql(self):
+        parts = []
+        for c in self.c:
+            s = "%s %s" % (c.name, c.type.ddl())
+            if not c.nullable:
+                s += " NOT NULL"
+            parts.append(s)
+        pk = self.primary_key
+        if pk:
+            parts.append("PRIMARY KEY (%s)" % ", ".join(c.name for c in pk))
+        for c in self.c:
+            if c.unique:
+                parts.append("UNIQUE (%s)" % c.name)
+        for c in self.c:
+            for fk in c.foreign_keys:
+                tname, cname = fk._target()
+                s = "FOREIGN KEY(%s) REFERENCES %s (%s)" % (c.name, tname, cname)
+                if fk.ondelete:
+                    s += " ON DELETE " + fk.ondelete
+                parts.append(s)
+        return "CREATE TABLE IF NOT EXISTS %s (\n\t%s\n)" % (self.name, ", \n\t".join(parts))
+
+    def create(self, bind, checkfirst=True):
+        with bind.begin() as conn:
+            conn._run(self._create_sql(), ())
+
+    def drop(self, bind, checkfirst=True):
+        with bind.begin() as conn:
+            conn._run("DROP TABLE IF EXISTS " + self.name, ())
+
+    def insert(self):
+        return insert(self)
+
+    def select(self):
+        return select(self)
+
+    def update(self):
+        return update(self)
+
+    def delete(self):
+        return delete(self)
+
+
+class Join(FromClause):
+    def __init__(self, left, right, onclause, isouter):
+        self.left = left
+        self.right = right
+        self.isouter = isouter
+        if onclause is None:
+            onclause = _join_condition(left._all_tables(), right)
+        self.onclause = onclause
+
+    def _all_tables(self):
+        return self.left._all_tables() + self.right._all_tables()
+
+    def _tables(self, acc):
+        for t in self._all_tables():
+            _add_unique(acc, t)
+
+    def _compile(self, ctx):
+        kw = "LEFT OUTER JOIN" if self.isouter else "JOIN"
+        return "%s %s %s ON %s" % (self.left._compile(ctx), kw, self.right._compile(ctx),
+                                   self.onclause._compile(ctx))
+
+
+def _join_condition(left_tables, right):
+    for lt in left_tables:
+        for c in right.c:
+            for fk in c.foreign_keys:
+                if fk.references(lt):
+                    return lt.c[fk._target()[1]] == c
+        for c in lt.c:
+            for fk in c.foreign_keys:
+                if fk.references(right):
+                    return c == right.c[fk._target()[1]]
+    raise exc.ArgumentError("Can't find any foreign key relationships between the tables")
+
+
+def _from_obj(x):
+    m = getattr(x, "__sa_mapper__", None)
+    if m is not None:
+        return m.table
+    return x
+
+
+class MetaData:
+    def __init__(self, schema=None):
+        self.tables = {}
+        self._order = []
+
+    @property
+    def sorted_tables(self):
+        done = []
+        pending = list(self._order)
+        while pending:
+            progressed = False
+            for t in list(pending):
+                ok = True
+                for fk in t.foreign_keys:
+                    tn = fk._target()[0]
+                    if tn != t.name and tn in self.tables and not any(d.name == tn for d in done):
+                        ok = False
+                if ok:
+                    done.append(t)
+                    pending.remove(t)
+                    progressed = True
+            if not progressed:
+                done.extend(pending)
+                break
+        return done
+
+    def create_all(self, bind, tables=None, checkfirst=True):
+        with bind.begin() as conn:
+            for t in self.sorted_tables:
+                if tables is None or t in tables:
+                    conn._run(t._create_sql(), ())
+
+    def drop_all(self, bind, tables=None, checkfirst=True):
+        with bind.begin() as conn:
+            for t in reversed(self.sorted_tables):
+                if tables is None or t in tables:
+                    conn._run("DROP TABLE IF EXISTS " + t.name, ())
+
+
+# ----------------------------------------------------------------------------- statements
+
+class _Slot:
+    """One entry of a select's columns clause: a column expression, or a mapped entity."""
+
+    def __init__(self, elem=None, mapper=None):
+        self.elem = elem
+        self.mapper = mapper
+        if mapper is not None:
+            self.key = mapper.class_.__name__
+            self.width = len(mapper.columns)
+        else:
+            self.key = elem.key if elem.key is not None else elem.name
+            self.width = 1
+
+
+def _slots(ent):
+    m = getattr(ent, "__sa_mapper__", None)
+    if m is not None:
+        return [_Slot(mapper=m)]
+    if isinstance(ent, Table):
+        return [_Slot(c) for c in ent.c]
+    return [_Slot(_lit(ent))]
+
+
+class Select(ClauseElement):
+    def __init__(self, *entities):
+        if len(entities) == 1 and isinstance(entities[0], (list, tuple)):
+            entities = entities[0]
+        self._slots = []
+        for e in entities:
+            self._slots.extend(_slots(e))
+        self._where = []
+        self._order = []
+        self._group = []
+        self._having = []
+        self._joins = []
+        self._from = []
+        self._limit = None
+        self._offset = None
+        self._distinct = False
+
+    def _clone(self):
+        s = Select()
+        s._slots = list(self._slots)
+        s._where = list(self._where)
+        s._order = list(self._order)
+        s._group = list(self._group)
+        s._having = list(self._having)
+        s._joins = list(self._joins)
+        s._from = list(self._from)
+        s._limit = self._limit
+        s._offset = self._offset
+        s._distinct = self._distinct
+        return s
+
+    def where(self, *clauses):
+        s = self._clone()
+        s._where.extend(clauses)
+        return s
+
+    filter = where
+
+    def filter_by(self, **kw):
+        s = self._clone()
+        t = self._first_table()
+        for k in kw:
+            s._where.append(t.c[k] == kw[k])
+        return s
+
+    def order_by(self, *clauses):
+        s = self._clone()
+        for c in clauses:
+            if c is not None:
+                s._order.append(c)
+        return s
+
+    def group_by(self, *clauses):
+        s = self._clone()
+        s._group.extend(clauses)
+        return s
+
+    def having(self, *clauses):
+        s = self._clone()
+        s._having.extend(clauses)
+        return s
+
+    def limit(self, n):
+        s = self._clone()
+        s._limit = n
+        return s
+
+    def offset(self, n):
+        s = self._clone()
+        s._offset = n
+        return s
+
+    def distinct(self):
+        s = self._clone()
+        s._distinct = True
+        return s
+
+    def select_from(self, *froms):
+        s = self._clone()
+        s._from.extend(_from_obj(f) for f in froms)
+        return s
+
+    def join(self, target, onclause=None, isouter=False, full=False):
+        s = self._clone()
+        info = getattr(target, "_join_info", None)
+        if info is not None and onclause is None:
+            target, onclause = info()
+        s._joins.append((_from_obj(target), onclause, isouter))
+        return s
+
+    def outerjoin(self, target, onclause=None, full=False):
+        return self.join(target, onclause, True)
+
+    join_from = None
+
+    def add_columns(self, *cols):
+        s = self._clone()
+        for c in cols:
+            s._slots.extend(_slots(c))
+        return s
+
+    def _first_table(self):
+        acc = []
+        self._column_tables(acc)
+        return acc[0]
+
+    def _column_tables(self, acc):
+        for sl in self._slots:
+            if sl.mapper is not None:
+                _add_unique(acc, sl.mapper.table)
+            else:
+                sl.elem._tables(acc)
+
+    def _froms(self):
+        if self._from:
+            base = list(self._from)
+        else:
+            base = []
+            self._column_tables(base)
+            if not base:
+                for w in self._where:
+                    w._tables(base)
+        joined = []
+        for target, _, _ in self._joins:
+            joined.append(target)
+        covered = []
+        for b in base:
+            if isinstance(b, Join):
+                for t in b._all_tables():
+                    covered.append(t)
+        out = []
+        for b in base:
+            if any(b is j for j in joined):
+                continue
+            if not isinstance(b, Join) and any(b is c for c in covered):
+                continue
+            out.append(b)
+        return out
+
+    def _compile(self, ctx):
+        ctx.columns_clause = True
+        cols = []
+        for sl in self._slots:
+            if sl.mapper is not None:
+                for c in sl.mapper.columns:
+                    cols.append(c._compile(ctx))
+            else:
+                cols.append(sl.elem._compile(ctx))
+        ctx.columns_clause = False
+        sql = "SELECT " + ("DISTINCT " if self._distinct else "") + ", ".join(cols)
+        froms = self._froms()
+        if froms or self._joins:
+            if not froms:
+                froms = [self._joins[0][0]]
+            parts = [f._compile(ctx) for f in froms]
+            seen = []
+            for f in froms:
+                seen.extend(f._all_tables())
+            jsql = ""
+            for target, onclause, isouter in self._joins:
+                if onclause is None:
+                    onclause = _join_condition(seen, target)
+                jsql += " %s %s ON %s" % ("LEFT OUTER JOIN" if isouter else "JOIN", target._compile(ctx),
+                                          onclause._compile(ctx))
+                seen.append(target)
+            parts[0] = parts[0] + jsql
+            sql += " \nFROM " + ", ".join(parts)
+        if self._where:
+            sql += " \nWHERE " + " AND ".join(w._compile(ctx) for w in self._where)
+        if self._group:
+            sql += " GROUP BY " + ", ".join(g._compile(ctx) for g in self._group)
+        if self._having:
+            sql += " \nHAVING " + " AND ".join(h._compile(ctx) for h in self._having)
+        if self._order:
+            sql += " ORDER BY " + ", ".join(o._compile(ctx) for o in self._order)
+        if self._limit is not None or self._offset is not None:
+            sql += " \nLIMIT ?"
+            ctx.params.append(self._limit if self._limit is not None else -1)
+            if self._offset is not None:
+                sql += " OFFSET ?"
+                ctx.params.append(self._offset)
+        return sql
+
+    def _execute_on(self, conn, params, session=None):
+        ctx = _Ctx()
+        sql = self._compile(ctx)
+        cur = conn._run(sql, ctx.params)
+        return CursorResult._from_cursor(cur, self._slots, session)
+
+    def subquery(self, name=None):
+        raise NotImplementedError("subqueries are not supported")
+
+    def scalar_subquery(self):
+        raise NotImplementedError("subqueries are not supported")
+
+
+def select(*entities):
+    return Select(*entities)
+
+
+def _values_from(args, kw):
+    d = {}
+    if args:
+        a = args[0]
+        if isinstance(a, dict):
+            d.update(a)
+    d.update(kw)
+    return d
+
+
+def _key_of(table, k):
+    if isinstance(k, Column):
+        return k.key
+    return k
+
+
+class _DML(ClauseElement):
+    def __init__(self, table):
+        self.table = _from_obj(table)
+        self._values = None
+        self._where = []
+        self._returning = []
+
+    def _clone(self):
+        s = type(self)(self.table)
+        s._values = None if self._values is None else dict(self._values)
+        s._where = list(self._where)
+        s._returning = list(self._returning)
+        return s
+
+    def values(self, *args, **kw):
+        s = self._clone()
+        d = {} if s._values is None else s._values
+        for k, v in _values_from(args, kw).items():
+            d[_key_of(self.table, k)] = v
+        s._values = d
+        return s
+
+    def where(self, *clauses):
+        s = self._clone()
+        s._where.extend(clauses)
+        return s
+
+    filter = where
+
+    def returning(self, *cols):
+        s = self._clone()
+        for c in cols:
+            if isinstance(c, Table):
+                s._returning.extend(c.c)
+            else:
+                s._returning.append(c)
+        return s
+
+    def _returning_sql(self, ctx):
+        if not self._returning:
+            return ""
+        q = ctx.qualify
+        ctx.qualify = False
+        s = " RETURNING " + ", ".join(c._compile(ctx) for c in self._returning)
+        ctx.qualify = q
+        return s
+
+    def _where_sql(self, ctx):
+        if not self._where:
+            return ""
+        return " WHERE " + " AND ".join(w._compile(ctx) for w in self._where)
+
+    def _result(self, cur):
+        slots = [_Slot(_lit(c)) for c in self._returning] if self._returning else None
+        return CursorResult._from_cursor(cur, slots)
+
+
+class Insert(_DML):
+    def _row(self, params):
+        row = {}
+        if self._values:
+            row.update(self._values)
+        if params:
+            row.update(params)
+        for c in self.table.c:
+            if c.key not in row and c.default is not None:
+                row[c.key] = c._default_value()
+        return row
+
+    def _sql(self, row, ctx):
+        cols = [c for c in self.table.c if c.key in row]
+        if not cols:
+            return "INSERT INTO %s DEFAULT VALUES" % self.table.name + self._returning_sql(ctx)
+        vals = []
+        for c in cols:
+            vals.append(_lit(row[c.key], c.type)._compile(ctx))
+        return "INSERT INTO %s (%s) VALUES (%s)" % (
+            self.table.name, ", ".join(c.name for c in cols), ", ".join(vals)) + self._returning_sql(ctx)
+
+    def _execute_on(self, conn, params, session=None):
+        if isinstance(params, list) and len(params) > 1:
+            rows = [self._row(p) for p in params]
+            ctx = _Ctx()
+            sql = self._sql(rows[0], ctx)
+            seq = []
+            for r in rows:
+                c2 = _Ctx()
+                self._sql(r, c2)
+                seq.append(c2.params)
+            cur = conn._run(sql, seq, many=True)
+            return self._result(cur)
+        if isinstance(params, list):
+            params = params[0] if params else None
+        row = self._row(params)
+        ctx = _Ctx()
+        cur = conn._run(self._sql(row, ctx), ctx.params)
+        res = self._result(cur)
+        pk = []
+        for c in self.table.primary_key:
+            pk.append(row[c.key] if row.get(c.key) is not None else cur.lastrowid)
+        res.inserted_primary_key = Row(pk, dict((c.key, i) for i, c in enumerate(self.table.primary_key)))
+        return res
+
+
+class Update(_DML):
+    def _execute_on(self, conn, params, session=None):
+        vals = dict(self._values or {})
+        if isinstance(params, dict):
+            vals.update(params)
+        ctx = _Ctx()
+        sets = []
+        for c in self.table.c:
+            if c.key in vals:
+                v = vals[c.key]
+                sets.append("%s=%s" % (c.name, _lit(v, c.type)._compile(ctx)))
+        sql = "UPDATE %s SET %s" % (self.table.name, ", ".join(sets)) + self._where_sql(ctx) + self._returning_sql(ctx)
+        return self._result(conn._run(sql, ctx.params))
+
+
+class Delete(_DML):
+    def _execute_on(self, conn, params, session=None):
+        ctx = _Ctx()
+        sql = "DELETE FROM " + self.table.name + self._where_sql(ctx) + self._returning_sql(ctx)
+        return self._result(conn._run(sql, ctx.params))
+
+
+def insert(table):
+    return Insert(table)
+
+
+def update(table):
+    return Update(table)
+
+
+def delete(table):
+    return Delete(table)
+
+
+# ----------------------------------------------------------------------------- results
+
+class Row:
+    def __init__(self, values, keymap):
+        self.__dict__["_values"] = tuple(values)
+        self.__dict__["_keymap"] = keymap
+
+    def __getattr__(self, name):
+        km = self.__dict__.get("_keymap")
+        if km is not None and name in km:
+            return self.__dict__["_values"][km[name]]
+        raise AttributeError("Could not locate column in row for column '%s'" % name)
+
+    def __getitem__(self, i):
+        return self._values[i]
+
+    def __iter__(self):
+        return iter(self._values)
+
+    def __len__(self):
+        return len(self._values)
+
+    def __eq__(self, other):
+        if isinstance(other, Row):
+            return self._values == other._values
+        if isinstance(other, tuple):
+            return self._values == other
+        return False
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def __hash__(self):
+        return hash(self._values)
+
+    def __repr__(self):
+        return repr(self._values)
+
+    def _asdict(self):
+        return dict((k, self._values[i]) for k, i in self._keymap.items())
+
+    @property
+    def _mapping(self):
+        return RowMapping(self._asdict())
+
+    @property
+    def _fields(self):
+        return tuple(self._keymap.keys())
+
+    def _tuple(self):
+        return self._values
+
+    @property
+    def t(self):
+        return self._values
+
+    def tuple(self):
+        return self._values
+
+
+class RowMapping(dict):
+    pass
+
+
+def _only(rows, allow_none):
+    if not rows:
+        if allow_none:
+            return None
+        raise exc.NoResultFound("No row was found when one was required")
+    if len(rows) > 1:
+        raise exc.MultipleResultsFound("Multiple rows were found when exactly one was required")
+    return rows[0]
+
+
+class _Rows:
+    def __init__(self, rows):
+        self._rows = rows
+        self._pos = 0
+
+    def _take(self):
+        r = self._rows[self._pos:]
+        self._pos = len(self._rows)
+        return r
+
+    def __iter__(self):
+        return iter(self._take())
+
+    def all(self):
+        return self._take()
+
+    fetchall = all
+
+    def fetchone(self):
+        if self._pos < len(self._rows):
+            self._pos += 1
+            return self._rows[self._pos - 1]
+        return None
+
+    def fetchmany(self, size=1):
+        r = self._rows[self._pos:self._pos + size]
+        self._pos += len(r)
+        return r
+
+    def first(self):
+        r = self._take()
+        return r[0] if r else None
+
+    def one(self):
+        return _only(self._take(), False)
+
+    def one_or_none(self):
+        return _only(self._take(), True)
+
+    def unique(self):
+        seen = []
+        out = []
+        for r in self._rows[self._pos:]:
+            if not any(r is s or r == s for s in seen):
+                seen.append(r)
+                out.append(r)
+        self._rows = out
+        self._pos = 0
+        return self
+
+
+class ScalarResult(_Rows):
+    pass
+
+
+class MappingResult(_Rows):
+    pass
+
+
+class CursorResult(_Rows):
+    def __init__(self, rows, keys, rowcount=-1, lastrowid=None):
+        _Rows.__init__(self, rows)
+        self._keys = keys
+        self.rowcount = rowcount
+        self.lastrowid = lastrowid
+        self.inserted_primary_key = None
+
+    @staticmethod
+    def _from_cursor(cur, slots, session=None):
+        desc = cur.description
+        if desc is None:
+            return CursorResult([], [], cur.rowcount, cur.lastrowid)
+        raw = cur.fetchall()
+        if slots is None:
+            keys = [d[0] for d in desc]
+            km = dict((k, i) for i, k in enumerate(keys))
+            return CursorResult([Row(r, km) for r in raw], keys, cur.rowcount, cur.lastrowid)
+        keys = [s.key for s in slots]
+        km = {}
+        for i, k in enumerate(keys):
+            if k is not None and k not in km:
+                km[k] = i
+        rows = []
+        for r in raw:
+            vals = []
+            pos = 0
+            for s in slots:
+                if s.mapper is not None:
+                    vals.append(s.mapper._load_row(session, r[pos:pos + s.width]))
+                else:
+                    vals.append(s.elem.type.result(r[pos]))
+                pos += s.width
+            rows.append(Row(vals, km))
+        return CursorResult(rows, keys, cur.rowcount, cur.lastrowid)
+
+    def keys(self):
+        return list(self._keys)
+
+    def scalars(self, index=0):
+        return ScalarResult([r[index] for r in self._take()])
+
+    def mappings(self):
+        return MappingResult([r._mapping for r in self._take()])
+
+    def scalar(self):
+        r = self._take()
+        return r[0][0] if r else None
+
+    def scalar_one(self):
+        return _only(self._take(), False)[0]
+
+    def scalar_one_or_none(self):
+        r = _only(self._take(), True)
+        return None if r is None else r[0]
+
+    def tuples(self):
+        return self
+
+    def close(self):
+        pass
+
+
+Result = CursorResult
+
+
+# ----------------------------------------------------------------------------- engine
+
+class Connection:
+    def __init__(self, engine):
+        self.engine = engine
+        self._dbapi = engine._raw_connection()
+        self.closed = False
+
+    def _run(self, sql, params, many=False):
+        cur = self._dbapi.cursor()
+        try:
+            if many:
+                cur.executemany(sql, params)
+            else:
+                cur.execute(sql, params)
+        except _sqlite3.Error as e:
+            raise exc._wrap(e, sql, params)
+        return cur
+
+    def execute(self, statement, parameters=None, execution_options=None):
+        if isinstance(statement, str):
+            raise exc.ArgumentError("Textual SQL expression should be explicitly declared as text()")
+        return statement._execute_on(self, parameters)
+
+    def exec_driver_sql(self, sql, parameters=()):
+        return CursorResult._from_cursor(self._run(sql, parameters), None)
+
+    def scalar(self, statement, parameters=None):
+        return self.execute(statement, parameters).scalar()
+
+    def scalars(self, statement, parameters=None):
+        return self.execute(statement, parameters).scalars()
+
+    def commit(self):
+        self._dbapi.commit()
+
+    def rollback(self):
+        self._dbapi.rollback()
+
+    def begin(self):
+        return _Tx(self, False)
+
+    def in_transaction(self):
+        return self._dbapi.in_transaction
+
+    def close(self):
+        if not self.closed:
+            self._dbapi.rollback()
+            self.closed = True
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, t, v, tb):
+        self.close()
+        return False
+
+
+class _Tx:
+    def __init__(self, conn, close_after):
+        self.conn = conn
+        self.close_after = close_after
+
+    def __enter__(self):
+        return self.conn
+
+    def __exit__(self, t, v, tb):
+        if t is None:
+            self.conn.commit()
+        else:
+            self.conn.rollback()
+        if self.close_after:
+            self.conn.close()
+        return False
+
+    def commit(self):
+        self.conn.commit()
+
+    def rollback(self):
+        self.conn.rollback()
+
+
+class _Dialect:
+    name = "sqlite"
+    driver = "pysqlite"
+
+
+class URL:
+    def __init__(self, s, database):
+        self._s = s
+        self.drivername = s.split(":", 1)[0]
+        self.database = database
+
+    def __str__(self):
+        return self._s
+
+
+def make_url(s):
+    if not s.startswith("sqlite"):
+        raise exc.ArgumentError("Only sqlite:// URLs are supported, got %r" % s)
+    rest = s.split("://", 1)[1] if "://" in s else ""
+    db = rest[1:] if rest.startswith("/") else rest
+    q = db.find("?")
+    if q >= 0:
+        db = db[:q]
+    return URL(s, db if db else None)
+
+
+class Engine:
+    def __init__(self, url, echo=False):
+        self.url = url
+        self.echo = echo
+        self.dialect = _Dialect()
+        self._dbapi = None
+
+    def _raw_connection(self):
+        # One DB-API connection for the engine (SQLAlchemy's SingletonThreadPool for SQLite).
+        if self._dbapi is None:
+            self._dbapi = _sqlite3.connect(self.url.database or ":memory:")
+        return self._dbapi
+
+    def raw_connection(self):
+        return self._raw_connection()
+
+    def connect(self):
+        return Connection(self)
+
+    def begin(self):
+        return _Tx(Connection(self), True)
+
+    def dispose(self):
+        if self._dbapi is not None:
+            self._dbapi.close()
+            self._dbapi = None
+
+
+def create_engine(url, echo=False, **kwargs):
+    if not isinstance(url, URL):
+        url = make_url(url)
+    return Engine(url, echo)
+
+
+def inspect(obj):
+    return obj

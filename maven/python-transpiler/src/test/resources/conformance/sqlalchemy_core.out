@@ -1,0 +1,34 @@
+(2, 'b', 2) b 2 2
+(3, 'c', 3) c 3 3
+3
+['a', 'b', 'c']
+[{'id': 1, 'name': 'a'}, {'id': 2, 'name': 'b'}, {'id': 3, 'name': 'c'}]
+('c', 3)
+None
+a
+MultipleResultsFound
+NoResultFound
+3
+['posts', 'users'] ['id', 'name', 'bio', 'score', 'active', 'created', 'born'] name
+pk 1
+ann hi 1.5 True 2024-01-02 03:04:05 1990-05-06 datetime date
+True
+['cid', 'ann']
+['bob', 'cid']
+['cid']
+['bob', 'cid']
+['cid']
+['ann']
+[('ann', 'p1'), ('ann', 'p2'), ('bob', 'p3')]
+[('ann', 'p1'), ('ann', 'p2')]
+3
+True
+[(1, 2), (2, 1)]
+4.0
+deleted 1
+updated 2
+3
+p2
+(4, 4)
+IntegrityError
+1

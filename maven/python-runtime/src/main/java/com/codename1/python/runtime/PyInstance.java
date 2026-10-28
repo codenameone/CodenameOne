@@ -642,8 +642,38 @@ public class PyInstance extends PyObject {
 
         @Override
         public void delItem(Object key) {
-            super.delItem(key);
+            // Not super.delItem: it removes through remove(), which is overridden below and
+            // would delete the attribute a second time.
+            if (super.remove(key) == null) {
+                throw Py.keyError(key);
+            }
             self.delAttrDirect(Py.toStr(key));
+        }
+
+        // pop() and popitem() remove through here, clear() through clear(): without these
+        // overrides `obj.__dict__.pop(name)` answered the value and left the attribute set.
+        @Override
+        public Object remove(Object key) {
+            Object v = super.remove(key);
+            if (v != null) {
+                self.delAttrDirect(Py.toStr(key));
+            }
+            return v;
+        }
+
+        @Override
+        public void clear() {
+            Object[] snapshot = new Object[used];
+            int n = 0;
+            for (int i = 0; i < used; i++) {
+                if (keys[i] != null) {
+                    snapshot[n++] = keys[i];
+                }
+            }
+            super.clear();
+            for (int i = 0; i < n; i++) {
+                self.delAttrDirect(Py.toStr(snapshot[i]));
+            }
         }
     }
 
