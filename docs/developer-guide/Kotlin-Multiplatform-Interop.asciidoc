@@ -88,10 +88,99 @@ library, no Compose runtime and no coroutines:
 The gap is the price of the reactive model, not of Kotlin. A composition
 records the state it read, compares what it emits against what it emitted
 last time and applies the difference; an imperative update sets three labels
-on a card that already exists. That bookkeeping is what makes Compose
-pleasant to write, and on Codename One it's fast enough for any screen. A
-hot list, a custom chart or a screen that has to fit a watch is where the
-imperative path pays; the rest of the application can stay in Compose.
+on a card that already exists.
+
+Nor does the declarative form buy readability. Here is one session card both
+ways. The Compose version, from the benchmark:
+
+[source,kotlin]
+----
+@Composable
+fun SessionCard(s: Session, favorite: Boolean, onFavorite: () -> Unit, onOpen: () -> Unit) {
+    Card(onOpen, Modifier.fillMaxWidth().testTag("session-${s.id}")) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.width(6.dp).height(84.dp).background(Color(s.track.color)))
+            Column(Modifier.weight(1f).padding(12.dp)) {
+                Text(s.timeLabel + "  -  " + s.room, style = MaterialTheme.typography.labelMedium)
+                Text(s.title, style = MaterialTheme.typography.titleMedium, maxLines = 2)
+                Text(s.speaker.name + ", " + s.speaker.company,
+                    style = MaterialTheme.typography.bodySmall)
+            }
+            FavoriteButton(favorite, onFavorite, Modifier.testTag("fav-${s.id}"))
+        }
+    }
+}
+----
+
+And in Codename One, with the look in the theme's CSS where a designer can
+change it:
+
+[source,java]
+----
+public class SessionCard extends Container {
+    final Label time = new Label("", "SessionTime");
+    final Label title = new Label("", "SessionTitle");
+    final Label speaker = new Label("", "SessionSpeaker");
+    final Button heart = new Button("", "Favorite");
+    private Session session;
+
+    public SessionCard(Favorites favorites) {
+        super(new BorderLayout(), "SessionCard");
+        add(BorderLayout.CENTER, BoxLayout.encloseY(time, title, speaker));
+        add(BorderLayout.EAST, heart);
+        heart.addActionListener(e -> {
+            favorites.toggle(session);
+            bind(session, favorites);
+        });
+    }
+
+    public void bind(Session s, Favorites favorites) {
+        session = s;
+        time.setText(s.getTimeLabel() + "  -  " + s.getRoom());
+        title.setText(s.getTitle());
+        speaker.setText(s.getSpeaker() + ", " + s.getCompany());
+        FontImage.setMaterialIcon(heart, favorites.contains(s)
+                ? FontImage.MATERIAL_FAVORITE : FontImage.MATERIAL_FAVORITE_BORDER);
+    }
+}
+----
+
+The Java card says what happens and when: the components are made once,
+`bind` fills them, a tap changes the favourite and shows it. Nothing reruns
+behind the code's back, so a breakpoint in `bind` stops exactly when a card
+shows a session -- the question a recomposition count leaves open.
+
+It tests as directly. A component is an ordinary object, so a unit test makes
+one, binds it and presses its button, with no test rule, semantics tree or
+tags kept only for the test:
+
+[source,java]
+----
+public class SessionCardTest extends AbstractTest {
+    @Override
+    public boolean runTest() throws Exception {
+        Favorites favorites = new Favorites();
+        Session talk = new Session(7, "Keynote", "A. Speaker", "Codename One",
+                "Hall A", "09:00");
+        SessionCard card = new SessionCard(favorites);
+        card.bind(talk, favorites);
+
+        assertEqual("Keynote", card.title.getText());
+        assertFalse(favorites.contains(talk));
+
+        card.heart.released();   // a tap
+        assertTrue(favorites.contains(talk), "the heart marks the session");
+        return true;
+    }
+}
+----
+
+The test sits in the card's package, so it reads the fields directly. It
+runs in the simulator with `mvn cn1:test`, like every other Codename One test.
+
+A hot list, a custom chart or a screen that has to fit a watch is where the
+imperative path pays first; nothing stops a team writing every screen that
+way.
 
 === One platform API on every target
 

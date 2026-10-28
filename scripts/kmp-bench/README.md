@@ -103,9 +103,10 @@ than CMP; a scroll step is 1.8 ms, nearly ten times faster; the executable is
 That gap is the cost of the reactive model, not of Kotlin's speed. A
 composition records what it read, diffs what it emits against its slot table
 and hands the changes to an applier. An imperative update sets three labels on
-a card that already exists. Compose buys a great deal with that bookkeeping,
-and on Codename One it is fast enough for any screen; the Java path is there
-for the screens where the last few milliseconds, or megabytes, decide.
+a card that already exists, and reads as plainly: the components are made
+once, `bind` fills them, and a test makes a card and presses its button
+without a test rule or semantics tree. The developer guide's Kotlin
+Multiplatform chapter shows the card both ways and a test for it.
 
 Building it found a framework bug every Codename One app on a notched device
 paid: a Form with a Toolbar laid itself out again on every EDT cycle, forever,
