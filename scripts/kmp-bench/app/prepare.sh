@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Materialises BOTH sides of the Kotlin Multiplatform benchmark into a work
+# Materialises all three sides of the Kotlin Multiplatform benchmark into a work
 # directory, from ONE copy of the application.
 #
 #   scripts/kmp-bench/app/prepare.sh --work /tmp/kbench [--maven-repo DIR]
@@ -35,7 +35,7 @@ fi
 MVN_REPO_ARG=""
 [ -n "$MAVEN_REPO_LOCAL" ] && MVN_REPO_ARG="-Dmaven.repo.local=$MAVEN_REPO_LOCAL"
 
-rm -rf "$WORK/cn1" "$WORK/cmp"
+rm -rf "$WORK/cn1" "$WORK/cmp" "$WORK/java"
 mkdir -p "$WORK"
 
 # --- Codename One -----------------------------------------------------------
@@ -50,6 +50,17 @@ mkdir -p "$COMMON/src/main/kotlin/com/example/kmpbench" "$COMMON/src/main/kmp/co
 cp "$HERE/cn1/BenchEntry.kt" "$COMMON/src/main/kotlin/com/example/kmpbench/"
 cp -R "$HERE/shared/commonMain/kotlin" "$COMMON/src/main/kmp/commonMain/kotlin"
 echo "codename1.arg.ios.newStorageLocation=true" >> "$COMMON/codenameone_settings.properties"
+
+# --- Codename One, written in Java ------------------------------------------
+# The same screens over Codename One directly: no Kotlin sources, so neither
+# the Kotlin standard library nor the Compose runtime is in the application.
+
+( cd "$WORK" && mvn -B -q $MVN_REPO_ARG archetype:generate \
+    -DarchetypeArtifactId=cn1app-archetype -DarchetypeGroupId=com.codenameone \
+    -DarchetypeVersion="$CN1_VERSION" -DgroupId=com.example.javabench -DartifactId=java \
+    -Dversion=1.0-SNAPSHOT -DmainName=JavaBench -DinteractiveMode=false )
+cp "$HERE/java/JavaBench.java" "$WORK/java/common/src/main/java/com/example/javabench/JavaBench.java"
+echo "codename1.arg.ios.newStorageLocation=true" >> "$WORK/java/common/codenameone_settings.properties"
 
 # --- Compose Multiplatform --------------------------------------------------
 

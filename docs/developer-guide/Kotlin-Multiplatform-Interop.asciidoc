@@ -20,19 +20,20 @@ reads. Only the UI layer -- `androidx.compose.ui`, `foundation` and
 `Graphics`.
 
 The same application, built from the same `commonMain` both ways and measured
-on the same iPhone simulator, with Compose Multiplatform as 100%:
+on the same iPhone simulator, with Compose Multiplatform as 100%. The second
+bar is the same screens written in Java against Codename One directly, which
+the next section explains:
 
-image::img/kmp-bench-results.svg["Size, memory, start-up, recomposition and scrolling of the same Compose application built by Codename One, relative to Compose Multiplatform",scaledwidth=95%]
+image::img/kmp-bench-results.svg["Size, memory, start-up, recomposition and scrolling of the same application built by Codename One from Compose and from Java, relative to Compose Multiplatform",scaledwidth=95%]
 
-- **Recomposition and scrolling take about a quarter of the CPU time.** A
-  state change is drawn in 4.2 ms against 19.5 ms, and one step of scrolling
-  in 5.1 ms against 17.1 ms. Both sides keep pace with the display, so the
-  difference is headroom: for heavier screens, and for battery.
+- **Recomposition and scrolling take a quarter to a third of the CPU time.**
+  A state change is drawn in 5.3 ms against 20.4 ms, and one step of
+  scrolling in 5.6 ms against 16.9 ms. Every side keeps pace with the display,
+  so the difference is headroom: for heavier screens, and for battery.
 - **The executable is 27% smaller** (16.8 MB against 22.9 MB) and the bundle
   20% smaller, although the Codename One one carries the whole iOS port.
-- **Start-up is faster**, 905 ms against 1097 ms cold and 572 ms against
-  638 ms warm.
-- **Memory is level**, 49 MB of physical footprint against 48 MB.
+- **Start-up is faster**, 794 ms against 1051 ms cold.
+- **Memory is level**, 48 MB of physical footprint against 49 MB.
 
 The benchmark, its method and how to run it are in `scripts/kmp-bench` in the
 Codename One repository. These are simulator numbers; they show where each
@@ -46,11 +47,56 @@ Codename One form next to any other component, and reaches every Codename One
 API directly -- push notifications, in-app purchase, the native maps, the
 backend -- with no `expect`/`actual` plumbing per platform.
 
-The same build also reaches targets Compose Multiplatform's UI does not run
+The same build also reaches targets Compose Multiplatform's UI doesn't run
 on: watchOS, tvOS, and Windows, Linux and macOS as native binaries with no JVM
 to install. The Codename One backend runs the same Kotlin on the server, so a
 data class or validation rule in `commonMain` is shared by the app and the
 service that feeds it.
+
+=== Dropping to Java where it pays
+
+A Compose screen and a Codename One screen are the same kind of object at run
+time -- a component in a form -- so an application doesn't have to choose one
+for all its screens. Kotlin calls every Codename One class directly, and a Java
+class can sit beside the composables in the same module. Compose
+Multiplatform has no such floor: below `commonMain` there is a different
+language and a different UI toolkit on every platform.
+
+The benchmark measures what that floor is worth. `JavaBench.java` in
+`scripts/kmp-bench/app/java` is the Keynote screens written against Codename
+One directly, timed by the same steps, and it ships no Kotlin standard
+library, no Compose runtime and no coroutines:
+
+- **The executable is 8.9 MB**, 39% of Compose Multiplatform's 22.9 MB and
+  about half of the Compose build's, and the bundle is 10.2 MB.
+- **A step of scrolling takes 1.8 ms**, against 5.6 ms for the Compose build
+  and 16.9 ms for Compose Multiplatform. A day change takes 4.6 ms.
+- **Memory is 53 MB**: it builds all fifty cards of a day as components,
+  where a lazy list composes only those in view.
+
+A hot list, a custom chart or a screen that has to fit a watch is where this
+pays; the rest of the application can stay in Compose.
+
+=== One platform API on every target
+
+The `expect`/`actual` declarations a KMP project writes per platform are
+mostly calls Codename One already makes the same everywhere. A composable
+reaches each of them as ordinary Kotlin calls:
+
+- <<push-notifications-section,Push notifications>>, in-app purchase and
+  subscriptions, and <<external-surfaces,home-screen widgets and live
+  activities>>.
+- <<crash-protection,Crash protection>> and <<app-shield,App Shield>>
+  hardening, as build options rather than per-platform SDKs.
+- <<webrtc-section,Real-time audio and video>> and
+  <<ai-and-speech-section,AI and speech>>.
+- Storage, SQLite, networking, the camera, location, sharing and the native
+  maps, with one implementation per platform maintained in Codename One.
+
+The targets go past phones and desktops too: Apple Watch and Wear OS from the
+same project as the phone application, CarPlay and Android Auto, tvOS,
+embedded Linux boards with no X11 and no JVM, the browser, and the
+<<_server_side_backend,server-side backend>>.
 
 === Quick start
 

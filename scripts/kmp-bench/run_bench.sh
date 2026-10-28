@@ -24,8 +24,9 @@
 #
 # Builds the Keynote app twice from the same Compose source -- once with
 # Codename One (compose-compat, ParparVM) and once with Compose Multiplatform
-# (Kotlin/Native + Skia) -- runs both on one iOS simulator and writes
-# results.json and results.md into the work directory.
+# (Kotlin/Native + Skia) -- and a third time from app/java, the same screens
+# written in Java over Codename One directly. Runs all three on one iOS
+# simulator and writes results.json and results.md into the work directory.
 #
 #   run_bench.sh --work <dir> [--runs N] [--device <udid>] [--maven-repo <dir>]
 #
@@ -68,6 +69,17 @@ SRC="$(dirname "$(find "$WORK/cn1/common/target" -maxdepth 2 -name Bench.xcodepr
 CN1_APP="$WORK/dd/Build/Products/Release-iphonesimulator/Bench.app"
 CN1_EXE="$CN1_APP/Bench"
 CN1_ID=com.example.kmpbench
+
+echo "== Codename One, Java: translate and build"
+( cd "$WORK/java" && JAVA_HOME="$JAVA17_HOME" mvn -B -q $MVN_REPO_ARG package -DskipTests \
+    -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-source -Dopen=false ) > "$WORK/java-build.log" 2>&1
+JSRC="$(dirname "$(find "$WORK/java/common/target" -maxdepth 2 -name JavaBench.xcodeproj | head -1)")"
+( cd "$JSRC" && xcodebuild -project JavaBench.xcodeproj -scheme JavaBench -configuration Release \
+    -sdk iphonesimulator -arch arm64 -derivedDataPath "$WORK/dd-java" CODE_SIGNING_ALLOWED=NO build ) \
+    > "$WORK/java-xcode.log" 2>&1
+JAVA_APP="$WORK/dd-java/Build/Products/Release-iphonesimulator/JavaBench.app"
+JAVA_EXE="$JAVA_APP/JavaBench"
+JAVA_ID=com.example.javabench
 
 echo "== Compose Multiplatform: build"
 ( cd "$WORK/cmp" && JAVA_HOME="$JAVA17_HOME" gradle --no-daemon -q \
@@ -136,8 +148,9 @@ footprint_bytes() {
         v = $(i + 1); u = $(i + 2); print int(v * (u == "GB" ? 1073741824 : u == "MB" ? 1048576 : 1024)); exit } }'
 }
 
-for side in cn1 cmp; do
-  if [ $side = cn1 ]; then app="$CN1_APP"; id=$CN1_ID; exe=Bench.app/Bench
+for side in cn1 java cmp; do
+  if [ $side = cn1 ]; then app="$CN1_APP"; id=$CN1_ID; exe=/Bench.app/Bench
+  elif [ $side = java ]; then app="$JAVA_APP"; id=$JAVA_ID; exe=JavaBench.app/JavaBench
   else app="$CMP_APP"; id=$CMP_ID; exe=Keynote.app/Keynote; fi
   xcrun simctl uninstall "$DEVICE" "$id" 2>/dev/null || true
   xcrun simctl install "$DEVICE" "$app"
@@ -160,8 +173,8 @@ perf() {
       j < NF && $(j + 1) !~ /^(perf-done|perf-start|first-frame)$/ {
       v[$(j + 1)] = v[$(j + 1)] (v[$(j + 1)] == "" ? "" : ",") $(j + 2) } END { for (k in v) print k "=" v[k] }' > "$WORK/$name-perf.txt"
 }
-perf $CN1_ID cn1; perf $CMP_ID cmp
-CN1_RSS="$(footprint_bytes $CN1_ID Bench.app/Bench)"; CMP_RSS="$(footprint_bytes $CMP_ID Keynote.app/Keynote)"
+perf $CN1_ID cn1; perf $JAVA_ID java; perf $CMP_ID cmp
+CN1_RSS="$(footprint_bytes $CN1_ID /Bench.app/Bench)"; JAVA_RSS="$(footprint_bytes $JAVA_ID JavaBench.app/JavaBench)"; CMP_RSS="$(footprint_bytes $CMP_ID Keynote.app/Keynote)"
 
 python3 - "$WORK" <<EOF
 import json, statistics, sys
@@ -180,6 +193,8 @@ def side(starts, exe, bundle, rss, res, perf):
             "footprint_bytes": rss, "perf_median_of_runs_us": perfvals(perf)}
 r = {"codename_one": side("$STARTS_cn1", $(stripped "$CN1_EXE"), $(bundle "$CN1_APP" Bench), ${CN1_RSS:-0},
                          $(resources "$CN1_APP" Bench), "cn1"),
+     "codename_one_java": side("$STARTS_java", $(stripped "$JAVA_EXE"), $(bundle "$JAVA_APP" JavaBench), ${JAVA_RSS:-0},
+                         $(resources "$JAVA_APP" JavaBench), "java"),
      "compose_multiplatform": side("$STARTS_cmp", $(stripped "$CMP_EXE"), $(bundle "$CMP_APP" Keynote), ${CMP_RSS:-0},
                          $(resources "$CMP_APP" Keynote), "cmp")}
 json.dump(r, open(work + "/results.json", "w"), indent=2)
@@ -199,11 +214,13 @@ rows += [("Recomposition, day change to drawn (median)", ms("recompose-median-us
          ("Scroll, frame interval (p95)", ms("scroll-frame-p95-us")),
          ("Scroll, frames over 2x median", lambda x: "%d of %d" % (x["perf_median_of_runs_us"]["scroll-jank-frames"],
                                                                x["perf_median_of_runs_us"]["scroll-frames"]))]
-md = ["| | Codename One | Compose Multiplatform |", "|---|---|---|"]
-md += ["| %s | %s | %s |" % (n, f(r["codename_one"]), f(r["compose_multiplatform"])) for n, f in rows]
+md = ["| | Codename One, Compose | Codename One, Java | Compose Multiplatform |", "|---|---|---|---|"]
+md += ["| %s | %s | %s | %s |" % (n, f(r["codename_one"]), f(r["codename_one_java"]), f(r["compose_multiplatform"]))
+       for n, f in rows]
 open(work + "/results.md", "w").write("\n".join(md) + "\n")
 print("\n".join(md))
 EOF
 echo "== Largest files besides the executable"
 echo "-- Codename One"; largest "$CN1_APP" Bench
+echo "-- Codename One, Java"; largest "$JAVA_APP" JavaBench
 echo "-- Compose Multiplatform"; largest "$CMP_APP" Keynote

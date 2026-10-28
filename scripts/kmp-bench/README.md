@@ -48,18 +48,21 @@ iPhone 17 Pro simulator, Xcode 27, Apple silicon, Release builds, 5 runs.
 Start-up here is from process start (the kernel's start time) to the marker, so
 `simctl`'s own overhead is left out of both.
 
-| | Codename One | Compose Multiplatform |
-|---|---|---|
-| Cold start | 905 ms | 1097 ms |
-| Warm start (median) | 572 ms | 638 ms |
-| Executable, stripped | 16.8 MB | 22.9 MB |
-| App bundle, executable stripped | 18.3 MB | 22.9 MB |
-| Bundle without executable | 1.3 MB | 2.5 KB |
-| Physical footprint | 49 MB | 48 MB |
-| Recomposition, day change to drawn (median / p95) | 4.2 / 5.3 ms | 19.5 / 24.0 ms |
-| Scroll, work per frame (median / p95) | 5.1 / 6.3 ms | 17.1 / 18.5 ms |
-| Scroll, frame interval (median / p95) | 34.8 / 38.8 ms | 33.4 / 35.3 ms |
-| Scroll, frames over 2x median | 0 of 144 | 0 of 144 |
+| | Codename One, Compose | Codename One, Java | Compose Multiplatform |
+|---|---|---|---|
+| Cold start | 794 ms | 754 ms | 1051 ms |
+| Warm start (median) | 555 ms | 560 ms | 597 ms |
+| Executable, stripped | 16.8 MB | 8.9 MB | 22.9 MB |
+| App bundle, executable stripped | 18.3 MB | 10.2 MB | 22.9 MB |
+| Bundle without executable | 1.3 MB | 1.3 MB | 2.5 KB |
+| Physical footprint | 48.0 MB | 53.0 MB | 49.0 MB |
+| Recomposition, day change to drawn (median) | 5.31 ms | 4.56 ms | 20.37 ms |
+| Recomposition, day change to drawn (p95) | 6.79 ms | 5.67 ms | 23.08 ms |
+| Scroll, work per frame (median) | 5.60 ms | 1.80 ms | 16.94 ms |
+| Scroll, work per frame (p95) | 8.06 ms | 1.94 ms | 18.81 ms |
+| Scroll, frame interval (median) | 39.52 ms | 37.91 ms | 33.34 ms |
+| Scroll, frame interval (p95) | 45.00 ms | 43.98 ms | 35.05 ms |
+| Scroll, frames over 2x median | 0 of 144 | 0 of 144 | 0 of 144 |
 
 Runtime values are the median over 5 launches of each launch's median or p95.
 An empty UIKit app measured 640-750 ms start-up and a 34 MB footprint on the
@@ -72,14 +75,29 @@ are linked in. The CN1 bundle holds 1.3 MB besides its executable:
 `iOSModernTheme.res` (213 KB), `default.metallib` (92 KB) and
 `kotlin.kotlin_builtins` (29 KB).
 
-**Codename One does each step in about a quarter of the time.** A day change
-takes 4.2 ms from state change to drawn on Codename One and 19.5 ms on CMP; one
-card of scrolling takes 5.1 ms against 17.1 ms. Both sides then wait for the display: the frame interval is about two display frames on each
-(35 ms and 33 ms), because `scrollToItem` is issued once per drawn frame, and
-neither dropped a frame against its own median. These are simulator numbers
-on an Apple-silicon Mac. They show where each runtime spends CPU in identical
-code. They do not show device frame rates, GPU cost, or how a finger-driven
-fling feels.
+**Codename One does each step in a quarter to a third of the time.** A day
+change takes 5.3 ms from state change to drawn on Codename One and 20.4 ms on
+CMP; one card of scrolling takes 5.6 ms against 16.9 ms. Every side then waits
+for the display: `scrollToItem` is issued once per drawn frame, so the frame
+interval is about two display frames on each, and none dropped a frame against
+its own median. These are simulator numbers on an Apple-silicon Mac. They show
+where each runtime spends CPU in identical code. They do not show device frame
+rates, GPU cost, or how a finger-driven fling feels.
+
+**The Java column is the same app without Kotlin.** `app/java/JavaBench.java`
+is the Keynote screens written against Codename One directly -- the same
+programme generator, the same cards, the same steps timed the same way, a 1 px
+marker painted after the list -- so it ships no Kotlin standard library, no
+Compose runtime and no coroutines. Its executable is 8.9 MB, 39% of CMP's and
+about half of the Compose build; a scroll step is 1.8 ms. Memory is the one
+row it does not win: it builds all fifty cards of a day as components, where a
+lazy list composes only those in view.
+
+Building it found a framework bug every Codename One app on a notched device
+paid: a Form with a Toolbar laid itself out again on every EDT cycle, forever,
+because the safe-area padding it sets for one measurement announced a style
+change that queued another layout. The idle app burned 14-26% CPU and 10-20 MB
+of garbage. `Container.snapToSafeAreaInternal` now sets that padding silently.
 
 The first version of compose-compat took 42 ms per day change, and almost none
 of it was work: the EDT sat idle for 83% of it. A state change waited for a
