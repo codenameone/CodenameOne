@@ -178,8 +178,11 @@ class ProcessBudgetPacingIntegrationTest {
      * Slack over the margin for the headroom assertion. Generous, because the assertion's
      * job is to separate a budget-derived figure from a host-wide one -- two readings
      * orders of magnitude apart -- not to pin down where exactly headroom bottomed out.
+     * The low point is sampled once per admitted block, after the collector has run, and
+     * on Linux runners it lands about 8MB above the margin: 72992KB in one build and 73736KB
+     * in the next, which an 8MB slack failed on by 8KB.
      */
-    private static final long HEADROOM_MARGIN_SLACK_KB = 8 * 1024;
+    private static final long HEADROOM_MARGIN_SLACK_KB = 32 * 1024;
 
     /**
      * Bound on a single translated-binary run. The workload takes a few seconds; this is
