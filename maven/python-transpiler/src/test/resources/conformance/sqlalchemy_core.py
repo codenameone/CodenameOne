@@ -3,7 +3,7 @@ import datetime
 from sqlalchemy import (create_engine, text, MetaData, Table, Column, Integer, String, Text, Float,
                         Boolean, DateTime, Date, ForeignKey, select, insert, update, delete, func,
                         and_, or_, not_)
-from sqlalchemy import exc
+from sqlalchemy import exc, inspect
 
 engine = create_engine(sys.argv[1] if len(sys.argv) > 1 else "sqlite://")
 # Raw DDL is the one place the SQL is the engine's own: an auto-numbered key is spelled per engine.
@@ -107,4 +107,4 @@ with engine.connect() as conn:
 
 metadata.drop_all(engine)
 with engine.connect() as conn:
-    print(conn.execute(text("SELECT count(*) FROM sqlite_master WHERE type='table'")).scalar())
+    print(sorted(n for n in inspect(conn).get_table_names() if n in ("t", "users", "posts")))

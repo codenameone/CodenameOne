@@ -524,6 +524,22 @@ public final class PythonTranspiler {
                 + "     */\n"
                 + "    private static final int WORKERS = 16;\n\n"
                 + "    static void install() {\n"
+                // Handlers may run on virtual threads: the GIL must step them
+                // aside rather than block their host thread (see Gil.Scheduler).
+                + "        com.codename1.python.runtime.Gil.setScheduler(new com.codename1.python.runtime.Gil.Scheduler() {\n"
+                + "            public long current() {\n"
+                // The handle even while pinned in a monitor: the GIL's owner
+                // key must not change between enter and exit.
+                + "                return com.codename1.backend.VirtualThread.current();\n"
+                + "            }\n\n"
+                + "            public boolean pause() {\n"
+                + "                if (!com.codename1.backend.VirtualThread.isVirtual()) {\n"
+                + "                    return false;\n"
+                + "                }\n"
+                + "                com.codename1.backend.VirtualThread.yieldNow();\n"
+                + "                return true;\n"
+                + "            }\n"
+                + "        });\n"
                 + "        PyServer.install(new BackendServer());\n"
                 + "    }\n\n"
                 + "    @Override\n"

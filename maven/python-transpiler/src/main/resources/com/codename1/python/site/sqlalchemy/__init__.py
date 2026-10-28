@@ -2341,7 +2341,38 @@ def create_engine(url, echo=False, **kwargs):
     return Engine(url, echo)
 
 
+class Inspector:
+    """``inspect(engine)``: the tables the database has, asked of the engine's own catalog."""
+
+    def __init__(self, bind):
+        self.bind = bind
+        self.dialect = bind.engine.dialect if isinstance(bind, Connection) else bind.dialect
+
+    def _catalog_sql(self):
+        name = self.dialect.name
+        if name == "postgresql":
+            return ("SELECT c.relname FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n "
+                    "ON n.oid = c.relnamespace WHERE n.nspname = current_schema() "
+                    "AND c.relkind IN ('r', 'p') ORDER BY c.relname")
+        if name in ("mysql", "mariadb"):
+            return ("SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE() "
+                    "AND table_type = 'BASE TABLE' ORDER BY table_name")
+        return ("SELECT name FROM sqlite_master WHERE type = 'table' "
+                "AND name NOT LIKE 'sqlite~_%' ESCAPE '~' ORDER BY name")
+
+    def get_table_names(self, schema=None):
+        if isinstance(self.bind, Connection):
+            return [str(n) for n in self.bind.exec_driver_sql(self._catalog_sql()).scalars().all()]
+        with self.bind.connect() as conn:
+            return [str(n) for n in conn.exec_driver_sql(self._catalog_sql()).scalars().all()]
+
+    def has_table(self, table_name, schema=None):
+        return table_name in self.get_table_names(schema)
+
+
 def inspect(obj):
+    if isinstance(obj, (Engine, Connection)):
+        return Inspector(obj)
     return obj
 
 # The DB-API module SQLAlchemy names in an error, "(psycopg2.OperationalError) ...", by driver.

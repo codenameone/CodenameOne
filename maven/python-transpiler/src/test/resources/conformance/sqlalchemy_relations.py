@@ -111,7 +111,8 @@ with Session(engine) as s:
     p2 = Post(title="two", tags=[py])
     s.add_all([p1, p2, web])
     s.commit()
-    print(sorted(t.name for t in p1.tags), [p.title for p in py.posts])
+    # A lazy load has no ORDER BY, so the order of py.posts is the database's to pick.
+    print(sorted(t.name for t in p1.tags), sorted(p.title for p in py.posts))
     p2.tags.append(web)
     p1.tags.remove(db)
     s.commit()

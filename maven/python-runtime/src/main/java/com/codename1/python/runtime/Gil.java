@@ -23,6 +23,8 @@
  */
 package com.codename1.python.runtime;
 
+import java.util.concurrent.atomic.AtomicLong;
+
 /// The global interpreter lock: Python code runs on one thread at a time.
 ///
 /// The runtime's caches, containers and module state assume a single
@@ -38,45 +40,97 @@ package com.codename1.python.runtime;
 /// Reentrant: a callback into Python from Java code that Python called runs
 /// on the same thread, which already holds the lock.
 public final class Gil {
-    private static final Object MONITOR = new Object();
-    private static Thread owner;
+    /// How many failed attempts a platform thread spins through
+    /// `Thread.yield()` before it starts sleeping between attempts.
+    private static final int SPINS = 64;
+
+    /// Who holds the lock: 0 when nobody does, a virtual thread's handle
+    /// (positive) or a platform thread's negated id. A key rather than the
+    /// `Thread`, because every virtual thread on a backend host answers the
+    /// host's `Thread` -- two of them would read as one reentrant owner.
+    private static final AtomicLong OWNER = new AtomicLong();
+
+    /// Reentry depth. Read and written only by the owner; ownership passes
+    /// through a compare-and-set on [#OWNER], which orders it.
     private static int depth;
 
+    private static Scheduler scheduler;
+
+    /// What a server with virtual threads tells the lock about them.
+    ///
+    /// A virtual thread must never block in `Object.wait` or on a contended
+    /// monitor: that blocks its HOST thread, and with tasks queued on every
+    /// host the whole server wedges. So the lock never blocks -- it is a
+    /// compare-and-set, and a waiter steps aside through [#pause()] between
+    /// attempts.
+    public interface Scheduler {
+        /// The running virtual thread's handle, or 0 on a platform thread.
+        long current();
+
+        /// Steps the running virtual thread aside so its host can run
+        /// another; answers false (and does nothing) on a platform thread.
+        boolean pause();
+    }
+
     private Gil() {
+    }
+
+    /// Installed once, before the server starts any thread.
+    public static void setScheduler(Scheduler s) {
+        scheduler = s;
+    }
+
+    private static long key() {
+        Scheduler s = scheduler;
+        if (s != null) {
+            long vt = s.current();
+            if (vt != 0) {
+                return vt;
+            }
+        }
+        return -(Thread.currentThread().getId() + 1);
     }
 
     /// Takes the lock, waiting for the thread that holds it to wait or
     /// leave Python.
     public static void enter() {
-        Thread t = Thread.currentThread();
-        synchronized (MONITOR) {
-            if (owner == t) { //NOPMD CompareObjectsWithEquals - identity is meant
-                depth++;
-                return;
+        long me = key();
+        if (OWNER.get() == me) {
+            depth++;
+            return;
+        }
+        acquire(me);
+        depth = 1;
+    }
+
+    private static void acquire(long me) {
+        int spins = 0;
+        while (!OWNER.compareAndSet(0, me)) {
+            Scheduler s = scheduler;
+            if (s != null && s.pause()) {
+                continue;
             }
-            while (owner != null) {
+            if (spins < SPINS) {
+                spins++;
+                Thread.yield();
+            } else {
                 try {
-                    MONITOR.wait();
+                    Thread.sleep(1);
                 } catch (InterruptedException e) {
                     // keep waiting: the lock is the only way back into Python
                 }
             }
-            owner = t;
-            depth = 1;
         }
     }
 
     /// Leaves one [#enter()].
     public static void exit() {
-        synchronized (MONITOR) {
-            if (owner != Thread.currentThread()) { //NOPMD CompareObjectsWithEquals - identity is meant
-                return;
-            }
-            depth--;
-            if (depth == 0) {
-                owner = null;
-                MONITOR.notifyAll();
-            }
+        if (OWNER.get() != key()) {
+            return;
+        }
+        depth--;
+        if (depth == 0) {
+            OWNER.set(0);
         }
     }
 
@@ -84,25 +138,20 @@ public final class Gil {
     /// [#restore(int)] takes back afterwards (0 when this thread did not
     /// hold it).
     public static int release() {
-        synchronized (MONITOR) {
-            if (owner != Thread.currentThread()) { //NOPMD CompareObjectsWithEquals - identity is meant
-                return 0;
-            }
-            int d = depth;
-            owner = null;
-            depth = 0;
-            MONITOR.notifyAll();
-            return d;
+        if (OWNER.get() != key()) {
+            return 0;
         }
+        int d = depth;
+        depth = 0;
+        OWNER.set(0);
+        return d;
     }
 
     /// Takes the lock back after a wait.
     public static void restore(int saved) {
         if (saved > 0) {
-            enter();
-            synchronized (MONITOR) {
-                depth = saved;
-            }
+            acquire(key());
+            depth = saved;
         }
     }
 
@@ -110,7 +159,10 @@ public final class Gil {
     /// does.
     public static void yieldNow() {
         int saved = release();
-        Thread.yield();
+        Scheduler s = scheduler;
+        if (s == null || !s.pause()) {
+            Thread.yield();
+        }
         restore(saved);
     }
 }

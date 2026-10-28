@@ -34,6 +34,10 @@ on:
       - 'maven/project-model/**'
       - 'maven/backend/**'
       - 'maven/backend-test/**'
+      # The Python SQLAlchemy step runs these against the PostgreSQL service.
+      - 'maven/python-runtime/**'
+      - 'maven/python-transpiler/**'
+      - 'scripts/python-backend/sqlalchemy-realdb-test.sh'
       - 'scripts/hellocodenameone/pom.xml'
       - 'scripts/hellocodenameone/backend/**'
       # The core classes the backend compiles as its own (the ORM and the entity
@@ -99,6 +103,10 @@ on:
       - 'maven/project-model/**'
       - 'maven/backend/**'
       - 'maven/backend-test/**'
+      # The Python SQLAlchemy step runs these against the PostgreSQL service.
+      - 'maven/python-runtime/**'
+      - 'maven/python-transpiler/**'
+      - 'scripts/python-backend/sqlalchemy-realdb-test.sh'
       - 'scripts/hellocodenameone/pom.xml'
       - 'scripts/hellocodenameone/backend/**'
       # The core classes the backend compiles as its own (the ORM and the entity
@@ -449,6 +457,22 @@ jobs:
           # through server.sh, which would otherwise re-install the backend runtime
           # the step above just installed from this same checkout.
           CN1SS_BACKEND_SKIP_INSTALL: 1
+
+      # The SQLAlchemy conformance programs against the PostgreSQL service
+      # above: the suite in python-transpiler runs them on SQLite only, so this
+      # is the one place the postgresql dialect and the _cn1db bridge meet a
+      # real server. PostgreSQL only; the MySQL family is run by hand.
+      # python-runtime compiles at release 17, hence JDK 17 for the install.
+      - name: Python SQLAlchemy on PostgreSQL
+        run: |
+          (cd maven && bash "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -B -pl python-runtime,python-transpiler \
+            install -DskipTests -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
+            -Dmaven.javadoc.skip=true -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo")
+          bash scripts/python-backend/sqlalchemy-realdb-test.sh "$GITHUB_WORKSPACE/.m2-repo"
+        env:
+          JAVA_HOME: ${{ env.JDK_17_HOME }}
+          JAVA17_HOME: ${{ env.JDK_17_HOME }}
+          CN1_SQLA_POSTGRES: postgres://cn1:cn1secret@127.0.0.1:5432/cn1?sslmode=disable
 
       - name: Run ParparVM Benchmark
         working-directory: vm
