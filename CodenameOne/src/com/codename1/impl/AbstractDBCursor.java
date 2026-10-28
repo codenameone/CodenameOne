@@ -448,7 +448,7 @@ public abstract class AbstractDBCursor implements Cursor, CursorExt, Row, RowExt
     /// `Database.COLUMN_UNKNOWN` (the default) where the engine cannot say. Only called on an
     /// open cursor positioned on a row, with a valid index.
     protected int columnType(int index) throws IOException {
-        return com.codename1.db.Database.COLUMN_UNKNOWN;
+        return Database.COLUMN_UNKNOWN;
     }
 
     @Override
