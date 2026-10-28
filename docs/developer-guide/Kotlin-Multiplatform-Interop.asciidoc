@@ -10,6 +10,12 @@ watchOS and tvOS.
 
 === Motivation
 
+Kotlin Multiplatform with Compose Multiplatform is the toolkit closest to
+Codename One's own model: one codebase, one declarative UI, logic shared
+between every client. It's a good way to write an application. Codename One
+takes that code further -- onto more platforms, into a smaller and faster
+application, and next to a Java API that every target shares.
+
 Compose Multiplatform runs on Kotlin/Native on iOS and links its own drawing
 engine into the application. Codename One takes the JVM half of a KMP project
 instead. kotlinc already compiles `commonMain` to ordinary class files for
@@ -26,14 +32,15 @@ the next section explains:
 
 image::img/kmp-bench-results.svg["Size, memory, start-up, recomposition and scrolling of the same application built by Codename One from Compose and from Java, relative to Compose Multiplatform",scaledwidth=95%]
 
-- **Recomposition and scrolling take a quarter to a third of the CPU time.**
-  A state change is drawn in 5.3 ms against 20.4 ms, and one step of
-  scrolling in 5.6 ms against 16.9 ms. Every side keeps pace with the display,
-  so the difference is headroom: for heavier screens, and for battery.
+- **The same Compose code runs in a quarter of the CPU time.** A state change
+  is drawn in 4.6 ms against 19.2 ms, and one step of scrolling in 4.0 ms
+  against 17.0 ms. Both keep pace with the display, so the difference is
+  headroom: for heavier screens, older devices and battery.
 - **The executable is 27% smaller** (16.8 MB against 22.9 MB) and the bundle
   20% smaller, although the Codename One one carries the whole iOS port.
-- **Start-up is faster**, 794 ms against 1051 ms cold.
-- **Memory is level**, 48 MB of physical footprint against 49 MB.
+- **Start-up is faster**, 961 ms against 1008 ms cold and 580 ms against
+  604 ms warm.
+- **Memory is level**, 47 MB of physical footprint against 48 MB.
 
 The benchmark, its method and how to run it are in `scripts/kmp-bench` in the
 Codename One repository. These are simulator numbers; they show where each
@@ -64,18 +71,27 @@ language and a different UI toolkit on every platform.
 
 The benchmark measures what that floor is worth. `JavaBench.java` in
 `scripts/kmp-bench/app/java` is the Keynote screens written against Codename
-One directly, timed by the same steps, and it ships no Kotlin standard
+One directly, timed by the same steps. Its list is an `InfiniteContainer`,
+which makes cards a batch at a time as the scroll nears the end -- as
+`LazyColumn` composes only what comes into view -- and rebinds a card it has
+already made instead of building another. It ships no Kotlin standard
 library, no Compose runtime and no coroutines:
 
-- **The executable is 8.9 MB**, 39% of Compose Multiplatform's 22.9 MB and
-  about half of the Compose build's, and the bundle is 10.2 MB.
-- **A step of scrolling takes 1.8 ms**, against 5.6 ms for the Compose build
-  and 16.9 ms for Compose Multiplatform. A day change takes 4.6 ms.
-- **Memory is 53 MB**: it builds all fifty cards of a day as components,
-  where a lazy list composes only those in view.
+- **A state change is drawn in 1.5 ms**, thirteen times faster than Compose
+  Multiplatform's 19.2 ms and three times faster than the Compose build.
+- **A step of scrolling takes 1.8 ms**, against 17.0 ms for Compose
+  Multiplatform.
+- **The executable is 8.9 MB**, 39% of Compose Multiplatform's 22.9 MB, and
+  the bundle is 10.2 MB.
+- **Memory is level** with both, at 47 MB.
 
-A hot list, a custom chart or a screen that has to fit a watch is where this
-pays; the rest of the application can stay in Compose.
+The gap is the price of the reactive model, not of Kotlin. A composition
+records the state it read, compares what it emits against what it emitted
+last time and applies the difference; an imperative update sets three labels
+on a card that already exists. That bookkeeping is what makes Compose
+pleasant to write, and on Codename One it's fast enough for any screen. A
+hot list, a custom chart or a screen that has to fit a watch is where the
+imperative path pays; the rest of the application can stay in Compose.
 
 === One platform API on every target
 

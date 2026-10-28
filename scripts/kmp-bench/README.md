@@ -50,18 +50,18 @@ Start-up here is from process start (the kernel's start time) to the marker, so
 
 | | Codename One, Compose | Codename One, Java | Compose Multiplatform |
 |---|---|---|---|
-| Cold start | 794 ms | 754 ms | 1051 ms |
-| Warm start (median) | 555 ms | 560 ms | 597 ms |
+| Cold start | 961 ms | 805 ms | 1008 ms |
+| Warm start (median) | 580 ms | 572 ms | 604 ms |
 | Executable, stripped | 16.8 MB | 8.9 MB | 22.9 MB |
 | App bundle, executable stripped | 18.3 MB | 10.2 MB | 22.9 MB |
 | Bundle without executable | 1.3 MB | 1.3 MB | 2.5 KB |
-| Physical footprint | 48.0 MB | 53.0 MB | 49.0 MB |
-| Recomposition, day change to drawn (median) | 5.31 ms | 4.56 ms | 20.37 ms |
-| Recomposition, day change to drawn (p95) | 6.79 ms | 5.67 ms | 23.08 ms |
-| Scroll, work per frame (median) | 5.60 ms | 1.80 ms | 16.94 ms |
-| Scroll, work per frame (p95) | 8.06 ms | 1.94 ms | 18.81 ms |
-| Scroll, frame interval (median) | 39.52 ms | 37.91 ms | 33.34 ms |
-| Scroll, frame interval (p95) | 45.00 ms | 43.98 ms | 35.05 ms |
+| Physical footprint | 47.0 MB | 47.0 MB | 48.0 MB |
+| Recomposition, day change to drawn (median) | 4.58 ms | 1.49 ms | 19.24 ms |
+| Recomposition, day change to drawn (p95) | 6.17 ms | 2.01 ms | 23.02 ms |
+| Scroll, work per frame (median) | 4.04 ms | 1.76 ms | 17.03 ms |
+| Scroll, work per frame (p95) | 6.60 ms | 2.68 ms | 18.21 ms |
+| Scroll, frame interval (median) | 35.45 ms | 34.79 ms | 33.35 ms |
+| Scroll, frame interval (p95) | 38.12 ms | 37.94 ms | 34.74 ms |
 | Scroll, frames over 2x median | 0 of 144 | 0 of 144 | 0 of 144 |
 
 Runtime values are the median over 5 launches of each launch's median or p95.
@@ -75,23 +75,37 @@ are linked in. The CN1 bundle holds 1.3 MB besides its executable:
 `iOSModernTheme.res` (213 KB), `default.metallib` (92 KB) and
 `kotlin.kotlin_builtins` (29 KB).
 
-**Codename One does each step in a quarter to a third of the time.** A day
-change takes 5.3 ms from state change to drawn on Codename One and 20.4 ms on
-CMP; one card of scrolling takes 5.6 ms against 16.9 ms. Every side then waits
+**Compose Multiplatform is the reference point, and a good one.** It is the
+closest thing to Codename One's own model -- one codebase, one UI, shared
+logic -- and it keeps pace with the display on every step here. The question
+is how much CPU each runtime spends to get there.
+
+**Codename One runs the same Compose code in a quarter of the time.** A day
+change takes 4.6 ms from state change to drawn on Codename One and 19.2 ms on
+CMP; one card of scrolling takes 4.0 ms against 17.0 ms. Every side then waits
 for the display: `scrollToItem` is issued once per drawn frame, so the frame
 interval is about two display frames on each, and none dropped a frame against
 its own median. These are simulator numbers on an Apple-silicon Mac. They show
 where each runtime spends CPU in identical code. They do not show device frame
 rates, GPU cost, or how a finger-driven fling feels.
 
-**The Java column is the same app without Kotlin.** `app/java/JavaBench.java`
-is the Keynote screens written against Codename One directly -- the same
-programme generator, the same cards, the same steps timed the same way, a 1 px
-marker painted after the list -- so it ships no Kotlin standard library, no
-Compose runtime and no coroutines. Its executable is 8.9 MB, 39% of CMP's and
-about half of the Compose build; a scroll step is 1.8 ms. Memory is the one
-row it does not win: it builds all fifty cards of a day as components, where a
-lazy list composes only those in view.
+**The Java column is the same app without Kotlin, and it is faster again.**
+`app/java/JavaBench.java` is the Keynote screens written against Codename One
+directly -- the same programme generator, the same cards, the same steps timed
+the same way, a 1 px marker painted after the list -- so it ships no Kotlin
+standard library, no Compose runtime and no coroutines. The list is an
+`InfiniteContainer`: cards are made a batch at a time as the scroll nears the
+end, as `LazyColumn` composes only what comes into view, and a card once made
+is rebound rather than rebuilt. A day change is 1.5 ms, thirteen times faster
+than CMP; a scroll step is 1.8 ms, nearly ten times faster; the executable is
+8.9 MB, 39% of CMP's; memory is level with both.
+
+That gap is the cost of the reactive model, not of Kotlin's speed. A
+composition records what it read, diffs what it emits against its slot table
+and hands the changes to an applier. An imperative update sets three labels on
+a card that already exists. Compose buys a great deal with that bookkeeping,
+and on Codename One it is fast enough for any screen; the Java path is there
+for the screens where the last few milliseconds, or megabytes, decide.
 
 Building it found a framework bug every Codename One app on a notched device
 paid: a Form with a Toolbar laid itself out again on every EDT cycle, forever,
@@ -115,7 +129,7 @@ before quoting a difference.
 The Codename One executable includes the whole iOS port and the full Material
 icon font, so the 6.1 MB difference is a floor.
 
-**Memory is level.** The Java heap holds
+**Memory is level**, 47 MB on both Codename One builds against 48 MB. The Java heap holds
 3.2 MB live after start-up, in about 57,000 objects. Loading the theme used to
 leave 24,000 strings behind -- one per key and value, plus every colour and
 padding built by concatenation, and a cache key per `Font.derive` call. The

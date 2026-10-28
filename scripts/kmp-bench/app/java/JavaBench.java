@@ -32,6 +32,7 @@ import com.codename1.ui.Font;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
+import com.codename1.ui.InfiniteContainer;
 import com.codename1.ui.Label;
 import com.codename1.ui.Tabs;
 import com.codename1.ui.TextField;
@@ -335,58 +336,59 @@ public class JavaBench extends Lifecycle {
     }
 
     /**
-     * The scrolling list of cards. Cards are kept and rebound when the day or
-     * the query changes, as a lazy list reuses its item nodes.
+     * The scrolling list of cards: an InfiniteContainer, so cards are made a
+     * batch at a time as the scroll nears the end, as LazyColumn composes only
+     * what comes into view. A card, once made, is kept in a pool and rebound
+     * when the day or the query changes, as a lazy list reuses its item nodes.
      */
-    static final class SessionList extends Container {
+    static final class SessionList extends InfiniteContainer {
+        private static final int BATCH = 8;
         private final JavaBench app;
-        private final List<Card> cards = new ArrayList<Card>();
+        private final List<Card> pool = new ArrayList<Card>();
         private final Label empty = new Label();
-        private int shown;
+        private List<Session> items = new ArrayList<Session>();
 
         SessionList(JavaBench app) {
-            super(BoxLayout.y());
+            super(BATCH);
             this.app = app;
-            setScrollableY(true);
             getAllStyles().setPaddingUnit(Style.UNIT_TYPE_DIPS);
             getAllStyles().setPadding(1.3f, 1.3f, 2.5f, 2.5f);
             empty.getAllStyles().setAlignment(Component.CENTER);
             empty.getAllStyles().setFgColor(0x49454F);
         }
 
-        void show(List<Session> list, String emptyText) {
-            while (cards.size() < list.size()) {
-                Card c = new Card(app);
-                cards.add(c);
-                add(c);
+        @Override
+        public Component[] fetchComponents(int index, int amount) {
+            if (items.isEmpty()) {
+                return index == 0 ? new Component[] {empty} : new Component[0];
             }
-            for (int i = 0; i < cards.size(); i++) {
-                Card c = cards.get(i);
-                boolean visible = i < list.size();
-                if (visible) {
-                    c.bind(list.get(i));
+            int n = Math.max(0, Math.min(amount, items.size() - index));
+            Component[] out = new Component[n];
+            for (int i = 0; i < n; i++) {
+                while (pool.size() <= index + i) {
+                    pool.add(new Card(app));
                 }
-                c.setHidden(!visible);
-                c.setVisible(visible);
+                Card c = pool.get(index + i);
+                c.bind(items.get(index + i));
+                out[i] = c;
             }
-            if (list.isEmpty()) {
-                empty.setText(emptyText);
-                if (empty.getParent() == null) {
-                    add(empty);
-                }
-            } else if (empty.getParent() != null) {
-                removeComponent(empty);
-            }
-            if (shown != list.size()) {
-                shown = list.size();
-                revalidate();
-            }
-            repaint();
+            return out;
         }
 
-        /** The list's scrollToItem: card i at the top. */
+        void show(List<Session> list, String emptyText) {
+            items = list;
+            empty.setText(emptyText);
+            refresh();
+        }
+
+        /** The list's scrollToItem: card i at the top, made first if needed. */
         void scrollToCard(int i) {
-            int y = cards.get(i).getY() - getStyle().getPaddingTop();
+            int y = 0;
+            if (i < pool.size() && pool.get(i).getParent() == this) {
+                y = pool.get(i).getY() - getStyle().getPaddingTop();
+            } else {
+                y = Integer.MAX_VALUE;
+            }
             int max = Math.max(0, getScrollDimension().getHeight() - getHeight());
             setScrollY(Math.max(0, Math.min(y, max)));
         }
