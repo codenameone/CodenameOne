@@ -566,14 +566,14 @@ class Pickler:
         return True
 
     def _reduce_object(self, obj):
-        """What `__reduce_ex__(proto)` answers; the runtime's object has none."""
+        """What `__reduce_ex__(proto)` answers for obj."""
         t = type(obj)
-        reduce = getattr(obj, "__reduce_ex__", _NoValue)
-        if reduce is not _NoValue:
-            return reduce(self.proto)
-        reduce = getattr(obj, "__reduce__", _NoValue)
-        if reduce is not _NoValue:
-            return reduce()
+        # A class's own __reduce_ex__ or __reduce__ wins; object's default
+        # (copyreg._reduce_ex) comes after the built-in kinds below.
+        if getattr(t, "__reduce_ex__", None) is not object.__reduce_ex__:
+            return obj.__reduce_ex__(self.proto)
+        if getattr(t, "__reduce__", None) is not object.__reduce__:
+            return obj.__reduce__()
         if isinstance(obj, BaseException):
             state = {}
             extra = getattr(obj, "__dict__", None)
@@ -599,74 +599,7 @@ class Pickler:
             return (getattr, (obj.__self__, obj.__func__.__name__))
         if name == "module" or name == "generator" or name == "coroutine":
             raise PicklingError("cannot pickle %r object" % name)
-        if self.proto >= 2:
-            return self._reduce_newobj(obj, t)
-        return self._reduce_legacy(obj, t)
-
-    def _getstate(self, obj):
-        t = type(obj)
-        getstate = getattr(obj, "__getstate__", _NoValue)
-        if getstate is not _NoValue:
-            return getstate()
-        state = getattr(obj, "__dict__", None)
-        if state is not None and len(state) == 0:
-            state = None
-        slots = copyreg._slotnames(t)
-        if slots:
-            if not _has_dict(t):
-                state = None
-            slotstate = {}
-            for name in slots:
-                value = getattr(obj, name, _NoValue)
-                if value is not _NoValue:
-                    slotstate[name] = value
-            if slotstate:
-                return (state, slotstate)
-        return state
-
-    def _reduce_newobj(self, obj, cls):
-        getnewargs_ex = getattr(obj, "__getnewargs_ex__", _NoValue)
-        if getnewargs_ex is not _NoValue:
-            args, kwargs = getnewargs_ex()
-            if not isinstance(args, tuple):
-                raise TypeError("__getnewargs_ex__ should return a tuple of (tuple, dict)")
-            if kwargs:
-                func = copyreg.__newobj_ex__
-                newargs = (cls, args, kwargs)
-            else:
-                func = copyreg.__newobj__
-                newargs = (cls,) + args
-        else:
-            getnewargs = getattr(obj, "__getnewargs__", _NoValue)
-            if getnewargs is not _NoValue:
-                args = getnewargs()
-                if not isinstance(args, tuple):
-                    raise TypeError("__getnewargs__ should return a tuple")
-            else:
-                args = ()
-            func = copyreg.__newobj__
-            newargs = (cls,) + args
-        state = self._getstate(obj)
-        listitems = iter(obj) if isinstance(obj, list) else None
-        dictitems = iter(obj.items()) if isinstance(obj, dict) else None
-        return (func, newargs, state, listitems, dictitems)
-
-    def _reduce_legacy(self, obj, cls):
-        if isinstance(obj, (list, dict, set, frozenset, bytes, bytearray, str, int, float, tuple)):
-            raise PicklingError("can't pickle %s with protocol %d" % (_T(obj), self.proto))
-        if getattr(obj, "__getstate__", _NoValue) is _NoValue:
-            state = getattr(obj, "__dict__", None)
-            if state is not None and len(state) == 0:
-                state = None
-            slots = copyreg._slotnames(cls)
-            if slots:
-                raise PicklingError("a class that defines __slots__ without defining __getstate__ cannot be pickled with protocol %d" % self.proto)
-        else:
-            state = obj.__getstate__()
-        args = (cls, object, None)
-        if state is not None:
-            return (copyreg._reconstructor, args, state)
-        return (copyreg._reconstructor, args)
+        return copyreg._reduce_ex(obj, self.proto)
 
     def save_pers(self, pid):
         if self.bin:

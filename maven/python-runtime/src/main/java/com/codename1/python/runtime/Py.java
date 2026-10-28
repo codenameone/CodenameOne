@@ -1995,6 +1995,26 @@ public final class Py {
         return made;
     }
 
+    /// What a functional class factory (namedtuple, Enum('C', ...),
+    /// make_dataclass) made, moved to the calling module: the library names
+    /// its own module, or `__main__`, where CPython reads the caller's frame.
+    public static Object callerModule(Object made, PyModule caller) {
+        if (made instanceof PyType) {
+            PyType t = (PyType) made;
+            Object m = t.getAttrOrNull("__module__");
+            if (m instanceof String && FACTORY_MODULES.contains(m)) {
+                Object n = caller.getAttrOrNull("__name__");
+                if (n instanceof String && !n.equals(m)) {
+                    t.setAttr("__module__", n);
+                }
+            }
+        }
+        return made;
+    }
+
+    private static final java.util.Set<String> FACTORY_MODULES = new java.util.HashSet<String>(java.util.Arrays.asList(
+            "__main__", "collections", "typing", "enum", "dataclasses"));
+
     public static boolean isinstance(Object o, Object t) {
         if (t instanceof PyTuple) {
             Object[] items = ((PyTuple) t).items;

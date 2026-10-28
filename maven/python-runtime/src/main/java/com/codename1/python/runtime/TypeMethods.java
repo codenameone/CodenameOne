@@ -854,7 +854,9 @@ final class TypeMethods {
         if (!(o instanceof PyDict)) {
             throw Py.typeError("descriptor requires a 'dict' object but received a '" + Py.typeOf(o).name + "'");
         }
-        return (PyDict) o;
+        PyDict d = (PyDict) o;
+        d.sync();
+        return d;
     }
 
     private static void installDict() {

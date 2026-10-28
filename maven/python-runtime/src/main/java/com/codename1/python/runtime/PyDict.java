@@ -63,7 +63,14 @@ public class PyDict extends PyObject {
     }
 
     public int size() {
+        sync();
         return size;
+    }
+
+    /// Brings the entries up to date before a read. A plain dict holds its
+    /// own entries; a view over something else (an instance's `__dict__`)
+    /// refills itself here from what it stands for.
+    void sync() {
     }
 
     private static boolean keyEq(Object a, long ha, Object b, long hb) {
@@ -216,6 +223,7 @@ public class PyDict extends PyObject {
 
     /// `self[key]`, or `null` when absent.
     public Object getOrNull(Object key) {
+        sync();
         int s = find(key, Py.keyHash(key, "a dict key"));
         return s >= 0 ? values[index[s]] : null;
     }
@@ -330,16 +338,19 @@ public class PyDict extends PyObject {
 
     @Override
     public boolean contains(Object x) {
+        sync();
         return find(x, Py.keyHash(x, "a dict key")) >= 0;
     }
 
     @Override
     public int len() {
+        sync();
         return size;
     }
 
     @Override
     public boolean isTrue() {
+        sync();
         return size != 0;
     }
 
@@ -386,6 +397,9 @@ public class PyDict extends PyObject {
     /// `dict.update(other)` for a mapping or an iterable of pairs.
     public void update(Object other) {
         if (other instanceof PyDict) {
+            ((PyDict) other).sync();
+        }
+        if (other instanceof PyDict) {
             PyDict d = (PyDict) other;
             for (int i = 0; i < d.used; i++) {
                 if (d.keys[i] != null) {
@@ -416,6 +430,7 @@ public class PyDict extends PyObject {
 
     /// The live keys in order.
     public Object[] keyArray() {
+        sync();
         Object[] r = new Object[size];
         int w = 0;
         for (int i = 0; i < used; i++) {
@@ -428,6 +443,7 @@ public class PyDict extends PyObject {
 
     /// Iterates over entries; `kind` 0 = keys, 1 = values, 2 = items.
     Object iterate(final int kind) {
+        sync();
         final int startSize = size;
         return new PyJavaIter(new PyJavaIter.Source() {
             int i;
@@ -462,6 +478,7 @@ public class PyDict extends PyObject {
 
     @Override
     public String repr() {
+        sync();
         if (size == 0) {
             return "{}";
         }
@@ -489,6 +506,10 @@ public class PyDict extends PyObject {
 
     @Override
     public Object eq(Object o) {
+        sync();
+        if (o instanceof PyDict) {
+            ((PyDict) o).sync();
+        }
         if (!(o instanceof PyDict)) {
             return null;
         }

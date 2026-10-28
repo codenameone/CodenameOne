@@ -6,9 +6,10 @@
 This is the registry of reduction functions (`pickle`), the reconstructors
 `pickle` writes for plain objects, and the extension-code registry.
 
-`pickle` does not ask an instance for a default `__reduce_ex__`, because the
-runtime's `object` has none: `pickle` builds the same reduction itself, and
-`__newobj__`, `__newobj_ex__` and `_reconstructor` here are what it writes.
+The runtime's `object.__reduce_ex__`, `__reduce__` and `__getstate__` answer
+through `_reduce_ex`, `_reduce` and `_getstate` here, so `pickle` and `copy`
+both reach the same reduction; `__newobj__`, `__newobj_ex__` and
+`_reconstructor` are the reconstructors it names.
 """
 
 __all__ = ["pickle", "constructor", "add_extension", "remove_extension", "clear_extension_cache"]
@@ -67,6 +68,97 @@ def _slotnames(cls):
                 else:
                     names.append(name)
     return names
+
+
+def _has_dict(cls):
+    for c in cls.__mro__:
+        if c is object:
+            continue
+        if "__slots__" not in c.__dict__:
+            return True
+        slots = c.__dict__["__slots__"]
+        if slots == "__dict__" or (not isinstance(slots, str) and "__dict__" in slots):
+            return True
+    return False
+
+
+def _getstate(obj):
+    """`object.__getstate__()`: the instance dict, plus `(dict, slots)` with slots."""
+    t = type(obj)
+    state = getattr(obj, "__dict__", None) if _has_dict(t) else None
+    if state is not None:
+        state = dict(state) if len(state) else None
+    slots = _slotnames(t)
+    if slots:
+        slotstate = {}
+        for name in slots:
+            try:
+                slotstate[name] = getattr(obj, name)
+            except AttributeError:
+                pass
+        if slotstate:
+            return (state, slotstate)
+    return state
+
+
+def _reduce_ex(obj, proto):
+    """`object.__reduce_ex__(proto)`: a class's own `__reduce__` when it has one."""
+    cls = type(obj)
+    if getattr(cls, "__reduce__", None) is not object.__reduce__:
+        return obj.__reduce__()
+    if proto >= 2:
+        return _reduce_newobj(obj, cls)
+    return _reduce_legacy(obj, cls, proto)
+
+
+def _reduce(obj):
+    """`object.__reduce__()`: the protocol 0 reduction."""
+    return _reduce_legacy(obj, type(obj), 0)
+
+
+def _reduce_newobj(obj, cls):
+    getnewargs_ex = getattr(obj, "__getnewargs_ex__", None)
+    if getnewargs_ex is not None:
+        args, kwargs = getnewargs_ex()
+        if not isinstance(args, tuple):
+            raise TypeError("__getnewargs_ex__ should return a tuple of (tuple, dict)")
+        if kwargs:
+            func = __newobj_ex__
+            newargs = (cls, args, kwargs)
+        else:
+            func = __newobj__
+            newargs = (cls,) + args
+    else:
+        getnewargs = getattr(obj, "__getnewargs__", None)
+        if getnewargs is not None:
+            args = getnewargs()
+            if not isinstance(args, tuple):
+                raise TypeError("__getnewargs__ should return a tuple")
+        else:
+            args = ()
+        func = __newobj__
+        newargs = (cls,) + args
+    state = obj.__getstate__()
+    listitems = iter(obj) if isinstance(obj, list) else None
+    dictitems = iter(obj.items()) if isinstance(obj, dict) else None
+    return (func, newargs, state, listitems, dictitems)
+
+
+def _reduce_legacy(obj, cls, proto):
+    if isinstance(obj, (list, dict, set, frozenset, bytes, bytearray, str, int, float, tuple)):
+        raise TypeError("cannot pickle %r object with protocol %d" % (cls.__name__, proto))
+    if getattr(cls, "__getstate__", None) is object.__getstate__:
+        state = getattr(obj, "__dict__", None)
+        if state is not None and len(state) == 0:
+            state = None
+        if _slotnames(cls):
+            raise TypeError("a class that defines __slots__ without defining __getstate__ cannot be pickled with protocol %d" % proto)
+    else:
+        state = obj.__getstate__()
+    args = (cls, object, None)
+    if state is not None:
+        return (_reconstructor, args, state)
+    return (_reconstructor, args)
 
 
 _extension_registry = {}

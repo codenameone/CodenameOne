@@ -46,12 +46,12 @@ final class PyDictView extends PyObject {
 
     @Override
     public int len() {
-        return d.size;
+        return d.len();
     }
 
     @Override
     public boolean isTrue() {
-        return d.size != 0;
+        return d.isTrue();
     }
 
     @Override

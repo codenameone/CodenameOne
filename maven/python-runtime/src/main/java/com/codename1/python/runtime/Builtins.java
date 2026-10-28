@@ -296,13 +296,22 @@ public final class Builtins {
             // The lookup without __getattr__: what a class's own
             // __getattribute__ or __getattr__ reaches for.
             String name = Py.toStr(a[1]);
-            Object v = a[0] instanceof PyObject ? ((PyObject) a[0]).getAttrOrNull(name)
+            Object v = a[0] instanceof PyInstance ? ((PyInstance) a[0]).genericAttrOrNull(name)
+                    : a[0] instanceof PyObject ? ((PyObject) a[0]).getAttrOrNull(name)
                     : Py.bindAttr(Py.typeOf(a[0]).lookup(name), a[0]);
             if (v == null) {
                 throw Py.attributeError("'" + Py.typeOf(a[0]).name + "' object has no attribute '" + name + "'");
             }
             return v;
         }));
+        // The reduction protocol's defaults are written in Python, in copyreg,
+        // which pickle and copy import; object only forwards to them.
+        o.define("__reduce_ex__", PyBuiltin.positional("__reduce_ex__",
+                a -> Py.call(Py.importFrom(Py.importModule("copyreg"), "_reduce_ex"), a[0], a[1])));
+        o.define("__reduce__", PyBuiltin.positional("__reduce__",
+                a -> Py.call(Py.importFrom(Py.importModule("copyreg"), "_reduce"), a[0])));
+        o.define("__getstate__", PyBuiltin.positional("__getstate__",
+                a -> Py.call(Py.importFrom(Py.importModule("copyreg"), "_getstate"), a[0])));
         o.define("__delattr__", PyBuiltin.positional("__delattr__", a -> {
             if (a[0] instanceof PyInstance) {
                 ((PyInstance) a[0]).delAttrDirect(Py.toStr(a[1]));

@@ -2360,6 +2360,25 @@ public final class Emitter {
         return sb.append(")").toString();
     }
 
+    private static final java.util.Set<String> CLASS_FACTORIES = new java.util.HashSet<String>(java.util.Arrays.asList(
+            "namedtuple", "NamedTuple", "TypedDict", "make_dataclass", "Enum", "IntEnum", "StrEnum", "Flag", "IntFlag"));
+
+    /// A call of a functional class factory that names its class after the
+    /// caller's module, without an explicit `module=`.
+    private static boolean isClassFactory(Call c) {
+        String n = c.func instanceof Name ? ((Name) c.func).id
+                : c.func instanceof Attribute ? ((Attribute) c.func).attr : null;
+        if (n == null || !CLASS_FACTORIES.contains(n) || c.args.isEmpty()) {
+            return false;
+        }
+        for (Keyword k : c.keywords) {
+            if ("module".equals(k.arg)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private String call(Call c) {
         if (!inTypeCall && c.func instanceof Name && "type".equals(((Name) c.func).id) && c.args.size() == 3
                 && c.keywords.isEmpty() && sc.resolve("type") == Scope.Binding.BUILTIN) {
@@ -2368,6 +2387,17 @@ public final class Emitter {
             inTypeCall = true;
             try {
                 return "Py.typeModule(" + call(c) + ", M)";
+            } finally {
+                inTypeCall = false;
+            }
+        }
+        if (!inTypeCall && isClassFactory(c)) {
+            // namedtuple('P', ...), Enum('C', ...), make_dataclass(...): CPython
+            // reads __module__ off the caller's frame, which only the call site
+            // knows here.
+            inTypeCall = true;
+            try {
+                return "Py.callerModule(" + call(c) + ", M)";
             } finally {
                 inTypeCall = false;
             }

@@ -3,6 +3,8 @@
 # exception, as the rest of the Codename One Python runtime.
 """Shallow and deep copy operations."""
 
+import copyreg
+
 
 class Error(Exception):
     pass
@@ -30,7 +32,61 @@ def copy(x):
     copier = getattr(cls, "__copy__", None)
     if copier is not None:
         return copier(x)
-    return _reconstruct(x, None)
+    rv = _reduction(x, cls)
+    if rv is None:
+        return _reconstruct(x, None)
+    if isinstance(rv, str):
+        return x
+    return _reconstruct_from(x, None, *rv)
+
+
+def _reduction(x, cls):
+    """What x reduces to, as CPython's copy asks; None for the runtime's own
+    reconstruction of a built-in subclass that keeps object's default."""
+    reductor = copyreg.dispatch_table.get(cls)
+    if reductor is not None:
+        return reductor(x)
+    if getattr(cls, "__reduce_ex__", None) is not object.__reduce_ex__:
+        return x.__reduce_ex__(4)
+    if getattr(cls, "__reduce__", None) is not object.__reduce__:
+        return x.__reduce__()
+    if _builtin_base(cls) or isinstance(x, BaseException):
+        return None
+    return x.__reduce_ex__(4)
+
+
+def _reconstruct_from(x, memo, func, args, state=None, listiter=None, dictiter=None):
+    deep = memo is not None
+    if deep and args:
+        args = deepcopy(args, memo)
+    y = func(*args)
+    if deep:
+        memo[id(x)] = y
+    if state is not None:
+        if deep:
+            state = deepcopy(state, memo)
+        if hasattr(y, "__setstate__"):
+            y.__setstate__(state)
+        else:
+            slotstate = None
+            if isinstance(state, tuple) and len(state) == 2:
+                state, slotstate = state
+            if state:
+                for k, v in state.items():
+                    setattr(y, k, v)
+            if slotstate:
+                for k, v in slotstate.items():
+                    setattr(y, k, v)
+    if listiter is not None:
+        for item in listiter:
+            y.append(deepcopy(item, memo) if deep else item)
+    if dictiter is not None:
+        for k, v in dictiter:
+            if deep:
+                k = deepcopy(k, memo)
+                v = deepcopy(v, memo)
+            y[k] = v
+    return y
 
 
 def deepcopy(x, memo=None, _nil=[]):
@@ -66,7 +122,13 @@ def deepcopy(x, memo=None, _nil=[]):
     elif cls.__name__ in _FUNCTIONS:
         return x
     else:
-        y = _reconstruct(x, memo)
+        rv = _reduction(x, cls)
+        if rv is None:
+            y = _reconstruct(x, memo)
+        elif isinstance(rv, str):
+            return x
+        else:
+            y = _reconstruct_from(x, memo, *rv)
     if y is not x:
         memo[d] = y
         _keep_alive(x, memo)

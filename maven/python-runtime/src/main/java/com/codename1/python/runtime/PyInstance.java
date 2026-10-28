@@ -168,6 +168,39 @@ public class PyInstance extends PyObject {
 
     @Override
     public Object getAttrOrNull(String name) {
+        if (cls.hasCustomGetattribute()) {
+            // Every explicit read goes through a class's own __getattribute__,
+            // dunder names included (`obj.__dict__`, getattr(obj, '__x__')); the
+            // implicit special-method lookup of len(obj) and friends reads the
+            // type and never comes here. An AttributeError it raises falls back
+            // to __getattr__, as CPython's slot does.
+            try {
+                return Py.obj(cls.lookup("__getattribute__")).call(new Object[] {this, name}, Py.NO_KW);
+            } catch (PyException e) {
+                if (!e.matches(Py.ATTRIBUTE_ERROR)) {
+                    throw e;
+                }
+                Object ga = cls.lookup("__getattr__");
+                if (ga == null) {
+                    return null;
+                }
+                return Py.obj(ga).call(new Object[] {this, name}, Py.NO_KW);
+            }
+        }
+        Object v = genericAttrOrNull(name);
+        if (v != null) {
+            return v;
+        }
+        Object ga = cls.lookup("__getattr__");
+        if (ga != null) {
+            return Py.obj(ga).call(new Object[] {this, name}, Py.NO_KW);
+        }
+        return null;
+    }
+
+    /// `object.__getattribute__(self, name)`: the lookup without the class's
+    /// own `__getattribute__` or `__getattr__`; null when absent.
+    Object genericAttrOrNull(String name) {
         Object clsAttr = cls.lookup(name);
         if (clsAttr instanceof PyProperty) {
             return ((PyProperty) clsAttr).get(this);
@@ -190,25 +223,16 @@ public class PyInstance extends PyObject {
             return Py.obj(get).call(new Object[] {clsAttr, this, cls}, Py.NO_KW);
         }
         if ("__dict__".equals(name)) {
-            // A copy of the attributes whose stores and deletes reach the
-            // instance too; a change made the other way after it was read
-            // is not seen through it.
-            PyDict d = new InstanceDict(this);
-            String[] names = attributeNames();
-            for (String e : names) {
-                d.setItem(e, own(e));
-            }
-            return d;
+            // A live view: its stores and deletes reach the instance, and it
+            // refills itself from the instance before every read, so a write
+            // made through the attribute shows in a view fetched earlier.
+            return new InstanceDict(this);
         }
         if ("__class__".equals(name)) {
             return cls;
         }
         if (clsAttr != null) {
             return Py.bindAttr(clsAttr, this);
-        }
-        Object ga = cls.lookup("__getattr__");
-        if (ga != null) {
-            return Py.obj(ga).call(new Object[] {this, name}, Py.NO_KW);
         }
         return null;
     }
@@ -625,8 +649,28 @@ public class PyInstance extends PyObject {
     private static final class InstanceDict extends PyDict {
         private final PyInstance self;
 
+        /// Set while refilling, so the refill's own stores do not sync again.
+        private boolean syncing;
+
         InstanceDict(PyInstance self) {
             this.self = self;
+        }
+
+        @Override
+        void sync() {
+            if (syncing) {
+                return;
+            }
+            syncing = true;
+            try {
+                super.clear();
+                String[] names = self.attributeNames();
+                for (String e : names) {
+                    super.setItem(e, self.own(e));
+                }
+            } finally {
+                syncing = false;
+            }
         }
 
         @Override
@@ -642,6 +686,7 @@ public class PyInstance extends PyObject {
 
         @Override
         public void delItem(Object key) {
+            sync();
             // Not super.delItem: it removes through remove(), which is overridden below and
             // would delete the attribute a second time.
             if (super.remove(key) == null) {
@@ -654,6 +699,7 @@ public class PyInstance extends PyObject {
         // overrides `obj.__dict__.pop(name)` answered the value and left the attribute set.
         @Override
         public Object remove(Object key) {
+            sync();
             Object v = super.remove(key);
             if (v != null) {
                 self.delAttrDirect(Py.toStr(key));
@@ -663,6 +709,7 @@ public class PyInstance extends PyObject {
 
         @Override
         public void clear() {
+            sync();
             Object[] snapshot = new Object[used];
             int n = 0;
             for (int i = 0; i < used; i++) {
