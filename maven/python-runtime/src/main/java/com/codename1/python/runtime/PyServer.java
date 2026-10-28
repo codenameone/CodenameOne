@@ -62,6 +62,15 @@ public abstract class PyServer {
 
     /// Calls `dispatch` and checks what it answered.
     public static Response call(Object dispatch, Object[] request) {
+        Gil.enter();
+        try {
+            return call0(dispatch, request);
+        } finally {
+            Gil.exit();
+        }
+    }
+
+    private static Response call0(Object dispatch, Object[] request) {
         Object r = Py.obj(dispatch).call(request, Py.NO_KW);
         if (!(r instanceof PyTuple) || ((PyTuple) r).size() != 3) {
             throw Py.typeError("dispatch must return (status, headers, body)");

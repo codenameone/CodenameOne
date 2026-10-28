@@ -524,6 +524,7 @@ public final class PythonTranspiler {
         sb.append("    public static int runMain() {\n");
         sb.append("        registerAll();\n");
         if (mainModule != null) {
+            sb.append("        com.codename1.python.runtime.Gil.enter();\n");
             sb.append("        try {\n");
             sb.append("            ").append(classes.get(mainModule)).append(".exec(\"__main__\");\n");
             sb.append("            return 0;\n");
@@ -531,6 +532,7 @@ public final class PythonTranspiler {
             sb.append("            return com.codename1.python.runtime.StdModules.exitStatus(e);\n");
             sb.append("        } finally {\n");
             sb.append("            com.codename1.python.runtime.StdModules.runExitHandlers();\n");
+            sb.append("            com.codename1.python.runtime.Gil.exit();\n");
             sb.append("        }\n");
         } else {
             sb.append("        return 0;\n");

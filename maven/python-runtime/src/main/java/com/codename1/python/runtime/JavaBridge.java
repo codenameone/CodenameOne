@@ -234,7 +234,12 @@ public abstract class JavaBridge {
 
     /// Calls a Python function from a functional interface adapter.
     public static Object callPy(Object fn, Object[] args) {
-        return Py.obj(fn).call(args, Py.NO_KW);
+        Gil.enter();
+        try {
+            return Py.obj(fn).call(args, Py.NO_KW);
+        } finally {
+            Gil.exit();
+        }
     }
 
     /// The error for a call no overload accepts.

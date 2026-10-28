@@ -74,6 +74,10 @@ public final class StdModules {
             PyModule.registerModule(m);
             return true;
         }
+        if ("_thread".equals(name)) {
+            PyModule.registerModule(thread());
+            return true;
+        }
         if ("_cn1sql".equals(name)) {
             PyModule.registerModule(sql());
             return true;
@@ -443,6 +447,69 @@ public final class StdModules {
         return v;
     }
 
+    private static final java.util.Map<Thread, Long> THREAD_IDS = new java.util.HashMap<Thread, Long>();
+    private static long threadIds;
+
+    /// The `threading` ident of the calling thread, assigned on first use.
+    /// Read only while the [Gil] is held, which is what guards the map.
+    private static long threadIdent() {
+        Thread t = Thread.currentThread();
+        Long id = THREAD_IDS.get(t);
+        if (id == null) {
+            id = Long.valueOf(++threadIds);
+            THREAD_IDS.put(t, id);
+        }
+        return id.longValue();
+    }
+
+    /// `_thread`: `start_new_thread(fn, args)` runs `fn` on a new Java
+    /// thread that enters the [Gil] first; `allocate_lock()` answers a
+    /// [PyLock], driven by `lock_acquire(lock, blocking, timeout)`,
+    /// `lock_release` and `lock_locked`; `get_ident()`. An exception that
+    /// leaves a thread is reported on stderr, as CPython reports it.
+    private static PyModule thread() {
+        PyModule m = new PyModule("_thread", new String[0]);
+        m.setAttr("start_new_thread", PyBuiltin.positional("start_new_thread", a -> {
+            final Object fn = a[0];
+            final Object[] args = a.length > 1 && a[1] instanceof PyTuple ? ((PyTuple) a[1]).items : new Object[0];
+            Thread t = new Thread(() -> {
+                Gil.enter();
+                try {
+                    Py.obj(fn).call(args, Py.NO_KW);
+                } catch (PyException e) {
+                    if (!e.matches(Py.SYSTEM_EXIT)) {
+                        System.err.println("Exception in thread:");
+                        exitStatus(e);
+                    }
+                } finally {
+                    THREAD_IDS.remove(Thread.currentThread());
+                    Gil.exit();
+                }
+            });
+            t.start();
+            return Py.NONE;
+        }));
+        m.setAttr("allocate_lock", PyBuiltin.positional("allocate_lock", a -> new PyJavaObject(new PyLock())));
+        m.setAttr("lock_acquire", PyBuiltin.positional("lock_acquire", a -> {
+            double timeout = a[2] == Py.NONE ? -1 : Py.asDouble(a[2]); //NOPMD CompareObjectsWithEquals - identity is meant
+            return Py.bool(lock(a[0]).acquire(Py.isTrue(a[1]), timeout < 0 ? -1 : (long) (timeout * 1000)));
+        }));
+        m.setAttr("lock_release", PyBuiltin.positional("lock_release", a -> {
+            lock(a[0]).release();
+            return Py.NONE;
+        }));
+        m.setAttr("lock_locked", PyBuiltin.positional("lock_locked", a -> Py.bool(lock(a[0]).locked())));
+        m.setAttr("get_ident", PyBuiltin.positional("get_ident", a -> PyInt.of(threadIdent())));
+        return m;
+    }
+
+    private static PyLock lock(Object o) {
+        if (o instanceof PyJavaObject && ((PyJavaObject) o).value instanceof PyLock) {
+            return (PyLock) ((PyJavaObject) o).value;
+        }
+        throw Py.typeError("not a lock");
+    }
+
     /// `_cn1http`: `request(method, url, headers, body, timeout, redirects)`
     /// over [PyHttp], answering `(status, reason, url, headers, body)` with
     /// the headers a list of pairs. No response at all raises `OSError`.
@@ -466,10 +533,16 @@ public final class StdModules {
             byte[] body = a[3] == Py.NONE ? null : PyBytes.like(a[3]); //NOPMD CompareObjectsWithEquals - identity is meant
             int timeout = a[4] == Py.NONE ? 0 : (int) Math.ceil(Py.asDouble(a[4]) * 1000); //NOPMD CompareObjectsWithEquals - identity is meant
             PyHttp.Response r;
+            String method = Py.toStr(a[0]);
+            String url = Py.toStr(a[1]);
+            boolean redirects = Py.isTrue(a[5]);
+            int saved = Gil.release();
             try {
-                r = PyHttp.get().send(Py.toStr(a[0]), Py.toStr(a[1]), headers, body, timeout, Py.isTrue(a[5]));
+                r = PyHttp.get().send(method, url, headers, body, timeout, redirects);
             } catch (java.io.IOException e) {
                 throw Py.error(Py.OS_ERROR, String.valueOf(e.getMessage())); //NOPMD PreserveStackTrace - a Python exception has no Java cause
+            } finally {
+                Gil.restore(saved);
             }
             Object[] pairs = new Object[r.headers.length / 2];
             for (int i = 0; i < pairs.length; i++) {
@@ -717,10 +790,18 @@ public final class StdModules {
         m.setAttr("perf_counter_ns", PyBuiltin.positional("perf_counter_ns", a -> PyInt.of(System.nanoTime())));
         m.setAttr("monotonic", PyBuiltin.positional("monotonic", a -> Py.ofFloat(System.nanoTime() / 1e9)));
         m.setAttr("sleep", PyBuiltin.positional("sleep", a -> {
+            long ms = (long) (Py.asDouble(a[0]) * 1000);
+            int saved = Gil.release();
             try {
-                Thread.sleep((long) (Py.asDouble(a[0]) * 1000));
+                if (ms <= 0) {
+                    Thread.yield();
+                } else {
+                    Thread.sleep(ms);
+                }
             } catch (InterruptedException e) {
                 throw Py.error(Py.KEYBOARD_INTERRUPT, ""); //NOPMD PreserveStackTrace - a Python exception has no Java cause
+            } finally {
+                Gil.restore(saved);
             }
             return Py.NONE;
         }));
