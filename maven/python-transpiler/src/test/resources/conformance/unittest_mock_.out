@@ -1,0 +1,67 @@
+False 0 None
+True 2
+call('again')
+[call(1, 2, a=3), call('again')]
+True ('again',) {}
+(1, 2) {'a': 3}
+AssertionError: Expected 'mock' to have been called once. Called 2 times.
+Calls: [call(1, 2, a=3), call('again')].
+AssertionError: expected call not found.
+Expected: mock('nope')
+  Actual: mock('again')
+AssertionError: Expected 'mock' to be called once. Called 2 times.
+Calls: [call(1, 2, a=3), call('again')].
+AssertionError: Expected 'mock' to not have been called. Called 2 times.
+Calls: [call(1, 2, a=3), call('again')].
+AssertionError: Expected 'mock' to have been called.
+AssertionError: expected call not found.
+Expected: mock(1)
+  Actual: not called.
+AssertionError: mock(9) call not found
+False 0 []
+42 42 2
+7
+True
+raised bad
+raised KeyError
+1 2 3
+exhausted
+8
+1
+second raised two
+2 call(2)
+[call.child.method(1), call.child.method(2), call.other(3)]
+[call.child.method(1), call.child.method(2), call.other(3)]
+True
+5
+9
+1 two
+call(1, k=2) call.foo(3) call.foo.bar()
+True False True True
+3 True [] False
+item item
+True
+[1, 2] call('q')
+5
+patched call('x')
+hello x
+lambda x
+hello x
+fake 1
+real k
+inst
+real z
+D
+x
+dec! hello x
+new a real a
+['a', 'b']
+['a']
+['c']
+['a']
+True
+hello q
+missing attribute
+True
+False
+2 True
