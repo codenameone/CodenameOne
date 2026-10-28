@@ -44,6 +44,7 @@ log.propagate = False
 engine = create_engine(sys.argv[1] if len(sys.argv) > 1 else "sqlite://", echo=True)
 engine.echo = False
 Base.metadata.drop_all(engine)  # a server database keeps tables between runs
+# Every query is ordered by id: a server collation sorts "bob" and "Cid" differently from SQLite.
 engine.echo = True
 Base.metadata.create_all(engine)
 s = Session(engine)
@@ -64,7 +65,7 @@ print(s.execute(select(User.name, cnt.label("n")).order_by(User.id)).all())
 
 # subquery in FROM
 sub = select(Address.user_id, func.count(Address.id).label("c")).group_by(Address.user_id).subquery()
-print(s.execute(select(User.name, sub.c.c).join(sub, User.id == sub.c.user_id).order_by(User.name)).all())
+print(s.execute(select(User.name, sub.c.c).join(sub, User.id == sub.c.user_id).order_by(User.id)).all())
 
 # exists
 print(s.scalars(select(User.name).where(exists().where(Address.user_id == User.id)).order_by(User.id)).all())
@@ -75,11 +76,11 @@ print(s.scalars(select(User.name).where(~select(Address.id).where(Address.user_i
 print(s.scalars(select(User.name).where(User.id.in_(select(Address.user_id).where(Address.email.like("%a.com"))))
                 .order_by(User.id)).all())
 print(s.scalars(select(User.name).where(User.age.between(20, 35)).order_by(User.id)).all())
-print(s.scalars(select(User.name).where(User.name.ilike("c%"))).all())
+print(s.scalars(select(User.name).where(User.name.ilike("c%")).order_by(User.id)).all())
 
 # cte
 old = select(User.id, User.name).where(User.age > 24).cte("old")
-print(s.execute(select(old.c.name).order_by(old.c.name)).scalars().all())
+print(s.execute(select(old.c.name).order_by(old.c.id)).scalars().all())
 
 # union / union_all
 u = union(select(User.name).where(User.age < 20), select(User.name).where(User.age > 40))
@@ -90,7 +91,7 @@ print(sorted(s.execute(select(User.name).where(User.age < 20).union(select(User.
 
 # aliased self join
 boss = aliased(User)
-print(s.execute(select(User.name, boss.name).join(boss, User.boss_id == boss.id).order_by(User.name)).all())
+print(s.execute(select(User.name, boss.name).join(boss, User.boss_id == boss.id).order_by(User.id)).all())
 print(s.scalars(select(boss).where(boss.age > 40)).one().name)
 
 # case, cast, functions
@@ -103,7 +104,7 @@ print(s.execute(select(func.lower(User.name), func.upper(User.name), func.length
 print(s.execute(select(func.coalesce(User.boss_id, -1)).order_by(User.id)).scalars().all())
 
 # relationship any / has
-print(s.scalars(select(User.name).where(User.addresses.any(Address.email.like("%.org")))).all())
+print(s.scalars(select(User.name).where(User.addresses.any(Address.email.like("%.org"))).order_by(User.id)).all())
 print(s.scalars(select(User.name).where(User.addresses.any()).order_by(User.id)).all())
 print(s.scalars(select(Address.email).where(Address.user.has(User.age > 26)).order_by(Address.id)).all())
 

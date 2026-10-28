@@ -363,6 +363,25 @@ public final class StdModules {
         });
         fs(m, "size", (fs, a) -> PyInt.of(fs.size(Py.toStr(a[0]))));
         fs(m, "mtime", (fs, a) -> Py.ofFloat(fs.lastModified(Py.toStr(a[0])) / 1000.0));
+        // The process environment, for os.environ. ParparVM's System.getenv()
+        // map is empty (it cannot enumerate the environment), so `getenv` reads
+        // one variable by name as well; the JVM answers both.
+        m.setAttr("environ", PyBuiltin.positional("environ", a -> {
+            PyDict d = new PyDict();
+            java.util.Map<String, String> env = System.getenv();
+            if (env != null) {
+                for (java.util.Map.Entry<String, String> e : env.entrySet()) {
+                    if (e.getKey() != null && e.getValue() != null) {
+                        d.setItem(Py.str(e.getKey()), Py.str(e.getValue()));
+                    }
+                }
+            }
+            return d;
+        }));
+        m.setAttr("getenv", PyBuiltin.positional("getenv", a -> {
+            String v = System.getenv(Py.toStr(a[0]));
+            return v == null ? Py.NONE : Py.str(v);
+        }));
         return m;
     }
 

@@ -30,20 +30,28 @@ R_OK = 4
 W_OK = 2
 X_OK = 1
 
-environ = {}
+environ = _cn1fs.environ()
+_unset = set()
 error = OSError
 
 
 def getenv(key, default=None):
-    return environ.get(key, default)
+    if key in environ:
+        return environ[key]
+    # ParparVM cannot enumerate the environment, so environ may lack a
+    # variable that is still readable by name.
+    v = None if key in _unset else _cn1fs.getenv(key)
+    return default if v is None else v
 
 
 def putenv(key, value):
     environ[key] = value
+    _unset.discard(key)
 
 
 def unsetenv(key):
     environ.pop(key, None)
+    _unset.add(key)
 
 
 class PathLike:

@@ -85,8 +85,8 @@ _BY_NAME = {
 }
 
 
-def _wrap(e, statement, params):
+def _wrap(e, statement, params, driver="sqlite3"):
     """Wraps a DB-API exception the way SQLAlchemy does, keeping the original as ``orig``."""
     cls = _BY_NAME.get(type(e).__name__, DBAPIError)
-    msg = "(sqlite3.%s) %s\n[SQL: %s]" % (type(e).__name__, e, statement)
+    msg = "(%s.%s) %s\n[SQL: %s]" % (driver, type(e).__name__, e, statement)
     return cls(msg, statement, params, e)

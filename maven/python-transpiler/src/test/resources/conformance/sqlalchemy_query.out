@@ -6,11 +6,11 @@ True sqlalchemy.engine.Engine False
 ['Ann', 'bob']
 ['Ann', 'bob']
 ['Cid']
-['Ann', 'Cid', 'bob']
+['Ann', 'bob', 'Cid']
 ['Cid', 'dee']
 [19, 19, 25, 25]
 ['Ann', 'dee']
-[('Cid', 'Ann'), ('bob', 'Ann')]
+[('bob', 'Ann'), ('Cid', 'Ann')]
 Cid
 [('Ann', 'adult'), ('bob', 'adult'), ('Cid', 'senior'), ('dee', 'teen')]
 ['30y', '25y', '41y', '19y']

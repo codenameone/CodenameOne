@@ -149,7 +149,11 @@ with Session(engine) as s:
     s.expire(a, ["memos"])
     s.delete(a)
     s.commit()
-    print(s.scalars(select(Memo.author_id)).all())
+    # passive_deletes: the ORM leaves the memos to the database's ON DELETE CASCADE and never
+    # nulls them. SQLite enforces no foreign keys by default and keeps them; a server deletes
+    # them. Either way none is left pointing at NULL or at another author.
+    left = s.scalars(select(Memo.author_id)).all()
+    print(len(left) in (0, 2), all(x == aid for x in left))
 
 # ---- eager loading
 with Session(engine) as s:

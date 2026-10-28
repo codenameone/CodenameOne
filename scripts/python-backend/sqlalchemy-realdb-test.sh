@@ -26,8 +26,8 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
 M2="${1:-$REPO/.m2-repo}"
 J17="${JAVA17_HOME:?set JAVA17_HOME}"
-CONF="$REPO/maven/python-transpiler/src/test/resources/conformance"
-PROGRAMS="sqlalchemy_core sqlalchemy_orm sqlalchemy_relations sqlalchemy_query"
+CONF="${CN1_SQLA_CONF:-$REPO/maven/python-transpiler/src/test/resources/conformance}"
+PROGRAMS="${CN1_SQLA_PROGRAMS:-sqlalchemy_core sqlalchemy_orm sqlalchemy_relations sqlalchemy_query}"
 art() { echo "$M2/$1/$2/$3/$2-$3.jar"; }
 CORE=$(art com/codenameone codenameone-core 8.0-SNAPSHOT)
 RUNTIME=$(art com/codenameone codenameone-python-runtime 8.0-SNAPSHOT)
@@ -67,6 +67,28 @@ public class Main {
     }
 }
 JAVA
+    # Each program starts from an empty database: whatever an earlier program
+    # (or an earlier run) left behind -- tables, sequences, types -- would
+    # otherwise leak into its output.
+    cat >"$APP/gen/com/pybackend/Reset.java" <<'JAVA'
+package com.pybackend;
+
+import com.codename1.backend.Database;
+
+public class Reset {
+    public static void main(String[] args) throws Exception {
+        Database db = Database.open(args[0]);
+        try {
+            if ("postgresql".equals(db.dialect().getName())) {
+                db.execute("DROP SCHEMA public CASCADE", new Object[0]);
+                db.execute("CREATE SCHEMA public", new Object[0]);
+            }
+        } finally {
+            db.close();
+        }
+    }
+}
+JAVA
     (cd "$APP/classes" && unzip -qo "$RUNTIME" 'com/*' && unzip -qo "$CORE" 'com/codename1/util/*')
     "$J17/bin/javac" -nowarn --release 17 -d "$APP/classes" $(find "$REPO/scripts/python-bench/hostfs" -name '*.java')
     "$J17/bin/javac" -nowarn --release 17 -cp "$APP/classes:$BACKEND" -d "$APP/classes" \
@@ -78,6 +100,7 @@ JAVA
             mariadb) url="$CN1_SQLA_MARIADB" ;;
         esac
         out="$APP/$engine.out"
+        "$J17/bin/java" -cp "$APP/classes:$BACKEND:$CORE" com.pybackend.Reset "$url"
         "$J17/bin/java" -cp "$APP/classes:$BACKEND:$CORE" com.pybackend.Main "$url" >"$out" 2>&1 || true
         if diff -u "$CONF/$prog.out" "$out" >"$APP/$engine.diff"; then
             echo "PASS $prog on $engine"

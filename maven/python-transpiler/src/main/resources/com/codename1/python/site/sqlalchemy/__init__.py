@@ -16,6 +16,7 @@ CTEs, ``Enum``/``JSON``/``Numeric`` decimal handling.
 """
 
 import datetime as _dt
+import decimal as _decimal
 import logging as _logging
 import sqlite3 as _sqlite3
 
@@ -90,7 +91,41 @@ class Float(TypeEngine):
 
 
 class Numeric(Float):
+    """``decimal.Decimal`` both ways, as SQLAlchemy's ``Numeric`` (``asdecimal=True``).
+
+    A Decimal is bound as its text, which every engine casts exactly; SQLite hands back a
+    float, which is rounded to the column's scale the way SQLAlchemy does."""
     _ddl = "NUMERIC"
+
+    def __init__(self, precision=None, scale=None, asdecimal=True, **kw):
+        self.precision = precision
+        self.scale = scale
+        self.asdecimal = asdecimal
+
+    def ddl(self):
+        if self.precision is None:
+            return self._ddl
+        if self.scale is None:
+            return "%s(%d)" % (self._ddl, self.precision)
+        return "%s(%d, %d)" % (self._ddl, self.precision, self.scale)
+
+    def bind(self, value):
+        if value is not None and isinstance(value, _decimal.Decimal):
+            return str(value)
+        return value
+
+    def result(self, value):
+        if value is None:
+            return None
+        if not self.asdecimal:
+            return float(value)
+        if isinstance(value, _decimal.Decimal):
+            return value
+        if isinstance(value, float):
+            if self.scale is not None:
+                return _decimal.Decimal("%.*f" % (self.scale, value))
+            return _decimal.Decimal(repr(value))
+        return _decimal.Decimal(str(value))
 
 
 class Boolean(TypeEngine):
@@ -480,6 +515,47 @@ def true():
 
 def false():
     return _BoolConst(False)
+
+
+def _result_name(col_sql):
+    """The name a server gives a compiled result column, or None for an expression."""
+    i = col_sql.rfind(" AS ")
+    if i >= 0:
+        tail = col_sql[i + 4:].strip()
+        if tail and all(ch.isalnum() or ch in "_\"`" for ch in tail):
+            return tail.strip("\"`")
+    if col_sql and all(ch.isalnum() or ch in "_.\"`" for ch in col_sql):
+        return col_sql.split(".")[-1].strip("\"`")
+    return None
+
+
+def _dedupe_labels(cols):
+    """Labels a repeated result column ``name_1``, ``name_2``... as SQLAlchemy does.
+
+    Rows are read by position, but the backend's drivers hand each row over keyed by
+    column name, so ``SELECT users.name, users_1.name`` came back one column short (an
+    aliased self join). Distinct names keep every column."""
+    seen = set()
+    for c in cols:
+        n = _result_name(c)
+        if n is not None:
+            seen.add(n)
+    taken = set()
+    for i in range(len(cols)):
+        n = _result_name(cols[i])
+        if n is None:
+            continue
+        if n in taken:
+            k = 1
+            while (n + "_" + str(k)) in seen:
+                k += 1
+            alias = n + "_" + str(k)
+            seen.add(alias)
+            j = cols[i].rfind(" AS ")
+            base = cols[i][:j] if j >= 0 else cols[i]
+            cols[i] = base + " AS " + alias
+            n = alias
+        taken.add(n)
 
 
 class Label(ColumnElement):
@@ -1071,6 +1147,7 @@ class Select(ClauseElement):
             else:
                 cols.append(sl.elem._compile(ctx))
         ctx.columns_clause = False
+        _dedupe_labels(cols)
         sql = "SELECT " + ("DISTINCT " if self._distinct else "") + ", ".join(cols)
         sql = self._compile_rest(ctx, sql, froms)
         ctx.outer = saved_outer
@@ -1844,7 +1921,8 @@ class Connection:
             else:
                 cur.execute(sql, params)
         except _sqlite3.Error as e:
-            raise exc._wrap(e, sql, params)
+            d = self.engine.dialect
+            raise exc._wrap(e, sql, params, _DBAPI_MODULES.get(d.driver) or _DBAPI_MODULES.get(d.name, "sqlite3"))
         return cur
 
     def execute(self, statement, parameters=None, execution_options=None):
@@ -2265,3 +2343,8 @@ def create_engine(url, echo=False, **kwargs):
 
 def inspect(obj):
     return obj
+
+# The DB-API module SQLAlchemy names in an error, "(psycopg2.OperationalError) ...", by driver.
+_DBAPI_MODULES = {"pysqlite": "sqlite3", "psycopg": "psycopg", "psycopg2": "psycopg2", "asyncpg": "asyncpg",
+                  "mysqldb": "MySQLdb", "pymysql": "pymysql", "mariadbconnector": "mariadb",
+                  "postgresql": "psycopg", "mysql": "MySQLdb", "mariadb": "MySQLdb"}
