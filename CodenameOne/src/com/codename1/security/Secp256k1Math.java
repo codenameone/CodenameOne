@@ -143,7 +143,25 @@ final class Secp256k1Math {
         long b7 = b[7];
         long b8 = b[8];
         long b9 = b[9];
-        long c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15, c16, c17, c18;
+        long c0;
+        long c1;
+        long c2;
+        long c3;
+        long c4;
+        long c5;
+        long c6;
+        long c7;
+        long c8;
+        long c9;
+        long c10;
+        long c11;
+        long c12;
+        long c13;
+        long c14;
+        long c15;
+        long c16;
+        long c17;
+        long c18;
         if (KARATSUBA) {
             // 2^130 splits the limbs into halves of five, so a * b = L + (L + U - D) 2^130 + U 2^260
             // with D = (a_lo - a_hi)(b_lo - b_hi): 75 products for 100. Limbs are never negative,
