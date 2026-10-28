@@ -23,7 +23,7 @@
 package com.codename1.crypto.evm;
 
 import java.nio.charset.StandardCharsets;
-import com.codename1.crypto.encoding.Json;
+import com.codename1.io.JSONParser;
 import com.codename1.security.Hash;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -95,7 +95,14 @@ public final class TypedData {
     ///
     /// - `IllegalArgumentException`: for malformed JSON or a document missing a part
     public static TypedData fromJson(String json) {
-        Map<?, ?> root = map(Json.parse(json), "document");
+        Object parsed;
+        try {
+            // exact: an integer past a long stays digits, never a rounded double
+            parsed = JSONParser.parseStrict(json, true);
+        } catch (java.io.IOException e) {
+            throw new IllegalArgumentException("EIP-712 document is not JSON: " + e.getMessage(), e);
+        }
+        Map<?, ?> root = map(parsed, "document");
         Map<?, ?> rawTypes = map(root.get("types"), "types");
         Map<String, List<String[]>> types = new LinkedHashMap<String, List<String[]>>();
         Iterator<?> it = rawTypes.entrySet().iterator();
@@ -236,9 +243,17 @@ public final class TypedData {
         }
         if ("bytes".equals(type)) {
             return Hash.keccak256(value instanceof byte[] ? (byte[]) value
-                    : com.codename1.security.Hash.fromHex(text(value)));
+                    : Hash.fromHex(text(value)));
         }
         Object v = value;
+        if (v instanceof JSONParser.RawJson) {
+            // an integer the JSON reader kept exactly because it exceeds a long
+            String digits = ((JSONParser.RawJson) v).getJson();
+            if (digits.startsWith("-")) {
+                throw new IllegalArgumentException(type + " value " + digits + " is out of range");
+            }
+            v = com.codename1.crypto.UInt256.parse(digits, 10);
+        }
         if (v instanceof Double) {
             throw new IllegalArgumentException(type + " cannot take a fractional number");
         }
@@ -247,7 +262,7 @@ public final class TypedData {
         }
         if (v instanceof String && type.startsWith("bytes") && ((String) v).length() < 66) {
             // a short bytesN hex value is right-padded, as wallets accept it
-            byte[] raw = com.codename1.security.Hash.fromHex((String) v);
+            byte[] raw = Hash.fromHex((String) v);
             int n = Integer.parseInt(type.substring(5));
             byte[] padded = new byte[n];
             System.arraycopy(raw, 0, padded, 0, Math.min(raw.length, n));

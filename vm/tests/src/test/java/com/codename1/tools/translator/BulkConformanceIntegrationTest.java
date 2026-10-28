@@ -322,6 +322,10 @@ class BulkConformanceIntegrationTest {
     /// the `paths` of `.github/workflows/parparvm-tests.yml`.
     static final String[] CORE_SOURCES = {
         "com/codename1/impl/SharedWithBackend.java",
+        "com/codename1/io/CharArrayReader.java",
+        "com/codename1/io/JSONParseCallback.java",
+        "com/codename1/io/JSONParser.java",
+        "com/codename1/io/JSONSanitizer.java",
         "com/codename1/crypto/UInt256.java",
         "com/codename1/crypto/bitcoin/BitcoinAddress.java",
         "com/codename1/crypto/bitcoin/BitcoinKey.java",
@@ -338,7 +342,6 @@ class BulkConformanceIntegrationTest {
         "com/codename1/crypto/encoding/Base64.java",
         "com/codename1/crypto/encoding/Bech32.java",
         "com/codename1/crypto/encoding/Hex.java",
-        "com/codename1/crypto/encoding/Json.java",
         "com/codename1/crypto/encoding/Rlp.java",
         "com/codename1/crypto/evm/Abi.java",
         "com/codename1/crypto/evm/Erc20.java",

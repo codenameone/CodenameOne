@@ -25,7 +25,7 @@ package com.codename1.crypto.rpc;
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.NetworkManager;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -78,20 +78,12 @@ public class NetworkTransport implements RpcTransport {
             throw new IOException(String.valueOf(r.failure.getMessage()));
         }
         byte[] data = r.getResponseData();
-        String text = data == null ? "" : utf8(data);
+        String text = data == null ? "" : new String(data, StandardCharsets.UTF_8);
         int code = r.errorCode != 0 ? r.errorCode : r.getResponseCode();
         if (code < 200 || code > 299) {
             throw RpcException.http(code, text);
         }
         return text;
-    }
-
-    private static String utf8(byte[] data) throws IOException {
-        try {
-            return new String(data, "UTF-8");
-        } catch (UnsupportedEncodingException e) {
-            throw new IOException("UTF-8 is unavailable", e);
-        }
     }
 
     // Records what ConnectionRequest would otherwise show in a dialog.

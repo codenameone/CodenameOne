@@ -56,6 +56,9 @@ final class PriceFeeds {
         if (o instanceof Number) {
             return ((Number) o).doubleValue();
         }
+        if (o instanceof com.codename1.io.JSONParser.RawJson) {
+            return Double.parseDouble(((com.codename1.io.JSONParser.RawJson) o).getJson());
+        }
         if (o instanceof com.codename1.crypto.UInt256) {
             return Double.parseDouble(o.toString());
         }

@@ -24,7 +24,7 @@ package com.codename1.crypto.rpc;
 
 import com.codename1.crypto.bitcoin.BitcoinAddress;
 import com.codename1.crypto.bitcoin.BitcoinTransaction;
-import com.codename1.crypto.encoding.Json;
+import com.codename1.io.JSONParser;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -73,8 +73,8 @@ public class EsploraClient {
     private Object getJson(String path) throws IOException {
         String body = get(path);
         try {
-            return Json.parse(body);
-        } catch (IllegalArgumentException e) {
+            return JSONParser.parseStrict(body, true);
+        } catch (IOException e) {
             throw new IOException("not JSON from " + base + path, e);
         }
     }

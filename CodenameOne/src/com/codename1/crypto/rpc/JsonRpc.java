@@ -22,7 +22,7 @@
  */
 package com.codename1.crypto.rpc;
 
-import com.codename1.crypto.encoding.Json;
+import com.codename1.io.JSONParser;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -31,8 +31,10 @@ import java.util.List;
 import java.util.Map;
 
 /// JSON-RPC 2.0 over an [RpcTransport]: what Ethereum and Solana nodes speak. Parameters and
-/// results are the values [Json] reads and writes: `Map`, `List`, `String`, `Boolean`, `Long`,
-/// [com.codename1.crypto.UInt256] and `Double`.
+/// results are the values [com.codename1.io.JSONParser#parseStrict(String, boolean)] reads and
+/// [com.codename1.io.JSONParser#toJson(Object)] writes: `Map`, `List`, `String`, `Boolean`, `Long`,
+/// `Double`, and an integer past a `long` as a [com.codename1.io.JSONParser.RawJson] holding its
+/// exact digits.
 @com.codename1.impl.SharedWithBackend
 public class JsonRpc {
     private final RpcTransport transport;
@@ -79,11 +81,11 @@ public class JsonRpc {
         req.put("id", Long.valueOf(id));
         req.put("method", method);
         req.put("params", params == null ? new ArrayList<Object>() : params);
-        String reply = transport.send("POST", url, "application/json", Json.stringify(req));
+        String reply = transport.send("POST", url, "application/json", JSONParser.toJson(req));
         Object parsed;
         try {
-            parsed = Json.parse(reply);
-        } catch (IllegalArgumentException e) {
+            parsed = JSONParser.parseStrict(reply, true);
+        } catch (IOException e) {
             throw new IOException("not a JSON-RPC response from " + url + ": " + e.getMessage(), e);
         }
         if (!(parsed instanceof Map)) {

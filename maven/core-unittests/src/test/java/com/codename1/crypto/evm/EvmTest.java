@@ -23,7 +23,7 @@
 package com.codename1.crypto.evm;
 
 import com.codename1.crypto.UInt256;
-import com.codename1.crypto.encoding.Json;
+import com.codename1.io.JSONParser;
 import com.codename1.security.Hash;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -280,7 +280,7 @@ class EvmTest {
     }
 
     @Test
-    void uint256() {
+    void uint256() throws Exception {
         assertEquals("1.5", UInt256.parseUnits("1.5", 18).formatUnits(18));
         assertEquals("1500000000000000000", UInt256.parseUnits("1.5", 18).toString());
         assertEquals("0.000001", UInt256.ONE.formatUnits(6));
@@ -296,9 +296,12 @@ class EvmTest {
         assertEquals(a, qr[0].multiply(b).add(qr[1]));
         assertEquals(new java.math.BigInteger("123456789012345678901234567890").divide(new java.math.BigInteger("987654321")).toString(),
                 qr[0].toString());
-        assertEquals(Long.valueOf(5), Json.parse("5"));
-        assertEquals(UInt256.MAX, Json.parse(UInt256.MAX.toString()));
-        assertEquals("{\"a\":[1,\"x\",true,null],\"b\":\"0x0102\"}", Json.stringify(Json.parse(
-                "{\"a\":[1,\"x\",true,null],\"b\":\"0x0102\"}")));
+        assertEquals(Long.valueOf(5), JSONParser.parseStrict("5", true));
+        // past a long the digits are kept exactly, never rounded through a double
+        Object max = JSONParser.parseStrict(UInt256.MAX.toString(), true);
+        assertEquals(UInt256.MAX.toString(), ((JSONParser.RawJson) max).getJson());
+        assertEquals("{\"a\":[1,\"x\",true,null],\"b\":\"0x0102\",\"c\":" + UInt256.MAX + "}",
+                JSONParser.toJson(JSONParser.parseStrict(
+                "{\"a\":[1,\"x\",true,null],\"b\":\"0x0102\",\"c\":" + UInt256.MAX + "}", true)));
     }
 }

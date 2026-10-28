@@ -25,7 +25,7 @@ package com.codename1.crypto.rpc;
 import com.codename1.crypto.UInt256;
 import com.codename1.crypto.bitcoin.BitcoinAddress;
 import com.codename1.crypto.bitcoin.BitcoinNetwork;
-import com.codename1.crypto.encoding.Json;
+import com.codename1.io.JSONParser;
 import com.codename1.crypto.evm.EvmAddress;
 import com.codename1.crypto.solana.SolanaAddress;
 import java.io.IOException;
@@ -57,9 +57,9 @@ class RpcTest {
             return replies.remove(0);
         }
 
-        Map<?, ?> lastBody() {
+        Map<?, ?> lastBody() throws java.io.IOException {
             String r = requests.get(requests.size() - 1);
-            return (Map<?, ?>) Json.parse(r.substring(r.indexOf('{')));
+            return (Map<?, ?>) JSONParser.parseStrict(r.substring(r.indexOf('{')), true);
         }
     }
 

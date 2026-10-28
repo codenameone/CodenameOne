@@ -22,7 +22,7 @@
  */
 package com.codename1.crypto.market;
 
-import com.codename1.crypto.encoding.Json;
+import com.codename1.io.JSONParser;
 import com.codename1.crypto.rpc.RpcTransport;
 import java.io.IOException;
 import java.util.HashMap;
@@ -89,10 +89,11 @@ public class CoinGeckoFeed implements PriceFeed {
         if (apiKey != null) {
             url.append(pro ? "&x_cg_pro_api_key=" : "&x_cg_demo_api_key=").append(PriceFeeds.encode(apiKey));
         }
+        String body = transport.send("GET", url.toString(), null, null);
         Object parsed;
         try {
-            parsed = Json.parse(transport.send("GET", url.toString(), null, null));
-        } catch (IllegalArgumentException e) {
+            parsed = JSONParser.parseStrict(body, true);
+        } catch (IOException e) {
             throw new IOException("CoinGecko answered something that is not JSON", e);
         }
         Object coin = parsed instanceof Map ? ((Map<?, ?>) parsed).get(id) : null;

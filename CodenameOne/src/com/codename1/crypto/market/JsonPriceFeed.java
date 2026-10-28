@@ -22,7 +22,7 @@
  */
 package com.codename1.crypto.market;
 
-import com.codename1.crypto.encoding.Json;
+import com.codename1.io.JSONParser;
 import com.codename1.crypto.rpc.RpcTransport;
 import java.io.IOException;
 import java.util.List;
@@ -85,10 +85,11 @@ public class JsonPriceFeed implements PriceFeed {
         url = replace(url, "{quote}", PriceFeeds.encode(PriceFeeds.lower(quote)));
         url = replace(url, "{BASE}", PriceFeeds.encode(PriceFeeds.upper(base)));
         url = replace(url, "{QUOTE}", PriceFeeds.encode(PriceFeeds.upper(quote)));
+        String body = transport.send("GET", url, null, null);
         Object node;
         try {
-            node = Json.parse(transport.send("GET", url, null, null));
-        } catch (IllegalArgumentException e) {
+            node = JSONParser.parseStrict(body, true);
+        } catch (IOException e) {
             throw new IOException(name + " answered something that is not JSON", e);
         }
         for (String pathItem : path) {
