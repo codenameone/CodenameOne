@@ -30,7 +30,15 @@ package com.codename1.python.runtime;
 /// generated registry; an application without a server has none, and
 /// serving raises `OSError`. `dispatch` takes `(method, path, query,
 /// headers, body)`, the headers a list of pairs and the body bytes, and
-/// answers `(status, headers, body)` the same way.
+/// answers `(status, headers, body)` the same way, or
+/// `(status, headers, body, after)` when work is to run once the response
+/// has been sent (FastAPI's background tasks): the server calls
+/// [#runAfter(Response)] when the last byte is out.
+///
+/// Requests are served concurrently, on several threads. Each holds the
+/// [Gil] only while it runs Python -- [#call], [#nextChunk], [#runAfter] --
+/// and never while it writes to a socket or waits for a chunk to drain, so a
+/// slow streamed response does not hold up the requests beside it.
 public abstract class PyServer {
     private static PyServer current;
 
@@ -180,10 +188,11 @@ public abstract class PyServer {
 
     private static Response call0(Object dispatch, Object[] request) {
         Object r = Py.obj(dispatch).call(request, Py.NO_KW);
-        if (!(r instanceof PyTuple) || ((PyTuple) r).size() != 3) {
-            throw Py.typeError("dispatch must return (status, headers, body)");
+        if (!(r instanceof PyTuple) || ((PyTuple) r).size() < 3 || ((PyTuple) r).size() > 4) {
+            throw Py.typeError("dispatch must return (status, headers, body[, after])");
         }
         PyTuple t = (PyTuple) r;
+        Object after = t.size() == 4 && t.get(3) != Py.NONE ? t.get(3) : null; //NOPMD CompareObjectsWithEquals - identity is meant
         Object hl = t.get(1);
         Object[] pairs = hl instanceof PyList ? ((PyList) hl).toArray()
                 : hl instanceof PyTuple ? ((PyTuple) hl).items : null;
@@ -202,10 +211,52 @@ public abstract class PyServer {
         Object body = t.get(2);
         byte[] bytes = PyBytes.like(body);
         if (bytes != null || body == Py.NONE) { //NOPMD CompareObjectsWithEquals - identity is meant
-            return new Response((int) Py.asLong(t.get(0)), headers, bytes == null ? new byte[0] : bytes, null);
+            return new Response((int) Py.asLong(t.get(0)), headers, bytes == null ? new byte[0] : bytes, null, after);
         }
         // Anything else is an iterable of chunks, sent as each is produced.
-        return new Response((int) Py.asLong(t.get(0)), headers, new byte[0], Py.iter(body));
+        return new Response((int) Py.asLong(t.get(0)), headers, new byte[0], Py.iter(body), after);
+    }
+
+    /// Runs the work `dispatch` asked to run after the response, at most
+    /// once, under the GIL. A failure is printed: the response is already
+    /// out, so there is nobody left to answer it to, as in Starlette.
+    public static void runAfter(Response response) {
+        Object after = response.after.getAndSet(null);
+        if (after == null) {
+            return;
+        }
+        Gil.enter();
+        try {
+            Py.obj(after).call(new Object[0], Py.NO_KW);
+        } catch (PyException e) {
+            e.printStackTrace();
+        } finally {
+            Gil.exit();
+        }
+    }
+
+    /// Drops the work to run after a response that was never completed --
+    /// the client went away -- as Starlette skips its background tasks when
+    /// a send fails.
+    public static void cancelAfter(Response response) {
+        response.after.set(null);
+    }
+
+    /// [#runAfter(Response)] on a thread of its own, for a server that has
+    /// no hook for "the response is written": the caller returns and the
+    /// response goes out without waiting for the work, which then waits only
+    /// for the GIL. Does nothing when there is no such work.
+    public static void runAfterLater(final Response response) {
+        if (response.after.get() == null) {
+            return;
+        }
+        Thread t = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                runAfter(response);
+            }
+        });
+        t.start();
     }
 
     /// The next chunk of a streamed response, or an empty array when it is
@@ -271,12 +322,20 @@ public abstract class PyServer {
         public final byte[] body;
         /// The chunk iterator of a streamed body, until it is exhausted.
         Object stream;
+        /// What [#runAfter(Response)] calls, until it has.
+        final java.util.concurrent.atomic.AtomicReference<Object> after;
 
-        Response(int status, String[] headers, byte[] body, Object stream) {
+        Response(int status, String[] headers, byte[] body, Object stream, Object after) {
             this.status = status;
             this.headers = headers;
             this.body = body;
             this.stream = stream;
+            this.after = new java.util.concurrent.atomic.AtomicReference<Object>(after);
+        }
+
+        /// Whether there is work to run once this response has been sent.
+        public boolean hasAfter() {
+            return after.get() != null;
         }
 
         /// Whether the body comes from [#nextChunk] rather than [#body].

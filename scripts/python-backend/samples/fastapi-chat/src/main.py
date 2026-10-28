@@ -8,7 +8,7 @@ import asyncio
 import sys
 import time
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import BackgroundTasks, FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse, JSONResponse
 
 app = FastAPI(title="chat")
@@ -90,6 +90,45 @@ async def astream():
             if i < 2:
                 await asyncio.sleep(1)
     return StreamingResponse(gen(), media_type="text/plain")
+
+
+events = []
+
+
+def _late(name):
+    # Slow enough that a server running it before (or while holding up) the
+    # response would be seen by the client's clock.
+    time.sleep(0.5)
+    events.append("task " + name)
+
+
+@app.get("/background")
+def background(tasks: BackgroundTasks):
+    events.append("handler")
+    tasks.add_task(_late, "plain")
+    return {"queued": True}
+
+
+@app.get("/background-stream")
+def background_stream(tasks: BackgroundTasks):
+    def gen():
+        for i in range(2):
+            yield "bg %d\n" % i
+            time.sleep(0.3)
+        events.append("stream done")
+    tasks.add_task(_late, "stream")
+    return StreamingResponse(gen(), media_type="text/plain", background=tasks)
+
+
+@app.get("/events")
+def list_events():
+    return {"events": events}
+
+
+@app.delete("/events")
+def clear_events():
+    del events[:]
+    return {"events": events}
 
 
 @app.websocket("/ws/echo")

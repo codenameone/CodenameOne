@@ -215,11 +215,11 @@ class FastAPI(APIRouter):
             resp = await self._handle_exception(req, exc)
         return resp
 
-    def _handle(self, method, path, query, headers, body):
+    def _handle(self, method, path, query, headers, body, run_background=True):
         req = Request(method.upper(), unquote(path), query, headers, body, self)
         req.app = self
         resp = run_coro(self._build_stack()(req))
-        if resp.background is not None:
+        if run_background and resp.background is not None:
             resp.background()
         return resp
 
@@ -237,17 +237,23 @@ class FastAPI(APIRouter):
         # The server's entry: a streaming body is handed over as its chunk
         # iterator, which the server sends as each chunk is produced. The test
         # client goes through _dispatch_for_client and reads it whole.
+        # Background tasks are handed over as a fourth element: the server
+        # runs them once the whole response, streamed or not, has been sent,
+        # as Starlette does after its final send.
         try:
-            resp = self._handle(method, path, query, headers, body)
+            resp = self._handle(method, path, query, headers, body, False)
         except Exception:
             resp = PlainTextResponse("Internal Server Error", status_code=500)
+        after = resp.background
         if method.upper() == "HEAD":
-            return resp.status_code, resp.headers.items(), b""
-        take = getattr(resp, "take_stream", None)
-        stream = take() if take is not None else None
-        if stream is not None:
-            return resp.status_code, resp.headers.items(), stream
-        return resp.status_code, resp.headers.items(), resp.body
+            data = b""
+        else:
+            take = getattr(resp, "take_stream", None)
+            stream = take() if take is not None else None
+            data = stream if stream is not None else resp.body
+        if after is not None:
+            return resp.status_code, resp.headers.items(), data, after
+        return resp.status_code, resp.headers.items(), data
 
     # -- websockets
     def websocket_route(self, path):

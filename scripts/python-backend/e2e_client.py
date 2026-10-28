@@ -11,6 +11,7 @@ import os
 import socket
 import struct
 import sys
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -164,6 +165,50 @@ def streaming(path, marker_first, marker_last):
     return body
 
 
+def concurrency():
+    """A slow stream on one connection must not hold up a request on another."""
+    result = {}
+
+    def slow():
+        result["stream"] = timed_stream("/stream")
+    t = threading.Thread(target=slow)
+    t.start()
+    time.sleep(0.3)
+    start = time.time()
+    st, h, b = http("GET", "/health")
+    took = time.time() - start
+    stream_running = t.is_alive()
+    t.join()
+    check("request beside a slow stream answers", st == 200, st)
+    check("request beside a slow stream is not held up",
+          took < 0.5 and stream_running, "took %.2fs, stream still running %s" % (took, stream_running))
+    check("the slow stream still completes",
+          result.get("stream", ("", b"", []))[1] == b"chunk 0\nchunk 1\nchunk 2\n", result.get("stream"))
+
+
+def background_tasks():
+    """Background tasks run after the response is sent, as in Starlette."""
+    http("DELETE", "/events")
+    start = time.time()
+    st, h, b = http("GET", "/background")
+    took = time.time() - start
+    check("GET /background 200", st == 200 and json.loads(b) == {"queued": True}, (st, b))
+    check("response does not wait for its background task", took < 0.4, "took %.2fs" % took)
+    time.sleep(1.0)
+    st, h, b = http("GET", "/events")
+    check("background task ran after the handler",
+          json.loads(b)["events"] == ["handler", "task plain"], b)
+
+    http("DELETE", "/events")
+    head, body, arrivals = timed_stream("/background-stream")
+    check("/background-stream body", body == b"bg 0\nbg 1\n", body)
+    check("/background-stream ends before its task", arrivals and arrivals[-1][0] < 0.9, arrivals)
+    time.sleep(1.0)
+    st, h, b = http("GET", "/events")
+    check("streamed background task ran after the last chunk",
+          json.loads(b)["events"] == ["stream done", "task stream"], b)
+
+
 def fastapi():
     st, h, b = http("GET", "/health")
     check("GET /health 200", st == 200, st)
@@ -233,6 +278,9 @@ def fastapi():
 
     st, h, b = http("GET", "/health")
     check("still serving after websockets", st == 200, st)
+
+    concurrency()
+    background_tasks()
 
 
 def flask():
