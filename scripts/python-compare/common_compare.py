@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 # Runs vm/benchmarks' CommonWorkloads, ported to Python
 # (scripts/python-bench/common), on every Python runtime given, plus the
-# Codename One build twice: the Python as written, and the same program with
-# the hot spot in Java. Each workload runs in a process of its own, so every
+# Codename One build twice: the Python as written, and Codename One Java, the
+# same executable running vm/benchmarks' own Java method for the workload --
+# the floor the compiled Python is measured against. Each workload runs in a process of its own, so every
 # row has its own peak RSS. Checksums are checked against Java's.
 #
 #   common_compare.py --cn1 <common_bench binary> --cpython P [--pypy P]
@@ -55,14 +56,16 @@ def main():
     ap.add_argument("--md")
     ap.add_argument("--only", help="comma separated workloads")
     a = ap.parse_args()
+    # The workloads run from the Python sources' directory.
+    a.cn1 = os.path.abspath(a.cn1)
     script = os.path.join(COMMON, "common_bench.py")
     arms = [("CPython", lambda w: [a.cpython, script, w])]
     if a.pypy:
         arms.append(("PyPy", lambda w: [a.pypy, script, w]))
     if a.graalpy:
         arms.append(("GraalPy", lambda w: [a.graalpy, script, w]))
-    arms.append(("Codename One", lambda w: [a.cn1, w, "python"]))
-    arms.append(("Codename One, hot spot in Java", lambda w: [a.cn1, w, "java"]))
+    arms.append(("Codename One Python", lambda w: [a.cn1, w, "python"]))
+    arms.append(("Codename One Java", lambda w: [a.cn1, w, "java"]))
     reps = [str(a.warmup), str(a.measured)]
     names = [w for w in EXPECTED if not a.only or w in a.only.split(",")]
     results = {}

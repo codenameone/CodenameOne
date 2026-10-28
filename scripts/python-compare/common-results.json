@@ -3,250 +3,250 @@
   "CPython",
   "PyPy",
   "GraalPy",
-  "Codename One",
-  "Codename One, hot spot in Java"
+  "Codename One Python",
+  "Codename One Java"
  ],
  "results": {
   "intArithmetic": {
    "CPython": {
-    "ms": 15124.8,
-    "rss_mb": 14.96875
+    "ms": 14452.1,
+    "rss_mb": 14.84375
    },
    "PyPy": {
-    "ms": 141.8,
-    "rss_mb": 32.125
+    "ms": 131.6,
+    "rss_mb": 32.0625
    },
    "GraalPy": {
-    "ms": 114.2,
-    "rss_mb": 352.953125
+    "ms": 101.6,
+    "rss_mb": 365.046875
    },
-   "Codename One": {
-    "ms": 1753.8,
-    "rss_mb": 85.5625
+   "Codename One Python": {
+    "ms": 65.7,
+    "rss_mb": 10.90625
    },
-   "Codename One, hot spot in Java": {
-    "ms": 65.2,
-    "rss_mb": 11.375
+   "Codename One Java": {
+    "ms": 57.5,
+    "rss_mb": 11.28125
    }
   },
   "longArithmetic": {
    "CPython": {
-    "ms": 11839.2,
-    "rss_mb": 14.796875
+    "ms": 11708.8,
+    "rss_mb": 14.9375
    },
    "PyPy": {
-    "ms": 5410.0,
-    "rss_mb": 41.578125
+    "ms": 5300.7,
+    "rss_mb": 41.625
    },
    "GraalPy": {
-    "ms": 11761.8,
-    "rss_mb": 259.015625
+    "ms": 11133.7,
+    "rss_mb": 263.0625
    },
-   "Codename One": {
-    "ms": 26378.6,
-    "rss_mb": 135.328125
+   "Codename One Python": {
+    "ms": 38.6,
+    "rss_mb": 10.921875
    },
-   "Codename One, hot spot in Java": {
-    "ms": 40.6,
-    "rss_mb": 11.3125
+   "Codename One Java": {
+    "ms": 38.4,
+    "rss_mb": 11.296875
    }
   },
   "mathTranscendental": {
    "CPython": {
-    "ms": 1024.5,
-    "rss_mb": 14.953125
+    "ms": 1009.9,
+    "rss_mb": 14.8125
    },
    "PyPy": {
-    "ms": 191.6,
-    "rss_mb": 31.765625
+    "ms": 186.4,
+    "rss_mb": 31.84375
    },
    "GraalPy": {
-    "ms": 292.2,
-    "rss_mb": 342.9375
+    "ms": 288.5,
+    "rss_mb": 354.125
    },
-   "Codename One": {
-    "ms": 2015.7,
-    "rss_mb": 93.0
+   "Codename One Python": {
+    "ms": 179.8,
+    "rss_mb": 11.34375
    },
-   "Codename One, hot spot in Java": {
-    "ms": 180.8,
-    "rss_mb": 11.40625
+   "Codename One Java": {
+    "ms": 167.2,
+    "rss_mb": 11.578125
    }
   },
   "arraySequential": {
    "CPython": {
-    "ms": 1778.4,
-    "rss_mb": 382.203125
+    "ms": 1745.4,
+    "rss_mb": 382.046875
    },
    "PyPy": {
-    "ms": 33.7,
-    "rss_mb": 154.046875
+    "ms": 32.6,
+    "rss_mb": 154.171875
    },
    "GraalPy": {
-    "ms": 26.2,
-    "rss_mb": 331.28125
+    "ms": 25.7,
+    "rss_mb": 337.640625
    },
-   "Codename One": {
-    "ms": 282.4,
-    "rss_mb": 273.09375
+   "Codename One Python": {
+    "ms": 31.5,
+    "rss_mb": 41.75
    },
-   "Codename One, hot spot in Java": {
-    "ms": 10.5,
-    "rss_mb": 41.796875
+   "Codename One Java": {
+    "ms": 9.3,
+    "rss_mb": 41.8125
    }
   },
   "arrayRandom": {
    "CPython": {
-    "ms": 4662.5,
-    "rss_mb": 198.609375
+    "ms": 4541.6,
+    "rss_mb": 198.5625
    },
    "PyPy": {
-    "ms": 308.2,
-    "rss_mb": 93.078125
+    "ms": 275.4,
+    "rss_mb": 93.1875
    },
    "GraalPy": {
-    "ms": 252.1,
-    "rss_mb": 248.125
+    "ms": 233.5,
+    "rss_mb": 247.96875
    },
-   "Codename One": {
-    "ms": 549.5,
-    "rss_mb": 104.59375
+   "Codename One Python": {
+    "ms": 244.4,
+    "rss_mb": 26.265625
    },
-   "Codename One, hot spot in Java": {
-    "ms": 239.8,
-    "rss_mb": 26.625
+   "Codename One Java": {
+    "ms": 219.7,
+    "rss_mb": 26.609375
    }
   },
   "objectAllocation": {
    "CPython": {
-    "ms": 527.8,
-    "rss_mb": 15.078125
+    "ms": 521.6,
+    "rss_mb": 14.875
    },
    "PyPy": {
-    "ms": 19.1,
-    "rss_mb": 63.28125
+    "ms": 18.1,
+    "rss_mb": 63.140625
    },
    "GraalPy": {
-    "ms": 62.0,
-    "rss_mb": 344.03125
+    "ms": 58.1,
+    "rss_mb": 351.859375
    },
-   "Codename One": {
-    "ms": 68.2,
-    "rss_mb": 133.0625
+   "Codename One Python": {
+    "ms": 30.8,
+    "rss_mb": 163.84375
    },
-   "Codename One, hot spot in Java": {
-    "ms": 16.6,
-    "rss_mb": 191.6875
+   "Codename One Java": {
+    "ms": 14.2,
+    "rss_mb": 179.09375
    }
   },
   "valueEscape": {
    "CPython": {
-    "ms": 805.3,
-    "rss_mb": 14.78125
+    "ms": 801.2,
+    "rss_mb": 14.921875
    },
    "PyPy": {
-    "ms": 6.3,
-    "rss_mb": 32.03125
+    "ms": 6.1,
+    "rss_mb": 32.015625
    },
    "GraalPy": {
-    "ms": 59.1,
-    "rss_mb": 330.71875
+    "ms": 55.5,
+    "rss_mb": 330.59375
    },
-   "Codename One": {
-    "ms": 114.2,
-    "rss_mb": 90.984375
+   "Codename One Python": {
+    "ms": 3.5,
+    "rss_mb": 10.921875
    },
-   "Codename One, hot spot in Java": {
-    "ms": 5.0,
-    "rss_mb": 11.453125
+   "Codename One Java": {
+    "ms": 4.5,
+    "rss_mb": 11.25
    }
   },
   "hashMapChurn": {
    "CPython": {
-    "ms": 160.9,
-    "rss_mb": 25.546875
+    "ms": 158.4,
+    "rss_mb": 23.125
    },
    "PyPy": {
-    "ms": 43.6,
-    "rss_mb": 77.625
+    "ms": 41.1,
+    "rss_mb": 70.84375
    },
    "GraalPy": {
-    "ms": 97.8,
-    "rss_mb": 243.46875
+    "ms": 86.7,
+    "rss_mb": 250.609375
    },
-   "Codename One": {
-    "ms": 127.3,
-    "rss_mb": 126.5625
+   "Codename One Python": {
+    "ms": 43.7,
+    "rss_mb": 26.890625
    },
-   "Codename One, hot spot in Java": {
-    "ms": 20.8,
+   "Codename One Java": {
+    "ms": 20.4,
     "rss_mb": 30.265625
    }
   },
   "stringBuilding": {
    "CPython": {
-    "ms": 670.0,
-    "rss_mb": 14.921875
+    "ms": 629.5,
+    "rss_mb": 14.9375
    },
    "PyPy": {
-    "ms": 30.5,
+    "ms": 31.5,
     "rss_mb": 40.078125
    },
    "GraalPy": {
-    "ms": 70.7,
-    "rss_mb": 256.90625
+    "ms": 66.7,
+    "rss_mb": 262.984375
    },
-   "Codename One": {
-    "ms": 695.2,
-    "rss_mb": 86.5
+   "Codename One Python": {
+    "ms": 28.9,
+    "rss_mb": 83.609375
    },
-   "Codename One, hot spot in Java": {
-    "ms": 14.4,
-    "rss_mb": 86.421875
+   "Codename One Java": {
+    "ms": 13.9,
+    "rss_mb": 86.0
    }
   },
   "recursion": {
    "CPython": {
-    "ms": 2227.7,
-    "rss_mb": 14.796875
+    "ms": 2151.7,
+    "rss_mb": 14.921875
    },
    "PyPy": {
-    "ms": 181.9,
-    "rss_mb": 57.15625
+    "ms": 177.3,
+    "rss_mb": 57.015625
    },
    "GraalPy": {
-    "ms": 193.3,
-    "rss_mb": 280.40625
+    "ms": 188.6,
+    "rss_mb": 282.609375
    },
-   "Codename One": {
-    "ms": 355.1,
-    "rss_mb": 10.96875
+   "Codename One Python": {
+    "ms": 85.7,
+    "rss_mb": 10.9375
    },
-   "Codename One, hot spot in Java": {
-    "ms": 87.6,
-    "rss_mb": 11.34375
+   "Codename One Java": {
+    "ms": 81.5,
+    "rss_mb": 11.328125
    }
   },
   "quicksort": {
    "CPython": {
-    "ms": 1779.8,
-    "rss_mb": 83.609375
+    "ms": 1519.2,
+    "rss_mb": 83.796875
    },
    "PyPy": {
-    "ms": 171.4,
-    "rss_mb": 57.96875
+    "ms": 168.0,
+    "rss_mb": 57.859375
    },
    "GraalPy": {
-    "ms": 160.0,
-    "rss_mb": 267.625
+    "ms": 110.9,
+    "rss_mb": 247.046875
    },
-   "Codename One": {
-    "ms": 410.4,
-    "rss_mb": 113.53125
+   "Codename One Python": {
+    "ms": 117.7,
+    "rss_mb": 16.703125
    },
-   "Codename One, hot spot in Java": {
-    "ms": 89.3,
-    "rss_mb": 17.171875
+   "Codename One Java": {
+    "ms": 79.8,
+    "rss_mb": 17.03125
    }
   }
  }

@@ -180,49 +180,62 @@ FastAPI WebSockets and middleware.
 
 === Compared with CPython, PyPy and GraalPy
 
-The same programs, run on one Apple silicon Mac, with
-`scripts/python-compare/compare.py`. Codename One rows are native binaries;
-GraalPy is the Community edition, 25.4, on its own JVM.
+The same programs, run on one Apple silicon Mac with
+`scripts/python-compare/compare.py` and
+`scripts/python-compare/common_compare.py`. Codename One rows are native
+executables. The interpreters are CPython 3.14, PyPy 3.11 (7.3.20) and GraalPy
+3.13 (Community edition 25.4, on its own JVM). Every program runs in a process
+of its own, so each memory figure is that program's peak resident memory.
 
-Startup, a program that prints one line:
+==== Startup
+
+A program that prints one line, best of ten runs:
+
+image::img/python-startup.svg["Startup wall time and peak memory on CPython, PyPy, GraalPy and Codename One"]
 
 [cols="1,1,1",options="header"]
 |===
 | | Wall time (ms) | Peak memory (MB)
-| CPython 3.14 | 20.3 | 14.3
-| PyPy 3.11 | 18.2 | 29.2
-| GraalPy 3.13 | 34.9 | 116.6
-| Codename One | 5.9 | 8.7
+| CPython 3.14 | 15.1 | 14.4
+| PyPy 3.11 | 13.9 | 29.1
+| GraalPy 3.13 | 28.2 | 118.6
+| Codename One | 4.7 | 8.6
 |===
 
-CPU kernels, fastest round in milliseconds, then the process's peak memory in
-MB:
+==== Python kernels
+
+Classic benchmark programs written for Python (`scripts/python-bench/kernels`),
+fastest round in milliseconds, then peak memory in MB:
+
+image::img/python-kernels-time.svg["Run time of the Python kernels on CPython, PyPy, GraalPy and Codename One"]
+
+image::img/python-kernels-rss.svg["Peak memory of the Python kernels on CPython, PyPy, GraalPy and Codename One"]
 
 [cols="2,1,1,1,1,1,1,1,1",options="header"]
 |===
 | Kernel 2+| CPython 3.14 2+| PyPy 3.11 2+| GraalPy 3.13 2+| Codename One
-| nbody | 776.0 | 15 | 62.7 | 32 | 192.5 | 234 | 89.2 | 10
-| richards | 634.8 | 16 | 39.9 | 34 | 146.5 | 260 | 44.7 | 11
-| fannkuch | 2652.3 | 15 | 604.7 | 33 | 541.2 | 244 | 723.4 | 10
-| spectral_norm | 729.4 | 15 | 12.0 | 32 | 7.4 | 248 | 11.1 | 10
-| dicts_strings | 404.2 | 63 | 141.5 | 87 | 274.4 | 383 | 208.6 | 127
+| nbody | 764 | 15 | 62 | 32 | 180 | 236 | 88 | 10
+| richards | 632 | 15 | 39 | 34 | 104 | 272 | 36 | 11
+| fannkuch | 2606 | 15 | 582 | 33 | 519 | 248 | 568 | 10
+| spectral_norm | 711 | 15 | 12 | 32 | 7.2 | 253 | 32 | 10
+| dicts_strings | 387 | 63 | 134 | 80 | 213 | 434 | 189 | 125
 |===
 
-The two JITs and Codename One's ahead of time compilation land within a small
-factor of each other, from three to sixty times as fast as CPython. PyPy is
-the fastest on most kernels and GraalPy on two of them; Codename One gets
-close without a warm-up and in a third of PyPy's memory and a twentieth of
-GraalPy's on the numeric kernels.
+==== A Flask server
 
-The Flask sample above, measured with `ab -n 20000 -c 8`:
+The Flask sample above, measured with `ab -n 20000 -c 8` after a warm-up:
+
+image::img/python-flask-rps.svg["Requests per second of the Flask sample on CPython, PyPy, GraalPy and Codename One"]
+
+image::img/python-flask-memory.svg["Memory and deployed size of the Flask sample on CPython, PyPy, GraalPy and Codename One"]
 
 [cols="1,1,1,1,1,1",options="header"]
 |===
 | | First response (ms) | Requests per second | Idle memory (MB) | Memory after load (MB) | Deployed size (MB)
-| CPython 3.14 | 85 | 685 | 39.0 | 24.5 | 82.0
-| PyPy 3.11 | 196 | 688 | 65.3 | 88.7 | 137.7
-| GraalPy 3.13 | 609 | 561 | 325.7 | 931.0 | 343.1
-| Codename One | 58 | 13,564 | 26.8 | 423.4 | 22.7
+| CPython 3.14 | 81 | 611 | 39.1 | 39.9 | 82.0
+| PyPy 3.11 | 184 | 610 | 64.8 | 102.3 | 110.5
+| GraalPy 3.13 | 438 | 468 | 322.8 | 1270.4 | 305.8
+| Codename One | 33 | 16,749 | 26.6 | 375.2 | 22.8
 |===
 
 The deployed size is the interpreter's installation plus Flask and its
@@ -231,69 +244,66 @@ Werkzeug's threaded server, which is what `app.run()` starts; a production
 CPython deployment behind a WSGI server with several worker processes serves
 more, using a full interpreter's memory per worker. The Codename One server's
 heap grows under load and stays at that size, which is the memory after load
-column; it isn't a leak, and it doesn't grow further on longer runs.
+column; it doesn't grow further on longer runs.
 
 Where an application needs CPython instead: packages with C extensions that
 have no Codename One implementation (for example `pandas`, `scipy` or `torch`),
 and code that builds source text and runs it with `exec`.
 
-=== Performance and Java hot spots
+=== Python against Java on Codename One
 
-The comparisons above are Python programs written for Python. The workloads
-below are the ones every Codename One port is measured with,
+The workloads below are the ones every Codename One port is measured with,
 `com.bench.CommonWorkloads`, ported line by line to Python in
 `scripts/python-bench/common`. Each one returns a checksum, and every runtime
 has to return the checksum Java returns, so all five columns compute the same
 thing. The Python port reproduces Java's 32 and 64-bit wrap-around with masks,
 since a Python `int` never overflows.
 
-Five ways to run them, each workload in a process of its own so that the peak
-memory column belongs to that workload alone
-(`scripts/python-compare/common_compare.py`):
+The *Codename One Java* column is the Java original compiled by Codename One
+into the same executable. It's the floor: the speed and memory Codename One
+reaches for this work when written in Java, and the target for the same
+program written in Python.
 
-* CPython 3.14, PyPy 3.11 and GraalPy 3.13 (Community, 25.4) running the
-  Python source.
-* Codename One, the same Python compiled to a native executable.
-* Codename One with the hot spot in Java: the same executable, where the
-  Python calls the Java method for the workload instead of its own loop.
+image::img/python-perf-time.svg["Run time of each CommonWorkloads benchmark on CPython, PyPy, GraalPy, Codename One Python and Codename One Java"]
 
-image::img/python-perf-time.svg["Run time of each CommonWorkloads benchmark on CPython, PyPy, GraalPy and Codename One, with and without a Java hot spot"]
-
-image::img/python-perf-rss.svg["Peak memory of each CommonWorkloads benchmark on CPython, PyPy, GraalPy and Codename One, with and without a Java hot spot"]
+image::img/python-perf-rss.svg["Peak memory of each CommonWorkloads benchmark on CPython, PyPy, GraalPy, Codename One Python and Codename One Java"]
 
 [cols="2,1,1,1,1,1,1,1,1,1,1",options="header"]
 |===
-| Workload 2+| CPython (ms, MB) 2+| PyPy 2+| GraalPy 2+| Codename One 2+| Hot spot in Java
-| `intArithmetic` | 15125 | 15 | 142 | 32 | 114 | 353 | 1754 | 86 | 65 | 11
-| `longArithmetic` | 11839 | 15 | 5410 | 42 | 11762 | 259 | 26379 | 135 | 41 | 11
-| `mathTranscendental` | 1024 | 15 | 192 | 32 | 292 | 343 | 2016 | 93 | 181 | 11
-| `arraySequential` | 1778 | 382 | 34 | 154 | 26 | 331 | 282 | 273 | 10 | 42
-| `arrayRandom` | 4662 | 199 | 308 | 93 | 252 | 248 | 550 | 105 | 240 | 27
-| `objectAllocation` | 528 | 15 | 19 | 63 | 62 | 344 | 68 | 133 | 17 | 192
-| `valueEscape` | 805 | 15 | 6.3 | 32 | 59 | 331 | 114 | 91 | 5.0 | 11
-| `hashMapChurn` | 161 | 26 | 44 | 78 | 98 | 243 | 127 | 127 | 21 | 30
-| `stringBuilding` | 670 | 15 | 30 | 40 | 71 | 257 | 695 | 86 | 14 | 86
-| `recursion` | 2228 | 15 | 182 | 57 | 193 | 280 | 355 | 11 | 88 | 11
-| `quicksort` | 1780 | 84 | 171 | 58 | 160 | 268 | 410 | 114 | 89 | 17
+| Workload 2+| CPython (ms, MB) 2+| PyPy 2+| GraalPy 2+| Codename One Python 2+| Codename One Java
+| `intArithmetic` | 14452 | 15 | 132 | 32 | 102 | 365 | 66 | 11 | 58 | 11
+| `longArithmetic` | 11709 | 15 | 5301 | 42 | 11134 | 263 | 39 | 11 | 38 | 11
+| `mathTranscendental` | 1010 | 15 | 186 | 32 | 289 | 354 | 180 | 11 | 167 | 12
+| `arraySequential` | 1745 | 382 | 33 | 154 | 26 | 338 | 32 | 42 | 9.3 | 42
+| `arrayRandom` | 4542 | 199 | 275 | 93 | 234 | 248 | 244 | 26 | 220 | 27
+| `objectAllocation` | 522 | 15 | 18 | 63 | 58 | 352 | 31 | 164 | 14 | 179
+| `valueEscape` | 801 | 15 | 6.1 | 32 | 56 | 331 | 3.5 | 11 | 4.5 | 11
+| `hashMapChurn` | 158 | 23 | 41 | 71 | 87 | 251 | 44 | 27 | 20 | 30
+| `stringBuilding` | 630 | 15 | 32 | 40 | 67 | 263 | 29 | 84 | 14 | 86
+| `recursion` | 2152 | 15 | 177 | 57 | 189 | 283 | 86 | 11 | 82 | 11
+| `quicksort` | 1519 | 84 | 168 | 58 | 111 | 247 | 118 | 17 | 80 | 17
 |===
 
 What the numbers say:
 
-* **Python as written.** Compiled ahead of time, Codename One runs seven of
-  these eleven workloads 4 to 9 times faster than CPython, without a warm-up
-  and in less memory than GraalPy. PyPy and GraalPy are faster still on most of
-  them: a JIT watches the program run and specializes the loop for the values
-  it sees, which a compiler that runs before the program can't do.
-* **Where Codename One is slowest.** Arithmetic that leaves 64 bits
-  (`longArithmetic` masks the result of a multiplication that needs 128) runs
-  on arbitrary precision integers, and code the compiler can't type, such as
-  the string loop in `stringBuilding` and the `struct` call in
-  `mathTranscendental`, runs on the generic object path. Those are the long
-  blue bars, and the workloads where CPython keeps up or wins.
-* **Hot spot in Java.** Moving the measured hot spot into a Java method made
-  each of these workloads the fastest of the five runs, and usually the
-  smallest in memory as well because the loop then runs on unboxed `int`,
-  `long` and `double` values and arrays.
+* **Python reaches Java's memory.** On every workload the compiled Python uses
+  the memory the Java program uses, within a few percent and sometimes less:
+  ints, floats and int lists are held unboxed, a list of ints that fit 32 bits
+  takes four bytes an item as a Java `int[]` does, and objects that don't
+  escape a function are never allocated.
+* **And mostly its speed.** Six of the eleven run within 15% of Java, among
+  them the arithmetic, recursion and the transcendental math; the rest take
+  1.5 to 3.4 times as long. What remains is the cost of a Python `int` being
+  unbounded: where the compiler can't prove a value stays within 64 bits, the
+  generated code carries the check and a slow path Java doesn't need.
+* **Against the interpreters.** Codename One Python is the fastest of the four
+  Python runtimes on six workloads and within 10% of the fastest JIT on three
+  more, without a warm-up; GraalPy is faster at sequential array access and
+  PyPy at allocating objects. It uses a
+  third of PyPy's memory and a twentieth of GraalPy's on most of them. `longArithmetic`
+  multiplies 64-bit values whose product needs 128 bits and masks it back: the
+  interpreters compute it with arbitrary precision integers, and the compiler
+  recognizes the wrap-around and computes it in a Java `long`.
 
 ==== Tuning a hot spot in Java
 

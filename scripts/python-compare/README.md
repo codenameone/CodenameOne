@@ -22,7 +22,8 @@ scripts/python-backend/build.sh scripts/python-backend/samples/flask-todo /tmp/f
 python3 scripts/python-compare/compare.py \
   --cpython <python with flask> --pypy <pypy3 with flask> [--graalpy <graalpy with flask>] \
   --cn1-kernels scripts/python-bench/target --cn1-hello scripts/python-bench/target/hello/hello \
-  --cn1-server /tmp/flask-todo --out scripts/python-compare/RESULTS.md
+  --cn1-server /tmp/flask-todo --out scripts/python-compare/RESULTS.md \
+  --json scripts/python-compare/compare-results.json
 ```
 
 GraalPy is an optional arm (`--graalpy`); `RESULTS.md` includes it. Install
@@ -34,7 +35,8 @@ Flask into it with `graalpy -m ensurepip` and `graalpy -m pip install flask`.
 Codename One port runs, ported to Python in `scripts/python-bench/common`.
 Each workload runs in its own process, so the peak RSS is that workload's,
 and every checksum must equal Java's. Codename One runs twice: the Python as
-written, and the same executable calling the Java method for the hot spot.
+written, and Codename One Java, the same executable running the Java original
+-- the floor the compiled Python is held against.
 
 ```bash
 C=scripts/python-bench/common
@@ -44,5 +46,6 @@ PY_SOURCES=$C PY_EXTRA_FILES="$C/common_workloads.py $C/java_hotspots.py" \
 python3 scripts/python-compare/common_compare.py \
   --cn1 scripts/python-bench/target/common_bench/common_bench \
   --cpython <python> --pypy <pypy3> --graalpy <graalpy> --json common.json
-python3 scripts/python-compare/render_charts.py common.json --out docs/developer-guide/img
+python3 scripts/python-compare/render_charts.py common.json \
+  --compare scripts/python-compare/compare-results.json --out docs/developer-guide/img
 ```

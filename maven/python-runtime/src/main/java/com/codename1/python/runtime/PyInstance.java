@@ -160,9 +160,8 @@ public class PyInstance extends PyObject {
                 out.add(f[i]);
             }
         }
-        String[] names = shape().names;
-        for (int i = 0; i < names.length; i++) {
-            out.add(names[i]);
+        for (String n : shape().names) {
+            out.add(n);
         }
         return out.toArray(new String[out.size()]);
     }

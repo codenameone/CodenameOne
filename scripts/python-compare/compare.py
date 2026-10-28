@@ -25,6 +25,7 @@ KERNELS = os.path.join(REPO, "scripts", "python-bench", "kernels")
 SERVER_APP = os.path.join(REPO, "scripts", "python-backend", "samples", "flask-todo", "src", "main.py")
 KERNEL_NAMES = ["nbody", "richards", "fannkuch", "spectral_norm", "dicts_strings"]
 PORT = 8080
+CN1 = "Codename One Python"
 
 
 def timed(cmd, cwd=None):
@@ -76,7 +77,7 @@ def kernel_rows(arms, cn1_dir):
             out, wall, rss = timed([exe, os.path.join(KERNELS, k + ".py")], cwd=KERNELS)
             row[name] = (best_ms(out), rss)
         out, wall, rss = timed([os.path.join(cn1_dir, k, k)])
-        row["Codename One"] = (best_ms(out), rss)
+        row[CN1] = (best_ms(out), rss)
         rows.append(row)
     return rows
 
@@ -136,13 +137,14 @@ def main():
     ap.add_argument("--cn1-hello", help="native binary of hello.py, for the startup row")
     ap.add_argument("--cn1-server", required=True)
     ap.add_argument("--out")
+    ap.add_argument("--json", help="the measurements, for render_charts.py --compare")
     a = ap.parse_args()
     arms = [("CPython", a.cpython)]
     if a.pypy:
         arms.append(("PyPy", a.pypy))
     if a.graalpy:
         arms.append(("GraalPy", a.graalpy))
-    names = [n for n, _ in arms] + ["Codename One"]
+    names = [n for n, _ in arms] + [CN1]
     lines = []
     w = lines.append
     w("# Codename One Python vs %s\n" % ", ".join(n for n, _ in arms))
@@ -162,16 +164,20 @@ def main():
     w("|---|---:|---:|")
     startup = [(n, [exe, hello]) for n, exe in arms]
     if a.cn1_hello:
-        startup.append(("Codename One", [a.cn1_hello]))
+        startup.append((CN1, [a.cn1_hello]))
+    data = {"arms": names, "startup": {}, "kernels": {}, "flask": {}, "deploy": {}}
     for n, cmd in startup:
         runs = [timed(cmd) for _ in range(10)]
-        w("| %s | %.1f | %.1f |" % (n, min(r[1] for r in runs) * 1000, min(r[2] for r in runs)))
+        ms, mb = min(r[1] for r in runs) * 1000, min(r[2] for r in runs)
+        data["startup"][n] = {"ms": ms, "rss_mb": mb}
+        w("| %s | %.1f | %.1f |" % (n, ms, mb))
     w("")
 
     w("## CPU kernels (fastest of the kernel's rounds, ms; peak RSS MB)\n")
     w("| kernel | " + " | ".join("%s ms | %s MB" % (n, n) for n in names) + " |")
     w("|---|" + "---:|---:|" * len(names))
     for r in kernel_rows(arms, a.cn1_kernels):
+        data["kernels"][r["kernel"]] = {n: {"ms": r[n][0], "rss_mb": r[n][1]} for n in names}
         w("| %s | " % r["kernel"] + " | ".join("%.1f | %.1f" % r[n] for n in names) + " |")
     w("")
 
@@ -186,9 +192,11 @@ def main():
             w("| %s | (Flask not installed) | | | | |" % n)
             continue
         r = server_row([exe, SERVER_APP])
+        data["flask"][n] = dict(zip(("first_ms", "idle_mb", "loaded_mb", "rps", "p99_ms"), r))
         w("| %s | %.0f | %.1f | %.1f | %.0f | %s |" % ((n,) + r))
     r = server_row([a.cn1_server])
-    w("| Codename One | %.0f | %.1f | %.1f | %.0f | %s |" % (r[0], r[1], r[2], r[3], r[4]))
+    data["flask"][CN1] = dict(zip(("first_ms", "idle_mb", "loaded_mb", "rps", "p99_ms"), r))
+    w("| " + CN1 + " | %.0f | %.1f | %.1f | %.0f | %s |" % (r[0], r[1], r[2], r[3], r[4]))
     w("")
 
     w("## What you deploy\n")
@@ -197,10 +205,16 @@ def main():
     for n, exe in arms:
         home = interpreter_home(exe)
         extra = flask_size(exe) if has_flask(exe) else 0.0
+        data["deploy"][n] = du_mb(home) + extra
         w("| %s | %.1f | interpreter install (`%s`) + Flask and its dependencies (%.1f) |"
           % (n, du_mb(home) + extra, home, extra))
-    w("| Codename One | %.1f | one self-contained executable, Flask included |" % du_mb(a.cn1_server))
+    w("| " + CN1 + " | %.1f | one self-contained executable, Flask included |" % du_mb(a.cn1_server))
     w("")
+    data["deploy"][CN1] = du_mb(a.cn1_server)
+    if a.json:
+        import json
+        with open(a.json, "w") as f:
+            json.dump(data, f, indent=1)
     text = "\n".join(lines)
     if a.out:
         with open(a.out, "w") as f:

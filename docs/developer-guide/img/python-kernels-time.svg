@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="364" viewBox="0 0 760 364" font-family="Helvetica, Arial, sans-serif">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="150" y="24" font-size="16" font-weight="bold" fill="#202124">Kernel run time (lower is better, log scale)</text>
+<rect x="150" y="36" width="12" height="12" fill="#9aa0a6"/>
+<text x="168" y="47" font-size="12" fill="#202124">CPython</text>
+<rect x="350" y="36" width="12" height="12" fill="#f9ab00"/>
+<text x="368" y="47" font-size="12" fill="#202124">PyPy</text>
+<rect x="550" y="36" width="12" height="12" fill="#a142f4"/>
+<text x="568" y="47" font-size="12" fill="#202124">GraalPy</text>
+<rect x="150" y="58" width="12" height="12" fill="#1a73e8"/>
+<text x="168" y="69" font-size="12" fill="#202124">Codename One Python</text>
+<line x1="150.0" y1="80" x2="150.0" y2="334" stroke="#e8eaed"/>
+<text x="150.0" y="350" font-size="11" fill="#5f6368" text-anchor="middle">1 ms</text>
+<line x1="282.5" y1="80" x2="282.5" y2="334" stroke="#e8eaed"/>
+<text x="282.5" y="350" font-size="11" fill="#5f6368" text-anchor="middle">10 ms</text>
+<line x1="415.0" y1="80" x2="415.0" y2="334" stroke="#e8eaed"/>
+<text x="415.0" y="350" font-size="11" fill="#5f6368" text-anchor="middle">100 ms</text>
+<line x1="547.5" y1="80" x2="547.5" y2="334" stroke="#e8eaed"/>
+<text x="547.5" y="350" font-size="11" fill="#5f6368" text-anchor="middle">1000 ms</text>
+<line x1="680.0" y1="80" x2="680.0" y2="334" stroke="#e8eaed"/>
+<text x="680.0" y="350" font-size="11" fill="#5f6368" text-anchor="middle">10k ms</text>
+<text x="142" y="106" font-size="12" fill="#202124" text-anchor="end">nbody</text>
+<rect x="150" y="84" width="382.0" height="8" fill="#9aa0a6"/>
+<text x="536.0" y="91" font-size="9" fill="#5f6368">764</text>
+<rect x="150" y="93" width="237.4" height="8" fill="#f9ab00"/>
+<text x="391.4" y="100" font-size="9" fill="#5f6368">62</text>
+<rect x="150" y="102" width="299.0" height="8" fill="#a142f4"/>
+<text x="453.0" y="109" font-size="9" fill="#5f6368">180</text>
+<rect x="150" y="111" width="257.6" height="8" fill="#1a73e8"/>
+<text x="411.6" y="118" font-size="9" fill="#5f6368">88</text>
+<text x="142" y="156" font-size="12" fill="#202124" text-anchor="end">richards</text>
+<rect x="150" y="134" width="371.1" height="8" fill="#9aa0a6"/>
+<text x="525.1" y="141" font-size="9" fill="#5f6368">632</text>
+<rect x="150" y="143" width="210.1" height="8" fill="#f9ab00"/>
+<text x="364.1" y="150" font-size="9" fill="#5f6368">39</text>
+<rect x="150" y="152" width="267.3" height="8" fill="#a142f4"/>
+<text x="421.3" y="159" font-size="9" fill="#5f6368">104</text>
+<rect x="150" y="161" width="206.3" height="8" fill="#1a73e8"/>
+<text x="360.3" y="168" font-size="9" fill="#5f6368">36</text>
+<text x="142" y="206" font-size="12" fill="#202124" text-anchor="end">fannkuch</text>
+<rect x="150" y="184" width="452.6" height="8" fill="#9aa0a6"/>
+<text x="606.6" y="191" font-size="9" fill="#5f6368">2606</text>
+<rect x="150" y="193" width="366.3" height="8" fill="#f9ab00"/>
+<text x="520.3" y="200" font-size="9" fill="#5f6368">582</text>
+<rect x="150" y="202" width="359.8" height="8" fill="#a142f4"/>
+<text x="513.8" y="209" font-size="9" fill="#5f6368">519</text>
+<rect x="150" y="211" width="364.9" height="8" fill="#1a73e8"/>
+<text x="518.9" y="218" font-size="9" fill="#5f6368">568</text>
+<text x="142" y="256" font-size="12" fill="#202124" text-anchor="end">spectral_norm</text>
+<rect x="150" y="234" width="377.9" height="8" fill="#9aa0a6"/>
+<text x="531.9" y="241" font-size="9" fill="#5f6368">711</text>
+<rect x="150" y="243" width="141.5" height="8" fill="#f9ab00"/>
+<text x="295.5" y="250" font-size="9" fill="#5f6368">12</text>
+<rect x="150" y="252" width="113.7" height="8" fill="#a142f4"/>
+<text x="267.7" y="259" font-size="9" fill="#5f6368">7.2</text>
+<rect x="150" y="261" width="200.2" height="8" fill="#1a73e8"/>
+<text x="354.2" y="268" font-size="9" fill="#5f6368">32</text>
+<text x="142" y="306" font-size="12" fill="#202124" text-anchor="end">dicts_strings</text>
+<rect x="150" y="284" width="342.8" height="8" fill="#9aa0a6"/>
+<text x="496.8" y="291" font-size="9" fill="#5f6368">386</text>
+<rect x="150" y="293" width="281.8" height="8" fill="#f9ab00"/>
+<text x="435.8" y="300" font-size="9" fill="#5f6368">134</text>
+<rect x="150" y="302" width="308.6" height="8" fill="#a142f4"/>
+<text x="462.6" y="309" font-size="9" fill="#5f6368">213</text>
+<rect x="150" y="311" width="301.6" height="8" fill="#1a73e8"/>
+<text x="455.6" y="318" font-size="9" fill="#5f6368">189</text>
+</svg>

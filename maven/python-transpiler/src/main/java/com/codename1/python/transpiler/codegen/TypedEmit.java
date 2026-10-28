@@ -98,6 +98,14 @@ final class TypedEmit {
         }
     }
 
+    /// Appends a copy of each entry of `m` to `out`: an entry set may hand
+    /// out one reused entry object.
+    private static <K, V> void copyEntries(Map<K, V> m, List<Map.Entry<K, V>> out) {
+        for (Map.Entry<K, V> e : m.entrySet()) {
+            out.add(new java.util.AbstractMap.SimpleImmutableEntry<K, V>(e.getKey(), e.getValue()));
+        }
+    }
+
     /// The int a typed function returned as `long` `r`, left as it is
     /// (see `E.pk`).
     static E pushed(String r) {
@@ -500,11 +508,12 @@ final class TypedEmit {
                 // site's arguments differ between the two bodies.
                 Map<Call, IntRanges.Iv[]> st = new HashMap<Call, IntRanges.Iv[]>();
                 new IntRanges(in, f, null, st, seeds, rets);
-                List<Map.Entry<Call, IntRanges.Iv[]>> all = new ArrayList<Map.Entry<Call, IntRanges.Iv[]>>(st.entrySet());
+                List<Map.Entry<Call, IntRanges.Iv[]>> all = new ArrayList<Map.Entry<Call, IntRanges.Iv[]>>();
+                copyEntries(st, all);
                 if (seeds.containsKey(f)) {
                     Map<Call, IntRanges.Iv[]> sl = new HashMap<Call, IntRanges.Iv[]>();
                     IntRanges r = new IntRanges(in, f, seeds(f, seeds.get(f)), sl, seeds, rets);
-                    all.addAll(sl.entrySet());
+                    copyEntries(sl, all);
                     IntRanges.Iv v = f.ret.k == Ty.K.INT && !f.ret.opt ? r.returns() : null;
                     if (v != null && v.fitsLong()) {
                         nr.put(f, v);
@@ -804,11 +813,6 @@ final class TypedEmit {
     /// A Java parameter of type `t`: an int is two, its long and its object.
     static String param(Ty t, String name, String bigName) {
         return t.k == Ty.K.INT ? "long " + name + ", Object " + bigName : jt(t) + " " + name;
-    }
-
-    /// Whether `n` is an int local held as a pair.
-    private boolean pairLocal(String n) {
-        return sc.resolve(n) == Scope.Binding.LOCAL && localType(n).k == Ty.K.INT && !longLocals.contains(n);
     }
 
     /// The long and object halves of int (or bool) `e`, for a pair: the

@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="264" viewBox="0 0 760 264" font-family="Helvetica, Arial, sans-serif">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="150" y="24" font-size="16" font-weight="bold" fill="#202124">Flask server memory and deployed size, MB (lower is better)</text>
+<rect x="150" y="36" width="12" height="12" fill="#9aa0a6"/>
+<text x="168" y="47" font-size="12" fill="#202124">CPython</text>
+<rect x="350" y="36" width="12" height="12" fill="#f9ab00"/>
+<text x="368" y="47" font-size="12" fill="#202124">PyPy</text>
+<rect x="550" y="36" width="12" height="12" fill="#a142f4"/>
+<text x="568" y="47" font-size="12" fill="#202124">GraalPy</text>
+<rect x="150" y="58" width="12" height="12" fill="#1a73e8"/>
+<text x="168" y="69" font-size="12" fill="#202124">Codename One Python</text>
+<line x1="150.0" y1="80" x2="150.0" y2="234" stroke="#e8eaed"/>
+<text x="150.0" y="250" font-size="11" fill="#5f6368" text-anchor="middle">0 MB</text>
+<line x1="415.0" y1="80" x2="415.0" y2="234" stroke="#e8eaed"/>
+<text x="415.0" y="250" font-size="11" fill="#5f6368" text-anchor="middle">1000 MB</text>
+<line x1="680.0" y1="80" x2="680.0" y2="234" stroke="#e8eaed"/>
+<text x="680.0" y="250" font-size="11" fill="#5f6368" text-anchor="middle">2000 MB</text>
+<text x="142" y="106" font-size="12" fill="#202124" text-anchor="end">idle</text>
+<rect x="150" y="84" width="10.4" height="8" fill="#9aa0a6"/>
+<text x="164.4" y="91" font-size="9" fill="#5f6368">39</text>
+<rect x="150" y="93" width="17.2" height="8" fill="#f9ab00"/>
+<text x="171.2" y="100" font-size="9" fill="#5f6368">65</text>
+<rect x="150" y="102" width="85.5" height="8" fill="#a142f4"/>
+<text x="239.5" y="109" font-size="9" fill="#5f6368">323</text>
+<rect x="150" y="111" width="7.0" height="8" fill="#1a73e8"/>
+<text x="161.0" y="118" font-size="9" fill="#5f6368">27</text>
+<text x="142" y="156" font-size="12" fill="#202124" text-anchor="end">after load</text>
+<rect x="150" y="134" width="10.6" height="8" fill="#9aa0a6"/>
+<text x="164.6" y="141" font-size="9" fill="#5f6368">40</text>
+<rect x="150" y="143" width="27.1" height="8" fill="#f9ab00"/>
+<text x="181.1" y="150" font-size="9" fill="#5f6368">102</text>
+<rect x="150" y="152" width="336.6" height="8" fill="#a142f4"/>
+<text x="490.6" y="159" font-size="9" fill="#5f6368">1270</text>
+<rect x="150" y="161" width="99.4" height="8" fill="#1a73e8"/>
+<text x="253.4" y="168" font-size="9" fill="#5f6368">375</text>
+<text x="142" y="206" font-size="12" fill="#202124" text-anchor="end">deployed size</text>
+<rect x="150" y="184" width="21.7" height="8" fill="#9aa0a6"/>
+<text x="175.7" y="191" font-size="9" fill="#5f6368">82</text>
+<rect x="150" y="193" width="29.3" height="8" fill="#f9ab00"/>
+<text x="183.3" y="200" font-size="9" fill="#5f6368">111</text>
+<rect x="150" y="202" width="81.0" height="8" fill="#a142f4"/>
+<text x="235.0" y="209" font-size="9" fill="#5f6368">306</text>
+<rect x="150" y="211" width="6.0" height="8" fill="#1a73e8"/>
+<text x="160.0" y="218" font-size="9" fill="#5f6368">23</text>
+</svg>

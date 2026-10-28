@@ -34,4 +34,20 @@
         </Or>
         <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
     </Match>
+    <!-- null is "not at hand": no long version for these arguments
+         (IntRanges.longArgs), no int index (TypedEmit.index). Every caller
+         tests for it, and an empty array would read as zero arguments. -->
+    <Match>
+        <Or>
+            <And>
+                <Class name="com.codename1.python.transpiler.codegen.IntRanges"/>
+                <Method name="longArgs"/>
+            </And>
+            <And>
+                <Class name="com.codename1.python.transpiler.codegen.TypedEmit"/>
+                <Method name="index"/>
+            </And>
+        </Or>
+        <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
+    </Match>
 </FindBugsFilter>
