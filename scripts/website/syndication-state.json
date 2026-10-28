@@ -3049,6 +3049,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-10-28T05:53:00+00:00"
+      },
+      "devto": {
+        "id": 4936845,
+        "url": "https://dev.to/codenameone/let-users-install-your-java-web-app-again-4hcm",
+        "syndicated_at": "2026-10-28T21:00:55+00:00"
       }
     }
   }
