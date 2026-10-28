@@ -29,6 +29,34 @@ class _Final:
     __slots__ = ()
 
 
+class ForwardRef(_Final):
+    """A class named by a string inside a subscript (`Optional["Author"]`), kept as
+    CPython keeps it so `get_args` hands the name back."""
+
+    __slots__ = ("__forward_arg__", "__forward_module__")
+
+    def __init__(self, arg, is_argument=True, module=None, *, is_class=False):
+        if not isinstance(arg, str):
+            raise TypeError("Forward reference must be a string -- got " + repr(arg))
+        self.__forward_arg__ = arg
+        self.__forward_module__ = module
+
+    def __eq__(self, other):
+        if not isinstance(other, ForwardRef):
+            return NotImplemented
+        return self.__forward_arg__ == other.__forward_arg__
+
+    def __hash__(self):
+        return hash(("ForwardRef", self.__forward_arg__))
+
+    def __repr__(self):
+        return "ForwardRef(" + repr(self.__forward_arg__) + ")"
+
+
+def _ref(p):
+    return ForwardRef(p) if isinstance(p, str) else p
+
+
 class _SpecialForm(_Final):
     def __init__(self, name, getitem=None):
         self._name = name
@@ -131,7 +159,7 @@ def _union(form, params):
         params = (params,)
     flat = []
     for p in params:
-        p = type(None) if p is None else p
+        p = type(None) if p is None else _ref(p)
         if isinstance(p, _UnionGenericAlias):
             items = p.__args__
         else:
@@ -219,6 +247,10 @@ class _SpecialGenericAlias(_Final):
             if args is ...:
                 return _CallableGenericAlias(self.__origin__, (..., result), self._name)
             return _CallableGenericAlias(self.__origin__, tuple(args) + (result,), self._name)
+        if isinstance(params, tuple):
+            params = tuple(_ref(p) for p in params)
+        else:
+            params = _ref(params)
         return _GenericAlias(self.__origin__, params, self._name)
 
     def __call__(self, *args, **kwargs):

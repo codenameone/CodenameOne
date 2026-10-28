@@ -92,7 +92,11 @@ public final class StdModules {
             return true;
         }
         if ("_cn1sql".equals(name)) {
-            PyModule.registerModule(sql());
+            PyModule.registerModule(sql("_cn1sql", false));
+            return true;
+        }
+        if ("_cn1db".equals(name)) {
+            PyModule.registerModule(sql("_cn1db", true));
             return true;
         }
         if ("_cn1http".equals(name)) {
@@ -360,11 +364,35 @@ public final class StdModules {
     /// a tuple; `begin`, `commit`, `rollback` and `close` of a handle. An
     /// engine failure raises `OSError` with the engine's message, which the
     /// `sqlite3` module turns into its own exceptions.
-    private static PyModule sql() {
-        PyModule m = new PyModule("_cn1sql", new String[0]);
+    ///
+    /// `_cn1db` is the same over `PyDb`, for a server database URL, plus
+    /// `dialect(handle)`; where the build has no driver, `open` raises
+    /// `OSError` naming the URL's scheme.
+    private static PyModule sql(String moduleName, boolean server) {
+        PyModule m = new PyModule(moduleName, new String[0]);
+        if (server) {
+            m.setAttr("available", PyBuiltin.positional("available", a -> Py.bool(PyDb.get() != null)));
+            m.setAttr("dialect", PyBuiltin.positional("dialect", a -> {
+                PySql.Connection c = sqlConnection(a[0]);
+                return Py.str(c instanceof PyDb.Connection ? ((PyDb.Connection) c).dialect() : "sqlite");
+            }));
+        }
         m.setAttr("open", PyBuiltin.positional("open", a -> {
             try {
-                PySql.Connection c = PySql.get().open(Py.toStr(a[0]));
+                String target = Py.toStr(a[0]);
+                PySql.Connection c;
+                if (server) {
+                    PyDb db = PyDb.get();
+                    if (db == null) {
+                        int colon = target.indexOf(':');
+                        String scheme = colon > 0 ? target.substring(0, colon) : target;
+                        throw Py.error(Py.OS_ERROR, "No driver for '" + scheme + "' databases in this build: "
+                                + "server databases need the Codename One backend (a server build)");
+                    }
+                    c = db.open(target);
+                } else {
+                    c = PySql.get().open(target);
+                }
                 long h = ++sqlHandles;
                 SQL.put(h, c);
                 return PyInt.of(h);
@@ -377,7 +405,10 @@ public final class StdModules {
             Object[] ps = Py.toArray(a[2]);
             Object[] params = new Object[ps.length];
             for (int i = 0; i < ps.length; i++) {
-                params[i] = sqlParam(ps[i], i);
+                // A bool stays a bool for a server database: a PostgreSQL boolean column
+                // refuses an integer. SQLite stores it as the integer it is.
+                params[i] = server && ps[i] instanceof PyBool
+                        ? Boolean.valueOf(ps[i] == Py.TRUE) : sqlParam(ps[i], i); //NOPMD CompareObjectsWithEquals - identity is meant
             }
             PySql.Result r;
             try {
@@ -479,6 +510,9 @@ public final class StdModules {
         }
         if (v instanceof String) {
             return Py.str((String) v);
+        }
+        if (v instanceof Boolean) {
+            return Py.bool(((Boolean) v).booleanValue());
         }
         return v;
     }

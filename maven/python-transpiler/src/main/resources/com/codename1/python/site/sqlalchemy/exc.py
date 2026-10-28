@@ -9,6 +9,14 @@ class ArgumentError(SQLAlchemyError):
     pass
 
 
+class CompileError(SQLAlchemyError):
+    pass
+
+
+class NoSuchModuleError(ArgumentError):
+    pass
+
+
 class InvalidRequestError(SQLAlchemyError):
     pass
 

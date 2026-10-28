@@ -1,0 +1,10 @@
+(ForwardRef('Author'), <class 'NoneType'>)
+Author True
+True
+(ForwardRef('Book'),)
+(ForwardRef('A'), <class 'int'>)
+True False
+1
+ForwardRef('Node')
+(<class 'int'>, <class 'NoneType'>)
+Author

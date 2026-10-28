@@ -55,15 +55,7 @@ def _name_of(t):
     fa = getattr(t, "__forward_arg__", None)
     if fa is not None:
         return fa
-    n = getattr(t, "__name__", None)
-    if n is None and t is not None:
-        # A forward reference whose type object carries no name (Optional["Author"]): its
-        # repr still quotes the class name.
-        r = repr(t)
-        for q in ("'", '"'):
-            if r.count(q) >= 2:
-                return r.split(q)[1]
-    return n
+    return getattr(t, "__name__", None)
 
 
 def _strip(s, prefix):
@@ -630,14 +622,6 @@ def _map_class(cls, ns, parent=None):
             v._target_name = pyt if isinstance(pyt, str) else _name_of(pyt)
             v._list_ann = is_list if pyt is not None else None
             v._ann = a
-            if v._target_name is None and isinstance(a, _MappedAnnotation):
-                # Optional["Author"] whose typing arguments lost the forward reference: the
-                # repr still quotes the class name.
-                r = repr(a.arg)
-                for q in ("'", '"'):
-                    if r.count(q) >= 2:
-                        v._target_name = r.split(q)[1]
-                        break
             v.key = key
             v.parent = cls
             rels[key] = v

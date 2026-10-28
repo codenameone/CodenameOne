@@ -1,6 +1,7 @@
 """A SQLAlchemy 2.x subset for Codename One: Core over the DB-API ``sqlite3`` module.
 
-Only the SQLite dialect exists. Statements compile to SQL with ``?`` placeholders and run
+SQLite runs over ``sqlite3``; PostgreSQL, MySQL and MariaDB URLs run over the backend's own
+drivers (``_cn1dbapi``), in a server build. Statements compile to SQL with ``?`` placeholders and run
 through ``sqlite3``; results are read from the cursor as they are iterated. The ORM lives in ``sqlalchemy.orm``
 and plugs in through two hooks: a mapped class carries ``__sa_mapper__`` (selecting it
 yields objects) and a relationship attribute answers ``_join_info()`` (joining on it).
@@ -10,7 +11,7 @@ are supported; a scalar or ``EXISTS`` subquery correlates to the enclosing query
 as SQLAlchemy does. ``echo=True`` logs each statement through the ``sqlalchemy.engine.Engine``
 logger.
 
-Unsupported: other dialects, connection pooling options, reflection, events, recursive
+Unsupported: Oracle and SQL Server dialects, connection pooling options, reflection, events, recursive
 CTEs, ``Enum``/``JSON``/``Numeric`` decimal handling.
 """
 
@@ -98,7 +99,7 @@ class Boolean(TypeEngine):
     def bind(self, value):
         if value is None:
             return None
-        return 1 if value else 0
+        return bool(value)
 
     def result(self, value):
         return None if value is None else bool(value)
@@ -165,8 +166,22 @@ def _is_type(a):
 
 # ----------------------------------------------------------------------------- compiler
 
+# The dialect statements compile for: the executing engine's, pushed by Connection.execute.
+_active = []
+
+class _Compiled:
+    def __init__(self, sql, params, dialect):
+        self.string = sql
+        self.positiontup = list(params)
+        self.dialect = dialect
+
+    def __str__(self):
+        return self.string
+
+
 class _Ctx:
     def __init__(self, qualify=True):
+        self.dialect = _active[-1]
         self.params = []
         self.qualify = qualify
         self.columns_clause = False
@@ -181,6 +196,26 @@ class ClauseElement:
 
     def _compile(self, ctx):
         raise NotImplementedError(type(self).__name__)
+
+    def compile(self, bind=None, dialect=None, **kw):
+        """The statement as the given dialect (or the bind's) would run it, with ``?``
+        placeholders: ``str()`` of the result is the SQL, ``positiontup`` the values."""
+        if dialect is None and bind is not None:
+            dialect = getattr(bind, "dialect", None)
+        _active.append(dialect if dialect is not None else _active[0])
+        try:
+            ctx = _Ctx()
+            sql = _compile_top(self, ctx) if isinstance(self, (Select, CompoundSelect)) else self._compile_any(ctx)
+        finally:
+            _active.pop()
+        return _Compiled(sql, ctx.params, ctx.dialect)
+
+    def _compile_any(self, ctx):
+        if isinstance(self, _DML):
+            if isinstance(self, Insert):
+                return self._sql(self._row(None), ctx)
+            raise exc.CompileError("compile() of UPDATE or DELETE is not supported")
+        return self._compile(ctx)
 
     def _tables(self, acc):
         pass
@@ -428,12 +463,23 @@ def not_(clause):
     return UnaryExpression(clause, "NOT", None, Boolean())
 
 
+class _BoolConst(ColumnElement):
+    def __init__(self, value):
+        self.value = value
+        self.type = Boolean()
+
+    def _compile(self, ctx):
+        if ctx.dialect.supports_native_boolean:
+            return "true" if self.value else "false"
+        return "1" if self.value else "0"
+
+
 def true():
-    return TextClause("1")
+    return _BoolConst(True)
 
 
 def false():
-    return TextClause("0")
+    return _BoolConst(False)
 
 
 class Label(ColumnElement):
@@ -563,9 +609,10 @@ class Column(ColumnElement):
         self.table = None
 
     def _compile(self, ctx):
+        q = ctx.dialect.quote
         if ctx.qualify and self.table is not None:
-            return "%s.%s" % (self.table.name, self.name)
-        return self.name
+            return "%s.%s" % (q(self.table.name), q(self.name))
+        return q(self.name)
 
     def _tables(self, acc):
         if self.table is not None:
@@ -659,7 +706,7 @@ class Table(FromClause):
         return out
 
     def _compile(self, ctx):
-        return self.name
+        return ctx.dialect.quote(self.name)
 
     def _tables(self, acc):
         _add_unique(acc, self)
@@ -668,26 +715,30 @@ class Table(FromClause):
         return [self]
 
     def _create_sql(self):
+        d = _active[-1]
+        q = d.quote
         parts = []
-        for c in self.c:
-            s = "%s %s" % (c.name, c.type.ddl())
-            if not c.nullable:
-                s += " NOT NULL"
-            parts.append(s)
         pk = self.primary_key
+        for c in self.c:
+            s = "%s %s" % (q(c.name), d.column_ddl(c, self))
+            if not c.nullable or c in pk:
+                s += " NOT NULL"
+            if d.autoincrement_suffix and d._is_autoincrement(c, self):
+                s += d.autoincrement_suffix
+            parts.append(s)
         if pk:
-            parts.append("PRIMARY KEY (%s)" % ", ".join(c.name for c in pk))
+            parts.append("PRIMARY KEY (%s)" % ", ".join(q(c.name) for c in pk))
         for c in self.c:
             if c.unique:
-                parts.append("UNIQUE (%s)" % c.name)
+                parts.append("UNIQUE (%s)" % q(c.name))
         for c in self.c:
             for fk in c.foreign_keys:
                 tname, cname = fk._target()
-                s = "FOREIGN KEY(%s) REFERENCES %s (%s)" % (c.name, tname, cname)
+                s = "FOREIGN KEY(%s) REFERENCES %s (%s)" % (q(c.name), q(tname), q(cname))
                 if fk.ondelete:
                     s += " ON DELETE " + fk.ondelete
                 parts.append(s)
-        return "CREATE TABLE IF NOT EXISTS %s (\n\t%s\n)" % (self.name, ", \n\t".join(parts))
+        return "CREATE TABLE IF NOT EXISTS %s (\n\t%s\n)" % (q(self.name), ", \n\t".join(parts))
 
     def create(self, bind, checkfirst=True):
         with bind.begin() as conn:
@@ -1047,11 +1098,7 @@ class Select(ClauseElement):
         if self._order:
             sql += " ORDER BY " + ", ".join(o._compile(ctx) for o in self._order)
         if self._limit is not None or self._offset is not None:
-            sql += " \nLIMIT ?"
-            ctx.params.append(self._limit if self._limit is not None else -1)
-            if self._offset is not None:
-                sql += " OFFSET ?"
-                ctx.params.append(self._offset)
+            sql += ctx.dialect.limit_clause(ctx, self._limit, self._offset)
         return sql
 
     def _execute_on(self, conn, params, session=None):
@@ -1454,12 +1501,13 @@ class Insert(_DML):
     def _sql(self, row, ctx):
         cols = [c for c in self.table.c if c.key in row]
         if not cols:
-            return "INSERT INTO %s DEFAULT VALUES" % self.table.name + self._returning_sql(ctx)
+            return "INSERT INTO %s DEFAULT VALUES" % ctx.dialect.quote(self.table.name) + self._returning_sql(ctx)
         vals = []
         for c in cols:
             vals.append(_lit(row[c.key], c.type)._compile(ctx))
+        q = ctx.dialect.quote
         return "INSERT INTO %s (%s) VALUES (%s)" % (
-            self.table.name, ", ".join(c.name for c in cols), ", ".join(vals)) + self._returning_sql(ctx)
+            q(self.table.name), ", ".join(q(c.name) for c in cols), ", ".join(vals)) + self._returning_sql(ctx)
 
     def _execute_on(self, conn, params, session=None):
         if isinstance(params, list) and len(params) > 1:
@@ -1477,7 +1525,16 @@ class Insert(_DML):
             params = params[0] if params else None
         row = self._row(params)
         ctx = _Ctx()
-        cur = conn._run(self._sql(row, ctx), ctx.params)
+        sql = self._sql(row, ctx)
+        gen = [c for c in self.table.primary_key if row.get(c.key) is None]
+        if gen and not self._returning and ctx.dialect.insert_returning_key:
+            # No lastrowid on PostgreSQL: the generated key comes back through RETURNING.
+            cur = conn._run(sql + " RETURNING " + ctx.dialect.quote(gen[0].name), ctx.params)
+            got = cur.fetchone()
+            cur.lastrowid = got[0] if got else None
+            cur.description = None
+        else:
+            cur = conn._run(sql, ctx.params)
         res = self._result(cur)
         pk = []
         for c in self.table.primary_key:
@@ -1497,14 +1554,14 @@ class Update(_DML):
             if c.key in vals:
                 v = vals[c.key]
                 sets.append("%s=%s" % (c.name, _lit(v, c.type)._compile(ctx)))
-        sql = "UPDATE %s SET %s" % (self.table.name, ", ".join(sets)) + self._where_sql(ctx) + self._returning_sql(ctx)
+        sql = "UPDATE %s SET %s" % (ctx.dialect.quote(self.table.name), ", ".join(sets)) + self._where_sql(ctx) + self._returning_sql(ctx)
         return self._result(conn._run(sql, ctx.params))
 
 
 class Delete(_DML):
     def _execute_on(self, conn, params, session=None):
         ctx = _Ctx()
-        sql = "DELETE FROM " + self.table.name + self._where_sql(ctx) + self._returning_sql(ctx)
+        sql = "DELETE FROM " + ctx.dialect.quote(self.table.name) + self._where_sql(ctx) + self._returning_sql(ctx)
         return self._result(conn._run(sql, ctx.params))
 
 
@@ -1787,7 +1844,11 @@ class Connection:
     def execute(self, statement, parameters=None, execution_options=None):
         if isinstance(statement, str):
             raise exc.ArgumentError("Textual SQL expression should be explicitly declared as text()")
-        return statement._execute_on(self, parameters)
+        _active.append(self.engine.dialect)
+        try:
+            return statement._execute_on(self, parameters)
+        finally:
+            _active.pop()
 
     def exec_driver_sql(self, sql, parameters=()):
         return CursorResult._from_cursor(self._run(sql, parameters), None)
@@ -1847,43 +1908,322 @@ class _Tx:
         self.conn.rollback()
 
 
+_RESERVED = frozenset((
+    "all", "and", "as", "asc", "between", "both", "by", "case", "check", "column", "constraint",
+    "create", "cross", "default", "delete", "desc", "distinct", "drop", "else", "end", "except",
+    "false", "for", "foreign", "from", "grant", "group", "having", "in", "index", "inner", "insert",
+    "intersect", "into", "is", "join", "key", "leading", "left", "like", "limit", "not", "null",
+    "offset", "on", "or", "order", "outer", "primary", "references", "right", "select", "set",
+    "table", "then", "to", "trailing", "true", "union", "unique", "update", "user", "using",
+    "values", "when", "where", "with"))
+
+
+def _plain_identifier(name):
+    if not name or not (name[0] == "_" or "a" <= name[0] <= "z"):
+        return False
+    for ch in name:
+        if not (ch == "_" or "a" <= ch <= "z" or "0" <= ch <= "9" or ch == "$"):
+            return False
+    return name not in _RESERVED
+
+
+class _IdentifierPreparer:
+    def __init__(self, q):
+        self.initial_quote = q
+        self.final_quote = q
+
+    def quote(self, name):
+        if name is None or _plain_identifier(name):
+            return name
+        q = self.initial_quote
+        return q + name.replace(q, q + q) + q
+
+
 class _Dialect:
+    """What differs between engines: quoting, column DDL, LIMIT/OFFSET, booleans and
+    how a generated key comes back. Statements always run with ``?`` placeholders (the
+    drivers here bind them); ``paramstyle`` reports the one SQLAlchemy's DB-API uses."""
+
     name = "sqlite"
     driver = "pysqlite"
+    paramstyle = "qmark"
+    supports_native_boolean = False
+    insert_returning = True
+    insert_returning_key = False
+    autoincrement_suffix = ""
+    _quote_char = '"'
+
+    def __init__(self, **kw):
+        self.identifier_preparer = _IdentifierPreparer(self._quote_char)
+
+    def quote(self, name):
+        return self.identifier_preparer.quote(name)
+
+    def _is_autoincrement(self, c, table):
+        pk = table.primary_key
+        if len(pk) != 1 or pk[0] is not c or c.foreign_keys:
+            return False
+        if getattr(c, "autoincrement", "auto") is False:
+            return False
+        return isinstance(c.type, Integer)
+
+    def column_ddl(self, c, table):
+        return c.type.ddl()
+
+    def limit_clause(self, ctx, limit, offset):
+        ctx.params.append(limit if limit is not None else -1)
+        if offset is None:
+            return " \nLIMIT ?"
+        ctx.params.append(offset)
+        return " \nLIMIT ? OFFSET ?"
+
+
+class SQLiteDialect(_Dialect):
+    pass
+
+
+def _server_type(t, names):
+    for cls, ddl in names:
+        if isinstance(t, cls):
+            return ddl(t) if callable(ddl) else ddl
+    return t.ddl()
+
+
+def _varchar(dialect):
+    def ddl(t):
+        n = getattr(t, "length", None)
+        if n is None:
+            if dialect == "postgresql":
+                return "VARCHAR"
+            raise exc.CompileError("VARCHAR requires a length on dialect %s" % dialect)
+        return "VARCHAR(%d)" % n
+    return ddl
+
+
+class PGDialect(_Dialect):
+    name = "postgresql"
+    driver = "psycopg2"
+    paramstyle = "pyformat"
+    supports_native_boolean = True
+    insert_returning_key = True
+
+    def column_ddl(self, c, table):
+        t = c.type
+        if self._is_autoincrement(c, table):
+            if isinstance(t, BigInteger):
+                return "BIGSERIAL"
+            if isinstance(t, SmallInteger):
+                return "SMALLSERIAL"
+            return "SERIAL"
+        return _server_type(t, (
+            (Text, "TEXT"), (String, _varchar("postgresql")), (BigInteger, "BIGINT"),
+            (SmallInteger, "SMALLINT"), (Integer, "INTEGER"), (Boolean, "BOOLEAN"),
+            (DateTime, "TIMESTAMP WITHOUT TIME ZONE"), (Date, "DATE"), (Numeric, "NUMERIC"),
+            (Float, "FLOAT"), (LargeBinary, "BYTEA")))
+
+    def limit_clause(self, ctx, limit, offset):
+        sql = ""
+        if limit is not None:
+            sql += " \nLIMIT ?"
+            ctx.params.append(limit)
+        if offset is not None:
+            sql += " OFFSET ?"
+            ctx.params.append(offset)
+        return sql
+
+
+class MySQLDialect(_Dialect):
+    name = "mysql"
+    driver = "mysqldb"
+    paramstyle = "format"
+    supports_native_boolean = False
+    insert_returning = False
+    autoincrement_suffix = " AUTO_INCREMENT"
+    _quote_char = "`"
+
+    def column_ddl(self, c, table):
+        return _server_type(c.type, (
+            (Text, "TEXT"), (String, _varchar(self.name)), (BigInteger, "BIGINT"),
+            (SmallInteger, "SMALLINT"), (Integer, "INTEGER"), (Boolean, "BOOL"),
+            (DateTime, "DATETIME"), (Date, "DATE"), (Numeric, "NUMERIC"), (Float, "FLOAT"),
+            (LargeBinary, "BLOB")))
+
+    def limit_clause(self, ctx, limit, offset):
+        if offset is None:
+            ctx.params.append(limit)
+            return " \nLIMIT ?"
+        ctx.params.append(offset)
+        ctx.params.append(limit if limit is not None else 18446744073709551615)
+        return " \nLIMIT ?, ?"
+
+
+class MariaDBDialect(MySQLDialect):
+    name = "mariadb"
+    insert_returning = True
+
+
+_DIALECTS = {"sqlite": SQLiteDialect, "postgresql": PGDialect, "postgres": PGDialect,
+             "mysql": MySQLDialect, "mariadb": MariaDBDialect}
+_DRIVERS = {"sqlite": "pysqlite", "postgresql": "psycopg", "mysql": "mysqldb", "mariadb": "mysqldb"}
+
+
+def _dialect_for(url):
+    if url.get_backend_name() not in _DIALECTS:
+        raise exc.NoSuchModuleError("Can't load plugin: sqlalchemy.dialects:" + url.drivername.replace("+", "."))
+    d = _DIALECTS[url.get_backend_name()]()
+    drv = url.get_driver_name()
+    d.driver = drv
+    if drv in ("psycopg", "psycopg2", "pymysql", "asyncpg") and d.name != "sqlite":
+        d.paramstyle = "pyformat"
+    return d
+
+
+_active.append(SQLiteDialect())
+
+
+def _unquote(s):
+    out = []
+    i = 0
+    while i < len(s):
+        if s[i] == "%" and i + 2 < len(s):
+            try:
+                out.append(chr(int(s[i + 1:i + 3], 16)))
+                i += 3
+                continue
+            except ValueError:
+                pass
+        out.append(s[i])
+        i += 1
+    return "".join(out)
 
 
 class URL:
-    def __init__(self, s, database):
-        self._s = s
-        self.drivername = s.split(":", 1)[0]
+    def __init__(self, drivername, username=None, password=None, host=None, port=None,
+                 database=None, query=None):
+        self.drivername = drivername
+        self.username = username
+        self.password = password
+        self.host = host
+        self.port = port
         self.database = database
+        self.query = dict(query or {})
+
+    @classmethod
+    def create(cls, drivername, username=None, password=None, host=None, port=None,
+               database=None, query=None):
+        return cls(drivername, username, password, host, port, database, query)
+
+    def get_backend_name(self):
+        return self.drivername.split("+", 1)[0]
+
+    def get_driver_name(self):
+        if "+" in self.drivername:
+            return self.drivername.split("+", 1)[1]
+        return _DRIVERS.get(self.get_backend_name(), "")
+
+    def get_dialect(self):
+        return _DIALECTS[self.get_backend_name()]
+
+    def set(self, **kw):
+        a = dict(drivername=self.drivername, username=self.username, password=self.password,
+                 host=self.host, port=self.port, database=self.database, query=self.query)
+        a.update(kw)
+        return URL(**a)
+
+    def render_as_string(self, hide_password=True):
+        s = self.drivername + "://"
+        if self.username is not None:
+            s += self.username
+            if self.password is not None:
+                s += ":" + ("***" if hide_password else self.password)
+            s += "@"
+        if self.host is not None:
+            s += "[" + self.host + "]" if ":" in self.host else self.host
+        if self.port is not None:
+            s += ":" + str(self.port)
+        if self.database is not None:
+            s += "/" + self.database
+        if self.query:
+            s += "?" + "&".join("%s=%s" % (k, self.query[k]) for k in sorted(self.query))
+        return s
+
+    def _backend_url(self):
+        # The backend's drivers take postgresql:// | mysql:// | mariadb:// and no driver suffix.
+        u = self.set(drivername="postgresql" if self.get_backend_name() == "postgres"
+                     else self.get_backend_name())
+        return u.render_as_string(hide_password=False)
 
     def __str__(self):
-        return self._s
+        return self.render_as_string(hide_password=True)
+
+    def __repr__(self):
+        return self.render_as_string(hide_password=True)
+
+    def __eq__(self, other):
+        return isinstance(other, URL) and str(self) == str(other) and self.password == other.password
+
+    def __hash__(self):
+        return hash(str(self))
 
 
 def make_url(s):
-    if not s.startswith("sqlite"):
-        raise exc.ArgumentError("Only sqlite:// URLs are supported, got %r" % s)
-    rest = s.split("://", 1)[1] if "://" in s else ""
-    db = rest[1:] if rest.startswith("/") else rest
-    q = db.find("?")
+    if isinstance(s, URL):
+        return s
+    if "://" not in s:
+        raise exc.ArgumentError("Could not parse SQLAlchemy URL from given URL string")
+    name, rest = s.split("://", 1)
+    backend = name.split("+", 1)[0]
+    query = {}
+    q = rest.find("?")
     if q >= 0:
-        db = db[:q]
-    return URL(s, db if db else None)
+        for part in rest[q + 1:].split("&"):
+            if part:
+                k, _, v = part.partition("=")
+                query[k] = _unquote(v)
+        rest = rest[:q]
+    if backend == "sqlite":
+        db = rest[1:] if rest.startswith("/") else rest
+        return URL(name, database=db if db else None, query=query)
+    user = password = host = port = None
+    slash = rest.find("/")
+    netloc, db = (rest, None) if slash < 0 else (rest[:slash], rest[slash + 1:] or None)
+    at = netloc.rfind("@")
+    if at >= 0:
+        cred, netloc = netloc[:at], netloc[at + 1:]
+        user, sep, pw = cred.partition(":")
+        user = _unquote(user)
+        password = _unquote(pw) if sep else None
+    if netloc.startswith("["):
+        end = netloc.find("]")
+        host, after = netloc[1:end], netloc[end + 1:]
+        if after.startswith(":"):
+            port = int(after[1:])
+    elif ":" in netloc:
+        host, p = netloc.rsplit(":", 1)
+        port = int(p)
+    else:
+        host = netloc or None
+    return URL(name, user, password, host, port, db, query)
 
 
 class Engine:
     def __init__(self, url, echo=False):
         self.url = url
         self.echo = echo
-        self.dialect = _Dialect()
+        self.dialect = _dialect_for(url)
         self._dbapi = None
 
     def _raw_connection(self):
         # One DB-API connection for the engine (SQLAlchemy's SingletonThreadPool for SQLite).
         if self._dbapi is None:
-            self._dbapi = _sqlite3.connect(self.url.database or ":memory:")
+            if self.dialect.name == "sqlite":
+                self._dbapi = _sqlite3.connect(self.url.database or ":memory:")
+            else:
+                from . import _cn1dbapi
+                self._dbapi = _cn1dbapi.connect(self.url._backend_url())
+                if self._dbapi.server_dialect == "mariadb" and self.dialect.name == "mysql":
+                    # The server says which it is, whatever the URL scheme claimed.
+                    self.dialect = MariaDBDialect()
         return self._dbapi
 
     def raw_connection(self):
