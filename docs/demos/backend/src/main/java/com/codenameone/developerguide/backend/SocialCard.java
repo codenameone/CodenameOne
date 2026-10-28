@@ -22,12 +22,12 @@
  */
 package com.codenameone.developerguide.backend;
 
-import com.codename1.image.JpegCodec;
-import com.codename1.image.PngCodec;
-import com.codename1.image.RasterGradient;
-import com.codename1.image.RasterGraphics;
-import com.codename1.image.RasterImage;
-import com.codename1.image.Resampler;
+import com.codename1.backend.image.JpegCodec;
+import com.codename1.backend.image.PngCodec;
+import com.codename1.backend.image.RasterGradient;
+import com.codename1.backend.image.RasterGraphics;
+import com.codename1.backend.image.RasterImage;
+import com.codename1.backend.image.Resampler;
 
 import java.io.IOException;
 

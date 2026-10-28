@@ -20,7 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.image;
+package com.codename1.backend.image;
 
 import org.junit.jupiter.api.Test;
 

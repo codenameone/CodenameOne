@@ -20,7 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.image;
+package com.codename1.backend.image;
 
 import java.io.IOException;
 import java.util.zip.Inflater;
@@ -30,11 +30,10 @@ import java.util.zip.Inflater;
 /// The font is the subset Pillow embeds for `ImageFont.load_default()`
 /// (12676 bytes): Aileron by Sora Sagano (dotcolon.net), released into the
 /// public domain under CC0 1.0 ("No Rights Reserved", as its `name` table
-/// says). The license is kept in `CodenameOne/third-party/aileron` and the
+/// says). The license is kept in `maven/backend/third-party/aileron` and the
 /// root `NOTICE`. The bytes are zlib-compressed and base64-encoded here
 /// because classes are what the backend shares with the core, not
 /// resources. It is data, not code: replace it whole, never edit it.
-@com.codename1.impl.SharedWithBackend
 final class DefaultFontData {
     private static final int SIZE = 12676;
 

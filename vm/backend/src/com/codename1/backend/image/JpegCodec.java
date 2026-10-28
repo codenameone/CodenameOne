@@ -20,7 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.image;
+package com.codename1.backend.image;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -39,7 +39,6 @@ import java.io.IOException;
 /// scaled to a quality the way libjpeg scales them, so quality 0.75 here
 /// gives the same tables as libjpeg's (and Pillow's) quality 75. Alpha is
 /// dropped.
-@com.codename1.impl.SharedWithBackend
 public final class JpegCodec {
     static final int[] ZIGZAG = {
         0, 1, 8, 16, 9, 2, 3, 10, 17, 24, 32, 25, 18, 11, 4, 5, 12, 19, 26, 33, 40, 48, 41, 34, 27, 20, 13, 6, 7,

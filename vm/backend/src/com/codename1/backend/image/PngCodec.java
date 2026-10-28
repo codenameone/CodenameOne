@@ -20,7 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.image;
+package com.codename1.backend.image;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -40,7 +40,6 @@ import java.util.zip.Inflater;
 /// [#expand(byte[], int, int, int, int)] keep the file's own sample layout
 /// instead of converting to ARGB; the Python runtime's `PIL` uses them to
 /// keep a palette image a palette image.
-@com.codename1.impl.SharedWithBackend
 public final class PngCodec {
     private static final byte[] SIGNATURE = {(byte) 0x89, 'P', 'N', 'G', 13, 10, 26, 10};
     private static final int[][] ADAM7 = {

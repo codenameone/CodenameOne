@@ -21,9 +21,10 @@
  * need additional information or have any questions.
  */
 
-/// Pure-Java images: pixels, drawing, resampling and PNG/JPEG codecs that
-/// need no display, so the same code runs on a device, in the simulator and
-/// on a Codename One server.
+/// Server-side images: pixels, drawing, resampling and PNG/JPEG codecs in
+/// pure Java, for a Codename One backend that has no display -- social cards,
+/// thumbnails, badges and charts rendered on the server. A client application
+/// uses `com.codename1.ui.Image` and `com.codename1.ui.Graphics` instead.
 ///
 /// - [RasterImage] holds non-premultiplied ARGB pixels and rotates, flips,
 ///   crops and resizes them.
@@ -49,6 +50,6 @@
 /// byte[] png = PngCodec.encode(card);
 /// ```
 ///
-/// Every class is shared with the backend runtime, and depends on nothing
-/// but the subset of the JDK every Codename One target provides.
-package com.codename1.image;
+/// Every class depends on nothing but the subset of the JDK the backend
+/// runtime provides, so it runs on the JVM and translated by ParparVM alike.
+package com.codename1.backend.image;

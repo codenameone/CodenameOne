@@ -20,14 +20,13 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.image;
+package com.codename1.backend.image;
 
 /// A linear or radial color gradient for [RasterGraphics#setPaint(RasterPaint)].
 ///
 /// Colors are interpolated per channel, not premultiplied, between stops at
 /// increasing fractions from 0 to 1. Before the first stop and after the last
 /// one the end colors extend ("pad").
-@com.codename1.impl.SharedWithBackend
 public final class RasterGradient implements RasterPaint {
     private final boolean radial;
     private final double x1;

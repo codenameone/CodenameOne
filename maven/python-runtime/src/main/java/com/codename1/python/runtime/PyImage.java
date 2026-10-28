@@ -23,76 +23,45 @@
  */
 package com.codename1.python.runtime;
 
-import com.codename1.image.JpegCodec;
-import com.codename1.image.PngCodec;
-import com.codename1.image.RasterImage;
-import com.codename1.image.Resampler;
-import com.codename1.image.TrueTypeFont;
 
-import java.io.IOException;
 
 
 /// The `_cn1image` module: pixel storage and the hot loops behind the
-/// bundled `PIL` package. An image is a [Img] handle holding interleaved
+/// bundled `PIL` package. An image is a [PyImageData] handle holding interleaved
 /// 8-bit bands (1 for "L", 3 for "RGB", 4 for "RGBA"), exactly the layout of
 /// Pillow's `tobytes()`. Every arithmetic here follows Pillow's own fixed
-/// point code so results are byte identical with it.
-final class PyImage {
+/// point code so results are byte identical with it. Codecs, resampling and
+/// text go through the [PyImageEngine] the generated registry installs with
+/// [#setEngine(PyImageEngine)].
+public final class PyImage {
     private PyImage() {
     }
 
-    /// One image: `w` by `h` pixels of `bands` interleaved bytes.
-    /// The platform image codec behind `native_decode`/`native_encode`:
-    /// Codename One's `Image` and `ImageIO`, installed by the generated
-    /// registry of a client build (`PyImageNative.install()`). It is a seam
-    /// rather than a direct call because a backend build has no UI package:
-    /// the backend translation takes every runtime class, and a reference
-    /// to `com.codename1.ui` from this one failed its C compile. There it
-    /// stays null and PIL uses its pure codecs.
-    interface Codec {
-        boolean available();
+    private static PyImageEngine engine;
 
-        Img decode(byte[] data);
-
-        byte[] encode(Img rgba, String format, float quality);
+    /// Installs the engine behind codecs, resampling and text; the generated
+    /// `PythonModules` calls it with the server or the client one.
+    public static void setEngine(PyImageEngine e) {
+        engine = e;
     }
 
-    private static Codec codec;
-
-    static void setCodec(Codec c) {
-        codec = c;
-    }
-
-    private static Codec requireCodec() {
-        Codec c = codec;
-        if (c == null) {
-            throw Py.error(Py.OS_ERROR, "this platform has no native image codec");
+    private static PyImageEngine requireEngine() {
+        PyImageEngine e = engine;
+        if (e == null || !e.available()) {
+            throw Py.error(Py.OS_ERROR, "this build has no image engine: on a device PIL needs a running "
+                    + "Codename One display");
         }
-        return c;
+        return e;
     }
 
-    static final class Img {
-        final int w;
-        final int h;
-        final int bands;
-        final byte[] d;
-
-        Img(int w, int h, int bands) {
-            this.w = w;
-            this.h = h;
-            this.bands = bands;
-            this.d = new byte[w * h * bands];
-        }
-    }
-
-    private static Img img(Object o) {
-        if (o instanceof PyJavaObject && ((PyJavaObject) o).value instanceof Img) {
-            return (Img) ((PyJavaObject) o).value;
+    private static PyImageData img(Object o) {
+        if (o instanceof PyJavaObject && ((PyJavaObject) o).value instanceof PyImageData) {
+            return (PyImageData) ((PyJavaObject) o).value;
         }
         throw Py.typeError("not an image");
     }
 
-    private static Object wrap(Img i) {
+    private static Object wrap(PyImageData i) {
         return new PyJavaObject(i);
     }
 
@@ -111,12 +80,12 @@ final class PyImage {
     static PyModule module() {
         PyModule m = new PyModule("_cn1image", new String[0]);
         m.setAttr("new", PyBuiltin.positional("new", a -> {
-            Img r = new Img(i(a[0]), i(a[1]), i(a[2]));
+            PyImageData r = new PyImageData(i(a[0]), i(a[1]), i(a[2]));
             fill(r, 0, 0, r.w, r.h, bytes(a[3]), null);
             return wrap(r);
         }));
         m.setAttr("frombytes", PyBuiltin.positional("frombytes", a -> {
-            Img r = new Img(i(a[0]), i(a[1]), i(a[2]));
+            PyImageData r = new PyImageData(i(a[0]), i(a[1]), i(a[2]));
             byte[] b = bytes(a[3]);
             if (b.length < r.d.length) {
                 throw Py.error(Py.VALUE_ERROR, "not enough image data");
@@ -125,17 +94,17 @@ final class PyImage {
             return wrap(r);
         }));
         m.setAttr("size", PyBuiltin.positional("size", a -> {
-            Img s = img(a[0]);
+            PyImageData s = img(a[0]);
             return new PyTuple(new Object[] {PyInt.of(s.w), PyInt.of(s.h)});
         }));
         m.setAttr("tobytes", PyBuiltin.positional("tobytes", a -> {
-            Img s = img(a[0]);
+            PyImageData s = img(a[0]);
             byte[] out = new byte[s.d.length];
             System.arraycopy(s.d, 0, out, 0, out.length);
             return new PyBytes(out);
         }));
         m.setAttr("getpixel", PyBuiltin.positional("getpixel", a -> {
-            Img s = img(a[0]);
+            PyImageData s = img(a[0]);
             int x = i(a[1]);
             int y = i(a[2]);
             if (x < 0 || y < 0 || x >= s.w || y >= s.h) {
@@ -149,7 +118,7 @@ final class PyImage {
             return new PyTuple(t);
         }));
         m.setAttr("putpixel", PyBuiltin.positional("putpixel", a -> {
-            Img s = img(a[0]);
+            PyImageData s = img(a[0]);
             int x = i(a[1]);
             int y = i(a[2]);
             if (x < 0 || y < 0 || x >= s.w || y >= s.h) {
@@ -160,7 +129,7 @@ final class PyImage {
         }));
         m.setAttr("crop", PyBuiltin.positional("crop", a -> wrap(crop(img(a[0]), i(a[1]), i(a[2]), i(a[3]), i(a[4])))));
         m.setAttr("fill", PyBuiltin.positional("fill", a -> {
-            Img s = img(a[0]);
+            PyImageData s = img(a[0]);
             fill(s, i(a[1]), i(a[2]), i(a[3]), i(a[4]), bytes(a[5]), a[6] == Py.NONE ? null : img(a[6])); //NOPMD CompareObjectsWithEquals - identity is meant
             return Py.NONE;
         }));
@@ -183,13 +152,8 @@ final class PyImage {
             for (int j = 0; j < 4; j++) {
                 box[j] = Py.asDouble(c[j]);
             }
-            Img src = img(a[0]);
-            boolean premultiply = a.length > 5 && Py.isTrue(a[5]);
-            if (premultiply) {
-                src = premultiply(src);
-            }
-            Img r = resample(src, i(a[1]), i(a[2]), box, a.length > 4 ? i(a[4]) : FILTER_BILINEAR);
-            return wrap(premultiply ? unpremultiply(r) : r);
+            return wrap(requireEngine().resample(img(a[0]), i(a[1]), i(a[2]), box,
+                    a.length > 4 ? i(a[4]) : FILTER_BILINEAR, a.length > 5 && Py.isTrue(a[5])));
         }));
         m.setAttr("palette", PyBuiltin.positional("palette", a -> wrap(palette(img(a[0]), bytes(a[1])))));
         m.setAttr("scatter", PyBuiltin.positional("scatter", a -> {
@@ -198,9 +162,9 @@ final class PyImage {
         }));
         m.setAttr("convert", PyBuiltin.positional("convert", a -> wrap(convert(img(a[0]), i(a[1])))));
         m.setAttr("band", PyBuiltin.positional("band", a -> {
-            Img s = img(a[0]);
+            PyImageData s = img(a[0]);
             int b = i(a[1]);
-            Img r = new Img(s.w, s.h, 1);
+            PyImageData r = new PyImageData(s.w, s.h, 1);
             for (int p = 0, n = s.w * s.h; p < n; p++) {
                 r.d[p] = s.d[p * s.bands + b];
             }
@@ -208,10 +172,10 @@ final class PyImage {
         }));
         m.setAttr("merge", PyBuiltin.positional("merge", a -> {
             Object[] parts = Py.toArray(a[0]);
-            Img first = img(parts[0]);
-            Img r = new Img(first.w, first.h, parts.length);
+            PyImageData first = img(parts[0]);
+            PyImageData r = new PyImageData(first.w, first.h, parts.length);
             for (int b = 0; b < parts.length; b++) {
-                Img s = img(parts[b]);
+                PyImageData s = img(parts[b]);
                 if (s.w != r.w || s.h != r.h || s.bands != 1) {
                     throw Py.error(Py.VALUE_ERROR, "images do not match");
                 }
@@ -223,9 +187,9 @@ final class PyImage {
         }));
         m.setAttr("getbbox", PyBuiltin.positional("getbbox", a -> getbbox(img(a[0]), Py.isTrue(a[1]))));
         m.setAttr("point", PyBuiltin.positional("point", a -> {
-            Img s = img(a[0]);
+            PyImageData s = img(a[0]);
             byte[] lut = bytes(a[1]);
-            Img r = new Img(s.w, s.h, s.bands);
+            PyImageData r = new PyImageData(s.w, s.h, s.bands);
             for (int p = 0; p < s.d.length; p += s.bands) {
                 for (int b = 0; b < s.bands; b++) {
                     r.d[p + b] = lut[(b << 8) + (s.d[p + b] & 0xff)];
@@ -234,21 +198,21 @@ final class PyImage {
             return wrap(r);
         }));
         m.setAttr("boxblur", PyBuiltin.positional("boxblur", a -> {
-            Img s = img(a[0]);
+            PyImageData s = img(a[0]);
             int r = i(a[1]);
-            Img t = blurRows(s, r);
-            Img u = blurRows(transpose(t, 5), r);
+            PyImageData t = blurRows(s, r);
+            PyImageData u = blurRows(transpose(t, 5), r);
             return wrap(transpose(u, 5));
         }));
         m.setAttr("png_unfilter", PyBuiltin.positional("png_unfilter", a ->
-                new PyBytes(pngUnfilter(bytes(a[0]), i(a[1]), i(a[2]), i(a[3])))));
+                new PyBytes(requireEngine().pngUnfilter(bytes(a[0]), i(a[1]), i(a[2]), i(a[3])))));
         m.setAttr("png_expand", PyBuiltin.positional("png_expand", a ->
-                wrap(pngExpand(bytes(a[0]), i(a[1]), i(a[2]), i(a[3]), i(a[4])))));
-        m.setAttr("jpeg_decode", PyBuiltin.positional("jpeg_decode", a -> wrap(jpegDecode(bytes(a[0])))));
+                wrap(requireEngine().pngExpand(bytes(a[0]), i(a[1]), i(a[2]), i(a[3]), i(a[4])))));
+        m.setAttr("jpeg_decode", PyBuiltin.positional("jpeg_decode", a -> wrap(requireEngine().jpegDecode(bytes(a[0])))));
         m.setAttr("jpeg_encode", PyBuiltin.positional("jpeg_encode", a ->
-                new PyBytes(jpegEncode(img(a[0]), (float) Py.asDouble(a[1])))));
+                new PyBytes(requireEngine().jpegEncode(img(a[0]), (float) Py.asDouble(a[1])))));
         m.setAttr("png_rows", PyBuiltin.positional("png_rows", a -> {
-            Img s = img(a[0]);
+            PyImageData s = img(a[0]);
             int row = s.w * s.bands;
             byte[] out = new byte[(row + 1) * s.h];
             for (int y = 0; y < s.h; y++) {
@@ -256,72 +220,74 @@ final class PyImage {
             }
             return new PyBytes(out);
         }));
-        m.setAttr("ft_load", PyBuiltin.positional("ft_load", a -> {
-            try {
-                return new PyJavaObject(new FreeTypeMetrics(
-                        TrueTypeFont.load(bytes(a[0]), i(a[1]), Py.asDouble(a[2]))));
-            } catch (IOException e) {
-                throw osError(e);
-            }
+        m.setAttr("ft_load", PyBuiltin.positional("ft_load", a ->
+                new PyJavaObject(requireEngine().loadFont(bytes(a[0]), i(a[1]), Py.asDouble(a[2])))));
+        m.setAttr("ft_default_data", PyBuiltin.positional("ft_default_data", a -> {
+            byte[] d = requireEngine().defaultFontData();
+            return d.length == 0 ? Py.NONE : new PyBytes(d);
         }));
-        m.setAttr("ft_default_data", PyBuiltin.positional("ft_default_data", a ->
-                new PyBytes(TrueTypeFont.getDefaultFontData())));
+        m.setAttr("ft_default", PyBuiltin.positional("ft_default", a ->
+                new PyJavaObject(requireEngine().defaultFont(Py.asDouble(a[0])))));
         m.setAttr("ft_variant", PyBuiltin.positional("ft_variant", a ->
-                new PyJavaObject(new FreeTypeMetrics(ft(a[0]).font.deriveFont(Py.asDouble(a[1]))))));
+                new PyJavaObject(requireEngine().deriveFont(ft(a[0]), Py.asDouble(a[1])))));
         m.setAttr("ft_name", PyBuiltin.positional("ft_name", a -> {
-            TrueTypeFont f = ft(a[0]).font;
-            return new PyTuple(new Object[] {new PyStr(f.getFamilyName()), new PyStr(f.getStyleName())});
+            String[] n = requireEngine().fontName(ft(a[0]));
+            return new PyTuple(new Object[] {new PyStr(n[0]), new PyStr(n[1])});
         }));
         m.setAttr("ft_metrics", PyBuiltin.positional("ft_metrics", a -> {
-            FreeTypeMetrics f = ft(a[0]);
-            return new PyTuple(new Object[] {PyInt.of(FreeTypeMetrics.pixel(f.ascender)),
-                PyInt.of(-FreeTypeMetrics.pixel(f.descender))});
+            int[] mt = requireEngine().fontMetrics(ft(a[0]));
+            return new PyTuple(new Object[] {PyInt.of(mt[0]), PyInt.of(mt[1])});
         }));
         m.setAttr("ft_length", PyBuiltin.positional("ft_length", a ->
-                PyInt.of(ft(a[0]).length(Py.toStr(a[1])))));
+                PyInt.of(requireEngine().textLength(ft(a[0]), Py.toStr(a[1])))));
         m.setAttr("ft_bbox", PyBuiltin.positional("ft_bbox", a -> {
-            FreeTypeMetrics f = ft(a[0]);
-            int[] b = ftBox(f, f.layout(Py.toStr(a[1])), a[2]);
+            int[] b = requireEngine().textBox(ft(a[0]), Py.toStr(a[1]), anchor(a[2]));
             return new PyTuple(new Object[] {PyInt.of(b[0]), PyInt.of(b[1]), PyInt.of(b[2]), PyInt.of(b[3])});
         }));
         m.setAttr("ft_mask", PyBuiltin.positional("ft_mask", a -> {
-            FreeTypeMetrics f = ft(a[0]);
-            FreeTypeMetrics.Layout l = f.layout(Py.toStr(a[1]));
-            int[] b = ftBox(f, l, a[2]);
-            Img r = new Img(Math.max(0, b[0]), Math.max(0, b[1]), 1);
-            byte[] cov = f.mask(l, b, Py.isTrue(a[3]));
-            System.arraycopy(cov, 0, r.d, 0, Math.min(cov.length, r.d.length));
-            return new PyTuple(new Object[] {wrap(r), PyInt.of(b[2]), PyInt.of(b[3])});
+            PyImageEngine e = requireEngine();
+            Object f = ft(a[0]);
+            String text = Py.toStr(a[1]);
+            String anchor = anchor(a[2]);
+            int[] b = e.textBox(f, text, anchor);
+            return new PyTuple(new Object[] {wrap(e.textMask(f, text, anchor, Py.isTrue(a[3]))), PyInt.of(b[2]),
+                PyInt.of(b[3])});
+        }));
+        m.setAttr("exact", PyBuiltin.positional("exact", a -> {
+            PyImageEngine e = engine;
+            return e != null && e.exact() ? Py.TRUE : Py.FALSE;
         }));
         m.setAttr("native_available", PyBuiltin.positional("native_available", a -> {
-            Codec c = codec;
-            return c != null && c.available() ? Py.TRUE : Py.FALSE;
+            PyImageEngine e = engine;
+            return e != null && e.available() ? Py.TRUE : Py.FALSE;
         }));
         m.setAttr("native_decode", PyBuiltin.positional("native_decode", a ->
-                wrap(requireCodec().decode(bytes(a[0])))));
+                wrap(requireEngine().decode(bytes(a[0])))));
         m.setAttr("native_encode", PyBuiltin.positional("native_encode", a ->
-                new PyBytes(requireCodec().encode(convert(img(a[0]), 4), Py.toStr(a[1]),
+                new PyBytes(requireEngine().encode(convert(img(a[0]), 4), Py.toStr(a[1]),
                         (float) Py.asDouble(a[2])))));
         return m;
     }
 
-    private static FreeTypeMetrics ft(Object o) {
-        if (o instanceof PyJavaObject && ((PyJavaObject) o).value instanceof FreeTypeMetrics) {
-            return (FreeTypeMetrics) ((PyJavaObject) o).value;
+    private static Object ft(Object o) {
+        if (o instanceof PyJavaObject && ((PyJavaObject) o).value != null) {
+            return ((PyJavaObject) o).value;
         }
         throw Py.typeError("not a TrueType font");
     }
 
-    private static int[] ftBox(FreeTypeMetrics f, FreeTypeMetrics.Layout l, Object anchor) {
-        String a = Py.NONE.equals(anchor) ? null : Py.toStr(anchor);
-        if (!FreeTypeMetrics.validAnchor(a)) {
+    /// Pillow's anchor check: null (the default, `la`) or a horizontal
+    /// `l`/`m`/`r` followed by a vertical `a`/`t`/`m`/`s`/`b`/`d`.
+    private static String anchor(Object o) {
+        String a = Py.NONE.equals(o) ? null : Py.toStr(o);
+        if (a != null && (a.length() != 2 || "lmr".indexOf(a.charAt(0)) < 0 || "atmsbd".indexOf(a.charAt(1)) < 0)) {
             throw Py.error(Py.VALUE_ERROR, "bad anchor specified: " + a);
         }
-        return f.box(l, a);
+        return a;
     }
 
-    private static Img crop(Img s, int x0, int y0, int x1, int y1) {
-        Img r = new Img(Math.max(0, x1 - x0), Math.max(0, y1 - y0), s.bands);
+    private static PyImageData crop(PyImageData s, int x0, int y0, int x1, int y1) {
+        PyImageData r = new PyImageData(Math.max(0, x1 - x0), Math.max(0, y1 - y0), s.bands);
         for (int y = 0; y < r.h; y++) {
             int sy = y + y0;
             if (sy < 0 || sy >= s.h) {
@@ -343,11 +309,11 @@ final class PyImage {
         return ((t >> 8) + t) >> 8;
     }
 
-    private static int maskAt(Img mask, int x, int y) {
+    private static int maskAt(PyImageData mask, int x, int y) {
         return mask.d[(y * mask.w + x) * mask.bands + mask.bands - 1] & 0xff;
     }
 
-    private static void fill(Img s, int x0, int y0, int x1, int y1, byte[] color, Img mask) {
+    private static void fill(PyImageData s, int x0, int y0, int x1, int y1, byte[] color, PyImageData mask) {
         int ax = Math.max(0, x0);
         int ay = Math.max(0, y0);
         int bx = Math.min(s.w, x1);
@@ -367,7 +333,7 @@ final class PyImage {
         }
     }
 
-    private static void paste(Img dst, Img src, int x0, int y0, Img mask) {
+    private static void paste(PyImageData dst, PyImageData src, int x0, int y0, PyImageData mask) {
         for (int y = 0; y < src.h; y++) {
             int dy = y + y0;
             if (dy < 0 || dy >= dst.h) {
@@ -394,9 +360,9 @@ final class PyImage {
 
     /// Pillow's `Transpose` values: 0 flip left-right, 1 flip top-bottom,
     /// 2 rotate 90, 3 rotate 180, 4 rotate 270, 5 transpose, 6 transverse.
-    private static Img transpose(Img s, int op) {
+    private static PyImageData transpose(PyImageData s, int op) {
         boolean swap = op == 2 || op == 4 || op == 5 || op == 6;
-        Img r = swap ? new Img(s.h, s.w, s.bands) : new Img(s.w, s.h, s.bands);
+        PyImageData r = swap ? new PyImageData(s.h, s.w, s.bands) : new PyImageData(s.w, s.h, s.bands);
         for (int y = 0; y < r.h; y++) {
             for (int x = 0; x < r.w; x++) {
                 int sx;
@@ -424,8 +390,8 @@ final class PyImage {
 
     /// Nearest neighbour affine transform, accumulating the coordinates the
     /// way Pillow's `affine_transform` does so the rounding is the same.
-    private static Img affine(Img s, int w, int h, double[] a, byte[] fill) {
-        Img r = new Img(w, h, s.bands);
+    private static PyImageData affine(PyImageData s, int w, int h, double[] a, byte[] fill) {
+        PyImageData r = new PyImageData(w, h, s.bands);
         double xo = a[2] + a[1] * 0.5 + a[0] * 0.5;
         double yo = a[5] + a[4] * 0.5 + a[3] * 0.5;
         for (int y = 0; y < h; y++) {
@@ -455,82 +421,9 @@ final class PyImage {
     static final int FILTER_BOX = 4;
     static final int FILTER_HAMMING = 5;
 
-    /// Pillow's two-pass resampling, shared with every Java program through
-    /// `com.codename1.image.Resampler` (same fixed point, same bytes).
-    private static Img resample(Img s, int w, int h, double[] box, int filter) {
-        Img r = new Img(w, h, s.bands);
-        byte[] d = Resampler.resample(s.d, s.w, s.h, s.bands, w, h, box, filter);
-        System.arraycopy(d, 0, r.d, 0, d.length);
-        return r;
-    }
-
-    /// RGBA to RGBa (or LA to La): Pillow's `MULDIV255` premultiply.
-    private static Img premultiply(Img s) {
-        Img r = new Img(s.w, s.h, s.bands);
-        byte[] d = Resampler.premultiply(s.d, s.bands);
-        System.arraycopy(d, 0, r.d, 0, d.length);
-        return r;
-    }
-
-    /// RGBa to RGBA (or La to LA), as Pillow's `rgbA2rgba`; in place.
-    private static Img unpremultiply(Img s) {
-        Resampler.unpremultiply(s.d, s.bands);
-        return s;
-    }
-
-    private static Img fromBands(int w, int h, int bands, byte[] d) {
-        Img r = new Img(w, h, bands);
-        System.arraycopy(d, 0, r.d, 0, r.d.length);
-        return r;
-    }
-
-    private static RuntimeException osError(IOException e) {
-        return Py.error(Py.OS_ERROR, String.valueOf(e.getMessage()));
-    }
-
-    /// Decodes a JPEG file with the shared pure-Java codec, to "L" (one band)
-    /// for a gray file and "RGB" (three) otherwise, as Pillow opens them.
-    private static Img jpegDecode(byte[] data) {
-        RasterImage ri;
-        try {
-            ri = JpegCodec.decode(data);
-        } catch (IOException e) {
-            throw osError(e); // NOPMD PreserveStackTrace - surfaced as a Python OSError
-        }
-        int bands = JpegCodec.componentCount(data) == 1 ? 1 : 3;
-        int[] px = ri.getPixels();
-        Img r = new Img(ri.getWidth(), ri.getHeight(), bands);
-        for (int p = 0; p < px.length; p++) {
-            int c = px[p];
-            if (bands == 1) {
-                r.d[p] = (byte) c;
-            } else {
-                r.d[p * 3] = (byte) (c >> 16);
-                r.d[p * 3 + 1] = (byte) (c >> 8);
-                r.d[p * 3 + 2] = (byte) c;
-            }
-        }
-        return r;
-    }
-
-    /// Encodes an "L" or "RGB" image as baseline JPEG.
-    private static byte[] jpegEncode(Img s, float quality) {
-        if (s.bands != 1 && s.bands != 3) {
-            throw Py.error(Py.OS_ERROR, "cannot write this mode as JPEG");
-        }
-        int[] px = new int[s.w * s.h];
-        for (int p = 0; p < px.length; p++) {
-            int r = s.d[p * s.bands] & 0xff;
-            int g = s.bands == 1 ? r : s.d[p * 3 + 1] & 0xff;
-            int b = s.bands == 1 ? r : s.d[p * 3 + 2] & 0xff;
-            px[p] = 0xff000000 | r << 16 | g << 8 | b;
-        }
-        return JpegCodec.encode(new RasterImage(s.w, s.h, px), quality, s.bands == 1);
-    }
-
     /// Maps a 1-band index image through a 256 entry RGBA table.
-    private static Img palette(Img s, byte[] lut) {
-        Img r = new Img(s.w, s.h, 4);
+    private static PyImageData palette(PyImageData s, byte[] lut) {
+        PyImageData r = new PyImageData(s.w, s.h, 4);
         for (int p = 0, n = s.w * s.h; p < n; p++) {
             int idx = s.d[p * s.bands] & 0xff;
             System.arraycopy(lut, idx * 4, r.d, p * 4, 4);
@@ -539,7 +432,7 @@ final class PyImage {
     }
 
     /// Writes `src` into `dst` at `x0 + x * dx, y0 + y * dy`: one Adam7 pass.
-    private static void scatter(Img dst, Img src, int x0, int y0, int dx, int dy) {
+    private static void scatter(PyImageData dst, PyImageData src, int x0, int y0, int dx, int dy) {
         int n = dst.bands;
         for (int y = 0; y < src.h; y++) {
             for (int x = 0; x < src.w; x++) {
@@ -548,8 +441,8 @@ final class PyImage {
         }
     }
 
-    private static Img convert(Img s, int bands) {
-        Img r = new Img(s.w, s.h, bands);
+    private static PyImageData convert(PyImageData s, int bands) {
+        PyImageData r = new PyImageData(s.w, s.h, bands);
         for (int p = 0, n = s.w * s.h; p < n; p++) {
             int q = p * s.bands;
             int cr = s.d[q] & 0xff;
@@ -576,7 +469,7 @@ final class PyImage {
         return r;
     }
 
-    private static Object getbbox(Img s, boolean alphaOnly) {
+    private static Object getbbox(PyImageData s, boolean alphaOnly) {
         int x0 = s.w;
         int y0 = s.h;
         int x1 = -1;
@@ -607,8 +500,8 @@ final class PyImage {
     }
 
     /// One horizontal pass of Pillow's box blur for an integer radius.
-    private static Img blurRows(Img s, int r) {
-        Img o = new Img(s.w, s.h, s.bands);
+    private static PyImageData blurRows(PyImageData s, int r) {
+        PyImageData o = new PyImageData(s.w, s.h, s.bands);
         int ww = (1 << 24) / (r * 2 + 1);
         int fw = ((1 << 24) - (r * 2 + 1) * ww) / 2;
         int last = s.w - 1;
@@ -627,18 +520,5 @@ final class PyImage {
             }
         }
         return o;
-    }
-
-    private static byte[] pngUnfilter(byte[] data, int row, int h, int bpp) {
-        try {
-            return PngCodec.unfilter(data, 0, row, h, bpp);
-        } catch (IOException e) {
-            throw osError(e); // NOPMD PreserveStackTrace - surfaced as a Python OSError
-        }
-    }
-
-    private static Img pngExpand(byte[] raw, int w, int h, int ctype, int depth) {
-        int bands = ctype == 0 || ctype == 3 ? 1 : ctype == 2 ? 3 : ctype == 4 ? 2 : 4;
-        return fromBands(w, h, bands, PngCodec.expand(raw, w, h, ctype, depth));
     }
 }

@@ -20,7 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.image;
+package com.codename1.backend.image;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -53,7 +53,6 @@ import java.util.Map;
 /// An instance keeps a bounded cache of glyph outlines and is not safe to use
 /// from two threads at once; [#deriveFont(double)] is cheap and gives each
 /// thread its own.
-@com.codename1.impl.SharedWithBackend
 public final class TrueTypeFont implements RasterFont {
     private static final int CACHE_LIMIT = 512;
     private static final int MAX_COMPONENT_DEPTH = 8;

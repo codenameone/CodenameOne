@@ -20,7 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.image;
+package com.codename1.backend.image;
 
 /// Draws antialiased shapes, gradients and images into a [RasterImage].
 ///
@@ -43,7 +43,6 @@ package com.codename1.image;
 /// - **Text** goes through the [RasterFont] seam set with [#setFont(RasterFont)].
 ///
 /// A graphics object is not thread safe; create one per thread.
-@com.codename1.impl.SharedWithBackend
 public final class RasterGraphics {
     /// Stroke ends stop exactly at the end points.
     public static final int CAP_BUTT = 0;

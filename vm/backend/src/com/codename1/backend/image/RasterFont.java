@@ -20,7 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.image;
+package com.codename1.backend.image;
 
 /// The seam through which [RasterGraphics#drawString(String, double, double)]
 /// draws text: a font turns a string into an outline, and the graphics fills
@@ -29,7 +29,6 @@ package com.codename1.image;
 /// [TrueTypeFont] is the implementation that ships: TrueType fonts read from
 /// bytes, with an embedded default. Another font engine plugs in here
 /// without any change to the graphics.
-@com.codename1.impl.SharedWithBackend
 public interface RasterFont {
     /// Returns the outline of `text` with its baseline starting at `(x, y)`.
     ///

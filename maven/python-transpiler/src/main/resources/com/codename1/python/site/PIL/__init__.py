@@ -4,10 +4,12 @@
 """A Pillow subset: images in "L", "RGB" and "RGBA" with PNG and JPEG built in.
 
 Pixels live in the runtime's `_cn1image` module, which also does every loop
-over them. Resampling and the PNG and JPEG codecs are Codename One's pure-Java
-`com.codename1.image` package, so they work on servers as well as devices;
-GIF, BMP and WEBP go through the platform's image codecs and need a running
-display.
+over them. Codecs, resampling and text go through an engine the build picks:
+on a server the backend's pure-Java `com.codename1.backend.image`, which
+gives Pillow's exact pixels for resampling, PNG, JPEG and TrueType text; on
+a device Codename One's `Image`, `ImageIO`, `Graphics` and `Font`, which
+decode, encode, scale and draw text the platform's way, and also read GIF,
+BMP and WEBP.
 """
 
 __version__ = "11.0.0"

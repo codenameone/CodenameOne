@@ -41,7 +41,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -142,8 +141,16 @@ class ConformanceTest {
         List<String> args = new ArrayList<String>();
         String runtime = location(com.codename1.python.runtime.Py.class);
         String core = location(com.codename1.io.Util.class);
-        // Programs may import Java classes: the JDK's, and the core's.
-        List<File> classPath = Collections.singletonList(new File(core));
+        // Programs may import Java classes: the JDK's, and the core's. The
+        // pil_ programs are built as a server is (the backend on the class
+        // path), so PIL runs on com.codename1.backend.image and its output
+        // stays Pillow's exact bytes.
+        String backend = stem.startsWith("pil_") ? location(com.codename1.backend.image.RasterImage.class) : null;
+        List<File> classPath = new ArrayList<File>();
+        classPath.add(new File(core));
+        if (backend != null) {
+            classPath.add(new File(backend));
+        }
         for (Map.Entry<String, String> e : PythonTranspiler.transpile(sources, "main", classPath, natives).entrySet()) {
             Path f = gen.resolve(e.getKey());
             Files.createDirectories(f.getParent());
@@ -155,7 +162,7 @@ class ConformanceTest {
         args.add(1, "--release");
         args.add(2, "17");
         args.add(3, "-cp");
-        args.add(4, runtime + File.pathSeparator + core);
+        args.add(4, runtime + File.pathSeparator + core + (backend == null ? "" : File.pathSeparator + backend));
         args.add(5, "-d");
         args.add(6, cls.toString());
         JavaCompiler javac = ToolProvider.getSystemJavaCompiler();
@@ -166,7 +173,8 @@ class ConformanceTest {
         URL[] urls = {cls.toUri().toURL(), new File(runtime).toURI().toURL(), new File(core).toURI().toURL(),
                 new File(location(JvmFileSystem.class)).toURI().toURL(),
                 new File(location(org.sqlite.JDBC.class)).toURI().toURL(),
-                new File(location(org.slf4j.LoggerFactory.class)).toURI().toURL()};
+                new File(location(org.slf4j.LoggerFactory.class)).toURI().toURL(),
+                new File(backend == null ? core : backend).toURI().toURL()};
         Path fsRoot = work.resolve("fs");
         Files.createDirectories(fsRoot.resolve("home"));
         ByteArrayOutputStream out = new ByteArrayOutputStream();

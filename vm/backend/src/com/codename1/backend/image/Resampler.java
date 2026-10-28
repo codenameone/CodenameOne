@@ -20,7 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.image;
+package com.codename1.backend.image;
 
 /// Resampling of interleaved 8-bit band data, the two-pass fixed-point
 /// convolution of Pillow's `Resample.c`.
@@ -33,7 +33,6 @@ package com.codename1.image;
 /// bleed their color into their neighbours.
 ///
 /// [RasterImage#scale(int, int, int)] wraps this for ARGB images.
-@com.codename1.impl.SharedWithBackend
 public final class Resampler {
     /// Nearest neighbour: each output pixel takes the input pixel under its center.
     public static final int NEAREST = 0;

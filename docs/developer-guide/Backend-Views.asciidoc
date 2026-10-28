@@ -184,3 +184,19 @@ expressions or dialect features. Keep existing HTML and htmx attributes within t
 supported subset. Controller advice, method-level `@ModelAttribute`, flash attributes,
 `forward:` views, custom converters, dynamic fragment selectors, and internationalized
 message bundles aren't part of this first version.
+
+=== Images on the server
+
+A backend often has to produce an image: a sharing card for a link, a thumbnail of an upload, a badge, or a chart exported as PNG. A server has no display, so `com.codename1.backend.image` draws and encodes images in pure Java, with no platform code. It runs on the JVM and in a backend translated by ParparVM alike. A client application uses `com.codename1.ui.Image` and `Graphics` instead.
+
+* `RasterImage` holds non-premultiplied ARGB pixels, and crops, rotates, flips and resizes them. Its resize filters (`NEAREST`, `BILINEAR`, `BICUBIC`, `LANCZOS`, `BOX` and `HAMMING`) produce the same bytes as Pillow.
+* `RasterGraphics` draws antialiased lines, rectangles, rounded rectangles, ellipses, arcs, polygons and Bezier paths, with stroke width, caps and joins, an affine transform, a clip rectangle, alpha, linear and radial gradients and scaled images.
+* `TrueTypeFont` reads a TrueType font for `RasterGraphics.drawString`. `TrueTypeFont.createDefault(size)` needs no font file: it embeds Aileron, the font Pillow uses for `ImageFont.load_default()`.
+* `PngCodec` reads every PNG variant and writes 8-bit PNG; `JpegCodec` reads baseline and progressive JPEG and writes baseline JPEG.
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/SocialCard.java[tag=raster-image-card,indent=0]
+----
+
+A handler returns the encoded bytes with the matching content type, such as `image/png`. A Python backend gets the same classes through Pillow: `PIL.Image`, `ImageDraw` and `ImageFont` run on them in a server build, pixel for pixel.

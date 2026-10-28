@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 only, as
  * published by the Free Software Foundation.  Codename One designates this
@@ -20,21 +21,26 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.image;
+package com.codename1.python.runtime;
 
-/// What [RasterGraphics] fills with when it is not a single color: a
-/// gradient ([RasterGradient]) or your own pattern.
-@com.codename1.impl.SharedWithBackend
-public interface RasterPaint {
-    /// Returns the non-premultiplied ARGB color at a point.
-    ///
-    /// #### Parameters
-    ///
-    /// - `x`: horizontal position in user space (before the graphics transform)
-    /// - `y`: vertical position in user space
-    ///
-    /// #### Returns
-    ///
-    /// the color at that point
-    int getColor(double x, double y);
+/// One image of PIL's `_cn1image` module: `w` by `h` pixels of `bands`
+/// interleaved bytes (1 for "L", 2 for "LA", 3 for "RGB", 4 for "RGBA").
+/// It is what a [PyImageEngine] receives and returns.
+public final class PyImageData {
+    /// Width in pixels.
+    public final int w;
+    /// Height in pixels.
+    public final int h;
+    /// Bytes per pixel.
+    public final int bands;
+    /// The pixels, row by row, `w * h * bands` bytes.
+    public final byte[] d;
+
+    /// A zero-filled image.
+    public PyImageData(int w, int h, int bands) {
+        this.w = w;
+        this.h = h;
+        this.bands = bands;
+        this.d = new byte[w * h * bands];
+    }
 }

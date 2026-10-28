@@ -260,9 +260,10 @@ Pillow's notice:
 Aileron (font)
 ================================================================================
 
-CodenameOne/src/com/codename1/image/DefaultFontData.java embeds Aileron
+vm/backend/src/com/codename1/backend/image/DefaultFontData.java embeds Aileron
 Regular by Sora Sagano (https://dotcolon.net/fonts/aileron), the subset
 Pillow embeds for ImageFont.load_default(). It is the default font of
-com.codename1.image.TrueTypeFont and of the Python runtime's PIL.ImageFont.
+com.codename1.backend.image.TrueTypeFont, the backend's image API, and
+of PIL.ImageFont in a Python server build.
 Aileron is dedicated to the public domain under CC0 1.0 Universal; the legal
-code is kept in CodenameOne/third-party/aileron/LICENSE.txt.
+code is kept in maven/backend/third-party/aileron/LICENSE.txt.

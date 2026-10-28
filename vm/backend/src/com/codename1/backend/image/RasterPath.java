@@ -20,7 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.image;
+package com.codename1.backend.image;
 
 /// A shape made of straight lines and quadratic and cubic Bezier curves, for
 /// [RasterGraphics#fill(RasterPath)] and [RasterGraphics#draw(RasterPath)].
@@ -32,7 +32,6 @@ package com.codename1.image;
 /// The static factories build the common shapes. Angles are in degrees,
 /// counterclockwise from three o'clock, as on screen with `y` pointing down
 /// (so a positive extent turns toward the top).
-@com.codename1.impl.SharedWithBackend
 public final class RasterPath {
     static final byte MOVE = 0;
     static final byte LINE = 1;

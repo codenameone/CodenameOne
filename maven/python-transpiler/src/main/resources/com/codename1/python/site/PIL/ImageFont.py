@@ -36,11 +36,13 @@
 #
 """PIL fonts: Pillow's built-in bitmap font and scalable TrueType fonts.
 
-`truetype()` reads a TrueType font (a `.ttf`, an `.otf` with TrueType
-outlines, or a face of a `.ttc`) with Codename One's pure-Java font engine,
-`com.codename1.image.TrueTypeFont`. `load_default()` returns Aileron Regular,
-the scalable font a Pillow with FreeType returns, embedded in that engine;
-`load_default_imagefont()` returns the bitmap font.
+On a server `truetype()` reads a TrueType font (a `.ttf`, an `.otf` with
+TrueType outlines, or a face of a `.ttc`) with the backend's pure-Java font
+engine, `com.codename1.backend.image.TrueTypeFont`, and `load_default()`
+returns Aileron Regular, the scalable font a Pillow with FreeType returns.
+On a device both answer the platform's native font at the requested size,
+drawn by Codename One, so text is close to Pillow's but not pixel exact.
+`load_default_imagefont()` returns the bitmap font everywhere.
 
 Layout is Pillow's basic layout (`Layout.BASIC`) whatever `layout_engine`
 asks for: one glyph per character, advances rounded to whole pixels, kerning
@@ -135,6 +137,9 @@ def _text(text):
     return text
 
 
+_DEFAULT = object()
+
+
 class FreeTypeFont:
     """A scalable TrueType font at one size."""
 
@@ -146,6 +151,9 @@ class FreeTypeFont:
         self.index = index
         self.encoding = encoding
         self.layout_engine = Layout.BASIC
+        if font is _DEFAULT:
+            self.font = _cn1image.ft_default(float(size))
+            return
         if isinstance(font, (str, bytes)) or hasattr(font, "__fspath__"):
             with open(font, "rb") as f:
                 data = f.read()
@@ -209,7 +217,10 @@ class FreeTypeFont:
 def load_default(size=None):
     """Aileron Regular at `size` pixels (10 by default), as a Pillow with
     FreeType returns it."""
-    return FreeTypeFont(io.BytesIO(_cn1image.ft_default_data()), 10 if size is None else size)
+    data = _cn1image.ft_default_data()
+    size = 10 if size is None else size
+    # a device has no font file: the native font stands in for Aileron
+    return FreeTypeFont(_DEFAULT if data is None else io.BytesIO(data), size)
 
 
 def truetype(font=None, size=10, index=0, encoding="", layout_engine=None):

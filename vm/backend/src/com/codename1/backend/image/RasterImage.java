@@ -20,7 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.image;
+package com.codename1.backend.image;
 
 /// A mutable image held in memory as 32-bit ARGB pixels.
 ///
@@ -33,7 +33,6 @@ package com.codename1.image;
 /// server alike. Draw into it with [RasterGraphics], read and write files with
 /// [PngCodec] and [JpegCodec], and hand the pixels to the UI with
 /// `Image.createImage(raster.getPixels(), w, h)` when you need one.
-@com.codename1.impl.SharedWithBackend
 public final class RasterImage {
     private final int width;
     private final int height;

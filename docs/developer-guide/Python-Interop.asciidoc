@@ -203,16 +203,19 @@ the real package:
   long and wide frames are shortened. Date indexes, `MultiIndex`, pivot tables, categoricals
   and rolling windows aren't supported.
 | `Pillow` | `PIL.Image` in the `RGB`, `RGBA`, `L`, `LA`, `P` and `1` modes: conversion,
-  cropping, resizing, rotation, pasting, channels and point operations,
-  computed as Pillow computes them. PNG and JPEG are read and written on
-  every platform, servers included, by Codename One's `com.codename1.image`
-  package; GIF, BMP and WebP go through the platform's image support and need
-  the application's display. `ImageDraw` draws points, lines, rectangles,
-  ellipses, polygons and text. `ImageFont.truetype` loads TrueType fonts and
-  `ImageFont.load_default()` returns the scalable Aileron font, as in Pillow.
-  Text is laid out as Pillow's basic layout does, without hinting, so at small
-  sizes a glyph can sit a pixel away from where Pillow puts it. Every resizing
-  filter, `LANCZOS` and `BICUBIC` included, gives Pillow's pixels.
+  cropping, rotation, pasting, channels and point operations, computed as
+  Pillow computes them. `ImageDraw` draws points, lines, rectangles, ellipses,
+  polygons and text. On a server, decoding and encoding PNG and JPEG,
+  resizing and text use the backend's `com.codename1.backend.image` package
+  and give Pillow's exact pixels: every resizing filter, `LANCZOS` and
+  `BICUBIC` included, matches Pillow, `ImageFont.truetype` loads TrueType
+  fonts and `ImageFont.load_default()` returns the scalable Aileron font.
+  Text follows Pillow's basic layout without hinting, so at small sizes a
+  glyph can sit a pixel away from where Pillow puts it. On a device,
+  decoding, encoding, resizing and text go through Codename One's image
+  support (`Image`, `ImageIO`, `Graphics` and the native font), which also
+  reads GIF, BMP and WebP. Those results are drawn by the platform, so they
+  look right but aren't Pillow's exact pixels.
 | `flask`, `fastapi`, `uvicorn` | See <<python-backends,Python backends>>.
 | `typing_extensions`, `six`, `tabulate`, `idna`, `packaging` |
 |===

@@ -70,7 +70,7 @@ def stream():
 @app.route("/badge.<fmt>")
 def badge(fmt):
     """A PNG or JPEG drawn on the server: shapes, then text in the embedded
-    TrueType font (com.codename1.image underneath)."""
+    TrueType font (com.codename1.backend.image underneath)."""
     import io
     from PIL import Image, ImageDraw, ImageFont
     who = request.args.get("who", "todo")

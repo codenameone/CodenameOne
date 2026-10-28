@@ -256,6 +256,8 @@ class Image:
         return self._new(_cn1image.crop(self._im, x0, y0, x1, y1), (x1 - x0, y1 - y0))
 
     def resize(self, size, resample=None, box=None, reducing_gap=None):
+        # Server builds resample with Pillow's own convolution, byte for byte;
+        # on a device every filter but NEAREST is the platform's scaling.
         w, h = int(size[0]), int(size[1])
         if box is None:
             box = (0, 0) + self._size
@@ -494,6 +496,12 @@ def open(fp, mode="r", formats=None):
             data = f.read()
     else:
         data = fp.read()
+    if data[:8] == _PNG_SIG and not _cn1image.exact():
+        # A device decodes through the platform, then takes the file's mode
+        mode = {0: "L", 2: "RGB", 3: "RGBA", 4: "LA", 6: "RGBA"}.get(data[25], "RGBA")
+        im = _native_decode(data).convert(mode)
+        im.format = "PNG"
+        return im
     if data[:8] == _PNG_SIG:
         im = _png_decode(data)
         im.format = "PNG"
@@ -513,10 +521,9 @@ def open(fp, mode="r", formats=None):
         kind = "WEBP"
     if kind is None:
         raise UnidentifiedImageError("cannot identify image file %r" % (fp if isinstance(fp, str) else fp,))
-    if not _cn1image.native_available():
-        raise OSError(kind + " needs a running Codename One display to decode; only PNG and JPEG are built in")
-    handle = _cn1image.native_decode(data)
-    im = _wrap("RGBA", _cn1image.size(handle), handle)
+    if _cn1image.exact():
+        raise OSError(kind + " is not decoded on a server; only PNG and JPEG are")
+    im = _native_decode(data)
     im.format = kind
     if kind == "BMP":
         im = im.convert("RGB")
@@ -524,15 +531,24 @@ def open(fp, mode="r", formats=None):
     return im
 
 
-def _native_encode(im, format, quality):
+def _native_decode(data):
     if not _cn1image.native_available():
-        raise OSError(format + " needs a running Codename One display to encode; only PNG and JPEG are built in")
+        raise OSError("decoding an image on a device needs a running Codename One display")
+    handle = _cn1image.native_decode(data)
+    return _wrap("RGBA", _cn1image.size(handle), handle)
+
+
+def _native_encode(im, format, quality):
+    if _cn1image.exact():
+        raise OSError(format + " is not encoded on a server; only PNG and JPEG are")
+    if not _cn1image.native_available():
+        raise OSError(format + " needs a running Codename One display to encode")
     return _cn1image.native_encode(im._im, format.lower(), quality / 100.0)
 
 
 def _jpeg_encode(im, quality):
-    # The shared pure-Java codec (com.codename1.image.JpegCodec): baseline,
-    # libjpeg's quality scaling, so it works on servers as well as devices.
+    # On a server the backend's JpegCodec (baseline, libjpeg's quality
+    # scaling); on a device the platform's encoder.
     if im.mode == "1":
         im = im.convert("L")
     if im.mode not in ("L", "RGB"):
