@@ -101,6 +101,13 @@ public final class ClassPathReader implements AutoCloseable {
     private final Map<String, ClassInfo> cache = new HashMap<String, ClassInfo>();
     private FileSystem jrt;
     private ZipFile rtJar;
+    private ZipFile ctSym;
+    /// `java/lang/Math.class` to its Java 17 entry in `ct.sym`.
+    private Map<String, ZipEntry> release17;
+
+    /// The release the generated Java is compiled for (`javac --release
+    /// 17`), as `ct.sym` spells releases: one base-36 digit each.
+    private static final char RELEASE = Character.toUpperCase(Character.forDigit(17, 36));
 
     public ClassPathReader(List<File> classPath) throws IOException {
         for (File f : classPath) {
@@ -162,15 +169,34 @@ public final class ClassPathReader implements AutoCloseable {
         return null;
     }
 
-    /// A JDK class: from the module image on JDK 9 and newer, from `rt.jar`
-    /// on JDK 8.
+    /// A JDK class, as Java 17 declares it. The generated Java is compiled
+    /// with `--release 17`, which checks it against the JDK's own record of
+    /// each release's API (`lib/ct.sym`); a member read from a newer
+    /// running JDK instead (`Math.TAU`, from 19) would be bridged and then
+    /// fail to compile. Without `ct.sym`, from the module image on JDK 9 and
+    /// newer and from `rt.jar` on JDK 8.
     private byte[] jdkClass(String path) throws IOException {
         if (jrt == null && rtJar == null) {
-            File rt = new File(System.getProperty("java.home"), "lib/rt.jar");
+            File home = new File(System.getProperty("java.home"));
+            File rt = new File(home, "lib/rt.jar");
+            File ct = new File(home, "lib/ct.sym");
             if (rt.isFile()) {
                 rtJar = new ZipFile(rt);
             } else {
                 jrt = FileSystems.getFileSystem(URI.create("jrt:/"));
+                if (ct.isFile()) {
+                    ctSym = new ZipFile(ct);
+                    release17 = indexRelease(ctSym);
+                }
+            }
+        }
+        if (release17 != null && !release17.isEmpty()) {
+            ZipEntry e = release17.get(path);
+            if (e == null) {
+                return null;
+            }
+            try (InputStream in = ctSym.getInputStream(e)) {
+                return readAll(in);
             }
         }
         if (rtJar != null) {
@@ -184,6 +210,26 @@ public final class ClassPathReader implements AutoCloseable {
         }
         Path p = jrt.getPath("modules", "java.base", path);
         return Files.isRegularFile(p) ? Files.readAllBytes(p) : null;
+    }
+
+    /// The `java.base` classes of Java 17 in `ct.sym`, whose entries are
+    /// `<releases>/java.base/java/lang/Math.sig`: the directory names every
+    /// release that class file holds for.
+    private static Map<String, ZipEntry> indexRelease(ZipFile ct) {
+        Map<String, ZipEntry> out = new HashMap<String, ZipEntry>();
+        java.util.Enumeration<? extends ZipEntry> en = ct.entries();
+        String module = "/java.base/";
+        while (en.hasMoreElements()) {
+            ZipEntry e = en.nextElement();
+            String n = e.getName();
+            int slash = n.indexOf('/');
+            if (slash < 0 || !n.endsWith(".sig") || !n.startsWith(module, slash)
+                    || n.substring(0, slash).indexOf(RELEASE) < 0) {
+                continue;
+            }
+            out.put(n.substring(slash + module.length(), n.length() - 4) + ".class", e);
+        }
+        return out;
     }
 
     private static byte[] readAll(InputStream in) throws IOException {
@@ -274,6 +320,9 @@ public final class ClassPathReader implements AutoCloseable {
         }
         if (rtJar != null) {
             rtJar.close();
+        }
+        if (ctSym != null) {
+            ctSym.close();
         }
     }
 }

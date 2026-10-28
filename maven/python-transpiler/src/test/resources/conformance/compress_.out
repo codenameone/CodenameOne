@@ -1,0 +1,37 @@
+True True True True True
+level 0 True 78 True
+level 1 True 78 True
+level 6 True 78 True
+level 9 True 78 True
+level -1 True 78 True
+0x6f087e52 0x5fe8e499 1821799577 1 0
+dict True True
+stream True True
+max_length 100 True False
+rest True True b'extra'
+error Error -3 while decompressing data: incorrect header check
+error Error -5 while decompressing data: incomplete or truncated stream
+15 9 8
+gzip True 1f8b08000000000002ff 1f8b08000500000004ff True
+members True
+text ['line one\n', 'line two\n']
+binary b'line' b' one\nline two\n'
+header 1f8b0808 b'f.txt\x00'
+fileobj 1f8b08000000000002ff b'abcdef'
+bad Not a gzipped file (b'pl')
+eof Compressed file ended before the end-of-stream marker was reached
+['a.txt', 'dir/b.bin'] [(2020, 1, 2, 3, 4, 6), (2021, 5, 6, 7, 8, 10)] [0, 0]
+True True None
+600 0x6f087e52 False
+b'\x00\x01\x02'
+KeyError "There is no item named 'missing' in the archive"
+is_zipfile True False
+['x.txt', 'stored.bin', 'w.txt', 'empty/', 'nested/f.gz', 'appended.txt'] b'a comment'
+True b'written through open' b'more' True
+[('x.txt', 8, False), ('stored.bin', 0, False), ('w.txt', 8, False), ('empty/', 0, True), ('nested/f.gz', 8, False), ('appended.txt', 0, False)]
+(2022, 2, 3, 4, 5, 6) 2
+['appended.txt', 'empty', 'nested', 'stored.bin', 'w.txt', 'x.txt'] ['f.gz'] True
+['appended.txt', 'empty', 'nested', 'stored.bin', 'w.txt', 'x.txt'] written through open True
+written through open
+BadZipFile File is not a zip file
+NotImplementedError That compression method is not supported

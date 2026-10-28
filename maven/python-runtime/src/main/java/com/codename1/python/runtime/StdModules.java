@@ -78,6 +78,14 @@ public final class StdModules {
             PyModule.registerModule(thread());
             return true;
         }
+        if ("_cn1zlib".equals(name)) {
+            PyModule.registerModule(PyZlib.module());
+            return true;
+        }
+        if ("_cn1tz".equals(name)) {
+            PyModule.registerModule(tz());
+            return true;
+        }
         if ("_cn1sql".equals(name)) {
             PyModule.registerModule(sql());
             return true;
@@ -237,13 +245,36 @@ public final class StdModules {
     /// Seconds east of UTC of the device's zone at instant `t` (seconds
     /// since the epoch), daylight saving included.
     private static int utcOffset(double t) {
-        java.util.TimeZone z = java.util.TimeZone.getDefault();
+        return utcOffset(java.util.TimeZone.getDefault(), t);
+    }
+
+    /// The offset of `z` from UTC, in seconds, at the instant `t` (seconds
+    /// since the epoch): the local wall time the calendar shows for that
+    /// instant, read as if it were UTC, less the instant. Handing those
+    /// local fields to `getOffset(era, ...)` instead -- the only offset
+    /// query every device class library has -- reads them as local
+    /// *standard* time, which names the wrong offset for the hour that
+    /// repeats when daylight time ends.
+    static int utcOffset(java.util.TimeZone z, double t) {
+        long ms = (long) Math.floor(t * 1000);
         java.util.Calendar c = java.util.Calendar.getInstance(z);
-        c.setTime(new java.util.Date((long) Math.floor(t * 1000)));
-        int ms = ((c.get(java.util.Calendar.HOUR_OF_DAY) * 60 + c.get(java.util.Calendar.MINUTE)) * 60
-                + c.get(java.util.Calendar.SECOND)) * 1000 + c.get(java.util.Calendar.MILLISECOND);
-        return z.getOffset(1, c.get(java.util.Calendar.YEAR), c.get(java.util.Calendar.MONTH),
-                c.get(java.util.Calendar.DAY_OF_MONTH), c.get(java.util.Calendar.DAY_OF_WEEK), ms) / 1000;
+        c.setTime(new java.util.Date(ms));
+        long days = daysFromCivil(c.get(java.util.Calendar.YEAR), c.get(java.util.Calendar.MONTH) + 1,
+                c.get(java.util.Calendar.DAY_OF_MONTH));
+        long wall = ((days * 24 + c.get(java.util.Calendar.HOUR_OF_DAY)) * 60 + c.get(java.util.Calendar.MINUTE)) * 60
+                + c.get(java.util.Calendar.SECOND);
+        long secs = ms >= 0 ? ms / 1000 : -((999 - ms) / 1000);
+        return (int) (wall - secs);
+    }
+
+    /// Days from 1970-01-01 to the proleptic Gregorian date `y-m-d`.
+    private static long daysFromCivil(long y, int m, int d) {
+        long yy = m <= 2 ? y - 1 : y;
+        long era = (yy >= 0 ? yy : yy - 399) / 400;
+        long yoe = yy - era * 400;
+        long doy = (153L * (m + (m > 2 ? -3 : 9)) + 2) / 5 + d - 1;
+        long doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+        return era * 146097 + doe - 719468;
     }
 
     private interface FsOp {
@@ -445,6 +476,32 @@ public final class StdModules {
             return Py.str((String) v);
         }
         return v;
+    }
+
+    /// `_cn1tz`: `offset(key, t)` answers the zone's offset from UTC in
+    /// seconds at the instant `t`, `raw(key)` its standard offset,
+    /// `known(key)` whether the platform knows the zone (an unknown ID
+    /// resolves to GMT), and `available()` the IDs the platform lists.
+    private static PyModule tz() {
+        PyModule m = new PyModule("_cn1tz", new String[0]);
+        m.setAttr("offset", PyBuiltin.positional("offset", a ->
+                PyInt.of(utcOffset(java.util.TimeZone.getTimeZone(Py.toStr(a[0])), Py.asDouble(a[1])))));
+        m.setAttr("raw", PyBuiltin.positional("raw", a ->
+                PyInt.of(java.util.TimeZone.getTimeZone(Py.toStr(a[0])).getRawOffset() / 1000)));
+        m.setAttr("known", PyBuiltin.positional("known", a -> {
+            String key = Py.toStr(a[0]);
+            String id = java.util.TimeZone.getTimeZone(key).getID();
+            return Py.bool(id != null && (id.equals(key) || !"GMT".equals(id)));
+        }));
+        m.setAttr("available", PyBuiltin.positional("available", a -> {
+            String[] ids = java.util.TimeZone.getAvailableIDs();
+            Object[] out = new Object[ids.length];
+            for (int i = 0; i < ids.length; i++) {
+                out[i] = Py.str(ids[i]);
+            }
+            return new PyList(out);
+        }));
+        return m;
     }
 
     private static final java.util.Map<Thread, Long> THREAD_IDS = new java.util.HashMap<Thread, Long>();

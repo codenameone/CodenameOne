@@ -557,7 +557,11 @@ class TextIOWrapper(TextIOBase):
             if newline is None:
                 text = text.replace("\r\n", "\n").replace("\r", "\n")
         self._t = _Buffer(text, "")
-        if getattr(buffer, "raw", None) is not None and getattr(buffer.raw, "_append", False):
+        # Over this module's own files the text is written back through the
+        # file's buffer; over any other binary stream (a GzipFile, a socket
+        # file) only what was added since the last flush is written to it.
+        self._native = isinstance(buffer, _BufferedFile)
+        if self._native and getattr(buffer.raw, "_append", False):
             self._t._pos = self._t.size()
             self._base = self._t.size()
         else:
@@ -609,7 +613,7 @@ class TextIOWrapper(TextIOBase):
             raise UnsupportedOperation("not writable")
         if not isinstance(s, str):
             raise TypeError("write() argument must be str, not " + type(s).__name__)
-        if getattr(self.buffer.raw, "_append", False):
+        if not self._native or getattr(self.buffer.raw, "_append", False):
             self._t._pos = self._t.size()
         self._dirty = True
         n = self._t.write(s, lambda k: "\0" * k)
@@ -641,6 +645,11 @@ class TextIOWrapper(TextIOBase):
             nl = self._newline
             if nl is not None and nl not in ("", "\n"):
                 text = text.replace("\n", nl)
+            if not self._native:
+                self.buffer.write(text[self._base:].encode(self.encoding, self.errors))
+                self._base = len(text)
+                self._dirty = False
+                return
             raw = self.buffer.raw
             if getattr(raw, "_append", False):
                 data = text[self._base:].encode(self.encoding, self.errors)
