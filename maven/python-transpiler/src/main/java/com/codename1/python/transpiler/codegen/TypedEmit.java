@@ -1613,6 +1613,11 @@ final class TypedEmit {
                     v = spillTo(v, b, ind);
                 }
                 indent(b, ind);
+                String k = l.t.k == Ty.K.LIST ? null : intKey(i);
+                if (k != null) {
+                    b.append("Typed.dset(").append(box(l)).append(", ").append(k).append(", ").append(box(v)).append(");\n");
+                    return;
+                }
                 b.append("Py.setitem(").append(box(l)).append(", ").append(box(i)).append(", ").append(box(v))
                         .append(");\n");
                 return;
@@ -3562,6 +3567,11 @@ final class TypedEmit {
                 return listMethod(r, a.attr, args);
             }
             if (r.t.k != Ty.K.INST) {
+                String k = "get".equals(a.attr) && args.size() == 1 && c.keywords.isEmpty() ? intKey(args.get(0)) : null;
+                if (k != null) {
+                    // A plain dict looks an int key up without boxing it.
+                    return new E("Typed.dget(" + em.attrSite(a.attr) + ", " + box(r) + ", " + k + ")", Ty.DYN);
+                }
                 return siteCall(r, a.attr, args);
             }
             List<FunctionDef> cand = in.candidates(r.t.cls, a.attr);
@@ -3598,6 +3608,12 @@ final class TypedEmit {
             return result(f, recv + ".tv_" + Emitter.mangle(a.attr) + "_" + args.size() + "(" + al + ")");
         }
         throw new Unsupported("call");
+    }
+
+    /// `x` as a Java `long` when it is an int at hand as one, cheap and free
+    /// of effects (see `E.lc`); or null.
+    private static String intKey(E x) {
+        return x.t.k == Ty.K.INT && !x.t.opt && x.pk == null && x.lc != null && (plain(x.lc) || literal(x.lc)) ? x.lc : null;
     }
 
     /// `r.attr(args)` as the generic code calls a method: through an inline

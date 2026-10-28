@@ -460,8 +460,30 @@ public final class Typed {
 
     /// `len(o)` where `f` is what the name `len` holds, for typed code,
     /// which takes the result to be an int as the builtin's is.
+    /// `m.get(k)` for an int key: a dict answers without the call or a
+    /// boxed key; anything else goes through `site`.
+    public static Object dget(AttrSite site, Object m, long k) {
+        if (m instanceof PyDict) {
+            Object v = ((PyDict) m).getLong(k);
+            return v != null ? v : Py.NONE;
+        }
+        return site.call1(m, Long.valueOf(k));
+    }
+
+    /// `m[k] = v` for an int key.
+    public static void dset(Object m, long k, Object v) {
+        if (m instanceof PyDict) {
+            ((PyDict) m).setLong(k, v);
+            return;
+        }
+        Py.setitem(m, Long.valueOf(k), v);
+    }
+
     public static long len(Object f, Object o) {
         if (f == Builtins.LEN) { //NOPMD CompareObjectsWithEquals - identity is meant
+            if (o instanceof PyDict) {
+                return ((PyDict) o).size;
+            }
             return Py.len(o);
         }
         Object r = Py.call(f, o);

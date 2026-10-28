@@ -630,6 +630,11 @@ public class PyInstance extends PyObject {
         }
 
         @Override
+        void setLong(long k, Object value) {
+            setItem(Long.valueOf(k), value);
+        }
+
+        @Override
         public void delItem(Object key) {
             super.delItem(key);
             self.delAttrDirect(Py.toStr(key));

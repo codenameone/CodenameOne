@@ -158,6 +158,62 @@ public class PyDict extends PyObject {
         return r;
     }
 
+    /// The slot of int key `k` (hash `h`), as `find` answers; the key is
+    /// compared without being boxed.
+    private int findLong(long k, long h) {
+        int mask = index.length - 1;
+        int i = (int) (h & mask);
+        long perturb = h & Long.MAX_VALUE;
+        int freeSlot = -1;
+        while (true) {
+            int e = index[i];
+            if (e == EMPTY) {
+                return -1 - (freeSlot >= 0 ? freeSlot : i);
+            }
+            if (e == DUMMY) {
+                if (freeSlot < 0) {
+                    freeSlot = i;
+                }
+            } else if (hashes[e] == h) {
+                Object x = keys[e];
+                if (x instanceof Long ? ((Long) x).longValue() == k : keyEq(x, h, Long.valueOf(k), h)) {
+                    return i;
+                }
+            }
+            perturb >>>= 5;
+            i = (int) ((i * 5L + perturb + 1) & mask);
+        }
+    }
+
+    /// `self.get(k)` for an int key, or `null` when absent.
+    Object getLong(long k) {
+        int s = findLong(k, Hashing.ofLong(k));
+        return s >= 0 ? values[index[s]] : null;
+    }
+
+    /// `self[k] = value` for an int key; the key is boxed only when it is new.
+    void setLong(long k, Object value) {
+        long h = Hashing.ofLong(k);
+        int s = findLong(k, h);
+        if (s >= 0) {
+            values[index[s]] = value;
+            return;
+        }
+        if (used == keys.length) {
+            grow();
+            s = findLong(k, h);
+        }
+        index[-1 - s] = used;
+        keys[used] = Long.valueOf(k);
+        values[used] = value;
+        hashes[used] = h;
+        used++;
+        size++;
+        if (used * 3 >= index.length * 2) {
+            rebuild(index.length * 2);
+        }
+    }
+
     /// `self[key]`, or `null` when absent.
     public Object getOrNull(Object key) {
         int s = find(key, Py.keyHash(key, "a dict key"));
@@ -298,10 +354,8 @@ public class PyDict extends PyObject {
             // capacity as Java's HashMap does: refilling it would otherwise
             // regrow it from eight entries, a dozen arrays of garbage each
             // time.
-            for (int i = 0; i < used; i++) {
-                keys[i] = null;
-                values[i] = null;
-            }
+            nullOut(keys, used);
+            nullOut(values, used);
             int[] ix = index;
             for (int i = 0; i < ix.length; i++) {
                 ix[i] = EMPTY;
@@ -314,6 +368,16 @@ public class PyDict extends PyObject {
         }
         used = 0;
         size = 0;
+    }
+
+    private static final Object[] NULLS = new Object[256];
+
+    /// Nulls the first `n` slots of `a` in bulk copies: one store per slot
+    /// would pass each through the collector's write barrier.
+    private static void nullOut(Object[] a, int n) {
+        for (int i = 0; i < n; i += NULLS.length) {
+            System.arraycopy(NULLS, 0, a, i, Math.min(NULLS.length, n - i));
+        }
     }
 
     /// The largest entry capacity `clear` keeps.

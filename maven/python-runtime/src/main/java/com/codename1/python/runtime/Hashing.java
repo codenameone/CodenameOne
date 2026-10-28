@@ -48,6 +48,9 @@ final class Hashing {
     }
 
     static long ofLong(long v) {
+        if (v >= 0 && v < MODULUS) {
+            return v;
+        }
         if (v >= 0) {
             return fix(v % MODULUS);
         }
