@@ -91,6 +91,16 @@ final class IntRanges {
                     hi == null || o.hi == null ? null : hi.max(o.hi));
         }
 
+        @Override
+        public String toString() {
+            return "[" + lo + ".." + hi + "]";
+        }
+
+        boolean within(Iv o) {
+            return (o.lo == null || lo != null && lo.compareTo(o.lo) >= 0)
+                    && (o.hi == null || hi != null && hi.compareTo(o.hi) <= 0);
+        }
+
         boolean same(Iv o) {
             return o != null && eq(lo, o.lo) && eq(hi, o.hi);
         }
@@ -120,7 +130,18 @@ final class IntRanges {
     /// when `sites` is not null, it receives the interval of every argument
     /// of every direct call of a module function the analysis follows.
     IntRanges(Infer in, Infer.Fn fn, Map<String, Iv> params, Map<Call, Iv[]> sites) {
+        this(in, fn, params, sites, null, null);
+    }
+
+    /// As above, with the long-parameter versions of module functions
+    /// known: a call whose arguments are within `longParams` of its callee
+    /// calls that version, and returns within `longRets` of it when that
+    /// has an entry.
+    IntRanges(Infer in, Infer.Fn fn, Map<String, Iv> params, Map<Call, Iv[]> sites,
+            Map<Infer.Fn, Iv[]> longParams, Map<Infer.Fn, Iv> longRets) {
         this.in = in;
+        this.longParams = longParams;
+        this.longRets = longRets;
         this.fn = fn;
         this.sc = fn.def.scope;
         this.sites = sites;
@@ -143,6 +164,65 @@ final class IntRanges {
 
     /// Where call arguments are recorded, or null.
     private final Map<Call, Iv[]> sites;
+    private final Map<Infer.Fn, Iv[]> longParams;
+    private final Map<Infer.Fn, Iv> longRets;
+    /// Every int the function returns; null when it never returns one.
+    private Iv returned;
+    private boolean returnsOther;
+
+    /// What the function returns, when it returns only ints the analysis
+    /// bounds; else null.
+    Iv returns() {
+        return returnsOther ? null : returned;
+    }
+
+    /// The arguments of a call of `g` as the intervals its long version
+    /// takes (null for a parameter that is not an int), or null when an
+    /// int argument may not fit a long or `g` takes no int.
+    static Iv[] longArgs(Infer.Fn g, Iv[] args) {
+        if (args == null || args.length != g.names.size()) {
+            return null;
+        }
+        Iv[] r = new Iv[args.length];
+        boolean any = false;
+        for (int i = 0; i < args.length; i++) {
+            if (g.params[i].k == Ty.K.INT && !g.params[i].opt) {
+                if (!args[i].fitsLong()) {
+                    return null;
+                }
+                r[i] = args[i];
+                any = true;
+            }
+        }
+        return any ? r : null;
+    }
+
+    /// Whether `a` has an interval, and every one fits a long.
+    static boolean fitAll(Iv[] a) {
+        boolean any = false;
+        for (Iv v : a) {
+            if (v != null) {
+                if (!v.fitsLong()) {
+                    return false;
+                }
+                any = true;
+            }
+        }
+        return any;
+    }
+
+    /// Whether every interval of `a` is within the same one of `s`.
+    static boolean within(Iv[] a, Iv[] s) {
+        if (a == null || s == null || a.length != s.length) {
+            return false;
+        }
+        for (int i = 0; i < a.length; i++) {
+            if (a[i] == null ? s[i] != null : s[i] == null || !a[i].within(s[i])) {
+                return false;
+            }
+        }
+        return true;
+    }
 
     /// The locals held in a Java `long`.
     Set<String> longLocals() {
@@ -286,7 +366,17 @@ final class IntRanges {
             Map<String, Iv> out = loop(w.body, env, null, null, null, forever(w.test) ? null : w.test);
             return run(w.orelse, out, loop);
         }
-        if (s instanceof Return || s instanceof Raise) {
+        if (s instanceof Return) {
+            Expr v = ((Return) s).value;
+            if (v == null) {
+                returnsOther = true;
+            } else {
+                Iv r = eval(v, env);
+                returned = returned == null ? r : returned.join(r);
+            }
+            return null;
+        }
+        if (s instanceof Raise) {
             return null;
         }
         if (s instanceof Break) {
@@ -804,6 +894,21 @@ final class IntRanges {
             }
         }
         Infer.Fn f = inlinable(c);
+        if (f == null && longParams != null && bound.isEmpty() && c.func instanceof Name && c.keywords.isEmpty()
+                && sc.resolve(((Name) c.func).id) == Scope.Binding.GLOBAL) {
+            Infer.Fn g = in.globalFns.get(((Name) c.func).id);
+            Iv[] s = g == null ? null : longParams.get(g);
+            Iv r = s == null ? null : longRets.get(g);
+            if (r != null) {
+                Iv[] a = new Iv[c.args.size()];
+                for (int i = 0; i < a.length; i++) {
+                    a[i] = c.args.get(i) instanceof Starred ? Iv.TOP : eval(c.args.get(i), env);
+                }
+                if (within(longArgs(g, a), s)) {
+                    return r;
+                }
+            }
+        }
         if (f != null) {
             Map<String, Iv> b = new HashMap<String, Iv>();
             for (int i = 0; i < c.args.size(); i++) {

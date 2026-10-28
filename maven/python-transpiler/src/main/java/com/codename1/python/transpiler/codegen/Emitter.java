@@ -1358,6 +1358,11 @@ public final class Emitter {
                 indent(out, ind);
                 out.append("boolean ").append(ok).append(" = false;\n");
             }
+            // A typed call's result an exception left untaken (see
+            // Typed.take) is dropped where the exception is caught.
+            String tk = fresh("tk");
+            indent(out, ind);
+            out.append("final int ").append(tk).append(" = Typed.taken();\n");
             indent(out, ind);
             out.append("try {\n");
             block(t.body, out, ind + 1);
@@ -1369,6 +1374,8 @@ public final class Emitter {
             String pe = fresh("pe");
             indent(out, ind);
             out.append("} catch (Throwable ").append(th).append(") {\n");
+            indent(out, ind + 1);
+            out.append("Typed.untake(").append(tk).append(");\n");
             indent(out, ind + 1);
             out.append("final PyException ").append(pe).append(" = Py.convert(").append(th).append(");\n");
             handlers.add(pe);
@@ -1464,11 +1471,16 @@ public final class Emitter {
         }
         indent(out, ind);
         out.append("boolean ").append(ok).append(" = true;\n");
+        String tk = fresh("tk");
+        indent(out, ind);
+        out.append("final int ").append(tk).append(" = Typed.taken();\n");
         indent(out, ind);
         out.append("try {\n");
         withItems(w, i + 1, out, ind + 1);
         indent(out, ind);
         out.append("} catch (Throwable ").append(th).append(") {\n");
+        indent(out, ind + 1);
+        out.append("Typed.untake(").append(tk).append(");\n");
         indent(out, ind + 1);
         out.append(ok).append(" = false;\n");
         indent(out, ind + 1);

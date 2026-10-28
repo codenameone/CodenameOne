@@ -134,14 +134,40 @@ public final class Typed {
         return toLong(o);
     }
 
-    /// The int a typed function returned in place of its `long` result:
-    /// a big int, a bool, or a `Long.MIN_VALUE` (the marker itself).
-    private static final ThreadLocal<Object> RETURNED = new ThreadLocal<Object>();
+    /// The ints typed functions returned in place of their `long` results
+    /// (a big int, a bool, or a `Long.MIN_VALUE`, the marker itself), last
+    /// returned on top. A stack rather than one slot so a caller may hold a
+    /// result as its bare marker while it makes further calls, and take
+    /// the object only on the slow path, in a method of its own: a ParparVM
+    /// method with an object local pays for a stack frame on every call,
+    /// the fast path included. Each marker is taken exactly once, the last
+    /// first.
+    private static final class Returned {
+        Object[] items = new Object[8];
+        int size;
+    }
+
+    private static final ThreadLocal<Returned> RETURNED = new ThreadLocal<Returned>();
+
+    private static Returned returned() {
+        Returned r = RETURNED.get();
+        if (r == null) {
+            r = new Returned();
+            RETURNED.set(r);
+        }
+        return r;
+    }
 
     /// Returns int `o` from a typed function whose result is a `long`: the
     /// marker, with `o` left for the caller's `take`.
     public static long retBig(Object o) {
-        RETURNED.set(o);
+        Returned r = returned();
+        if (r.size == r.items.length) {
+            Object[] n = new Object[r.size * 2];
+            System.arraycopy(r.items, 0, n, 0, r.size);
+            r.items = n;
+        }
+        r.items[r.size++] = o;
         return Long.MIN_VALUE;
     }
 
@@ -156,11 +182,31 @@ public final class Typed {
         return retBig(o);
     }
 
-    /// The int behind a `Long.MIN_VALUE` a typed function returned.
+    /// The int behind the last `Long.MIN_VALUE` a typed function returned.
     public static Object take() {
-        Object o = RETURNED.get();
-        RETURNED.set(null);
+        Returned r = returned();
+        Object o = r.items[--r.size];
+        r.items[r.size] = null;
         return o;
+    }
+
+    /// How many results are waiting to be taken: kept at the start of a
+    /// `try`, for `untake`.
+    public static int taken() {
+        Returned r = RETURNED.get();
+        return r == null ? 0 : r.size;
+    }
+
+    /// Drops the results an exception left untaken, back to `mark`: one
+    /// raised between a call returning a marker and its caller taking it.
+    public static void untake(int mark) {
+        Returned r = RETURNED.get();
+        if (r == null) {
+            return;
+        }
+        while (r.size > mark) {
+            r.items[--r.size] = null;
+        }
     }
 
     /// A typed function's `long` result as an object.

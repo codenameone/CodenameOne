@@ -75,6 +75,11 @@ final class TypedEmit {
         /// bool). Both plain Java names; or both null.
         final String ll;
         final String bg;
+        /// An int held as the bare `long` a typed function returned: a
+        /// plain Java name whose `Long.MIN_VALUE` means the object is
+        /// waiting in `Typed.take`, which `c` takes. Only the consumers that
+        /// know to take it exactly once see one (see `pushed`); or null.
+        String pk;
 
         E(String c, Ty t) {
             this(c, t, null);
@@ -91,6 +96,14 @@ final class TypedEmit {
             this.ll = ll;
             this.bg = bg;
         }
+    }
+
+    /// The int a typed function returned as `long` `r`, left as it is
+    /// (see `E.pk`).
+    static E pushed(String r) {
+        E e = new E("Typed.unret(" + r + ")", Ty.INT);
+        e.pk = r;
+        return e;
     }
 
     /// An int pair `l`/`b` as an expression: the boxed value, built only
@@ -129,6 +142,19 @@ final class TypedEmit {
     /// put in a Java `long` (see `IntRanges`).
     private IntRanges ranges;
     private Set<String> longLocals = new HashSet<String>();
+    /// The module functions that also have a version taking their int
+    /// parameters as Java longs (`TL_`), and the interval each such
+    /// parameter is known to hold there; what that version returns, when
+    /// it is bounded. See `planLongParams`.
+    private Map<Infer.Fn, IntRanges.Iv[]> longParams = new HashMap<Infer.Fn, IntRanges.Iv[]>();
+    private Map<Infer.Fn, IntRanges.Iv> longRets = new HashMap<Infer.Fn, IntRanges.Iv>();
+    /// The expression a `return` of an int returns, which may lower to a
+    /// pushed result (see `E.pk`); and the call a hoisted leaf is, likewise.
+    private Expr pushTop;
+    private Expr pushLeaf;
+    private final Map<Infer.Fn, String> longBodies = new LinkedHashMap<Infer.Fn, String>();
+    /// The argument intervals of the calls the function being emitted makes.
+    private Map<Call, IntRanges.Iv[]> sites = new HashMap<Call, IntRanges.Iv[]>();
     /// The Java code of each parameter of the expression functions being
     /// inlined, innermost last, and whether it is the exact value (true) or
     /// only the value modulo 2^64.
@@ -413,6 +439,7 @@ final class TypedEmit {
                 }
             }
         }
+        planLongParams(ok);
         for (Set<String> g : gdeps.values()) {
             if (g != null) {
                 usedGroups.addAll(g);
@@ -442,6 +469,149 @@ final class TypedEmit {
         return r;
     }
 
+    /// Which typed module functions get a version taking their int
+    /// parameters as longs, and the interval of each: the union of the
+    /// arguments of every call whose int arguments all fit a long, found by
+    /// running the range analysis over every typed body to a fixpoint (a
+    /// recursive call's arguments depend on its own parameters). A call
+    /// whose arguments are within those intervals calls that version
+    /// directly, and the generic version starts with a test that sends
+    /// arguments within them there; a call outside them is unchanged.
+    /// `fib(n - 1)` under `if n < 2: return n` then runs on longs from the
+    /// first call down.
+    ///
+    /// What the long version returns is bounded the same way, when the
+    /// analysis bounds it, and that is only trusted once a round reproduces
+    /// both the intervals and the returns it assumed.
+    private void planLongParams(Set<Infer.Fn> ok) {
+        Map<Infer.Fn, IntRanges.Iv[]> seeds = new HashMap<Infer.Fn, IntRanges.Iv[]>();
+        Map<Infer.Fn, IntRanges.Iv> rets = new HashMap<Infer.Fn, IntRanges.Iv>();
+        boolean settled = false;
+        for (int round = 0; round < 12 && !settled; round++) {
+            Map<Infer.Fn, IntRanges.Iv[]> ns = new HashMap<Infer.Fn, IntRanges.Iv[]>();
+            Map<Infer.Fn, IntRanges.Iv> nr = new HashMap<Infer.Fn, IntRanges.Iv>();
+            for (Infer.Fn f : ok) {
+                // The generic and the long version's calls apart: one
+                // site's arguments differ between the two bodies.
+                Map<Call, IntRanges.Iv[]> st = new HashMap<Call, IntRanges.Iv[]>();
+                new IntRanges(in, f, null, st, seeds, rets);
+                List<Map.Entry<Call, IntRanges.Iv[]>> all = new ArrayList<Map.Entry<Call, IntRanges.Iv[]>>(st.entrySet());
+                if (seeds.containsKey(f)) {
+                    Map<Call, IntRanges.Iv[]> sl = new HashMap<Call, IntRanges.Iv[]>();
+                    IntRanges r = new IntRanges(in, f, seeds(f, seeds.get(f)), sl, seeds, rets);
+                    all.addAll(sl.entrySet());
+                    IntRanges.Iv v = f.ret.k == Ty.K.INT && !f.ret.opt ? r.returns() : null;
+                    if (v != null && v.fitsLong()) {
+                        nr.put(f, v);
+                    }
+                }
+                for (Map.Entry<Call, IntRanges.Iv[]> e : all) {
+                    Infer.Fn g = in.globalFns.get(((Name) e.getKey().func).id);
+                    IntRanges.Iv[] a = g == null || !ok.contains(g) || g.cls != null ? null
+                            : IntRanges.longArgs(g, e.getValue());
+                    if (a == null) {
+                        continue;
+                    }
+                    IntRanges.Iv[] o = ns.get(g);
+                    if (o != null) {
+                        for (int i = 0; i < a.length; i++) {
+                            a[i] = a[i] == null ? null : a[i].join(o[i]);
+                        }
+                    }
+                    ns.put(g, a);
+                }
+            }
+            if (round >= 3) {
+                // Out to the next threshold, so the rounds end.
+                for (Map.Entry<Infer.Fn, IntRanges.Iv[]> e : ns.entrySet()) {
+                    IntRanges.Iv[] o = seeds.get(e.getKey());
+                    IntRanges.Iv[] a = e.getValue();
+                    for (int i = 0; o != null && i < a.length; i++) {
+                        a[i] = a[i] == null ? null : IntRanges.widen(o[i], a[i]);
+                    }
+                }
+                ns.values().removeIf(a -> !IntRanges.fitAll(a));
+            }
+            settled = sameSeeds(ns, seeds) && sameRets(nr, rets);
+            seeds = ns;
+            rets = nr;
+        }
+        if (!settled) {
+            // The intervals are sound whatever they are (every call is
+            // tested against them); the returns are not.
+            rets = new HashMap<Infer.Fn, IntRanges.Iv>();
+        }
+        while (!seeds.isEmpty()) {
+            longParams = seeds;
+            longRets = rets;
+            Infer.Fn failed;
+            try {
+                failed = emitLong(ok);
+            } catch (Unsupported u) {
+                // A typed body that only failed beside the long versions:
+                // without them, it is what it was.
+                seeds.clear();
+                break;
+            }
+            if (failed == null) {
+                return;
+            }
+            seeds.remove(failed);
+            rets = new HashMap<Infer.Fn, IntRanges.Iv>();
+        }
+        longParams = seeds;
+        longRets = rets;
+        emitLong(ok);
+    }
+
+    /// Emits every typed body again against `longParams`, and the long
+    /// versions; the function whose long version could not be emitted, or
+    /// null.
+    private Infer.Fn emitLong(Set<Infer.Fn> ok) {
+        slow.setLength(0);
+        slowCount = 0;
+        longBodies.clear();
+        for (Infer.Fn f : longParams.keySet()) {
+            try {
+                longBodies.put(f, function(f, true));
+            } catch (Unsupported u) {
+                return f;
+            }
+        }
+        for (Infer.Fn f : ok) {
+            bodies.put(f, function(f));
+        }
+        return null;
+    }
+
+    private static boolean sameSeeds(Map<Infer.Fn, IntRanges.Iv[]> a, Map<Infer.Fn, IntRanges.Iv[]> b) {
+        if (!a.keySet().equals(b.keySet())) {
+            return false;
+        }
+        for (Map.Entry<Infer.Fn, IntRanges.Iv[]> e : a.entrySet()) {
+            IntRanges.Iv[] x = e.getValue();
+            IntRanges.Iv[] y = b.get(e.getKey());
+            for (int i = 0; i < x.length; i++) {
+                if (x[i] == null ? y[i] != null : !x[i].same(y[i])) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private static boolean sameRets(Map<Infer.Fn, IntRanges.Iv> a, Map<Infer.Fn, IntRanges.Iv> b) {
+        if (!a.keySet().equals(b.keySet())) {
+            return false;
+        }
+        for (Map.Entry<Infer.Fn, IntRanges.Iv> e : a.entrySet()) {
+            if (!e.getValue().same(b.get(e.getKey()))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private static boolean representable(Ty t) {
         switch (t.k) {
             case INT:
@@ -454,6 +624,10 @@ final class TypedEmit {
             default:
                 return false;
         }
+    }
+
+    private static String longName(Infer.Fn f) {
+        return "TL_" + Emitter.mangle(f.def.name);
     }
 
     private String typedName(Infer.Fn f) {
@@ -670,6 +844,22 @@ final class TypedEmit {
     }
 
     private String function(Infer.Fn f) {
+        return function(f, false);
+    }
+
+    /// The parameters of `f`'s long version, by name, at their intervals.
+    private static Map<String, IntRanges.Iv> seeds(Infer.Fn f, IntRanges.Iv[] iv) {
+        Map<String, IntRanges.Iv> m = new HashMap<String, IntRanges.Iv>();
+        for (int i = 0; i < iv.length; i++) {
+            if (iv[i] != null) {
+                m.put(f.names.get(i), iv[i]);
+            }
+        }
+        return m;
+    }
+
+    /// `f`'s typed body; with `asLong`, its long version (see `longParams`).
+    private String function(Infer.Fn f, boolean asLong) {
         cur = f;
         sc = f.def.scope;
         calls = new LinkedHashSet<Infer.Fn>();
@@ -678,10 +868,18 @@ final class TypedEmit {
         nonNull = new HashSet<String>();
         shadow = new HashMap<String, String>();
         codePoints.clear();
-        ranges = new IntRanges(in, f);
+        sites = new HashMap<Call, IntRanges.Iv[]>();
+        IntRanges.Iv[] lp = asLong ? longParams.get(f) : null;
+        ranges = new IntRanges(in, f, lp == null ? null : seeds(f, lp), sites, longParams, longRets);
         longLocals = ranges.longLocals();
-        // A parameter arrives as a pair, whatever its range.
-        longLocals.removeAll(f.names);
+        for (int i = 0; i < f.names.size(); i++) {
+            if (lp == null || lp[i] == null) {
+                // A parameter arrives as a pair, whatever its range.
+                longLocals.remove(f.names.get(i));
+            } else if (!longLocals.contains(f.names.get(i))) {
+                throw new Unsupported("long parameter " + f.names.get(i) + " outgrows a long");
+            }
+        }
         if (!f.def.scope.cells.isEmpty() || f.def.scope.hasYield || f.def.isAsync || !f.def.decorators.isEmpty()
                 || f.def.args.vararg != null || f.def.args.kwarg != null || !f.def.args.kwonly.isEmpty()) {
             throw new Unsupported("signature");
@@ -696,11 +894,15 @@ final class TypedEmit {
         recycled = ListRecycling.find(f.def.body, f.names, sc);
         scalars = findScalars(f);
         StringBuilder b = new StringBuilder();
-        b.append("    static ").append(retJ(f)).append(' ').append(typed.get(f)).append('(');
+        b.append("    static ").append(retJ(f)).append(' ').append(lp != null ? longName(f) : typed.get(f)).append('(');
         Set<String> declared = new HashSet<String>(f.names);
         StringBuilder norm = new StringBuilder();
         for (int i = 0; i < f.names.size(); i++) {
             String n = f.names.get(i);
+            if (lp != null && lp[i] != null) {
+                b.append(i == 0 ? "" : ", ").append("long ").append(var(n));
+                continue;
+            }
             b.append(i == 0 ? "" : ", ").append(param(f.params[i], var(n), big(n)));
             if (f.params[i].k == Ty.K.INT) {
                 // A caller holding only the object passes it whole.
@@ -710,6 +912,31 @@ final class TypedEmit {
             }
         }
         b.append(") {\n").append(norm);
+        IntRanges.Iv[] dl = asLong ? null : longParams.get(f);
+        if (dl != null) {
+            // Arguments the long version takes go there.
+            StringBuilder test = new StringBuilder();
+            StringBuilder pass = new StringBuilder();
+            for (int i = 0; i < dl.length; i++) {
+                String n = f.names.get(i);
+                pass.append(i == 0 ? "" : ", ").append(var(n));
+                if (dl[i] == null) {
+                    if (f.params[i].k == Ty.K.INT) {
+                        pass.append(", ").append(big(n));
+                    }
+                    continue;
+                }
+                test.append(test.length() == 0 ? "" : " && ").append(big(n)).append(" == null");
+                if (dl[i].lo.compareTo(IntRanges.LONG_MIN) > 0) {
+                    test.append(" && ").append(var(n)).append(" >= ").append(lit(dl[i].lo));
+                }
+                if (dl[i].hi.compareTo(IntRanges.LONG_MAX) < 0) {
+                    test.append(" && ").append(var(n)).append(" <= ").append(lit(dl[i].hi));
+                }
+            }
+            b.append("        if (").append(test).append(") {\n            return ").append(longName(f)).append('(')
+                    .append(pass).append(");\n        }\n");
+        }
         for (Map.Entry<String, Ty> e : f.locals.entrySet()) {
             if (longLocals.contains(e.getKey())) {
                 if (declared.contains(e.getKey())) {
@@ -919,7 +1146,20 @@ final class TypedEmit {
                     throw new Unsupported("return None as " + cur.ret);
                 }
             } else if (cur.ret.k == Ty.K.INT) {
-                returnInt(expr(v), b, ind);
+                Expr saved = pushTop;
+                pushTop = v;
+                E e;
+                try {
+                    e = expr(v);
+                } finally {
+                    pushTop = saved;
+                }
+                if (e.lc != null && ranges.eval(v, null).fitsLong() && ranges.eval(v, null).lo.compareTo(IntRanges.LONG_MIN) > 0) {
+                    // Never the marker.
+                    b.append("return ").append(e.lc).append(";\n");
+                } else {
+                    returnInt(e, b, ind);
+                }
             } else {
                 b.append("return ").append(conv(expr(v), cur.ret)).append(";\n");
             }
@@ -1031,6 +1271,11 @@ final class TypedEmit {
     /// `return e` from a function returning an int (see `retJ`); the
     /// statement is already indented.
     private void returnInt(E e, StringBuilder b, int ind) {
+        if (e.pk != null) {
+            // The marker and what it stands for, passed on as they are.
+            b.append("return ").append(e.pk).append(";\n");
+            return;
+        }
         if (e.lc != null && literal(e.lc) && !e.lc.contains("-9223372036854775808")) {
             b.append("return ").append(e.lc).append(";\n");
             return;
@@ -2339,8 +2584,22 @@ final class TypedEmit {
         Map<Expr, E> savedLeaves = leafSubst;
         leafSubst = new IdentityHashMap<Expr, E>(savedLeaves);
         try {
+            List<Expr> pushedLeaves = new ArrayList<Expr>();
             for (Expr x : ls) {
-                leafSubst.put(x, spill(expr(x)));
+                Expr savedLeaf = pushLeaf;
+                pushLeaf = x;
+                E v;
+                try {
+                    v = expr(x);
+                } finally {
+                    pushLeaf = savedLeaf;
+                }
+                if (v.pk != null) {
+                    pushedLeaves.add(x);
+                    leafSubst.put(x, v);
+                } else {
+                    leafSubst.put(x, spill(v));
+                }
             }
             char k;
             if (e instanceof Compare) {
@@ -2352,6 +2611,16 @@ final class TypedEmit {
                 k = kindOf(e);
             }
             if (k == 0) {
+                // Taken here, the last first: the generic path reads each
+                // leaf as an object.
+                for (int i = pushedLeaves.size() - 1; i >= 0; i--) {
+                    String r = leafSubst.get(pushedLeaves.get(i)).pk;
+                    String rb = fresh();
+                    indent(pre, preInd);
+                    pre.append("Object ").append(rb).append(" = ").append(r)
+                            .append(" != Long.MIN_VALUE ? null : Typed.take();\n");
+                    leafSubst.put(pushedLeaves.get(i), dual(r, rb));
+                }
                 return generic0(e);
             }
             return fastPath(e, ls, k);
@@ -2418,22 +2687,36 @@ final class TypedEmit {
         Map<Expr, E> sub = new IdentityHashMap<Expr, E>(leafSubst);
         StringBuilder params = new StringBuilder();
         StringBuilder args = new StringBuilder();
+        StringBuilder takes = new StringBuilder();
         for (int i = 0; i < ls.size(); i++) {
             E v = leafSubst.get(ls.get(i));
             String pn = "p" + i;
             String sep = i == 0 ? "" : ", ";
+            if (v.pk != null) {
+                // Passed bare and taken in the slow path, the last first,
+                // so the caller holds no object (see Typed.take).
+                params.append(sep).append("long ").append(pn);
+                args.append(sep).append(v.pk);
+                takes.insert(0, "        Object o" + i + " = " + pn + " != Long.MIN_VALUE ? Long.valueOf(" + pn
+                        + ") : Typed.take();\n");
+                sub.put(ls.get(i), new E("o" + i, Ty.INT));
+                continue;
+            }
             params.append(sep).append(jt(v.t)).append(' ').append(pn);
             args.append(sep).append(v.t.k == Ty.K.INT ? box(v) : v.c);
             sub.put(ls.get(i), new E(pn, v.t));
         }
+        boolean push = t.k == Ty.K.INT && e == pushTop; //NOPMD CompareObjectsWithEquals - identity is meant
         String generic;
         Map<Expr, E> saved = leafSubst;
         leafSubst = sub;
         try {
             E g = generic0(e);
             String m = "S" + (slowCount++);
-            slow.append("    static ").append(jt(t)).append(' ').append(m).append('(').append(params)
-                    .append(") {\n        return ").append(t.k == Ty.K.FLOAT ? toD(g) : conv(g, t)).append(";\n    }\n");
+            String body = t.k == Ty.K.FLOAT ? toD(g) : conv(g, t);
+            slow.append("    static ").append(push ? "long" : jt(t)).append(' ').append(m).append('(').append(params)
+                    .append(") {\n").append(takes).append("        return ")
+                    .append(push ? "Typed.retObj(" + box(new E(body, t)) + ")" : body).append(";\n    }\n");
             generic = m + "(" + args + ")";
         } finally {
             leafSubst = saved;
@@ -2457,8 +2740,16 @@ final class TypedEmit {
             v = longOf(e, f, guards, fast);
         }
         String r = fresh();
-        String rb = t.k == Ty.K.INT ? fresh() : null;
+        String rb = t.k == Ty.K.INT && !push ? fresh() : null;
         int ind = preInd;
+        if (push) {
+            // The marker stands for a pushed result only: a true
+            // Long.MIN_VALUE goes the slow way, and is pushed.
+            String x = fresh();
+            f.append("long ").append(x).append(" = ").append(v).append(";\nif (").append(x)
+                    .append(" == Long.MIN_VALUE) {\n    break ").append(fast).append(";\n}\n");
+            v = x;
+        }
         boolean leaves = f.toString().contains("break " + fast + ";");
         indent(pre, ind);
         pre.append(t.k == Ty.K.INT ? "long" : jt(t)).append(' ').append(r).append(";\n");
@@ -2475,6 +2766,27 @@ final class TypedEmit {
             indent(pre, ind);
             pre.append(r).append(" = ").append(v).append(";\n");
             return t.k == Ty.K.INT ? new E("Long.valueOf(" + r + ")", t, r) : new E(r, t);
+        }
+        if (push) {
+            indent(pre, ind);
+            pre.append(done).append(": {\n");
+            indent(pre, ind + 1);
+            pre.append(fast).append(": {\n");
+            for (String line : f.toString().split("\n")) {
+                indent(pre, ind + 2);
+                pre.append(line).append('\n');
+            }
+            indent(pre, ind + 2);
+            pre.append(r).append(" = ").append(v).append(";\n");
+            indent(pre, ind + 2);
+            pre.append("break ").append(done).append(";\n");
+            indent(pre, ind + 1);
+            pre.append("}\n");
+            indent(pre, ind + 1);
+            pre.append(r).append(" = ").append(generic).append(";\n");
+            indent(pre, ind);
+            pre.append("}\n");
+            return pushed(r);
         }
         if (rb != null) {
             indent(pre, ind);
@@ -2561,6 +2873,13 @@ final class TypedEmit {
             }
             if (lv.t.k == Ty.K.BOOL) {
                 return "(" + lv.c + " ? 1L : 0L)";
+            }
+            if (lv.pk != null) {
+                if (guards.put(lv.pk, lv.pk) == null) {
+                    f.append("if (").append(lv.pk).append(" == Long.MIN_VALUE) {\n    break ").append(fast)
+                            .append(";\n}\n");
+                }
+                return lv.pk;
             }
             if (lv.ll != null) {
                 if (guards.put(lv.bg, lv.ll) == null) {
@@ -2922,6 +3241,16 @@ final class TypedEmit {
         return sb.toString();
     }
 
+    /// The arguments of a call of `f`'s long version: its int parameters
+    /// as longs (the call's ranges proved each fits).
+    private String longArgList(Infer.Fn f, IntRanges.Iv[] lp, List<E> args) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < args.size(); i++) {
+            sb.append(i == 0 ? "" : ", ").append(lp[i] != null ? fitting(args.get(i)) : arg(args.get(i), f.params[i]));
+        }
+        return sb.toString();
+    }
+
     /// `a` passed for a parameter of type `t`: an int as its two halves.
     private String arg(E a, Ty t) {
         if (t.k != Ty.K.INT) {
@@ -3059,8 +3388,19 @@ final class TypedEmit {
                 if (f != null) {
                     List<E> a = args(c);
                     calls.add(f);
-                    E r = result(f, typed.get(f) + "(" + argList(f, 0, a) + ")");
+                    IntRanges.Iv[] lp = longParams.get(f);
+                    String call = lp != null && IntRanges.within(IntRanges.longArgs(f, sites.get(c)), lp)
+                            ? longName(f) + "(" + longArgList(f, lp, a) + ")"
+                            : typed.get(f) + "(" + argList(f, 0, a) + ")";
                     Ty site = in.siteRet.get(c);
+                    if (f.ret.k == Ty.K.INT && pre != null && stmtPure && condDepth == 0 && (site == null || site.k == Ty.K.INT)
+                            && (c == pushTop || c == pushLeaf)) { //NOPMD CompareObjectsWithEquals - identity is meant
+                        String r = fresh();
+                        indent(pre, preInd);
+                        pre.append("long ").append(r).append(" = ").append(call).append(";\n");
+                        return pushed(r);
+                    }
+                    E r = result(f, call);
                     return site == null || site.k == r.t.k ? r : relabel(r, site);
                 }
                 Layouts.Cls k = in.globalClasses.get(n);
@@ -4091,6 +4431,9 @@ final class TypedEmit {
     String members() {
         StringBuilder o = new StringBuilder();
         for (String b : bodies.values()) {
+            o.append(b);
+        }
+        for (String b : longBodies.values()) {
             o.append(b);
         }
         for (Layouts.Cls k : constructors) {
