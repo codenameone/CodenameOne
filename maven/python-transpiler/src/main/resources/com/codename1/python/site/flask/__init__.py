@@ -7,7 +7,13 @@
 ``(status, headers, body)``; the test client and the native server both go
 through it. Written from Flask's public documentation and behaviour.
 """
+import base64 as _base64
+import hashlib as _hashlib
+import hmac as _hmac
+import io as _io
 import json as _json
+import os as _os
+import sys as _sys
 import re as _re
 import uuid as _uuid
 from urllib.parse import parse_qsl, quote, quote_plus, unquote, urlencode
@@ -17,7 +23,9 @@ from werkzeug.exceptions import (HTTPException, BadRequest, NotFound, MethodNotA
                                  default_exceptions)
 
 __all__ = ["Flask", "Blueprint", "Response", "request", "g", "jsonify", "make_response",
-           "abort", "redirect", "url_for", "current_app"]
+           "abort", "redirect", "url_for", "current_app", "session", "render_template",
+           "render_template_string", "stream_with_context", "flash", "get_flashed_messages",
+           "Markup", "escape"]
 
 _STATUS = {
     100: "CONTINUE", 101: "SWITCHING PROTOCOLS", 200: "OK", 201: "CREATED", 202: "ACCEPTED",
@@ -242,11 +250,16 @@ class Response:
             else:
                 self.status = status
         self._data = b""
+        self.is_streamed = False
         if response is not None:
             if isinstance(response, (str, bytes, bytearray)):
                 self.set_data(response)
             else:
+                # A generator body is drained here, while the request context is
+                # still pushed: the native server has no chunked-transfer API, so a
+                # streamed response is buffered and sent whole.
                 self.set_data(b"".join([_b(c) for c in response]))
+                self.is_streamed = True
         self._cookies = []
 
     @property
@@ -356,6 +369,13 @@ class _Ctx:
         self.app = app
         self.request = req
         self.g = _AppGlobals()
+        self._session = None
+
+    @property
+    def session(self):
+        if self._session is None:
+            self._session = self.app._open_session(self.request)
+        return self._session
 
 
 class _AppGlobals:
@@ -391,6 +411,8 @@ class _Proxy:
             return c.request
         if w == "g":
             return c.g
+        if w == "session":
+            return c.session
         return c.app
 
     def __getattr__(self, name):
@@ -408,7 +430,24 @@ class _Proxy:
     def __iter__(self):
         return iter(self._get())
 
+    def __getitem__(self, key):
+        return self._get()[key]
+
+    def __setitem__(self, key, value):
+        self._get()[key] = value
+
+    def __delitem__(self, key):
+        del self._get()[key]
+
+    def __len__(self):
+        return len(self._get())
+
+    def __eq__(self, other):
+        return self._get() == other
+
     def __bool__(self):
+        if object.__getattribute__(self, "_what") == "session":
+            return bool(_stack) and bool(self._get())
         return bool(_stack)
 
     def __repr__(self):
@@ -448,11 +487,7 @@ class Request:
 
     @property
     def form(self):
-        if self._form is None:
-            if self.mimetype == "application/x-www-form-urlencoded":
-                self._form = _parse_qs(self._body)
-            else:
-                self._form = MultiDict()
+        self._load_form()
         return self._form
 
     @property
@@ -468,7 +503,19 @@ class Request:
 
     @property
     def files(self):
-        return MultiDict()
+        self._load_form()
+        return self._files
+
+    def _load_form(self):
+        if self._form is not None:
+            return
+        self._files = MultiDict()
+        if self.mimetype == "application/x-www-form-urlencoded":
+            self._form = _parse_qs(self._body)
+        elif self.mimetype == "multipart/form-data":
+            self._form, self._files = _parse_multipart(self.headers.get("Content-Type", ""), self._body)
+        else:
+            self._form = MultiDict()
 
     @property
     def cookies(self):
@@ -555,6 +602,7 @@ class Request:
 request = _Proxy("request")
 g = _Proxy("g")
 current_app = _Proxy("app")
+session = _Proxy("session")
 
 
 def _to_json(obj, compact=True, sort=True):
@@ -817,6 +865,52 @@ class Flask(_Routes):
         self._bp_errors = {}
         self._sorted = None
         self.json = None
+        self.template_folder = "templates" if template_folder is None else template_folder
+        self._jinja_env = None
+        self._context_processors = []
+        self.root_path = _root_path(import_name)
+        self.session_interface = SecureCookieSessionInterface()
+
+    @property
+    def secret_key(self):
+        return self.config.get("SECRET_KEY")
+
+    @secret_key.setter
+    def secret_key(self, value):
+        self.config["SECRET_KEY"] = value
+
+    @property
+    def jinja_env(self):
+        if self._jinja_env is None:
+            from jinja2 import Environment, FileSystemLoader
+            folder = self.template_folder
+            if not _os.path.isabs(folder):
+                folder = _os.path.join(self.root_path, folder)
+            env = Environment(loader=FileSystemLoader(folder), autoescape=_select_autoescape)
+            env.globals["url_for"] = url_for
+            env.globals["get_flashed_messages"] = get_flashed_messages
+            env.globals["config"] = self.config
+            self._jinja_env = env
+        return self._jinja_env
+
+    def context_processor(self, f):
+        self._context_processors.append(f)
+        return f
+
+    def _template_context(self, ctx):
+        out = {}
+        if _stack:
+            c = _stack[-1]
+            out["request"] = c.request
+            out["session"] = c.session
+            out["g"] = c.g
+        for f in self._context_processors:
+            out.update(f())
+        out.update(ctx)
+        return out
+
+    def _open_session(self, req):
+        return self.session_interface.open_session(self, req)
 
     # -- registration
     def add_url_rule(self, rule, endpoint=None, view_func=None, **options):
@@ -1052,6 +1146,8 @@ class Flask(_Routes):
             if method == "HEAD":
                 req.method = "HEAD"
             resp = self.full_dispatch(req)
+            if ctx._session is not None:
+                self.session_interface.save_session(self, ctx._session, resp)
             for f in self._teardown:
                 try:
                     f(None)
@@ -1169,6 +1265,9 @@ class FlaskClient:
             for k, v in (headers.items() if hasattr(headers, "items") else headers):
                 hdrs[k] = v
         body = b""
+        if isinstance(data, dict) and any(_is_upload(v) for v in data.values()):
+            body, content_type = _encode_multipart(data)
+            data = None
         if json is not None:
             body = _to_json(json, True).encode("utf-8")
             content_type = content_type or "application/json"
@@ -1218,3 +1317,382 @@ class TestResponse(Response):
         self.headers = Headers(headers)
         self._data = bytes(body)
         self.status_code = status
+
+
+# ---- sessions --------------------------------------------------------------
+
+class SecureCookieSession(dict):
+    """The session dict: tracks whether it was read and whether it changed."""
+
+    def __init__(self, initial=None):
+        dict.__init__(self, initial or {})
+        self.modified = False
+        self.accessed = False
+        self.new = False
+        self.permanent = False
+
+    def __getitem__(self, key):
+        self.accessed = True
+        return dict.__getitem__(self, key)
+
+    def get(self, key, default=None):
+        self.accessed = True
+        return dict.get(self, key, default)
+
+    def __contains__(self, key):
+        self.accessed = True
+        return dict.__contains__(self, key)
+
+    def __setitem__(self, key, value):
+        self.accessed = True
+        self.modified = True
+        dict.__setitem__(self, key, value)
+
+    def __delitem__(self, key):
+        self.accessed = True
+        self.modified = True
+        dict.__delitem__(self, key)
+
+    def setdefault(self, key, default=None):
+        self.accessed = True
+        if not dict.__contains__(self, key):
+            self.modified = True
+        return dict.setdefault(self, key, default)
+
+    def pop(self, key, *default):
+        self.accessed = True
+        self.modified = True
+        return dict.pop(self, key, *default)
+
+    def popitem(self):
+        self.accessed = True
+        self.modified = True
+        return dict.popitem(self)
+
+    def update(self, *a, **k):
+        self.accessed = True
+        self.modified = True
+        dict.update(self, *a, **k)
+
+    def clear(self):
+        self.accessed = True
+        self.modified = True
+        dict.clear(self)
+
+
+class NullSession(SecureCookieSession):
+    def _fail(self, *a, **k):
+        raise RuntimeError("The session is unavailable because no secret key was set.  Set the"
+                           " secret_key on the application to something unique and secret.")
+
+    __setitem__ = _fail
+    __delitem__ = _fail
+    clear = _fail
+    pop = _fail
+    popitem = _fail
+    update = _fail
+    setdefault = _fail
+
+
+def _b64e(b):
+    return _base64.urlsafe_b64encode(b).rstrip(b"=").decode("ascii")
+
+
+def _b64d(s):
+    s = s.encode("ascii")
+    return _base64.urlsafe_b64decode(s + b"=" * (-len(s) % 4))
+
+
+class SecureCookieSessionInterface:
+    """Signed (not encrypted) cookie: ``base64url(json) "." base64url(HMAC-SHA1)``.
+
+    The key is derived from the app's secret key and the salt
+    ``cookie-session``, but the cookie carries no timestamp, so it is not
+    byte-compatible with the cookie a CPython Flask server writes.
+    """
+    salt = "cookie-session"
+
+    def _key(self, app):
+        sk = app.secret_key
+        if isinstance(sk, str):
+            sk = sk.encode("utf-8")
+        return _hashlib.sha1(self.salt.encode("utf-8") + b"signer" + sk).digest()
+
+    def _sign(self, app, payload):
+        return _b64e(_hmac.new(self._key(app), payload.encode("ascii"), _hashlib.sha1).digest())
+
+    def open_session(self, app, req):
+        if not app.secret_key:
+            return NullSession()
+        name = app.config.get("SESSION_COOKIE_NAME", "session")
+        raw = req.cookies.get(name)
+        if raw and "." in raw:
+            payload, sig = raw.rsplit(".", 1)
+            if _hmac.compare_digest(self._sign(app, payload), sig):
+                try:
+                    data = _json.loads(_b64d(payload).decode("utf-8"))
+                    if isinstance(data, dict):
+                        return SecureCookieSession(data)
+                except ValueError:
+                    pass
+        s = SecureCookieSession()
+        s.new = True
+        return s
+
+    def save_session(self, app, sess, resp):
+        if isinstance(sess, NullSession):
+            return
+        name = app.config.get("SESSION_COOKIE_NAME", "session")
+        if sess.accessed:
+            vary = resp.headers.get("Vary")
+            if not vary:
+                resp.headers["Vary"] = "Cookie"
+            elif "cookie" not in vary.lower():
+                resp.headers["Vary"] = vary + ", Cookie"
+        if not len(sess):
+            if sess.modified and not sess.new:
+                resp.delete_cookie(name)
+            return
+        if not sess.modified:
+            return
+        payload = _b64e(_json.dumps(dict(sess), separators=(",", ":"), sort_keys=True).encode("utf-8"))
+        resp.set_cookie(name, payload + "." + self._sign(app, payload), httponly=True)
+
+
+def flash(message, category="message"):
+    flashes = session.get("_flashes", [])
+    flashes.append([category, message])
+    session["_flashes"] = flashes
+
+
+def get_flashed_messages(with_categories=False, category_filter=()):
+    c = _stack[-1]
+    cached = getattr(c, "_flashes", None)
+    if cached is None:
+        cached = c.session.pop("_flashes") if "_flashes" in c.session else []
+        c._flashes = cached
+    out = [tuple(f) for f in cached]
+    if category_filter:
+        out = [f for f in out if f[0] in category_filter]
+    if not with_categories:
+        return [f[1] for f in out]
+    return out
+
+
+# ---- templates -------------------------------------------------------------
+
+def _root_path(import_name):
+    try:
+        mod = _sys.modules.get(import_name)
+        fn = getattr(mod, "__file__", None)
+        if fn:
+            return _os.path.dirname(_os.path.abspath(fn))
+    except Exception:
+        pass
+    try:
+        return _os.getcwd()
+    except Exception:
+        return "."
+
+
+def _select_autoescape(name):
+    if name is None:
+        return True
+    return name.lower().endswith((".html", ".htm", ".xml", ".xhtml", ".svg"))
+
+
+def _current_app():
+    if not _stack:
+        raise RuntimeError("Working outside of application context.")
+    return _stack[-1].app
+
+
+def render_template(template_name_or_list, **context):
+    app = _current_app()
+    env = app.jinja_env
+    if isinstance(template_name_or_list, (list, tuple)):
+        t = env.select_template(template_name_or_list)
+    else:
+        t = env.get_template(template_name_or_list)
+    return t.render(app._template_context(context))
+
+
+def render_template_string(source, **context):
+    app = _current_app()
+    return app.jinja_env.from_string(source).render(app._template_context(context))
+
+
+def stream_with_context(generator_or_function):
+    """Keeps the request context around a generator body.
+
+    Response drains a generator while the request context is still pushed
+    (the native server has no chunked API), so this only wraps a function.
+    """
+    if hasattr(generator_or_function, "__next__") or not callable(generator_or_function):
+        return generator_or_function
+
+    def wrapper(*a, **k):
+        return generator_or_function(*a, **k)
+    return wrapper
+
+
+from markupsafe import Markup, escape  # noqa: E402
+
+
+# ---- multipart -------------------------------------------------------------
+
+class FileStorage:
+    def __init__(self, stream=None, filename=None, name=None, content_type=None, headers=None):
+        self.stream = stream if stream is not None else _io.BytesIO()
+        self.filename = filename
+        self.name = name
+        self.headers = Headers(headers or [])
+        if content_type is None:
+            content_type = self.headers.get("Content-Type")
+        self.content_type = content_type
+
+    @property
+    def mimetype(self):
+        return (self.content_type or "").split(";")[0].strip().lower()
+
+    def read(self, *a):
+        return self.stream.read(*a)
+
+    def seek(self, *a):
+        return self.stream.seek(*a)
+
+    def tell(self):
+        return self.stream.tell()
+
+    def save(self, dst, buffer_size=16384):
+        if isinstance(dst, str) or hasattr(dst, "__fspath__"):
+            with open(str(dst), "wb") as f:
+                f.write(self.stream.read())
+        else:
+            dst.write(self.stream.read())
+
+    def close(self):
+        self.stream.close()
+
+    def __bool__(self):
+        return bool(self.filename)
+
+    def __repr__(self):
+        return "<FileStorage: %r (%r)>" % (self.filename, self.content_type)
+
+
+def _header_params(value):
+    """Splits ``form-data; name="a"; filename="b.txt"`` into its parameters."""
+    out = {}
+    i = value.find(";")
+    if i < 0:
+        return out
+    rest = value[i + 1:]
+    n = len(rest)
+    j = 0
+    while j < n:
+        while j < n and rest[j] in " ;\t":
+            j += 1
+        k = rest.find("=", j)
+        if k < 0:
+            break
+        key = rest[j:k].strip().lower()
+        j = k + 1
+        if j < n and rest[j] == '"':
+            j += 1
+            buf = []
+            while j < n and rest[j] != '"':
+                if rest[j] == "\\" and j + 1 < n:
+                    j += 1
+                buf.append(rest[j])
+                j += 1
+            j += 1
+            out[key] = "".join(buf)
+        else:
+            e = rest.find(";", j)
+            if e < 0:
+                e = n
+            out[key] = rest[j:e].strip()
+            j = e
+    return out
+
+
+def _parse_multipart(content_type, body):
+    form = MultiDict()
+    files = MultiDict()
+    boundary = _header_params(content_type).get("boundary")
+    if not boundary:
+        return form, files
+    delim = b"--" + boundary.encode("latin-1")
+    parts = body.split(delim)
+    for part in parts[1:]:
+        if part.startswith(b"--"):
+            break
+        if part.startswith(b"\r\n"):
+            part = part[2:]
+        if part.endswith(b"\r\n"):
+            part = part[:-2]
+        sep = part.find(b"\r\n\r\n")
+        if sep < 0:
+            continue
+        hdrs = Headers()
+        for line in part[:sep].decode("utf-8", "replace").split("\r\n"):
+            if ":" in line:
+                k, v = line.split(":", 1)
+                hdrs.add(k.strip(), v.strip())
+        data = part[sep + 4:]
+        params = _header_params(hdrs.get("Content-Disposition", ""))
+        name = params.get("name")
+        if name is None:
+            continue
+        if "filename" in params:
+            files.add(name, FileStorage(_io.BytesIO(data), params["filename"], name,
+                                        hdrs.get("Content-Type", "application/octet-stream"),
+                                        hdrs.items()))
+        else:
+            form.add(name, data.decode("utf-8", "replace"))
+    return form, files
+
+
+_GUESS = {"txt": "text/plain", "html": "text/html", "htm": "text/html", "css": "text/css",
+          "csv": "text/csv", "json": "application/json", "js": "text/javascript",
+          "png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "gif": "image/gif",
+          "pdf": "application/pdf", "xml": "application/xml", "zip": "application/zip"}
+
+
+def _is_upload(v):
+    if isinstance(v, (list, tuple)) and v and hasattr(v[0], "read"):
+        return True
+    return hasattr(v, "read")
+
+
+def _encode_multipart(data):
+    boundary = "----cn1FormBoundary7MA4YWxkTrZu0gW"
+    out = []
+    for key, value in data.items():
+        values = value if isinstance(value, list) else [value]
+        for v in values:
+            out.append(b"--" + boundary.encode("ascii") + b"\r\n")
+            if _is_upload(v):
+                if isinstance(v, tuple):
+                    stream = v[0]
+                    filename = v[1] if len(v) > 1 else None
+                    ctype = v[2] if len(v) > 2 else None
+                else:
+                    stream = v
+                    filename = getattr(v, "name", None)
+                    ctype = None
+                if filename is None:
+                    filename = ""
+                if ctype is None:
+                    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+                    ctype = _GUESS.get(ext, "application/octet-stream")
+                out.append(('Content-Disposition: form-data; name="%s"; filename="%s"\r\n'
+                            "Content-Type: %s\r\n\r\n" % (key, filename, ctype)).encode("utf-8"))
+                out.append(_b(stream.read()))
+            else:
+                out.append(('Content-Disposition: form-data; name="%s"\r\n\r\n' % key).encode("utf-8"))
+                out.append(_b(v))
+            out.append(b"\r\n")
+    out.append(b"--" + boundary.encode("ascii") + b"--\r\n")
+    return b"".join(out), "multipart/form-data; boundary=" + boundary
