@@ -38,22 +38,30 @@ concurrency:
 
 jobs:
   download:
-    name: ${{ matrix.template }}
+    name: ${{ matrix.template }} (JDK ${{ matrix.java }})
     runs-on: ubuntu-24.04
     timeout-minutes: 75
     strategy:
       fail-fast: false
       matrix:
         template: [BAREBONES, KOTLIN, WAYLINE, SAVOR, SKIRMISH, PARLEY, BASTION, REEL]
+        java: ['17']
+        # Developers download on current JDKs too: Kotlin 1.6.0 crashed on 25
+        # ("IllegalArgumentException: 25") while every 17 leg was green.
+        include:
+          - template: KOTLIN
+            java: '25'
+          - template: SKIRMISH
+            java: '25'
     steps:
       - uses: actions/checkout@v6
 
       # No cache: the point is a developer's first build, from an empty repository.
-      - name: Set up JDK 17
+      - name: Set up JDK ${{ matrix.java }}
         uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: ${{ matrix.java }}
 
       - name: Ensure a virtual display (xvfb) for the simulator
         run: |
@@ -71,7 +79,7 @@ jobs:
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
-          name: initializr-e2e-${{ matrix.template }}
+          name: initializr-e2e-${{ matrix.template }}-jdk${{ matrix.java }}
           path: |
             scripts/initializr/target/e2e-shipped/*.log
             scripts/initializr/target/e2e-shipped/*-shots/**
