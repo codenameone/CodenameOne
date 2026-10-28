@@ -244,3 +244,14 @@ math.erfc agree with CPython's. It retains FDLIBM's notice:
   Permission to use, copy, modify, and distribute this
   software is freely granted, provided that this notice
   is preserved.
+
+The module PIL.ImageFont, in maven/python-transpiler
+(src/main/resources/com/codename1/python/site/PIL/ImageFont.py), is a
+rewrite of the bitmap font support of Pillow's ImageFont and embeds Pillow's
+built-in default font (courB08) unchanged, so that text drawn with
+ImageFont.load_default_imagefont() matches Pillow pixel for pixel. It retains
+Pillow's notice:
+
+  Copyright (c) 1997-2003 by Secret Labs AB
+  Copyright (c) 1996-2003 by Fredrik Lundh
+  Licensed under the MIT-CMU (HPND) license; the full text is in the file.

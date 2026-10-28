@@ -52,15 +52,29 @@ ROTATE_270 = Transpose.ROTATE_270
 TRANSPOSE = Transpose.TRANSPOSE
 TRANSVERSE = Transpose.TRANSVERSE
 
-_BANDS = {"L": 1, "RGB": 3, "RGBA": 4}
-_BAND_NAMES = {"L": ("L",), "RGB": ("R", "G", "B"), "RGBA": ("R", "G", "B", "A")}
+
+class Dither:
+    NONE = 0
+    ORDERED = 1
+    RASTERIZE = 2
+    FLOYDSTEINBERG = 3
+
+
+NONE = Dither.NONE
+FLOYDSTEINBERG = Dither.FLOYDSTEINBERG
+
+_BANDS = {"1": 1, "L": 1, "P": 1, "LA": 2, "RGB": 3, "RGBA": 4}
+_BAND_NAMES = {"1": ("1",), "L": ("L",), "P": ("P",), "LA": ("L", "A"), "RGB": ("R", "G", "B"),
+               "RGBA": ("R", "G", "B", "A")}
+# Adam7 passes: first column, first row, column step, row step
+_ADAM7 = ((0, 0, 8, 8), (4, 0, 8, 8), (0, 4, 4, 8), (2, 0, 4, 4), (0, 2, 2, 4), (1, 0, 2, 2), (0, 1, 1, 2))
 _PNG_SIG = b"\x89PNG\r\n\x1a\n"
 _EXT = {".png": "PNG", ".jpg": "JPEG", ".jpeg": "JPEG", ".gif": "GIF", ".bmp": "BMP", ".webp": "WEBP"}
 
 
 def _bands(mode):
     if mode not in _BANDS:
-        raise ValueError("unrecognized image mode: %s (only L, RGB and RGBA are supported)" % mode)
+        raise ValueError("unrecognized image mode: %s (only 1, L, P, LA, RGB and RGBA are supported)" % mode)
     return _BANDS[mode]
 
 
@@ -85,6 +99,32 @@ def _color(mode, color):
     return bytes([v & 255 for v in c[:n]])
 
 
+def _pack_bits(raw, w, h, filter_byte=False):
+    """One byte a pixel (0 or 255) to rows of eight pixels a byte, MSB first."""
+    rows = bytearray()
+    for y in range(h):
+        if filter_byte:
+            rows.append(0)
+        line = raw[y * w:(y + 1) * w]
+        for x in range(0, w, 8):
+            v = 0
+            for b, p in enumerate(line[x:x + 8]):
+                if p:
+                    v |= 0x80 >> b
+            rows.append(v)
+    return bytes(rows)
+
+
+def _unpack_bits(data, w, h):
+    stride = (w + 7) // 8
+    out = bytearray(w * h)
+    for y in range(h):
+        for x in range(w):
+            if data[y * stride + (x >> 3)] & (0x80 >> (x & 7)):
+                out[y * w + x] = 255
+    return bytes(out)
+
+
 def _wrap(mode, size, handle):
     im = Image()
     im.mode = mode
@@ -101,6 +141,7 @@ class Image:
         self._size = (0, 0)
         self._im = None
         self.info = {}
+        self._palette = None
 
     @property
     def size(self):
@@ -130,7 +171,24 @@ class Image:
         return _BAND_NAMES[self.mode]
 
     def _new(self, handle, size=None, mode=None):
-        return _wrap(mode or self.mode, size or self._size, handle)
+        im = _wrap(mode or self.mode, size or self._size, handle)
+        if im.mode == "P":
+            # a palette image keeps its palette and transparency index
+            im._palette = self._palette
+            im.info = dict(self.info)
+        return im
+
+    def getpalette(self, rawmode="RGB"):
+        if self.mode != "P":
+            return None
+        return list(self._palette or b"")
+
+    def putpalette(self, data, rawmode="RGB"):
+        if self.mode not in ("L", "LA", "P", "PA"):
+            raise ValueError("illegal image mode")
+        if self.mode in ("L", "LA"):
+            self.mode = "P"
+        self._palette = bytes(data)
 
     def copy(self):
         return self._new(_cn1image.crop(self._im, 0, 0, self.width, self.height))
@@ -142,7 +200,7 @@ class Image:
         if y < 0:
             y += self.height
         t = _cn1image.getpixel(self._im, x, y)
-        return t[0] if self.mode == "L" else t
+        return t[0] if len(t) == 1 else t
 
     def putpixel(self, xy, value):
         x, y = int(xy[0]), int(xy[1])
@@ -153,7 +211,7 @@ class Image:
         _cn1image.putpixel(self._im, x, y, _color(self.mode, value))
 
     def getdata(self, band=None):
-        raw = self.tobytes()
+        raw = _cn1image.tobytes(self._im)
         n = _bands(self.mode)
         if n == 1:
             return list(raw)
@@ -162,7 +220,7 @@ class Image:
         return [tuple(raw[i:i + n]) for i in range(0, len(raw), n)]
 
     def histogram(self):
-        raw = self.tobytes()
+        raw = _cn1image.tobytes(self._im)
         n = _bands(self.mode)
         h = [0] * (256 * n)
         for i, v in enumerate(raw):
@@ -171,14 +229,20 @@ class Image:
 
     def getextrema(self):
         n = _bands(self.mode)
-        raw = self.tobytes()
+        raw = _cn1image.tobytes(self._im)
         ext = tuple((min(raw[b::n]), max(raw[b::n])) for b in range(n))
         return ext[0] if n == 1 else ext
 
     def tobytes(self, encoder_name="raw", *args):
-        return _cn1image.tobytes(self._im)
+        raw = _cn1image.tobytes(self._im)
+        if self.mode == "1":
+            # rawmode "1": eight pixels a byte, most significant bit first, rows padded
+            return _pack_bits(raw, self.width, self.height)
+        return raw
 
     def frombytes(self, data):
+        if self.mode == "1":
+            data = _unpack_bits(data, self.width, self.height)
         self._im = _cn1image.frombytes(self.width, self.height, _bands(self.mode), data)
 
     def crop(self, box=None):
@@ -199,10 +263,14 @@ class Image:
             resample = BICUBIC
         if (w, h) == self._size and tuple(box) == (0, 0) + self._size:
             return self.copy()
+        if self.mode in ("1", "P"):
+            resample = NEAREST
         if resample == NEAREST:
             a = [(box[2] - box[0]) / w, 0, box[0], 0, (box[3] - box[1]) / h, box[1]]
             return self._new(_cn1image.affine(self._im, w, h, a, bytes(4)), (w, h))
-        return self._new(_cn1image.resample(self._im, w, h, tuple(float(v) for v in box)), (w, h))
+        # Pillow resamples LA and RGBA premultiplied (La, RGBa), then divides back
+        return self._new(_cn1image.resample(self._im, w, h, tuple(float(v) for v in box), int(resample),
+                                            self.mode in ("LA", "RGBA")), (w, h))
 
     def thumbnail(self, size, resample=BICUBIC, reducing_gap=2.0):
         x, y = math.floor(size[0]), math.floor(size[1])
@@ -274,7 +342,35 @@ class Image:
     def convert(self, mode=None, matrix=None, dither=None, palette=None, colors=256):
         if mode is None or mode == self.mode:
             return self.copy()
-        return self._new(_cn1image.convert(self._im, _bands(mode)), mode=mode)
+        if mode == "P":
+            raise ValueError("conversion to P is not supported")
+        handle = self._im
+        if self.mode == "P":
+            handle = _cn1image.palette(handle, self._palette_lut(mode in ("LA", "RGBA")))
+        if mode == "1":
+            if dither != 0:
+                # Pillow's default here is Floyd-Steinberg dithering, which is not built in
+                raise ValueError("conversion to 1 is supported with dither=Dither.NONE only")
+            lum = handle if _bands(self.mode) == 1 and self.mode != "P" else _cn1image.convert(handle, 1)
+            return self._new(_cn1image.point(lum, bytes(255 if v >= 128 else 0 for v in range(256))),
+                             mode="1")
+        return self._new(_cn1image.convert(handle, _bands(mode)), mode=mode)
+
+    def _palette_lut(self, alpha):
+        """256 RGBA entries: the palette, with the tRNS alpha when `alpha`."""
+        lut = bytearray(1024)
+        pal = self._palette or b""
+        t = self.info.get("transparency") if alpha else None
+        for i in range(256):
+            if 3 * i + 2 < len(pal):
+                lut[4 * i:4 * i + 3] = pal[3 * i:3 * i + 3]
+            a = 255
+            if isinstance(t, int):
+                a = 0 if i == t else 255
+            elif isinstance(t, (bytes, bytearray)) and i < len(t):
+                a = t[i]
+            lut[4 * i + 3] = a
+        return bytes(lut)
 
     def paste(self, im, box=None, mask=None):
         if box is not None and len(box) == 2 and isinstance(im, Image):
@@ -374,6 +470,8 @@ def new(mode, size, color=0):
 
 def frombytes(mode, size, data, decoder_name="raw", *args):
     w, h = int(size[0]), int(size[1])
+    if mode == "1":
+        data = _unpack_bits(data, w, h)
     return _wrap(mode, (w, h), _cn1image.frombytes(w, h, _bands(mode), data))
 
 
@@ -433,10 +531,23 @@ def _chunk(kind, body):
 
 
 def _png_encode(im):
-    ctype = {"L": 0, "RGB": 2, "RGBA": 6}[im.mode]
-    head = struct.pack(">IIBBBBB", im.width, im.height, 8, ctype, 0, 0, 0)
-    body = zlib.compress(_cn1image.png_rows(im._im), 6)
-    return _PNG_SIG + _chunk(b"IHDR", head) + _chunk(b"IDAT", body) + _chunk(b"IEND", b"")
+    ctype = {"1": 0, "L": 0, "P": 3, "LA": 4, "RGB": 2, "RGBA": 6}[im.mode]
+    depth = 1 if im.mode == "1" else 8
+    head = struct.pack(">IIBBBBB", im.width, im.height, depth, ctype, 0, 0, 0)
+    if depth == 1:
+        rows = _pack_bits(_cn1image.tobytes(im._im), im.width, im.height, True)
+    else:
+        rows = _cn1image.png_rows(im._im)
+    extra = b""
+    if im.mode == "P":
+        extra = _chunk(b"PLTE", bytes(im._palette or bytes(768)))
+        t = im.info.get("transparency")
+        if isinstance(t, int):
+            extra += _chunk(b"tRNS", b"\xff" * t + b"\x00")
+        elif isinstance(t, (bytes, bytearray)):
+            extra += _chunk(b"tRNS", bytes(t))
+    body = zlib.compress(rows, 6)
+    return _PNG_SIG + _chunk(b"IHDR", head) + extra + _chunk(b"IDAT", body) + _chunk(b"IEND", b"")
 
 
 def _png_decode(data):
@@ -462,14 +573,37 @@ def _png_decode(data):
     if head is None:
         raise UnidentifiedImageError("cannot identify image file")
     w, h, depth, ctype, _, _, interlace = head
-    if interlace:
-        raise OSError("interlaced PNG files are not supported")
     channels = {0: 1, 2: 3, 3: 1, 4: 2, 6: 4}[ctype]
-    row = (w * channels * depth + 7) // 8
     bpp = max(1, channels * depth // 8)
-    raw = _cn1image.png_unfilter(zlib.decompress(b"".join(idat)), row, h, bpp)
-    if ctype != 3:
-        trns = None
-    handle = _cn1image.png_expand(raw, w, h, ctype, depth, plte, trns)
-    mode = "L" if ctype == 0 else "RGB" if ctype == 2 or (ctype == 3 and trns is None) else "RGBA"
-    return _wrap(mode, (w, h), handle)
+    data = zlib.decompress(b"".join(idat))
+    mode = {0: "1" if depth == 1 else "L", 2: "RGB", 3: "P", 4: "LA", 6: "RGBA"}[ctype]
+    if not interlace:
+        row = (w * channels * depth + 7) // 8
+        handle = _cn1image.png_expand(_cn1image.png_unfilter(data, row, h, bpp), w, h, ctype, depth)
+    else:
+        handle = _cn1image.new(w, h, _BANDS[mode], bytes(_BANDS[mode]))
+        pos = 0
+        for x0, y0, dx, dy in _ADAM7:
+            pw = (w - x0 + dx - 1) // dx
+            ph = (h - y0 + dy - 1) // dy
+            if pw <= 0 or ph <= 0:
+                continue
+            row = (pw * channels * depth + 7) // 8
+            n = (row + 1) * ph
+            sub = _cn1image.png_expand(_cn1image.png_unfilter(data[pos:pos + n], row, ph, bpp), pw, ph, ctype,
+                                       depth)
+            _cn1image.scatter(handle, sub, x0, y0, dx, dy)
+            pos += n
+    im = _wrap(mode, (w, h), handle)
+    if ctype == 3:
+        im._palette = plte
+    if trns is not None:
+        # PngImagePlugin's chunk_tRNS
+        if ctype == 3:
+            simple = trns.count(b"\x00") == 1 and trns.count(b"\xff") == len(trns) - 1
+            im.info["transparency"] = trns.index(b"\x00") if simple else trns
+        elif ctype == 0:
+            im.info["transparency"] = struct.unpack(">H", trns[:2])[0]
+        elif ctype == 2:
+            im.info["transparency"] = struct.unpack(">HHH", trns[:6])
+    return im

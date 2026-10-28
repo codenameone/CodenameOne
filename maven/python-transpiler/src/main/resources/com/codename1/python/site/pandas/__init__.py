@@ -751,9 +751,19 @@ class Series:
         if not self._v:
             return "Series([], " + ("Name: %s, " % self.name if self.name is not None else "") + \
                 "dtype: " + self._dt + ")"
-        labels = [_label(v) for v in self._index._v]
+        n = len(self._v)
+        shown = self
+        if n > _MAX_ROWS:
+            # display.max_rows exceeded: min_rows of them, half from each end
+            shown = self._take(list(range(_MIN_ROWS // 2)) + list(range(n - _MIN_ROWS // 2, n)))
+        labels = [_label(v) for v in shown._index._v]
+        vals = _rjust_all(_fmt_values(shown._v, shown._dt))
+        if shown is not self:
+            # SeriesFormatter: dots centred (str.center) in the value width
+            dots = ".." if len(vals[_MIN_ROWS // 2 - 1]) <= 3 else "..."
+            vals.insert(_MIN_ROWS // 2, dots.center(len(vals[_MIN_ROWS // 2 - 1])))
+            labels.insert(_MIN_ROWS // 2, "")
         w = max(len(x) for x in labels)
-        vals = _rjust_all(_fmt_values(self._v, self._dt))
         lines = []
         if self._index.name is not None:
             lines.append(str(self._index.name))
@@ -762,6 +772,8 @@ class Series:
         foot = []
         if self.name is not None:
             foot.append("Name: " + str(self.name))
+        if shown is not self:
+            foot.append("Length: %d" % n)
         foot.append("dtype: " + self._dt)
         lines.append(", ".join(foot))
         return "\n".join(lines)
@@ -924,6 +936,27 @@ class _SILoc:
 
 # ---- DataFrame ------------------------------------------------------------
 
+_MAX_ROWS = 60
+_MIN_ROWS = 10
+_WIDTH = 80
+
+
+def _adjoin(strcols):
+    return [" ".join(cells) for cells in zip(*strcols)]
+
+
+def _fit_columns(strcols, max_len):
+    """StringFormatter._fit_strcols_to_terminal_width: drop middle columns
+    until the repr fits, and answer how many data columns remain."""
+    adj_dif = max_len - _WIDTH + 1
+    lens = [max(len(x) for x in col) for col in strcols]
+    while adj_dif > 0 and len(lens) > 1:
+        mid = round(len(lens) / 2)
+        adj_dif -= lens[mid] + 1
+        del lens[mid]
+    return max(len(lens) - 1, 2)
+
+
 class DataFrame:
     def __init__(self, data=None, index=None, columns=None, dtype=None):
         cols = []
@@ -939,7 +972,7 @@ class DataFrame:
                     if index is None:
                         index = v._index
                     n = len(v)
-                elif isinstance(v, (list, tuple, _np.ndarray)):
+                elif isinstance(v, (list, tuple, range, _np.ndarray)):
                     n = len(v)
             if n is None:
                 n = len(index) if index is not None else 1
@@ -948,7 +981,7 @@ class DataFrame:
                     continue
                 if isinstance(v, Series):
                     vals = v._v
-                elif isinstance(v, (list, tuple)):
+                elif isinstance(v, (list, tuple, range)):
                     vals = list(v)
                 elif isinstance(v, _np.ndarray):
                     vals = v.tolist()
@@ -1417,17 +1450,57 @@ class DataFrame:
         if not self._cols or not len(self._index):
             return "Empty DataFrame\nColumns: [" + ", ".join(_label(n) for n in names) + \
                 "]\nIndex: [" + ", ".join(_label(v) for v in self._index._v) + "]"
+        # pandas' DataFrameFormatter with the defaults of a run that is not
+        # an interactive terminal: max_rows 60 (then min_rows 10), and
+        # max_columns 0, which fits the columns to a width of 80
+        nrows = len(self._index)
+        ncols = len(self._cols)
+        rows = list(range(nrows))
+        vtrunc = nrows > _MAX_ROWS
+        if vtrunc:
+            half = _MIN_ROWS // 2
+            rows = rows[:half] + rows[-half:]
+        strcols = self._strcols(rows, None, vtrunc, -1)
+        lines = _adjoin(strcols)
+        htrunc = False
+        if max(len(x) for x in lines) > _WIDTH:
+            fitted = _fit_columns(strcols, max(len(x) for x in lines))
+            if ncols > fitted:
+                htrunc = True
+                keep = fitted // 2
+                names = self._names()
+                strcols = self._strcols(rows, names[:keep] + names[ncols - keep:], vtrunc, keep)
+                lines = _adjoin(strcols)
+        if vtrunc or htrunc:
+            lines.append("")
+            lines.append("[%d rows x %d columns]" % (nrows, ncols))
+        return "\n".join(lines)
+
+    def _strcols(self, rows, names, vtrunc, dotcol):
+        """The index and every column as lists of equal-width strings."""
+        frame = self._take(rows, names)
         named = self._index.name is not None
-        idx = [""] + ([str(self._index.name)] if named else []) + [_label(v) for v in self._index._v]
+        idx = [""] + ([str(self._index.name)] if named else []) + [_label(v) for v in frame._index._v]
         iw = max(len(x) for x in idx)
-        lines = [x.ljust(iw) for x in idx]
-        for c in self._cols:
+        strcols = [[x.ljust(iw) for x in idx]]
+        for c in frame._cols:
             head = (" " if _numeric(c._dt) else "") + _label(c.name)
             cells = _fmt_values(c._v, c._dt)
             w = max([len(head)] + [len(x) for x in cells])
-            colstrs = [head.rjust(w)] + ([" " * w] if named else []) + [x.rjust(w) for x in cells]
-            lines = [a + " " + b for a, b in zip(lines, colstrs)]
-        return "\n".join(lines)
+            strcols.append([head.rjust(w)] + ([" " * w] if named else []) + [x.rjust(w) for x in cells])
+        if dotcol >= 0:
+            strcols.insert(dotcol + 1, [" ..."] * len(idx))
+        if vtrunc:
+            at = _MIN_ROWS // 2 + 1 + (1 if named else 0)
+            for ix, col in enumerate(strcols):
+                width = len(col[at - 1])
+                dot_col = ix == dotcol + 1 and dotcol >= 0
+                dots = "..." if width > 3 or dot_col else ".."
+                if ix == 0:
+                    col.insert(at, dots.ljust(width))
+                else:
+                    col.insert(at, dots.rjust(4 if dot_col else width))
+        return strcols
 
     __str__ = __repr__
 

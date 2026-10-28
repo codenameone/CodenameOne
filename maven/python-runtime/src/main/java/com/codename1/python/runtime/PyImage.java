@@ -150,7 +150,18 @@ final class PyImage {
             for (int j = 0; j < 4; j++) {
                 box[j] = Py.asDouble(c[j]);
             }
-            return wrap(resample(img(a[0]), i(a[1]), i(a[2]), box));
+            Img src = img(a[0]);
+            boolean premultiply = a.length > 5 && Py.isTrue(a[5]);
+            if (premultiply) {
+                src = premultiply(src);
+            }
+            Img r = resample(src, i(a[1]), i(a[2]), box, a.length > 4 ? i(a[4]) : FILTER_BILINEAR);
+            return wrap(premultiply ? unpremultiply(r) : r);
+        }));
+        m.setAttr("palette", PyBuiltin.positional("palette", a -> wrap(palette(img(a[0]), bytes(a[1])))));
+        m.setAttr("scatter", PyBuiltin.positional("scatter", a -> {
+            scatter(img(a[0]), img(a[1]), i(a[2]), i(a[3]), i(a[4]), i(a[5]));
+            return Py.NONE;
         }));
         m.setAttr("convert", PyBuiltin.positional("convert", a -> wrap(convert(img(a[0]), i(a[1])))));
         m.setAttr("band", PyBuiltin.positional("band", a -> {
@@ -199,8 +210,7 @@ final class PyImage {
         m.setAttr("png_unfilter", PyBuiltin.positional("png_unfilter", a ->
                 new PyBytes(unfilter(bytes(a[0]), i(a[1]), i(a[2]), i(a[3])))));
         m.setAttr("png_expand", PyBuiltin.positional("png_expand", a ->
-                wrap(expand(bytes(a[0]), i(a[1]), i(a[2]), i(a[3]), i(a[4]),
-                        PyBytes.like(a[5]), PyBytes.like(a[6])))));
+                wrap(expand(bytes(a[0]), i(a[1]), i(a[2]), i(a[3]), i(a[4])))));
         m.setAttr("png_rows", PyBuiltin.positional("png_rows", a -> {
             Img s = img(a[0]);
             int row = s.w * s.bands;
@@ -380,13 +390,71 @@ final class PyImage {
         return r;
     }
 
-    /// Bilinear coefficients for one axis, as Pillow's `precompute_coeffs`
+    static final int FILTER_LANCZOS = 1;
+    static final int FILTER_BILINEAR = 2;
+    static final int FILTER_BICUBIC = 3;
+    static final int FILTER_BOX = 4;
+    static final int FILTER_HAMMING = 5;
+
+    private static double support(int filter) {
+        switch (filter) {
+            case FILTER_BOX:
+                return 0.5;
+            case FILTER_BICUBIC:
+                return 2.0;
+            case FILTER_LANCZOS:
+                return 3.0;
+            default:
+                return 1.0;
+        }
+    }
+
+    private static double sinc(double x) {
+        if (x == 0.0) {
+            return 1.0;
+        }
+        double px = x * Math.PI;
+        return Math.sin(px) / px;
+    }
+
+    /// Pillow's filter kernels (`Resample.c`), evaluated at signed `x`.
+    private static double kernel(int filter, double x) {
+        double t = x < 0 ? -x : x;
+        switch (filter) {
+            case FILTER_BOX:
+                return x > -0.5 && x <= 0.5 ? 1.0 : 0.0;
+            case FILTER_HAMMING:
+                if (t == 0.0) {
+                    return 1.0;
+                }
+                if (t >= 1.0) {
+                    return 0.0;
+                }
+                t = t * Math.PI;
+                return Math.sin(t) / t * (0.54 + 0.46 * Math.cos(t));
+            case FILTER_BICUBIC:
+                if (t < 1.0) {
+                    return (1.5 * t - 2.5) * t * t + 1;
+                }
+                if (t < 2.0) {
+                    return (((t - 5) * t + 8) * t - 4) * -0.5;
+                }
+                return 0.0;
+            case FILTER_LANCZOS:
+                return x > -3.0 && x < 3.0 ? sinc(x) * sinc(x / 3.0) : 0.0;
+            default:
+                return t < 1.0 ? 1.0 - t : 0.0;
+        }
+    }
+
+    /// Filter coefficients for one axis, as Pillow's `precompute_coeffs`
     /// and `normalize_coeffs_8bpc` make them. Returns `ksize`; `bounds`
     /// receives `xmin, count` per output position.
-    private static int coeffs(int inSize, double in0, double in1, int outSize, int[] bounds, int[][] out) {
+    private static int coeffs(int inSize, double in0, double in1, int outSize, int[] bounds, int[][] out,
+                              int filter) {
         double scale = (in1 - in0) / outSize;
         double filterscale = scale < 1.0 ? 1.0 : scale;
-        double support = filterscale;
+        double support = support(filter) * filterscale;
         int ksize = (int) Math.ceil(support) * 2 + 1;
         int[] kk = new int[outSize * ksize];
         double[] k = new double[ksize];
@@ -404,11 +472,7 @@ final class PyImage {
             }
             xmax -= xmin;
             for (int x = 0; x < xmax; x++) {
-                double t = (x + xmin - center + 0.5) * ss;
-                if (t < 0) {
-                    t = -t;
-                }
-                double w = t < 1.0 ? 1.0 - t : 0.0;
+                double w = kernel(filter, (x + xmin - center + 0.5) * ss);
                 k[x] = w;
                 ww += w;
             }
@@ -429,14 +493,14 @@ final class PyImage {
         return (byte) (s < 0 ? 0 : s > 255 ? 255 : s);
     }
 
-    private static Img resample(Img s, int w, int h, double[] box) {
+    private static Img resample(Img s, int w, int h, double[] box, int filter) {
         Img cur = s;
         boolean horizontal = w != s.w || box[0] != 0 || box[2] != w;
         boolean vertical = h != s.h || box[1] != 0 || box[3] != h;
         if (horizontal) {
             int[] bounds = new int[w * 2];
             int[][] kh = new int[1][];
-            int ks = coeffs(cur.w, box[0], box[2], w, bounds, kh);
+            int ks = coeffs(cur.w, box[0], box[2], w, bounds, kh, filter);
             Img r = new Img(w, cur.h, cur.bands);
             for (int y = 0; y < cur.h; y++) {
                 for (int x = 0; x < w; x++) {
@@ -456,7 +520,7 @@ final class PyImage {
         if (vertical) {
             int[] bounds = new int[h * 2];
             int[][] kv = new int[1][];
-            int ks = coeffs(cur.h, box[1], box[3], h, bounds, kv);
+            int ks = coeffs(cur.h, box[1], box[3], h, bounds, kv, filter);
             Img r = new Img(cur.w, h, cur.bands);
             for (int y = 0; y < h; y++) {
                 int ymin = bounds[y * 2];
@@ -479,18 +543,74 @@ final class PyImage {
         return cur;
     }
 
+    /// RGBA to RGBa (or LA to La): Pillow's `MULDIV255` premultiply.
+    private static Img premultiply(Img s) {
+        Img r = crop(s, 0, 0, s.w, s.h);
+        int n = s.bands;
+        for (int p = 0, c = s.w * s.h; p < c; p++) {
+            int q = p * n;
+            int alpha = s.d[q + n - 1] & 0xff;
+            for (int b = 0; b < n - 1; b++) {
+                int t = (s.d[q + b] & 0xff) * alpha + 128;
+                r.d[q + b] = (byte) (((t >> 8) + t) >> 8);
+            }
+        }
+        return r;
+    }
+
+    /// RGBa to RGBA (or La to LA), as Pillow's `rgbA2rgba`.
+    private static Img unpremultiply(Img s) {
+        int n = s.bands;
+        for (int p = 0, c = s.w * s.h; p < c; p++) {
+            int q = p * n;
+            int alpha = s.d[q + n - 1] & 0xff;
+            if (alpha == 0 || alpha == 255) {
+                continue;
+            }
+            for (int b = 0; b < n - 1; b++) {
+                int v = (255 * (s.d[q + b] & 0xff)) / alpha;
+                s.d[q + b] = (byte) (v > 255 ? 255 : v);
+            }
+        }
+        return s;
+    }
+
+    /// Maps a 1-band index image through a 256 entry RGBA table.
+    private static Img palette(Img s, byte[] lut) {
+        Img r = new Img(s.w, s.h, 4);
+        for (int p = 0, n = s.w * s.h; p < n; p++) {
+            int idx = s.d[p * s.bands] & 0xff;
+            System.arraycopy(lut, idx * 4, r.d, p * 4, 4);
+        }
+        return r;
+    }
+
+    /// Writes `src` into `dst` at `x0 + x * dx, y0 + y * dy`: one Adam7 pass.
+    private static void scatter(Img dst, Img src, int x0, int y0, int dx, int dy) {
+        int n = dst.bands;
+        for (int y = 0; y < src.h; y++) {
+            for (int x = 0; x < src.w; x++) {
+                System.arraycopy(src.d, (y * src.w + x) * n, dst.d, ((y0 + y * dy) * dst.w + x0 + x * dx) * n, n);
+            }
+        }
+    }
+
     private static Img convert(Img s, int bands) {
         Img r = new Img(s.w, s.h, bands);
         for (int p = 0, n = s.w * s.h; p < n; p++) {
             int q = p * s.bands;
             int cr = s.d[q] & 0xff;
-            int cg = s.bands == 1 ? cr : s.d[q + 1] & 0xff;
-            int cb = s.bands == 1 ? cr : s.d[q + 2] & 0xff;
-            int ca = s.bands == 4 ? s.d[q + 3] & 0xff : 255;
+            boolean gray = s.bands < 3;
+            int cg = gray ? cr : s.d[q + 1] & 0xff;
+            int cb = gray ? cr : s.d[q + 2] & 0xff;
+            int ca = s.bands == 4 ? s.d[q + 3] & 0xff : s.bands == 2 ? s.d[q + 1] & 0xff : 255;
             int o = p * bands;
-            if (bands == 1) {
+            if (bands <= 2) {
                 // Pillow's L24: ITU-R 601-2 luma in 16-bit fixed point
-                r.d[o] = (byte) ((cr * 19595 + cg * 38470 + cb * 7471 + 0x8000) >> 16);
+                r.d[o] = gray ? (byte) cr : (byte) ((cr * 19595 + cg * 38470 + cb * 7471 + 0x8000) >> 16);
+                if (bands == 2) {
+                    r.d[o + 1] = (byte) ca;
+                }
             } else {
                 r.d[o] = (byte) cr;
                 r.d[o + 1] = (byte) cg;
@@ -611,33 +731,24 @@ final class PyImage {
     }
 
     /// Unpacks unfiltered PNG rows into an image: gray to 1 band, RGB to 3,
-    /// gray+alpha, RGBA and palette (to 3, or 4 with a transparency chunk).
-    private static Img expand(byte[] raw, int w, int h, int ctype, int depth, byte[] plte, byte[] trns) {
+    /// gray+alpha to 2, RGBA to 4 and palette to its 1-band indices.
+    private static Img expand(byte[] raw, int w, int h, int ctype, int depth) {
         int channels = ctype == 0 || ctype == 3 ? 1 : ctype == 2 ? 3 : ctype == 4 ? 2 : 4;
         int row = (w * channels * depth + 7) / 8;
-        int bands = ctype == 0 ? 1 : ctype == 2 ? 3 : ctype == 3 && trns == null ? 3 : 4;
+        int bands = ctype == 0 || ctype == 3 ? 1 : ctype == 2 ? 3 : ctype == 4 ? 2 : 4;
         Img r = new Img(w, h, bands);
         for (int y = 0; y < h; y++) {
             int rs = y * row;
             for (int x = 0; x < w; x++) {
                 int o = (y * w + x) * bands;
                 if (ctype == 3) {
-                    int idx = sample(raw, rs, x, depth);
-                    for (int b = 0; b < 3; b++) {
-                        r.d[o + b] = plte != null && idx * 3 + b < plte.length ? plte[idx * 3 + b] : 0;
-                    }
-                    if (bands == 4) {
-                        r.d[o + 3] = idx < trns.length ? trns[idx] : (byte) 255;
-                    }
+                    r.d[o] = (byte) sample(raw, rs, x, depth);
                     continue;
                 }
                 int scale = depth < 8 ? 255 / ((1 << depth) - 1) : 1;
                 if (ctype == 4) {
-                    int g = sample(raw, rs, x * 2, depth);
-                    r.d[o] = (byte) g;
-                    r.d[o + 1] = (byte) g;
-                    r.d[o + 2] = (byte) g;
-                    r.d[o + 3] = (byte) sample(raw, rs, x * 2 + 1, depth);
+                    r.d[o] = (byte) sample(raw, rs, x * 2, depth);
+                    r.d[o + 1] = (byte) sample(raw, rs, x * 2 + 1, depth);
                     continue;
                 }
                 for (int b = 0; b < channels; b++) {

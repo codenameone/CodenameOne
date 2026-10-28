@@ -6,7 +6,7 @@
 Points, rectangles and horizontal or vertical lines match Pillow pixel for
 pixel. Diagonal lines are Bresenham's, and ellipses and polygons are filled
 by pixel centre, so their edges can differ from Pillow's by a pixel. Nothing
-is antialiased and there is no text.
+is antialiased. Text is drawn with the built-in bitmap font (see ImageFont).
 """
 
 import _cn1image
@@ -169,8 +169,85 @@ class ImageDraw:
                 a, b = q[i], q[(i + 1) % len(q)]
                 self._segment(a[0], a[1], b[0], b[1], ink, max(1, width))
 
-    def text(self, xy, text, fill=None, font=None, *args, **kwargs):
-        raise NotImplementedError("ImageDraw.text is not supported")
+    def _font(self, font):
+        if font is None:
+            from PIL import ImageFont
+            font = ImageFont.load_default()
+        return font
+
+    def _spacing(self, font, spacing):
+        return self.textbbox((0, 0), "A", font)[3] + spacing
+
+    def text(self, xy, text, fill=None, font=None, anchor=None, spacing=4, align="left", *args, **kwargs):
+        """Draws `text` with a bitmap font: each line's glyph mask is filled
+        with the ink at the integer position, as Pillow's basic layout does."""
+        font = self._font(font)
+        if isinstance(text, bytes):
+            text = text.decode("latin-1")
+        if "\n" in text:
+            return self.multiline_text(xy, text, fill, font, anchor, spacing, align)
+        ink = self._ink(fill)
+        if ink is None:
+            ink = self.ink
+        mask = font.getmask(text, self.mode)
+        if mask.width == 0 or mask.height == 0:
+            return
+        x, y = int(xy[0]), int(xy[1])
+        self.im.paste(ink, (x, y, x + mask.width, y + mask.height), mask)
+
+    def multiline_text(self, xy, text, fill=None, font=None, anchor=None, spacing=4, align="left",
+                       *args, **kwargs):
+        font = self._font(font)
+        lines = text.split("\n")
+        line_spacing = self._spacing(font, spacing)
+        widths = [self.textlength(line, font) for line in lines]
+        widest = max(widths)
+        top = xy[1]
+        for line, w in zip(lines, widths):
+            left = xy[0]
+            if align == "center":
+                left += (widest - w) / 2.0
+            elif align == "right":
+                left += widest - w
+            elif align != "left":
+                raise ValueError('align must be "left", "center" or "right"')
+            self.text((left, top), line, fill, font)
+            top += line_spacing
+
+    def textlength(self, text, font=None, *args, **kwargs):
+        if "\n" in text:
+            raise ValueError("can't measure length of multiline text")
+        return self._font(font).getlength(text)
+
+    def textbbox(self, xy, text, font=None, anchor=None, spacing=4, align="left", *args, **kwargs):
+        font = self._font(font)
+        if "\n" in text:
+            return self.multiline_textbbox(xy, text, font, anchor, spacing, align)
+        b = font.getbbox(text)
+        return (b[0] + xy[0], b[1] + xy[1], b[2] + xy[0], b[3] + xy[1])
+
+    def multiline_textbbox(self, xy, text, font=None, anchor=None, spacing=4, align="left",
+                           *args, **kwargs):
+        font = self._font(font)
+        lines = text.split("\n")
+        line_spacing = self._spacing(font, spacing)
+        widths = [self.textlength(line, font) for line in lines]
+        widest = max(widths)
+        bbox = None
+        top = xy[1]
+        for line, w in zip(lines, widths):
+            left = xy[0]
+            if align == "center":
+                left += (widest - w) / 2.0
+            elif align == "right":
+                left += widest - w
+            b = self.textbbox((left, top), line, font)
+            if bbox is None:
+                bbox = list(b)
+            else:
+                bbox = [min(bbox[0], b[0]), min(bbox[1], b[1]), max(bbox[2], b[2]), max(bbox[3], b[3])]
+            top += line_spacing
+        return tuple(bbox)
 
 
 def Draw(im, mode=None):
