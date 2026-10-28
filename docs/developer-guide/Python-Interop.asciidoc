@@ -199,16 +199,17 @@ the real package:
 | `pandas` | `Series` and `DataFrame` over the `numpy` subset: index
   alignment, selection with `loc`, `iloc` and masks, missing values,
   statistics and `describe`, `groupby` on one key, `merge`, `concat`, and
-  CSV and JSON reading and writing. Printing matches pandas. Long frames
-  print in full, and date indexes, `MultiIndex`, pivot tables, categoricals
+  CSV and JSON reading and writing. Printing matches pandas, including how
+  long and wide frames are shortened. Date indexes, `MultiIndex`, pivot tables, categoricals
   and rolling windows aren't supported.
-| `Pillow` | `PIL.Image` in the `RGB`, `RGBA` and `L` modes: conversion,
+| `Pillow` | `PIL.Image` in the `RGB`, `RGBA`, `L`, `LA`, `P` and `1` modes: conversion,
   cropping, resizing, rotation, pasting, channels and point operations,
   computed as Pillow computes them. PNG is read and written on every platform;
   JPEG, GIF, BMP and WebP go through Codename One's image support and need the
   application's display, so a server reads and writes PNG only. `ImageDraw`
-  draws points, lines, rectangles, ellipses and polygons, but not text.
-  Resizing filters other than `NEAREST` and `BILINEAR` resize bilinearly.
+  draws points, lines, rectangles, ellipses, polygons and text in Pillow's
+  bitmap font, which `ImageFont.load_default()` returns. Every resizing
+  filter, `LANCZOS` and `BICUBIC` included, gives Pillow's pixels.
 | `flask`, `fastapi`, `uvicorn` | See <<python-backends,Python backends>>.
 | `typing_extensions`, `six`, `tabulate`, `idna`, `packaging` |
 |===
