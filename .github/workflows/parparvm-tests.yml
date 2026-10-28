@@ -38,6 +38,10 @@ on:
       - 'maven/python-runtime/**'
       - 'maven/python-transpiler/**'
       - 'scripts/python-backend/sqlalchemy-realdb-test.sh'
+      - 'scripts/python-backend/build.sh'
+      - 'scripts/python-backend/e2e-test.sh'
+      - 'scripts/python-backend/e2e_client.py'
+      - 'scripts/python-backend/samples/**'
       - 'scripts/hellocodenameone/pom.xml'
       - 'scripts/hellocodenameone/backend/**'
       # The core classes the backend compiles as its own (the ORM and the entity
@@ -107,6 +111,10 @@ on:
       - 'maven/python-runtime/**'
       - 'maven/python-transpiler/**'
       - 'scripts/python-backend/sqlalchemy-realdb-test.sh'
+      - 'scripts/python-backend/build.sh'
+      - 'scripts/python-backend/e2e-test.sh'
+      - 'scripts/python-backend/e2e_client.py'
+      - 'scripts/python-backend/samples/**'
       - 'scripts/hellocodenameone/pom.xml'
       - 'scripts/hellocodenameone/backend/**'
       # The core classes the backend compiles as its own (the ORM and the entity
@@ -473,6 +481,22 @@ jobs:
           JAVA_HOME: ${{ env.JDK_17_HOME }}
           JAVA17_HOME: ${{ env.JDK_17_HOME }}
           CN1_SQLA_POSTGRES: postgres://cn1:cn1secret@127.0.0.1:5432/cn1?sslmode=disable
+
+      # The Flask and FastAPI samples built NATIVELY (ParparVM, clang) and
+      # driven over sockets by the same client as the JVM run. The only place
+      # Python handlers run on the backend's virtual threads, so the only run
+      # of the GIL's scheduler path. python-transpiler and python-runtime were
+      # installed by the step above; core, backend and build-engine by the
+      # contract install; JavaAPI explicitly, since the JVM tests may not.
+      - name: Python backend end to end, native
+        run: |
+          bash "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -B -f vm/pom.xml -pl JavaAPI install -DskipTests \
+            -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+          bash scripts/python-backend/e2e-test.sh --native "$GITHUB_WORKSPACE/.m2-repo"
+        env:
+          JAVA_HOME: ${{ env.JDK_8_HOME }}
+          JDK_8_HOME: ${{ env.JDK_8_HOME }}
+          JAVA17_HOME: ${{ env.JDK_17_HOME }}
 
       - name: Run ParparVM Benchmark
         working-directory: vm

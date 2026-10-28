@@ -23,7 +23,6 @@
  */
 package com.codename1.python.runtime;
 
-import java.io.ByteArrayOutputStream;
 
 /// The `_cn1image` module: pixel storage and the hot loops behind the
 /// bundled `PIL` package. An image is a [Img] handle holding interleaved
@@ -38,6 +37,35 @@ final class PyImage {
     }
 
     /// One image: `w` by `h` pixels of `bands` interleaved bytes.
+    /// The platform image codec behind `native_decode`/`native_encode`:
+    /// Codename One's `Image` and `ImageIO`, installed by the generated
+    /// registry of a client build (`PyImageNative.install()`). It is a seam
+    /// rather than a direct call because a backend build has no UI package:
+    /// the backend translation takes every runtime class, and a reference
+    /// to `com.codename1.ui` from this one failed its C compile. There it
+    /// stays null and PIL uses its pure codecs.
+    interface Codec {
+        boolean available();
+
+        Img decode(byte[] data);
+
+        byte[] encode(Img rgba, String format, float quality);
+    }
+
+    private static Codec codec;
+
+    static void setCodec(Codec c) {
+        codec = c;
+    }
+
+    private static Codec requireCodec() {
+        Codec c = codec;
+        if (c == null) {
+            throw Py.error(Py.OS_ERROR, "this platform has no native image codec");
+        }
+        return c;
+    }
+
     static final class Img {
         final int w;
         final int h;
@@ -220,44 +248,15 @@ final class PyImage {
             }
             return new PyBytes(out);
         }));
-        m.setAttr("native_available", PyBuiltin.positional("native_available", a ->
-                com.codename1.ui.Display.isInitialized() ? Py.TRUE : Py.FALSE));
-        m.setAttr("native_decode", PyBuiltin.positional("native_decode", a -> {
-            byte[] b = bytes(a[0]);
-            com.codename1.ui.Image ci = com.codename1.ui.Image.createImage(b, 0, b.length);
-            int w = ci.getWidth();
-            int h = ci.getHeight();
-            int[] argb = ci.getRGB();
-            Img r = new Img(w, h, 4);
-            for (int p = 0; p < w * h; p++) {
-                int c = argb[p];
-                r.d[p * 4] = (byte) (c >> 16);
-                r.d[p * 4 + 1] = (byte) (c >> 8);
-                r.d[p * 4 + 2] = (byte) c;
-                r.d[p * 4 + 3] = (byte) (c >>> 24);
-            }
-            return wrap(r);
+        m.setAttr("native_available", PyBuiltin.positional("native_available", a -> {
+            Codec c = codec;
+            return c != null && c.available() ? Py.TRUE : Py.FALSE;
         }));
-        m.setAttr("native_encode", PyBuiltin.positional("native_encode", a -> {
-            Img s = convert(img(a[0]), 4);
-            int[] argb = new int[s.w * s.h];
-            for (int p = 0; p < argb.length; p++) {
-                argb[p] = (s.d[p * 4 + 3] & 0xff) << 24 | (s.d[p * 4] & 0xff) << 16
-                        | (s.d[p * 4 + 1] & 0xff) << 8 | (s.d[p * 4 + 2] & 0xff);
-            }
-            com.codename1.ui.Image ci = com.codename1.ui.Image.createImage(argb, s.w, s.h);
-            com.codename1.ui.util.ImageIO io = com.codename1.ui.util.ImageIO.getImageIO();
-            if (io == null) {
-                throw Py.error(Py.OS_ERROR, "this platform cannot encode " + Py.toStr(a[1]));
-            }
-            ByteArrayOutputStream bo = new ByteArrayOutputStream();
-            try {
-                io.save(ci, bo, Py.toStr(a[1]), (float) Py.asDouble(a[2]));
-            } catch (java.io.IOException e) {
-                throw Py.error(Py.OS_ERROR, String.valueOf(e.getMessage())); // NOPMD PreserveStackTrace - surfaced as a Python OSError
-            }
-            return new PyBytes(bo.toByteArray());
-        }));
+        m.setAttr("native_decode", PyBuiltin.positional("native_decode", a ->
+                wrap(requireCodec().decode(bytes(a[0])))));
+        m.setAttr("native_encode", PyBuiltin.positional("native_encode", a ->
+                new PyBytes(requireCodec().encode(convert(img(a[0]), 4), Py.toStr(a[1]),
+                        (float) Py.asDouble(a[2])))));
         return m;
     }
 

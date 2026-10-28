@@ -2143,7 +2143,30 @@ public final class HttpServer {
     /// they live in the virtual thread's own VM state, mapped lazily -- so this
     /// buys call depth rather than data. 64KB holds a few hundred nested Java
     /// frames, well past what an HTTP handler needs, and is mapped lazily too.
-    private static final int VT_STACK_BYTES = envIntAtLeast("CN1_HTTP_VT_STACK", 64 * 1024, 1);
+    ///
+    /// Not final: an application whose handlers are deeper than that raises it
+    /// with `requireVirtualThreadStack` before starting a server. Transpiled
+    /// Python is one: its frames are large and `re` recurses, and a FastAPI
+    /// request overflowed 64KB on its first route match -- a SIGBUS on the
+    /// connection's host with nothing but an empty reply to show for it. Plain
+    /// static rather than atomic: it is written before the server starts, and
+    /// every reader runs on a host thread that start created afterwards.
+    private static int vtStackBytes = envIntAtLeast("CN1_HTTP_VT_STACK", 64 * 1024, 1);
+
+    /// Makes every virtual thread this process creates from now on have at
+    /// least `bytes` of C stack. Call it before `start`; it only ever raises
+    /// the size, so it composes with `CN1_HTTP_VT_STACK` and with other callers.
+    /// The stack is mapped lazily, so a generous size costs address space, not
+    /// memory.
+    ///
+    /// #### Parameters
+    ///
+    /// - `bytes`: the C stack a connection's handler needs
+    public static void requireVirtualThreadStack(int bytes) {
+        if (bytes > vtStackBytes) {
+            vtStackBytes = bytes;
+        }
+    }
 
     /// How often a virtual-thread host sweeps its deadlines, however busy it is.
     /// The same 250ms the idle poll waits, so a quiet host behaves exactly as
@@ -3419,7 +3442,7 @@ public final class HttpServer {
             synchronized (VIRTUAL_TASKS) {
                 queued = (Runnable) VIRTUAL_TASKS.get(Long.valueOf(token));
             }
-            long handle = VirtualThread.createTask(token, VT_STACK_BYTES);
+            long handle = VirtualThread.createTask(token, vtStackBytes);
             if (handle != 0 && queued != null) {
                 // Kept so a task abandoned at shutdown can still be told.
                 me.tasks.put(Long.valueOf(handle), queued);
@@ -4385,7 +4408,7 @@ public final class HttpServer {
             return;
         }
         if (handle == 0) {
-            handle = VirtualThread.create(fd, VT_STACK_BYTES);
+            handle = VirtualThread.create(fd, vtStackBytes);
             if (handle == 0) {
                 // No stack. Serving it on this thread is not an option here: the
                 // keep-alive wait is indefinite because it expects to park, so

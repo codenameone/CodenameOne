@@ -68,7 +68,9 @@ public class PyBackendMain {
 }
 JAVA
 # The runtime, the one core package it uses, and the host file system shim.
-(cd "$CLASSES" && unzip -qo "$RUNTIME" 'com/*' && unzip -qo "$CORE" 'com/codename1/util/*')
+# PyImageNative is PIL's codec over the client UI, which a server lacks.
+(cd "$CLASSES" && unzip -qo "$RUNTIME" 'com/*' -x 'com/codename1/python/runtime/PyImageNative*' \
+    && unzip -qo "$CORE" 'com/codename1/util/*')
 "$J17/bin/javac" -nowarn --release 17 -d "$CLASSES" $(find "$REPO/scripts/python-bench/hostfs" -name '*.java')
 "$J17/bin/javac" -nowarn --release 17 -cp "$CLASSES:$BACKEND" -d "$CLASSES" $(find "$GEN" -name '*.java')
 # Line numbers and source file of the Python, for stack traces and debuggers.

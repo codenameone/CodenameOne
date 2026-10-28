@@ -5,10 +5,17 @@
 # drives it over real sockets with e2e_client.py -- HTTP routes, both kinds
 # of middleware, websockets and streamed responses.
 #
-#   e2e-test.sh [maven repo]
+#   e2e-test.sh [--native] [maven repo]
+#
+# --native builds each sample with build.sh's native path instead (ParparVM
+# translation, clang) and drives the binary with the same checks. That is
+# the only run of the GIL's virtual-thread scheduler, which the generated
+# BackendServer installs and which exists only under ParparVM.
 #
 # Needs JAVA17_HOME, python3, and the inputs build.sh lists in its header.
 set -e
+BUILD_MODE=--jvm
+if [ "$1" = "--native" ]; then BUILD_MODE=; shift; fi
 HERE="$(cd "$(dirname "$0")" && pwd)"
 M2="${1:-$(cd "$HERE/../.." && pwd)/.m2-repo}"
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/cn1-py-e2e.XXXXXX")"
@@ -24,7 +31,7 @@ free_port() {
 
 run_sample() {
     local name="$1" kind="$2"
-    "$HERE/build.sh" --jvm "$HERE/samples/$name" "$WORK/$name" "$M2"
+    "$HERE/build.sh" $BUILD_MODE "$HERE/samples/$name" "$WORK/$name" "$M2"
     local port
     port="$(free_port)"
     "$WORK/$name" "$port" > "$WORK/$name.log" 2>&1 &
@@ -47,4 +54,4 @@ run_sample() {
 
 run_sample fastapi-chat fastapi
 run_sample flask-todo flask
-echo "python backend e2e: passed"
+echo "python backend e2e${BUILD_MODE:+ ($BUILD_MODE)}${BUILD_MODE:- (native)}: passed"
