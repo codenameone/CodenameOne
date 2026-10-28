@@ -619,6 +619,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             // SurfacesRasterizerScreenshotTest above.
             new SurfacesSerializerRoundTripTest(),
             new SurfacesTimelineLogicTest(),
+            new TrueTypeFontFromDataTest(),
             new SurfacesActionDispatchTest(),
             new SurfacesPublishTest(),
             // Document provider on the device VM: the serializer that is the on-disk contract

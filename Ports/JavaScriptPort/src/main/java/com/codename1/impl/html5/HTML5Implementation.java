@@ -11398,12 +11398,27 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // (measuring) and the host's document.fonts (painting) load as they load
         // a bundled file. Encoded here in Java: the arrayBufferToBase64 helper
         // goes through Window.current, which the worker cannot reach.
+        // FontFace rejects bytes that are not a font asynchronously, after this
+        // has already answered; the contract is null, so check the SFNT tag
+        // (0x00010000, 'true', 'OTTO', 'ttcf') up front as the other ports do.
+        if (!isSfntHeader(data)) {
+            return null;
+        }
         if (!loadedFonts.contains(fontName)) {
             loadTrueTypeFont_(fontName,
                     "data:font/ttf;base64," + com.codename1.util.Base64.encodeNoNewline(data), "truetype");
             loadedFonts.add(fontName);
         }
         return createFallbackTrueTypeFont(fontName, null);
+    }
+
+    private static boolean isSfntHeader(byte[] data) {
+        if (data == null || data.length < 12) {
+            return false;
+        }
+        int tag = ((data[0] & 0xff) << 24) | ((data[1] & 0xff) << 16)
+                | ((data[2] & 0xff) << 8) | (data[3] & 0xff);
+        return tag == 0x00010000 || tag == 0x74727565 || tag == 0x4f54544f || tag == 0x74746366;
     }
 
     /**
