@@ -21,6 +21,10 @@ class OperationalError(Error, _sqlite3.OperationalError):
     pass
 
 
+class ProgrammingError(Error, _sqlite3.ProgrammingError):
+    pass
+
+
 class IntegrityError(Error, _sqlite3.IntegrityError):
     pass
 
@@ -37,6 +41,39 @@ def _error(e):
     return OperationalError(msg)
 
 
+def _named(sql, params):
+    """``:name`` binds (``text()``, the named style sqlite3 takes) as ``?`` and a tuple: the
+    backend's drivers bind by position. Quoted text, identifiers and PostgreSQL's ``::``
+    casts are left alone."""
+    out = []
+    values = []
+    i = 0
+    n = len(sql)
+    while i < n:
+        ch = sql[i]
+        if ch in "'\"`":
+            j = sql.find(ch, i + 1)
+            j = n - 1 if j < 0 else j
+            out.append(sql[i:j + 1])
+            i = j + 1
+            continue
+        if ch == ":" and i + 1 < n and (sql[i + 1].isalpha() or sql[i + 1] == "_") \
+                and (i == 0 or sql[i - 1] != ":"):
+            j = i + 1
+            while j < n and (sql[j].isalnum() or sql[j] == "_"):
+                j += 1
+            name = sql[i + 1:j]
+            if name not in params:
+                raise ProgrammingError("You did not supply a value for binding parameter :" + name + ".")
+            values.append(params[name])
+            out.append("?")
+            i = j
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out), tuple(values)
+
+
 class Cursor:
     def __init__(self, conn):
         self.connection = conn
@@ -48,6 +85,8 @@ class Cursor:
         self._at = 0
 
     def execute(self, sql, params=()):
+        if isinstance(params, dict):
+            sql, params = _named(sql, params)
         c = self.connection
         if c._handle is None:
             raise OperationalError("Cannot operate on a closed database.")

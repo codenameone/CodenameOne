@@ -833,16 +833,22 @@ class MetaData:
         return done
 
     def create_all(self, bind, tables=None, checkfirst=True):
+        # The DDL is the bind's dialect's (SERIAL, AUTO_INCREMENT, its types), not SQLite's.
         with bind.begin() as conn:
-            for t in self.sorted_tables:
-                if tables is None or t in tables:
-                    conn._run(t._create_sql(), ())
+            _active.append(conn.engine.dialect)
+            try:
+                for t in self.sorted_tables:
+                    if tables is None or t in tables:
+                        conn._run(t._create_sql(), ())
+            finally:
+                _active.pop()
 
     def drop_all(self, bind, tables=None, checkfirst=True):
         with bind.begin() as conn:
+            q = conn.engine.dialect.quote
             for t in reversed(self.sorted_tables):
                 if tables is None or t in tables:
-                    conn._run("DROP TABLE IF EXISTS " + t.name, ())
+                    conn._run("DROP TABLE IF EXISTS " + q(t.name), ())
 
 
 # ----------------------------------------------------------------------------- statements

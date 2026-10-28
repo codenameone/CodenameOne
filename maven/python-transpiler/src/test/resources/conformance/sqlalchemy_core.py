@@ -1,12 +1,17 @@
+import sys
 import datetime
 from sqlalchemy import (create_engine, text, MetaData, Table, Column, Integer, String, Text, Float,
                         Boolean, DateTime, Date, ForeignKey, select, insert, update, delete, func,
                         and_, or_, not_)
 from sqlalchemy import exc
 
-engine = create_engine("sqlite://")
+engine = create_engine(sys.argv[1] if len(sys.argv) > 1 else "sqlite://")
+# Raw DDL is the one place the SQL is the engine's own: an auto-numbered key is spelled per engine.
+AUTO_ID = {"postgresql": "SERIAL PRIMARY KEY", "mysql": "INTEGER PRIMARY KEY AUTO_INCREMENT",
+           "mariadb": "INTEGER PRIMARY KEY AUTO_INCREMENT"}.get(engine.dialect.name, "INTEGER PRIMARY KEY")
 with engine.connect() as conn:
-    conn.execute(text("CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT, n INTEGER)"))
+    conn.execute(text("DROP TABLE IF EXISTS t"))
+    conn.execute(text("CREATE TABLE t (id " + AUTO_ID + ", name TEXT, n INTEGER)"))
     conn.execute(text("INSERT INTO t (name, n) VALUES (:name, :n)"), [{"name": "a", "n": 1}, {"name": "b", "n": 2}])
     conn.execute(text("INSERT INTO t (name, n) VALUES (:name, :n)"), {"name": "c", "n": 3})
     conn.commit()
@@ -45,6 +50,7 @@ posts = Table("posts", metadata,
               Column("user_id", Integer, ForeignKey("users.id")),
               Column("title", String(100)),
               Column("likes", Integer, default=0))
+metadata.drop_all(engine)  # a server database keeps tables between runs
 metadata.create_all(engine)
 print(sorted(metadata.tables), [c.name for c in users.columns], users.c.name.name)
 

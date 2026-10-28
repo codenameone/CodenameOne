@@ -1,3 +1,4 @@
+import sys
 from typing import List, Optional
 from sqlalchemy import create_engine, ForeignKey, String, Table, Column, Integer, select, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, Session, \
@@ -99,7 +100,8 @@ class Truck(Vehicle):
     __mapper_args__ = {"polymorphic_identity": "truck"}
 
 
-engine = create_engine("sqlite://")
+engine = create_engine(sys.argv[1] if len(sys.argv) > 1 else "sqlite://")
+Base.metadata.drop_all(engine)  # a server database keeps tables between runs
 Base.metadata.create_all(engine)
 
 # ---- many-to-many

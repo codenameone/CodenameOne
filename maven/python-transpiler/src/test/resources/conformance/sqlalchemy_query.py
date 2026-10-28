@@ -1,3 +1,4 @@
+import sys
 import logging
 from typing import List, Optional
 from sqlalchemy import create_engine, ForeignKey, String, Integer, select, func, exists, union, \
@@ -40,7 +41,10 @@ log = logging.getLogger("sqlalchemy.engine.Engine")
 log.addHandler(cap)
 log.propagate = False
 
-engine = create_engine("sqlite://", echo=True)
+engine = create_engine(sys.argv[1] if len(sys.argv) > 1 else "sqlite://", echo=True)
+engine.echo = False
+Base.metadata.drop_all(engine)  # a server database keeps tables between runs
+engine.echo = True
 Base.metadata.create_all(engine)
 s = Session(engine)
 ann = User(name="Ann", age=30, addresses=[Address(email="ann@a.com"), Address(email="ann@b.org")])
