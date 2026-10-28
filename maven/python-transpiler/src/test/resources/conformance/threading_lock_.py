@@ -111,3 +111,25 @@ sem = threading.Semaphore(1)
 sem.acquire()
 print("semaphore timeout", sem.acquire(timeout=0.01))
 sem.release()
+
+# A platform thread waiting for the GIL gets turns while another thread runs a
+# CPU-bound loop that only yields with sleep(0).
+progress = {"loop": 0, "other": 0}
+stop = [False]
+
+
+def other_thread():
+    while not stop[0]:
+        progress["other"] += 1
+        time.sleep(0)
+
+
+ot = threading.Thread(target=other_thread)
+ot.start()
+for i in range(3000):
+    progress["loop"] += 1
+    if i % 10 == 0:
+        time.sleep(0)
+stop[0] = True
+ot.join()
+print("both progressed", progress["loop"] == 3000, progress["other"] > 0)

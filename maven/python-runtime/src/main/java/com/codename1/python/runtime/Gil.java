@@ -62,7 +62,13 @@ public final class Gil {
 
     /// How many pauses [#yieldNow()] waits at most for a waiter to take the
     /// lock before it competes for it again.
-    private static final int HANDOFF_PAUSES = 16;
+    private static final long HANDOFF_NANOS = 2000000L;
+
+    /// Set while [#yieldNow()] leaves the lock free for a waiter: waiters
+    /// then poll instead of sleeping, so a platform thread asleep in
+    /// `Thread.sleep(1)` is not outwaited by the yielder.
+    private static final java.util.concurrent.atomic.AtomicBoolean HANDOFF =
+            new java.util.concurrent.atomic.AtomicBoolean();
 
     private static Scheduler scheduler;
 
@@ -121,7 +127,7 @@ public final class Gil {
         try {
             int attempt = 0;
             while (!OWNER.compareAndSet(0, me)) {
-                pauseWaiter(attempt++);
+                pauseWaiter(HANDOFF.get() ? 0 : attempt++);
             }
         } finally {
             WAITERS.decrementAndGet();
@@ -186,18 +192,22 @@ public final class Gil {
     /// Fair to a waiter: a bare yield followed by a compare-and-set lets
     /// the yielding thread win the lock straight back almost every time,
     /// starving the others. So when a thread is waiting, the lock is left
-    /// free until somebody else has taken it (bounded by
-    /// [#HANDOFF_PAUSES], in case the waiter gave up), and when nobody is
-    /// waiting the lock is not released at all.
+    /// free until somebody else has taken it -- for at most
+    /// [#HANDOFF_NANOS], longer than a platform waiter's one-millisecond
+    /// sleep, and waiters stop sleeping while [#HANDOFF] is set -- and
+    /// when nobody is waiting the lock is not released at all.
     public static void yieldNow() {
         if (WAITERS.get() == 0) {
             pauseWaiter(0);
             return;
         }
         int saved = release();
-        for (int i = 0; i < HANDOFF_PAUSES && OWNER.get() == 0 && WAITERS.get() > 0; i++) {
-            pauseWaiter(i);
+        HANDOFF.set(true);
+        long end = System.nanoTime() + HANDOFF_NANOS;
+        while (OWNER.get() == 0 && WAITERS.get() > 0 && System.nanoTime() - end < 0) {
+            pauseWaiter(0);
         }
+        HANDOFF.set(false);
         restore(saved);
     }
 }

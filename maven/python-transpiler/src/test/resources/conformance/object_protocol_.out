@@ -13,3 +13,5 @@ __newobj__ True
 True False
 TypeError comparing strings with non-ASCII characters is not supported
 TypeError mixed
+no error
+['b', 'c'] 3

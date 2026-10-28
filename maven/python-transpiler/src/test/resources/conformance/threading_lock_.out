@@ -10,3 +10,4 @@ condition True [1]
 event timeout False
 event set True
 semaphore timeout False
+both progressed True True

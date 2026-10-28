@@ -246,6 +246,12 @@ public abstract class PyServer {
         Gil.pauseWaiter(attempt);
     }
 
+    /// The error a websocket endpoint gets for using a connection the server
+    /// no longer holds open (refused, or the handshake timed out).
+    public static RuntimeException webSocketGone(String why) {
+        return Py.error(Py.RUNTIME_ERROR, why);
+    }
+
     /// Drops the work to run after a response that was never completed --
     /// the client went away -- as Starlette skips its background tasks when
     /// a send fails.

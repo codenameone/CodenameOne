@@ -46,7 +46,9 @@ def _error(e):
 def _skip(sql, i, backslash):
     """The end of the quoted text, comment or dollar-quoted body starting at ``sql[i]``, or
     -1 when ``sql[i]`` starts none. ``backslash`` is whether a backslash escapes the next
-    character inside quotes (MySQL and MariaDB always, PostgreSQL in an ``E''`` string)."""
+    character inside quotes (MySQL and MariaDB always, PostgreSQL in an ``E''`` string); it
+    also selects MySQL's comment rules, where ``--`` opens a comment only when followed by
+    whitespace (``1--1`` is arithmetic) and ``#`` runs to the end of the line."""
     n = len(sql)
     ch = sql[i]
     if ch in "'\"`":
@@ -65,7 +67,9 @@ def _skip(sql, i, backslash):
                 return j + 1
             j += 1
         return n
-    if ch == "-" and sql.startswith("--", i):
+    if (ch == "-" and sql.startswith("--", i)
+            and (not backslash or i + 2 >= n or sql[i + 2] in " \t\r\n\f\v")) \
+            or (ch == "#" and backslash):
         j = sql.find("\n", i)
         return n if j < 0 else j + 1
     if ch == "/" and sql.startswith("/*", i):
@@ -138,27 +142,54 @@ _QUERY_HEADS = ("SELECT", "WITH", "VALUES", "SHOW", "EXPLAIN", "PRAGMA", "TABLE"
 
 
 def _words(code):
+    """The words of ``code``, each paired with its parenthesis depth."""
     w = []
     cur = []
+    depth = 0
     for c in code:
         if c.isalnum() or c == "_":
             cur.append(c)
-        elif cur:
-            w.append("".join(cur))
+            continue
+        if cur:
+            w.append(("".join(cur), depth))
             cur = []
+        if c == "(":
+            depth += 1
+        elif c == ")":
+            depth = max(depth - 1, 0)
     if cur:
-        w.append("".join(cur))
+        w.append(("".join(cur), depth))
     return w
+
+
+_STATEMENTS = ("SELECT", "VALUES", "TABLE", "INSERT", "UPDATE", "DELETE", "MERGE")
+
+
+def _query_words(words):
+    """Whether a statement of these words answers rows: by its first keyword, or for a
+    ``WITH`` by the first statement keyword after the CTE list (outside its parentheses),
+    or by a ``RETURNING`` clause anywhere."""
+    if not words:
+        return False
+    if any(w == "RETURNING" for w, _ in words):
+        return True
+    base = words[0][1]
+    head = words[0][0]
+    if head == "WITH":
+        head = ""
+        for w, d in words[1:]:
+            if d == base and w in _STATEMENTS:
+                head = w
+                break
+        return head in ("SELECT", "VALUES", "TABLE")
+    return head in _QUERY_HEADS
 
 
 def _is_query(sql, backslash=False):
     """Whether ``sql`` answers rows. The backend's run() is told up front (its drivers read
     a result set only when asked), so this decides by the statement: its first keyword after
     comments and opening parentheses, or a RETURNING clause anywhere outside quotes."""
-    words = _words(_code(sql, backslash))
-    if not words:
-        return False
-    return words[0] in _QUERY_HEADS or "RETURNING" in words
+    return _query_words(_words(_code(sql, backslash)))
 
 
 def _offset(text):
@@ -176,6 +207,8 @@ def _datetime(text):
     return _dt.datetime.fromisoformat(_offset(text))
 
 
+# A BC date or timestamp ("0044-03-15 BC") is outside what datetime can hold. psycopg2
+# raises ValueError for it too, so it is not mapped to anything: fromisoformat raises.
 def _date(text):
     if text == "infinity":
         return _dt.date.max
@@ -185,6 +218,10 @@ def _date(text):
 
 
 def _time(text):
+    # PostgreSQL allows 24:00:00 (the end of a day); psycopg2 answers it as 00:00:00,
+    # since datetime.time cannot hold it.
+    if text.startswith("24:00:00"):
+        text = "00:00:00" + text[8:]
     return _dt.time.fromisoformat(_offset(text))
 
 
@@ -230,8 +267,8 @@ class Cursor:
         if c._handle is None:
             raise OperationalError("Cannot operate on a closed database.")
         words = _words(_code(sql, backslash))
-        head = words[0] if words else ""
-        query = head in _QUERY_HEADS or "RETURNING" in words
+        head = words[0][0] if words else ""
+        query = _query_words(words)
         if not c._in_tx and head != "CREATE" and head != "DROP":
             _cn1db.begin(c._handle)
             c._in_tx = True

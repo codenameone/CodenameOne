@@ -657,6 +657,21 @@ public class PyInstance extends PyObject {
         /// Set while refilling, so the refill's own stores do not sync again.
         private boolean syncing;
 
+        /// What the keys were last read from: the instance's shape and which
+        /// of its fields were set. While both are unchanged the keys are, and
+        /// sync only re-reads the values -- by index, with no name lookup.
+        /// Values cannot be stamped: inline caches and generated code store
+        /// into slots and fields directly.
+        private Object seenShape;
+        private long seenFields;
+        private boolean seen;
+
+        // No "dictionary keys changed during iteration" check: CPython 3.14
+        // does not raise it for an instance's __dict__ either (deleting one
+        // attribute and adding another while iterating runs on, as
+        // object_protocol_ in the conformance tests shows); only a change of
+        // size is reported, as there.
+
         InstanceDict(PyInstance self) {
             this.self = self;
         }
@@ -668,6 +683,24 @@ public class PyInstance extends PyObject {
             }
             syncing = true;
             try {
+                String[] fields = self.fieldNames();
+                long mask = 0;
+                boolean small = fields.length <= 64;
+                for (int i = 0; small && i < fields.length; i++) {
+                    if (self.getField(i) != null) {
+                        mask |= 1L << i;
+                    }
+                }
+                PyDict other0 = self.nonStrKeys;
+                int expected = Long.bitCount(mask) + self.shape().size() + (other0 == null ? 0 : other0.size);
+                if (small && seen && seenShape == self.shape && seenFields == mask //NOPMD CompareObjectsWithEquals - identity is meant
+                        && size == expected) {
+                    refreshValues(fields.length, mask);
+                    return;
+                }
+                seenShape = self.shape;
+                seenFields = mask;
+                seen = small;
                 String[] names = self.attributeNames();
                 PyDict other = self.nonStrKeys;
                 if (sameKeys(names, other)) {
@@ -695,6 +728,31 @@ public class PyInstance extends PyObject {
                 }
             } finally {
                 syncing = false;
+            }
+        }
+
+        /// Re-reads the values in key order: the set fields, then the shape's
+        /// slots (the order [PyInstance#attributeNames()] lists them in).
+        private void refreshValues(int fieldCount, long mask) {
+            int f = 0;
+            int slot = 0;
+            Object[] sl = self.slots;
+            for (int i = 0; i < used; i++) {
+                if (keys[i] == null) {
+                    continue;
+                }
+                while (f < fieldCount && (mask & (1L << f)) == 0) {
+                    f++;
+                }
+                if (f < fieldCount) {
+                    values[i] = self.getField(f++);
+                } else if (sl != null && slot < sl.length && self.shape != null && slot < self.shape.size()) {
+                    values[i] = sl[slot++];
+                } else {
+                    // The non-str keys, after every attribute: they change
+                    // only through this dict, which keeps them current.
+                    break;
+                }
             }
         }
 
@@ -733,6 +791,10 @@ public class PyInstance extends PyObject {
             if (isStr(key)) {
                 self.store(Py.toStr(key), value);
             } else {
+                // Kept apart from the attributes, so the dict lists them
+                // after every attribute rather than in insertion order as
+                // CPython does: a known difference, for keys no program
+                // reaches through an attribute anyway.
                 if (self.nonStrKeys == null) {
                     self.nonStrKeys = new PyDict();
                 }

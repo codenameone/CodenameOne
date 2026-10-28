@@ -108,3 +108,18 @@ try:
     hmac.compare_digest("abc", b"abc")
 except TypeError:
     print("TypeError mixed")
+
+# Deleting one key and adding another through the dict keeps the size: still an error.
+o3 = Plain()
+o3.a = 1
+o3.b = 2
+d3 = o3.__dict__
+try:
+    for k in d3:
+        if k == "a":
+            del d3["a"]
+            d3["c"] = 3
+    print("no error")
+except RuntimeError as e:
+    print("RuntimeError", e)
+print(sorted(o3.__dict__), o3.c)
