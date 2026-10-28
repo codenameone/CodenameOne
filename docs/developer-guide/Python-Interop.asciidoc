@@ -15,11 +15,13 @@ Two things follow from compiling ahead of time rather than interpreting:
 
 * The program is known in full at build time. A module imported by a
   name computed while the program runs, `exec`, `eval` and `compile` of a
-  string, frame introspection and C extension modules are build errors that
-  name the file and the line. None of them reaches a device as a hidden failure.
-* Packages that CPython implements in C -- `numpy`, `pydantic`'s core,
-  `yaml`'s scanner -- are provided as Codename One implementations of the same
-  public API. Pure Python packages are translated like your own code.
+  string, and frame introspection are build errors that name the file and the
+  line. None of them reaches a device as a hidden failure.
+* Packages with C extensions are supported. The package's Python is
+  translated like your own code, and each compiled module is replaced by a
+  Java class with the same functions; see <<python-c-extensions,C extensions>>.
+  The most used ones -- `numpy`, `pydantic`'s core, `yaml`'s scanner -- are
+  already provided, as Codename One implementations of the same public API.
 
 === Adding Python to a project
 
@@ -28,7 +30,7 @@ project into a Codename One application:
 
 [source,bash]
 ----
-mvn cn1:import-python-project -Dsource=/path/to/my-python-app
+include::../demos/common/src/main/snippets/developer-guide/python-interop.sh[tag=python-interop-bash-001,indent=0]
 ----
 
 The import copies the `.py` files, adds the Python runtime dependency and the
@@ -69,8 +71,7 @@ With `jdb`:
 
 [source,bash]
 ----
-jdb -sourcepath common/src/main/python -classpath ... MyAppStub
-stop at com.codename1.generated.python.py_app$2eutil:6
+include::../demos/common/src/main/snippets/developer-guide/python-interop.sh[tag=python-interop-bash-002,indent=0]
 ----
 
 The mapping is applied to the compiled classes by the build's `remap-compat`
@@ -84,26 +85,7 @@ Any class on the project's class path is importable under the `java.` prefix:
 
 [source,python]
 ----
-from java.com.codename1.ui import Form, Button, Label, TextField, Dialog
-from java.com.codename1.ui.layouts import BoxLayout
-
-
-def main():
-    form = Form("Hello Python", BoxLayout.y())
-    name = TextField("", "Your name")
-    out = Label("Hello, world!")
-
-    def on_greet(event):
-        out.setText(f"Hello, {name.getText().strip()}!")
-        form.revalidate()
-
-    button = Button("Greet")
-    button.addActionListener(on_greet)
-    form.add(name).add(button).add(out)
-    form.show()
-
-
-main()
+include::../demos/common/src/main/snippets/developer-guide/python-interop.py[tag=python-interop-python-001,indent=0]
 ----
 
 A Python function or lambda passed where Java expects a listener or another
@@ -131,14 +113,63 @@ Java exception arrives as a Python exception whose message names the Java
 type.
 
 To call into Python from Java, import the module through the runtime and call
-its attributes:
+its attributes. The build generates
+`com.codename1.generated.python.PythonModules`, which registers every
+translated module. When Python is the application's entry point, its main
+class calls `PythonModules.registerAll()` at startup; a Java application
+that uses Python as a library calls it once before importing anything:
 
 [source,java]
 ----
-PythonModules.registerAll();
-PyModule pricing = Py.importModule("pricing");
-Object total = Py.call(Py.getattr(pricing, "total"), cart);
+include::../demos/common/src/main/java/com/codenameone/developerguide/python/PythonInteropSnippets.java[tag=python-interop-java-001,indent=0]
 ----
+
+=== Building the user interface in Python
+
+The user interface is Codename One's, called from Python, so everything in
+the rest of this guide applies: layouts, themes and CSS, the component
+inspector, and the same look on every platform. The examples below are
+complete applications. Each is a `main.py` you can put in
+`common/src/main/python`.
+
+==== A list loaded from the network
+
+The first example fetches JSON with `requests` on a worker thread, shows a
+progress indicator while it waits and fills a list when the response
+arrives. Pull the list down, or tap the toolbar button, to load it again.
+
+[source,python]
+----
+include::../demos/common/src/main/snippets/developer-guide/python-interop.py[tag=python-interop-python-002,indent=0]
+----
+
+Three conventions carry over from Codename One's Java API:
+
+* Network calls run off the event dispatch thread. A Python thread is fine
+  for that, and `callSerially` hands the result back to the thread that owns
+  the components.
+* A component added to a form that's already showing appears after
+  `revalidate()`.
+* A Python function goes wherever an `ActionListener` or a `Runnable` is
+  expected. A default argument, as in `lambda e, n=name: ...`, captures the
+  loop's value for each row, as it would in any Python callback.
+
+==== A model, two forms and storage
+
+The second example keeps notes in SQLite through the standard `sqlite3`
+module, models them as a dataclass and moves between a list and an editor
+form. The editor saves when the user goes back, and asks before deleting.
+
+[source,python]
+----
+include::../demos/common/src/main/snippets/developer-guide/python-interop.py[tag=python-interop-python-003,indent=0]
+----
+
+The structure is the one a Python developer would write for any user
+interface toolkit: a storage class with no user interface code, and a class
+that owns the forms and turns model objects into components. `show()`
+moves forward to a form, `showBack()` returns with the reverse transition,
+and the toolbar's back command is also what Android's back button runs.
 
 === Libraries
 
@@ -146,7 +177,11 @@ The standard library modules applications use most are included: `json`, `re`,
 `datetime`, `decimal`, `fractions`, `collections`, `itertools`, `functools`,
 `dataclasses`, `enum`, `typing`, `inspect`, `asyncio`, `logging`, `pathlib`,
 `os.path`, `csv`, `struct`, `hashlib`, `base64`, `uuid`, `random`,
-`statistics`, `heapq`, `bisect`, `textwrap`, `string`, `tomllib` and others.
+`statistics`, `heapq`, `bisect`, `textwrap`, `string`, `tomllib`, `sqlite3`,
+`threading`, `queue`, `concurrent.futures`, `pickle`, `shelve`,
+`urllib.request`, `http.client`, `email.message`, `zlib`, `gzip`, `zipfile`,
+`zoneinfo`, `unittest` (with `unittest.mock`) and others. A small `pytest` is
+included as well: `raises`, `approx`, marks, fixtures and parametrized tests.
 
 These third party packages are provided, each tested against the output of
 the real package:
@@ -165,8 +200,88 @@ the real package:
 | `typing_extensions`, `six`, `tabulate`, `idna`, `packaging` |
 |===
 
-Import other pure Python packages by copying their sources into the source
-directory; they translate like the application's own modules.
+==== Packages from PyPI
+
+`cn1:import-python-project` installs the project's requirements, read from
+`pyproject.toml` and `requirements.txt`, from PyPI. Each requirement and
+everything it depends on is resolved to the newest release its version
+specifiers accept, its download is checked against the SHA-256 PyPI
+publishes, and its Python sources go into `common/src/main/python-packages`.
+The build translates that directory together with `src/main/python`.
+Requirements on packages the runtime already provides, such as `requests`
+or `numpy`, aren't downloaded.
+
+The versions chosen are recorded in `python-packages/python.lock`. Importing
+again installs the same versions, so a dependency changes only when you
+delete its line from the lock, or the file itself, and import again.
+
+[cols="1,3",options="header"]
+|===
+| Property | Meaning
+| `cn1.python.offline` | `true` lists the requirements without downloading them.
+| `cn1.python.index` | Another index that serves PyPI's JSON API, such as a company mirror.
+|===
+
+You can also copy a package's sources into the source directory by hand;
+they translate like the application's own modules.
+
+[[python-c-extensions]]
+==== C extensions
+
+A package with a C extension is supported. Its compiled modules are what
+CPython loads from C; everything around them is ordinary Python. The build
+translates that Python as usual, and each compiled module is replaced by a
+Java class that registers the same functions. Most C extensions are small
+accelerators or thin wrappers over a system facility, so the Java is usually
+short, and often a call into a Codename One API that already does the job.
+
+The import finds the compiled modules (`.so` and `.pyd` files in a wheel,
+`.pyx` sources in a source distribution) and the names the package's Python
+uses from each one. For every module it generates a class in
+`common/src/main/java/com/codename1/python/ext` with a stub per function,
+and lists it in `python-packages/cn1-native-modules.properties`:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/python/MarkupsafeSpeedups.java[tag=python-interop-java-002,indent=0]
+----
+
+Replace each stub's body with Java. The functions receive plain Java values
+(a `Number` for an `int` or a `float`, `String`, `byte[]`, `java.util.List`
+for a list or tuple, `java.util.Map` for a dict, `null` for `None`) and
+return the same kinds; an `Object[]` comes back to Python as a tuple. Raise a
+Python exception with `Py.error(Py.TYPE_ERROR, "...")` and its siblings, and
+use `NativeModule.raw` for a function that needs the Python objects
+themselves. Until a stub is filled in, calling it raises a
+`NotImplementedError` that names it. The import never overwrites a class
+that already exists, so importing again keeps your code.
+
+Many packages ship a C accelerator together with a pure Python version of
+the same code, and import the compiled module inside
+`try: ... except ImportError:`. When every import of a compiled module is
+guarded that way, the import reports it as optional and generates nothing:
+the pure Python version runs instead.
+
+==== Threads
+
+`threading`, `queue` and `concurrent.futures` run on Java threads. As in
+CPython, one global interpreter lock serializes Python code: it's released
+while a thread sleeps, waits on a lock, a queue or a future, or waits for a
+network response, so threads help with blocking work and not with
+computation. `ProcessPoolExecutor` is accepted and runs its tasks on threads.
+
+Codename One's user interface belongs to its event dispatch thread. Python
+code started by the application runs on that thread, so update components
+from a worker thread with `Display.getInstance().callSerially`, as Java code
+does.
+
+==== `sqlite3`
+
+`sqlite3` runs on the platform's own SQLite through Codename One's
+`Database`. On iOS, Android and the simulator a value comes back in the
+storage class SQLite recorded for it. The Linux, Windows and JavaScript ports
+don't report storage classes, so a value comes back as an `int` or a `float`
+when its text is a number, and as a `str` otherwise.
 
 [[python-backends]]
 === Python backends
@@ -176,21 +291,7 @@ The application starts the server the way it always does:
 
 [source,python]
 ----
-from flask import Flask, jsonify
-
-app = Flask(__name__)
-
-
-@app.get("/fib/<int:n>")
-def fib(n):
-    a, b = 0, 1
-    for _ in range(n):
-        a, b = b, a + b
-    return jsonify({"n": n, "fib": str(a)})
-
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8080)
+include::../demos/common/src/main/snippets/developer-guide/python-interop.py[tag=python-interop-python-004,indent=0]
 ----
 
 `app.run()` and `uvicorn.run(app)` are lowered onto the Codename One backend's
@@ -198,8 +299,7 @@ HTTP server, so the same file still runs under CPython for development:
 
 [source,bash]
 ----
-scripts/python-backend/build.sh scripts/python-backend/samples/flask-todo ./todo-server
-./todo-server
+include::../demos/common/src/main/snippets/developer-guide/python-interop.sh[tag=python-interop-bash-003,indent=0]
 ----
 
 Routing, converters, JSON bodies, `abort`, error handlers and the default
@@ -276,9 +376,11 @@ more, using a full interpreter's memory per worker. The Codename One server's
 heap grows under load and stays at that size, which is the memory after load
 column; it doesn't grow further on longer runs.
 
-Where an application needs CPython instead: packages with C extensions that
-have no Codename One implementation (for example `pandas`, `scipy` or `torch`),
-and code that builds source text and runs it with `exec`.
+Where an application needs CPython instead: code that builds source text and
+runs it with `exec`, and packages whose C code is the bulk of the package
+rather than an accelerator under its Python, such as `scipy` or `torch`.
+Replacing those means writing a numerical library in Java, not a few
+functions.
 
 === Python against Java on Codename One
 
@@ -317,7 +419,7 @@ image::img/python-perf-rss.svg["Peak memory of each CommonWorkloads benchmark on
 What the numbers say:
 
 * **Python reaches Java's memory.** On every workload the compiled Python uses
-  the memory the Java program uses, within a few percent and sometimes less:
+  about the memory the Java program uses, and sometimes less:
   ints, floats and int lists are held unboxed, a list of ints that fit 32 bits
   takes four bytes an item as a Java `int[]` does, and objects that don't
   escape a function are never allocated.
@@ -345,50 +447,21 @@ The integer kernel in Python:
 
 [source,python]
 ----
-M32 = 0xFFFFFFFF
-
-def i32(v: int) -> int:
-    return ((v + 0x80000000) & M32) - 0x80000000
-
-def int_arithmetic() -> int:
-    a: int = 0x12345678
-    b: int = i32(0x9E3779B9)
-    checksum: int = 0
-    for _ in range(40000000):
-        a = i32((a * 1103515245 + 12345) ^ ((b & M32) >> 3))
-        b = i32((b + a) * 5 - (a << 7))
-        checksum += (a ^ b) & 0xFFFF
-    return checksum + a + b
+include::../demos/common/src/main/snippets/developer-guide/python-interop.py[tag=python-interop-python-005,indent=0]
 ----
 
 The same function in Java, under `common/src/main/java`:
 
 [source,java]
 ----
-package com.bench;
-
-public final class CommonWorkloads {
-    public static long intArithmetic() {
-        int a = 0x12345678;
-        int b = 0x9E3779B9;
-        long checksum = 0;
-        for (int i = 0; i < 40000000; i++) {
-            a = (a * 1103515245 + 12345) ^ (b >>> 3);
-            b = (b + a) * 5 - (a << 7);
-            checksum += (a ^ b) & 0xFFFF;
-        }
-        return checksum + a + b;
-    }
-}
+include::../demos/common/src/main/java/com/codenameone/developerguide/python/CommonWorkloads.java[tag=python-interop-java-003,indent=0]
 ----
 
 And the Python that calls it:
 
 [source,python]
 ----
-from java.com.bench import CommonWorkloads
-
-checksum = CommonWorkloads.intArithmetic()
+include::../demos/common/src/main/snippets/developer-guide/python-interop.py[tag=python-interop-python-006,indent=0]
 ----
 
 The Java `int` wraps by itself, so the masks disappear and the loop compiles

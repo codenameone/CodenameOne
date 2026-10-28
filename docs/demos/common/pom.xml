@@ -33,6 +33,18 @@
             <scope>provided</scope>
         </dependency>
 
+        <!--
+          The Python chapter's Java snippets name the Python runtime's API
+          (NativeModule, Py) and compile against it here, as the Flutter
+          chapter's do against the Flutter runtime.
+        -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-python-runtime</artifactId>
+            <version>${cn1.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
         <!-- INJECT DEPENDENCIES -->
     </dependencies>
 
