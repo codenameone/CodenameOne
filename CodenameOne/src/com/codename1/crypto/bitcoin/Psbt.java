@@ -22,11 +22,11 @@
  */
 package com.codename1.crypto.bitcoin;
 
-import com.codename1.crypto.encoding.Base64;
 import com.codename1.crypto.hd.DerivationPath;
 import com.codename1.security.Hash;
 import com.codename1.security.Secp256k1;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 
 /// A Partially Signed Bitcoin Transaction (BIP-174, with the BIP-371 Taproot fields): the
@@ -140,7 +140,7 @@ public final class Psbt {
 
     /// Reads a Base64 PSBT, the form wallets exchange.
     public static Psbt fromBase64(String base64) {
-        return parse(Base64.decode(base64));
+        return parse(Base64.getDecoder().decode(base64));
     }
 
     // Key shapes of the typed keys BIP-174 and BIP-371 define, indexed by type: 1 means the
@@ -207,7 +207,7 @@ public final class Psbt {
 
     /// The Base64 PSBT.
     public String toBase64() {
-        return Base64.encode(serialize());
+        return Base64.getEncoder().encodeToString(serialize());
     }
 
     private static void writeMap(Wire w, List<byte[][]> map) {

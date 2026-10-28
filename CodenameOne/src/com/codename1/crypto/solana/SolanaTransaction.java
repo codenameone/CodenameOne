@@ -23,8 +23,8 @@
 package com.codename1.crypto.solana;
 
 import com.codename1.crypto.encoding.Base58;
-import com.codename1.crypto.encoding.Base64;
 import com.codename1.security.Ed25519;
+import java.util.Base64;
 
 /// A Solana transaction: a [SolanaMessage] and one Ed25519 signature per required signer.
 /// A slot whose signer has not signed yet holds 64 zero bytes, which is how a transaction is
@@ -124,7 +124,7 @@ public final class SolanaTransaction {
 
     /// The Base64 wire form, what `sendTransaction` takes with `encoding: base64`.
     public String toBase64() {
-        return Base64.encode(serialize());
+        return Base64.getEncoder().encodeToString(serialize());
     }
 
     /// Reads a transaction.
@@ -150,6 +150,6 @@ public final class SolanaTransaction {
 
     /// Reads a Base64 transaction.
     public static SolanaTransaction fromBase64(String base64) {
-        return parse(Base64.decode(base64));
+        return parse(Base64.getDecoder().decode(base64));
     }
 }

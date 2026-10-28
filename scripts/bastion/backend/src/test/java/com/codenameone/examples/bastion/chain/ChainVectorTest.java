@@ -18,8 +18,8 @@
  */
 package com.codenameone.examples.bastion.chain;
 
+import com.codename1.security.Hash;
 import com.codename1.crypto.UInt256;
-import com.codename1.crypto.encoding.Hex;
 import com.codename1.crypto.evm.EvmAddress;
 import com.codename1.crypto.evm.EvmTransaction;
 import com.codename1.crypto.hd.Bip32;
@@ -79,7 +79,7 @@ class ChainVectorTest {
     @Test
     void aKeyHasItsKnownAddress() {
         assertEquals("0x2c7536e3605d9c16a7a3d7b1898e529396a65c23",
-                EvmAddress.fromPrivateKey(Hex.decode(KEY)).toLowerCaseString());
+                EvmAddress.fromPrivateKey(Hash.fromHex(KEY)).toLowerCaseString());
     }
 
     @Test
@@ -89,19 +89,19 @@ class ChainVectorTest {
                 Chain.fromGwei(1500000000L), null);
         assertEquals("0b1bd411c9eb4da68dee78e282b1a66831167368952179f857f69a680f642cba",
                 hex(tx.signingHash()));
-        EvmTransaction signed = tx.sign(Hex.decode(KEY));
+        EvmTransaction signed = tx.sign(Hash.fromHex(KEY));
         assertEquals("02f87582053903847735940085174876e8008252089435353535353535353535353535353535"
                 + "353535358814d1120d7b16000080c001a0c34cfde89d316325c60fc29e10403b382c28543668c155"
                 + "2957112c5496125a30a0453e3bcbf326db30b59ea3015c8faf5c190800bddf6f53c83d1967df5c06"
                 + "4dbc", hex(signed.encode()));
         assertEquals("f0a0c01af56fcf57face413edf956894ebd29855b1143abde08823d6b4827b8e", hex(signed.hash()));
         // The signature names its signer: what a node checks.
-        assertEquals(EvmAddress.fromPrivateKey(Hex.decode(KEY)), signed.sender());
+        assertEquals(EvmAddress.fromPrivateKey(Hash.fromHex(KEY)), signed.sender());
     }
 
     @Test
     void depositAndHotKeysDeriveAsStandardWalletsDo() {
-        byte[] seed = Hex.decode(SEED);
+        byte[] seed = Hash.fromHex(SEED);
         Bip32 first = Bip32.master(seed).derive("m/44'/60'/0'/0/0");
         assertEquals("1ab42cc412b618bdea3a599e3c9bae199ebf030895b039e9db1e30dafb12b727",
                 hex(first.privateKey()));
@@ -127,6 +127,6 @@ class ChainVectorTest {
     }
 
     private static String hex(byte[] bytes) {
-        return Hex.encode(bytes);
+        return Hash.toHex(bytes);
     }
 }

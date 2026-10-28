@@ -101,7 +101,7 @@ class ChainIntegrationTest {
         until("the float arrives", () -> balanceQuietly(chain.hotWallet()) > before);
 
         // A withdrawal of 0.4 ETH to an outside address, past its cooling-off.
-        String outside = "0x" + com.codename1.crypto.encoding.Hex.encode(new byte[] {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+        String outside = "0x" + com.codename1.security.Hash.toHex(new byte[] {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
                 13, 14, 15, 16, 17, 18, 19, 20});
         CryptoAddress to = new CryptoAddress();
         to.setId("chaintest-address");

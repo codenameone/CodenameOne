@@ -22,7 +22,7 @@
  */
 package com.codename1.crypto.bitcoin;
 
-import com.codename1.crypto.encoding.Hex;
+import com.codename1.security.Hash;
 import com.codename1.crypto.hd.Bip32;
 import com.codename1.crypto.hd.Mnemonic;
 import com.codename1.junit.UITestBase;
@@ -134,12 +134,12 @@ class BitcoinTest extends UITestBase {
             assertEquals(tx[0], t.toHex());
             List<BitcoinTransaction.Output> spent = utxos(tx[1]);
             int index = Integer.parseInt(in[1]);
-            byte[] priv = Hex.decode(in[2]);
-            byte[] root = in[3] == null ? null : Hex.decode(in[3]);
+            byte[] priv = Hash.fromHex(in[2]);
+            byte[] root = in[3] == null ? null : Hash.fromHex(in[3]);
             int type = Integer.parseInt(in[4]);
-            assertEquals(in[5], Hex.encode(Taproot.tweakPrivateKey(priv, root)));
+            assertEquals(in[5], Hash.toHex(Taproot.tweakPrivateKey(priv, root)));
             byte[] sighash = t.taprootSighash(index, spent, type);
-            assertEquals(in[6], Hex.encode(sighash));
+            assertEquals(in[6], Hash.toHex(sighash));
             t.signP2trKeyPath(index, priv, root, spent, type);
             byte[] sig = t.getInputs().get(index).getWitness().get(0);
             assertEquals(type == 0 ? 64 : 65, sig.length);
@@ -151,8 +151,8 @@ class BitcoinTest extends UITestBase {
     @Test
     void taprootScriptPubKeys() {
         for (String[] v : SPK) {
-            byte[] root = v[1] == null ? null : Hex.decode(v[1]);
-            BitcoinAddress a = BitcoinAddress.p2tr(Hex.decode(v[0]), root, BitcoinNetwork.MAINNET);
+            byte[] root = v[1] == null ? null : Hash.fromHex(v[1]);
+            BitcoinAddress a = BitcoinAddress.p2tr(Hash.fromHex(v[0]), root, BitcoinNetwork.MAINNET);
             assertEquals(v[2], a.getScriptPubKey().toHex());
             assertEquals(v[3], a.toString());
             assertEquals(a, BitcoinAddress.parse(v[3], BitcoinNetwork.MAINNET));
@@ -163,12 +163,12 @@ class BitcoinTest extends UITestBase {
     void bip143NativeP2wpkh() {
         BitcoinTransaction t = BitcoinTransaction.fromHex(BIP143_UNSIGNED);
         assertEquals(BIP143_UNSIGNED, t.toHex());
-        byte[] k1 = Hex.decode("619c335025c7f4012e556c2a58b2506e30b8511b53ade95ea316fd8c3286feb9");
-        Script code = Script.p2pkh(Hex.decode("1d0f172a0ecb48aee1be1f2687d2963ae33f71a1"));
+        byte[] k1 = Hash.fromHex("619c335025c7f4012e556c2a58b2506e30b8511b53ade95ea316fd8c3286feb9");
+        Script code = Script.p2pkh(Hash.fromHex("1d0f172a0ecb48aee1be1f2687d2963ae33f71a1"));
         assertEquals("c37af31116d1b27caf68aae9e3ac82f1477929014d5b917657d0eb49478cb670",
-                Hex.encode(t.segwitV0Sighash(1, code, 600000000L, BitcoinTransaction.SIGHASH_ALL)));
+                Hash.toHex(t.segwitV0Sighash(1, code, 600000000L, BitcoinTransaction.SIGHASH_ALL)));
         Script p2pk = Script.fromHex("2103c9f4836b9a4f77fc0d81f7bcb01b7f1b35916864b9476c241ce9fc198bd25432ac");
-        byte[] k0 = Hex.decode("bbc27228ddcb9209d7fd6f36b02f7dfa6252af40bb2f1cbc7a557da8027ff866");
+        byte[] k0 = Hash.fromHex("bbc27228ddcb9209d7fd6f36b02f7dfa6252af40bb2f1cbc7a557da8027ff866");
         byte[] sig0 = BitcoinTransaction.ecdsa(t.legacySighash(0, p2pk, BitcoinTransaction.SIGHASH_ALL), k0,
                 BitcoinTransaction.SIGHASH_ALL);
         t.getInputs().get(0).setScriptSig(Script.builder().push(sig0).build());
@@ -204,11 +204,11 @@ class BitcoinTest extends UITestBase {
     void wif() {
         String key = "0c28fca386c7a227600b2fe50b7cae11ec86d3bf1fbe471be89827e19d72aa1d";
         assertEquals("5HueCGU8rMjxEXxiPuD5BDku4MkFqeZyd4dZ1jvhTVqvbTLvyTJ",
-                Wif.encode(Hex.decode(key), false, BitcoinNetwork.MAINNET));
+                Wif.encode(Hash.fromHex(key), false, BitcoinNetwork.MAINNET));
         Wif w = Wif.decode("5HueCGU8rMjxEXxiPuD5BDku4MkFqeZyd4dZ1jvhTVqvbTLvyTJ", BitcoinNetwork.MAINNET);
-        assertEquals(key, Hex.encode(w.getPrivateKey()));
+        assertEquals(key, Hash.toHex(w.getPrivateKey()));
         assertFalse(w.isCompressed());
-        String c = Wif.encode(Hex.decode(key), true, BitcoinNetwork.MAINNET);
+        String c = Wif.encode(Hash.fromHex(key), true, BitcoinNetwork.MAINNET);
         assertTrue(Wif.decode(c, BitcoinNetwork.MAINNET).isCompressed());
     }
 
@@ -221,7 +221,7 @@ class BitcoinTest extends UITestBase {
         byte[] der = Der.encode(r, s);
         byte[][] back = new byte[][] {Der.decode(der)};
         assertEquals(64, back[0].length);
-        assertEquals(Hex.encode(r) + Hex.encode(s), Hex.encode(back[0]));
+        assertEquals(Hash.toHex(r) + Hash.toHex(s), Hash.toHex(back[0]));
     }
 
     @Test
@@ -272,7 +272,7 @@ class BitcoinTest extends UITestBase {
         List<byte[]> w = signed.getInputs().get(0).getWitness();
         assertEquals(4, w.size());
         assertEquals(0, w.get(0).length);
-        assertEquals(ms.toHex(), Hex.encode(w.get(3)));
+        assertEquals(ms.toHex(), Hash.toHex(w.get(3)));
         assertEquals(t.getTxid(), signed.getTxid());
     }
 }

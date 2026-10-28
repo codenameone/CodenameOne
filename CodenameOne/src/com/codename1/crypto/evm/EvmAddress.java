@@ -22,8 +22,8 @@
  */
 package com.codename1.crypto.evm;
 
-import com.codename1.crypto.encoding.Hex;
 import com.codename1.crypto.encoding.Rlp;
+import com.codename1.security.CryptoException;
 import com.codename1.security.Hash;
 import com.codename1.security.Secp256k1;
 
@@ -112,7 +112,12 @@ public final class EvmAddress {
             throw new IllegalArgumentException("an address is 0x and 40 hex digits");
         }
         String hex = text.substring(2);
-        EvmAddress out = new EvmAddress(Hex.decode(hex));
+        EvmAddress out;
+        try {
+            out = new EvmAddress(Hash.fromHex(hex));
+        } catch (CryptoException notHex) {
+            throw new IllegalArgumentException("an address is 0x and 40 hex digits");
+        }
         boolean lower = false;
         boolean upper = false;
         for (int iter = 0; iter < 40; iter++) {
@@ -148,7 +153,7 @@ public final class EvmAddress {
 
     /// The EIP-55 mixed-case form, which is how an address should be shown.
     public String toChecksumString() {
-        String hex = Hex.encode(bytes);
+        String hex = Hash.toHex(bytes);
         byte[] hash = Hash.keccak256(ascii(hex));
         StringBuilder out = new StringBuilder("0x");
         for (int iter = 0; iter < 40; iter++) {
@@ -161,7 +166,7 @@ public final class EvmAddress {
 
     /// The lowercase `0x` form.
     public String toLowerCaseString() {
-        return "0x" + Hex.encode(bytes);
+        return "0x" + Hash.toHex(bytes);
     }
 
     /// The EIP-55 form.

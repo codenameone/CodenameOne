@@ -20,11 +20,12 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-/// Text and binary encodings used by blockchain and wallet code: hexadecimal,
-/// Base58 and Base58Check, Bech32 and Bech32m with SegWit addresses, and
-/// Ethereum's Recursive Length Prefix serialization.
+/// Text and binary encodings used by blockchain and wallet code: Base58 and
+/// Base58Check, Bech32 and Bech32m with SegWit addresses, and
+/// Ethereum's Recursive Length Prefix serialization. Hexadecimal is
+/// [com.codename1.security.Hash#toHex(byte[])] and
+/// [com.codename1.security.Hash#fromHex(String)]; Base64 is `java.util.Base64`.
 ///
-/// - [com.codename1.crypto.encoding.Hex]
 /// - [com.codename1.crypto.encoding.Base58]
 /// - [com.codename1.crypto.encoding.Base58Check]
 /// - [com.codename1.crypto.encoding.Bech32]

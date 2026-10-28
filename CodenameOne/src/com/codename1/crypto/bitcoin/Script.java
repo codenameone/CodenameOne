@@ -22,7 +22,7 @@
  */
 package com.codename1.crypto.bitcoin;
 
-import com.codename1.crypto.encoding.Hex;
+import com.codename1.security.Hash;
 
 /// A Bitcoin script: the locking `scriptPubKey` of an output, or the `scriptSig`, redeem and
 /// witness scripts that unlock one. Immutable.
@@ -86,7 +86,7 @@ public final class Script {
 
     /// Wraps script bytes given in hex.
     public static Script fromHex(String hex) {
-        return new Script(Hex.decode(hex));
+        return new Script(Hash.fromHex(hex));
     }
 
     /// `OP_DUP OP_HASH160 <hash> OP_EQUALVERIFY OP_CHECKSIG`.
@@ -314,7 +314,7 @@ public final class Script {
 
     /// The serialized script in hex.
     public String toHex() {
-        return Hex.encode(program);
+        return Hash.toHex(program);
     }
 
     @Override

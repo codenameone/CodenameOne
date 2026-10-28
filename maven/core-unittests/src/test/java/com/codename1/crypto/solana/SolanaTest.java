@@ -22,12 +22,12 @@
  */
 package com.codename1.crypto.solana;
 
-import com.codename1.crypto.encoding.Base64;
 import com.codename1.junit.UITestBase;
+import org.junit.jupiter.api.Test;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.List;
-import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -129,7 +129,7 @@ class SolanaTest extends UITestBase {
         passed.sign(payerSeed);
         assertTrue(passed.isFullySigned());
         assertEquals(0x80, passed.getMessageBytes()[0] & 0xff);
-        assertEquals(Base64.encode(passed.serialize()), SolanaTransaction.parse(passed.serialize()).toBase64());
+        assertEquals(Base64.getEncoder().encodeToString(passed.serialize()), SolanaTransaction.parse(passed.serialize()).toBase64());
         List<Instruction> back = passed.getMessage().getInstructions();
         assertEquals(4, back.size());
         assertTrue(Arrays.equals(ixs.get(2).getData(), back.get(2).getData()));

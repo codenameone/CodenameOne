@@ -18,9 +18,9 @@
  */
 package com.codenameone.examples.bastion.chain;
 
+import com.codename1.security.Hash;
 import com.codename1.backend.WebRpcTransport;
 import com.codename1.crypto.UInt256;
-import com.codename1.crypto.encoding.Hex;
 import com.codename1.crypto.rpc.EvmRpc;
 
 import java.io.IOException;
@@ -76,6 +76,6 @@ public class EthRpc extends EvmRpc {
 
     /// Broadcasts signed bytes and answers their hash.
     public String sendRaw(byte[] raw) throws IOException {
-        return (String) call("eth_sendRawTransaction", "0x" + Hex.encode(raw));
+        return (String) call("eth_sendRawTransaction", "0x" + Hash.toHex(raw));
     }
 }

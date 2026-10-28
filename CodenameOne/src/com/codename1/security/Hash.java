@@ -250,21 +250,26 @@ public final class Hash {
         return b.toString();
     }
 
-    /// Decodes a hex string back into bytes. The string must contain an even
-    /// number of hex characters (whitespace and the `0x` prefix are not
-    /// stripped -- pass cleaned input).
+    /// Decodes a hex string back into bytes. Either case is accepted, as is a
+    /// leading `0x` or `0X`, the form Ethereum writes hex in; the rest must be
+    /// an even number of hex characters (whitespace is not stripped).
     public static byte[] fromHex(String hex) {
         if (hex == null) {
             return null;
         }
-        int len = hex.length();
+        int start = 0;
+        if (hex.length() >= 2 && hex.charAt(0) == '0'
+                && (hex.charAt(1) == 'x' || hex.charAt(1) == 'X')) {
+            start = 2;
+        }
+        int len = hex.length() - start;
         if ((len & 1) != 0) {
             throw new CryptoException("hex string must have even length");
         }
         byte[] out = new byte[len / 2];
         for (int i = 0; i < len; i += 2) {
-            int hi = nibble(hex.charAt(i));
-            int lo = nibble(hex.charAt(i + 1));
+            int hi = nibble(hex.charAt(start + i));
+            int lo = nibble(hex.charAt(start + i + 1));
             out[i / 2] = (byte) ((hi << 4) | lo);
         }
         return out;

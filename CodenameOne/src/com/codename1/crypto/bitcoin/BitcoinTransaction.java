@@ -22,7 +22,6 @@
  */
 package com.codename1.crypto.bitcoin;
 
-import com.codename1.crypto.encoding.Hex;
 import com.codename1.security.Hash;
 import com.codename1.security.Schnorr;
 import com.codename1.security.Secp256k1;
@@ -86,7 +85,7 @@ public final class BitcoinTransaction {
 
         /// The spent transaction's id in display (big-endian) hex, as explorers show it.
         public String getPrevTxid() {
-            return Hex.encode(Wire.reverse(prevTxidInternal));
+            return Hash.toHex(Wire.reverse(prevTxidInternal));
         }
 
         /// The output index spent.
@@ -175,7 +174,7 @@ public final class BitcoinTransaction {
 
     /// Adds an input with an explicit sequence. Returns its index.
     public int addInput(String prevTxid, long index, long sequence) {
-        byte[] txid = Hex.decode(prevTxid);
+        byte[] txid = Hash.fromHex(prevTxid);
         if (txid.length != 32) {
             throw new IllegalArgumentException("a txid is 32 bytes");
         }
@@ -269,18 +268,18 @@ public final class BitcoinTransaction {
 
     /// [#serialize] in hex, the form `sendrawtransaction` and every broadcast API take.
     public String toHex() {
-        return Hex.encode(serialize());
+        return Hash.toHex(serialize());
     }
 
     /// The transaction id in display hex: the reversed double SHA-256 of the form without
     /// witness.
     public String getTxid() {
-        return Hex.encode(Wire.reverse(Hash.sha256(Hash.sha256(serialize(false)))));
+        return Hash.toHex(Wire.reverse(Hash.sha256(Hash.sha256(serialize(false)))));
     }
 
     /// The witness transaction id in display hex.
     public String getWtxid() {
-        return Hex.encode(Wire.reverse(Hash.sha256(Hash.sha256(serialize(true)))));
+        return Hash.toHex(Wire.reverse(Hash.sha256(Hash.sha256(serialize(true)))));
     }
 
     /// The virtual size in vbytes, which fees are priced in.
@@ -357,7 +356,7 @@ public final class BitcoinTransaction {
 
     /// [#parse] from hex.
     public static BitcoinTransaction fromHex(String hex) {
-        return parse(Hex.decode(hex));
+        return parse(Hash.fromHex(hex));
     }
 
     private static void checkCount(long n, Wire r) {

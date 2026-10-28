@@ -379,7 +379,7 @@ public final class UInt256 implements Comparable<UInt256> {
 
     /// Lowercase hexadecimal without leading zeros or prefix; `"0"` for zero.
     public String toHex() {
-        String hex = com.codename1.crypto.encoding.Hex.encode(toMinimalBytes());
+        String hex = com.codename1.security.Hash.toHex(toMinimalBytes());
         int start = 0;
         while (start < hex.length() - 1 && hex.charAt(start) == '0') {
             start++;

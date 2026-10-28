@@ -18,10 +18,10 @@
  */
 package com.codenameone.examples.bastion.chain;
 
+import com.codename1.security.Hash;
 import java.time.Instant;
 import com.codename1.backend.annotations.Component;
 import com.codename1.crypto.UInt256;
-import com.codename1.crypto.encoding.Hex;
 import com.codename1.crypto.evm.EvmAddress;
 import com.codename1.crypto.evm.EvmTransaction;
 import com.codename1.crypto.rpc.RpcException;
@@ -175,7 +175,7 @@ public class Chain {
             throw new IllegalStateException("the node is on chain " + actual
                     + ", bastion.chain.id says " + expectedChainId);
         }
-        signer = new SeedSigner(Hex.decode(seedHex));
+        signer = new SeedSigner(Hash.fromHex(seedHex));
         // The cursor exists before the first address is handed out. Made
         // lazily by the first scan instead, it would start at the head of
         // that moment, and a deposit sent between the address being shown
@@ -492,8 +492,8 @@ public class Chain {
         EvmTransaction signed = tx.withSignature(signature);
         // Saved before any broadcast, and only over the QUEUED row it was
         // made from: a second worker's signature is dropped here, unsent.
-        transfers.signed(t.getId(), QUEUED, SIGNED, nonce, Hex.encode(signed.encode()),
-                "0x" + Hex.encode(signed.hash()),
+        transfers.signed(t.getId(), QUEUED, SIGNED, nonce, Hash.toHex(signed.encode()),
+                "0x" + Hash.toHex(signed.hash()),
                 t.getAmount(), Instant.now());
     }
 
@@ -517,7 +517,7 @@ public class Chain {
     @Transactional(rollbackFor = Exception.class)
     private void broadcast(ChainTransfer t) throws IOException {
         try {
-            rpc.sendRaw(Hex.decode(t.getRaw()));
+            rpc.sendRaw(Hash.fromHex(t.getRaw()));
         } catch (RpcException refused) {
             String m = String.valueOf(refused.getMessage());
             // The node already has it: from an earlier broadcast whose answer
@@ -545,7 +545,7 @@ public class Chain {
             if (System.currentTimeMillis() - t.getBroadcastAt().toEpochMilli() > rebroadcastMillis) {
                 // Dropped from a node's pool: send the same bytes again.
                 try {
-                    rpc.sendRaw(Hex.decode(t.getRaw()));
+                    rpc.sendRaw(Hash.fromHex(t.getRaw()));
                 } catch (RpcException ignored) {
                     // "already known" and "nonce too low" both mean wait.
                 }

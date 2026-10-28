@@ -23,7 +23,6 @@
 package com.codename1.crypto.evm;
 
 import com.codename1.crypto.UInt256;
-import com.codename1.crypto.encoding.Hex;
 import com.codename1.security.Hash;
 import java.util.ArrayList;
 import java.util.List;
@@ -110,7 +109,7 @@ public final class Abi {
 
     /// [#decode] from `0x` hex, the form `eth_call` returns.
     public static List<Object> decodeHex(String tupleType, String hex) {
-        return decode(tupleType, Hex.decode(hex));
+        return decode(tupleType, Hash.fromHex(hex));
     }
 
     /// Normalizes a signature: drops spaces and expands `uint`/`int` to their 256-bit names.
@@ -641,7 +640,7 @@ public final class Abi {
                 return (byte[]) value;
             }
             if (value instanceof String) {
-                return Hex.decode((String) value);
+                return Hash.fromHex((String) value);
             }
             throw new IllegalArgumentException("bytes take a byte[] or a 0x String");
         }

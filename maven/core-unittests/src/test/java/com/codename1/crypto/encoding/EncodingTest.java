@@ -23,6 +23,8 @@
 
 package com.codename1.crypto.encoding;
 
+import com.codename1.security.CryptoException;
+import com.codename1.security.Hash;
 import org.junit.jupiter.api.Test;
 
 import com.codename1.crypto.UInt256;
@@ -49,19 +51,19 @@ class EncodingTest {
     @Test
     void hex_roundTripAndPrefix() {
         byte[] b = {0, 1, (byte) 0xab, (byte) 0xff};
-        assertEquals("0001abff", Hex.encode(b));
-        assertArrayEquals(b, Hex.decode("0001abff"));
-        assertArrayEquals(b, Hex.decode("0x0001ABFF"));
-        assertArrayEquals(b, Hex.decode("0X0001aBfF"));
-        assertEquals(0, Hex.decode("").length);
-        assertEquals(0, Hex.decode("0x").length);
+        assertEquals("0001abff", Hash.toHex(b));
+        assertArrayEquals(b, Hash.fromHex("0001abff"));
+        assertArrayEquals(b, Hash.fromHex("0x0001ABFF"));
+        assertArrayEquals(b, Hash.fromHex("0X0001aBfF"));
+        assertEquals(0, Hash.fromHex("").length);
+        assertEquals(0, Hash.fromHex("0x").length);
     }
 
     @Test
     void hex_rejectsBadInput() {
-        assertThrows(IllegalArgumentException.class, () -> Hex.decode("abc"));
-        assertThrows(IllegalArgumentException.class, () -> Hex.decode("0xabc"));
-        assertThrows(IllegalArgumentException.class, () -> Hex.decode("zz"));
+        assertThrows(CryptoException.class, () -> Hash.fromHex("abc"));
+        assertThrows(CryptoException.class, () -> Hash.fromHex("0xabc"));
+        assertThrows(CryptoException.class, () -> Hash.fromHex("zz"));
     }
 
     // ---- Base58 ----
@@ -69,15 +71,15 @@ class EncodingTest {
     @Test
     void base58_vectors() {
         assertEquals("", Base58.encode(new byte[0]));
-        assertEquals("2g", Base58.encode(Hex.decode("61")));
+        assertEquals("2g", Base58.encode(Hash.fromHex("61")));
         assertEquals("ZiCa", Base58.encode(ascii("abc")));
         assertEquals("2NEpo7TZRRrLZSi2U", Base58.encode(ascii("Hello World!")));
         assertEquals("USm3fpXnKG5EUBx2ndxBDMPVciP5hGey2Jh4NDv6gmeo1LkMeiKrLJUUBk6Z",
                 Base58.encode(ascii("The quick brown fox jumps over the lazy dog.")));
-        assertEquals("11233QC4", Base58.encode(Hex.decode("0000287fb4cd")));
+        assertEquals("11233QC4", Base58.encode(Hash.fromHex("0000287fb4cd")));
         assertEquals("1111", Base58.encode(new byte[4]));
         assertArrayEquals(new byte[4], Base58.decode("1111"));
-        assertArrayEquals(Hex.decode("0000287fb4cd"), Base58.decode("11233QC4"));
+        assertArrayEquals(Hash.fromHex("0000287fb4cd"), Base58.decode("11233QC4"));
         assertEquals(0, Base58.decode("").length);
     }
 
@@ -107,12 +109,12 @@ class EncodingTest {
     void base58check_knownAddresses() {
         String genesis = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa";
         byte[] payload = Base58Check.decode(genesis);
-        assertEquals("0062e907b15cbf27d5425399ebf6f0fb50ebb88f18", Hex.encode(payload));
+        assertEquals("0062e907b15cbf27d5425399ebf6f0fb50ebb88f18", Hash.toHex(payload));
         assertEquals(genesis, Base58Check.encode(payload));
 
         String other = "1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN2";
-        assertEquals("0077bff20c60e522dfaa3350c39b030a5d004e839a", Hex.encode(Base58Check.decode(other)));
-        assertEquals(other, Base58Check.encode(Hex.decode("0077bff20c60e522dfaa3350c39b030a5d004e839a")));
+        assertEquals("0077bff20c60e522dfaa3350c39b030a5d004e839a", Hash.toHex(Base58Check.decode(other)));
+        assertEquals(other, Base58Check.encode(Hash.fromHex("0077bff20c60e522dfaa3350c39b030a5d004e839a")));
     }
 
     @Test
@@ -227,9 +229,9 @@ class EncodingTest {
     private static void check(String hrp, String addr, int version, String programHex) {
         Bech32.SegwitAddress a = Bech32.decodeSegwitAddress(hrp, addr);
         assertEquals(version, a.getVersion(), addr);
-        assertEquals(programHex, Hex.encode(a.getProgram()), addr);
+        assertEquals(programHex, Hash.toHex(a.getProgram()), addr);
         assertEquals(addr.toLowerCase(java.util.Locale.ROOT),
-                Bech32.encodeSegwitAddress(hrp, version, Hex.decode(programHex)), addr);
+                Bech32.encodeSegwitAddress(hrp, version, Hash.fromHex(programHex)), addr);
     }
 
     @Test
@@ -270,7 +272,7 @@ class EncodingTest {
     // ---- RLP ----
 
     private static String rlpHex(Object o) {
-        return Hex.encode(Rlp.encode(o));
+        return Hash.toHex(Rlp.encode(o));
     }
 
     @Test
@@ -279,13 +281,13 @@ class EncodingTest {
         assertEquals("c88363617483646f67", rlpHex(Arrays.asList((Object) ascii("cat"), ascii("dog"))));
         assertEquals("80", rlpHex(new byte[0]));
         assertEquals("c0", rlpHex(new ArrayList<Object>()));
-        assertEquals("80", Hex.encode(Rlp.encodeLong(0)));
-        assertEquals("0f", Hex.encode(Rlp.encodeLong(15)));
-        assertEquals("820400", Hex.encode(Rlp.encodeLong(1024)));
-        assertEquals("820400", Hex.encode(Rlp.encodeQuantity(UInt256.valueOf(1024))));
-        assertEquals("80", Hex.encode(Rlp.encodeQuantity(UInt256.ZERO)));
-        assertEquals("8180", Hex.encode(Rlp.encodeLong(128)));
-        assertEquals("88ffffffffffffffff", Hex.encode(Rlp.encodeQuantity(UInt256.ONE.shiftLeft(64).subtract(UInt256.ONE))));
+        assertEquals("80", Hash.toHex(Rlp.encodeLong(0)));
+        assertEquals("0f", Hash.toHex(Rlp.encodeLong(15)));
+        assertEquals("820400", Hash.toHex(Rlp.encodeLong(1024)));
+        assertEquals("820400", Hash.toHex(Rlp.encodeQuantity(UInt256.valueOf(1024))));
+        assertEquals("80", Hash.toHex(Rlp.encodeQuantity(UInt256.ZERO)));
+        assertEquals("8180", Hash.toHex(Rlp.encodeLong(128)));
+        assertEquals("88ffffffffffffffff", Hash.toHex(Rlp.encodeQuantity(UInt256.ONE.shiftLeft(64).subtract(UInt256.ONE))));
         List<Object> empty = new ArrayList<Object>();
         List<Object> one = new ArrayList<Object>();
         one.add(empty);
@@ -304,7 +306,7 @@ class EncodingTest {
         String lorem = "Lorem ipsum dolor sit amet, consectetur adipisicing elit";
         assertEquals(56, lorem.length());
         byte[] enc = Rlp.encode(ascii(lorem));
-        assertEquals("b838", Hex.encode(enc).substring(0, 4));
+        assertEquals("b838", Hash.toHex(enc).substring(0, 4));
         assertEquals(58, enc.length);
         assertArrayEquals(ascii(lorem), (byte[]) Rlp.decode(enc));
 
@@ -313,7 +315,7 @@ class EncodingTest {
             list.add(ascii("ab"));
         }
         byte[] le = Rlp.encode(list);
-        assertEquals("f85a", Hex.encode(le).substring(0, 4));
+        assertEquals("f85a", Hash.toHex(le).substring(0, 4));
         Object back = Rlp.decode(le);
         assertEquals(30, ((List) back).size());
     }
@@ -351,7 +353,7 @@ class EncodingTest {
             "b8",              // length missing
         };
         for (final String h : bad) {
-            assertThrows(IllegalArgumentException.class, () -> Rlp.decode(Hex.decode(h)), h);
+            assertThrows(IllegalArgumentException.class, () -> Rlp.decode(Hash.fromHex(h)), h);
         }
     }
 

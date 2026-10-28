@@ -22,6 +22,7 @@
  */
 package com.codename1.crypto.encoding;
 
+import com.codename1.security.Hash;
 import com.codename1.crypto.UInt256;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -91,7 +92,7 @@ public final class Json {
                 out.append(d);
             }
         } else if (value instanceof byte[]) {
-            quote(out, "0x" + Hex.encode((byte[]) value));
+            quote(out, "0x" + Hash.toHex((byte[]) value));
         } else if (value instanceof Map) {
             out.append('{');
             boolean first = true;

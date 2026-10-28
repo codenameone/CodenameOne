@@ -235,7 +235,7 @@ public final class TypedData {
         }
         if ("bytes".equals(type)) {
             return Hash.keccak256(value instanceof byte[] ? (byte[]) value
-                    : com.codename1.crypto.encoding.Hex.decode(text(value)));
+                    : com.codename1.security.Hash.fromHex(text(value)));
         }
         Object v = value;
         if (v instanceof Double) {
@@ -246,7 +246,7 @@ public final class TypedData {
         }
         if (v instanceof String && type.startsWith("bytes") && ((String) v).length() < 66) {
             // a short bytesN hex value is right-padded, as wallets accept it
-            byte[] raw = com.codename1.crypto.encoding.Hex.decode((String) v);
+            byte[] raw = com.codename1.security.Hash.fromHex((String) v);
             int n = Integer.parseInt(type.substring(5));
             byte[] padded = new byte[n];
             System.arraycopy(raw, 0, padded, 0, Math.min(raw.length, n));

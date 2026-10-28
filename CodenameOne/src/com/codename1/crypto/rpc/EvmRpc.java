@@ -22,8 +22,8 @@
  */
 package com.codename1.crypto.rpc;
 
+import com.codename1.security.Hash;
 import com.codename1.crypto.UInt256;
-import com.codename1.crypto.encoding.Hex;
 import com.codename1.crypto.evm.Erc20;
 import com.codename1.crypto.evm.EvmAddress;
 import com.codename1.crypto.evm.EvmTransaction;
@@ -150,7 +150,7 @@ public class EvmRpc extends JsonRpc {
             o.put("value", value.toQuantity());
         }
         if (data != null && data.length > 0) {
-            o.put("data", "0x" + Hex.encode(data));
+            o.put("data", "0x" + Hash.toHex(data));
         }
         return o;
     }
@@ -163,7 +163,7 @@ public class EvmRpc extends JsonRpc {
     /// `eth_call` at a block tag, answering the returned bytes.
     public byte[] call(EvmAddress to, byte[] data, String block) throws IOException {
         String r = asString(call("eth_call", callObject(null, to, null, data), block), "eth_call");
-        return Hex.decode(r.startsWith("0x") ? r.substring(2) : r);
+        return Hash.fromHex(r.startsWith("0x") ? r.substring(2) : r);
     }
 
     /// `eth_call` at the latest block.

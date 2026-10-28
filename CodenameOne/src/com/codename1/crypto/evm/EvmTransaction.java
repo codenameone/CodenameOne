@@ -23,7 +23,6 @@
 package com.codename1.crypto.evm;
 
 import com.codename1.crypto.UInt256;
-import com.codename1.crypto.encoding.Hex;
 import com.codename1.crypto.encoding.Rlp;
 import com.codename1.security.Hash;
 import com.codename1.security.Secp256k1;
@@ -291,7 +290,7 @@ public final class EvmTransaction {
 
     /// [#encode] as `0x` hex.
     public String encodeHex() {
-        return "0x" + Hex.encode(encode());
+        return "0x" + Hash.toHex(encode());
     }
 
     /// The transaction hash nodes and explorers know a signed transaction by.
@@ -348,7 +347,7 @@ public final class EvmTransaction {
 
     /// [#decode] from `0x` hex.
     public static EvmTransaction decodeHex(String hex) {
-        return decode(Hex.decode(hex));
+        return decode(Hash.fromHex(hex));
     }
 
     private static EvmTransaction decodeFields(int type, List<?> f) {
