@@ -1,0 +1,155 @@
+  name  age  score
+0  Ann   28  88.50
+1  Bob   35  92.00
+2   Cy   42  79.25
+3  Dee   19  95.00
+(4, 3) ['name', 'age', 'score'] 4
+Index(['name', 'age', 'score'], dtype='str')
+RangeIndex(start=0, stop=4, step=1)
+name         str
+age        int64
+score    float64
+dtype: object
+0    28
+1    35
+2    42
+3    19
+Name: age, dtype: int64
+  name  score
+0  Ann  88.50
+1  Bob  92.00
+2   Cy  79.25
+3  Dee  95.00
+  name  age  score
+0  Ann   28  88.50
+1  Bob   35  92.00
+2   Cy   42  79.25
+  name  age  score
+0  Ann   28   88.5
+1  Bob   35   92.0
+  name  age  score
+3  Dee   19   95.0
+name      Bob
+age        35
+score    92.0
+Name: 1, dtype: object
+Cy 28 95.0
+  name  age  score
+1  Bob   35  92.00
+2   Cy   42  79.25
+  name  score
+1  Bob   92.0
+3  Dee   95.0
+  name  age  score  passed  double
+0  Ann   28  88.50    True      56
+1  Bob   35  92.00    True      70
+2   Cy   42  79.25   False      84
+3  Dee   19  95.00    True      38
+             age      score
+count   4.000000   4.000000
+mean   31.000000  88.687500
+std     9.831921   6.829394
+min    19.000000  79.250000
+25%    25.750000  86.187500
+50%    31.500000  90.250000
+75%    36.750000  92.750000
+max    42.000000  95.000000
+  name  age  score  passed
+3  Dee   19  95.00    True
+0  Ann   28  88.50    True
+1  Bob   35  92.00    True
+2   Cy   42  79.25   False
+  name  age  score  passed
+3  Dee   19  95.00    True
+1  Bob   35  92.00    True
+0  Ann   28  88.50    True
+2   Cy   42  79.25   False
+31.0 95.0
+      pts  ast
+team          
+a       9  4.0
+b       6  2.0
+      pts       ast
+team               
+a     3.0  1.333333
+b     3.0  1.000000
+      pts  ast
+team          
+a       3    3
+b       2    2
+team
+a    3
+b    2
+dtype: int64
+team
+a    9
+b    6
+Name: pts, dtype: int64
+      pts  ast
+team          
+a       9  2.0
+b       6  1.5
+   k  a   b
+0  1  x  10
+1  3  z  30
+   k  a     b
+0  1  x  10.0
+1  2  y   NaN
+2  3  z  30.0
+   k  a
+0  1  x
+1  2  y
+2  3  z
+0  1  x
+1  2  y
+2  3  z
+   k    a     b
+0  1    x   NaN
+1  2    y   NaN
+2  3    z   NaN
+3  1  NaN  10.0
+4  3  NaN  30.0
+5  4  NaN  40.0
+   k  a  c
+0  1  x  3
+1  2  y  6
+2  3  z  9
+   k letter
+0  1      x
+1  2      y
+2  3      z
+   k
+0  1
+1  2
+2  3
+   k  a
+1  2  y
+pts    5.0
+ast    2.0
+dtype: float64
+0    1.0
+1    1.0
+2    6.0
+3    6.0
+4    5.0
+dtype: float64
+[{'team': 'a', 'pts': 1, 'ast': 1.0}, {'team': 'b', 'pts': 2, 'ast': 0.5}, {'team': 'a', 'pts': 3, 'ast': 2.0}, {'team': 'b', 'pts': 4, 'ast': 1.5}, {'team': 'a', 'pts': 5, 'ast': 1.0}]
+{'team': ['a', 'b', 'a', 'b', 'a'], 'pts': [1, 2, 3, 4, 5], 'ast': [1.0, 0.5, 2.0, 1.5, 1.0]}
+{'k': {0: 1, 1: 2, 2: 3}, 'a': {0: 'x', 1: 'y', 2: 'z'}}
+0 1 x
+1 2 y
+2 3 z
+0 1 x
+1 2 y
+2 3 z
+   a  b
+0  1  2
+1  3  4
+   x    y
+0  1  2.5
+1  3  4.0
+   a    b
+0  1  NaN
+1  2  5.0
+[28 35 42 19]
+False 15
