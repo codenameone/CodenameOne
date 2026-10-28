@@ -207,7 +207,7 @@ class HighLevelVisionDependencyTest {
         // not provision.
         for (String simple : cameraOpeningClasses()) {
             List<String> deps = androidDeps(simple);
-            assertTrue(deps.contains("androidx.camera:camera-core:1.3.4"),
+            assertTrue(deps.contains("androidx.camera:camera-core:1.4.2"),
                     simple + " opens a camera but the catalog adds no CameraX"
                             + " artifact for it");
             boolean permission = false;
