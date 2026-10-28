@@ -833,7 +833,7 @@ public final class Builtins {
             try {
                 return toFloat(new String(cs));
             } catch (PyException e) {
-                throw Py.valueError("could not convert string to float: " + Py.toRepr(x));
+                throw Py.valueError("could not convert string to float: " + Py.toRepr(x)); //NOPMD PreserveStackTrace - CPython's error has no cause
             }
         }
         return Py.ofFloat(Py.asDouble(x));

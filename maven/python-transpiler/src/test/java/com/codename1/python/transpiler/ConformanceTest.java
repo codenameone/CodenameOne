@@ -85,9 +85,33 @@ class ConformanceTest {
         String name = program.getFileName().toString();
         String stem = name.endsWith(".py") ? name.substring(0, name.length() - 3) : name;
         Map<String, String> sources = new TreeMap<String, String>();
+        // A directory program may stand in for a C extension: natives.properties
+        // maps a module to the Java class (a .java file beside it) that
+        // replaces it. The module's .py there is what CPython ran for the
+        // expected output, and is left out here.
+        Map<String, String> natives = new TreeMap<String, String>();
+        List<String> javaSources = new ArrayList<String>();
+        Path nativesFile = program.resolve("natives.properties");
+        if (Files.isDirectory(program) && Files.isRegularFile(nativesFile)) {
+            for (String line : Files.readAllLines(nativesFile, StandardCharsets.UTF_8)) {
+                int eq = line.indexOf('=');
+                if (eq > 0 && !line.startsWith("#")) {
+                    natives.put(line.substring(0, eq).trim(), line.substring(eq + 1).trim());
+                }
+            }
+            try (Stream<Path> s = Files.walk(program)) {
+                for (Path p : s.filter(x -> x.toString().endsWith(".java")).collect(Collectors.toList())) {
+                    javaSources.add(p.toAbsolutePath().toString());
+                }
+            }
+        }
         if (Files.isDirectory(program)) {
             try (Stream<Path> s = Files.walk(program)) {
                 for (Path p : s.filter(x -> x.toString().endsWith(".py")).collect(Collectors.toList())) {
+                    String rel = program.relativize(p).toString().replace(File.separatorChar, '/');
+                    if (natives.containsKey(rel.substring(0, rel.length() - 3).replace('/', '.'))) {
+                        continue;
+                    }
                     sources.put(program.relativize(p).toString().replace(File.separatorChar, '/'), read(p));
                 }
             }
@@ -101,7 +125,7 @@ class ConformanceTest {
             sources.put("_testbase.py", "BASE = \"http://127.0.0.1:" + server.port() + "\"\n");
         }
         try {
-            run(stem, sources, server != null);
+            run(stem, sources, server != null, natives, javaSources);
         } finally {
             if (server != null) {
                 server.stop();
@@ -109,7 +133,8 @@ class ConformanceTest {
         }
     }
 
-    private static void run(String stem, Map<String, String> sources, boolean http) throws Exception {
+    private static void run(String stem, Map<String, String> sources, boolean http, Map<String, String> natives,
+            List<String> javaSources) throws Exception {
         Path work = Files.createTempDirectory("py-conf-" + stem);
         Path gen = work.resolve("gen");
         Path cls = work.resolve("classes");
@@ -119,12 +144,13 @@ class ConformanceTest {
         String core = location(com.codename1.io.Util.class);
         // Programs may import Java classes: the JDK's, and the core's.
         List<File> classPath = Collections.singletonList(new File(core));
-        for (Map.Entry<String, String> e : PythonTranspiler.transpile(sources, "main", classPath).entrySet()) {
+        for (Map.Entry<String, String> e : PythonTranspiler.transpile(sources, "main", classPath, natives).entrySet()) {
             Path f = gen.resolve(e.getKey());
             Files.createDirectories(f.getParent());
             Files.write(f, e.getValue().getBytes(StandardCharsets.US_ASCII));
             args.add(f.toString());
         }
+        args.addAll(javaSources);
         args.add(0, "-nowarn");
         args.add(1, "--release");
         args.add(2, "17");

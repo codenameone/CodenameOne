@@ -364,7 +364,7 @@ public final class StdModules {
                 SQL.put(h, c);
                 return PyInt.of(h);
             } catch (java.io.IOException e) {
-                throw Py.error(Py.OS_ERROR, String.valueOf(e.getMessage()));
+                throw Py.error(Py.OS_ERROR, String.valueOf(e.getMessage())); //NOPMD PreserveStackTrace - a Python exception has no Java cause
             }
         }));
         m.setAttr("run", PyBuiltin.positional("run", a -> {
@@ -378,7 +378,7 @@ public final class StdModules {
             try {
                 r = c.run(Py.toStr(a[1]), params, Py.isTrue(a[3]));
             } catch (java.io.IOException e) {
-                throw Py.error(Py.OS_ERROR, String.valueOf(e.getMessage()));
+                throw Py.error(Py.OS_ERROR, String.valueOf(e.getMessage())); //NOPMD PreserveStackTrace - a Python exception has no Java cause
             }
             Object[] cols = new Object[r.columns.length];
             for (int i = 0; i < cols.length; i++) {
@@ -418,7 +418,7 @@ public final class StdModules {
                     c.close();
                 }
             } catch (java.io.IOException e) {
-                throw Py.error(Py.OS_ERROR, String.valueOf(e.getMessage()));
+                throw Py.error(Py.OS_ERROR, String.valueOf(e.getMessage())); //NOPMD PreserveStackTrace - a Python exception has no Java cause
             }
             return Py.NONE;
         }));

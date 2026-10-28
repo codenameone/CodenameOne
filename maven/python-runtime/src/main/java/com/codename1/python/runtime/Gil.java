@@ -72,7 +72,8 @@ public final class Gil {
             if (owner != Thread.currentThread()) { //NOPMD CompareObjectsWithEquals - identity is meant
                 return;
             }
-            if (--depth == 0) {
+            depth--;
+            if (depth == 0) {
                 owner = null;
                 MONITOR.notifyAll();
             }

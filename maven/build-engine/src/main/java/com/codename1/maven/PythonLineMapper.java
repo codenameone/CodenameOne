@@ -92,15 +92,12 @@ public final class PythonLineMapper {
                 continue;
             }
             String stem = n.substring(0, n.length() - ".class".length());
-            Table t = null;
+            // The class's own table, else its nearest enclosing class's.
             String outer = stem;
-            while (t == null) {
-                t = tables.get(outer);
-                int cut = outer.lastIndexOf('$');
-                if (t != null || cut < 0) {
-                    break;
-                }
+            Table t = tables.get(outer);
+            for (int cut = outer.lastIndexOf('$'); t == null && cut >= 0; cut = outer.lastIndexOf('$')) {
                 outer = outer.substring(0, cut);
+                t = tables.get(outer);
             }
             if (t != null) {
                 Files.write(f.toPath(), rewrite(Files.readAllBytes(f.toPath()), t));

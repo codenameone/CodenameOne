@@ -108,8 +108,19 @@ public final class PythonProjectBuilder {
             return false;
         }
         Map<String, String> sources = new TreeMap<String, String>();
+        Map<String, String> nativeModules = new TreeMap<String, String>();
         try {
             collect(sourceDir, "", sources);
+            // PyPI packages import resolved beside the project; the
+            // project's own file wins where both have one.
+            File packages = new File(sourceDir.getParentFile(), PythonPackageResolver.PACKAGES_DIR);
+            if (packages.isDirectory()) {
+                Map<String, String> vendored = new TreeMap<String, String>();
+                collect(packages, "", vendored);
+                vendored.putAll(sources);
+                sources = vendored;
+                nativeModules = PythonExtensionStubs.readIndex(new File(packages, PythonExtensionStubs.INDEX));
+            }
         } catch (IOException e) {
             throw new BuildException("Could not read " + sourceDir + ": " + e.getMessage(), e);
         }
@@ -129,7 +140,7 @@ public final class PythonProjectBuilder {
         }
         Map<String, String> out;
         try {
-            out = PythonTranspiler.transpile(sources, entry, classPath);
+            out = PythonTranspiler.transpile(sources, entry, classPath, nativeModules);
         } catch (PythonSyntaxError e) {
             throw new BuildException("src/main/python/" + e.file + ":" + e.line + ":" + e.col + ": " + e.reason, e);
         } catch (IllegalArgumentException e) {

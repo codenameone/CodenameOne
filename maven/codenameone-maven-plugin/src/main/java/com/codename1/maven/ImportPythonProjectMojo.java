@@ -54,6 +54,14 @@ public class ImportPythonProjectMojo extends AbstractCN1Mojo {
     @Parameter(property = "cn1.python.import")
     private File pythonImport;
 
+    /// Leaves PyPI alone: the requirements are listed, not downloaded.
+    @Parameter(property = "cn1.python.offline", defaultValue = "false")
+    private boolean offline;
+
+    /// An index that speaks PyPI's JSON API, in place of pypi.org.
+    @Parameter(property = "cn1.python.index")
+    private String index;
+
     @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
         File from = pythonImport != null ? pythonImport : source;
@@ -81,10 +89,37 @@ public class ImportPythonProjectMojo extends AbstractCN1Mojo {
                 + (r.removedFiles == 0 ? "" : "; removed " + r.removedFiles + " the project no longer has"));
         getLog().info(r.mainModule == null ? "No entry module was found: the sources are imported as a library"
                 : "Entry module: " + r.mainModule);
-        if (!r.requirements.isEmpty()) {
-            getLog().warn("The project depends on " + r.requirements + ". A pure-Python package builds when its "
-                    + "sources are under src/main/python; see the developer guide for the packages the runtime "
-                    + "provides.");
+        if (r.requirementSpecs.isEmpty()) {
+            return;
+        }
+        if (offline) {
+            getLog().warn("The project depends on " + r.requirements + "; they were not downloaded "
+                    + "(-Dcn1.python.offline). Import again without it to vendor them.");
+            return;
+        }
+        PythonPackageResolver.Result p;
+        try {
+            PythonPackageResolver resolver = new PythonPackageResolver(MavenLog.of(getLog()));
+            if (index != null && !index.isEmpty()) {
+                resolver.index(index);
+            }
+            p = resolver.resolve(r.requirementSpecs, common);
+        } catch (com.codename1.builders.BuildException e) {
+            throw new MojoFailureException(e.getMessage(), e);
+        }
+        if (!p.provided.isEmpty()) {
+            getLog().info("Provided by the Codename One Python runtime: " + p.provided);
+        }
+        if (!p.installed.isEmpty()) {
+            getLog().info("Installed into src/main/" + PythonPackageResolver.PACKAGES_DIR + ": " + p.installed);
+        }
+        for (java.util.Map.Entry<String, String> e : p.nativeModules.entrySet()) {
+            getLog().warn("C extension module " + e.getKey() + " is written in Java by " + e.getValue()
+                    + (p.stubsWritten.contains(e.getValue()) ? " (stub generated: fill in its functions)" : ""));
+        }
+        if (!p.optionalNativeModules.isEmpty()) {
+            getLog().info("C accelerator modules with a pure-Python fallback, used instead: "
+                    + p.optionalNativeModules);
         }
     }
 

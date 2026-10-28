@@ -33,7 +33,8 @@ import java.io.IOException;
 /// reports it ([Database#getColumnType(Row, int)]), and are inferred from
 /// their text where it does not.
 public final class Cn1Sql extends PySql {
-    private static int memoryCount;
+    private static final java.util.concurrent.atomic.AtomicInteger MEMORY_COUNT =
+            new java.util.concurrent.atomic.AtomicInteger();
 
     /// Makes this the engine unless a host installed its own first.
     public static void installDefault() {
@@ -45,7 +46,7 @@ public final class Cn1Sql extends PySql {
     @Override
     public Connection open(String name) throws IOException {
         boolean memory = ":memory:".equals(name) || name.length() == 0;
-        String dbName = memory ? "cn1py-memory-" + System.currentTimeMillis() + "-" + (memoryCount++) + ".db"
+        String dbName = memory ? "cn1py-memory-" + System.currentTimeMillis() + "-" + MEMORY_COUNT.getAndIncrement() + ".db"
                 : localName(name);
         if (memory && Database.exists(dbName)) {
             Database.delete(dbName);

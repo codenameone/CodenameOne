@@ -69,6 +69,8 @@ public final class PythonProjectImporter {
         /// Requirements the project declares, which have to be provided as
         /// source under `src/main/python` or by the runtime.
         public final List<String> requirements = new ArrayList<String>();
+        /// The same requirements as written, versions and markers included.
+        public final List<String> requirementSpecs = new ArrayList<String>();
     }
 
     public PythonProjectImporter(Log log) {
@@ -108,7 +110,9 @@ public final class PythonProjectImporter {
             writeRecord(target, imported);
             String pyproject = read(new File(source, "pyproject.toml"));
             r.mainModule = mainModule(root, pyproject);
-            r.requirements.addAll(requirements(pyproject, read(new File(source, "requirements.txt"))));
+            String txt = read(new File(source, "requirements.txt"));
+            r.requirements.addAll(requirements(pyproject, txt));
+            r.requirementSpecs.addAll(requirementSpecs(pyproject, txt));
             if (r.mainModule != null) {
                 updateSetting(new File(commonDir, "codenameone_settings.properties"), r.mainModule);
                 if (mainPackage != null && mainClass != null && mainPackage.length() > 0 && mainClass.length() > 0) {
@@ -205,6 +209,45 @@ public final class PythonProjectImporter {
             }
         }
         return new ArrayList<String>(names);
+    }
+
+    /// The requirements of `[project] dependencies` and `requirements.txt`
+    /// as PEP 508 lines, comments and pip options left out.
+    static List<String> requirementSpecs(String pyproject, String requirementsTxt) {
+        List<String> out = new ArrayList<String>();
+        if (pyproject != null) {
+            String project = section(pyproject, "project");
+            if (project != null) {
+                int at = project.indexOf("dependencies");
+                int open = at < 0 ? -1 : project.indexOf('[', at);
+                // Quoted items up to the unquoted bracket that closes the list:
+                // an extra such as `requests[socks]` has brackets of its own.
+                for (int i = open + 1; open >= 0 && i < project.length(); i++) {
+                    char c = project.charAt(i);
+                    if (c == ']') {
+                        break;
+                    }
+                    if (c == '"' || c == '\'') {
+                        int end = project.indexOf(c, i + 1);
+                        if (end < 0) {
+                            break;
+                        }
+                        out.add(project.substring(i + 1, end).trim());
+                        i = end;
+                    }
+                }
+            }
+        }
+        if (requirementsTxt != null) {
+            for (String line : requirementsTxt.split("\n")) {
+                int hash = line.indexOf(" #");
+                String l = (hash >= 0 ? line.substring(0, hash) : line).trim();
+                if (!l.isEmpty() && !l.startsWith("-") && !l.startsWith("#")) {
+                    out.add(l);
+                }
+            }
+        }
+        return out;
     }
 
     private static void add(Set<String> names, String spec) {
