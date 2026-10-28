@@ -9,6 +9,8 @@ way into ``sqlalchemy.exc``.
 import sqlite3 as _sqlite3
 
 import _cn1db
+import datetime as _dt
+import decimal as _decimal
 
 paramstyle = "qmark"
 
@@ -74,6 +76,36 @@ def _named(sql, params):
     return "".join(out), tuple(values)
 
 
+def _datetime(text):
+    # PostgreSQL writes a timestamptz offset as +HH when it has no minutes.
+    if len(text) > 3 and text[-3] in "+-" and text[-2:].isdigit():
+        text += ":00"
+    return _dt.datetime.fromisoformat(text)
+
+
+# A server database sends DECIMAL/NUMERIC and the date and time types as text;
+# the backend reports each column's kind so they come back as the Python types
+# psycopg2 and mysqlclient return.
+_PARSERS = {
+    "decimal": _decimal.Decimal,
+    "date": _dt.date.fromisoformat,
+    "datetime": _datetime,
+    "datetimetz": _datetime,
+    "time": _dt.time.fromisoformat,
+}
+
+
+def _typed(rows, kinds):
+    parsers = [_PARSERS.get(k) if k is not None else None for k in kinds]
+    if not any(p is not None for p in parsers):
+        return list(rows)
+    out = []
+    for row in rows:
+        out.append(tuple(p(v) if p is not None and isinstance(v, str) else v
+                         for p, v in zip(parsers, row)))
+    return out
+
+
 class Cursor:
     def __init__(self, conn):
         self.connection = conn
@@ -96,10 +128,10 @@ class Cursor:
             _cn1db.begin(c._handle)
             c._in_tx = True
         try:
-            cols, rows, changes, rowid = _cn1db.run(c._handle, sql, tuple(params or ()), query)
+            cols, rows, changes, rowid, kinds = _cn1db.run(c._handle, sql, tuple(params or ()), query)
         except OSError as e:
             raise _error(e)
-        self._rows = list(rows)
+        self._rows = _typed(rows, kinds) if query else list(rows)
         self._at = 0
         self.description = tuple((n, None, None, None, None, None, None) for n in cols) if query else None
         self.rowcount = len(self._rows) if query else changes

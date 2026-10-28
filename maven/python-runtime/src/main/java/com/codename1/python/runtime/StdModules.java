@@ -459,8 +459,19 @@ public final class StdModules {
                 }
                 rows[i] = new PyTuple(t);
             }
+            if (!server) {
+                // sqlite3 (_cn1sql): SQLite reports no column types.
+                return new PyTuple(new Object[] {new PyTuple(cols), new PyList(rows), PyInt.of(r.changes),
+                    PyInt.of(r.lastRowId)});
+            }
+            // _cn1db adds each column's kind (PySql.Result.types) for _cn1dbapi.
+            Object[] kinds = new Object[cols.length];
+            for (int i = 0; i < kinds.length; i++) {
+                kinds[i] = r.types != null && i < r.types.length && r.types[i] != null
+                        ? Py.str(r.types[i]) : Py.NONE;
+            }
             return new PyTuple(new Object[] {new PyTuple(cols), new PyList(rows), PyInt.of(r.changes),
-                PyInt.of(r.lastRowId)});
+                PyInt.of(r.lastRowId), new PyTuple(kinds)});
         }));
         sqlControl(m, "begin", 0);
         sqlControl(m, "commit", 1);

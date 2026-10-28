@@ -33,6 +33,7 @@ import java.util.Map;
 import com.codename1.backend.sql.Dialect;
 import com.codename1.backend.sql.MySql;
 import com.codename1.backend.sql.Postgres;
+import com.codename1.backend.sql.QueryRows;
 
 /// One database API over SQLite, PostgreSQL and MySQL, chosen by URL.
 ///
@@ -322,6 +323,23 @@ public final class Database {
         } finally {
             exit();
         }
+    }
+
+    /// The kind of each column of a result `query` returned, in the order the
+    /// statement projects them, for the columns whose values come back as text
+    /// that still has to be parsed: `"decimal"` (an exact DECIMAL or NUMERIC,
+    /// kept as its digits), `"date"`, `"datetime"` (no zone), `"datetimetz"`
+    /// (PostgreSQL's timestamp with time zone, which carries its offset) and
+    /// `"time"`. Every other column is null, because its value is already the
+    /// Long, Double, String or byte\[\] it is.
+    ///
+    /// Answers null for rows this class did not produce, and for SQLite, which
+    /// has no column types to report.
+    public static String[] columnTypes(List rows) {
+        if (rows instanceof QueryRows) {
+            return ((QueryRows) rows).getColumnTypes();
+        }
+        return null;
     }
 
     private List queryUntraced(String sql, Object[] params) throws IOException {

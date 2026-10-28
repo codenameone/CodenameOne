@@ -620,6 +620,11 @@ public final class Postgres {
                         types[iter] = intAt(message.body, at + 6);
                         at += 18; // + type size (2), modifier (4), format (2)
                     }
+                    String[] kinds = new String[columns];
+                    for (int iter = 0 ; iter < columns ; iter++) {
+                        kinds[iter] = kind(types[iter]);
+                    }
+                    result.rows.setColumnTypes(kinds);
                     break;
                 }
                 case DATA_ROW: {
@@ -729,6 +734,25 @@ public final class Postgres {
             return Wire.utf8(((Boolean) value).booleanValue() ? "t" : "f");
         }
         return Wire.utf8(String.valueOf(value));
+    }
+
+    /// The portable column kind (`Database.columnTypes(List)`) of a type OID:
+    /// only the kinds whose values arrive as text a caller must parse.
+    private static String kind(int typeOid) {
+        switch (typeOid) {
+            case 1700:
+                return "decimal";
+            case 1082:
+                return "date";
+            case 1114:
+                return "datetime";
+            case 1184:
+                return "datetimetz";
+            case 1083:
+                return "time";
+            default:
+                return null;
+        }
     }
 
     /// Maps a text-format value to the same Java types the SQLite path returns.

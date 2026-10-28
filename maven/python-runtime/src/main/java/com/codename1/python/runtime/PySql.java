@@ -81,6 +81,11 @@ public abstract class PySql {
         public final List<Object[]> rows = new ArrayList<Object[]>();
         public long changes = -1;
         public long lastRowId = -1;
+        /// Per column, the kind of value a server database sent as text that
+        /// the DB-API layer turns into a Python type -- "decimal", "date",
+        /// "datetime", "datetimetz" or "time" -- or null; null altogether when
+        /// the engine reports none (SQLite).
+        public String[] types;
     }
 
     /// The value a SQLite engine that cannot report storage classes most

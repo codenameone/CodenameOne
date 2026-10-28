@@ -471,9 +471,11 @@ jobs:
       # The SQLAlchemy conformance programs against the PostgreSQL service
       # above: the suite in python-transpiler runs them on SQLite only, so this
       # is the one place the postgresql dialect and the _cn1db bridge meet a
-      # real server. PostgreSQL only; the MySQL family is run by hand.
+      # real server. PostgreSQL and the job's MySQL service; MariaDB is run by
+      # hand. Last of the steps using MySQL: each program drops and recreates
+      # the cn1 database.
       # python-runtime compiles at release 17, hence JDK 17 for the install.
-      - name: Python SQLAlchemy on PostgreSQL
+      - name: Python SQLAlchemy on PostgreSQL and MySQL
         run: |
           (cd maven && bash "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -B -pl python-runtime,python-transpiler \
             install -DskipTests -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
@@ -483,6 +485,7 @@ jobs:
           JAVA_HOME: ${{ env.JDK_17_HOME }}
           JAVA17_HOME: ${{ env.JDK_17_HOME }}
           CN1_SQLA_POSTGRES: postgres://cn1:cn1secret@127.0.0.1:5432/cn1?sslmode=disable
+          CN1_SQLA_MYSQL: mysql://cn1:cn1secret@127.0.0.1:3306/cn1?sslmode=disable
 
       # The Flask and FastAPI samples built NATIVELY (ParparVM, clang) and
       # driven over sockets by the same client as the JVM run. The only place

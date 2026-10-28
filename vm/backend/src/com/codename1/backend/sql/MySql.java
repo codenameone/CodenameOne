@@ -634,6 +634,13 @@ public final class MySql {
             }
         }
         readPacket(); // EOF ending the definitions
+        if (rows != null) {
+            String[] kinds = new String[resultColumns];
+            for (int iter = 0 ; iter < resultColumns ; iter++) {
+                kinds[iter] = kind(resultDefinitions[iter].type);
+            }
+            rows.setColumnTypes(kinds);
+        }
         while (true) {
             Packet packet = readPacket();
             int marker = packet.body[0] & 0xff;
@@ -655,7 +662,27 @@ public final class MySql {
         }
     }
 
-    /// A binary row: a 0x00 marker, a null bitmap offset by two bits, then each
+    /// The portable column kind (`Database.columnTypes(List)`) of a binary
+    /// protocol type: only the kinds whose values arrive as text a caller must
+    /// parse.
+    private static String kind(int type) {
+        switch (type) {
+            case 0x00: // DECIMAL
+            case 0xf6: // NEWDECIMAL
+                return "decimal";
+            case 0x0a: // DATE
+                return "date";
+            case 0x0c: // DATETIME
+            case 0x07: // TIMESTAMP
+                return "datetime";
+            case 0x0b: // TIME
+                return "time";
+            default:
+                return null;
+        }
+    }
+
+        /// A binary row: a 0x00 marker, a null bitmap offset by two bits, then each
     /// non-null value in its column's binary form.
     private static Map decodeBinaryRow(byte[] body, Column[] columns) throws IOException {
         Reader reader = new Reader(body);

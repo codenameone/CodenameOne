@@ -19,6 +19,7 @@ relationship, hybrid properties.
 
 import datetime as _dt
 import typing as _typing
+import sqlalchemy as _sa
 
 from sqlalchemy import (Column, ForeignKey, Integer, String, Float, Boolean, DateTime, Date, LargeBinary,
                         MetaData, Table, TypeEngine, select, exc, _is_type, _to_type)
@@ -1174,7 +1175,14 @@ class Session:
         return out
 
     def _run(self, statement, params):
-        res = statement._execute_on(self.connection(), params, self)
+        conn = self.connection()
+        # Compile for the bind's dialect, as Connection.execute does: without it a
+        # Session statement compiled as SQLite (CAST AS VARCHAR, || on MySQL).
+        _sa._active.append(conn.engine.dialect)
+        try:
+            res = statement._execute_on(conn, params, self)
+        finally:
+            _sa._active.pop()
         eager = self._eager_rels(statement)
         if not eager:
             return res
