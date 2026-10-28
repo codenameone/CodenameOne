@@ -51,6 +51,7 @@ on:
       # marker; a class marked outside these directories needs its path here.
       - 'CodenameOne/src/com/codename1/impl/SharedWithBackend.java'
       - 'CodenameOne/src/com/codename1/impl/orm/**'
+      - 'CodenameOne/src/com/codename1/image/**'
       - 'CodenameOne/src/com/codename1/orm/session/**'
       - 'CodenameOne/src/com/codename1/orm/repository/**'
       - 'CodenameOne/src/com/codename1/annotations/db/**'
@@ -124,6 +125,7 @@ on:
       # marker; a class marked outside these directories needs its path here.
       - 'CodenameOne/src/com/codename1/impl/SharedWithBackend.java'
       - 'CodenameOne/src/com/codename1/impl/orm/**'
+      - 'CodenameOne/src/com/codename1/image/**'
       - 'CodenameOne/src/com/codename1/orm/session/**'
       - 'CodenameOne/src/com/codename1/orm/repository/**'
       - 'CodenameOne/src/com/codename1/annotations/db/**'

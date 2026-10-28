@@ -23,6 +23,13 @@
  */
 package com.codename1.python.runtime;
 
+import com.codename1.image.JpegCodec;
+import com.codename1.image.PngCodec;
+import com.codename1.image.RasterImage;
+import com.codename1.image.Resampler;
+
+import java.io.IOException;
+
 
 /// The `_cn1image` module: pixel storage and the hot loops behind the
 /// bundled `PIL` package. An image is a [Img] handle holding interleaved
@@ -30,9 +37,6 @@ package com.codename1.python.runtime;
 /// Pillow's `tobytes()`. Every arithmetic here follows Pillow's own fixed
 /// point code so results are byte identical with it.
 final class PyImage {
-    /// Pillow's resampling precision, `32 - 8 - 2`.
-    private static final int PRECISION_BITS = 22;
-
     private PyImage() {
     }
 
@@ -236,9 +240,12 @@ final class PyImage {
             return wrap(transpose(u, 5));
         }));
         m.setAttr("png_unfilter", PyBuiltin.positional("png_unfilter", a ->
-                new PyBytes(unfilter(bytes(a[0]), i(a[1]), i(a[2]), i(a[3])))));
+                new PyBytes(pngUnfilter(bytes(a[0]), i(a[1]), i(a[2]), i(a[3])))));
         m.setAttr("png_expand", PyBuiltin.positional("png_expand", a ->
-                wrap(expand(bytes(a[0]), i(a[1]), i(a[2]), i(a[3]), i(a[4])))));
+                wrap(pngExpand(bytes(a[0]), i(a[1]), i(a[2]), i(a[3]), i(a[4])))));
+        m.setAttr("jpeg_decode", PyBuiltin.positional("jpeg_decode", a -> wrap(jpegDecode(bytes(a[0])))));
+        m.setAttr("jpeg_encode", PyBuiltin.positional("jpeg_encode", a ->
+                new PyBytes(jpegEncode(img(a[0]), (float) Py.asDouble(a[1])))));
         m.setAttr("png_rows", PyBuiltin.positional("png_rows", a -> {
             Img s = img(a[0]);
             int row = s.w * s.bands;
@@ -395,183 +402,77 @@ final class PyImage {
     static final int FILTER_BOX = 4;
     static final int FILTER_HAMMING = 5;
 
-    private static double support(int filter) {
-        switch (filter) {
-            case FILTER_BOX:
-                return 0.5;
-            case FILTER_BICUBIC:
-                return 2.0;
-            case FILTER_LANCZOS:
-                return 3.0;
-            default:
-                return 1.0;
-        }
-    }
-
-    private static double sinc(double x) {
-        if (x == 0.0) {
-            return 1.0;
-        }
-        double px = x * Math.PI;
-        return Math.sin(px) / px;
-    }
-
-    /// Pillow's filter kernels (`Resample.c`), evaluated at signed `x`.
-    private static double kernel(int filter, double x) {
-        double t = x < 0 ? -x : x;
-        switch (filter) {
-            case FILTER_BOX:
-                return x > -0.5 && x <= 0.5 ? 1.0 : 0.0;
-            case FILTER_HAMMING:
-                if (t == 0.0) {
-                    return 1.0;
-                }
-                if (t >= 1.0) {
-                    return 0.0;
-                }
-                t = t * Math.PI;
-                return Math.sin(t) / t * (0.54 + 0.46 * Math.cos(t));
-            case FILTER_BICUBIC:
-                if (t < 1.0) {
-                    return (1.5 * t - 2.5) * t * t + 1;
-                }
-                if (t < 2.0) {
-                    return (((t - 5) * t + 8) * t - 4) * -0.5;
-                }
-                return 0.0;
-            case FILTER_LANCZOS:
-                return x > -3.0 && x < 3.0 ? sinc(x) * sinc(x / 3.0) : 0.0;
-            default:
-                return t < 1.0 ? 1.0 - t : 0.0;
-        }
-    }
-
-    /// Filter coefficients for one axis, as Pillow's `precompute_coeffs`
-    /// and `normalize_coeffs_8bpc` make them. Returns `ksize`; `bounds`
-    /// receives `xmin, count` per output position.
-    private static int coeffs(int inSize, double in0, double in1, int outSize, int[] bounds, int[][] out,
-                              int filter) {
-        double scale = (in1 - in0) / outSize;
-        double filterscale = scale < 1.0 ? 1.0 : scale;
-        double support = support(filter) * filterscale;
-        int ksize = (int) Math.ceil(support) * 2 + 1;
-        int[] kk = new int[outSize * ksize];
-        double[] k = new double[ksize];
-        for (int xx = 0; xx < outSize; xx++) {
-            double center = in0 + (xx + 0.5) * scale;
-            double ww = 0.0;
-            double ss = 1.0 / filterscale;
-            int xmin = (int) (center - support + 0.5);
-            if (xmin < 0) {
-                xmin = 0;
-            }
-            int xmax = (int) (center + support + 0.5);
-            if (xmax > inSize) {
-                xmax = inSize;
-            }
-            xmax -= xmin;
-            for (int x = 0; x < xmax; x++) {
-                double w = kernel(filter, (x + xmin - center + 0.5) * ss);
-                k[x] = w;
-                ww += w;
-            }
-            for (int x = 0; x < xmax; x++) {
-                double v = ww != 0.0 ? k[x] / ww : k[x];
-                kk[xx * ksize + x] = v < 0 ? (int) (-0.5 + v * (1 << PRECISION_BITS))
-                        : (int) (0.5 + v * (1 << PRECISION_BITS));
-            }
-            bounds[xx * 2] = xmin;
-            bounds[xx * 2 + 1] = xmax;
-        }
-        out[0] = kk;
-        return ksize;
-    }
-
-    private static byte clip8(int v) {
-        int s = v >> PRECISION_BITS;
-        return (byte) (s < 0 ? 0 : s > 255 ? 255 : s);
-    }
-
+    /// Pillow's two-pass resampling, shared with every Java program through
+    /// `com.codename1.image.Resampler` (same fixed point, same bytes).
     private static Img resample(Img s, int w, int h, double[] box, int filter) {
-        Img cur = s;
-        boolean horizontal = w != s.w || box[0] != 0 || box[2] != w;
-        boolean vertical = h != s.h || box[1] != 0 || box[3] != h;
-        if (horizontal) {
-            int[] bounds = new int[w * 2];
-            int[][] kh = new int[1][];
-            int ks = coeffs(cur.w, box[0], box[2], w, bounds, kh, filter);
-            Img r = new Img(w, cur.h, cur.bands);
-            for (int y = 0; y < cur.h; y++) {
-                for (int x = 0; x < w; x++) {
-                    int xmin = bounds[x * 2];
-                    int n = bounds[x * 2 + 1];
-                    for (int b = 0; b < cur.bands; b++) {
-                        int ss = 1 << (PRECISION_BITS - 1);
-                        for (int j = 0; j < n; j++) {
-                            ss += (cur.d[(y * cur.w + xmin + j) * cur.bands + b] & 0xff) * kh[0][x * ks + j];
-                        }
-                        r.d[(y * w + x) * cur.bands + b] = clip8(ss);
-                    }
-                }
-            }
-            cur = r;
-        }
-        if (vertical) {
-            int[] bounds = new int[h * 2];
-            int[][] kv = new int[1][];
-            int ks = coeffs(cur.h, box[1], box[3], h, bounds, kv, filter);
-            Img r = new Img(cur.w, h, cur.bands);
-            for (int y = 0; y < h; y++) {
-                int ymin = bounds[y * 2];
-                int n = bounds[y * 2 + 1];
-                for (int x = 0; x < cur.w; x++) {
-                    for (int b = 0; b < cur.bands; b++) {
-                        int ss = 1 << (PRECISION_BITS - 1);
-                        for (int j = 0; j < n; j++) {
-                            ss += (cur.d[((ymin + j) * cur.w + x) * cur.bands + b] & 0xff) * kv[0][y * ks + j];
-                        }
-                        r.d[(y * cur.w + x) * cur.bands + b] = clip8(ss);
-                    }
-                }
-            }
-            cur = r;
-        }
-        if (cur == s) { //NOPMD CompareObjectsWithEquals - identity is meant
-            cur = crop(s, 0, 0, s.w, s.h);
-        }
-        return cur;
+        Img r = new Img(w, h, s.bands);
+        byte[] d = Resampler.resample(s.d, s.w, s.h, s.bands, w, h, box, filter);
+        System.arraycopy(d, 0, r.d, 0, d.length);
+        return r;
     }
 
     /// RGBA to RGBa (or LA to La): Pillow's `MULDIV255` premultiply.
     private static Img premultiply(Img s) {
-        Img r = crop(s, 0, 0, s.w, s.h);
-        int n = s.bands;
-        for (int p = 0, c = s.w * s.h; p < c; p++) {
-            int q = p * n;
-            int alpha = s.d[q + n - 1] & 0xff;
-            for (int b = 0; b < n - 1; b++) {
-                int t = (s.d[q + b] & 0xff) * alpha + 128;
-                r.d[q + b] = (byte) (((t >> 8) + t) >> 8);
+        Img r = new Img(s.w, s.h, s.bands);
+        byte[] d = Resampler.premultiply(s.d, s.bands);
+        System.arraycopy(d, 0, r.d, 0, d.length);
+        return r;
+    }
+
+    /// RGBa to RGBA (or La to LA), as Pillow's `rgbA2rgba`; in place.
+    private static Img unpremultiply(Img s) {
+        Resampler.unpremultiply(s.d, s.bands);
+        return s;
+    }
+
+    private static Img fromBands(int w, int h, int bands, byte[] d) {
+        Img r = new Img(w, h, bands);
+        System.arraycopy(d, 0, r.d, 0, r.d.length);
+        return r;
+    }
+
+    private static RuntimeException osError(IOException e) {
+        return Py.error(Py.OS_ERROR, String.valueOf(e.getMessage()));
+    }
+
+    /// Decodes a JPEG file with the shared pure-Java codec, to "L" (one band)
+    /// for a gray file and "RGB" (three) otherwise, as Pillow opens them.
+    private static Img jpegDecode(byte[] data) {
+        RasterImage ri;
+        try {
+            ri = JpegCodec.decode(data);
+        } catch (IOException e) {
+            throw osError(e); // NOPMD PreserveStackTrace - surfaced as a Python OSError
+        }
+        int bands = JpegCodec.componentCount(data) == 1 ? 1 : 3;
+        int[] px = ri.getPixels();
+        Img r = new Img(ri.getWidth(), ri.getHeight(), bands);
+        for (int p = 0; p < px.length; p++) {
+            int c = px[p];
+            if (bands == 1) {
+                r.d[p] = (byte) c;
+            } else {
+                r.d[p * 3] = (byte) (c >> 16);
+                r.d[p * 3 + 1] = (byte) (c >> 8);
+                r.d[p * 3 + 2] = (byte) c;
             }
         }
         return r;
     }
 
-    /// RGBa to RGBA (or La to LA), as Pillow's `rgbA2rgba`.
-    private static Img unpremultiply(Img s) {
-        int n = s.bands;
-        for (int p = 0, c = s.w * s.h; p < c; p++) {
-            int q = p * n;
-            int alpha = s.d[q + n - 1] & 0xff;
-            if (alpha == 0 || alpha == 255) {
-                continue;
-            }
-            for (int b = 0; b < n - 1; b++) {
-                int v = (255 * (s.d[q + b] & 0xff)) / alpha;
-                s.d[q + b] = (byte) (v > 255 ? 255 : v);
-            }
+    /// Encodes an "L" or "RGB" image as baseline JPEG.
+    private static byte[] jpegEncode(Img s, float quality) {
+        if (s.bands != 1 && s.bands != 3) {
+            throw Py.error(Py.OS_ERROR, "cannot write this mode as JPEG");
         }
-        return s;
+        int[] px = new int[s.w * s.h];
+        for (int p = 0; p < px.length; p++) {
+            int r = s.d[p * s.bands] & 0xff;
+            int g = s.bands == 1 ? r : s.d[p * 3 + 1] & 0xff;
+            int b = s.bands == 1 ? r : s.d[p * 3 + 2] & 0xff;
+            px[p] = 0xff000000 | r << 16 | g << 8 | b;
+        }
+        return JpegCodec.encode(new RasterImage(s.w, s.h, px), quality, s.bands == 1);
     }
 
     /// Maps a 1-band index image through a 256 entry RGBA table.
@@ -675,85 +576,16 @@ final class PyImage {
         return o;
     }
 
-    private static int paeth(int a, int b, int c) {
-        int p = a + b - c;
-        int pa = Math.abs(p - a);
-        int pb = Math.abs(p - b);
-        int pc = Math.abs(p - c);
-        if (pa <= pb && pa <= pc) {
-            return a;
+    private static byte[] pngUnfilter(byte[] data, int row, int h, int bpp) {
+        try {
+            return PngCodec.unfilter(data, 0, row, h, bpp);
+        } catch (IOException e) {
+            throw osError(e); // NOPMD PreserveStackTrace - surfaced as a Python OSError
         }
-        return pb <= pc ? b : c;
     }
 
-    /// Reverses the five PNG row filters; `data` holds `h` rows of a filter
-    /// byte followed by `row` bytes, and `bpp` is the filter's byte distance.
-    private static byte[] unfilter(byte[] data, int row, int h, int bpp) {
-        if (data.length < (row + 1) * h) {
-            throw Py.error(Py.OS_ERROR, "image file is truncated");
-        }
-        byte[] out = new byte[row * h];
-        for (int y = 0; y < h; y++) {
-            int ft = data[y * (row + 1)] & 0xff;
-            int in = y * (row + 1) + 1;
-            int o = y * row;
-            for (int x = 0; x < row; x++) {
-                int raw = data[in + x] & 0xff;
-                int a = x >= bpp ? out[o + x - bpp] & 0xff : 0;
-                int b = y > 0 ? out[o - row + x] & 0xff : 0;
-                int c = x >= bpp && y > 0 ? out[o - row + x - bpp] & 0xff : 0;
-                int v;
-                switch (ft) {
-                    case 0: v = raw; break;
-                    case 1: v = raw + a; break;
-                    case 2: v = raw + b; break;
-                    case 3: v = raw + ((a + b) >> 1); break;
-                    case 4: v = raw + paeth(a, b, c); break;
-                    default: throw Py.error(Py.OS_ERROR, "unknown PNG filter type " + ft);
-                }
-                out[o + x] = (byte) v;
-            }
-        }
-        return out;
-    }
-
-    private static int sample(byte[] raw, int rowStart, int index, int depth) {
-        if (depth == 8) {
-            return raw[rowStart + index] & 0xff;
-        }
-        if (depth == 16) {
-            return raw[rowStart + index * 2] & 0xff;
-        }
-        int bit = index * depth;
-        return (raw[rowStart + (bit >> 3)] & 0xff) >> (8 - depth - (bit & 7)) & ((1 << depth) - 1);
-    }
-
-    /// Unpacks unfiltered PNG rows into an image: gray to 1 band, RGB to 3,
-    /// gray+alpha to 2, RGBA to 4 and palette to its 1-band indices.
-    private static Img expand(byte[] raw, int w, int h, int ctype, int depth) {
-        int channels = ctype == 0 || ctype == 3 ? 1 : ctype == 2 ? 3 : ctype == 4 ? 2 : 4;
-        int row = (w * channels * depth + 7) / 8;
+    private static Img pngExpand(byte[] raw, int w, int h, int ctype, int depth) {
         int bands = ctype == 0 || ctype == 3 ? 1 : ctype == 2 ? 3 : ctype == 4 ? 2 : 4;
-        Img r = new Img(w, h, bands);
-        for (int y = 0; y < h; y++) {
-            int rs = y * row;
-            for (int x = 0; x < w; x++) {
-                int o = (y * w + x) * bands;
-                if (ctype == 3) {
-                    r.d[o] = (byte) sample(raw, rs, x, depth);
-                    continue;
-                }
-                int scale = depth < 8 ? 255 / ((1 << depth) - 1) : 1;
-                if (ctype == 4) {
-                    r.d[o] = (byte) sample(raw, rs, x * 2, depth);
-                    r.d[o + 1] = (byte) sample(raw, rs, x * 2 + 1, depth);
-                    continue;
-                }
-                for (int b = 0; b < channels; b++) {
-                    r.d[o + b] = (byte) (sample(raw, rs, x * channels + b, depth) * scale);
-                }
-            }
-        }
-        return r;
+        return fromBands(w, h, bands, PngCodec.expand(raw, w, h, ctype, depth));
     }
 }

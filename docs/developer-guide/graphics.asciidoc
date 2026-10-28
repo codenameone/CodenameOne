@@ -1081,3 +1081,18 @@ The following classes are available for different kinds of visualisations:
 | `XYMultipleSeriesDataset` / `XYMultipleSeriesRenderer`
 | Extends `LineChart` with date-aware labelling on the X axis for time series data.
 |===
+
+=== Images without a display
+
+`com.codename1.image` draws and encodes images in pure Java, with no display and no platform code. The same calls work on a device, in the simulator and in a Codename One backend, which makes it the tool for server-generated sharing cards, thumbnails of uploads and chart exports.
+
+* `RasterImage` holds non-premultiplied ARGB pixels, and crops, rotates, flips and resizes them. Its resize filters (`NEAREST`, `BILINEAR`, `BICUBIC`, `LANCZOS`, `BOX` and `HAMMING`) produce the same bytes as Pillow.
+* `RasterGraphics` draws antialiased lines, rectangles, rounded rectangles, ellipses, arcs, polygons and Bezier paths, with stroke width, caps and joins, an affine transform, a clip rectangle, alpha, linear and radial gradients and scaled images.
+* `PngCodec` reads every PNG variant and writes 8-bit PNG; `JpegCodec` reads baseline and progressive JPEG and writes baseline JPEG.
+
+[source,java]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/SocialCard.java[tag=raster-image-card,indent=0]
+----
+
+To show the result in the UI, pass the pixels to `Image.createImage(raster.getPixels(), width, height)`. Text isn't drawn yet: `RasterGraphics.drawString` renders through a `RasterFont`, and Codename One doesn't ship one.

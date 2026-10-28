@@ -444,6 +444,8 @@ class Image:
         format = format.upper()
         if format == "PNG":
             data = _png_encode(self)
+        elif format in ("JPEG", "JPG"):
+            data = _jpeg_encode(self, params.get("quality", 75))
         else:
             data = _native_encode(self, format, params.get("quality", 75))
         if filename is not None:
@@ -496,10 +498,14 @@ def open(fp, mode="r", formats=None):
         im = _png_decode(data)
         im.format = "PNG"
         return im
-    kind = None
     if data[:3] == b"\xff\xd8\xff":
-        kind = "JPEG"
-    elif data[:4] == b"GIF8":
+        handle = _cn1image.jpeg_decode(data)
+        mode = "L" if len(_cn1image.getpixel(handle, 0, 0)) == 1 else "RGB"
+        im = _wrap(mode, _cn1image.size(handle), handle)
+        im.format = "JPEG"
+        return im
+    kind = None
+    if data[:4] == b"GIF8":
         kind = "GIF"
     elif data[:2] == b"BM":
         kind = "BMP"
@@ -508,11 +514,11 @@ def open(fp, mode="r", formats=None):
     if kind is None:
         raise UnidentifiedImageError("cannot identify image file %r" % (fp if isinstance(fp, str) else fp,))
     if not _cn1image.native_available():
-        raise OSError(kind + " needs a running Codename One display to decode; only PNG is built in")
+        raise OSError(kind + " needs a running Codename One display to decode; only PNG and JPEG are built in")
     handle = _cn1image.native_decode(data)
     im = _wrap("RGBA", _cn1image.size(handle), handle)
     im.format = kind
-    if kind in ("JPEG", "BMP"):
+    if kind == "BMP":
         im = im.convert("RGB")
         im.format = kind
     return im
@@ -520,10 +526,18 @@ def open(fp, mode="r", formats=None):
 
 def _native_encode(im, format, quality):
     if not _cn1image.native_available():
-        raise OSError(format + " needs a running Codename One display to encode; only PNG is built in")
-    if format == "JPEG" and im.mode == "RGBA":
-        raise OSError("cannot write mode RGBA as JPEG")
+        raise OSError(format + " needs a running Codename One display to encode; only PNG and JPEG are built in")
     return _cn1image.native_encode(im._im, format.lower(), quality / 100.0)
+
+
+def _jpeg_encode(im, quality):
+    # The shared pure-Java codec (com.codename1.image.JpegCodec): baseline,
+    # libjpeg's quality scaling, so it works on servers as well as devices.
+    if im.mode == "1":
+        im = im.convert("L")
+    if im.mode not in ("L", "RGB"):
+        raise OSError("cannot write mode %s as JPEG" % im.mode)
+    return _cn1image.jpeg_encode(im._im, int(quality) / 100.0)
 
 
 def _chunk(kind, body):
