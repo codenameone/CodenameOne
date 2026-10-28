@@ -322,8 +322,14 @@ Flask sessions (signed cookies), `flash`, Jinja templates (`extends`, `block`,
 `include`, loops, conditions and the common filters, with autoescaping),
 multipart file uploads and streamed responses work as well. A streamed
 response is sent once its generator finishes. Jinja macros aren't supported yet, and a session cookie
-written by CPython's Flask isn't readable here, or the reverse. FastAPI
-WebSockets and middleware aren't supported yet.
+written by CPython's Flask isn't readable here, or the reverse.
+
+FastAPI middleware works as in Starlette: `@app.middleware("http")`,
+`BaseHTTPMiddleware` subclasses, `CORSMiddleware`, `GZipMiddleware` and
+`TrustedHostMiddleware`. WebSocket endpoints are supported, including
+`TestClient.websocket_connect`. A WebSocket endpoint can't yet wait on
+something that suspends, such as `asyncio.sleep`, while its socket is open,
+and middleware doesn't apply to WebSocket connections.
 
 === Compared with CPython, PyPy and GraalPy
 
