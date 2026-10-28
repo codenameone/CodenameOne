@@ -204,11 +204,14 @@ the real package:
   and rolling windows aren't supported.
 | `Pillow` | `PIL.Image` in the `RGB`, `RGBA`, `L`, `LA`, `P` and `1` modes: conversion,
   cropping, resizing, rotation, pasting, channels and point operations,
-  computed as Pillow computes them. PNG is read and written on every platform;
-  JPEG, GIF, BMP and WebP go through Codename One's image support and need the
-  application's display, so a server reads and writes PNG only. `ImageDraw`
-  draws points, lines, rectangles, ellipses, polygons and text in Pillow's
-  bitmap font, which `ImageFont.load_default()` returns. Every resizing
+  computed as Pillow computes them. PNG and JPEG are read and written on
+  every platform, servers included, by Codename One's `com.codename1.image`
+  package; GIF, BMP and WebP go through the platform's image support and need
+  the application's display. `ImageDraw` draws points, lines, rectangles,
+  ellipses, polygons and text. `ImageFont.truetype` loads TrueType fonts and
+  `ImageFont.load_default()` returns the scalable Aileron font, as in Pillow.
+  Text is laid out as Pillow's basic layout does, without hinting, so at small
+  sizes a glyph can sit a pixel away from where Pillow puts it. Every resizing
   filter, `LANCZOS` and `BICUBIC` included, gives Pillow's pixels.
 | `flask`, `fastapi`, `uvicorn` | See <<python-backends,Python backends>>.
 | `typing_extensions`, `six`, `tabulate`, `idna`, `packaging` |
