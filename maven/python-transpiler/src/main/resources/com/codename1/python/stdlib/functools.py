@@ -37,6 +37,17 @@ class partial:
     def __call__(self, *args, **keywords):
         return self.func(*self.args, *args, **{**self.keywords, **keywords})
 
+    def __reduce__(self):
+        return (type(self), (self.func,), (self.func, self.args, self.keywords or None, None))
+
+    def __setstate__(self, state):
+        func, args, keywords, namespace = state
+        if not callable(func) or not isinstance(args, tuple) or (keywords is not None and not isinstance(keywords, dict)):
+            raise TypeError("invalid partial state")
+        self.func = func
+        self.args = args
+        self.keywords = {} if keywords is None else dict(keywords)
+
     def __repr__(self):
         parts = [repr(self.func)]
         parts.extend(repr(a) for a in self.args)
