@@ -100,10 +100,11 @@ is rebound rather than rebuilt. A day change is 1.5 ms, thirteen times faster
 than CMP; a scroll step is 1.8 ms, nearly ten times faster; the executable is
 8.9 MB, 39% of CMP's; memory is level with both.
 
-That gap is the cost of the reactive model, not of Kotlin's speed. A
-composition records what it read, diffs what it emits against its slot table
-and hands the changes to an applier. An imperative update sets three labels on
-a card that already exists, and reads as plainly: the components are made
+The time gap is mostly the cost of the reactive model. A composition records
+what it read, diffs what it emits against its slot table and hands the changes
+to an applier. An imperative update sets three labels on a card that already
+exists. The size gap is Kotlin: the Java build carries neither the Kotlin
+standard library nor the Compose runtime. The Java card also reads as plainly: the components are made
 once, `bind` fills them, and a test makes a card and presses its button
 without a test rule or semantics tree. The developer guide's Kotlin
 Multiplatform chapter shows the card both ways and a test for it.

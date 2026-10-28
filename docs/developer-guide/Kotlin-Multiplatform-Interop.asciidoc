@@ -85,10 +85,11 @@ library, no Compose runtime and no coroutines:
   the bundle is 10.2 MB.
 - **Memory is level** with both, at 47 MB.
 
-The gap is the price of the reactive model, not of Kotlin. A composition
+The time gap is mostly the price of the reactive model. A composition
 records the state it read, compares what it emits against what it emitted
 last time and applies the difference; an imperative update sets three labels
-on a card that already exists.
+on a card that already exists. The size gap is Kotlin: the Java build carries
+neither the Kotlin standard library nor the Compose runtime.
 
 Nor does the declarative form buy readability. Here is one session card both
 ways. The Compose version, from the benchmark:
