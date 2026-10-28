@@ -110,7 +110,7 @@ internal class ComposeHost : Container(HostLayout) {
     private var sentInLayout = false
     private var animatedOn: com.codename1.ui.Form? = null
     private var frameRequested = false
-    private var timerPending = false
+    private var remeasureInFrame = false
 
     init {
         cn1StripStyle(this)
@@ -147,8 +147,10 @@ internal class ComposeHost : Container(HostLayout) {
     /// whole cycle more. The cycle's own wait paces continuous animation:
     /// `revalidateLater` does not wake the EDT. `animate()`, after the paint,
     /// is the fallback for a cycle whose layout pass did not reach this host
-    /// (the form defers revalidation while it animates); the timer is for a
-    /// host that is not showing. A timer per frame cost a thread per frame.
+    /// (the form defers revalidation while it animates). A host that is not
+    /// showing gets no frames: its request waits, and `initComponent` sends it
+    /// when the host is shown again, so a hidden infinite animation costs
+    /// nothing.
     private fun scheduleFrame() {
         frameRequested = true
         val f = componentForm
@@ -160,14 +162,6 @@ internal class ComposeHost : Container(HostLayout) {
             }
             if (!inFrame) {
                 revalidateLater()
-            }
-            return
-        }
-        if (!timerPending) {
-            timerPending = true
-            com.codename1.ui.CN.setTimeout(16) {
-                timerPending = false
-                sendFrame()
             }
         }
     }
@@ -212,7 +206,9 @@ internal class ComposeHost : Container(HostLayout) {
 
     fun requestRemeasure() {
         if (inFrame) {
-            // This pass measures what the frame applies.
+            // This pass lays out what the frame applies, but the parent sized
+            // the host before it; layoutChildren asks the parent again.
+            remeasureInFrame = true
             return
         }
         if (!remeasurePending) {
@@ -241,6 +237,20 @@ internal class ComposeHost : Container(HostLayout) {
                 inFrame = false
             }
             sentInLayout = true
+            if (remeasureInFrame) {
+                // Next cycle, never inline: the parent is mid-layout.
+                // Only when the size really moved: most frames change content,
+                // not size, and a parent pass per frame is what this avoids.
+                remeasureInFrame = false
+                val before = preferredSize
+                val w = before.width
+                val h = before.height
+                setShouldCalcPreferredSize(true)
+                val after = preferredSize
+                if (after.width != w || after.height != h) {
+                    parent?.revalidateLater()
+                }
+            }
             if (frameRequested) {
                 revalidateLater()
             }
