@@ -223,7 +223,7 @@ final class BulkGeneratedCodeChecks {
             // must walk the branch that ran -- the else branch's load used to
             // be folded in as the receiver of both, so a true condition with a
             // null else threw. Without the fix trueNullElse, trueOther,
-            // localsFirst, localsFirstNullElse, keySetFirst,
+            // localsFirst, localsFirstNullElse, staticsNullElse, keySetFirst,
             // keySetFirstNullElse and valuesFirst fail; the other cases pin the
             // branches that were right by construction. Equal output catches
             // them too; named so the failure says what broke.
@@ -232,6 +232,8 @@ final class BulkGeneratedCodeChecks {
                 {"ternary.falseOther", "uv:2"}, {"ternary.falseNull", "THREW java.lang.NullPointerException"},
                 {"ternary.localsFirst", "a1a2"}, {"ternary.localsSecond", "uv"},
                 {"ternary.localsFirstNullElse", "a1a2"},
+                {"ternary.fieldsNullElse", "c"}, {"ternary.fieldsElse", "b"},
+                {"ternary.staticsNullElse", "sc"}, {"ternary.staticsElse", "sb"},
                 {"ternary.keySetFirst", "1"}, {"ternary.keySetSecond", "6"},
                 {"ternary.keySetFirstNullElse", "1"},
                 {"ternary.valuesFirst", "3"}, {"ternary.valuesSecond", "6"},

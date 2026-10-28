@@ -269,6 +269,29 @@ public class CollectionSemanticsApp {
     // ternaryIteratorCall is behaviour only: lowerIteratorCalls does not retype
     // this shape (the iterator stores are folded first), so no translator
     // revision has been seen to fail it.
+    // The shape JpqlQueryImpl walks a CASE expression with: both branches read
+    // a field, and the else branch's is null exactly when the then branch runs.
+    // A guard, not a reproduction: an instance field read is not folded into
+    // the loop, so master already took this receiver off the stack.
+    private List<String> ternaryChildren;
+    private List<String> ternaryBranches;
+
+    private String ternaryFields() {
+        String value = "";
+        for (String item : ternaryBranches == null ? ternaryChildren : ternaryBranches) value += item;
+        return value;
+    }
+
+    // A static field read IS folded, so this shape failed like a local did.
+    private static List<String> staticChildren;
+    private static List<String> staticBranches;
+
+    private static String ternaryStatics() {
+        String value = "";
+        for (String item : staticBranches == null ? staticChildren : staticBranches) value += item;
+        return value;
+    }
+
     private static int ternaryKeySet(boolean first, boolean secondNull) {
         java.util.HashMap<String, String> a = new java.util.HashMap<String, String>();
         a.put("k", "vvv");
@@ -332,6 +355,20 @@ public class CollectionSemanticsApp {
         ternaryCase("ternary.localsFirst", () -> ternaryLocals(true, a, other));
         ternaryCase("ternary.localsSecond", () -> ternaryLocals(false, a, other));
         ternaryCase("ternary.localsFirstNullElse", () -> ternaryLocals(true, a, null));
+        ternaryChildren = new ArrayList<String>();
+        ternaryChildren.add("c");
+        ternaryBranches = null;
+        ternaryCase("ternary.fieldsNullElse", () -> ternaryFields());
+        ternaryBranches = new ArrayList<String>();
+        ternaryBranches.add("b");
+        ternaryCase("ternary.fieldsElse", () -> ternaryFields());
+        staticChildren = new ArrayList<String>();
+        staticChildren.add("sc");
+        staticBranches = null;
+        ternaryCase("ternary.staticsNullElse", () -> ternaryStatics());
+        staticBranches = new ArrayList<String>();
+        staticBranches.add("sb");
+        ternaryCase("ternary.staticsElse", () -> ternaryStatics());
         ternaryCase("ternary.keySetFirst", () -> ternaryKeySet(true, false));
         ternaryCase("ternary.keySetSecond", () -> ternaryKeySet(false, false));
         ternaryCase("ternary.keySetFirstNullElse", () -> ternaryKeySet(true, true));
