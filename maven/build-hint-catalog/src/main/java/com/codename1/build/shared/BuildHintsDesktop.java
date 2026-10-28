@@ -115,9 +115,9 @@ final class BuildHintsDesktop {
                 .group(HintGroup.JAVASCRIPT)
                 .values("SplashAppearance", "auto", "light", "dark")
                 .platform("javascript")
-                .doc("Which colours the loading screen uses. Defaults to `auto` when any "
-                        + "`javascript.splash.dark*` colour is set and to `light` otherwise, so an app "
-                        + "that never asked for a dark loading screen does not get one. `auto` follows the "
+                .doc("Which colors the loading screen uses. Defaults to `auto` when any "
+                        + "`javascript.splash.dark*` color is set and to `light` otherwise, so an app "
+                        + "that never asked for a dark loading screen doesn't get one. `auto` follows the "
                         + "browser's light/dark preference, or the choice the app remembered with "
                         + "`Display.setProperty(\"platformHint.javascript.splashAppearance\", \"dark\")`. "
                         + "`light` and `dark` always use that set, for apps with one appearance."));
@@ -127,8 +127,8 @@ final class BuildHintsDesktop {
                 .type(HintType.STRING)
                 .def("#ffffff")
                 .platform("javascript")
-                .doc("The loading screen's background in light appearance, as a hex colour (`#rgb`, `#rrggbb`, "
-                        + "with optional alpha) or a CSS colour name. Applied from the first frame the "
+                .doc("The loading screen's background in light appearance, as a hex color (`#rgb`, `#rrggbb`, "
+                        + "with optional alpha) or a CSS color name. Applied from the first frame the "
                         + "page paints until the first form shows."));
 
         h.add(new Hint("javascript.splash.textColor")
@@ -136,8 +136,8 @@ final class BuildHintsDesktop {
                 .type(HintType.STRING)
                 .def("#666666")
                 .platform("javascript")
-                .doc("The loading screen's text colour in light appearance, as a hex colour (`#rgb`, `#rrggbb`, "
-                        + "with optional alpha) or a CSS colour name. Applied from the first frame the "
+                .doc("The loading screen's text color in light appearance, as a hex color (`#rgb`, `#rrggbb`, "
+                        + "with optional alpha) or a CSS color name. Applied from the first frame the "
                         + "page paints until the first form shows."));
 
         h.add(new Hint("javascript.splash.accentColor")
@@ -145,8 +145,8 @@ final class BuildHintsDesktop {
                 .type(HintType.STRING)
                 .def("#0072ff")
                 .platform("javascript")
-                .doc("The loading screen's progress bar colour in light appearance, as a hex colour (`#rgb`, `#rrggbb`, "
-                        + "with optional alpha) or a CSS colour name. Applied from the first frame the "
+                .doc("The loading screen's progress bar color in light appearance, as a hex color (`#rgb`, `#rrggbb`, "
+                        + "with optional alpha) or a CSS color name. Applied from the first frame the "
                         + "page paints until the first form shows."));
 
         h.add(new Hint("javascript.splash.darkBackground")
@@ -154,8 +154,8 @@ final class BuildHintsDesktop {
                 .type(HintType.STRING)
                 .def("#121212")
                 .platform("javascript")
-                .doc("The loading screen's background in dark appearance, as a hex colour (`#rgb`, `#rrggbb`, "
-                        + "with optional alpha) or a CSS colour name. Applied from the first frame the "
+                .doc("The loading screen's background in dark appearance, as a hex color (`#rgb`, `#rrggbb`, "
+                        + "with optional alpha) or a CSS color name. Applied from the first frame the "
                         + "page paints until the first form shows."));
 
         h.add(new Hint("javascript.splash.darkTextColor")
@@ -163,8 +163,8 @@ final class BuildHintsDesktop {
                 .type(HintType.STRING)
                 .def("#b3b3b3")
                 .platform("javascript")
-                .doc("The loading screen's text colour in dark appearance, as a hex colour (`#rgb`, `#rrggbb`, "
-                        + "with optional alpha) or a CSS colour name. Applied from the first frame the "
+                .doc("The loading screen's text color in dark appearance, as a hex color (`#rgb`, `#rrggbb`, "
+                        + "with optional alpha) or a CSS color name. Applied from the first frame the "
                         + "page paints until the first form shows."));
 
         h.add(new Hint("javascript.splash.darkAccentColor")
@@ -172,8 +172,8 @@ final class BuildHintsDesktop {
                 .type(HintType.STRING)
                 .def("#4da3ff")
                 .platform("javascript")
-                .doc("The loading screen's progress bar colour in dark appearance, as a hex colour (`#rgb`, `#rrggbb`, "
-                        + "with optional alpha) or a CSS colour name. Applied from the first frame the "
+                .doc("The loading screen's progress bar color in dark appearance, as a hex color (`#rgb`, `#rrggbb`, "
+                        + "with optional alpha) or a CSS color name. Applied from the first frame the "
                         + "page paints until the first form shows."));
 
         h.add(new Hint("javascript.splash.logo")
