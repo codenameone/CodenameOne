@@ -4,6 +4,7 @@
 """A test client that calls the app's pure dispatch core."""
 import gzip as _gzip
 import json as _json
+import queue as _queue
 from urllib.parse import urlencode, urljoin
 
 from starlette.datastructures import Headers, MutableHeaders, URL
@@ -185,7 +186,17 @@ class TestClient:
         return resp
 
 
+class WebSocketDenialResponse(TestResponse, Exception):
+    """Raised when the app answers a websocket handshake with an HTTP response."""
+    __test__ = False
+
+    def __init__(self, status_code, headers, content, url):
+        TestResponse.__init__(self, status_code, headers, content, url)
+        Exception.__init__(self)
+
+
 class WebSocketTestSession:
+    """A websocket connection to the app's loop; this thread blocks on its queue."""
     __test__ = False
 
     def __init__(self, app, path, query, headers):
@@ -195,11 +206,14 @@ class WebSocketTestSession:
         self.headers = headers
         self.accepted_subprotocol = None
         self.extra_headers = None
-        self._out = []
+        self._out = _queue.SimpleQueue()
         self._session = None
 
     def _sink(self, message):
-        self._out.append(message)
+        self._out.put(message)
+
+    def _finished(self, session):
+        self._out.put(None)
 
     def _raise_error(self):
         s = self._session
@@ -209,26 +223,37 @@ class WebSocketTestSession:
             raise e
 
     def __enter__(self):
-        self._session = self.app.websocket_open(self.path, self.query, self.headers, self._sink)
-        self._raise_error()
+        self._session = self.app.websocket_open(self.path, self.query, self.headers, self._sink,
+                                                self._finished)
         m = self.receive()
+        if m["type"] == "websocket.http.response":
+            self._wait()
+            raise WebSocketDenialResponse(m["status"], m["headers"], m["body"], self.path)
         if m["type"] == "websocket.close":
+            self._wait()
             from starlette.websockets import WebSocketDisconnect
             raise WebSocketDisconnect(m.get("code", 1000), m.get("reason", ""))
         self.accepted_subprotocol = m.get("subprotocol")
         self.extra_headers = m.get("headers")
         return self
 
+    def _wait(self):
+        s = self._session
+        if not s.wait(5):
+            s.cancel()
+            s.wait(5)
+        self._raise_error()
+
     def __exit__(self, *a):
         s = self._session
         if not s.done:
             s.deliver({"type": "websocket.disconnect", "code": 1000})
-        self._raise_error()
+        self._wait()
         return False
 
     def send(self, message):
-        self._session.deliver(message)
         self._raise_error()
+        self._session.deliver(message)
 
     def send_text(self, data):
         self.send({"type": "websocket.receive", "text": data})
@@ -247,10 +272,13 @@ class WebSocketTestSession:
         self.send({"type": "websocket.disconnect", "code": code, "reason": reason})
 
     def receive(self):
-        self._raise_error()
-        if not self._out:
-            raise RuntimeError("the websocket endpoint is waiting for a message and sent nothing")
-        return self._out.pop(0)
+        m = self._out.get()
+        if m is None:
+            # The endpoint has finished; keep the marker for later receives.
+            self._out.put(None)
+            self._raise_error()
+            return {"type": "websocket.close", "code": 1000, "reason": ""}
+        return m
 
     def _raise_on_close(self, m):
         if m["type"] == "websocket.close":

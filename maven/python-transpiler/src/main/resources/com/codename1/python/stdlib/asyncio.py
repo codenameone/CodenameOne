@@ -5,9 +5,13 @@
 
 The loop runs callbacks, timers and tasks in the thread that called run().
 There is no selector: a loop with nothing ready sleeps until its next
-timer. Networking, subprocesses and executors are not part of this module.
+timer, or until another thread hands it work through
+``call_soon_threadsafe`` / ``run_coroutine_threadsafe``. Each thread has its
+own running loop. Networking, subprocesses and executors are not part of
+this module.
 """
 
+import _thread
 import time as _time
 from heapq import heappush as _heappush, heappop as _heappop
 
@@ -17,12 +21,16 @@ __all__ = [
     "Task", "TimeoutError", "all_tasks", "as_completed", "create_task", "current_task", "ensure_future",
     "gather", "get_event_loop", "get_running_loop", "iscoroutine", "iscoroutinefunction", "new_event_loop",
     "run", "set_event_loop", "shield", "sleep", "wait", "wait_for", "FIRST_COMPLETED", "FIRST_EXCEPTION",
-    "ALL_COMPLETED", "timeout",
+    "ALL_COMPLETED", "timeout", "run_coroutine_threadsafe",
 ]
 
 FIRST_COMPLETED = "FIRST_COMPLETED"
 FIRST_EXCEPTION = "FIRST_EXCEPTION"
 ALL_COMPLETED = "ALL_COMPLETED"
+
+
+# Since Python 3.11 asyncio's TimeoutError is the builtin one.
+TimeoutError = TimeoutError
 
 
 class CancelledError(BaseException):
@@ -296,6 +304,9 @@ class BaseEventLoop(AbstractEventLoop):
         self._stopping = False
         self._running = False
         self._closed = False
+        # Work handed over by other threads, created on first use; its
+        # semaphore is also what an idle loop blocks on.
+        self._threadsafe = None
 
     def time(self):
         return _time.monotonic()
@@ -305,7 +316,18 @@ class BaseEventLoop(AbstractEventLoop):
         self._ready.append(h)
         return h
 
-    call_soon_threadsafe = call_soon
+    def call_soon_threadsafe(self, callback, *args, context=None):
+        h = Handle(callback, args, self)
+        self._inbox().put(h)
+        return h
+
+    def _inbox(self):
+        q = self._threadsafe
+        if q is None:
+            import queue
+            q = queue.SimpleQueue()
+            self._threadsafe = q
+        return q
 
     def call_later(self, delay, callback, *args, context=None):
         return self.call_at(self.time() + delay, callback, *args)
@@ -330,6 +352,8 @@ class BaseEventLoop(AbstractEventLoop):
 
     def stop(self):
         self._stopping = True
+        if self._threadsafe is not None:
+            self._threadsafe.put(None)
 
     def close(self):
         if self._running:
@@ -343,9 +367,9 @@ class BaseEventLoop(AbstractEventLoop):
             raise RuntimeError("This event loop is already running")
         if self._closed:
             raise RuntimeError("Event loop is closed")
-        global _running_loop
-        previous = _running_loop
-        _running_loop = self
+        me = _thread.get_ident()
+        previous = _running_loops.get(me)
+        _running_loops[me] = self
         self._running = True
         try:
             while True:
@@ -355,7 +379,10 @@ class BaseEventLoop(AbstractEventLoop):
         finally:
             self._stopping = False
             self._running = False
-            _running_loop = previous
+            if previous is None:
+                _running_loops.pop(me, None)
+            else:
+                _running_loops[me] = previous
 
     def run_until_complete(self, future):
         future = ensure_future(future, loop=self)
@@ -373,10 +400,21 @@ class BaseEventLoop(AbstractEventLoop):
         scheduled = self._scheduled
         while scheduled and scheduled[0][2]._cancelled:
             _heappop(scheduled)
-        if not self._ready and scheduled and not self._stopping:
-            wait = scheduled[0][0] - self.time()
-            if wait > 0:
-                _time.sleep(wait)
+        q = self._threadsafe
+        if q is not None:
+            self._drain(q, False, None)
+        if not self._ready and not self._stopping:
+            if q is not None:
+                if scheduled:
+                    wait = scheduled[0][0] - self.time()
+                    if wait > 0:
+                        self._drain(q, True, wait)
+                else:
+                    self._drain(q, True, None)
+            elif scheduled:
+                wait = scheduled[0][0] - self.time()
+                if wait > 0:
+                    _time.sleep(wait)
         now = self.time()
         while scheduled and scheduled[0][0] <= now:
             h = _heappop(scheduled)[2]
@@ -388,21 +426,42 @@ class BaseEventLoop(AbstractEventLoop):
             if not h._cancelled:
                 h._run()
 
+    def _drain(self, q, block, timeout):
+        import queue
+        try:
+            h = q.get(block, timeout)
+        except queue.Empty:
+            return
+        while True:
+            if h is not None:
+                self._ready.append(h)
+            try:
+                h = q.get(False)
+            except queue.Empty:
+                return
 
-_running_loop = None
+
+# The loop each thread is running, keyed by thread id.
+_running_loops = {}
+
+
+def _get_running():
+    return _running_loops.get(_thread.get_ident())
 _event_loop = None
 
 
 def get_running_loop():
-    if _running_loop is None:
+    loop = _get_running()
+    if loop is None:
         raise RuntimeError("no running event loop")
-    return _running_loop
+    return loop
 
 
 def get_event_loop():
     global _event_loop
-    if _running_loop is not None:
-        return _running_loop
+    running = _get_running()
+    if running is not None:
+        return running
     if _event_loop is None or _event_loop.is_closed():
         _event_loop = BaseEventLoop()
     return _event_loop
@@ -450,7 +509,7 @@ def create_task(coro, *, name=None, context=None):
 
 
 def run(main, *, debug=None):
-    if _running_loop is not None:
+    if _get_running() is not None:
         raise RuntimeError("asyncio.run() cannot be called from a running event loop")
     if not iscoroutine(main):
         raise ValueError("a coroutine was expected, got " + repr(main))
@@ -489,7 +548,7 @@ def _set_result_unless_cancelled(fut, result):
 
 
 def gather(*coros_or_futures, return_exceptions=False):
-    loop = get_event_loop() if _running_loop is None else _running_loop
+    loop = get_event_loop()
     children = [ensure_future(c, loop=loop) for c in coros_or_futures]
     outer = loop.create_future()
     if not children:
@@ -602,7 +661,7 @@ async def wait(fs, *, timeout=None, return_when=ALL_COMPLETED):
 
 def as_completed(fs, *, timeout=None):
     todo = [ensure_future(f) for f in fs]
-    loop = get_event_loop() if _running_loop is None else _running_loop
+    loop = get_event_loop()
     queue = Queue()
 
     def on_done(f):
@@ -918,3 +977,28 @@ class Queue:
     async def join(self):
         if self._unfinished > 0:
             await self._finished.wait()
+
+
+def run_coroutine_threadsafe(coro, loop):
+    """Runs ``coro`` on ``loop`` from another thread; answers a concurrent future."""
+    if not iscoroutine(coro):
+        raise TypeError("A coroutine object is required")
+    from concurrent.futures import Future as _CFuture
+    result = _CFuture()
+
+    def copy(task):
+        if task.cancelled():
+            result.cancel()
+            return
+        e = task.exception()
+        if e is not None:
+            result.set_exception(e)
+        else:
+            result.set_result(task.result())
+
+    def start():
+        if result.set_running_or_notify_cancel():
+            loop.create_task(coro).add_done_callback(copy)
+
+    loop.call_soon_threadsafe(start)
+    return result

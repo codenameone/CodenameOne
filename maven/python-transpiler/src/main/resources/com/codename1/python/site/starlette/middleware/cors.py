@@ -54,6 +54,9 @@ class CORSMiddleware:
         return origin in self.allow_origins
 
     async def __call__(self, request):
+        if request.scope.get("type") == "websocket":
+            # Starlette's middleware passes a websocket scope straight through.
+            return await self.app(request)
         headers = request.headers
         origin = headers.get("origin")
         if origin is None:

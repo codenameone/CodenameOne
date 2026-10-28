@@ -194,6 +194,9 @@ class FastAPI(APIRouter):
         raise StarletteHTTPException(404, "Not Found")
 
     async def _core(self, req):
+        if req.scope.get("type") == "websocket":
+            await self._run_ws(req._route, req)
+            return None
         try:
             if self.openapi_url and req._path == self.openapi_url and req.method == "GET":
                 resp = JSONResponse(self.openapi())
@@ -229,27 +232,44 @@ class FastAPI(APIRouter):
         return self._dispatch_for_client(method, path, query, headers, body, False)
 
     # -- websockets
-    def websocket_open(self, path, query, headers, sink):
-        """Starts a websocket connection; returns its session, or None with no route.
-
-        ``sink(message)`` receives the ASGI-shaped messages the endpoint sends
-        (``websocket.accept``, ``websocket.send``, ``websocket.close``). The
-        caller feeds client messages with ``session.deliver``.
-        """
+    def websocket_route(self, path):
+        """The websocket route serving ``path`` and its path parameters, or (None, None)."""
         path = unquote(path)
-        route = None
-        vals = None
         for r in self.routes:
             if isinstance(r, APIWebSocketRoute):
                 vals = r.match(path)
                 if vals is not None:
-                    route = r
-                    break
-        session = _Session(sink)
-        ws = WebSocket(path, query, headers, session, self)
+                    return r, vals
+        return None, None
+
+    def websocket_open(self, path, query, headers, sink, on_done=None):
+        """Starts a websocket connection on the shared loop; returns its session.
+
+        ``sink(message)`` receives the ASGI-shaped messages the endpoint sends
+        (``websocket.accept``, ``websocket.send``, ``websocket.close``, and
+        ``websocket.http.response`` when middleware refuses the handshake
+        with a response), on the loop thread. The caller feeds client
+        messages with ``session.deliver`` from any thread. The connection
+        goes through the middleware stack first, as Starlette's does.
+        """
+        route, vals = self.websocket_route(path)
+        session = _Session(sink, on_done)
+        ws = WebSocket(unquote(path), query, headers, session, self)
+        ws.app = self
         ws.path_params = vals or {}
-        session.start(self._run_ws(route, ws))
+        ws._route = route
+        session.start(self._run_ws_stack(ws))
         return session
+
+    async def _run_ws_stack(self, ws):
+        from starlette.websockets import WebSocketState
+        resp = await self._build_stack()(ws)
+        if isinstance(resp, Response) and ws.application_state == WebSocketState.CONNECTING:
+            # A middleware answered the handshake with an HTTP response
+            # (TrustedHostMiddleware's 400): the upgrade is refused with it.
+            ws.application_state = WebSocketState.DISCONNECTED
+            ws._session.outgoing({"type": "websocket.http.response", "status": resp.status_code,
+                                  "headers": list(resp.headers.items()), "body": resp.body})
 
     async def _run_ws(self, route, ws):
         from fastapi.exceptions import WebSocketException, WebSocketRequestValidationError

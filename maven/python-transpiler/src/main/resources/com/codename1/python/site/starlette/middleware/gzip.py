@@ -12,6 +12,9 @@ class GZipMiddleware:
         self.compresslevel = compresslevel
 
     async def __call__(self, request):
+        if request.scope.get("type") == "websocket":
+            # Starlette's middleware passes a websocket scope straight through.
+            return await self.app(request)
         resp = await self.app(request)
         if "content-encoding" in resp.headers:
             return resp

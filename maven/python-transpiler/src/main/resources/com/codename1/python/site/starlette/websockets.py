@@ -3,15 +3,18 @@
 # exception, as the rest of the Codename One Python runtime.
 """Server-side websockets without ASGI.
 
-The endpoint coroutine is driven by ``_Session`` one step at a time rather
-than by an event loop: whenever it waits for a message that has not arrived,
-it yields a ``_Suspend`` and the session returns to its caller (the test
-client, or the platform server's frame callback). A message delivered later
-resumes it. An endpoint that awaits anything else that really suspends -- a
-timer, another task -- is not supported by this driver.
+Every connection runs as a task on one shared asyncio event loop, which a
+daemon thread runs. The platform server and the test client call in from
+their own threads: ``_Session.deliver`` hands a client message to the loop
+with ``call_soon_threadsafe``, and the endpoint's ``receive`` awaits an
+``asyncio.Queue``. The endpoint can therefore await anything that really
+suspends -- timers, other tasks, ``wait_for`` -- and send from any task.
+Messages it sends reach the session's sink on the loop thread.
 """
+import asyncio
 import enum
 import json as _json
+import threading
 
 from starlette.datastructures import URL
 from starlette.requests import HTTPConnection
@@ -31,11 +34,6 @@ class WebSocketDisconnect(Exception):
         self.reason = reason or ""
 
 
-class _Suspend:
-    def __await__(self):
-        yield self
-
-
 class WebSocket(HTTPConnection):
     def __init__(self, path, query, headers, session, app=None):
         HTTPConnection.__init__(self, "GET", path, query, headers, b"", app)
@@ -52,10 +50,7 @@ class WebSocket(HTTPConnection):
     async def receive(self):
         if self.client_state == WebSocketState.DISCONNECTED:
             raise RuntimeError('Cannot call "receive" once a disconnect message has been received.')
-        inbox = self._session.inbox
-        while not inbox:
-            await _Suspend()
-        m = inbox.pop(0)
+        m = await self._session.inbox.get()
         if m["type"] == "websocket.disconnect":
             self.client_state = WebSocketState.DISCONNECTED
         return m
@@ -144,41 +139,79 @@ class WebSocket(HTTPConnection):
         await self.send({"type": "websocket.close", "code": code, "reason": reason or ""})
 
 
-class _Session:
-    """One connection: the inbox the endpoint reads and the coroutine it runs in.
+_loop = None
+_loop_lock = threading.Lock()
 
-    ``sink(message)`` receives every message the endpoint sends. ``deliver``
-    queues a client message and runs the endpoint until it waits again.
+
+def _ws_loop():
+    """The event loop every websocket connection runs on, started on first use."""
+    global _loop
+    with _loop_lock:
+        if _loop is None:
+            loop = asyncio.new_event_loop()
+            loop._inbox()
+            t = threading.Thread(target=loop.run_forever, name="websockets", daemon=True)
+            t.start()
+            _loop = loop
+        return _loop
+
+
+class _Session:
+    """One connection: the queue the endpoint reads and the task it runs in.
+
+    ``sink(message)`` receives every message the endpoint sends, on the loop
+    thread. ``deliver`` queues a client message from any thread.
+    ``on_done(session)``, when given, runs on the loop thread once the
+    endpoint has finished; ``error`` then holds what it raised, if anything.
     """
 
-    def __init__(self, sink):
-        self.inbox = [{"type": "websocket.connect"}]
+    def __init__(self, sink, on_done=None):
         self.sink = sink
-        self.coro = None
+        self.on_done = on_done
+        self.inbox = None
+        self.task = None
         self.done = False
         self.error = None
+        self.loop = _ws_loop()
+        self.finished = threading.Event()
 
     def outgoing(self, message):
         self.sink(message)
 
     def start(self, coro):
-        self.coro = coro
-        self.pump()
+        self.loop.call_soon_threadsafe(self._begin, coro)
+
+    def _begin(self, coro):
+        self.inbox = asyncio.Queue()
+        self.inbox.put_nowait({"type": "websocket.connect"})
+        self.task = self.loop.create_task(coro)
+        self.task.add_done_callback(self._end)
+
+    def _end(self, task):
+        if not task.cancelled():
+            e = task.exception()
+            if e is not None:
+                self.error = e
+        self.done = True
+        try:
+            if self.on_done is not None:
+                self.on_done(self)
+        finally:
+            self.finished.set()
 
     def deliver(self, message):
-        self.inbox.append(message)
-        self.pump()
+        self.loop.call_soon_threadsafe(self._put, message)
 
-    def pump(self):
-        while not self.done:
-            try:
-                y = self.coro.send(None)
-            except StopIteration:
-                self.done = True
-                return
-            except BaseException as e:  # noqa
-                self.done = True
-                self.error = e
-                return
-            if isinstance(y, _Suspend) and not self.inbox:
-                return
+    def _put(self, message):
+        if not self.done:
+            self.inbox.put_nowait(message)
+
+    def cancel(self):
+        """Cancels the endpoint task from any thread."""
+        def stop():
+            if self.task is not None and not self.done:
+                self.task.cancel()
+        self.loop.call_soon_threadsafe(stop)
+
+    def wait(self, timeout=None):
+        return self.finished.wait(timeout)

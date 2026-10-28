@@ -15,6 +15,9 @@ class BaseHTTPMiddleware:
         return resp
 
     async def __call__(self, request):
+        if request.scope.get("type") == "websocket":
+            # Starlette's middleware passes a websocket scope straight through.
+            return await self.app(request)
         return await self.dispatch_func(request, self.call_next)
 
     async def dispatch(self, request, call_next):

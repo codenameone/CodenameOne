@@ -71,12 +71,17 @@ public abstract class PyServer {
         void binary(byte[] value);
 
         void close(int code, String reason);
+
+        /// The endpoint refused the handshake before accepting; `status` is
+        /// the HTTP status it answered with (403 when it simply closed).
+        void deny(int status);
     }
 
     /// Opens one websocket connection in Python; answers the connection
     /// object [#webSocketText], [#webSocketBinary] and [#webSocketClosed]
-    /// take. Messages the endpoint sends, including any it sends while
-    /// opening, reach `sink`.
+    /// take. The endpoint runs on Python's websocket event loop thread, so
+    /// this returns at once and `sink` is called later, from that thread:
+    /// first `accept` or `deny`, then the messages the endpoint sends.
     public static Object openWebSocket(Object webSockets, String target, String[] headers,
                                        final WebSocketSink sink) {
         Object[] req = request("GET", target, headers, null);
@@ -88,6 +93,8 @@ public abstract class PyServer {
                 sink.text(Py.toStr(a[1]));
             } else if ("bytes".equals(kind)) {
                 sink.binary(PyBytes.like(a[1]));
+            } else if ("deny".equals(kind)) {
+                sink.deny((int) Py.asLong(a[1]));
             } else {
                 sink.close((int) Py.asLong(a[1]), a[2] == Py.NONE ? "" : Py.toStr(a[2])); //NOPMD CompareObjectsWithEquals - identity is meant
             }

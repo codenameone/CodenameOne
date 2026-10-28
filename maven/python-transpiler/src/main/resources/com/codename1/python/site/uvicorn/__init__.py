@@ -5,39 +5,33 @@
 
 
 class _Connection:
-    """One upgraded connection, as the platform server drives it."""
+    """One upgraded connection, as the platform server drives it.
+
+    The endpoint runs as a task on the shared websocket loop; these methods
+    are called on the server's threads and only hand the message over.
+    """
 
     def __init__(self, session):
         self.session = session
 
-    def _check(self):
-        s = self.session
-        if s.error is not None:
-            e = s.error
-            s.error = None
-            raise e
-
     def text(self, value):
-        if not self.session.done:
-            self.session.deliver({"type": "websocket.receive", "text": value})
-        self._check()
+        self.session.deliver({"type": "websocket.receive", "text": value})
 
     def binary(self, value):
-        if not self.session.done:
-            self.session.deliver({"type": "websocket.receive", "bytes": bytes(value)})
-        self._check()
+        self.session.deliver({"type": "websocket.receive", "bytes": bytes(value)})
 
     def closed(self, code, reason):
-        if not self.session.done:
-            self.session.deliver({"type": "websocket.disconnect", "code": code, "reason": reason})
-        self._check()
+        self.session.deliver({"type": "websocket.disconnect", "code": code, "reason": reason})
 
 
 def _websockets(app):
     def open_(path, query, headers, send):
+        state = {"accepted": False, "closed": False}
+
         def sink(m):
             t = m["type"]
             if t == "websocket.accept":
+                state["accepted"] = True
                 send("accept", m.get("subprotocol"), None)
             elif t == "websocket.send":
                 if m.get("text") is not None:
@@ -45,10 +39,26 @@ def _websockets(app):
                 else:
                     send("bytes", m["bytes"], None)
             elif t == "websocket.close":
+                state["closed"] = True
                 send("close", m.get("code", 1000), m.get("reason") or "")
-        conn = _Connection(app.websocket_open(path, query, headers, sink))
-        conn._check()
-        return conn
+            elif t == "websocket.http.response":
+                state["closed"] = True
+                send("deny", m["status"], None)
+
+        def done(session):
+            e = session.error
+            if e is not None:
+                session.error = None
+                import traceback
+                traceback.print_exception(e)
+            if not state["closed"]:
+                state["closed"] = True
+                if state["accepted"]:
+                    send("close", 1011 if e is not None else 1000, "")
+                else:
+                    send("deny", 500 if e is not None else 403, None)
+
+        return _Connection(app.websocket_open(path, query, headers, sink, done))
     return open_
 
 
