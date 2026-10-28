@@ -22,6 +22,7 @@
  */
 package com.codename1.crypto.evm;
 
+import java.nio.charset.StandardCharsets;
 import com.codename1.security.Hash;
 import com.codename1.security.Secp256k1;
 
@@ -46,7 +47,7 @@ public final class PersonalSign {
 
     /// [#hash] of a text message, UTF-8 encoded.
     public static byte[] hash(String message) {
-        return hash(Abi.utf8(message));
+        return hash(message.getBytes(StandardCharsets.UTF_8));
     }
 
     /// Signs a message as `personal_sign` does.
@@ -56,7 +57,7 @@ public final class PersonalSign {
 
     /// Signs a text message as `personal_sign` does.
     public static byte[] sign(String message, byte[] privateKey) {
-        return sign(Abi.utf8(message), privateKey);
+        return sign(message.getBytes(StandardCharsets.UTF_8), privateKey);
     }
 
     /// The address that signed a message.
@@ -73,7 +74,7 @@ public final class PersonalSign {
     /// Tells whether `address` signed the text `message`.
     public static boolean verify(String message, byte[] signature65, EvmAddress address) {
         try {
-            return recover(Abi.utf8(message), signature65).equals(address);
+            return recover(message.getBytes(StandardCharsets.UTF_8), signature65).equals(address);
         } catch (RuntimeException invalid) {
             return false;
         }

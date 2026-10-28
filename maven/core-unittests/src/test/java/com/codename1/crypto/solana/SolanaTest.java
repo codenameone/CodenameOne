@@ -24,6 +24,7 @@ package com.codename1.crypto.solana;
 
 import com.codename1.junit.UITestBase;
 import org.junit.jupiter.api.Test;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
@@ -36,7 +37,7 @@ class SolanaTest extends UITestBase {
     private static final SolanaAddress BPF = SolanaAddress.parse("BPFLoader1111111111111111111111111111111111");
 
     private static byte[] utf8(String s) {
-        return SolanaAddress.utf8(s);
+        return s.getBytes(StandardCharsets.UTF_8);
     }
 
     @Test

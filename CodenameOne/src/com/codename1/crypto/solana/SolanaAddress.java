@@ -22,6 +22,7 @@
  */
 package com.codename1.crypto.solana;
 
+import java.nio.charset.StandardCharsets;
 import com.codename1.crypto.encoding.Base58;
 import com.codename1.security.Ed25519;
 import com.codename1.security.Hash;
@@ -173,7 +174,7 @@ public final class SolanaAddress implements Comparable<SolanaAddress> {
     ///
     /// - `IllegalArgumentException`: for a seed over 32 bytes
     public static SolanaAddress createWithSeed(SolanaAddress base, String seed, SolanaAddress owner) {
-        byte[] s = utf8(seed);
+        byte[] s = seed.getBytes(StandardCharsets.UTF_8);
         if (s.length > MAX_SEED_LENGTH) {
             throw new IllegalArgumentException("a seed is at most 32 bytes");
         }
@@ -197,13 +198,6 @@ public final class SolanaAddress implements Comparable<SolanaAddress> {
                 ASSOCIATED_TOKEN_PROGRAM).getAddress();
     }
 
-    static byte[] utf8(String s) {
-        try {
-            return s.getBytes("UTF-8");
-        } catch (java.io.UnsupportedEncodingException e) {
-            throw new IllegalStateException("UTF-8 is unavailable", e);
-        }
-    }
 
     /// The Base58 form.
     @Override

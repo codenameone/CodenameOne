@@ -22,6 +22,7 @@
  */
 package com.codename1.crypto.solana;
 
+import java.nio.charset.StandardCharsets;
 /// Compute Budget and Memo instructions, the two most transactions add beside their payload.
 @com.codename1.impl.SharedWithBackend
 public final class ComputeBudget {
@@ -46,6 +47,6 @@ public final class ComputeBudget {
         for (int i = 0; i < signers.length; i++) {
             metas[i] = AccountMeta.signer(signers[i]);
         }
-        return new Instruction(SolanaAddress.MEMO_PROGRAM, metas, SolanaAddress.utf8(text));
+        return new Instruction(SolanaAddress.MEMO_PROGRAM, metas, text.getBytes(StandardCharsets.UTF_8));
     }
 }

@@ -245,7 +245,8 @@ public final class Rlp {
         return out;
     }
 
-    private static byte[] concat(byte[] a, byte[] b) {
+    /// `a` followed by `b`; Bech32 shares it.
+    static byte[] concat(byte[] a, byte[] b) {
         byte[] out = new byte[a.length + b.length];
         System.arraycopy(a, 0, out, 0, a.length);
         System.arraycopy(b, 0, out, a.length, b.length);

@@ -1315,18 +1315,10 @@ final class Secp256k1Math {
     static final int[] G_Y = new int[10];
 
     static {
-        byte[] gx = hex("79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798");
-        byte[] gy = hex("483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8");
+        byte[] gx = Hash.fromHex("79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798");
+        byte[] gy = Hash.fromHex("483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8");
         fromBytes(G_X, gx, 0);
         fromBytes(G_Y, gy, 0);
-    }
-
-    private static byte[] hex(String s) {
-        byte[] out = new byte[s.length() / 2];
-        for (int i = 0; i < out.length; i++) {
-            out[i] = (byte) Integer.parseInt(s.substring(2 * i, 2 * i + 2), 16);
-        }
-        return out;
     }
 
     /// k G for a scalar `0 < k < n` given as eight little-endian 32-bit

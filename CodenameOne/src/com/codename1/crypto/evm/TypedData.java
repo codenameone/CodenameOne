@@ -22,6 +22,7 @@
  */
 package com.codename1.crypto.evm;
 
+import java.nio.charset.StandardCharsets;
 import com.codename1.crypto.encoding.Json;
 import com.codename1.security.Hash;
 import java.util.ArrayList;
@@ -199,7 +200,7 @@ public final class TypedData {
             throw new IllegalArgumentException("unknown type " + type);
         }
         java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
-        byte[] typeHash = Hash.keccak256(Abi.utf8(encodeType(type)));
+        byte[] typeHash = Hash.keccak256(encodeType(type).getBytes(StandardCharsets.UTF_8));
         out.write(typeHash, 0, 32);
         for (String[] f : fields) {
             byte[] enc = encodeValue(f[1], value.get(f[0]));
@@ -231,7 +232,7 @@ public final class TypedData {
             return hashStruct(type, strMap(map(value, type)));
         }
         if ("string".equals(type)) {
-            return Hash.keccak256(Abi.utf8(text(value)));
+            return Hash.keccak256(text(value).getBytes(StandardCharsets.UTF_8));
         }
         if ("bytes".equals(type)) {
             return Hash.keccak256(value instanceof byte[] ? (byte[]) value

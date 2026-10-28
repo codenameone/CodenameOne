@@ -22,6 +22,7 @@
  */
 package com.codename1.crypto.evm;
 
+import java.nio.charset.StandardCharsets;
 import com.codename1.crypto.UInt256;
 import com.codename1.security.Hash;
 import java.util.ArrayList;
@@ -57,7 +58,7 @@ public final class Abi {
 
     /// The 4-byte selector of a function signature such as `transfer(address,uint256)`.
     public static byte[] selector(String signature) {
-        byte[] hash = Hash.keccak256(utf8(canonical(signature)));
+        byte[] hash = Hash.keccak256(canonical(signature).getBytes(StandardCharsets.UTF_8));
         byte[] out = new byte[4];
         System.arraycopy(hash, 0, out, 0, 4);
         return out;
@@ -65,7 +66,7 @@ public final class Abi {
 
     /// The topic 0 of an event signature such as `Transfer(address,address,uint256)`.
     public static byte[] eventTopic(String signature) {
-        return Hash.keccak256(utf8(canonical(signature)));
+        return Hash.keccak256(canonical(signature).getBytes(StandardCharsets.UTF_8));
     }
 
     /// The call data for a function: its selector followed by the encoded arguments.
@@ -150,21 +151,7 @@ public final class Abi {
         return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '$';
     }
 
-    static byte[] utf8(String s) {
-        try {
-            return s.getBytes("UTF-8");
-        } catch (java.io.UnsupportedEncodingException impossible) {
-            throw new IllegalStateException("UTF-8 is always supported", impossible);
-        }
-    }
 
-    static String fromUtf8(byte[] b) {
-        try {
-            return new String(b, "UTF-8");
-        } catch (java.io.UnsupportedEncodingException impossible) {
-            throw new IllegalStateException("UTF-8 is always supported", impossible);
-        }
-    }
 
     /// A parsed ABI type.
     static final class Type {
@@ -371,11 +358,14 @@ public final class Abi {
                 case BYTES:
                     return dynamicBytes(raw(value));
                 case STRING:
-                    return dynamicBytes(utf8(str(value)));
+                    return dynamicBytes(str(value).getBytes(StandardCharsets.UTF_8));
                 case ARRAY: {
                     Object[] items = items(value);
                     byte[] body = sequence(element, items);
-                    return concat(UInt256.valueOf(items.length).toBytes32(), body);
+                    byte[] out = new byte[32 + body.length];
+                    System.arraycopy(UInt256.valueOf(items.length).toBytes32(), 0, out, 0, 32);
+                    System.arraycopy(body, 0, out, 32, body.length);
+                    return out;
                 }
                 case FIXED_ARRAY: {
                     Object[] items = items(value);
@@ -468,7 +458,7 @@ public final class Abi {
                     }
                     byte[] out = new byte[len];
                     System.arraycopy(data, off + 32, out, 0, len);
-                    return kind == STRING ? fromUtf8(out) : out;
+                    return kind == STRING ? new String(out, StandardCharsets.UTF_8) : out;
                 }
                 case ARRAY: {
                     int off = base + offset(data, at);
@@ -657,10 +647,4 @@ public final class Abi {
         }
     }
 
-    static byte[] concat(byte[] a, byte[] b) {
-        byte[] out = new byte[a.length + b.length];
-        System.arraycopy(a, 0, out, 0, a.length);
-        System.arraycopy(b, 0, out, a.length, b.length);
-        return out;
-    }
 }

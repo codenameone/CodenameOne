@@ -22,6 +22,7 @@
  */
 package com.codename1.crypto.hd;
 
+import java.nio.charset.StandardCharsets;
 import com.codename1.security.Hash;
 import com.codename1.security.Pbkdf2;
 
@@ -161,8 +162,8 @@ public final class Mnemonic {
             }
             joined.append(words[iter]);
         }
-        byte[] password = utf8(joined.toString());
-        byte[] salt = utf8("mnemonic" + (passphrase == null ? "" : passphrase));
+        byte[] password = joined.toString().getBytes(StandardCharsets.UTF_8);
+        byte[] salt = ("mnemonic" + (passphrase == null ? "" : passphrase)).getBytes(StandardCharsets.UTF_8);
         try {
             return Pbkdf2.hmacSha512(password, salt, SEED_ITERATIONS, 64);
         } finally {
@@ -221,13 +222,6 @@ public final class Mnemonic {
         return (data[pos >> 3] >> (7 - (pos & 7))) & 1;
     }
 
-    static byte[] utf8(String text) {
-        try {
-            return text.getBytes("UTF-8");
-        } catch (java.io.UnsupportedEncodingException impossible) {
-            throw new IllegalStateException("UTF-8 is always supported", impossible);
-        }
-    }
 
     static void wipe(byte[] data) {
         if (data != null) {

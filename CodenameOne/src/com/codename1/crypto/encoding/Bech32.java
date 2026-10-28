@@ -129,12 +129,6 @@ public final class Bech32 {
         return out;
     }
 
-    private static byte[] concat(byte[] a, byte[] b) {
-        byte[] out = new byte[a.length + b.length];
-        System.arraycopy(a, 0, out, 0, a.length);
-        System.arraycopy(b, 0, out, a.length, b.length);
-        return out;
-    }
 
     private static int constant(int variant) {
         if (variant == BECH32) {
@@ -198,7 +192,7 @@ public final class Bech32 {
                 throw new IllegalArgumentException("Data value out of range");
             }
         }
-        byte[] values = concat(concat(expandHrp(hr), data), new byte[6]);
+        byte[] values = Rlp.concat(Rlp.concat(expandHrp(hr), data), new byte[6]);
         int mod = polymod(values) ^ k;
         StringBuilder sb = new StringBuilder(hr.length() + 1 + data.length + 6);
         sb.append(hr).append('1');
@@ -263,7 +257,7 @@ public final class Bech32 {
             }
             values[i] = (byte) d;
         }
-        int chk = polymod(concat(expandHrp(hrp), values));
+        int chk = polymod(Rlp.concat(expandHrp(hrp), values));
         int variant;
         if (chk == BECH32_CONST) {
             variant = BECH32;
