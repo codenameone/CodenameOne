@@ -323,7 +323,7 @@ public final class Typed {
         if (i instanceof Long) {
             long k = ((Long) i).longValue();
             if (k >= 0 && k < l.size) {
-                long[] n = l.ints;
+                int[] n = l.ints;
                 if (n != null) {
                     return Long.valueOf(n[(int) k]);
                 }
@@ -354,10 +354,10 @@ public final class Typed {
         if (i instanceof Long) {
             long k = ((Long) i).longValue();
             if (k >= 0 && k < l.size) {
-                long[] n = l.ints;
+                int[] n = l.ints;
                 if (n != null) {
-                    if (v instanceof Long) {
-                        n[(int) k] = ((Long) v).longValue();
+                    if (v instanceof Long && PyList.fits(((Long) v).longValue())) {
+                        n[(int) k] = (int) ((Long) v).longValue();
                         return;
                     }
                 } else if (l.floats == null) {

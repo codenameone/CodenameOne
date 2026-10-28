@@ -42,11 +42,12 @@ public final class PyList extends PyObject {
     /// objects first ([#objects()]), once.
     public double[] floats;
 
-    /// The items of a list that has only ever held ints, unboxed, as
-    /// `floats` is for floats; never both. A Long that fits 61 bits is an
-    /// immediate under ParparVM, so reading one back allocates nothing, and
-    /// storing one needs no GC write barrier.
-    public long[] ints;
+    /// The items of a list that has only ever held ints that fit 32 bits,
+    /// unboxed, as `floats` is for floats; never both. Four bytes an item, as
+    /// a Java `int[]` takes; a wider int turns the list into objects, where
+    /// a Long that fits 61 bits is an immediate under ParparVM, so reading
+    /// one back allocates nothing either.
+    public int[] ints;
 
     /// Set on a list Py.recycleSlice or Py.recycleList made for a local the
     /// transpiler proved never shares it; only such a list is reused. A list
@@ -80,7 +81,7 @@ public final class PyList extends PyObject {
 
     /// The items as objects, boxing an unboxed list for good.
     Object[] objects() {
-        long[] l = ints;
+        int[] l = ints;
         if (l != null) {
             Object[] o = new Object[Math.max(4, l.length)];
             for (int i = 0; i < size; i++) {
@@ -140,7 +141,7 @@ public final class PyList extends PyObject {
     }
 
     public Object get(int i) {
-        long[] l = ints;
+        int[] l = ints;
         if (l != null) {
             return Long.valueOf(l[i]);
         }
@@ -153,8 +154,8 @@ public final class PyList extends PyObject {
                 appendFloat(((Double) v).doubleValue());
                 return;
             }
-            if (v instanceof Long && floats == null) {
-                appendInt(((Long) v).longValue());
+            if (v instanceof Long && floats == null && fits(((Long) v).longValue())) {
+                appendInt((int) ((Long) v).longValue());
                 return;
             }
             objects();
@@ -162,13 +163,18 @@ public final class PyList extends PyObject {
         appendObject(v);
     }
 
-    private void appendInt(long v) {
-        long[] l = ints;
+    /// Whether `v` may go into `ints`.
+    static boolean fits(long v) {
+        return (int) v == v;
+    }
+
+    private void appendInt(int v) {
+        int[] l = ints;
         if (l == null) {
-            l = new long[4];
+            l = new int[4];
             ints = l;
         } else if (size == l.length) {
-            long[] n = new long[size * 2 + 4];
+            int[] n = new int[size * 2 + 4];
             System.arraycopy(l, 0, n, 0, size);
             ints = n;
             l = n;
@@ -206,7 +212,7 @@ public final class PyList extends PyObject {
             if (o.ints != null && intsOrEmpty()) {
                 // One copy, into an array of the exact size when this list
                 // was empty: no element by element growth.
-                long[] l = intRoom(n);
+                int[] l = intRoom(n);
                 System.arraycopy(o.ints, 0, l, size, n);
                 size += n;
                 return;
@@ -228,10 +234,10 @@ public final class PyList extends PyObject {
     }
 
     /// `ints`, with room for `n` more after `size`.
-    private long[] intRoom(int n) {
-        long[] l = ints;
+    private int[] intRoom(int n) {
+        int[] l = ints;
         if (l == null || l.length - size < n) {
-            long[] g = new long[l == null ? n : Math.max(size + n, size * 2 + 4)];
+            int[] g = new int[l == null ? n : Math.max(size + n, size * 2 + 4)];
             if (l != null) {
                 System.arraycopy(l, 0, g, 0, size);
             }
@@ -246,9 +252,9 @@ public final class PyList extends PyObject {
         if (n <= 0) {
             return;
         }
-        if (v instanceof Long && n <= Integer.MAX_VALUE - size && intsOrEmpty()) {
-            long x = ((Long) v).longValue();
-            long[] l = intRoom((int) n);
+        if (v instanceof Long && n <= Integer.MAX_VALUE - size && intsOrEmpty() && fits(((Long) v).longValue())) {
+            int x = (int) ((Long) v).longValue();
+            int[] l = intRoom((int) n);
             int end = size + (int) n;
             for (int i = size; i < end; i++) {
                 l[i] = x;
@@ -412,13 +418,13 @@ public final class PyList extends PyObject {
         if (ints == null && floats == null && size > 0) {
             boolean all = true;
             for (int i = 0; i < size && all; i++) {
-                all = items[i] instanceof Long;
+                all = items[i] instanceof Long && fits(((Long) items[i]).longValue());
             }
             if (all) {
                 // `[0] * n` is a list of ints: unboxed.
-                long[] one = new long[size];
+                int[] one = new int[size];
                 for (int i = 0; i < size; i++) {
-                    one[i] = ((Long) items[i]).longValue();
+                    one[i] = (int) ((Long) items[i]).longValue();
                 }
                 return repeatInts(one, n);
             }
@@ -444,9 +450,9 @@ public final class PyList extends PyObject {
         return new PyList(r);
     }
 
-    private PyList repeatInts(long[] one, long n) {
+    private PyList repeatInts(int[] one, long n) {
         int k = size;
-        long[] l = new long[Math.max(4, (int) (k * n))];
+        int[] l = new int[Math.max(4, (int) (k * n))];
         for (int i = 0; i < n; i++) {
             System.arraycopy(one, 0, l, i * k, k);
         }
@@ -505,7 +511,7 @@ public final class PyList extends PyObject {
             int lo = PySlice.lower(start, stop, st, size);
             int hi = PySlice.upper(stop, st, size);
             int n = PySlice.count(lo, hi, st);
-            long[] out = new long[Math.max(4, n)];
+            int[] out = new int[Math.max(4, n)];
             if (st == 1) {
                 System.arraycopy(ints, lo, out, 0, n);
             } else {
@@ -546,9 +552,9 @@ public final class PyList extends PyObject {
             int lo = PySlice.lower(start, stop, st, size);
             int hi = PySlice.upper(stop, st, size);
             int n = PySlice.count(lo, hi, st);
-            long[] out = dst.ints;
+            int[] out = dst.ints;
             if (out == null || out.length < n) {
-                out = new long[Math.max(4, n)];
+                out = new int[Math.max(4, n)];
             }
             if (st == 1) {
                 System.arraycopy(ints, lo, out, 0, n);
@@ -673,9 +679,9 @@ public final class PyList extends PyObject {
                     s0 = size - 1;
                 }
                 if (lo == 0 && hr >= 0 && hi == s0 + 1 && li) {
-                    long[] it = ints;
+                    int[] it = ints;
                     for (int i = 0, j = (int) s0; i < j; i++, j--) {
-                        long t = it[i];
+                        int t = it[i];
                         it[i] = it[j];
                         it[j] = t;
                     }
@@ -747,8 +753,8 @@ public final class PyList extends PyObject {
 
     @Override
     public void setItem(Object key, Object value) {
-        if (ints != null && value instanceof Long && !(key instanceof PySlice)) {
-            ints[checkIndex(key)] = ((Long) value).longValue();
+        if (ints != null && value instanceof Long && !(key instanceof PySlice) && fits(((Long) value).longValue())) {
+            ints[checkIndex(key)] = (int) ((Long) value).longValue();
             return;
         }
         if (floats != null && value instanceof Double && !(key instanceof PySlice)) {
@@ -911,9 +917,9 @@ public final class PyList extends PyObject {
 
     public void reverse() {
         if (ints != null) {
-            long[] l = ints;
+            int[] l = ints;
             for (int i = 0, j = size - 1; i < j; i++, j--) {
-                long t = l[i];
+                int t = l[i];
                 l[i] = l[j];
                 l[j] = t;
             }

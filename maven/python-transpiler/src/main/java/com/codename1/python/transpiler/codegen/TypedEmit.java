@@ -1635,9 +1635,9 @@ final class TypedEmit {
                 String[] vp = parts(v);
                 b.append("if (").append(ix[1]).append(inRange(l, ix[0])).append(" && ").append(l.c)
                         .append(".ints != null").append("null".equals(vp[1]) ? "" : " && " + vp[1] + " == null")
-                        .append(") {\n");
+                        .append(" && (int) ").append(vp[0]).append(" == ").append(vp[0]).append(") {\n");
                 indent(b, ind + 1);
-                b.append(l.c).append(".ints[(int) ").append(ix[0]).append("] = ").append(vp[0]).append(";\n");
+                b.append(l.c).append(".ints[(int) ").append(ix[0]).append("] = (int) ").append(vp[0]).append(";\n");
                 indent(b, ind);
                 b.append("} else {\n");
                 indent(b, ind + 1);
@@ -2450,7 +2450,7 @@ final class TypedEmit {
             "        if (l != null && i instanceof Long) {",
             "            long k = ((Long) i).longValue();",
             "            if (k >= 0 && k < l.size) {",
-            "                long[] n = l.ints;",
+            "                int[] n = l.ints;",
             "                if (n != null) {",
             "                    return Long.valueOf(n[(int) k]);",
             "                }",

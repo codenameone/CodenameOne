@@ -1283,7 +1283,7 @@ public final class Py {
             if (key instanceof Long) {
                 long i = ((Long) key).longValue();
                 if (i >= 0 && i < l.size) {
-                    long[] li = l.ints;
+                    int[] li = l.ints;
                     if (li != null) {
                         return Long.valueOf(li[(int) i]);
                     }
@@ -1609,10 +1609,10 @@ public final class Py {
             if (key instanceof Long) {
                 long i = ((Long) key).longValue();
                 if (i >= 0 && i < l.size) {
-                    long[] li = l.ints;
+                    int[] li = l.ints;
                     if (li != null) {
-                        if (v instanceof Long) {
-                            li[(int) i] = ((Long) v).longValue();
+                        if (v instanceof Long && PyList.fits(((Long) v).longValue())) {
+                            li[(int) i] = (int) ((Long) v).longValue();
                             return;
                         }
                     } else if (l.floats == null) {
