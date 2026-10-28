@@ -66,7 +66,18 @@ public class JSOImplementations {
         JSObject getBounds();
     }
     
+    /// The page's `window.localStorage`, for the few values the page itself reads before any
+    /// Java runs (the loading screen's remembered appearance).
+    public interface JSStorage extends JSObject {
+        void setItem(String key, String value);
+
+        void removeItem(String key);
+    }
+
     public interface WindowExt extends JSObject {
+
+        @JSProperty
+        abstract JSStorage getLocalStorage();
         
         
         @JSProperty

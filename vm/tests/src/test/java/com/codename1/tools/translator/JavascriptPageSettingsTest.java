@@ -90,6 +90,58 @@ class JavascriptPageSettingsTest {
         assertEquals(JavascriptSecurityHeaders.hashesOf(raw, "style"), JavascriptSecurityHeaders.hashesOf(filled, "style"));
     }
 
+    @Test
+    void defaultSplashFollowsTheBrowserAndTheRememberedChoice() throws Exception {
+        String html = JavascriptBundleWriter.applySplashSettings(template(),
+                JavascriptBundleWriter.SplashSettings.defaults());
+        assertTrue(html.contains("@media (prefers-color-scheme: dark)"), html);
+        assertTrue(html.contains(":root[data-cn1-appearance=\"dark\"]"), html);
+        assertTrue(html.contains("localStorage.getItem(\"" + JavascriptBundleWriter.SPLASH_APPEARANCE_STORAGE_KEY + "\")"), html);
+        // The theme is set in <head>, before the splash markup exists, so nothing paints white first.
+        assertTrue(html.indexOf("--cn1-splash-background") < html.indexOf("<body>"), html);
+        assertFalse(html.contains("cn1-splash-logo\" src"), html);
+        assertFalse(html.contains("__SPLASH_"), html);
+    }
+
+    @Test
+    void singleAppearanceSplashHasNoMediaQueryAndNoScript() throws Exception {
+        String html = JavascriptBundleWriter.applySplashSettings(template(),
+                new JavascriptBundleWriter.SplashSettings("Dark", "#fff", null, null, "#1e1e1e", "white", "#F80", "_icons/icon-192.png"));
+        assertFalse(html.contains("prefers-color-scheme"), html);
+        assertFalse(html.contains("localStorage"), html);
+        assertTrue(html.contains("--cn1-splash-background:#1e1e1e;--cn1-splash-text:white;--cn1-splash-accent:#F80;"), html);
+        assertTrue(html.contains("<img class=\"cn1-splash-logo\" src=\"_icons/icon-192.png\" alt=\"\">"), html);
+    }
+
+    @Test
+    void splashValuesThatCouldEscapeTheirContextAreRejected() {
+        String[] badColors = {"red;}body{display:none", "#12", "#ggg", "rgb(0,0,0)", "url(x)"};
+        for (String bad : badColors) {
+            assertThrows(IllegalArgumentException.class, () -> new JavascriptBundleWriter.SplashSettings(
+                    null, bad, null, null, null, null, null, null), bad);
+        }
+        String[] badLogos = {"\"><script>", "../secret.png", "/etc/x.png", "https://evil/x.png", "a b.png"};
+        for (String bad : badLogos) {
+            assertThrows(IllegalArgumentException.class, () -> new JavascriptBundleWriter.SplashSettings(
+                    null, null, null, null, null, null, null, bad), bad);
+        }
+        assertThrows(IllegalArgumentException.class, () -> new JavascriptBundleWriter.SplashSettings(
+                "sepia", null, null, null, null, null, null, null));
+    }
+
+    @Test
+    void splashInlineBlocksAreHashedIntoThePolicy() throws Exception {
+        String html = JavascriptBundleWriter.applySplashSettings(template(),
+                JavascriptBundleWriter.SplashSettings.defaults());
+        String csp = JavascriptSecurityHeaders.contentSecurityPolicy(html, "");
+        for (String hash : JavascriptSecurityHeaders.hashesOf(html, "script")) {
+            assertTrue(csp.contains(hash), csp);
+        }
+        for (String hash : JavascriptSecurityHeaders.hashesOf(html, "style")) {
+            assertTrue(csp.contains(hash), csp);
+        }
+    }
+
     private static void assertNoPlaceholderLeft(String html) {
         assertFalse(html.contains("__HTML_ATTRS__"), html);
         assertFalse(html.contains("__HEAD_META__"), html);

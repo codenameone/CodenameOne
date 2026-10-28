@@ -111,6 +111,78 @@ final class BuildHintsDesktop {
                         + "lock in its default Dynamic mode only; its Filter, Filter+ and Static modes "
                         + "ignore it. Set to `false` to omit the tag."));
 
+        h.add(new Hint("javascript.splash.appearance")
+                .group(HintGroup.JAVASCRIPT)
+                .values("SplashAppearance", "auto", "light", "dark")
+                .def("auto")
+                .platform("javascript")
+                .doc("Which colours the loading screen uses. `auto` (the default) follows the "
+                        + "browser's light/dark preference, or the choice the app remembered with "
+                        + "`Display.setProperty(\"platformHint.javascript.splashAppearance\", \"dark\")`. "
+                        + "`light` and `dark` always use that set, for apps with one appearance."));
+
+        h.add(new Hint("javascript.splash.background")
+                .group(HintGroup.JAVASCRIPT)
+                .type(HintType.STRING)
+                .def("#ffffff")
+                .platform("javascript")
+                .doc("The loading screen's background in light appearance, as a hex colour (`#rgb`, `#rrggbb`, "
+                        + "with optional alpha) or a CSS colour name. Applied from the first frame the "
+                        + "page paints until the first form shows."));
+
+        h.add(new Hint("javascript.splash.textColor")
+                .group(HintGroup.JAVASCRIPT)
+                .type(HintType.STRING)
+                .def("#666666")
+                .platform("javascript")
+                .doc("The loading screen's text colour in light appearance, as a hex colour (`#rgb`, `#rrggbb`, "
+                        + "with optional alpha) or a CSS colour name. Applied from the first frame the "
+                        + "page paints until the first form shows."));
+
+        h.add(new Hint("javascript.splash.accentColor")
+                .group(HintGroup.JAVASCRIPT)
+                .type(HintType.STRING)
+                .def("#0072ff")
+                .platform("javascript")
+                .doc("The loading screen's progress bar colour in light appearance, as a hex colour (`#rgb`, `#rrggbb`, "
+                        + "with optional alpha) or a CSS colour name. Applied from the first frame the "
+                        + "page paints until the first form shows."));
+
+        h.add(new Hint("javascript.splash.darkBackground")
+                .group(HintGroup.JAVASCRIPT)
+                .type(HintType.STRING)
+                .def("#121212")
+                .platform("javascript")
+                .doc("The loading screen's background in dark appearance, as a hex colour (`#rgb`, `#rrggbb`, "
+                        + "with optional alpha) or a CSS colour name. Applied from the first frame the "
+                        + "page paints until the first form shows."));
+
+        h.add(new Hint("javascript.splash.darkTextColor")
+                .group(HintGroup.JAVASCRIPT)
+                .type(HintType.STRING)
+                .def("#b3b3b3")
+                .platform("javascript")
+                .doc("The loading screen's text colour in dark appearance, as a hex colour (`#rgb`, `#rrggbb`, "
+                        + "with optional alpha) or a CSS colour name. Applied from the first frame the "
+                        + "page paints until the first form shows."));
+
+        h.add(new Hint("javascript.splash.darkAccentColor")
+                .group(HintGroup.JAVASCRIPT)
+                .type(HintType.STRING)
+                .def("#4da3ff")
+                .platform("javascript")
+                .doc("The loading screen's progress bar colour in dark appearance, as a hex colour (`#rgb`, `#rrggbb`, "
+                        + "with optional alpha) or a CSS colour name. Applied from the first frame the "
+                        + "page paints until the first form shows."));
+
+        h.add(new Hint("javascript.splash.logo")
+                .group(HintGroup.JAVASCRIPT)
+                .type(HintType.STRING)
+                .platform("javascript")
+                .doc("The image the loading screen shows above the progress bar, as a path relative to "
+                        + "the bundle's `index.html` (letters, digits, `/`, `.`, `-` and `_`). Defaults to the "
+                        + "app icon; `none` shows no image."));
+
         h.add(new Hint("javascript.desktopTheme")
                 .group(HintGroup.JAVASCRIPT)
                 .type(HintType.STRING)

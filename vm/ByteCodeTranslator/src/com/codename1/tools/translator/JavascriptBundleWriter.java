@@ -1693,6 +1693,7 @@ final class JavascriptBundleWriter {
                 System.getProperty(PAGE_TITLE_PROPERTY),
                 Boolean.parseBoolean(Util.systemProperty(ALLOW_TRANSLATION_PROPERTY, "false")),
                 !"false".equalsIgnoreCase(Util.systemProperty(DARKREADER_LOCK_PROPERTY, "true")));
+        index = applySplashSettings(index, SplashSettings.fromSystemProperties());
         Util.writeUtf8(new File(outputDirectory, "index.html"), index);
     }
 
@@ -1739,6 +1740,174 @@ final class JavascriptBundleWriter {
                 .replace("__HTML_ATTRS__", allowTranslation ? "" : " translate=\"no\"")
                 .replace("<!--__HEAD_META__-->", meta.toString())
                 .replace("__APP_TITLE__", escapeHtml(pageTitle));
+    }
+
+    /// Prefix of the translator properties the `javascript.splash.*` build hints become.
+    static final String SPLASH_PROPERTY_PREFIX = "codename1.javascript.splash.";
+
+    /// Local storage key an application writes, through the
+    /// `platformHint.javascript.splashAppearance` property, to have the next launch's loading
+    /// screen follow its own light/dark choice instead of the browser's. `HTML5Implementation`
+    /// writes it; the inline script [#splashTheme(SplashSettings)] emits reads it before the
+    /// first paint.
+    static final String SPLASH_APPEARANCE_STORAGE_KEY = "cn1.splashAppearance";
+
+    /// The loading screen's look: the logo and the colours for each appearance. Every value is
+    /// validated here, because each one is written verbatim into the page's CSS or markup.
+    static final class SplashSettings {
+        /// `auto` (follow the browser, or the app's remembered choice), `light` or `dark`.
+        final String appearance;
+        final String background;
+        final String text;
+        final String accent;
+        final String darkBackground;
+        final String darkText;
+        final String darkAccent;
+        /// A URL relative to the bundle root, or null for no logo.
+        final String logo;
+
+        SplashSettings(String appearance, String background, String text, String accent,
+                String darkBackground, String darkText, String darkAccent, String logo) {
+            this.appearance = appearance(appearance);
+            this.background = color("background", background, "#ffffff");
+            this.text = color("textColor", text, "#666666");
+            this.accent = color("accentColor", accent, "#0072ff");
+            this.darkBackground = color("darkBackground", darkBackground, "#121212");
+            this.darkText = color("darkTextColor", darkText, "#b3b3b3");
+            this.darkAccent = color("darkAccentColor", darkAccent, "#4da3ff");
+            this.logo = logo(logo);
+        }
+
+        static SplashSettings defaults() {
+            return new SplashSettings(null, null, null, null, null, null, null, null);
+        }
+
+        static SplashSettings fromSystemProperties() {
+            return new SplashSettings(prop("appearance"), prop("background"), prop("textColor"),
+                    prop("accentColor"), prop("darkBackground"), prop("darkTextColor"),
+                    prop("darkAccentColor"), prop("logo"));
+        }
+
+        private static String prop(String name) {
+            return System.getProperty(SPLASH_PROPERTY_PREFIX + name);
+        }
+
+        private static String appearance(String value) {
+            if (value == null || value.trim().length() == 0) {
+                return "auto";
+            }
+            String v = value.trim();
+            if (v.equalsIgnoreCase("auto") || v.equalsIgnoreCase("light") || v.equalsIgnoreCase("dark")) {
+                return asciiLower(v);
+            }
+            throw new IllegalArgumentException("javascript.splash.appearance must be auto, light or dark, not '"
+                    + value + "'");
+        }
+
+        /// A hex colour (`#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa`) or a CSS colour keyword. Nothing
+        /// else: `rgb(...)` and friends would need a parser to be sure they cannot close the
+        /// declaration, and the hex forms express every colour they can.
+        private static String color(String hint, String value, String def) {
+            if (value == null || value.trim().length() == 0) {
+                return def;
+            }
+            String v = value.trim();
+            boolean ok;
+            if (v.charAt(0) == '#') {
+                int n = v.length() - 1;
+                ok = n == 3 || n == 4 || n == 6 || n == 8;
+                for (int i = 1; ok && i < v.length(); i++) {
+                    char c = v.charAt(i);
+                    ok = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+                }
+            } else {
+                ok = true;
+                for (int i = 0; ok && i < v.length(); i++) {
+                    char c = v.charAt(i);
+                    ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+                }
+            }
+            if (!ok) {
+                throw new IllegalArgumentException("javascript.splash." + hint
+                        + " must be a hex colour such as #1e1e1e or a CSS colour name, not '" + value + "'");
+            }
+            return v;
+        }
+
+        /// `none` (or nothing) for no logo; otherwise a path inside the bundle. Restricted to
+        /// plain path characters so it can go into a `src` attribute as it is, and never `..`
+        /// or a scheme, so it cannot point the page at another origin.
+        private static String logo(String value) {
+            if (value == null || value.trim().length() == 0 || value.trim().equalsIgnoreCase("none")) {
+                return null;
+            }
+            String v = value.trim();
+            boolean ok = v.charAt(0) != '/' && v.indexOf("..") < 0;
+            for (int i = 0; ok && i < v.length(); i++) {
+                char c = v.charAt(i);
+                ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+                        || c == '/' || c == '.' || c == '-' || c == '_';
+            }
+            if (!ok) {
+                throw new IllegalArgumentException("javascript.splash.logo must be a path inside the web "
+                        + "bundle (letters, digits, '/', '.', '-', '_'), not '" + value + "'");
+            }
+            return v;
+        }
+    }
+
+    private static String asciiLower(String s) {
+        StringBuilder out = new StringBuilder(s.length());
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            out.append(c >= 'A' && c <= 'Z' ? (char) (c + ('a' - 'A')) : c);
+        }
+        return out.toString();
+    }
+
+    /// Fills the loading screen's placeholders: its colours and its logo.
+    ///
+    /// This adds an inline `<style>` and, in `auto` mode, an inline `<script>`. Both are fine for
+    /// the Content-Security-Policy: [JavascriptSecurityHeaders] hashes the page after this writes
+    /// it. A template the developer replaced without the placeholders is left alone.
+    static String applySplashSettings(String index, SplashSettings splash) {
+        String logo = splash.logo == null ? ""
+                : "<img class=\"cn1-splash-logo\" src=\"" + splash.logo + "\" alt=\"\">";
+        return index
+                .replace("<!--__SPLASH_THEME__-->", splashTheme(splash))
+                .replace("<!--__SPLASH_LOGO__-->", logo);
+    }
+
+    /// The `--cn1-splash-*` variables for the chosen appearance mode.
+    ///
+    /// In `auto` mode the browser's `prefers-color-scheme` decides, unless the application
+    /// remembered a choice of its own ([#SPLASH_APPEARANCE_STORAGE_KEY]); the script that reads
+    /// it runs in `<head>`, before the body exists, so the first frame is already the right
+    /// colour. The variables also colour `html`, which stays behind the canvas until the first
+    /// form paints over it -- the gap where a dark app used to flash white.
+    static String splashTheme(SplashSettings s) {
+        String light = vars(s.background, s.text, s.accent);
+        String dark = vars(s.darkBackground, s.darkText, s.darkAccent);
+        StringBuilder out = new StringBuilder();
+        if ("auto".equals(s.appearance)) {
+            out.append("<script>try{var a=localStorage.getItem(\"").append(SPLASH_APPEARANCE_STORAGE_KEY)
+                    .append("\");if(a===\"light\"||a===\"dark\"){document.documentElement.setAttribute(")
+                    .append("\"data-cn1-appearance\",a);}}catch(e){}</script>\n");
+            out.append("<style>\n:root{").append(light).append("}\n")
+                    .append("@media (prefers-color-scheme: dark){:root:not([data-cn1-appearance=\"light\"]){")
+                    .append(dark).append("}}\n")
+                    .append(":root[data-cn1-appearance=\"dark\"]{").append(dark).append("}\n")
+                    .append("</style>");
+        } else {
+            out.append("<style>\n:root{").append("dark".equals(s.appearance) ? dark : light)
+                    .append("}\n</style>");
+        }
+        return out.toString();
+    }
+
+    private static String vars(String background, String text, String accent) {
+        return "--cn1-splash-background:" + background + ";--cn1-splash-text:" + text
+                + ";--cn1-splash-accent:" + accent + ";";
     }
 
     private static String escapeHtml(String text) {

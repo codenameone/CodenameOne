@@ -262,14 +262,44 @@ This tells Apache to proxy all requests for '/app' to the domain https://www.mye
 [id="splash_screen", reftext="Customizing the Splash Screen"]
 === Customizing the splash screen
 
-Since your application may include many resource files, videos, etc., the build-server will generate a splash screen for your app to display while it's loading. This basically shows a progress indicator with your app's icon.
+While the application downloads and starts, the page shows a loading screen: the app icon, an animated progress bar and a "Loading" label. It stays up until the first form is shown.
 
-You can customize this splash screen by modifying the HTML source inside the *cn1-splash* `div` tag of your app's index.html file:
+Build hints set its look, so the settings survive every build instead of being edited into each generated bundle:
 
-[source,html]
+[cols="1,1,3",options="header"]
+|===
+|Build hint |Default |Meaning
+
+|`javascript.splash.appearance`
+|`auto`
+|`auto` follows the browser's light/dark preference. `light` or `dark` always uses that set of colors, for an app with a single appearance.
+
+|`javascript.splash.background`, `javascript.splash.textColor`, `javascript.splash.accentColor`
+|`#ffffff`, `#666666`, `#0072ff`
+|The page background, the label and the progress bar in the light appearance.
+
+|`javascript.splash.darkBackground`, `javascript.splash.darkTextColor`, `javascript.splash.darkAccentColor`
+|`#121212`, `#b3b3b3`, `#4da3ff`
+|The same three in the dark appearance.
+
+|`javascript.splash.logo`
+|The app icon
+|A different image, as a path relative to the bundle's `index.html`, or `none` for no image.
+|===
+
+Colors are hex values (`#rgb`, `#rrggbb`, with optional alpha) or CSS color names. The page applies them before it paints anything, and the background stays behind the app until the first form covers it, so a dark app no longer opens on a white page.
+
+An app that lets the user choose its own appearance can have the next launch's loading screen match that choice, even when it differs from the browser's preference:
+
+[source,java]
 ----
-include::../demos/javascript/src/main/snippets/developer-guide/working-with-javascript.html[tag=working-with-javascript-html-001,indent=0]
+CN.setProperty("platformHint.javascript.splashAppearance", "dark"); // or "light"
+CN.setProperty("platformHint.javascript.splashAppearance", null);   // follow the browser again
 ----
+
+The choice is kept in the browser's local storage and applies only in `auto` mode.
+
+For anything the hints don't cover, the markup is the `cn1-splash` `div` in the generated `index.html`; edit it there if you host the bundle yourself.
 
 [id="debugging", reftext="Debugging in Chrome"]
 === Debugging

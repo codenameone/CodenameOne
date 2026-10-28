@@ -5349,6 +5349,31 @@ public class HTML5Implementation extends CodenameOneImplementation {
         );
     }
 
+    /// Remembers the application's light/dark choice for the loading screen of the NEXT launch:
+    /// `light` or `dark`, or null/anything else to follow the browser again. The page reads the
+    /// key in `<head>` before any Java runs (`JavascriptBundleWriter.splashTheme` in the
+    /// ByteCodeTranslator, which also names the key); a build whose `javascript.splash.appearance`
+    /// is `light` or `dark` ignores it.
+    private static void setSplashAppearance(String value) {
+        // The cast stays outside the try: a CHECKCAST is unchecked on ParparVM, so a handler
+        // around it would never run (scripts/check-cast-semantics.sh).
+        WindowExt win = (WindowExt) Window.current();
+        try {
+            JSOImplementations.JSStorage storage = win.getLocalStorage();
+            if (storage == null) {
+                return;
+            }
+            if ("light".equals(value) || "dark".equals(value)) {
+                storage.setItem("cn1.splashAppearance", value);
+            } else {
+                storage.removeItem("cn1.splashAppearance");
+            }
+        } catch (RuntimeException e) {
+            // Storage disabled (private mode, a sandboxed frame): the splash follows the browser.
+            Log.e(e);
+        }
+    }
+
     @JSBody(params={"msg"}, script="window.onbeforeunload=function(){return msg;}")
     private native static void setBeforeUnloadMessage(String msg);
     
@@ -5357,6 +5382,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
     
     @Override
     public void setPlatformHint(String key, String value) {
+        if ("platformHint.javascript.splashAppearance".equalsIgnoreCase(key)) {
+            setSplashAppearance(value);
+        }
         if ("platformHint.javascript.beforeUnloadMessage".equalsIgnoreCase(key)) {
             if (value == null) {
                 removeBeforeUnload();

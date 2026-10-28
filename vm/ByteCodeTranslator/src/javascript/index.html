@@ -5,26 +5,57 @@
 <!--__HEAD_META__-->
 <title>__APP_TITLE__</title>
 <link rel="stylesheet" href="style.css">
+<!--__SPLASH_THEME__-->
 <style>
   /* Indeterminate progress bar shown until HTML5Implementation.hideSplash
      runs and the host-bridge ``__cn1_hide_splash__`` handler removes
      #cn1-splash. Pure CSS so it animates regardless of whether the worker
      is still downloading translated_app.js or busy initialising the
      framework -- both phases sit on the splash and the old static
-     "Loading..." left users wondering whether the page had hung. */
+     "Loading..." left users wondering whether the page had hung.
+     The colours are the --cn1-splash-* variables the build writes from the
+     javascript.splash.* hints just above (JavascriptBundleWriter.splashTheme),
+     so a dark app never opens on a white page. */
+  html {
+    background: var(--cn1-splash-background, #ffffff);
+  }
+  #cn1-splash {
+    color: var(--cn1-splash-text, #666666);
+  }
+  #cn1-splash .cn1-splash-logo {
+    display: block;
+    width: 6em;
+    height: 6em;
+    max-width: 40vw;
+    max-height: 40vw;
+    margin: 0 auto 1.2em;
+    border-radius: 22%;
+    object-fit: contain;
+  }
   #cn1-splash .cn1-progress {
     width: 16em;
     max-width: 60vw;
     height: 6px;
     border-radius: 3px;
-    background: #eee;
+    /* The track is the text colour at low opacity, painted by ::before:
+       works on every browser (color-mix() would not before 2023) and reads
+       as the empty part of the bar on any background. */
+    position: relative;
     overflow: hidden;
     margin: 1em auto 0.6em;
   }
+  #cn1-splash .cn1-progress::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: currentColor;
+    opacity: 0.2;
+  }
   #cn1-splash .cn1-progress-bar {
+    position: relative;
     width: 33%;
     height: 100%;
-    background: linear-gradient(90deg, #0072ff, #00c6ff);
+    background: var(--cn1-splash-accent, #0072ff);
     border-radius: 3px;
     animation: cn1-progress-slide 1.4s ease-in-out infinite;
   }
@@ -36,6 +67,7 @@
 </head>
 <body>
 <div id="cn1-splash">
+  <!--__SPLASH_LOGO__-->
   <div class="cn1-progress" role="progressbar" aria-label="Loading application">
     <div class="cn1-progress-bar"></div>
   </div>
