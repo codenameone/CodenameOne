@@ -2286,9 +2286,26 @@ public class LinuxImplementation extends CodenameOneImplementation {
         return true;
     }
 
+    /// True when data starts with a TrueType (0x00010000 or 'true'), OpenType
+    /// CFF ('OTTO') or collection ('ttcf') tag.
+    private static boolean isSfntHeader(byte[] data) {
+        if (data == null || data.length < 12) {
+            return false;
+        }
+        int tag = ((data[0] & 0xff) << 24) | ((data[1] & 0xff) << 16)
+                | ((data[2] & 0xff) << 8) | (data[3] & 0xff);
+        return tag == 0x00010000 || tag == 0x74727565 || tag == 0x4f54544f
+                || tag == 0x74746366;
+    }
+
     @Override
     public Object loadTrueTypeFontFromData(String fontName, byte[] data) {
-        // The same in-memory loader bundled fonts go through.
+        // The in-memory loader answers a system family for bytes it cannot
+        // register, while the contract for data that is not a font is null,
+        // so anything without an SFNT header is rejected before it.
+        if (!isSfntHeader(data)) {
+            return null;
+        }
         long font = LinuxNative.loadTrueTypeFontFromMemory(fontName, data);
         return font == 0 ? null : Long.valueOf(font);
     }

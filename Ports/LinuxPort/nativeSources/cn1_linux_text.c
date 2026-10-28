@@ -30,8 +30,10 @@
  *
  * NOTE: implemented against Pango/PangoCairo but not yet compiled/run on a
  * Linux/GTK host. In-memory TrueType registration (loadTrueTypeFontFromMemory)
- * currently falls back to a system family -- wiring the bytes through
- * FcConfigAppFontAddMemFace/FreeType is a later refinement.
+ * spools the bytes to a temp file, adds it to FontConfig and names the family
+ * from the face via FreeType. Bytes that are not a font still answer a system
+ * family here, so LinuxImplementation.loadTrueTypeFontFromData rejects anything
+ * without an SFNT header before calling it.
  */
 
 #define _GNU_SOURCE
