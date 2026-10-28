@@ -26,8 +26,9 @@ package com.codename1.image;
 /// draws text: a font turns a string into an outline, and the graphics fills
 /// it like any other path.
 ///
-/// No implementation ships yet; a font engine plugs in here without any
-/// change to the graphics.
+/// [TrueTypeFont] is the implementation that ships: TrueType fonts read from
+/// bytes, with an embedded default. Another font engine plugs in here
+/// without any change to the graphics.
 @com.codename1.impl.SharedWithBackend
 public interface RasterFont {
     /// Returns the outline of `text` with its baseline starting at `(x, y)`.

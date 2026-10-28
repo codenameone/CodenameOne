@@ -34,19 +34,27 @@
 # renderer of Pillow's ImageFont, with Pillow's embedded default font
 # (courB08, the PIL font data and its glyph sheet) kept byte for byte.
 #
-"""PIL raster fonts. Only Pillow's built-in bitmap font is available.
+"""PIL fonts: Pillow's built-in bitmap font and scalable TrueType fonts.
 
-`load_default()` returns that bitmap font: it is what Pillow returns when it
-is built without FreeType. A Pillow with FreeType returns a scalable font
-instead (Aileron), which this runtime does not have, so text drawn with
-`load_default()` matches `ImageFont.load_default_imagefont()` in CPython.
-`truetype()` raises, since no TrueType rasterizer is built in.
+`truetype()` reads a TrueType font (a `.ttf`, an `.otf` with TrueType
+outlines, or a face of a `.ttc`) with Codename One's pure-Java font engine,
+`com.codename1.image.TrueTypeFont`. `load_default()` returns Aileron Regular,
+the scalable font a Pillow with FreeType returns, embedded in that engine;
+`load_default_imagefont()` returns the bitmap font.
+
+Layout is Pillow's basic layout (`Layout.BASIC`) whatever `layout_engine`
+asks for: one glyph per character, advances rounded to whole pixels, kerning
+from the `kern` table only, no shaping. Glyphs are not hinted, while FreeType
+hints Aileron with its auto-hinter, so an advance or a box edge can differ
+from Pillow's by a pixel at small sizes; `getmetrics()` and the anchor
+arithmetic are Pillow's own. PostScript-flavoured (CFF) fonts raise OSError.
 """
 
 import base64
 import io
 import struct
 
+import _cn1image
 from PIL import Image
 
 
@@ -113,12 +121,105 @@ def load_default_imagefont():
     return f
 
 
+class Layout:
+    BASIC = 0
+    RAQM = 1
+
+
+MAX_STRING_LENGTH = 1000000
+
+
+def _text(text):
+    if isinstance(text, bytes):
+        return text.decode("latin-1")
+    return text
+
+
+class FreeTypeFont:
+    """A scalable TrueType font at one size."""
+
+    def __init__(self, font=None, size=10, index=0, encoding="", layout_engine=None):
+        if size <= 0:
+            raise ValueError("font size must be greater than 0, not " + str(size))
+        self.path = font
+        self.size = size
+        self.index = index
+        self.encoding = encoding
+        self.layout_engine = Layout.BASIC
+        if isinstance(font, (str, bytes)) or hasattr(font, "__fspath__"):
+            with open(font, "rb") as f:
+                data = f.read()
+        else:
+            data = font.read()
+        self.font = _cn1image.ft_load(data, index, float(size))
+
+    def __getstate__(self):
+        return [self.path, self.size, self.index, self.encoding, self.layout_engine]
+
+    def _check(self, direction, features, language):
+        if direction is not None or features is not None or language is not None:
+            raise KeyError("setting text direction, language or font features is not "
+                           "supported without libraqm")
+
+    def getname(self):
+        return _cn1image.ft_name(self.font)
+
+    def getmetrics(self):
+        return _cn1image.ft_metrics(self.font)
+
+    def getlength(self, text, mode="", direction=None, features=None, language=None):
+        self._check(direction, features, language)
+        return _cn1image.ft_length(self.font, _text(text)) / 64
+
+    def getbbox(self, text, mode="", direction=None, features=None, language=None,
+                stroke_width=0, anchor=None):
+        self._check(direction, features, language)
+        w, h, x, y = _cn1image.ft_bbox(self.font, _text(text), anchor)
+        left, top = x - stroke_width, y - stroke_width
+        return left, top, left + w + 2 * stroke_width, top + h + 2 * stroke_width
+
+    def getmask2(self, text, mode="", direction=None, features=None, language=None,
+                 stroke_width=0, anchor=None, ink=0, start=None, *args, **kwargs):
+        """Returns `(mask, offset)`: an "L" (or "1") coverage image of the
+        text and where its top-left corner lies relative to the anchor."""
+        self._check(direction, features, language)
+        handle, x, y = _cn1image.ft_mask(self.font, _text(text), anchor, mode == "1")
+        w, h = _cn1image.size(handle)
+        return Image._wrap("L", (w, h), handle), (x, y)
+
+    def getmask(self, text, mode="", *args, **kwargs):
+        return self.getmask2(text, mode, *args, **kwargs)[0]
+
+    def font_variant(self, font=None, size=None, index=None, encoding=None, layout_engine=None):
+        if font is None and not isinstance(self.path, (str, bytes)) and self.path is not None:
+            v = FreeTypeFont.__new__(FreeTypeFont)
+            v.path, v.index, v.encoding, v.layout_engine = self.path, self.index, self.encoding, Layout.BASIC
+            v.size = self.size if size is None else size
+            if v.size <= 0:
+                raise ValueError("font size must be greater than 0, not " + str(v.size))
+            v.font = _cn1image.ft_variant(self.font, float(v.size))
+            return v
+        return FreeTypeFont(self.path if font is None else font,
+                            self.size if size is None else size,
+                            self.index if index is None else index,
+                            self.encoding if encoding is None else encoding,
+                            layout_engine)
+
+
 def load_default(size=None):
-    return load_default_imagefont()
+    """Aileron Regular at `size` pixels (10 by default), as a Pillow with
+    FreeType returns it."""
+    return FreeTypeFont(io.BytesIO(_cn1image.ft_default_data()), 10 if size is None else size)
 
 
 def truetype(font=None, size=10, index=0, encoding="", layout_engine=None):
-    raise OSError("cannot open resource: TrueType fonts are not supported")
+    """Loads a TrueType font from a path, a file object or bytes."""
+    if font is None:
+        raise OSError("cannot open resource")
+    try:
+        return FreeTypeFont(font, size, index, encoding, layout_engine)
+    except FileNotFoundError:
+        raise OSError("cannot open resource")
 
 
 def load(filename):

@@ -108,7 +108,7 @@ public final class PngCodec {
             }
             int body = pos + 8;
             String kind = new String(new char[] {(char) data[pos + 4], (char) data[pos + 5],
-                (char) data[pos + 6], (char) data[pos + 7]});
+                    (char) data[pos + 6], (char) data[pos + 7]});
             if ("IHDR".equals(kind)) {
                 w = be32(data, body);
                 h = be32(data, body + 4);

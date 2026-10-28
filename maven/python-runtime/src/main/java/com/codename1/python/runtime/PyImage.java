@@ -27,6 +27,7 @@ import com.codename1.image.JpegCodec;
 import com.codename1.image.PngCodec;
 import com.codename1.image.RasterImage;
 import com.codename1.image.Resampler;
+import com.codename1.image.TrueTypeFont;
 
 import java.io.IOException;
 
@@ -255,6 +256,43 @@ final class PyImage {
             }
             return new PyBytes(out);
         }));
+        m.setAttr("ft_load", PyBuiltin.positional("ft_load", a -> {
+            try {
+                return new PyJavaObject(new FreeTypeMetrics(
+                        TrueTypeFont.load(bytes(a[0]), i(a[1]), Py.asDouble(a[2]))));
+            } catch (IOException e) {
+                throw osError(e);
+            }
+        }));
+        m.setAttr("ft_default_data", PyBuiltin.positional("ft_default_data", a ->
+                new PyBytes(TrueTypeFont.getDefaultFontData())));
+        m.setAttr("ft_variant", PyBuiltin.positional("ft_variant", a ->
+                new PyJavaObject(new FreeTypeMetrics(ft(a[0]).font.deriveFont(Py.asDouble(a[1]))))));
+        m.setAttr("ft_name", PyBuiltin.positional("ft_name", a -> {
+            TrueTypeFont f = ft(a[0]).font;
+            return new PyTuple(new Object[] {new PyStr(f.getFamilyName()), new PyStr(f.getStyleName())});
+        }));
+        m.setAttr("ft_metrics", PyBuiltin.positional("ft_metrics", a -> {
+            FreeTypeMetrics f = ft(a[0]);
+            return new PyTuple(new Object[] {PyInt.of(FreeTypeMetrics.pixel(f.ascender)),
+                PyInt.of(-FreeTypeMetrics.pixel(f.descender))});
+        }));
+        m.setAttr("ft_length", PyBuiltin.positional("ft_length", a ->
+                PyInt.of(ft(a[0]).length(Py.toStr(a[1])))));
+        m.setAttr("ft_bbox", PyBuiltin.positional("ft_bbox", a -> {
+            FreeTypeMetrics f = ft(a[0]);
+            int[] b = ftBox(f, f.layout(Py.toStr(a[1])), a[2]);
+            return new PyTuple(new Object[] {PyInt.of(b[0]), PyInt.of(b[1]), PyInt.of(b[2]), PyInt.of(b[3])});
+        }));
+        m.setAttr("ft_mask", PyBuiltin.positional("ft_mask", a -> {
+            FreeTypeMetrics f = ft(a[0]);
+            FreeTypeMetrics.Layout l = f.layout(Py.toStr(a[1]));
+            int[] b = ftBox(f, l, a[2]);
+            Img r = new Img(Math.max(0, b[0]), Math.max(0, b[1]), 1);
+            byte[] cov = f.mask(l, b, Py.isTrue(a[3]));
+            System.arraycopy(cov, 0, r.d, 0, Math.min(cov.length, r.d.length));
+            return new PyTuple(new Object[] {wrap(r), PyInt.of(b[2]), PyInt.of(b[3])});
+        }));
         m.setAttr("native_available", PyBuiltin.positional("native_available", a -> {
             Codec c = codec;
             return c != null && c.available() ? Py.TRUE : Py.FALSE;
@@ -265,6 +303,21 @@ final class PyImage {
                 new PyBytes(requireCodec().encode(convert(img(a[0]), 4), Py.toStr(a[1]),
                         (float) Py.asDouble(a[2])))));
         return m;
+    }
+
+    private static FreeTypeMetrics ft(Object o) {
+        if (o instanceof PyJavaObject && ((PyJavaObject) o).value instanceof FreeTypeMetrics) {
+            return (FreeTypeMetrics) ((PyJavaObject) o).value;
+        }
+        throw Py.typeError("not a TrueType font");
+    }
+
+    private static int[] ftBox(FreeTypeMetrics f, FreeTypeMetrics.Layout l, Object anchor) {
+        String a = Py.NONE.equals(anchor) ? null : Py.toStr(anchor);
+        if (!FreeTypeMetrics.validAnchor(a)) {
+            throw Py.error(Py.VALUE_ERROR, "bad anchor specified: " + a);
+        }
+        return f.box(l, a);
     }
 
     private static Img crop(Img s, int x0, int y0, int x1, int y1) {

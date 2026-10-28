@@ -67,6 +67,35 @@ def stream():
     return Response(stream_with_context(gen()), mimetype="text/plain")
 
 
+@app.route("/badge.<fmt>")
+def badge(fmt):
+    """A PNG or JPEG drawn on the server: shapes, then text in the embedded
+    TrueType font (com.codename1.image underneath)."""
+    import io
+    from PIL import Image, ImageDraw, ImageFont
+    who = request.args.get("who", "todo")
+    font = ImageFont.load_default(24)
+    im = Image.new("RGB", (240, 64), (24, 32, 48))
+    d = ImageDraw.Draw(im)
+    d.rectangle((4, 4, 235, 59), outline=(250, 200, 40), width=3)
+    d.text((120, 32), "Hi, " + who, fill=(255, 255, 255), font=font, anchor="mm")
+    ink = Image.new("L", (240, 64), 0)
+    ImageDraw.Draw(ink).text((120, 32), "Hi, " + who, fill=255, font=font, anchor="mm")
+    if fmt == "json":
+        return jsonify(bbox=list(ink.getbbox() or ()), length=font.getlength("Hi, " + who),
+                       metrics=list(font.getmetrics()), name=list(font.getname()))
+    out = io.BytesIO()
+    if fmt == "png":
+        im.save(out, "PNG")
+        mime = "image/png"
+    elif fmt == "jpg":
+        im.save(out, "JPEG", quality=85)
+        mime = "image/jpeg"
+    else:
+        abort(404)
+    return Response(out.getvalue(), mimetype=mime)
+
+
 if __name__ == "__main__":
     import sys
     app.run(host="127.0.0.1", port=int(sys.argv[1]) if len(sys.argv) > 1 else 8080)

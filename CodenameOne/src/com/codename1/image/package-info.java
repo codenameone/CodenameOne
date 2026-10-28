@@ -30,7 +30,8 @@
 /// - [RasterGraphics] draws antialiased lines, rectangles, ellipses, arcs,
 ///   polygons and Bezier paths ([RasterPath]), with transforms, clipping,
 ///   alpha, gradients ([RasterGradient]) and images. Text goes through the
-///   [RasterFont] seam.
+///   [RasterFont] seam; [TrueTypeFont] reads TrueType fonts and embeds a
+///   default one, so text needs no font file.
 /// - [Resampler] is Pillow's resampling convolution, byte for byte.
 /// - [PngCodec] and [JpegCodec] read and write files.
 ///

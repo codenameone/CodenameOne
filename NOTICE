@@ -255,3 +255,14 @@ Pillow's notice:
   Copyright (c) 1997-2003 by Secret Labs AB
   Copyright (c) 1996-2003 by Fredrik Lundh
   Licensed under the MIT-CMU (HPND) license; the full text is in the file.
+
+================================================================================
+Aileron (font)
+================================================================================
+
+CodenameOne/src/com/codename1/image/DefaultFontData.java embeds Aileron
+Regular by Sora Sagano (https://dotcolon.net/fonts/aileron), the subset
+Pillow embeds for ImageFont.load_default(). It is the default font of
+com.codename1.image.TrueTypeFont and of the Python runtime's PIL.ImageFont.
+Aileron is dedicated to the public domain under CC0 1.0 Universal; the legal
+code is kept in CodenameOne/third-party/aileron/LICENSE.txt.

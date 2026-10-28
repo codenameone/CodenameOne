@@ -288,6 +288,17 @@ def flask():
     check("GET / answers", st in (200, 404), st)
     body = streaming("/stream?who=bob", b"bob 0", b"bob 2")
     check("flask /stream body with request context", body == b"bob 0\nbob 1\nbob 2\n", body)
+    st, h, b = http("GET", "/badge.png?who=bob")
+    check("flask /badge.png is a 240x64 PNG", st == 200 and b[:8] == b"\x89PNG\r\n\x1a\n"
+          and struct.unpack(">II", b[16:24]) == (240, 64), (st, b[:24]))
+    st, h, b = http("GET", "/badge.jpg?who=bob")
+    check("flask /badge.jpg is a JPEG", st == 200 and b[:2] == b"\xff\xd8" and b[-2:] == b"\xff\xd9", (st, b[:4]))
+    st, h, b = http("GET", "/badge.json?who=bob")
+    info = json.loads(b) if st == 200 else {}
+    box = info.get("bbox") or [0, 0, 0, 0]
+    check("flask /badge.json text inked in the middle", st == 200 and info.get("name") == ["Aileron", "Regular"]
+          and 60 < box[0] < 120 < box[2] < 180 and 14 < box[1] < 32 < box[3] < 50
+          and abs(info.get("length", 0) - (box[2] - box[0])) < 6, info)
 
 
 def main():

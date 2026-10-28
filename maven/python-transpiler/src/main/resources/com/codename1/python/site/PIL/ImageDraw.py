@@ -36,6 +36,8 @@ class ImageDraw:
         self.mode = im.mode
         self.ink = _Image._color(im.mode, -1)
         self.fill = False
+        self.font = None
+        self.fontmode = "1" if im.mode in ("1", "P", "I", "F") else "L"
 
     def _ink(self, color):
         return None if color is None else _Image._color(self.mode, color)
@@ -169,84 +171,129 @@ class ImageDraw:
                 a, b = q[i], q[(i + 1) % len(q)]
                 self._segment(a[0], a[1], b[0], b[1], ink, max(1, width))
 
-    def _font(self, font):
-        if font is None:
+    def getfont(self):
+        if self.font is None:
             from PIL import ImageFont
-            font = ImageFont.load_default()
-        return font
+            self.font = ImageFont.load_default()
+        return self.font
 
-    def _spacing(self, font, spacing):
-        return self.textbbox((0, 0), "A", font)[3] + spacing
+    def _font(self, font, font_size=None):
+        if font is not None:
+            return font
+        if font_size is not None:
+            from PIL import ImageFont
+            return ImageFont.load_default(font_size)
+        return self.getfont()
 
-    def text(self, xy, text, fill=None, font=None, anchor=None, spacing=4, align="left", *args, **kwargs):
-        """Draws `text` with a bitmap font: each line's glyph mask is filled
-        with the ink at the integer position, as Pillow's basic layout does."""
-        font = self._font(font)
+    def _spacing(self, font, spacing, stroke_width=0):
+        return self.textbbox((0, 0), "A", font, stroke_width=stroke_width)[3] + stroke_width + spacing
+
+    @staticmethod
+    def _scalable(font):
+        return hasattr(font, "getmask2")
+
+    def text(self, xy, text, fill=None, font=None, anchor=None, spacing=4, align="left",
+             direction=None, features=None, language=None, stroke_width=0, stroke_fill=None,
+             embedded_color=False, *args, **kwargs):
+        """Draws `text`. A TrueType font's coverage mask is filled with the
+        ink at the anchor's integer position, as Pillow does; the bitmap
+        font's glyph mask likewise, at the top-left corner."""
+        font = self._font(font, kwargs.get("font_size"))
         if isinstance(text, bytes):
             text = text.decode("latin-1")
         if "\n" in text:
-            return self.multiline_text(xy, text, fill, font, anchor, spacing, align)
+            return self.multiline_text(xy, text, fill, font, anchor, spacing, align,
+                                       direction, features, language, stroke_width)
         ink = self._ink(fill)
         if ink is None:
             ink = self.ink
-        mask = font.getmask(text, self.mode)
+        x, y = int(xy[0]), int(xy[1])
+        if self._scalable(font):
+            mask, offset = font.getmask2(text, self.fontmode, direction, features, language,
+                                         anchor=anchor)
+            x += offset[0]
+            y += offset[1]
+        else:
+            mask = font.getmask(text, self.mode)
         if mask.width == 0 or mask.height == 0:
             return
-        x, y = int(xy[0]), int(xy[1])
         self.im.paste(ink, (x, y, x + mask.width, y + mask.height), mask)
 
-    def multiline_text(self, xy, text, fill=None, font=None, anchor=None, spacing=4, align="left",
-                       *args, **kwargs):
-        font = self._font(font)
+    def _lines(self, xy, text, font, anchor, spacing, align, stroke_width=0):
+        if anchor is None:
+            anchor = "la"
+        elif len(anchor) != 2:
+            raise ValueError("anchor must be a 2 character string")
+        elif anchor[1] in "tb":
+            raise ValueError("anchor not supported for multiline text")
         lines = text.split("\n")
-        line_spacing = self._spacing(font, spacing)
+        line_spacing = self._spacing(font, spacing, stroke_width)
         widths = [self.textlength(line, font) for line in lines]
         widest = max(widths)
         top = xy[1]
+        if anchor[1] == "m":
+            top -= (len(lines) - 1) * line_spacing / 2.0
+        elif anchor[1] == "d":
+            top -= (len(lines) - 1) * line_spacing
+        out = []
         for line, w in zip(lines, widths):
             left = xy[0]
+            diff = widest - w
+            if anchor[0] == "m":
+                left -= diff / 2.0
+            elif anchor[0] == "r":
+                left -= diff
             if align == "center":
-                left += (widest - w) / 2.0
+                left += diff / 2.0
             elif align == "right":
-                left += widest - w
+                left += diff
             elif align != "left":
                 raise ValueError('align must be "left", "center" or "right"')
-            self.text((left, top), line, fill, font)
+            out.append(((left, top), line))
             top += line_spacing
+        return out, anchor
 
-    def textlength(self, text, font=None, *args, **kwargs):
+    def multiline_text(self, xy, text, fill=None, font=None, anchor=None, spacing=4, align="left",
+                       direction=None, features=None, language=None, stroke_width=0, *args, **kwargs):
+        font = self._font(font, kwargs.get("font_size"))
+        lines, anchor = self._lines(xy, text, font, anchor, spacing, align, stroke_width)
+        for pos, line in lines:
+            self.text(pos, line, fill, font, anchor if self._scalable(font) else None)
+
+    def textlength(self, text, font=None, direction=None, features=None, language=None,
+                   embedded_color=False, *args, **kwargs):
         if "\n" in text:
             raise ValueError("can't measure length of multiline text")
-        return self._font(font).getlength(text)
+        font = self._font(font, kwargs.get("font_size"))
+        if self._scalable(font):
+            return font.getlength(text, self.fontmode, direction, features, language)
+        return font.getlength(text)
 
-    def textbbox(self, xy, text, font=None, anchor=None, spacing=4, align="left", *args, **kwargs):
-        font = self._font(font)
+    def textbbox(self, xy, text, font=None, anchor=None, spacing=4, align="left", direction=None,
+                 features=None, language=None, stroke_width=0, embedded_color=False, *args, **kwargs):
+        font = self._font(font, kwargs.get("font_size"))
         if "\n" in text:
-            return self.multiline_textbbox(xy, text, font, anchor, spacing, align)
-        b = font.getbbox(text)
+            return self.multiline_textbbox(xy, text, font, anchor, spacing, align, direction,
+                                           features, language, stroke_width)
+        if self._scalable(font):
+            b = font.getbbox(text, self.fontmode, direction, features, language, stroke_width, anchor)
+        else:
+            b = font.getbbox(text)
         return (b[0] + xy[0], b[1] + xy[1], b[2] + xy[0], b[3] + xy[1])
 
     def multiline_textbbox(self, xy, text, font=None, anchor=None, spacing=4, align="left",
+                           direction=None, features=None, language=None, stroke_width=0,
                            *args, **kwargs):
-        font = self._font(font)
-        lines = text.split("\n")
-        line_spacing = self._spacing(font, spacing)
-        widths = [self.textlength(line, font) for line in lines]
-        widest = max(widths)
+        font = self._font(font, kwargs.get("font_size"))
+        lines, anchor = self._lines(xy, text, font, anchor, spacing, align, stroke_width)
         bbox = None
-        top = xy[1]
-        for line, w in zip(lines, widths):
-            left = xy[0]
-            if align == "center":
-                left += (widest - w) / 2.0
-            elif align == "right":
-                left += widest - w
-            b = self.textbbox((left, top), line, font)
+        for pos, line in lines:
+            b = self.textbbox(pos, line, font, anchor if self._scalable(font) else None,
+                              stroke_width=stroke_width)
             if bbox is None:
                 bbox = list(b)
             else:
                 bbox = [min(bbox[0], b[0]), min(bbox[1], b[1]), max(bbox[2], b[2]), max(bbox[3], b[3])]
-            top += line_spacing
         return tuple(bbox)
 
 
