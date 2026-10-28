@@ -43,9 +43,19 @@ public class PyInstance extends PyObject {
     /// array shared by every instance of a class instead of a hash table
     /// per instance, which is both the lookup cost and most of the memory
     /// a small object would otherwise take.
-    Shape shape = Shape.EMPTY;
-    Object[] slots = NO_SLOTS;
-    private static final Object[] NO_SLOTS = new Object[0];
+    ///
+    /// Null for the empty shape, and `slots` null with it: neither is
+    /// stored by the constructor, which every object of every class runs.
+    /// A ParparVM reference store goes through the collector's barrier, a
+    /// call, so storing the two defaults cost more than the rest of a small
+    /// object's construction.
+    Shape shape;
+    Object[] slots;
+
+    /// The shape, the empty one for null.
+    final Shape shape() {
+        return shape == null ? Shape.EMPTY : shape;
+    }
     /// For an instance of a subclass of a builtin type, the builtin value it
     /// extends (see `BuiltinSubclass`); null otherwise.
     public Object base;
@@ -94,7 +104,7 @@ public class PyInstance extends PyObject {
                 return v;
             }
         }
-        int i = shape.indexOf(name);
+        int i = shape == null ? -1 : shape.indexOf(name);
         return i < 0 ? null : slots[i];
     }
 
@@ -108,7 +118,7 @@ public class PyInstance extends PyObject {
             setField(f, value);
             return;
         }
-        int i = shape.indexOf(name);
+        int i = shape == null ? -1 : shape.indexOf(name);
         if (i >= 0) {
             slots[i] = value;
         } else {
@@ -117,15 +127,17 @@ public class PyInstance extends PyObject {
                 throw Py.attributeError("'" + cls.name + "' object has no attribute '" + name
                         + "' and no __dict__ for setting new attributes");
             }
-            append(shape.with(name), value);
+            append(shape().with(name), value);
         }
     }
 
     /// Moves to `next`, which is this instance's shape plus one name, and
     /// stores that name's value.
     void append(Shape next, Object value) {
-        int n = shape.size();
-        if (n == slots.length) {
+        int n = shape().size();
+        if (slots == null) {
+            slots = new Object[4];
+        } else if (n == slots.length) {
             Object[] grown = new Object[n < 4 ? 4 : n * 2];
             System.arraycopy(slots, 0, grown, 0, n);
             slots = grown;
@@ -140,7 +152,7 @@ public class PyInstance extends PyObject {
     String[] attributeNames() {
         String[] f = fieldNames();
         if (f.length == 0) {
-            return shape.names;
+            return shape().names;
         }
         List<String> out = new ArrayList<String>();
         for (int i = 0; i < f.length; i++) {
@@ -148,8 +160,9 @@ public class PyInstance extends PyObject {
                 out.add(f[i]);
             }
         }
-        for (int i = 0; i < shape.names.length; i++) {
-            out.add(shape.names[i]);
+        String[] names = shape().names;
+        for (int i = 0; i < names.length; i++) {
+            out.add(names[i]);
         }
         return out.toArray(new String[out.size()]);
     }
@@ -258,7 +271,7 @@ public class PyInstance extends PyObject {
                 return;
             }
         }
-        int at = shape.indexOf(name);
+        int at = shape().indexOf(name);
         if (at < 0) {
             throw Py.attributeError("'" + cls.name + "' object has no attribute '" + name + "'");
         }
@@ -266,11 +279,11 @@ public class PyInstance extends PyObject {
         // instance that holds the same names in the same order.
         String[] names = shape.names;
         Object[] old = slots;
-        shape = Shape.EMPTY;
-        slots = NO_SLOTS;
+        shape = null;
+        slots = null;
         for (int i = 0; i < names.length; i++) {
             if (i != at) {
-                append(shape.with(names[i]), old[i]);
+                append(shape().with(names[i]), old[i]);
             }
         }
     }

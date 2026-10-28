@@ -305,6 +305,12 @@ public final class Py {
         if (o instanceof String) {
             return o.hashCode();
         }
+        return keyHashSlow(o, role);
+    }
+
+    /// `keyHash` for anything else, apart: a ParparVM `try` costs a
+    /// `setjmp` on every entry, the fast cases above included.
+    private static long keyHashSlow(Object o, String role) {
         try {
             return obj(o).hash();
         } catch (PyException e) {

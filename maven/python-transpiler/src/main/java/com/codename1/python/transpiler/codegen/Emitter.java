@@ -2745,6 +2745,10 @@ public final class Emitter {
             }
             o.append("};\n");
             o.append("        ").append(k.javaName).append("(PyType t) {\n            super(t);\n        }\n");
+            String pc = typedEmit != null ? typedEmit.plainCtor(k) : null;
+            if (pc != null) {
+                o.append(pc);
+            }
             if (!k.fields.isEmpty()) {
                 o.append("        @Override\n        protected int fieldIndex(String n) {\n            switch (n) {\n");
                 for (int i = 0; i < k.fields.size(); i++) {

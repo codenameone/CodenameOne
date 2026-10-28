@@ -4155,8 +4155,11 @@ final class TypedEmit {
         }
         Infer.Fn f = in.fns.get(init);
         calls.add(f);
-        constructors.add(k);
         String al = argList(f, 1, args);
+        if (plainCtor(k) != null) {
+            return new E("new " + k.javaName + "(" + k.typeVar + ", " + al + ")", Ty.inst(k, false));
+        }
+        constructors.add(k);
         return new E("n_" + k.javaName + "(" + al + ")", Ty.inst(k, false));
     }
 
@@ -4364,6 +4367,91 @@ final class TypedEmit {
     }
 
     /// The Java declaration of a typed field, or null for an object one.
+    private final Map<Layouts.Cls, String> plainCtors = new HashMap<Layouts.Cls, String>();
+
+    /// A Java constructor of `k`'s class doing its `__init__` in place,
+    /// when that only stores parameters in fields (`self.x = x`); or null.
+    /// Typed code then constructs with one `new`: ParparVM inlines no call,
+    /// and the allocation, the generic constructor and a separate
+    /// `__init__` were three of them on the path every object takes.
+    String plainCtor(Layouts.Cls k) {
+        if (!plainCtors.containsKey(k)) {
+            plainCtors.put(k, plainCtor0(k));
+        }
+        return plainCtors.get(k);
+    }
+
+    private String plainCtor0(Layouts.Cls k) {
+        for (String h : new String[] {"__new__", "__setattr__", "__getattribute__", "__getattr__", "__del__"}) {
+            if (Layouts.resolver(k, h) != null) {
+                return null;
+            }
+        }
+        Layouts.Cls o = Layouts.resolver(k, "__init__");
+        FunctionDef init = o == null ? null : o.typable.get("__init__");
+        Infer.Fn f = init == null ? null : in.fns.get(init);
+        if (f == null || !typed.containsKey(f) || f.names.size() < 2 || !init.decorators.isEmpty()
+                || init.args.vararg != null || init.args.kwarg != null || !init.args.kwonly.isEmpty()) {
+            return null;
+        }
+        String self = f.names.get(0);
+        StringBuilder sig = new StringBuilder();
+        StringBuilder norm = new StringBuilder();
+        for (int i = 1; i < f.names.size(); i++) {
+            sig.append(", ").append(param(f.params[i], "a" + i, "b" + i));
+        }
+        StringBuilder body = new StringBuilder();
+        Set<String> seen = new HashSet<String>();
+        Set<Integer> normed = new HashSet<Integer>();
+        for (Stmt st : init.body) {
+            if (!(st instanceof Assign) || ((Assign) st).targets.size() != 1
+                    || !(((Assign) st).targets.get(0) instanceof Attribute) || !(((Assign) st).value instanceof Name)) {
+                return null;
+            }
+            Attribute t = (Attribute) ((Assign) st).targets.get(0);
+            int p = f.names.indexOf(((Name) ((Assign) st).value).id);
+            if (!(t.value instanceof Name) || !((Name) t.value).id.equals(self) || p < 1 || !seen.add(t.attr)) {
+                return null;
+            }
+            Layouts.Cls ow = Infer.fieldOwner(k, t.attr);
+            if (ow == null) {
+                return null;
+            }
+            Ty ft = typedField(ow, t.attr);
+            Ty pt = f.params[p];
+            String m = Emitter.mangle(t.attr);
+            if (ft != null && ft.k == Ty.K.INT) {
+                if (pt.k != Ty.K.INT) {
+                    return null;
+                }
+                if (normed.add(p)) {
+                    // As the typed __init__ does: a caller holding only the
+                    // object passes it whole.
+                    norm.append("            if (b").append(p).append(" instanceof Long) {\n                a").append(p)
+                            .append(" = ((Long) b").append(p).append(").longValue();\n                b").append(p)
+                            .append(" = null;\n            }\n");
+                }
+                // The object half is almost always null, the field's
+                // default: not stored, a barrier saved (see PyInstance).
+                body.append("            t_").append(m).append(" = a").append(p).append(";\n            if (b").append(p)
+                        .append(" != null) {\n                b_").append(m).append(" = b").append(p)
+                        .append(";\n            }\n");
+            } else if (ft != null) {
+                if (pt.k == Ty.K.INT || !jt(ft).equals(jt(pt))) {
+                    return null;
+                }
+                body.append("            t_").append(m).append(" = a").append(p).append(";\n");
+            } else {
+                if (!in.definitelySet(ow, t.attr)) {
+                    return null;
+                }
+                String v = pt.k == Ty.K.INT ? dual("a" + p, "b" + p).c : box(new E("a" + p, pt));
+                body.append("            f_").append(m).append(" = ").append(v).append(";\n");
+            }
+        }
+        return "        " + k.javaName + "(PyType t" + sig + ") {\n            super(t);\n" + norm + body + "        }\n";
+    }
+
     String fieldDecl(Layouts.Cls k, String f) {
         Ty t = typedField(k, f);
         if (t != null && t.k == Ty.K.INT) {

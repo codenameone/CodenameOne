@@ -256,7 +256,7 @@ public final class AttrSite {
         // A compiled field is read by the generated code itself; this site
         // only sees it unset, and must not remember that.
         if (!(clsAttr instanceof PyProperty) && !cls.hasCustomGetattribute() && i.fieldIndex(name) < 0) {
-            slot = shape.indexOf(name);
+            slot = shape == null ? -1 : shape.indexOf(name);
             if (slot >= 0) {
                 kind = SLOT;
             } else if (clsAttr != null) {
@@ -359,7 +359,7 @@ public final class AttrSite {
         }
         Shape after = i.shape;
         if (before == after) { //NOPMD CompareObjectsWithEquals - identity is meant
-            addSet(cls, before, after.indexOf(name), null);
+            addSet(cls, before, after == null ? -1 : after.indexOf(name), null);
         } else {
             // Adding the attribute moved the instance to a new shape. Remember
             // both the transition (the next new instance) and the slot on the
@@ -473,7 +473,7 @@ public final class AttrSite {
                 addGet(i.cls, i.shape, NONE, 0, null);
                 return null;
             }
-            int slot = i.shape.indexOf(name);
+            int slot = i.shape().indexOf(name);
             if (slot >= 0) {
                 addGet(i.cls, i.shape, SLOT, slot, null);
                 return null;
