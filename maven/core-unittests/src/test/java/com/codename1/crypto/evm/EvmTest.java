@@ -288,6 +288,14 @@ class EvmTest {
         assertEquals("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", UInt256.MAX.toQuantity());
         assertEquals("0x0", UInt256.ZERO.toQuantity());
         assertThrows(ArithmeticException.class, () -> UInt256.MAX.add(UInt256.ONE));
+        assertThrows(NumberFormatException.class, () -> UInt256.parse(
+                "115792089237316195423570985008687907853269984665640564039457584007913129639936"));
+        assertThrows(NumberFormatException.class, () -> UInt256.parse("-1"));
+        assertThrows(NumberFormatException.class, () -> UInt256.parse("0x+1"));
+        assertEquals(UInt256.valueOf(26), UInt256.parse("0X1a"));
+        assertThrows(ArithmeticException.class, () -> UInt256.MAX.shiftLeft(1));
+        assertThrows(ArithmeticException.class, () -> UInt256.tenPow(78));
+        assertEquals(32, UInt256.MAX.toMinimalBytes().length);
         assertThrows(ArithmeticException.class, () -> UInt256.ZERO.subtract(UInt256.ONE));
         assertThrows(NumberFormatException.class, () -> UInt256.parseUnits("1.0000001", 6));
         UInt256 a = UInt256.parse("123456789012345678901234567890");

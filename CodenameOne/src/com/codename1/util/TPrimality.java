@@ -21,6 +21,7 @@ import java.util.Arrays;
 import java.util.Random;
 
 /// Provides primality probabilistic methods.
+@com.codename1.impl.SharedWithBackend
 final class TPrimality {
 
     /// All prime numbers with bit length lesser than 10 bits.

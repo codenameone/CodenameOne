@@ -200,7 +200,7 @@ public class JSONParser implements JSONParseCallback {
     private boolean includeNulls = includeNullsDefault;
     private boolean modern;
     private Map<String, Object> state;
-    private java.util.List<Object> parseStack;
+    private List<Object> parseStack;
     private String currentKey;
     /// If strict is set to false, then the parser will attempt to sanitize the JSON
     /// input before parsing.  I.e. it will accept invalid JSON, such as unquoted keys, etc..
@@ -884,9 +884,9 @@ public class JSONParser implements JSONParseCallback {
             sb.append('}');
             return;
         }
-        if (o instanceof java.util.List) {
+        if (o instanceof List) {
             sb.append('[');
-            java.util.List l = (java.util.List) o;
+            List l = (List) o;
             for (int i = 0; i < l.size(); i++) {
                 if (i > 0) {
                     sb.append(',');
@@ -957,11 +957,11 @@ public class JSONParser implements JSONParseCallback {
     /// Cast helper for list-typed values pulled out of a parsed JSON
     /// tree. Same null behavior as [#asMap].
     @SuppressWarnings("unchecked")
-    public static java.util.List<Object> asList(Object o) {
+    public static List<Object> asList(Object o) {
         if (o == null) {
             return null;
         }
-        return (java.util.List<Object>) o;
+        return (List<Object>) o;
     }
 
     /// Retrieves a String field from a parsed JSON object. Returns
@@ -1256,8 +1256,8 @@ public class JSONParser implements JSONParseCallback {
         return (Map) parseStack.get(parseStack.size() - 1);
     }
 
-    private java.util.List<Object> getStackVec() {
-        return (java.util.List<Object>) parseStack.get(parseStack.size() - 1);
+    private List<Object> getStackVec() {
+        return (List<Object>) parseStack.get(parseStack.size() - 1);
     }
 
     /// {@inheritDoc}
@@ -1351,7 +1351,7 @@ public class JSONParser implements JSONParseCallback {
     /// {@inheritDoc}
     @Override
     public void startArray(String arrayName) {
-        java.util.List<Object> currentVector;
+        List<Object> currentVector;
         if (modern) {
             currentVector = new ArrayList<Object>();
         } else {
@@ -1633,8 +1633,8 @@ public class JSONParser implements JSONParseCallback {
             }
         }
 
-        private java.util.List<Object> readArray() throws IOException {
-            java.util.List<Object> out = new ArrayList<Object>();
+        private List<Object> readArray() throws IOException {
+            List<Object> out = new ArrayList<Object>();
             pos++;
             skipWhitespace();
             if (peek() == ']') {
@@ -1965,8 +1965,8 @@ public class JSONParser implements JSONParseCallback {
             if (value instanceof Map) {
                 return printMap((Map<?, ?>) value, indent);
             }
-            if (value instanceof java.util.List) {
-                return printList((java.util.List<?>) value, indent);
+            if (value instanceof List) {
+                return printList((List<?>) value, indent);
             }
             if (value instanceof Date) {
                 return quote(formatDate((Date) value));

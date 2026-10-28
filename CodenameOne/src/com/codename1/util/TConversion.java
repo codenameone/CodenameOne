@@ -19,6 +19,7 @@ package com.codename1.util;
 
 /// Static library that provides `TBigInteger` base conversion from/to any
 /// integer represented in an `java.lang.String` Object.
+@com.codename1.impl.SharedWithBackend
 final class TConversion {
 
     /// Holds the maximal exponent for each radix, so that radixdigitFitInInt[radix]
@@ -82,7 +83,7 @@ final class TConversion {
                 resDigit = TDivision.divideArrayByInt(temp, temp, tempLen, bigRadix);
                 int previous = currentChar;
                 do {
-                    result[--currentChar] = TBigDecimal.forDigit(resDigit % radix, radix);
+                    result[--currentChar] = TBitLevel.forDigit(resDigit % radix, radix);
                 } while (((resDigit /= radix) != 0) && (currentChar != 0));
                 int delta = charsPerInt - previous + currentChar;
                 for (i = 0; i < delta && currentChar > 0; i++) {
@@ -100,7 +101,7 @@ final class TConversion {
             for (int i = 0; i < numberLength; i++) {
                 for (int j = 0; (j < 8) && (currentChar > 0); j++) {
                     resDigit = digits[i] >> (j << 2) & 0xf;
-                    result[--currentChar] = TBigDecimal.forDigit(resDigit, 16);
+                    result[--currentChar] = TBitLevel.forDigit(resDigit, 16);
                 }
             }
         }

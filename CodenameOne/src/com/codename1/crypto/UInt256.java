@@ -22,6 +22,8 @@
  */
 package com.codename1.crypto;
 
+import com.codename1.util.BigInteger;
+
 /// An unsigned 256-bit integer: the width of every EVM quantity and wide enough for any
 /// Bitcoin or Solana amount. Immutable.
 ///
@@ -30,22 +32,35 @@ package com.codename1.crypto;
 /// [#parseUnits] and [#formatUnits] move between base units and the decimal amounts people
 /// read (`"1.5"` ether is `1500000000000000000` wei).
 ///
-/// The device class library has no `java.math`, so this is what the shared crypto API uses
-/// for amounts.
+/// The arithmetic is [com.codename1.util.BigInteger]'s, which both the device and the
+/// backend compile; this class adds the 256-bit range check and the wallet encodings.
 @com.codename1.impl.SharedWithBackend
 public final class UInt256 implements Comparable<UInt256> {
+    private static final BigInteger LIMIT = BigInteger.ONE.shiftLeft(256);
+
     /// Zero.
-    public static final UInt256 ZERO = new UInt256(new int[8]);
+    public static final UInt256 ZERO = new UInt256(BigInteger.ZERO);
     /// One.
-    public static final UInt256 ONE = valueOf(1);
+    public static final UInt256 ONE = new UInt256(BigInteger.ONE);
     /// 2^256 - 1.
-    public static final UInt256 MAX = new UInt256(new int[] {-1, -1, -1, -1, -1, -1, -1, -1});
+    public static final UInt256 MAX = new UInt256(LIMIT.subtract(BigInteger.ONE));
 
-    /// Little-endian 32-bit limbs.
-    private final int[] limbs;
+    /// Always in [0, 2^256).
+    private final BigInteger value;
 
-    private UInt256(int[] limbs) {
-        this.limbs = limbs;
+    private UInt256(BigInteger value) {
+        this.value = value;
+    }
+
+    /// Wraps `v`, refusing anything outside [0, 2^256).
+    private static UInt256 checked(BigInteger v) {
+        if (v.signum() < 0) {
+            throw new ArithmeticException("negative result");
+        }
+        if (v.bitLength() > 256) {
+            throw new ArithmeticException("256-bit overflow");
+        }
+        return new UInt256(v);
     }
 
     /// The value of a non-negative long.
@@ -53,10 +68,7 @@ public final class UInt256 implements Comparable<UInt256> {
         if (value < 0) {
             throw new ArithmeticException("negative value");
         }
-        int[] l = new int[8];
-        l[0] = (int) value;
-        l[1] = (int) (value >>> 32);
-        return new UInt256(l);
+        return new UInt256(BigInteger.valueOf(value));
     }
 
     /// Reads a big-endian unsigned integer of at most 32 significant bytes; leading zero
@@ -67,18 +79,13 @@ public final class UInt256 implements Comparable<UInt256> {
 
     /// Reads `length` big-endian bytes at `offset`.
     public static UInt256 fromBytes(byte[] data, int offset, int length) {
-        int[] l = new int[8];
-        for (int iter = 0; iter < length; iter++) {
-            int b = data[offset + length - 1 - iter] & 0xff;
-            if (iter >= 32) {
-                if (b != 0) {
-                    throw new ArithmeticException("more than 256 bits");
-                }
-                continue;
-            }
-            l[iter >> 2] |= b << ((iter & 3) * 8);
+        byte[] mag = new byte[length];
+        System.arraycopy(data, offset, mag, 0, length);
+        BigInteger v = new BigInteger(1, mag);
+        if (v.bitLength() > 256) {
+            throw new ArithmeticException("more than 256 bits");
         }
-        return new UInt256(l);
+        return new UInt256(v);
     }
 
     /// Parses decimal digits, or hexadecimal after `0x`.
@@ -104,17 +111,17 @@ public final class UInt256 implements Comparable<UInt256> {
         if (digits.length() == 0) {
             throw new NumberFormatException("empty number");
         }
-        int[] l = new int[8];
+        // BigInteger accepts a sign; an amount must not have one.
         for (int iter = 0; iter < digits.length(); iter++) {
-            int d = Character.digit(digits.charAt(iter), radix);
-            if (d < 0) {
+            if (Character.digit(digits.charAt(iter), radix) < 0) {
                 throw new NumberFormatException("bad digit in " + digits);
             }
-            if (mulSmallAdd(l, radix, d) != 0) {
-                throw new NumberFormatException("more than 256 bits: " + digits);
-            }
         }
-        return new UInt256(l);
+        BigInteger v = new BigInteger(digits, radix);
+        if (v.bitLength() > 256) {
+            throw new NumberFormatException("more than 256 bits: " + digits);
+        }
+        return new UInt256(v);
     }
 
     /// Parses a decimal amount into base units: `parseUnits("1.5", 18)` is 1.5 ether in wei.
@@ -170,17 +177,7 @@ public final class UInt256 implements Comparable<UInt256> {
     ///
     /// - `ArithmeticException`: when the sum exceeds [#MAX]
     public UInt256 add(UInt256 other) {
-        int[] out = new int[8];
-        long carry = 0;
-        for (int iter = 0; iter < 8; iter++) {
-            carry += (limbs[iter] & 0xffffffffL) + (other.limbs[iter] & 0xffffffffL);
-            out[iter] = (int) carry;
-            carry >>>= 32;
-        }
-        if (carry != 0) {
-            throw new ArithmeticException("256-bit overflow");
-        }
-        return new UInt256(out);
+        return checked(value.add(other.value));
     }
 
     /// `this - other`.
@@ -189,11 +186,7 @@ public final class UInt256 implements Comparable<UInt256> {
     ///
     /// - `ArithmeticException`: when `other` is larger
     public UInt256 subtract(UInt256 other) {
-        int[] out = new int[8];
-        if (sub(limbs, other.limbs, out) != 0) {
-            throw new ArithmeticException("negative result");
-        }
-        return new UInt256(out);
+        return checked(value.subtract(other.value));
     }
 
     /// `this * other`.
@@ -202,29 +195,7 @@ public final class UInt256 implements Comparable<UInt256> {
     ///
     /// - `ArithmeticException`: when the product exceeds [#MAX]
     public UInt256 multiply(UInt256 other) {
-        long[] wide = new long[16];
-        for (int i = 0; i < 8; i++) {
-            long a = limbs[i] & 0xffffffffL;
-            if (a == 0) {
-                continue;
-            }
-            long carry = 0;
-            for (int j = 0; j < 8; j++) {
-                long t = a * (other.limbs[j] & 0xffffffffL) + (wide[i + j] & 0xffffffffL) + carry;
-                wide[i + j] = t & 0xffffffffL;
-                carry = t >>> 32;
-            }
-            wide[i + 8] = carry;
-        }
-        int[] out = new int[8];
-        for (int iter = 0; iter < 16; iter++) {
-            if (iter < 8) {
-                out[iter] = (int) wide[iter];
-            } else if (wide[iter] != 0) {
-                throw new ArithmeticException("256-bit overflow");
-            }
-        }
-        return new UInt256(out);
+        return checked(value.multiply(other.value));
     }
 
     /// `this * factor` for a small non-negative factor.
@@ -241,25 +212,8 @@ public final class UInt256 implements Comparable<UInt256> {
         if (divisor.isZero()) {
             throw new ArithmeticException("division by zero");
         }
-        int[] q = new int[8];
-        int[] r = new int[8];
-        int[] tmp = new int[8];
-        for (int bit = bitLength() - 1; bit >= 0; bit--) {
-            // r = r << 1 | bit
-            int carry = (limbs[bit >> 5] >>> (bit & 31)) & 1;
-            for (int iter = 0; iter < 8; iter++) {
-                int next = r[iter] >>> 31;
-                r[iter] = (r[iter] << 1) | carry;
-                carry = next;
-            }
-            boolean ge = carry != 0 || compare(r, divisor.limbs) >= 0;
-            if (ge) {
-                sub(r, divisor.limbs, tmp);
-                System.arraycopy(tmp, 0, r, 0, 8);
-                q[bit >> 5] |= 1 << (bit & 31);
-            }
-        }
-        return new UInt256[] {new UInt256(q), new UInt256(r)};
+        BigInteger[] qr = value.divideAndRemainder(divisor.value);
+        return new UInt256[] {new UInt256(qr[0]), new UInt256(qr[1])};
     }
 
     /// `this / divisor`, rounded down.
@@ -274,74 +228,51 @@ public final class UInt256 implements Comparable<UInt256> {
 
     /// `this << bits`, refusing to drop set bits.
     public UInt256 shiftLeft(int bits) {
-        if (bits < 0 || bits > 256 || (bits > 0 && bitLength() + bits > 256)) {
-            if (isZero()) {
-                return this;
-            }
+        if (isZero()) {
+            return this;
+        }
+        if (bits < 0 || bits > 256) {
             throw new ArithmeticException("256-bit overflow");
         }
-        int[] out = new int[8];
-        for (int bit = 0; bit < 256 - bits; bit++) {
-            if (testBit(bit)) {
-                out[(bit + bits) >> 5] |= 1 << ((bit + bits) & 31);
-            }
-        }
-        return new UInt256(out);
+        return checked(value.shiftLeft(bits));
     }
 
     /// `this >>> bits`.
     public UInt256 shiftRight(int bits) {
-        int[] out = new int[8];
-        for (int bit = bits; bit < 256; bit++) {
-            if (testBit(bit)) {
-                out[(bit - bits) >> 5] |= 1 << ((bit - bits) & 31);
-            }
+        if (bits < 0) {
+            throw new IllegalArgumentException("negative shift");
         }
-        return new UInt256(out);
+        return bits >= 256 ? ZERO : new UInt256(value.shiftRight(bits));
     }
 
     /// `10^exponent`, for unit conversions.
+    ///
+    /// #### Throws
+    ///
+    /// - `ArithmeticException`: when the power exceeds [#MAX]
     public static UInt256 tenPow(int exponent) {
-        UInt256 out = ONE;
-        UInt256 ten = valueOf(10);
-        for (int iter = 0; iter < exponent; iter++) {
-            out = out.multiply(ten);
+        if (exponent < 0) {
+            return ONE;
         }
-        return out;
+        if (exponent > 78) {
+            throw new ArithmeticException("256-bit overflow");
+        }
+        return checked(BigInteger.valueOf(10).pow(exponent));
     }
 
     /// Tells whether bit `n` (0 is the lowest) is set.
     public boolean testBit(int n) {
-        if (n < 0 || n >= 256) {
-            return false;
-        }
-        return ((limbs[n >> 5] >>> (n & 31)) & 1) != 0;
+        return n >= 0 && n < 256 && value.testBit(n);
     }
 
     /// The number of significant bits; 0 for zero.
     public int bitLength() {
-        for (int iter = 7; iter >= 0; iter--) {
-            if (limbs[iter] != 0) {
-                int v = limbs[iter];
-                int n = 32;
-                while (v >= 0) {
-                    v <<= 1;
-                    n--;
-                }
-                return iter * 32 + n;
-            }
-        }
-        return 0;
+        return value.bitLength();
     }
 
     /// Tells whether this is zero.
     public boolean isZero() {
-        for (int iter = 0; iter < 8; iter++) {
-            if (limbs[iter] != 0) {
-                return false;
-            }
-        }
-        return true;
+        return value.signum() == 0;
     }
 
     /// The value as a long.
@@ -353,27 +284,27 @@ public final class UInt256 implements Comparable<UInt256> {
         if (bitLength() > 63) {
             throw new ArithmeticException("does not fit in a long");
         }
-        return (limbs[0] & 0xffffffffL) | ((long) limbs[1] << 32);
+        return value.longValue();
     }
 
     /// The 32 big-endian bytes.
     public byte[] toBytes32() {
+        byte[] min = toMinimalBytes();
         byte[] out = new byte[32];
-        for (int iter = 0; iter < 32; iter++) {
-            out[31 - iter] = (byte) ((limbs[iter >> 2] >> ((iter & 3) * 8)) & 0xff);
-        }
+        System.arraycopy(min, 0, out, 32 - min.length, min.length);
         return out;
     }
 
     /// The minimal big-endian bytes, empty for zero: the RLP and JSON-RPC quantity form.
     public byte[] toMinimalBytes() {
-        byte[] full = toBytes32();
+        // Two's complement: a value with its top bit set gains a leading zero byte.
+        byte[] twos = value.toByteArray();
         int start = 0;
-        while (start < 32 && full[start] == 0) {
+        while (start < twos.length && twos[start] == 0) {
             start++;
         }
-        byte[] out = new byte[32 - start];
-        System.arraycopy(full, start, out, 0, out.length);
+        byte[] out = new byte[twos.length - start];
+        System.arraycopy(twos, start, out, 0, out.length);
         return out;
     }
 
@@ -395,91 +326,21 @@ public final class UInt256 implements Comparable<UInt256> {
     /// The decimal digits.
     @Override
     public String toString() {
-        if (isZero()) {
-            return "0";
-        }
-        int[] l = new int[8];
-        System.arraycopy(limbs, 0, l, 0, 8);
-        StringBuilder rev = new StringBuilder();
-        while (!allZero(l)) {
-            long rem = 0;
-            for (int iter = 7; iter >= 0; iter--) {
-                long cur = (rem << 32) | (l[iter] & 0xffffffffL);
-                l[iter] = (int) (cur / 1000000000L);
-                rem = cur % 1000000000L;
-            }
-            String chunk = String.valueOf(rem);
-            boolean last = allZero(l);
-            for (int iter = chunk.length() - 1; iter >= 0; iter--) {
-                rev.append(chunk.charAt(iter));
-            }
-            if (!last) {
-                for (int iter = chunk.length(); iter < 9; iter++) {
-                    rev.append('0');
-                }
-            }
-        }
-        return rev.reverse().toString();
+        return value.toString();
     }
 
     @Override
     public int compareTo(UInt256 other) {
-        return compare(limbs, other.limbs);
+        return value.compareTo(other.value);
     }
 
     @Override
     public boolean equals(Object o) {
-        return o instanceof UInt256 && compare(limbs, ((UInt256) o).limbs) == 0;
+        return o instanceof UInt256 && value.equals(((UInt256) o).value);
     }
 
     @Override
     public int hashCode() {
-        int h = 0;
-        for (int iter = 0; iter < 8; iter++) {
-            h = h * 31 + limbs[iter];
-        }
-        return h;
-    }
-
-    private static boolean allZero(int[] l) {
-        for (int limb : l) {
-            if (limb != 0) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private static int compare(int[] a, int[] b) {
-        for (int iter = 7; iter >= 0; iter--) {
-            long x = a[iter] & 0xffffffffL;
-            long y = b[iter] & 0xffffffffL;
-            if (x != y) {
-                return x < y ? -1 : 1;
-            }
-        }
-        return 0;
-    }
-
-    /// out = a - b, answering the borrow.
-    private static int sub(int[] a, int[] b, int[] out) {
-        long borrow = 0;
-        for (int iter = 0; iter < 8; iter++) {
-            long t = (a[iter] & 0xffffffffL) - (b[iter] & 0xffffffffL) - borrow;
-            out[iter] = (int) t;
-            borrow = t < 0 ? 1 : 0;
-        }
-        return (int) borrow;
-    }
-
-    /// l = l * m + add in place, answering the carry out of the top limb.
-    private static long mulSmallAdd(int[] l, int m, int add) {
-        long carry = add;
-        for (int iter = 0; iter < 8; iter++) {
-            long t = (l[iter] & 0xffffffffL) * m + carry;
-            l[iter] = (int) t;
-            carry = t >>> 32;
-        }
-        return carry;
+        return value.hashCode();
     }
 }

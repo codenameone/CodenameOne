@@ -23,6 +23,7 @@ package com.codename1.util;
 /// - <http://today.java.net/pub/a/today/2007/11/06/creating-java-me-math-pow-method.html>: for other approximations.
 /// - <http://martin.ankerl.com/2007/10/04/optimized-pow-approximation-for-java-and-c-c/>: for fast but rough approximations.
 /// - <http://martin.ankerl.com/2007/02/11/optimized-exponential-functions-for-java/>: for more fast but rough approximations.
+@com.codename1.impl.SharedWithBackend
 public abstract class MathUtil {
 
     /* Common constants. */

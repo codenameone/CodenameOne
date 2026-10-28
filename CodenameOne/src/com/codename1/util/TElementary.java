@@ -28,6 +28,7 @@ package com.codename1.util;
 ///
 /// In addition to this, some ***Inplace*** (mutable) methods are
 /// provided.
+@com.codename1.impl.SharedWithBackend
 final class TElementary {
 
     /// Just to denote that this class can't be instantiated
