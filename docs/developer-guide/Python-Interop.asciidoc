@@ -321,15 +321,17 @@ dependencies, `response_model` and OpenAPI generation are supported, and
 Flask sessions (signed cookies), `flash`, Jinja templates (`extends`, `block`,
 `include`, loops, conditions and the common filters, with autoescaping),
 multipart file uploads and streamed responses work as well. A streamed
-response is sent once its generator finishes. Jinja macros aren't supported yet, and a session cookie
+response is sent chunk by chunk as its generator yields. Jinja macros aren't supported yet, and a session cookie
 written by CPython's Flask isn't readable here, or the reverse.
 
 FastAPI middleware works as in Starlette: `@app.middleware("http")`,
 `BaseHTTPMiddleware` subclasses, `CORSMiddleware`, `GZipMiddleware` and
 `TrustedHostMiddleware`. WebSocket endpoints are supported, including
-`TestClient.websocket_connect`. A WebSocket endpoint can't yet wait on
-something that suspends, such as `asyncio.sleep`, while its socket is open,
-and middleware doesn't apply to WebSocket connections.
+`TestClient.websocket_connect`. A WebSocket endpoint runs on a real asyncio
+event loop, so it can await `asyncio.sleep`, tasks and queues while its socket
+is open, and pure ASGI middleware sees WebSocket connections as it does in
+Starlette. Denying a connection answers with the status the endpoint or
+middleware chose, such as 403.
 
 === Compared with CPython, PyPy and GraalPy
 
