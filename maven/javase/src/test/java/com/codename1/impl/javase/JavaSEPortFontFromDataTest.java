@@ -74,6 +74,16 @@ public class JavaSEPortFontFromDataTest {
         assertNull(port.loadTrueTypeFontFromData("Junk", new byte[]{1, 2, 3, 4, 5, 6, 7, 8}));
     }
 
+    @Test
+    void aValidHeaderOverCorruptTablesLoadsNothing() throws IOException {
+        byte[] header = new byte[]{0, 1, 0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 7, 7, 7, 7, 7, 7, 7, 7};
+        assertNull(port.loadTrueTypeFontFromData("Corrupt", header));
+        byte[] roboto = readResource("/com/codename1/impl/javase/Roboto-Regular.ttf");
+        byte[] truncated = new byte[64];
+        System.arraycopy(roboto, 0, truncated, 0, truncated.length);
+        assertNull(port.loadTrueTypeFontFromData("Truncated", truncated));
+    }
+
     private static byte[] readResource(String path) throws IOException {
         InputStream in = JavaSEPortFontFromDataTest.class.getResourceAsStream(path);
         assertNotNull(in, path);

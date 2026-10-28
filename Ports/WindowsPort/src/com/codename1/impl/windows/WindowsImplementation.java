@@ -2098,9 +2098,9 @@ public class WindowsImplementation extends CodenameOneImplementation {
 
     @Override
     public Object loadTrueTypeFontFromData(String fontName, byte[] data) {
-        // The in-memory loader answers a system family for bytes it cannot
-        // register, while the contract for data that is not a font is null,
-        // so anything without an SFNT header is rejected before it.
+        // The contract for data that is not a font is null. Bytes without an
+        // SFNT header are rejected here; bytes with one that the native loader
+        // still cannot parse or register make it answer 0, which is null too.
         if (!isSfntHeader(data)) {
             return null;
         }

@@ -146,6 +146,20 @@ class FontTest extends UITestBase {
     }
 
     @EdtTest
+    void testSameNameWithDifferentBytesIsADifferentFont() {
+        int loads = implementation.getTrueTypeDataLoads();
+        Font first = Font.createTrueTypeFontFromData("SharedName", new byte[]{1, 2, 3});
+        Font other = Font.createTrueTypeFontFromData("SharedName", new byte[]{1, 2, 4});
+        Font longer = Font.createTrueTypeFontFromData("SharedName", new byte[]{1, 2, 3, 0});
+        assertNotNull(first);
+        assertNotNull(other);
+        assertNotSame(first, other);
+        assertNotSame(first, longer);
+        assertSame(first, Font.createTrueTypeFontFromData("SharedName", new byte[]{1, 2, 3}));
+        assertEquals(loads + 3, implementation.getTrueTypeDataLoads());
+    }
+
+    @EdtTest
     void testCreateTrueTypeFontFromDataReturnsNullWhenUnsupportedOrInvalid() {
         assertNull(Font.createTrueTypeFontFromData("Empty", new byte[0]));
         implementation.setTrueTypeStreamSupported(false);

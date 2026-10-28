@@ -14635,11 +14635,45 @@ void com_codename1_impl_ios_IOSNative_registerBundledFont___java_lang_String(CN1
     POOL_END();
 }
 
+/// True when Core Text already has a font registered under `psName` and it is the same
+/// font as `candidate`, judged by the `head` table (which carries the whole-file checksum
+/// adjustment and the modification date). Core Text answers a name it does not know with a
+/// fallback font, so the registered font's own PostScript name is checked as well.
+static BOOL cn1RegisteredFontMatches(CFStringRef psName, CGFontRef candidate) {
+    BOOL same = NO;
+    CTFontRef existing = CTFontCreateWithName(psName, 12, NULL);
+    if (existing == NULL) {
+        return NO;
+    }
+    CFStringRef existingName = CTFontCopyPostScriptName(existing);
+    if (existingName != NULL && CFStringCompare(existingName, psName, 0) == kCFCompareEqualTo) {
+        CGFontRef existingGraphics = CTFontCopyGraphicsFont(existing, NULL);
+        if (existingGraphics != NULL) {
+            CFDataRef a = CGFontCopyTableForTag(existingGraphics, 'head');
+            CFDataRef b = CGFontCopyTableForTag(candidate, 'head');
+            same = a != NULL && b != NULL && CFEqual(a, b);
+            if (a != NULL) {
+                CFRelease(a);
+            }
+            if (b != NULL) {
+                CFRelease(b);
+            }
+            CGFontRelease(existingGraphics);
+        }
+    }
+    if (existingName != NULL) {
+        CFRelease(existingName);
+    }
+    CFRelease(existing);
+    return same;
+}
+
 /// Registers a font held in memory (Font.createTrueTypeFontFromData) with
 /// Core Text and answers its PostScript name, which createTruetypeFont then looks
 /// up exactly as it does for a bundled font. Answers null when the bytes are not a
-/// font. A font registered twice reports an error that is discarded: the name is
-/// what the caller needs and it is valid either way.
+/// font or registration fails. A font already registered under the same PostScript
+/// name is accepted only when it is the same font; a different font holding that
+/// name would otherwise be what the name lookup returns.
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_registerFontData___byte_1ARRAY_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT data) {
     if (data == JAVA_NULL) {
         return JAVA_NULL;
@@ -14652,14 +14686,20 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_registerFontData___byte_1ARRAY_R_ja
     CGDataProviderRef provider = cfData == NULL ? NULL : CGDataProviderCreateWithCFData(cfData);
     CGFontRef cgFont = provider == NULL ? NULL : CGFontCreateWithDataProvider(provider);
     if (cgFont != NULL) {
-        CFErrorRef error = NULL;
-        CTFontManagerRegisterGraphicsFont(cgFont, &error);
-        if (error != NULL) {
-            CFRelease(error);
-        }
         CFStringRef psName = CGFontCopyPostScriptName(cgFont);
         if (psName != NULL) {
-            result = fromNSString(CN1_THREAD_STATE_PASS_ARG (BRIDGE_CAST NSString *)psName);
+            CFErrorRef error = NULL;
+            BOOL usable = CTFontManagerRegisterGraphicsFont(cgFont, &error) ? YES : NO;
+            if (!usable && error != NULL
+                    && CFErrorGetCode(error) == kCTFontManagerErrorAlreadyRegistered) {
+                usable = cn1RegisteredFontMatches(psName, cgFont);
+            }
+            if (error != NULL) {
+                CFRelease(error);
+            }
+            if (usable) {
+                result = fromNSString(CN1_THREAD_STATE_PASS_ARG (BRIDGE_CAST NSString *)psName);
+            }
             CFRelease(psName);
         }
         CGFontRelease(cgFont);

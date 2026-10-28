@@ -11401,15 +11401,27 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // FontFace rejects bytes that are not a font asynchronously, after this
         // has already answered; the contract is null, so check the SFNT tag
         // (0x00010000, 'true', 'OTTO', 'ttcf') up front as the other ports do.
+        //
+        // Because the browser loads the face asynchronously, a font whose header
+        // is valid but whose tables are corrupt is not detected here: it answers a
+        // font, and the browser draws its text in the fallback family.
         if (!isSfntHeader(data)) {
             return null;
         }
-        if (!loadedFonts.contains(fontName)) {
-            loadTrueTypeFont_(fontName,
-                    "data:font/ttf;base64," + com.codename1.util.Base64.encodeNoNewline(data), "truetype");
-            loadedFonts.add(fontName);
+        // The browser family is keyed by content as well as name, so the same name
+        // given different bytes registers a second face instead of drawing with
+        // the first one loaded under that name.
+        int h = 1;
+        for (byte b : data) {
+            h = 31 * h + b;
         }
-        return createFallbackTrueTypeFont(fontName, null);
+        String family = fontName + "_" + data.length + "_" + Integer.toHexString(h);
+        if (!loadedFonts.contains(family)) {
+            loadTrueTypeFont_(family,
+                    "data:font/ttf;base64," + com.codename1.util.Base64.encodeNoNewline(data), "truetype");
+            loadedFonts.add(family);
+        }
+        return createFallbackTrueTypeFont(family, null);
     }
 
     private static boolean isSfntHeader(byte[] data) {

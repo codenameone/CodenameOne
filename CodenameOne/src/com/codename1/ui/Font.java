@@ -470,6 +470,14 @@ public class Font extends CN {
     /// #### Returns
     ///
     /// the font, or null when the platform can't create fonts from data
+    ///
+    /// Fonts are cached by name and content together: calling this again with the same name and
+    /// the same bytes answers the font made the first time, while the same name with different
+    /// bytes makes a new font.
+    ///
+    /// On the JavaScript port the browser loads the font asynchronously, so the bytes are only
+    /// checked for a font header here; a font that has a valid header but is corrupt is not
+    /// reported as null and renders in the browser's fallback font.
     public static Font createTrueTypeFontFromData(String fontName, byte[] data) {
         if (fontName == null || data == null) {
             throw new IllegalArgumentException("Font name and data are required");
@@ -479,7 +487,9 @@ public class Font extends CN {
         }
         // A prefix keeps a font made from data apart from a file-based font that
         // happens to use the same name, in both this cache and the derive cache.
-        String id = "data:" + fontName;
+        // The length and a hash of the bytes are part of the key, so the same name given
+        // different bytes is a different font rather than the one cached first.
+        String id = "data:" + fontName + ":" + data.length + ":" + Integer.toHexString(hashBytes(data));
         Font f = derivedFontCache.get(id);
         if (f != null) {
             return f;
@@ -493,6 +503,15 @@ public class Font extends CN {
         f.fontUniqueId = id;
         derivedFontCache.put(id, f);
         return f;
+    }
+
+    /// A cheap hash of a font's bytes for the data-font cache key.
+    private static int hashBytes(byte[] data) {
+        int h = 1;
+        for (byte b : data) {
+            h = 31 * h + b;
+        }
+        return h;
     }
 
     /// Creates a new font instance based on the platform specific string name of the

@@ -81,6 +81,18 @@ public abstract class AbstractDBCursor implements Cursor, CursorExt, Row, RowExt
     /// per-read path.
     private int knownColumnCount = -1;
 
+    /// Counts the rows stepped onto, so a cached column type can tell which row it belongs to.
+    private int rowStamp;
+
+    /// The storage class of each column of the current row, as `columnType` reported it before
+    /// any getter read the value; valid where the matching `typeStamps` entry is `rowStamp`.
+    /// SQLite's `sqlite3_column_type` is undefined once a getter has converted the value (reading
+    /// an INTEGER as text), so the type is taken before the first read and answered from here.
+    private int[] cachedTypes;
+
+    /// The `rowStamp` each entry of `cachedTypes` was taken on.
+    private int[] typeStamps;
+
     /// Repositions the underlying statement before its first row.
     ///
     /// #### Throws
@@ -234,7 +246,7 @@ public abstract class AbstractDBCursor implements Cursor, CursorExt, Row, RowExt
             // position beyond the row count. Only an explicit rewind clears this.
             return false;
         }
-        if (stepForward()) {
+        if (advance()) {
             position++;
             onRow = true;
             return true;
@@ -308,7 +320,7 @@ public abstract class AbstractDBCursor implements Cursor, CursorExt, Row, RowExt
             rewindInternal();
         }
         while (position < row) {
-            if (!stepForward()) {
+            if (!advance()) {
                 markExhausted();
                 return false;
             }
@@ -351,7 +363,7 @@ public abstract class AbstractDBCursor implements Cursor, CursorExt, Row, RowExt
 
         rewindInternal();
         int total = 0;
-        while (stepForward()) {
+        while (advance()) {
             total++;
         }
         knownCount = total;
@@ -444,6 +456,28 @@ public abstract class AbstractDBCursor implements Cursor, CursorExt, Row, RowExt
         return false;
     }
 
+    /// Steps the engine forward and starts a new row for the column-type cache.
+    private boolean advance() throws IOException {
+        rowStamp++;
+        return stepForward();
+    }
+
+    /// The storage class of a column on the current row, taken from the engine the first time the
+    /// row is asked and answered from the cache afterwards, so a getter that converted the value
+    /// in between cannot change the answer.
+    private int cachedColumnType(int index) throws IOException {
+        if (cachedTypes == null || cachedTypes.length <= index) {
+            int size = Math.max(index + 1, knownColumnCount);
+            cachedTypes = new int[size];
+            typeStamps = new int[size];
+        }
+        if (typeStamps[index] != rowStamp) {
+            cachedTypes[index] = columnType(index);
+            typeStamps[index] = rowStamp;
+        }
+        return cachedTypes[index];
+    }
+
     /// Returns the storage class of a value as one of the `Database.COLUMN_*` constants, or
     /// `Database.COLUMN_UNKNOWN` (the default) where the engine cannot say. Only called on an
     /// open cursor positioned on a row, with a valid index.
@@ -458,7 +492,7 @@ public abstract class AbstractDBCursor implements Cursor, CursorExt, Row, RowExt
             throw new IOException("The cursor is not on a row");
         }
         checkColumn(index);
-        return columnType(index);
+        return cachedColumnType(index);
     }
 
     /// Guards a value read and updates the null latch.
@@ -469,6 +503,9 @@ public abstract class AbstractDBCursor implements Cursor, CursorExt, Row, RowExt
         }
         checkColumn(index);
         anythingRead = true;
+        // Taken before the value is read: the read may convert it, after which the engine cannot
+        // say what it was.
+        cachedColumnType(index);
         lastReadWasNull = isNullAt(index);
     }
 
