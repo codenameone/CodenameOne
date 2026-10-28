@@ -634,7 +634,8 @@ public class AppBuilder {
      * property. This is where a profile-kind/distribution-method mismatch is decided, since
      * a library can still change the method after the early pass has run.
      */
-    private void applyIOSProvisioningPreflight(Properties mergedSettings) throws BuildFailureException {
+    private void applyIOSProvisioningPreflight(Properties mergedSettings, File stagedJar)
+            throws BuildFailureException {
         if (!isIOSDeviceBuild()) {
             return;
         }
@@ -647,7 +648,10 @@ public class AppBuilder {
         // the ios module under Maven, src/ios under Gradle, native/ios under Ant.
         report(IOSProvisioningPreflight.checkAppExtensions(mergedSettings, release,
                 host.layout().iosAppExtensionsDir().getParentFile()));
-        report(IOSProvisioningPreflight.checkGeneratedExtensions(mergedSettings, release));
+        // CN1Widgets is generated whenever a class names com.codename1.surfaces, so the staged
+        // classes decide it, the same scan the builder makes.
+        report(IOSProvisioningPreflight.checkGeneratedExtensions(mergedSettings, release,
+                IOSProvisioningPreflight.referencesSurfaces(stagedJar)));
         report(IOSProvisioningPreflight.checkContinuitySync(mergedSettings, release));
     }
 
@@ -2016,7 +2020,7 @@ public class AppBuilder {
         // Same reason, for the same reason: a CN1Lib can supply ios.*.distributionMethod, so the
         // profile's kind is compared against the export method only now that those properties
         // have been merged -- an early refusal would reject a build the merge was about to fix.
-        applyIOSProvisioningPreflight(cn1SettingsProps);
+        applyIOSProvisioningPreflight(cn1SettingsProps, jarWithDependencies);
 
         // Validate the exact settings and classes sent to every cloud/local target before
         // invoking the build client. A renamed entry point must not cost a cloud build.

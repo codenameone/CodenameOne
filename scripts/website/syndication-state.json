@@ -3011,6 +3011,44 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-10-26T01:01:08+00:00"
+      },
+      "devto": {
+        "id": 4923811,
+        "url": "https://dev.to/codenameone/build-your-app-theme-without-a-display-server-35c3",
+        "syndicated_at": "2026-10-26T19:15:24+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/@Codename_One/build-your-app-theme-without-a-display-server-482b8fa04e1b?postPublishedType=initial",
+        "syndicated_at": "2026-10-26T20:02:00+00:00"
+      }
+    },
+    "desktop-tools-title-bars-processes-zip": {
+      "hashnode": {
+        "url": "https://debugagent.com/give-your-desktop-app-a-useful-title-bar-and-real-tools",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6adff79d492df5eac02ede42",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-10-27T01:01:07+00:00"
+      },
+      "devto": {
+        "id": 4930304,
+        "url": "https://dev.to/codenameone/give-your-desktop-app-a-useful-title-bar-and-real-tools-199h",
+        "syndicated_at": "2026-10-27T19:01:49+00:00"
+      }
+    },
+    "install-your-java-web-app-again": {
+      "hashnode": {
+        "url": "https://debugagent.com/let-users-install-your-java-web-app-again",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6ae18d866465ae00ed16f3bc",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-10-28T05:53:00+00:00"
       }
     }
   }

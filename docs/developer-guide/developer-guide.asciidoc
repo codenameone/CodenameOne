@@ -162,6 +162,10 @@ include::Parley-Users-Guide.asciidoc[]
 
 include::Parley-Implementors-Guide.asciidoc[]
 
+include::Reel-Users-Guide.asciidoc[]
+
+include::Reel-Implementors-Guide.asciidoc[]
+
 include::Bastion-Users-Guide.asciidoc[]
 
 include::Bastion-Implementors-Guide.asciidoc[]
@@ -289,6 +293,8 @@ include::Working-with-Mac-Catalyst.asciidoc[]
 include::Working-With-Windows.asciidoc[]
 
 include::Working-With-Linux.asciidoc[]
+
+include::Embedded-Linux.asciidoc[]
 
 include::Desktop-Integration.asciidoc[]
 

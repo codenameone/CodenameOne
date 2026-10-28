@@ -2033,6 +2033,24 @@ static inline void cn1NativeOwnerFence(JAVA_OBJECT* owner) {
 #define CN1_BIBOP_NUM_CLASSES 32
 #endif
 
+// The current pages an ALLOCATION goes to. A virtual thread allocates into its
+// carrier's pages, as HotSpot's virtual threads use the carrier's TLAB: only one
+// virtual thread runs on a carrier at a time, so the carrier's array still has one
+// writer, and that writer is on the carrier's pthread. With a page set per virtual
+// thread instead, every connection held a part-filled 64KB page in each size class
+// it had touched, and no sweep reclaims an owned page: measured on a JSON route, the
+// heap grew 263KB per connection -- 147MB resident at 512 connections, against 2 for
+// the two carriers that are actually running.
+//
+// The collector never reads through this. It walks each thread's OWN bibopCurrent,
+// and a virtual thread's own array stays empty for its whole life, so every current
+// page is seen exactly once, in its carrier's array.
+#ifdef CN1_VIRTUAL_THREADS
+#define CN1_BIBOP_CUR(t) ((t)->bibopCur)
+#else
+#define CN1_BIBOP_CUR(t) ((t)->bibopCurrent)
+#endif
+
 // handles the stack used for print stack trace and GC
 struct ThreadLocalData {
     JAVA_LONG threadId;
@@ -2085,6 +2103,11 @@ struct ThreadLocalData {
     /* Per-size-class current BiBOP page. See the note at the fast path: this was
      * `__thread`, which costs an indirect call per allocation on Darwin. */
     struct CN1BibopPage* bibopCurrent[CN1_BIBOP_NUM_CLASSES];
+#ifdef CN1_VIRTUAL_THREADS
+    /* The pages this thread ALLOCATES into: its own bibopCurrent, except on a virtual
+     * thread, where it is the carrier's, set at every resume. See CN1_BIBOP_CUR. */
+    struct CN1BibopPage** bibopCur;
+#endif
 
 #ifdef CN1_GC_VERIFY
     // The thread's whole C stack, [low, high), recorded beside the limit above and
@@ -2266,6 +2289,8 @@ struct ThreadLocalData {
 #include <unistd.h>
 #include <sched.h>
 #endif
+// Cores this process may run on: affinity mask and cgroup quota, not the machine.
+int cn1UsableCpuCount(void);
 static inline void cn1CpuRelax(void) {
 #if defined(__aarch64__) || defined(__arm__)
     __asm__ __volatile__("yield" ::: "memory");
@@ -3033,7 +3058,7 @@ static inline __attribute__((always_inline)) JAVA_OBJECT cn1BibopFastAlloc(CODEN
     // (cn1ClassReady) before it published `initialized`. Every OTHER allocation path
     // still registers on its own (cn1BibopAlloc, cn1BibopAllocRecycled, the NoZero
     // entry the String twins use).
-    CN1BibopPage* p = threadStateData->bibopCurrent[ci];
+    CN1BibopPage* p = CN1_BIBOP_CUR(threadStateData)[ci];
     if(__builtin_expect(p != (CN1BibopPage*)0
 #ifndef CN1_CONSERVATIVE_GC_ROOTS
                         && !threadStateData->nativeAllocationMode
@@ -3113,7 +3138,7 @@ static inline __attribute__((always_inline)) JAVA_OBJECT cn1BibopFastAllocNoZero
     if(!registered) {
         CN1_CLAZZ_REGISTER(parent); // see cn1BibopFastAlloc: every alloc path registers
     }
-    CN1BibopPage* p = threadStateData->bibopCurrent[ci];
+    CN1BibopPage* p = CN1_BIBOP_CUR(threadStateData)[ci];
     if(__builtin_expect(p != (CN1BibopPage*)0
 #ifndef CN1_CONSERVATIVE_GC_ROOTS
                         && !threadStateData->nativeAllocationMode
@@ -4817,6 +4842,13 @@ extern struct cn1VirtualThread* cn1SpawnVirtualThread(void (*body)(void*), void*
  * own body; it frees the stack that body is running on.
  */
 extern void cn1RetireVirtualThread(struct cn1VirtualThread* vt);
+/**
+ * Resumes a virtual thread spawned by cn1SpawnVirtualThread on the calling thread,
+ * which becomes its carrier: the virtual thread allocates into the carrier's current
+ * pages until it parks (see CN1_BIBOP_CUR). Use this rather than
+ * cn1VirtualThreadResume for any virtual thread that runs Java.
+ */
+extern void cn1ResumeVirtualThreadOn(CODENAME_ONE_THREAD_STATE, struct cn1VirtualThread* vt);
 
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
 // PHASE 3b production conservative-root API. cn1ConservativeResolve maps an

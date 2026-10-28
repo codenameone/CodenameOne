@@ -23,5 +23,6 @@
 package com.codename1.unitycompat.system;
 
 /// `System.MulticastDelegate`: the base of every delegate type.
+@SuppressWarnings("PMD.AbstractClassWithoutAnyMethod") // abstract in C#, so never instantiated here either
 public abstract class MulticastDelegate extends Delegate {
 }

@@ -2835,6 +2835,65 @@
   // with JavaSEPort.applyLensBuffer(): the Simulator is the browser renderer's
   // pixel reference for the glass-tab animation.
   var LENS_MAG_FLAT = 0.75;
+
+  // Reads RGBA bytes of a canvas region WITHOUT calling getImageData on that
+  // canvas. Chrome counts read-backs per context and, after a couple, moves the
+  // canvas off the GPU for the rest of the page's life ("Multiple readback
+  // operations using getImageData..."). For the full-screen display canvas that
+  // meant every later frame was rasterized in software -- ~80ms a frame on a
+  // low-end Android phone (#6123). Copying the region into a scratch canvas made
+  // for reading keeps the read-back off the source's count. Out-of-bounds pixels
+  // read as transparent, as getImageData's do.
+  var READBACK_SCRATCH_KEEP_PIXELS = 1 << 20;
+  var readbackScratch = null;
+  var readbackScratchCtx = null;
+  function readCanvasPixels(canvas, ctx, x, y, w, h) {
+    if (w <= 0 || h <= 0) {
+      return null;
+    }
+    var doc = global.document || (global.window && global.window.document);
+    if (!canvas || !doc || !doc.createElement) {
+      try {
+        return ctx.getImageData(x, y, w, h).data;
+      } catch (_ed) {
+        return null;
+      }
+    }
+    try {
+      if (!readbackScratch) {
+        readbackScratch = doc.createElement('canvas');
+      }
+      if (readbackScratch.width < w || readbackScratch.height < h) {
+        readbackScratch.width = Math.max(readbackScratch.width, w);
+        readbackScratch.height = Math.max(readbackScratch.height, h);
+        readbackScratchCtx = null;
+      }
+      if (!readbackScratchCtx) {
+        readbackScratchCtx = readbackScratch.getContext('2d', { willReadFrequently: true });
+      }
+      var sc = readbackScratchCtx;
+      sc.setTransform(1, 0, 0, 1, 0, 0);
+      sc.globalAlpha = 1;
+      sc.globalCompositeOperation = 'source-over';
+      sc.clearRect(0, 0, w, h);
+      // The source rect is clipped to the canvas; draw only the part that is
+      // inside it, at its own offset, so the rest stays transparent.
+      var sx = Math.max(0, x), sy = Math.max(0, y);
+      var ex = Math.min(canvas.width, x + w), ey = Math.min(canvas.height, y + h);
+      if (ex > sx && ey > sy) {
+        sc.drawImage(canvas, sx, sy, ex - sx, ey - sy, sx - x, sy - y, ex - sx, ey - sy);
+      }
+      var data = sc.getImageData(0, 0, w, h).data;
+      if (w * h > READBACK_SCRATCH_KEEP_PIXELS) {
+        // One large getRGB must not pin a big CPU-backed canvas for the page's life.
+        readbackScratch = null;
+        readbackScratchCtx = null;
+      }
+      return data;
+    } catch (_er) {
+      return null;
+    }
+  }
   var LENS_TINT_HI = 150;
   var LENS_TINT_LO = 55;
   var LENS_LIFT_COEF = 0.40;
@@ -2917,8 +2976,11 @@
       return;
     }
 
-    var source = ctx.getImageData(rx, ry, rw, rh);
-    var src = source.data;
+    // Read through a scratch canvas: see readCanvasPixels (#6123).
+    var src = readCanvasPixels(ctx.canvas, ctx, rx, ry, rw, rh);
+    if (!src) {
+      return;
+    }
     var result = ctx.createImageData(rw, rh);
     var out = result.data;
     var hw = rw / 2.0, hh = rh / 2.0;
@@ -3250,7 +3312,10 @@
     if (availableWidth <= 0 || availableHeight <= 0) {
       return;
     }
-    var available = ctx.getImageData(ax0, ay0, availableWidth, availableHeight).data;
+    var available = readCanvasPixels(ctx.canvas, ctx, ax0, ay0, availableWidth, availableHeight);
+    if (!available) {
+      return;
+    }
     var padded = new Uint8ClampedArray(bufferWidth * bufferHeight * 4);
     for (var by = 0; by < bufferHeight; by++) {
       var sourceY = ry - pad + by - ay0;
@@ -3440,7 +3505,10 @@
     if (rw <= 0 || rh <= 0) {
       return;
     }
-    var part = ctx.getImageData(rx, ry, rw, rh).data;
+    var part = readCanvasPixels(ctx.canvas, ctx, rx, ry, rw, rh);
+    if (!part) {
+      return;
+    }
     var full = new Uint8ClampedArray(fullW * fullH * 4);
     var row;
     for (row = 0; row < rh; row++) {
@@ -3867,13 +3935,10 @@
       return null;
     }
     var x = r.x | 0, y = r.y | 0, w = r.w | 0, h = r.h | 0;
-    var img;
-    try {
-      img = s.ctx.getImageData(x, y, w, h);
-    } catch (_er) {
+    var data = readCanvasPixels(s.canvas, s.ctx, x, y, w, h);
+    if (!data) {
       return null;
     }
-    var data = img.data;
     var n = w * h;
     var out = new Array(n);
     for (var i = 0; i < n; i++) {
@@ -7617,7 +7682,6 @@
   // TRANSPARENT (an actual punched hole), so we additionally require the canvas
   // pixel under the cursor to be (near-)transparent before yielding to the peer.
   function installPeerPointerToggle() {
-    var alphaCtx = null;
     function canvasAlphaAt(canvas, x, y) {
       // Returns the canvas' painted alpha (0-255) at client point (x,y), or -1 if
       // it cannot be read. Maps CSS coords -> backing-store pixels (devicePixelRatio).
@@ -7627,12 +7691,9 @@
         var px = Math.round((x - rect.left) * (canvas.width / rect.width));
         var py = Math.round((y - rect.top) * (canvas.height / rect.height));
         if (px < 0 || py < 0 || px >= canvas.width || py >= canvas.height) { return -1; }
-        if (!alphaCtx) {
-          alphaCtx = canvas.getContext('2d', { willReadFrequently: true })
-                  || canvas.getContext('2d');
-        }
-        if (!alphaCtx || typeof alphaCtx.getImageData !== 'function') { return -1; }
-        return alphaCtx.getImageData(px, py, 1, 1).data[3];
+        // Never getImageData on the display canvas itself: see readCanvasPixels.
+        var px1 = readCanvasPixels(canvas, null, px, py, 1, 1);
+        return px1 ? px1[3] : -1;
       } catch (e) { return -1; }
     }
     function pointerOverPeer(x, y) {

@@ -92,10 +92,11 @@ class LinuxEventPumpTest(unittest.TestCase):
     def test_input_is_delivered_before_waiting_again(self):
         native = REPO / 'Ports/LinuxPort/nativeSources'
         header = (native / 'cn1_linux.h').read_text()
+        ring = (native / 'cn1_linux_events.c').read_text()
         source = (native / 'cn1_linux_window.c').read_text()
         events = re.search(r'typedef enum\s*\{[^}]+\}\s*CN1EventType;', header).group(0)
-        queue = source[source.index('#define CN1_EVENT_RING'):
-                       source.index('/* ------------------------------------------------------------- globals */')]
+        queue = ring[ring.index('#define CN1_EVENT_RING'):
+                     ring.index('/* ------------------------------------------------------------- globals */')]
         start = source.index('JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_pumpMessages___R_boolean(')
         pump = source[start:source.index('\n}', start) + 3]
         flags = shlex.split(subprocess.check_output(

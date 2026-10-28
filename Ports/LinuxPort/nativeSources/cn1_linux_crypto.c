@@ -51,6 +51,176 @@
 #include <openssl/err.h>
 #include <openssl/pkcs12.h>
 
+#include <dlfcn.h>
+#include <pthread.h>
+
+/*
+ * libcrypto is loaded on the first crypto call, not linked: it is 4 MB that an
+ * application which never encrypts would otherwise map, and read from storage,
+ * on every start (most visibly on the embedded target, whose whole stack is
+ * smaller than that). The functions are reached through pointers named after
+ * them, as cn1_linux_net.c reaches libcurl. Resolving by name against the
+ * OpenSSL 3 ABI also means the binary does not carry the build host's symbol
+ * versions.
+ */
+#if !defined(OPENSSL_VERSION_MAJOR) || OPENSSL_VERSION_MAJOR < 3
+#error "The Linux port's crypto bridge needs the OpenSSL 3 headers"
+#endif
+
+/* The names dlsym finds: where OpenSSL 3 keeps an old name as a macro (OPENSSL_free,
+ * EVP_PKEY_id), the function it expands to is listed, and the old name reaches
+ * the pointer through that expansion. */
+#define CN1_CRYPTO_FUNCTIONS(X) \
+    X(ERR_clear_error) \
+    X(ERR_error_string_n) \
+    X(ERR_get_error) \
+    X(EVP_CIPHER_CTX_ctrl) \
+    X(EVP_CIPHER_CTX_free) \
+    X(EVP_CIPHER_CTX_new) \
+    X(EVP_CIPHER_CTX_set_padding) \
+    X(EVP_CipherFinal_ex) \
+    X(EVP_CipherInit_ex) \
+    X(EVP_CipherUpdate) \
+    X(EVP_DigestSign) \
+    X(EVP_DigestSignInit) \
+    X(EVP_DigestVerify) \
+    X(EVP_DigestVerifyInit) \
+    X(EVP_MD_CTX_free) \
+    X(EVP_MD_CTX_new) \
+    X(EVP_PKCS82PKEY) \
+    X(EVP_PKEY2PKCS8) \
+    X(EVP_PKEY_CTX_free) \
+    X(EVP_PKEY_CTX_new) \
+    X(EVP_PKEY_CTX_new_id) \
+    X(EVP_PKEY_CTX_set_ec_paramgen_curve_nid) \
+    X(EVP_PKEY_CTX_set_rsa_keygen_bits) \
+    X(EVP_PKEY_CTX_set_rsa_mgf1_md) \
+    X(EVP_PKEY_CTX_set_rsa_oaep_md) \
+    X(EVP_PKEY_CTX_set_rsa_padding) \
+    X(EVP_PKEY_get_base_id) \
+    X(EVP_PKEY_decrypt) \
+    X(EVP_PKEY_decrypt_init) \
+    X(EVP_PKEY_derive) \
+    X(EVP_PKEY_derive_init) \
+    X(EVP_PKEY_derive_set_peer) \
+    X(EVP_PKEY_encrypt) \
+    X(EVP_PKEY_encrypt_init) \
+    X(EVP_PKEY_free) \
+    X(EVP_PKEY_get_id) \
+    X(EVP_PKEY_keygen) \
+    X(EVP_PKEY_keygen_init) \
+    X(EVP_aes_128_cbc) \
+    X(EVP_aes_128_ecb) \
+    X(EVP_aes_128_gcm) \
+    X(EVP_aes_192_cbc) \
+    X(EVP_aes_192_ecb) \
+    X(EVP_aes_192_gcm) \
+    X(EVP_aes_256_cbc) \
+    X(EVP_aes_256_ecb) \
+    X(EVP_aes_256_gcm) \
+    X(EVP_sha256) \
+    X(EVP_sha384) \
+    X(EVP_sha512) \
+    X(OPENSSL_cleanse) \
+    X(CRYPTO_free) \
+    X(PKCS8_PRIV_KEY_INFO_free) \
+    X(RAND_bytes) \
+    X(d2i_AutoPrivateKey) \
+    X(d2i_PKCS8_PRIV_KEY_INFO) \
+    X(d2i_PUBKEY) \
+    X(i2d_PKCS8_PRIV_KEY_INFO) \
+    X(i2d_PUBKEY)
+
+#define CN1_CRYPTO_POINTER(name) static __typeof__(name)* p_##name;
+CN1_CRYPTO_FUNCTIONS(CN1_CRYPTO_POINTER)
+#undef CN1_CRYPTO_POINTER
+
+static pthread_once_t cn1CryptoOnce = PTHREAD_ONCE_INIT;
+static int cn1CryptoAvailable;
+
+static void cn1LoadCrypto(void) {
+    void* library = dlopen("libcrypto.so.3", RTLD_NOW | RTLD_LOCAL);
+    if (library == NULL) {
+        fprintf(stderr, "Codename One: unable to load libcrypto.so.3: %s\n", dlerror());
+        return;
+    }
+#define CN1_CRYPTO_RESOLVE(name) \
+    if ((*(void**) (&p_##name) = dlsym(library, #name)) == NULL) { \
+        fprintf(stderr, "Codename One: libcrypto.so.3 is missing %s\n", #name); \
+        dlclose(library); \
+        return; \
+    }
+    CN1_CRYPTO_FUNCTIONS(CN1_CRYPTO_RESOLVE)
+#undef CN1_CRYPTO_RESOLVE
+    cn1CryptoAvailable = 1;
+}
+
+static int cn1CryptoLoaded(void) {
+    pthread_once(&cn1CryptoOnce, cn1LoadCrypto);
+    return cn1CryptoAvailable;
+}
+
+#define ERR_clear_error p_ERR_clear_error
+#define ERR_error_string_n p_ERR_error_string_n
+#define ERR_get_error p_ERR_get_error
+#define EVP_CIPHER_CTX_ctrl p_EVP_CIPHER_CTX_ctrl
+#define EVP_CIPHER_CTX_free p_EVP_CIPHER_CTX_free
+#define EVP_CIPHER_CTX_new p_EVP_CIPHER_CTX_new
+#define EVP_CIPHER_CTX_set_padding p_EVP_CIPHER_CTX_set_padding
+#define EVP_CipherFinal_ex p_EVP_CipherFinal_ex
+#define EVP_CipherInit_ex p_EVP_CipherInit_ex
+#define EVP_CipherUpdate p_EVP_CipherUpdate
+#define EVP_DigestSign p_EVP_DigestSign
+#define EVP_DigestSignInit p_EVP_DigestSignInit
+#define EVP_DigestVerify p_EVP_DigestVerify
+#define EVP_DigestVerifyInit p_EVP_DigestVerifyInit
+#define EVP_MD_CTX_free p_EVP_MD_CTX_free
+#define EVP_MD_CTX_new p_EVP_MD_CTX_new
+#define EVP_PKCS82PKEY p_EVP_PKCS82PKEY
+#define EVP_PKEY2PKCS8 p_EVP_PKEY2PKCS8
+#define EVP_PKEY_CTX_free p_EVP_PKEY_CTX_free
+#define EVP_PKEY_CTX_new p_EVP_PKEY_CTX_new
+#define EVP_PKEY_CTX_new_id p_EVP_PKEY_CTX_new_id
+#define EVP_PKEY_CTX_set_ec_paramgen_curve_nid p_EVP_PKEY_CTX_set_ec_paramgen_curve_nid
+#define EVP_PKEY_CTX_set_rsa_keygen_bits p_EVP_PKEY_CTX_set_rsa_keygen_bits
+#define EVP_PKEY_CTX_set_rsa_mgf1_md p_EVP_PKEY_CTX_set_rsa_mgf1_md
+#define EVP_PKEY_CTX_set_rsa_oaep_md p_EVP_PKEY_CTX_set_rsa_oaep_md
+#define EVP_PKEY_CTX_set_rsa_padding p_EVP_PKEY_CTX_set_rsa_padding
+#define EVP_PKEY_get_base_id p_EVP_PKEY_get_base_id
+#define EVP_PKEY_decrypt p_EVP_PKEY_decrypt
+#define EVP_PKEY_decrypt_init p_EVP_PKEY_decrypt_init
+#define EVP_PKEY_derive p_EVP_PKEY_derive
+#define EVP_PKEY_derive_init p_EVP_PKEY_derive_init
+#define EVP_PKEY_derive_set_peer p_EVP_PKEY_derive_set_peer
+#define EVP_PKEY_encrypt p_EVP_PKEY_encrypt
+#define EVP_PKEY_encrypt_init p_EVP_PKEY_encrypt_init
+#define EVP_PKEY_free p_EVP_PKEY_free
+#define EVP_PKEY_get_id p_EVP_PKEY_get_id
+#define EVP_PKEY_keygen p_EVP_PKEY_keygen
+#define EVP_PKEY_keygen_init p_EVP_PKEY_keygen_init
+#define EVP_aes_128_cbc p_EVP_aes_128_cbc
+#define EVP_aes_128_ecb p_EVP_aes_128_ecb
+#define EVP_aes_128_gcm p_EVP_aes_128_gcm
+#define EVP_aes_192_cbc p_EVP_aes_192_cbc
+#define EVP_aes_192_ecb p_EVP_aes_192_ecb
+#define EVP_aes_192_gcm p_EVP_aes_192_gcm
+#define EVP_aes_256_cbc p_EVP_aes_256_cbc
+#define EVP_aes_256_ecb p_EVP_aes_256_ecb
+#define EVP_aes_256_gcm p_EVP_aes_256_gcm
+#define EVP_sha256 p_EVP_sha256
+#define EVP_sha384 p_EVP_sha384
+#define EVP_sha512 p_EVP_sha512
+#define OPENSSL_cleanse p_OPENSSL_cleanse
+#define CRYPTO_free p_CRYPTO_free
+#define PKCS8_PRIV_KEY_INFO_free p_PKCS8_PRIV_KEY_INFO_free
+#define RAND_bytes p_RAND_bytes
+#define d2i_AutoPrivateKey p_d2i_AutoPrivateKey
+#define d2i_PKCS8_PRIV_KEY_INFO p_d2i_PKCS8_PRIV_KEY_INFO
+#define d2i_PUBKEY p_d2i_PUBKEY
+#define i2d_PKCS8_PRIV_KEY_INFO p_i2d_PKCS8_PRIV_KEY_INFO
+#define i2d_PUBKEY p_i2d_PUBKEY
+
+
 #define CN1_GCM_TAG_BYTES 16
 
 /* Per-thread: crypto failures on different threads would otherwise overwrite
@@ -59,7 +229,7 @@
 static __thread char cn1CryptoError[512];
 
 static void cn1CryptoFail(const char* what) {
-    unsigned long code = ERR_get_error();
+    unsigned long code = cn1CryptoAvailable ? ERR_get_error() : 0;
     char detail[256];
     detail[0] = 0;
     if (code != 0) {
@@ -67,7 +237,9 @@ static void cn1CryptoFail(const char* what) {
     }
     snprintf(cn1CryptoError, sizeof(cn1CryptoError), "%s%s%s", what,
              detail[0] ? ": " : "", detail);
-    ERR_clear_error();
+    if (cn1CryptoAvailable) {
+        ERR_clear_error();
+    }
 }
 
 /* Clears the per-thread message so a caller can tell whether the operation it
@@ -97,6 +269,10 @@ static const unsigned char* cn1Bytes(JAVA_OBJECT array, int* length) {
 /* ------------------------------------------------------------ random */
 
 JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_secureRandomBytes___byte_1ARRAY_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT out) {
+    if (!cn1CryptoLoaded()) {
+        cn1CryptoFail("libcrypto.so.3 could not be loaded");
+        return JAVA_FALSE;
+    }
     int length = 0;
     unsigned char* data = (unsigned char*) cn1Bytes(out, &length);
     if (data == 0 || length <= 0) {
@@ -170,6 +346,10 @@ static const EVP_CIPHER* cn1AesCipher(const char* transformation, int keyLength)
 JAVA_OBJECT com_codename1_impl_linux_LinuxNative_aesCrypt___java_lang_String_boolean_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_R_byte_1ARRAY(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT transformation, JAVA_BOOLEAN encrypt,
         JAVA_OBJECT keyArray, JAVA_OBJECT ivArray, JAVA_OBJECT aadArray, JAVA_OBJECT dataArray) {
+    if (!cn1CryptoLoaded()) {
+        cn1CryptoFail("libcrypto.so.3 could not be loaded");
+        return JAVA_NULL;
+    }
     const char* mode = transformation == JAVA_NULL ? "" : stringToUTF8(threadStateData, transformation);
     int keyLength = 0, ivLength = 0, aadLength = 0, dataLength = 0;
     const unsigned char* key = cn1Bytes(keyArray, &keyLength);
@@ -364,6 +544,10 @@ static int cn1ApplyRsaPadding(EVP_PKEY_CTX* ctx, const char* transformation) {
 JAVA_OBJECT com_codename1_impl_linux_LinuxNative_rsaCrypt___java_lang_String_boolean_byte_1ARRAY_byte_1ARRAY_R_byte_1ARRAY(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT transformation, JAVA_BOOLEAN encrypt,
         JAVA_OBJECT keyArray, JAVA_OBJECT dataArray) {
+    if (!cn1CryptoLoaded()) {
+        cn1CryptoFail("libcrypto.so.3 could not be loaded");
+        return JAVA_NULL;
+    }
     const char* mode = transformation == JAVA_NULL ? "" : stringToUTF8(threadStateData, transformation);
     int keyLength = 0, dataLength = 0;
     const unsigned char* keyDer = cn1Bytes(keyArray, &keyLength);
@@ -439,6 +623,10 @@ static const EVP_MD* cn1SignatureDigest(const char* algorithm) {
 
 JAVA_OBJECT com_codename1_impl_linux_LinuxNative_signData___java_lang_String_byte_1ARRAY_byte_1ARRAY_R_byte_1ARRAY(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT algorithm, JAVA_OBJECT keyArray, JAVA_OBJECT dataArray) {
+    if (!cn1CryptoLoaded()) {
+        cn1CryptoFail("libcrypto.so.3 could not be loaded");
+        return JAVA_NULL;
+    }
     const char* name = algorithm == JAVA_NULL ? "" : stringToUTF8(threadStateData, algorithm);
     int keyLength = 0, dataLength = 0;
     const unsigned char* keyDer = cn1Bytes(keyArray, &keyLength);
@@ -497,6 +685,10 @@ done:
 JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_verifyData___java_lang_String_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_R_boolean(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT algorithm, JAVA_OBJECT keyArray,
         JAVA_OBJECT dataArray, JAVA_OBJECT signatureArray) {
+    if (!cn1CryptoLoaded()) {
+        cn1CryptoFail("libcrypto.so.3 could not be loaded");
+        return JAVA_FALSE;
+    }
     const char* name = algorithm == JAVA_NULL ? "" : stringToUTF8(threadStateData, algorithm);
     int keyLength = 0, dataLength = 0, signatureLength = 0;
     const unsigned char* keyDer = cn1Bytes(keyArray, &keyLength);
@@ -555,6 +747,10 @@ JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_verifyData___java_lang_String_
 /* Same layout as generateRsaKeyPair below. Keygen straight from an EC context
  * with the curve set works on OpenSSL 1.1 and 3 alike. */
 JAVA_OBJECT com_codename1_impl_linux_LinuxNative_generateEcKeyPair___R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE) {
+    if (!cn1CryptoLoaded()) {
+        cn1CryptoFail("libcrypto.so.3 could not be loaded");
+        return JAVA_NULL;
+    }
     EVP_PKEY_CTX* ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_EC, 0);
     EVP_PKEY* key = 0;
     PKCS8_PRIV_KEY_INFO* info = 0;
@@ -612,6 +808,10 @@ done:
 
 JAVA_OBJECT com_codename1_impl_linux_LinuxNative_ecdh___byte_1ARRAY_byte_1ARRAY_R_byte_1ARRAY(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT privateArray, JAVA_OBJECT publicArray) {
+    if (!cn1CryptoLoaded()) {
+        cn1CryptoFail("libcrypto.so.3 could not be loaded");
+        return JAVA_NULL;
+    }
     int privateLength = 0, publicLength = 0;
     const unsigned char* privateDer = cn1Bytes(privateArray, &privateLength);
     const unsigned char* publicDer = cn1Bytes(publicArray, &publicLength);
@@ -655,6 +855,10 @@ done:
  * the X.509 public key, then the PKCS#8 private key. A pair has to come from
  * a single call -- two calls would produce two unrelated keys. */
 JAVA_OBJECT com_codename1_impl_linux_LinuxNative_generateRsaKeyPair___int_R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_INT bits) {
+    if (!cn1CryptoLoaded()) {
+        cn1CryptoFail("libcrypto.so.3 could not be loaded");
+        return JAVA_NULL;
+    }
     EVP_PKEY_CTX* ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_RSA, 0);
     EVP_PKEY* key = 0;
     PKCS8_PRIV_KEY_INFO* info = 0;

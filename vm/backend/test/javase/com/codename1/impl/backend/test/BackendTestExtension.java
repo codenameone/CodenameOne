@@ -25,6 +25,8 @@ package com.codename1.impl.backend.test;
 import org.junit.jupiter.api.extension.AfterEachCallback;
 import org.junit.jupiter.api.extension.BeforeEachCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
+import org.junit.jupiter.api.extension.InvocationInterceptor;
+import org.junit.jupiter.api.extension.ReflectiveInvocationContext;
 import org.junit.jupiter.api.extension.TestInstancePostProcessor;
 
 /// The JUnit 5 side of `@BackendTest`: finds the context the build generated for
@@ -36,7 +38,7 @@ import org.junit.jupiter.api.extension.TestInstancePostProcessor;
 /// reflection. The compiled half has no reflection and no JUnit; the build writes
 /// the same calls into a generated runner instead.
 public final class BackendTestExtension implements TestInstancePostProcessor,
-        BeforeEachCallback, AfterEachCallback {
+        BeforeEachCallback, AfterEachCallback, InvocationInterceptor {
     private static final ExtensionContext.Namespace NAMESPACE =
             ExtensionContext.Namespace.create(BackendTestExtension.class);
     private static boolean hookInstalled;
@@ -85,6 +87,36 @@ public final class BackendTestExtension implements TestInstancePostProcessor,
         String[] mocks = environment.context().mockBeans();
         for (String value : mocks) {
             Mocks.reset(environment.bean(value));
+        }
+    }
+
+    /// The test method alone, in a transaction rolled back after it, when the
+    /// context asks for one: the compiled runner makes the same call through
+    /// [TestTransactions], so the two runs leave the database alike.
+    @Override
+    public void interceptTestMethod(Invocation<Void> invocation,
+                                    ReflectiveInvocationContext<java.lang.reflect.Method> method,
+                                    ExtensionContext extension) throws Throwable {
+        Object stored = extension.getStore(NAMESPACE).get("environment");
+        if (!(stored instanceof TestEnvironment)
+                || !((TestEnvironment) stored).context().rollsBack()) {
+            invocation.proceed();
+            return;
+        }
+        TestTransactions.rollingBack(new Proceed(invocation));
+    }
+
+    /// The intercepted test method, as the body [TestTransactions] runs.
+    private static final class Proceed implements TestTransactions.Body {
+        private final Invocation<Void> invocation;
+
+        Proceed(Invocation<Void> invocation) {
+            this.invocation = invocation;
+        }
+
+        @Override
+        public void run() throws Throwable {
+            invocation.proceed();
         }
     }
 

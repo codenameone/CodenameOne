@@ -377,11 +377,18 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
     /// Returns a full Java statement (terminated with `;`) that writes
     /// `rhsExpr` into the field for the runtime instance `o`. Records
     /// can't mutate after construction, so we accumulate in a local of
-    /// the form `_name` for later canonical-constructor invocation;
+    /// the form `__name` for later canonical-constructor invocation;
     /// JavaBeans POJOs route through `o.setName(rhsExpr)`; plain POJOs
     /// assign the field directly.
+    /// The local a record component is gathered in before the constructor
+    /// call. Two underscores: the generated code's own locals (`_kids`, `_i`,
+    /// `_e`, ...) take one, so a component named `kids` cannot redeclare one.
+    private static String recordLocal(MappedField f) {
+        return "__" + f.name;
+    }
+
     private static String writeStmt(MappedField f, boolean isRecord, String rhsExpr) {
-        if (isRecord) return "_" + f.name + " = " + rhsExpr + ";";
+        if (isRecord) return recordLocal(f) + " = " + rhsExpr + ";";
         // `_p_`, not `_`: a creator parameter called `v` would otherwise be the
         // `_v` every read already declares.
         if (f.viaLocal) return "_p_" + f.name + " = " + rhsExpr + ";";
@@ -606,7 +613,7 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
         boolean first = true;
         for (MappedField f : mc.fields) {
             if (!first) sb.append(", ");
-            sb.append("_").append(f.name);
+            sb.append(recordLocal(f));
             first = false;
         }
         sb.append(")");
@@ -1678,8 +1685,8 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
         }
         if (mc.isRecord) {
             for (MappedField f : mc.fields) {
-                sb.append("        ").append(fieldType(f)).append(" _")
-                        .append(f.name).append(" = ")
+                sb.append("        ").append(fieldType(f)).append(" ")
+                        .append(recordLocal(f)).append(" = ")
                         .append(f.isArray ? "null" : defaultLiteral(f.kind)).append(";\n");
             }
             sb.append("        if (").append(src).append(" == null) return ");

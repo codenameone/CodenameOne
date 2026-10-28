@@ -79,6 +79,9 @@ public final class Backend {
         // First, so code in another package reaching for the internals while
         // anything below initializes still finds them.
         com.codename1.impl.backend.BackendAccess.install(new Access());
+        // The class library's host: MessageDigest and SecureRandom ask it for
+        // digests and random bytes on a ParparVM server (a no-op on the JDK).
+        ClassLibraryHost.install();
     }
 
     private final HttpServer server;
@@ -1811,6 +1814,8 @@ public final class Backend {
         /// waiting. Tests want this; a process wants [#run].
         public Backend start() throws Exception {
             claimProcess();
+            // Before the application's started() callback, which may open a pin.
+            BoardHardware.install();
             Backend running = null;
             try {
                 running = startOnce();

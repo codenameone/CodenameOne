@@ -377,8 +377,11 @@ class PlatformFeatureCatalogTest {
         acc.consume("com/codename1/ai/imagegen/StableDiffusion");
         assertTrue(acc.anyRequiresBigUpload(),
                 "On-device SD ships a 1-2 GB Core ML model -- cloud builds must abort with a friendly message");
-        assertEquals(21, acc.minimumAndroidSdk(),
-                "ONNX Runtime Android requires API 21");
+        // Every 16 KB page aligned ONNX Runtime (1.21.1 and later) declares
+        // minSdk 24; without the floor the manifest merger rejects a default
+        // project, whose android.min_sdk_version is 19.
+        assertEquals(24, acc.minimumAndroidSdk(),
+                "ONNX Runtime Android 1.21.1 requires API 24");
     }
 
     @Test
@@ -540,8 +543,8 @@ class PlatformFeatureCatalogTest {
             permissions.addAll(entry.androidPermissions());
         }
 
-        assertTrue(android.contains("com.google.mlkit:barcode-scanning:17.2.0"));
-        assertTrue(android.contains("androidx.camera:camera-core:1.3.4"));
+        assertTrue(android.contains("com.google.mlkit:barcode-scanning:17.3.0"));
+        assertTrue(android.contains("androidx.camera:camera-core:1.4.2"));
         assertTrue(permissions.contains("android.permission.CAMERA"));
         assertTrue(acc.iosFrameworks().contains("AVFoundation"));
         assertTrue(acc.iosFrameworks().contains("Vision"));
@@ -566,7 +569,7 @@ class PlatformFeatureCatalogTest {
             android.addAll(entry.androidGradleDeps());
         }
 
-        assertTrue(android.contains("androidx.camera:camera-core:1.3.4"));
+        assertTrue(android.contains("androidx.camera:camera-core:1.4.2"));
         for (String dependency : android) {
             assertFalse(dependency.startsWith("com.google.mlkit:"),
                     "the view must not pull a model the app never asked for: "

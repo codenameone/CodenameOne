@@ -48,6 +48,49 @@ import java.util.Set;
  */
 public final class PlatformFeatureCatalog {
 
+    // Every Android artifact below that carries native code is pinned at or
+    // above the first release whose 64-bit .so files are linked for 16 KB
+    // pages (p_align 0x4000 on arm64-v8a AND x86_64). Google Play rejects an
+    // upload containing a 4 KB aligned library, and the app cannot fix it:
+    // alignment is settled when Google links the .so. The previous pins
+    // (barcode 17.2.0, face 16.1.5, labeling 17.0.7, text 16.0.0, pose
+    // 18.0.0-beta3, selfie 16.0.0-beta5, LiteRT 1.0.1, TFLite 2.13.0) all
+    // shipped 0x1000 libraries, directly or through vision-internal-vkp,
+    // mediapipe-internal or text-recognition-bundled-common. Do not lower
+    // one of these without checking the AAR and its transitive natives.
+    // scripts/check-android-dependency-alignment.py (CodenameOne) resolves
+    // every coordinate in this table and fails CI on a 4 KB aligned library.
+    private static final String MLKIT_BARCODE_SCANNING =
+            "com.google.mlkit:barcode-scanning:17.3.0";
+    private static final String MLKIT_FACE_DETECTION =
+            "com.google.mlkit:face-detection:16.1.7";
+    private static final String MLKIT_IMAGE_LABELING =
+            "com.google.mlkit:image-labeling:17.0.9";
+    private static final String MLKIT_TEXT_RECOGNITION =
+            "com.google.mlkit:text-recognition:16.0.1";
+    private static final String MLKIT_POSE_DETECTION =
+            "com.google.mlkit:pose-detection:18.0.0-beta5";
+    private static final String LITERT = "com.google.ai.edge.litert:litert:1.4.2";
+    // TensorFlow Lite moved to LiteRT and kept its org.tensorflow.lite
+    // packages. The org.tensorflow coordinates stop at 2.16.1 / 0.4.4, both
+    // 4 KB aligned; tensorflow-lite 2.17.0 and tensorflow-lite-support 0.5.0
+    // are relocation-only POMs that Gradle follows to LiteRT 1.0.1, which is
+    // still 4 KB aligned on x86_64. So the legacy cn1lib names LiteRT itself.
+    private static final String LITERT_SUPPORT =
+            "com.google.ai.edge.litert:litert-support:1.4.2";
+    // CameraX, for com.codename1.camera and the camera-driven vision classes.
+    // 1.3.4 shipped camera-core's libimage_processing_util_jni.so with 4 KB
+    // pages, so every CodeScanner / VisionCameraView app was refused by Play.
+    // 1.4.0 is the first aligned line; 1.4.2 keeps minSdk 21 and the
+    // minCompileSdk 34 that 1.3.4 already declared. 1.5 would raise minSdk to
+    // 23. AndroidCameraImpl reaches CameraX by reflection, so a bump has to
+    // keep every class and method name it looks up.
+    private static final String CAMERAX_VERSION = "1.4.2";
+    // ONNX Runtime measured 4 KB aligned at 1.16.3, 1.19.2, 1.20.0 and 1.21.0;
+    // 1.21.1 is aligned. It and 1.22.0 both declare minSdk 24, which the
+    // StableDiffusion entry therefore raises the app to.
+    private static final String ONNX_RUNTIME =
+            "com.microsoft.onnxruntime:onnxruntime-android:1.21.1";
     private static final String MLKIT_LANGUAGE_ID =
             "com.google.mlkit:language-id:17.0.6";
     private static final String MLKIT_TRANSLATE =
@@ -55,7 +98,7 @@ public final class PlatformFeatureCatalog {
     private static final String MLKIT_SMART_REPLY =
             "com.google.mlkit:smart-reply:17.0.4";
     private static final String MLKIT_SELFIE_SEGMENTATION =
-            "com.google.mlkit:segmentation-selfie:16.0.0-beta5";
+            "com.google.mlkit:segmentation-selfie:16.0.0-beta6";
     /** Shared version of the per-script ML Kit text recognition bundles. */
     private static final String MLKIT_TEXT_SCRIPT_VERSION = "16.0.1";
     private static final List<Entry> ENTRIES;
@@ -100,7 +143,7 @@ public final class PlatformFeatureCatalog {
                 .iosMinimumDeploymentTarget("15.5")
                 .iosDependenciesUnsupportedOnMacCatalyst()
                 .iosDependenciesUnsupportedOnArm64Simulator()
-                .androidGradle("com.google.mlkit:text-recognition:16.0.0")
+                .androidGradle(MLKIT_TEXT_RECOGNITION)
                 .androidMinimumSdk(21)
                 .iosPlist("NSCameraUsageDescription",
                          "Used to recognise text from your camera.")
@@ -110,7 +153,7 @@ public final class PlatformFeatureCatalog {
                 .iosMinimumDeploymentTarget("15.5")
                 .iosDependenciesUnsupportedOnMacCatalyst()
                 .iosDependenciesUnsupportedOnArm64Simulator()
-                .androidGradle("com.google.mlkit:barcode-scanning:17.2.0")
+                .androidGradle(MLKIT_BARCODE_SCANNING)
                 .androidMinimumSdk(21)
                 .iosPlist("NSCameraUsageDescription",
                          "Used to scan barcodes with your camera.")
@@ -121,7 +164,7 @@ public final class PlatformFeatureCatalog {
                 .iosMinimumDeploymentTarget("15.5")
                 .iosDependenciesUnsupportedOnMacCatalyst()
                 .iosDependenciesUnsupportedOnArm64Simulator()
-                .androidGradle("com.google.mlkit:face-detection:16.1.5")
+                .androidGradle(MLKIT_FACE_DETECTION)
                 .androidMinimumSdk(21)
                 .iosPlist("NSCameraUsageDescription",
                          "Used to detect faces in images.")
@@ -131,7 +174,7 @@ public final class PlatformFeatureCatalog {
                 .iosMinimumDeploymentTarget("15.5")
                 .iosDependenciesUnsupportedOnMacCatalyst()
                 .iosDependenciesUnsupportedOnArm64Simulator()
-                .androidGradle("com.google.mlkit:image-labeling:17.0.7")
+                .androidGradle(MLKIT_IMAGE_LABELING)
                 .androidMinimumSdk(21)
                 .description("Legacy ML Kit Image Labeling cn1lib"));
         e.add(new Entry("com/codename1/ai/mlkit/translate/")
@@ -163,7 +206,7 @@ public final class PlatformFeatureCatalog {
                 .iosMinimumDeploymentTarget("15.5")
                 .iosDependenciesUnsupportedOnMacCatalyst()
                 .iosDependenciesUnsupportedOnArm64Simulator()
-                .androidGradle("com.google.mlkit:pose-detection:18.0.0-beta3")
+                .androidGradle(MLKIT_POSE_DETECTION)
                 .androidMinimumSdk(21)
                 .description("Legacy ML Kit Pose Detection cn1lib"));
         e.add(new Entry("com/codename1/ai/mlkit/segmentation/")
@@ -189,9 +232,8 @@ public final class PlatformFeatureCatalog {
                 .iosSpm("TensorFlowLiteSwift",
                         "https://github.com/tensorflow/tensorflow.git",
                         "from:2.13.0", "TensorFlowLite")
-                .androidGradle("org.tensorflow:tensorflow-lite:2.13.0")
-                .androidGradle(
-                        "org.tensorflow:tensorflow-lite-support:0.4.4")
+                .androidGradle(LITERT)
+                .androidGradle(LITERT_SUPPORT)
                 .androidMinimumSdk(21)
                 .description("Legacy TensorFlow Lite interpreter cn1lib"));
 
@@ -201,7 +243,7 @@ public final class PlatformFeatureCatalog {
         // so iOS only bundles ML Kit pods for features actually used.
         e.add(new Entry("com/codename1/ai/vision/TextRecognizer")
                 .iosFrameworks("Vision", "CoreImage")
-                .androidGradle("com.google.mlkit:text-recognition:16.0.0")
+                .androidGradle(MLKIT_TEXT_RECOGNITION)
                 .androidMinimumSdk(21)
                 .description("Text recognition"));
         e.add(new Entry("com/codename1/ai/vision/TextRecognizer")
@@ -246,7 +288,7 @@ public final class PlatformFeatureCatalog {
 
         e.add(new Entry("com/codename1/ai/vision/BarcodeScanner")
                 .iosFrameworks("Vision", "CoreImage")
-                .androidGradle("com.google.mlkit:barcode-scanning:17.2.0")
+                .androidGradle(MLKIT_BARCODE_SCANNING)
                 .androidMinimumSdk(21)
                 .description("Barcode scanning"));
         e.add(new Entry("com/codename1/ai/vision/BarcodeScanner")
@@ -267,7 +309,7 @@ public final class PlatformFeatureCatalog {
         // low-level camera entry.
         e.add(new Entry("com/codename1/ai/vision/CodeScanner")
                 .iosFrameworks("Vision", "CoreImage")
-                .androidGradle("com.google.mlkit:barcode-scanning:17.2.0")
+                .androidGradle(MLKIT_BARCODE_SCANNING)
                 .androidMinimumSdk(21)
                 .description("Barcode scanning (ready-made scanner screen)"));
         e.add(new Entry("com/codename1/ai/vision/CodeScanner")
@@ -282,7 +324,7 @@ public final class PlatformFeatureCatalog {
 
         e.add(new Entry("com/codename1/ai/vision/FaceDetector")
                 .iosFrameworks("Vision", "CoreImage")
-                .androidGradle("com.google.mlkit:face-detection:16.1.5")
+                .androidGradle(MLKIT_FACE_DETECTION)
                 .androidMinimumSdk(21)
                 .description("Face detection"));
         e.add(new Entry("com/codename1/ai/vision/FaceDetector")
@@ -296,7 +338,7 @@ public final class PlatformFeatureCatalog {
 
         e.add(new Entry("com/codename1/ai/vision/ImageLabeler")
                 .iosFrameworks("Vision", "CoreML")
-                .androidGradle("com.google.mlkit:image-labeling:17.0.7")
+                .androidGradle(MLKIT_IMAGE_LABELING)
                 .androidMinimumSdk(21)
                 .description("Image labeling"));
         e.add(new Entry("com/codename1/ai/vision/ImageLabeler")
@@ -310,7 +352,7 @@ public final class PlatformFeatureCatalog {
 
         e.add(new Entry("com/codename1/ai/vision/PoseDetector")
                 .iosFrameworks("Vision", "CoreML")
-                .androidGradle("com.google.mlkit:pose-detection:18.0.0-beta3")
+                .androidGradle(MLKIT_POSE_DETECTION)
                 .androidMinimumSdk(21)
                 .description("Pose detection"));
         e.add(new Entry("com/codename1/ai/vision/PoseDetector")
@@ -347,7 +389,7 @@ public final class PlatformFeatureCatalog {
                 .iosPod("TensorFlowLiteObjC/CoreML")
                 .iosDependenciesUnsupportedOnMacCatalyst()
                 .iosFrameworks("CoreML", "Metal", "Accelerate")
-                .androidGradle("com.google.ai.edge.litert:litert:1.0.1")
+                .androidGradle(LITERT)
                 .androidMinimumSdk(21)
                 .description("LiteRT inference"));
 
@@ -424,11 +466,11 @@ public final class PlatformFeatureCatalog {
                                     "android.permission.RECORD_AUDIO")
                 .androidFeatures("android.hardware.camera",
                                  "android.hardware.camera.autofocus")
-                .androidGradle("androidx.camera:camera-core:1.3.4")
-                .androidGradle("androidx.camera:camera-camera2:1.3.4")
-                .androidGradle("androidx.camera:camera-lifecycle:1.3.4")
-                .androidGradle("androidx.camera:camera-view:1.3.4")
-                .androidGradle("androidx.camera:camera-video:1.3.4")
+                .androidGradle("androidx.camera:camera-core:" + CAMERAX_VERSION)
+                .androidGradle("androidx.camera:camera-camera2:" + CAMERAX_VERSION)
+                .androidGradle("androidx.camera:camera-lifecycle:" + CAMERAX_VERSION)
+                .androidGradle("androidx.camera:camera-view:" + CAMERAX_VERSION)
+                .androidGradle("androidx.camera:camera-video:" + CAMERAX_VERSION)
                 .androidMinimumSdk(21)
                 .description("Cross-platform camera (preview + frames + photo + video)"));
 
@@ -458,11 +500,11 @@ public final class PlatformFeatureCatalog {
                     .androidPermissions("android.permission.CAMERA")
                     .androidFeatures("android.hardware.camera",
                                      "android.hardware.camera.autofocus")
-                    .androidGradle("androidx.camera:camera-core:1.3.4")
-                    .androidGradle("androidx.camera:camera-camera2:1.3.4")
-                    .androidGradle("androidx.camera:camera-lifecycle:1.3.4")
-                    .androidGradle("androidx.camera:camera-view:1.3.4")
-                    .androidGradle("androidx.camera:camera-video:1.3.4")
+                    .androidGradle("androidx.camera:camera-core:" + CAMERAX_VERSION)
+                    .androidGradle("androidx.camera:camera-camera2:" + CAMERAX_VERSION)
+                    .androidGradle("androidx.camera:camera-lifecycle:" + CAMERAX_VERSION)
+                    .androidGradle("androidx.camera:camera-view:" + CAMERAX_VERSION)
+                    .androidGradle("androidx.camera:camera-video:" + CAMERAX_VERSION)
                     .androidMinimumSdk(21)
                     .description("Camera for the " + cameraBacked[1]));
         }
@@ -618,8 +660,8 @@ public final class PlatformFeatureCatalog {
         // message.
         e.add(new Entry("com/codename1/ai/imagegen/StableDiffusion")
                 .iosFrameworks("CoreML", "Vision")
-                .androidGradle("com.microsoft.onnxruntime:onnxruntime-android:1.16.3")
-                .androidMinimumSdk(21)
+                .androidGradle(ONNX_RUNTIME)
+                .androidMinimumSdk(24)
                 .markBigUpload()
                 .description("On-device Stable Diffusion (local-build only)"));
 

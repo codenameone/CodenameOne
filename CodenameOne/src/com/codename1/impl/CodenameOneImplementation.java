@@ -5770,6 +5770,66 @@ public abstract class CodenameOneImplementation {
         return null;
     }
 
+    /// Creates the platform player for a streaming request. The default plays an
+    /// unprotected or [com.codename1.media.DrmScheme#AES_128] stream through
+    /// `#createMedia(String, boolean, Runnable)`, since the platform players that
+    /// play HLS decrypt AES-128 themselves, and seeks to the start position once the
+    /// player exists. A port that supports more schemes or headers overrides this
+    /// together with `#isDrmSupported` and `#isStreamHeadersSupported`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: the stream to play
+    ///
+    /// #### Returns
+    ///
+    /// the media, or null when the platform cannot create a player
+    ///
+    /// #### Throws
+    ///
+    /// - `java.io.IOException`: if the stream cannot be opened
+    public Media createStreamingMedia(com.codename1.media.StreamRequest request) throws IOException {
+        com.codename1.media.DrmConfig drm = request.getDrm();
+        if (drm != null && drm.getScheme() != com.codename1.media.DrmScheme.AES_128) {
+            throw new IOException(drm.getScheme() + " is not supported on this platform");
+        }
+        if (!request.getHeaders().isEmpty() && !isStreamHeadersSupported()) {
+            throw new IOException("Stream request headers are not supported on this platform");
+        }
+        Media m = createMedia(request.getUrl(), true, request.getOnCompletion());
+        if (m != null && request.getStartPosition() > 0) {
+            m.setTime(request.getStartPosition());
+        }
+        return m;
+    }
+
+    /// Answers whether the platform player can play streams protected by a scheme.
+    /// The default answers false for every scheme; a port whose player decrypts HLS
+    /// AES-128 answers true for [com.codename1.media.DrmScheme#AES_128].
+    ///
+    /// #### Parameters
+    ///
+    /// - `scheme`: the protection scheme
+    ///
+    /// #### Returns
+    ///
+    /// true when the scheme is supported
+    public boolean isDrmSupported(com.codename1.media.DrmScheme scheme) {
+        // AES-128 HLS needs nothing beyond a player that reads the key URL in the
+        // playlist, which is what the default createStreamingMedia hands it to.
+        return scheme == com.codename1.media.DrmScheme.AES_128;
+    }
+
+    /// Answers whether the platform player can attach HTTP headers to the manifest
+    /// and segment requests of a stream. The default answers false.
+    ///
+    /// #### Returns
+    ///
+    /// true when stream request headers are supported
+    public boolean isStreamHeadersSupported() {
+        return false;
+    }
+
     /// Creates media asynchronously.
     ///
     /// #### Parameters
@@ -8662,6 +8722,12 @@ public abstract class CodenameOneImplementation {
     public com.codename1.nfc.Nfc getNfc() {
         return null;
     }
+    /// Returns the port-specific hardware entry point. Default implementation
+    /// returns {@code null}; ports with bus and pin access override this to
+    /// return a cached {@link com.codename1.hardware.Hardware} subclass.
+    public com.codename1.hardware.Hardware getHardware() {
+        return null;
+    }
 
     /// Returns the port-specific local calendar source, or null when the port
     /// has no device calendar integration.
@@ -10615,6 +10681,31 @@ public abstract class CodenameOneImplementation {
     /// - ConnectionRequest#isInsecure()
     public void setInsecure(Object connection, boolean insecure) {
 
+    }
+
+    /// True when [#setClientCertificate(Object, String, String, byte[])]
+    /// is implemented.
+    public boolean isClientCertificateSupported() {
+        return false;
+    }
+
+    /// Presents a client certificate on this connection's TLS handshake.
+    ///
+    /// #### Parameters
+    ///
+    /// - `connection`: the connection from `connect`
+    ///
+    /// - `certificateChainPem`: one or more PEM certificates, the device's first
+    ///
+    /// - `keyAlgorithm`: `EC` or `RSA`
+    ///
+    /// - `privateKeyPkcs8`: the private key, PKCS#8 DER
+    ///
+    /// The server is always verified: `ConnectionRequest` refuses a client
+    /// certificate on an insecure request before this is called.
+    public void setClientCertificate(Object connection, String certificateChainPem, String keyAlgorithm,
+            byte[] privateKeyPkcs8) {
+        throw new IllegalStateException("This platform cannot present a client certificate");
     }
 
     /// Checks if this platform supports read timeout in network connections.

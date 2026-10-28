@@ -66,6 +66,10 @@ final class ToolSupport {
         Provider<List<String>> roots = project.provider(() -> sourceRoots(main));
         Provider<String> javaRoot = project.provider(() -> primaryJavaRoot(main, layout).getAbsolutePath());
         Provider<String> encoding = AppSupport.javaEncoding(project, main);
+        project.getTasks().register("cn1DeployDevice", com.codename1.gradle.tasks.DeployDeviceTask.class, t -> {
+            t.setGroup(AppSupport.GROUP);
+            t.setDescription("Copies the native Linux build to a device over SSH and runs it as a service.");
+        });
         register(project, layout, ext, userProperties, roots, javaRoot, encoding, "settings",
                 DesktopTool.SETTINGS, "Opens Codename One Settings for this project");
         register(project, layout, ext, userProperties, roots, javaRoot, encoding, "guibuilder",

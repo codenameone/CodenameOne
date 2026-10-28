@@ -17358,6 +17358,14 @@ public class JavaSEPort extends CodenameOneImplementation {
     
 
     @Override
+    public boolean isDrmSupported(com.codename1.media.DrmScheme scheme) {
+        // The simulator plays through ffmpeg, whose HLS demuxer fetches the
+        // #EXT-X-KEY URI and decrypts AES-128 segments. It has no CDM, so the
+        // CENC schemes (ClearKey, Widevine, FairPlay) are answered honestly as no.
+        return scheme == com.codename1.media.DrmScheme.AES_128 && FFMPEGMedia.isConfigured();
+    }
+
+    @Override
     public AsyncResource<Media> createMediaAsync(String uriAddress, final boolean isVideo, final Runnable onCompletion) {
         if (FFMPEGMedia.isConfigured() && !"cef".equalsIgnoreCase(System.getProperty("cn1.javase.mediaImplementation", ""))) {
             return FFMPEGMedia.createMediaAsync(this, uriAddress, isVideo, onCompletion);
@@ -17800,6 +17808,24 @@ public class JavaSEPort extends CodenameOneImplementation {
             NetworkRequestObject o = new NetworkRequestObject();
             o.setTimeQueued(System.currentTimeMillis());
             netMonitor.addQueuedRequest(req, o);
+        }
+    }
+
+    @Override
+    public boolean isClientCertificateSupported() {
+        return true;
+    }
+
+    @Override
+    public void setClientCertificate(Object connection, String certificateChainPem, String keyAlgorithm,
+            byte[] privateKeyPkcs8) {
+        if (connection instanceof HttpsURLConnection) {
+            try {
+                ((HttpsURLConnection) connection).setSSLSocketFactory(TrustModifier.clientCertificateFactory(
+                        certificateChainPem, keyAlgorithm, privateKeyPkcs8, null));
+            } catch (Exception ex) {
+                throw new IllegalStateException("Cannot use the client certificate: " + ex, ex);
+            }
         }
     }
 
@@ -18633,6 +18659,22 @@ public class JavaSEPort extends CodenameOneImplementation {
             nfc = new JavaSENfc();
         }
         return nfc;
+    }
+
+    private JavaSEHardware hardware;
+
+    /// The simulator's virtual board (see [JavaSEHardware]), so hardware code
+    /// runs with nothing attached. A desktop application built from this port
+    /// has no such board and reports no hardware.
+    @Override
+    public com.codename1.hardware.Hardware getHardware() {
+        if (!isSimulator()) {
+            return null;
+        }
+        if (hardware == null) {
+            hardware = new JavaSEHardware();
+        }
+        return hardware;
     }
 
     @Override

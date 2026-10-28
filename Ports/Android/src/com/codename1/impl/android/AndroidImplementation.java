@@ -4820,6 +4820,70 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
 
+    @Override
+    public boolean isDrmSupported(com.codename1.media.DrmScheme scheme) {
+        if (scheme == com.codename1.media.DrmScheme.AES_128) {
+            // The framework player's HLS extractor decrypts #EXT-X-KEY METHOD=AES-128.
+            return true;
+        }
+        return DrmVideoView.isSupported(scheme);
+    }
+
+    @Override
+    public boolean isStreamHeadersSupported() {
+        // VideoView.setVideoURI(Uri, Map) and MediaPlayer.setDataSource(Context, Uri, Map)
+        // send the headers with the manifest and every segment request.
+        return true;
+    }
+
+    @Override
+    public Media createStreamingMedia(final com.codename1.media.StreamRequest request) throws IOException {
+        if (getActivity() == null) {
+            return null;
+        }
+        final com.codename1.media.DrmConfig drm = request.getDrm();
+        final boolean cenc = drm != null && drm.getScheme() != com.codename1.media.DrmScheme.AES_128;
+        if (cenc && !DrmVideoView.isSupported(drm.getScheme())) {
+            throw new IOException(drm.getScheme() + " is not supported on this device");
+        }
+        if (cenc && request.getUrl().toLowerCase(java.util.Locale.ROOT).indexOf(".mpd") > -1) {
+            // The framework MediaPlayer has no DASH extractor; failing here names
+            // the reason instead of a generic prepare error later.
+            throw new IOException("DASH is not supported by the framework player; serve HLS (fMP4) or MP4");
+        }
+        final java.util.Map<String, String> headers = request.getHeaders();
+        final Uri videoUri = Uri.parse(request.getUrl());
+        final AndroidImplementation.Video[] video = new AndroidImplementation.Video[1];
+        final java.util.concurrent.CountDownLatch created = new java.util.concurrent.CountDownLatch(1);
+        getActivity().runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    VideoView v;
+                    if (cenc) {
+                        v = new DrmVideoView(getActivity(), videoUri, headers, drm, request.getStartPosition());
+                    } else {
+                        v = new VideoView(getActivity());
+                        v.setVideoURI(videoUri, headers);
+                        if (request.getStartPosition() > 0) {
+                            v.seekTo(request.getStartPosition());
+                        }
+                    }
+                    v.setZOrderMediaOverlay(true);
+                    video[0] = new AndroidImplementation.Video(v, getActivity(), request.getOnCompletion());
+                } finally {
+                    created.countDown();
+                }
+            }
+        });
+        try {
+            created.await();
+        } catch (InterruptedException ex) {
+            throw new IOException("Interrupted while creating the player");
+        }
+        return video[0];
+    }
+
     /**
      * @inheritDoc
      */
@@ -7805,6 +7869,24 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return true;
     }
     
+    @Override
+    public boolean isClientCertificateSupported() {
+        return true;
+    }
+
+    @Override
+    public void setClientCertificate(Object connection, String certificateChainPem, String keyAlgorithm,
+            byte[] privateKeyPkcs8) {
+        if (connection instanceof HttpsURLConnection) {
+            try {
+                ((HttpsURLConnection) connection).setSSLSocketFactory(TrustModifier.clientCertificateFactory(
+                        certificateChainPem, keyAlgorithm, privateKeyPkcs8, null));
+            } catch (Exception ex) {
+                throw new IllegalStateException("Cannot use the client certificate: " + ex, ex);
+            }
+        }
+    }
+
     @Override
     public void setInsecure(Object connection, boolean insecure) {
         if (insecure) {

@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.16)
+project(qtgauge CXX)
+set(CMAKE_CXX_STANDARD 17)
+find_package(Qt6 REQUIRED COMPONENTS Widgets)
+add_executable(qtgauge gauge.cpp)
+target_link_libraries(qtgauge Qt6::Widgets)

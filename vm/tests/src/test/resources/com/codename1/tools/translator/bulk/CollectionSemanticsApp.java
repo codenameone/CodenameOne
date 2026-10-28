@@ -244,6 +244,140 @@ public class CollectionSemanticsApp {
         } catch (NullPointerException expected) { emit("fieldTraversal.null", traversalCalls); }
     }
 
+    /// A for-each and a map view whose receiver is a `?:`, plus a
+    /// behaviour-only iterator call. javac joins the two branches at a label
+    /// right before the consumer, and the translator used to take the else
+    /// branch's load for the receiver on whichever path ran (and NPE when that
+    /// value was null).
+    private Iterable<String> ownTraversal() { traversalCalls++; return traversalField; }
+
+    private String ternaryLoop(boolean all, List<String> updated) {
+        String value = "";
+        for (String item : (all ? ownTraversal() : updated)) value += item;
+        return value;
+    }
+
+    private static String ternaryLocals(boolean first, List<String> a, List<String> b) {
+        String value = "";
+        for (String item : first ? a : b) value += item;
+        return value;
+    }
+
+    // The keySet/values fold fires only on a receiver whose exact class the
+    // translator has proved, so both maps are built right here; with the
+    // parameters typed HashMap these cases passed even before the fix.
+    // ternaryIteratorCall is behaviour only: lowerIteratorCalls does not retype
+    // this shape (the iterator stores are folded first), so no translator
+    // revision has been seen to fail it.
+    // The shape JpqlQueryImpl walks a CASE expression with: both branches read
+    // a field, and the else branch's is null exactly when the then branch runs.
+    // A guard, not a reproduction: an instance field read is not folded into
+    // the loop, so master already took this receiver off the stack.
+    private List<String> ternaryChildren;
+    private List<String> ternaryBranches;
+
+    private String ternaryFields() {
+        String value = "";
+        for (String item : ternaryBranches == null ? ternaryChildren : ternaryBranches) value += item;
+        return value;
+    }
+
+    // A static field read IS folded, so this shape failed like a local did.
+    private static List<String> staticChildren;
+    private static List<String> staticBranches;
+
+    private static String ternaryStatics() {
+        String value = "";
+        for (String item : staticBranches == null ? staticChildren : staticBranches) value += item;
+        return value;
+    }
+
+    private static int ternaryKeySet(boolean first, boolean secondNull) {
+        java.util.HashMap<String, String> a = new java.util.HashMap<String, String>();
+        a.put("k", "vvv");
+        java.util.HashMap<String, String> b = secondNull ? null : new java.util.HashMap<String, String>();
+        if (b != null) { b.put("kk", "v"); b.put("kkkk", "vvvvv"); }
+        int seen = 0;
+        for (String key : (first ? a : b).keySet()) seen += key.length();
+        return seen;
+    }
+
+    private static int ternaryValues(boolean first) {
+        java.util.HashMap<String, String> a = new java.util.HashMap<String, String>();
+        a.put("k", "vvv");
+        java.util.HashMap<String, String> b = new java.util.HashMap<String, String>();
+        b.put("kk", "v"); b.put("kkkk", "vvvvv");
+        int seen = 0;
+        for (String v : (first ? a : b).values()) seen += v.length();
+        return seen;
+    }
+
+    private static String ternaryIteratorCall(boolean first) {
+        ArrayList<String> a = new ArrayList<String>();
+        a.add("a1");
+        // Two iterator classes the translator can name: if a future lowering
+        // retypes this shape, a retype onto the wrong branch would read the
+        // wrong layout.
+        java.util.ArrayDeque<String> b = new java.util.ArrayDeque<String>();
+        b.add("u");
+        Iterator<String> ia = a.iterator();
+        Iterator<String> ib = b.iterator();
+        return (first ? ia : ib).next();
+    }
+
+    private interface TernaryCase {
+        Object run();
+    }
+
+    /// One case per call, so a case that throws cannot hide the ones after it.
+    private static void ternaryCase(String key, TernaryCase body) {
+        Object value;
+        try {
+            value = body.run();
+        } catch (RuntimeException e) {
+            value = "THREW " + e.getClass().getName();
+        }
+        emit(key, value);
+    }
+
+    private void ternaryTraversalCases() {
+        traversalField = new ArrayList<String>();
+        traversalField.add("o");
+        traversalCalls = 0;
+        final List<String> other = new java.util.LinkedList<String>();
+        other.add("u"); other.add("v");
+        ternaryCase("ternary.trueNullElse", () -> ternaryLoop(true, null) + ":" + traversalCalls);
+        ternaryCase("ternary.trueOther", () -> ternaryLoop(true, other) + ":" + traversalCalls);
+        ternaryCase("ternary.falseOther", () -> ternaryLoop(false, other) + ":" + traversalCalls);
+        ternaryCase("ternary.falseNull", () -> ternaryLoop(false, null));
+        final List<String> a = new ArrayList<String>();
+        a.add("a1"); a.add("a2");
+        ternaryCase("ternary.localsFirst", () -> ternaryLocals(true, a, other));
+        ternaryCase("ternary.localsSecond", () -> ternaryLocals(false, a, other));
+        ternaryCase("ternary.localsFirstNullElse", () -> ternaryLocals(true, a, null));
+        ternaryChildren = new ArrayList<String>();
+        ternaryChildren.add("c");
+        ternaryBranches = null;
+        ternaryCase("ternary.fieldsNullElse", () -> ternaryFields());
+        ternaryBranches = new ArrayList<String>();
+        ternaryBranches.add("b");
+        ternaryCase("ternary.fieldsElse", () -> ternaryFields());
+        staticChildren = new ArrayList<String>();
+        staticChildren.add("sc");
+        staticBranches = null;
+        ternaryCase("ternary.staticsNullElse", () -> ternaryStatics());
+        staticBranches = new ArrayList<String>();
+        staticBranches.add("sb");
+        ternaryCase("ternary.staticsElse", () -> ternaryStatics());
+        ternaryCase("ternary.keySetFirst", () -> ternaryKeySet(true, false));
+        ternaryCase("ternary.keySetSecond", () -> ternaryKeySet(false, false));
+        ternaryCase("ternary.keySetFirstNullElse", () -> ternaryKeySet(true, true));
+        ternaryCase("ternary.valuesFirst", () -> ternaryValues(true));
+        ternaryCase("ternary.valuesSecond", () -> ternaryValues(false));
+        ternaryCase("ternary.iteratorFirst", () -> ternaryIteratorCall(true));
+        ternaryCase("ternary.iteratorSecond", () -> ternaryIteratorCall(false));
+    }
+
     public static void fixtureMain(String[] args) throws InterruptedException {
         // The migration result exposes this exact wrapper. Its toString calls
         // Object.toString through a Collection receiver, whose interface also
@@ -265,6 +399,7 @@ public class CollectionSemanticsApp {
         emit("unmodifiable.collection", java.util.Collections.unmodifiableCollection(migrations).toString());
         emit("interface.string", stringFromCollection(applied));
         new CollectionSemanticsApp().fieldTraversalCases();
+        new CollectionSemanticsApp().ternaryTraversalCases();
         new CollectionSemanticsApp().directCallCases();
         nativeStorageCases();
         bulkCopyCases();

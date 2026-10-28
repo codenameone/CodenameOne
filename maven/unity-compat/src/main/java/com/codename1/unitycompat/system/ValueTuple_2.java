@@ -27,7 +27,7 @@ package com.codename1.unitycompat.system;
 /// constructor, `$new`, `$copy`, `$assign`, `$clear` and the array helpers
 /// -- written out by hand because this type comes from the base library and
 /// not from translated C#. The items are erased, like every type argument.
-@SuppressWarnings("PMD.MethodNamingConventions") // C# member names: translated code binds to them by name
+@SuppressWarnings({"PMD.MethodNamingConventions", "PMD.ClassNamingConventions"}) // C# member and type names: translated code binds to them by name
 public final class ValueTuple_2 implements Struct {
     public Object Item1;
     public Object Item2;

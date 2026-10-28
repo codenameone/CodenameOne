@@ -791,7 +791,7 @@ jobs:
           QUALITY_REPORT_REQUIRED_SPOTBUGS: core-unittests:android:ios:ByteCodeTranslator:codenameone-maven-plugin:build-engine:project-model:codenameone-gradle-plugin:build-hint-catalog:build-hint-tools:backend:backend-test:javac:android-res-compiler:android-compat:swing-compat:javafx-compat:fxml-compiler:desktop-compat-runtime:python-transpiler:python-runtime
           # PMD and Checkstyle run on the core, the backend runtime and the Python
           # transpiler and runtime, and each must produce its report: without one,
-          # the forbidden-rule gate below it has nothing to read and passes.
+          # the PMD gate below it has nothing to read and passes.
           QUALITY_REPORT_REQUIRED_PMD: core-unittests:backend:backend-test:backend-parparvm:python-transpiler:python-runtime
           QUALITY_REPORT_REQUIRED_CHECKSTYLE: core-unittests:backend:backend-test:python-transpiler:python-runtime
           QUALITY_REPORT_SERVER_URL: ${{ github.server_url }}

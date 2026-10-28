@@ -1,0 +1,113 @@
+name: Check Android dependency 16 KB alignment
+
+# check-16k-page-alignment.yml reads every TRACKED artifact. Most native code a
+# Codename One Android app ships is not tracked: the builder writes Maven
+# coordinates into the generated build.gradle (PlatformFeatureCatalog entries,
+# the play-services defaults) and Gradle downloads them on the build machine.
+# CameraX 1.3.4 reached every CodeScanner / VisionCameraView app that way with
+# a 4 KB aligned libimage_processing_util_jni.so, Google Play refused the
+# upload, and the tree gate stayed green because it never saw the file.
+#
+# This resolves every one of those coordinates with Gradle, each catalog entry
+# on its own (Gradle's highest-version-wins would otherwise let one entry's new
+# pin hide another's old one), and runs the same ELF check over the result.
+# It needs the network, so it runs only when something that decides the set
+# changes; AndroidSixteenKbPageFloorTest is the offline half (version floors,
+# and a ratchet that fails when the builder sources name a coordinate the
+# lister does not list). It runs here first, and in every build-engine test run.
+#
+# The cloud builder (BuildDaemon) has its own copy of the catalog and the
+# defaults and runs this same script over its own list.
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [ master ]
+    paths:
+      - 'maven/platform-feature-catalog/**'
+      - 'maven/build-engine/src/main/java/com/codename1/builders/**'
+      - 'maven/build-engine/src/test/java/com/codename1/builders/AndroidDependencyCoordinates.java'
+      - 'maven/build-engine/src/test/java/com/codename1/builders/AndroidSixteenKbPageFloorTest.java'
+      - 'maven/build-hint-catalog/**'
+      - 'scripts/check-android-dependency-alignment.py'
+      - 'scripts/test_check_android_dependency_alignment.py'
+      - 'scripts/check-16k-page-alignment.py'
+      - '.github/workflows/check-android-dependency-alignment.yml'
+  push:
+    branches: [ master ]
+    paths:
+      - 'maven/platform-feature-catalog/**'
+      - 'maven/build-engine/src/main/java/com/codename1/builders/**'
+      - 'maven/build-engine/src/test/java/com/codename1/builders/AndroidDependencyCoordinates.java'
+      - 'maven/build-engine/src/test/java/com/codename1/builders/AndroidSixteenKbPageFloorTest.java'
+      - 'maven/build-hint-catalog/**'
+      - 'scripts/check-android-dependency-alignment.py'
+      - 'scripts/test_check_android_dependency_alignment.py'
+      - 'scripts/check-16k-page-alignment.py'
+      - '.github/workflows/check-android-dependency-alignment.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check-android-dependency-alignment:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Unit-test the gate
+        # Run before anything is resolved, so a broken gate is reported as a
+        # broken gate rather than as a clean dependency set.
+        run: python3 scripts/test_check_android_dependency_alignment.py
+
+      # Installed FIRST so the JDK 8 below is the one JAVA_HOME names.
+      - name: Set up JDK 17 for Gradle
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      - run: echo "GRADLE_JAVA_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - name: Set up JDK 8
+        uses: actions/setup-java@v5
+        with:
+          java-version: '8'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Build build-engine, run the floor test, list its Android dependencies
+        env:
+          RETRY_ONLY_MATCHING: transient
+          RETRY_ATTEMPTS: '5'
+          RETRY_DELAY_SECONDS: '60'
+        run: |
+          set -euo pipefail
+          # The build runs UpdateCodenameOne.jar from ~/.codenameone, as in
+          # every other workflow that builds the framework.
+          mkdir -p ~/.codenameone
+          cp maven/UpdateCodenameOne.jar ~/.codenameone/
+          cd maven
+          bash ../scripts/ci/retry.sh mvn -B -pl build-engine -am install \
+            -DskipTests -Dmaven.javadoc.skip=true -Plocal-dev-javase
+          mvn -B -pl build-engine test -Dtest=AndroidSixteenKbPageFloorTest \
+            -Dsurefire.failIfNoSpecifiedTests=false -Plocal-dev-javase
+          mvn -B -q -pl build-engine test-compile dependency:build-classpath \
+            -Dmdep.outputFile="$RUNNER_TEMP/build-engine.cp" -Plocal-dev-javase
+          java -Dcn1.builders.src=build-engine/src/main/java/com/codename1/builders \
+            -cp "build-engine/target/classes:build-engine/target/test-classes:$(cat "$RUNNER_TEMP/build-engine.cp")" \
+            com.codename1.builders.AndroidDependencyCoordinates "$RUNNER_TEMP/android-coordinates.txt"
+          wc -l "$RUNNER_TEMP/android-coordinates.txt"
+
+      - name: Resolve every dependency and check 16 KB page alignment
+        run: |
+          JAVA_HOME="$GRADLE_JAVA_HOME" GRADLE="$(command -v gradle)" \
+            python3 scripts/check-android-dependency-alignment.py \
+              --coordinates "$RUNNER_TEMP/android-coordinates.txt" \
+              --work "$RUNNER_TEMP/dependency-alignment" --verbose

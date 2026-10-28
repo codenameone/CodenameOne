@@ -548,6 +548,16 @@ public final class HttpServer {
             return conn.pooledResponse;
         }
 
+        /// [#respondJson(int, Object)] written by `encoder` rather than by
+        /// inspecting the value. The form a generated controller uses: the encoder
+        /// is a static of the route, so answering allocates nothing beyond what the
+        /// handler returned. `value` must not be null.
+        public Response respondJson(int status, Object value, Json.Encoder encoder) {
+            Response r = respondJson(status, value);
+            r.deferredEncoder = encoder;
+            return r;
+        }
+
         /// DIAGNOSTIC: the connection's Response exactly as the last request left
         /// it, or null the first time. Separates the allocation pooling saves from
         /// the field writes it adds -- see the bench demo's RESPONSE_MODE.
@@ -1403,6 +1413,30 @@ public final class HttpServer {
         /// Serialised into the connection buffer at write time; see jsonValue.
         Object deferredJson;
         boolean hasDeferredJson;
+        /// How deferredJson is written, or null for [Json#write(Object, ByteSink)].
+        Json.Encoder deferredEncoder;
+
+        /// Writes the deferred value into `out`, through its encoder when it has one.
+        void writeDeferredJson(ByteSink out) {
+            if (deferredEncoder != null) {
+                deferredEncoder.write(deferredJson, out);
+            } else {
+                Json.write(deferredJson, out);
+            }
+        }
+
+        /// The deferred value as its own array, for the paths with no connection
+        /// buffer to render into (HTTP/2 frames, serialising before a copy).
+        byte[] deferredJsonBytes() {
+            if (deferredEncoder == null) {
+                return bytes(Json.write(deferredJson));
+            }
+            ByteSink sink = new ByteSink(256);
+            deferredEncoder.write(deferredJson, sink);
+            byte[] out = new byte[sink.length()];
+            System.arraycopy(sink.bytes(), 0, out, 0, out.length);
+            return out;
+        }
         BodyWriter bodyWriter;
         /// The length a HEAD answer advertises for a bodiless response, or -1 to
         /// measure the body as usual: HttpProxy's HEAD carries the upstream's
@@ -1419,6 +1453,7 @@ public final class HttpServer {
         void releaseRetained() {
             this.deferredJson = null;
             this.hasDeferredJson = false;
+            this.deferredEncoder = null;
             this.bodyWriter = null;
             this.describedLength = -1;
             this.body = EMPTY_BODY;
@@ -1454,9 +1489,10 @@ public final class HttpServer {
         /// object graph may change after this without changing the response.
         void serializeDeferredJson() {
             if (hasDeferredJson) {
-                body = bytes(Json.write(deferredJson));
+                body = deferredJsonBytes();
                 deferredJson = null;
                 hasDeferredJson = false;
+                deferredEncoder = null;
             }
         }
 
@@ -1475,6 +1511,7 @@ public final class HttpServer {
             this.extraHeaders = extraHeaders;
             this.deferredJson = null;
             this.hasDeferredJson = false;
+            this.deferredEncoder = null;
             this.bodyWriter = null;
             this.describedLength = -1;
         }
@@ -1517,6 +1554,7 @@ public final class HttpServer {
                     fileLength, headers);
             copy.deferredJson = deferredJson;
             copy.hasDeferredJson = hasDeferredJson;
+            copy.deferredEncoder = deferredEncoder;
             copy.bodyWriter = bodyWriter;
             copy.describedLength = describedLength;
             return copy;
@@ -2011,6 +2049,9 @@ public final class HttpServer {
     static final int COMBINED_WRITE_LIMIT = 8192;
 
     static final byte[] EMPTY_BODY = new byte[0];
+
+    /// The most one read asks for, zero-copy or copying.
+    static final int READ_CHUNK = 8192;
     /// One instance, so the pooled JSON path does not intern a literal per call.
     static final String JSON_CONTENT_TYPE = "application/json; charset=utf-8";
     /// What a Response with no content type is sent as, on either protocol.
@@ -5610,9 +5651,38 @@ public final class HttpServer {
         /// answer before it lets go of a borrow, and "is there anything left to
         /// read" is NOT the same question -- see the comment there.
         boolean parsedFromBuffer;
+        /// The last zero-copy read did not fill the buffer, so the socket is very
+        /// likely empty: a virtual thread waits for the poller before reading again
+        /// rather than spending a recv to learn EAGAIN. See fill().
+        boolean drained;
 
         /// Memoised request targets for this connection. See internTarget.
         private final String[] targetCache = new String[TARGET_CACHE_SLOTS];
+        /// The Host value of the previous request on this connection.
+        private String lastHost;
+
+        /// The Host field as a String, the previous request's when the bytes are
+        /// the same. A keep-alive client sends one Host for the life of the
+        /// connection, and building it afresh was three of the five objects a
+        /// small JSON request allocated (the String, its chars and their copy).
+        /// One slot, not a table: a connection that alternates hosts is a proxy
+        /// multiplexing virtual hosts, and it simply misses as it did before.
+        String internHost(byte[] data, int start, int length) {
+            String cached = lastHost;
+            if (cached != null && cached.length() == length) {
+                int iter = 0;
+                while (iter < length
+                        && cached.charAt(iter) == (char) (data[start + iter] & 0xff)) {
+                    iter++;
+                }
+                if (iter == length) {
+                    return cached;
+                }
+            }
+            String fresh = asciiString(data, start, length);
+            lastHost = length > MAX_CACHED_TARGET_BYTES ? null : fresh;
+            return fresh;
+        }
 
         String internTarget(byte[] data, int start, int length) {
             // NOTHING LONG GOES IN. The cache exists for a route asked for over and
@@ -5877,8 +5947,27 @@ public final class HttpServer {
         /// not, so detachPreservingOffsets can re-point it.
         Request liveRequest;
 
+        /// The copying read's buffer, created by the first read that copies.
+        ///
+        /// A plaintext connection reads straight into its host's buffer and never
+        /// needs one; TLS and a request spanning reads do. It used to be allocated
+        /// for every connection up front, and 8KB is over the size the collector
+        /// serves from its pages, so each one was a zeroed calloc held for the
+        /// connection's whole life -- the larger part of what an idle keep-alive
+        /// connection cost.
+        private byte[] scratch;
+
+        private byte[] scratch() {
+            byte[] s = scratch;
+            if (s == null) {
+                s = new byte[READ_CHUNK];
+                scratch = s;
+            }
+            return s;
+        }
+
         /// Reads more. False at end of stream.
-        boolean fill(byte[] scratch) throws IOException {
+        boolean fill() throws IOException {
             if (borrowed && available() == 0 && !parsedFromBuffer) {
                 // Nothing is left unread AND nothing has been parsed out of this
                 // buffer, so this is the START of a new request on a kept-alive
@@ -5927,6 +6016,19 @@ public final class HttpServer {
                 detachPreservingOffsets();
             }
             if (ZERO_COPY_READ && available() == 0 && session == 0) {
+                if (drained && !parsedFromBuffer && VirtualThread.isVirtual()) {
+                    // The last read came back short, so the client had sent
+                    // everything it had, and a keep-alive client sends its next
+                    // request only after reading this answer. Park first: a read
+                    // now would almost always answer EAGAIN and cost a syscall to
+                    // say so. The poller is level-triggered, so bytes that did
+                    // arrive meanwhile resume this thread at once. This is how
+                    // tokio reads: a short read clears the socket's readiness.
+                    drained = false;
+                    if (!ServerSocket.parkUntilReadable(fd)) {
+                        return false;
+                    }
+                }
                 // The common case by far: nothing left over, so the bytes are read
                 // into this thread's reusable buffer and parsed where they land --
                 // no array allocated, nothing copied. The request is parsed out of
@@ -5941,7 +6043,7 @@ public final class HttpServer {
                 //
                 // Plaintext only (session == 0): a TLS read decrypts through its
                 // own path and does not hand back a buffer we own.
-                byte[] direct = ServerSocket.readIntoThreadBuffer(fd, scratch.length);
+                byte[] direct = ServerSocket.readIntoThreadBuffer(fd, READ_CHUNK);
                 if (direct == null) {
                     return false;
                 }
@@ -5968,11 +6070,31 @@ public final class HttpServer {
                     // already maintained for fill()'s benefit. Note a SPLIT header
                     // block needs nothing here: after the first partial read
                     // available() is non-zero, so it never takes this branch.
-                    if (!parsedFromBuffer) {
+                    //
+                    // ON A VIRTUAL THREAD the quiet is neither: nothing points into
+                    // the thread buffer yet, so the thread parks until the poller
+                    // reports bytes and reads again. Read first and wait only on
+                    // EAGAIN is what Rust's and Go's servers do; the keep-alive loop
+                    // used to call poll() before EVERY read instead -- one syscall
+                    // per request more than either, measured as a third of ours --
+                    // because this branch could not park.
+                    if (parsedFromBuffer) {
+                        return fillCopying();
+                    }
+                    if (!VirtualThread.isVirtual()) {
                         return false;
                     }
-                    return fillCopying(scratch);
+                    do {
+                        if (!ServerSocket.parkUntilReadable(fd)) {
+                            return false;
+                        }
+                        direct = ServerSocket.readIntoThreadBuffer(fd, READ_CHUNK);
+                        if (direct == null) {
+                            return false;
+                        }
+                    } while (direct.length == 0);
                 }
+                drained = direct.length < READ_CHUNK;
                 if (ZERO_COPY_MODE == 2) {
                     // Diagnostic bisection only -- see ZERO_COPY_MODE. Same read as
                     // mode 1, same heap array as mode 0, so whichever of the two the
@@ -5989,7 +6111,7 @@ public final class HttpServer {
                 borrowed = true;
                 return true;
             }
-            return fillCopying(scratch);
+            return fillCopying();
         }
 
         /// The copying read: into this connection's own scratch, then into a buffer
@@ -5998,7 +6120,8 @@ public final class HttpServer {
         /// Split out of fill() so the zero-copy path can defer to it when the
         /// descriptor has nothing ready. readFrom parks on EAGAIN for a virtual
         /// thread, which is the behaviour the shared-buffer read cannot safely have.
-        private boolean fillCopying(byte[] scratch) throws IOException {
+        private boolean fillCopying() throws IOException {
+            byte[] scratch = scratch();
             int n = readFrom(fd, session, scratch, 0, scratch.length);
             if (n <= 0) {
                 return false;
@@ -6385,7 +6508,6 @@ public final class HttpServer {
         if (virtualThreads) {
             ownerOf(fd).setConn(fd, conn);
         }
-        byte[] scratch = new byte[8192];
         int served = 0;
 
         // Cleartext HTTP/2 by prior knowledge: a client that already knows the
@@ -6407,7 +6529,7 @@ public final class HttpServer {
         if (session == 0) {
             try {
                 while (conn.available() < HTTP2_PREFACE.length) {
-                    if (!conn.fill(scratch)) {
+                    if (!conn.fill()) {
                         drop(fd);
                         return;
                     }
@@ -6436,7 +6558,7 @@ public final class HttpServer {
         while (true) {
             Request request;
             try {
-                request = readRequest(conn, scratch);
+                request = readRequest(conn);
             } catch (ProtocolException err) {
                 trace("fd=" + fd + " rejected: " + err.getMessage());
                 writeStatusOnly(conn, err.status, err.getMessage());
@@ -6537,7 +6659,7 @@ public final class HttpServer {
                 if (response.hasDeferredJson) {
                     try {
                         conn.bodySink.reset();
-                        Json.write(response.deferredJson, conn.bodySink);
+                        response.writeDeferredJson(conn.bodySink);
                     } catch (Throwable err) {
                         rethrowIfFatal(err);
                         System.err.println("handler failed: " + err);
@@ -6669,7 +6791,11 @@ public final class HttpServer {
                     // is waiting for still gets the full one when it arrives.
                     // Setting and restoring SO_RCVTIMEO around each wait did work,
                     // and cost four setsockopt per request -- 15% of syscall time.
-                    if (!ServerSocket.awaitReadable(fd, linger)) {
+                    //
+                    // Not on a virtual thread: there fill() reads straight away and
+                    // parks only when nothing has arrived, so asking first would be
+                    // a syscall per request spent learning what the read learns.
+                    if (!virtualThreads && !ServerSocket.awaitReadable(fd, linger)) {
                         break;                  // quiet client; the poller can have it
                     }
                     // The request this buffer was parsed from has been ANSWERED,
@@ -6694,7 +6820,7 @@ public final class HttpServer {
                     // window by construction -- the handler has returned and the
                     // response is on the wire.
                     conn.parsedFromBuffer = false;
-                    more = conn.fill(scratch);
+                    more = conn.fill();
                 } catch (IOException err) {
                     drop(fd);
                     return;
@@ -6719,15 +6845,12 @@ public final class HttpServer {
         try {
             // Back to the poller for the next request on this connection. Both
             // epoll_ctl and kevent are safe to call from this thread.
-            if (virtualThreads) {
-                // Reached only when the connection itself is finished: a virtual
-                // thread does not come back here to wait, it parks where it waits.
-                // Re-arming now would hand the poller a descriptor nobody owns.
-                drop(fd);
-            } else {
-                ServerSocket.setBlocking(fd, false);
-                armConnection(fd, false);
-            }
+            //
+            // Never reached on a virtual thread: every break above is taken only
+            // by pooled workers, and a virtual thread leaves the loop by returning
+            // once the connection is finished. It parks where it waits instead.
+            ServerSocket.setBlocking(fd, false);
+            armConnection(fd, false);
         } catch (IOException err) {
             drop(fd);
         }
@@ -7465,7 +7588,7 @@ public final class HttpServer {
                 // so they are built as their own array. Without this the body is empty,
                 // and the same handler that works over HTTP/1.1 answers HTTP/2 with
                 // nothing at all.
-                return Response.bytes(Json.write(response.deferredJson));
+                return response.deferredJsonBytes();
             }
             return response.body;
         }
@@ -8020,7 +8143,7 @@ public final class HttpServer {
         try {
             if (refused.hasDeferredJson) {
                 conn.bodySink.reset();
-                Json.write(refused.deferredJson, conn.bodySink);
+                refused.writeDeferredJson(conn.bodySink);
             }
             writeResponse(conn, fd, session, refused, false, false, true);
             conn.writtenStatus = status;
@@ -8147,7 +8270,7 @@ public final class HttpServer {
 
     /// Reads one request. Null when the peer closed; ProtocolException when what
     /// arrived is not a request this server will act on.
-    private Request readRequest(Conn conn, byte[] scratch) throws IOException {
+    private Request readRequest(Conn conn) throws IOException {
         // Cleared before the header block is read and raised once it has been
         // parsed, so fill() can tell "start of a request" from "midway through
         // one" -- which an empty buffer alone cannot say.
@@ -8176,7 +8299,7 @@ public final class HttpServer {
             if (headDeadline != 0 && System.currentTimeMillis() > headDeadline) {
                 throw new ProtocolException(408, "the request head did not arrive in time");
             }
-            if (!conn.fill(scratch)) {
+            if (!conn.fill()) {
                 return null;
             }
             headerEnd = indexOfHeaderEnd(conn.buffer, conn.pos);
@@ -8461,7 +8584,7 @@ public final class HttpServer {
             } else if (sliceEqualsIgnoreCase(raw, slices[base], slices[base + 1], HOST_BYTES)) {
                 hostCount++;
                 if (hostValue == null) {
-                    hostValue = asciiString(raw, slices[base + 2], slices[base + 3]);
+                    hostValue = conn.internHost(raw, slices[base + 2], slices[base + 3]);
                 }
             }
         }
@@ -8591,7 +8714,7 @@ public final class HttpServer {
             Spool spool = new Spool(SPOOL_THRESHOLD, MAX_SPOOLED_BODY_BYTES, SPOOL_DIRECTORY);
             boolean kept = false;
             try {
-                boolean complete = chunked ? readChunked(conn, scratch, spool) != null
+                boolean complete = chunked ? readChunked(conn, spool) != null
                         : conn.spoolTo(spool, declaredLength);
                 if (!complete) {
                     return null;
@@ -8609,7 +8732,7 @@ public final class HttpServer {
             }
         }
         if (chunked) {
-            byte[] decoded = readChunked(conn, scratch, null);
+            byte[] decoded = readChunked(conn, null);
             if (decoded == null) {
                 return null;
             }
@@ -8804,7 +8927,7 @@ public final class HttpServer {
     /// chunk as it arrives, never a whole chunk in the connection buffer -- and
     /// under MAX_SPOOLED_BODY_BYTES; the answer is then an empty array, or null
     /// for a peer that went away.
-    private byte[] readChunked(Conn conn, byte[] scratch, Spool spool) throws IOException {
+    private byte[] readChunked(Conn conn, Spool spool) throws IOException {
         // Charged against the SAME process-wide budget the fixed-length path uses.
         // Bounding only that path left this one open: a chunked body is capped per
         // request at MAX_BODY_BYTES and by nothing at all across requests, so
@@ -8848,7 +8971,7 @@ public final class HttpServer {
                     }
                     requireChunkedProgress(started, body.length() + conn.available());
                     reserveUploadUpTo(charged, body.length() + conn.available());
-                    if (!conn.fill(scratch)) {
+                    if (!conn.fill()) {
                         return null;
                     }
                     lineEnd = indexOfCrLf(conn.buffer, conn.pos);
@@ -8894,7 +9017,7 @@ public final class HttpServer {
                             }
                             requireChunkedProgress(started, body.length() + conn.available());
                             reserveUploadUpTo(charged, body.length() + conn.available());
-                            if (!conn.fill(scratch)) {
+                            if (!conn.fill()) {
                                 // EOF before the blank line that ends the trailers: the
                                 // chunked framing never finished, so this is a truncated
                                 // message, not a complete one. Returning the body here
@@ -8966,7 +9089,7 @@ public final class HttpServer {
                             requireChunkedProgress(started,
                                     (int) Math.min(Integer.MAX_VALUE, spool.length()));
                             reserveUploadUpTo(charged, conn.available());
-                            if (!conn.fill(scratch)) {
+                            if (!conn.fill()) {
                                 return null;
                             }
                             continue;
@@ -8981,7 +9104,7 @@ public final class HttpServer {
                     while (conn.available() < 2) {
                         requireChunkedProgress(started,
                                 (int) Math.min(Integer.MAX_VALUE, spool.length()));
-                        if (!conn.fill(scratch)) {
+                        if (!conn.fill()) {
                             return null;
                         }
                     }
@@ -8998,7 +9121,7 @@ public final class HttpServer {
                 while (conn.available() < size + 2) {
                     requireChunkedProgress(started, body.length() + conn.available());
                     reserveUploadUpTo(charged, body.length() + conn.available());
-                    if (!conn.fill(scratch)) {
+                    if (!conn.fill()) {
                         return null;
                     }
                 }

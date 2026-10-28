@@ -219,6 +219,29 @@ final class BulkGeneratedCodeChecks {
             caseValue(collections, "ihm.valNulls", "1", "the value iterator must hand back a null value as null",
                     failures);
             caseValue(collections, "ihm.bigSeen", "500", "key iteration must survive a rehash", failures);
+            // A `?:` receiver joins two branches right before the loop. Each
+            // must walk the branch that ran -- the else branch's load used to
+            // be folded in as the receiver of both, so a true condition with a
+            // null else threw. Without the fix trueNullElse, trueOther,
+            // localsFirst, localsFirstNullElse, staticsNullElse, keySetFirst,
+            // keySetFirstNullElse and valuesFirst fail; the other cases pin the
+            // branches that were right by construction. Equal output catches
+            // them too; named so the failure says what broke.
+            String[][] ternary = {
+                {"ternary.trueNullElse", "o:1"}, {"ternary.trueOther", "o:2"},
+                {"ternary.falseOther", "uv:2"}, {"ternary.falseNull", "THREW java.lang.NullPointerException"},
+                {"ternary.localsFirst", "a1a2"}, {"ternary.localsSecond", "uv"},
+                {"ternary.localsFirstNullElse", "a1a2"},
+                {"ternary.fieldsNullElse", "c"}, {"ternary.fieldsElse", "b"},
+                {"ternary.staticsNullElse", "sc"}, {"ternary.staticsElse", "sb"},
+                {"ternary.keySetFirst", "1"}, {"ternary.keySetSecond", "6"},
+                {"ternary.keySetFirstNullElse", "1"},
+                {"ternary.valuesFirst", "3"}, {"ternary.valuesSecond", "6"},
+                {"ternary.iteratorFirst", "a1"}, {"ternary.iteratorSecond", "u"},
+            };
+            for (String[] c : ternary) {
+                caseValue(collections, c[0], c[1], "a ?: receiver must use the branch that ran", failures);
+            }
         }
         List<String> rethrow = parparvm.get("CatchRethrowApp");
         if (rethrow != null && !rethrow.contains("RESULT=127")) {

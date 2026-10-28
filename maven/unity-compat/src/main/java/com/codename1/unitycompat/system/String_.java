@@ -25,7 +25,7 @@ package com.codename1.unitycompat.system;
 /// The methods of `System.String`, which is `java.lang.String` here. The
 /// string comes first. Comparisons are ordinal and case changes are per
 /// character: translated code has no culture.
-@SuppressWarnings("PMD.MethodNamingConventions") // C# member names: translated code binds to them by name
+@SuppressWarnings({"PMD.MethodNamingConventions", "PMD.ClassNamingConventions"}) // C# member and type names: translated code binds to them by name
 public final class String_ {
     public static final String Empty = "";
 

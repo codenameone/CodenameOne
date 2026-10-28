@@ -1,0 +1,31 @@
+= Reel packager
+
+A standalone Java 17 command line tool (no runtime dependencies, needs `ffmpeg` and `ffprobe` on the PATH) that turns source videos into protected streaming renditions for the Reel sample.
+
+Build: `mvn package` produces `target/reel-packager-1.0-SNAPSHOT.jar`, an executable jar.
+Set `-Dreel.tmp=<dir>` to choose where temporary files go.
+
+== Commands
+
+`package --input <file> --out <dir> --key-id <32 hex> --key <32 hex> --iv <32 hex> [--renditions 720,480,360] [--segment 6]`::
+Encodes an HLS AES-128 ladder (never upscaling) and a CENC fragmented MP4, and writes the poster, scrub sprite, frame hashes and metadata.
+
+`worker --server <url> --token <t> [--name <worker>] [--once]`::
+Claims packaging jobs from a Reel server, downloads the source, packages it, uploads the outputs and reports progress, completion or failure.
+
+`seed --media <dir> [--films bbb,sintel,tos,ed] [--small]`::
+Downloads the Blender open movies into `<dir>/../sources`, generates three academy lessons and two ads, packages each with random keys into `<dir>/<slug>/` and writes `<dir>/seed.json`. Re-runs only package what is missing. `--small` keeps the first 60 s of each film.
+
+== Output layout
+
+All files are flat in the output directory.
+
+[cols="1,3"]
+|===
+|`master.m3u8`, `v<h>.m3u8`, `v<h>_00001.ts` ...|HLS AES-128 ladder; each playlist says `URI="key"`, which the server resolves. No key file is written.
+|`cenc.mp4`|Fragmented MP4 at the middle rendition, `cenc-aes-ctr`, with a W3C common PSSH box (ClearKey) in `moov`.
+|`poster.jpg`|1280 px wide frame at about 10% of the duration.
+|`sprite.jpg`|10x10 grid of 160x90 thumbnails across the duration.
+|`hashes.txt`|One 64-bit dHash (16 hex characters) per line, a frame every 10 s.
+|`info.json`|`durationSeconds`, `width`, `height`, `renditions`, `schemes`, `frameHashes`.
+|===

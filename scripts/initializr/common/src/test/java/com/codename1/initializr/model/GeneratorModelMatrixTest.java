@@ -104,6 +104,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         validateMavenProjectTypeBeforeTheGate();
         validateMavenRefusals();
         validateFullStackTemplate();
+        validateReelGate();
         for (Template template : Template.values()) {
             for (ProjectOptions.ProjectType type : ProjectOptions.ProjectType.values()) {
                 if (template.isFullStack() && type == ProjectOptions.ProjectType.APP) {
@@ -376,6 +377,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         boolean rides = template == Template.WAYLINE;
         boolean bank = template == Template.BASTION;
         boolean game = template == Template.SKIRMISH;
+        boolean video = template == Template.REEL;
         String name = template.SOURCE_MAIN_CLASS;
         String upper = template.name();
         String lower = GeneratorModel.toLowerCaseInvariant(name);
@@ -390,12 +392,12 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         // project once got the ride-hailing accounts and chapters.
         String readme = getText(entries, "README.md");
         boolean chat = template == Template.PARLEY;
-        assertContains(readme, game ? "card battler" : rides ? "ride-hailing app" : chat ? "messaging app" : bank ? "working bank" : "food-delivery app",
+        assertContains(readme, game ? "card battler" : rides ? "ride-hailing app" : chat ? "messaging app" : bank ? "working bank" : video ? "video streaming service" : "food-delivery app",
                 label + "README names the app");
         if (!game) {
-            assertContains(readme, (rides ? "`rider@" : chat ? "`alice@" : bank ? "`customer2@" : "`customer@") + artifact + ".example`",
+            assertContains(readme, (rides ? "`rider@" : chat ? "`alice@" : bank ? "`customer2@" : video ? "`viewer@" : "`customer@") + artifact + ".example`",
                     label + "README lists the template's own demo accounts");
-            assertFalse(readme.indexOf(rides || chat || bank ? "courier@" : "rider@") >= 0,
+            assertFalse(readme.indexOf(rides || chat || bank || video ? "courier@" : "rider@") >= 0,
                     label + "README carries no other template's accounts");
             assertFalse(chat && readme.indexOf("rider@") >= 0, label + "README carries no ride-hailing accounts");
         }
@@ -416,15 +418,15 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertContains(getText(entries, "backend/pom.xml"), "<goal>generate-annotation-stubs</goal>",
                 label + "the server generates its half of the contract");
 
-        assertContains(getText(entries, "shared/src/main/java/" + packagePath + (game ? "/api/AccountApi.java" : rides ? "/api/RiderApi.java" : chat ? "/api/MessageApi.java" : bank ? "/api/BankingApi.java" : "/api/OrderApi.java")),
+        assertContains(getText(entries, "shared/src/main/java/" + packagePath + (game ? "/api/AccountApi.java" : rides ? "/api/RiderApi.java" : chat ? "/api/MessageApi.java" : bank ? "/api/BankingApi.java" : video ? "/api/CatalogApi.java" : "/api/OrderApi.java")),
                 "package " + packageName + ".api;", label + "the contract moves to the project's package");
         assertContains(getText(entries, "backend/src/main/java/" + packagePath + "/SecurityConfig.java"),
                 "package " + packageName + ";", label + "the server moves to the project's package");
         assertNotNull(entries.get("backend/src/main/resources/db/migration/" + (game ? "V1__game.sql" : bank ? "V4__accounts.sql" : "V1__accounts.sql")),
                 label + "the server keeps its migrations");
-        assertNotNull(entries.get("backend/src/test/java/" + packagePath + (game ? "/GameSocketTest.java" : rides ? "/RideFlowTest.java" : chat ? "/MessagingTest.java" : bank ? "/LedgerTest.java" : "/OrderFlowTest.java")),
+        assertNotNull(entries.get("backend/src/test/java/" + packagePath + (game ? "/GameSocketTest.java" : rides ? "/RideFlowTest.java" : chat ? "/MessagingTest.java" : bank ? "/LedgerTest.java" : video ? "/PlaybackTest.java" : "/OrderFlowTest.java")),
                 label + "the server keeps its tests");
-        assertNotNull(entries.get("common/src/main/java/" + packagePath + (game ? "/ui/HomeForm.java" : rides ? "/rider/RiderForm.java" : chat ? "/ui/ChatForm.java" : bank ? "/ui/HomeForm.java" : "/customer/CustomerForm.java")),
+        assertNotNull(entries.get("common/src/main/java/" + packagePath + (game ? "/ui/HomeForm.java" : rides ? "/rider/RiderForm.java" : chat ? "/ui/ChatForm.java" : bank ? "/ui/HomeForm.java" : video ? "/ui/WelcomeForm.java" : "/customer/CustomerForm.java")),
                 label + "the app's screens move to the project's package");
         if (!game) {
             assertNotNull(entries.get("common/src/main/l10n/Bundle.properties"), label + "the app keeps its bundle");
@@ -444,7 +446,12 @@ public class GeneratorModelMatrixTest extends AbstractTest {
             assertContains(settings, "codename1.arg.android.playIntegrity=true", label + "the template's Android hint");
         } else {
             assertContains(settings, "codename1.arg.android.xapplication_attr=", label + "the template's Android hint");
-            if (!game) {
+            if (video) {
+                // Streaming asks for no location; a creator picks videos and posters
+                // from the library.
+                assertContains(settings, "codename1.arg.ios.NSPhotoLibraryUsageDescription=",
+                        label + "the template's iOS photo library prompt");
+            } else if (!game) {
                 assertContains(settings, "codename1.arg.ios.NSLocationWhenInUseUsageDescription=",
                         label + "the template's iOS location prompt");
             }
@@ -569,6 +576,18 @@ public class GeneratorModelMatrixTest extends AbstractTest {
     private static final String LAYOUTS_VERSION = "7.0.275";
     /// The version the full-stack combinations are generated for.
     private static final String FULL_STACK_VERSION = GeneratorModel.FULL_STACK_SINCE;
+
+    /// The streaming template needs a newer core than the other complete apps:
+    /// below its own gate it is refused, and the page does not list it.
+    private void validateReelGate() throws Exception {
+        assertFalse(GeneratorModel.isVersionAtLeast(FULL_STACK_VERSION, GeneratorModel.REEL_SINCE),
+                "Reel's gate is past the other complete apps'");
+        assertRefused(GeneratorModel.createForPluginVersion(IDE.INTELLIJ, Template.REEL, "OldReel",
+                "com.acme.oldreel", ProjectOptions.defaults().forFullStack(), FULL_STACK_VERSION),
+                GeneratorModel.REEL_SINCE, "Reel is not generated before its gate");
+        assertEqual(Boolean.valueOf(GeneratorModel.isVersionAtLeast(GeneratorModel.cn1PluginVersion(),
+                GeneratorModel.REEL_SINCE)), Boolean.valueOf(GeneratorModel.isTemplateOffered(Template.REEL)), "The page offers Reel from its gate on");
+    }
 
     private static ProjectOptions mavenOptions(ProjectOptions.ProjectType type, boolean allModules) {
         return ProjectOptions.defaults().withBuild(ProjectOptions.BuildTool.MAVEN, type).withPlatformModules(allModules);
