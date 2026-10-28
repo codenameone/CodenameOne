@@ -58,6 +58,51 @@ class SqlLimitsAndKindsTest {
     }
 
     @Test
+    void driverSpellingsMatchTheUrlParser() throws IOException {
+        String[] spellings = {"disable", "DISABLED", "false", "prefer", "PREFERRED", "require",
+            "REQUIRED", "true", "verify-full", "VERIFY_IDENTITY", "verify-ca", "VERIFY_CA"};
+        for (String s : spellings) {
+            assertEquals(SqlLimitsAccess.urlCanonical(s), SqlLimits.canonicalSslMode(s), s);
+        }
+        assertNull(SqlLimits.canonicalSslMode(null));
+        assertThrows(IOException.class, () -> SqlLimits.canonicalSslMode("allow"));
+    }
+
+    @Test
+    void tlsRefusalNamesTheModeAsWritten() throws Exception {
+        // A peer that answers the SSLRequest with 'N', as a server without TLS does.
+        final java.net.ServerSocket peer = new java.net.ServerSocket(0, 1,
+                java.net.InetAddress.getByName("127.0.0.1"));
+        Thread answer = new Thread(() -> {
+            try (java.net.Socket s = peer.accept()) {
+                byte[] request = new byte[8];
+                int read = 0;
+                while (read < 8) {
+                    int n = s.getInputStream().read(request, read, 8 - read);
+                    if (n < 0) {
+                        return;
+                    }
+                    read += n;
+                }
+                s.getOutputStream().write('N');
+                s.getOutputStream().flush();
+                s.getInputStream().read();
+            } catch (IOException ignored) {
+                // the client hung up, which is the expected end
+            }
+        });
+        answer.start();
+        try {
+            IOException err = assertThrows(IOException.class, () -> Postgres.connect("127.0.0.1",
+                    peer.getLocalPort(), "db", "u", "pw", "verify-full", null, 5000, 5000));
+            assertTrue(err.getMessage().contains("sslmode=verify-full"), err.getMessage());
+        } finally {
+            peer.close();
+            answer.join(5000);
+        }
+    }
+
+    @Test
     void postgresKindsNameTheZonedTypesConsistently() {
         assertEquals("decimal", Postgres.kind(1700));
         assertEquals("date", Postgres.kind(1082));

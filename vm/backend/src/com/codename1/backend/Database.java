@@ -1336,7 +1336,10 @@ public final class Database {
                 String value = decode(pair.substring(equals + 1));
                 if ("sslmode".equals(key) || "ssl".equals(key)
                         || "ssl-mode".equals(key) || "sslMode".equals(key)) {
-                    out.sslMode = canonicalSslMode(value);
+                    // Validated here, before any socket, and handed on as
+                    // written so the drivers' errors name the user's spelling.
+                    canonicalSslMode(value);
+                    out.sslMode = value.trim();
                 } else if ("user".equals(key)) {
                     out.user = value;
                 } else if ("password".equals(key)) {

@@ -2172,7 +2172,7 @@ public final class HttpServer {
     ///   more than the current size is a no-op at any time.
     public static void requireVirtualThreadStack(int bytes) {
         if (bytes > vtStackBytes) {
-            if (ANY_SERVER_STARTED.get()) {
+            if (LIVE_SERVERS.get() > 0) {
                 throw new IllegalStateException("requireVirtualThreadStack(" + bytes
                         + ") was called after a server started; call it before "
                         + "HttpServer.start so every connection gets the stack");
@@ -2181,10 +2181,12 @@ public final class HttpServer {
         }
     }
 
-    /// Set by the first `start`, so a stack raise that can no longer reach every
-    /// connection is refused rather than silently partial.
-    private static final java.util.concurrent.atomic.AtomicBoolean ANY_SERVER_STARTED =
-            new java.util.concurrent.atomic.AtomicBoolean(false);
+    /// Servers that bound their listener and have not been stopped. While any
+    /// is live a stack raise could no longer reach every connection, so it is
+    /// refused rather than silently partial; a start that failed to bind never
+    /// counts, and once the last server stops a raise is accepted again.
+    private static final java.util.concurrent.atomic.AtomicInteger LIVE_SERVERS =
+            new java.util.concurrent.atomic.AtomicInteger();
 
     /// How often a virtual-thread host sweeps its deadlines, however busy it is.
     /// The same 250ms the idle poll waits, so a quiet host behaves exactly as
@@ -2521,7 +2523,6 @@ public final class HttpServer {
     static HttpServer start(String host, int port, int backlog, int workerCount,
                             Handler handler, Tls tls, WebSocketRoutes webSockets,
                             Tracer tracer) throws IOException {
-        ANY_SERVER_STARTED.set(true);
         // BEFORE THE BIND, because the two arms failed this differently and both
         // badly. Java SE's Executors.newFixedThreadPool throws for a non-positive
         // count -- but only after the listener and the reactor are open, so the
@@ -2596,6 +2597,9 @@ public final class HttpServer {
         final HttpServer server = new HttpServer(listener, reactor,
                 useVirtualThreads ? null : Executors.newFixedThreadPool(workerCount),
                 workerCount, handler, tls);
+        // Counted only now, with the listener bound: a start that threw above
+        // leaves the stack size free to raise.
+        LIVE_SERVERS.incrementAndGet();
         if (tracer != null) {
             server.serverTracer = tracer;
         }
@@ -2834,7 +2838,9 @@ public final class HttpServer {
         // wedge itself against a drain that is waiting for that same handler: the
         // bound is the whole teardown the winner is allowed, and after it this
         // returns whether or not the winner finished.
-        if (!stopClaimed.compareAndSet(false, true)) {
+        if (stopClaimed.compareAndSet(false, true)) {
+            LIVE_SERVERS.decrementAndGet();
+        } else {
             long limit = System.currentTimeMillis() + drainMillis
                     + SESSION_RELEASE_GRACE_MILLIS + POLL_LOOP_JOIN_MILLIS;
             synchronized (stopped) {

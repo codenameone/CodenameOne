@@ -115,7 +115,9 @@ public final class MySql {
             String password, String sslMode, String caFile, int timeoutMillis,
             int socketTimeoutMillis) throws IOException {
         // BEFORE THE SOCKET, for the reason Postgres gives one engine over.
-        SqlLimits.requireSslMode(sslMode);
+        // Kept as written for the errors, as Postgres does.
+        final String sslModeAsWritten = sslMode;
+        sslMode = SqlLimits.canonicalSslMode(sslMode);
         SqlLimits.requireRootForVerifyCa(sslMode, caFile);
         Tcp connection = Tcp.connect(host, port <= 0 ? 3306 : port, timeoutMillis);
         // AFTER THE CONNECT, and before anything is said on it: the deadline
@@ -127,7 +129,7 @@ public final class MySql {
         }
         try {
             MySql session = new MySql(new Wire(connection));
-            session.handshake(host, database, user, password, sslMode, caFile);
+            session.handshake(host, database, user, password, sslMode, sslModeAsWritten, caFile);
             // UTC, whatever the server's default. A TIMESTAMP column is converted
             // to and from the session zone on every read and write, and a
             // @Temporal value is written as UTC text, so a session left in the
@@ -142,7 +144,7 @@ public final class MySql {
     }
 
     private void handshake(String host, String database, String user, String password,
-            String sslMode, String caFile) throws IOException {
+            String sslMode, String sslModeAsWritten, String caFile) throws IOException {
         Packet greeting = readPacket();
         Reader reader = new Reader(greeting.body);
         int protocol = reader.u8();
@@ -197,7 +199,7 @@ public final class MySql {
         if (useTls && (serverCapabilities & CLIENT_SSL) == 0) {
             if (SqlLimits.demandsTls(sslMode)) {
                 throw new IOException("The MySQL server at " + host
-                        + " does not offer TLS and sslmode=" + sslMode);
+                        + " does not offer TLS and sslmode=" + sslModeAsWritten);
             }
             useTls = false;
         }

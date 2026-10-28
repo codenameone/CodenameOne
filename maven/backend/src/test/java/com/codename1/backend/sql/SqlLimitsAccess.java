@@ -27,6 +27,10 @@ public final class SqlLimitsAccess {
     private SqlLimitsAccess() {
     }
 
+    public static String urlCanonical(String sslMode) throws java.io.IOException {
+        return com.codename1.backend.DatabaseUrlAccess.canonicalSslMode(sslMode);
+    }
+
     public static boolean verifiesHost(String sslMode) {
         return SqlLimits.verifiesHost(sslMode);
     }

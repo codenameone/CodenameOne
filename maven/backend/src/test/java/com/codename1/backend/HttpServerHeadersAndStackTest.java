@@ -33,6 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /// Header merging for upgrade responses, and the virtual-thread stack raise that
 /// must happen before any server starts.
@@ -85,5 +86,40 @@ class HttpServerHeadersAndStackTest {
         } finally {
             server.stop(1000);
         }
+        // The last live server stopped, so a raise is accepted again; the size
+        // is put back with the smallest legal raise (it never lowers).
+        HttpServer.requireVirtualThreadStack(256 * 1024);
+    }
+
+    @Test
+    void aStartThatFailsToBindDoesNotLatch() throws Exception {
+        HttpServer holder = HttpServer.start("127.0.0.1", 0, 16, 1, new HttpServer.Handler() {
+            public HttpServer.Response handle(HttpServer.Request request) {
+                return HttpServer.Response.text(200, "ok");
+            }
+        });
+        int taken = holder.getPort();
+        holder.stop(1000);
+        HttpServer blocker = HttpServer.start("127.0.0.1", 0, 16, 1, new HttpServer.Handler() {
+            public HttpServer.Response handle(HttpServer.Request request) {
+                return HttpServer.Response.text(200, "ok");
+            }
+        });
+        int busy = blocker.getPort();
+        blocker.stop(1000);
+        java.net.ServerSocket occupied = new java.net.ServerSocket(busy, 1,
+                java.net.InetAddress.getByName("127.0.0.1"));
+        try {
+            assertThrows(java.io.IOException.class, () -> HttpServer.start("127.0.0.1", busy, 16, 1,
+                    new HttpServer.Handler() {
+                        public HttpServer.Response handle(HttpServer.Request request) {
+                            return HttpServer.Response.text(200, "ok");
+                        }
+                    }));
+            HttpServer.requireVirtualThreadStack(320 * 1024);
+        } finally {
+            occupied.close();
+        }
+        assertTrue(taken > 0);
     }
 }

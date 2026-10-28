@@ -101,7 +101,11 @@ public final class Postgres {
             int socketTimeoutMillis) throws IOException {
         // BEFORE THE SOCKET: a mode this code does not implement is a typo, and
         // reading it as prefer is how "require" spelled wrong accepts plaintext.
-        SqlLimits.requireSslMode(sslMode);
+        // The mode as written is kept for the errors: "sslmode=require" in a
+        // message about a URL that said verify-full would send the reader
+        // looking for a setting they never wrote.
+        final String sslModeAsWritten = sslMode;
+        sslMode = SqlLimits.canonicalSslMode(sslMode);
         SqlLimits.requireRootForVerifyCa(sslMode, caFile);
         Tcp connection = Tcp.connect(host, port <= 0 ? 5432 : port, timeoutMillis);
         // AFTER THE CONNECT, and before anything is said on it: the deadline
@@ -120,7 +124,7 @@ public final class Postgres {
                 boolean required = SqlLimits.demandsTls(sslMode);
                 if (!offered && required) {
                     throw new IOException("The server at " + host
-                            + " refused TLS and sslmode=" + sslMode);
+                            + " refused TLS and sslmode=" + sslModeAsWritten);
                 }
                 if (offered) {
                     try {
