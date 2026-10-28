@@ -152,6 +152,11 @@ final class TypedEmit {
     /// pushed result (see `E.pk`); and the call a hoisted leaf is, likewise.
     private Expr pushTop;
     private Expr pushLeaf;
+    /// See `top`; and whether the leaves being collected or evaluated are
+    /// that expression's.
+    private Expr hoistTop;
+    private boolean topLeaves;
+    private boolean leafImpureOk;
     private final Map<Infer.Fn, String> longBodies = new LinkedHashMap<Infer.Fn, String>();
     /// The argument intervals of the calls the function being emitted makes.
     private Map<Call, IntRanges.Iv[]> sites = new HashMap<Call, IntRanges.Iv[]>();
@@ -1150,7 +1155,7 @@ final class TypedEmit {
                 pushTop = v;
                 E e;
                 try {
-                    e = expr(v);
+                    e = top(v);
                 } finally {
                     pushTop = saved;
                 }
@@ -1702,15 +1707,30 @@ final class TypedEmit {
         b.append("}\n");
     }
 
+    /// `e`, the whole value of a statement that does nothing else with an
+    /// effect: an augmented assignment to a local, or a `return`. Its
+    /// arithmetic may then be hoisted even over calls that are not pure
+    /// (see `collectLeaves`): its leaves run in order, as Python runs them,
+    /// and nothing else in the statement runs between them.
+    private E top(Expr e) {
+        Expr saved = hoistTop;
+        hoistTop = e;
+        try {
+            return expr(e);
+        } finally {
+            hoistTop = saved;
+        }
+    }
+
     private void augAssign(AugAssign a, StringBuilder b, int ind) {
         Expr t = a.target;
         if (t instanceof Name && longLocals.contains(((Name) t).id)) {
-            store(t, expr(new BinOp(t, a.op, a.value)), b, ind);
+            store(t, top(new BinOp(t, a.op, a.value)), b, ind);
             return;
         }
         if (t instanceof Name && (localType(((Name) t).id).k == Ty.K.INT || localType(((Name) t).id).k == Ty.K.FLOAT)
                 && sc.resolve(((Name) t).id) == Scope.Binding.LOCAL) {
-            store(t, expr(new BinOp(t, a.op, a.value)), b, ind);
+            store(t, top(new BinOp(t, a.op, a.value)), b, ind);
             return;
         }
         if (t instanceof Attribute && ((Attribute) t).value instanceof Name
@@ -2132,6 +2152,12 @@ final class TypedEmit {
                 }
             }
             BinOp b = (BinOp) e;
+            if ("+".equals(b.op) && b.left instanceof BinOp && "+".equals(((BinOp) b.left).op)) {
+                E c = strChain(b);
+                if (c != null) {
+                    return c;
+                }
+            }
             return binop(b.op, expr(b.left), expr(b.right), b.right);
         }
         if (e instanceof UnaryOp) {
@@ -2512,7 +2538,12 @@ final class TypedEmit {
     /// conditionally.
     private List<Expr> leaves(Expr e) {
         List<Expr> out = new ArrayList<Expr>();
-        return collectLeaves(e, out) ? out : null;
+        topLeaves = e == hoistTop; //NOPMD CompareObjectsWithEquals - identity is meant
+        try {
+            return collectLeaves(e, out) ? out : null;
+        } finally {
+            topLeaves = false;
+        }
     }
 
     private boolean collectLeaves(Expr e, List<Expr> out) {
@@ -2527,7 +2558,7 @@ final class TypedEmit {
             return collectLeaves(((BinOp) e).left, out) && collectLeaves(((BinOp) e).right, out);
         }
         boolean quiet = e instanceof Constant || e instanceof Name && sc.resolve(((Name) e).id) == Scope.Binding.LOCAL;
-        if (!quiet && !(stmtPure && condDepth == 0)) {
+        if (!quiet && !((stmtPure || topLeaves) && condDepth == 0)) {
             return false;
         }
         out.add(e);
@@ -2581,18 +2612,22 @@ final class TypedEmit {
         if (ls == null) {
             return null;
         }
+        boolean impureOk = e == hoistTop; //NOPMD CompareObjectsWithEquals - identity is meant
         Map<Expr, E> savedLeaves = leafSubst;
         leafSubst = new IdentityHashMap<Expr, E>(savedLeaves);
         try {
             List<Expr> pushedLeaves = new ArrayList<Expr>();
             for (Expr x : ls) {
                 Expr savedLeaf = pushLeaf;
+                boolean savedOk = leafImpureOk;
                 pushLeaf = x;
+                leafImpureOk = impureOk;
                 E v;
                 try {
                     v = expr(x);
                 } finally {
                     pushLeaf = savedLeaf;
+                    leafImpureOk = savedOk;
                 }
                 if (v.pk != null) {
                     pushedLeaves.add(x);
@@ -3031,6 +3066,55 @@ final class TypedEmit {
         return o.append(";\n    }\n").toString();
     }
 
+    /// `a + b + c ...` of strs, three or more: one `StringBuilder` sized
+    /// for the result, where nested concatenation made a string per `+`;
+    /// a `str(i)` of an int is appended as the long itself. Null when the
+    /// chain is not of strs.
+    private E strChain(BinOp b) {
+        List<Expr> ops = new ArrayList<Expr>();
+        Expr x = b;
+        while (x instanceof BinOp && "+".equals(((BinOp) x).op)) {
+            ops.add(0, ((BinOp) x).right);
+            x = ((BinOp) x).left;
+        }
+        ops.add(0, x);
+        for (Expr o : ops) {
+            Ty t = in.type(o, cur, sc);
+            if (t.k != Ty.K.STR || t.opt) {
+                return null;
+            }
+        }
+        StringBuilder sb = new StringBuilder();
+        int cap = 0;
+        for (Expr o : ops) {
+            if (o instanceof Call && ((Call) o).func instanceof Name && "str".equals(((Name) ((Call) o).func).id)
+                    && ((Call) o).args.size() == 1 && ((Call) o).keywords.isEmpty()
+                    && !(((Call) o).args.get(0) instanceof Starred)
+                    && sc.resolve("str") == Scope.Binding.BUILTIN) {
+                E v = expr(((Call) o).args.get(0));
+                if (v.t.k == Ty.K.INT && v.lc != null && !v.t.opt) {
+                    sb.append(".append(").append(v.lc).append(')');
+                    cap += 20;
+                    continue;
+                }
+                E sv = builtin("str", java.util.Collections.singletonList(v));
+                if (sv == null || sv.t.k != Ty.K.STR || sv.t.opt) {
+                    throw new Unsupported("str() of " + v.t);
+                }
+                sb.append(".append(").append(sv.c).append(')');
+                cap += 16;
+                continue;
+            }
+            E v = expr(o);
+            if (v.t.k != Ty.K.STR || v.t.opt) {
+                throw new Unsupported("str chain over " + v.t);
+            }
+            cap += o instanceof Constant ? v.c.length() - 2 : 16;
+            sb.append(".append(").append(v.c).append(')');
+        }
+        return new E("new StringBuilder(" + cap + ")" + sb + ".toString()", Ty.STR);
+    }
+
     E binop(String op, E l, E r, Expr right) {
         Ty t = Infer.binop(op, l.t, r.t, right);
         if (l.t.k == Ty.K.LIST && "*".equals(op) && (r.t.k == Ty.K.INT || r.t.k == Ty.K.BOOL)) {
@@ -3393,8 +3477,8 @@ final class TypedEmit {
                             ? longName(f) + "(" + longArgList(f, lp, a) + ")"
                             : typed.get(f) + "(" + argList(f, 0, a) + ")";
                     Ty site = in.siteRet.get(c);
-                    if (f.ret.k == Ty.K.INT && pre != null && stmtPure && condDepth == 0 && (site == null || site.k == Ty.K.INT)
-                            && (c == pushTop || c == pushLeaf)) { //NOPMD CompareObjectsWithEquals - identity is meant
+                    if (f.ret.k == Ty.K.INT && pre != null && condDepth == 0 && (site == null || site.k == Ty.K.INT)
+                            && (c == pushTop || c == pushLeaf && (stmtPure || leafImpureOk))) { //NOPMD CompareObjectsWithEquals - identity is meant
                         String r = fresh();
                         indent(pre, preInd);
                         pre.append("long ").append(r).append(" = ").append(call).append(";\n");
