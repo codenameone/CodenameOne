@@ -43,6 +43,10 @@
 # simulator: xvfb-run is used where there is one.
 set -euo pipefail
 
+# Opt out of the build telemetry: the launchers and the plugin otherwise report
+# these builds to production as if a new developer had made them.
+export CN1_TELEMETRY=0
+
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/../.." && pwd)"
 WORK="${E2E_WORK:-$HERE/target/e2e-shipped}"
