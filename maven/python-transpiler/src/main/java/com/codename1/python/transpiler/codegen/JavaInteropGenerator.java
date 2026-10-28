@@ -60,6 +60,9 @@ public final class JavaInteropGenerator {
 
     private final ClassPathReader cp;
     /// Imported classes, by internal name, numbered in order.
+    /// Static fields per generated getter method.
+    private static final int STATIC_CHUNK = 256;
+
     private final Map<String, Integer> imported = new LinkedHashMap<String, Integer>();
     /// Python module (`java.com.codename1.ui`) to its imported names.
     private final Map<String, Map<String, String>> modules = new TreeMap<String, Map<String, String>>();
@@ -771,18 +774,32 @@ public final class JavaInteropGenerator {
                 }
             }
         }
+        // One method per class, and per STATIC_CHUNK fields of it, each
+        // falling through to the next: a class such as FontImage has
+        // thousands of constants, which in one method pass the JVM's 64 KB
+        // limit on a method's code.
+        StringBuilder fieldGetters = new StringBuilder();
         body.append("    @Override\n    public Object getStatic(int cls, String name) {\n");
         body.append("        switch (cls) {\n");
         for (Map.Entry<Integer, Map<String, Member>> e : staticFields.entrySet()) {
             String c = javaType("L" + ids.get(e.getKey()) + ";");
-            body.append("            case ").append(e.getKey()).append(":\n                switch (name) {\n");
-            for (Member f : e.getValue().values()) {
-                body.append("                    case ").append(q(f.name)).append(": return ")
-                        .append(toPy(f.desc, c + "." + f.name)).append(";\n");
+            String fn = "getStatic" + e.getKey() + "_";
+            body.append("            case ").append(e.getKey()).append(": return ").append(fn).append("0(name);\n");
+            List<Member> fields = new ArrayList<Member>(e.getValue().values());
+            for (int chunk = 0; chunk * STATIC_CHUNK < fields.size(); chunk++) {
+                fieldGetters.append("    private static Object ").append(fn).append(chunk).append("(String name) {\n");
+                fieldGetters.append("        switch (name) {\n");
+                int end = Math.min(fields.size(), (chunk + 1) * STATIC_CHUNK);
+                for (Member f : fields.subList(chunk * STATIC_CHUNK, end)) {
+                    fieldGetters.append("            case ").append(q(f.name)).append(": return ")
+                            .append(toPy(f.desc, c + "." + f.name)).append(";\n");
+                }
+                fieldGetters.append("            default: return ")
+                        .append(end < fields.size() ? fn + (chunk + 1) + "(name)" : "null").append(";\n");
+                fieldGetters.append("        }\n    }\n\n");
             }
-            body.append("                    default: return null;\n                }\n");
         }
-        body.append("            default: return null;\n        }\n    }\n\n");
+        body.append("            default: return null;\n        }\n    }\n\n").append(fieldGetters);
         body.append("    @Override\n    public boolean hasStatic(int cls, String name) {\n");
         body.append("        switch (cls) {\n");
         for (Map.Entry<Integer, Map<String, List<Member>>> e : staticMethods.entrySet()) {
