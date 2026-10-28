@@ -333,6 +333,27 @@ is open, and pure ASGI middleware sees WebSocket connections as it does in
 Starlette. Denying a connection answers with the status the endpoint or
 middleware chose, such as 403.
 
+==== SQLAlchemy
+
+SQLAlchemy's Core and ORM run over the platform's SQLite, and on a backend
+over the PostgreSQL, MySQL and MariaDB drivers the Codename One backend ships.
+The engine URL picks the database, as it does under CPython:
+
+[source,python]
+----
+include::../demos/common/src/main/snippets/developer-guide/python-interop.py[tag=python-interop-python-007,indent=0]
+----
+
+Declarative models with `Mapped` annotations, relationships in both
+directions (including many-to-many and cascades), `selectinload` and
+`joinedload`, joins, aliases, subqueries, common table expressions, unions,
+single and joined table inheritance and `text()` queries are supported.
+`Numeric` columns come back as `decimal.Decimal` and `DateTime` and `Date`
+columns as `datetime` values on every database. A `text()` query has no
+column types, so on a server database its numbers and dates come back as
+the text the server sent. SQLAlchemy's own drivers, such as `psycopg`, aren't
+used: the URL `postgresql+psycopg://` selects the backend's driver.
+
 === Compared with CPython, PyPy and GraalPy
 
 The same programs, run on one Apple silicon Mac with
