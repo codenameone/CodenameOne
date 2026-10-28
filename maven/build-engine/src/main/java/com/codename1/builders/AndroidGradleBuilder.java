@@ -2654,6 +2654,11 @@ public class AndroidGradleBuilder extends Executor {
             // ("uses-sdk:minSdkVersion 19 cannot be smaller than version 21").
             minSDK = maxInt("21", minSDK);
         }
+        if (rootCheck) {
+            // rootbeer-lib 0.1.0 ships 4 KB aligned arm64/x86_64 natives, which Play
+            // rejects; 0.1.2 is aligned but declares minSdk 21 in its manifest.
+            minSDK = maxInt("21", minSDK);
+        }
         if (googleAdUnitId != null && googleAdUnitId.length() > 0) {
             minSDK = maxInt("9", minSDK);
             if (!userXapplication.contains("com.google.android.gms.version")) {
@@ -7069,7 +7074,7 @@ public class AndroidGradleBuilder extends Executor {
         String rootCheckCall = "";
         if (rootCheck) {
             if (!request.getArg("gradleDependencies", "").contains("com.scottyab:rootbeer-lib")) {
-                String rootbeerVersion = request.getArg("android.rootbeerVersion", "0.1.0");
+                String rootbeerVersion = request.getArg("android.rootbeerVersion", "0.1.2");
                 request.putArgument(
                         "gradleDependencies",
                         request.getArg("gradleDependencies", "") +
@@ -8121,7 +8126,12 @@ public class AndroidGradleBuilder extends Executor {
                 additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-identity:"+getDefaultPlayServiceVersion("identity")+"'\n";
             }
             if(playServicesIndexing){
-                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-appindexing:"+getDefaultPlayServiceVersion("appindexing")+"'\n";
+                // play-services-appindexing ended at 9.8.0 and continued as firebase-appindexing
+                // under another package. Any newer version names nothing, and 9.8.0 beside a
+                // current play-services base breaks at run time, so the hint cannot work.
+                throw new BuildException("android.playService.indexing is no longer supported: "
+                        + "Google discontinued play-services-appindexing after 9.8.0; use "
+                        + "com.google.firebase:firebase-appindexing through android.gradleDep instead");
             }
             if(playServicesInvite){
                 additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-appinvite:"+getDefaultPlayServiceVersion("appinvite")+"'\n";
@@ -8157,13 +8167,13 @@ public class AndroidGradleBuilder extends Executor {
                 additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-nearby:"+getDefaultPlayServiceVersion("nearby")+"'\n";
             }
             if(playServicesSafetyPanorama){
-                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-panaroma:"+getDefaultPlayServiceVersion("panorama")+"'\n";
+                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-panorama:"+getDefaultPlayServiceVersion("panorama")+"'\n";
             }
             if(playServicesGames){
                 additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-games:"+getDefaultPlayServiceVersion("games")+"'\n";
             }
             if(playServicesSafetyNet){
-                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-safenet:"+getDefaultPlayServiceVersion("safenet")+"'\n";
+                additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-safetynet:"+getDefaultPlayServiceVersion("safetynet")+"'\n";
             }
             if(playServicesWallet){
                 additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-wallet:"+getDefaultPlayServiceVersion("wallet")+"'\n";
@@ -12426,6 +12436,14 @@ public class AndroidGradleBuilder extends Executor {
 
     }
 
+
+    /// The play-services defaults, keyed by the name after `play-services-`.
+    /// Read by `AndroidDependencyCoordinates`, which lists every coordinate
+    /// this builder can inject so CI can check its native libraries for
+    /// 16 KB page alignment.
+    static Map<String, String> defaultPlayServiceVersionsView() {
+        return Collections.unmodifiableMap(defaultPlayServiceVersions);
+    }
 
     private String getDefaultPlayServiceVersion(String playService) {
         if (playServiceVersions.containsKey(playService)) {

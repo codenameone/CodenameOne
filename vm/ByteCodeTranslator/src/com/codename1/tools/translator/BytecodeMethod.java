@@ -2851,10 +2851,30 @@ public class BytecodeMethod implements SignatureSet {
         return -1;
     }
 
+    /// The instruction that produced the value on top of the operand stack just
+    /// before `from + 1`, or -1 when no single instruction did.
+    ///
+    /// Stops at a jump target, like srNextRealNoJoin: past a join the value can
+    /// arrive from a predecessor that never executed the instruction before the
+    /// label. javac compiles `for (x : c ? a : b)` to
+    ///
+    ///     IFEQ L2 ; <a> ; GOTO L3 ; L2: ALOAD b ; L3: INVOKE iterator
+    ///
+    /// and skipping L3 made `ALOAD b` the loop's receiver: intrinsifyForEach
+    /// folded it into the setup and deleted it from the else branch, so the
+    /// loop always walked `b` -- a NullPointerException when `b` was null and
+    /// `c` true -- while the value `a` pushed was never popped. Every caller
+    /// pairs a consumer with its producer, so none may look through a join.
     private int prevExecutable(int from) {
         for (int i = from; i >= 0; i--) {
             Instruction ins = instructions.get(i);
-            if (ins instanceof LabelInstruction || ins instanceof LineNumber || ins instanceof TryCatch) {
+            if (ins instanceof LabelInstruction) {
+                if (LabelInstruction.isJumpTarget(((LabelInstruction) ins).getLabel())) {
+                    return -1;
+                }
+                continue;
+            }
+            if (ins instanceof LineNumber || ins instanceof TryCatch) {
                 continue;
             }
             return i;
@@ -2961,15 +2981,14 @@ public class BytecodeMethod implements SignatureSet {
                     || !"()Ljava/util/Iterator;".equals(inv.getDesc())) {
                 continue;
             }
+            // -1 when the receiver arrives through a join (a `?:`): there is no
+            // one producer to fold, and the loop reads it off the stack below.
             int recvIdx = prevExecutable(i - 1);
-            if (recvIdx < 0) {
-                continue;
-            }
             // Fold an expression when it is already available. Raw stack
             // producers remain in the IR and use a non-assignable consumer,
             // so later expression folding cannot discard their evaluation.
             StringBuilder recvCode = new StringBuilder();
-            Instruction recv = instructions.get(recvIdx);
+            Instruction recv = recvIdx < 0 ? null : instructions.get(recvIdx);
             Invoke foldedMapView = null;
             int viewIndex = -1;
             if (recv instanceof Invoke) {
