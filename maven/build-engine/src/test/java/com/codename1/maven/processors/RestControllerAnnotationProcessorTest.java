@@ -308,6 +308,67 @@ public class RestControllerAnnotationProcessorTest {
                 .indexOf(".tracing(new com.codename1.backend.otel.OtlpTracer(null))") >= 0);
     }
 
+    /// Resolves `@VirtualThreadStack` the way the build does and returns the
+    /// processor, with the context's errors left for the caller to read.
+    private RestControllerAnnotationProcessor resolveStack(String source, ProcessorContext[] out)
+            throws Exception {
+        File classes = compile(source);
+        File root = sourceRootWith("Notes.java", source);
+        ProcessorContext ctx = new ProcessorContext(classes, tmp.newFolder(),
+                ClassScanner.scan(classes), new SystemStreamLog(), tmp.newFolder(),
+                new Properties(), null, Collections.singletonList(root.getAbsolutePath()),
+                "UTF-8", Collections.<String>emptyList());
+        RestControllerAnnotationProcessor proc = new RestControllerAnnotationProcessor();
+        proc.resolveVirtualThreadStack(ctx);
+        out[0] = ctx;
+        return proc;
+    }
+
+    @Test
+    public void virtualThreadStackRaisesTheStackInTheEntryPoint() throws Exception {
+        ProcessorContext[] ctx = new ProcessorContext[1];
+        RestControllerAnnotationProcessor proc = resolveStack(CONTROLLER_SOURCE.replace(
+                "@RestController\n", "@RestController\n@VirtualThreadStack(\"2mb\")\n"), ctx);
+        assertFalse(String.valueOf(ctx[0].getErrors()), ctx[0].hasErrors());
+        assertEquals(2 * 1024 * 1024, proc.virtualThreadStack);
+        String boot = proc.generateBootstrap("com.example");
+        int call = boot.indexOf(
+                "com.codename1.backend.HttpServer.requireVirtualThreadStack(2097152);");
+        assertTrue(boot, call >= 0);
+        assertTrue("raised before the builder can start a server",
+                call < boot.indexOf("cn1Builder = "));
+    }
+
+    @Test
+    public void noVirtualThreadStackLeavesTheRuntimeDefault() throws Exception {
+        ProcessorContext[] ctx = new ProcessorContext[1];
+        RestControllerAnnotationProcessor proc = resolveStack(CONTROLLER_SOURCE, ctx);
+        assertEquals(0, proc.virtualThreadStack);
+        assertTrue(proc.generateBootstrap("com.example")
+                .indexOf("requireVirtualThreadStack") < 0);
+    }
+
+    @Test
+    public void aBadVirtualThreadStackFailsTheBuildNamingTheClass() throws Exception {
+        ProcessorContext[] ctx = new ProcessorContext[1];
+        resolveStack(CONTROLLER_SOURCE.replace(
+                "@RestController\n", "@RestController\n@VirtualThreadStack(\"lots\")\n"), ctx);
+        assertTrue(ctx[0].hasErrors());
+        assertTrue(String.valueOf(ctx[0].getErrors()),
+                String.valueOf(ctx[0].getErrors()).indexOf("com.example.Notes") >= 0);
+    }
+
+    @Test
+    public void stackSizesParse() {
+        assertEquals(4096, RestControllerAnnotationProcessor.parseStackSize("4096"));
+        assertEquals(512 * 1024, RestControllerAnnotationProcessor.parseStackSize(" 512 KB "));
+        assertEquals(1024 * 1024, RestControllerAnnotationProcessor.parseStackSize("1MB"));
+        assertEquals(-1, RestControllerAnnotationProcessor.parseStackSize("0"));
+        assertEquals(-1, RestControllerAnnotationProcessor.parseStackSize("-1MB"));
+        assertEquals(-1, RestControllerAnnotationProcessor.parseStackSize("4096MB"));
+        assertEquals(-1, RestControllerAnnotationProcessor.parseStackSize("1GB"));
+    }
+
     @Test
     public void anUntracedBuildNamesRoutesButNeverLinksTheTracer() throws Exception {
         // The same controller without the annotation. The OTLP tracer is not

@@ -36,7 +36,11 @@ import java.util.TreeMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-/// Command line: `Main [-cp <class path>] <source root> <output root> [main module]`.
+/// Command line: `Main [-cp <class path>] [-vtstack <size>] <source root> <output root> [main module]`.
+///
+/// `-vtstack` is the C stack a served request's virtual thread gets, as the
+/// `python.virtualThreadStack` build hint takes it: bytes, or a number with a
+/// `KB` or `MB` suffix. 1MB when not given.
 ///
 /// Transpiles every `.py` under the source root and writes the Java sources
 /// under the output root. Exit status is 0 on success, 1 when a source does
@@ -58,8 +62,20 @@ public final class Main {
             System.arraycopy(args, 2, rest, 0, rest.length);
             args = rest;
         }
+        int stack = PythonTranspiler.DEFAULT_VIRTUAL_THREAD_STACK;
+        if (args.length >= 2 && "-vtstack".equals(args[0])) {
+            stack = PythonTranspiler.parseStackSize(args[1]);
+            if (stack <= 0) {
+                System.err.println("-vtstack " + args[1] + " is not a stack size (bytes, or a number with KB or MB)");
+                System.exit(2);
+                return;
+            }
+            String[] rest = new String[args.length - 2];
+            System.arraycopy(args, 2, rest, 0, rest.length);
+            args = rest;
+        }
         if (args.length < 2 || args.length > 3) {
-            System.err.println("usage: Main [-cp <class path>] <source root> <output root> [main module]");
+            System.err.println("usage: Main [-cp <class path>] [-vtstack <size>] <source root> <output root> [main module]");
             System.exit(2);
             return;
         }
@@ -75,7 +91,8 @@ public final class Main {
         }
         Map<String, String> out;
         try {
-            out = PythonTranspiler.transpile(sources, args.length == 3 ? args[2] : null, classPath);
+            out = PythonTranspiler.transpile(sources, args.length == 3 ? args[2] : null, classPath,
+                    java.util.Collections.<String, String>emptyMap(), stack);
         } catch (PythonSyntaxError e) {
             System.err.println(e.getMessage());
             System.exit(1);

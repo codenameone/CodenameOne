@@ -307,6 +307,16 @@ final class BuildHintsGeneral {
                 .type(HintType.STRING)
                 .platform("general"));
 
+        h.add(new Hint("python.virtualThreadStack")
+                .group(HintGroup.GENERAL)
+                .type(HintType.STRING)
+                .def("1MB")
+                .platform("general")
+                .doc("The C stack each request's virtual thread gets in a Python backend: bytes, "
+                        + "or a number followed by `KB` or `MB`, such as `2MB`. Raise it when a "
+                        + "handler recurses deeply. `CN1_HTTP_VT_STACK` can still raise it at "
+                        + "start-up; the larger of the two applies."));
+
         h.add(new Hint("watchMain")
                 .group(HintGroup.GENERAL)
                 .type(HintType.STRING)

@@ -161,8 +161,11 @@ final class AppSupport {
             addFramework(project, "implementation", ext.getVersion(),
                     com.codename1.maven.PythonProjectBuilder.RUNTIME_ARTIFACT);
         }
-        final String pythonMain = AppSettings.read(layout.settingsFile())
+        final java.util.Properties pythonSettings = AppSettings.read(layout.settingsFile());
+        final String pythonMain = pythonSettings
                 .getProperty(com.codename1.maven.PythonProjectImporter.MAIN_MODULE_SETTING);
+        final String pythonStack = pythonSettings
+                .getProperty(com.codename1.maven.PythonProjectBuilder.VIRTUAL_THREAD_STACK_HINT);
         TaskProvider<com.codename1.gradle.tasks.TranspilePythonTask> python = project.getTasks().register(
                 "transpilePython", com.codename1.gradle.tasks.TranspilePythonTask.class, t -> {
                     common(t, project, layout, ext, userProperties);
@@ -171,6 +174,9 @@ final class AppSupport {
                     t.getSources().from(project.fileTree(pythonDir, f -> f.include("**/*.py")));
                     if (pythonMain != null) {
                         t.getMainModule().set(pythonMain);
+                    }
+                    if (pythonStack != null) {
+                        t.getVirtualThreadStack().set(pythonStack);
                     }
                     t.getJavaClassPath().from(project.getConfigurations().getByName("compileClasspath"));
                     t.getOutputDirectory().set(new File(layout.buildDir(), "generated/sources/cn1-python"));

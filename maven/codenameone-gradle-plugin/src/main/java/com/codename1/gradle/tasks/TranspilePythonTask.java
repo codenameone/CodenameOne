@@ -64,6 +64,12 @@ public abstract class TranspilePythonTask extends Cn1Task {
     @Classpath
     public abstract ConfigurableFileCollection getJavaClassPath();
 
+    /// The `codename1.arg.python.virtualThreadStack` build hint, or unset for
+    /// the transpiler's default.
+    @Input
+    @Optional
+    public abstract Property<String> getVirtualThreadStack();
+
     @OutputDirectory
     public abstract DirectoryProperty getOutputDirectory();
 
@@ -72,7 +78,8 @@ public abstract class TranspilePythonTask extends Cn1Task {
         try {
             new PythonProjectBuilder(getPythonDirectory().get().getAsFile(), getOutputDirectory().get().getAsFile(),
                     getMainModule().getOrNull(), log())
-                    .classPath(new java.util.ArrayList<java.io.File>(getJavaClassPath().getFiles())).run();
+                    .classPath(new java.util.ArrayList<java.io.File>(getJavaClassPath().getFiles()))
+                    .virtualThreadStack(getVirtualThreadStack().getOrNull()).run();
         } catch (BuildException ex) {
             throw new GradleException(ex.getMessage(), ex.getCause() == null ? ex : ex.getCause());
         }

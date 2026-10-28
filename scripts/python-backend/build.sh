@@ -52,8 +52,11 @@ GEN="$W/gen"
 CLASSES="$W/classes"
 DEMO="$W/demo"
 mkdir -p "$GEN" "$CLASSES" "$DEMO"
+# CN1_PY_VT_STACK: the C stack a request's virtual thread gets, as the
+# codename1.arg.python.virtualThreadStack build hint takes it (2MB, 512KB,
+# bytes). Unset keeps the transpiler's 1MB.
 "$J17/bin/java" -cp "$TRANSPILER" com.codename1.python.transpiler.api.Main -cp "$JAVAAPI:$CORE:$BACKEND" \
-    "$APP/src" "$GEN" main
+    ${CN1_PY_VT_STACK:+-vtstack "$CN1_PY_VT_STACK"} "$APP/src" "$GEN" main
 [ -f "$GEN/com/codename1/generated/python/BackendServer.java" ] || {
     echo "the application does not serve anything (no Flask/FastAPI run): nothing to build" >&2; exit 1; }
 mkdir -p "$GEN/com/pybackend"

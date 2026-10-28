@@ -78,6 +78,20 @@ public final class PythonProjectBuilder {
     /// `java-runtime` supplies the device's `java.*`. The project's own Java
     /// sources are not
     /// compiled yet when Python is transpiled, so they cannot be imported.
+    /// The build hint naming the C stack a served request's virtual thread
+    /// gets, such as `2MB`; see [#virtualThreadStack(String)].
+    public static final String VIRTUAL_THREAD_STACK_HINT = "codename1.arg.python.virtualThreadStack";
+
+    private String virtualThreadStack;
+
+    /// The value of [#VIRTUAL_THREAD_STACK_HINT]: bytes, or a number with a
+    /// `KB` or `MB` suffix. Null or blank keeps the transpiler's 1MB default;
+    /// anything else that is not a size fails [#run()].
+    public PythonProjectBuilder virtualThreadStack(String size) {
+        this.virtualThreadStack = size;
+        return this;
+    }
+
     public PythonProjectBuilder classPath(java.util.List<File> entries) {
         this.classPath = entries;
         return this;
@@ -140,7 +154,7 @@ public final class PythonProjectBuilder {
         }
         Map<String, String> out;
         try {
-            out = PythonTranspiler.transpile(sources, entry, classPath, nativeModules);
+            out = PythonTranspiler.transpile(sources, entry, classPath, nativeModules, stackBytes());
         } catch (PythonSyntaxError e) {
             throw new BuildException("src/main/python/" + e.file + ":" + e.line + ":" + e.col + ": " + e.reason, e);
         } catch (IllegalArgumentException e) {
@@ -221,5 +235,18 @@ public final class PythonProjectBuilder {
                 into.add(c);
             }
         }
+    }
+
+    private int stackBytes() throws BuildException {
+        if (virtualThreadStack == null || virtualThreadStack.trim().length() == 0) {
+            return PythonTranspiler.DEFAULT_VIRTUAL_THREAD_STACK;
+        }
+        int bytes = PythonTranspiler.parseStackSize(virtualThreadStack);
+        if (bytes <= 0) {
+            throw new BuildException(VIRTUAL_THREAD_STACK_HINT + "=" + virtualThreadStack
+                    + " is not a stack size. Write a positive number of bytes, or a number followed by "
+                    + "KB or MB, such as 2MB.");
+        }
+        return bytes;
     }
 }
