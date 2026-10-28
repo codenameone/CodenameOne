@@ -515,6 +515,21 @@ def _parse_expr(s):
 
 # ---- statements ------------------------------------------------------------
 
+def _params(p):
+    """Macro parameters after the opening parenthesis: names with optional defaults."""
+    params = []
+    while not p.accept("op", ")"):
+        n = p.expect("name")[1]
+        d = None
+        if p.accept("op", "="):
+            d = p.expr()
+        params.append((n, d))
+        if not p.accept("op", ","):
+            p.expect("op", ")")
+            break
+    return params
+
+
 def _parse(tokens):
     pos = [0]
     blocks = {}
@@ -531,6 +546,8 @@ def _parse(tokens):
                 nodes.append(("out", _parse_expr(val)))
             else:
                 word = val.split(None, 1)[0] if val else ""
+                if "(" in word:
+                    word = word[:word.index("(")]
                 rest = val[len(word):].strip()
                 if word in ends:
                     return nodes, word, rest
@@ -580,8 +597,12 @@ def _parse(tokens):
                             break
                     e = ("tuple", items)
                 return ("set", targets, e)
+            filt = None
+            if p.accept("op", "|"):
+                fp = _P("__cn1_body|" + rest.split("|", 1)[1])
+                filt = fp.expr()
             b, _, _ = body(("endset",))
-            return ("setblock", targets[0], b)
+            return ("setblock", targets[0], b, filt)
         if word == "block":
             name = rest.split()[0]
             b, _, _ = body(("endblock",))
@@ -609,6 +630,46 @@ def _parse(tokens):
                 p.accept("op", ",")
             b, _, _ = body(("endwith",))
             return ("with", assigns, b)
+        if word == "macro":
+            p = _P(rest)
+            name = p.expect("name")[1]
+            p.expect("op", "(")
+            params = _params(p)
+            b, _, _ = body(("endmacro",))
+            return ("macro", name, params, b)
+        if word == "call":
+            p = _P(rest)
+            params = []
+            if p.accept("op", "("):
+                params = _params(p)
+            call = p.expr()
+            if call[0] != "call":
+                raise TemplateSyntaxError("expected call")
+            b, _, _ = body(("endcall",))
+            return ("callblock", params, call, b)
+        if word == "filter":
+            filt = _P("__cn1_body|" + rest).expr()
+            b, _, _ = body(("endfilter",))
+            return ("filterblock", filt, b)
+        if word == "import":
+            p = _P(rest)
+            src_e = p.expr(False)
+            p.expect("name", "as")
+            return ("import", src_e, p.expect("name")[1])
+        if word == "from":
+            p = _P(rest)
+            src_e = p.expr(False)
+            p.expect("name", "import")
+            names = []
+            while p.at("name") and p.peek()[1] not in ("with", "without"):
+                n = p.next()[1]
+                alias = n
+                if p.accept("name", "as"):
+                    alias = p.expect("name")[1]
+                names.append((n, alias))
+                if not p.accept("op", ","):
+                    break
+            return ("fromimport", src_e, names)
         raise TemplateSyntaxError("Encountered unknown tag %r." % (word,))
 
     nodes, _, _ = body(())
@@ -617,11 +678,130 @@ def _parse(tokens):
 
 # ---- runtime ---------------------------------------------------------------
 
+class _TemplateModule:
+    def __init__(self, name):
+        self._name = name
+        self._body = ""
+
+    def __str__(self):
+        return self._body
+
+    def __html__(self):
+        return Markup(self._body)
+
+
+class _Macro:
+    """A ``{% macro %}`` (or the ``caller`` of a ``{% call %}``) bound to the
+    variables of the frame that defined it."""
+
+    def __init__(self, tmpl, name, params, body, fr):
+        self._tmpl = tmpl
+        self._fr = fr
+        self._params = params
+        self._body = body
+        self.name = name
+        self.arguments = tuple(p[0] for p in params)
+        self.catch_varargs = _uses(body, "varargs")
+        self.catch_kwargs = _uses(body, "kwargs")
+        self.caller = _uses(body, "caller")
+
+    def __call__(self, *args, **kwargs):
+        fr = self._fr
+        vars = dict(fr.vars)
+        n = len(self._params)
+        caller = kwargs.pop("caller", None)
+        for i in range(n):
+            pname, dflt = self._params[i]
+            if i < len(args):
+                if pname in kwargs:
+                    raise TypeError("macro %r got multiple values for argument %r"
+                                    % (self.name, pname))
+                vars[pname] = args[i]
+            elif pname in kwargs:
+                vars[pname] = kwargs.pop(pname)
+            elif dflt is not None:
+                vars[pname] = self._tmpl._eval(dflt, _Frame(fr.tmpl, vars, fr.blocks, []))
+            else:
+                vars[pname] = Undefined(hint="parameter %r was not provided" % (pname,),
+                                        name=pname)
+        extra = tuple(args[n:])
+        if extra and not self.catch_varargs:
+            raise TypeError("macro %r takes not more than %d argument(s)" % (self.name, n))
+        if kwargs and not self.catch_kwargs:
+            raise TypeError("macro %r takes no keyword argument %r"
+                            % (self.name, next(iter(kwargs))))
+        vars["varargs"] = extra
+        vars["kwargs"] = kwargs
+        if caller is not None:
+            vars["caller"] = caller
+        elif self.caller:
+            vars["caller"] = Undefined(name="caller")
+        out = []
+        self._tmpl._exec_list(self._body, _Frame(fr.tmpl, vars, fr.blocks, out))
+        s = "".join(out)
+        return Markup(s) if self._tmpl.autoescape else s
+
+    def __repr__(self):
+        return "<Macro %r>" % (self.name,)
+
+
+def _uses(node, name):
+    """True when ``name`` is read anywhere inside a parsed body."""
+    if isinstance(node, tuple):
+        if len(node) == 2 and node[0] == "name" and node[1] == name:
+            return True
+        if node and node[0] == "macro":
+            return False
+        for x in node:
+            if _uses(x, name):
+                return True
+    elif isinstance(node, list):
+        for x in node:
+            if _uses(x, name):
+                return True
+    return False
+
+
+class Cycler:
+    def __init__(self, *items):
+        if not items:
+            raise RuntimeError("at least one item has to be provided")
+        self.items = items
+        self.pos = 0
+
+    def reset(self):
+        self.pos = 0
+
+    @property
+    def current(self):
+        return self.items[self.pos]
+
+    def next(self):
+        rv = self.items[self.pos]
+        self.pos = (self.pos + 1) % len(self.items)
+        return rv
+
+    __next__ = next
+
+
+_NO_CHANGE = object()
+
+
 class _Loop:
+    depth = 1
+    depth0 = 0
+
     def __init__(self, items):
         self._items = items
         self.length = len(items)
         self.index0 = 0
+        self._last_changed = _NO_CHANGE
+
+    def changed(self, *value):
+        if self._last_changed != value:
+            self._last_changed = value
+            return True
+        return False
 
     index = property(lambda self: self.index0 + 1)
     revindex = property(lambda self: self.length - self.index0)
@@ -868,7 +1048,7 @@ class Template:
         if self._extends is not None:
             fr = _Frame(self, vars, merged, [])
             for n in self._nodes:
-                if n[0] == "set":
+                if n[0] in ("set", "macro", "import", "fromimport"):
                     self._exec(n, fr)
             parent = self._eval(self._extends, fr)
             if not isinstance(parent, Template):
@@ -903,7 +1083,39 @@ class Template:
             sub = _Frame(fr.tmpl, fr.vars, fr.blocks, [])
             self._exec_list(n[2], sub)
             s = "".join(sub.out)
-            fr.vars[n[1]] = Markup(s) if self.autoescape else s
+            s = Markup(s) if self.autoescape else s
+            if n[3] is not None:
+                tmp = dict(fr.vars)
+                tmp["__cn1_body"] = s
+                s = self._eval(n[3], _Frame(fr.tmpl, tmp, fr.blocks, []))
+            fr.vars[n[1]] = s
+        elif k == "macro":
+            fr.vars[n[1]] = _Macro(self, n[1], n[2], n[3], fr)
+        elif k == "callblock":
+            call = n[2]
+            caller = _Macro(self, "caller", n[1], n[3], fr)
+            f = self._eval(call[1], fr)
+            args = [self._eval(a, fr) for a in call[2]]
+            kw = dict((kk, self._eval(v, fr)) for kk, v in call[3])
+            kw["caller"] = caller
+            fr.out.append(self._finalize(f(*args, **kw)))
+        elif k == "filterblock":
+            sub = _Frame(fr.tmpl, fr.vars, fr.blocks, [])
+            self._exec_list(n[2], sub)
+            s = "".join(sub.out)
+            tmp = dict(fr.vars)
+            tmp["__cn1_body"] = Markup(s) if self.autoescape else s
+            fr.out.append(self._finalize(self._eval(n[1], _Frame(fr.tmpl, tmp, fr.blocks, []))))
+        elif k == "import":
+            fr.vars[n[2]] = self._module(self._eval(n[1], fr))
+        elif k == "fromimport":
+            mod = self._module(self._eval(n[1], fr))
+            for name, alias in n[2]:
+                v = getattr(mod, name, None)
+                if v is None or name.startswith("_"):
+                    v = Undefined(hint="the template %r does not export the requested name %r"
+                                  % (mod._name, name), name=name)
+                fr.vars[alias] = v
         elif k == "block":
             self._render_block(n[1], 0, fr)
         elif k == "include":
@@ -923,6 +1135,22 @@ class Template:
             for name, e in n[1]:
                 vars[name] = self._eval(e, fr)
             self._exec_list(n[2], _Frame(fr.tmpl, vars, fr.blocks, fr.out))
+
+    def _module(self, t):
+        """Run a template's top level and expose its macros and top-level
+        assignments as attributes, as ``{% import %}`` does."""
+        if not isinstance(t, Template):
+            t = self.environment.get_template(t)
+        vars = dict(self.environment.globals)
+        out = []
+        t._render_root(vars, {}, out)
+        mod = _TemplateModule(t.name)
+        for k, v in vars.items():
+            if k not in self.environment.globals or vars[k] is not self.environment.globals[k]:
+                if not k.startswith("_"):
+                    setattr(mod, k, v)
+        mod._body = "".join(out)
+        return mod
 
     def _render_block(self, name, level, fr):
         chain = fr.blocks.get(name)
@@ -1094,7 +1322,7 @@ class Environment:
         self.filters = {}
         self.tests = {}
         self.globals = {"range": range, "dict": dict, "lipsum": lambda *a, **k: "",
-                        "cycler": None, "namespace": _Namespace}
+                        "cycler": Cycler, "namespace": _Namespace}
         self._cache = {}
 
     def from_string(self, source, globals=None, template_class=None):

@@ -9,7 +9,6 @@ through it. Written from Flask's public documentation and behaviour.
 """
 import base64 as _base64
 import hashlib as _hashlib
-import hmac as _hmac
 import io as _io
 import json as _json
 import os as _os
@@ -1418,50 +1417,136 @@ class NullSession(SecureCookieSession):
     setdefault = _fail
 
 
-def _b64e(b):
-    return _base64.urlsafe_b64encode(b).rstrip(b"=").decode("ascii")
+_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
 
-def _b64d(s):
-    s = s.encode("ascii")
-    return _base64.urlsafe_b64decode(s + b"=" * (-len(s) % 4))
+def _http_date(d):
+    import datetime as _dt
+    if d.tzinfo is not None:
+        d = d.astimezone(_dt.timezone.utc)
+    return "%s, %02d %s %04d %02d:%02d:%02d GMT" % (_DAYS[d.weekday()], d.day, _MONTHS[d.month - 1],
+                                                    d.year, d.hour, d.minute, d.second)
+
+
+def _parse_http_date(s):
+    import datetime as _dt
+    parts = s.replace(",", " ").split()
+    day, mon, year = int(parts[1]), _MONTHS.index(parts[2]) + 1, int(parts[3])
+    h, m, sec = [int(x) for x in parts[4].split(":")]
+    return _dt.datetime(year, mon, day, h, m, sec, tzinfo=_dt.timezone.utc)
+
+
+class TaggedJSONSerializer:
+    """Flask's tagged JSON (``flask.json.tag``): the tags `` t`` (tuple),
+    `` b`` (bytes), `` m`` (Markup), `` u`` (UUID), `` d`` (datetime) and
+    `` di`` (a one-key dict whose key is itself a tag) are written and read
+    exactly as Flask writes them, so a session holding any of those types
+    round-trips with a CPython server."""
+
+    def tag(self, value):
+        import datetime as _dt
+        if isinstance(value, dict):
+            if len(value) == 1:
+                k = next(iter(value))
+                if k in (" t", " b", " m", " u", " d", " di"):
+                    return {" di": {k + "__": self.tag(value[k])}}
+            return {k: self.tag(v) for k, v in value.items()}
+        if isinstance(value, tuple):
+            return {" t": [self.tag(x) for x in value]}
+        if isinstance(value, list):
+            return [self.tag(x) for x in value]
+        if isinstance(value, (bytes, bytearray)):
+            return {" b": _base64.b64encode(bytes(value)).decode("ascii")}
+        if callable(getattr(value, "__html__", None)):
+            return {" m": str(value.__html__())}
+        if isinstance(value, _uuid.UUID):
+            return {" u": value.hex}
+        if isinstance(value, _dt.datetime):
+            return {" d": _http_date(value)}
+        return value
+
+    def untag(self, value):
+        if isinstance(value, dict):
+            if len(value) == 1:
+                k = next(iter(value))
+                v = value[k]
+                if k == " t":
+                    return tuple(v)
+                if k == " b":
+                    return _base64.b64decode(v)
+                if k == " m":
+                    return Markup(v)
+                if k == " u":
+                    return _uuid.UUID(v)
+                if k == " d":
+                    return _parse_http_date(v)
+                if k == " di":
+                    ik = next(iter(v))
+                    return {ik[:-2]: v[ik]}
+            return value
+        return value
+
+    def _scan(self, value):
+        if isinstance(value, dict):
+            value = {k: self._scan(v) for k, v in value.items()}
+        elif isinstance(value, list):
+            value = [self._scan(x) for x in value]
+        return self.untag(value)
+
+    def dumps(self, value, **kwargs):
+        return _json.dumps(self.tag(value), separators=(",", ":"), sort_keys=True)
+
+    def loads(self, value):
+        return self._scan(_json.loads(value))
+
+
+session_json_serializer = TaggedJSONSerializer()
 
 
 class SecureCookieSessionInterface:
-    """Signed (not encrypted) cookie: ``base64url(json) "." base64url(HMAC-SHA1)``.
-
-    The key is derived from the app's secret key and the salt
-    ``cookie-session``, but the cookie carries no timestamp, so it is not
-    byte-compatible with the cookie a CPython Flask server writes.
-    """
+    """Flask's own cookie format: an ``itsdangerous.URLSafeTimedSerializer``
+    with the salt ``cookie-session``, the ``hmac`` key derivation over SHA-1
+    and Flask's tagged JSON, so a cookie written by a CPython Flask server
+    with the same ``secret_key`` opens here and the other way around.
+    ``SECRET_KEY_FALLBACKS`` keys verify but never sign, as in Flask."""
     salt = "cookie-session"
+    key_derivation = "hmac"
+    serializer = session_json_serializer
 
-    def _key(self, app):
-        sk = app.secret_key
-        if isinstance(sk, str):
-            sk = sk.encode("utf-8")
-        return _hashlib.sha1(self.salt.encode("utf-8") + b"signer" + sk).digest()
+    def get_signing_serializer(self, app):
+        import itsdangerous as _its
+        if not app.secret_key:
+            return None
+        keys = list(app.config.get("SECRET_KEY_FALLBACKS") or [])
+        keys.append(app.secret_key)
+        return _its.URLSafeTimedSerializer(keys, salt=self.salt, serializer=self.serializer,
+                                          signer_kwargs={"key_derivation": self.key_derivation,
+                                                         "digest_method": _hashlib.sha1})
 
-    def _sign(self, app, payload):
-        return _b64e(_hmac.new(self._key(app), payload.encode("ascii"), _hashlib.sha1).digest())
+    def _max_age(self, app):
+        life = app.config.get("PERMANENT_SESSION_LIFETIME", 31 * 86400)
+        if hasattr(life, "total_seconds"):
+            life = life.total_seconds()
+        return int(life)
 
     def open_session(self, app, req):
-        if not app.secret_key:
+        import itsdangerous as _its
+        s = self.get_signing_serializer(app)
+        if s is None:
             return NullSession()
         name = app.config.get("SESSION_COOKIE_NAME", "session")
         raw = req.cookies.get(name)
-        if raw and "." in raw:
-            payload, sig = raw.rsplit(".", 1)
-            if _hmac.compare_digest(self._sign(app, payload), sig):
-                try:
-                    data = _json.loads(_b64d(payload).decode("utf-8"))
-                    if isinstance(data, dict):
-                        return SecureCookieSession(data)
-                except ValueError:
-                    pass
-        s = SecureCookieSession()
-        s.new = True
-        return s
+        if raw:
+            try:
+                data = s.loads(raw, max_age=self._max_age(app))
+                if isinstance(data, dict):
+                    return SecureCookieSession(data)
+            except _its.BadSignature:
+                pass
+        sess = SecureCookieSession()
+        sess.new = True
+        return sess
 
     def save_session(self, app, sess, resp):
         if isinstance(sess, NullSession):
@@ -1479,8 +1564,8 @@ class SecureCookieSessionInterface:
             return
         if not sess.modified:
             return
-        payload = _b64e(_json.dumps(dict(sess), separators=(",", ":"), sort_keys=True).encode("utf-8"))
-        resp.set_cookie(name, payload + "." + self._sign(app, payload), httponly=True)
+        value = self.get_signing_serializer(app).dumps(dict(sess))
+        resp.set_cookie(name, value, httponly=True)
 
 
 def flash(message, category="message"):
