@@ -767,6 +767,11 @@ public final class StdModules {
         m.setAttr("argv", new PyList(argv));
         m.setAttr("path", new PyList());
         m.setAttr("modules", PyModule.SYS_MODULES);
+        // CPython has builtins in sys.modules from start-up; nothing can
+        // look at sys.modules before importing sys, so this is the moment.
+        if (PyModule.find("builtins") == null) {
+            provide("builtins");
+        }
         m.setAttr("float_info", PyTuple.of(Py.ofFloat(Double.MAX_VALUE), PyInt.of(1024), PyInt.of(308),
                 Py.ofFloat(Double.MIN_NORMAL), PyInt.of(-1021), PyInt.of(-307), PyInt.of(15), PyInt.of(53),
                 Py.ofFloat(Math.ulp(1.0)), PyInt.of(2), PyInt.of(1)));

@@ -76,6 +76,8 @@ public final class Py {
     // ---- singletons ------------------------------------------------------
 
     public static final Object NONE = new PyNone("None", null);
+    /// The type of an exception's `__traceback__`; its instances carry no frames.
+    public static final PyType TRACEBACK_TYPE = builtinType("traceback", null);
     public static final Object NOT_IMPLEMENTED = new PyNone("NotImplemented", NOT_IMPLEMENTED_TYPE);
     public static final Object ELLIPSIS = new PyNone("Ellipsis", ELLIPSIS_TYPE);
     public static final PyBool TRUE = new PyBool(true);

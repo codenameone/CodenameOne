@@ -524,8 +524,9 @@ def namedtuple(typename, field_names, *, rename=False, defaults=None, module=Non
     for index, name in enumerate(field_names):
         namespace[name] = property(_itemgetter(index), doc="Alias for field number " + str(index))
     result = type(typename, (tuple,), namespace)
-    if module is not None:
-        result.__module__ = module
+    # CPython reads the caller's module from its frame; there are no frames
+    # here, so a caller outside __main__ passes module= (the stdlib does).
+    result.__module__ = "__main__" if module is None else module
     return result
 
 

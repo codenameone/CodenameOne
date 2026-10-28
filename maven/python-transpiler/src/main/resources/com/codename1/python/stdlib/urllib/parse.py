@@ -111,9 +111,9 @@ class _NetlocResultMixinBase:
         return hostname, port
 
 
-_DefragResultBase = namedtuple("DefragResult", "url fragment")
-_SplitResultBase = namedtuple("SplitResult", "scheme netloc path query fragment")
-_ParseResultBase = namedtuple("ParseResult", "scheme netloc path params query fragment")
+_DefragResultBase = namedtuple("DefragResult", "url fragment", module="urllib.parse")
+_SplitResultBase = namedtuple("SplitResult", "scheme netloc path query fragment", module="urllib.parse")
+_ParseResultBase = namedtuple("ParseResult", "scheme netloc path params query fragment", module="urllib.parse")
 
 
 class DefragResult(_DefragResultBase):

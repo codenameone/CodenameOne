@@ -282,7 +282,7 @@ public final class Builtins {
         o.define("__init__", OBJECT_INIT);
         o.define("__setattr__", PyBuiltin.positional("__setattr__", a -> {
             if (a[0] instanceof PyInstance) {
-                ((PyInstance) a[0]).setAttrDirect(Py.toStr(a[1]), a[2]);
+                ((PyInstance) a[0]).setAttrObject(Py.toStr(a[1]), a[2]);
             } else if (a[0] instanceof PyType) {
                 // What a metaclass's super().__setattr__ reaches: store,
                 // never back through the metaclass.

@@ -43,6 +43,56 @@ public final class PyRange extends PyObject {
         return Py.RANGE_TYPE;
     }
 
+    @Override
+    public Object getAttrOrNull(String name) {
+        if ("start".equals(name)) {
+            return PyInt.of(start);
+        }
+        if ("stop".equals(name)) {
+            return PyInt.of(stop);
+        }
+        if ("step".equals(name)) {
+            return PyInt.of(step);
+        }
+        return super.getAttrOrNull(name);
+    }
+
+    /// Ranges compare as the sequences they produce: equal lengths, and when
+    /// not empty the same first element and (for more than one) the same step.
+    @Override
+    public Object eq(Object o) {
+        if (!(o instanceof PyRange)) {
+            return null;
+        }
+        PyRange r = (PyRange) o;
+        long n = length();
+        if (n != r.length()) {
+            return Py.FALSE;
+        }
+        if (n == 0) {
+            return Py.TRUE;
+        }
+        if (start != r.start) {
+            return Py.FALSE;
+        }
+        return n == 1 || step == r.step ? Py.TRUE : Py.FALSE;
+    }
+
+    /// Consistent with `eq`: hashes the length, and the first element and
+    /// step only where they decide equality.
+    @Override
+    public long hash() {
+        long n = length();
+        long h = n * 1000003L;
+        if (n > 0) {
+            h = h * 31 + start;
+            if (n > 1) {
+                h = h * 31 + step;
+            }
+        }
+        return h == -1 ? -2 : h;
+    }
+
     public long length() {
         if (step > 0) {
             return stop > start ? (stop - start + step - 1) / step : 0;

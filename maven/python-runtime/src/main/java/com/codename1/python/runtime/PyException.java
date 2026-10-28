@@ -39,6 +39,12 @@ public final class PyException extends RuntimeException {
         if (h != Py.NONE && h != value && value instanceof PyInstance) { //NOPMD CompareObjectsWithEquals - identity is meant
             ((PyInstance) value).setAttrDirect("__context__", h);
         }
+        // A raised exception has a traceback. The translated program has no
+        // frame objects, so it is an empty `traceback` instance: what
+        // `traceback.format_exception` reads to print the header.
+        if (value instanceof PyInstance && ((PyInstance) value).getAttrOrNull("__traceback__") == Py.NONE) { //NOPMD CompareObjectsWithEquals - identity is meant
+            ((PyInstance) value).setAttrDirect("__traceback__", new PyInstance(Py.TRACEBACK_TYPE));
+        }
     }
 
     /// `isinstance(value, type)`, where `type` may be a tuple of types.

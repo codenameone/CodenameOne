@@ -134,8 +134,13 @@ public final class PyBuiltin extends PyObject {
 
     @Override
     public Object getAttrOrNull(String attr) {
-        if ("__name__".equals(attr)) {
+        if ("__name__".equals(attr) || "__qualname__".equals(attr)) {
             return name;
+        }
+        if ("__module__".equals(attr)) {
+            // A builtins function reports its module; any other built-in
+            // (a module's function, a bound helper) reports None here.
+            return Builtins.NAMES.get(String.valueOf(name)) == this ? Py.str("builtins") : Py.NONE; //NOPMD CompareObjectsWithEquals - identity is meant
         }
         return super.getAttrOrNull(attr);
     }

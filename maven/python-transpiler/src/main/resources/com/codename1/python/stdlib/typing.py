@@ -680,7 +680,8 @@ class _NamedTupleMeta(type):
         types = ns.get("__annotations__", {})
         default_names = [n for n in types if n in ns]
         nm_tpl = collections.namedtuple(typename, list(types.keys()),
-                                        defaults=[ns[n] for n in default_names])
+                                        defaults=[ns[n] for n in default_names],
+                                        module=ns.get("__module__", "__main__"))
         nm_tpl.__annotations__ = types
         for key, val in ns.items():
             if key not in ("__annotations__", "__module__", "__qualname__") and key not in types and \

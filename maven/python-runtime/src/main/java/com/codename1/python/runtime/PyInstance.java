@@ -215,6 +215,19 @@ public class PyInstance extends PyObject {
 
     @Override
     public void setAttr(String name, Object value) {
+        // A class's own __setattr__ runs first and decides, even for a name
+        // a property or another data descriptor owns, as in CPython.
+        Object sa = cls.lookup("__setattr__");
+        if (sa != null && !(sa instanceof PyBuiltin)) {
+            Py.obj(sa).call(new Object[] {this, name, value}, Py.NO_KW);
+            return;
+        }
+        setAttrObject(name, value);
+    }
+
+    /// `object.__setattr__(self, name, value)`: data descriptors, then the
+    /// plain store, never an overriding `__setattr__`.
+    public void setAttrObject(String name, Object value) {
         Object clsAttr = cls.lookup(name);
         if (clsAttr instanceof PyProperty) {
             ((PyProperty) clsAttr).set(this, value);
@@ -227,16 +240,10 @@ public class PyInstance extends PyObject {
                 return;
             }
         }
-        Object sa = cls.lookup("__setattr__");
-        if (sa != null && !(sa instanceof PyBuiltin)) {
-            Py.obj(sa).call(new Object[] {this, name, value}, Py.NO_KW);
-            return;
-        }
         store(name, value);
     }
 
-    /// `object.__setattr__(self, name, value)`: the plain store, bypassing an
-    /// overriding `__setattr__`.
+    /// The plain store, bypassing descriptors and an overriding `__setattr__`.
     public void setAttrDirect(String name, Object value) {
         store(name, value);
     }
