@@ -172,3 +172,17 @@ def count_through_dict():
 
 
 count_through_dict()
+
+
+def len_through_cached_dict():
+    class C:
+        pass
+    o = C()
+    o.a = 1
+    d = o.__dict__
+    print(len(d))
+    o.x = 1
+    print(len(o.__dict__), len(d))
+
+
+len_through_cached_dict()

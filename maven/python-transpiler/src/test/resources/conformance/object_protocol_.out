@@ -22,3 +22,5 @@ AttributeError 'Slotted' object has no attribute '__dict__'
 True True
 11 11
 5 [('a', 11), ('b', 5)]
+1
+2 2

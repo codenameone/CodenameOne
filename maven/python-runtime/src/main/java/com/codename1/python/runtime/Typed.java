@@ -482,7 +482,7 @@ public final class Typed {
     public static long len(Object f, Object o) {
         if (f == Builtins.LEN) { //NOPMD CompareObjectsWithEquals - identity is meant
             if (o instanceof PyDict) {
-                return ((PyDict) o).size;
+                return ((PyDict) o).size();
             }
             return Py.len(o);
         }
