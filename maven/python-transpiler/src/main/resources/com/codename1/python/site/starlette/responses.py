@@ -39,7 +39,8 @@ class Response:
                 have_len = True
             if k.lower() == "content-type":
                 have_type = True
-        body = self.body
+        # A stream pending is not measured: it goes out chunked.
+        body = None if getattr(self, "_iterator", None) is not None else self.body
         if body is not None and not have_len and not (self.status_code < 200 or self.status_code in (204, 304)):
             self.headers.append("content-length", str(len(body)))
         ct = self.media_type
@@ -94,8 +95,62 @@ class RedirectResponse(Response):
 
 
 class StreamingResponse(Response):
+    """A body produced as it is sent.
+
+    Served, each chunk the iterator yields goes to the client as it is
+    yielded (chunked). Read through ``body`` -- the test client, a
+    middleware -- the iterator is drained once and kept.
+    """
+
     def __init__(self, content, status_code=200, headers=None, media_type=None, background=None):
-        if hasattr(content, "__iter__") and not isinstance(content, (str, bytes)):
-            content = b"".join([c if isinstance(c, (bytes, bytearray)) else str(c).encode("utf-8")
-                                for c in content])
-        Response.__init__(self, content, status_code, headers, media_type, background)
+        self.status_code = status_code
+        if media_type is not None:
+            self.media_type = media_type
+        self.background = background
+        if isinstance(content, (str, bytes, bytearray)) or content is None:
+            self._iterator = None
+            self._body = self.render(content)
+        else:
+            self._iterator = _sync_chunks(content, self.charset)
+            self._body = None
+        self.headers = MutableHeaders()
+        self._init_headers(headers)
+
+    @property
+    def body(self):
+        if self._iterator is not None:
+            it = self._iterator
+            self._iterator = None
+            self._body = b"".join(list(it))
+        return self._body
+
+    @body.setter
+    def body(self, value):
+        self._iterator = None
+        self._body = value
+
+    def take_stream(self):
+        """The pending chunk iterator, once, or None when there is none."""
+        it = self._iterator
+        self._iterator = None
+        return it
+
+
+def _sync_chunks(content, charset):
+    if hasattr(content, "__aiter__"):
+        content = _drive_async(content.__aiter__())
+    for c in content:
+        if isinstance(c, (bytes, bytearray)):
+            yield bytes(c)
+        else:
+            yield str(c).encode(charset)
+
+
+def _drive_async(it):
+    from fastapi.routing import run_coro
+    while True:
+        try:
+            item = run_coro(it.__anext__())
+        except StopAsyncIteration:
+            return
+        yield item

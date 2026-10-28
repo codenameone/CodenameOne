@@ -199,7 +199,67 @@ public abstract class PyServer {
             headers[2 * i] = Py.toStr(p.get(0));
             headers[2 * i + 1] = Py.toStr(p.get(1));
         }
-        return new Response((int) Py.asLong(t.get(0)), headers, PyBytes.like(t.get(2)));
+        Object body = t.get(2);
+        byte[] bytes = PyBytes.like(body);
+        if (bytes != null || body == Py.NONE) { //NOPMD CompareObjectsWithEquals - identity is meant
+            return new Response((int) Py.asLong(t.get(0)), headers, bytes == null ? new byte[0] : bytes, null);
+        }
+        // Anything else is an iterable of chunks, sent as each is produced.
+        return new Response((int) Py.asLong(t.get(0)), headers, new byte[0], Py.iter(body));
+    }
+
+    /// The next chunk of a streamed response, or an empty array when it is
+    /// done. Runs the application's generator, under the GIL, up to its next
+    /// `yield`; empty chunks are skipped, so empty means the end and never
+    /// "nothing yet".
+    public static byte[] nextChunk(Response response) {
+        if (response.stream == null) {
+            return new byte[0];
+        }
+        Gil.enter();
+        try {
+            while (true) {
+                Object item = Py.next(response.stream);
+                if (item == null) {
+                    response.stream = null;
+                    return new byte[0];
+                }
+                byte[] chunk = PyBytes.like(item);
+                if (chunk == null) {
+                    chunk = Py.toStr(item).getBytes("UTF-8");
+                }
+                if (chunk.length > 0) {
+                    return chunk;
+                }
+            }
+        } catch (java.io.UnsupportedEncodingException e) {
+            throw Py.error(Py.OS_ERROR, "UTF-8 is unsupported");
+        } finally {
+            Gil.exit();
+        }
+    }
+
+    /// Stops a streamed response early -- the client went away -- by closing
+    /// the application's generator, so its `finally` blocks run.
+    public static void closeStream(Response response) {
+        Object it = response.stream;
+        response.stream = null;
+        if (it == null) {
+            return;
+        }
+        Gil.enter();
+        try {
+            Object close = Py.obj(it).getAttrOrNull("close");
+            if (close != null) {
+                Py.obj(close).call(new Object[0], Py.NO_KW);
+            }
+        } catch (PyException e) {
+            // The client is gone; a generator that fails while closing has
+            // nobody left to answer.
+            e.printStackTrace();
+        } finally {
+            Gil.exit();
+        }
     }
 
     /// What `dispatch` answered.
@@ -207,12 +267,21 @@ public abstract class PyServer {
         public final int status;
         /// Name, value, name, value...
         public final String[] headers;
+        /// Empty when the body is streamed.
         public final byte[] body;
+        /// The chunk iterator of a streamed body, until it is exhausted.
+        Object stream;
 
-        Response(int status, String[] headers, byte[] body) {
+        Response(int status, String[] headers, byte[] body, Object stream) {
             this.status = status;
             this.headers = headers;
             this.body = body;
+            this.stream = stream;
+        }
+
+        /// Whether the body comes from [#nextChunk] rather than [#body].
+        public boolean isStreamed() {
+            return stream != null;
         }
 
         /// The value of the first header named `name`, ignoring case.

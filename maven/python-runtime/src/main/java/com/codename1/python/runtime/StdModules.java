@@ -68,8 +68,19 @@ public final class StdModules {
                     throw Py.typeError("serve(dispatch, host, port[, websockets])");
                 }
                 Object ws = a.length == 4 && a[3] != Py.NONE ? a[3] : null; //NOPMD CompareObjectsWithEquals - identity is meant
-                PyServer.get().serve(a[0], a[1] == Py.NONE ? null : Py.toStr(a[1]), //NOPMD CompareObjectsWithEquals - identity is meant
-                        (int) Py.asLong(a[2]), ws);
+                String host = a[1] == Py.NONE ? null : Py.toStr(a[1]); //NOPMD CompareObjectsWithEquals - identity is meant
+                int port = (int) Py.asLong(a[2]);
+                PyServer server = PyServer.get();
+                // Serving is a wait: the calling thread blocks until the server
+                // stops, and every request is answered on a worker thread that
+                // takes the GIL itself. Holding it here deadlocked the first
+                // request, which no test without a real server could see.
+                int saved = Gil.release();
+                try {
+                    server.serve(a[0], host, port, ws);
+                } finally {
+                    Gil.restore(saved);
+                }
                 return Py.NONE;
             }));
             PyModule.registerModule(m);

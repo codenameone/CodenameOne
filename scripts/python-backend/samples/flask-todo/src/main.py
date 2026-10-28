@@ -1,7 +1,9 @@
 # A small JSON API in plain Flask. Built by scripts/python-backend/build.sh
 # into one native executable that serves through the backend's HTTP server;
 # `python3 main.py` with Flask installed runs the same file unchanged.
-from flask import Flask, jsonify, request, abort
+import time
+
+from flask import Flask, Response, jsonify, request, abort, stream_with_context
 
 app = Flask(__name__)
 todos = {}
@@ -52,5 +54,19 @@ def fib(n):
     return jsonify({"n": n, "fib": str(a)})
 
 
+@app.route("/stream")
+def stream():
+    """Streamed as it is produced: one line a second, naming the request."""
+    who = request.args.get("who", "anon")
+
+    def gen():
+        for i in range(3):
+            yield "%s %d\n" % (request.args.get("who", who), i)
+            if i < 2:
+                time.sleep(1)
+    return Response(stream_with_context(gen()), mimetype="text/plain")
+
+
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=8080)
+    import sys
+    app.run(host="127.0.0.1", port=int(sys.argv[1]) if len(sys.argv) > 1 else 8080)

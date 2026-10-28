@@ -249,16 +249,18 @@ class Response:
                 self.status_code = status
             else:
                 self.status = status
+        self._iter = None
         self._data = b""
         self.is_streamed = False
         if response is not None:
             if isinstance(response, (str, bytes, bytearray)):
                 self.set_data(response)
             else:
-                # A generator body is drained here, while the request context is
-                # still pushed: the native server has no chunked-transfer API, so a
-                # streamed response is buffered and sent whole.
-                self.set_data(b"".join([_b(c) for c in response]))
+                # A generator body stays a generator: the server sends each
+                # chunk as it is yielded (chunked, no Content-Length). Reading
+                # the data -- the test client, an after_request hook -- drains
+                # it once and keeps the bytes.
+                self._iter = iter(response)
                 self.is_streamed = True
         self._cookies = []
 
@@ -278,6 +280,24 @@ class Response:
             value = str(value)
             self.status_code = int(value.split(None, 1)[0])
             self._status_text = (self.status_code, value)
+
+    @property
+    def _data(self):
+        it = self._iter
+        if it is not None:
+            self._iter = None
+            self._bytes = b"".join([_b(c) for c in it])
+        return self._bytes
+
+    @_data.setter
+    def _data(self, value):
+        self._iter = None
+        self._bytes = value
+
+    def _take_stream(self):
+        it = self._iter
+        self._iter = None
+        return it
 
     def set_data(self, value):
         self._data = _b(value)
@@ -1158,6 +1178,9 @@ class Flask(_Routes):
         if method == "HEAD":
             hdrs = resp.headers.items()
             return resp.status_code, hdrs, b""
+        stream = resp._take_stream()
+        if stream is not None:
+            return resp.status_code, resp.headers.items(), _in_context(ctx, stream)
         if "Content-Length" not in resp.headers and resp.status_code not in (204, 304):
             resp.headers["Content-Length"] = str(len(resp._data))
         return resp.status_code, resp.headers.items(), resp._data
@@ -1315,7 +1338,8 @@ class TestResponse(Response):
     def __init__(self, body, status, headers):
         Response.__init__(self)
         self.headers = Headers(headers)
-        self._data = bytes(body)
+        # A streamed body arrives as its chunk generator; the client reads it whole.
+        self._data = bytes(body) if isinstance(body, (bytes, bytearray)) else b"".join(list(body))
         self.status_code = status
 
 
@@ -1522,11 +1546,29 @@ def render_template_string(source, **context):
     return app.jinja_env.from_string(source).render(app._template_context(context))
 
 
+_END = object()
+
+
+def _in_context(ctx, chunks):
+    """Yields `chunks` as bytes, with the request context pushed around
+    each step, so a streamed body can still read `request` and `session` --
+    what stream_with_context promises, given to every streamed body."""
+    while True:
+        _stack.append(ctx)
+        try:
+            c = next(chunks, _END)
+        finally:
+            _stack.pop()
+        if c is _END:
+            return
+        yield _b(c)
+
+
 def stream_with_context(generator_or_function):
     """Keeps the request context around a generator body.
 
-    Response drains a generator while the request context is still pushed
-    (the native server has no chunked API), so this only wraps a function.
+    The server pushes the request context around every step of a streamed
+    body, so a generator needs no wrapping; this only wraps a function.
     """
     if hasattr(generator_or_function, "__next__") or not callable(generator_or_function):
         return generator_or_function

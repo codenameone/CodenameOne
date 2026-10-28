@@ -94,8 +94,38 @@ def _inner(app):
         conn._cn1_inner_response = resp
         await send({"type": "http.response.start", "status": resp.status_code,
                     "headers": resp.headers.raw})
+        if getattr(resp, "_iterator", None) is not None:
+            # A streamed body is offered unread: a middleware that passes the
+            # message on leaves it to stream to the client chunk by chunk,
+            # and one that reads message["body"] gets the whole of it.
+            await send(_StreamBody(resp))
+            return
         await send({"type": "http.response.body", "body": resp.body})
     return asgi
+
+
+class _Pending:
+    """The body of a streamed response nobody has read yet."""
+
+    def __init__(self, resp):
+        self.resp = resp
+
+
+class _StreamBody(dict):
+    def __init__(self, resp):
+        dict.__init__(self, type="http.response.body", body=_Pending(resp), more_body=False)
+
+    def _real(self, key, value):
+        if key == "body" and isinstance(value, _Pending):
+            value = value.resp.body
+            dict.__setitem__(self, "body", value)
+        return value
+
+    def __getitem__(self, key):
+        return self._real(key, dict.__getitem__(self, key))
+
+    def get(self, key, default=None):
+        return self._real(key, dict.get(self, key, default))
 
 
 def wrap(cls, app, args, kwargs):
@@ -121,7 +151,7 @@ async def _http(mw, conn, scope):
         state["read"] = True
         return {"type": "http.request", "body": conn._body, "more_body": False}
 
-    out = {"status": None, "headers": [], "body": b""}
+    out = {"status": None, "headers": [], "body": b"", "stream": None}
 
     async def send(m):
         t = m["type"]
@@ -129,11 +159,23 @@ async def _http(mw, conn, scope):
             out["status"] = m["status"]
             out["headers"] = list(m.get("headers") or [])
         elif t == "http.response.body":
-            out["body"] += bytes(m.get("body", b""))
+            raw = dict.get(m, "body", b"") if isinstance(m, dict) else m.get("body", b"")
+            if isinstance(raw, _Pending) and not out["body"]:
+                # Passed on unread: the inner stream goes out as it is.
+                out["stream"] = raw.resp
+            else:
+                out["body"] += bytes(m.get("body", b""))
 
     await mw(scope, receive, send)
     if out["status"] is None:
         raise RuntimeError("No response returned.")
+    stream = out["stream"]
+    if stream is not None and getattr(stream, "_iterator", None) is not None:
+        stream.status_code = out["status"]
+        del stream.headers._list[:]
+        for k, v in out["headers"]:
+            stream.headers.append(_text(k), _text(v))
+        return stream
     resp = Response(out["body"], status_code=out["status"])
     del resp.headers._list[:]
     for k, v in out["headers"]:

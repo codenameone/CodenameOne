@@ -3,7 +3,12 @@
 # binary: Python -> Java -> bytecode, then vm/backend/build.sh translates it
 # with the backend runtime and its HTTP server into C and compiles it.
 #
-#   build.sh <dir with src/main.py> <out binary> [maven repo]
+#   build.sh [--jvm] <dir with src/main.py> <out binary> [maven repo]
+#
+# --jvm stops before the native build and writes <out> as a launcher that
+# runs the same application on a JVM (JAVA17_HOME) over the backend jar's
+# JavaSE runtime: no clang, no translator, seconds to build. What
+# e2e-test.sh drives.
 #
 # The application serves itself the usual way -- `app.run(port=...)` or
 # `uvicorn.run(app, ...)` -- and the transpiler bridges that to the backend's
@@ -19,6 +24,8 @@
 # Needs JAVA17_HOME (javac for the generated code) and JDK_8_HOME or
 # JAVA_HOME (the backend build and the translator), and clang.
 set -e
+JVM=0
+if [ "$1" = "--jvm" ]; then JVM=1; shift; fi
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
 APP="$(cd "${1:?usage: build.sh <app dir> <out binary> [maven repo]}" && pwd)"
@@ -66,6 +73,14 @@ JAVA
 "$J17/bin/javac" -nowarn --release 17 -cp "$CLASSES:$BACKEND" -d "$CLASSES" $(find "$GEN" -name '*.java')
 # Line numbers and source file of the Python, for stack traces and debuggers.
 "$J17/bin/java" -cp "$ENGINE:$ASM" com.codename1.maven.PythonLineMapper "$CLASSES"
+
+if [ "$JVM" = 1 ]; then
+    mkdir -p "$(dirname "$OUT")"
+    printf '#!/bin/sh\nexec "%s/bin/java" -cp "%s:%s" com.pybackend.PyBackendMain "$@"\n' \
+        "$J17" "$CLASSES" "$BACKEND" > "$OUT"
+    chmod +x "$OUT"
+    exit 0
+fi
 
 # The backend build compiles a demo directory with JDK 8; the application is
 # already compiled, so it is an empty one and the classes come in through

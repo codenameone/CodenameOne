@@ -27,6 +27,8 @@ on:
       - 'maven/integration-tests/python-project-test.sh'
       - 'maven/integration-tests/inc/**'
       - 'scripts/python-samples/**'
+      - 'scripts/python-backend/**'
+      - 'vm/backend/src/**'
       - '.github/workflows/python-project.yml'
   push:
     branches: [ master ]
@@ -41,6 +43,8 @@ on:
       - 'maven/integration-tests/python-project-test.sh'
       - 'maven/integration-tests/inc/**'
       - 'scripts/python-samples/**'
+      - 'scripts/python-backend/**'
+      - 'vm/backend/src/**'
       - '.github/workflows/python-project.yml'
 
 concurrency:
@@ -92,6 +96,13 @@ jobs:
       - name: Unit tests
         working-directory: maven
         run: JAVA_HOME="$JAVA17_HOME" mvn -B -pl build-engine,codenameone-maven-plugin test -Dtest='Python*' -Dsurefire.failIfNoSpecifiedTests=false
+      # The real server path: Flask and FastAPI samples served by the
+      # backend's HttpServer on a JVM and driven over sockets -- HTTP,
+      # middleware, websockets and streamed responses.
+      - name: Python backend end-to-end
+        run: |
+          (cd maven && mvn -B -q -f ../vm/pom.xml -pl JavaAPI -am install -DskipTests)
+          bash scripts/python-backend/e2e-test.sh "$HOME/.m2/repository"
       - name: Refresh archetype catalog
         run: |
           cd maven

@@ -234,7 +234,20 @@ class FastAPI(APIRouter):
         return resp.status_code, resp.headers.items(), data
 
     def dispatch(self, method, path, query, headers, body):
-        return self._dispatch_for_client(method, path, query, headers, body, False)
+        # The server's entry: a streaming body is handed over as its chunk
+        # iterator, which the server sends as each chunk is produced. The test
+        # client goes through _dispatch_for_client and reads it whole.
+        try:
+            resp = self._handle(method, path, query, headers, body)
+        except Exception:
+            resp = PlainTextResponse("Internal Server Error", status_code=500)
+        if method.upper() == "HEAD":
+            return resp.status_code, resp.headers.items(), b""
+        take = getattr(resp, "take_stream", None)
+        stream = take() if take is not None else None
+        if stream is not None:
+            return resp.status_code, resp.headers.items(), stream
+        return resp.status_code, resp.headers.items(), resp.body
 
     # -- websockets
     def websocket_route(self, path):
