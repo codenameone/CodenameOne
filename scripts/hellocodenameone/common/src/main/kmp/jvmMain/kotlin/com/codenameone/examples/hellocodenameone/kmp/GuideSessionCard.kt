@@ -21,7 +21,6 @@
  * need additional information or have any questions.
  */
 package com.codenameone.examples.hellocodenameone.kmp
-package com.codenameone.examples.hellocodenameone.kmp
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
