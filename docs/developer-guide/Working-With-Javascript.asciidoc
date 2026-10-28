@@ -293,8 +293,7 @@ An app that lets the user choose its own appearance can have the next launch's l
 
 [source,java]
 ----
-CN.setProperty("platformHint.javascript.splashAppearance", "dark"); // or "light"
-CN.setProperty("platformHint.javascript.splashAppearance", null);   // follow the browser again
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/WorkingWithJavascriptSplashAppearanceSnippet.java[tag=working-with-javascript-splash-appearance,indent=0]
 ----
 
 The choice is kept in the browser's local storage and applies only in `auto` mode.
