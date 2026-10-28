@@ -992,7 +992,7 @@ final class BuildHintsAndroid {
         h.add(new Hint("android.rootbeerVersion")
                 .group(HintGroup.ANDROID)
                 .type(HintType.VERSION)
-                .def("0.1.0")
+                .def("0.1.2")
                 .platform("android"));
 
         h.add(new Hint("android.shareFilter")

@@ -35,9 +35,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 /// What the network guard lets through.
 class GuardTest {
-    /// A ConnectionRequest asks the implementation about the platform as
-    /// it is built, so this class installs one itself rather than relying
-    /// on whichever test happened to run before it.
+    /// `new ConnectionRequest()` asks the platform whether it supports access
+    /// points. Without this the test passed only when an earlier test class in
+    /// the same JVM had installed a port, and failed whenever it ran first.
     @BeforeAll
     static void port() {
         Util.setImplementation(new JavaSEPort());

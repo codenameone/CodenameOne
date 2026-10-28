@@ -727,6 +727,15 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
     
     private boolean hitTest(int x, int y) {
+        // With no native peer behind the canvas there is nothing a pointer could
+        // fall through to, so the canvas owns every point. Probing anyway cost a
+        // blocking round trip and a pixel read-back of the display canvas on every
+        // touchstart and wheel event, and Chrome answers repeated read-backs by
+        // taking the canvas off the GPU for good: on a low-end Android phone every
+        // later frame was then rasterized in software, ~80ms each (#6123).
+        if (!(Accessor.getActivePeerCount() > 0 && paintNativePeersBehind())) {
+            return true;
+        }
         if (outputCanvas != null) {
             // Single-pixel alpha probe of the display surface. A fully
             // transparent pixel means the pointer falls through (no component

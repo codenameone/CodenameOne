@@ -198,6 +198,11 @@ class BulkConformanceIntegrationTest {
         Run parpar = run(Collections.singletonList(executable.toString()), parparDir);
 
         Map<String, List<String>> expected = parse(hotspot.output);
+        // Bulk.end() prints "(end)". Without it the HotSpot run stopped early
+        // -- a check that exits the JVM -- and every later check would be
+        // missing from both sides and compare as equal.
+        assertTrue(expected.containsKey("(end)"), "the HotSpot run never reached Bulk.end():\n"
+                + tail(hotspot.output));
         Map<String, List<String>> actual = parse(parpar.output);
         compare(expected, actual, failures);
         BulkGeneratedCodeChecks.checkOutput(actual, failures);
@@ -249,7 +254,32 @@ class BulkConformanceIntegrationTest {
                 failures.add(name + ": never ran on ParparVM");
                 continue;
             }
-            if (!e.isEmpty() && e.get(0).startsWith("SKIPPED ")) {
+            // "Both runtimes printed the same" is only evidence when something
+            // was printed and every line of the check ran. A check that prints
+            // nothing compares nothing, and one that throws out of its body on
+            // HotSpot stops at the throw on both sides -- its remaining
+            // assertions then pass on ParparVM without running there. Both
+            // passed silently; neither is ever intended.
+            if (e.isEmpty()) {
+                failures.add(name + ": printed nothing on HotSpot, so it compares nothing");
+                continue;
+            }
+            for (String line : e) {
+                if (line.startsWith("THREW ")) {
+                    failures.add(name + ": threw out of its body on HotSpot (" + clip(line)
+                            + "); the rest of the check never ran. Catch the expected exception"
+                            + " with Bulk.pThrown");
+                }
+            }
+            if (e.get(0).startsWith("SKIPPED ")) {
+                // The JDK's answer differs from Codename One's here, so there is
+                // nothing to compare -- but ParparVM still runs the body, and an
+                // uncaught exception there is a failure, not a difference.
+                for (String line : a) {
+                    if (line.startsWith("THREW ")) {
+                        failures.add(name + " (skipped on HotSpot): ParparVM " + clip(line));
+                    }
+                }
                 continue;
             }
             if (e.size() == 1 && "CN1-ONLY".equals(e.get(0))) {

@@ -3371,6 +3371,7 @@ static CodenameOne_GLViewController *sharedSingleton;
 }
 
 #elif !TARGET_OS_OSX && !TARGET_OS_WATCH
+#define CN1_PUBLISH_VIEW_SIZE_FROM_LAYOUT 1
 // Defined further down, beside the drawing code that reads it.
 extern bool lockDrawing;
 
@@ -3391,6 +3392,17 @@ extern bool lockDrawing;
 // size, so it does not reach this either.
 - (void)viewDidLayoutSubviews {
     [super viewDidLayoutSubviews];
+    [self cn1PublishViewSizeIfChanged];
+}
+
+// The other half of #6080. With the app in landscape, a stale size can be
+// published around the portrait-only camera covering this view -- possibly a
+// portrait viewWillTransitionToSize:, or updateCanvas: swapping the bounds to
+// match a scene that still reports portrait; the device log did not say. The view itself
+// never leaves landscape, so when the user stays in landscape its bounds never
+// change and no layout pass runs to correct the published size. viewDidAppear
+// and the transition's completion therefore re-read the real bounds as well.
+- (void)cn1PublishViewSizeIfChanged {
     // The same reason viewWillTransitionToSize: gives: iOS lays the view out
     // at the opposite orientation for its background snapshot.
     if (isAppSuspended || self.view == nil) {
@@ -3409,6 +3421,10 @@ extern bool lockDrawing;
     if (dw <= 1 && dh <= 1) {
         return;
     }
+    // Rare by construction (a rotation normally publishes first), so it is
+    // worth a line: it names the stale size the next time #6080 recurs.
+    CN1Log(@"CN1: view is %dx%d px but the published size was %dx%d; republishing",
+          newW, newH, displayWidth, displayHeight);
     [[self renderingView] updateFrameBufferSize:newW h:newH];
     [[self renderingView] deleteFramebuffer];
     displayWidth = newW;
@@ -3684,6 +3700,19 @@ bool lockDrawing;
 #endif
     [self becomeFirstResponder];
     [self updateCanvas:animated];
+#ifdef CN1_PUBLISH_VIEW_SIZE_FROM_LAYOUT
+    // After the portrait-only camera closes over a landscape app that stayed
+    // landscape, the reported display was portrait while the view's bounds
+    // were landscape (#6080 case 3), and since the bounds never change no
+    // layout pass corrects it. Which publication went stale is not pinned
+    // down: updateCanvas: itself sizes through cn1OrientationCorrectSize,
+    // which swaps the bounds if the scene still reports portrait at this
+    // moment. So the bounds are re-read once the dismissal has settled, after
+    // updateCanvas:, and cn1PublishViewSizeIfChanged logs any correction.
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self cn1PublishViewSizeIfChanged];
+    });
+#endif
     // Re-install / bring the status-bar tap proxy to the front. Native peers
     // (browsers, video, etc.) added after viewDidLoad can obscure it or push
     // sibling scroll views into the hierarchy.
@@ -4949,13 +4978,29 @@ BOOL prefersStatusBarHidden = NO;
     [[self renderingView] updateFrameBufferSize:(int)(size.width * scaleValue) h:(int)(size.height * scaleValue)];
     [[self renderingView] deleteFramebuffer];
 
-    displayWidth = (int)size.width * scaleValue;
-    displayHeight = (int)size.height * scaleValue;
+    // Scale before truncating, as cn1PublishViewSizeIfChanged does: a
+    // fractional point width would otherwise disagree with it by more than
+    // its tolerance and republish after every resize.
+    displayWidth = (int)(size.width * scaleValue);
+    displayHeight = (int)(size.height * scaleValue);
     
     lockDrawing = NO;
     
     screenSizeChanged(displayWidth, displayHeight);
     repaintUI();
+#ifdef CN1_PUBLISH_VIEW_SIZE_FROM_LAYOUT
+    // A size announced to a covered controller may never become its bounds
+    // (#6080, see cn1PublishViewSizeIfChanged); settle on the real ones.
+    if (coordinator != nil) {
+        [coordinator animateAlongsideTransition:nil completion:^(id context) {
+            // Still covered, the bounds are the stale ones; republishing them
+            // would only churn the framebuffer. viewDidAppear settles it.
+            if (self.presentedViewController == nil) {
+                [self cn1PublishViewSizeIfChanged];
+            }
+        }];
+    }
+#endif
     
     if ( currentActionSheet != nil ){
         [CN1View beginAnimations:nil context:nil];
