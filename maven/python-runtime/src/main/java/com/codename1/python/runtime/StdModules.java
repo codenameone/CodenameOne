@@ -64,11 +64,12 @@ public final class StdModules {
         if ("_cn1server".equals(name)) {
             PyModule m = new PyModule("_cn1server", new String[0]);
             m.setAttr("serve", PyBuiltin.positional("serve", a -> {
-                if (a.length != 3) {
-                    throw Py.typeError("serve(dispatch, host, port)");
+                if (a.length != 3 && a.length != 4) {
+                    throw Py.typeError("serve(dispatch, host, port[, websockets])");
                 }
+                Object ws = a.length == 4 && a[3] != Py.NONE ? a[3] : null; //NOPMD CompareObjectsWithEquals - identity is meant
                 PyServer.get().serve(a[0], a[1] == Py.NONE ? null : Py.toStr(a[1]), //NOPMD CompareObjectsWithEquals - identity is meant
-                        (int) Py.asLong(a[2]));
+                        (int) Py.asLong(a[2]), ws);
                 return Py.NONE;
             }));
             PyModule.registerModule(m);

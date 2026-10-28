@@ -10,12 +10,14 @@ through it. Written from FastAPI's public documentation and behaviour.
 from starlette.background import BackgroundTasks
 from starlette.requests import Request
 from starlette.responses import Response
+from starlette.websockets import WebSocket, WebSocketDisconnect
 
 from fastapi import status
 from fastapi.applications import FastAPI
-from fastapi.exceptions import HTTPException
+from fastapi.exceptions import HTTPException, WebSocketException
 from fastapi.params import Body, Cookie, Depends, File, Form, Header, Path, Query, Security
 from fastapi.routing import APIRouter
 
 __all__ = ["FastAPI", "APIRouter", "Depends", "Query", "Path", "Body", "Header", "Cookie", "Form",
-           "File", "Security", "HTTPException", "Request", "Response", "BackgroundTasks", "status"]
+           "File", "Security", "HTTPException", "Request", "Response", "BackgroundTasks", "status",
+           "WebSocket", "WebSocketDisconnect", "WebSocketException"]

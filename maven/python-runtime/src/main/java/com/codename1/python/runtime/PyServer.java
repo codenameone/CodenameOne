@@ -48,6 +48,88 @@ public abstract class PyServer {
     /// Serves until the server stops.
     public abstract void serve(Object dispatch, String host, int port);
 
+    /// Serves `dispatch`, and websocket connections through `webSockets`
+    /// when it is not null. `webSockets` is the callable `uvicorn.run`
+    /// passes: `(path, query, headers, send)` answering a connection object
+    /// with `text(str)`, `binary(bytes)` and `closed(code, reason)`. A server
+    /// that cannot upgrade a connection refuses to start rather than serving
+    /// an application whose websocket routes nothing could reach.
+    public void serve(Object dispatch, String host, int port, Object webSockets) {
+        if (webSockets != null) {
+            throw Py.error(Py.OS_ERROR, "this HTTP server does not support websockets");
+        }
+        serve(dispatch, host, port);
+    }
+
+    /// What a server does with the messages a Python websocket endpoint sends.
+    public interface WebSocketSink {
+        /// The endpoint accepted; the handshake has already completed.
+        void accept(String subprotocol);
+
+        void text(String value);
+
+        void binary(byte[] value);
+
+        void close(int code, String reason);
+    }
+
+    /// Opens one websocket connection in Python; answers the connection
+    /// object [#webSocketText], [#webSocketBinary] and [#webSocketClosed]
+    /// take. Messages the endpoint sends, including any it sends while
+    /// opening, reach `sink`.
+    public static Object openWebSocket(Object webSockets, String target, String[] headers,
+                                       final WebSocketSink sink) {
+        Object[] req = request("GET", target, headers, null);
+        PyBuiltin send = PyBuiltin.positional("send", a -> {
+            String kind = Py.toStr(a[0]);
+            if ("accept".equals(kind)) {
+                sink.accept(a[1] == Py.NONE ? null : Py.toStr(a[1])); //NOPMD CompareObjectsWithEquals - identity is meant
+            } else if ("text".equals(kind)) {
+                sink.text(Py.toStr(a[1]));
+            } else if ("bytes".equals(kind)) {
+                sink.binary(PyBytes.like(a[1]));
+            } else {
+                sink.close((int) Py.asLong(a[1]), a[2] == Py.NONE ? "" : Py.toStr(a[2])); //NOPMD CompareObjectsWithEquals - identity is meant
+            }
+            return Py.NONE;
+        });
+        Gil.enter();
+        try {
+            return Py.obj(webSockets).call(new Object[] {req[1], req[2], req[3], send}, Py.NO_KW);
+        } finally {
+            Gil.exit();
+        }
+    }
+
+    /// Delivers a text message to a connection [#openWebSocket] opened.
+    public static void webSocketText(Object connection, String value) {
+        event(connection, "text", value);
+    }
+
+    /// Delivers a binary message to a connection [#openWebSocket] opened.
+    public static void webSocketBinary(Object connection, byte[] value) {
+        event(connection, "binary", new PyBytes(value));
+    }
+
+    /// Tells a connection [#openWebSocket] opened that the peer has gone.
+    public static void webSocketClosed(Object connection, int code, String reason) {
+        Gil.enter();
+        try {
+            Py.callMethod(connection, "closed", Py.of(code), reason == null ? "" : reason);
+        } finally {
+            Gil.exit();
+        }
+    }
+
+    private static void event(Object connection, String name, Object value) {
+        Gil.enter();
+        try {
+            Py.callMethod(connection, name, value);
+        } finally {
+            Gil.exit();
+        }
+    }
+
     /// The request as `dispatch` takes it.
     public static Object[] request(String method, String target, String[] headers, byte[] body) {
         int q = target.indexOf('?');

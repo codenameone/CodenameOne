@@ -35,3 +35,20 @@ class ResponseValidationError(ValidationException):
 
 class FastAPIError(RuntimeError):
     pass
+
+
+class WebSocketRequestValidationError(ValidationException):
+    pass
+
+
+class WebSocketException(Exception):
+    def __init__(self, code, reason=None):
+        Exception.__init__(self)
+        self.code = code
+        self.reason = reason or ""
+
+    def __str__(self):
+        return "%d: %s" % (self.code, self.reason)
+
+    def __repr__(self):
+        return "WebSocketException(code=%d, reason=%r)" % (self.code, self.reason)

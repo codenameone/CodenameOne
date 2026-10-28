@@ -18,6 +18,7 @@ from starlette.datastructures import QueryParams
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.requests import Request
 from starlette.responses import JSONResponse, RedirectResponse, Response
+from starlette.websockets import WebSocket
 
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import (HTTPException, RequestValidationError, ResponseValidationError)
@@ -146,6 +147,9 @@ def _analyze(call, path_names):
         elif isinstance(default, Param):
             field = default
             default = field.default
+        if isinstance(tp, type) and issubclass(tp, WebSocket):
+            dep.specials[name] = "websocket"
+            continue
         if isinstance(tp, type) and issubclass(tp, Request):
             dep.specials[name] = "request"
             continue
@@ -272,10 +276,10 @@ class APIRoute:
         return vals
 
 
-def _call(call, values):
+async def _call(call, values):
     r = call(**values)
     if inspect.iscoroutine(r):
-        r = run_coro(r)
+        r = await r
     return r
 
 
@@ -328,18 +332,18 @@ def _missing(ctx, loc):
     ctx.errors.append({"type": "missing", "loc": tuple(loc), "msg": "Field required", "input": None})
 
 
-def _run_dep(sub, subvals, ctx):
+async def _run_dep(sub, subvals, ctx):
     r = sub.call(**subvals)
     if sub.is_gen:
         r2 = next(r)
         ctx.cleanups.append(r)
         return r2
     if inspect.iscoroutine(r):
-        r = run_coro(r)
+        r = await r
     return r
 
 
-def _solve(dep, ctx):
+async def _solve(dep, ctx):
     req = ctx.req
     values = {}
     for name, sub, use_cache in dep.deps:
@@ -348,15 +352,15 @@ def _solve(dep, ctx):
             values[name] = ctx.cache[key]
             continue
         before = len(ctx.errors)
-        subvals = _solve(sub, ctx)
+        subvals = await _solve(sub, ctx)
         if len(ctx.errors) > before:
             continue
-        r = _run_dep(sub, subvals, ctx)
+        r = await _run_dep(sub, subvals, ctx)
         if use_cache:
             ctx.cache[key] = r
         values[name] = r
     for name, kind in dep.specials.items():
-        if kind == "request":
+        if kind == "request" or kind == "websocket":
             values[name] = req
         elif kind == "response":
             values[name] = ctx.sub
@@ -511,7 +515,7 @@ def _serialize(route, raw):
     return jsonable_encoder(raw)
 
 
-def run_route(route, req, default_class):
+async def run_route(route, req, default_class):
     route._prepare()
     body, form, err = _read_body(route, req)
     if err is not None:
@@ -520,15 +524,15 @@ def run_route(route, req, default_class):
     ctx.form = form
     try:
         for pre in route._pre:
-            pv = _solve(pre, ctx)
+            pv = await _solve(pre, ctx)
             if not ctx.errors:
-                _run_dep(pre, pv, ctx)
-        values = _solve(route._dep, ctx)
+                await _run_dep(pre, pv, ctx)
+        values = await _solve(route._dep, ctx)
         if ctx.errors:
             raise RequestValidationError(list(ctx.errors), body=body if body is not Undefined else None)
         raw = route.endpoint(**values)
         if inspect.iscoroutine(raw):
-            raw = run_coro(raw)
+            raw = await raw
         if isinstance(raw, Response):
             resp = raw
         else:
@@ -555,6 +559,50 @@ def run_route(route, req, default_class):
             _finish_cleanups(ctx, exc)
         raise
     return resp
+
+
+class APIWebSocketRoute:
+    """A websocket endpoint: path parameters and dependencies resolve as for HTTP."""
+
+    def __init__(self, path, endpoint, name=None, dependencies=None):
+        self.path = path
+        self.endpoint = endpoint
+        self.name = name or endpoint.__name__
+        self.regex, self.path_names = _compile(path)
+        self.dependencies = list(dependencies or [])
+        self.methods = set()
+        self.include_in_schema = False
+        self.body_params = []
+        self._dep = None
+        self._pre = None
+
+    def _prepare(self):
+        if self._dep is None:
+            self._dep = _analyze(self.endpoint, self.path_names)
+            self._pre = [_analyze(d.dependency, self.path_names) for d in self.dependencies]
+
+    def match(self, path):
+        return APIRoute.match(self, path)
+
+
+async def run_websocket(route, ws):
+    route._prepare()
+    ctx = _Ctx(route, ws, Undefined)
+    try:
+        for pre in route._pre:
+            pv = await _solve(pre, ctx)
+            if not ctx.errors:
+                await _run_dep(pre, pv, ctx)
+        values = await _solve(route._dep, ctx)
+        if ctx.errors:
+            from fastapi.exceptions import WebSocketRequestValidationError
+            raise WebSocketRequestValidationError(list(ctx.errors))
+        await _call(route.endpoint, values)
+        _finish_cleanups(ctx, None)
+    except Exception as exc:
+        if ctx.cleanups:
+            _finish_cleanups(ctx, exc)
+        raise
 
 
 def _verb_decorator(self, methods, path, kw):
@@ -585,6 +633,19 @@ class APIRouter:
             kw["deprecated"] = self.deprecated
         self.routes.append(APIRoute(self.prefix + path, endpoint, methods or ["GET"], **kw))
 
+    def add_api_websocket_route(self, path, endpoint, name=None, dependencies=None):
+        self.routes.append(APIWebSocketRoute(self.prefix + path, endpoint, name=name,
+                                             dependencies=list(self.dependencies) + list(dependencies or [])))
+
+    def websocket(self, path, name=None, dependencies=None):
+        def deco(f):
+            self.add_api_websocket_route(path, f, name=name, dependencies=dependencies)
+            return f
+        return deco
+
+    def websocket_route(self, path, name=None):
+        return self.websocket(path, name=name)
+
     def api_route(self, path, *, methods=None, **kw):
         return _verb_decorator(self, methods or ["GET"], path, kw)
 
@@ -613,6 +674,10 @@ class APIRouter:
                        default_response_class=None, responses=None, deprecated=None,
                        include_in_schema=True, **kw):
         for r in router.routes:
+            if isinstance(r, APIWebSocketRoute):
+                self.routes.append(APIWebSocketRoute(prefix + r.path, r.endpoint, name=r.name,
+                                                     dependencies=list(dependencies or []) + list(r.dependencies)))
+                continue
             n = APIRoute(prefix + r.path, r.endpoint, r.methods, name=r.name,
                          status_code=r.status_code, response_model=r.response_model,
                          response_class=r.response_class or default_response_class or self.default_response_class,

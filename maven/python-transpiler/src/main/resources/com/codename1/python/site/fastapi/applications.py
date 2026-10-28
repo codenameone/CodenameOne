@@ -15,7 +15,10 @@ from starlette.responses import JSONResponse, PlainTextResponse, RedirectRespons
 
 from fastapi.exceptions import RequestValidationError, ResponseValidationError
 from fastapi.params import Undefined
-from fastapi.routing import APIRouter, APIRoute, run_coro, run_route, _all_params, _all_body, _analyze
+from fastapi.routing import (APIRouter, APIRoute, APIWebSocketRoute, run_coro, run_route, run_websocket,
+                             _all_params, _all_body, _analyze)
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.websockets import WebSocket, WebSocketDisconnect, _Session
 
 
 def _http_exception_handler(request, exc):
@@ -33,7 +36,7 @@ class FastAPI(APIRouter):
     def __init__(self, *, debug=False, title="FastAPI", summary=None, description="", version="0.1.0",
                  openapi_url="/openapi.json", docs_url="/docs", redoc_url="/redoc",
                  default_response_class=None, dependencies=None, exception_handlers=None,
-                 lifespan=None, tags=None, root_path="", **kw):
+                 lifespan=None, tags=None, root_path="", middleware=None, **kw):
         APIRouter.__init__(self, dependencies=dependencies, default_response_class=default_response_class)
         self.debug = debug
         self.title = title
@@ -59,8 +62,37 @@ class FastAPI(APIRouter):
         self._lifespan = lifespan
         self._lifespan_cm = None
         self._openapi = None
+        self.user_middleware = []
+        self._stack = None
+        for m in middleware or []:
+            self.user_middleware.append(m)
 
     # -- registration
+    def add_middleware(self, middleware_class, *args, **kwargs):
+        if self._stack is not None:
+            raise RuntimeError("Cannot add middleware after an application has started")
+        from starlette.middleware import Middleware
+        self.user_middleware.insert(0, Middleware(middleware_class, *args, **kwargs))
+
+    def middleware(self, middleware_type):
+        if middleware_type != "http":
+            raise ValueError("Currently only middleware(\"http\") is supported.")
+
+        def deco(f):
+            self.add_middleware(BaseHTTPMiddleware, dispatch=f)
+            return f
+        return deco
+
+    def _build_stack(self):
+        if self._stack is None:
+            app = self._core
+            for m in reversed(self.user_middleware):
+                cls, args, kwargs = m
+                app = cls(app, *args, **kwargs)
+            self._stack = app
+        return self._stack
+
+    # -- registration (handlers)
     def exception_handler(self, exc_class_or_status):
         def deco(f):
             self.exception_handlers[exc_class_or_status] = f
@@ -121,13 +153,13 @@ class FastAPI(APIRouter):
                 return self.exception_handlers[cls]
         return None
 
-    def _handle_exception(self, req, exc):
+    async def _handle_exception(self, req, exc):
         h = self._find_handler(exc)
         if h is None:
             raise exc
         r = h(req, exc)
         if inspect.iscoroutine(r):
-            r = run_coro(r)
+            r = await r
         return r
 
     def _route(self, req):
@@ -135,6 +167,8 @@ class FastAPI(APIRouter):
         method = req.method
         partial = None
         for r in self.routes:
+            if isinstance(r, APIWebSocketRoute):
+                continue
             vals = r.match(path)
             if vals is None:
                 continue
@@ -151,7 +185,7 @@ class FastAPI(APIRouter):
         else:
             alt = path + "/"
         for r in self.routes:
-            if r.match(alt) is not None:
+            if not isinstance(r, APIWebSocketRoute) and r.match(alt) is not None:
                 host = req.headers.get("host", "testserver")
                 loc = "http://" + host + quote(alt)
                 if req._query:
@@ -159,9 +193,7 @@ class FastAPI(APIRouter):
                 return RedirectResponse(loc, status_code=307)
         raise StarletteHTTPException(404, "Not Found")
 
-    def _handle(self, method, path, query, headers, body):
-        req = Request(method.upper(), unquote(path), query, headers, body, self)
-        req.app = self
+    async def _core(self, req):
         try:
             if self.openapi_url and req._path == self.openapi_url and req.method == "GET":
                 resp = JSONResponse(self.openapi())
@@ -170,9 +202,15 @@ class FastAPI(APIRouter):
                 if isinstance(route, Response):
                     resp = route
                 else:
-                    resp = run_route(route, req, self.default_response_class or JSONResponse)
+                    resp = await run_route(route, req, self.default_response_class or JSONResponse)
         except Exception as exc:
-            resp = self._handle_exception(req, exc)
+            resp = await self._handle_exception(req, exc)
+        return resp
+
+    def _handle(self, method, path, query, headers, body):
+        req = Request(method.upper(), unquote(path), query, headers, body, self)
+        req.app = self
+        resp = run_coro(self._build_stack()(req))
         if resp.background is not None:
             resp.background()
         return resp
@@ -190,6 +228,41 @@ class FastAPI(APIRouter):
     def dispatch(self, method, path, query, headers, body):
         return self._dispatch_for_client(method, path, query, headers, body, False)
 
+    # -- websockets
+    def websocket_open(self, path, query, headers, sink):
+        """Starts a websocket connection; returns its session, or None with no route.
+
+        ``sink(message)`` receives the ASGI-shaped messages the endpoint sends
+        (``websocket.accept``, ``websocket.send``, ``websocket.close``). The
+        caller feeds client messages with ``session.deliver``.
+        """
+        path = unquote(path)
+        route = None
+        vals = None
+        for r in self.routes:
+            if isinstance(r, APIWebSocketRoute):
+                vals = r.match(path)
+                if vals is not None:
+                    route = r
+                    break
+        session = _Session(sink)
+        ws = WebSocket(path, query, headers, session, self)
+        ws.path_params = vals or {}
+        session.start(self._run_ws(route, ws))
+        return session
+
+    async def _run_ws(self, route, ws):
+        from fastapi.exceptions import WebSocketException, WebSocketRequestValidationError
+        if route is None:
+            await ws.close(1000)
+            return
+        try:
+            await run_websocket(route, ws)
+        except WebSocketRequestValidationError:
+            await ws.close(1008)
+        except WebSocketException as e:
+            await ws.close(e.code, e.reason)
+
     # -- OpenAPI
     def openapi(self):
         if self._openapi is None:
@@ -206,7 +279,7 @@ class FastAPI(APIRouter):
         schemas = {}
         need_validation = False
         for r in self.routes:
-            if not r.include_in_schema:
+            if isinstance(r, APIWebSocketRoute) or not r.include_in_schema:
                 continue
             r._prepare()
             item = paths.setdefault(_re.sub(":[a-z]+\\}", "}", r.path), {})

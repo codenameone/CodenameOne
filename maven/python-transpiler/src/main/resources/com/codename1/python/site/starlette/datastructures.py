@@ -106,6 +106,12 @@ class MutableHeaders(Headers):
         for k, v in items:
             self[k] = v
 
+    def add_vary_header(self, vary):
+        existing = self.get("vary")
+        if existing is not None:
+            vary = ", ".join([existing, vary])
+        self["vary"] = vary
+
 
 class QueryParams:
     """Immutable multi-dict of decoded query parameters; the last value wins on get."""

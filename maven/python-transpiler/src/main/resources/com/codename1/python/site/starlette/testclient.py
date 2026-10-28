@@ -2,6 +2,7 @@
 # Licensed under the GNU General Public License version 2 with the Classpath
 # exception, as the rest of the Codename One Python runtime.
 """A test client that calls the app's pure dispatch core."""
+import gzip as _gzip
 import json as _json
 from urllib.parse import urlencode, urljoin
 
@@ -79,6 +80,19 @@ class TestClient:
             self.app._shutdown()
         return False
 
+    def websocket_connect(self, url, subprotocols=None, headers=None, **kw):
+        if "://" not in url:
+            url = self.base_url.rstrip("/") + "/" + url.lstrip("/")
+        u = URL(url)
+        hdrs = MutableHeaders([("host", u.netloc), ("accept", "*/*"), ("accept-encoding", "gzip, deflate"),
+                               ("user-agent", "testclient"), ("connection", "upgrade"),
+                               ("sec-websocket-key", "testserver=="), ("sec-websocket-version", "13")])
+        if subprotocols:
+            hdrs["sec-websocket-protocol"] = ", ".join(subprotocols)
+        if headers:
+            hdrs.update(headers)
+        return WebSocketTestSession(self.app, u.path, u.query, hdrs.items())
+
     def get(self, url, **kw):
         return self.request("GET", url, **kw)
 
@@ -155,6 +169,9 @@ class TestClient:
                                                            self.raise_server_exceptions)
         except Exception:
             raise
+        for k, v in rh:
+            if k.lower() == "content-encoding" and v.strip().lower() == "gzip":
+                rb = _gzip.decompress(rb)
         resp = TestResponse(status, rh, rb, url if not query else url.split("?")[0] + "?" + query)
         for k, v in resp.headers.multi_items():
             if k == "set-cookie":
@@ -166,3 +183,93 @@ class TestClient:
                     else:
                         self.cookies[ck] = cv
         return resp
+
+
+class WebSocketTestSession:
+    __test__ = False
+
+    def __init__(self, app, path, query, headers):
+        self.app = app
+        self.path = path
+        self.query = query
+        self.headers = headers
+        self.accepted_subprotocol = None
+        self.extra_headers = None
+        self._out = []
+        self._session = None
+
+    def _sink(self, message):
+        self._out.append(message)
+
+    def _raise_error(self):
+        s = self._session
+        if s is not None and s.error is not None:
+            e = s.error
+            s.error = None
+            raise e
+
+    def __enter__(self):
+        self._session = self.app.websocket_open(self.path, self.query, self.headers, self._sink)
+        self._raise_error()
+        m = self.receive()
+        if m["type"] == "websocket.close":
+            from starlette.websockets import WebSocketDisconnect
+            raise WebSocketDisconnect(m.get("code", 1000), m.get("reason", ""))
+        self.accepted_subprotocol = m.get("subprotocol")
+        self.extra_headers = m.get("headers")
+        return self
+
+    def __exit__(self, *a):
+        s = self._session
+        if not s.done:
+            s.deliver({"type": "websocket.disconnect", "code": 1000})
+        self._raise_error()
+        return False
+
+    def send(self, message):
+        self._session.deliver(message)
+        self._raise_error()
+
+    def send_text(self, data):
+        self.send({"type": "websocket.receive", "text": data})
+
+    def send_bytes(self, data):
+        self.send({"type": "websocket.receive", "bytes": bytes(data)})
+
+    def send_json(self, data, mode="text"):
+        text = _json.dumps(data, separators=(",", ":"), ensure_ascii=False)
+        if mode == "text":
+            self.send({"type": "websocket.receive", "text": text})
+        else:
+            self.send({"type": "websocket.receive", "bytes": text.encode("utf-8")})
+
+    def close(self, code=1000, reason=None):
+        self.send({"type": "websocket.disconnect", "code": code, "reason": reason})
+
+    def receive(self):
+        self._raise_error()
+        if not self._out:
+            raise RuntimeError("the websocket endpoint is waiting for a message and sent nothing")
+        return self._out.pop(0)
+
+    def _raise_on_close(self, m):
+        if m["type"] == "websocket.close":
+            from starlette.websockets import WebSocketDisconnect
+            raise WebSocketDisconnect(m.get("code", 1000), m.get("reason", ""))
+
+    def receive_text(self):
+        m = self.receive()
+        self._raise_on_close(m)
+        return m["text"]
+
+    def receive_bytes(self):
+        m = self.receive()
+        self._raise_on_close(m)
+        return m["bytes"]
+
+    def receive_json(self, mode="text"):
+        m = self.receive()
+        self._raise_on_close(m)
+        if mode == "text":
+            return _json.loads(m["text"])
+        return _json.loads(m["bytes"].decode("utf-8"))
