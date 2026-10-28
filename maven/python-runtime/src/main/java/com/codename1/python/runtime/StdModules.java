@@ -82,6 +82,10 @@ public final class StdModules {
             PyModule.registerModule(PyZlib.module());
             return true;
         }
+        if ("_cn1image".equals(name)) {
+            PyModule.registerModule(PyImage.module());
+            return true;
+        }
         if ("_cn1tz".equals(name)) {
             PyModule.registerModule(tz());
             return true;
