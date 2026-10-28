@@ -11387,6 +11387,25 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     }
 
+    @Override
+    public boolean isTrueTypeStreamSupported() {
+        return true;
+    }
+
+    @Override
+    public Object loadTrueTypeFontFromData(String fontName, byte[] data) {
+        // The bytes travel as a data: URL, which both the worker's FontFace
+        // (measuring) and the host's document.fonts (painting) load as they load
+        // a bundled file. Encoded here in Java: the arrayBufferToBase64 helper
+        // goes through Window.current, which the worker cannot reach.
+        if (!loadedFonts.contains(fontName)) {
+            loadTrueTypeFont_(fontName,
+                    "data:font/ttf;base64," + com.codename1.util.Base64.encodeNoNewline(data), "truetype");
+            loadedFonts.add(fontName);
+        }
+        return createFallbackTrueTypeFont(fontName, null);
+    }
+
     /**
      * The format hint handed to the FontFace constructor. Browsers treat
      * "truetype" and "opentype" as the same SFNT container, but naming the

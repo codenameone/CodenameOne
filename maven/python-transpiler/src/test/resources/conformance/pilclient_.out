@@ -32,3 +32,17 @@ truetype textbbox True True True
 truetype textlength True
 truetype ink True
 truetype mask L True True
+sfnt length True True
+sfnt bbox True True
+sfnt metrics True True
+sfnt textbbox True True True
+sfnt textlength True
+sfnt ink True
+sfnt mask L True True
+sfnt again length True True
+sfnt again bbox True True
+sfnt again metrics True True
+sfnt again textbbox True True True
+sfnt again textlength True
+sfnt again ink True
+sfnt again mask L True True

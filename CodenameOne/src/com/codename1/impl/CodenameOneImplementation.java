@@ -4740,6 +4740,32 @@ public abstract class CodenameOneImplementation {
         return null;
     }
 
+    /// Creates a native TrueType or OpenType font from the content of a font file.
+    /// Ports that return true from `#isTrueTypeStreamSupported()` override this;
+    /// the result must be usable with `#deriveTrueTypeFont(Object, float, int)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `fontName`: the name the application gave the font
+    ///
+    /// - `data`: the bytes of a .ttf or .otf file
+    ///
+    /// #### Returns
+    ///
+    /// the native font, or null if it can't be created
+    public Object loadTrueTypeFontFromData(String fontName, byte[] data) {
+        return null;
+    }
+
+    /// Returns true if `#loadTrueTypeFontFromData(String, byte[])` is implemented by this port.
+    ///
+    /// #### Returns
+    ///
+    /// true if fonts can be created from data
+    public boolean isTrueTypeStreamSupported() {
+        return false;
+    }
+
     /// Indicates whether the implementation supports loading a font "natively" to handle one of the common
     /// native prefixes
     ///

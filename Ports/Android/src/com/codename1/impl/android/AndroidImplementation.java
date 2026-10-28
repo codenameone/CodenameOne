@@ -2924,6 +2924,58 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 com.codename1.ui.Font.STYLE_PLAIN, com.codename1.ui.Font.SIZE_MEDIUM, newPaint, fileName, 0, 0);
     }
 
+    @Override
+    public boolean isTrueTypeStreamSupported() {
+        return true;
+    }
+
+    @Override
+    public Object loadTrueTypeFontFromData(String fontName, byte[] data) {
+        // Typeface.createFromFile is the only loader every supported API level has;
+        // the memory based Typeface.Builder needs API 26. The file is named by a
+        // hash of the content, so the same font is written once however many
+        // times it is loaded, and two fonts can never overwrite each other.
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(data);
+            StringBuilder name = new StringBuilder("font_");
+            for (int i = 0; i < 16; i++) {
+                int b = digest[i] & 0xff;
+                name.append(Character.forDigit(b >> 4, 16)).append(Character.forDigit(b & 0xf, 16));
+            }
+            name.append(".ttf");
+            File dir = new File(getContext().getCacheDir(), "cn1_fonts");
+            if (!dir.isDirectory() && !dir.mkdirs()) {
+                return null;
+            }
+            File file = new File(dir, name.toString());
+            if (file.length() != data.length) {
+                File tmp = new File(dir, name + ".tmp");
+                FileOutputStream out = new FileOutputStream(tmp);
+                try {
+                    out.write(data);
+                } finally {
+                    out.close();
+                }
+                if (!tmp.renameTo(file)) {
+                    return null;
+                }
+            }
+            Typeface t = Typeface.createFromFile(file);
+            if (t == null) {
+                return null;
+            }
+            CodenameOneTextPaint newPaint = new CodenameOneTextPaint(t);
+            newPaint.setAntiAlias(true);
+            newPaint.setSubpixelText(true);
+            return new NativeFont(com.codename1.ui.Font.FACE_SYSTEM,
+                    com.codename1.ui.Font.STYLE_PLAIN, com.codename1.ui.Font.SIZE_MEDIUM, newPaint,
+                    "data:" + fontName, 0, 0);
+        } catch (Exception err) {
+            com.codename1.io.Log.e(err);
+            return null;
+        }
+    }
+
     public static class NativeFont {
         int face;
         int style;

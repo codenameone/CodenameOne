@@ -14635,6 +14635,45 @@ void com_codename1_impl_ios_IOSNative_registerBundledFont___java_lang_String(CN1
     POOL_END();
 }
 
+/// Registers a font held in memory (Font.createTrueTypeFontFromData) with
+/// Core Text and answers its PostScript name, which createTruetypeFont then looks
+/// up exactly as it does for a bundled font. Answers null when the bytes are not a
+/// font. A font registered twice reports an error that is discarded: the name is
+/// what the caller needs and it is valid either way.
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_registerFontData___byte_1ARRAY_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT data) {
+    if (data == JAVA_NULL) {
+        return JAVA_NULL;
+    }
+    JAVA_OBJECT result = JAVA_NULL;
+    POOL_BEGIN();
+    void *bytes = CN1_ARRAY_DATA((JAVA_ARRAY)data);
+    int length = ((JAVA_ARRAY)data)->length;
+    CFDataRef cfData = CFDataCreate(NULL, (const UInt8 *)bytes, length);
+    CGDataProviderRef provider = cfData == NULL ? NULL : CGDataProviderCreateWithCFData(cfData);
+    CGFontRef cgFont = provider == NULL ? NULL : CGFontCreateWithDataProvider(provider);
+    if (cgFont != NULL) {
+        CFErrorRef error = NULL;
+        CTFontManagerRegisterGraphicsFont(cgFont, &error);
+        if (error != NULL) {
+            CFRelease(error);
+        }
+        CFStringRef psName = CGFontCopyPostScriptName(cgFont);
+        if (psName != NULL) {
+            result = fromNSString(CN1_THREAD_STATE_PASS_ARG (BRIDGE_CAST NSString *)psName);
+            CFRelease(psName);
+        }
+        CGFontRelease(cgFont);
+    }
+    if (provider != NULL) {
+        CGDataProviderRelease(provider);
+    }
+    if (cfData != NULL) {
+        CFRelease(cfData);
+    }
+    POOL_END();
+    return result;
+}
+
 #if TARGET_OS_OSX
 static NSFont *cn1MacSystemFontForAlias(NSString *name, CGFloat size) {
     BOOL italic = [name hasPrefix:@"native:Italic"];

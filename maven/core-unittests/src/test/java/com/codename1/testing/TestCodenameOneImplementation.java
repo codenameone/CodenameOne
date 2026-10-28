@@ -3309,6 +3309,32 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         this.trueTypeSupported = trueTypeSupported;
     }
 
+    private boolean trueTypeStreamSupported = true;
+    private int trueTypeDataLoads;
+
+    public void setTrueTypeStreamSupported(boolean supported) {
+        this.trueTypeStreamSupported = supported;
+    }
+
+    /// How many times loadTrueTypeFontFromData(String, byte[]) reached this implementation.
+    public int getTrueTypeDataLoads() {
+        return trueTypeDataLoads;
+    }
+
+    @Override
+    public boolean isTrueTypeStreamSupported() {
+        return trueTypeStreamSupported;
+    }
+
+    @Override
+    public Object loadTrueTypeFontFromData(String fontName, byte[] data) {
+        trueTypeDataLoads++;
+        if (data.length == 0) {
+            return null;
+        }
+        return new TestFont(defaultFont.charWidth, defaultFont.height);
+    }
+
     @Override
     public boolean isNativeFontSchemeSupported() {
         return nativeFontSchemeSupported;

@@ -95,7 +95,15 @@ def text_checks(name, f):
 
 text_checks("default", ImageFont.load_default(18))
 # CPython hands back the TrueType bytes it loaded the default from; this
-# runtime keeps none, and the client engine draws its native font whatever
-# bytes truetype() is given -- so either way this is a real truetype() call.
+# runtime keeps none on a client, and the client engine falls back to its
+# native font for bytes that are not a font -- so either way this is a real
+# truetype() call.
 data = getattr(ImageFont.load_default(), "font_bytes", b"")
 text_checks("truetype", ImageFont.truetype(io.BytesIO(data), 18))
+# An SFNT header goes through Font.createTrueTypeFontFromData(String, byte[]); the
+# headless implementation answers its box font for it. CPython rejects a
+# header with no tables, so the TrueType bytes it loaded the default from
+# stand in for it there.
+sfnt = data if data else b"\x00\x01\x00\x00" + b"\x00" * 60
+text_checks("sfnt", ImageFont.truetype(io.BytesIO(sfnt), 18))
+text_checks("sfnt again", ImageFont.truetype(io.BytesIO(sfnt), 24))

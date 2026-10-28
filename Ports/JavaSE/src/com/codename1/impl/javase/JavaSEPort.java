@@ -15654,6 +15654,27 @@ public class JavaSEPort extends CodenameOneImplementation {
         throw new RuntimeException("The file wasn't found: " + fontName);
     }
 
+    @Override
+    public boolean isTrueTypeStreamSupported() {
+        return true;
+    }
+
+    @Override
+    public Object loadTrueTypeFontFromData(String fontName, byte[] data) {
+        try {
+            // TRUETYPE_FONT reads the whole SFNT container, so CFF-flavoured
+            // OpenType loads here as well. deriveTrueTypeFont works on the
+            // returned java.awt.Font exactly as for a font loaded from a file.
+            return java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, new java.io.ByteArrayInputStream(data));
+        } catch (java.awt.FontFormatException err) {
+            System.err.println("Not a TrueType or OpenType font: " + fontName + " (" + err.getMessage() + ")");
+            return null;
+        } catch (IOException err) {
+            System.err.println("Could not read font " + fontName + ": " + err.getMessage());
+            return null;
+        }
+    }
+
     private static double fontScale=1.0;
     
     public static double getFontScale() {

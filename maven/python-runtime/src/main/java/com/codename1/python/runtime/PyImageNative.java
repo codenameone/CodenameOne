@@ -39,9 +39,13 @@ import java.io.IOException;
 /// Everything here is drawn by the platform, so results are close to
 /// Pillow's but are not its exact pixels: resizing is the platform's
 /// scaling whatever filter was asked for, PNG files are decoded by the
-/// platform, and text is the platform's native font. A device cannot load
-/// a TrueType file from bytes, so `ImageFont.truetype` answers the native
-/// font at the requested size as well.
+/// platform, and text is the platform's native font unless a font is
+/// loaded. `ImageFont.truetype` hands the file's bytes to
+/// `Font.createTrueTypeFontFromData(String, byte[])` where the platform supports
+/// fonts from data, and answers the native font at the requested size where
+/// it does not or the bytes are not a font. `ImageFont.load_default` is the
+/// native font: the Aileron data the server engine embeds lives in the
+/// backend runtime, which a client build does not ship.
 public final class PyImageNative implements PyImageEngine {
     private static final String NATIVE_FONT = "native:MainRegular";
 
@@ -175,7 +179,26 @@ public final class PyImageNative implements PyImageEngine {
 
     @Override
     public Object loadFont(byte[] data, int index, double size) {
+        if (data != null && data.length > 0 && Font.isTrueTypeStreamSupported()) {
+            // The name keys Font's cache, so it has to tell fonts apart by
+            // content: the same file loaded twice is one platform font.
+            Font f = Font.createTrueTypeFontFromData("pil:" + contentKey(data), data);
+            if (f != null) {
+                return f.derive((float) size, Font.STYLE_PLAIN);
+            }
+        }
         return defaultFont(size);
+    }
+
+    private static String contentKey(byte[] data) {
+        // 64 bit FNV-1a plus the length; collisions between two real fonts
+        // in one process are not a practical concern.
+        long h = 0xcbf29ce484222325L;
+        for (byte b : data) {
+            h ^= b & 0xff;
+            h *= 0x100000001b3L;
+        }
+        return Long.toString(h, 16) + "_" + data.length;
     }
 
     @Override

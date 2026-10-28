@@ -214,8 +214,11 @@ the real package:
   glyph can sit a pixel away from where Pillow puts it. On a device,
   decoding, encoding, resizing and text go through Codename One's image
   support (`Image`, `ImageIO`, `Graphics` and the native font), which also
-  reads GIF, BMP and WebP. Those results are drawn by the platform, so they
-  look right but aren't Pillow's exact pixels.
+  reads GIF, BMP and WebP. `ImageFont.truetype` loads the font through
+  `Font.createTrueTypeFontFromData` where the platform supports it and falls
+  back to the native font elsewhere, and `ImageFont.load_default()` is the
+  native font. Those results are drawn by the platform, so they look right
+  but aren't Pillow's exact pixels.
 | `flask`, `fastapi`, `uvicorn` | See <<python-backends,Python backends>>.
 | `typing_extensions`, `six`, `tabulate`, `idna`, `packaging` |
 |===

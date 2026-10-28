@@ -111,6 +111,22 @@ public class HeadlessImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public boolean isTrueTypeStreamSupported() {
+        return true;
+    }
+
+    /// Accepts anything that starts like an SFNT file (TrueType, OpenType or
+    /// Apple 'true') and answers the box font every other load answers.
+    @Override
+    public Object loadTrueTypeFontFromData(String fontName, byte[] data) {
+        if (data == null || data.length < 4) {
+            return null;
+        }
+        int tag = (data[0] & 0xff) << 24 | (data[1] & 0xff) << 16 | (data[2] & 0xff) << 8 | data[3] & 0xff;
+        return tag == 0x00010000 || tag == 0x4f54544f || tag == 0x74727565 ? FONT : null;
+    }
+
+    @Override
     public Object deriveTrueTypeFont(Object font, float size, int weight) {
         return FONT;
     }

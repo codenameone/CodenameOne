@@ -2282,6 +2282,18 @@ public class LinuxImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public boolean isTrueTypeStreamSupported() {
+        return true;
+    }
+
+    @Override
+    public Object loadTrueTypeFontFromData(String fontName, byte[] data) {
+        // The same in-memory loader bundled fonts go through.
+        long font = LinuxNative.loadTrueTypeFontFromMemory(fontName, data);
+        return font == 0 ? null : Long.valueOf(font);
+    }
+
+    @Override
     public Object loadTrueTypeFont(String fontName, String fileName) {
         long font = 0;
         // Bundled TTFs (material-design-font.ttf and any app font) ship as

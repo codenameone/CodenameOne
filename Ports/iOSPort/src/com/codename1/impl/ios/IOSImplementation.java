@@ -11958,6 +11958,26 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public boolean isTrueTypeStreamSupported() {
+        return true;
+    }
+
+    @Override
+    public Object loadTrueTypeFontFromData(String fontName, byte[] data) {
+        String postScriptName = nativeInstance.registerFontData(data);
+        if (postScriptName == null) {
+            return null;
+        }
+        NativeFont fnt = new NativeFont();
+        fnt.face = com.codename1.ui.Font.FACE_SYSTEM;
+        fnt.size = com.codename1.ui.Font.SIZE_MEDIUM;
+        fnt.style = com.codename1.ui.Font.STYLE_PLAIN;
+        fnt.name = postScriptName;
+        fnt.peer = nativeInstance.createTruetypeFont(postScriptName);
+        return fnt;
+    }
+
+    @Override
     public Object deriveTrueTypeFont(Object font, float size, int weight) {
         NativeFont original = (NativeFont)font;
         NativeFont fnt = new NativeFont();
