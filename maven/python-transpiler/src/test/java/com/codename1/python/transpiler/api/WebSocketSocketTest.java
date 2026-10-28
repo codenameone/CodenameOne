@@ -109,15 +109,14 @@ class WebSocketSocketTest {
             "        }",
             "        out.append(\"ordered;\");",
             // A late accept after the handshake timed out.
-            "        Outer.Socket.handshakeMillis = 30;",
             "        PyServer.LOG.setLength(0);",
             "        final Outer.Socket late = new Outer.Socket(null, \"/\", new String[0]);",
+            "        late.handshakeMillis = 30;",
             "        out.append(late.handshake() == HttpServer.REFUSED).append(';').append(PyServer.LOG);",
             "        out.append(gone(new Runnable() { public void run() { late.accept(null, new String[0]); } })).append(';');",
             "        out.append(gone(new Runnable() { public void run() { late.text(\"x\"); } })).append(';');",
             // Closed before accepting: refused at once, sends raise.
             "        PyServer.closeAtOnce = true;",
-            "        Outer.Socket.handshakeMillis = 30000;",
             "        PyServer.LOG.setLength(0);",
             "        final Outer.Socket shut = new Outer.Socket(null, \"/\", new String[0]);",
             "        out.append(shut.handshake() == HttpServer.REFUSED).append(';').append(PyServer.LOG);",

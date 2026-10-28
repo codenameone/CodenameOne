@@ -52,6 +52,7 @@ public class PyInstance extends PyObject {
     Shape shape;
     Object[] slots;
 
+
     /// Keys of `__dict__` that are not strings (`o.__dict__[1] = x`), which
     /// CPython keeps in the dict but no attribute can name. Null for nearly
     /// every instance.
@@ -231,6 +232,16 @@ public class PyInstance extends PyObject {
             // A live view: its stores and deletes reach the instance, and it
             // refills itself from the instance before every read, so a write
             // made through the attribute shows in a view fetched earlier.
+            if (cls.slotNames() != null) {
+                // Every class declares __slots__ without __dict__: CPython
+                // has no dict to answer either.
+                throw Py.attributeError("'" + cls.name + "' object has no attribute '__dict__'");
+            }
+            // A new view per read, so `o.__dict__ is o.__dict__` is False
+            // here (True in CPython). Keeping one view per instance was
+            // tried and broke zipfile's write-through-open in the compress_
+            // conformance program; until that is understood each read
+            // gets its own view, which refills itself from the instance.
             return new InstanceDict(this);
         }
         if ("__class__".equals(name)) {
@@ -691,11 +702,13 @@ public class PyInstance extends PyObject {
                         mask |= 1L << i;
                     }
                 }
+                // A net, not the mechanism: every write through this dict
+                // clears `seen`, but a path that changes the instance without
+                // moving its shape or set fields would otherwise go unseen.
                 PyDict other0 = self.nonStrKeys;
                 int expected = Long.bitCount(mask) + self.shape().size() + (other0 == null ? 0 : other0.size);
                 if (small && seen && seenShape == self.shape && seenFields == mask //NOPMD CompareObjectsWithEquals - identity is meant
-                        && size == expected) {
-                    refreshValues(fields.length, mask);
+                        && size == expected && refreshValues(fields, mask)) {
                     return;
                 }
                 seenShape = self.shape;
@@ -733,7 +746,11 @@ public class PyInstance extends PyObject {
 
         /// Re-reads the values in key order: the set fields, then the shape's
         /// slots (the order [PyInstance#attributeNames()] lists them in).
-        private void refreshValues(int fieldCount, long mask) {
+        /// Answers false, leaving the caller to rebuild, when a key is not
+        /// the name expected at its place.
+        private boolean refreshValues(String[] fieldNames, long mask) {
+            int fieldCount = fieldNames.length;
+            String[] shapeNames = self.shape().names;
             int f = 0;
             int slot = 0;
             Object[] sl = self.slots;
@@ -745,8 +762,14 @@ public class PyInstance extends PyObject {
                     f++;
                 }
                 if (f < fieldCount) {
+                    if (!fieldNames[f].equals(keys[i])) {
+                        return false;
+                    }
                     values[i] = self.getField(f++);
-                } else if (sl != null && slot < sl.length && self.shape != null && slot < self.shape.size()) {
+                } else if (sl != null && slot < sl.length && slot < shapeNames.length) {
+                    if (!shapeNames[slot].equals(keys[i])) {
+                        return false;
+                    }
                     values[i] = sl[slot++];
                 } else {
                     // The non-str keys, after every attribute: they change
@@ -754,6 +777,7 @@ public class PyInstance extends PyObject {
                     break;
                 }
             }
+            return true;
         }
 
         /// Whether the keys already are `names` and then `other`'s, in that
@@ -787,10 +811,13 @@ public class PyInstance extends PyObject {
         @Override
         public void setItem(Object key, Object value) {
             sync();
-            super.setItem(key, value);
+            // The attribute first: a store that fails (a slot it may not
+            // hold) leaves the dict as it was.
             if (isStr(key)) {
                 self.store(Py.toStr(key), value);
+                super.setItem(key, value);
             } else {
+                super.setItem(key, value);
                 // Kept apart from the attributes, so the dict lists them
                 // after every attribute rather than in insertion order as
                 // CPython does: a known difference, for keys no program
@@ -800,6 +827,9 @@ public class PyInstance extends PyObject {
                 }
                 self.nonStrKeys.setItem(key, value);
             }
+            // The write may restore a shape the stamp already holds (del
+            // d['b'] then c.b = 9), so the next sync must not trust it.
+            seen = false;
         }
 
         @Override
@@ -820,6 +850,7 @@ public class PyInstance extends PyObject {
 
         /// Removes `key` from what the dict stands for.
         private void forget(Object key) {
+            seen = false;
             if (isStr(key)) {
                 self.delAttrDirect(Py.toStr(key));
             } else if (self.nonStrKeys != null) {

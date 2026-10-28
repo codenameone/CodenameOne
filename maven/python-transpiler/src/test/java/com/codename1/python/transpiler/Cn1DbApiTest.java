@@ -25,7 +25,6 @@ package com.codename1.python.transpiler;
 
 import org.junit.jupiter.api.Test;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -56,9 +55,12 @@ class Cn1DbApiTest {
             throw e;
         }
         boolean done = p.waitFor(120, TimeUnit.SECONDS);
+        if (!done) {
+            p.destroyForcibly().waitFor(10, TimeUnit.SECONDS);
+        }
         String out = new String(Files.readAllBytes(log), StandardCharsets.UTF_8);
         Files.delete(log);
-        assertEquals("ok" + System.lineSeparator(), done ? out : "timed out" + File.separator + out);
+        assertEquals("ok" + System.lineSeparator(), done ? out : "timed out after 120s:" + System.lineSeparator() + out);
         assertEquals(0, p.exitValue());
     }
 }

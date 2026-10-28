@@ -46,6 +46,8 @@ check("with update", Q("WITH x AS (SELECT 1) UPDATE t SET a = (SELECT * FROM x)"
 check("with recursive select", Q("with recursive r(n) as (select 1 union select n+1 from r) select n from r"), True)
 check("with insert", Q("WITH x AS (SELECT 1 AS v) INSERT INTO t SELECT v FROM x"), False)
 check("with delete returning", Q("WITH x AS (SELECT 1) DELETE FROM t RETURNING id"), True)
+check("returning only in cte", Q("WITH d AS (DELETE FROM t RETURNING id) DELETE FROM u USING d WHERE u.id = d.id"), False)
+check("with select from returning cte", Q("WITH d AS (DELETE FROM t RETURNING id) SELECT id FROM d"), True)
 check("mysql # hides keyword", Q("# select\nupdate t set a=1", True), False)
 
 tz2 = dt.timezone(dt.timedelta(hours=2))

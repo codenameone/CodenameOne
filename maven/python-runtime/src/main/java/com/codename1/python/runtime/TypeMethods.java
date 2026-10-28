@@ -880,6 +880,9 @@ final class TypeMethods {
         });
         def(t, "popitem", a -> {
             PyDict self = d(a[0]);
+            // An instance's __dict__ refills itself here; reading the
+            // entries before that could answer a stale pair.
+            self.sync();
             for (int i = self.used - 1; i >= 0; i--) {
                 if (self.keys[i] != null) {
                     Object k = self.keys[i];

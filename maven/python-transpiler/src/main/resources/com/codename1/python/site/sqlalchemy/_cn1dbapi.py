@@ -168,12 +168,14 @@ _STATEMENTS = ("SELECT", "VALUES", "TABLE", "INSERT", "UPDATE", "DELETE", "MERGE
 def _query_words(words):
     """Whether a statement of these words answers rows: by its first keyword, or for a
     ``WITH`` by the first statement keyword after the CTE list (outside its parentheses),
-    or by a ``RETURNING`` clause anywhere."""
+    or by a ``RETURNING`` clause of the statement itself (not of a CTE)."""
     if not words:
         return False
-    if any(w == "RETURNING" for w, _ in words):
-        return True
     base = words[0][1]
+    # RETURNING counts only in the statement itself, not inside a CTE: WITH d AS
+    # (DELETE ... RETURNING id) DELETE FROM u USING d answers no rows.
+    if any(w == "RETURNING" and d == base for w, d in words):
+        return True
     head = words[0][0]
     if head == "WITH":
         head = ""

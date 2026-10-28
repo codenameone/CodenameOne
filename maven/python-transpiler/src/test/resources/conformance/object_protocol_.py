@@ -123,3 +123,29 @@ try:
 except RuntimeError as e:
     print("RuntimeError", e)
 print(sorted(o3.__dict__), o3.c)
+
+# A dict-level delete, then an attribute write that restores the old shape.
+c = Plain()
+c.a = 1
+c.b = 2
+dd = c.__dict__
+print(len(dd))
+del dd["b"]
+c.b = 9
+print(dd)
+# popitem after an attribute was added behind the dict's back.
+c.z = 5
+print(dd.popitem(), sorted(c.__dict__), hasattr(c, "z"))
+
+
+class Slotted:
+    __slots__ = ("x",)
+
+
+s = Slotted()
+s.x = 1
+try:
+    s.__dict__
+    print("has dict")
+except AttributeError as e:
+    print("AttributeError", e)
