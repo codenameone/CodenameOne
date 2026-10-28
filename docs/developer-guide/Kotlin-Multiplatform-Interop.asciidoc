@@ -80,8 +80,8 @@ pays; the rest of the application can stay in Compose.
 === One platform API on every target
 
 The `expect`/`actual` declarations a KMP project writes per platform are
-mostly calls Codename One already makes the same everywhere. A composable
-reaches each of them as ordinary Kotlin calls:
+mostly calls Codename One already makes the same everywhere. Composable code
+calls each of them as an ordinary Kotlin function:
 
 - <<push-notifications-section,Push notifications>>, in-app purchase and
   subscriptions, and <<external-surfaces,home-screen widgets and live

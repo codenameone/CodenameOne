@@ -2972,6 +2972,13 @@ public class Container extends Component implements Iterable<Component> {
             }
         }
         style.setSuppressChangeEvents(suppressEvents);
+        if (changed && !shouldCalcPreferredSize) {
+            // What the suppressed PADDING event did, minus its revalidateLater
+            // of the parent: this and every nested container measure and lay
+            // out again against the snapped padding. Without it a nested
+            // container kept a layout made for the unsnapped one.
+            setShouldCalcPreferredSize(true);
+        }
         return changed;
 
     }
