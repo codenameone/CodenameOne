@@ -210,10 +210,14 @@ public final class PythonTranspiler {
         Deque<Node.Module> work = new ArrayDeque<Node.Module>(trees.values());
         Map<String, String> found = new LinkedHashMap<String, String>();
         Set<Node.Module> opens = new HashSet<Node.Module>();
+        Set<Node.Module> reduces = new HashSet<Node.Module>();
         for (Map.Entry<String, String> e : sources.entrySet()) {
             Node.Module t = trees.get(e.getKey().replace('\\', '/'));
             if (t != null && mentionsOpen(e.getValue())) {
                 opens.add(t);
+            }
+            if (t != null && mentionsReduction(e.getValue())) {
+                reduces.add(t);
             }
         }
         while (!work.isEmpty()) {
@@ -230,6 +234,11 @@ public final class PythonTranspiler {
             if (opens.contains(tree)) {
                 // The builtin open() is io.open, written in Python.
                 imported.add("io");
+            }
+            if (reduces.contains(tree)) {
+                // object.__reduce_ex__, __reduce__ and __getstate__ are
+                // copyreg's functions, written in Python.
+                imported.add("copyreg");
             }
             for (String name : imported) {
                 String prefix = null;
@@ -267,6 +276,12 @@ public final class PythonTranspiler {
 
     /// Whether `text` may call the builtin `open` (a cheap textual test:
     /// bundling `io` for a false positive costs only its size).
+    /// Whether `text` names a method of the reduction protocol that
+    /// `object` implements in `copyreg`.
+    private static boolean mentionsReduction(String text) {
+        return text != null && (text.contains("__reduce") || text.contains("__getstate__"));
+    }
+
     private static boolean mentionsOpen(String text) {
         if (text == null) {
             return false;
