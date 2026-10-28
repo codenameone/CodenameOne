@@ -304,9 +304,13 @@ include::../demos/common/src/main/snippets/developer-guide/python-interop.sh[tag
 
 Routing, converters, JSON bodies, `abort`, error handlers and the default
 error pages of Flask, and FastAPI's path, query, body and header parameters,
-dependencies, `response_model` and OpenAPI generation are supported. Flask
-sessions, templates, file uploads and streaming responses aren't, nor are
-FastAPI WebSockets and middleware.
+dependencies, `response_model` and OpenAPI generation are supported, and
+Flask sessions (signed cookies), `flash`, Jinja templates (`extends`, `block`,
+`include`, loops, conditions and the common filters, with autoescaping),
+multipart file uploads and streamed responses work as well. A streamed
+response is sent once its generator finishes. Jinja macros aren't supported yet, and a session cookie
+written by CPython's Flask isn't readable here, or the reverse. FastAPI
+WebSockets and middleware aren't supported yet.
 
 === Compared with CPython, PyPy and GraalPy
 
