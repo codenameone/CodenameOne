@@ -1,0 +1,34 @@
+png PNG RGB (24, 16)
+png red True
+png green True
+jpg JPEG RGB (24, 16)
+jpg red True
+convert L (24, 16) ('L',)
+convert LA (24, 16) ('L', 'A')
+convert RGBA (24, 16) ('R', 'G', 'B', 'A')
+convert RGB (24, 16) ('R', 'G', 'B')
+luma True
+resize RGB (12, 8) True
+resize RGBA (48, 32) True
+resize L (6, 4)
+resize box (8, 8) True
+thumbnail (6, 4)
+save PNG True PNG RGB (24, 16)
+round trip PNG True
+save JPEG True JPEG RGB (24, 16)
+round trip JPEG True
+save RGBA RGBA
+default length True True
+default bbox True True
+default metrics True True
+default textbbox True True True
+default textlength True
+default ink True
+default mask L True True
+truetype length True True
+truetype bbox True True
+truetype metrics True True
+truetype textbbox True True True
+truetype textlength True
+truetype ink True
+truetype mask L True True

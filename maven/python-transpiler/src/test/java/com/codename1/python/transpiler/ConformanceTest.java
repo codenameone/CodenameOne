@@ -146,6 +146,9 @@ class ConformanceTest {
         // path), so PIL runs on com.codename1.backend.image and its output
         // stays Pillow's exact bytes.
         String backend = stem.startsWith("pil_") ? location(com.codename1.backend.image.RasterImage.class) : null;
+        // A pilclient_ program is built as a client app is (no backend), so
+        // PIL runs on PyImageNative over a headless Display.
+        boolean client = stem.startsWith("pilclient_");
         List<File> classPath = new ArrayList<File>();
         classPath.add(new File(core));
         if (backend != null) {
@@ -174,7 +177,9 @@ class ConformanceTest {
                 new File(location(JvmFileSystem.class)).toURI().toURL(),
                 new File(location(org.sqlite.JDBC.class)).toURI().toURL(),
                 new File(location(org.slf4j.LoggerFactory.class)).toURI().toURL(),
-                new File(backend == null ? core : backend).toURI().toURL()};
+                new File(backend == null ? core : backend).toURI().toURL(),
+                new File(client ? location(com.codename1.compat.testing.HeadlessImplementation.class) : core)
+                        .toURI().toURL()};
         Path fsRoot = work.resolve("fs");
         Files.createDirectories(fsRoot.resolve("home"));
         ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -193,6 +198,20 @@ class ConformanceTest {
                 Class<?> sqlType = loader.loadClass("com.codename1.python.runtime.PySql");
                 sqlType.getMethod("install", sqlType).invoke(null, loader.loadClass(JvmSql.class.getName())
                         .getConstructor(String.class).newInstance(fsRoot.resolve("home").toString()));
+                if (client) {
+                    // A Display over compat-testing's headless implementation,
+                    // which decodes with the JDK's image readers, keeps
+                    // pixels, scales and rasterizes text as boxes -- no window.
+                    // The JDK's image readers and writers must not start a
+                    // toolkit (a Dock icon on macOS) for it.
+                    System.setProperty("java.awt.headless", "true");
+                    Class<?> hi =loader.loadClass("com.codename1.compat.testing.HeadlessImplementation");
+                    hi.getField("pixelImages").setBoolean(null, true);
+                    hi.getField("rasterImages").setBoolean(null, true);
+                    hi.getField("imageIO").set(null, loader.loadClass("pilclienttest.JdkImageIO")
+                            .getConstructor().newInstance());
+                    hi.getMethod("install").invoke(null);
+                }
                 if (http) {
                     Class<?> httpType = loader.loadClass("com.codename1.python.runtime.PyHttp");
                     httpType.getMethod("install", httpType)

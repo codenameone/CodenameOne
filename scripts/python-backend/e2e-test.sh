@@ -13,9 +13,26 @@
 # BackendServer installs and which exists only under ParparVM.
 #
 # Needs JAVA17_HOME, python3, and the inputs build.sh lists in its header.
+# --native also needs a JDK 8 for the backend build and the translator:
+# JDK_8_HOME, else JAVA_HOME when that is a JDK 8, else (macOS) the one
+# /usr/libexec/java_home finds. A native run takes over ten minutes.
 set -e
 BUILD_MODE=--jvm
 if [ "$1" = "--native" ]; then BUILD_MODE=; shift; fi
+is_jdk8() {
+    [ -x "$1/bin/javac" ] && "$1/bin/javac" -version 2>&1 | grep -q ' 1\.8\.'
+}
+if [ -z "$BUILD_MODE" ] && [ -z "$JDK_8_HOME" ]; then
+    if [ -n "$JAVA_HOME" ] && is_jdk8 "$JAVA_HOME"; then
+        JDK_8_HOME="$JAVA_HOME"
+    elif [ -x /usr/libexec/java_home ] && J8="$(/usr/libexec/java_home -v 1.8 2>/dev/null)" && is_jdk8 "$J8"; then
+        JDK_8_HOME="$J8"
+    else
+        echo "--native needs a JDK 8: set JDK_8_HOME" >&2
+        exit 2
+    fi
+    export JDK_8_HOME
+fi
 HERE="$(cd "$(dirname "$0")" && pwd)"
 M2="${1:-$(cd "$HERE/../.." && pwd)/.m2-repo}"
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/cn1-py-e2e.XXXXXX")"

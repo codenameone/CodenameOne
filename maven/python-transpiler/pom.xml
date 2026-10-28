@@ -164,6 +164,13 @@
                     <version>${project.version}</version>
                     <scope>test</scope>
                 </dependency>
+                <!-- pilclient_ programs run PIL on a headless client Display. -->
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>codenameone-compat-testing</artifactId>
+                    <version>${project.version}</version>
+                    <scope>test</scope>
+                </dependency>
                 <!-- The pil_ conformance programs build as a server does. -->
                 <dependency>
                     <groupId>com.codenameone</groupId>
