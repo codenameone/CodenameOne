@@ -579,10 +579,7 @@ internal open class UiNode : Container(NodeLayout) {
     private fun clipTo(g: Graphics, shape: Shape, cx: Int, cy: Int, cw: Int, ch: Int) {
         val o = Painting.outline(shape, cw, ch)
         if (o is androidx.compose.ui.graphics.Outline.Rounded && g.isShapeClipSupported) {
-            val path = Painting.roundedPath(o, cx.toFloat(), cy.toFloat())
-            if (path.intersect(g.clipX, g.clipY, g.clipWidth, g.clipHeight)) {
-                g.setClip(path)
-            } else {
+            if (!Painting.clipRounded(g, o, cx, cy)) {
                 // The clip in force misses the outline (it may still meet a
                 // corner the rounding cuts off): nothing is visible.
                 g.clipRect(0, 0, 0, 0)

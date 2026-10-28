@@ -30,7 +30,6 @@ import androidx.compose.runtime.Composition
 import androidx.compose.runtime.Recomposer
 import com.codename1.ui.Component
 import com.codename1.ui.Container
-import com.codename1.ui.Form
 import com.codename1.ui.geom.Dimension
 import com.codename1.ui.layouts.Layout
 import kotlinx.coroutines.CoroutineScope
@@ -99,10 +98,17 @@ internal class NodeApplier(root: Container) : AbstractApplier<Component>(root) {
 /// composition's top level nodes, stacked as a `Box` would stack them.
 internal class ComposeHost : Container(HostLayout) {
     private val clock = BroadcastFrameClock { scheduleFrame() }
-    private val scope = CoroutineScope(EdtDispatcher.Main + clock + Job())
+    // Immediate, so a frame resumes its awaiters inside sendFrame. Dispatched,
+    // every resumption waited for the end of the EDT cycle, and so did the
+    // state it wrote: a change reached the screen three cycles after it was
+    // made. Now the recomposer applies what a frame callback writes in that
+    // same frame (see scheduleFrame for when the frame runs).
+    private val scope = CoroutineScope(EdtDispatcher.Immediate + clock + Job())
     private val recomposer = Recomposer(scope.coroutineContext)
     private var composition: Composition? = null
-    private var animatedOn: Form? = null
+    private var inFrame = false
+    private var sentInLayout = false
+    private var animatedOn: com.codename1.ui.Form? = null
     private var frameRequested = false
     private var timerPending = false
 
@@ -134,6 +140,15 @@ internal class ComposeHost : Container(HostLayout) {
 
     // --- frames -------------------------------------------------------------
 
+    /// A frame runs at the start of the next EDT cycle's layout pass, as
+    /// Android's Choreographer runs a frame's callbacks before traversal: the
+    /// frame, recomposition, layout and paint then share one cycle. Sent from
+    /// `animate()`, which runs after the cycle has painted, a change waited a
+    /// whole cycle more. The cycle's own wait paces continuous animation:
+    /// `revalidateLater` does not wake the EDT. `animate()`, after the paint,
+    /// is the fallback for a cycle whose layout pass did not reach this host
+    /// (the form defers revalidation while it animates); the timer is for a
+    /// host that is not showing. A timer per frame cost a thread per frame.
     private fun scheduleFrame() {
         frameRequested = true
         val f = componentForm
@@ -142,6 +157,9 @@ internal class ComposeHost : Container(HostLayout) {
                 animatedOn?.deregisterAnimated(this)
                 f.registerAnimated(this)
                 animatedOn = f
+            }
+            if (!inFrame) {
+                revalidateLater()
             }
             return
         }
@@ -161,9 +179,20 @@ internal class ComposeHost : Container(HostLayout) {
         }
     }
 
+
     override fun animate(): Boolean {
-        sendFrame()
+        if (sentInLayout) {
+            sentInLayout = false
+        } else {
+            sendFrame()
+        }
         return false
+    }
+
+    override fun deinitialize() {
+        animatedOn?.deregisterAnimated(this)
+        animatedOn = null
+        super.deinitialize()
     }
 
     override fun paint(g: com.codename1.ui.Graphics) {
@@ -177,17 +206,15 @@ internal class ComposeHost : Container(HostLayout) {
         }
     }
 
-    override fun deinitialize() {
-        animatedOn?.deregisterAnimated(this)
-        animatedOn = null
-        super.deinitialize()
-    }
-
     // --- measuring ----------------------------------------------------------
 
     private var remeasurePending = false
 
     fun requestRemeasure() {
+        if (inFrame) {
+            // This pass measures what the frame applies.
+            return
+        }
         if (!remeasurePending) {
             remeasurePending = true
             setShouldCalcPreferredSize(true)
@@ -204,6 +231,20 @@ internal class ComposeHost : Container(HostLayout) {
     private var insetsKnown = false
 
     internal fun layoutChildren() {
+        if (frameRequested) {
+            // What the frame applies is measured by this pass, so it must not
+            // queue another; a frame asked for during it goes to the next cycle.
+            inFrame = true
+            try {
+                sendFrame()
+            } finally {
+                inFrame = false
+            }
+            sentInLayout = true
+            if (frameRequested) {
+                revalidateLater()
+            }
+        }
         remeasurePending = false
         val insets = SafeInsets.of(absoluteY, height)
         val top = (insets ushr 32).toInt()

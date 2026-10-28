@@ -149,6 +149,117 @@ internal object Painting {
         return p
     }
 
+    /// Clips `g` to the rounded rectangle `o` at (`x`, `y`), intersected with
+    /// the clip already in force, and answers false when nothing of it is
+    /// visible. `setClip(Shape)` replaces the clip, so the intersection is
+    /// ours to make. A rounded rectangle is convex: flattened to a polygon it
+    /// is cut by the clip rectangle edge by edge (Sutherland-Hodgman), with no
+    /// curve math and no allocation once the buffers have grown. Cutting the
+    /// curved path with `GeneralPath.intersect` was most of what a scrolling
+    /// list allocated; the iOS port flattens a curved clip to a polygon anyway.
+    fun clipRounded(g: Graphics, o: Outline.Rounded, x: Int, y: Int): Boolean {
+        var n = roundedPolygon(o, x.toFloat(), y.toFloat())
+        val left = g.clipX.toFloat()
+        val top = g.clipY.toFloat()
+        val right = left + g.clipWidth
+        val bottom = top + g.clipHeight
+        n = cut(n, 0, left, true)
+        n = cut(n, 0, right, false)
+        n = cut(n, 1, top, true)
+        n = cut(n, 1, bottom, false)
+        if (n < 3) {
+            return false
+        }
+        val p = clipPath
+        p.reset()
+        p.moveTo(poly[0], poly[1])
+        for (i in 1 until n) {
+            p.lineTo(poly[i * 2], poly[i * 2 + 1])
+        }
+        p.closePath()
+        g.setClip(p)
+        return true
+    }
+
+    private const val ARC_STEPS = 6
+    private var poly = FloatArray(64)
+    private var scratch = FloatArray(64)
+    private val clipPath = GeneralPath()
+
+    /// Writes `o` as a clockwise polygon into `poly`; answers its point count.
+    private fun roundedPolygon(o: Outline.Rounded, x: Float, y: Float): Int {
+        val max = Math.min(o.width, o.height) / 2f
+        val w = o.width
+        val h = o.height
+        ensure(4 * (ARC_STEPS + 1) + 8)
+        var n = 0
+        n = corner(n, x, y, Math.min(o.topLeft, max), 1f, 1f, PI)
+        n = corner(n, x + w, y, Math.min(o.topRight, max), -1f, 1f, PI + HALF_PI)
+        n = corner(n, x + w, y + h, Math.min(o.bottomRight, max), -1f, -1f, 0f)
+        n = corner(n, x, y + h, Math.min(o.bottomLeft, max), 1f, -1f, HALF_PI)
+        return n
+    }
+
+    private fun corner(n: Int, px: Float, py: Float, r: Float, sx: Float, sy: Float, start: Float): Int {
+        var k = n
+        if (r <= 0f) {
+            poly[k * 2] = px
+            poly[k * 2 + 1] = py
+            return k + 1
+        }
+        val cx = px + sx * r
+        val cy = py + sy * r
+        for (i in 0..ARC_STEPS) {
+            val a = start + HALF_PI * i / ARC_STEPS
+            poly[k * 2] = cx + r * Math.cos(a.toDouble()).toFloat()
+            poly[k * 2 + 1] = cy + r * Math.sin(a.toDouble()).toFloat()
+            k++
+        }
+        return k
+    }
+
+    /// Keeps the part of the polygon in `poly` on the inner side of the line
+    /// `axis` (0 is x, 1 is y) = `v`; `low` keeps values at or above it.
+    private fun cut(n: Int, axis: Int, v: Float, low: Boolean): Int {
+        if (n == 0) {
+            return 0
+        }
+        ensure(n + 4)
+        val src = poly
+        val dst = scratch
+        var m = 0
+        for (i in 0 until n) {
+            val j = (i + 1) % n
+            val a = src[i * 2 + axis]
+            val b = src[j * 2 + axis]
+            val aIn = if (low) a >= v else a <= v
+            val bIn = if (low) b >= v else b <= v
+            if (aIn) {
+                dst[m * 2] = src[i * 2]
+                dst[m * 2 + 1] = src[i * 2 + 1]
+                m++
+            }
+            if (aIn != bIn) {
+                val t = (v - a) / (b - a)
+                dst[m * 2] = src[i * 2] + t * (src[j * 2] - src[i * 2])
+                dst[m * 2 + 1] = src[i * 2 + 1] + t * (src[j * 2 + 1] - src[i * 2 + 1])
+                m++
+            }
+        }
+        poly = dst
+        scratch = src
+        return m
+    }
+
+    private fun ensure(points: Int) {
+        if (poly.size < points * 2) {
+            poly = poly.copyOf(points * 4)
+        }
+        if (scratch.size < points * 2 || scratch.size < poly.size) {
+            scratch = FloatArray(poly.size)
+        }
+    }
+
     private const val PI = Math.PI.toFloat()
     private const val HALF_PI = (Math.PI / 2).toFloat()
 }
