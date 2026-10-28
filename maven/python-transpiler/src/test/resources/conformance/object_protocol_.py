@@ -149,3 +149,26 @@ try:
     print("has dict")
 except AttributeError as e:
     print("AttributeError", e)
+
+
+# The __dict__ view is one object per instance, and a counting store through
+# it (d[k] = d.get(k, 0) + n, which plain dicts run with one probe) reaches
+# the instance.
+class Counted:
+    def __init__(self):
+        self.a = 1
+
+
+def count_through_dict():
+    c = Counted()
+    print(c.__dict__ is c.__dict__, vars(c) is c.__dict__)
+    d = c.__dict__
+    k = "a"
+    d[k] = d.get(k, 0) + 10
+    print(c.a, d[k])
+    k = "b"
+    d[k] = d.get(k, 0) + 5
+    print(c.b, sorted(d.items()))
+
+
+count_through_dict()

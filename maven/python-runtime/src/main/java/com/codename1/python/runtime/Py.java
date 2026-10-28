@@ -814,9 +814,13 @@ public final class Py {
         return ta != tb && tb.isSubtype(ta) && b instanceof PyInstance; //NOPMD CompareObjectsWithEquals - identity is meant
     }
 
-    /// `d[k] = d.get(k, dflt) + inc`, probing an exact dict once.
+    /// `d[k] = d.get(k, dflt) + inc`, probing an exact dict once. Only a
+    /// plain dict takes the one-probe path: it writes the value array
+    /// directly, which would bypass a view such as an instance's `__dict__`
+    /// (whose stores must reach the instance) -- those go through get and
+    /// setitem.
     public static void dictCount(Object d, Object k, Object dflt, Object inc) {
-        if (d instanceof PyDict && ((PyDict) d).type() == DICT_TYPE) {
+        if (d instanceof PyDict && d.getClass() == PyDict.class && ((PyDict) d).type() == DICT_TYPE) {
             ((PyDict) d).count(k, dflt, inc);
             return;
         }

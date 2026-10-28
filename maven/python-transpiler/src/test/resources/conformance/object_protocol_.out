@@ -19,3 +19,6 @@ no error
 {'a': 1, 'b': 9}
 ('z', 5) ['a', 'b'] False
 AttributeError 'Slotted' object has no attribute '__dict__'
+True True
+11 11
+5 [('a', 11), ('b', 5)]

@@ -58,6 +58,10 @@ public class PyInstance extends PyObject {
     /// every instance.
     PyDict nonStrKeys;
 
+    /// The `__dict__` view, made on first use and kept, so that
+    /// `o.__dict__ is o.__dict__` as in CPython. Null until then.
+    private InstanceDict dictView;
+
     /// The shape, the empty one for null.
     final Shape shape() {
         return shape == null ? Shape.EMPTY : shape;
@@ -237,12 +241,12 @@ public class PyInstance extends PyObject {
                 // has no dict to answer either.
                 throw Py.attributeError("'" + cls.name + "' object has no attribute '__dict__'");
             }
-            // A new view per read, so `o.__dict__ is o.__dict__` is False
-            // here (True in CPython). Keeping one view per instance was
-            // tried and broke zipfile's write-through-open in the compress_
-            // conformance program; until that is understood each read
-            // gets its own view, which refills itself from the instance.
-            return new InstanceDict(this);
+            // One view per instance, refilled from the instance before
+            // every read, so a view fetched earlier sees later writes.
+            if (dictView == null) {
+                dictView = new InstanceDict(this);
+            }
+            return dictView;
         }
         if ("__class__".equals(name)) {
             return cls;
@@ -747,7 +751,10 @@ public class PyInstance extends PyObject {
         /// Re-reads the values in key order: the set fields, then the shape's
         /// slots (the order [PyInstance#attributeNames()] lists them in).
         /// Answers false, leaving the caller to rebuild, when a key is not
-        /// the name expected at its place.
+        /// the name expected at its place. The caller has already matched
+        /// the shape, the set fields and the size, which fix the keys; the
+        /// name check is a cheap safety net against a path that changes the
+        /// keys without moving any of those, never the expected case.
         private boolean refreshValues(String[] fieldNames, long mask) {
             int fieldCount = fieldNames.length;
             String[] shapeNames = self.shape().names;
