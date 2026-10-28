@@ -1,15 +1,21 @@
 """A SQLAlchemy 2.x subset for Codename One: Core over the DB-API ``sqlite3`` module.
 
 Only the SQLite dialect exists. Statements compile to SQL with ``?`` placeholders and run
-through ``sqlite3``; every result is fetched eagerly. The ORM lives in ``sqlalchemy.orm``
+through ``sqlite3``; results are read from the cursor as they are iterated. The ORM lives in ``sqlalchemy.orm``
 and plugs in through two hooks: a mapped class carries ``__sa_mapper__`` (selecting it
 yields objects) and a relationship attribute answers ``_join_info()`` (joining on it).
 
-Unsupported: other dialects, connection pooling options, reflection, events, ``echo``
-output, subqueries/CTEs/unions, ``Enum``/``JSON``/``Numeric`` decimal handling.
+Subqueries (FROM, scalar, ``EXISTS``, ``IN``), CTEs, unions, aliases, ``case`` and ``cast``
+are supported; a scalar or ``EXISTS`` subquery correlates to the enclosing query's tables
+as SQLAlchemy does. ``echo=True`` logs each statement through the ``sqlalchemy.engine.Engine``
+logger.
+
+Unsupported: other dialects, connection pooling options, reflection, events, recursive
+CTEs, ``Enum``/``JSON``/``Numeric`` decimal handling.
 """
 
 import datetime as _dt
+import logging as _logging
 import sqlite3 as _sqlite3
 
 from . import exc
@@ -164,6 +170,10 @@ class _Ctx:
         self.params = []
         self.qualify = qualify
         self.columns_clause = False
+        # Tables of the enclosing queries, which a correlated subquery leaves out of its FROM.
+        self.outer = []
+        self.correlate = False
+        self.ctes = []
 
 
 class ClauseElement:
@@ -218,6 +228,8 @@ class ColumnElement(ClauseElement):
         return self._op(">=", other)
 
     def __add__(self, other):
+        if isinstance(self.type, String):
+            return Grouping(self._op("||", other), self.type)
         return Grouping(self._op("+", other), self.type)
 
     def __sub__(self, other):
@@ -239,9 +251,13 @@ class ColumnElement(ClauseElement):
         return not_(self)
 
     def in_(self, values):
+        if isinstance(values, (Select, CompoundSelect, ScalarSelect)):
+            return InExpression(self, [_SubqueryList(values)], False)
         return InExpression(self, [_lit(v, self.type) for v in values], False)
 
     def not_in(self, values):
+        if isinstance(values, (Select, CompoundSelect, ScalarSelect)):
+            return InExpression(self, [_SubqueryList(values)], True)
         return InExpression(self, [_lit(v, self.type) for v in values], True)
 
     notin_ = not_in
@@ -444,7 +460,9 @@ class Function(ColumnElement):
         self.args = [_lit(a) for a in args]
         if name == "count":
             self.type = Integer()
-        elif self.args and name in ("sum", "max", "min", "abs", "coalesce", "lower", "upper"):
+        elif name in ("length", "char_length"):
+            self.type = Integer()
+        elif self.args and name in ("sum", "max", "min", "abs", "coalesce", "lower", "upper", "trim"):
             self.type = self.args[0].type
         elif name == "avg":
             self.type = Float()
@@ -728,9 +746,12 @@ def _join_condition(left_tables, right):
 
 
 def _from_obj(x):
+    al = getattr(x, "_sa_aliased", None)
+    if al is not None:
+        return al.alias
     m = getattr(x, "__sa_mapper__", None)
     if m is not None:
-        return m.table
+        return m.local_from
     return x
 
 
@@ -778,18 +799,23 @@ class MetaData:
 class _Slot:
     """One entry of a select's columns clause: a column expression, or a mapped entity."""
 
-    def __init__(self, elem=None, mapper=None):
+    def __init__(self, elem=None, mapper=None, cols=None, from_=None, key=None):
         self.elem = elem
         self.mapper = mapper
         if mapper is not None:
-            self.key = mapper.class_.__name__
-            self.width = len(mapper.columns)
+            self.key = key if key is not None else mapper.class_.__name__
+            self.cols = cols if cols is not None else mapper.columns
+            self.from_ = from_ if from_ is not None else mapper.local_from
+            self.width = len(self.cols)
         else:
             self.key = elem.key if elem.key is not None else elem.name
             self.width = 1
 
 
 def _slots(ent):
+    al = getattr(ent, "_sa_aliased", None)
+    if al is not None:
+        return [al._slot()]
     m = getattr(ent, "__sa_mapper__", None)
     if m is not None:
         return [_Slot(mapper=m)]
@@ -814,9 +840,13 @@ class Select(ClauseElement):
         self._limit = None
         self._offset = None
         self._distinct = False
+        self._options = []
+        self._exec_opts = {}
 
     def _clone(self):
         s = Select()
+        s._options = list(self._options)
+        s._exec_opts = dict(self._exec_opts)
         s._slots = list(self._slots)
         s._where = list(self._where)
         s._order = list(self._order)
@@ -904,21 +934,48 @@ class Select(ClauseElement):
         self._column_tables(acc)
         return acc[0]
 
+    def options(self, *opts):
+        s = self._clone()
+        s._options.extend(opts)
+        return s
+
+    def execution_options(self, **kw):
+        s = self._clone()
+        s._exec_opts.update(kw)
+        return s
+
     def _column_tables(self, acc):
         for sl in self._slots:
             if sl.mapper is not None:
-                _add_unique(acc, sl.mapper.table)
+                _add_unique(acc, sl.from_)
             else:
                 sl.elem._tables(acc)
 
-    def _froms(self):
+    def _all_where(self):
+        out = list(self._where)
+        for sl in self._slots:
+            if sl.mapper is not None and sl.mapper.poly_filter is not None:
+                f = sl.mapper.poly_filter(sl.cols)
+                if f is not None:
+                    out.append(f)
+        return out
+
+    def _froms(self, ctx=None):
+        out = self._froms_all()
+        if ctx is not None and ctx.correlate and ctx.outer:
+            kept = [b for b in out if not any(b is o for o in ctx.outer)]
+            if kept:
+                return kept
+        return out
+
+    def _froms_all(self):
         if self._from:
             base = list(self._from)
         else:
             base = []
             self._column_tables(base)
             if not base:
-                for w in self._where:
+                for w in self._all_where():
                     w._tables(base)
         joined = []
         for target, _, _ in self._joins:
@@ -938,17 +995,32 @@ class Select(ClauseElement):
         return out
 
     def _compile(self, ctx):
+        froms = self._froms(ctx)
+        saved_outer = ctx.outer
+        saved_corr = ctx.correlate
+        mine = list(saved_outer)
+        for f in froms:
+            mine.extend(f._all_tables())
+        for target, _, _ in self._joins:
+            mine.extend(target._all_tables())
+        ctx.outer = mine
+        ctx.correlate = False
         ctx.columns_clause = True
         cols = []
         for sl in self._slots:
             if sl.mapper is not None:
-                for c in sl.mapper.columns:
+                for c in sl.cols:
                     cols.append(c._compile(ctx))
             else:
                 cols.append(sl.elem._compile(ctx))
         ctx.columns_clause = False
         sql = "SELECT " + ("DISTINCT " if self._distinct else "") + ", ".join(cols)
-        froms = self._froms()
+        sql = self._compile_rest(ctx, sql, froms)
+        ctx.outer = saved_outer
+        ctx.correlate = saved_corr
+        return sql
+
+    def _compile_rest(self, ctx, sql, froms):
         if froms or self._joins:
             if not froms:
                 froms = [self._joins[0][0]]
@@ -965,8 +1037,9 @@ class Select(ClauseElement):
                 seen.append(target)
             parts[0] = parts[0] + jsql
             sql += " \nFROM " + ", ".join(parts)
-        if self._where:
-            sql += " \nWHERE " + " AND ".join(w._compile(ctx) for w in self._where)
+        where = self._all_where()
+        if where:
+            sql += " \nWHERE " + " AND ".join(w._compile(ctx) for w in where)
         if self._group:
             sql += " GROUP BY " + ", ".join(g._compile(ctx) for g in self._group)
         if self._having:
@@ -983,15 +1056,310 @@ class Select(ClauseElement):
 
     def _execute_on(self, conn, params, session=None):
         ctx = _Ctx()
-        sql = self._compile(ctx)
+        sql = _compile_top(self, ctx)
         cur = conn._run(sql, ctx.params)
-        return CursorResult._from_cursor(cur, self._slots, session)
+        res = CursorResult._from_cursor(cur, self._slots, session)
+        res._yield_per = self._exec_opts.get("yield_per")
+        return res
+
+    def __str__(self):
+        return _compile_top(self, _Ctx())
 
     def subquery(self, name=None):
-        raise NotImplementedError("subqueries are not supported")
+        return Alias(self, name)
+
+    alias = subquery
+
+    def cte(self, name=None, recursive=False):
+        if recursive:
+            raise NotImplementedError("recursive CTEs are not supported")
+        return CTE(self, name)
 
     def scalar_subquery(self):
-        raise NotImplementedError("subqueries are not supported")
+        return ScalarSelect(self)
+
+    as_scalar = scalar_subquery
+
+    def label(self, name):
+        return ScalarSelect(self).label(name)
+
+    def exists(self):
+        return Exists(self)
+
+    def union(self, *others):
+        return CompoundSelect("UNION", (self,) + others)
+
+    def union_all(self, *others):
+        return CompoundSelect("UNION ALL", (self,) + others)
+
+    def _first(self):
+        return self
+
+    def _all_tables(self):
+        return []
+
+
+_anon = [0]
+
+
+def _anon_name(prefix):
+    _anon[0] += 1
+    return "%s_%d" % (prefix, _anon[0])
+
+
+def _compile_top(stmt, ctx):
+    """Compiles a statement, putting the WITH clause of every CTE it reached ahead of it."""
+    body_ctx = _Ctx()
+    body = stmt._compile(body_ctx)
+    if not body_ctx.ctes:
+        ctx.params.extend(body_ctx.params)
+        return body
+    parts = []
+    for c in body_ctx.ctes:
+        inner = _Ctx()
+        parts.append("%s AS \n(%s)" % (c.name, c.element._compile(inner)))
+        ctx.params.extend(inner.params)
+    ctx.params.extend(body_ctx.params)
+    return "WITH " + ", \n".join(parts) + " \n" + body
+
+
+class Alias(FromClause):
+    """A named FROM element over a table (an alias) or a select (a subquery)."""
+
+    def __init__(self, element, name=None):
+        self.element = element
+        self.name = name if name is not None else _anon_name(
+            element.name if isinstance(element, Table) else "anon")
+        self.c = self.columns = ColumnCollection()
+        if isinstance(element, Table):
+            src = list(element.c)
+        else:
+            src = []
+            for sl in element._first()._slots:
+                if sl.mapper is not None:
+                    src.extend(sl.cols)
+                else:
+                    src.append(sl.elem)
+        for col in src:
+            nm = col.key if col.key is not None else col.name
+            c = Column(nm, col.type, primary_key=getattr(col, "primary_key", False))
+            c.table = self
+            c._proxied = col
+            self.c._add(c)
+
+    def corresponding_column(self, col):
+        for c in self.c:
+            if getattr(c, "_proxied", None) is col:
+                return c
+        return None
+
+    def _compile(self, ctx):
+        if isinstance(self.element, Table):
+            return "%s AS %s" % (self.element.name, self.name)
+        inner = _Ctx()
+        inner.params = ctx.params
+        inner.ctes = ctx.ctes
+        return "(%s) AS %s" % (self.element._compile(inner), self.name)
+
+    def _tables(self, acc):
+        _add_unique(acc, self)
+
+    def _all_tables(self):
+        return [self]
+
+    @property
+    def foreign_keys(self):
+        return []
+
+    def select(self):
+        return select(self)
+
+
+class CTE(Alias):
+    def _compile(self, ctx):
+        if not any(c is self for c in ctx.ctes):
+            ctx.ctes.append(self)
+        return self.name
+
+
+class ScalarSelect(ColumnElement):
+    def __init__(self, sel):
+        self.sel = sel
+        sl = sel._first()._slots[0]
+        self.type = sl.elem.type if sl.elem is not None else NullType()
+
+    def _compile(self, ctx):
+        cc = ctx.columns_clause
+        corr = ctx.correlate
+        ctx.columns_clause = False
+        ctx.correlate = True
+        s = "(%s)" % self.sel._compile(ctx)
+        ctx.columns_clause = cc
+        ctx.correlate = corr
+        return s
+
+    def _first(self):
+        return self.sel._first()
+
+
+class _SubqueryList(ScalarSelect):
+    def _compile(self, ctx):
+        s = ScalarSelect._compile(self, ctx)
+        return s[1:-1]
+
+
+class Exists(ColumnElement):
+    def __init__(self, sel):
+        self.sel = sel
+        self.type = Boolean()
+
+    def where(self, *clauses):
+        return Exists(self.sel.where(*clauses))
+
+    def select_from(self, *froms):
+        return Exists(self.sel.select_from(*froms))
+
+    def _compile(self, ctx):
+        cc = ctx.columns_clause
+        corr = ctx.correlate
+        ctx.columns_clause = False
+        ctx.correlate = True
+        s = "EXISTS (%s)" % self.sel._compile(ctx)
+        ctx.columns_clause = cc
+        ctx.correlate = corr
+        return s
+
+    def select(self):
+        return select(self)
+
+
+def exists(*args):
+    if args:
+        a = args[0]
+        if isinstance(a, (Select, CompoundSelect)):
+            return Exists(a)
+        return Exists(Select(*args))
+    return Exists(Select(TextClause("*")))
+
+
+class CompoundSelect(ClauseElement):
+    def __init__(self, keyword, selects):
+        self.keyword = keyword
+        self.selects = list(selects)
+        self._order = []
+        self._limit = None
+        self._exec_opts = {}
+
+    def _first(self):
+        return self.selects[0]._first()
+
+    @property
+    def _slots(self):
+        return self._first()._slots
+
+    def order_by(self, *clauses):
+        c = CompoundSelect(self.keyword, self.selects)
+        c._order = self._order + [x for x in clauses if x is not None]
+        c._limit = self._limit
+        return c
+
+    def limit(self, n):
+        c = self.order_by()
+        c._limit = n
+        return c
+
+    def _compile(self, ctx):
+        sql = (" %s " % self.keyword).join(x._compile(ctx) for x in self.selects)
+        if self._order:
+            q = ctx.qualify
+            ctx.qualify = False
+            sql += " ORDER BY " + ", ".join(o._compile(ctx) for o in self._order)
+            ctx.qualify = q
+        if self._limit is not None:
+            sql += " LIMIT ?"
+            ctx.params.append(self._limit)
+        return sql
+
+    def __str__(self):
+        return _compile_top(self, _Ctx())
+
+    def _execute_on(self, conn, params, session=None):
+        ctx = _Ctx()
+        sql = _compile_top(self, ctx)
+        return CursorResult._from_cursor(conn._run(sql, ctx.params), self._slots, session)
+
+    def subquery(self, name=None):
+        return Alias(self, name)
+
+    def cte(self, name=None, recursive=False):
+        return CTE(self, name)
+
+    def scalar_subquery(self):
+        return ScalarSelect(self)
+
+    def _all_tables(self):
+        return []
+
+
+def union(*selects):
+    return CompoundSelect("UNION", selects)
+
+
+def union_all(*selects):
+    return CompoundSelect("UNION ALL", selects)
+
+
+def alias(element, name=None):
+    return Alias(element, name)
+
+
+class Case(ColumnElement):
+    def __init__(self, whens, else_):
+        self.whens = [(w[0], _lit(w[1])) for w in whens]
+        self.else_ = None if else_ is None else _lit(else_)
+        self.type = self.whens[0][1].type if self.whens else NullType()
+
+    def _compile(self, ctx):
+        cc = ctx.columns_clause
+        ctx.columns_clause = False
+        out = "CASE"
+        for cond, val in self.whens:
+            out += " WHEN %s THEN %s" % (cond._compile(ctx), val._compile(ctx))
+        if self.else_ is not None:
+            out += " ELSE " + self.else_._compile(ctx)
+        ctx.columns_clause = cc
+        return out + " END"
+
+    def _tables(self, acc):
+        for cond, val in self.whens:
+            cond._tables(acc)
+            val._tables(acc)
+
+
+def case(*whens, **kw):
+    if len(whens) == 1 and isinstance(whens[0], dict):
+        raise NotImplementedError("case() with a value= mapping is not supported")
+    return Case(whens, kw.get("else_"))
+
+
+class Cast(ColumnElement):
+    def __init__(self, expr, typ):
+        self.expr = _lit(expr)
+        self.type = _to_type(typ)
+
+    def _compile(self, ctx):
+        cc = ctx.columns_clause
+        ctx.columns_clause = False
+        out = "CAST(%s AS %s)" % (self.expr._compile(ctx), self.type.ddl())
+        ctx.columns_clause = cc
+        return out
+
+    def _tables(self, acc):
+        self.expr._tables(acc)
+
+
+def cast(expr, type_):
+    return Cast(expr, type_)
 
 
 def select(*entities):
@@ -1226,18 +1594,29 @@ def _only(rows, allow_none):
     return rows[0]
 
 
+_END = object()
+
+
 class _Rows:
+    """Rows read on demand from an iterator: a cursor is only fetched as far as it is consumed."""
+
+    _yield_per = None
+
     def __init__(self, rows):
-        self._rows = rows
-        self._pos = 0
+        self._it = iter(rows)
+
+    def _next(self):
+        return next(self._it, _END)
 
     def _take(self):
-        r = self._rows[self._pos:]
-        self._pos = len(self._rows)
-        return r
+        return list(self._it)
 
     def __iter__(self):
-        return iter(self._take())
+        while True:
+            r = self._next()
+            if r is _END:
+                return
+            yield r
 
     def all(self):
         return self._take()
@@ -1245,14 +1624,36 @@ class _Rows:
     fetchall = all
 
     def fetchone(self):
-        if self._pos < len(self._rows):
-            self._pos += 1
-            return self._rows[self._pos - 1]
-        return None
+        r = self._next()
+        return None if r is _END else r
 
-    def fetchmany(self, size=1):
-        r = self._rows[self._pos:self._pos + size]
-        self._pos += len(r)
+    def fetchmany(self, size=None):
+        if size is None:
+            size = self._yield_per or 1
+        out = []
+        while len(out) < size:
+            r = self._next()
+            if r is _END:
+                break
+            out.append(r)
+        return out
+
+    def partitions(self, size=None):
+        if size is None:
+            size = self._yield_per or 100
+        while True:
+            p = self.fetchmany(size)
+            if not p:
+                return
+            yield p
+
+    def yield_per(self, num):
+        self._yield_per = num
+        return self
+
+    def _derive(self, cls, gen):
+        r = cls(gen)
+        r._yield_per = self._yield_per
         return r
 
     def first(self):
@@ -1268,12 +1669,11 @@ class _Rows:
     def unique(self):
         seen = []
         out = []
-        for r in self._rows[self._pos:]:
-            if not any(r is s or r == s for s in seen):
+        for r in self._take():
+            if not any(r is x or r == x for x in seen):
                 seen.append(r)
                 out.append(r)
-        self._rows = out
-        self._pos = 0
+        self._it = iter(out)
         return self
 
 
@@ -1298,37 +1698,25 @@ class CursorResult(_Rows):
         desc = cur.description
         if desc is None:
             return CursorResult([], [], cur.rowcount, cur.lastrowid)
-        raw = cur.fetchall()
         if slots is None:
             keys = [d[0] for d in desc]
             km = dict((k, i) for i, k in enumerate(keys))
-            return CursorResult([Row(r, km) for r in raw], keys, cur.rowcount, cur.lastrowid)
+            return CursorResult((Row(r, km) for r in _cursor_rows(cur)), keys, cur.rowcount, cur.lastrowid)
         keys = [s.key for s in slots]
         km = {}
         for i, k in enumerate(keys):
             if k is not None and k not in km:
                 km[k] = i
-        rows = []
-        for r in raw:
-            vals = []
-            pos = 0
-            for s in slots:
-                if s.mapper is not None:
-                    vals.append(s.mapper._load_row(session, r[pos:pos + s.width]))
-                else:
-                    vals.append(s.elem.type.result(r[pos]))
-                pos += s.width
-            rows.append(Row(vals, km))
-        return CursorResult(rows, keys, cur.rowcount, cur.lastrowid)
+        return CursorResult(_load_rows(cur, slots, km, session), keys, cur.rowcount, cur.lastrowid)
 
     def keys(self):
         return list(self._keys)
 
     def scalars(self, index=0):
-        return ScalarResult([r[index] for r in self._take()])
+        return self._derive(ScalarResult, (r[index] for r in self))
 
     def mappings(self):
-        return MappingResult([r._mapping for r in self._take()])
+        return self._derive(MappingResult, (r._mapping for r in self))
 
     def scalar(self):
         r = self._take()
@@ -1351,6 +1739,28 @@ class CursorResult(_Rows):
 Result = CursorResult
 
 
+def _cursor_rows(cur):
+    while True:
+        batch = cur.fetchmany(64)
+        if not batch:
+            return
+        for r in batch:
+            yield r
+
+
+def _load_rows(cur, slots, km, session):
+    for r in _cursor_rows(cur):
+        vals = []
+        pos = 0
+        for sl in slots:
+            if sl.mapper is not None:
+                vals.append(sl.mapper._load_row(session, r[pos:pos + sl.width], sl.cols))
+            else:
+                vals.append(sl.elem.type.result(r[pos]))
+            pos += sl.width
+        yield Row(vals, km)
+
+
 # ----------------------------------------------------------------------------- engine
 
 class Connection:
@@ -1360,6 +1770,10 @@ class Connection:
         self.closed = False
 
     def _run(self, sql, params, many=False):
+        if self.engine.echo:
+            log = _logging.getLogger("sqlalchemy.engine.Engine")
+            log.info("%s", sql)
+            log.info("%r", tuple(params) if isinstance(params, list) and not many else params)
         cur = self._dbapi.cursor()
         try:
             if many:
@@ -1490,6 +1904,16 @@ class Engine:
 def create_engine(url, echo=False, **kwargs):
     if not isinstance(url, URL):
         url = make_url(url)
+    if echo:
+        # As SQLAlchemy does: INFO on the engine logger, and a stdout handler when nothing
+        # handles that logger yet.
+        log = _logging.getLogger("sqlalchemy.engine.Engine")
+        log.setLevel(_logging.DEBUG if echo == "debug" else _logging.INFO)
+        if not log.handlers:
+            import sys as _sys
+            h = _logging.StreamHandler(_sys.stdout)
+            h.setFormatter(_logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
+            log.addHandler(h)
     return Engine(url, echo)
 
 
