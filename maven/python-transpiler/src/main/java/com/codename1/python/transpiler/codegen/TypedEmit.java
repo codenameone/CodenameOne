@@ -3527,15 +3527,20 @@ final class TypedEmit {
             throw new Unsupported("call of " + n);
         }
         if (in.isMathCall(c, sc)) {
-            StringBuilder sb = new StringBuilder("PyMath.").append(((Attribute) c.func).attr).append('(');
+            String fn = ((Attribute) c.func).attr;
+            StringBuilder sb = new StringBuilder("PyMath.").append(fn).append('(');
+            List<String> ds = new ArrayList<String>();
             for (int i = 0; i < c.args.size(); i++) {
                 E x = expr(c.args.get(i));
                 if (x.t.opt || x.t.k != Ty.K.INT && x.t.k != Ty.K.FLOAT) {
                     throw new Unsupported("math of " + x.t);
                 }
-                sb.append(i == 0 ? "" : ", ").append(toD(x));
+                ds.add(toD(x));
+                sb.append(i == 0 ? "" : ", ").append(ds.get(i));
             }
-            return new E(sb.append(')').toString(), Ty.FLOAT);
+            sb.append(')');
+            String in0 = inlineMath(fn, ds);
+            return new E(in0 != null ? "(" + in0 + " : " + sb + ")" : sb.toString(), Ty.FLOAT);
         }
         if (c.func instanceof Attribute) {
             Attribute a = (Attribute) c.func;
@@ -3608,6 +3613,34 @@ final class TypedEmit {
             return result(f, recv + ".tv_" + Emitter.mangle(a.attr) + "_" + args.size() + "(" + al + ")");
         }
         throw new Unsupported("call");
+    }
+
+    /// The guard and the `Math` call of `math.fn(ds)` when its domain can be
+    /// tested in line (`guard ? Math.fn(..)`, the `PyMath` call raising the
+    /// error after the colon); or null. A `PyMath` call is two calls ParparVM
+    /// does not inline, in what is usually an inner loop. `x - x == 0` holds
+    /// for every finite `x`, not for an infinity or NaN.
+    private static String inlineMath(String fn, List<String> ds) {
+        for (String d : ds) {
+            if (!plain(d) && !literal(d)) {
+                return null;
+            }
+        }
+        if (ds.size() == 1) {
+            String x = ds.get(0);
+            if ("sqrt".equals(fn)) {
+                return x + " >= 0.0 ? Math.sqrt(" + x + ")";
+            }
+            if ("sin".equals(fn) || "cos".equals(fn)) {
+                return x + " - " + x + " == 0.0 ? Math." + fn + "(" + x + ")";
+            }
+        } else if (ds.size() == 2 && "fmod".equals(fn)) {
+            String x = ds.get(0);
+            String y = ds.get(1);
+            // Finite `x` and a nonzero `y`: C's fmod, which `%` is.
+            return x + " - " + x + " == 0.0 && " + y + " != 0.0 ? " + x + " % " + y;
+        }
+        return null;
     }
 
     /// `x` as a Java `long` when it is an int at hand as one, cheap and free
