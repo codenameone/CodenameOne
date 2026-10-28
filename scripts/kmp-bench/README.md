@@ -50,15 +50,15 @@ Start-up here is from process start (the kernel's start time) to the marker, so
 
 | | Codename One | Compose Multiplatform |
 |---|---|---|
-| Cold start | 1075 ms | 1349 ms |
-| Warm start (median) | 623 ms | 840 ms |
+| Cold start | 905 ms | 1097 ms |
+| Warm start (median) | 572 ms | 638 ms |
 | Executable, stripped | 16.8 MB | 22.9 MB |
-| App bundle, executable stripped | 18.2 MB | 22.9 MB |
+| App bundle, executable stripped | 18.3 MB | 22.9 MB |
 | Bundle without executable | 1.3 MB | 2.5 KB |
 | Physical footprint | 49 MB | 48 MB |
-| Recomposition, day change to drawn (median / p95) | 42.6 / 47.0 ms | 20.2 / 23.3 ms |
-| Scroll, work per frame (median / p95) | 40.0 / 43.4 ms | 16.8 / 18.0 ms |
-| Scroll, frame interval (median / p95) | 51.2 / 55.1 ms | 33.4 / 34.2 ms |
+| Recomposition, day change to drawn (median / p95) | 4.2 / 5.3 ms | 19.5 / 24.0 ms |
+| Scroll, work per frame (median / p95) | 5.1 / 6.3 ms | 17.1 / 18.5 ms |
+| Scroll, frame interval (median / p95) | 34.8 / 38.8 ms | 33.4 / 35.3 ms |
 | Scroll, frames over 2x median | 0 of 144 | 0 of 144 |
 
 Runtime values are the median over 5 launches of each launch's median or p95.
@@ -72,14 +72,22 @@ are linked in. The CN1 bundle holds 1.3 MB besides its executable:
 `iOSModernTheme.res` (213 KB), `default.metallib` (92 KB) and
 `kotlin.kotlin_builtins` (29 KB).
 
-**CMP does each step in about half the time.** A day change takes about 42 ms
-from state change to drawn on Codename One and 20 ms on CMP. One card of
-scrolling takes 40 ms against 17 ms. Neither side dropped a frame against its own
-median, but Codename One's frame interval (51 ms) is well past the simulator's
-display interval, while CMP's is about two display frames (33 ms). These are
-simulator numbers on an Apple-silicon Mac. They show where each runtime spends
-CPU in identical code. They do not show device frame rates, GPU cost, or how a
-finger-driven fling feels.
+**Codename One does each step in about a quarter of the time.** A day change
+takes 4.2 ms from state change to drawn on Codename One and 19.5 ms on CMP; one
+card of scrolling takes 5.1 ms against 17.1 ms. Both sides then wait for the display: the frame interval is about two display frames on each
+(35 ms and 33 ms), because `scrollToItem` is issued once per drawn frame, and
+neither dropped a frame against its own median. These are simulator numbers
+on an Apple-silicon Mac. They show where each runtime spends CPU in identical
+code. They do not show device frame rates, GPU cost, or how a finger-driven
+fling feels.
+
+The first version of compose-compat took 42 ms per day change, and almost none
+of it was work: the EDT sat idle for 83% of it. A state change waited for a
+dispatched resumption, then for the snapshot to apply, then for frame
+callbacks sent after paint -- three EDT cycles. Frames now run at the start of
+the layout pass, as Android's Choreographer runs them before traversal, and
+the recomposer resumes inline on the EDT, so change, layout and paint share
+one cycle.
 
 **Start-up is the simulator's floor.** An empty UIKit application, with no
 code of its own, takes as long to show its first frame as either side, so

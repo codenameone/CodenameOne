@@ -10,30 +10,33 @@ watchOS and tvOS.
 
 === Motivation
 
-Compose Multiplatform draws its whole user interface with Skia, and on iOS it
-runs on Kotlin/Native. Both come with the application: a large native
-runtime, a drawing engine that doesn't use the platform's text input,
-accessibility or look, and a second toolchain to keep in step with the JVM
-one.
-
-Codename One takes the JVM half of a KMP project instead. kotlinc already
-compiles `commonMain` to ordinary class files for Android and the desktop.
-Those classes, together with the real Compose runtime and the real
-`kotlinx.coroutines`, are exactly what Codename One's translator reads. Only
-the UI layer -- `androidx.compose.ui`, `foundation` and `material3` -- is
-replaced, by one written over Codename One components and `Graphics`.
+Compose Multiplatform runs on Kotlin/Native on iOS and links its own drawing
+engine into the application. Codename One takes the JVM half of a KMP project
+instead. kotlinc already compiles `commonMain` to ordinary class files for
+Android and the desktop. Those classes, together with the real Compose runtime
+and the real `kotlinx.coroutines`, are exactly what Codename One's translator
+reads. Only the UI layer -- `androidx.compose.ui`, `foundation` and
+`material3` -- is replaced, by one written over Codename One components and
+`Graphics`.
 
 The same application, built from the same `commonMain` both ways and measured
-on the same iPhone simulator:
+on the same iPhone simulator, with Compose Multiplatform as 100%:
 
-image::img/kmp-bench-results.svg["Executable, bundle, memory and start-up of the same Compose application built by Codename One and by Compose Multiplatform",scaledwidth=95%]
+image::img/kmp-bench-results.svg["Size, memory, start-up, recomposition and scrolling of the same Compose application built by Codename One, relative to Compose Multiplatform",scaledwidth=95%]
 
-The executable is 28% smaller, although the Codename One one still carries
-the whole iOS port and the full Material icon font. Memory and start-up are
-level: an empty UIKit application takes 640-750 ms to its first frame on the
-same simulator, so neither side has much start-up left to lose there. The
-benchmark, its method and how to run it are in `scripts/kmp-bench` in the
-Codename One repository.
+- **Recomposition and scrolling take about a quarter of the CPU time.** A
+  state change is drawn in 4.2 ms against 19.5 ms, and one step of scrolling
+  in 5.1 ms against 17.1 ms. Both sides keep pace with the display, so the
+  difference is headroom: for heavier screens, and for battery.
+- **The executable is 27% smaller** (16.8 MB against 22.9 MB) and the bundle
+  20% smaller, although the Codename One one carries the whole iOS port.
+- **Start-up is faster**, 905 ms against 1097 ms cold and 572 ms against
+  638 ms warm.
+- **Memory is level**, 49 MB of physical footprint against 48 MB.
+
+The benchmark, its method and how to run it are in `scripts/kmp-bench` in the
+Codename One repository. These are simulator numbers; they show where each
+runtime spends CPU in identical code, not a device's frame rate.
 
 image::img/kmp-keynote-schedule.png["The Keynote schedule screen rendered by Compose Multiplatform (left) and by Codename One (right)",scaledwidth=70%]
 
@@ -42,6 +45,12 @@ uses the platform's own text input and accessibility, can sit inside a
 Codename One form next to any other component, and reaches every Codename One
 API directly -- push notifications, in-app purchase, the native maps, the
 backend -- with no `expect`/`actual` plumbing per platform.
+
+The same build also reaches targets Compose Multiplatform's UI does not run
+on: watchOS, tvOS, and Windows, Linux and macOS as native binaries with no JVM
+to install. The Codename One backend runs the same Kotlin on the server, so a
+data class or validation rule in `commonMain` is shared by the app and the
+service that feeds it.
 
 === Quick start
 
