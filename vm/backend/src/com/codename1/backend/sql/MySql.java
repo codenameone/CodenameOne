@@ -197,7 +197,7 @@ public final class MySql {
         if (useTls && (serverCapabilities & CLIENT_SSL) == 0) {
             if (SqlLimits.demandsTls(sslMode)) {
                 throw new IOException("The MySQL server at " + host
-                        + " does not offer TLS and sslmode=require");
+                        + " does not offer TLS and sslmode=" + sslMode);
             }
             useTls = false;
         }
@@ -665,7 +665,7 @@ public final class MySql {
     /// The portable column kind (`Database.columnTypes(List)`) of a binary
     /// protocol type: only the kinds whose values arrive as text a caller must
     /// parse.
-    private static String kind(int type) {
+    static String kind(int type) {
         switch (type) {
             case 0x00: // DECIMAL
             case 0xf6: // NEWDECIMAL

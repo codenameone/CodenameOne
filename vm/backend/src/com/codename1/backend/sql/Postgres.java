@@ -120,7 +120,7 @@ public final class Postgres {
                 boolean required = SqlLimits.demandsTls(sslMode);
                 if (!offered && required) {
                     throw new IOException("The server at " + host
-                            + " refused TLS and sslmode=require");
+                            + " refused TLS and sslmode=" + sslMode);
                 }
                 if (offered) {
                     try {
@@ -738,7 +738,7 @@ public final class Postgres {
 
     /// The portable column kind (`Database.columnTypes(List)`) of a type OID:
     /// only the kinds whose values arrive as text a caller must parse.
-    private static String kind(int typeOid) {
+    static String kind(int typeOid) {
         switch (typeOid) {
             case 1700:
                 return "decimal";
@@ -750,6 +750,8 @@ public final class Postgres {
                 return "datetimetz";
             case 1083:
                 return "time";
+            case 1266:
+                return "timetz";
             default:
                 return null;
         }

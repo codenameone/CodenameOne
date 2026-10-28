@@ -2162,11 +2162,29 @@ public final class HttpServer {
     /// #### Parameters
     ///
     /// - `bytes`: the C stack a connection's handler needs
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalStateException`: when a server has already started and `bytes`
+    ///   would raise the size. Hosts and connections that exist keep the stack
+    ///   they were created with, so a late raise would protect only some of the
+    ///   handlers and overflow the others the same way. A call that asks for no
+    ///   more than the current size is a no-op at any time.
     public static void requireVirtualThreadStack(int bytes) {
         if (bytes > vtStackBytes) {
+            if (ANY_SERVER_STARTED.get()) {
+                throw new IllegalStateException("requireVirtualThreadStack(" + bytes
+                        + ") was called after a server started; call it before "
+                        + "HttpServer.start so every connection gets the stack");
+            }
             vtStackBytes = bytes;
         }
     }
+
+    /// Set by the first `start`, so a stack raise that can no longer reach every
+    /// connection is refused rather than silently partial.
+    private static final java.util.concurrent.atomic.AtomicBoolean ANY_SERVER_STARTED =
+            new java.util.concurrent.atomic.AtomicBoolean(false);
 
     /// How often a virtual-thread host sweeps its deadlines, however busy it is.
     /// The same 250ms the idle poll waits, so a quiet host behaves exactly as
@@ -2503,6 +2521,7 @@ public final class HttpServer {
     static HttpServer start(String host, int port, int backlog, int workerCount,
                             Handler handler, Tls tls, WebSocketRoutes webSockets,
                             Tracer tracer) throws IOException {
+        ANY_SERVER_STARTED.set(true);
         // BEFORE THE BIND, because the two arms failed this differently and both
         // badly. Java SE's Executors.newFixedThreadPool throws for a non-positive
         // count -- but only after the listener and the reactor are open, so the
@@ -5421,8 +5440,11 @@ public final class HttpServer {
     }
 
     /// Both header maps in one, `first`'s entries before `second`'s; a name in
-    /// both keeps every value. Null when neither has any.
-    private static Map mergeHeaders(Map first, Map second) {
+    /// both keeps every value. Header names are case-insensitive, so a name in
+    /// `second` that differs from one in `first` only by case is merged into
+    /// `first`'s spelling rather than written as a second header. Null when
+    /// neither has any.
+    static Map mergeHeaders(Map first, Map second) {
         if (first == null || first.isEmpty()) {
             return second;
         }
@@ -5433,17 +5455,34 @@ public final class HttpServer {
         java.util.Iterator entries = second.entrySet().iterator();
         while (entries.hasNext()) {
             Map.Entry entry = (Map.Entry) entries.next();
-            Object had = merged.get(entry.getKey());
+            Object key = sameHeaderKey(merged, entry.getKey());
+            Object had = merged.get(key);
             if (had == null) {
-                merged.put(entry.getKey(), entry.getValue());
+                merged.put(key, entry.getValue());
                 continue;
             }
             List values = new ArrayList();
             addValues(values, had);
             addValues(values, entry.getValue());
-            merged.put(entry.getKey(), values);
+            merged.put(key, values);
         }
         return merged;
+    }
+
+    /// The key of `map` that names the same header as `name`, compared without
+    /// regard to case; `name` itself when there is none.
+    private static Object sameHeaderKey(Map map, Object name) {
+        if (map.containsKey(name) || !(name instanceof String)) {
+            return name;
+        }
+        java.util.Iterator keys = map.keySet().iterator();
+        while (keys.hasNext()) {
+            Object key = keys.next();
+            if (key instanceof String && ((String) key).equalsIgnoreCase((String) name)) {
+                return key;
+            }
+        }
+        return name;
     }
 
     private static void addValues(List into, Object value) {

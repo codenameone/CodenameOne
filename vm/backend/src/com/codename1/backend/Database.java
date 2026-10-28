@@ -329,8 +329,9 @@ public final class Database {
     /// statement projects them, for the columns whose values come back as text
     /// that still has to be parsed: `"decimal"` (an exact DECIMAL or NUMERIC,
     /// kept as its digits), `"date"`, `"datetime"` (no zone), `"datetimetz"`
-    /// (PostgreSQL's timestamp with time zone, which carries its offset) and
-    /// `"time"`. Every other column is null, because its value is already the
+    /// (PostgreSQL's timestamp with time zone, which carries its offset),
+    /// `"time"` and `"timetz"` (PostgreSQL's time with time zone, which carries
+    /// its offset). Every other column is null, because its value is already the
     /// Long, Double, String or byte\[\] it is.
     ///
     /// Answers null for rows this class did not produce, and for SQLite, which
@@ -1225,7 +1226,7 @@ public final class Database {
     /// pulled from java.net: URI is not on the server-safe surface, and the
     /// password in the userinfo has to be percent-decoded, which a hand-rolled
     /// split usually forgets.
-    private static final class Url {
+    static final class Url {
         String host = "localhost";
         int port;
         String path = "";
@@ -1406,6 +1407,13 @@ public final class Database {
         /// the drivers implement: `disable`, `prefer`, `require` (verify-full) and
         /// `verify-ca`. Anything else is refused rather than read as prefer, which
         /// would accept plaintext.
+        ///
+        /// Folding verify-full (and MySQL's VERIFY_IDENTITY) into `require` is
+        /// safe only because `require` here is stricter than libpq's: it verifies
+        /// the certificate chain AND the host name (`SqlLimits.verifiesHost`
+        /// answers true for it). If `require` ever stops checking the host, this
+        /// mapping silently weakens verify-full, so `DatabaseUrlSslModeTest`
+        /// holds both facts together.
         static String canonicalSslMode(String value) throws IOException {
             String v = value == null ? "" : value.trim();
             if ("disable".equals(v) || "DISABLED".equals(v) || "false".equals(v)) {
