@@ -819,6 +819,45 @@ public abstract class Database {
                 "Changing the database key is not supported on this platform");
     }
 
+    /// `#getColumnType(Row, int)`: the value is SQL NULL.
+    public static final int COLUMN_NULL = 0;
+    /// `#getColumnType(Row, int)`: the value is stored as a signed integer.
+    public static final int COLUMN_INTEGER = 1;
+    /// `#getColumnType(Row, int)`: the value is stored as a floating point number.
+    public static final int COLUMN_FLOAT = 2;
+    /// `#getColumnType(Row, int)`: the value is stored as text.
+    public static final int COLUMN_TEXT = 3;
+    /// `#getColumnType(Row, int)`: the value is stored as a blob.
+    public static final int COLUMN_BLOB = 4;
+    /// `#getColumnType(Row, int)`: the port cannot tell how the value is stored.
+    public static final int COLUMN_UNKNOWN = -1;
+
+    /// Returns how the value in a column of the row's current position is stored.
+    ///
+    /// SQLite types values rather than columns, so this is per row. The typed getters convert
+    /// whatever is stored; use this to read a value back in the type it was written with.
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: the row, as returned by `Cursor#getRow()`
+    ///
+    /// - `index`: the zero-based column index
+    ///
+    /// #### Returns
+    ///
+    /// one of `#COLUMN_NULL`, `#COLUMN_INTEGER`, `#COLUMN_FLOAT`, `#COLUMN_TEXT`,
+    /// `#COLUMN_BLOB`, or `#COLUMN_UNKNOWN` when the port cannot tell
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the cursor is closed, not on a row, or the index is out of range
+    public static int getColumnType(Row row, int index) throws IOException {
+        if (row instanceof TypedRow) {
+            return ((TypedRow) row).getColumnType(index);
+        }
+        return COLUMN_UNKNOWN;
+    }
+
     /// Checks if the last value accessed from a given row was null.  Not all platforms
     /// support wasNull().  If the platform does not support it, this will just return false.
     ///

@@ -130,6 +130,13 @@
             <artifactId>junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <!-- The sqlite3 engine of the conformance runs (JvmSql). -->
+            <groupId>org.xerial</groupId>
+            <artifactId>sqlite-jdbc</artifactId>
+            <version>3.46.1.0</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <profiles>

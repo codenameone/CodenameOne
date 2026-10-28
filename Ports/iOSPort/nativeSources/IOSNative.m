@@ -13782,6 +13782,19 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlCursorNullValueAtColumn___long_
     return sqlite3_column_type((sqlite3_stmt*)statement, col) == SQLITE_NULL ? JAVA_TRUE : JAVA_FALSE;
 }
 
+// The storage class as Database.COLUMN_*. Asked before any getter reads the value, since a
+// getter's conversion leaves sqlite3_column_type undefined.
+JAVA_INT com_codename1_impl_ios_IOSNative_sqlCursorColumnType___long_int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statement, JAVA_INT col) {
+    switch (sqlite3_column_type((sqlite3_stmt*)statement, col)) {
+        case SQLITE_NULL: return 0;
+        case SQLITE_INTEGER: return 1;
+        case SQLITE_FLOAT: return 2;
+        case SQLITE_TEXT: return 3;
+        case SQLITE_BLOB: return 4;
+        default: return -1;
+    }
+}
+
 JAVA_INT com_codename1_impl_ios_IOSNative_sqlCursorGetColumnCount___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statement) {
     return sqlite3_column_count((sqlite3_stmt*)statement);
 }

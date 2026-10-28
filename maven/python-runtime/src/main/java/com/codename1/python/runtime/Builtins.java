@@ -823,6 +823,19 @@ public final class Builtins {
             }
             throw Py.valueError("could not convert string to float: " + Py.toRepr(x));
         }
+        byte[] b = x instanceof PyStr ? null : PyBytes.like(x);
+        if (b != null) {
+            // float(b"1.5") parses the bytes as ASCII text.
+            char[] cs = new char[b.length];
+            for (int i = 0; i < b.length; i++) {
+                cs[i] = (char) (b[i] & 0xff);
+            }
+            try {
+                return toFloat(new String(cs));
+            } catch (PyException e) {
+                throw Py.valueError("could not convert string to float: " + Py.toRepr(x));
+            }
+        }
         return Py.ofFloat(Py.asDouble(x));
     }
 

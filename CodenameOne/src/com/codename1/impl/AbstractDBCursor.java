@@ -55,7 +55,7 @@ import java.io.IOException;
 ///
 /// Ports whose underlying cursor is genuinely random access, such as Android's, do not need this
 /// class.
-public abstract class AbstractDBCursor implements Cursor, CursorExt, Row, RowExt {
+public abstract class AbstractDBCursor implements Cursor, CursorExt, Row, RowExt, com.codename1.db.TypedRow {
 
     /// Position of the cursor, -1 before the first row, and the row count once exhausted.
     private int position = -1;
@@ -442,6 +442,23 @@ public abstract class AbstractDBCursor implements Cursor, CursorExt, Row, RowExt
     /// true if the compatibility hint should make `wasNull()` true before the first read
     protected boolean legacyWasNullBeforeAnyRead() {
         return false;
+    }
+
+    /// Returns the storage class of a value as one of the `Database.COLUMN_*` constants, or
+    /// `Database.COLUMN_UNKNOWN` (the default) where the engine cannot say. Only called on an
+    /// open cursor positioned on a row, with a valid index.
+    protected int columnType(int index) throws IOException {
+        return com.codename1.db.Database.COLUMN_UNKNOWN;
+    }
+
+    @Override
+    public int getColumnType(int index) throws IOException {
+        checkOpen();
+        if (!onRow) {
+            throw new IOException("The cursor is not on a row");
+        }
+        checkColumn(index);
+        return columnType(index);
     }
 
     /// Guards a value read and updates the null latch.

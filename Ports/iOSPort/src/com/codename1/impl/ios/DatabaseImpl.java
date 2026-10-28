@@ -608,6 +608,11 @@ class DatabaseImpl extends Database {
         }
 
         @Override
+        protected int columnType(int index) throws IOException {
+            return IOSImplementation.nativeInstance.sqlCursorColumnType(stmt, index);
+        }
+
+        @Override
         protected boolean legacyWasNullBeforeAnyRead() {
             // iOS answered wasNull() by asking the statement about the last column index it was
             // given, which starts at zero, so before any read it reported on column zero of the

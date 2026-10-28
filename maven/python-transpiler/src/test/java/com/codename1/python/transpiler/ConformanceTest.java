@@ -138,7 +138,9 @@ class ConformanceTest {
         assertEquals(0, rc, "generated Java did not compile:\n" + diagnostics.toString("UTF-8"));
 
         URL[] urls = {cls.toUri().toURL(), new File(runtime).toURI().toURL(), new File(core).toURI().toURL(),
-                new File(location(JvmFileSystem.class)).toURI().toURL()};
+                new File(location(JvmFileSystem.class)).toURI().toURL(),
+                new File(location(org.sqlite.JDBC.class)).toURI().toURL(),
+                new File(location(org.slf4j.LoggerFactory.class)).toURI().toURL()};
         Path fsRoot = work.resolve("fs");
         Files.createDirectories(fsRoot.resolve("home"));
         ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -154,6 +156,9 @@ class ConformanceTest {
                 Object fs = loader.loadClass(JvmFileSystem.class.getName()).getConstructor(String.class)
                         .newInstance(fsRoot.toString());
                 fsType.getMethod("install", fsType).invoke(null, fs);
+                Class<?> sqlType = loader.loadClass("com.codename1.python.runtime.PySql");
+                sqlType.getMethod("install", sqlType).invoke(null, loader.loadClass(JvmSql.class.getName())
+                        .getConstructor(String.class).newInstance(fsRoot.resolve("home").toString()));
                 if (http) {
                     Class<?> httpType = loader.loadClass("com.codename1.python.runtime.PyHttp");
                     httpType.getMethod("install", httpType)

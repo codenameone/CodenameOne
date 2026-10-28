@@ -510,6 +510,9 @@ public final class PythonTranspiler {
         if (classes.containsKey("_cn1_http")) {
             sb.append("        com.codename1.python.runtime.Cn1Http.installDefault();\n");
         }
+        if (classes.containsKey("sqlite3")) {
+            sb.append("        com.codename1.python.runtime.Cn1Sql.installDefault();\n");
+        }
         for (String cls : classes.values()) {
             sb.append("        ").append(cls).append(".register();\n");
         }

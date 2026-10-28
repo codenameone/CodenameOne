@@ -159,6 +159,33 @@ public class SECursor extends AbstractDBCursor {
     }
 
     @Override
+    protected int columnType(int index) throws IOException {
+        Object v;
+        try {
+            v = resultSet.getObject(index + 1);
+        } catch (SQLException ex) {
+            throw new IOException(ex.getMessage(), ex);
+        }
+        // The SQLite driver hands each value back in the class of its storage.
+        if (v == null) {
+            return com.codename1.db.Database.COLUMN_NULL;
+        }
+        if (v instanceof Integer || v instanceof Long || v instanceof Short || v instanceof Byte) {
+            return com.codename1.db.Database.COLUMN_INTEGER;
+        }
+        if (v instanceof Double || v instanceof Float) {
+            return com.codename1.db.Database.COLUMN_FLOAT;
+        }
+        if (v instanceof String) {
+            return com.codename1.db.Database.COLUMN_TEXT;
+        }
+        if (v instanceof byte[]) {
+            return com.codename1.db.Database.COLUMN_BLOB;
+        }
+        return com.codename1.db.Database.COLUMN_UNKNOWN;
+    }
+
+    @Override
     protected boolean isNullAt(int index) throws IOException {
         try {
             return resultSet.getObject(index + 1) == null;

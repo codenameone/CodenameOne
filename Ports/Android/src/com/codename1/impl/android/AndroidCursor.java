@@ -37,7 +37,7 @@ import java.io.IOException;
  * slower rather than faster. The externally visible behaviour is the same either way, and the
  * portable conformance suite checks that.
  */
-public class AndroidCursor implements Cursor, CursorExt, RowExt {
+public class AndroidCursor implements Cursor, CursorExt, RowExt, com.codename1.db.TypedRow {
 
     private android.database.Cursor c;
     private int last_read_column_index = -1;
@@ -629,6 +629,31 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
         if (index < 0 || index >= count) {
             throw new IOException("Column index " + index + " is out of range. This result set has "
                     + count + (count == 1 ? " column" : " columns"));
+        }
+    }
+
+    @Override
+    public int getColumnType(int index) throws IOException {
+        checkOpen();
+        checkOnARow();
+        checkColumn(index);
+        try {
+            switch (c.getType(index)) {
+                case android.database.Cursor.FIELD_TYPE_NULL:
+                    return Database.COLUMN_NULL;
+                case android.database.Cursor.FIELD_TYPE_INTEGER:
+                    return Database.COLUMN_INTEGER;
+                case android.database.Cursor.FIELD_TYPE_FLOAT:
+                    return Database.COLUMN_FLOAT;
+                case android.database.Cursor.FIELD_TYPE_STRING:
+                    return Database.COLUMN_TEXT;
+                case android.database.Cursor.FIELD_TYPE_BLOB:
+                    return Database.COLUMN_BLOB;
+                default:
+                    return Database.COLUMN_UNKNOWN;
+            }
+        } catch (RuntimeException failed) {
+            throw readFailed(index, failed);
         }
     }
 

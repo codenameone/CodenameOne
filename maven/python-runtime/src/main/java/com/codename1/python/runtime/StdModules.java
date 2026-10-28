@@ -74,6 +74,10 @@ public final class StdModules {
             PyModule.registerModule(m);
             return true;
         }
+        if ("_cn1sql".equals(name)) {
+            PyModule.registerModule(sql());
+            return true;
+        }
         if ("_cn1http".equals(name)) {
             PyModule.registerModule(http());
             return true;
@@ -115,8 +119,43 @@ public final class StdModules {
             return 1;
         }
         System.err.println("Traceback (most recent call last):");
+        System.err.print(traceback(e));
         System.err.println(e.getMessage());
         return 1;
+    }
+
+    /// The Python frames of an exception's stack, outermost first, as
+    /// CPython prints them. The build points the translated classes at
+    /// their `.py` files and lines (`PythonLineMapper`), so the frames are
+    /// found by their file name; without that mapping there are none, and
+    /// the traceback is the message alone.
+    static String traceback(Throwable e) {
+        StackTraceElement[] st = e.getStackTrace();
+        StringBuilder b = new StringBuilder();
+        StackTraceElement previous = null;
+        java.util.List<String> lines = new java.util.ArrayList<String>();
+        for (StackTraceElement f : st) {
+            StackTraceElement callee = previous;
+            previous = f;
+            String file = f.getFileName();
+            if (file == null || !file.endsWith(".py") || f.getLineNumber() <= 0) {
+                continue;
+            }
+            // A Python function may be a lambda that only calls the method
+            // holding its body; that lambda's frame, at the `def` line, is
+            // not a frame of the Python program.
+            String m = f.getMethodName();
+            if (m != null && m.startsWith("lambda$") && callee != null
+                    && f.getClassName().equals(callee.getClassName())
+                    && !String.valueOf(callee.getMethodName()).startsWith("lambda$")) {
+                continue;
+            }
+            lines.add("  File \"" + file + "\", line " + f.getLineNumber() + "\n");
+        }
+        for (int i = lines.size() - 1; i >= 0; i--) {
+            b.append(lines.get(i));
+        }
+        return b.toString();
     }
 
     public static void runExitHandlers() {
@@ -270,6 +309,138 @@ public final class StdModules {
         fs(m, "size", (fs, a) -> PyInt.of(fs.size(Py.toStr(a[0]))));
         fs(m, "mtime", (fs, a) -> Py.ofFloat(fs.lastModified(Py.toStr(a[0])) / 1000.0));
         return m;
+    }
+
+    /// The open `_cn1sql` connections, by the handle given to Python.
+    private static final java.util.Map<Long, PySql.Connection> SQL = new java.util.HashMap<Long, PySql.Connection>();
+    private static long sqlHandles;
+
+    /// `_cn1sql`: `open(name)` answering a handle; `run(handle, sql, params,
+    /// query)` answering `(columns, rows, changes, lastrowid)` with each row
+    /// a tuple; `begin`, `commit`, `rollback` and `close` of a handle. An
+    /// engine failure raises `OSError` with the engine's message, which the
+    /// `sqlite3` module turns into its own exceptions.
+    private static PyModule sql() {
+        PyModule m = new PyModule("_cn1sql", new String[0]);
+        m.setAttr("open", PyBuiltin.positional("open", a -> {
+            try {
+                PySql.Connection c = PySql.get().open(Py.toStr(a[0]));
+                long h = ++sqlHandles;
+                SQL.put(h, c);
+                return PyInt.of(h);
+            } catch (java.io.IOException e) {
+                throw Py.error(Py.OS_ERROR, String.valueOf(e.getMessage()));
+            }
+        }));
+        m.setAttr("run", PyBuiltin.positional("run", a -> {
+            PySql.Connection c = sqlConnection(a[0]);
+            Object[] ps = Py.toArray(a[2]);
+            Object[] params = new Object[ps.length];
+            for (int i = 0; i < ps.length; i++) {
+                params[i] = sqlParam(ps[i], i);
+            }
+            PySql.Result r;
+            try {
+                r = c.run(Py.toStr(a[1]), params, Py.isTrue(a[3]));
+            } catch (java.io.IOException e) {
+                throw Py.error(Py.OS_ERROR, String.valueOf(e.getMessage()));
+            }
+            Object[] cols = new Object[r.columns.length];
+            for (int i = 0; i < cols.length; i++) {
+                cols[i] = Py.str(r.columns[i]);
+            }
+            Object[] rows = new Object[r.rows.size()];
+            for (int i = 0; i < rows.length; i++) {
+                Object[] values = r.rows.get(i);
+                Object[] t = new Object[values.length];
+                for (int k = 0; k < values.length; k++) {
+                    t[k] = sqlValue(values[k]);
+                }
+                rows[i] = new PyTuple(t);
+            }
+            return new PyTuple(new Object[] {new PyTuple(cols), new PyList(rows), PyInt.of(r.changes),
+                PyInt.of(r.lastRowId)});
+        }));
+        sqlControl(m, "begin", 0);
+        sqlControl(m, "commit", 1);
+        sqlControl(m, "rollback", 2);
+        sqlControl(m, "close", 3);
+        return m;
+    }
+
+    private static void sqlControl(PyModule m, String name, int op) {
+        m.setAttr(name, PyBuiltin.positional(name, a -> {
+            PySql.Connection c = sqlConnection(a[0]);
+            try {
+                if (op == 0) {
+                    c.begin();
+                } else if (op == 1) {
+                    c.commit();
+                } else if (op == 2) {
+                    c.rollback();
+                } else {
+                    SQL.remove(Py.asLong(a[0]));
+                    c.close();
+                }
+            } catch (java.io.IOException e) {
+                throw Py.error(Py.OS_ERROR, String.valueOf(e.getMessage()));
+            }
+            return Py.NONE;
+        }));
+    }
+
+    private static PySql.Connection sqlConnection(Object handle) {
+        PySql.Connection c = SQL.get(Py.asLong(handle));
+        if (c == null) {
+            throw Py.error(Py.OS_ERROR, "Cannot operate on a closed database.");
+        }
+        return c;
+    }
+
+    /// A parameter as the engine binds it. The `sqlite3` module has applied
+    /// the adapters already, so anything else is an error.
+    private static Object sqlParam(Object v, int index) {
+        if (v == Py.NONE) { //NOPMD CompareObjectsWithEquals - identity is meant
+            return null;
+        }
+        if (Py.isInt(v)) {
+            if (v instanceof Long) {
+                return v;
+            }
+            PyInt big = (PyInt) v;
+            if (big.isBig()) {
+                throw Py.error(Py.OVERFLOW_ERROR, "Python int too large to convert to SQLite INTEGER");
+            }
+            return Long.valueOf(big.asLong());
+        }
+        if (Py.isFloat(v)) {
+            return Double.valueOf(Py.asDouble(v));
+        }
+        if (v instanceof String) {
+            return v;
+        }
+        byte[] b = PyBytes.like(v);
+        if (b != null) {
+            return b;
+        }
+        if (v instanceof PyStr) {
+            return Py.toStr(v);
+        }
+        throw Py.error(Py.TYPE_ERROR, "Error binding parameter " + (index + 1) + ": type '"
+                + Py.typeOf(v).name + "' is not supported");
+    }
+
+    private static Object sqlValue(Object v) {
+        if (v == null) {
+            return Py.NONE;
+        }
+        if (v instanceof byte[]) {
+            return new PyBytes((byte[]) v);
+        }
+        if (v instanceof String) {
+            return Py.str((String) v);
+        }
+        return v;
     }
 
     /// `_cn1http`: `request(method, url, headers, body, timeout, redirects)`
