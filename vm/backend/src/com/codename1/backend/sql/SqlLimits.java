@@ -84,10 +84,30 @@ final class SqlLimits {
             return;
         }
         if (!"require".equals(sslMode) && !"prefer".equals(sslMode)
-                && !"disable".equals(sslMode)) {
+                && !"disable".equals(sslMode) && !"verify-ca".equals(sslMode)) {
             throw new IOException("sslmode=" + sslMode + " is not one this runtime "
-                    + "implements: use require, prefer or disable. It is refused "
-                    + "rather than read as prefer, which would accept plaintext");
+                    + "implements: use require, verify-ca, prefer or disable. It is "
+                    + "refused rather than read as prefer, which would accept plaintext");
+        }
+    }
+
+    /// Whether `sslMode` refuses a connection that cannot be encrypted.
+    static boolean demandsTls(String sslMode) {
+        return "require".equals(sslMode) || "verify-ca".equals(sslMode);
+    }
+
+    /// Whether the certificate's name must match the host: every mode but
+    /// `verify-ca`.
+    static boolean verifiesHost(String sslMode) {
+        return !"verify-ca".equals(sslMode);
+    }
+
+    /// Refuses `verify-ca` without its own trust root: skipping the name check
+    /// against the public roots would accept any certificate any CA issued.
+    static void requireRootForVerifyCa(String sslMode, String caFile) throws IOException {
+        if ("verify-ca".equals(sslMode) && caFile == null) {
+            throw new IOException("sslmode=verify-ca needs sslrootcert naming the "
+                    + "CA (or server certificate) to trust");
         }
     }
 }

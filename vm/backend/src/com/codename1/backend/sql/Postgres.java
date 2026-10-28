@@ -102,6 +102,7 @@ public final class Postgres {
         // BEFORE THE SOCKET: a mode this code does not implement is a typo, and
         // reading it as prefer is how "require" spelled wrong accepts plaintext.
         SqlLimits.requireSslMode(sslMode);
+        SqlLimits.requireRootForVerifyCa(sslMode, caFile);
         Tcp connection = Tcp.connect(host, port <= 0 ? 5432 : port, timeoutMillis);
         // AFTER THE CONNECT, and before anything is said on it: the deadline
         // governs the conversation, which is where a peer can stall a worker.
@@ -116,14 +117,14 @@ public final class Postgres {
             boolean secured = false;
             if (!plaintextByChoice) {
                 boolean offered = requestTls(wire);
-                boolean required = "require".equals(sslMode);
+                boolean required = SqlLimits.demandsTls(sslMode);
                 if (!offered && required) {
                     throw new IOException("The server at " + host
                             + " refused TLS and sslmode=require");
                 }
                 if (offered) {
                     try {
-                        connection.startTls(host, caFile);
+                        connection.startTls(host, caFile, SqlLimits.verifiesHost(sslMode));
                         secured = true;
                     } catch (IOException err) {
                         if (required) {

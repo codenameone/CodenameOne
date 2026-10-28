@@ -116,6 +116,7 @@ public final class MySql {
             int socketTimeoutMillis) throws IOException {
         // BEFORE THE SOCKET, for the reason Postgres gives one engine over.
         SqlLimits.requireSslMode(sslMode);
+        SqlLimits.requireRootForVerifyCa(sslMode, caFile);
         Tcp connection = Tcp.connect(host, port <= 0 ? 3306 : port, timeoutMillis);
         // AFTER THE CONNECT, and before anything is said on it: the deadline
         // governs the conversation, which is where a peer can stall a worker.
@@ -194,7 +195,7 @@ public final class MySql {
 
         boolean useTls = !"disable".equals(sslMode);
         if (useTls && (serverCapabilities & CLIENT_SSL) == 0) {
-            if ("require".equals(sslMode)) {
+            if (SqlLimits.demandsTls(sslMode)) {
                 throw new IOException("The MySQL server at " + host
                         + " does not offer TLS and sslmode=require");
             }
@@ -235,7 +236,7 @@ public final class MySql {
             }
             sendPacket(request.toByteArray());
             try {
-                wire.getConnection().startTls(host, caFile);
+                wire.getConnection().startTls(host, caFile, SqlLimits.verifiesHost(sslMode));
             } catch (IOException err) {
                 // The SSLRequest packet has already gone out, so this connection
                 // cannot go back to plaintext -- the server is waiting for a
