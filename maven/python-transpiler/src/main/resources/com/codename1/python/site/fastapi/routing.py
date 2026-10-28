@@ -551,7 +551,9 @@ async def run_route(route, req, default_class):
             if k == "content-length":
                 continue
             resp.headers.append(k, v)
-        if ctx.background.tasks:
+        if ctx.background.tasks and resp.background is None:
+            # As FastAPI: a response that carries its own background task
+            # keeps it, and the injected BackgroundTasks are dropped.
             resp.background = ctx.background
         _finish_cleanups(ctx, None)
     except Exception as exc:

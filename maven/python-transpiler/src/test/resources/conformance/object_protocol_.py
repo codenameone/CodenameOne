@@ -1,0 +1,110 @@
+import copy
+import hmac
+
+
+# __getattribute__ raising AttributeError falls back to __getattr__.
+class Fallback:
+    def __init__(self):
+        self.real = 1
+
+    def __getattribute__(self, name):
+        if name.startswith("hidden"):
+            raise AttributeError(name)
+        return object.__getattribute__(self, name)
+
+    def __getattr__(self, name):
+        return "fallback:" + name
+
+
+f = Fallback()
+print(f.real, f.hidden_x, f.missing)
+print(getattr(f, "hidden_y"), hasattr(f, "anything"))
+
+
+class Counting:
+    def __init__(self):
+        object.__setattr__(self, "reads", 0)
+
+    def __getattribute__(self, name):
+        if name != "reads":
+            object.__setattr__(self, "reads", object.__getattribute__(self, "reads") + 1)
+        return object.__getattribute__(self, name)
+
+
+c = Counting()
+c.a = 5
+_ = c.a
+_ = c.a
+print("reads", c.reads)
+
+
+# Writing an unrelated class does not change what an instance reads.
+class Plain:
+    x = 1
+
+
+p = Plain()
+p.y = 2
+
+
+class Other:
+    pass
+
+
+Other.z = 3
+print(p.x, p.y)
+Plain.x = 10
+print(p.x)
+
+# __dict__ with keys that are not strings.
+o = Plain()
+o.__dict__[1] = "one"
+o.__dict__["name"] = "n"
+print(sorted(map(str, o.__dict__.keys())), o.name)
+print(hasattr(o, "1"), o.__dict__.get(1))
+d = o.__dict__
+del d[1]
+print(1 in o.__dict__, list(o.__dict__))
+
+# Mutating the instance while iterating its __dict__ raises, as for a dict.
+o.a = 1
+o.b = 2
+try:
+    for k in o.__dict__:
+        o.__dict__["new_" + str(k)] = 0
+    print("no error")
+except RuntimeError as e:
+    print("RuntimeError", e)
+o2 = Plain()
+o2.a = 1
+o2.b = 2
+seen = []
+for k in o2.__dict__:
+    seen.append(k)
+    o2.a = 5
+print(seen, o2.a)
+
+
+# copyreg reached through a computed getattr.
+class Point:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+
+name = "__reduce" + "_ex__"
+red = getattr(Point(1, 2), name)(2)
+print(red[0].__name__, red[1][0] is Point)
+q = copy.copy(Point(3, 4))
+print(q.x, q.y)
+
+# hmac.compare_digest on strings.
+print(hmac.compare_digest("abc", "abc"), hmac.compare_digest("abc", "abd"))
+try:
+    hmac.compare_digest("café", "café")
+except TypeError as e:
+    print("TypeError", e)
+try:
+    hmac.compare_digest("abc", b"abc")
+except TypeError:
+    print("TypeError mixed")

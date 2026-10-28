@@ -140,10 +140,12 @@ def _sync_chunks(content, charset):
     if hasattr(content, "__aiter__"):
         content = _drive_async(content.__aiter__())
     for c in content:
-        if isinstance(c, (bytes, bytearray)):
+        if isinstance(c, (bytes, bytearray, memoryview)):
             yield bytes(c)
         else:
-            yield str(c).encode(charset)
+            # As Starlette: anything that is not bytes is encoded, so a str
+            # works and an int fails with AttributeError here.
+            yield c.encode(charset)
 
 
 def _drive_async(it):

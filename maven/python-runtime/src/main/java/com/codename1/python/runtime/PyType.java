@@ -55,6 +55,11 @@ public final class PyType extends PyObject {
     /// nothing in practice and needs no list of subclasses.
     static int version;
 
+    /// [#hasCustomGetattribute()]'s answer, valid while [#version] equals
+    /// [#customGetattributeVersion].
+    private boolean customGetattribute;
+    private int customGetattributeVersion = -1;
+
     private static final Object MISSING = new PyObject() {
         @Override
         public PyType type() {
@@ -637,9 +642,21 @@ public final class PyType extends PyObject {
 
     /// Whether the class overrides `__getattribute__`, which takes every
     /// attribute read out of the inline caches' hands.
+    ///
+    /// Asked on every plain attribute read, so the answer is kept per class
+    /// against [#version]: a read costs two field compares until some class
+    /// changes. The version stays one global counter rather than one per
+    /// class with propagation to subclasses: writes to a class after it is
+    /// built are rare (and mostly at import), a type does not track its
+    /// subclasses, and a per-class version would need that list kept for
+    /// every class just to make the rare write cheaper.
     boolean hasCustomGetattribute() {
-        Object g = lookup("__getattribute__");
-        return g != null && !(g instanceof PyBuiltin);
+        if (customGetattributeVersion != version) {
+            Object g = lookup("__getattribute__");
+            customGetattribute = g != null && !(g instanceof PyBuiltin);
+            customGetattributeVersion = version;
+        }
+        return customGetattribute;
     }
 
     /// `issubclass(self, other)`.

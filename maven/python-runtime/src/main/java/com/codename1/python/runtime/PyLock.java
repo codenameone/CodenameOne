@@ -23,62 +23,50 @@
  */
 package com.codename1.python.runtime;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
 /// `_thread.LockType`: a lock that is not owned by the thread that took it,
 /// so any thread may release it. Waiting for it releases the [Gil].
+///
+/// A compare-and-set, never a monitor: `Object.wait` or a contended
+/// `synchronized` on a backend virtual thread blocks the HOST thread, and
+/// with tasks queued on every host the whole server wedges. A waiter steps
+/// aside through [Gil#pauseWaiter(int)] between attempts instead.
 final class PyLock {
-    private boolean locked;
+    private final AtomicBoolean locked = new AtomicBoolean();
 
     /// Takes the lock: at once, without waiting when `blocking` is false,
     /// or waiting at most `timeoutMillis` when that is not negative.
     boolean acquire(boolean blocking, long timeoutMillis) {
-        synchronized (this) {
-            if (!locked) {
-                locked = true;
-                return true;
-            }
-            if (!blocking) {
-                return false;
-            }
+        if (locked.compareAndSet(false, true)) {
+            return true;
         }
+        if (!blocking) {
+            return false;
+        }
+        long deadline = timeoutMillis < 0 ? 0 : System.currentTimeMillis() + timeoutMillis;
         int saved = Gil.release();
         try {
-            synchronized (this) {
-                long deadline = timeoutMillis < 0 ? 0 : System.currentTimeMillis() + timeoutMillis;
-                while (locked) {
-                    long wait = 0;
-                    if (timeoutMillis >= 0) {
-                        wait = deadline - System.currentTimeMillis();
-                        if (wait <= 0) {
-                            return false;
-                        }
-                    }
-                    try {
-                        wait(wait);
-                    } catch (InterruptedException e) {
-                        // a spurious wake-up: the loop checks again
-                    }
+            int attempt = 0;
+            while (!locked.compareAndSet(false, true)) {
+                if (timeoutMillis >= 0 && System.currentTimeMillis() >= deadline) {
+                    return false;
                 }
-                locked = true;
-                return true;
+                Gil.pauseWaiter(attempt++);
             }
+            return true;
         } finally {
             Gil.restore(saved);
         }
     }
 
     void release() {
-        synchronized (this) {
-            if (!locked) {
-                throw Py.error(Py.RUNTIME_ERROR, "release unlocked lock");
-            }
-            locked = false;
-            notifyAll();
+        if (!locked.compareAndSet(true, false)) {
+            throw Py.error(Py.RUNTIME_ERROR, "release unlocked lock");
         }
     }
 
     boolean locked() {
-        synchronized (this) {
-            return locked;
-        }
+        return locked.get();
     }
 }

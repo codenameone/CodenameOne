@@ -23,6 +23,7 @@
  */
 package com.codename1.python.runtime;
 
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 /// The global interpreter lock: Python code runs on one thread at a time.
@@ -53,6 +54,15 @@ public final class Gil {
     /// Reentry depth. Read and written only by the owner; ownership passes
     /// through a compare-and-set on [#OWNER], which orders it.
     private static int depth;
+
+    /// How many threads are inside [#acquire(long)] waiting for the lock.
+    /// [#yieldNow()] reads it to hand the lock over rather than take it
+    /// straight back.
+    private static final AtomicInteger WAITERS = new AtomicInteger();
+
+    /// How many pauses [#yieldNow()] waits at most for a waiter to take the
+    /// lock before it competes for it again.
+    private static final int HANDOFF_PAUSES = 16;
 
     private static Scheduler scheduler;
 
@@ -104,21 +114,36 @@ public final class Gil {
     }
 
     private static void acquire(long me) {
-        int spins = 0;
-        while (!OWNER.compareAndSet(0, me)) {
-            Scheduler s = scheduler;
-            if (s != null && s.pause()) {
-                continue;
+        if (OWNER.compareAndSet(0, me)) {
+            return;
+        }
+        WAITERS.incrementAndGet();
+        try {
+            int attempt = 0;
+            while (!OWNER.compareAndSet(0, me)) {
+                pauseWaiter(attempt++);
             }
-            if (spins < SPINS) {
-                spins++;
-                Thread.yield();
-            } else {
-                try {
-                    Thread.sleep(1);
-                } catch (InterruptedException e) {
-                    // keep waiting: the lock is the only way back into Python
-                }
+        } finally {
+            WAITERS.decrementAndGet();
+        }
+    }
+
+    /// One step aside for a thread waiting on something another thread
+    /// will change: the virtual thread yields its host, a platform thread
+    /// yields and, after [#SPINS] attempts, sleeps a millisecond. Never a
+    /// monitor wait, which would block a virtual thread's host.
+    public static void pauseWaiter(int attempt) {
+        Scheduler s = scheduler;
+        if (s != null && s.pause()) {
+            return;
+        }
+        if (attempt < SPINS) {
+            Thread.yield();
+        } else {
+            try {
+                Thread.sleep(1);
+            } catch (InterruptedException e) {
+                // keep waiting: the caller re-checks its condition
             }
         }
     }
@@ -157,11 +182,21 @@ public final class Gil {
 
     /// Lets another thread waiting for the lock run, as `time.sleep(0)`
     /// does.
+    ///
+    /// Fair to a waiter: a bare yield followed by a compare-and-set lets
+    /// the yielding thread win the lock straight back almost every time,
+    /// starving the others. So when a thread is waiting, the lock is left
+    /// free until somebody else has taken it (bounded by
+    /// [#HANDOFF_PAUSES], in case the waiter gave up), and when nobody is
+    /// waiting the lock is not released at all.
     public static void yieldNow() {
+        if (WAITERS.get() == 0) {
+            pauseWaiter(0);
+            return;
+        }
         int saved = release();
-        Scheduler s = scheduler;
-        if (s == null || !s.pause()) {
-            Thread.yield();
+        for (int i = 0; i < HANDOFF_PAUSES && OWNER.get() == 0 && WAITERS.get() > 0; i++) {
+            pauseWaiter(i);
         }
         restore(saved);
     }

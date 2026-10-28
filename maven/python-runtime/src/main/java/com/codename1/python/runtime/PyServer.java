@@ -228,11 +228,22 @@ public abstract class PyServer {
         Gil.enter();
         try {
             Py.obj(after).call(new Object[0], Py.NO_KW);
-        } catch (PyException e) {
+        } catch (RuntimeException e) {
+            // A background task that fails runs after the response is out:
+            // nobody is left to answer, so it is logged, as Starlette's
+            // server logs it. A Java exception escaping a task must not
+            // kill the server thread that ran it either.
             e.printStackTrace();
         } finally {
             Gil.exit();
         }
+    }
+
+    /// One step aside for generated server code waiting on the Python
+    /// side (a websocket handshake): never a monitor wait, which would block
+    /// a virtual thread's host. See [Gil#pauseWaiter(int)].
+    public static void pauseWaiter(int attempt) {
+        Gil.pauseWaiter(attempt);
     }
 
     /// Drops the work to run after a response that was never completed --
@@ -268,6 +279,7 @@ public abstract class PyServer {
             return new byte[0];
         }
         Gil.enter();
+        boolean done = false;
         try {
             while (true) {
                 Object item = Py.next(response.stream);
@@ -277,15 +289,36 @@ public abstract class PyServer {
                 }
                 byte[] chunk = PyBytes.like(item);
                 if (chunk == null) {
+                    if (!Py.isinstance(item, Py.STR_TYPE)) {
+                        // Starlette encodes anything that is not bytes with
+                        // chunk.encode(charset): an int fails right there.
+                        throw Py.attributeError("'" + Py.typeOf(item).name + "' object has no attribute 'encode'");
+                    }
                     chunk = Py.toStr(item).getBytes("UTF-8");
                 }
                 if (chunk.length > 0) {
+                    done = true;
                     return chunk;
                 }
             }
         } catch (java.io.UnsupportedEncodingException e) {
             throw Py.error(Py.OS_ERROR, "UTF-8 is unsupported"); // NOPMD PreserveStackTrace - surfaced as a Python OSError
         } finally {
+            if (!done && response.stream != null) {
+                // The generator raised: close it, so its finally blocks run
+                // and a later call answers the end rather than resuming a
+                // generator that already failed. The exception propagates.
+                Object it = response.stream;
+                response.stream = null;
+                try {
+                    Object close = Py.obj(it).getAttrOrNull("close");
+                    if (close != null) {
+                        Py.obj(close).call(new Object[0], Py.NO_KW);
+                    }
+                } catch (RuntimeException e) {
+                    e.printStackTrace();
+                }
+            }
             Gil.exit();
         }
     }

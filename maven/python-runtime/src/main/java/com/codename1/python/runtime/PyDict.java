@@ -450,6 +450,11 @@ public class PyDict extends PyObject {
 
             @Override
             public Object next() {
+                // A view (an instance's __dict__) picks up what changed in the
+                // object behind it, so a store made through the object while
+                // iterating is caught as one made through the dict is. A plain
+                // dict's sync does nothing.
+                sync();
                 if (size != startSize) {
                     throw Py.runtimeError("dictionary changed size during iteration");
                 }

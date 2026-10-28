@@ -52,6 +52,11 @@ public class PyInstance extends PyObject {
     Shape shape;
     Object[] slots;
 
+    /// Keys of `__dict__` that are not strings (`o.__dict__[1] = x`), which
+    /// CPython keeps in the dict but no attribute can name. Null for nearly
+    /// every instance.
+    PyDict nonStrKeys;
+
     /// The shape, the empty one for null.
     final Shape shape() {
         return shape == null ? Shape.EMPTY : shape;
@@ -663,20 +668,76 @@ public class PyInstance extends PyObject {
             }
             syncing = true;
             try {
-                super.clear();
                 String[] names = self.attributeNames();
+                PyDict other = self.nonStrKeys;
+                if (sameKeys(names, other)) {
+                    // The same keys in the same order: the values are
+                    // brought up to date in place, so an iteration in
+                    // progress over this dict is not disturbed.
+                    int n = 0;
+                    for (int i = 0; i < used && n < names.length; i++) {
+                        if (keys[i] != null) {
+                            values[i] = self.own(names[n++]);
+                        }
+                    }
+                    return;
+                }
+                super.clear();
                 for (String e : names) {
                     super.setItem(e, self.own(e));
+                }
+                if (other != null) {
+                    for (int i = 0; i < other.used; i++) {
+                        if (other.keys[i] != null) {
+                            super.setItem(other.keys[i], other.values[i]);
+                        }
+                    }
                 }
             } finally {
                 syncing = false;
             }
         }
 
+        /// Whether the keys already are `names` and then `other`'s, in that
+        /// order.
+        private boolean sameKeys(String[] names, PyDict other) {
+            int extra = other == null ? 0 : other.size;
+            if (size != names.length + extra) {
+                return false;
+            }
+            int n = 0;
+            for (int i = 0; i < used; i++) {
+                if (keys[i] == null) {
+                    continue;
+                }
+                if (n < names.length) {
+                    if (!names[n].equals(keys[i])) {
+                        return false;
+                    }
+                } else if (!other.contains(keys[i])) {
+                    return false;
+                }
+                n++;
+            }
+            return true;
+        }
+
+        private static boolean isStr(Object key) {
+            return key instanceof String || Py.isinstance(key, Py.STR_TYPE);
+        }
+
         @Override
         public void setItem(Object key, Object value) {
+            sync();
             super.setItem(key, value);
-            self.store(Py.toStr(key), value);
+            if (isStr(key)) {
+                self.store(Py.toStr(key), value);
+            } else {
+                if (self.nonStrKeys == null) {
+                    self.nonStrKeys = new PyDict();
+                }
+                self.nonStrKeys.setItem(key, value);
+            }
         }
 
         @Override
@@ -692,7 +753,16 @@ public class PyInstance extends PyObject {
             if (super.remove(key) == null) {
                 throw Py.keyError(key);
             }
-            self.delAttrDirect(Py.toStr(key));
+            forget(key);
+        }
+
+        /// Removes `key` from what the dict stands for.
+        private void forget(Object key) {
+            if (isStr(key)) {
+                self.delAttrDirect(Py.toStr(key));
+            } else if (self.nonStrKeys != null) {
+                self.nonStrKeys.remove(key);
+            }
         }
 
         // pop() and popitem() remove through here, clear() through clear(): without these
@@ -702,7 +772,7 @@ public class PyInstance extends PyObject {
             sync();
             Object v = super.remove(key);
             if (v != null) {
-                self.delAttrDirect(Py.toStr(key));
+                forget(key);
             }
             return v;
         }
@@ -719,7 +789,7 @@ public class PyInstance extends PyObject {
             }
             super.clear();
             for (int i = 0; i < n; i++) {
-                self.delAttrDirect(Py.toStr(snapshot[i]));
+                forget(snapshot[i]);
             }
         }
     }

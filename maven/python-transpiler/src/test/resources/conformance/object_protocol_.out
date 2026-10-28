@@ -1,0 +1,15 @@
+1 fallback:hidden_x fallback:missing
+fallback:hidden_y True
+reads 2
+1 2
+10
+['1', 'name'] n
+False one
+False ['name']
+RuntimeError dictionary changed size during iteration
+['a', 'b'] 5
+__newobj__ True
+3 4
+True False
+TypeError comparing strings with non-ASCII characters is not supported
+TypeError mixed

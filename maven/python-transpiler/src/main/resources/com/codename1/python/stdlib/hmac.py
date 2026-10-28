@@ -73,8 +73,11 @@ def digest(key, msg, digest):
 
 def compare_digest(a, b):
     if isinstance(a, str) and isinstance(b, str):
-        a = a.encode("ascii")
-        b = b.encode("ascii")
+        try:
+            a = a.encode("ascii")
+            b = b.encode("ascii")
+        except UnicodeEncodeError:
+            raise TypeError("comparing strings with non-ASCII characters is not supported")
     elif isinstance(a, str) or isinstance(b, str):
         raise TypeError("unsupported operand types(s) or combination of types")
     a = bytes(a)
