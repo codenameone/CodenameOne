@@ -675,7 +675,11 @@ public final class Backend {
                         }
                         try {
                             WebSocket endpoint = router.open(request);
-                            return endpoint == null ? null
+                            // A refusal is not an endpoint: it is never opened,
+                            // and wrapped it would no longer read as one.
+                            return endpoint == null
+                                    || endpoint instanceof HttpServer.UpgradeRefusal
+                                    ? endpoint
                                     : new TaskBound(endpoint, tasks, tracer, inFlight);
                         } finally {
                             if (sessions != null) {
@@ -847,6 +851,17 @@ public final class Backend {
             Object[] previous = bind();
             try {
                 return endpoint.getSubprotocols();
+            } finally {
+                unbind(previous);
+            }
+        }
+
+        /// Forwarded for the same reason as [#getSubprotocols].
+        @Override
+        public java.util.Map getHandshakeHeaders() {
+            Object[] previous = bind();
+            try {
+                return endpoint.getHandshakeHeaders();
             } finally {
                 unbind(previous);
             }

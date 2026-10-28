@@ -88,7 +88,12 @@ class FastAPI(APIRouter):
             app = self._core
             for m in reversed(self.user_middleware):
                 cls, args, kwargs = m
-                app = cls(app, *args, **kwargs)
+                if getattr(cls, "_cn1_request_based", False):
+                    app = cls(app, *args, **kwargs)
+                else:
+                    # A pure ASGI middleware: adapted to the request stack.
+                    from starlette.middleware import _asgi
+                    app = _asgi.wrap(cls, app, args, kwargs)
             self._stack = app
         return self._stack
 

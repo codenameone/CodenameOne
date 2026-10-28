@@ -8,6 +8,9 @@ ENFORCE_DOMAIN_WILDCARD = "Domain wildcard patterns must be like '*.example.com'
 
 
 class TrustedHostMiddleware:
+    # Request based (see starlette.middleware); not wrapped as ASGI.
+    _cn1_request_based = True
+
     def __init__(self, app, allowed_hosts=None, www_redirect=True):
         if allowed_hosts is None:
             allowed_hosts = ["*"]

@@ -11,6 +11,9 @@ SAFELISTED_HEADERS = {"Accept", "Accept-Language", "Content-Language", "Content-
 
 
 class CORSMiddleware:
+    # Request based (see starlette.middleware); not wrapped as ASGI.
+    _cn1_request_based = True
+
     def __init__(self, app, allow_origins=(), allow_methods=("GET",), allow_headers=(),
                  allow_credentials=False, allow_origin_regex=None, expose_headers=(), max_age=600,
                  allow_private_network=False):

@@ -41,6 +41,11 @@ class WebSocket(HTTPConnection):
         self._session = session
         self.client_state = WebSocketState.CONNECTING
         self.application_state = WebSocketState.CONNECTING
+        # Set while a pure ASGI middleware wraps this connection: the
+        # receive/send it handed the app inside it, which the endpoint's
+        # receive and send must go through.
+        self._receive_hook = None
+        self._send_hook = None
 
     @property
     def url(self):
@@ -48,6 +53,11 @@ class WebSocket(HTTPConnection):
         return URL("ws://" + host + self._path + ("?" + self._query if self._query else ""))
 
     async def receive(self):
+        if self._receive_hook is not None:
+            return await self._receive_hook()
+        return await self._raw_receive()
+
+    async def _raw_receive(self):
         if self.client_state == WebSocketState.DISCONNECTED:
             raise RuntimeError('Cannot call "receive" once a disconnect message has been received.')
         m = await self._session.inbox.get()
@@ -56,6 +66,12 @@ class WebSocket(HTTPConnection):
         return m
 
     async def send(self, message):
+        if self._send_hook is not None:
+            await self._send_hook(message)
+        else:
+            await self._raw_send(message)
+
+    async def _raw_send(self, message):
         t = message["type"]
         if self.application_state == WebSocketState.DISCONNECTED:
             raise RuntimeError('Cannot call "send" once a close message has been sent.')

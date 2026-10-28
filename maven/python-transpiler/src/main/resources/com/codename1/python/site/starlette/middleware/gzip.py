@@ -6,6 +6,9 @@ import gzip
 
 
 class GZipMiddleware:
+    # Request based (see starlette.middleware); not wrapped as ASGI.
+    _cn1_request_based = True
+
     def __init__(self, app, minimum_size=500, compresslevel=9):
         self.app = app
         self.minimum_size = minimum_size

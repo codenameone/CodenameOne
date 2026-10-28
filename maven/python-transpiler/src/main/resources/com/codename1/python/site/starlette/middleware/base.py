@@ -5,6 +5,9 @@
 
 
 class BaseHTTPMiddleware:
+    # Request based (see starlette.middleware); not wrapped as ASGI.
+    _cn1_request_based = True
+
     def __init__(self, app, dispatch=None):
         self.app = app
         self.dispatch_func = self.dispatch if dispatch is None else dispatch

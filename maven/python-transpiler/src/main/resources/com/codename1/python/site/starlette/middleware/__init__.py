@@ -7,7 +7,9 @@ There is no ASGI here: an "app" a middleware wraps is an async callable
 taking a request and answering a response. Every middleware class takes
 that app first and implements ``async __call__(request)``; the application
 builds the stack with the last one added outermost, as Starlette does.
-Websocket connections do not pass through it.
+Websocket connections pass through it too, with the websocket as the
+request. A middleware without ``_cn1_request_based`` is taken to be pure
+ASGI (``__call__(scope, receive, send)``) and adapted by ``_asgi``.
 """
 
 

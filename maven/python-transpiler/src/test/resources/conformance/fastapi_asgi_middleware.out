@@ -1,0 +1,11 @@
+200 {'hi': 1} v1 base
+['scope http /hello', 'start 200', "gate body b''"]
+200 {'len': 6} v1
+['scope http /echo', 'start 200', "gate body b'abcdef'"]
+404 {'detail': 'Not Found'} v1
+echo hey [(b'x-room', b'lobby')]
+['scope websocket /ws/chat', 'ws in websocket.connect', 'ws out websocket.accept', 'ws in websocket.receive', 'ws out websocket.send', 'ws out websocket.close']
+WebSocketDenialResponse 401 no entry gate
+['scope websocket /ws/secret']
+disconnect 1000
+['scope websocket /ws/none', 'ws out websocket.close']

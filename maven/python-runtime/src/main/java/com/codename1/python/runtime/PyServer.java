@@ -63,8 +63,9 @@ public abstract class PyServer {
 
     /// What a server does with the messages a Python websocket endpoint sends.
     public interface WebSocketSink {
-        /// The endpoint accepted; the handshake has already completed.
-        void accept(String subprotocol);
+        /// The endpoint accepted. `headers` are the extra handshake response
+        /// headers it asked for, name then value, never null.
+        void accept(String subprotocol, String[] headers);
 
         void text(String value);
 
@@ -73,8 +74,10 @@ public abstract class PyServer {
         void close(int code, String reason);
 
         /// The endpoint refused the handshake before accepting; `status` is
-        /// the HTTP status it answered with (403 when it simply closed).
-        void deny(int status);
+        /// the HTTP status it answered with (403 when it simply closed, 500
+        /// when it failed), `headers` the response's headers, name then value,
+        /// and `body` its body. Neither is ever null.
+        void deny(int status, String[] headers, byte[] body);
     }
 
     /// Opens one websocket connection in Python; answers the connection
@@ -88,13 +91,16 @@ public abstract class PyServer {
         PyBuiltin send = PyBuiltin.positional("send", a -> {
             String kind = Py.toStr(a[0]);
             if ("accept".equals(kind)) {
-                sink.accept(a[1] == Py.NONE ? null : Py.toStr(a[1])); //NOPMD CompareObjectsWithEquals - identity is meant
+                sink.accept(a[1] == Py.NONE ? null : Py.toStr(a[1]), strings(a[2])); //NOPMD CompareObjectsWithEquals - identity is meant
             } else if ("text".equals(kind)) {
                 sink.text(Py.toStr(a[1]));
             } else if ("bytes".equals(kind)) {
                 sink.binary(PyBytes.like(a[1]));
             } else if ("deny".equals(kind)) {
-                sink.deny((int) Py.asLong(a[1]));
+                Object detail = a[2];
+                Object[] parts = detail instanceof PyList ? ((PyList) detail).toArray() : null;
+                sink.deny((int) Py.asLong(a[1]), parts == null ? new String[0] : strings(parts[0]),
+                        parts == null ? new byte[0] : PyBytes.like(parts[1]));
             } else {
                 sink.close((int) Py.asLong(a[1]), a[2] == Py.NONE ? "" : Py.toStr(a[2])); //NOPMD CompareObjectsWithEquals - identity is meant
             }
@@ -106,6 +112,19 @@ public abstract class PyServer {
         } finally {
             Gil.exit();
         }
+    }
+
+    /// A Python list of strings as an array; anything else is empty.
+    private static String[] strings(Object list) {
+        if (!(list instanceof PyList)) {
+            return new String[0];
+        }
+        Object[] items = ((PyList) list).toArray();
+        String[] out = new String[items.length];
+        for (int i = 0; i < items.length; i++) {
+            out[i] = Py.toStr(items[i]);
+        }
+        return out;
     }
 
     /// Delivers a text message to a connection [#openWebSocket] opened.

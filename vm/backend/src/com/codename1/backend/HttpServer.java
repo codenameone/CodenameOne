@@ -1729,8 +1729,54 @@ public final class HttpServer {
     ///
     /// The same "null means not mine" the Handler chain uses, so a generated router
     /// can answer for the routes it knows and leave the rest alone.
+    ///
+    /// A router that wants a refusal other than 404 returns [#refuseUpgrade]
+    /// instead of null: the handshake is then answered with that response.
     public interface WebSocketHandler {
         WebSocket open(Request request) throws Exception;
+    }
+
+    /// An endpoint a [WebSocketHandler] returns to refuse the upgrade with
+    /// `status` and `body` rather than the 404 a null answers -- a 403 for a
+    /// client that is not allowed in, a 400 for a handshake missing what the
+    /// endpoint needs. The status must be 400 or higher; anything else is
+    /// answered as a 500, because a refusal that reads as a success would leave
+    /// the client waiting for a session that never starts. The body is sent as
+    /// `text/plain` and may be null.
+    public static WebSocket refuseUpgrade(int status, String body) {
+        return new UpgradeRefusal(Response.text(status, body == null ? "" : body));
+    }
+
+    /// [#refuseUpgrade(int, String)] with a whole response, so the refusal can
+    /// carry its own headers and content type.
+    public static WebSocket refuseUpgrade(Response response) {
+        if (response == null) {
+            throw new IllegalArgumentException("a refusal needs a response");
+        }
+        return new UpgradeRefusal(response);
+    }
+
+    /// The marker [#refuseUpgrade] answers. It is never opened: the server sees
+    /// it before the handshake and writes its response instead.
+    static final class UpgradeRefusal implements WebSocket {
+        final Response response;
+
+        UpgradeRefusal(Response response) {
+            this.response = response;
+        }
+
+        @Override
+        public void onOpen(WebSocketSession session) {
+        }
+
+        @Override
+        public void onText(WebSocketSession session, String message) {
+        }
+
+        @Override
+        public void onBinary(WebSocketSession session, byte[] message, int offset,
+                             int length) {
+        }
     }
 
     /// Where websocket routes come from.
@@ -4821,6 +4867,18 @@ public final class HttpServer {
                     .withHeaders(upgrade == null ? null : upgrade.extraHeaders));
             return false;
         }
+        if (endpoint instanceof UpgradeRefusal) {
+            Response refused = ((UpgradeRefusal) endpoint).response;
+            if (refused.status < 400 || refused.status > 599) {
+                System.err.println("websocket refusal with status " + refused.status
+                        + " answered as 500");
+                refused = Response.text(500, "internal error");
+            }
+            writeRefusedUpgrade(conn, fd, session, refused.withHeaders(
+                    mergeHeaders(refused.extraHeaders,
+                            upgrade == null ? null : upgrade.extraHeaders)));
+            return false;
+        }
 
         String subprotocol;
         try {
@@ -4836,6 +4894,20 @@ public final class HttpServer {
                     .withHeaders(upgrade == null ? null : upgrade.extraHeaders));
             return false;
         }
+
+        Map endpointHeaders;
+        try {
+            // Application code too, and asked before the borrow ends for the same
+            // reason: a failure is still answerable with a status.
+            endpointHeaders = endpoint.getHandshakeHeaders();
+        } catch (RuntimeException err) {
+            System.err.println("websocket endpoint getHandshakeHeaders failed: " + err);
+            writeRefusedUpgrade(conn, fd, session, Response.text(500, "internal error")
+                    .withHeaders(upgrade == null ? null : upgrade.extraHeaders));
+            return false;
+        }
+        Map handshakeExtra = mergeHeaders(upgrade == null ? null : upgrade.extraHeaders,
+                endpointHeaders);
 
         // Snapshot what the session needs BEFORE the buffer the Request was parsed
         // from stops being the one this connection holds. getHeaders() builds
@@ -4862,7 +4934,8 @@ public final class HttpServer {
         conn.releaseIdleMemory();
 
         try {
-            writeHandshakeResponse(conn, WebSocketHandshake.accept(key), subprotocol, upgrade);
+            writeHandshakeResponse(conn, WebSocketHandshake.accept(key), subprotocol,
+                    handshakeExtra);
         } catch (IOException err) {
             trace("fd=" + fd + " handshake write failed: " + err);
             // Handled here, not by the caller: this path reports the connection
@@ -5277,7 +5350,7 @@ public final class HttpServer {
     /// fresh connection two writes are two segments, and the client waits a round
     /// trip before it can send anything.
     private void writeHandshakeResponse(Conn conn, String accept, String subprotocol,
-                                        Response upgrade)
+                                        Map extraHeaders)
             throws IOException {
         conn.reset();
         conn.put("HTTP/1.1 101 Switching Protocols\r\n");
@@ -5295,8 +5368,8 @@ public final class HttpServer {
             conn.put(subprotocol);
             conn.put("\r\n");
         }
-        if (upgrade != null && upgrade.extraHeaders != null) {
-            java.util.Iterator entries = upgrade.extraHeaders.entrySet().iterator();
+        if (extraHeaders != null) {
+            java.util.Iterator entries = extraHeaders.entrySet().iterator();
             while (entries.hasNext()) {
                 Map.Entry entry = (Map.Entry) entries.next();
                 String name = String.valueOf(entry.getKey());
@@ -5322,6 +5395,40 @@ public final class HttpServer {
         }
         conn.put("\r\n");
         writeTo(conn.fd, conn.session, conn.out, 0, conn.outLength);
+    }
+
+    /// Both header maps in one, `first`'s entries before `second`'s; a name in
+    /// both keeps every value. Null when neither has any.
+    private static Map mergeHeaders(Map first, Map second) {
+        if (first == null || first.isEmpty()) {
+            return second;
+        }
+        if (second == null || second.isEmpty()) {
+            return first;
+        }
+        Map merged = new LinkedHashMap(first);
+        java.util.Iterator entries = second.entrySet().iterator();
+        while (entries.hasNext()) {
+            Map.Entry entry = (Map.Entry) entries.next();
+            Object had = merged.get(entry.getKey());
+            if (had == null) {
+                merged.put(entry.getKey(), entry.getValue());
+                continue;
+            }
+            List values = new ArrayList();
+            addValues(values, had);
+            addValues(values, entry.getValue());
+            merged.put(entry.getKey(), values);
+        }
+        return merged;
+    }
+
+    private static void addValues(List into, Object value) {
+        if (value instanceof List) {
+            into.addAll((List) value);
+        } else {
+            into.add(value);
+        }
     }
 
     /// 426, naming the version this server speaks. RFC 6455 4.2.2 requires it.
