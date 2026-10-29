@@ -533,7 +533,35 @@ public final class AstBuilder {
         return ed;
     }
 
+    /**
+     * A stub's {@code @Unapplied('a, b')} names the parameters of the constructor or method
+     * below it that are accepted and not applied, so a call passing one is reported (see
+     * {@code JavaEmitter.warnUnapplied}) instead of silently doing less than it says.
+     */
     private void buildMember(Dart2Parser.ClassMemberDeclarationContext ctx,
+                             Dart2Parser.MetadataContext meta, ClassDecl cd) {
+        int ctors = cd.ctors.size();
+        int methods = cd.methods.size();
+        buildMemberDecl(ctx, meta, cd);
+        String unapplied = annotationArg(meta, "Unapplied");
+        if (unapplied == null) {
+            return;
+        }
+        java.util.Set<String> names = new java.util.LinkedHashSet<String>();
+        for (String n : unapplied.split(",")) {
+            if (!n.trim().isEmpty()) {
+                names.add(n.trim());
+            }
+        }
+        for (int i = ctors; i < cd.ctors.size(); i++) {
+            cd.ctors.get(i).unapplied = names;
+        }
+        for (int i = methods; i < cd.methods.size(); i++) {
+            cd.methods.get(i).unapplied = names;
+        }
+    }
+
+    private void buildMemberDecl(Dart2Parser.ClassMemberDeclarationContext ctx,
                              Dart2Parser.MetadataContext meta, ClassDecl cd) {
         boolean override = hasAnnotation(meta, "override");
         if (ctx.methodSignature() != null) {

@@ -49,7 +49,9 @@ import dart.typed_data.Uint8List;
 /// completes with what comes out of the last of them. A JSON response (by content
 /// type, for the default `ResponseType.json`) is decoded into Dart maps and lists.
 /// With no Display (headless) there is no network, and every request fails with a
-/// `connectionError`, so an app's offline path is what runs.
+/// `connectionError`, so an app's offline path is what runs. `onSendProgress` is
+/// called per 8 KB chunk of the encoded body and `onReceiveProgress` per chunk read,
+/// with the Content-Length as total (-1 when absent), on the EDT.
 public class Dio {
 
     private BaseOptions options;
@@ -104,39 +106,81 @@ public class Dio {
     }
 
     public <T> Future<Response<T>> get(String path, Object data, Map<String, Object> queryParameters,
-            Options options, CancelToken cancelToken, Object onReceiveProgress) {
-        return send("GET", path, data, queryParameters, options, cancelToken);
+            Options options, CancelToken cancelToken, dart.runtime.Funcs.VoidFunc2<Long, Long> onReceiveProgress) {
+        return send("GET", path, data, queryParameters, options, cancelToken, null, onReceiveProgress, null);
     }
 
     public <T> Future<Response<T>> post(String path, Object data, Map<String, Object> queryParameters,
-            Options options, CancelToken cancelToken, Object onSendProgress, Object onReceiveProgress) {
-        return send("POST", path, data, queryParameters, options, cancelToken);
+            Options options, CancelToken cancelToken, dart.runtime.Funcs.VoidFunc2<Long, Long> onSendProgress, dart.runtime.Funcs.VoidFunc2<Long, Long> onReceiveProgress) {
+        return send("POST", path, data, queryParameters, options, cancelToken, onSendProgress, onReceiveProgress, null);
     }
 
     public <T> Future<Response<T>> put(String path, Object data, Map<String, Object> queryParameters,
-            Options options, CancelToken cancelToken, Object onSendProgress, Object onReceiveProgress) {
-        return send("PUT", path, data, queryParameters, options, cancelToken);
+            Options options, CancelToken cancelToken, dart.runtime.Funcs.VoidFunc2<Long, Long> onSendProgress, dart.runtime.Funcs.VoidFunc2<Long, Long> onReceiveProgress) {
+        return send("PUT", path, data, queryParameters, options, cancelToken, onSendProgress, onReceiveProgress, null);
     }
 
     public <T> Future<Response<T>> patch(String path, Object data, Map<String, Object> queryParameters,
-            Options options, CancelToken cancelToken, Object onSendProgress, Object onReceiveProgress) {
-        return send("PATCH", path, data, queryParameters, options, cancelToken);
+            Options options, CancelToken cancelToken, dart.runtime.Funcs.VoidFunc2<Long, Long> onSendProgress, dart.runtime.Funcs.VoidFunc2<Long, Long> onReceiveProgress) {
+        return send("PATCH", path, data, queryParameters, options, cancelToken, onSendProgress, onReceiveProgress, null);
     }
 
     public <T> Future<Response<T>> delete(String path, Object data, Map<String, Object> queryParameters,
             Options options, CancelToken cancelToken) {
-        return send("DELETE", path, data, queryParameters, options, cancelToken);
+        return send("DELETE", path, data, queryParameters, options, cancelToken, null, null, null);
     }
 
     public <T> Future<Response<T>> head(String path, Object data, Map<String, Object> queryParameters,
             Options options, CancelToken cancelToken) {
-        return send("HEAD", path, data, queryParameters, options, cancelToken);
+        return send("HEAD", path, data, queryParameters, options, cancelToken, null, null, null);
     }
 
     public <T> Future<Response<T>> request(String path, Object data, Map<String, Object> queryParameters,
-            CancelToken cancelToken, Options options, Object onSendProgress, Object onReceiveProgress) {
+            CancelToken cancelToken, Options options, dart.runtime.Funcs.VoidFunc2<Long, Long> onSendProgress, dart.runtime.Funcs.VoidFunc2<Long, Long> onReceiveProgress) {
         String method = options != null && options.method != null ? options.method : null;
-        return send(method, path, data, queryParameters, options, cancelToken);
+        return send(method, path, data, queryParameters, options, cancelToken, onSendProgress, onReceiveProgress, null);
+    }
+
+    /// `dio.download(urlPath, savePath, ...)`: a GET whose body is written to
+    /// `savePath` (a String path, through dart:io's File) instead of decoded; the
+    /// response's data is null. A function `savePath` (dio's `(headers) => path`)
+    /// is not supported and fails the request. `lengthHeader` is accepted; the
+    /// total passed to `onReceiveProgress` is the response's Content-Length, or -1.
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public Future<Response<Object>> download(String urlPath, Object savePath, dart.runtime.Funcs.VoidFunc2<Long, Long> onReceiveProgress,
+            Map<String, Object> queryParameters, CancelToken cancelToken, Boolean deleteOnError,
+            Object fileAccessMode, String lengthHeader, Object data, Options options) {
+        if (!(savePath instanceof String)) {
+            RequestOptions ro = compose("GET", urlPath, data, queryParameters, options);
+            return Future.error(DioException.of(ro, DioExceptionType.unknown,
+                    "download: only a String savePath is supported", null, null));
+        }
+        return send(options != null && options.method != null ? options.method : "GET", urlPath, data,
+                queryParameters, options, cancelToken, null, onReceiveProgress, (String) savePath);
+    }
+
+    /// Calls a Dart `ProgressCallback(count, total)`, whichever arity class the
+    /// closure compiled to; on the EDT, where Dart code runs.
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    static void progress(final Object cb, final long count, final long total) {
+        if (cb == null) {
+            return;
+        }
+        Runnable r = new Runnable() {
+            @Override
+            public void run() {
+                if (cb instanceof dart.runtime.Funcs.VoidFunc2) {
+                    ((dart.runtime.Funcs.VoidFunc2) cb).call(Long.valueOf(count), Long.valueOf(total));
+                } else if (cb instanceof dart.runtime.Funcs.Func2) {
+                    ((dart.runtime.Funcs.Func2) cb).call(Long.valueOf(count), Long.valueOf(total));
+                }
+            }
+        };
+        if (Display.isInitialized() && !Display.getInstance().isEdt()) {
+            Display.getInstance().callSerially(r);
+        } else {
+            r.run();
+        }
     }
 
     /// `dio.fetch(requestOptions)`: re-runs a fully built request -- the usual way
@@ -155,9 +199,16 @@ public class Dio {
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private <T> Future<Response<T>> send(String method, String path, Object data,
-            Map<String, Object> query, Options opts, CancelToken cancelToken) {
+            Map<String, Object> query, Options opts, CancelToken cancelToken,
+            dart.runtime.Funcs.VoidFunc2<Long, Long> onSendProgress, dart.runtime.Funcs.VoidFunc2<Long, Long> onReceiveProgress, String savePath) {
         RequestOptions ro = compose(method, path, data, query, opts);
         ro.cancelToken = cancelToken;
+        ro.onSendProgress = onSendProgress;
+        ro.onReceiveProgress = onReceiveProgress;
+        ro.savePath = savePath;
+        if (savePath != null) {
+            ro.responseType = ResponseType.bytes;
+        }
         return fetch(ro);
     }
 
@@ -380,7 +431,13 @@ public class Dio {
             @Override
             protected void buildRequestBody(OutputStream os) throws IOException {
                 if (payload != null) {
-                    os.write(payload);
+                    int off = 0;
+                    while (off < payload.length) {
+                        int n = Math.min(8192, payload.length - off);
+                        os.write(payload, off, n);
+                        off += n;
+                        progress(ro.onSendProgress, off, payload.length);
+                    }
                 }
             }
 
@@ -388,8 +445,18 @@ public class Dio {
             protected void readResponse(InputStream input) throws IOException {
                 byte[] buf = new byte[8192];
                 int n;
+                long total = -1;
+                String len = responseHeaders.value("content-length");
+                if (len != null) {
+                    try {
+                        total = Long.parseLong(len.trim());
+                    } catch (NumberFormatException e) {
+                        total = -1;
+                    }
+                }
                 while ((n = input.read(buf)) > 0) {
                     received.write(buf, 0, n);
+                    progress(ro.onReceiveProgress, received.size(), total);
                 }
             }
 
@@ -453,6 +520,15 @@ public class Dio {
                                     + getResponseCode() + " and RequestOptions.validateStatus was configured "
                                     + "to throw for this status code.", null, r));
                     return;
+                }
+                if (ro.savePath != null) {
+                    try {
+                        new dart.io.File(ro.savePath).writeAsBytesSync(Uint8List.fromBytes(received.toByteArray()));
+                    } catch (RuntimeException e) {
+                        call.error(0, DioException.of(ro, DioExceptionType.unknown, e.getMessage(), e, r));
+                        return;
+                    }
+                    r.data = null;
                 }
                 call.response(0, r);
             }

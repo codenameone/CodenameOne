@@ -56,6 +56,12 @@ public class ImportFlutterProjectMojo extends AbstractCN1Mojo {
     @Parameter(property = "cn1.flutter.package", defaultValue = "com.codename1.generated.flutter")
     private String flutterPackage;
 
+    /// Third-party stub packs (jars or directories with `META-INF/dart` stubs), comma
+    /// separated, whose `// cn1:covers` lines the report counts as covered. Stubs under the
+    /// application's own `common/src/main/resources/META-INF/dart` are always read.
+    @Parameter(property = "cn1.flutter.stubPacks")
+    private String stubPacks;
+
     @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
         File common = getCN1ProjectDir();
@@ -67,7 +73,15 @@ public class ImportFlutterProjectMojo extends AbstractCN1Mojo {
         String main = properties == null ? null : properties.getProperty("codename1.mainName");
         FlutterProjectImporter.Result r;
         try {
-            r = new FlutterProjectImporter(MavenLog.of(getLog())).importProject(source, common, pkg, main,
+            java.util.List<File> packs = new java.util.ArrayList<File>();
+            if (stubPacks != null) {
+                for (String p : stubPacks.split(",")) {
+                    if (!p.trim().isEmpty()) {
+                        packs.add(new File(p.trim()));
+                    }
+                }
+            }
+            r = new FlutterProjectImporter(MavenLog.of(getLog())).withStubPacks(packs).importProject(source, common, pkg, main,
                     flutterPackage);
         } catch (com.codename1.builders.BuildException e) {
             throw new MojoFailureException(e.getMessage(), e);

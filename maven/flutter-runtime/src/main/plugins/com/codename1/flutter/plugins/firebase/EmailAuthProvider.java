@@ -23,12 +23,15 @@
  */
 package com.codename1.flutter.plugins.firebase;
 
-/** firebase_auth's {@code EmailAuthProvider}. */
+/**
+ * firebase_auth's {@code EmailAuthProvider}, and firebase_ui_auth's of the same name: an
+ * instance in a {@code SignInScreen}'s providers asks for the email form.
+ */
 public final class EmailAuthProvider {
     public static final String PROVIDER_ID = "password";
     public static final String EMAIL_PASSWORD_SIGN_IN_METHOD = "password";
 
-    private EmailAuthProvider() {
+    public EmailAuthProvider() {
     }
 
     public static AuthCredential credential(String email, String password) {

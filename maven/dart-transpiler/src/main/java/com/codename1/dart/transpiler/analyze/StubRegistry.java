@@ -156,15 +156,19 @@ public final class StubRegistry {
     public void load(String name, String source, Diagnostics diags) {
         AstBuilder builder = new AstBuilder(diags);
         Ast.Library lib = builder.parse(name, source);
+        java.util.regex.Matcher pm = PACKAGE_LINE.matcher(source);
+        String pkg = pm.find() ? pm.group(1) : null;
         for (Ast.ClassDecl c : lib.classes) {
             if (c.extensionOn != null) {
                 extensions.add(c);
             } else {
                 classes.put(c.name, c);
+                variant(c.name, pkg, c);
             }
         }
         for (Ast.EnumDecl e : lib.enums) {
             enums.put(e.name, e);
+            variant(e.name, pkg, e);
         }
         String scoped = scopedLibrary(name);
         for (Ast.FunctionDecl f : lib.functions) {
@@ -182,6 +186,69 @@ public final class StubRegistry {
         for (Ast.FieldDecl v : lib.topLevelVars) {
             if (v.javaName != null) {
                 topLevelVars.put(v.name, v);
+            }
+        }
+    }
+
+    /// `// cn1:package firebase_app_check` at the top of a stub file: the pub package whose
+    /// API the file declares.
+    private static final java.util.regex.Pattern PACKAGE_LINE =
+            java.util.regex.Pattern.compile("(?m)^//\\s*cn1:package\\s+([A-Za-z0-9_]+)");
+
+    /// A type name and every stub file's declaration of it, with the package that file
+    /// declares. Stubs share one namespace, but two pub packages can both export a name:
+    /// firebase_app_check's `AppleProvider` enum and firebase_ui_oauth_apple's
+    /// `AppleProvider` class. Dart keeps them apart by what a file imports, and so does
+    /// [#viewFrom].
+    private final Map<String, List<Object[]>> variants = new LinkedHashMap<String, List<Object[]>>();
+
+    private void variant(String name, String pkg, Object decl) {
+        List<Object[]> l = variants.get(name);
+        if (l == null) {
+            l = new java.util.ArrayList<Object[]>();
+            variants.put(name, l);
+        }
+        l.add(new Object[] {pkg, decl});
+    }
+
+    /// Makes every type name more than one package declares resolve to the declaration of
+    /// the package `importedPackages` contains, for the library about to be emitted. A
+    /// library importing neither keeps whichever was loaded last.
+    public void viewFrom(java.util.Collection<String> importedPackages) {
+        viewFrom(importedPackages, java.util.Collections.<String>emptySet());
+    }
+
+    /// As [#viewFrom(java.util.Collection)], and a type the program itself declares in
+    /// `programTypes` hides a stub of a package the library does not import: emoji_picker's
+    /// `Config` must not shadow an application's own `Config`.
+    public void viewFrom(java.util.Collection<String> importedPackages, java.util.Set<String> programTypes) {
+        for (Map.Entry<String, List<Object[]>> e : variants.entrySet()) {
+            List<Object[]> l = e.getValue();
+            if (programTypes.contains(e.getKey())) {
+                boolean imported = false;
+                for (Object[] v : l) {
+                    imported |= v[0] == null || importedPackages.contains(v[0]);
+                }
+                if (!imported) {
+                    classes.remove(e.getKey());
+                    enums.remove(e.getKey());
+                    continue;
+                }
+            }
+            if (l.size() < 2) {
+                continue;
+            }
+            for (Object[] v : l) {
+                if (v[0] != null && importedPackages.contains(v[0])) {
+                    classes.remove(e.getKey());
+                    enums.remove(e.getKey());
+                    if (v[1] instanceof Ast.ClassDecl) {
+                        classes.put(e.getKey(), (Ast.ClassDecl) v[1]);
+                    } else {
+                        enums.put(e.getKey(), (Ast.EnumDecl) v[1]);
+                    }
+                    break;
+                }
             }
         }
     }

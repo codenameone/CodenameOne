@@ -86,6 +86,7 @@ class OAuthCredential extends AuthCredential {
 
 @JavaName('com.codename1.flutter.plugins.firebase.EmailAuthProvider')
 class EmailAuthProvider {
+  external EmailAuthProvider();
   external static String get PROVIDER_ID;
   external static String get EMAIL_PASSWORD_SIGN_IN_METHOD;
   external static AuthCredential credential({required String email, required String password});

@@ -53,6 +53,14 @@ public class GoogleAuthProvider implements FederatedSignIn {
     public static final String GOOGLE_SIGN_IN_METHOD = "google.com";
 
     private final DartList<String> scopes = new DartList<String>();
+    private String clientId;
+
+    /// The OAuth client to sign in with, ahead of the Display property and the app's
+    /// options; FirebaseUI's GoogleProvider names one. Not firebase_auth API.
+    public GoogleAuthProvider clientId(String v) {
+        clientId = v;
+        return this;
+    }
 
     public static OAuthCredential credential(String idToken, String accessToken) {
         return new OAuthCredential(PROVIDER_ID, GOOGLE_SIGN_IN_METHOD, idToken, accessToken, null, null);
@@ -81,7 +89,7 @@ public class GoogleAuthProvider implements FederatedSignIn {
         final Completer<OAuthCredential> done = new Completer<OAuthCredential>();
         GoogleSignIn g = new GoogleSignIn();
         g.scopes(scopes);
-        g.clientId(clientId(app));
+        g.clientId(clientId != null ? clientId : clientId(app));
         g.signIn().then(new Funcs.VoidFunc1<GoogleSignInAccount>() {
             @Override
             public void call(GoogleSignInAccount a) {

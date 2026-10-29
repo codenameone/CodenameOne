@@ -1,3 +1,4 @@
+// cn1:package emoji_picker_flutter
 // package:emoji_picker_flutter, drawn with Codename One components from a
 // built-in emoji set. Config is accepted; recents persist in Preferences.
 

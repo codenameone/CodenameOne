@@ -92,13 +92,17 @@ public class RichTextRenderElement extends RenderElement {
 
     private int cn1Align() {
         TextAlign a = richText().getTextAlign();
+        boolean rtl = isRtl();
         if (a == null) {
-            return Component.LEFT;
+            a = TextAlign.start;
         }
         switch (a) {
             case right:
-            case end:
                 return Component.RIGHT;
+            case end:
+                return rtl ? Component.LEFT : Component.RIGHT;
+            case start:
+                return rtl ? Component.RIGHT : Component.LEFT;
             case center:
                 return Component.CENTER;
             default:

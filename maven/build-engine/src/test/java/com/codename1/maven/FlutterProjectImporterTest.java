@@ -784,6 +784,44 @@ public class FlutterProjectImporterTest {
                 FlutterProjectImporter.pluginPlatforms(new File(mobile, "lib"))));
     }
 
+    /// A third-party stub pack's `// cn1:covers` line makes its package covered: reported
+    /// with the pack's note, and its platform-plugin sources never followed.
+    @Test
+    public void aStubPackDeclaresTheCoverageOfItsPackage() throws Exception {
+        File root = Files.createTempDirectory("flutter-stub-pack").toFile();
+        File app = new File(root, "demo");
+        write(new File(app, "pubspec.yaml"), "name: demo\nversion: 1.0.0\n"
+                + "dependencies:\n  flutter:\n    sdk: flutter\n  lottie_like: 1.0.0\n");
+        write(new File(app, "lib/main.dart"), "import 'package:lottie_like/lottie_like.dart';\nvoid main() {}\n");
+        File plugin = new File(root, "cache/lottie_like-1.0.0");
+        write(new File(plugin, "pubspec.yaml"), "name: lottie_like\nflutter:\n  plugin:\n    platforms:\n"
+                + "      android:\n        package: a.b\n        pluginClass: P\n");
+        write(new File(plugin, "lib/lottie_like.dart"), "int l() => 1;\n");
+        packageConfig(app, "lottie_like", plugin, "lottie_like", plugin);
+        File common = new File(root, "common");
+        write(new File(common, "src/main/resources/META-INF/dart/plugin_lottie_like.dart"),
+                "// cn1:covers lottie_like animations over a Codename One player\n");
+
+        FlutterProjectImporter.Result r = new FlutterProjectImporter(new com.codename1.build.SystemStreamLog())
+                .importProject(app, common, null, null);
+
+        assertTrue(r.unsupportedPackages.toString(), r.unsupportedPackages.isEmpty());
+        assertTrue(r.covered.toString(), r.covered.contains("lottie_like (animations over a Codename One player)"));
+        assertFalse(new File(common, "src/main/flutter/packages/lottie_like/lottie_like.dart").exists());
+    }
+
+    /// The families named through google_fonts, which the stub can only draw bundled.
+    @Test
+    public void googleFontFamiliesAreNamedFromTheirMethods() {
+        java.util.Set<String> f = new java.util.TreeSet<String>();
+        FlutterProjectImporter.googleFontFamilies("final a = GoogleFonts.openSans(fontSize: 12);\n"
+                + "final b = GoogleFonts.notoSansHebrewTextTheme(base);\n"
+                + "final c = GoogleFonts.baloo2();\n"
+                + "final d = GoogleFonts.getFont('Rubik', fontSize: 3);\n"
+                + "final e = GoogleFonts.asMap(); GoogleFonts.config.allowRuntimeFetching = false;\n", f);
+        assertEquals("[Baloo 2, Noto Sans Hebrew, Open Sans, Rubik]", f.toString());
+    }
+
     /// The JSON report names the chain behind a verdict and the app file behind it.
     @Test
     public void theReportCarriesTheTransitiveCause() throws Exception {

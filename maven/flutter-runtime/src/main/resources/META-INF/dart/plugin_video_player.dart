@@ -26,10 +26,13 @@ class VideoPlayerValue {
 
 @JavaName('com.codename1.flutter.plugins.videoplayer.VideoPlayerController')
 class VideoPlayerController extends ValueNotifier<VideoPlayerValue> {
+  @Unapplied('httpHeaders, closedCaptionFile, formatHint')
   external static VideoPlayerController networkUrl(Uri url, {VideoPlayerOptions? videoPlayerOptions,
       Map<String, String> httpHeaders, dynamic formatHint, dynamic closedCaptionFile});
+  @Unapplied('httpHeaders, closedCaptionFile, formatHint')
   external static VideoPlayerController network(String dataSource, {VideoPlayerOptions? videoPlayerOptions,
       Map<String, String> httpHeaders, dynamic formatHint, dynamic closedCaptionFile});
+  @Unapplied('httpHeaders, closedCaptionFile, formatHint')
   external static VideoPlayerController file(File file, {VideoPlayerOptions? videoPlayerOptions,
       Map<String, String> httpHeaders, dynamic closedCaptionFile});
   external static VideoPlayerController asset(String dataSource, {String? package,

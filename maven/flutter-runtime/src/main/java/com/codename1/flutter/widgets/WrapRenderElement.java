@@ -160,6 +160,13 @@ public class WrapRenderElement extends RenderElement {
             }
             crossPos += runCr + runSpacing;
         }
+        if (isRtl()) {
+            // A horizontal wrap fills each run from the right; a vertical one stacks its
+            // runs from the right. Both are the left-to-right placement mirrored.
+            for (RenderElement kid : renderChildren()) {
+                mirrorChildX(kid, self.width());
+            }
+        }
         return self;
     }
 

@@ -334,5 +334,6 @@ abstract class WebSocket extends Stream<dynamic> {
   external String? get closeReason;
   external String? get protocol;
   external String get extensions;
+  external Duration? get pingInterval;
   external set pingInterval(Duration? interval);
 }

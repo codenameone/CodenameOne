@@ -329,6 +329,7 @@ public final class Ast {
         public SuperInit superInit;               // nullable
         public SuperInit redirect;                // `: this(...)` / `: this.named(...)`; nullable
         public Block body;                        // nullable (";" body)
+        public java.util.Set<String> unapplied;   // stub @Unapplied('a, b'): accepted, not applied
     }
 
     public static class FieldInit extends Node {
@@ -342,6 +343,7 @@ public final class Ast {
     }
 
     public static class MethodDecl extends Node {
+        public java.util.Set<String> unapplied;   // stub @Unapplied('a, b'): accepted, not applied
         public TypeRef returnType;                // may be VAR (=> inferred) or VOID
         public String name;
         public List<String> typeParams = new ArrayList<String>();  // generic method: m<T>(...)

@@ -41,6 +41,10 @@ public class RequestOptions extends OptionsBase {
     Object data;
     Duration connectTimeout;
     CancelToken cancelToken;
+    /// The Dart `ProgressCallback`s and `download`'s target; set by Dio, not part of dio's API.
+    Object onSendProgress;
+    Object onReceiveProgress;
+    String savePath;
 
     public String path() {
         return path;
