@@ -436,6 +436,16 @@ when it paints, so it stays sharp at any display density.
 
 === On a phone and on the desktop
 
+The screens below are the Swing and JavaFX scenes from the screenshot test suite, running unmodified on an iPhone. Each is ordinary desktop code: a `JTable` with a custom renderer, JavaFX controls, and an FXML document styled by its own style sheet.
+
+[cols="1,1",frame=none,grid=none]
+|===
+a|image::img/desktop-compat-ios-swing-controls.png[Swing text fields, check boxes, radio buttons, a combo box, a slider and a progress bar on an iPhone,scaledwidth=90%]
+a|image::img/desktop-compat-ios-swing-tables.png[A JTable with a custom renderer and a striped JXTable on an iPhone,scaledwidth=90%]
+a|image::img/desktop-compat-ios-javafx-controls.png[JavaFX text fields, a choice box, a slider, a progress bar and check boxes on an iPhone,scaledwidth=90%]
+a|image::img/desktop-compat-ios-javafx-fxml.png[An FXML form with its controller and style sheet on an iPhone,scaledwidth=90%]
+|===
+
 ==== Logical pixels
 
 Desktop code sizes things in pixels and assumes about 96 of them to the

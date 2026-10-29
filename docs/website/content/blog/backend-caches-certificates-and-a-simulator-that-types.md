@@ -113,6 +113,10 @@ Now it does. **Simulate > Virtual Keyboard** slides up a keyboard styled after t
 - **Android, resize mode:** the form gets a `sizeChanged` and lays out again.
 - **Android, pan mode:** the whole screen shifts up.
 
+{{< guide-block >}}
+<figure style="margin:24px 0"><video controls playsinline muted loop preload="metadata" poster="/blog/release-2026-10-30/simulator-virtual-keyboard-poster.jpg" width="540" height="960" style="width:100%;height:auto;max-width:320px;display:block;margin:0 auto"><source src="/blog/release-2026-10-30/simulator-virtual-keyboard.mp4" type="video/mp4">The simulated iOS keyboard sliding up over a sign up form.</video><figcaption>Recorded by the simulator itself, driven over MCP by the script below.</figcaption></figure>
+{{< /guide-block >}}
+
 By default Android picks a mode per field, the way the real platform does. The **Android: Resize** and **Android: Pan** menu items, or the `androidSoftInput` setting, force one so you can test both.
 
 The simulator also records. It writes MP4, MOV, WebM or an animated GIF, of the screen alone or inside the device skin, on a fixed frame clock so the video doesn't stutter when your machine is busy. Taps show touch indicators and can play a click, and you can add captions. That's a store preview, a bug report or a tweet, without a screen recorder.
@@ -120,12 +124,15 @@ The simulator also records. It writes MP4, MOV, WebM or an animated GIF, of the 
 Both are also tools in the simulator's built in MCP server, so a coding agent can drive a whole flow and hand you the video:
 
 ```
-sim_keyboard_set   {"mode": "auto"}
-sim_record_start   {"path": "/tmp/signup.mp4", "tapSound": true}
-sim_record_caption {"text": "Sign up in one step"}
-sim_tap            {"nodeId": "email"}
+sim_keyboard_set   {"mode": "ios"}
+sim_record_start   {"path": "/tmp/signup.mp4", "frame": "screen"}
+sim_record_caption {"text": "The keyboard slides up, the field stays visible"}
+ui_snapshot        {}
+sim_tap            {"nodeId": 41}
 sim_keyboard_type  {"text": "ada@example.com"}
 sim_keyboard_key   {"key": "next"}
+sim_keyboard_type  {"text": "correct horse"}
+sim_keyboard_key   {"key": "done"}
 sim_record_stop
 ```
 

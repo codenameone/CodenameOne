@@ -35,6 +35,17 @@ flowchart LR
     C --> P[ParparVM native builds]
 {{< /mermaid >}}
 
+{{< guide-block >}}
+<div class="release-screenshots" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:16px;align-items:start;margin:24px 0">
+<figure style="margin:0"><a href="/developer-guide/img/desktop-compat-ios-swing-controls.png"><img width="589" height="1278" src="/developer-guide/img/desktop-compat-ios-swing-controls.png" alt="Swing controls running on an iPhone" loading="lazy" style="width:100%;height:auto" /></a><figcaption>Swing controls.</figcaption></figure>
+<figure style="margin:0"><a href="/developer-guide/img/desktop-compat-ios-swing-tables.png"><img width="589" height="1278" src="/developer-guide/img/desktop-compat-ios-swing-tables.png" alt="A JTable and a JXTable running on an iPhone" loading="lazy" style="width:100%;height:auto" /></a><figcaption>JTable and JXTable.</figcaption></figure>
+<figure style="margin:0"><a href="/developer-guide/img/desktop-compat-ios-javafx-controls.png"><img width="589" height="1278" src="/developer-guide/img/desktop-compat-ios-javafx-controls.png" alt="JavaFX controls running on an iPhone" loading="lazy" style="width:100%;height:auto" /></a><figcaption>JavaFX controls.</figcaption></figure>
+<figure style="margin:0"><a href="/developer-guide/img/desktop-compat-ios-javafx-fxml.png"><img width="589" height="1278" src="/developer-guide/img/desktop-compat-ios-javafx-fxml.png" alt="An FXML form styled with CSS running on an iPhone" loading="lazy" style="width:100%;height:auto" /></a><figcaption>FXML with its CSS.</figcaption></figure>
+</div>
+{{< /guide-block >}}
+
+Unmodified desktop code on an iPhone, captured by our screenshot tests.
+
 Our test set includes two JDK demos, SwingSet2 and Notepad, along with a Swing gallery, a falling blocks game, a JavaFX gallery, an open source 2048 game, an address book and a Mandelbrot explorer.
 
 ## The numbers
