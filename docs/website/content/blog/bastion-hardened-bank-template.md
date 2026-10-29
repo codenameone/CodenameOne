@@ -109,7 +109,7 @@ BitcoinAddress btc = wallet.getBitcoinAddress(BitcoinNetwork.MAINNET,
 SolanaAddress sol = wallet.getSolanaAddress(0);              // m/44'/501'/0'/0'
 ```
 
-Bitcoin covers legacy, nested SegWit, native SegWit and Taproot, on mainnet, testnet, signet and regtest. Sending ether is an EIP-1559 transaction with the fees the node suggests:
+Bitcoin covers legacy, nested SegWit, native SegWit and Taproot, on the main network and on testnet, signet and regtest. Sending ether is an EIP-1559 transaction with the fees the node suggests:
 
 ```java {class="cn1-no-try"}
 EvmRpc rpc = new EvmRpc(new NetworkTransport(), "https://ethereum-sepolia-rpc.publicnode.com");

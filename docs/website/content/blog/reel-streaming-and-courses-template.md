@@ -72,7 +72,7 @@ req.createAsync().ready(media -> {
 });
 ```
 
-Each port maps the scheme to what the device has: AVPlayer decrypts AES-128 HLS and plays FairPlay on Apple, and Android's player and `MediaDrm` handle AES-128, ClearKey and Widevine. Devices differ, so Reel asks first and sends the server the schemes this device can play, strongest first. The server picks one and returns the matching manifest and license URL:
+Each port maps the scheme to what the device has: AVPlayer decrypts AES-128 HLS and plays FairPlay on Apple, and Android's player and `MediaDrm` handle AES-128 HLS, ClearKey, and Widevine where the device has it. Devices differ, so Reel asks first and sends the server the schemes this device can play, strongest first. The server picks one and returns the matching manifest and license URL:
 
 ```java {class="cn1-no-try"}
 List<String> out = new ArrayList<String>();

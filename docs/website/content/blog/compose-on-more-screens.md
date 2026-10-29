@@ -136,7 +136,7 @@ Put them side by side and the claimed advantages don't hold up:
 
 - **Readability.** Both are a box with three lines of text and a button. Neither is shorter in any way that matters. The Java version names its parts, so `title` is a field you can find, not the second `Text` call in a nested lambda.
 - **Testability.** Compose tests find nodes by test tags you add for the purpose. A Codename One test holds the component, calls `bind`, and asserts on `title.getText()`. The [test framework](/developer-guide/testing-with-junit/) and the simulator's MCP tools drive both the same way.
-- **Debugging.** This is where imperative code wins outright. Set a breakpoint in `bind` and you see the one call that changed the text, with a stack that leads back to your code. In Compose, the same change runs through the snapshot system, the recomposer and generated code from the compiler plugin, and "why did this recompose?" is a question you need a dedicated tool to answer.
+- **Debugging.** This is where imperative code wins outright. Set a breakpoint in `bind` and you see the one call that changed the text, with a stack that leads back to your code. In Compose, the same change runs through the snapshot system, the runtime that schedules recomposition, and generated code from the compiler plugin, and "why did this recompose?" is a question you need a dedicated tool to answer.
 
 Compose is a fine way to write UI, and if your team already has it, bring it. But it isn't simpler than the imperative code it replaced, and on this screen it costs three times the CPU and twice the binary. Codename One lets you choose per screen. Keep Compose where you have it, and write the hot screen in Java:
 

@@ -125,7 +125,7 @@ Desktop Java was built for a desk. It never had a camera API, never knew where i
 - **Location.** [`LocationManager`](/developer-guide/miscellaneous-features/#_location_gps) with [geofencing in the background](/developer-guide/miscellaneous-features/#_location_in_the_background_geofencing), so a field service app knows when the technician arrived.
 - **Push, biometrics and sign in.** [Push notifications](/developer-guide/push-notifications/), [Face ID and fingerprint](/developer-guide/biometric-authentication/), and [OAuth, Google and Sign in with Apple](/developer-guide/authentication-and-identity/), without a hand rolled browser redirect.
 - **Generated network clients.** Point [`cn1:generate-openapi`](/developer-guide/maven-appendix-goals/#_generate_openapi_client_generate_openapi) at an OpenAPI 3 spec and you get a typed client. GraphQL and gRPC have goals of their own, and REST and WebSocket clients are generated from annotations.
-- **In app purchase.** [`Purchase`](/developer-guide/monetization/) handles store billing on both phones, if the internal tool turns into a product.
+- **In-app purchase.** [`Purchase`](/developer-guide/monetization/) handles store billing on both phones, if the internal tool turns into a product.
 - **SQLite with an ORM** whose mapping mistakes fail the build, **CSS styling** with light and dark themes and live reload, and **a Java backend** in the same project, sharing your types.
 - **A real browser component** with two way calls between Java and JavaScript, for the parts of the app that are already a web page.
 
