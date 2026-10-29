@@ -77,7 +77,7 @@ That error is the point. You find out at build time, on your machine, with a fil
 
 ## Why pay for what you don't need?
 
-Look at that list again and ask where those features show up in a typical desktop app. Reflection usually powers a binding framework, a serializer or a dependency injector. Class loaders power plugins. Serialization powers a cache or a save file.
+Look at that list again and ask where those features show up in a typical desktop app. Reflection usually powers a binding framework, a serialization library or a dependency injector. Class loaders power plugins. Serialization powers a cache or a save file.
 
 Codename One does those jobs at build time instead. Binding a form to a model is generated code, with no reflection and no listener bookkeeping:
 

@@ -129,7 +129,7 @@ sim_keyboard_key   {"key": "next"}
 sim_record_stop
 ```
 
-It's an emulation of each platform's keyboard behavior, not the native keyboard itself, so do a final pass on a device. But the covered password field shows up on your desk now, not in a one star review. The [headless and MCP chapter](/developer-guide/mcp-headless-api/) lists every tool.
+It's an emulation of each platform's keyboard behavior, not the native keyboard itself, so do a final pass on a device. But the covered password field shows up on your desk now, not in a one-star review. The [headless and MCP chapter](/developer-guide/mcp-headless-api/) lists every tool.
 
 ## That's the week
 

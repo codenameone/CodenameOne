@@ -72,7 +72,7 @@ Other limits: Keystore keys aren't hardware backed there, `Parcel` is an in proc
 
 I was a member of Team OS/2. I know what it's like to use an operating system the big vendors forgot, and to find that half the apps you need just don't start. People choose GrapheneOS, LineageOS and other AOSP builds for good reasons, usually privacy, and they deserve apps that work.
 
-Codename One apps now run on them out of the box. One APK serves both kinds of phone: at run time it checks whether Google Play services is there. No build hint, no flavor, no second build. The Android port never calls Play services, Play Core or Firebase without checking first, and CI enforces that, so a future change can't quietly break it.
+Codename One apps now run on them out of the box. One APK serves both kinds of phone: at run time it checks whether Google Play Services is there. No build hint, no flavor, no second build. The Android port never calls Play services, Play Core or Firebase without checking first, and CI enforces that, so a future change can't quietly break it.
 
 | Feature | With Google Play | Without Google Play |
 | --- | --- | --- |
@@ -99,7 +99,7 @@ Your app code doesn't change, and neither does your server. The registration ord
 
 {{< mermaid >}}
 flowchart TD
-    S[PushClient registers] --> G{Google Play services?}
+    S[PushClient registers] --> G{Google Play Services?}
     G -->|yes| F[Firebase Cloud Messaging]
     G -->|no| H{Huawei HMS?}
     H -->|yes| K[Huawei Push Kit]

@@ -68,11 +68,11 @@ AppShield.init(shield);
 
 **The screen.** Secure windows that keep sensitive screens out of screenshots and the app switcher, tapjacking protection, and a clipboard that clears itself after you copy an account number.
 
-**Limits.** Per transfer and daily limits, a cooling off period for new payees, step up authentication above a threshold, and an allow list for crypto withdrawals.
+**Limits.** Per transfer and daily limits, a cooling-off period for new payees, step up authentication above a threshold, and an allow list for crypto withdrawals.
 
 ## The Security Center tells the truth
 
-Most security settings screens show a column of green checks. Bastion's Security Center shows what's actually on for this device and this build. Some protections need a cloud build: code obfuscation with string encryption and control flow flattening (`cn1.hardenLevel=aggressive`), Play Integrity, jailbreak detection, and blocking screenshots when the app goes to the background. When those aren't active, the Security Center says "Cloud build" instead of claiming they're on. A test keeps that screen in sync with the build hints, so it can't drift into a lie.
+Most security settings screens show a column of green checks. Bastion's Security Center shows what's actually on for this device and this build. Some protections need a cloud build: code obfuscation with string encryption and control flow flattening (`cn1.hardenLevel=aggressive`), Play Integrity, jailbreak detection, and blocking screenshots when the app goes to the background. When those aren't active, the Security Center labels them "Cloud build" rather than showing a green check. A test keeps that screen in sync with the build hints, so it can't drift into a lie.
 
 ## The back office auditors want
 
@@ -100,7 +100,7 @@ String shown = eth.toChecksumString();
 
 `VaultSigner` keeps the phrase sealed behind biometrics or a password and refuses to sign while locked. `revealMnemonic` returns a `char[]` you can wipe, not a `String` that lingers on the heap.
 
-The expensive parts (secp256k1, Schnorr, Ed25519 and the hashes) run as native C on iOS, macOS, Android, Windows and Linux. CI benchmarks every kernel against libsecp256k1, libsodium, OpenSSL and BouncyCastle, and a pull request that makes one slower fails. Even the portable Java engine, used in the simulator, holds its own against BouncyCastle on the JVM:
+The expensive parts (secp256k1, Schnorr, Ed25519 and the hashes) run as native C on iOS, macOS, Android, Windows, and Linux. CI benchmarks every kernel against libsecp256k1, libsodium, OpenSSL and BouncyCastle, and a pull request that makes one slower fails. Even the portable Java engine, used in the simulator, holds its own against BouncyCastle on the JVM:
 
 | Operation | Codename One | BouncyCastle | Ratio |
 | --- | --- | --- | --- |

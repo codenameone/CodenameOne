@@ -4,7 +4,7 @@ slug: reel-streaming-and-courses-template
 url: /blog/reel-streaming-and-courses-template/
 date: '2026-11-03'
 author: Shai Almog
-description: "Reel is a streaming service and its server in one Java project. Flip a preset and it's a subscription service, a creator platform with community uploads, or an academy with courses and quizzes. Codename One also gained a DRM streaming API for HLS, ClearKey, Widevine and FairPlay."
+description: "Reel is a streaming service and its server in one Java project. Flip a preset and it's a subscription service, a creator platform with community uploads, or an academy with courses and quizzes. Codename One also gained a DRM streaming API for HLS, ClearKey, Widevine, and FairPlay."
 feed_html: "<img src=\"https://www.codenameone.com/blog/reel-streaming-and-courses-template.jpg\" alt=\"The Reel streaming app catalog and player\" /> Reel is a streaming service and its server in one Java project: a subscription service, a creator platform or a course academy, with a new DRM streaming API."
 series: ["release-2026-10-30"]
 ---
@@ -36,7 +36,7 @@ On top of the preset, toggles turn ads, rentals, downloads, uploads, courses, qu
 
 ## Uploads and moderation
 
-Creators upload from the app and the server packages each upload for streaming and checks it against blocklists the moderators maintain. A title only goes live after a moderator approves it, and a moderator can take it down later. Takedowns take effect mid stream: the player's heartbeat checks with the server, so a removed title stops playing instead of running to the end.
+Creators upload from the app and the server packages each upload for streaming and checks it against blocklists the moderators maintain. A title only goes live after a moderator approves it, and a moderator can take it down later. Takedowns take effect mid-stream: the player's heartbeat checks with the server, so a removed title stops playing instead of running to the end.
 
 {{< mermaid >}}
 flowchart LR
@@ -50,7 +50,7 @@ flowchart LR
 
 ## A streaming API with DRM, in core
 
-Reel needed protected playback, so Codename One now has a streaming API that takes a DRM configuration:
+Reel needed playback for protected video, so Codename One now has a streaming API that takes a DRM configuration:
 
 ```java {class="cn1-no-try"}
 StreamRequest req = new StreamRequest(manifestUrl)
@@ -63,7 +63,7 @@ req.createAsync().ready(media -> {
 });
 ```
 
-`DrmScheme` covers AES-128 HLS, ClearKey, Widevine and FairPlay. `MediaManager.isDrmSupported()` tells you which ones the current device can play, so you offer the strongest scheme it has and tell the user before playback if it has none.
+`DrmScheme` covers AES-128 HLS, ClearKey, Widevine, and FairPlay. `MediaManager.isDrmSupported()` tells you which ones the current device can play, so you offer the strongest scheme it has and tell the user before playback if it has none.
 
 Out of the box, Reel packages video as AES-128 HLS plus ClearKey. Keys are issued only against a license token tied to the session, and media tokens expire and are scoped to one video and a maximum quality. Concurrent stream limits are enforced by the same heartbeat. Protected video also blocks screenshots and can add a watermark with the account name.
 

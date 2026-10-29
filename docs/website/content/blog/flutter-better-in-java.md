@@ -11,7 +11,7 @@ series: ["release-2026-10-30"]
 
 ![The Flutter Gallery running in Flutter and in Codename One side by side](/blog/flutter-better-in-java.jpg)
 
-I usually blog about a feature the week it lands. This one landed a few weeks ago and was in development for months before that: Codename One can now take a Flutter app's Dart source and build it as a Codename One app. The results are, frankly, amazing. I held this post back because I know how explosive some of these claims are, and I wanted the numbers to come from a CI job that runs on every commit instead of a benchmark I tuned once on my laptop.
+I usually blog about a feature the week it lands. This one landed a few weeks ago and was in development for months before that: Codename One can now take a Flutter app's Dart source and build it as a Codename One app. The results are amazing. I held this post back because I know how explosive some of these claims are, and I wanted the numbers to come from a CI job that runs on every commit instead of a benchmark I tuned once on my laptop.
 
 In the meantime we also added support for Kotlin Multiplatform with Compose, for a big part of Swing and JavaFX, and for classic Android apps on iOS. More is coming. The part that still surprises me is how well Codename One does against every one of them. The same Flutter app, built from the same Dart files, starts faster, uses less memory and ships less code when Codename One builds it. That holds on Android, macOS, Windows and Linux, and the sizes hold on iOS and the web too.
 
@@ -44,7 +44,7 @@ Today is the Flutter story and the numbers behind it. Then one post a day:
 
 - **Saturday, October 31:** {{< post-link path="/blog/compose-on-more-screens" text="Your Compose Code, on More Screens and Less CPU" >}}. Kotlin Multiplatform and Compose, running on Codename One, and why the Java version of the same screen is faster still.
 - **Sunday, November 1:** {{< post-link path="/blog/swing-and-javafx-on-phones" text="Your Swing and JavaFX Code on iPhone, Android and the Web" >}}. What carries over, what doesn't, and why you might not miss the parts that don't.
-- **Monday, November 2:** {{< post-link path="/blog/bastion-hardened-bank-template" text="Bastion: A Hardened Bank Template, and Crypto Wallets in Core" >}}. A virtual bank and exchange with passkeys, signed requests and a double entry ledger, plus wallets for Ethereum, Bitcoin and Solana.
+- **Monday, November 2:** {{< post-link path="/blog/bastion-hardened-bank-template" text="Bastion: A Hardened Bank Template, and Crypto Wallets in Core" >}}. A virtual bank and exchange with passkeys, signed requests and a double entry ledger, plus wallets for Ethereum, Bitcoin, and Solana.
 - **Tuesday, November 3:** {{< post-link path="/blog/reel-streaming-and-courses-template" text="Reel: Your Own Streaming Service or Course Platform" >}}. Community uploads, courses, DRM and moderation in one Java project.
 - **Wednesday, November 4:** {{< post-link path="/blog/android-apps-everywhere-even-without-google" text="Your Android App on iPhone, and on Phones Without Google" >}}. Room, WorkManager and document pickers in the Android layer, and apps that run on GrapheneOS as they are.
 - **Thursday, November 5:** {{< post-link path="/blog/backend-caches-certificates-and-a-simulator-that-types" text="Caches, Certificates, Streaming Uploads and a Simulator That Types" >}}. Eight backend upgrades and a simulator with a virtual keyboard and video recording.
@@ -63,16 +63,16 @@ Today is the Flutter story and the numbers behind it. Then one post a day:
 Every commit to Codename One builds the Flutter Gallery twice: once with Flutter's own release build and once with Codename One. CI measures both on the same machine in interleaved rounds, so a runner that slows down halfway through penalizes both builds equally. The figures below are from the run on October 29.
 
 {{< guide-block >}}
-<img width="760" height="364" src="/blog/release-2026-10-30/flutter-cold-start.svg" alt="Cold start to first frame. Android: Codename One 395 ms, Flutter 1247 ms. macOS: 609 against 722 ms. Windows: 126 against 205 ms. Linux: 123 against 198 ms." loading="lazy" style="width:100%;height:auto;margin:16px 0" />
-<img width="760" height="364" src="/blog/release-2026-10-30/flutter-memory.svg" alt="Memory at rest. Android: Codename One 46 MB, Flutter 79 MB. macOS: 37 against 56 MB. Windows: 58 against 92 MB. Linux: 82 against 224 MB." loading="lazy" style="width:100%;height:auto;margin:16px 0" />
-<img width="760" height="502" src="/blog/release-2026-10-30/flutter-code-size.svg" alt="Executable code. Android: Codename One 4.7 MB, Flutter 20.6 MB. iOS: 17.3 against 19.1 MB. macOS: 33.2 against 47.9 MB. Windows: 11.4 against 14.1 MB. Linux: 14.2 against 16.1 MB. Web: 12.9 against 25.2 MB." loading="lazy" style="width:100%;height:auto;margin:16px 0" />
+<img width="760" height="364" src="/blog/release-2026-10-30/flutter-cold-start.svg" alt="Cold start to first frame. Android: 395 ms for Codename One against 1247 ms for Flutter. macOS: 609 against 722 ms. Windows: 126 against 205 ms. Linux: 123 against 198 ms." loading="lazy" style="width:100%;height:auto;margin:16px 0" />
+<img width="760" height="364" src="/blog/release-2026-10-30/flutter-memory.svg" alt="Memory at rest. Android: 46 MB for Codename One against 79 MB for Flutter. macOS: 37 against 56 MB. Windows: 58 against 92 MB. Linux: 82 against 224 MB." loading="lazy" style="width:100%;height:auto;margin:16px 0" />
+<img width="760" height="502" src="/blog/release-2026-10-30/flutter-code-size.svg" alt="Executable code. Android: 4.7 MB for Codename One against 20.6 MB for Flutter. iOS: 17.3 against 19.1 MB. macOS: 33.2 against 47.9 MB. Windows: 11.4 against 14.1 MB. Linux: 14.2 against 16.1 MB. Web: 12.9 against 25.2 MB." loading="lazy" style="width:100%;height:auto;margin:16px 0" />
 {{< /guide-block >}}
 
 Across six platforms CI measured 26 metrics: installed size, executable code and download size everywhere, plus cold start and memory at rest where we can measure them. Codename One wins all 26. The biggest gaps are on Android, where the app starts in a third of the time and carries a quarter of the code, and on Linux, where it settles at 82 MB against 224 MB.
 
 The comparison is tilted toward Flutter. The app is Flutter's own showcase, written in Flutter's idioms. To run it, Codename One carries a runtime that reimplements Flutter's widget, element and layout model on top of Codename One components. A Codename One app never pays for that layer. We win while paying for it.
 
-CI also runs eleven small compute workloads (hash maps, recursion, string building, sorting and so on) in both languages. Here the result is mixed, and I want to be clear about where we lose:
+CI also runs eleven small compute workloads (hash maps, recursion, string building, sorting, arithmetic and more) in both languages. Here the result is mixed, and I want to be clear about where we lose:
 
 | Platform | Compute, geometric mean | Where Flutter is ahead |
 | --- | --- | --- |
@@ -185,13 +185,13 @@ class MyApp : Lifecycle() {
 
 Saturday's {{< post-link path="/blog/compose-on-more-screens" text="Compose article" >}} has the numbers and their caveats.
 
-### Swing and JavaFX, honestly
+### Swing and JavaFX, with the limits up front
 
 We can't run every Swing or JavaFX app, and I won't pretend otherwise. There are no class loaders, no runtime reflection and no third party jars compiled against `java.awt`. What does carry over is a large share of real application code, and on Linux the native build is 4 to 6 times smaller zipped and starts 2 to 4.6 times faster than the same app on the JVM. Sunday's {{< post-link path="/blog/swing-and-javafx-on-phones" text="Swing and JavaFX article" >}} goes through what works, what doesn't, and why the missing pieces matter less than you'd think.
 
 ### A bank you can study, and wallets in core
 
-A large share of our users are banks and financial institutions. **Bastion** is a reference implementation for them: a virtual bank and small exchange with passkeys, TOTP, signed requests, device keys, a hash chained audit log, a double entry ledger and an auditor console. Codename One also gained wallet APIs for Ethereum, Bitcoin and Solana.
+A large share of our users are banks and financial institutions. **Bastion** is a reference implementation for them: a virtual bank and small exchange with passkeys, TOTP, signed requests, device keys, a hash chained audit log, a double entry ledger and an auditor console. Codename One also gained wallet APIs for Ethereum, Bitcoin, and Solana.
 
 ```java {class="cn1-no-try"}
 Wallet wallet = Wallet.fromMnemonic(words, "");
@@ -204,7 +204,7 @@ Monday's {{< post-link path="/blog/bastion-hardened-bank-template" text="Bastion
 
 ### Streaming and courses
 
-**Reel** is a streaming service and its server in one Java project. Switch a preset and it becomes a subscription service, a creator platform in the style of YouTube, or an academy with courses, lessons and quizzes. Tuesday's {{< post-link path="/blog/reel-streaming-and-courses-template" text="Reel article" >}} walks through uploads, moderation and DRM.
+**Reel** is a streaming service and its server in one Java project. Switch a preset and it becomes a subscription service, a creator platform in the style of YouTube, or an academy with courses, lessons, and quizzes. Tuesday's {{< post-link path="/blog/reel-streaming-and-courses-template" text="Reel article" >}} walks through uploads, moderation, and DRM.
 
 ### Android code everywhere, and Android without Google
 
