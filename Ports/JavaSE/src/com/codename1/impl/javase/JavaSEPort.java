@@ -4494,6 +4494,38 @@ public class JavaSEPort extends CodenameOneImplementation {
         protected void paintChildren(java.awt.Graphics g) {
         }
 
+        /// Paints the Swing children into the screen raster. In the simulated
+        /// keyboard's Android pan mode the native editor's bounds are raised by the
+        /// pan offset, so that it sits, and takes clicks, where the panned field is
+        /// drawn rather than under the keyboard. The raster itself is raised by that
+        /// same offset when it is composed (composeSimulatorOverlays), so painting the
+        /// editor at its bounds here raised it twice and the typed text appeared a
+        /// pan offset above the field. The editor is therefore painted lowered by the
+        /// offset, and clipped out of the regular pass.
+        private void paintChildrenIntoBuffer(Graphics2D bg) {
+            int pan = this == canvas ? simulatorPanOffset() : 0;
+            JComponent editor = textCmp;
+            if (pan == 0 || editor == null || editor.getParent() != this || !editor.isVisible()) {
+                super.paintChildren(bg);
+                return;
+            }
+            Rectangle eb = editor.getBounds();
+            java.awt.Shape oldClip = bg.getClip();
+            java.awt.geom.Area rest = new java.awt.geom.Area(oldClip != null ? oldClip
+                    : new Rectangle(0, 0, getWidth(), getHeight()));
+            rest.subtract(new java.awt.geom.Area(eb));
+            bg.setClip(rest);
+            super.paintChildren(bg);
+            bg.setClip(oldClip);
+            int shift = (int) Math.round(pan * zoomLevel);
+            Graphics2D eg = (Graphics2D) bg.create(eb.x, eb.y + shift, eb.width, eb.height);
+            try {
+                editor.paint(eg);
+            } finally {
+                eg.dispose();
+            }
+        }
+
         private boolean drawScreenBuffer(java.awt.Graphics g) {
             if (buffer == null) {
                 return false;
@@ -4523,11 +4555,11 @@ public class JavaSEPort extends CodenameOneImplementation {
                         AffineTransform af = bg.getTransform();
                         bg.setTransform(AffineTransform.getScaleInstance(1, 1));
                         bg.translate(-(screenCoord.x + x )* zoomLevel, -(screenCoord.y + y ) * zoomLevel);
-                        super.paintChildren(bg);
+                        paintChildrenIntoBuffer(bg);
                         bg.setTransform(af);
                     } else {
                         bg.translate(-screenCoord.x - x, -screenCoord.y - y);
-                        super.paintChildren(bg);
+                        paintChildrenIntoBuffer(bg);
                     }                    
                     bg.dispose();
                     painted = true;
