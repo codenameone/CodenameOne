@@ -42,6 +42,8 @@ on:
       - 'scripts/python-backend/e2e-test.sh'
       - 'scripts/python-backend/e2e_client.py'
       - 'scripts/python-backend/samples/**'
+      # sqlalchemy-realdb-test.sh compiles the host file system shims from here.
+      - 'scripts/python-bench/hostfs/**'
       - 'scripts/hellocodenameone/pom.xml'
       - 'scripts/hellocodenameone/backend/**'
       # The core classes the backend compiles as its own (the ORM and the entity
@@ -119,6 +121,8 @@ on:
       - 'scripts/python-backend/e2e-test.sh'
       - 'scripts/python-backend/e2e_client.py'
       - 'scripts/python-backend/samples/**'
+      # sqlalchemy-realdb-test.sh compiles the host file system shims from here.
+      - 'scripts/python-bench/hostfs/**'
       - 'scripts/hellocodenameone/pom.xml'
       - 'scripts/hellocodenameone/backend/**'
       # The core classes the backend compiles as its own (the ORM and the entity

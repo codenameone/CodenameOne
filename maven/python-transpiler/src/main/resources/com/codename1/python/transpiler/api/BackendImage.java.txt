@@ -276,6 +276,8 @@ final class FreeTypeMetrics {
             int k = l.count;
             if (last != 0 && g != 0) {
                 long delta = round(mulFix(font.kerning(last, g), scale));
+                // Whole pixels added to a 26.6 advance on purpose: Pillow's
+                // own x_advance += PIXEL(delta.x), so text lays out the same.
                 l.advances[k - 1] += pixel(delta);
             }
             l.glyphs[k] = g;

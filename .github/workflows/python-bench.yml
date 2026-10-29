@@ -25,6 +25,10 @@ on:
       - 'vm/ByteCodeTranslator/**'
       - 'vm/JavaAPI/**'
       - 'vm/selfhost/compile-dist.sh'
+      # Transpiled Python runs on the core's classes (collections, io/gzip).
+      - 'CodenameOne/src/**'
+      - 'maven/core/**'
+      - 'maven/pom.xml'
   workflow_dispatch:
 
 permissions:
@@ -114,11 +118,12 @@ jobs:
       - name: Measure and gate
         run: |
           repo="$GITHUB_WORKSPACE/m2/com/codenameone"
+          v=$(cd "$repo/codenameone-python-runtime" && ls -d */ | head -1 | tr -d /)
           python3 scripts/python-bench/run_bench.py \
               --java-home "$JAVA_HOME" \
-              --runtime-jar "$repo/codenameone-python-runtime/8.0-SNAPSHOT/codenameone-python-runtime-8.0-SNAPSHOT.jar" \
-              --core-jar "$repo/codenameone-core/8.0-SNAPSHOT/codenameone-core-8.0-SNAPSHOT.jar" \
-              --transpiler-cp "$repo/codenameone-python-transpiler/8.0-SNAPSHOT/codenameone-python-transpiler-8.0-SNAPSHOT.jar" \
+              --runtime-jar "$repo/codenameone-python-runtime/$v/codenameone-python-runtime-$v.jar" \
+              --core-jar "$repo/codenameone-core/$v/codenameone-core-$v.jar" \
+              --transpiler-cp "$repo/codenameone-python-transpiler/$v/codenameone-python-transpiler-$v.jar" \
               --json python-bench.json --check | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Upload the report
