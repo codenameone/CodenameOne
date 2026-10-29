@@ -490,6 +490,10 @@ jobs:
           (cd maven && bash "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -B -pl python-runtime,python-transpiler \
             install -DskipTests -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
             -Dmaven.javadoc.skip=true -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo")
+          # The test transpiles against JavaAPI from the same repository, and
+          # the step that installs it for the native samples runs after this.
+          bash "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -B -f vm/pom.xml -pl JavaAPI install -DskipTests \
+            -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
           bash scripts/python-backend/sqlalchemy-realdb-test.sh "$GITHUB_WORKSPACE/.m2-repo"
         env:
           JAVA_HOME: ${{ env.JDK_17_HOME }}

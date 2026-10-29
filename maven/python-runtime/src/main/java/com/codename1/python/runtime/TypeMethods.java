@@ -113,27 +113,30 @@ final class TypeMethods {
         boolean prevCased = false;
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
-            char r;
             switch (mode) {
                 case 0:
-                    r = Character.toLowerCase(c);
+                    Unicode.LOWER_MAP.append(sb, c);
                     break;
                 case 1:
-                    r = Character.toUpperCase(c);
+                    Unicode.UPPER_MAP.append(sb, c);
                     break;
                 case 2:
-                    r = Character.isUpperCase(c) ? Character.toLowerCase(c) : Character.toUpperCase(c);
+                    if (Unicode.is(c, Unicode.UPPER)) {
+                        Unicode.LOWER_MAP.append(sb, c);
+                    } else if (Unicode.is(c, Unicode.LOWER)) {
+                        Unicode.UPPER_MAP.append(sb, c);
+                    } else {
+                        sb.append(c);
+                    }
+                    break;
+                case 3:
+                    (prevCased ? Unicode.LOWER_MAP : Unicode.TITLE_MAP).append(sb, c);
+                    prevCased = Unicode.is(c, Unicode.CASED);
                     break;
                 default:
-                    r = prevCased ? Character.toLowerCase(c) : Character.toUpperCase(c);
-                    prevCased = Character.isLetter(c);
+                    Unicode.FOLD_MAP.append(sb, c);
                     break;
             }
-            if (mode == 1 && c == '\u00df') {
-                sb.append("SS");
-                continue;
-            }
-            sb.append(r);
         }
         return sb.toString();
     }
@@ -225,7 +228,7 @@ final class TypeMethods {
         }
         return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\u000b' || c == '\u000c'
                 || c == '\u001c' || c == '\u001d' || c == '\u001e' || c == '\u001f' || c == '\u0085'
-                || Character.isWhitespace(c) || c == '\u00a0';
+                || Unicode.is(c, Unicode.SPACE);
     }
 
     private static String strip(String v, Object chars, boolean left, boolean right) {
@@ -398,41 +401,58 @@ final class TypeMethods {
         return Py.str(sb.toString());
     }
 
-    private static boolean all(String v, int kind) {
+    /// True when `v` is not empty and every char has one of the `mask` bits.
+    private static boolean all(String v, int mask) {
         if (v.length() == 0) {
             return false;
         }
-        boolean cased = false;
         for (int i = 0; i < v.length(); i++) {
-            char c = v.charAt(i);
-            boolean ok;
-            switch (kind) {
-                case 0:
-                    ok = Character.isDigit(c);
-                    break;
-                case 1:
-                    ok = Character.isLetter(c);
-                    break;
-                case 2:
-                    ok = Character.isLetterOrDigit(c);
-                    break;
-                case 3:
-                    ok = isSpace(c);
-                    break;
-                case 4:
-                    ok = !Character.isLowerCase(c);
-                    cased |= Character.isUpperCase(c);
-                    break;
-                default:
-                    ok = !Character.isUpperCase(c);
-                    cased |= Character.isLowerCase(c);
-                    break;
-            }
-            if (!ok) {
+            if (!Unicode.is(v.charAt(i), mask)) {
                 return false;
             }
         }
-        return kind < 4 || cased;
+        return true;
+    }
+
+    /// `istitle`: an upper or titlecase char only after an uncased one, a
+    /// lowercase char only after a cased one, and at least one cased char.
+    private static boolean isTitle(String v) {
+        boolean prevCased = false;
+        boolean seen = false;
+        for (int i = 0; i < v.length(); i++) {
+            char c = v.charAt(i);
+            boolean lower = Unicode.is(c, Unicode.LOWER);
+            if (Unicode.is(c, Unicode.CASED) && !lower) {
+                if (prevCased) {
+                    return false;
+                }
+                prevCased = true;
+                seen = true;
+            } else if (lower) {
+                if (!prevCased) {
+                    return false;
+                }
+                seen = true;
+            } else {
+                prevCased = false;
+            }
+        }
+        return seen;
+    }
+
+    /// `isupper`/`islower`: at least one char has `want` and none has
+    /// `against`; a titlecase letter is cased but neither, so it fails both.
+    private static boolean cased(String v, int want, int against) {
+        boolean seen = false;
+        for (int i = 0; i < v.length(); i++) {
+            char c = v.charAt(i);
+            if (Unicode.is(c, against)
+                    || Unicode.is(c, Unicode.CASED) && !Unicode.is(c, Unicode.UPPER | Unicode.LOWER)) {
+                return false;
+            }
+            seen |= Unicode.is(c, want);
+        }
+        return seen;
     }
 
     /// `sep.join(items)`; a list is read in place, without an iterator.
@@ -583,7 +603,7 @@ final class TypeMethods {
         });
         def(t, "upper", a -> Py.str(mapCase(s(a[0]), 1)));
         def(t, "lower", a -> Py.str(mapCase(s(a[0]), 0)));
-        def(t, "casefold", a -> Py.str(mapCase(s(a[0]), 0)));
+        def(t, "casefold", a -> Py.str(mapCase(s(a[0]), 4)));
         def(t, "swapcase", a -> Py.str(mapCase(s(a[0]), 2)));
         def(t, "title", a -> Py.str(mapCase(s(a[0]), 3)));
         def(t, "capitalize", a -> {
@@ -591,16 +611,20 @@ final class TypeMethods {
             if (v.length() == 0) {
                 return a[0];
             }
-            return Py.str(Character.toUpperCase(v.charAt(0)) + mapCase(v.substring(1), 0));
+            StringBuilder first = new StringBuilder();
+            Unicode.TITLE_MAP.append(first, v.charAt(0));
+            return Py.str(first.append(mapCase(v.substring(1), 0)).toString());
         });
-        def(t, "isdigit", a -> Py.bool(all(s(a[0]), 0)));
-        def(t, "isdecimal", a -> Py.bool(all(s(a[0]), 0)));
-        def(t, "isnumeric", a -> Py.bool(all(s(a[0]), 0)));
-        def(t, "isalpha", a -> Py.bool(all(s(a[0]), 1)));
-        def(t, "isalnum", a -> Py.bool(all(s(a[0]), 2)));
-        def(t, "isspace", a -> Py.bool(all(s(a[0]), 3)));
-        def(t, "isupper", a -> Py.bool(all(s(a[0]), 4)));
-        def(t, "islower", a -> Py.bool(all(s(a[0]), 5)));
+        def(t, "isdigit", a -> Py.bool(all(s(a[0]), Unicode.DIGIT)));
+        def(t, "isdecimal", a -> Py.bool(all(s(a[0]), Unicode.DECIMAL)));
+        def(t, "isnumeric", a -> Py.bool(all(s(a[0]), Unicode.NUMERIC)));
+        def(t, "isalpha", a -> Py.bool(all(s(a[0]), Unicode.ALPHA)));
+        def(t, "isalnum", a -> Py.bool(all(s(a[0]),
+                Unicode.ALPHA | Unicode.DECIMAL | Unicode.DIGIT | Unicode.NUMERIC)));
+        def(t, "isspace", a -> Py.bool(all(s(a[0]), Unicode.SPACE)));
+        def(t, "isupper", a -> Py.bool(cased(s(a[0]), Unicode.UPPER, Unicode.LOWER)));
+        def(t, "islower", a -> Py.bool(cased(s(a[0]), Unicode.LOWER, Unicode.UPPER)));
+        def(t, "istitle", a -> Py.bool(isTitle(s(a[0]))));
         def(t, "isascii", a -> {
             String v = s(a[0]);
             for (int i = 0; i < v.length(); i++) {
@@ -612,11 +636,11 @@ final class TypeMethods {
         });
         def(t, "isidentifier", a -> {
             String v = s(a[0]);
-            if (v.length() == 0 || !(Character.isLetter(v.charAt(0)) || v.charAt(0) == '_')) {
+            if (v.length() == 0 || !(Unicode.is(v.charAt(0), Unicode.ALPHA) || v.charAt(0) == '_')) {
                 return Py.FALSE;
             }
             for (int i = 1; i < v.length(); i++) {
-                if (!(Character.isLetterOrDigit(v.charAt(i)) || v.charAt(i) == '_')) {
+                if (!(Unicode.is(v.charAt(i), Unicode.ALPHA | Unicode.DECIMAL) || v.charAt(i) == '_')) {
                     return Py.FALSE;
                 }
             }

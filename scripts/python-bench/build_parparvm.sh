@@ -54,6 +54,11 @@ if [ -n "${PY_JAVA_SOURCES:-}" ]; then
 fi
 # Java imports resolve against JavaAPI, the class library the binary links.
 "$J17/bin/java" -cp "$TRANSPILER" com.codename1.python.transpiler.api.Main -cp "$JAVAAPI:$CORE$APPCP" "$W/src" "$W/gen" "$K"
+# PY_DRIVER replaces the entry point: the conformance suite runs every
+# program from one binary rather than building one each.
+if [ -n "${PY_DRIVER:-}" ]; then
+    cp "$PY_DRIVER" "$W/gen/com/pybench/PyBench.java"
+else
 cat > "$W/gen/com/pybench/PyBench.java" <<JAVA
 package com.pybench;
 
@@ -64,11 +69,15 @@ public class PyBench {
     }
 }
 JAVA
+fi
 # The runtime, and the one core package it uses (com.codename1.util: BigInteger,
 # MathUtil). The whole core would drag in the UI and its natives.
 # The translator reads class directories, not jars.
 (cd "$W/javaapi" && unzip -qo "$JAVAAPI" 'java/*')
-(cd "$W/jclasses" && unzip -qo "$RUNTIME" 'com/*' && unzip -qo "$CORE" 'com/codename1/util/*')
+# zlib, gzip and zipfile run over core's JZlib port (io/gzip); its one
+# networking class extends ConnectionRequest, which is UI, so it stays out.
+(cd "$W/jclasses" && unzip -qo "$RUNTIME" 'com/*' && unzip -qo "$CORE" 'com/codename1/util/*' \
+    && unzip -qo "$CORE" 'com/codename1/io/gzip/*' -x 'com/codename1/io/gzip/GZConnectionRequest*')
 # The file system the runtime reaches through core's FileSystemStorage, over
 # the host's files (hostfs/): the real class would bring the UI with it.
 "$J17/bin/javac" -nowarn --release 17 -d "$W/jclasses" $(find "$HERE/hostfs" -name '*.java')
@@ -83,6 +92,9 @@ JAVA
 PYTHON=python3
 WINDOWS=0
 native_path() { echo "$1"; }
-CN1_SELFHOST_CFLAGS="-flto=thin $CN1_SELFHOST_CFLAGS"
+# PY_OPT lowers the level for a build that tests behaviour, not speed: the
+# conformance binary holds every program and takes minutes at -O3 with LTO.
+PY_OPT="${PY_OPT:--O3}"
+[ "$PY_OPT" = "-O3" ] && CN1_SELFHOST_CFLAGS="-flto=thin $CN1_SELFHOST_CFLAGS"
 . "$REPO/vm/selfhost/compile-dist.sh"
-cn1_compile_dist "$W/out/dist" PyBench "$W/$K" -O3 "$W/cc.log"
+cn1_compile_dist "$W/out/dist" PyBench "$W/$K" "$PY_OPT" "$W/cc.log"
