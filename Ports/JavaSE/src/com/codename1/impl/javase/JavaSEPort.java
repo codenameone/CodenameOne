@@ -12974,6 +12974,18 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         public void setPanOffset(int pixels) {
+            // The editor's bounds carry the pan offset (paintChildrenIntoBuffer
+            // relies on that), but they are only recomputed when the editor
+            // repaints. Ask it to now, so the frame after a pan change does not
+            // draw it from bounds made for the previous offset.
+            EventQueue.invokeLater(new Runnable() {
+                public void run() {
+                    JComponent editor = textCmp;
+                    if (editor != null && editor.getParent() != null) {
+                        editor.repaint();
+                    }
+                }
+            });
             requestOverlayRepaint();
         }
 
@@ -13547,7 +13559,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         int marginBottom = cmp.getSelectedStyle().getPadding(Component.BOTTOM);
         if (getSkin() != null) {
             textCmp.setBounds((int) ((cmp.getAbsoluteX() + cmp.getScrollX() + getScreenCoordinates().x + canvas.x + marginLeft) * zoomLevel),
-                    (int) ((cmp.getAbsoluteY() + cmp.getScrollY() + getScreenCoordinates().y + canvas.y + marginTop) * zoomLevel),
+                    (int) ((cmp.getAbsoluteY() + cmp.getScrollY() + getScreenCoordinates().y + canvas.y + marginTop - simulatorPanOffset()) * zoomLevel),
                     (int) ((cmp.getWidth() - marginLeft - marginRight) * zoomLevel), 
                     (int) ((cmp.getHeight() - marginTop - marginBottom)* zoomLevel));
             //System.out.println("Set bounds to "+textCmp.getBounds());
