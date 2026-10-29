@@ -552,7 +552,7 @@ final class EmojiData {
     private EmojiData() {
     }
 
-    static synchronized DartList<CategoryEmoji> all() {
+    static DartList<CategoryEmoji> all() {
         if (all == null) {
             all = new DartList<CategoryEmoji>();
             add(Category.SMILEYS, SMILEYS);

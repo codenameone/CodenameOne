@@ -213,7 +213,7 @@ public final class StubRegistry {
 
     /// Makes every type name more than one package declares resolve to the declaration of
     /// the package `importedPackages` contains, for the library about to be emitted. A
-    /// library importing neither keeps whichever was loaded last.
+    /// library importing neither sees the one loaded last.
     public void viewFrom(java.util.Collection<String> importedPackages) {
         viewFrom(importedPackages, java.util.Collections.<String>emptySet());
     }
@@ -222,33 +222,29 @@ public final class StubRegistry {
     /// `programTypes` hides a stub of a package the library does not import: emoji_picker's
     /// `Config` must not shadow an application's own `Config`.
     public void viewFrom(java.util.Collection<String> importedPackages, java.util.Set<String> programTypes) {
+        // Rebuilt from the loaded declarations on every call, never from what the previous
+        // library's view left behind: a choice or a removal made for one library must not
+        // carry over to the next.
         for (Map.Entry<String, List<Object[]>> e : variants.entrySet()) {
             List<Object[]> l = e.getValue();
-            if (programTypes.contains(e.getKey())) {
-                boolean imported = false;
-                for (Object[] v : l) {
-                    imported |= v[0] == null || importedPackages.contains(v[0]);
-                }
-                if (!imported) {
-                    classes.remove(e.getKey());
-                    enums.remove(e.getKey());
-                    continue;
-                }
-            }
-            if (l.size() < 2) {
-                continue;
-            }
+            Object[] chosen = l.get(l.size() - 1);
             for (Object[] v : l) {
                 if (v[0] != null && importedPackages.contains(v[0])) {
-                    classes.remove(e.getKey());
-                    enums.remove(e.getKey());
-                    if (v[1] instanceof Ast.ClassDecl) {
-                        classes.put(e.getKey(), (Ast.ClassDecl) v[1]);
-                    } else {
-                        enums.put(e.getKey(), (Ast.EnumDecl) v[1]);
-                    }
+                    chosen = v;
                     break;
                 }
+            }
+            String name = e.getKey();
+            classes.remove(name);
+            enums.remove(name);
+            boolean visible = chosen[0] == null || importedPackages.contains(chosen[0]);
+            if (!visible && programTypes.contains(name)) {
+                continue;
+            }
+            if (chosen[1] instanceof Ast.ClassDecl) {
+                classes.put(name, (Ast.ClassDecl) chosen[1]);
+            } else {
+                enums.put(name, (Ast.EnumDecl) chosen[1]);
             }
         }
     }

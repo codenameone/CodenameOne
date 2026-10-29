@@ -223,6 +223,8 @@ public final class JavaEmitter {
                 }
             }
         }
+        // What is emitted from here on belongs to no one library: the loaded-last view.
+        stubs.viewFrom(java.util.Collections.<String>emptySet(), java.util.Collections.<String>emptySet());
         String mainLib = resolveMainLib(mainCandidates);
         if (mainLib != null) {
             out.add(emitRegistry(mainLib));

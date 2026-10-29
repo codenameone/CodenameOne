@@ -58,10 +58,9 @@ public class AudioPlayer {
     private final StreamController<PlayerState> states = StreamController.broadcast();
 
     public AudioPlayer() {
-        synchronized (AudioPlayer.class) {
-            ids++;
-            this.playerId = "cn1-player-" + ids;
-        }
+        // Players are made on the EDT, so the counter needs no lock.
+        ids++;
+        this.playerId = "cn1-player-" + ids;
     }
 
     /** The {@code playerId} constructor argument. */

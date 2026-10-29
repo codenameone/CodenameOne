@@ -23,7 +23,6 @@
  */
 package com.codename1.flutter.plugins.cachednetworkimage;
 
-import java.util.HashMap;
 import java.util.Map;
 
 import com.codename1.flutter.BoxFit;
@@ -60,7 +59,40 @@ import dart.typed_data.Uint8List;
  */
 public class CachedNetworkImage extends StatefulWidget {
     /** Bytes of finished downloads, by cache key. */
-    private static final Map<String, byte[]> CACHE = new HashMap<String, byte[]>();
+    /// The encoded bytes of recent downloads, least recently used first, held to
+    /// [#CACHE_BUDGET] bytes so a long scrolling feed cannot exhaust the heap.
+    private static final java.util.LinkedHashMap<String, byte[]> CACHE =
+            new java.util.LinkedHashMap<String, byte[]>();
+
+    /// The most encoded bytes [#CACHE] keeps.
+    static final long CACHE_BUDGET = 16L * 1024 * 1024;
+
+    private static long cachedBytes;
+
+    static byte[] cacheGet(String key) {
+        byte[] b = CACHE.remove(key);
+        if (b != null) {
+            CACHE.put(key, b);
+        }
+        return b;
+    }
+
+    static void cachePut(String key, byte[] data) {
+        byte[] old = CACHE.remove(key);
+        if (old != null) {
+            cachedBytes -= old.length;
+        }
+        if (data.length > CACHE_BUDGET) {
+            return;
+        }
+        CACHE.put(key, data);
+        cachedBytes += data.length;
+        while (cachedBytes > CACHE_BUDGET && !CACHE.isEmpty()) {
+            // The eldest entry, removed through the map rather than an iterator.
+            String eldest = CACHE.keySet().iterator().next();
+            cachedBytes -= CACHE.remove(eldest).length;
+        }
+    }
 
     String imageUrl;
     Double width;
@@ -143,7 +175,7 @@ public class CachedNetworkImage extends StatefulWidget {
     /// What can be answered without the network: the cached bytes (as byte[]), or the
     /// error a load that cannot start fails with; null when a download is needed.
     private Object immediate() {
-        byte[] cached = CACHE.get(key());
+        byte[] cached = cacheGet(key());
         if (cached != null) {
             return cached;
         }
@@ -201,7 +233,7 @@ public class CachedNetworkImage extends StatefulWidget {
 
     /// Stores bytes as a finished download of this widget's key.
     public void seedCache(dart.typed_data.Uint8List data) {
-        CACHE.put(key(), data.toBytes());
+        cachePut(key(), data.toBytes());
     }
 
     private static final class Loader extends State<CachedNetworkImage> {
@@ -220,10 +252,32 @@ public class CachedNetworkImage extends StatefulWidget {
 
         @Override
         public void didUpdateWidget(CachedNetworkImage old) {
-            if (!widget().key().equals(loadedKey)) {
+            // A header change (a rotated auth token) reloads too, so a failure the old
+            // headers caused is not kept.
+            if (!widget().key().equals(loadedKey) || !sameHeaders(old.httpHeaders, widget().httpHeaders)) {
                 stop();
                 start();
             }
+        }
+
+        /// Entry by entry: a Dart map literal is a new object on every build, and DartMap's
+        /// equality is identity, as Dart's is.
+        private static boolean sameHeaders(Map<?, ?> a, Map<?, ?> b) {
+            int na = a == null ? 0 : a.size();
+            int nb = b == null ? 0 : b.size();
+            if (na != nb) {
+                return false;
+            }
+            if (na == 0) {
+                return true;
+            }
+            for (Map.Entry<?, ?> e : a.entrySet()) {
+                Object v = b.get(e.getKey());
+                if (v == null ? e.getValue() != null || !b.containsKey(e.getKey()) : !v.equals(e.getValue())) {
+                    return false;
+                }
+            }
+            return true;
         }
 
         @Override
@@ -337,7 +391,7 @@ public class CachedNetworkImage extends StatefulWidget {
                     }
                     request = null;
                     if (data != null) {
-                        CACHE.put(key, data);
+                        cachePut(key, data);
                     }
                     setState(new Funcs.VoidFunc0() {
                         @Override
