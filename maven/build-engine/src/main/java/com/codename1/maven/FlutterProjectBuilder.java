@@ -221,7 +221,7 @@ public final class FlutterProjectBuilder {
      * name produced by {@link #flatAssetName}, which the Flutter runtime's
      * {@code FlutterAssets} recomputes when resolving {@code Image.asset(...)}.</p>
      */
-    private void copyAssets() throws BuildException {
+    void copyAssets() throws BuildException {
         File outDir = assetsDir;
         Set<String> written = new HashSet<String>();
         List<String> keys = new ArrayList<String>();
@@ -325,7 +325,7 @@ public final class FlutterProjectBuilder {
      * the application's own resources, and a name this plugin did not write is not
      * one it should remove.</p>
      */
-    private void removeStaleAssets(Set<String> written) throws BuildException {
+    void removeStaleAssets(Set<String> written) throws BuildException {
         File outDir = assetsDir;
         File manifest = assetManifest;
         try {

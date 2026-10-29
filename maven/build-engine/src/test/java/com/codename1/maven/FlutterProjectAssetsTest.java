@@ -23,15 +23,13 @@
  */
 package com.codename1.maven;
 
-import org.apache.maven.model.Build;
-import org.apache.maven.project.MavenProject;
+import com.codename1.build.SystemStreamLog;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import java.io.File;
-import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.util.HashSet;
 
@@ -44,12 +42,12 @@ import static org.junit.Assert.assertTrue;
  * what disappears from src/main/flutter disappears from the output, and nothing
  * the plugin did not write is ever removed.
  */
-public class TranscodeFlutterAssetsTest {
+public class FlutterProjectAssetsTest {
 
     @Rule
     public TemporaryFolder tmp = new TemporaryFolder();
 
-    private TranscodeFlutterMojo mojo;
+    private FlutterProjectBuilder mojo;
     private File flutter;
     private File classes;
 
@@ -58,14 +56,9 @@ public class TranscodeFlutterAssetsTest {
         File target = tmp.newFolder("target");
         classes = new File(target, "classes");
         flutter = tmp.newFolder("flutter");
-        MavenProject project = new MavenProject();
-        Build build = new Build();
-        build.setDirectory(target.getAbsolutePath());
-        build.setOutputDirectory(classes.getAbsolutePath());
-        project.setBuild(build);
-        mojo = new TranscodeFlutterMojo();
-        set("project", project);
-        set("flutterSourceDir", flutter);
+        mojo = new FlutterProjectBuilder(flutter, new File(target, "generated-sources/flutter"), classes,
+                new File(target, "cn1-flutter-assets.lst"), new File(target, "dart2java-state.txt"), null,
+                new SystemStreamLog());
     }
 
     @Test
@@ -91,7 +84,7 @@ public class TranscodeFlutterAssetsTest {
         asset("assets/2.5x/a.png");
         asset("packages/lib/assets/3x/b.png");
         mojo.copyAssets();
-        File manifest = new File(classes, TranscodeFlutterMojo.ASSET_MANIFEST);
+        File manifest = new File(classes, FlutterProjectBuilder.ASSET_MANIFEST);
         assertTrue(manifest.isFile());
         assertEquals(java.util.Arrays.asList("assets/2.5x/a.png", "assets/a.png", "packages/lib/assets/3x/b.png"),
                 Files.readAllLines(manifest.toPath(), java.nio.charset.StandardCharsets.UTF_8));
@@ -198,10 +191,10 @@ public class TranscodeFlutterAssetsTest {
 
         mojo.copyAssets();
 
-        File asset = new File(classes, TranscodeFlutterMojo.flatAssetName("AssetManifest.txt"));
+        File asset = new File(classes, FlutterProjectBuilder.flatAssetName("AssetManifest.txt"));
         assertEquals("this is the developer's own asset", new String(Files.readAllBytes(asset.toPath()),
                 java.nio.charset.StandardCharsets.UTF_8));
-        File manifestFile = new File(classes, TranscodeFlutterMojo.ASSET_MANIFEST);
+        File manifestFile = new File(classes, FlutterProjectBuilder.ASSET_MANIFEST);
         assertTrue("the generated manifest is written under its own name", manifestFile.isFile());
         assertFalse(asset.getName().equals(manifestFile.getName()));
     }
@@ -214,11 +207,11 @@ public class TranscodeFlutterAssetsTest {
     @Test
     public void encodingMatchesTheRuntimeAndIsPrefixFree() {
         assertEquals("cn1f_assets_sstudies_sreply__card.png",
-                TranscodeFlutterMojo.flatAssetName("assets/studies/reply_card.png"));
-        assertEquals("cn1f_a___sb.png", TranscodeFlutterMojo.flatAssetName("a_/b.png"));
-        assertEquals("cn1f_a_s__b.png", TranscodeFlutterMojo.flatAssetName("a/_b.png"));
-        assertFalse(TranscodeFlutterMojo.flatAssetName("a_/b.png")
-                .equals(TranscodeFlutterMojo.flatAssetName("a/_b.png")));
+                FlutterProjectBuilder.flatAssetName("assets/studies/reply_card.png"));
+        assertEquals("cn1f_a___sb.png", FlutterProjectBuilder.flatAssetName("a_/b.png"));
+        assertEquals("cn1f_a_s__b.png", FlutterProjectBuilder.flatAssetName("a/_b.png"));
+        assertFalse(FlutterProjectBuilder.flatAssetName("a_/b.png")
+                .equals(FlutterProjectBuilder.flatAssetName("a/_b.png")));
     }
 
     private File asset(String key) throws Exception {
@@ -229,20 +222,6 @@ public class TranscodeFlutterAssetsTest {
     }
 
     private File flat(String key) {
-        return new File(classes, TranscodeFlutterMojo.flatAssetName(key));
-    }
-
-    private void set(String name, Object value) throws Exception {
-        for (Class<?> c = mojo.getClass(); c != null; c = c.getSuperclass()) {
-            try {
-                Field f = c.getDeclaredField(name);
-                f.setAccessible(true);
-                f.set(mojo, value);
-                return;
-            } catch (NoSuchFieldException keepLooking) {
-                // up the chain
-            }
-        }
-        throw new NoSuchFieldException(name);
+        return new File(classes, FlutterProjectBuilder.flatAssetName(key));
     }
 }
