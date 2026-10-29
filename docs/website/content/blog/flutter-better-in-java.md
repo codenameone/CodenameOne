@@ -46,7 +46,7 @@ Today is the Flutter story and the numbers behind it. Then one post a day:
 - **Sunday, November 1:** {{< post-link path="/blog/swing-and-javafx-on-phones" text="Your Swing and JavaFX Code on iPhone, Android and the Web" >}}. What carries over, what doesn't, and why you might not miss the parts that don't.
 - **Monday, November 2:** {{< post-link path="/blog/bastion-hardened-bank-template" text="Bastion: A Hardened Bank Template, and Crypto Wallets in Core" >}}. A virtual bank and exchange with passkeys, signed requests and a double entry ledger, plus wallets for Ethereum, Bitcoin, and Solana.
 - **Tuesday, November 3:** {{< post-link path="/blog/reel-streaming-and-courses-template" text="Reel: Your Own Streaming Service or Course Platform" >}}. Community uploads, courses, DRM and moderation in one Java project.
-- **Wednesday, November 4:** {{< post-link path="/blog/android-apps-everywhere-even-without-google" text="Your Android App on iPhone, and on Phones Without Google" >}}. Room, WorkManager and document pickers in the Android layer, and apps that run on GrapheneOS as they are.
+- **Wednesday, November 4:** {{< post-link path="/blog/android-apps-everywhere-even-without-google" text="Your Android App on iPhone, and on GrapheneOS, LineageOS and /e/OS" >}}. Room, WorkManager and document pickers in the Android layer, and apps that run on GrapheneOS as they are.
 - **Thursday, November 5:** {{< post-link path="/blog/backend-caches-certificates-and-a-simulator-that-types" text="Caches, Certificates, Streaming Uploads and a Simulator That Types" >}}. Eight backend upgrades and a simulator with a virtual keyboard and video recording.
 
 {{< guide-block >}}
@@ -70,19 +70,17 @@ Every commit to Codename One builds the Flutter Gallery twice: once with Flutter
 
 CI collects 26 metrics: installed size, executable code and download size on six platforms, plus cold start and memory at rest on the four where we can measure both sides fairly. Codename One is ahead on all 26. The Android timings come from an emulator, and iOS start-up and memory aren't measured; both are explained below. The biggest gaps are on Android, where the app starts in a third of the time and carries a quarter of the code, and on Linux, where it settles at 82 MB against 224 MB.
 
-Some of this cuts in Flutter's favor and some doesn't. Our runtime ignores a few parameters Flutter honors (the guide lists them), so we aren't doing every bit of Flutter's work. On the other hand, the app is Flutter's own showcase, written in Flutter's idioms. To run it, Codename One carries a runtime that reimplements Flutter's widget, element and layout model on top of Codename One components. A Codename One app never pays for that layer. We win while paying for it.
+The comparison is tilted toward Flutter, not away from it. The app is Flutter's own showcase, written by the Flutter team in Flutter's idioms, and Codename One runs it as it is. To do that, Codename One carries a runtime that reimplements Flutter's widget, element and layout model on top of Codename One components. That layer is slower than Codename One code written directly; the [Compose post](/blog/compose-on-more-screens/) shows the same effect, where the imperative Java version of a screen does a third of the work of the declarative one. A Codename One app never pays for that layer. We win while paying for it.
 
-CI also runs eleven small compute workloads (hash maps, recursion, string building, sorting, arithmetic and more) in both languages. Here the result is mixed, and I want to be clear about where we lose:
+CI also runs eleven compute workloads (hash maps, recursion, string building, sorting, arithmetic and more) in Java and in Dart. On every native platform we measured, Codename One is faster overall, by 1.3x on Android up to 1.9x on Windows and Linux:
 
-| Platform | Compute, geometric mean | Where Flutter is ahead |
-| --- | --- | --- |
-| Windows | Codename One 1.9x faster | Long arithmetic, slightly |
-| Linux | Codename One 1.9x faster | Nowhere |
-| macOS | Codename One 1.5x faster | Object allocation (3x) and quicksort, slightly |
-| Android | Codename One 1.3x faster | Object allocation (2.3x) and value escape |
-| Web | Flutter 3.6x faster | Nearly everything |
+{{< guide-block >}}
+<img width="760" height="574" src="/blog/release-2026-10-30/flutter-compute.svg" alt="Compute speedups for eleven workloads on Android, macOS, Windows and Linux. Codename One is faster or tied in 38 of the 43 measured cells. Flutter wins object allocation on Android (2.3x) and macOS (3.1x), value escape on Android (1.2x), and quicksort on macOS and long arithmetic on Windows by a few percent. Geometric means: Android 1.3x, macOS 1.5x, Windows 1.9x, Linux 1.9x for Codename One." loading="lazy" style="width:100%;height:auto;margin:16px 0" />
+{{< /guide-block >}}
 
-On the web we lose compute badly, by 3.6x, and I don't have a fix for that yet. The sizes still favor us there.
+Flutter takes 5 of the 43 cells. Two are within a few percent. The real one is object allocation on Android and macOS, where Dart's allocator is quick at short lived objects; that's on our list.
+
+The web is the exception, and it's the one place Flutter is faster. We leave it out of the comparison because Flutter's web build gets some of the workloads wrong: integer arithmetic, random array access and quicksort return different checksums than the same code on every other platform, because Dart on the web runs numbers as JavaScript doubles. A benchmark that gets the answer wrong can't be timed against one that gets it right. On the workloads where both sides agree, Flutter is ahead. The browser is asynchronous by nature, and that's the one environment where Flutter's model helps it rather than costing it. The sizes still favor us there.
 
 Some things aren't measured, and the charts leave them out rather than guess. Flutter can't compile Dart ahead of time for the iOS simulator, so iOS start-up and memory would compare Flutter's debug engine against our release build. We report iOS sizes only. Web start-up needs a browser driver the benchmark doesn't have yet. Android timings come from an emulator, so they compare two builds on one machine rather than predicting a phone. The method, the harness and the raw numbers are in the [Flutter chapter of the developer guide](/developer-guide/flutter-interop/), and the benchmark lives in `scripts/flutter-bench` in the [repository](https://github.com/codenameone/CodenameOne).
 
@@ -145,6 +143,16 @@ dashboard.add(new Button("Also Codename One"));
 dashboard.show();
 ```
 
+## Can't Flutter do the same?
+
+No. Flutter could, in theory, run a Codename One app the way we run a Flutter app. It would be slow, because the two models point in opposite directions.
+
+Flutter is asynchronous to the core. Dart runs in an event loop, platform calls are messages that come back as futures, and the engine draws on its own threads. Codename One is synchronous: your code calls the platform and gets an answer. Emulating a synchronous API on top of an asynchronous one means queuing, waiting and copying on every call. Going the other way is cheap: a future is a callback, and a callback is a method call.
+
+The same reason explains why Flutter can't catch Codename One on most platforms. Operating systems, graphics APIs and hardware are synchronous. Codename One calls them directly. Flutter goes through a message channel and its own engine to reach them.
+
+Android makes it obvious. The native platform on Android is Java. Codename One compiles to it and talks to Android the way Android expects. Flutter avoids it, shipping its own VM and engine beside the one the phone already has. That's why Android shows the biggest gap: a third of the start-up time and a quarter of the code.
+
 ## We can finally show the code
 
 For years, every Codename One against Flutter discussion went the same way. I'd explain why ahead of time compiled Java with a lightweight UI should produce a smaller, faster app. Someone would explain why it shouldn't. Neither of us had the same app built both ways, so it came down to which camp you were already in.
@@ -160,12 +168,6 @@ The part I didn't expect is how much this made Codename One better. Each compati
 - **An idle app burned CPU.** The Compose work found, and we fixed, a bug where on phones with a notch, safe area padding kept queuing layout so an idle app sat at 14% to 26% CPU.
 
 None of these fixes are specific to Flutter. If you write Codename One apps in plain Java and never touch a Dart file, your app gets these fixes too: faster start-up, lower memory and an idle CPU that stays idle.
-
-## The universal platform
-
-Last week I made the case that [a Java word processor beats its Rust twin](/blog/rewrite-everything-in-java-not-rust/). This week the swing is bigger. Flutter, Compose, Swing, JavaFX and Android code all build into the same kind of app and run on iOS, Android, desktop, the web and the watch.
-
-Instead of coding to an operating system, you code to Codename One, and Codename One becomes the operating system. The usual price for that kind of abstraction is performance. On the native targets we measured, we don't charge it.
 
 ## More This Week
 
@@ -187,13 +189,32 @@ class MyApp : Lifecycle() {
 
 Saturday's {{< post-link path="/blog/compose-on-more-screens" text="Compose article" >}} has the numbers and their caveats.
 
-### Swing and JavaFX, with the limits up front
+### Swing and JavaFX on phones
 
-We can't run every Swing or JavaFX app, and I won't pretend otherwise. There are no class loaders, no runtime reflection and no third party jars compiled against `java.awt`. What does carry over is a lot of real application code: the samples we test include SwingSet2 and Notepad, the JDK's own demos. On Linux the native build is 4 to 6 times smaller zipped than the same app on the JVM, and starts faster in 7 of 8 apps even against a JVM tuned with AppCDS. Sunday's {{< post-link path="/blog/swing-and-javafx-on-phones" text="Swing and JavaFX article" >}} goes through what works, what doesn't, and why the missing pieces matter less than you'd think.
+A large share of real Swing and JavaFX code now builds for iOS, Android and the web: the samples we test include SwingSet2 and Notepad, the JDK's own demos. On Linux the native build is 4 to 6 times smaller zipped than the same app on the JVM, and starts faster in 7 of 8 apps even against a JVM tuned with AppCDS.
+
+{{< guide-block >}}
+<div class="release-screenshots" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,140px),1fr));gap:16px;align-items:start;margin:24px 0">
+<figure style="margin:0"><img width="589" height="1278" src="/developer-guide/img/desktop-compat-ios-swing-controls.png" alt="Swing controls running on an iPhone" loading="lazy" style="width:100%;height:auto" /><figcaption>Swing controls.</figcaption></figure>
+<figure style="margin:0"><img width="589" height="1278" src="/developer-guide/img/desktop-compat-ios-swing-tables.png" alt="A JTable running on an iPhone" loading="lazy" style="width:100%;height:auto" /><figcaption>JTable.</figcaption></figure>
+<figure style="margin:0"><img width="589" height="1278" src="/developer-guide/img/desktop-compat-ios-javafx-controls.png" alt="JavaFX controls running on an iPhone" loading="lazy" style="width:100%;height:auto" /><figcaption>JavaFX.</figcaption></figure>
+<figure style="margin:0"><img width="589" height="1278" src="/developer-guide/img/desktop-compat-ios-javafx-fxml.png" alt="An FXML form running on an iPhone" loading="lazy" style="width:100%;height:auto" /><figcaption>FXML and CSS.</figcaption></figure>
+</div>
+{{< /guide-block >}}
+
+Sunday's {{< post-link path="/blog/swing-and-javafx-on-phones" text="Swing and JavaFX article" >}} goes through what carries over and why you won't miss what doesn't.
 
 ### A bank you can study, and wallets in core
 
 A large share of our users are banks and financial institutions. **Bastion** is a reference implementation for them: a virtual bank and small exchange with passkeys, TOTP, signed requests, device keys, a hash chained audit log, a double entry ledger and an auditor console. Codename One also gained wallet APIs for Ethereum, Bitcoin, and Solana.
+
+{{< guide-block >}}
+<div class="release-screenshots" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,140px),1fr));gap:16px;align-items:start;margin:24px 0">
+<figure style="margin:0"><img width="420" height="860" src="/developer-guide/img/bastion-dashboard.png" alt="The Bastion dashboard" loading="lazy" style="width:100%;height:auto" /><figcaption>Four currencies.</figcaption></figure>
+<figure style="margin:0"><img width="420" height="860" src="/developer-guide/img/bastion-exchange.png" alt="The Bastion exchange" loading="lazy" style="width:100%;height:auto" /><figcaption>The exchange.</figcaption></figure>
+<figure style="margin:0"><img width="420" height="860" src="/developer-guide/img/bastion-security-center.png" alt="The Bastion Security Center" loading="lazy" style="width:100%;height:auto" /><figcaption>The Security Center.</figcaption></figure>
+</div>
+{{< /guide-block >}}
 
 ```java {class="cn1-no-try"}
 Wallet wallet = Wallet.fromMnemonic(words, "");
@@ -206,17 +227,47 @@ Monday's {{< post-link path="/blog/bastion-hardened-bank-template" text="Bastion
 
 ### Streaming and courses
 
-**Reel** is a streaming service and its server in one Java project. Switch a preset and it becomes a subscription service, a creator platform in the style of YouTube, or an academy with courses, lessons, and quizzes. Tuesday's {{< post-link path="/blog/reel-streaming-and-courses-template" text="Reel article" >}} walks through uploads, moderation, and DRM.
+**Reel** is a streaming service and its server in one Java project. Switch a preset and it becomes a subscription service, a creator platform in the style of YouTube, or an academy with courses, lessons, and quizzes. {{< guide-block >}}
+<div class="release-screenshots" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,140px),1fr));gap:16px;align-items:start;margin:24px 0">
+<figure style="margin:0"><img width="1080" height="1920" src="/developer-guide/img/reel-viewer-home.png" alt="The Reel catalog" loading="lazy" style="width:100%;height:auto" /><figcaption>The catalog.</figcaption></figure>
+<figure style="margin:0"><img width="1080" height="1920" src="/developer-guide/img/reel-viewer-player-tracks.png" alt="The Reel player" loading="lazy" style="width:100%;height:auto" /><figcaption>The player.</figcaption></figure>
+<figure style="margin:0"><img width="1080" height="1920" src="/developer-guide/img/reel-viewer-course.png" alt="A Reel course" loading="lazy" style="width:100%;height:auto" /><figcaption>A course.</figcaption></figure>
+</div>
+{{< /guide-block >}}
 
-### Android code everywhere, and Android without Google
+```java {class="cn1-no-try"}
+StreamRequest req = new StreamRequest(manifestUrl)
+        .setDrm(new DrmConfig(DrmScheme.WIDEVINE, licenseUrl));
+```
 
-The Android compatibility layer now covers Room, WorkManager, location, sensors, foreground services and the document picker intents, all running on iOS too. And Codename One apps now run on de-Googled Android such as GrapheneOS out of the box: one APK checks for Play Services at run time. Wednesday's {{< post-link path="/blog/android-apps-everywhere-even-without-google" text="Android article" >}} has the details.
+Tuesday's {{< post-link path="/blog/reel-streaming-and-courses-template" text="Reel article" >}} walks through uploads, moderation, and DRM.
+
+### Android code everywhere, including GrapheneOS
+
+The Android compatibility layer now covers Room, WorkManager, location, sensors, foreground services and the document picker intents, all running on iOS too. And Codename One apps now run on GrapheneOS, LineageOS, CalyxOS and /e/OS out of the box: one APK checks for Play Services at run time, and push works through UnifiedPush.
+
+{{< guide-block >}}
+<div class="release-screenshots" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:16px;align-items:start;margin:24px 0">
+<figure style="margin:0"><img width="736" height="800" src="/developer-guide/img/android-interop-material.png" alt="A Material 3 screen on Android and on Codename One" loading="lazy" style="width:100%;height:auto" /><figcaption>Material 3, Android left, Codename One right.</figcaption></figure>
+<figure style="margin:0"><img width="736" height="800" src="/developer-guide/img/android-interop-recycler.png" alt="A RecyclerView on Android and on Codename One" loading="lazy" style="width:100%;height:auto" /><figcaption>RecyclerView, same source.</figcaption></figure>
+</div>
+{{< /guide-block >}}
+
+Wednesday's {{< post-link path="/blog/android-apps-everywhere-even-without-google" text="Android article" >}} has the details.
 
 ### A modern backend, and a simulator that types
 
+{{< guide-block >}}
+<video controls playsinline muted loop preload="metadata" poster="/blog/release-2026-10-30/simulator-virtual-keyboard-poster.jpg" width="540" height="960" style="width:100%;height:auto;max-width:280px;display:block;margin:16px auto"><source src="/blog/release-2026-10-30/simulator-virtual-keyboard.mp4" type="video/mp4">The simulated keyboard sliding up over a sign up form.</video>
+{{< /guide-block >}}
+
 Thursday closes the week with eight backend upgrades (a bounded cache, outbound OAuth tokens, PKI, JSON codecs, streaming uploads, error advice, `java.time` in the ORM and test slices) and a simulator that slides up a virtual keyboard and records video. See the {{< post-link path="/blog/backend-caches-certificates-and-a-simulator-that-types" text="backend and simulator article" >}}.
 
-## Try it
+## The universal platform
+
+Last week I made the case that [a Java word processor beats its Rust twin](/blog/rewrite-everything-in-java-not-rust/). This week the swing is bigger. Flutter, Compose, Swing, JavaFX and Android code all build into the same kind of app and run on iOS, Android, desktop, the web and the watch.
+
+Instead of coding to an operating system, you code to Codename One, and Codename One becomes the operating system. The usual price for that kind of abstraction is performance. We don't charge it. You get more performance, more features, more compatibility and more platforms, and it's free and open source.
 
 If you have a Flutter app, run the import on a copy and build it for the simulator. Tell me which screen breaks first; that's the most useful bug report I can get right now. If you're on Kotlin, Swing, JavaFX or Android, the rest of this week is for you. And if you think a number above is wrong, the benchmark is in the repository. Rerun it and open an issue.
 

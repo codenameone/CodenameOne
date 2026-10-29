@@ -81,6 +81,6 @@ Payments are simulated in the dev profile; the test card 4242 4242 4242 4242 goe
 
 Generate Reel from the [Initializr](/initializr/). The [user's guide](/developer-guide/reel-users-guide/) walks through every screen, and the [implementor's guide](/developer-guide/reel-implementors-guide/) covers the packaging pipeline, DRM vendors and what to change before you launch. The template source is free under MIT-0, with no royalties and no revenue share.
 
-Tomorrow: {{< post-link path="/blog/android-apps-everywhere-even-without-google" text="Your Android App on iPhone, and on Phones Without Google" >}}.
+Tomorrow: {{< post-link path="/blog/android-apps-everywhere-even-without-google" text="Your Android App on iPhone, and on GrapheneOS, LineageOS and /e/OS" >}}.
 
 {{< giscus >}}

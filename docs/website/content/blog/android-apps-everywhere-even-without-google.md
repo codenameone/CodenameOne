@@ -1,17 +1,17 @@
 ---
-title: "Your Android App on iPhone, and on Phones Without Google"
+title: "Your Android App on iPhone, and on GrapheneOS, LineageOS and /e/OS"
 slug: android-apps-everywhere-even-without-google
 url: /blog/android-apps-everywhere-even-without-google/
 date: '2026-11-04'
 author: Shai Almog
-description: "The Android compatibility layer now runs Room, WorkManager, location, sensors, foreground services and document picker intents on iOS, desktop and the web. And Codename One apps run on de-Googled Android such as GrapheneOS with no build hints, with push through UnifiedPush."
-feed_html: "<img src=\"https://www.codenameone.com/blog/android-apps-everywhere-even-without-google.jpg\" alt=\"An Android app running on Android and on Codename One side by side\" /> The Android layer now runs Room, WorkManager, location and document pickers on iOS and desktop, and Codename One apps run on GrapheneOS with no build hints."
+description: "The Android compatibility layer now runs Room, WorkManager, location, sensors, foreground services and document picker intents on iOS, desktop and the web. And Codename One apps run on GrapheneOS, LineageOS, CalyxOS and /e/OS as they are, with push through UnifiedPush."
+feed_html: "<img src=\"https://www.codenameone.com/blog/android-apps-everywhere-even-without-google.jpg\" alt=\"An Android app running on Android and on Codename One side by side\" /> The Android layer now runs Room, WorkManager, location and document pickers on iOS and desktop, and Codename One apps run on GrapheneOS, LineageOS, CalyxOS and /e/OS."
 series: ["release-2026-10-30"]
 ---
 
 ![An Android app running on Android and on Codename One side by side](/blog/android-apps-everywhere-even-without-google.jpg)
 
-This post is about Android in two directions. The first is taking an existing Android app, written with activities, XML layouts and AndroidX, and running it on iPhone, desktop and the web. The second is running Codename One apps on Android phones that don't have Google at all.
+This post is about Android in two directions. The first is taking an existing Android app, written with activities, XML layouts and AndroidX, and running it on iPhone, desktop and the web. The second is running Codename One apps on GrapheneOS, LineageOS, CalyxOS, /e/OS and other Android builds that don't have Google at all.
 
 ## Classic Android apps, everywhere
 
@@ -68,7 +68,7 @@ Some Android behavior has no iOS equivalent, and the [Android chapter](/develope
 
 Other limits: Keystore keys aren't hardware backed there, `Parcel` is an in process container, SQLite uses a single connection, there are no system content providers or broadcasts, and reflection based libraries won't run on iOS.
 
-## Android without Google
+## GrapheneOS, LineageOS, CalyxOS and /e/OS
 
 I was a member of Team OS/2. I know what it's like to use an operating system the big vendors forgot, and to find that half the apps you need just don't start. People choose GrapheneOS, LineageOS and other AOSP builds for good reasons, usually privacy, and they deserve apps that work.
 
