@@ -13,7 +13,7 @@ series: ["release-2026-10-30"]
 
 There's a lot of Swing and JavaFX code in the world. Much of it is internal tooling and line of business software that works fine and that nobody wants to rewrite. Then someone asks for it on an iPad, or in a browser, and the answer has always been "rewrite it."
 
-Codename One can now build a large share of that code for iOS, Android, the web and native desktop, as a native app with no JVM inside. SwingSet2 and Notepad, the JDK's own demos, build and run. This post shows what carries over, what it costs in size and start-up (less than the JVM), and why the parts that don't carry over have better replacements in a client app.
+Codename One can now build a large share of that code for iOS, Android, the web and native desktop, as a native app with no JVM inside. SwingSet2 and Notepad, the JDK's own demos, both build and run. This post shows what carries over, what it costs in size and start-up (less than the JVM), and why the parts that don't carry over have better replacements in a client app.
 
 ## What it does
 

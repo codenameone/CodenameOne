@@ -75,10 +75,10 @@ The comparison is tilted toward Flutter, not away from it. The app is Flutter's 
 CI also runs eleven compute workloads (hash maps, recursion, string building, sorting, arithmetic and more) in Java and in Dart. On every native platform we measured, Codename One is faster overall, by 1.3x on Android up to 1.9x on Windows and Linux:
 
 {{< guide-block >}}
-<img width="760" height="574" src="/blog/release-2026-10-30/flutter-compute.svg" alt="Compute speedups for eleven workloads on Android, macOS, Windows and Linux. Codename One is faster or tied in 38 of the 43 measured cells. Flutter wins object allocation on Android (2.3x) and macOS (3.1x), value escape on Android (1.2x), and quicksort on macOS and long arithmetic on Windows by a few percent. Geometric means: Android 1.3x, macOS 1.5x, Windows 1.9x, Linux 1.9x for Codename One." loading="lazy" style="width:100%;height:auto;margin:16px 0" />
+<img width="760" height="574" src="/blog/release-2026-10-30/flutter-compute.svg" alt="Compute speedups for eleven workloads on Android, macOS, Windows and Linux. Codename One is faster or tied in 38 of the 43 measured cells. Flutter wins object allocation on Android (2.3x) and macOS (3.1x), value escape on Android (1.2x), and quicksort on macOS and long arithmetic on Windows by 2% and 6%. Geometric means: Android 1.3x, macOS 1.5x, Windows 1.9x, Linux 1.9x for Codename One." loading="lazy" style="width:100%;height:auto;margin:16px 0" />
 {{< /guide-block >}}
 
-Flutter takes 5 of the 43 cells. Two are within a few percent. The real one is object allocation on Android and macOS, where Dart's allocator is quick at short lived objects; that's on our list.
+Flutter takes 5 of the 43 cells. Two are within 6%. The real one is object allocation on Android and macOS, where Dart's allocator is quick at short lived objects; that's on our list.
 
 The web is the exception, and it's the one place Flutter is faster. We leave it out of the comparison because Flutter's web build gets some of the workloads wrong: integer arithmetic, random array access and quicksort return different checksums than the same code on every other platform, because Dart on the web runs numbers as JavaScript doubles. A benchmark that gets the answer wrong can't be timed against one that gets it right. On the workloads where both sides agree, Flutter is ahead. The browser is asynchronous by nature, and that's the one environment where Flutter's model helps it rather than costing it. The sizes still favor us there.
 
