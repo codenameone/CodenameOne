@@ -90,6 +90,16 @@ public class ImportFlutterProjectMojo extends AbstractCN1Mojo {
             getLog().warn("  asset not imported, its path is taken by a lib/ source file: " + a
                     + " (rename one of them)");
         }
+        // The same report, machine-readable: each package's status, why an unsupported
+        // one is (through which dependencies), and the app files that reach it.
+        File report = new File(common, "target/flutter-import-report.json");
+        try {
+            report.getParentFile().mkdirs();
+            java.nio.file.Files.write(report.toPath(), r.toJson().getBytes("UTF-8"));
+            getLog().info("Import report: " + report);
+        } catch (java.io.IOException e) {
+            getLog().warn("Could not write " + report + ": " + e.getMessage());
+        }
         if (!r.unresolvedPackages.isEmpty()) {
             // Each one was already warned individually, with the remedy, as it was hit.
             getLog().warn("  " + r.unresolvedPackages.size() + " pub package(s) could not be resolved: "

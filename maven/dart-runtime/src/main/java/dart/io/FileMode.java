@@ -23,17 +23,26 @@
  */
 package dart.io;
 
-/** Dart's {@code FileMode}; only whether a write appends matters here. */
+/**
+ * Dart's {@code FileMode}: whether a write appends, and for {@link File#open} whether the
+ * file can be read and whether opening it empties it.
+ */
 public final class FileMode {
-    public static final FileMode read = new FileMode(false);
-    public static final FileMode write = new FileMode(false);
-    public static final FileMode append = new FileMode(true);
-    public static final FileMode writeOnly = new FileMode(false);
-    public static final FileMode writeOnlyAppend = new FileMode(true);
+    public static final FileMode read = new FileMode(false, true, false, false);
+    public static final FileMode write = new FileMode(false, true, true, true);
+    public static final FileMode append = new FileMode(true, true, true, false);
+    public static final FileMode writeOnly = new FileMode(false, false, true, true);
+    public static final FileMode writeOnlyAppend = new FileMode(true, false, true, false);
 
     final boolean append_;
+    final boolean readable;
+    final boolean writable;
+    final boolean truncates;
 
-    private FileMode(boolean append) {
+    private FileMode(boolean append, boolean readable, boolean writable, boolean truncates) {
         this.append_ = append;
+        this.readable = readable;
+        this.writable = writable;
+        this.truncates = truncates;
     }
 }

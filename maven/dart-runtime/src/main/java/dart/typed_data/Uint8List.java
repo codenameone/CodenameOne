@@ -130,4 +130,17 @@ public final class Uint8List {
     public byte[] toBytes() {
         return bytes;
     }
+
+    /// `[1, 2, 3]`, as Dart prints any list; it printed the Java object id.
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < bytes.length; i++) {
+            if (i > 0) {
+                sb.append(", ");
+            }
+            sb.append(bytes[i] & 0xff);
+        }
+        return sb.append(']').toString();
+    }
 }

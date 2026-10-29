@@ -154,7 +154,9 @@ public final class AstBuilder {
                     lib.importPrefixes.add(spec.identifier().getText());
                     lib.prefixImports.put(spec.identifier().getText(), stripQuotes(uri));
                 }
-                lib.importDirectives.add(directive(stripQuotes(uri), spec.combinator()));
+                Ast.Directive d = directive(stripQuotes(uri), spec.combinator());
+                d.prefix = spec.identifier() == null ? null : spec.identifier().getText();
+                lib.importDirectives.add(d);
             } else if (ie.libraryExport() != null) {
                 Dart2Parser.LibraryExportContext ex = ie.libraryExport();
                 lib.exportDirectives.add(directive(stripQuotes(selectUri(ex.configurableUri())), ex.combinator()));
@@ -171,13 +173,13 @@ public final class AstBuilder {
 
     /**
      * The {@code dart:} libraries this runtime implements, i.e. the {@code dart.library.X}
-     * conditions that are true here. {@code dart:io}, {@code dart:html}, {@code dart:ffi}
+     * conditions that are true here. {@code dart:html}, {@code dart:ffi}
      * and the JS interop libraries are not provided, so a conditional import keyed on one
      * of them takes its default (usually the portable stub), exactly as Dart picks it on
      * a platform without that library.
      */
     private static final java.util.Set<String> SUPPORTED_DART_LIBRARIES = new java.util.HashSet<String>(
-            java.util.Arrays.asList("core", "async", "collection", "convert", "io", "math", "typed_data", "ui"));
+            java.util.Arrays.asList("core", "async", "collection", "convert", "developer", "io", "math", "typed_data", "ui"));
 
     /**
      * Picks the uri a configurable import/export names on this platform: the first

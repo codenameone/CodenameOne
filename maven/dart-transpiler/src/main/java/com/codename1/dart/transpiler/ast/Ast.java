@@ -160,6 +160,8 @@ public final class Ast {
         /** Names a `show` lists; null when there is no show combinator. */
         public List<String> show;
         public List<String> hide = new ArrayList<String>();
+        /** The {@code as} name of an import, else null. */
+        public String prefix;
 
         /** Whether a declaration named {@code name} passes this directive's combinators. */
         public boolean admits(String name) {

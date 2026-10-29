@@ -8369,7 +8369,8 @@ public final class JavaEmitter {
         // is globally addressable, so dispatch it as a bare (unqualified) call.
         if (c.name != null && isImportPrefix(c.target, ctx)
                 && (program.functions.containsKey(c.name) || program.classes.containsKey(c.name)
-                    || stubs.isStubClass(c.name) || stubs.functions.containsKey(c.name))) {
+                    || stubs.isStubClass(c.name) || stubs.functions.containsKey(c.name)
+                    || prefixedLibraryFunction(((Ident) c.target).name, c.name, ctx))) {
             Call bare = new Call();
             bare.file = c.file;
             bare.line = c.line;
@@ -8641,8 +8642,13 @@ public final class JavaEmitter {
             // Object parameters: a primitive long/double/bool argument autoboxes.
             return new Out("DartRuntime.identical(" + a.code + ", " + b.code + ")", TypeRef.BOOL);
         }
-        // stub top-level function (e.g. runApp)
-        Ast.FunctionDecl sf = stubs.functions.get(n);
+        // stub top-level function (e.g. runApp); a dart: library's own, when its name
+        // collides with another's (dart:developer's log is not dart:math's), only
+        // through that library's import
+        Ast.FunctionDecl sf = libraryStubFunction(n, ctx);
+        if (sf == null) {
+            sf = stubs.functions.get(n);
+        }
         if (sf != null && sf.javaName != null) {
             int dot = sf.javaName.lastIndexOf('.');
             String cls = sf.javaName.substring(0, dot);
@@ -8675,6 +8681,48 @@ public final class JavaEmitter {
         diags.error(c, "E0135", "Cannot resolve function or constructor '" + n
                 + "'. Confirm the file passes `dart analyze`, or the API may be unsupported in M1.");
         return new Out("null", TypeRef.DYNAMIC, true);
+    }
+
+    /**
+     * The {@code dartlib_<lib>.dart} stub function {@code n} this call reaches: through
+     * its prefix when the call is {@code prefix.n(...)} and the prefix imports
+     * {@code dart:<lib>}, else through an unprefixed import of {@code dart:<lib>} that
+     * admits {@code n}. Null when the call reaches no such function.
+     */
+    private Ast.FunctionDecl libraryStubFunction(String n, Ctx ctx) {
+        if (stubs.libraryFunctions.isEmpty()) {
+            return null;
+        }
+        Ast.Library lib = ctx.library();
+        if (lib == null) {
+            return null;
+        }
+        String prefix = ctx.callPrefix;
+        if (prefix != null) {
+            String uri = lib.prefixImports.get(prefix);
+            return uri != null && uri.startsWith("dart:") ? libraryFunction(uri.substring(5), n) : null;
+        }
+        for (Ast.Directive d : lib.importDirectives) {
+            if (d.uri == null || !d.uri.startsWith("dart:") || !d.admits(n) || d.prefix != null) {
+                continue;
+            }
+            Ast.FunctionDecl f = libraryFunction(d.uri.substring(5), n);
+            if (f != null) {
+                return f;
+            }
+        }
+        return null;
+    }
+
+    private boolean prefixedLibraryFunction(String prefix, String n, Ctx ctx) {
+        Ast.Library lib = ctx.library();
+        String uri = lib == null ? null : lib.prefixImports.get(prefix);
+        return uri != null && uri.startsWith("dart:") && libraryFunction(uri.substring(5), n) != null;
+    }
+
+    private Ast.FunctionDecl libraryFunction(String library, String n) {
+        Map<String, Ast.FunctionDecl> m = stubs.libraryFunctions.get(library);
+        return m == null ? null : m.get(n);
     }
 
     private Out emitMethodCallOn(Out target, Call c, Ctx ctx) {

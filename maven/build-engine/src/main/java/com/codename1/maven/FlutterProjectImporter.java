@@ -172,10 +172,89 @@ public final class FlutterProjectImporter {
         /// the reason: a platform plugin, or a library that needs dart:ffi, dart:html
         /// or dart:mirrors. These are what an import of this app cannot provide.
         public final Map<String, String> unsupportedPackages = new TreeMap<String, String>();
+        /// A plugin with no Android or iOS implementation, transpiled as Dart (see
+        /// [#isForeignPlatformPlugin]), with the platforms it does implement.
+        public final Map<String, String> foreignPlugins = new TreeMap<String, String>();
+        /// For an unsupported package, the packages its verdict came through, ending with
+        /// the one that is unsupported itself: `[firebase_ui_oauth, flutter_svg,
+        /// vector_graphics_compiler]` when vector_graphics_compiler needs dart:ffi.
+        public final Map<String, List<String>> unsupportedChains = new TreeMap<String, List<String>>();
+        /// Every package the import reached, with the app's own `lib/` files that reach
+        /// it, directly or through other packages.
+        public final Map<String, Set<String>> reachedFrom = new TreeMap<String, Set<String>>();
         public String appName;
         public String appVersion;
         public int copiedFiles;
         public int copiedAssets;
+
+        /// The report as JSON, for a tool or a CI step to read: every package with its
+        /// status (`covered`, `unsupported`), the note or reason, the chain an
+        /// unsupported verdict came through, and the app files that reach it.
+        public String toJson() {
+            StringBuilder b = new StringBuilder("{\n");
+            b.append("  \"app\": ").append(jsonString(appName)).append(",\n");
+            b.append("  \"version\": ").append(jsonString(appVersion)).append(",\n");
+            b.append("  \"packages\": [");
+            boolean first = true;
+            for (int pass = 0; pass < 2; pass++) {
+                for (String entry : pass == 0 ? covered : uncovered) {
+                    int paren = entry.indexOf(" (");
+                    String name = paren < 0 ? entry : entry.substring(0, paren);
+                    String note = paren < 0 ? null : entry.substring(paren + 2, entry.length() - 1);
+                    b.append(first ? "\n" : ",\n");
+                    first = false;
+                    b.append("    {\"package\": ").append(jsonString(name));
+                    b.append(", \"status\": \"").append(pass == 0 ? "covered" : "unsupported").append('"');
+                    if (note != null) {
+                        b.append(", \"note\": ").append(jsonString(note));
+                    }
+                    List<String> chain = unsupportedChains.get(name);
+                    if (pass == 1 && chain != null) {
+                        b.append(", \"cause\": ").append(jsonString(unsupportedPackages.get(chain.get(chain.size() - 1))));
+                        b.append(", \"chain\": ").append(jsonArray(chain));
+                    }
+                    Set<String> from = reachedFrom.get(name);
+                    if (from != null) {
+                        b.append(", \"reachedFrom\": ").append(jsonArray(from));
+                    }
+                    b.append('}');
+                }
+            }
+            b.append("\n  ],\n");
+            b.append("  \"missingAssets\": ").append(jsonArray(missingAssets)).append(",\n");
+            b.append("  \"unresolvedPackages\": ").append(jsonArray(unresolvedPackages)).append(",\n");
+            b.append("  \"assetCollisions\": ").append(jsonArray(assetCollisions)).append("\n");
+            return b.append("}\n").toString();
+        }
+
+        private static String jsonArray(java.util.Collection<String> items) {
+            StringBuilder b = new StringBuilder("[");
+            for (String i : items) {
+                if (b.length() > 1) {
+                    b.append(", ");
+                }
+                b.append(jsonString(i));
+            }
+            return b.append(']').toString();
+        }
+
+        private static String jsonString(String v) {
+            if (v == null) {
+                return "null";
+            }
+            StringBuilder b = new StringBuilder("\"");
+            for (int i = 0; i < v.length(); i++) {
+                char c = v.charAt(i);
+                if (c == '"' || c == '\\') {
+                    b.append('\\').append(c);
+                } else if (c < 0x20) {
+                    b.append(String.format("\\u%04x", (int) c));
+                } else {
+                    b.append(c);
+                }
+            }
+            return b.append('"').toString();
+        }
     }
 
     private final Log log;
@@ -389,6 +468,10 @@ public final class FlutterProjectImporter {
                 if (note == null) {
                     note = assetOnlyCovered.get(dep);
                 }
+                if (note == null && r.foreignPlugins.containsKey(dep) && r.transpiledPackages.containsKey(dep)) {
+                    note = "a " + r.foreignPlugins.get(dep) + "-only plugin, transpiled as Dart; its platform "
+                            + "calls throw MissingPluginException";
+                }
                 if (note == null && r.transpiledPackages.containsKey(dep)) {
                     note = "transpiled from its sources, " + r.transpiledPackages.get(dep) + " file(s)";
                 }
@@ -424,7 +507,7 @@ public final class FlutterProjectImporter {
     /// test answers true for exactly these, and the walk below follows the same
     /// alternative it will pick.
     static final Set<String> SUPPORTED_DART_LIBRARIES = new HashSet<String>(java.util.Arrays.asList(
-            "core", "async", "collection", "convert", "io", "math", "typed_data", "ui"));
+            "core", "async", "collection", "convert", "developer", "io", "math", "typed_data", "ui"));
 
     private static final Pattern DIRECTIVE = Pattern.compile(
             "(?m)^\\s*(import|export|part)\\s+(?!of\\b)(['\"])([^'\"]+)\\2([^;]*);");
@@ -465,7 +548,8 @@ public final class FlutterProjectImporter {
         Map<String, File> libDirs = new HashMap<String, File>();
         Map<String, Integer> counts = new TreeMap<String, Integer>();
         Map<String, Set<String>> importers = new HashMap<String, Set<String>>();
-        Map<String, Boolean> pluginCache = new HashMap<String, Boolean>();
+        // package -> the app's own lib/ files that import it directly
+        Map<String, Set<String>> ownImporters = new HashMap<String, Set<String>>();
         int copied = 0;
         while (!work.isEmpty()) {
             String[] item = work.poll();
@@ -521,6 +605,14 @@ public final class FlutterProjectImporter {
                 }
                 if (nextPkg != null) {
                     lastReachedPackages.add(nextPkg);
+                    if (pkg == null) {
+                        Set<String> files = ownImporters.get(nextPkg);
+                        if (files == null) {
+                            files = new TreeSet<String>();
+                            ownImporters.put(nextPkg, files);
+                        }
+                        files.add(rel);
+                    }
                     if (pkg != null && !pkg.equals(nextPkg)) {
                         Set<String> by = importers.get(nextPkg);
                         if (by == null) {
@@ -545,12 +637,11 @@ public final class FlutterProjectImporter {
                             r.unsupportedPackages.put(nextPkg, "sources not found; run `flutter pub get`");
                             continue;
                         }
-                        Boolean plugin = pluginCache.get(nextPkg);
-                        if (plugin == null) {
-                            plugin = Boolean.valueOf(isPlatformPlugin(dir));
-                            pluginCache.put(nextPkg, plugin);
-                        }
-                        if (plugin.booleanValue()) {
+                        Set<String> platforms = pluginPlatforms(dir);
+                        if (isForeignPlatformPlugin(platforms)) {
+                            r.foreignPlugins.put(nextPkg, platforms.isEmpty() ? "no platform"
+                                    : String.join("/", platforms));
+                        } else if (platforms != null) {
                             r.unsupportedPackages.put(nextPkg, "a platform plugin with no Codename One stub");
                             continue;
                         }
@@ -575,9 +666,42 @@ public final class FlutterProjectImporter {
             for (String p : by) {
                 if (!r.unsupportedPackages.containsKey(p)) {
                     r.unsupportedPackages.put(p, "depends on " + dep + ", which is unsupported");
+                    List<String> chain = new ArrayList<String>();
+                    chain.add(p);
+                    List<String> rest = r.unsupportedChains.get(dep);
+                    chain.addAll(rest == null ? java.util.Collections.singletonList(dep) : rest);
+                    r.unsupportedChains.put(p, chain);
                     verdicts.add(p);
                 }
             }
+        }
+        for (String u : r.unsupportedPackages.keySet()) {
+            if (!r.unsupportedChains.containsKey(u)) {
+                r.unsupportedChains.put(u, java.util.Collections.singletonList(u));
+            }
+        }
+        // The app files behind each package: its own importers, and those of every
+        // package that imports it, transitively.
+        for (String reached : lastReachedPackages) {
+            Set<String> files = new TreeSet<String>();
+            Set<String> visited = new HashSet<String>();
+            java.util.ArrayDeque<String> up = new java.util.ArrayDeque<String>();
+            up.add(reached);
+            while (!up.isEmpty()) {
+                String q = up.poll();
+                if (!visited.add(q)) {
+                    continue;
+                }
+                Set<String> direct = ownImporters.get(q);
+                if (direct != null) {
+                    files.addAll(direct);
+                }
+                Set<String> by = importers.get(q);
+                if (by != null) {
+                    up.addAll(by);
+                }
+            }
+            r.reachedFrom.put(reached, files);
         }
         // A package found unsupported after some of its files were copied is not
         // transpiled: drop what was copied, so the build does not compile half of it.
@@ -622,28 +746,87 @@ public final class FlutterProjectImporter {
     /// Whether a package's pubspec declares `flutter: plugin:` -- a federated or
     /// classic platform plugin, whose Dart side calls into native code.
     static boolean isPlatformPlugin(File packageLibDir) {
+        return pluginPlatforms(packageLibDir) != null;
+    }
+
+    /// The platforms a plugin's pubspec lists under `flutter: plugin: platforms:`,
+    /// null for a package that is not a plugin. A plugin in the format that predates
+    /// `platforms:` (`androidPackage`/`pluginClass` directly under `plugin:`) served
+    /// Android and iOS, and answers those two.
+    static Set<String> pluginPlatforms(File packageLibDir) {
         File pubspec = new File(packageLibDir.getParentFile(), "pubspec.yaml");
         if (!pubspec.isFile()) {
-            return false;
+            return null;
         }
         try {
             boolean inFlutter = false;
+            int pluginIndent = -1;
+            int platformsIndent = -1;
+            int keyIndent = -1;
+            Set<String> platforms = null;
             for (String line : Files.readAllLines(pubspec.toPath(), Charset.forName("UTF-8"))) {
-                if (line.trim().isEmpty() || line.trim().startsWith("#")) {
+                String t = line.trim();
+                if (t.isEmpty() || t.startsWith("#")) {
                     continue;
                 }
-                if (!line.startsWith(" ")) {
+                int indent = line.length() - line.replaceAll("^\\s+", "").length();
+                if (indent == 0) {
+                    if (pluginIndent >= 0) {
+                        break;
+                    }
                     inFlutter = line.startsWith("flutter:");
                     continue;
                 }
-                if (inFlutter && line.trim().startsWith("plugin:")) {
-                    return true;
+                if (!inFlutter) {
+                    continue;
+                }
+                if (pluginIndent < 0) {
+                    if (t.startsWith("plugin:")) {
+                        pluginIndent = indent;
+                    }
+                    continue;
+                }
+                if (indent <= pluginIndent) {
+                    break;
+                }
+                if (platformsIndent < 0) {
+                    if (t.startsWith("platforms:")) {
+                        platformsIndent = indent;
+                        platforms = new TreeSet<String>();
+                    }
+                    continue;
+                }
+                if (indent <= platformsIndent) {
+                    break;
+                }
+                if (keyIndent < 0) {
+                    keyIndent = indent;
+                }
+                int colon = t.indexOf(':');
+                if (indent == keyIndent && colon > 0) {
+                    platforms.add(t.substring(0, colon).trim());
                 }
             }
+            if (pluginIndent < 0) {
+                return null;
+            }
+            if (platforms == null) {
+                return new TreeSet<String>(java.util.Arrays.asList("android", "ios"));
+            }
+            return platforms;
         } catch (IOException e) {
-            return false;
+            return null;
         }
-        return false;
+    }
+
+    /// A plugin with no Android or iOS implementation: what it does natively happens only
+    /// on a desktop or the web, platforms Codename One does not build for. A mobile Flutter
+    /// app reaches one only behind a platform check (`firebase_ui_oauth` depends on
+    /// `desktop_webview_auth` for its desktop sign-in), so the plugin's Dart is
+    /// transpiled like any pure-Dart package and its method-channel calls throw
+    /// MissingPluginException, as they do on a platform the plugin does not implement.
+    static boolean isForeignPlatformPlugin(Set<String> platforms) {
+        return platforms != null && !platforms.contains("android") && !platforms.contains("ios");
     }
 
     /// Removes `//` and `/* */` comments, keeping string literals intact enough for

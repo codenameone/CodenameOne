@@ -48,6 +48,15 @@ public final class StubRegistry {
     public final Map<String, Ast.EnumDecl> enums = new LinkedHashMap<String, Ast.EnumDecl>();
     public final Map<String, Ast.FunctionDecl> functions = new LinkedHashMap<String, Ast.FunctionDecl>();
     public final Map<String, Ast.FieldDecl> topLevelVars = new LinkedHashMap<String, Ast.FieldDecl>();
+    /**
+     * Top-level functions of a {@code dart:} library whose names collide with another
+     * library's: {@code dart:developer}'s {@code log} is not {@code dart:math}'s. They are
+     * declared in a stub file named {@code dartlib_<library>.dart}, kept out of
+     * {@link #functions}, and resolved only through an import of {@code dart:<library>}.
+     * Its classes and enums are global like any other stub's.
+     */
+    public final Map<String, Map<String, Ast.FunctionDecl>> libraryFunctions =
+            new LinkedHashMap<String, Map<String, Ast.FunctionDecl>>();
     /** Stub extension declarations (`extension X on T { ... }`), keyed via their {@code on} type. */
     public final List<Ast.ClassDecl> extensions = new ArrayList<Ast.ClassDecl>();
 
@@ -157,14 +166,34 @@ public final class StubRegistry {
         for (Ast.EnumDecl e : lib.enums) {
             enums.put(e.name, e);
         }
+        String scoped = scopedLibrary(name);
         for (Ast.FunctionDecl f : lib.functions) {
-            functions.put(f.name, f);
+            if (scoped == null) {
+                functions.put(f.name, f);
+            } else {
+                Map<String, Ast.FunctionDecl> m = libraryFunctions.get(scoped);
+                if (m == null) {
+                    m = new LinkedHashMap<String, Ast.FunctionDecl>();
+                    libraryFunctions.put(scoped, m);
+                }
+                m.put(f.name, f);
+            }
         }
         for (Ast.FieldDecl v : lib.topLevelVars) {
             if (v.javaName != null) {
                 topLevelVars.put(v.name, v);
             }
         }
+    }
+
+    /** {@code developer} for {@code .../dartlib_developer.dart}, else null. */
+    static String scopedLibrary(String stubName) {
+        String base = stubName.replace('\\', '/');
+        base = base.substring(base.lastIndexOf('/') + 1);
+        if (base.startsWith("dartlib_") && base.endsWith(".dart")) {
+            return base.substring("dartlib_".length(), base.length() - ".dart".length());
+        }
+        return null;
     }
 
     public boolean isStubClass(String dartName) {
