@@ -1079,21 +1079,24 @@ public class ByteCodeTranslator {
             }
         }
         optionalFrameworks.add("UserNotifications.framework");
-        includeFrameworks.add("libiconv.dylib");
+        // Only what the port's natives call. A linked framework is loaded at launch whether or not
+        // anything calls it, with everything it links in turn, so one listed here "in case" costs
+        // every application memory and start-up time. MapKit, GameKit, QuickLook, AddressBook,
+        // libxml2, libz and libiconv were listed here and called by nothing, and loading them cost
+        // a Compose application 11 MB of dyld memory on the simulator, a fifth of its footprint.
+        // A feature that needs a framework adds it when it is used -- the maps provider brings
+        // MapKit (MapsProviderInjector), contacts bring AddressBook, App Attest brings
+        // DeviceCheck -- and a cn1lib declares its own through ios.add_libs.
         //includeFrameworks.add("AdSupport.framework");
         // AddressBookUI and AddressBook are iOS-only. On macOS the contacts API
-        // is Contacts.framework, and linking the iOS ones fails outright rather
-        // than merely going unused.
-        if (platform.hasIosDeviceIdioms()) {
-            includeFrameworks.add("AddressBookUI.framework");
-            includeFrameworks.add("AddressBook.framework");
-        } else {
+        // is Contacts.framework, and linking the iOS ones fails outright.
+        // On iOS the builder links them with INCLUDE_CONTACTS_USAGE, the define their natives
+        // compile under (IPhoneBuilder, beside ios.add_libs).
+        if (!platform.hasIosDeviceIdioms()) {
             includeFrameworks.add("Contacts.framework");
         }
         includeFrameworks.add("SystemConfiguration.framework");
-        includeFrameworks.add("MapKit.framework");
         includeFrameworks.add("AudioToolbox.framework");
-        includeFrameworks.add("libxml2.dylib");
         includeFrameworks.add("QuartzCore.framework");
         if (!isBundledSqliteCipherEnabled()) {
             // The system libsqlite3 has no cipher support, so an application that encrypts
@@ -1103,7 +1106,6 @@ public class ByteCodeTranslator {
             includeFrameworks.add("libsqlite3.dylib");
             includeFrameworks.add("libsqlite3.0.dylib");
         }
-        includeFrameworks.add("GameKit.framework");
         includeFrameworks.add("Security.framework");
         //includeFrameworks.add("StoreKit.framework");
         // CoreMotion has no macOS implementation -- a Mac has no accelerometer to
@@ -1136,10 +1138,8 @@ public class ByteCodeTranslator {
         includeFrameworks.add("AVFoundation.framework");
         includeFrameworks.add("CoreText.framework");
         includeFrameworks.add("CoreVideo.framework");
-        includeFrameworks.add("QuickLook.framework");
         //includeFrameworks.add("iAd.framework");
         includeFrameworks.add("CoreMedia.framework");
-        includeFrameworks.add("libz.dylib");
         includeFrameworks.add("AVKit.framework");
         if(!addFrameworks.equalsIgnoreCase("none")) {
             includeFrameworks.addAll(Arrays.asList(Util.splitLiteral(addFrameworks, ';')));

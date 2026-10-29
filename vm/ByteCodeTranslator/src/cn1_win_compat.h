@@ -45,6 +45,7 @@
 #include <time.h>   /* struct timespec (C11), localtime_s, _mkgmtime */
 #include <stdint.h>
 #include <stdlib.h> /* _putenv_s */
+#include <stdio.h>  /* FILE, for cn1_win_fopen_utf8 */
 
 #ifdef __cplusplus
 extern "C" {
@@ -180,6 +181,16 @@ void cn1_win_resume_thread(void* handle);
    <windows.h>, which this header keeps out of translated units. */
 int cn1_win_zone_offset_millis(const char* zoneId, long long millis, int* offsetOut,
                                int* dstOut, int* rawOut);
+
+/* --- opening a file by a UTF-8 path ---
+   fopen on Windows reads its argument in the ANSI code page and stops at
+   MAX_PATH (260) characters, so a UTF-8 path with a non-ASCII name, or any
+   path longer than that, failed to open although the file was there. This
+   converts to UTF-16, resolves the path (which is also what removes "..",
+   since the long-path prefix turns normalization off), adds the \\?\ prefix
+   when the result is too long for the classic API, and calls _wfopen. mode
+   is an ASCII fopen mode. Returns NULL with errno set, as fopen does. */
+FILE* cn1_win_fopen_utf8(const char* path, const char* mode);
 
 /* --- environment / time.h POSIX helpers absent from MSVC ---
    Thin static-inline wrappers over the MSVC equivalents; used by the date /

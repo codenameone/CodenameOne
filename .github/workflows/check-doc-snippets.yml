@@ -17,6 +17,7 @@ on:
       - 'scripts/savor/**'
       - 'scripts/bastion/**'
       - 'scripts/skirmish/**'
+      - 'scripts/hellocodenameone/common/src/main/kmp/**'
       - 'docs/website/content/blog/**'
       - 'CodenameOne/src/**/*.java'
       - 'Ports/CLDC11/src/**/*.java'

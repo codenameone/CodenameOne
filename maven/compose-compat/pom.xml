@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <parent>
+        <groupId>com.codenameone</groupId>
+        <artifactId>codenameone</artifactId>
+        <version>8.0-SNAPSHOT</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>codenameone-compose-compat</artifactId>
+    <version>8.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+    <name>codenameone-compose-compat</name>
+    <description>
+        A subset of the Compose Multiplatform UI API (androidx.compose.ui,
+        foundation, material3) implemented over Codename One components, and
+        Dispatchers.Main on the Codename One EDT. A Kotlin Multiplatform
+        application compiles its shared Compose code against this jar under the
+        real names; the Compose runtime and kotlinx.coroutines are the real
+        libraries, translated like any other dependency.
+    </description>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!-- The Kotlin an application compiles with (the archetype's kotlinVersion):
+             the compose compiler plugin must match the compiler exactly, and a jar
+             built by a newer compiler carries metadata an older one cannot read. -->
+        <kotlin.version>2.2.10</kotlin.version>
+        <compose.runtime.version>1.12.1</compose.runtime.version>
+        <!-- 1.11 wants kotlin-stdlib 2.2.20, newer than the stdlib applications get. -->
+        <coroutines.version>1.10.2</coroutines.version>
+    </properties>
+
+    <repositories>
+        <!-- androidx.compose.runtime and androidx.collection are published to
+             Google's repository only. -->
+        <repository>
+            <id>google</id>
+            <url>https://maven.google.com</url>
+        </repository>
+    </repositories>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-core</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.jetbrains.kotlin</groupId>
+            <artifactId>kotlin-stdlib</artifactId>
+            <version>${kotlin.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>androidx.compose.runtime</groupId>
+            <artifactId>runtime-desktop</artifactId>
+            <version>${compose.runtime.version}</version>
+            <!-- The multiplatform root artifact: no classes, only Kotlin metadata
+                 trees (commonMain/, nativeMain/ ... *.knm) that every application
+                 then shipped as resources. The JVM classes are the
+                 kotlinx-coroutines-core-jvm dependency below. -->
+            <exclusions>
+                <exclusion>
+                    <groupId>org.jetbrains.kotlinx</groupId>
+                    <artifactId>kotlinx-coroutines-core</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <!-- The runtime declares these only in its Gradle module metadata, which
+             Maven does not read; without them a translation is missing
+             androidx.collection and fails to compile in Xcode. -->
+        <dependency>
+            <groupId>androidx.compose.runtime</groupId>
+            <artifactId>runtime-annotation-jvm</artifactId>
+            <version>${compose.runtime.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>androidx.collection</groupId>
+            <artifactId>collection-jvm</artifactId>
+            <version>1.5.0</version>
+        </dependency>
+        <dependency>
+            <groupId>androidx.annotation</groupId>
+            <artifactId>annotation-jvm</artifactId>
+            <version>1.9.1</version>
+        </dependency>
+        <!-- Gradle takes 23.0.0 from the runtime's metadata; Maven would stop at
+             the 13.0 kotlin-stdlib names, and the two tools' uploads differ. -->
+        <dependency>
+            <groupId>org.jetbrains</groupId>
+            <artifactId>annotations</artifactId>
+            <version>23.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.jetbrains.kotlinx</groupId>
+            <artifactId>kotlinx-coroutines-core-jvm</artifactId>
+            <version>${coroutines.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-compat-testing</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <sourceDirectory>src/main/kotlin</sourceDirectory>
+        <testSourceDirectory>src/test/kotlin</testSourceDirectory>
+        <plugins>
+            <plugin>
+                <groupId>com.github.spotbugs</groupId>
+                <artifactId>spotbugs-maven-plugin</artifactId>
+                <version>4.7.3.4</version>
+                <configuration>
+                    <effort>Max</effort>
+                    <threshold>Low</threshold>
+                    <failOnError>false</failOnError>
+                    <xmlOutput>true</xmlOutput>
+                    <xmlOutputDirectory>${project.build.directory}</xmlOutputDirectory>
+                    <excludeFilterFile>${project.basedir}/spotbugs-exclude.xml</excludeFilterFile>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>spotbugs</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>spotbugs</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <!-- The benchmark's application is a test source, so that every build
+                     drives the real hero app through its screens headlessly. -->
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>3.4.0</version>
+                <executions>
+                    <execution>
+                        <id>hero-app</id>
+                        <phase>generate-test-sources</phase>
+                        <goals>
+                            <goal>add-test-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>${project.basedir}/../../scripts/kmp-bench/app/shared/commonMain/kotlin</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.jetbrains.kotlin</groupId>
+                <artifactId>kotlin-maven-plugin</artifactId>
+                <version>${kotlin.version}</version>
+                <configuration>
+                    <!-- The compose runtime's inline functions are JVM 11 bytecode,
+                         and Kotlin refuses to inline them into an older target. -->
+                    <jvmTarget>11</jvmTarget>
+                    <args>
+                        <arg>-no-reflect</arg>
+                    </args>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>compile</id>
+                        <goals>
+                            <goal>compile</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>test-compile</id>
+                        <goals>
+                            <goal>test-compile</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <dependencies>
+                    <!-- On the plugin's class path, the compose compiler plugin
+                         registers itself (a CompilerPluginRegistrar service), the
+                         way -Xplugin would load it. -->
+                    <dependency>
+                        <groupId>org.jetbrains.kotlin</groupId>
+                        <artifactId>kotlin-compose-compiler-plugin-embeddable</artifactId>
+                        <version>${kotlin.version}</version>
+                    </dependency>
+                </dependencies>
+            </plugin>
+        </plugins>
+    </build>
+    <profiles>
+        <!-- Compose's runtime is class version 55, so its tests need JDK 11 or
+             newer. The JDK 8 leg still compiles and analyses the module. -->
+        <profile>
+            <id>jdk8-no-tests</id>
+            <activation>
+                <jdk>1.8</jdk>
+            </activation>
+            <properties>
+                <skipTests>true</skipTests>
+            </properties>
+        </profile>
+    </profiles>
+</project>

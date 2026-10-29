@@ -1514,6 +1514,14 @@ public class IPhoneBuilder extends Executor {
      * description.</p>
      */
     private boolean usesContactPicker;
+
+    /**
+     * Whether the application reads or writes the address book, decided by
+     * the scan the Android builder asks the same question with. Such an
+     * application gets AddressBook linked and, when it declares none, a
+     * generic {@code NSContactsUsageDescription}.
+     */
+    private final ContactsPermissionScan contactsScan = new ContactsPermissionScan();
     private boolean usesCalendarEventApi;
     private boolean usesCalendarTaskApi;
     private String firstBonjourType;
@@ -2761,6 +2769,7 @@ public class IPhoneBuilder extends Executor {
                             && "com/codename1/contacts/ContactPicker".equals(cls)) {
                         usesContactPicker = true;
                     }
+                    contactsScan.usesClass(cls);
                     if (!usesLocalNotifications && cls.indexOf("com/codename1/notifications/LocalNotification") == 0) {
                         usesLocalNotifications = true;
                     }
@@ -3127,6 +3136,7 @@ public class IPhoneBuilder extends Executor {
                                 || method.indexOf("isContactPickerSupported") > -1)) {
                         usesContactPicker = true;
                     }
+                    contactsScan.usesClassMethod(cls, method);
                     // Health.getStore()/getWorkouts() mean a real platform
                     // store; Health.getSensors() means BLE only. The class
                     // reference alone cannot tell them apart, so the facade
@@ -3792,6 +3802,17 @@ public class IPhoneBuilder extends Executor {
             }
         }
         
+        boolean usesContactsApi = contactsScan.readPermissionRequired()
+                || contactsScan.writePermissionRequired();
+        if (usesContactsApi) {
+            // iOS terminates an app that opens the address book with no purpose
+            // string, so one the developer did not write is supplied.
+            String contacts = privacyUsageDescriptions.get("NSContactsUsageDescription");
+            if (contacts == null || contacts.trim().length() == 0) {
+                privacyUsageDescriptions.put("NSContactsUsageDescription",
+                        "Some functionality of the application requires access to your contacts.");
+            }
+        }
         if (xcodeVersion >= 9) {
             try {
                 for (String privacyKey : privacyUsageDescriptions.keySet()) {
@@ -4862,6 +4883,15 @@ public class IPhoneBuilder extends Executor {
                 if (addLibs.startsWith(";")) {
                     addLibs = addLibs.substring(1);
                 }
+            }
+
+            // Linked with the define the AddressBook natives compile under,
+            // INCLUDE_CONTACTS_USAGE, which the contacts usage description turns
+            // on; the scan supplies that description for an app that calls the
+            // contacts API without one.
+            if (contactsScan.readPermissionRequired() || contactsScan.writePermissionRequired()
+                    || privacyUsageDescriptions.containsKey("NSContactsUsageDescription")) {
+                addLibs = appendFrameworks(addLibs, "AddressBookUI.framework", "AddressBook.framework");
             }
 
             // LocalAuthentication is required only when the app actually uses

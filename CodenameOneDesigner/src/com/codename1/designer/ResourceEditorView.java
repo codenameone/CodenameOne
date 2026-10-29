@@ -2491,7 +2491,7 @@ private void importResActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIR
             w.write("    protected void initTheme(Resources res) {\n");
             w.write("            String[] themes = res.getThemeResourceNames();\n");
             w.write("            if(themes != null && themes.length > 0) {\n");
-            w.write("                UIManager.getInstance().setThemeProps(res.getTheme(themes[0]));\n");
+            w.write("                UIManager.getInstance().setThemeMap(res.getThemeMap(themes[0]));\n");
             w.write("            }\n");
             w.write("    }\n\n");
 

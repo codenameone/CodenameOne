@@ -67,6 +67,7 @@ on:
       - 'scripts/bastion/**'
       - 'scripts/skirmish/**'
       - 'scripts/parley/**'
+      - 'scripts/hellocodenameone/common/src/main/kmp/**'
       - 'scripts/website/**'
       - 'scripts/skindesigner/**'
       - 'Ports/JavaScriptPort/**'

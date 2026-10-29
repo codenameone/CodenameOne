@@ -39,7 +39,7 @@ import org.opentest4j.TestAbortedException;
 
 import java.awt.GraphicsEnvironment;
 import java.lang.reflect.Method;
-import java.util.Hashtable;
+import java.util.HashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -336,8 +336,8 @@ public class CodenameOneExtension
                 throw new IllegalStateException(
                         "Theme resource " + resourcePath + " contains no themes");
             }
-            Hashtable themeProps = r.getTheme(names[0]);
-            UIManager.getInstance().setThemeProps(themeProps);
+            HashMap<String, Object> themeProps = r.getThemeMap(names[0]);
+            UIManager.getInstance().setThemeMap(themeProps);
             context.getStore(FONT_STATE).put("restore", restore);
         } catch (java.io.IOException | RuntimeException | Error e) {
             restore.run();

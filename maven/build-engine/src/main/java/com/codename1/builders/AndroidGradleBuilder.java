@@ -1844,6 +1844,7 @@ public class AndroidGradleBuilder extends Executor {
         extendAppCompatActivity = request.getArg("android.extendAppCompatActivity", "false").equals("true");
         // When using gradle 8 we need to strip kotlin files from user classes otherwise we get duplicate class errors
         stripKotlinFromUserClasses = useGradle8;
+        gradleProvidedLibraryDependencies = "";
         if (!request.getArg("android.java8", "true").equals("true")) {
             // Java 6 source level was produced by running retrolambda over the compiled
             // classes. Retrolambda is gone (it never supported the JDK 17 that Gradle 8
@@ -2491,6 +2492,7 @@ public class AndroidGradleBuilder extends Executor {
         }
         if (stripKotlinFromUserClasses) {
             stripKotlin(dummyClassesDir);
+            gradleProvidedLibraryDependencies = stripGradleProvidedLibraries(dummyClassesDir);
         }
 
         File appDir = buildToolsVersionInt >= 27 ?
@@ -8324,6 +8326,32 @@ public class AndroidGradleBuilder extends Executor {
         if (hasKotlinSources && kotlinVersion.length() == 0 && !builtInKotlin) {
             kotlinVersion = useGradle8 ? "1.9.22" : "1.7.22";
         }
+        // A declared kotlinx-coroutines brings its own kotlin-stdlib (2.1 for coroutines
+        // 1.10), and an older compiler refuses that stdlib's metadata ("compiled with an
+        // incompatible version of Kotlin"), so the compiler is raised to read it. That
+        // includes a pinned version: the Health Connect floor above pins 1.9.x, and no
+        // lower pin can compile against the stdlib the application itself shipped.
+        if (hasKotlinSources && kotlinVersion.length() > 0 && useGradle8
+                && gradleProvidedLibraryDependencies.contains("kotlinx-coroutines-core")) {
+            String comparable = HealthManifestFragments.numericVersionPrefix(kotlinVersion);
+            if (comparable == null
+                    || compareVersions(comparable, KOTLIN_FOR_GRADLE_PROVIDED_COROUTINES) < 0) {
+                if (request.getArg("android.topDependency", "").contains("kotlin-gradle-plugin")) {
+                    // The app's own kotlin-gradle-plugin line wins over ours, so only
+                    // the app can raise the compiler; say so instead of claiming to.
+                    log("WARNING: the application ships kotlinx-coroutines, whose kotlin-stdlib"
+                            + " needs Kotlin " + KOTLIN_FOR_GRADLE_PROVIDED_COROUTINES
+                            + " or newer, but android.topDependency pins its own"
+                            + " kotlin-gradle-plugin; raise it if :app:compileDebugKotlin"
+                            + " reports an incompatible Kotlin version");
+                } else {
+                    log("The application ships kotlinx-coroutines, whose kotlin-stdlib Kotlin "
+                            + kotlinVersion + " cannot read; compiling with Kotlin "
+                            + KOTLIN_FOR_GRADLE_PROVIDED_COROUTINES + " instead");
+                    kotlinVersion = KOTLIN_FOR_GRADLE_PROVIDED_COROUTINES;
+                }
+            }
+        }
         String kotlinPluginApply = "";
         String kotlinRuntimeDependency = "";
         if (hasKotlinSources && kotlinVersion.length() > 0) {
@@ -8677,6 +8705,7 @@ public class AndroidGradleBuilder extends Executor {
                 + "    "+compile+" fileTree(dir: 'libs', include: ['*.jar'])\n"
                 + request.getArg("android.supportv4Dep",supportV4Default) + "\n"
                 + kotlinRuntimeDependency
+                + gradleProvidedLibraryDependencies
                 + addNewlineIfMissing(additionalDependencies)
                 + addNewlineIfMissing(aiExtraGradleDependencies.toString())
                 + addNewlineIfMissing(request.getArg("android.gradleDep", ""))
@@ -12708,6 +12737,67 @@ public class AndroidGradleBuilder extends Executor {
             }
         }
         return false;
+    }
+
+    // Libraries a Compose application (src/main/kmp) carries in its own jar that the
+    // Android Gradle graph also supplies: AndroidX itself depends on all three. Left in
+    // userClasses.jar they fail checkDebugDuplicateClasses, so the classes are dropped
+    // and the coordinate is declared instead, at the version compose-compat was built
+    // against; Gradle then resolves the higher of that and what AndroidX asks for, never
+    // an older androidx.collection without the ScatterSet the Compose runtime calls.
+    private static final String[][] GRADLE_PROVIDED_LIBRARIES = {
+            // Raising this also raises KOTLIN_FOR_GRADLE_PROVIDED_COROUTINES.
+            {"kotlinx/coroutines", "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2"},
+            // The coroutines jar's debugger frames, outside its package; no coordinate
+            // of its own, the line above already declares the jar.
+            {"_COROUTINE", null},
+            {"androidx/collection", "androidx.collection:collection:1.5.0"},
+            {"androidx/annotation", "androidx.annotation:annotation:1.9.1"}
+    };
+
+    /// The Kotlin compiler a Kotlin app gets by default when the coroutines entry of
+    /// GRADLE_PROVIDED_LIBRARIES is declared: the stdlib that coroutines version depends
+    /// on, or newer. Raise it together with that coordinate.
+    private static final String KOTLIN_FOR_GRADLE_PROVIDED_COROUTINES = "2.1.21";
+
+    private String gradleProvidedLibraryDependencies = "";
+
+    private String stripGradleProvidedLibraries(File dummyClassesDir) {
+        StringBuilder deps = new StringBuilder();
+        for (String[] lib : GRADLE_PROVIDED_LIBRARIES) {
+            File directory = new File(dummyClassesDir, lib[0].replace('/', File.separatorChar));
+            if (directory.isDirectory()) {
+                String coordinate = lib[1];
+                if (lib[0].equals("kotlinx/coroutines")) {
+                    // The version the application shipped, so a newer one is never
+                    // downgraded; the jar records it in this file.
+                    String shipped = readTrimmed(new File(dummyClassesDir,
+                            "META-INF" + File.separator + "kotlinx_coroutines_core.version"));
+                    if (shipped != null && shipped.length() > 0) {
+                        coordinate = coordinate.substring(0, coordinate.lastIndexOf(':') + 1) + shipped;
+                    }
+                }
+                delTree(directory, true);
+                if (coordinate == null) {
+                    log("Deleted directory " + directory);
+                    continue;
+                }
+                log("Deleted directory " + directory + "; declaring " + coordinate + " instead");
+                deps.append("    implementation '").append(coordinate).append("'\n");
+            }
+        }
+        return deps.toString();
+    }
+
+    private static String readTrimmed(File f) {
+        if (!f.isFile()) {
+            return null;
+        }
+        try {
+            return new String(java.nio.file.Files.readAllBytes(f.toPath()), "UTF-8").trim();
+        } catch (IOException ex) {
+            return null;
+        }
     }
 
     private void stripKotlin(File dummyClassesDir) {

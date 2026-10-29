@@ -421,6 +421,7 @@ Ports/CLDC11/src/java/util/Collections.java | Apache Harmony class library sourc
 vm/JavaAPI/src/java/io/ByteArrayOutputStream.java | Apache Harmony class library source retaining its original Apache-2.0 notice
 vm/JavaAPI/src/java/lang/CharSequence.java | Apache Harmony class library source retaining its original Apache-2.0 notice
 vm/JavaAPI/src/java/util/Objects.java | Apache Harmony class library source retaining its original Apache-2.0 notice
+vm/JavaAPI/src/java/lang/ClassLoader.java | TeaVM class library source retaining its original Apache-2.0 notice (Copyright 2014 Alexey Andreev)
 CodenameOne/src/com/codename1/util/BigDecimal.java | Bouncy Castle derived source with its original provenance note
 CodenameOne/src/com/codename1/util/TBigDecimal.java | Apache Harmony source retaining its original Apache-2.0 notice
 CodenameOne/src/com/codename1/util/TBigInteger.java | Apache Harmony source retaining its original Apache-2.0 notice

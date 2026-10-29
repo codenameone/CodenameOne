@@ -66,6 +66,8 @@ public class Thread implements java.lang.Runnable{
 
     private Runnable target;
     private boolean alive;
+    private boolean terminated;
+    private ClassLoader contextClassLoader;
     private String name;
     private int priority = NORM_PRIORITY;
     private long nativeThreadId;
@@ -249,6 +251,28 @@ public class Thread implements java.lang.Runnable{
 
     private native boolean isInterrupted(boolean clearInterrupted);
 
+    /// A thread's state, as far as this runtime tracks it: a thread that is alive is
+    /// reported RUNNABLE whether or not it is blocked.
+    public enum State {
+        NEW, RUNNABLE, BLOCKED, WAITING, TIMED_WAITING, TERMINATED
+    }
+
+    /// Kept for code that installs one; nothing here loads classes through it.
+    public ClassLoader getContextClassLoader() {
+        return contextClassLoader;
+    }
+
+    public void setContextClassLoader(ClassLoader cl) {
+        contextClassLoader = cl;
+    }
+
+    public State getState() {
+        if (alive) {
+            return State.RUNNABLE;
+        }
+        return terminated ? State.TERMINATED : State.NEW;
+    }
+
     /**
      * Tests if this thread is alive. A thread is alive if it has been started and has not yet died.
      */
@@ -332,6 +356,7 @@ public class Thread implements java.lang.Runnable{
         threadLocalValues = null;
         synchronized(this) {
             alive = false;
+            terminated = true;
             notifyAll();
         }
     }

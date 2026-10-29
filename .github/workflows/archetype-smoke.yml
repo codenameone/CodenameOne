@@ -73,7 +73,9 @@ concurrency:
 jobs:
   archetype-smoke:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    # A green run takes about 28 minutes (the reactor build alone is 8-9), so 30 left
+    # no room for a slow runner and cancelled healthy runs mid-step.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v6
       # A JDK that is NOT 8, for the `cn1:backend-package` check at the end of the

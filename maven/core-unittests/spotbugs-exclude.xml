@@ -379,6 +379,27 @@
         <Bug pattern="WMI_WRONG_MAP_ITERATOR" />
     </Match>
 
+    <!-- Theme tables are walked by keySet() on purpose: ParparVM lowers a for-each
+         over an exact HashMap's keySet() to a direct table walk with no iterator,
+         while entrySet() builds an Entry per mapping, 5,000 of them per theme. -->
+    <Match>
+        <Class name="com.codename1.ui.plaf.UIManager" />
+        <Or>
+            <Method name="buildThemeImpl" />
+            <Method name="recordNativeThemeOwnership" />
+        </Or>
+        <Bug pattern="WMI_WRONG_MAP_ITERATOR" />
+    </Match>
+    <Match>
+        <Class name="com.codename1.ui.util.Resources" />
+        <Or>
+            <Method name="getTheme" />
+            <Method name="getThemeMap" />
+            <Method name="loadTheme" />
+        </Or>
+        <Bug pattern="WMI_WRONG_MAP_ITERATOR" />
+    </Match>
+
     <!-- Excluded classes... -->
 
     <!-- Badly written 3rd party class -->

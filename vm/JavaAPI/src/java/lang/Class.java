@@ -559,6 +559,56 @@ public final class Class<T> implements java.lang.reflect.Type {
     
     public native boolean isPrimitive();
     
+    /// Reflective lookups find nothing on this platform: the translator keeps no member
+    /// tables, and strips what nothing calls.
+    public Method getDeclaredMethod(String name, Class... parameterTypes) throws NoSuchMethodException {
+        throw new NoSuchMethodException(name);
+    }
+
+    public Method getMethod(String name, Class... parameterTypes) throws NoSuchMethodException {
+        throw new NoSuchMethodException(name);
+    }
+
+    public Constructor[] getConstructors() {
+        return new Constructor[0];
+    }
+
+    public Constructor[] getDeclaredConstructors() {
+        return new Constructor[0];
+    }
+
+    public Constructor getDeclaredConstructor(Class... parameterTypes) throws NoSuchMethodException {
+        throw new NoSuchMethodException("<init>");
+    }
+
+    public Constructor getConstructor(Class... parameterTypes) throws NoSuchMethodException {
+        throw new NoSuchMethodException("<init>");
+    }
+
+    public Method[] getMethods() {
+        return new Method[0];
+    }
+
+    public Method[] getDeclaredMethods() {
+        return new Method[0];
+    }
+
+    public java.lang.reflect.Field[] getFields() {
+        return new java.lang.reflect.Field[0];
+    }
+
+    public java.lang.reflect.Field[] getDeclaredFields() {
+        return new java.lang.reflect.Field[0];
+    }
+
+    public java.lang.reflect.Field getDeclaredField(String name) throws NoSuchFieldException {
+        throw new NoSuchFieldException(name);
+    }
+
+    public java.lang.reflect.Field getField(String name) throws NoSuchFieldException {
+        throw new NoSuchFieldException(name);
+    }
+
     public Method getEnclosingMethod() {
         return null;
     }

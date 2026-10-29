@@ -1,3 +1,4 @@
+[[android-interop]]
 == Running Android applications
 
 A classic Android application -- activities, XML layouts, `res/values`,

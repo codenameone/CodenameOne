@@ -672,7 +672,7 @@ public class CSSWatcher implements Runnable {
                             try {
                                 System.out.println("CSS File "+compilerArgs.input+" has been updated.  Reloading styles from "+fDestFile);
                                 Resources res = Resources.open(new FileInputStream(fDestFile));
-                                UIManager.getInstance().addThemeProps(res.getTheme(res.getThemeResourceNames()[0]));
+                                UIManager.getInstance().addThemeMap(res.getThemeMap(res.getThemeResourceNames()[0]));
                                 Form f = CN.getCurrentForm();
                                 if (f != null) {
                                     f.refreshTheme();

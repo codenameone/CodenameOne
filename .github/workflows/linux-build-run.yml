@@ -37,6 +37,7 @@ on:
       - 'scripts/unity-compat-samples/gallery/**'
       - 'maven/cil-translator/**'
       - 'maven/unity-compat/**'
+      - 'maven/compose-compat/**'
       - 'maven/build-engine/src/main/java/com/codename1/maven/Unity*'
       - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*'
       - 'scripts/unity-gallery-prebuilt.sh'
@@ -76,6 +77,7 @@ on:
       - 'scripts/unity-compat-samples/gallery/**'
       - 'maven/cil-translator/**'
       - 'maven/unity-compat/**'
+      - 'maven/compose-compat/**'
       - 'maven/build-engine/src/main/java/com/codename1/maven/Unity*'
       - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*'
       - 'scripts/unity-gallery-prebuilt.sh'
@@ -162,7 +164,7 @@ jobs:
         run: |
           cd maven
           JAVA_HOME="$JDK_8_HOME" bash ../scripts/ci/retry.sh \
-            mvn -B -pl codenameone-maven-plugin,cn1-ads-mock,backend,backend-test -am \
+            mvn -B -pl codenameone-maven-plugin,cn1-ads-mock,compose-compat,backend,backend-test -am \
             -DskipTests '-Dmaven.javadoc.skip=true' '-Plocal-dev-javase' install
 
       # After everything that fills the local Maven repository and before the
@@ -232,6 +234,20 @@ jobs:
 
       - name: Install clang and time
         run: bash scripts/ci/apt-get-install.sh clang time
+
+      # The suite's C build compiles ~7,000 translation units, several of them
+      # large, with full debug info. On ubuntu-24.04-arm it exhausted memory and
+      # the runner was shut down mid-build, twice at the same step; extra swap
+      # lets the peak spill instead of taking the machine down.
+      - name: Add swap (arm64)
+        if: matrix.arch == 'arm64'
+        run: |
+          free -m
+          sudo fallocate -l 12G /cn1-swapfile
+          sudo chmod 600 /cn1-swapfile
+          sudo mkswap /cn1-swapfile
+          sudo swapon /cn1-swapfile
+          free -m
 
       - name: Set up JDK 8
         uses: actions/setup-java@v5
