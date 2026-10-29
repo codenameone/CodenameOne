@@ -71,9 +71,9 @@ On Linux, the same app as a `jlink` image against a Codename One native build:
 <figure style="margin:24px 0"><img src="/developer-guide/img/desktop-compat-linux-startup-cold.svg" alt="Cold start on Linux: each sample on the default JVM, a tuned JVM and the Codename One native build" loading="lazy" style="width:100%;height:auto" /><figcaption>Cold start on Linux.</figcaption></figure>
 {{< /guide-block >}}
 
-On Linux, warm start-up is faster than the default JVM in all 8 apps, by 1.4x to 6.0x. Against a JVM tuned with the serial GC, C1 only and an AppCDS archive, the native build is faster in 7 of 8, by up to 4.1x. The falling blocks game is the exception: 74 ms native against 70 ms tuned. The JavaFX gallery starts in 100 ms native against 603 ms on the default JVM. The same apps build for iOS at 25 to 29 MB and as 2.8 to 4.4 MB Android APKs.
+From process start to the first painted frame, the native build starts faster than the default JVM in all 8 apps, by 1.5x to 5.5x. Against a JVM tuned with the serial GC, C1 only and an AppCDS archive, it's still faster in all 8, by 1.1x to 3.6x. The closest is the falling blocks game, at 86 ms native against 93 ms tuned. The JavaFX gallery starts in 116 ms native against 637 ms on the default JVM. The same apps build for iOS at 25 to 29 MB and as 2.8 to 4.4 MB Android APKs.
 
-Memory is closer than you might expect. At idle the native Swing gallery uses 64.5 MB against 84.2 MB on a tuned JVM. After a scripted session of clicks and drags, though, it's 81.8 MB against 80.5 MB.
+Memory is closer than you might expect. At idle the native Swing gallery holds 64.5 MB resident against 84.2 MB on a tuned JVM. After a scripted session of clicks and drags it's 90.8 MB against 86.0 MB.
 
 ## What isn't supported
 
@@ -118,16 +118,17 @@ The same goes for JSON and XML mapping, REST and GraphQL clients and the SQLite 
 
 ## What desktop Java never gave you
 
-Desktop Java was built for a desk. It never had a camera API, never knew where it was, and treated a phone as somebody else's problem. Once your app is a Codename One app, all of that is a method call away, mixed into the same screens as your Swing panels and JavaFX scenes:
+You don't have to wait for a phone to get something out of this. On the desktop, today, the same app picks up things Swing developers have fought for years to get, and that JavaFX offers only as its own aging WebKit fork:
 
-- **Camera and media.** [`Capture`](/developer-guide/miscellaneous-features/#_capture_photos_video_audio) takes photos, video and audio, and [`CodeScanner`](/developer-guide/ai-and-speech/#_scanning_a_barcode_or_qr_code) reads barcodes and QR codes. An inventory screen that used to need a USB scanner now uses the phone in the warehouse worker's pocket.
-- **Bluetooth and NFC.** The [Bluetooth API](/developer-guide/bluetooth/) covers BLE as central and peripheral, plus L2CAP and classic RFCOMM, and [NFC](/developer-guide/near-field-communication/) reads and writes tags. That's the device on the factory floor your desktop tool could only reach through a serial port.
-- **Location.** [`LocationManager`](/developer-guide/miscellaneous-features/#_location_gps) with [geofencing in the background](/developer-guide/miscellaneous-features/#_location_in_the_background_geofencing), so a field service app knows when the technician arrived.
-- **Push, biometrics and sign in.** [Push notifications](/developer-guide/push-notifications/), [Face ID and fingerprint](/developer-guide/biometric-authentication/), and [OAuth, Google and Sign in with Apple](/developer-guide/authentication-and-identity/), without a hand rolled browser redirect.
-- **Generated network clients.** Point [`cn1:generate-openapi`](/developer-guide/maven-appendix-goals/#_generate_openapi_client_generate_openapi) at an OpenAPI 3 spec and you get a typed client. GraphQL and gRPC have goals of their own, and REST and WebSocket clients are generated from annotations.
-- **In-app purchase.** [`Purchase`](/developer-guide/monetization/) handles store billing on both phones, if the internal tool turns into a product.
+- **A real browser.** [`BrowserComponent`](/developer-guide/working-with-javascript/) embeds the system's engine: WebKit on the Mac, WebView2 on Windows and WebKitGTK on Linux, with two way calls between Java and JavaScript. No bundled Chromium, no `JEditorPane` rendering HTML 3.2.
+- **The camera.** [`Capture`](/developer-guide/miscellaneous-features/#_capture_photos_video_audio) takes photos and video from the webcam on macOS, Windows and Linux. In Swing that has meant a native library and a prayer.
+- **Bluetooth LE.** The [Bluetooth API](/developer-guide/bluetooth/) talks to real devices on all three desktops, so the tool that configures your hardware no longer needs a vendor SDK or a serial port bridge.
+- **Maps.** A [vector `MapView`](/developer-guide/maps/) drawn by Codename One itself, with markers and shapes, the same on the desktop as on a phone.
+- **The web.** The same app builds for the browser, so the internal tool people install today can also be a link, with nothing installed.
+- **Generated network clients.** Point [`cn1:generate-openapi`](/developer-guide/maven-appendix-goals/#_generate_openapi_client_generate_openapi) at an OpenAPI 3 spec and you get a typed client. GraphQL and gRPC have goals of their own, and [OAuth and sign in with Google or Apple](/developer-guide/authentication-and-identity/) are built in.
 - **SQLite with an ORM** whose mapping mistakes fail the build, **CSS styling** with light and dark themes and live reload, and **a Java backend** in the same project, sharing your types.
-- **A real browser component** with two way calls between Java and JavaScript, for the parts of the app that are already a web page.
+
+And when the app does reach a phone, [push](/developer-guide/push-notifications/), [biometrics](/developer-guide/biometric-authentication/), [NFC](/developer-guide/near-field-communication/) and [location](/developer-guide/miscellaneous-features/#_location_gps) are there too.
 
 `SwingInterop.asComponent()` and `FxInterop.asComponent()` wrap a Swing component or a JavaFX node as a Codename One component, so you can migrate one panel at a time and put a Codename One map or camera view next to your existing table.
 

@@ -191,7 +191,7 @@ Saturday's {{< post-link path="/blog/compose-on-more-screens" text="Compose arti
 
 ### Swing and JavaFX on phones
 
-A large share of real Swing and JavaFX code now builds for iOS, Android and the web: the samples we test include SwingSet2 and Notepad, the JDK's own demos. On Linux the native build is 4 to 6 times smaller zipped than the same app on the JVM, and starts faster in 7 of 8 apps even against a JVM tuned with AppCDS.
+A large share of real Swing and JavaFX code now builds for iOS, Android and the web: the samples we test include SwingSet2 and Notepad, the JDK's own demos. On Linux the native build is 4 to 6 times smaller zipped than the same app on the JVM, and starts faster in all 8 apps, even against a JVM tuned with AppCDS.
 
 {{< guide-block >}}
 <div class="release-screenshots" style="display:grid;grid-template-columns:minmax(0,1.43fr) minmax(0,1fr);gap:16px;align-items:start;margin:24px 0">

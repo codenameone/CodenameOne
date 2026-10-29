@@ -84,7 +84,7 @@ Money is a double entry ledger, not a balance column. The admin console has the 
 
 ## Crypto wallets, exchanges and custody, in core
 
-I'm not a fan of crypto currency. I know plenty of people who are, and a few of them are customers. We're here to serve, and if we serve, we should be the best at it. So this isn't a wallet library bolted on the side. It's the largest feature in this release: everything a wallet, an exchange or a custodian needs, in core, with no third party library, and the same classes run in the app and in a Codename One backend.
+I'm not a fan of crypto currency. I know plenty of people who are, and a few of them are customers. We're here to serve, and if we serve, we should be the best at it. So this isn't a wallet library bolted on the side. It's a big feature: everything a wallet, an exchange or a custodian needs, in core, with no third party library, and the same classes run in the app and in a Codename One backend.
 
 | Package | What's in it |
 | --- | --- |

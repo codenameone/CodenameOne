@@ -70,7 +70,9 @@ The benchmark is Keynote, a Compose conference schedule app, built three ways: C
 | Frame interval, median | 35.45 ms | 34.79 ms | 33.35 ms |
 | Memory footprint | 47 MB | 47 MB | 48 MB |
 
+{{< guide-block >}}
 <figure style="margin:24px 0"><img src="/blog/release-2026-10-30/kmp-keynote.svg" alt="Bar charts of recomposition time, scroll work per frame, executable size and cold start for the three builds" loading="lazy" style="width:100%;height:auto" /><figcaption>Lower is better in every panel.</figcaption></figure>
+{{< /guide-block >}}
 
 All three apps hit the same frame rate, and Compose Multiplatform is slightly ahead there. On a fast machine, a simple screen keeps up either way. What differs is how much CPU each one burns to get there: about 4 ms a frame for Compose on Codename One against about 17 ms for Compose Multiplatform. On a phone that's battery life, heat, and headroom for the frame where your screen isn't simple.
 
@@ -138,7 +140,7 @@ Put them side by side and the claimed advantages don't hold up:
 - **Testability.** Compose tests find nodes by test tags you add for the purpose. A Codename One test holds the component, calls `bind`, and asserts on `title.getText()`. The [test framework](/developer-guide/testing-with-junit/) and the simulator's MCP tools drive both the same way.
 - **Debugging.** This is where imperative code wins outright. Set a breakpoint in `bind` and you see the one call that changed the text, with a stack that leads back to your code. In Compose, the same change runs through the snapshot system, the runtime that schedules recomposition, and generated code from the compiler plugin, and "why did this recompose?" is a question you need a dedicated tool to answer.
 
-Compose is a fine way to write UI, and if your team already has it, bring it. But it isn't simpler than the imperative code it replaced, and on this screen it costs three times the CPU and twice the binary. Codename One lets you choose per screen. Keep Compose where you have it, and write the hot screen in Java:
+Compose is a fine way to write UI, and if your team already has it, bring it. But it isn't simpler than the imperative code it replaced, and on this screen it costs two to three times the CPU and twice the binary. Codename One lets you choose per screen. Keep Compose where you have it, and write the hot screen in Java:
 
 ```kotlin
 val form = Form("Mixed", BorderLayout())
