@@ -122,9 +122,9 @@ covered is the first thing to look at if a screen misbehaves.
 The same report is written as JSON to `common/target/flutter-import-report.json`,
 for a script or a CI step to read. Each package has a status (`covered` or
 `unsupported`), the note or the reason, and the application's own files that
-reach it. An unsupported package that is only unsupported because of something
+reach it. An unsupported package that's only unsupported because of something
 it depends on carries the chain that verdict came through, ending with the
-package that is unsupported itself:
+package that's unsupported itself:
 
 [source,json]
 ----
@@ -401,7 +401,7 @@ never mirrors, as in Flutter.
 [[flutter-plugin-coverage]]
 === Plugin coverage
 
-These are the pub packages the runtime provides, and how. A package that is not
+These are the pub packages the runtime provides, and how. A package that's not
 listed and is pure Dart is transpiled from its own sources.
 
 [cols="2,4,3", options="header"]
@@ -547,7 +547,7 @@ Stub types share one namespace. When two packages export the same name -- the
 `AppleProvider` of `firebase_app_check` and of `firebase_ui_oauth_apple` -- give
 each file a `// cn1:package <package>` line: a library then sees the declaration
 of the package it imports, and a class of the application's own with the same
-name is never shadowed by a stub of a package it does not import.
+name is never shadowed by a stub of a package it doesn't import.
 
 The Java half is an ordinary class with the members the declarations map to:
 
@@ -558,7 +558,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/flutter/Lo
 
 The mapping rules:
 
-* Named parameters become positional Java parameters, in the order they are
+* Named parameters become positional Java parameters, in the order they're
   declared. A parameter the call leaves out is passed as `null`.
 * `int` is `Long` (or `long` when it can't be null), `double` is `Double`,
   `bool` is `Boolean`, `List` and `Map` are `dart.core.DartList` and
