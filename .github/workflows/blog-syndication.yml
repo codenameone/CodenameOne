@@ -68,10 +68,9 @@ jobs:
           set -euo pipefail
           pip install markdown
 
-      - name: Queue browser-extension syndication tasks (Medium)
-        run: |
-          set -euo pipefail
-          python3 scripts/website/queue_browser_syndication.py --platforms medium
+      # Medium syndication is dropped: Medium detects and blocks the
+      # automated browser that published to it, even on a freshly cleared
+      # profile, so queued tasks could only fail. Nothing is queued for it.
 
       # LinkedIn's weekly blog-post syndication is paused. Keep validating
       # existing artifacts so malformed inputs still fail CI, but do not add
