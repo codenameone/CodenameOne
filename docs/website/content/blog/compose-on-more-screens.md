@@ -4,20 +4,20 @@ slug: compose-on-more-screens
 url: /blog/compose-on-more-screens/
 date: '2026-10-31'
 author: Shai Almog
-description: "Kotlin Multiplatform code with Compose now builds as a Codename One app. The Compose runtime ships as it is, the UI layer is ours, and the same screen does about a quarter of the CPU work per frame that Compose Multiplatform does, on more platforms."
-feed_html: "<img src=\"https://www.codenameone.com/blog/compose-on-more-screens.jpg\" alt=\"A Compose schedule screen running on Compose Multiplatform and on Codename One\" /> Kotlin Multiplatform code with Compose now builds as a Codename One app, with about a quarter of the CPU work per frame, on more platforms."
+description: "Kotlin Multiplatform code with Compose now builds as a Codename One app. The Compose runtime ships as it is, the UI layer is ours, and on our benchmark screen it did about a quarter of the CPU work per frame that Compose Multiplatform does (frame rates were equal)."
+feed_html: "<img src=\"https://www.codenameone.com/blog/compose-on-more-screens.jpg\" alt=\"A Compose schedule screen running on Compose Multiplatform and on Codename One\" /> Kotlin Multiplatform code with Compose now builds as a Codename One app, with about a quarter of the CPU work per frame on our benchmark screen."
 series: ["release-2026-10-30"]
 ---
 
 ![A Compose schedule screen running on Compose Multiplatform and on Codename One](/blog/compose-on-more-screens.jpg)
 
-I'll start with a confession. If Codename One didn't exist, Kotlin Multiplatform is probably the platform I'd choose. I prefer Java, but Kotlin is a good language, and KMP was one of the strongest platforms we measured against in the [Flutter post](/blog/flutter-better-in-java/) this week. Its first take on UI leaned on heavyweight native widgets, the way React Native does. The team learned from that, and Compose Multiplatform today is a good product built by people who care about performance.
+If Codename One didn't exist, Kotlin Multiplatform is probably the platform I'd choose. I prefer Java, but Kotlin is a good language, and KMP was one of the strongest platforms we measured against in the [Flutter post](/blog/flutter-better-in-java/) this week. Its first take on UI leaned on heavyweight native widgets, the way React Native does. The team learned from that, and Compose Multiplatform today is a good product built by people who care about performance.
 
-So this post isn't about KMP being bad. It's the Pedro Pascal meme: KMP is good. This is better. Your Compose code now builds as a Codename One app, and it runs on more platforms with less work per frame.
+So this post isn't about KMP being bad. To borrow the Pedro Pascal meme: KMP is good. This is also good, and in a few ways better. Your Compose code now builds as a Codename One app, so it reaches more targets and did less work per frame on our benchmark. You don't have to pick one forever: the same `commonMain` builds both ways.
 
 ## What you keep
 
-There's no transpiler here. kotlinc compiles your Kotlin for the JVM with the Compose compiler plugin, exactly as it does today. The Compose runtime and `kotlinx.coroutines` ship unmodified. The only thing we replaced is the UI layer: `androidx.compose.ui`, `foundation`, `material3` and `animation`, written over Codename One components and graphics. Then ParparVM compiles everything ahead of time to a native binary.
+There's no transpiler here. kotlinc compiles your Kotlin for the JVM with the Compose compiler plugin, exactly as it does today. The Compose runtime and `kotlinx.coroutines` are the upstream jars. The UI layer (`androidx.compose.ui`, `foundation`, `material3` and `animation`) is our reimplementation, written over Codename One components and graphics. Then ParparVM compiles everything ahead of time to a native binary.
 
 {{< mermaid >}}
 flowchart LR

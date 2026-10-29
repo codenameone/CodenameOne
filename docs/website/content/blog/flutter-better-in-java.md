@@ -4,16 +4,16 @@ slug: flutter-better-in-java
 url: /blog/flutter-better-in-java/
 date: '2026-10-30'
 author: Shai Almog
-description: "Codename One now builds Flutter apps from their Dart source, and the result starts faster, uses less memory and ships less code than Flutter's own release build on every platform we measured. This week also covers Kotlin Multiplatform, Swing and JavaFX, classic Android apps, a hardened bank template, a streaming template and phones without Google Play."
+description: "Codename One now builds Flutter apps from their Dart source, and the result starts faster and uses less memory than Flutter's own release build on Android, macOS, Windows and Linux, and ships less code on all six platforms we measured. This week also covers Kotlin Multiplatform, Swing and JavaFX, classic Android apps, a hardened bank template, a streaming template and phones without Google Play."
 feed_html: "<img src=\"https://www.codenameone.com/blog/flutter-better-in-java.jpg\" alt=\"The Flutter Gallery running in Flutter and in Codename One side by side\" /> Codename One now builds Flutter apps from their Dart source, and the result starts faster, uses less memory and ships less code than Flutter's own release build. This week also covers KMP, Swing and JavaFX, Android apps and more."
 series: ["release-2026-10-30"]
 ---
 
 ![The Flutter Gallery running in Flutter and in Codename One side by side](/blog/flutter-better-in-java.jpg)
 
-I usually blog about a feature the week it lands. This one landed a few weeks ago and was in development for months before that: Codename One can now take a Flutter app's Dart source and build it as a Codename One app. The results are amazing. I held this post back because I know how explosive some of these claims are, and I wanted the numbers to come from a CI job that runs on every commit instead of a benchmark I tuned once on my laptop.
+I usually blog about a feature the week it lands. This one landed a few weeks ago and was in development for months before that: Codename One can now take a Flutter app's Dart source and build it as a Codename One app. The results are amazing. I held this post back because I know how explosive these claims are. I wanted the numbers to come from a CI job that runs on every commit instead of a benchmark I tuned once on my laptop.
 
-In the meantime we also added support for Kotlin Multiplatform with Compose, for a big part of Swing and JavaFX, and for classic Android apps on iOS. More is coming. The part that still surprises me is how well Codename One does against every one of them. The same Flutter app, built from the same Dart files, starts faster, uses less memory and ships less code when Codename One builds it. That holds on Android, macOS, Windows and Linux, and the sizes hold on iOS and the web too.
+In the meantime we also added support for Kotlin Multiplatform with Compose, for a big part of Swing and JavaFX, and for classic Android apps on iOS. More is coming. The part that still surprises me is how well Codename One does against the originals where we measured them. The same Flutter app, built from the same Dart files, starts faster, uses less memory and ships less code when Codename One builds it. That holds on Android, macOS, Windows and Linux, and the sizes hold on iOS and the web too.
 
 ## The same Dart, two builds
 
@@ -68,9 +68,9 @@ Every commit to Codename One builds the Flutter Gallery twice: once with Flutter
 <img width="760" height="502" src="/blog/release-2026-10-30/flutter-code-size.svg" alt="Executable code. Android: 4.7 MB for Codename One against 20.6 MB for Flutter. iOS: 17.3 against 19.1 MB. macOS: 33.2 against 47.9 MB. Windows: 11.4 against 14.1 MB. Linux: 14.2 against 16.1 MB. Web: 12.9 against 25.2 MB." loading="lazy" style="width:100%;height:auto;margin:16px 0" />
 {{< /guide-block >}}
 
-Across six platforms CI measured 26 metrics: installed size, executable code and download size everywhere, plus cold start and memory at rest where we can measure them. Codename One wins all 26. The biggest gaps are on Android, where the app starts in a third of the time and carries a quarter of the code, and on Linux, where it settles at 82 MB against 224 MB.
+CI collects 26 metrics: installed size, executable code and download size on six platforms, plus cold start and memory at rest on the four where we can measure both sides fairly. Codename One is ahead on all 26. The Android timings come from an emulator, and iOS start-up and memory aren't measured; both are explained below. The biggest gaps are on Android, where the app starts in a third of the time and carries a quarter of the code, and on Linux, where it settles at 82 MB against 224 MB.
 
-The comparison is tilted toward Flutter. The app is Flutter's own showcase, written in Flutter's idioms. To run it, Codename One carries a runtime that reimplements Flutter's widget, element and layout model on top of Codename One components. A Codename One app never pays for that layer. We win while paying for it.
+Some of this cuts in Flutter's favor and some doesn't. Our runtime ignores a few parameters Flutter honors (the guide lists them), so we aren't doing every bit of Flutter's work. On the other hand, the app is Flutter's own showcase, written in Flutter's idioms. To run it, Codename One carries a runtime that reimplements Flutter's widget, element and layout model on top of Codename One components. A Codename One app never pays for that layer. We win while paying for it.
 
 CI also runs eleven small compute workloads (hash maps, recursion, string building, sorting, arithmetic and more) in both languages. Here the result is mixed, and I want to be clear about where we lose:
 
@@ -82,11 +82,13 @@ CI also runs eleven small compute workloads (hash maps, recursion, string buildi
 | Android | Codename One 1.3x faster | Object allocation (2.3x) and value escape |
 | Web | Flutter 3.6x faster | Nearly everything |
 
+On the web we lose compute badly, by 3.6x, and I don't have a fix for that yet. The sizes still favor us there.
+
 Some things aren't measured, and the charts leave them out rather than guess. Flutter can't compile Dart ahead of time for the iOS simulator, so iOS start-up and memory would compare Flutter's debug engine against our release build. We report iOS sizes only. Web start-up needs a browser driver the benchmark doesn't have yet. Android timings come from an emulator, so they compare two builds on one machine rather than predicting a phone. The method, the harness and the raw numbers are in the [Flutter chapter of the developer guide](/developer-guide/flutter-interop/), and the benchmark lives in `scripts/flutter-bench` in the [repository](https://github.com/codenameone/CodenameOne).
 
 ## How a compatibility layer can be faster than the original
 
-Every one of these "ports" is an external tool that runs at build time. None of them is a VM inside your app.
+Each of these compatibility layers is a tool that runs at build time. None of them is a VM inside your app.
 
 {{< mermaid >}}
 flowchart LR
@@ -147,9 +149,9 @@ dashboard.show();
 
 For years, every Codename One against Flutter discussion went the same way. I'd explain why ahead of time compiled Java with a lightweight UI should produce a smaller, faster app. Someone would explain why it shouldn't. Neither of us had the same app built both ways, so it came down to which camp you were already in.
 
-That argument is over. The same Dart, two toolchains, one CI job, every commit. If you think a number is wrong, the harness is in the repository and you can rerun it.
+Now there's one app, built both ways, measured on every commit. If you think a number is wrong, the harness is in the repository and you can rerun it.
 
-The part I didn't expect is how much this made Codename One better. Each compatibility layer acted like a demanding new customer, and each one found something we had missed for years:
+The part I didn't expect is how much this made Codename One better. Each compatibility layer exposed problems we had missed for years:
 
 - **Styles were parsed over and over.** Every component re-parsed its pressed and disabled styles from the theme. Caching them took component creation in the Gallery from 131 ms to 17 ms and resident memory from 247 MB to 144 MB.
 - **Every string constant was created at startup.** ParparVM materialized every string literal before `main()` ran. Making the pool lazy cut that step from 119 ms to 46 ms.
@@ -157,19 +159,19 @@ The part I didn't expect is how much this made Codename One better. Each compati
 - **Images decoded inside the first frame.** Deferring that decode took the first frame from 302 ms to 213 ms.
 - **An idle app burned CPU.** The Compose work found, and we fixed, a bug where on phones with a notch, safe area padding kept queuing layout so an idle app sat at 14% to 26% CPU.
 
-None of these fixes are specific to Flutter. If you write Codename One apps in plain Java and never touch a Dart file, your app got faster, lighter and cooler on the battery all the same.
+None of these fixes are specific to Flutter. If you write Codename One apps in plain Java and never touch a Dart file, your app gets these fixes too: faster start-up, lower memory and an idle CPU that stays idle.
 
 ## The universal platform
 
 Last week I made the case that [a Java word processor beats its Rust twin](/blog/rewrite-everything-in-java-not-rust/). This week the swing is bigger. Flutter, Compose, Swing, JavaFX and Android code all build into the same kind of app and run on iOS, Android, desktop, the web and the watch.
 
-Instead of coding to an operating system, you code to Codename One, and Codename One becomes the operating system. The usual price for that kind of abstraction is performance. The numbers above say we don't charge it.
+Instead of coding to an operating system, you code to Codename One, and Codename One becomes the operating system. The usual price for that kind of abstraction is performance. On the native targets we measured, we don't charge it.
 
 ## More This Week
 
 ### Kotlin Multiplatform, from a fan
 
-If Codename One didn't exist, Kotlin Multiplatform is probably what I'd pick. Early on it leaned on heavyweight native widgets, much like React Native, and the team learned from that. Compose Multiplatform today is fast and well designed. Ours is better anyway: the same Compose code runs on more platforms, uses about a quarter of the CPU per frame, and you can drop to Java where it counts.
+If Codename One didn't exist, Kotlin Multiplatform is probably what I'd pick. Early on it leaned on heavyweight native widgets, much like React Native, and the team learned from that. Compose Multiplatform today is fast and well designed. Ours runs the same Compose code on more targets, used about a quarter of the CPU per frame on our benchmark screen, and lets you drop to Java where it counts.
 
 {{< guide-block >}}
 <figure style="margin:24px 0"><a href="/developer-guide/img/kmp-keynote-schedule.png"><img width="1024" height="907" src="/developer-guide/img/kmp-keynote-schedule.png" alt="The same Compose schedule screen rendered by Compose Multiplatform and by Codename One" loading="lazy" style="width:100%;height:auto;max-width:640px;display:block;margin:0 auto" /></a><figcaption>The same Compose screen: Compose Multiplatform on the left, Codename One on the right.</figcaption></figure>
@@ -187,7 +189,7 @@ Saturday's {{< post-link path="/blog/compose-on-more-screens" text="Compose arti
 
 ### Swing and JavaFX, with the limits up front
 
-We can't run every Swing or JavaFX app, and I won't pretend otherwise. There are no class loaders, no runtime reflection and no third party jars compiled against `java.awt`. What does carry over is a large share of real application code, and on Linux the native build is 4 to 6 times smaller zipped and starts 2 to 4.6 times faster than the same app on the JVM. Sunday's {{< post-link path="/blog/swing-and-javafx-on-phones" text="Swing and JavaFX article" >}} goes through what works, what doesn't, and why the missing pieces matter less than you'd think.
+We can't run every Swing or JavaFX app, and I won't pretend otherwise. There are no class loaders, no runtime reflection and no third party jars compiled against `java.awt`. What does carry over is a lot of real application code: the samples we test include SwingSet2 and Notepad, the JDK's own demos. On Linux the native build is 4 to 6 times smaller zipped than the same app on the JVM, and starts faster in 7 of 8 apps even against a JVM tuned with AppCDS. Sunday's {{< post-link path="/blog/swing-and-javafx-on-phones" text="Swing and JavaFX article" >}} goes through what works, what doesn't, and why the missing pieces matter less than you'd think.
 
 ### A bank you can study, and wallets in core
 
@@ -208,7 +210,7 @@ Monday's {{< post-link path="/blog/bastion-hardened-bank-template" text="Bastion
 
 ### Android code everywhere, and Android without Google
 
-The Android compatibility layer now covers Room, WorkManager, location, sensors, foreground services and the document picker intents, all running on iOS too. And Codename One apps now run on de-Googled Android such as GrapheneOS out of the box. Wednesday's {{< post-link path="/blog/android-apps-everywhere-even-without-google" text="Android article" >}} has the details.
+The Android compatibility layer now covers Room, WorkManager, location, sensors, foreground services and the document picker intents, all running on iOS too. And Codename One apps now run on de-Googled Android such as GrapheneOS out of the box: one APK checks for Play Services at run time. Wednesday's {{< post-link path="/blog/android-apps-everywhere-even-without-google" text="Android article" >}} has the details.
 
 ### A modern backend, and a simulator that types
 

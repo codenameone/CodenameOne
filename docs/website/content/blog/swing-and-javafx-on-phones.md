@@ -13,7 +13,7 @@ series: ["release-2026-10-30"]
 
 There's a lot of Swing and JavaFX code in the world. Much of it is internal tooling and line of business software that works fine and that nobody wants to rewrite. Then someone asks for it on an iPad, or in a browser, and the answer has always been "rewrite it."
 
-Codename One can now build a large share of that code for iOS, Android, the web and native desktop. I'll be upfront: we can't run every Swing or JavaFX app, and this post will tell you exactly where the line is. Then I'll argue that most of what's on the other side of it is a cost you pay today, not a feature you'd miss.
+Codename One can now build a large share of that code for iOS, Android, the web and native desktop. I'll be upfront: we can't run every Swing or JavaFX app. There's no reflection and no class loading, so frameworks built on them won't run. This post shows exactly where the line is, and then argues that for a client app, most of what's on the other side of it has a better replacement.
 
 ## What it does
 
@@ -52,7 +52,7 @@ On Linux, the same app as a `jlink` image against a Codename One native build:
 <img src="/developer-guide/img/desktop-compat-linux-startup-cold.svg" alt="Cold start on Linux: each sample on the default JVM, a tuned JVM and the Codename One native build" loading="lazy" style="width:100%;height:auto;margin:16px 0" />
 {{< /guide-block >}}
 
-Start-up on Linux is 3.4 to 4.6 times faster than the default JVM and 2 to 2.5 times faster than a tuned one. The Swing gallery starts in 96 ms native against 326 ms on the JVM. The same apps build for iOS at 25 to 29 MB and as 2.8 to 4.4 MB Android APKs.
+On Linux, warm start-up is faster than the default JVM in all 8 apps, by 1.4x to 6.0x. Against a JVM tuned with the serial GC, C1 only and an AppCDS archive, the native build is faster in 7 of 8, by up to 4.1x. The falling blocks game is the exception: 74 ms native against 70 ms tuned. The JavaFX gallery starts in 100 ms native against 603 ms on the default JVM. The same apps build for iOS at 25 to 29 MB and as 2.8 to 4.4 MB Android APKs.
 
 Memory is closer than you might expect. At idle the native Swing gallery uses 64.5 MB against 84.2 MB on a tuned JVM. After a scripted session of clicks and drags, though, it's 81.8 MB against 80.5 MB. The tuned JVM wins that one by a hair, and I'd rather tell you than have you find it.
 

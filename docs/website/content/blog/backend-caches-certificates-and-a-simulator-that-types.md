@@ -17,7 +17,7 @@ If you write Spring Boot during the day, most of this will look familiar on purp
 
 ## A bounded cache
 
-Bastion looks up prices on every quote. Calling the price feed every time is slow and rude; caching forever is wrong. The new cache has a size bound, expiry, a removal listener and metrics:
+Bastion looks up prices on every quote. Calling the price feed on every quote is slow and burns the feed's quota. Caching forever shows stale prices. The new cache has a size bound, expiry, a removal listener and metrics:
 
 ```java {class="cn1-no-try"}
 private static final Cache<String, Price> PRICES = Cache.<String, Price>builder("prices")
