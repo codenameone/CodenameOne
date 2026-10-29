@@ -3066,6 +3066,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-10-29T01:01:47+00:00"
+      },
+      "devto": {
+        "id": 4943089,
+        "url": "https://dev.to/codenameone/a-java-ide-in-your-browser-with-your-files-in-your-browser-1g9p",
+        "syndicated_at": "2026-10-29T19:19:55+00:00"
       }
     }
   }
