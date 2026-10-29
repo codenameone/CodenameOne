@@ -73,8 +73,10 @@ IDENTIFIER_ROOTS = [os.path.join(ROOT, d)
                     for d in ('CodenameOne', 'Ports', 'vm', 'maven',
                               os.path.join('docs', 'demos'),
                               os.path.join('scripts', 'wayline'))]
+# '.py' because the Python support ships real Python packages under maven/
+# (starlette's TestClient is one edit from RestClient and is a real class).
 IDENTIFIER_SUFFIXES = ('.java', '.m', '.h', '.mm', '.kt', '.js', '.c', '.cpp',
-                       '.xml', '.gradle', '.swift', '.cs')
+                       '.xml', '.gradle', '.swift', '.cs', '.py')
 
 # The last segment may name a nested class -- URLImage.ImageAdapter,
 # ActionEvent.Type, LayeredLayout.LayeredLayoutConstraint.Inset -- so the dot
