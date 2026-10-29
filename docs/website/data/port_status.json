@@ -276,12 +276,13 @@
       "id": "graphics-text-images",
       "category": "2D graphics",
       "name": "Text and image drawing",
-      "description": "Checks text decoration, glyph rendering, image rectangles, and tiled images.",
+      "description": "Checks text decoration, glyph rendering, TrueType fonts loaded from bytes, image rectangles, and tiled images.",
       "tests": [
         "DrawImage",
         "DrawString",
         "DrawStringDecorated",
-        "TileImage"
+        "TileImage",
+        "TrueTypeFontFromDataTest"
       ]
     },
     {
