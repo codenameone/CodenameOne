@@ -3055,6 +3055,18 @@
         "url": "https://dev.to/codenameone/let-users-install-your-java-web-app-again-4hcm",
         "syndicated_at": "2026-10-28T21:00:55+00:00"
       }
+    },
+    "not-a-cloud-ide": {
+      "hashnode": {
+        "url": "https://debugagent.com/a-java-ide-in-your-browser-with-your-files-in-your-browser",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6ae29ac6eba02eb6e8917286",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-10-29T01:01:47+00:00"
+      }
     }
   }
 }
