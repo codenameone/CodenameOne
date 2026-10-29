@@ -15,6 +15,13 @@ There's a lot of Swing and JavaFX code in the world. Much of it is internal tool
 
 Codename One can now build a large share of that code for iOS, Android, the web and native desktop, as a native app with no JVM inside. SwingSet2 and Notepad, the JDK's own demos, both build and run. This post shows what carries over, what it costs in size and start-up (less than the JVM), and why the parts that don't carry over have better replacements in a client app.
 
+{{< guide-block >}}
+<div class="release-screenshots" style="display:grid;grid-template-columns:minmax(0,1.43fr) minmax(0,1fr);gap:16px;align-items:start;margin:24px 0">
+<figure style="margin:0"><a href="/developer-guide/img/desktop-compat-swingset2.png"><img width="918" height="1300" src="/developer-guide/img/desktop-compat-swingset2.png" alt="SwingSet2, the JDK Swing demo, running as a Codename One app on an iPad" loading="lazy" style="width:100%;height:auto" /></a><figcaption>SwingSet2, the JDK demo, on an iPad.</figcaption></figure>
+<figure style="margin:0"><a href="/developer-guide/img/desktop-compat-fx2048.png"><img width="642" height="1300" src="/developer-guide/img/desktop-compat-fx2048.png" alt="The open source JavaFX 2048 game running as a Codename One app on an Android phone" loading="lazy" style="width:100%;height:auto" /></a><figcaption>The JavaFX 2048 game on a phone.</figcaption></figure>
+</div>
+{{< /guide-block >}}
+
 ## What it does
 
 You drop the project's `src/main` into a Codename One project, or import it:

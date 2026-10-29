@@ -436,6 +436,14 @@ when it paints, so it stays sharp at any display density.
 
 === On a phone and on the desktop
 
+SwingSet2, the JDK's own Swing demo, and the open source JavaFX 2048 game build without source changes beyond what the importer asks for (SwingSet2's classes moved out of the default package):
+
+[cols="1,1",frame=none,grid=none]
+|===
+a|image::img/desktop-compat-swingset2.png[SwingSet2 running as a Codename One app on an iPad,scaledwidth=95%]
+a|image::img/desktop-compat-fx2048.png[The JavaFX 2048 game running as a Codename One app on an Android phone,scaledwidth=70%]
+|===
+
 The screens below are the Swing and JavaFX scenes from the screenshot test suite, running unmodified on an iPhone. Each is ordinary desktop code: a `JTable` with a custom renderer, JavaFX controls, and an FXML document styled by its own style sheet.
 
 [cols="1,1",frame=none,grid=none]

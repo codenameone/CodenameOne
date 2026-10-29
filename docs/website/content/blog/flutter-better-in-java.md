@@ -194,6 +194,13 @@ Saturday's {{< post-link path="/blog/compose-on-more-screens" text="Compose arti
 A large share of real Swing and JavaFX code now builds for iOS, Android and the web: the samples we test include SwingSet2 and Notepad, the JDK's own demos. On Linux the native build is 4 to 6 times smaller zipped than the same app on the JVM, and starts faster in 7 of 8 apps even against a JVM tuned with AppCDS.
 
 {{< guide-block >}}
+<div class="release-screenshots" style="display:grid;grid-template-columns:minmax(0,1.43fr) minmax(0,1fr);gap:16px;align-items:start;margin:24px 0">
+<figure style="margin:0"><a href="/developer-guide/img/desktop-compat-swingset2.png"><img width="918" height="1300" src="/developer-guide/img/desktop-compat-swingset2.png" alt="SwingSet2, the JDK Swing demo, running as a Codename One app on an iPad" loading="lazy" style="width:100%;height:auto" /></a><figcaption>SwingSet2, the JDK demo, on an iPad.</figcaption></figure>
+<figure style="margin:0"><a href="/developer-guide/img/desktop-compat-fx2048.png"><img width="642" height="1300" src="/developer-guide/img/desktop-compat-fx2048.png" alt="The open source JavaFX 2048 game running as a Codename One app on an Android phone" loading="lazy" style="width:100%;height:auto" /></a><figcaption>The JavaFX 2048 game on a phone.</figcaption></figure>
+</div>
+{{< /guide-block >}}
+
+{{< guide-block >}}
 <div class="release-screenshots" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,140px),1fr));gap:16px;align-items:start;margin:24px 0">
 <figure style="margin:0"><img width="589" height="1278" src="/developer-guide/img/desktop-compat-ios-swing-controls.png" alt="Swing controls running on an iPhone" loading="lazy" style="width:100%;height:auto" /><figcaption>Swing controls.</figcaption></figure>
 <figure style="margin:0"><img width="589" height="1278" src="/developer-guide/img/desktop-compat-ios-swing-tables.png" alt="A JTable running on an iPhone" loading="lazy" style="width:100%;height:auto" /><figcaption>JTable.</figcaption></figure>
