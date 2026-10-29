@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="521" viewBox="0 0 760 521">
+  <rect x="0" y="0" width="760" height="521" fill="#ffffff"/>
+  <text x="380" y="24" font-family="Arial, sans-serif" font-size="15" font-weight="bold" text-anchor="middle" fill="#222222">Codename One against the reference library, same machine</text>
+  <rect x="190" y="40" width="12" height="12" fill="#2f6fb5"/>
+  <text x="208" y="50" font-family="Arial, sans-serif" font-size="12" fill="#333333">JVM, against BouncyCastle</text>
+  <rect x="190" y="58" width="12" height="12" fill="#e08a1e"/>
+  <text x="208" y="68" font-family="Arial, sans-serif" font-size="12" fill="#333333">Native, against libsecp256k1 or OpenSSL</text>
+  <rect x="190" y="76" width="12" height="12" fill="#3a9b5c"/>
+  <text x="208" y="86" font-family="Arial, sans-serif" font-size="12" fill="#333333">Android native, against BouncyCastle on ART</text>
+  <text x="182" y="127" font-family="Arial, sans-serif" font-size="12" text-anchor="end" fill="#222222">ECDSA sign</text>
+  <rect x="190" y="104" width="115.0" height="11" fill="#2f6fb5"/>
+  <text x="309.0" y="113" font-family="Arial, sans-serif" font-size="10" fill="#333333">1.49x</text>
+  <rect x="190" y="117" width="78.7" height="11" fill="#e08a1e"/>
+  <text x="272.7" y="126" font-family="Arial, sans-serif" font-size="10" fill="#333333">1.02x</text>
+  <rect x="190" y="130" width="385.8" height="11" fill="#3a9b5c"/>
+  <text x="579.8" y="139" font-family="Arial, sans-serif" font-size="10" fill="#333333">5.00x</text>
+  <text x="182" y="180" font-family="Arial, sans-serif" font-size="12" text-anchor="end" fill="#222222">ECDSA verify</text>
+  <rect x="190" y="157" width="86.4" height="11" fill="#2f6fb5"/>
+  <text x="280.4" y="166" font-family="Arial, sans-serif" font-size="10" fill="#333333">1.12x</text>
+  <rect x="190" y="170" width="77.9" height="11" fill="#e08a1e"/>
+  <text x="271.9" y="179" font-family="Arial, sans-serif" font-size="10" fill="#333333">1.01x</text>
+  <rect x="190" y="183" width="463.0" height="11" fill="#3a9b5c"/>
+  <text x="657.0" y="192" font-family="Arial, sans-serif" font-size="10" fill="#333333">6.00x</text>
+  <text x="182" y="233" font-family="Arial, sans-serif" font-size="12" text-anchor="end" fill="#222222">Schnorr verify</text>
+  <rect x="190" y="210" width="86.4" height="11" fill="#2f6fb5"/>
+  <text x="280.4" y="219" font-family="Arial, sans-serif" font-size="10" fill="#333333">1.12x</text>
+  <rect x="190" y="223" width="77.9" height="11" fill="#e08a1e"/>
+  <text x="271.9" y="232" font-family="Arial, sans-serif" font-size="10" fill="#333333">1.01x</text>
+  <rect x="190" y="236" width="460.6" height="11" fill="#3a9b5c"/>
+  <text x="654.6" y="245" font-family="Arial, sans-serif" font-size="10" fill="#333333">5.97x</text>
+  <text x="182" y="286" font-family="Arial, sans-serif" font-size="12" text-anchor="end" fill="#222222">Ed25519 verify</text>
+  <rect x="190" y="263" width="79.5" height="11" fill="#2f6fb5"/>
+  <text x="273.5" y="272" font-family="Arial, sans-serif" font-size="10" fill="#333333">1.03x</text>
+  <rect x="190" y="276" width="172.1" height="11" fill="#e08a1e"/>
+  <text x="366.1" y="285" font-family="Arial, sans-serif" font-size="10" fill="#333333">2.23x</text>
+  <rect x="190" y="289" width="111.1" height="11" fill="#3a9b5c"/>
+  <text x="305.1" y="298" font-family="Arial, sans-serif" font-size="10" fill="#333333">1.44x</text>
+  <text x="182" y="339" font-family="Arial, sans-serif" font-size="12" text-anchor="end" fill="#222222">Keccak-256, 1 KB</text>
+  <rect x="190" y="316" width="74.1" height="11" fill="#2f6fb5"/>
+  <text x="268.1" y="325" font-family="Arial, sans-serif" font-size="10" fill="#333333">0.96x</text>
+  <rect x="190" y="329" width="73.3" height="11" fill="#e08a1e"/>
+  <text x="267.3" y="338" font-family="Arial, sans-serif" font-size="10" fill="#333333">0.95x</text>
+  <rect x="190" y="342" width="151.2" height="11" fill="#3a9b5c"/>
+  <text x="345.2" y="351" font-family="Arial, sans-serif" font-size="10" fill="#333333">1.96x</text>
+  <text x="182" y="392" font-family="Arial, sans-serif" font-size="12" text-anchor="end" fill="#222222">SHA-256, 1 KB</text>
+  <rect x="190" y="369" width="84.1" height="11" fill="#2f6fb5"/>
+  <text x="278.1" y="378" font-family="Arial, sans-serif" font-size="10" fill="#333333">1.09x</text>
+  <rect x="190" y="382" width="85.6" height="11" fill="#e08a1e"/>
+  <text x="279.6" y="391" font-family="Arial, sans-serif" font-size="10" fill="#333333">1.11x</text>
+  <rect x="190" y="395" width="83.3" height="11" fill="#3a9b5c"/>
+  <text x="277.3" y="404" font-family="Arial, sans-serif" font-size="10" fill="#333333">1.08x</text>
+  <text x="182" y="445" font-family="Arial, sans-serif" font-size="12" text-anchor="end" fill="#222222">BIP-39 seed</text>
+  <rect x="190" y="422" width="111.1" height="11" fill="#2f6fb5"/>
+  <text x="305.1" y="431" font-family="Arial, sans-serif" font-size="10" fill="#333333">1.44x</text>
+  <rect x="190" y="435" width="96.5" height="11" fill="#e08a1e"/>
+  <text x="290.5" y="444" font-family="Arial, sans-serif" font-size="10" fill="#333333">1.25x</text>
+  <rect x="190" y="448" width="104.9" height="11" fill="#3a9b5c"/>
+  <text x="298.9" y="457" font-family="Arial, sans-serif" font-size="10" fill="#333333">1.36x</text>
+  <line x1="190" y1="100" x2="190" y2="467" stroke="#888888"/>
+  <line x1="267.2" y1="100" x2="267.2" y2="467" stroke="#c4473d" stroke-dasharray="4 3"/>
+  <text x="267.2" y="481" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#c4473d">parity</text>
+  <text x="440" y="499" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#555555">times the reference library's throughput</text>
+</svg>

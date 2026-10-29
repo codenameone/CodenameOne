@@ -192,6 +192,9 @@ public class IPhoneBuilder extends Executor {
     private boolean usesNfc;
     private boolean usesDatabase;
     private boolean usesDatabaseCipher;
+    /// Whether the application's classes use the elliptic-curve or Keccak APIs, so the translator
+    /// compiles in the native crypto kernels (`-Dcn1.cryptoKernels`).
+    private boolean usesCryptoKernels;
     private boolean usesBluetooth;
     private boolean usesBluetoothPeripheral;
 
@@ -2704,6 +2707,7 @@ public class IPhoneBuilder extends Executor {
             usesDatabaseCipher = databaseUsage.usesDatabaseCipher();
             usesVault = databaseUsage.usesVault();
             vaultUnknown = databaseUsage.isVaultUnknown();
+            usesCryptoKernels = databaseUsage.usesCryptoKernels();
         } catch (IOException ex) {
             throw new BuildException("Failed to scan for database usage", ex);
         }
@@ -6895,6 +6899,7 @@ public class IPhoneBuilder extends Executor {
                 // cannot do, which is why turning it on switches both flags at once.
                 parparCmd.add("-Dcn1.sqlite=" + usesDatabaseCipher);
                 parparCmd.add("-Dcn1.sqlcipher=" + usesDatabaseCipher);
+                parparCmd.add("-Dcn1.cryptoKernels=" + usesCryptoKernels);
                 parparCmd.add("-Dcn1.onDeviceDebug=" + onDeviceDebug);
                 parparCmd.add("-DbundleVersionNumber=" + bundleVersionNumber);
                 // The UNION of every enabled product's list, in ONE argument. These used to be

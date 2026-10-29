@@ -376,6 +376,59 @@ public class ByteCodeTranslator {
         }
     }
 
+    /**
+     * True when the application uses the elliptic-curve or Keccak APIs of com.codename1.security
+     * (or com.codename1.crypto), and so gets libsecp256k1 and ed25519-donna compiled in. Set by
+     * the platform builders from their class scan.
+     */
+    static boolean isCryptoKernelsEnabled() {
+        return "true".equals(Util.getProperty("cn1.cryptoKernels", "false"));
+    }
+
+    /// The GPU half of the crypto kernels, included by `cn1_crypto_kernels.c` when the
+    /// amalgamation is there: the kernel source in its three dialects, the CPU side that prepares
+    /// each entry, the dispatcher that shares a batch between the GPU and the CPU, and the Vulkan
+    /// host every non-Apple target loads at run time.
+    private static final String[] CRYPTO_GPU_HEADERS = {
+        "cn1_crypto_gpu.h", "cn1_crypto_gpu_kernels.h", "cn1_crypto_gpu_host.h", "cn1_crypto_gpu_batch.h",
+        "cn1_crypto_gpu_shaders.h", "cn1_crypto_gpu_vulkan.h"
+    };
+
+    /// Emits the native crypto kernels. `cn1_crypto_kernels.c` always goes out: it defines every
+    /// `NativeCryptoKernels` entry point, as stubs that answer "not available" unless the
+    /// amalgamation sits beside it, which it detects with `__has_include`. The amalgamation
+    /// (about 4 MB of vendored C) and the GPU sources are emitted only for an application that
+    /// uses the APIs, so every other application compiles the stubs and links none of it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `srcRoot`: the generated project's source directory
+    ///
+    /// - `apple`: true for an Xcode project, which also gets the Metal host
+    private static void emitCryptoKernels(File srcRoot, boolean apple) throws IOException {
+        copyRuntimeResource(srcRoot, "cn1_crypto_kernels.c");
+        File amalgamation = new File(srcRoot, "cn1_crypto_kernels_amalgamation.h");
+        File metal = new File(srcRoot, "cn1_crypto_gpu_metal.m");
+        if (isCryptoKernelsEnabled()) {
+            copyVendoredResource(srcRoot, "cn1_crypto_kernels_amalgamation.h");
+            for (String header : CRYPTO_GPU_HEADERS) {
+                copyRuntimeResource(srcRoot, header);
+            }
+            if (apple) {
+                copyRuntimeResource(srcRoot, "cn1_crypto_gpu_metal.m");
+            } else {
+                deleteIfPresent(metal);
+            }
+        } else {
+            deleteIfPresent(amalgamation);
+            for (String header : CRYPTO_GPU_HEADERS) {
+                deleteIfPresent(new File(srcRoot, header));
+            }
+            // a Metal host left behind would reference a backend the stubs never define
+            deleteIfPresent(metal);
+        }
+    }
+
     /// Removes a file this run decided not to emit, and says so if it cannot.
     ///
     /// Silence here would be the failure the caller is trying to avoid: the stale file would be
@@ -555,6 +608,7 @@ public class ByteCodeTranslator {
         // The multicast DNS socket behind com.codename1.impl.MdnsEngine, wrapped the same way.
         copyRuntimeResource(srcRoot, "cn1_mdns_impl.h");
         emitBundledSqlite(srcRoot);
+        emitCryptoKernels(srcRoot, false);
         copyRuntimeResource(srcRoot, "xmlvm.h");
 
         // Win32 POSIX compatibility shim. Always emitted; both files are gated on
@@ -959,6 +1013,7 @@ public class ByteCodeTranslator {
         // The multicast DNS socket behind com.codename1.impl.MdnsEngine, wrapped the same way.
         copyRuntimeResource(srcRoot, "cn1_mdns_impl.h");
         emitBundledSqlite(srcRoot);
+        emitCryptoKernels(srcRoot, true);
 
         Parser.writeOutput(srcRoot);
 
@@ -1088,6 +1143,13 @@ public class ByteCodeTranslator {
         includeFrameworks.add("AVKit.framework");
         if(!addFrameworks.equalsIgnoreCase("none")) {
             includeFrameworks.addAll(Arrays.asList(Util.splitLiteral(addFrameworks, ';')));
+        }
+        // The GPU crypto batches (cn1_crypto_gpu_metal.m). The macOS template links Metal already, and
+        // an iOS build may have asked for it through add.frameworks; a second entry would be a second
+        // build file for one framework. The watch builder takes it out of the watch target, whose
+        // slice compiles the Metal host to nothing.
+        if (isCryptoKernelsEnabled() && platform.hasIosDeviceIdioms() && !includeFrameworks.contains("Metal.framework")) {
+            includeFrameworks.add("Metal.framework");
         }
 
         int currentValue = 0xF63EAAA;

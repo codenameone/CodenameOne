@@ -96,6 +96,7 @@ package com.codename1.io;
 ///
 /// The sanitize method takes O(n) time where n is the length in UTF-16
 /// code-units.
+@com.codename1.impl.SharedWithBackend
 final class JSONSanitizer {
 
     /// The default for the maximumNestingDepth constructor parameter.

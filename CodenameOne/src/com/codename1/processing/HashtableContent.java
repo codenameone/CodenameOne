@@ -112,13 +112,10 @@ class MapContent implements StructuredContent {
     @Override
     public String toString() {
         if (root instanceof Map) {
-            if (((Map) root).containsKey("ROOT")) {
-                return PrettyPrinter.print((Map) ((Map) root).get("ROOT"));
-            } else {
-                return PrettyPrinter.print((Map) root);
-            }
+            // mapToJson prints a "ROOT" entry's map in place of the whole, as this did
+            return JSONParser.mapToJson((Map) root);
         } else if (root instanceof List) {
-            return PrettyPrinter.print((List) root);
+            return JSONParser.listToJson((List) root);
         } else if (root == null) {
             // A null entry of an array is wrapped like any other, and this
             // used to dereference it: [[null]] threw from here. Empty rather

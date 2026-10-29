@@ -712,15 +712,23 @@ public abstract class Executor {
 
         private final boolean vaultUnknown;
 
+        private final boolean cryptoKernels;
+
         DatabaseUsage(boolean database, boolean cipher, boolean vault) {
             this(database, cipher, vault, false);
         }
 
         DatabaseUsage(boolean database, boolean cipher, boolean vault, boolean vaultUnknown) {
+            this(database, cipher, vault, vaultUnknown, false);
+        }
+
+        DatabaseUsage(boolean database, boolean cipher, boolean vault, boolean vaultUnknown,
+                boolean cryptoKernels) {
             this.database = database;
             this.cipher = cipher;
             this.vault = vault;
             this.vaultUnknown = vaultUnknown;
+            this.cryptoKernels = cryptoKernels;
         }
 
         /// The answer from two roots, since a build can stage classes and libraries separately.
@@ -737,7 +745,17 @@ public abstract class Executor {
                 return this;
             }
             return new DatabaseUsage(database || other.database, cipher || other.cipher,
-                    vault || other.vault, vaultUnknown || other.vaultUnknown);
+                    vault || other.vault, vaultUnknown || other.vaultUnknown,
+                    cryptoKernels || other.cryptoKernels);
+        }
+
+        /// Whether anything outside the framework references the elliptic-curve APIs
+        /// (`Secp256k1`, `Schnorr`, `Ed25519`) or `com.codename1.crypto`, so that ParparVM
+        /// targets compile in the native crypto kernels (`-Dcn1.cryptoKernels`). Carried by this
+        /// scan rather than a second walk of the same classes; like the database answer, an
+        /// archive the scan could not finish counts as a yes, which costs only binary size.
+        public boolean usesCryptoKernels() {
+            return cryptoKernels;
         }
 
         /// Whether anything outside the framework references `com.codename1.db`.
@@ -946,13 +964,13 @@ public abstract class Executor {
     ///
     /// what the application's own classes reference, never null
     protected DatabaseUsage scanForDatabaseUsage(File classesDir) throws IOException {
-        boolean[] found = {false, false, false, false};
+        boolean[] found = {false, false, false, false, false};
         if (classesDir != null && classesDir.isDirectory()) {
             // One budget for the whole scan, so a hundred small archives cannot
             // add up to what one big one is refused for.
             scanForDatabaseUsage(classesDir, "", found, new PermScanBudget());
         }
-        return new DatabaseUsage(found[0], found[1], found[2], found[3]);
+        return new DatabaseUsage(found[0], found[1], found[2], found[3], found[4]);
     }
 
     private void scanForDatabaseUsage(File dir, String relativePath, boolean[] found,
@@ -963,7 +981,7 @@ public abstract class Executor {
             return;
         }
         for (int iter = 0; iter < children.length; iter++) {
-            if (found[0] && found[1] && found[2]) {
+            if (allFound(found)) {
                 return;
             }
             File child = children[iter];
@@ -996,7 +1014,7 @@ public abstract class Executor {
         try {
             zip = new java.util.zip.ZipFile(archive);
             java.util.Enumeration<? extends java.util.zip.ZipEntry> entries = zip.entries();
-            while (entries.hasMoreElements() && !(found[0] && found[1] && found[2])) {
+            while (entries.hasMoreElements() && !allFound(found)) {
                 java.util.zip.ZipEntry entry = entries.nextElement();
                 String name = entry.getName();
                 // Charged before any branch, exactly as the permission scanner
@@ -1087,6 +1105,7 @@ public abstract class Executor {
             // iOS binary Apple scans. Recorded as open instead, for the builder to resolve --
             // see DatabaseUsage.isVaultUnknown.
             found[3] = true;
+            found[4] = true;
             log("WARNING: " + archive + " was refused by the scan budget ("
                     + refused.getMessage() + "); assuming it uses an encrypted database, "
                     + "because what it contains past that point cannot be known. Whether it uses "
@@ -1125,7 +1144,7 @@ public abstract class Executor {
         // reaching a later class in the same jar that uses the vault. usesVault then came back
         // false, IPhoneBuilder left AES-GCM out of the binary, and the vault failed on the device
         // in an application whose dependency demonstrably uses it.
-        while (entry != null && !(found[0] && found[1] && found[2])) {
+        while (entry != null && !allFound(found)) {
             String name = entry.getName();
             // Charged before ANY test of what the entry is, directories
             // included. A directory carries no payload, so neither byte budget
@@ -1169,10 +1188,10 @@ public abstract class Executor {
     /// - `bytes`: one class file
     /// - `found`: the two answers so far, updated in place
     private void inspectClassForDatabaseUsage(byte[] bytes, boolean[] found) {
-        if (found[0] && found[1] && found[2]) {
+        if (allFound(found)) {
             return;
         }
-        boolean[] hit = {false, false, false};
+        boolean[] hit = {false, false, false, false};
         try {
             new ClassReader(bytes).accept(new DatabaseUsageVisitor(hit),
                     ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
@@ -1184,6 +1203,7 @@ public abstract class Executor {
             // that stops at Java 8, reads the constant pool directly instead for that reason.
             hit[0] = true;
             hit[1] = true;
+            hit[3] = true;
             // The vault answer is neither yes nor no, and it used to be recorded as no. Charging
             // an unreadable class the cipher is conservative, because it adds a dependency;
             // charging it the vault links a private CommonCrypto SPI into a binary Apple scans,
@@ -1196,12 +1216,54 @@ public abstract class Executor {
         found[0] = found[0] || hit[0];
         found[1] = found[1] || hit[1];
         found[2] = found[2] || hit[2];
+        found[4] = found[4] || hit[3];
+    }
+
+    /// Whether every question the usage scan asks is already answered yes, so reading on can
+    /// change nothing. `found[3]` is not a question but a note that one stayed open.
+    private static boolean allFound(boolean[] found) {
+        return found[0] && found[1] && found[2] && found[4];
+    }
+
+    /// The types whose use means the native crypto kernels have to ship.
+    private static final String[] CRYPTO_KERNEL_PREFIXES = {
+        "com/codename1/security/Secp256k1", "com/codename1/security/Schnorr",
+        "com/codename1/security/Ed25519", "com/codename1/crypto/"
+    };
+
+    /// The framework packages that name those types themselves, so that their classes say
+    /// nothing about the application. The ports reach `NativeCryptoEngine` from
+    /// `com.codename1.impl`, which every application carries.
+    private static final String[] CRYPTO_FRAMEWORK_PREFIXES = {
+        "com/codename1/security/", "com/codename1/crypto/", "com/codename1/impl/"
+    };
+
+    static boolean isCryptoKernelType(String name) {
+        for (int iter = 0; iter < CRYPTO_KERNEL_PREFIXES.length; iter++) {
+            if (name.indexOf(CRYPTO_KERNEL_PREFIXES[iter]) >= 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static boolean isCryptoFrameworkClass(String internalName) {
+        for (int iter = 0; iter < CRYPTO_FRAMEWORK_PREFIXES.length; iter++) {
+            if (internalName.startsWith(CRYPTO_FRAMEWORK_PREFIXES[iter])) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /// Answers "does this class use the database" and "does it configure encryption".
     private static final class DatabaseUsageVisitor extends ClassVisitor {
 
         private final boolean[] hit;
+
+        /// Set once the class turns out to be framework crypto code, whose references to the
+        /// kernel types are not the application's.
+        private boolean cryptoFramework;
 
         DatabaseUsageVisitor(boolean[] hit) {
             super(Opcodes.ASM9);
@@ -1212,6 +1274,9 @@ public abstract class Executor {
         private void note(String name) {
             if (name == null) {
                 return;
+            }
+            if (!cryptoFramework && !hit[3] && isCryptoKernelType(name)) {
+                hit[3] = true;
             }
             if (isVaultGcmClass(name)) {
                 hit[2] = true;
@@ -1271,6 +1336,7 @@ public abstract class Executor {
         @Override
         public void visit(int version, int access, String name, String signature,
                 String superName, String[] interfaces) {
+            cryptoFramework = name != null && isCryptoFrameworkClass(name);
             note(superName);
             note(signature);
             noteAll(interfaces);

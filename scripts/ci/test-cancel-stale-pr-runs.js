@@ -79,6 +79,33 @@ test('dry-run is read-only', async () => {
   assert.equal(await cancelStale({...client, dryRun: true}), 1);
   assert.deepEqual(client.cancelled, []);
 });
+test('a PR too large for pulls.get is read from the list endpoint instead', async () => {
+  const big = {...pr, head: {...pr.head, repo: {id: 9, owner: {login: 'o'}}}};
+  const client = api(big);
+  client.context.payload.pull_request = big;
+  client.github.rest.pulls.get = async () => { throw Object.assign(new Error('too many files changed'), {status: 422}); };
+  let asked;
+  client.github.rest.pulls.list = () => {};
+  client.github.paginate = async (fn, params) => {
+    if (fn === client.github.rest.pulls.list) { asked = params.head; return [{...big, number: 8}, big]; }
+    return params.status === 'queued' ? [run] : [];
+  };
+  assert.equal(await cancelStale(client), 1);
+  assert.equal(asked, 'o:patch-1');
+  assert.deepEqual(client.cancelled, [11]);
+  // the list's live head is what is judged: a run of that head survives
+  const kept = api(big, {...run, head_sha: 'listed'});
+  kept.context.payload.pull_request = big;
+  kept.github.rest.pulls.get = client.github.rest.pulls.get;
+  kept.github.rest.pulls.list = () => {};
+  kept.github.paginate = async (fn, params) => fn === kept.github.rest.pulls.list
+    ? [{...big, head: {...big.head, sha: 'listed'}}] : (params.status === 'queued' ? [run] : []);
+  await cancelStale(kept);
+  assert.deepEqual(kept.cancelled, []);
+  // no entry with this number: the original error stands
+  client.github.paginate = async (fn, params) => fn === client.github.rest.pulls.list ? [] : [];
+  await assert.rejects(cancelStale(client), /too many files/);
+});
 test('409 finish race is tolerated, authorization failures are not hidden', async () => {
   for (const status of [409, 403]) {
     const client = api();

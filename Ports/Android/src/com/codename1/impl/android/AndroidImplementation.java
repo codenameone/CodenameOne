@@ -19131,6 +19131,26 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return androidAes(transformation, key, iv, aad, ciphertext, javax.crypto.Cipher.DECRYPT_MODE);
     }
 
+    /// The C crypto kernels when the build put `libcn1crypto.so` in the application (it does for
+    /// an application that uses the elliptic-curve or `com.codename1.crypto` APIs), otherwise the
+    /// default engine. The library is JNI over the same kernels the ParparVM targets compile in,
+    /// bound by name to `NativeCryptoKernels`' natives, so once it is loaded the shared
+    /// `NativeCryptoEngine` drives it exactly as on iOS.
+    ///
+    /// Loading is the probe, and any failure keeps the Java engine: the library is absent from an
+    /// application that never used the API, and it is linked for API 21, so an older device
+    /// refuses it.
+    @Override
+    public com.codename1.security.CryptoEngine createCryptoEngine() {
+        com.codename1.security.CryptoEngine fallback = super.createCryptoEngine();
+        try {
+            System.loadLibrary("cn1crypto");
+        } catch (Throwable notThere) {
+            return fallback;
+        }
+        return com.codename1.security.NativeCryptoEngine.create(fallback);
+    }
+
     /// PBKDF2 through the JCE, over the password **bytes** the caller supplied.
     ///
     /// Not `SecretKeyFactory` with a `PBEKeySpec`, which takes a `char[]` and encodes it with
@@ -19140,6 +19160,84 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// portable fallback in `KdfProfile` and the browser's `deriveBits` produce.
     @Override
     public byte[] pbkdf2(String hashAlgorithm, byte[] password, byte[] salt, int iterations, int length) {
+        byte[] whole = pbkdf2InProvider(hashAlgorithm, password, salt, iterations, length);
+        if (whole != null) {
+            return whole;
+        }
+        return pbkdf2OverMac(hashAlgorithm, password, salt, iterations, length);
+    }
+
+    /// 0 untested, 1 the provider's PBKDF2 matched the `Mac` loop, -1 it did not or is absent.
+    private static int providerPbkdf2State;
+
+    /// The whole derivation in one provider call, `SecretKeyFactory` over a `PBEKeySpec`, which
+    /// Conscrypt runs natively: the loop over `Mac` crosses into native code twice per iteration,
+    /// which for a vault's hundreds of thousands of iterations is most of the unlock.
+    ///
+    /// Taken only where the objection above cannot apply. The password must be ASCII, which every
+    /// `char[]` encoding rule a provider might use (UTF-8, the low byte, Latin-1) maps to the same
+    /// bytes; and the provider must first reproduce the `Mac` loop's answer on a small input,
+    /// checked once per process. Anything else answers `null` and the `Mac` loop runs.
+    private static byte[] pbkdf2InProvider(String hashAlgorithm, byte[] password, byte[] salt,
+            int iterations, int length) {
+        if (android.os.Build.VERSION.SDK_INT < 26 || providerPbkdf2State < 0 || password == null
+                || password.length == 0 || salt == null || length <= 0) {
+            return null;
+        }
+        for (int iter = 0; iter < password.length; iter++) {
+            if (password[iter] <= 0) {
+                // negative is a byte above 0x7f; NUL is ASCII but some providers stop at it
+                return null;
+            }
+        }
+        boolean sha512 = hashAlgorithm != null && hashAlgorithm.indexOf("512") >= 0;
+        if (providerPbkdf2State == 0) {
+            byte[] probePassword = {'p', 'a', 's', 's', 'w', 'o', 'r', 'd'};
+            byte[] probeSalt = {'s', 'a', 'l', 't'};
+            String[] probeHashes = {"SHA-256", "SHA-512"};
+            int verdict = 1;
+            for (int iter = 0; iter < probeHashes.length; iter++) {
+                byte[] expected = pbkdf2OverMac(probeHashes[iter], probePassword, probeSalt, 3, 80);
+                byte[] actual = providerDerive(iter == 1, probePassword, probeSalt, 3, 80);
+                if (expected == null || actual == null || !java.util.Arrays.equals(expected, actual)) {
+                    verdict = -1;
+                }
+            }
+            providerPbkdf2State = verdict;
+            if (verdict < 0) {
+                return null;
+            }
+        }
+        return providerDerive(sha512, password, salt, iterations, length);
+    }
+
+    private static byte[] providerDerive(boolean sha512, byte[] password, byte[] salt, int iterations,
+            int length) {
+        char[] chars = new char[password.length];
+        javax.crypto.spec.PBEKeySpec spec = null;
+        try {
+            for (int iter = 0; iter < chars.length; iter++) {
+                chars[iter] = (char) password[iter];
+            }
+            spec = new javax.crypto.spec.PBEKeySpec(chars, salt, iterations, length * 8);
+            javax.crypto.SecretKeyFactory factory = javax.crypto.SecretKeyFactory.getInstance(
+                    sha512 ? "PBKDF2WithHmacSHA512" : "PBKDF2WithHmacSHA256");
+            byte[] out = factory.generateSecret(spec).getEncoded();
+            return out != null && out.length == length ? out : null;
+        } catch (Throwable unavailable) {
+            // NoSuchAlgorithmException on a provider without it, or anything a vendor provider
+            // throws: the Mac loop is always there
+            return null;
+        } finally {
+            java.util.Arrays.fill(chars, '\0');
+            if (spec != null) {
+                spec.clearPassword();
+            }
+        }
+    }
+
+    private static byte[] pbkdf2OverMac(String hashAlgorithm, byte[] password, byte[] salt, int iterations,
+            int length) {
         try {
             String macName = "HmacSHA256";
             if (hashAlgorithm != null && hashAlgorithm.indexOf("512") >= 0) {

@@ -67,7 +67,7 @@ class JavascriptOptionalAssetsTest {
         // survives the dead-code pass only when something can actually reach it.
         Path dir = bundleWith("var x = " + JavascriptBundleWriter.sqliteNativePrefix()
                 + "init_R_boolean;\n");
-        assertTrue(JavascriptBundleWriter.optionalAssetsToSkip(dir.toFile()).isEmpty());
+        assertFalse(JavascriptBundleWriter.optionalAssetsToSkip(dir.toFile()).contains("sqlite3mc.js"));
     }
 
     @Test
@@ -101,18 +101,34 @@ class JavascriptOptionalAssetsTest {
         Files.write(dir.resolve("translated_app_07.js"),
                 (JavascriptBundleWriter.sqliteNativePrefix() + "exists_java_lang_String_R_boolean")
                         .getBytes(StandardCharsets.UTF_8));
-        assertTrue(JavascriptBundleWriter.optionalAssetsToSkip(dir.toFile()).isEmpty());
+        assertFalse(JavascriptBundleWriter.optionalAssetsToSkip(dir.toFile()).contains("sqlite3mc.js"));
     }
 
     @Test
-    void theEngineIsTheOnlyThingDropped() throws Exception {
-        // Scoped deliberately. The other heavyweight assets under js/ are a separate question with
+    void theOptionalEnginesAreTheOnlyThingsDropped() throws Exception {
+        // Scoped deliberately: the SQLite engine and the GPU kernels. The other heavyweight assets under js/ are a separate question with
         // separate markers, and widening this set without one would be guessing.
         Path dir = bundleWith("function cn1_com_example_MyApp_start__() { return 1; }\n");
         Set<String> skipped = JavascriptBundleWriter.optionalAssetsToSkip(dir.toFile());
         assertFalse(skipped.contains("jquery.min.js"));
         assertFalse(skipped.contains("localforage-shim.js"));
         assertFalse(skipped.contains("fontmetrics.js"));
-        assertEquals(4, skipped.size(), skipped.toString());
+        assertEquals(5, skipped.size(), skipped.toString());
+    }
+
+    @Test
+    void theGpuKernelsShipOnlyWithAnApplicationThatRunsABatch() throws Exception {
+        Path none = bundleWith("function cn1_com_example_MyApp_start__() { return 1; }\n");
+        assertTrue(JavascriptBundleWriter.optionalAssetsToSkip(none.toFile())
+                .contains(JavascriptBundleWriter.CRYPTO_GPU_ASSET));
+        Path batch = bundleWith("var x = " + JavascriptBundleWriter.cryptoGpuNativePrefix()
+                + "Verify_int_int_1ARRAY_int_int_int_1ARRAY_R_boolean;\n");
+        Set<String> skipped = JavascriptBundleWriter.optionalAssetsToSkip(batch.toFile());
+        assertFalse(skipped.contains(JavascriptBundleWriter.CRYPTO_GPU_ASSET), skipped.toString());
+        // and the two decisions are independent
+        assertTrue(skipped.contains("sqlite3mc.js"), skipped.toString());
+        String fromMangler = JavascriptNameUtil.methodIdentifier("com/codename1/impl/html5/HTML5CryptoEngine",
+                "gpuHash", "(I[BIII[BI)Z");
+        assertTrue(fromMangler.startsWith(JavascriptBundleWriter.cryptoGpuNativePrefix()), fromMangler);
     }
 }

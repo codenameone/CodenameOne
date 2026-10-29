@@ -89,6 +89,19 @@ public final class JavaScriptBuildHints {
         "javascript.native.theme", "javascript.desktopTheme"
     };
 
+    /// The `javascript.splash.*` hints that style the loading screen, each passed to the
+    /// translator as `codename1.<hint>` (see `JavascriptBundleWriter.SplashSettings`, which
+    /// validates them).
+    static final String[] SPLASH_HINTS = {
+        "javascript.splash.appearance", "javascript.splash.background",
+        "javascript.splash.textColor", "javascript.splash.accentColor",
+        "javascript.splash.darkBackground", "javascript.splash.darkTextColor",
+        "javascript.splash.darkAccentColor", "javascript.splash.logo"
+    };
+
+    /// The 192px icon `JavaScriptPwa` writes into every bundle.
+    static final String SPLASH_DEFAULT_LOGO = "_icons/icon-192.png";
+
     private JavaScriptBuildHints() {
     }
 
@@ -125,6 +138,20 @@ public final class JavaScriptBuildHints {
         String darkReader = request.getArg("javascript.darkreaderLock", null);
         if (darkReader != null) {
             out.add("-Dcodename1.javascript.darkreaderLock=" + !"false".equalsIgnoreCase(darkReader.trim()));
+        }
+        for (String hint : SPLASH_HINTS) {
+            String value = request.getArg(hint, null);
+            if (value != null && value.trim().length() > 0) {
+                out.add("-Dcodename1." + hint + "=" + value.trim());
+            }
+        }
+        // The loading screen shows the application's icon unless the developer named another
+        // logo (or none). JavaScriptPwa writes the icon to this path after the translator runs,
+        // from the same request.getIcon(); without an icon it writes a placeholder square, which
+        // identifies nothing, so then there is no logo.
+        String logo = request.getArg("javascript.splash.logo", null);
+        if ((logo == null || logo.trim().length() == 0) && request.getIcon() != null) {
+            out.add("-Dcodename1.javascript.splash.logo=" + SPLASH_DEFAULT_LOGO);
         }
         return out;
     }

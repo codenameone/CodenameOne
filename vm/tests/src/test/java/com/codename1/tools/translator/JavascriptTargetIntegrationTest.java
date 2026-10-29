@@ -176,7 +176,7 @@ class JavascriptTargetIntegrationTest {
         assertTrue(browserBridge.contains("cn1HostBridge") && browserBridge.contains("host-callback") && browserBridge.contains("host-call"),
                 "Browser bridge should expose host-call plumbing for the JavaScript port shell");
         assertTrue(browserBridge.contains("function applyLensSelfRegion")
-                        && browserBridge.contains("ctx.getImageData(rx, ry, rw, rh)")
+                        && browserBridge.contains("readCanvasPixels(ctx.canvas, ctx, rx, ry, rw, rh)")
                         && browserBridge.contains("LENS_GLASS_TINT_STR")
                         && browserBridge.contains("_lab = nums[ni++]")
                         && browserBridge.contains("_ltintStrength = nums[ni++]"),

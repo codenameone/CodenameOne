@@ -321,9 +321,7 @@ CodenameOne/src/com/codename1/ui/list/CellRenderer.java#5eca0098701e
 CodenameOne/src/com/codename1/ui/list/ListCellRenderer.java#500e2416fe67
 CodenameOne/src/com/codename1/ui/list/ListModel.java#8d4d9b014972
 CodenameOne/src/com/codename1/ui/list/ListModel.java#d0795f2aa202
-CodenameOne/src/com/codename1/ui/plaf/UIManager.java#37f0f54d798c
-CodenameOne/src/com/codename1/ui/table/DefaultTableModel.java#c4df1a573cc2
-CodenameOne/src/com/codename1/ui/table/Table.java#c4df1a573cc2
+CodenameOne/src/com/codename1/ui/plaf/UIManager.java#6aaadca1b2ce
 CodenameOne/src/com/codename1/util/regex/RE.java#32627ff643a4
 CodenameOne/src/com/codename1/vpn/profile/Vpn.java#aaa2e660926c
 CodenameOne/src/com/codename1/vpn/profile/VpnProfile.java#a1cc6689b4e5
@@ -631,7 +629,6 @@ docs/developer-guide/State-Restoration-And-Continuity.asciidoc#8b6ff8c428ab
 docs/developer-guide/State-Restoration-And-Continuity.asciidoc#98003c9a0daf
 docs/developer-guide/State-Restoration-And-Continuity.asciidoc#ec9c1ec60cf8
 docs/developer-guide/The-Components-Of-Codename-One.asciidoc#02f631e14663
-docs/developer-guide/The-Components-Of-Codename-One.asciidoc#0807713493da
 docs/developer-guide/The-Components-Of-Codename-One.asciidoc#17ef0fb3fac8
 docs/developer-guide/The-Components-Of-Codename-One.asciidoc#1a8a01bd8d24
 docs/developer-guide/The-Components-Of-Codename-One.asciidoc#1bb3464941a9
@@ -663,7 +660,6 @@ docs/developer-guide/The-Components-Of-Codename-One.asciidoc#5dcf518613c7
 docs/developer-guide/The-Components-Of-Codename-One.asciidoc#60f01ed9bd26
 docs/developer-guide/The-Components-Of-Codename-One.asciidoc#634f7131ef7e
 docs/developer-guide/The-Components-Of-Codename-One.asciidoc#6b694e6d9bf2
-docs/developer-guide/The-Components-Of-Codename-One.asciidoc#6bda9ca85f49
 docs/developer-guide/The-Components-Of-Codename-One.asciidoc#75d00e7cdd19
 docs/developer-guide/The-Components-Of-Codename-One.asciidoc#7eb9e8094571
 docs/developer-guide/The-Components-Of-Codename-One.asciidoc#82c0caee5884
@@ -672,7 +668,6 @@ docs/developer-guide/The-Components-Of-Codename-One.asciidoc#85fac42abe9f
 docs/developer-guide/The-Components-Of-Codename-One.asciidoc#86df0406768f
 docs/developer-guide/The-Components-Of-Codename-One.asciidoc#8bca7b5cd70c
 docs/developer-guide/The-Components-Of-Codename-One.asciidoc#8c6a2370569d
-docs/developer-guide/The-Components-Of-Codename-One.asciidoc#9be7b0c28abe
 docs/developer-guide/The-Components-Of-Codename-One.asciidoc#9cab21a5b3f7
 docs/developer-guide/The-Components-Of-Codename-One.asciidoc#a6bc48b36d7d
 docs/developer-guide/The-Components-Of-Codename-One.asciidoc#a82c0d4b2e26

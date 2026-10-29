@@ -37,7 +37,34 @@ package com.codename1.util;
 ///
 /// All operations are provided in immutable way, and some in both mutable and
 /// immutable.
+@com.codename1.impl.SharedWithBackend
 final class TBitLevel {
+
+    /// Number of trailing zero bits of `lng` (64 for zero).
+    static int numberOfTrailingZeros(long lng) {
+        return bitCount((lng & -lng) - 1);
+    }
+
+    /// Population count of `lng`.
+    static int bitCount(long lng) {
+        lng = (lng & 0x5555555555555555L) + ((lng >> 1) & 0x5555555555555555L);
+        lng = (lng & 0x3333333333333333L) + ((lng >> 2) & 0x3333333333333333L);
+        // adjust for 64-bit integer
+        int i = (int) ((lng >>> 32) + lng);
+        i = (i & 0x0F0F0F0F) + ((i >> 4) & 0x0F0F0F0F);
+        i = (i & 0x00FF00FF) + ((i >> 8) & 0x00FF00FF);
+        i = (i & 0x0000FFFF) + ((i >> 16) & 0x0000FFFF);
+        return i;
+    }
+
+    /// The lower-case character for `digit` in `radix`, or NUL when out of range.
+    static char forDigit(int digit, int radix) {
+        if (radix < 2 || radix > 36 || digit >= radix) {
+            return '\0';
+        }
+        return digit < 10 ? (char) ('0' + digit) : (char) ('a' + digit - 10);
+    }
+
 
     /// Just to denote that this class can't be instantiated.
     private TBitLevel() {
@@ -104,14 +131,14 @@ final class TBitLevel {
         int i = val.getFirstNonzeroDigit();
         if (val.sign > 0) {
             for (; i < val.numberLength; i++) {
-                bCount += TBigDecimal.bitCount(val.digits[i] & 0xffffffffL);
+                bCount += TBitLevel.bitCount(val.digits[i] & 0xffffffffL);
             }
         } else {
             // (sign < 0)
             // this digit absorbs the carry
-            bCount += TBigDecimal.bitCount(-val.digits[i] & 0xffffffffL);
+            bCount += TBitLevel.bitCount(-val.digits[i] & 0xffffffffL);
             for (i++; i < val.numberLength; i++) {
-                bCount += TBigDecimal.bitCount(~val.digits[i] & 0xffffffffL);
+                bCount += TBitLevel.bitCount(~val.digits[i] & 0xffffffffL);
             }
             // We take the complement sum:
             bCount = (val.numberLength << 5) - bCount;
