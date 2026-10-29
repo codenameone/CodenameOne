@@ -142,6 +142,23 @@ public class Container extends Component implements Iterable<Component> {
     private int doLayoutDepth;
     private TmpInsets calcTmpInsets;
     private int calcPreferredSizeDepth;
+    /// The safe-area padding, in pixels (top, bottom, left, right), that the
+    /// last measurement of this container's preferred size added, or null when
+    /// there is nothing to hold its layout to. See checkMeasuredSafeArea.
+    private int[] measuredSafeInsets;
+    /// The safe-area padding, in pixels, the last layout of this container
+    /// applied; null before the first.
+    private int[] laidOutSafeInsets;
+    /// Corrections checkMeasuredSafeArea made in a row; capped so a layout that
+    /// cannot settle is left as it is rather than laid out without end.
+    private int safeAreaCorrections;
+    private int safeAreaCleanPasses;
+    /// Nesting of doLayout across all containers; the outermost call re-runs a
+    /// layout that a safe-area container found was sized for the wrong inset.
+    /// Static because layout only runs on the EDT; a flag raised in another
+    /// tree laid out inside this one costs a wasted pass, nothing worse.
+    private static int layoutNesting;
+    private static boolean safeAreaRelayout;
 
     /// Constructs a new Container with a new layout manager and UIID
     ///
@@ -2829,13 +2846,41 @@ public class Container extends Component implements Iterable<Component> {
 
     /// For iPhone X primarily.  This will check if the current bounds goes outside the
     /// safe area.  If so, it will add padding to make the contents fit the safe area.
-    private boolean snapToSafeAreaInternal() {
-        if (isHidden()) {
+    private boolean snapToSafeAreaInternal(int[] pad) {
+        Style style = getStyle();
+        if (pad == null) {
             return false;
+        }
+        if (pad[0] != style.getPaddingTop()) {
+            style.setPaddingUnitTop(Style.UNIT_TYPE_PIXELS);
+            style.setPaddingTop(pad[0]);
+        }
+        if (pad[1] != style.getPaddingBottom()) {
+            style.setPaddingUnitBottom(Style.UNIT_TYPE_PIXELS);
+            style.setPaddingBottom(pad[1]);
+        }
+        if (pad[2] != style.getPaddingLeftNoRTL()) {
+            style.setPaddingUnitLeft(Style.UNIT_TYPE_PIXELS);
+            style.setPaddingLeft(pad[2]);
+        }
+        if (pad[3] != style.getPaddingRightNoRTL()) {
+            style.setPaddingUnitRight(Style.UNIT_TYPE_PIXELS);
+            style.setPaddingRight(pad[3]);
+        }
+        return true;
+    }
+
+    /// The padding (top, bottom, left, right, in pixels) that keeps this
+    /// container's content clear of the display's unsafe edges, at its current
+    /// bounds, or null when it needs none.
+    /// Pure: the style is read, never written.
+    private int[] safeAreaPadding() {
+        if (isHidden()) {
+            return null;
         }
         Container safeAreaRoot = getSafeAreaRoot();
         if (safeAreaRoot == null) {
-            return false;
+            return null;
         }
         Rectangle rect;
         int surfaceWidth;
@@ -2863,12 +2908,12 @@ public class Container extends Component implements Iterable<Component> {
         int safeTopMargin = rect.getY();
         int safeBottomMargin = surfaceHeight - rect.getHeight() - rect.getY();
         if (safeLeftMargin == 0 && safeRightMargin == 0 && safeBottomMargin == 0 && safeTopMargin == 0) {
-            return false;
+            return null;
         }
         rect.setWidth(Math.max(0, safeAreaRoot.getWidth() - safeLeftMargin - safeRightMargin));
         rect.setHeight(Math.max(0, safeAreaRoot.getHeight() - safeTopMargin - safeBottomMargin));
         if (rect.getWidth() == 0 || rect.getHeight() == 0) {
-            return false;
+            return null;
         }
         Rectangle safeArea = rect;
         //Form f = getComponentForm();
@@ -2901,8 +2946,7 @@ public class Container extends Component implements Iterable<Component> {
 
 
         int absX = getAbsoluteX() - safeAreaRoot.getAbsoluteX();
-        int w = getWidth();
-        int absX2 = absX + w;
+        int absX2 = absX + getWidth();
 
         if (absX >= 0) {
             if (absX + paddingLeft < safeX1) {
@@ -2916,8 +2960,7 @@ public class Container extends Component implements Iterable<Component> {
         }
 
         int absY = getAbsoluteY() - safeAreaRoot.getAbsoluteY();
-        int h = getHeight();
-        int absY2 = absY + h;
+        int absY2 = absY + getHeight();
 
 
         if (absY >= 0) {
@@ -2932,40 +2975,29 @@ public class Container extends Component implements Iterable<Component> {
         }
 
         boolean changed = false;
-        if (newPaddingTop != paddingTop || newPaddingBottom != paddingBottom) {
-            if (!hasScrollableYParentInternal()) {
-                changed = true;
-
-                if (newPaddingTop != paddingTop) {
-                    style.setPaddingUnitTop(Style.UNIT_TYPE_PIXELS);
-                    style.setPaddingTop(newPaddingTop);
-                }
-                if (newPaddingBottom != paddingBottom) {
-                    style.setPaddingUnitBottom(Style.UNIT_TYPE_PIXELS);
-                    style.setPaddingBottom(newPaddingBottom);
-                }
-
-            }
+        if ((newPaddingTop != paddingTop || newPaddingBottom != paddingBottom)
+                && !hasScrollableYParentInternal()) {
+            changed = true;
+        } else {
+            newPaddingTop = paddingTop;
+            newPaddingBottom = paddingBottom;
         }
-
-        if (newPaddingLeft != paddingLeft || newPaddingRight != paddingRight) {
-            if (!hasScrollableXParentInternal()) {
-                changed = true;
-
-                if (newPaddingLeft != paddingLeft) {
-                    style.setPaddingUnitLeft(Style.UNIT_TYPE_PIXELS);
-                    style.setPaddingLeft(newPaddingLeft);
-                }
-                if (newPaddingRight != paddingRight) {
-                    style.setPaddingUnitRight(Style.UNIT_TYPE_PIXELS);
-                    style.setPaddingRight(newPaddingRight);
-                }
-
-
-            }
+        if ((newPaddingLeft != paddingLeft || newPaddingRight != paddingRight)
+                && !hasScrollableXParentInternal()) {
+            changed = true;
+        } else {
+            newPaddingLeft = paddingLeft;
+            newPaddingRight = paddingRight;
         }
-        return changed;
-
+        if (!changed) {
+            return null;
+        }
+        int[] out = new int[4];
+        out[0] = newPaddingTop;
+        out[1] = newPaddingBottom;
+        out[2] = newPaddingLeft;
+        out[3] = newPaddingRight;
+        return out;
     }
 
     // NOT suppressed, deliberately -- see the history before changing this.
@@ -2990,7 +3022,105 @@ public class Container extends Component implements Iterable<Component> {
     // Fixing the treadmill therefore needs the peers to drive their own
     // repaints first; until then the wasted passes are the cheaper defect.
 
+    /// The inset a safe-area container adds depends on where it sits, but its
+    /// preferred size is cached from wherever it sat when it was measured: not
+    /// yet placed, or placed by a parent that had moved since. A bottom tab bar
+    /// measured that way was sized for its content alone, and its layout then
+    /// padded the inset into that height and clipped the labels; whichever pass
+    /// next re-measured it put it back, so it jumped between the two as the
+    /// screen changed.
+    ///
+    /// Measurement therefore also counts the inset the last layout applied, so a
+    /// position that is stale mid-layout cannot take it away, and layout
+    /// compares the inset it applies with the one measured, having the size
+    /// computed again when they differ. Only an axis the parent sized from the
+    /// preferred size is compared: a stretched container's size never came from
+    /// its measurement, so a different inset there changes nothing.
+    private void checkMeasuredSafeArea(int[] applied) {
+        int[] measured = measuredSafeInsets;
+        if (measured == null) {
+            return;
+        }
+        if (shouldCalcPreferredSize) {
+            // Already to be measured again before anything reads it.
+            return;
+        }
+        // The final preferred size, after preferredSizeStr, setPreferredH,
+        // sameWidth and the like: what the parent really sized it from.
+        Dimension pref = getPreferredSize();
+        boolean sizedY = getHeight() == pref.getHeight();
+        boolean sizedX = getWidth() == pref.getWidth();
+        boolean stale = false;
+        for (int i = 0; i < 4; i++) {
+            if (applied[i] != measured[i] && (i < 2 ? sizedY : sizedX)) {
+                stale = true;
+            }
+        }
+        if (!stale) {
+            // Forgiven only after two clean passes in a row, so a layout that
+            // alternates stale and clean still runs into the cap.
+            if (safeAreaCorrections > 0) {
+                safeAreaCleanPasses++;
+                if (safeAreaCleanPasses >= 2) {
+                    safeAreaCorrections = 0;
+                    safeAreaCleanPasses = 0;
+                }
+            }
+            return;
+        }
+        safeAreaCleanPasses = 0;
+        if (safeAreaCorrections >= 3) {
+            return;
+        }
+        safeAreaCorrections++;
+        measuredSafeInsets = null;
+        setShouldCalcPreferredSize(true);
+        safeAreaRelayout = true;
+    }
+
     void doLayout() {
+        layoutNesting++;
+        boolean completed = false;
+        try {
+            doLayoutImpl();
+            completed = true;
+        } finally {
+            layoutNesting--;
+            if (layoutNesting == 0 && !completed) {
+                safeAreaRelayout = false;
+            }
+        }
+        if (layoutNesting == 0 && safeAreaRelayout) {
+            safeAreaRelayout = false;
+            // Within this same revalidate where this is the root, so no frame
+            // is painted with the stale size; a container laid out on its own
+            // cannot resize itself, so its parent goes next.
+            Container parent = getParent();
+            if (parent == null) {
+                // Each pass places the bar where the next measures it, so a
+                // change of size can take more than one; bounded, as is each
+                // container's own count of corrections.
+                layoutNesting++;
+                try {
+                    for (int pass = 0; pass < 3; pass++) {
+                        safeAreaRelayout = false;
+                        shouldLayout = true;
+                        layoutContainer();
+                        if (!safeAreaRelayout) {
+                            break;
+                        }
+                    }
+                } finally {
+                    layoutNesting--;
+                    safeAreaRelayout = false;
+                }
+            } else {
+                parent.revalidateLater();
+            }
+        }
+    }
+
+    private void doLayoutImpl() {
         doLayoutDepth++;
         boolean restoreBounds = false;
         if (safeArea && doLayoutDepth == 1) {
@@ -3006,7 +3136,18 @@ public class Container extends Component implements Iterable<Component> {
                 }
                 Style s = getStyle();
                 tmpInsets.set(s);
-                restoreBounds = snapToSafeAreaInternal();
+                int[] base = {s.getPaddingTop(), s.getPaddingBottom(), s.getPaddingLeftNoRTL(), s.getPaddingRightNoRTL()};
+                int[] pad = safeAreaPadding();
+                int[] applied = laidOutSafeInsets;
+                if (applied == null) {
+                    applied = new int[4];
+                }
+                for (int i = 0; i < 4; i++) {
+                    applied[i] = pad == null ? 0 : pad[i] - base[i];
+                }
+                laidOutSafeInsets = applied;
+                checkMeasuredSafeArea(applied);
+                restoreBounds = snapToSafeAreaInternal(pad);
             }
         }
         layout.layoutContainer(this);
@@ -3629,8 +3770,37 @@ public class Container extends Component implements Iterable<Component> {
                 }
                 Style s = getStyle();
                 calcTmpInsets.set(s);
-                restoreBounds = snapToSafeAreaInternal();
+                int[] base = {s.getPaddingTop(), s.getPaddingBottom(), s.getPaddingLeftNoRTL(), s.getPaddingRightNoRTL()};
+                int[] pad = safeAreaPadding();
+                int[] measured = measuredSafeInsets;
+                if (measured == null) {
+                    measured = new int[4];
+                }
+                boolean any = false;
+                for (int i = 0; i < 4; i++) {
+                    measured[i] = pad == null ? 0 : pad[i] - base[i];
+                    if (laidOutSafeInsets != null && laidOutSafeInsets[i] > measured[i]) {
+                        measured[i] = laidOutSafeInsets[i];
+                    }
+                    if (measured[i] != 0) {
+                        any = true;
+                    }
+                }
+                measuredSafeInsets = measured;
+                if (any) {
+                    pad = new int[4];
+                    for (int i = 0; i < 4; i++) {
+                        pad[i] = base[i] + measured[i];
+                    }
+                    restoreBounds = snapToSafeAreaInternal(pad);
+                }
+            } else {
+                measuredSafeInsets = null;
             }
+        } else if (calcPreferredSizeDepth == 1) {
+            // Not placed yet: nothing was added, and the first layout judges
+            // whether something should have been.
+            measuredSafeInsets = safeArea && (getWidth() <= 0 || getHeight() <= 0) ? new int[4] : null;
         }
 
         Dimension d = layout.getPreferredSize(this);
