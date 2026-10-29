@@ -179,7 +179,7 @@ no TLS, and what it does need is exactly what a translated binary is good at.
   in bytes or with a `KB` or `MB` suffix, and when several classes ask, the
   largest wins:
 +
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/DeepReports.java[tag=backend-virtual-thread-stack,indent=0]
 ----

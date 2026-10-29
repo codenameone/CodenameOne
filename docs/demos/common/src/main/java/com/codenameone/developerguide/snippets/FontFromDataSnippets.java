@@ -22,6 +22,7 @@
  */
 package com.codenameone.developerguide.snippets;
 
+import com.codename1.io.Log;
 import com.codename1.io.Storage;
 import com.codename1.ui.CN;
 import com.codename1.ui.Font;
@@ -33,12 +34,17 @@ import java.io.InputStream;
 /// Snippets for creating a font from data at runtime, included by the
 /// developer guide's CSS fonts section.
 public class FontFromDataSnippets {
-    Label fontFromStorage(Label label) throws IOException {
+    Label fontFromStorage() {
         // tag::font-from-data[]
+        Label label = new Label("Handlee");
         Font base = null;
         if (Font.isTrueTypeStreamSupported()) {
-            InputStream in = Storage.getInstance().createInputStream("Handlee-Regular.ttf");
-            base = Font.createTrueTypeFontFromData("Handlee", in);
+            try {
+                InputStream in = Storage.getInstance().createInputStream("Handlee-Regular.ttf");
+                base = Font.createTrueTypeFontFromData("Handlee", in);
+            } catch (IOException err) {
+                Log.e(err);
+            }
         }
         if (base == null) {
             base = Font.createTrueTypeFont("native:MainRegular");

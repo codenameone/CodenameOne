@@ -866,3 +866,14 @@ passlib
 Werkzeug
 enqueues
 backoff
+# Python support: package and stdlib names, and plain technical words.
+antialiased
+libpq
+pydantic
+yaml
+dataclass
+autoescaping
+Starlette
+asyncio
+subqueries
+recurses

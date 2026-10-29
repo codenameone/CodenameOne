@@ -194,7 +194,7 @@ A backend often has to produce an image: a sharing card for a link, a thumbnail 
 * `TrueTypeFont` reads a TrueType font for `RasterGraphics.drawString`. `TrueTypeFont.createDefault(size)` needs no font file: it embeds Aileron, the font Pillow uses for `ImageFont.load_default()`.
 * `PngCodec` reads every PNG variant and writes 8-bit PNG; `JpegCodec` reads baseline and progressive JPEG and writes baseline JPEG.
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/SocialCard.java[tag=raster-image-card,indent=0]
 ----

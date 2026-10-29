@@ -313,8 +313,8 @@ final class BuildHintsGeneral {
                 .def("1MB")
                 .platform("general")
                 .doc("The C stack each request's virtual thread gets in a Python backend: bytes, "
-                        + "or a number followed by `KB` or `MB`, such as `2MB`. Raise it when a "
-                        + "handler recurses deeply. `CN1_HTTP_VT_STACK` can still raise it at "
+                        + "or a number followed by `KB` or `MB`, such as `2MB`. Raise it for a "
+                        + "handler with deep recursion. `CN1_HTTP_VT_STACK` can still raise it at "
                         + "start-up; the larger of the two applies."));
 
         h.add(new Hint("watchMain")

@@ -421,8 +421,14 @@ public class Font extends CN {
     /// it to the size and weight you need.
     ///
     /// ```java
-    /// InputStream in = Storage.getInstance().createInputStream("Handlee-Regular.ttf");
-    /// Font handlee = Font.createTrueTypeFontFromData("Handlee", in);
+    /// Label label = new Label("Handlee");
+    /// Font handlee = null;
+    /// try {
+    ///     InputStream in = Storage.getInstance().createInputStream("Handlee-Regular.ttf");
+    ///     handlee = Font.createTrueTypeFontFromData("Handlee", in);
+    /// } catch (IOException err) {
+    ///     Log.e(err);
+    /// }
     /// if (handlee != null) {
     ///     label.getAllStyles().setFont(handlee.derive(Display.getInstance().convertToPixels(4), Font.STYLE_PLAIN));
     /// }

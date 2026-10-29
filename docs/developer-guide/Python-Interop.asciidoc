@@ -20,7 +20,7 @@ Two things follow from compiling ahead of time rather than interpreting:
 * Packages with C extensions are supported. The package's Python is
   translated like your own code, and each compiled module is replaced by a
   Java class with the same functions; see <<python-c-extensions,C extensions>>.
-  The most used ones -- `numpy`, `pydantic`'s core, `yaml`'s scanner -- are
+  The most used ones -- `numpy`, ``pydantic``'s core, ``yaml``'s scanner -- are
   already provided, as Codename One implementations of the same public API.
 
 === Adding Python to a project
@@ -35,8 +35,8 @@ include::../demos/common/src/main/snippets/developer-guide/python-interop.sh[tag
 
 The import copies the `.py` files, adds the Python runtime dependency and the
 `transpile-python` goal to the common module, records the entry module and
-makes the application's main class run it. Build and run the project as usual
-afterwards; the translation runs in `generate-sources`. Gradle projects get the
+makes the application's main class run it. Then build and run the project as
+usual; the translation runs in `generate-sources`. Gradle projects get the
 same step as the `transpilePython` task.
 
 The goal reads these properties:
@@ -76,8 +76,8 @@ include::../demos/common/src/main/snippets/developer-guide/python-interop.sh[tag
 
 The mapping is applied to the compiled classes by the build's `remap-compat`
 step (`cn1RemapCompat` in Gradle), so the generated Java in
-`target/generated-sources/python` still shows which Python line each
-statement came from, as a `/* line N */` comment above it.
+`target/generated-sources/python` still shows the Python line that
+each statement came from, as a `/* line N */` comment above it.
 
 === Calling Codename One and Java from Python
 
@@ -119,7 +119,7 @@ translated module. When Python is the application's entry point, its main
 class calls `PythonModules.registerAll()` at startup; a Java application
 that uses Python as a library calls it once before importing anything:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/python/PythonInteropSnippets.java[tag=python-interop-java-001,indent=0]
 ----
@@ -264,7 +264,7 @@ uses from each one. For every module it generates a class in
 `common/src/main/java/com/codename1/python/ext` with a stub per function,
 and lists it in `python-packages/cn1-native-modules.properties`:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/python/MarkupsafeSpeedups.java[tag=python-interop-java-002,indent=0]
 ----
@@ -383,7 +383,7 @@ of the two applies.
 
 === Compared with CPython, PyPy and GraalPy
 
-The same programs, run on one Apple silicon Mac with
+The same programs, run on one Apple Silicon Mac with
 `scripts/python-compare/compare.py` and
 `scripts/python-compare/common_compare.py`. Codename One rows are native
 executables. The interpreters are CPython 3.14, PyPy 3.11 (7.3.20) and GraalPy
@@ -493,7 +493,7 @@ What the numbers say:
 
 * **Python reaches Java's memory.** On every workload the compiled Python uses
   about the memory the Java program uses, and sometimes less:
-  ints, floats and int lists are held unboxed, a list of ints that fit 32 bits
+  integers, floats and integer lists are held unboxed, a list of integers that fit 32 bits
   takes four bytes an item as a Java `int[]` does, and objects that don't
   escape a function are never allocated.
 * **And mostly its speed.** Six of the eleven run within 15% of Java, among
