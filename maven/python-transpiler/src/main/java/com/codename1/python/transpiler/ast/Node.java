@@ -46,7 +46,7 @@ public abstract class Node {
     // Expressions
     // =====================================================================
 
-    public abstract static class Expr extends Node {
+    public abstract static class Expr extends Node { //NOPMD AbstractClassWithoutAnyMethod - a category of node, never instantiated itself
     }
 
     public static final class Name extends Expr {
@@ -358,7 +358,7 @@ public abstract class Node {
     // Statements
     // =====================================================================
 
-    public abstract static class Stmt extends Node {
+    public abstract static class Stmt extends Node { //NOPMD AbstractClassWithoutAnyMethod - a category of node, never instantiated itself
     }
 
     public static final class ExprStmt extends Stmt {

@@ -108,7 +108,7 @@ final class ShadowTypes {
                     continue;
                 }
                 try {
-                    f.setAccessible(true);
+                    f.setAccessible(true); //NOPMD AvoidAccessibilityAlteration - build-time walk of the transpiler's own AST, never device code
                     walk(f.get(o));
                 } catch (IllegalAccessException e) {
                     throw new IllegalStateException(e);

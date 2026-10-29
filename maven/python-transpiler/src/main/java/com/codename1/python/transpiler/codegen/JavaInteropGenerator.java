@@ -977,7 +977,7 @@ public final class JavaInteropGenerator {
                         continue;
                     }
                     try {
-                        f.setAccessible(true);
+                        f.setAccessible(true); //NOPMD AvoidAccessibilityAlteration - build-time walk of the transpiler's own AST, never device code
                         walk(f.get(o), out, seen);
                     } catch (IllegalAccessException e) {
                         throw new IllegalStateException(e);

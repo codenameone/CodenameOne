@@ -295,7 +295,7 @@ final class TypedEmit {
         } else if (o instanceof Assign) {
             for (Expr t : ((Assign) o).targets) {
                 if (!localTarget(t) && !(initSelf != null && t instanceof Attribute
-                        && ((Attribute) t).value instanceof Name && ((Name) ((Attribute) t).value).id.equals(initSelf))) {
+                        && ((Attribute) t).value instanceof Name && initSelf.equals(((Name) ((Attribute) t).value).id))) {
                     return false;
                 }
             }
