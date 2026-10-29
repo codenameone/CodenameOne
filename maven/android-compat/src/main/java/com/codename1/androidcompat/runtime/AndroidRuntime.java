@@ -230,7 +230,7 @@ public final class AndroidRuntime {
         if (action == null) {
             return false;
         }
-        if (app.activityForIntent(intent) != null) {
+        if (app.activityForIntent(intent) != null || DocumentIntents.handles(intent)) {
             return true;
         }
         // The same test startActivity() applies, without acting on it, so a

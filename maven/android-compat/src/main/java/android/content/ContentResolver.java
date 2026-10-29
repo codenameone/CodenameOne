@@ -48,10 +48,35 @@ public class ContentResolver {
     public final java.io.OutputStream openOutputStream(Uri uri) throws java.io.FileNotFoundException {
         String path = storagePath(uri);
         try {
-            return com.codename1.io.FileSystemStorage.getInstance().openOutputStream(path);
+            return com.codename1.androidcompat.runtime.DocumentIntents.wrapForExport(path,
+                    com.codename1.io.FileSystemStorage.getInstance().openOutputStream(path));
         } catch (java.io.IOException e) {
             throw new java.io.FileNotFoundException(uri.toString());
         }
+    }
+
+    /// `mode` ("w", "wt", "wa", "rw") is not distinguished: the stream
+    /// replaces the file's content, except that "wa" appends.
+    public final java.io.OutputStream openOutputStream(Uri uri, String mode) throws java.io.FileNotFoundException {
+        if (mode != null && mode.indexOf('a') >= 0) {
+            String path = storagePath(uri);
+            try {
+                return com.codename1.androidcompat.runtime.DocumentIntents.wrapForExport(path,
+                        com.codename1.io.FileSystemStorage.getInstance().openOutputStream(path,
+                        (int) com.codename1.io.FileSystemStorage.getInstance().getLength(path)));
+            } catch (java.io.IOException e) {
+                throw new java.io.FileNotFoundException(uri.toString());
+            }
+        }
+        return openOutputStream(uri);
+    }
+
+    /// Documents picked through `ACTION_OPEN_DOCUMENT` are plain files the
+    /// application can always read again, so a persisted grant is a no-op.
+    public void takePersistableUriPermission(Uri uri, int modeFlags) {
+    }
+
+    public void releasePersistableUriPermission(Uri uri, int modeFlags) {
     }
 
     /// The `FileSystemStorage` path for a `file:` URI or a bare absolute path.
