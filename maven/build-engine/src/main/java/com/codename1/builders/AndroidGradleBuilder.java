@@ -1612,6 +1612,34 @@ public class AndroidGradleBuilder extends Executor {
 
     boolean dbCipherSupport;
 
+    /// The ABIs `Ports/Android/crypto-jni/build.sh` builds `libcn1crypto.so` for.
+    private static final String[] CRYPTO_KERNEL_ABIS = {"arm64-v8a", "armeabi-v7a", "x86_64", "x86"};
+
+    /// Puts the native crypto kernels (libsecp256k1, ed25519-donna, Keccak behind JNI) into the
+    /// project's jniLibs, for an application that uses the elliptic-curve or `com.codename1.crypto`
+    /// APIs. `AndroidImplementation.createCryptoEngine` loads the library when it is there and
+    /// keeps the Java engine when it is not, so an application that never reaches this is
+    /// unaffected and one on a device the library cannot load on (below API 21) still runs.
+    ///
+    /// All four ABIs, as an application with no other native code needs. One that bundles a
+    /// library for fewer ABIs now carries a directory for an ABI that library lacks, and a device
+    /// of that ABI installs it without the other library -- the same device that previously could
+    /// not install the application at all.
+    void copyCryptoKernels(File jniLibs) throws IOException {
+        for (String abi : CRYPTO_KERNEL_ABIS) {
+            String resource = "/com/codename1/builders/android-crypto/jniLibs/" + abi + "/libcn1crypto.so";
+            InputStream in = AndroidGradleBuilder.class.getResourceAsStream(resource);
+            if (in == null) {
+                throw new IOException("the build engine is missing " + resource);
+            }
+            try {
+                FileUtils.copyInputStreamToFile(in, new File(new File(jniLibs, abi), "libcn1crypto.so"));
+            } finally {
+                in.close();
+            }
+        }
+    }
+
     /// Whether the application touches com.codename1.db at all, which is what the database
     /// compatibility default is keyed on.
     private boolean usesDatabase;
@@ -2743,6 +2771,9 @@ public class AndroidGradleBuilder extends Executor {
                 // Fed by name rather than by the scan, so the catalog applies its dependencies and
                 // its minimum SDK only when the application itself configures encryption.
                 aiAcc.consume(DATABASE_CIPHER_CATALOG_CLASS);
+            }
+            if (databaseUsage.usesCryptoKernels() || libraryUsage.usesCryptoKernels()) {
+                copyCryptoKernels(new File(projectDir, "src/main/jniLibs"));
             }
             scanClassesForPermissions(dummyClassesDir, new Executor.ClassScanner() {
                 @Override

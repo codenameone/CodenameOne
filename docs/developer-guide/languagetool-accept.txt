@@ -864,5 +864,17 @@ DTOs?
 # Identity migration: password hash formats read by ModularPbkdf2PasswordEncoder.
 passlib
 Werkzeug
+# Crypto wallets chapter: libraries, chain vocabulary and algorithm names.
+libsodium
+Merkle
+testnet
+regtest
+multisig
+Esplora
+sats
+lamports
+blockhash
+Vulkan
+Karatsuba
 enqueues
 backoff

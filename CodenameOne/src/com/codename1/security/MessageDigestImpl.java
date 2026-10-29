@@ -62,6 +62,9 @@ abstract class MessageDigestImpl {
         if ("KECCAK256".equals(a)) {
             return new Keccak(32, (byte) 0x01);
         }
+        if ("RIPEMD160".equals(a)) {
+            return new Ripemd160();
+        }
         if ("SHA3256".equals(a)) {
             return new Keccak(32, (byte) 0x06);
         }
@@ -458,6 +461,7 @@ abstract class MessageDigestImpl {
         private int h6;
         private int h7;
         private final int[] w = new int[64];
+        private final int[] state = new int[8];
 
         Sha256Family(boolean truncated) {
             this.truncated = truncated;
@@ -509,6 +513,17 @@ abstract class MessageDigestImpl {
                      | (block[o + i * 4 + 2] & 0xff) << 8
                      | (block[o + i * 4 + 3] & 0xff);
             }
+            int[] st = state;
+            st[0] = h0; st[1] = h1; st[2] = h2; st[3] = h3;
+            st[4] = h4; st[5] = h5; st[6] = h6; st[7] = h7;
+            compress(st, w);
+            h0 = st[0]; h1 = st[1]; h2 = st[2]; h3 = st[3];
+            h4 = st[4]; h5 = st[5]; h6 = st[6]; h7 = st[7];
+        }
+
+        /// One SHA-256 compression of the block whose sixteen big-endian
+        /// words are in `w[0..15]` (w has room for 64) into `st[0..7]`.
+        static void compress(int[] st, int[] w) {
             for (int i = 16; i < 64; i++) {
                 int v15 = w[i - 15];
                 int s0 = ((v15 >>> 7) | (v15 << 25)) ^ ((v15 >>> 18) | (v15 << 14)) ^ (v15 >>> 3);
@@ -516,14 +531,14 @@ abstract class MessageDigestImpl {
                 int s1 = ((v2 >>> 17) | (v2 << 15)) ^ ((v2 >>> 19) | (v2 << 13)) ^ (v2 >>> 10);
                 w[i] = w[i - 16] + s0 + w[i - 7] + s1;
             }
-            int a = h0;
-            int b = h1;
-            int c = h2;
-            int d = h3;
-            int e = h4;
-            int f = h5;
-            int g = h6;
-            int h = h7;
+            int a = st[0];
+            int b = st[1];
+            int c = st[2];
+            int d = st[3];
+            int e = st[4];
+            int f = st[5];
+            int g = st[6];
+            int h = st[7];
             for (int i = 0; i < 64; i++) {
                 int s1 = ((e >>> 6) | (e << 26)) ^ ((e >>> 11) | (e << 21)) ^ ((e >>> 25) | (e << 7));
                 int ch = (e & f) ^ (~e & g);
@@ -536,8 +551,8 @@ abstract class MessageDigestImpl {
                 d = c; c = b; b = a;
                 a = t1 + t2;
             }
-            h0 += a; h1 += b; h2 += c; h3 += d;
-            h4 += e; h5 += f; h6 += g; h7 += h;
+            st[0] += a; st[1] += b; st[2] += c; st[3] += d;
+            st[4] += e; st[5] += f; st[6] += g; st[7] += h;
         }
     }
 
@@ -581,6 +596,7 @@ abstract class MessageDigestImpl {
         private int bufferLen;
         private long byteCount; // we cap message length at 2^63-1 bytes which is plenty
         private final long[] w = new long[80];
+        private final long[] state = new long[8];
 
         Sha512Family(boolean truncated) {
             this.truncated = truncated;
@@ -702,6 +718,17 @@ abstract class MessageDigestImpl {
                      | ((long) (block[p + 6] & 0xff) << 8)
                      | ((long) (block[p + 7] & 0xff));
             }
+            long[] st = state;
+            st[0] = h0; st[1] = h1; st[2] = h2; st[3] = h3;
+            st[4] = h4; st[5] = h5; st[6] = h6; st[7] = h7;
+            compress(st, w);
+            h0 = st[0]; h1 = st[1]; h2 = st[2]; h3 = st[3];
+            h4 = st[4]; h5 = st[5]; h6 = st[6]; h7 = st[7];
+        }
+
+        /// One SHA-512 compression of the block whose sixteen big-endian
+        /// words are in `w[0..15]` (w has room for 80) into `st[0..7]`.
+        static void compress(long[] st, long[] w) {
             for (int i = 16; i < 80; i++) {
                 long v15 = w[i - 15];
                 long s0 = ((v15 >>> 1) | (v15 << 63))
@@ -713,14 +740,14 @@ abstract class MessageDigestImpl {
                         ^ (v2 >>> 6);
                 w[i] = w[i - 16] + s0 + w[i - 7] + s1;
             }
-            long a = h0;
-            long b = h1;
-            long c = h2;
-            long d = h3;
-            long e = h4;
-            long f = h5;
-            long g = h6;
-            long h = h7;
+            long a = st[0];
+            long b = st[1];
+            long c = st[2];
+            long d = st[3];
+            long e = st[4];
+            long f = st[5];
+            long g = st[6];
+            long h = st[7];
             for (int i = 0; i < 80; i++) {
                 long s1 = ((e >>> 14) | (e << 50))
                         ^ ((e >>> 18) | (e << 46))
@@ -737,8 +764,8 @@ abstract class MessageDigestImpl {
                 d = c; c = b; b = a;
                 a = t1 + t2;
             }
-            h0 += a; h1 += b; h2 += c; h3 += d;
-            h4 += e; h5 += f; h6 += g; h7 += h;
+            st[0] += a; st[1] += b; st[2] += c; st[3] += d;
+            st[4] += e; st[5] += f; st[6] += g; st[7] += h;
         }
     }
 
@@ -762,31 +789,10 @@ abstract class MessageDigestImpl {
             0x8000000080008081L, 0x8000000000008080L, 0x0000000080000001L, 0x8000000080008008L
         };
 
-        // rho rotation offsets, indexed by lane x + 5 * y
-        private static final int[] ROT = {
-            0, 1, 62, 28, 27,
-            36, 44, 6, 55, 20,
-            3, 10, 43, 25, 39,
-            41, 45, 15, 21, 8,
-            18, 2, 61, 56, 14
-        };
-
-        // pi: lane (x, y) moves to (y, 2x + 3y), again indexed by x + 5 * y
-        private static final int[] PI = new int[25];
-
-        static {
-            for (int x = 0; x < 5; x++) {
-                for (int y = 0; y < 5; y++) {
-                    PI[x + 5 * y] = y + 5 * ((2 * x + 3 * y) % 5);
-                }
-            }
-        }
-
         private final int outLen;
         private final int rate;
         private final byte domain;
         private final long[] state = new long[25];
-        private final long[] scratch = new long[25];
         private final byte[] buffer;
         private int bufferLen;
 
@@ -822,6 +828,11 @@ abstract class MessageDigestImpl {
         void update(byte[] data, int offset, int length) {
             int o = offset;
             int remaining = length;
+            while (bufferLen == 0 && remaining >= rate) {
+                absorb(data, o);
+                o += rate;
+                remaining -= rate;
+            }
             while (remaining > 0) {
                 int n = rate - bufferLen;
                 if (n > remaining) {
@@ -857,58 +868,164 @@ abstract class MessageDigestImpl {
         // XORs the full buffer into the state lane by lane (little endian) and
         // runs the permutation.
         private void absorb() {
-            int lanes = rate >> 3;
-            for (int i = 0; i < lanes; i++) {
-                int o = i << 3;
-                long v = 0;
-                for (int b = 7; b >= 0; b--) {
-                    v = (v << 8) | (buffer[o + b] & 0xffL);
-                }
-                state[i] ^= v;
-            }
+            absorb(buffer, 0);
             bufferLen = 0;
+        }
+
+        private void absorb(byte[] src, int off) {
+            int lanes = rate >> 3;
+            long[] st = state;
+            for (int i = 0; i < lanes; i++) {
+                int o = off + (i << 3);
+                st[i] ^= (src[o] & 0xffL) | (src[o + 1] & 0xffL) << 8 | (src[o + 2] & 0xffL) << 16
+                        | (src[o + 3] & 0xffL) << 24 | (src[o + 4] & 0xffL) << 32 | (src[o + 5] & 0xffL) << 40
+                        | (src[o + 6] & 0xffL) << 48 | (long) src[o + 7] << 56;
+            }
             permute();
         }
 
+        // Keccak-f[1600] with the 25 lanes in locals and each round's theta,
+        // rho, pi and chi written out lane by lane: no array traffic and no
+        // index tables inside the 24 rounds.
         private void permute() {
-            long[] a = state;
-            long[] b = scratch;
+            long[] st = state;
+            long a0 = st[0];
+            long a1 = st[1];
+            long a2 = st[2];
+            long a3 = st[3];
+            long a4 = st[4];
+            long a5 = st[5];
+            long a6 = st[6];
+            long a7 = st[7];
+            long a8 = st[8];
+            long a9 = st[9];
+            long a10 = st[10];
+            long a11 = st[11];
+            long a12 = st[12];
+            long a13 = st[13];
+            long a14 = st[14];
+            long a15 = st[15];
+            long a16 = st[16];
+            long a17 = st[17];
+            long a18 = st[18];
+            long a19 = st[19];
+            long a20 = st[20];
+            long a21 = st[21];
+            long a22 = st[22];
+            long a23 = st[23];
+            long a24 = st[24];
             for (int round = 0; round < 24; round++) {
-                // theta
-                long c0 = a[0] ^ a[5] ^ a[10] ^ a[15] ^ a[20];
-                long c1 = a[1] ^ a[6] ^ a[11] ^ a[16] ^ a[21];
-                long c2 = a[2] ^ a[7] ^ a[12] ^ a[17] ^ a[22];
-                long c3 = a[3] ^ a[8] ^ a[13] ^ a[18] ^ a[23];
-                long c4 = a[4] ^ a[9] ^ a[14] ^ a[19] ^ a[24];
-                long d0 = c4 ^ rotl(c1, 1);
-                long d1 = c0 ^ rotl(c2, 1);
-                long d2 = c1 ^ rotl(c3, 1);
-                long d3 = c2 ^ rotl(c4, 1);
-                long d4 = c3 ^ rotl(c0, 1);
-                for (int y = 0; y < 25; y += 5) {
-                    a[y] ^= d0;
-                    a[y + 1] ^= d1;
-                    a[y + 2] ^= d2;
-                    a[y + 3] ^= d3;
-                    a[y + 4] ^= d4;
-                }
-                // rho and pi
-                for (int i = 0; i < 25; i++) {
-                    b[PI[i]] = rotl(a[i], ROT[i]);
-                }
-                // chi
-                for (int y = 0; y < 25; y += 5) {
-                    for (int x = 0; x < 5; x++) {
-                        a[y + x] = b[y + x] ^ (~b[y + (x + 1) % 5] & b[y + (x + 2) % 5]);
-                    }
-                }
-                // iota
-                a[0] ^= RC[round];
+                long c0 = a0 ^ a5 ^ a10 ^ a15 ^ a20;
+                long c1 = a1 ^ a6 ^ a11 ^ a16 ^ a21;
+                long c2 = a2 ^ a7 ^ a12 ^ a17 ^ a22;
+                long c3 = a3 ^ a8 ^ a13 ^ a18 ^ a23;
+                long c4 = a4 ^ a9 ^ a14 ^ a19 ^ a24;
+                long d0 = c4 ^ ((c1 << 1) | (c1 >>> 63));
+                long d1 = c0 ^ ((c2 << 1) | (c2 >>> 63));
+                long d2 = c1 ^ ((c3 << 1) | (c3 >>> 63));
+                long d3 = c2 ^ ((c4 << 1) | (c4 >>> 63));
+                long d4 = c3 ^ ((c0 << 1) | (c0 >>> 63));
+                long b0 = (a0 ^ d0);
+                long t1 = a1 ^ d1;
+                long b10 = (t1 << 1) | (t1 >>> 63);
+                long t2 = a2 ^ d2;
+                long b20 = (t2 << 62) | (t2 >>> 2);
+                long t3 = a3 ^ d3;
+                long b5 = (t3 << 28) | (t3 >>> 36);
+                long t4 = a4 ^ d4;
+                long b15 = (t4 << 27) | (t4 >>> 37);
+                long t5 = a5 ^ d0;
+                long b16 = (t5 << 36) | (t5 >>> 28);
+                long t6 = a6 ^ d1;
+                long b1 = (t6 << 44) | (t6 >>> 20);
+                long t7 = a7 ^ d2;
+                long b11 = (t7 << 6) | (t7 >>> 58);
+                long t8 = a8 ^ d3;
+                long b21 = (t8 << 55) | (t8 >>> 9);
+                long t9 = a9 ^ d4;
+                long b6 = (t9 << 20) | (t9 >>> 44);
+                long t10 = a10 ^ d0;
+                long b7 = (t10 << 3) | (t10 >>> 61);
+                long t11 = a11 ^ d1;
+                long b17 = (t11 << 10) | (t11 >>> 54);
+                long t12 = a12 ^ d2;
+                long b2 = (t12 << 43) | (t12 >>> 21);
+                long t13 = a13 ^ d3;
+                long b12 = (t13 << 25) | (t13 >>> 39);
+                long t14 = a14 ^ d4;
+                long b22 = (t14 << 39) | (t14 >>> 25);
+                long t15 = a15 ^ d0;
+                long b23 = (t15 << 41) | (t15 >>> 23);
+                long t16 = a16 ^ d1;
+                long b8 = (t16 << 45) | (t16 >>> 19);
+                long t17 = a17 ^ d2;
+                long b18 = (t17 << 15) | (t17 >>> 49);
+                long t18 = a18 ^ d3;
+                long b3 = (t18 << 21) | (t18 >>> 43);
+                long t19 = a19 ^ d4;
+                long b13 = (t19 << 8) | (t19 >>> 56);
+                long t20 = a20 ^ d0;
+                long b14 = (t20 << 18) | (t20 >>> 46);
+                long t21 = a21 ^ d1;
+                long b24 = (t21 << 2) | (t21 >>> 62);
+                long t22 = a22 ^ d2;
+                long b9 = (t22 << 61) | (t22 >>> 3);
+                long t23 = a23 ^ d3;
+                long b19 = (t23 << 56) | (t23 >>> 8);
+                long t24 = a24 ^ d4;
+                long b4 = (t24 << 14) | (t24 >>> 50);
+                a0 = b0 ^ (~b1 & b2);
+                a1 = b1 ^ (~b2 & b3);
+                a2 = b2 ^ (~b3 & b4);
+                a3 = b3 ^ (~b4 & b0);
+                a4 = b4 ^ (~b0 & b1);
+                a5 = b5 ^ (~b6 & b7);
+                a6 = b6 ^ (~b7 & b8);
+                a7 = b7 ^ (~b8 & b9);
+                a8 = b8 ^ (~b9 & b5);
+                a9 = b9 ^ (~b5 & b6);
+                a10 = b10 ^ (~b11 & b12);
+                a11 = b11 ^ (~b12 & b13);
+                a12 = b12 ^ (~b13 & b14);
+                a13 = b13 ^ (~b14 & b10);
+                a14 = b14 ^ (~b10 & b11);
+                a15 = b15 ^ (~b16 & b17);
+                a16 = b16 ^ (~b17 & b18);
+                a17 = b17 ^ (~b18 & b19);
+                a18 = b18 ^ (~b19 & b15);
+                a19 = b19 ^ (~b15 & b16);
+                a20 = b20 ^ (~b21 & b22);
+                a21 = b21 ^ (~b22 & b23);
+                a22 = b22 ^ (~b23 & b24);
+                a23 = b23 ^ (~b24 & b20);
+                a24 = b24 ^ (~b20 & b21);
+                a0 ^= RC[round];
             }
-        }
-
-        private static long rotl(long v, int s) {
-            return s == 0 ? v : (v << s) | (v >>> (64 - s));
+            st[0] = a0;
+            st[1] = a1;
+            st[2] = a2;
+            st[3] = a3;
+            st[4] = a4;
+            st[5] = a5;
+            st[6] = a6;
+            st[7] = a7;
+            st[8] = a8;
+            st[9] = a9;
+            st[10] = a10;
+            st[11] = a11;
+            st[12] = a12;
+            st[13] = a13;
+            st[14] = a14;
+            st[15] = a15;
+            st[16] = a16;
+            st[17] = a17;
+            st[18] = a18;
+            st[19] = a19;
+            st[20] = a20;
+            st[21] = a21;
+            st[22] = a22;
+            st[23] = a23;
+            st[24] = a24;
         }
     }
 
@@ -930,5 +1047,262 @@ abstract class MessageDigestImpl {
         out[o + 5] = (byte) (v >>> 16);
         out[o + 6] = (byte) (v >>> 8);
         out[o + 7] = (byte) v;
+    }
+    // RIPEMD-160 (Dobbertin, Bosselaers, Preneel), unrolled: both lines of
+    // 80 steps run on locals, and the sixteen message words are read once.
+    static final class Ripemd160 extends Block64 {
+        int h0;
+        int h1;
+        int h2;
+        int h3;
+        int h4;
+
+        Ripemd160() {
+            reset();
+        }
+
+        @Override
+        public void reset() {
+            h0 = 0x67452301;
+            h1 = 0xefcdab89;
+            h2 = 0x98badcfe;
+            h3 = 0x10325476;
+            h4 = 0xc3d2e1f0;
+            bufferLen = 0;
+            byteCount = 0;
+        }
+
+        @Override
+        public int digestLength() {
+            return 20;
+        }
+
+        @Override
+        public byte[] digest() {
+            return finishCommon(false);
+        }
+
+        @Override
+        void writeStateBigEndian(byte[] out) {
+            // little-endian, like MD5; the shared finish path keeps the name
+            writeLE(out, 0, h0);
+            writeLE(out, 4, h1);
+            writeLE(out, 8, h2);
+            writeLE(out, 12, h3);
+            writeLE(out, 16, h4);
+        }
+
+        private static void writeLE(byte[] out, int o, int v) {
+            out[o] = (byte) v;
+            out[o + 1] = (byte) (v >>> 8);
+            out[o + 2] = (byte) (v >>> 16);
+            out[o + 3] = (byte) (v >>> 24);
+        }
+
+        final int[] x = new int[16];
+        final int[] lr = new int[5];
+
+        @Override
+        void processBlock(byte[] block, int o) {
+            int[] x = this.x;
+            for (int i = 0; i < 16; i++, o += 4) {
+                x[i] = (block[o] & 0xff) | (block[o + 1] & 0xff) << 8 | (block[o + 2] & 0xff) << 16 | block[o + 3] << 24;
+            }
+            int[] l = lr;
+            left(x, h0, h1, h2, h3, h4, l);
+            int la = l[0];
+            int lb = l[1];
+            int lc = l[2];
+            int ld = l[3];
+            int le = l[4];
+            right(x, h0, h1, h2, h3, h4, l);
+            int t = h1 + lc + l[3];
+            h1 = h2 + ld + l[4];
+            h2 = h3 + le + l[0];
+            h3 = h4 + la + l[1];
+            h4 = h0 + lb + l[2];
+            h0 = t;
+        }
+
+        // The two lines are separate methods because one method holding all
+        // 160 steps is past HotSpot's limit for JIT compilation and runs
+        // interpreted, seven times slower.
+        private static void left(int[] x, int la, int lb, int lc, int ld, int le, int[] out) {
+            int t;
+            t = la + (lb ^ lc ^ ld) + x[0]; la = ((t << 11) | (t >>> 21)) + le; lc = (lc << 10) | (lc >>> 22);
+            t = le + (la ^ lb ^ lc) + x[1]; le = ((t << 14) | (t >>> 18)) + ld; lb = (lb << 10) | (lb >>> 22);
+            t = ld + (le ^ la ^ lb) + x[2]; ld = ((t << 15) | (t >>> 17)) + lc; la = (la << 10) | (la >>> 22);
+            t = lc + (ld ^ le ^ la) + x[3]; lc = ((t << 12) | (t >>> 20)) + lb; le = (le << 10) | (le >>> 22);
+            t = lb + (lc ^ ld ^ le) + x[4]; lb = ((t << 5) | (t >>> 27)) + la; ld = (ld << 10) | (ld >>> 22);
+            t = la + (lb ^ lc ^ ld) + x[5]; la = ((t << 8) | (t >>> 24)) + le; lc = (lc << 10) | (lc >>> 22);
+            t = le + (la ^ lb ^ lc) + x[6]; le = ((t << 7) | (t >>> 25)) + ld; lb = (lb << 10) | (lb >>> 22);
+            t = ld + (le ^ la ^ lb) + x[7]; ld = ((t << 9) | (t >>> 23)) + lc; la = (la << 10) | (la >>> 22);
+            t = lc + (ld ^ le ^ la) + x[8]; lc = ((t << 11) | (t >>> 21)) + lb; le = (le << 10) | (le >>> 22);
+            t = lb + (lc ^ ld ^ le) + x[9]; lb = ((t << 13) | (t >>> 19)) + la; ld = (ld << 10) | (ld >>> 22);
+            t = la + (lb ^ lc ^ ld) + x[10]; la = ((t << 14) | (t >>> 18)) + le; lc = (lc << 10) | (lc >>> 22);
+            t = le + (la ^ lb ^ lc) + x[11]; le = ((t << 15) | (t >>> 17)) + ld; lb = (lb << 10) | (lb >>> 22);
+            t = ld + (le ^ la ^ lb) + x[12]; ld = ((t << 6) | (t >>> 26)) + lc; la = (la << 10) | (la >>> 22);
+            t = lc + (ld ^ le ^ la) + x[13]; lc = ((t << 7) | (t >>> 25)) + lb; le = (le << 10) | (le >>> 22);
+            t = lb + (lc ^ ld ^ le) + x[14]; lb = ((t << 9) | (t >>> 23)) + la; ld = (ld << 10) | (ld >>> 22);
+            t = la + (lb ^ lc ^ ld) + x[15]; la = ((t << 8) | (t >>> 24)) + le; lc = (lc << 10) | (lc >>> 22);
+            t = le + ((la & lb) | (~la & lc)) + x[7] + 0x5a827999; le = ((t << 7) | (t >>> 25)) + ld; lb = (lb << 10) | (lb >>> 22);
+            t = ld + ((le & la) | (~le & lb)) + x[4] + 0x5a827999; ld = ((t << 6) | (t >>> 26)) + lc; la = (la << 10) | (la >>> 22);
+            t = lc + ((ld & le) | (~ld & la)) + x[13] + 0x5a827999; lc = ((t << 8) | (t >>> 24)) + lb; le = (le << 10) | (le >>> 22);
+            t = lb + ((lc & ld) | (~lc & le)) + x[1] + 0x5a827999; lb = ((t << 13) | (t >>> 19)) + la; ld = (ld << 10) | (ld >>> 22);
+            t = la + ((lb & lc) | (~lb & ld)) + x[10] + 0x5a827999; la = ((t << 11) | (t >>> 21)) + le; lc = (lc << 10) | (lc >>> 22);
+            t = le + ((la & lb) | (~la & lc)) + x[6] + 0x5a827999; le = ((t << 9) | (t >>> 23)) + ld; lb = (lb << 10) | (lb >>> 22);
+            t = ld + ((le & la) | (~le & lb)) + x[15] + 0x5a827999; ld = ((t << 7) | (t >>> 25)) + lc; la = (la << 10) | (la >>> 22);
+            t = lc + ((ld & le) | (~ld & la)) + x[3] + 0x5a827999; lc = ((t << 15) | (t >>> 17)) + lb; le = (le << 10) | (le >>> 22);
+            t = lb + ((lc & ld) | (~lc & le)) + x[12] + 0x5a827999; lb = ((t << 7) | (t >>> 25)) + la; ld = (ld << 10) | (ld >>> 22);
+            t = la + ((lb & lc) | (~lb & ld)) + x[0] + 0x5a827999; la = ((t << 12) | (t >>> 20)) + le; lc = (lc << 10) | (lc >>> 22);
+            t = le + ((la & lb) | (~la & lc)) + x[9] + 0x5a827999; le = ((t << 15) | (t >>> 17)) + ld; lb = (lb << 10) | (lb >>> 22);
+            t = ld + ((le & la) | (~le & lb)) + x[5] + 0x5a827999; ld = ((t << 9) | (t >>> 23)) + lc; la = (la << 10) | (la >>> 22);
+            t = lc + ((ld & le) | (~ld & la)) + x[2] + 0x5a827999; lc = ((t << 11) | (t >>> 21)) + lb; le = (le << 10) | (le >>> 22);
+            t = lb + ((lc & ld) | (~lc & le)) + x[14] + 0x5a827999; lb = ((t << 7) | (t >>> 25)) + la; ld = (ld << 10) | (ld >>> 22);
+            t = la + ((lb & lc) | (~lb & ld)) + x[11] + 0x5a827999; la = ((t << 13) | (t >>> 19)) + le; lc = (lc << 10) | (lc >>> 22);
+            t = le + ((la & lb) | (~la & lc)) + x[8] + 0x5a827999; le = ((t << 12) | (t >>> 20)) + ld; lb = (lb << 10) | (lb >>> 22);
+            t = ld + ((le | ~la) ^ lb) + x[3] + 0x6ed9eba1; ld = ((t << 11) | (t >>> 21)) + lc; la = (la << 10) | (la >>> 22);
+            t = lc + ((ld | ~le) ^ la) + x[10] + 0x6ed9eba1; lc = ((t << 13) | (t >>> 19)) + lb; le = (le << 10) | (le >>> 22);
+            t = lb + ((lc | ~ld) ^ le) + x[14] + 0x6ed9eba1; lb = ((t << 6) | (t >>> 26)) + la; ld = (ld << 10) | (ld >>> 22);
+            t = la + ((lb | ~lc) ^ ld) + x[4] + 0x6ed9eba1; la = ((t << 7) | (t >>> 25)) + le; lc = (lc << 10) | (lc >>> 22);
+            t = le + ((la | ~lb) ^ lc) + x[9] + 0x6ed9eba1; le = ((t << 14) | (t >>> 18)) + ld; lb = (lb << 10) | (lb >>> 22);
+            t = ld + ((le | ~la) ^ lb) + x[15] + 0x6ed9eba1; ld = ((t << 9) | (t >>> 23)) + lc; la = (la << 10) | (la >>> 22);
+            t = lc + ((ld | ~le) ^ la) + x[8] + 0x6ed9eba1; lc = ((t << 13) | (t >>> 19)) + lb; le = (le << 10) | (le >>> 22);
+            t = lb + ((lc | ~ld) ^ le) + x[1] + 0x6ed9eba1; lb = ((t << 15) | (t >>> 17)) + la; ld = (ld << 10) | (ld >>> 22);
+            t = la + ((lb | ~lc) ^ ld) + x[2] + 0x6ed9eba1; la = ((t << 14) | (t >>> 18)) + le; lc = (lc << 10) | (lc >>> 22);
+            t = le + ((la | ~lb) ^ lc) + x[7] + 0x6ed9eba1; le = ((t << 8) | (t >>> 24)) + ld; lb = (lb << 10) | (lb >>> 22);
+            t = ld + ((le | ~la) ^ lb) + x[0] + 0x6ed9eba1; ld = ((t << 13) | (t >>> 19)) + lc; la = (la << 10) | (la >>> 22);
+            t = lc + ((ld | ~le) ^ la) + x[6] + 0x6ed9eba1; lc = ((t << 6) | (t >>> 26)) + lb; le = (le << 10) | (le >>> 22);
+            t = lb + ((lc | ~ld) ^ le) + x[13] + 0x6ed9eba1; lb = ((t << 5) | (t >>> 27)) + la; ld = (ld << 10) | (ld >>> 22);
+            t = la + ((lb | ~lc) ^ ld) + x[11] + 0x6ed9eba1; la = ((t << 12) | (t >>> 20)) + le; lc = (lc << 10) | (lc >>> 22);
+            t = le + ((la | ~lb) ^ lc) + x[5] + 0x6ed9eba1; le = ((t << 7) | (t >>> 25)) + ld; lb = (lb << 10) | (lb >>> 22);
+            t = ld + ((le | ~la) ^ lb) + x[12] + 0x6ed9eba1; ld = ((t << 5) | (t >>> 27)) + lc; la = (la << 10) | (la >>> 22);
+            t = lc + ((ld & la) | (le & ~la)) + x[1] + 0x8f1bbcdc; lc = ((t << 11) | (t >>> 21)) + lb; le = (le << 10) | (le >>> 22);
+            t = lb + ((lc & le) | (ld & ~le)) + x[9] + 0x8f1bbcdc; lb = ((t << 12) | (t >>> 20)) + la; ld = (ld << 10) | (ld >>> 22);
+            t = la + ((lb & ld) | (lc & ~ld)) + x[11] + 0x8f1bbcdc; la = ((t << 14) | (t >>> 18)) + le; lc = (lc << 10) | (lc >>> 22);
+            t = le + ((la & lc) | (lb & ~lc)) + x[10] + 0x8f1bbcdc; le = ((t << 15) | (t >>> 17)) + ld; lb = (lb << 10) | (lb >>> 22);
+            t = ld + ((le & lb) | (la & ~lb)) + x[0] + 0x8f1bbcdc; ld = ((t << 14) | (t >>> 18)) + lc; la = (la << 10) | (la >>> 22);
+            t = lc + ((ld & la) | (le & ~la)) + x[8] + 0x8f1bbcdc; lc = ((t << 15) | (t >>> 17)) + lb; le = (le << 10) | (le >>> 22);
+            t = lb + ((lc & le) | (ld & ~le)) + x[12] + 0x8f1bbcdc; lb = ((t << 9) | (t >>> 23)) + la; ld = (ld << 10) | (ld >>> 22);
+            t = la + ((lb & ld) | (lc & ~ld)) + x[4] + 0x8f1bbcdc; la = ((t << 8) | (t >>> 24)) + le; lc = (lc << 10) | (lc >>> 22);
+            t = le + ((la & lc) | (lb & ~lc)) + x[13] + 0x8f1bbcdc; le = ((t << 9) | (t >>> 23)) + ld; lb = (lb << 10) | (lb >>> 22);
+            t = ld + ((le & lb) | (la & ~lb)) + x[3] + 0x8f1bbcdc; ld = ((t << 14) | (t >>> 18)) + lc; la = (la << 10) | (la >>> 22);
+            t = lc + ((ld & la) | (le & ~la)) + x[7] + 0x8f1bbcdc; lc = ((t << 5) | (t >>> 27)) + lb; le = (le << 10) | (le >>> 22);
+            t = lb + ((lc & le) | (ld & ~le)) + x[15] + 0x8f1bbcdc; lb = ((t << 6) | (t >>> 26)) + la; ld = (ld << 10) | (ld >>> 22);
+            t = la + ((lb & ld) | (lc & ~ld)) + x[14] + 0x8f1bbcdc; la = ((t << 8) | (t >>> 24)) + le; lc = (lc << 10) | (lc >>> 22);
+            t = le + ((la & lc) | (lb & ~lc)) + x[5] + 0x8f1bbcdc; le = ((t << 6) | (t >>> 26)) + ld; lb = (lb << 10) | (lb >>> 22);
+            t = ld + ((le & lb) | (la & ~lb)) + x[6] + 0x8f1bbcdc; ld = ((t << 5) | (t >>> 27)) + lc; la = (la << 10) | (la >>> 22);
+            t = lc + ((ld & la) | (le & ~la)) + x[2] + 0x8f1bbcdc; lc = ((t << 12) | (t >>> 20)) + lb; le = (le << 10) | (le >>> 22);
+            t = lb + (lc ^ (ld | ~le)) + x[4] + 0xa953fd4e; lb = ((t << 9) | (t >>> 23)) + la; ld = (ld << 10) | (ld >>> 22);
+            t = la + (lb ^ (lc | ~ld)) + x[0] + 0xa953fd4e; la = ((t << 15) | (t >>> 17)) + le; lc = (lc << 10) | (lc >>> 22);
+            t = le + (la ^ (lb | ~lc)) + x[5] + 0xa953fd4e; le = ((t << 5) | (t >>> 27)) + ld; lb = (lb << 10) | (lb >>> 22);
+            t = ld + (le ^ (la | ~lb)) + x[9] + 0xa953fd4e; ld = ((t << 11) | (t >>> 21)) + lc; la = (la << 10) | (la >>> 22);
+            t = lc + (ld ^ (le | ~la)) + x[7] + 0xa953fd4e; lc = ((t << 6) | (t >>> 26)) + lb; le = (le << 10) | (le >>> 22);
+            t = lb + (lc ^ (ld | ~le)) + x[12] + 0xa953fd4e; lb = ((t << 8) | (t >>> 24)) + la; ld = (ld << 10) | (ld >>> 22);
+            t = la + (lb ^ (lc | ~ld)) + x[2] + 0xa953fd4e; la = ((t << 13) | (t >>> 19)) + le; lc = (lc << 10) | (lc >>> 22);
+            t = le + (la ^ (lb | ~lc)) + x[10] + 0xa953fd4e; le = ((t << 12) | (t >>> 20)) + ld; lb = (lb << 10) | (lb >>> 22);
+            t = ld + (le ^ (la | ~lb)) + x[14] + 0xa953fd4e; ld = ((t << 5) | (t >>> 27)) + lc; la = (la << 10) | (la >>> 22);
+            t = lc + (ld ^ (le | ~la)) + x[1] + 0xa953fd4e; lc = ((t << 12) | (t >>> 20)) + lb; le = (le << 10) | (le >>> 22);
+            t = lb + (lc ^ (ld | ~le)) + x[3] + 0xa953fd4e; lb = ((t << 13) | (t >>> 19)) + la; ld = (ld << 10) | (ld >>> 22);
+            t = la + (lb ^ (lc | ~ld)) + x[8] + 0xa953fd4e; la = ((t << 14) | (t >>> 18)) + le; lc = (lc << 10) | (lc >>> 22);
+            t = le + (la ^ (lb | ~lc)) + x[11] + 0xa953fd4e; le = ((t << 11) | (t >>> 21)) + ld; lb = (lb << 10) | (lb >>> 22);
+            t = ld + (le ^ (la | ~lb)) + x[6] + 0xa953fd4e; ld = ((t << 8) | (t >>> 24)) + lc; la = (la << 10) | (la >>> 22);
+            t = lc + (ld ^ (le | ~la)) + x[15] + 0xa953fd4e; lc = ((t << 5) | (t >>> 27)) + lb; le = (le << 10) | (le >>> 22);
+            t = lb + (lc ^ (ld | ~le)) + x[13] + 0xa953fd4e; lb = ((t << 6) | (t >>> 26)) + la; ld = (ld << 10) | (ld >>> 22);
+            out[0] = la;
+            out[1] = lb;
+            out[2] = lc;
+            out[3] = ld;
+            out[4] = le;
+        }
+
+        private static void right(int[] x, int ra, int rb, int rc, int rd, int re, int[] out) {
+            int t;
+            t = ra + (rb ^ (rc | ~rd)) + x[5] + 0x50a28be6; ra = ((t << 8) | (t >>> 24)) + re; rc = (rc << 10) | (rc >>> 22);
+            t = re + (ra ^ (rb | ~rc)) + x[14] + 0x50a28be6; re = ((t << 9) | (t >>> 23)) + rd; rb = (rb << 10) | (rb >>> 22);
+            t = rd + (re ^ (ra | ~rb)) + x[7] + 0x50a28be6; rd = ((t << 9) | (t >>> 23)) + rc; ra = (ra << 10) | (ra >>> 22);
+            t = rc + (rd ^ (re | ~ra)) + x[0] + 0x50a28be6; rc = ((t << 11) | (t >>> 21)) + rb; re = (re << 10) | (re >>> 22);
+            t = rb + (rc ^ (rd | ~re)) + x[9] + 0x50a28be6; rb = ((t << 13) | (t >>> 19)) + ra; rd = (rd << 10) | (rd >>> 22);
+            t = ra + (rb ^ (rc | ~rd)) + x[2] + 0x50a28be6; ra = ((t << 15) | (t >>> 17)) + re; rc = (rc << 10) | (rc >>> 22);
+            t = re + (ra ^ (rb | ~rc)) + x[11] + 0x50a28be6; re = ((t << 15) | (t >>> 17)) + rd; rb = (rb << 10) | (rb >>> 22);
+            t = rd + (re ^ (ra | ~rb)) + x[4] + 0x50a28be6; rd = ((t << 5) | (t >>> 27)) + rc; ra = (ra << 10) | (ra >>> 22);
+            t = rc + (rd ^ (re | ~ra)) + x[13] + 0x50a28be6; rc = ((t << 7) | (t >>> 25)) + rb; re = (re << 10) | (re >>> 22);
+            t = rb + (rc ^ (rd | ~re)) + x[6] + 0x50a28be6; rb = ((t << 7) | (t >>> 25)) + ra; rd = (rd << 10) | (rd >>> 22);
+            t = ra + (rb ^ (rc | ~rd)) + x[15] + 0x50a28be6; ra = ((t << 8) | (t >>> 24)) + re; rc = (rc << 10) | (rc >>> 22);
+            t = re + (ra ^ (rb | ~rc)) + x[8] + 0x50a28be6; re = ((t << 11) | (t >>> 21)) + rd; rb = (rb << 10) | (rb >>> 22);
+            t = rd + (re ^ (ra | ~rb)) + x[1] + 0x50a28be6; rd = ((t << 14) | (t >>> 18)) + rc; ra = (ra << 10) | (ra >>> 22);
+            t = rc + (rd ^ (re | ~ra)) + x[10] + 0x50a28be6; rc = ((t << 14) | (t >>> 18)) + rb; re = (re << 10) | (re >>> 22);
+            t = rb + (rc ^ (rd | ~re)) + x[3] + 0x50a28be6; rb = ((t << 12) | (t >>> 20)) + ra; rd = (rd << 10) | (rd >>> 22);
+            t = ra + (rb ^ (rc | ~rd)) + x[12] + 0x50a28be6; ra = ((t << 6) | (t >>> 26)) + re; rc = (rc << 10) | (rc >>> 22);
+            t = re + ((ra & rc) | (rb & ~rc)) + x[6] + 0x5c4dd124; re = ((t << 9) | (t >>> 23)) + rd; rb = (rb << 10) | (rb >>> 22);
+            t = rd + ((re & rb) | (ra & ~rb)) + x[11] + 0x5c4dd124; rd = ((t << 13) | (t >>> 19)) + rc; ra = (ra << 10) | (ra >>> 22);
+            t = rc + ((rd & ra) | (re & ~ra)) + x[3] + 0x5c4dd124; rc = ((t << 15) | (t >>> 17)) + rb; re = (re << 10) | (re >>> 22);
+            t = rb + ((rc & re) | (rd & ~re)) + x[7] + 0x5c4dd124; rb = ((t << 7) | (t >>> 25)) + ra; rd = (rd << 10) | (rd >>> 22);
+            t = ra + ((rb & rd) | (rc & ~rd)) + x[0] + 0x5c4dd124; ra = ((t << 12) | (t >>> 20)) + re; rc = (rc << 10) | (rc >>> 22);
+            t = re + ((ra & rc) | (rb & ~rc)) + x[13] + 0x5c4dd124; re = ((t << 8) | (t >>> 24)) + rd; rb = (rb << 10) | (rb >>> 22);
+            t = rd + ((re & rb) | (ra & ~rb)) + x[5] + 0x5c4dd124; rd = ((t << 9) | (t >>> 23)) + rc; ra = (ra << 10) | (ra >>> 22);
+            t = rc + ((rd & ra) | (re & ~ra)) + x[10] + 0x5c4dd124; rc = ((t << 11) | (t >>> 21)) + rb; re = (re << 10) | (re >>> 22);
+            t = rb + ((rc & re) | (rd & ~re)) + x[14] + 0x5c4dd124; rb = ((t << 7) | (t >>> 25)) + ra; rd = (rd << 10) | (rd >>> 22);
+            t = ra + ((rb & rd) | (rc & ~rd)) + x[15] + 0x5c4dd124; ra = ((t << 7) | (t >>> 25)) + re; rc = (rc << 10) | (rc >>> 22);
+            t = re + ((ra & rc) | (rb & ~rc)) + x[8] + 0x5c4dd124; re = ((t << 12) | (t >>> 20)) + rd; rb = (rb << 10) | (rb >>> 22);
+            t = rd + ((re & rb) | (ra & ~rb)) + x[12] + 0x5c4dd124; rd = ((t << 7) | (t >>> 25)) + rc; ra = (ra << 10) | (ra >>> 22);
+            t = rc + ((rd & ra) | (re & ~ra)) + x[4] + 0x5c4dd124; rc = ((t << 6) | (t >>> 26)) + rb; re = (re << 10) | (re >>> 22);
+            t = rb + ((rc & re) | (rd & ~re)) + x[9] + 0x5c4dd124; rb = ((t << 15) | (t >>> 17)) + ra; rd = (rd << 10) | (rd >>> 22);
+            t = ra + ((rb & rd) | (rc & ~rd)) + x[1] + 0x5c4dd124; ra = ((t << 13) | (t >>> 19)) + re; rc = (rc << 10) | (rc >>> 22);
+            t = re + ((ra & rc) | (rb & ~rc)) + x[2] + 0x5c4dd124; re = ((t << 11) | (t >>> 21)) + rd; rb = (rb << 10) | (rb >>> 22);
+            t = rd + ((re | ~ra) ^ rb) + x[15] + 0x6d703ef3; rd = ((t << 9) | (t >>> 23)) + rc; ra = (ra << 10) | (ra >>> 22);
+            t = rc + ((rd | ~re) ^ ra) + x[5] + 0x6d703ef3; rc = ((t << 7) | (t >>> 25)) + rb; re = (re << 10) | (re >>> 22);
+            t = rb + ((rc | ~rd) ^ re) + x[1] + 0x6d703ef3; rb = ((t << 15) | (t >>> 17)) + ra; rd = (rd << 10) | (rd >>> 22);
+            t = ra + ((rb | ~rc) ^ rd) + x[3] + 0x6d703ef3; ra = ((t << 11) | (t >>> 21)) + re; rc = (rc << 10) | (rc >>> 22);
+            t = re + ((ra | ~rb) ^ rc) + x[7] + 0x6d703ef3; re = ((t << 8) | (t >>> 24)) + rd; rb = (rb << 10) | (rb >>> 22);
+            t = rd + ((re | ~ra) ^ rb) + x[14] + 0x6d703ef3; rd = ((t << 6) | (t >>> 26)) + rc; ra = (ra << 10) | (ra >>> 22);
+            t = rc + ((rd | ~re) ^ ra) + x[6] + 0x6d703ef3; rc = ((t << 6) | (t >>> 26)) + rb; re = (re << 10) | (re >>> 22);
+            t = rb + ((rc | ~rd) ^ re) + x[9] + 0x6d703ef3; rb = ((t << 14) | (t >>> 18)) + ra; rd = (rd << 10) | (rd >>> 22);
+            t = ra + ((rb | ~rc) ^ rd) + x[11] + 0x6d703ef3; ra = ((t << 12) | (t >>> 20)) + re; rc = (rc << 10) | (rc >>> 22);
+            t = re + ((ra | ~rb) ^ rc) + x[8] + 0x6d703ef3; re = ((t << 13) | (t >>> 19)) + rd; rb = (rb << 10) | (rb >>> 22);
+            t = rd + ((re | ~ra) ^ rb) + x[12] + 0x6d703ef3; rd = ((t << 5) | (t >>> 27)) + rc; ra = (ra << 10) | (ra >>> 22);
+            t = rc + ((rd | ~re) ^ ra) + x[2] + 0x6d703ef3; rc = ((t << 14) | (t >>> 18)) + rb; re = (re << 10) | (re >>> 22);
+            t = rb + ((rc | ~rd) ^ re) + x[10] + 0x6d703ef3; rb = ((t << 13) | (t >>> 19)) + ra; rd = (rd << 10) | (rd >>> 22);
+            t = ra + ((rb | ~rc) ^ rd) + x[0] + 0x6d703ef3; ra = ((t << 13) | (t >>> 19)) + re; rc = (rc << 10) | (rc >>> 22);
+            t = re + ((ra | ~rb) ^ rc) + x[4] + 0x6d703ef3; re = ((t << 7) | (t >>> 25)) + rd; rb = (rb << 10) | (rb >>> 22);
+            t = rd + ((re | ~ra) ^ rb) + x[13] + 0x6d703ef3; rd = ((t << 5) | (t >>> 27)) + rc; ra = (ra << 10) | (ra >>> 22);
+            t = rc + ((rd & re) | (~rd & ra)) + x[8] + 0x7a6d76e9; rc = ((t << 15) | (t >>> 17)) + rb; re = (re << 10) | (re >>> 22);
+            t = rb + ((rc & rd) | (~rc & re)) + x[6] + 0x7a6d76e9; rb = ((t << 5) | (t >>> 27)) + ra; rd = (rd << 10) | (rd >>> 22);
+            t = ra + ((rb & rc) | (~rb & rd)) + x[4] + 0x7a6d76e9; ra = ((t << 8) | (t >>> 24)) + re; rc = (rc << 10) | (rc >>> 22);
+            t = re + ((ra & rb) | (~ra & rc)) + x[1] + 0x7a6d76e9; re = ((t << 11) | (t >>> 21)) + rd; rb = (rb << 10) | (rb >>> 22);
+            t = rd + ((re & ra) | (~re & rb)) + x[3] + 0x7a6d76e9; rd = ((t << 14) | (t >>> 18)) + rc; ra = (ra << 10) | (ra >>> 22);
+            t = rc + ((rd & re) | (~rd & ra)) + x[11] + 0x7a6d76e9; rc = ((t << 14) | (t >>> 18)) + rb; re = (re << 10) | (re >>> 22);
+            t = rb + ((rc & rd) | (~rc & re)) + x[15] + 0x7a6d76e9; rb = ((t << 6) | (t >>> 26)) + ra; rd = (rd << 10) | (rd >>> 22);
+            t = ra + ((rb & rc) | (~rb & rd)) + x[0] + 0x7a6d76e9; ra = ((t << 14) | (t >>> 18)) + re; rc = (rc << 10) | (rc >>> 22);
+            t = re + ((ra & rb) | (~ra & rc)) + x[5] + 0x7a6d76e9; re = ((t << 6) | (t >>> 26)) + rd; rb = (rb << 10) | (rb >>> 22);
+            t = rd + ((re & ra) | (~re & rb)) + x[12] + 0x7a6d76e9; rd = ((t << 9) | (t >>> 23)) + rc; ra = (ra << 10) | (ra >>> 22);
+            t = rc + ((rd & re) | (~rd & ra)) + x[2] + 0x7a6d76e9; rc = ((t << 12) | (t >>> 20)) + rb; re = (re << 10) | (re >>> 22);
+            t = rb + ((rc & rd) | (~rc & re)) + x[13] + 0x7a6d76e9; rb = ((t << 9) | (t >>> 23)) + ra; rd = (rd << 10) | (rd >>> 22);
+            t = ra + ((rb & rc) | (~rb & rd)) + x[9] + 0x7a6d76e9; ra = ((t << 12) | (t >>> 20)) + re; rc = (rc << 10) | (rc >>> 22);
+            t = re + ((ra & rb) | (~ra & rc)) + x[7] + 0x7a6d76e9; re = ((t << 5) | (t >>> 27)) + rd; rb = (rb << 10) | (rb >>> 22);
+            t = rd + ((re & ra) | (~re & rb)) + x[10] + 0x7a6d76e9; rd = ((t << 15) | (t >>> 17)) + rc; ra = (ra << 10) | (ra >>> 22);
+            t = rc + ((rd & re) | (~rd & ra)) + x[14] + 0x7a6d76e9; rc = ((t << 8) | (t >>> 24)) + rb; re = (re << 10) | (re >>> 22);
+            t = rb + (rc ^ rd ^ re) + x[12]; rb = ((t << 8) | (t >>> 24)) + ra; rd = (rd << 10) | (rd >>> 22);
+            t = ra + (rb ^ rc ^ rd) + x[15]; ra = ((t << 5) | (t >>> 27)) + re; rc = (rc << 10) | (rc >>> 22);
+            t = re + (ra ^ rb ^ rc) + x[10]; re = ((t << 12) | (t >>> 20)) + rd; rb = (rb << 10) | (rb >>> 22);
+            t = rd + (re ^ ra ^ rb) + x[4]; rd = ((t << 9) | (t >>> 23)) + rc; ra = (ra << 10) | (ra >>> 22);
+            t = rc + (rd ^ re ^ ra) + x[1]; rc = ((t << 12) | (t >>> 20)) + rb; re = (re << 10) | (re >>> 22);
+            t = rb + (rc ^ rd ^ re) + x[5]; rb = ((t << 5) | (t >>> 27)) + ra; rd = (rd << 10) | (rd >>> 22);
+            t = ra + (rb ^ rc ^ rd) + x[8]; ra = ((t << 14) | (t >>> 18)) + re; rc = (rc << 10) | (rc >>> 22);
+            t = re + (ra ^ rb ^ rc) + x[7]; re = ((t << 6) | (t >>> 26)) + rd; rb = (rb << 10) | (rb >>> 22);
+            t = rd + (re ^ ra ^ rb) + x[6]; rd = ((t << 8) | (t >>> 24)) + rc; ra = (ra << 10) | (ra >>> 22);
+            t = rc + (rd ^ re ^ ra) + x[2]; rc = ((t << 13) | (t >>> 19)) + rb; re = (re << 10) | (re >>> 22);
+            t = rb + (rc ^ rd ^ re) + x[13]; rb = ((t << 6) | (t >>> 26)) + ra; rd = (rd << 10) | (rd >>> 22);
+            t = ra + (rb ^ rc ^ rd) + x[14]; ra = ((t << 5) | (t >>> 27)) + re; rc = (rc << 10) | (rc >>> 22);
+            t = re + (ra ^ rb ^ rc) + x[0]; re = ((t << 15) | (t >>> 17)) + rd; rb = (rb << 10) | (rb >>> 22);
+            t = rd + (re ^ ra ^ rb) + x[3]; rd = ((t << 13) | (t >>> 19)) + rc; ra = (ra << 10) | (ra >>> 22);
+            t = rc + (rd ^ re ^ ra) + x[9]; rc = ((t << 11) | (t >>> 21)) + rb; re = (re << 10) | (re >>> 22);
+            t = rb + (rc ^ rd ^ re) + x[11]; rb = ((t << 11) | (t >>> 21)) + ra; rd = (rd << 10) | (rd >>> 22);
+            out[0] = ra;
+            out[1] = rb;
+            out[2] = rc;
+            out[3] = rd;
+            out[4] = re;
+        }
     }
 }

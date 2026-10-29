@@ -75,6 +75,22 @@ public class Log {
     // have if nobody had ever called bindCrashProtection.
     private static final boolean crashBound = false;
     private static Log instance = new Log();
+
+    static {
+        // JSONParser is shared with the backend runtime, which has no Log, so it
+        // cannot call this class itself: the device's log hands it a sink instead.
+        JSONParser.installDiagnostics(new JSONParser.Diagnostics() {
+            @Override
+            public void error(Throwable t) {
+                Log.e(t);
+            }
+
+            @Override
+            public void message(String text) {
+                Log.p(text);
+            }
+        });
+    }
     private static boolean initialized;
     private final long zeroTime = System.currentTimeMillis();
     private int level = DEBUG;

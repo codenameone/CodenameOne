@@ -226,6 +226,8 @@ include::MCP-Headless-API.asciidoc[]
 
 include::security.asciidoc[]
 
+include::Crypto-Wallets.asciidoc[]
+
 include::App-Shield.asciidoc[]
 
 include::App-Hardening.asciidoc[]

@@ -1,0 +1,129 @@
+name: Crypto benchmarks
+
+# The elliptic-curve and hash kernels of com.codename1.security against the
+# libraries a developer would otherwise pick, run side by side on one runner so
+# the gate compares RATIOS, which a shared runner's speed does not move:
+#
+# - jvm: the portable Java engine (JavaSE, the backend's JVM twin, and the
+#   fallback everywhere) against BouncyCastle and the JDK's own Ed25519;
+# - native: the C kernels ParparVM links into an iOS, macOS, Windows, Linux or
+#   backend binary, against upstream libsecp256k1, libsodium and OpenSSL.
+#
+# Each fails when a ratio drops below scripts/crypto-bench/floors.json. The
+# tables land in the job summary.
+#
+# gpu runs the GPU batches on Mesa's lavapipe, a Vulkan driver on the CPU,
+# result for result against the CPU batches -- correctness, not speed: on a
+# runner it is slower than the CPU kernels it is checked against. It also holds
+# the committed SPIR-V and MSL to the kernel source (scripts/crypto-gpu/gen.py
+# --check) and the hand-declared Vulkan subset to the real headers.
+#
+# android-kernels holds the committed libcn1crypto.so files to the sources
+# they were built from: they are prebuilt (Ports/Android/crypto-jni/build.sh,
+# NDK r28+), so a kernel change that is not followed by a rebuild would ship
+# old C behind new Java. Their speed on ART is measured by
+# scripts/crypto-bench/android-run.sh and reported, not gated.
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - master
+    paths:
+      - 'CodenameOne/src/com/codename1/security/**'
+      - 'CodenameOne/src/com/codename1/crypto/**'
+      - 'vm/ByteCodeTranslator/src/cn1_crypto_kernels*'
+      - 'vm/ByteCodeTranslator/src/cn1_crypto_gpu*'
+      - 'scripts/crypto-gpu/**'
+      - 'Ports/JavaScriptPort/src/main/webapp/js/cn1_crypto_gpu.js'
+      - 'Ports/JavaScriptPort/src/main/java/com/codename1/impl/html5/HTML5CryptoEngine.java'
+      - 'scripts/crypto-bench/**'
+      - 'scripts/crypto-kernels/**'
+      - 'Ports/Android/crypto-jni/**'
+      - 'maven/build-engine/src/main/resources/com/codename1/builders/android-crypto/**'
+      - 'scripts/check-android-crypto-kernels.sh'
+      - '.github/workflows/crypto-bench.yml'
+  push:
+    branches:
+      - master
+    paths:
+      - 'CodenameOne/src/com/codename1/security/**'
+      - 'CodenameOne/src/com/codename1/crypto/**'
+      - 'vm/ByteCodeTranslator/src/cn1_crypto_kernels*'
+      - 'vm/ByteCodeTranslator/src/cn1_crypto_gpu*'
+      - 'scripts/crypto-gpu/**'
+      - 'Ports/JavaScriptPort/src/main/webapp/js/cn1_crypto_gpu.js'
+      - 'Ports/JavaScriptPort/src/main/java/com/codename1/impl/html5/HTML5CryptoEngine.java'
+      - 'scripts/crypto-bench/**'
+      - 'scripts/crypto-kernels/**'
+      - 'Ports/Android/crypto-jni/**'
+      - 'maven/build-engine/src/main/resources/com/codename1/builders/android-crypto/**'
+      - 'scripts/check-android-crypto-kernels.sh'
+      - '.github/workflows/crypto-bench.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android-kernels:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - name: The prebuilt Android kernels match their sources
+        shell: bash
+        run: scripts/check-android-crypto-kernels.sh
+
+  gpu:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - name: The generated shaders match the kernel source
+        shell: bash
+        run: scripts/crypto-gpu/gen.py --check
+      - name: Install Vulkan, its headers and lavapipe
+        shell: bash
+        run: sudo apt-get update -q && sudo apt-get install -y -q clang libvulkan-dev mesa-vulkan-drivers
+      - name: The hand-declared Vulkan subset matches vulkan_core.h
+        shell: bash
+        run: clang -std=c11 -fsyntax-only -I vm/ByteCodeTranslator/src scripts/crypto-gpu/vulkan-abi-check.c
+      - name: GPU batches against CPU batches on lavapipe
+        shell: bash
+        env:
+          CC: clang
+          CN1_CRYPTO_GPU_ALLOW_CPU_DEVICE: '1'
+        run: scripts/crypto-gpu/batch-check.sh 2048 --require-gpu | tee -a "$GITHUB_STEP_SUMMARY"
+
+  jvm:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Run the JVM benchmark
+        shell: bash
+        run: scripts/crypto-bench/jvm-run.sh "$RUNNER_TEMP/jvm" | tee "$RUNNER_TEMP/jvm.txt"
+      - name: Hold it to the floors
+        shell: bash
+        run: scripts/crypto-bench/gate.py jvm "$RUNNER_TEMP/jvm.txt" | tee -a "$GITHUB_STEP_SUMMARY"
+
+  native:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install the reference libraries
+        shell: bash
+        run: sudo apt-get update -q && sudo apt-get install -y -q clang cmake libssl-dev libsodium-dev pkg-config
+      - name: Run the native benchmark
+        shell: bash
+        env:
+          CC: clang
+        run: scripts/crypto-bench/native/run.sh "$RUNNER_TEMP/native" | tee "$RUNNER_TEMP/native.txt"
+      - name: Hold it to the floors
+        shell: bash
+        run: scripts/crypto-bench/gate.py native "$RUNNER_TEMP/native.txt" | tee -a "$GITHUB_STEP_SUMMARY"

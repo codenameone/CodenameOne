@@ -18,25 +18,32 @@
  */
 package com.codenameone.examples.bastion.chain;
 
-/// [ChainSigner] from a BIP-32 seed held in memory. Each key is derived when
-/// it is needed and wiped after the one signature it makes, so a heap dump
-/// between signatures holds the seed and nothing more -- which is the reason
-/// a product moves the seed itself into a key service.
+import com.codename1.security.Secp256k1;
+import com.codename1.crypto.evm.EvmAddress;
+import com.codename1.crypto.hd.DerivationPath;
+import com.codename1.crypto.wallet.Wallet;
+
+/// [ChainSigner] from a BIP-32 seed held in memory, over the framework's
+/// [com.codename1.crypto.wallet.SeedSigner]. Each key is derived when it is
+/// needed and wiped after the one signature it makes, so a heap dump between
+/// signatures holds the seed and nothing more -- which is the reason a
+/// product moves the seed itself into a key service.
 public final class SeedSigner implements ChainSigner {
     /// The hot wallet: account 1, so it never collides with a deposit index.
-    private static final long HOT_ACCOUNT = 1;
+    private static final int HOT_ACCOUNT = 1;
 
-    private final byte[] seed;
+    private final com.codename1.crypto.wallet.SeedSigner keys;
+    private final Wallet wallet;
     private final String hot;
 
     public SeedSigner(byte[] seed) {
-        this.seed = seed;
-        this.hot = hotKey().address();
+        this.keys = new com.codename1.crypto.wallet.SeedSigner(seed);
+        this.wallet = new Wallet(keys);
+        this.hot = wallet.getEvmAddress(Wallet.evmPath(HOT_ACCOUNT, 0)).toLowerCaseString();
     }
 
-    private Bip32 hotKey() {
-        return Bip32.master(seed).child(44 + Bip32.HARDENED).child(60 + Bip32.HARDENED)
-                .child(HOT_ACCOUNT + Bip32.HARDENED).child(0).child(0);
+    private static DerivationPath depositPath(long index) {
+        return DerivationPath.bip44(60, 0, 0, index);
     }
 
     @Override
@@ -46,26 +53,26 @@ public final class SeedSigner implements ChainSigner {
 
     @Override
     public String depositAddress(long index) {
-        return Bip32.ethereum(seed, index).address();
+        EvmAddress a = wallet.getEvmAddress(depositPath(index));
+        return a.toLowerCaseString();
     }
 
     @Override
     public byte[] signWithHot(byte[] hash32) {
-        return signWith(hotKey().privateKey(), hash32);
+        return sign(Wallet.evmPath(HOT_ACCOUNT, 0), hash32);
     }
 
     @Override
     public byte[] signWithDeposit(long index, byte[] hash32) {
-        return signWith(Bip32.ethereum(seed, index).privateKey(), hash32);
+        return sign(depositPath(index), hash32);
     }
 
-    private static byte[] signWith(byte[] key, byte[] hash32) {
-        try {
-            return EthKeys.sign(key, hash32);
-        } finally {
-            for (int iter = 0; iter < key.length; iter++) {
-                key[iter] = 0;
-            }
-        }
+    /// r || s (low-S) || recovery id, 65 bytes.
+    private byte[] sign(DerivationPath path, byte[] hash32) {
+        Secp256k1.EcdsaSignature sig = keys.signSecp256k1(path, hash32).normalize();
+        byte[] out = new byte[65];
+        System.arraycopy(sig.toCompact(), 0, out, 0, 64);
+        out[64] = (byte) sig.recoveryId();
+        return out;
     }
 }

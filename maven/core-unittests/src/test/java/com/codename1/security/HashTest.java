@@ -169,4 +169,23 @@ class HashTest {
         assertArrayEquals(viaHashedKey, Hmac.create(Hash.KECCAK256, key137).doFinal(msg));
         assertFalse(java.util.Arrays.equals(direct, viaHashedKey));
     }
+
+    @Test
+    void ripemd160_referenceVectors() {
+        // The RIPEMD-160 authors' published test vectors
+        assertEquals("9c1185a5c5e9fc54612808977ee8f548b2258d31", Hash.toHex(Hash.ripemd160(new byte[0])));
+        assertEquals("0bdc9d2d256b3ee9daae347be6f4dc835a467ffe", Hash.toHex(Hash.ripemd160(ascii("a"))));
+        assertEquals("8eb208f7e05d987a9b044a8e98c6b087f15a0bfc", Hash.toHex(Hash.ripemd160(ascii("abc"))));
+        assertEquals("5d0689ef49d2fae572b881b123a85ffa21595f36",
+                Hash.toHex(Hash.ripemd160(ascii("message digest"))));
+        byte[] million = new byte[1000000];
+        java.util.Arrays.fill(million, (byte) 'a');
+        assertEquals("52783243c1697bdbe16d37f97f68f08325dc1528", Hash.toHex(Hash.ripemd160(million)));
+    }
+
+    @Test
+    void hash160_isRipemdOfSha256() {
+        byte[] in = ascii("abc");
+        assertArrayEquals(Hash.ripemd160(Hash.sha256(in)), Hash.hash160(in));
+    }
 }

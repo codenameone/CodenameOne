@@ -69,10 +69,14 @@ APP_ROOTS = [
 # through class by class. Its names -- AppConfig, MapStage, the WlRoute style --
 # are real identifiers of this repository that live outside the four framework
 # trees, and several are a short edit from a framework class.
+#
+# scripts/bastion is the same for the Bastion implementor's guide: its EthRpc
+# wraps the framework's EvmRpc, one letter away.
 IDENTIFIER_ROOTS = [os.path.join(ROOT, d)
                     for d in ('CodenameOne', 'Ports', 'vm', 'maven',
                               os.path.join('docs', 'demos'),
-                              os.path.join('scripts', 'wayline'))]
+                              os.path.join('scripts', 'wayline'),
+                              os.path.join('scripts', 'bastion'))]
 IDENTIFIER_SUFFIXES = ('.java', '.m', '.h', '.mm', '.kt', '.js', '.c', '.cpp',
                        '.xml', '.gradle', '.swift', '.cs')
 

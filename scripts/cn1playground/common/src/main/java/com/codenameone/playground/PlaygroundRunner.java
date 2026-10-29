@@ -383,6 +383,24 @@ final class PlaygroundRunner {
         if (end == p || !Character.isUpperCase(message.charAt(p))) {
             return null;
         }
+        // ``Secp256k1.EcdsaSignature`` with Secp256k1 unimported reads to javac as a
+        // package named Secp256k1: "symbol: class EcdsaSignature, location: package
+        // Secp256k1". The class to import is the outer one, so answer that.
+        // only this diagnostic's location: the message can carry later ones
+        int stop = message.indexOf("symbol:", end);
+        int nl = message.indexOf('\n', message.indexOf("location:", end) + 1);
+        int loc = message.indexOf("location: package", end);
+        if (loc >= 0 && (stop < 0 || loc < stop) && (nl < 0 || loc < nl)) {
+            int q = skipSpaces(message, loc + "location: package".length());
+            int qEnd = q;
+            while (qEnd < message.length() && Character.isJavaIdentifierPart(message.charAt(qEnd))) {
+                qEnd++;
+            }
+            if (qEnd > q && Character.isUpperCase(message.charAt(q))
+                    && (qEnd == message.length() || message.charAt(qEnd) != '.')) {
+                return message.substring(q, qEnd);
+            }
+        }
         return message.substring(p, end);
     }
 

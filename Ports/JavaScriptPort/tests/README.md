@@ -26,3 +26,10 @@ The selection harness also exercises runtime constraint changes, foreground alph
 bottom alignment, form shortcuts, fixed-height textarea scrolling in both directions,
 interactive/custom labels, and horizontal container scrolling. Set
 `CN1_JS_REVIEW_ONLY=true` to run only those review regression cases while iterating.
+
+`JavaScriptCryptoBatchApp` runs `CryptoBatch` verifies and hashes through the
+asynchronous forms, which reach WebGPU, and holds every answer to the portable
+Java engine. It prints one `CN1-CRYPTO` line per kernel with both rates.
+`scripts/crypto-gpu/js-batch-check.sh` translates it and runs it in headless
+Chromium; the kernels alone are checked against the C build by
+`scripts/crypto-gpu/webgpu-check.mjs`.

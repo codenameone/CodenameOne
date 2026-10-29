@@ -43,10 +43,31 @@ function stale(run, pr) {
     run.head_sha !== pr.merge_commit_sha;
 }
 
+// The live PR. pulls.get answers 422 "too many files changed" for a very large
+// PR, because it computes diff statistics this script never reads; the list
+// endpoint does not, and carries the same state, head and merge commit. It is
+// looked up by the head branch the event named, and only an entry with this
+// PR's number is accepted.
+async function readPr(github, repo, number, payloadPr) {
+  try {
+    return (await github.rest.pulls.get({...repo, pull_number: number})).data;
+  } catch (error) {
+    if (error.status !== 422) throw error;
+    const owner = payloadPr.head?.repo?.owner?.login;
+    if (!owner) throw error;
+    const list = await github.paginate(github.rest.pulls.list,
+      {...repo, state: 'all', head: `${owner}:${payloadPr.head.ref}`, per_page: 100});
+    const live = list.find(entry => entry.number === number);
+    if (!live) throw error;
+    return live;
+  }
+}
+
 async function cancelStale({github, context, core, dryRun = false}) {
   const repo = context.repo;
-  const number = context.payload.pull_request.number;
-  let pr = (await github.rest.pulls.get({...repo, pull_number: number})).data;
+  const payloadPr = context.payload.pull_request;
+  const number = payloadPr.number;
+  let pr = await readPr(github, repo, number, payloadPr);
   let cancelled = 0;
   // Gather before cancelling: mutating while paging can skip runs as the list
   // shrinks. Broad active statuses include queued dependencies and approvals.
@@ -59,7 +80,7 @@ async function cancelStale({github, context, core, dryRun = false}) {
   for (const candidate of runs.values()) {
     // Re-read both immediately before mutation: a delayed synchronize/closed
     // event must not kill a new head or a PR that has since been reopened.
-    pr = (await github.rest.pulls.get({...repo, pull_number: number})).data;
+    pr = await readPr(github, repo, number, payloadPr);
     const run = (await github.rest.actions.getWorkflowRun({...repo, run_id: candidate.id})).data;
     if (!stale(run, pr)) continue;
     core.info(`${dryRun ? 'Would cancel' : 'Cancelling'} obsolete PR #${number} run ${run.id}: ${run.name}`);

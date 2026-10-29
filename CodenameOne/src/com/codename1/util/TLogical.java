@@ -29,6 +29,7 @@ package com.codename1.util;
 /// - or
 ///
 /// - xor
+@com.codename1.impl.SharedWithBackend
 final class TLogical {
 
     /// Just to denote that this class can't be instantiated.

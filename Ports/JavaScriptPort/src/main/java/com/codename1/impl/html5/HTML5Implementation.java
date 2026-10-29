@@ -14639,6 +14639,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
         return com.codename1.impl.html5.database.SQLiteNative.exists(databaseName);
     }
 
+    /// Large signature and hash batches go to the GPU through WebGPU; see [HTML5CryptoEngine].
+    @Override
+    public com.codename1.security.CryptoEngine createCryptoEngine() {
+        return new HTML5CryptoEngine(this);
+    }
+
     /// The browser's non-prompting secure store.
     ///
     /// Without one the base class answers "unknown" to every question, and ManagedKeys refuses to

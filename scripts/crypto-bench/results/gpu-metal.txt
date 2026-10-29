@@ -1,0 +1,38 @@
+GPU: Metal after 0.2 s
+ecdsa       16384  cpu    37.45 ms  shared    37.17 ms  rates cpu       440 gpu         0  ok
+ecdsa       16384  cpu    35.43 ms  shared    89.25 ms  rates cpu       401 gpu        91  ok
+ecdsa       16384  cpu    34.15 ms  shared    37.95 ms  rates cpu       384 gpu       137  ok
+ecdsa       16384  cpu    39.04 ms  shared    34.86 ms  rates cpu       378 gpu       168  ok
+ecdsa       16384  cpu    36.11 ms  shared    33.57 ms  rates cpu       373 gpu       181  ok
+schnorr     16384  cpu    51.90 ms  shared    66.47 ms  rates cpu       246 gpu         0  ok
+schnorr     16384  cpu    61.97 ms  shared    47.76 ms  rates cpu       275 gpu       171  ok
+schnorr     16384  cpu    43.70 ms  shared    38.73 ms  rates cpu       280 gpu       190  ok
+schnorr     16384  cpu    51.05 ms  shared    47.64 ms  rates cpu       253 gpu       205  ok
+schnorr     16384  cpu    57.96 ms  shared    38.74 ms  rates cpu       258 gpu       233  ok
+ed25519     16384  cpu    64.59 ms  shared    73.60 ms  rates cpu       222 gpu         0  ok
+ed25519     16384  cpu    59.15 ms  shared    33.13 ms  rates cpu       251 gpu       315  ok
+ed25519     16384  cpu    56.26 ms  shared    31.71 ms  rates cpu       259 gpu       305  ok
+ed25519     16384  cpu    51.61 ms  shared    41.52 ms  rates cpu       246 gpu       259  ok
+ed25519     16384  cpu    62.77 ms  shared    48.18 ms  rates cpu       250 gpu       216  ok
+sha256      65536  cpu     0.57 ms  shared     0.52 ms  rates cpu   8112773 gpu         0  ok
+keccak256   65536  cpu     0.95 ms  shared     0.93 ms  rates cpu   4490689 gpu         0  ok
+sha256      65536  cpu     0.52 ms  shared     0.50 ms  rates cpu   8250690 gpu         0  ok
+keccak256   65536  cpu     0.93 ms  shared     0.93 ms  rates cpu   4510087 gpu         0  ok
+sha256      65536  cpu     0.51 ms  shared     0.52 ms  rates cpu   8181731 gpu         0  ok
+keccak256   65536  cpu     0.93 ms  shared     0.93 ms  rates cpu   4514905 gpu         0  ok
+sha256      65536  cpu     0.54 ms  shared     0.52 ms  rates cpu   8093063 gpu         0  ok
+keccak256   65536  cpu     0.93 ms  shared     0.92 ms  rates cpu   4534490 gpu         0  ok
+sha256      65536  cpu     0.91 ms  shared     0.88 ms  rates cpu  11502276 gpu         0  ok
+keccak256   65536  cpu     1.74 ms  shared     1.86 ms  rates cpu   5809731 gpu   3557871  ok
+sha256      65536  cpu     0.87 ms  shared     0.88 ms  rates cpu  13189957 gpu         0  ok
+keccak256   65536  cpu     1.74 ms  shared     1.51 ms  rates cpu   6277977 gpu   3440484  ok
+sha256      65536  cpu     0.86 ms  shared     0.88 ms  rates cpu  14025363 gpu         0  ok
+keccak256   65536  cpu     1.74 ms  shared     1.26 ms  rates cpu   6652349 gpu   3585193  ok
+sha256      65536  cpu     0.89 ms  shared     0.88 ms  rates cpu  14459954 gpu         0  ok
+keccak256   65536  cpu     1.74 ms  shared     1.74 ms  rates cpu   7083972 gpu   3585193  ok
+gpu-row sha256    no GPU measurement: no device, or no batch reached its minimum
+gpu-row keccak256 gpu/cpu  0.51  speedup  1.01  crossover 3120454 bytes  cpu 7083972000/s  gpu 3585193000/s
+gpu-row ecdsa     gpu/cpu  0.49  speedup  1.02  crossover 784 entries  cpu 373000/s  gpu 181000/s
+gpu-row schnorr   gpu/cpu  0.90  speedup  1.13  crossover 539 entries  cpu 258000/s  gpu 233000/s
+gpu-row ed25519   gpu/cpu  0.86  speedup  1.63  crossover 552 entries  cpu 250000/s  gpu 216000/s
+PASS
