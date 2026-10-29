@@ -2293,11 +2293,11 @@ public class ByteCodeClass {
     /// - `cn1_itix_<iface>`: for every class id between the lowest and highest
     ///   implementer, where its row starts. Only implementers ever index it --
     ///   the thunk is only reached with a receiver of the interface's type -- so
-    ///   ids outside that range need no entry and no bounds check.
+    ///   ids outside that range need no entry.
     ///
     /// The lookup is the same two dependent loads as before, and needs no
     /// publication: nothing is written at run time, so no thread can read it half
-    /// built.
+    /// built. It adds no branch either: see appendRowLookup.
     private void appendInterfaceMap(StringBuilder b, List<ByteCodeClass> allClasses) {
         List<BytecodeMethod> slots = new ArrayList<BytecodeMethod>();
         for(BytecodeMethod m : virtualMethodList) {
@@ -2362,33 +2362,45 @@ public class ByteCodeClass {
         String rowType = missing ? (maxValue < 32768 ? "short" : "JAVA_INT")
                 : (maxValue < 65536 ? "unsigned short" : "JAVA_INT");
         String ixType = lastStart < 65536 ? "unsigned short" : "JAVA_INT";
+        // Dense, every entry a real row: a gap (a class in the range that does not implement
+        // the interface) takes the row of the lowest implementer; see appendRowLookup.
+        int[] dense = new int[max - min + 1];
+        int lowest = 0;
+        for(int k = 0 ; k < implementers.size() ; k++) {
+            if(implementers.get(k).getClassOffset() == min) {
+                lowest = starts[k];
+            }
+        }
+        java.util.Arrays.fill(dense, lowest);
+        for(int k = 0 ; k < implementers.size() ; k++) {
+            dense[implementers.get(k).getClassOffset() - min] = starts[k];
+        }
         b.append("static const ").append(rowType).append(" cn1_itrows_").append(clsName)
          .append("[] __attribute__((unused)) = {");
         b.append(rows).append("\n};\n");
         b.append("static const ").append(ixType).append(" cn1_itix_").append(clsName)
          .append("[").append(max - min + 1).append("] __attribute__((unused)) = {");
-        for(int k = 0 ; k < implementers.size() ; k++) {
-            b.append(k == 0 ? "\n    [" : ",\n    [");
-            b.append("cn1_class_id_").append(implementers.get(k).clsName).append(" - ").append(min);
-            // Plus one: an id the designated initializers skip reads 0, "implements nothing".
-            b.append("] = ").append(starts[k] + 1);
+        for(int k = 0 ; k < dense.length ; k++) {
+            b.append(k == 0 ? "" : ",").append(k % 32 == 0 ? "\n    " : "").append(dense[k]);
         }
         b.append("\n};\n");
         interfaceMapBase = min;
         appendRowLookup(b, String.valueOf(max - min + 1), "cn1_itix_" + clsName + "[d]");
     }
 
-    /// The row of the receiver's class. A receiver that does not implement the interface -- its id
-    /// outside the table or in a gap of it -- traps. It can only get here through a cast that did
-    /// not hold, and ParparVM's CHECKCAST is unchecked; the old map read a NULL row and faulted
-    /// the same way, where reading the table out of bounds would jump through a random row.
+    /// The row of the receiver's class, with no branch: this runs on every interface call, and a
+    /// range test plus a trap here cost the backend benchmark about 1% of its throughput.
+    ///
+    /// A receiver that does not implement the interface can only get here through a cast that
+    /// did not hold, since ParparVM's CHECKCAST is unchecked. Its id is clamped into the table
+    /// (a conditional move, not a branch), and every entry is a real row, so such a call reaches
+    /// a real implementation of the same method with the wrong receiver -- what an unchecked cast
+    /// does everywhere else on ParparVM -- and never a row read from past the table.
     private void appendRowLookup(StringBuilder b, String len, String read) {
         b.append("static inline JAVA_INT cn1_itrow_").append(clsName).append("(JAVA_INT id) __attribute__((unused));\n");
         b.append("static inline JAVA_INT cn1_itrow_").append(clsName).append("(JAVA_INT id) {\n");
         b.append("    unsigned int d = (unsigned int)(id - ").append(interfaceMapBase).append(");\n");
-        b.append("    JAVA_INT v = d < ").append(len).append("u ? ").append(read).append(" : 0;\n");
-        b.append("    if (__builtin_expect(v == 0, 0)) __builtin_trap();\n");
-        b.append("    return v - 1;\n}\n");
+        b.append("    return ").append(read.replace("[d]", "[d < " + len + "u ? d : 0]")).append(";\n}\n");
     }
 
     /// The lowest class id cn1_itix_ covers; see appendInterfaceMap.
