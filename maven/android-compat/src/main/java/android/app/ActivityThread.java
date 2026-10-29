@@ -251,6 +251,24 @@ public final class ActivityThread {
 
     // ------------------------------------------------------------ starting
 
+    /// A document intent goes to the platform's Open or Save dialog; the
+    /// result reaches the caller -- or the instance that replaced it, when it
+    /// was recreated with the dialog open -- as one from another activity
+    /// would, through `onActivityResult` or the fragment that asked.
+    private static void startDocumentIntent(Context caller, Intent intent, final int requestCode) {
+        final Activity source = caller instanceof Activity ? (Activity) caller : null;
+        com.codename1.androidcompat.runtime.DocumentIntents.start(intent,
+                new com.codename1.androidcompat.runtime.DocumentIntents.Result() {
+                    @Override
+                    public void onResult(int resultCode, Intent data) {
+                        Activity target = currentInstance(source);
+                        if (target != null && requestCode >= 0) {
+                            target.dispatchActivityResult(requestCode, resultCode, data);
+                        }
+                    }
+                });
+    }
+
     /// Starts the activity `intent` names, from `caller` (null at launch).
     public static void startActivity(Context caller, Intent intent, int requestCode) {
         AndroidRuntime rt = AndroidRuntime.getInstance();
@@ -270,6 +288,12 @@ public final class ActivityThread {
         // its Intent after startActivity() must not change getIntent() or
         // what onNewIntent() was given.
         intent = snapshotIntent(intent);
+        if (intent.getComponent() == null && intent.getComponentClass() == null
+                && com.codename1.androidcompat.runtime.DocumentIntents.handles(intent)
+                && rt.getApp().activityForIntent(intent) == null) {
+            startDocumentIntent(caller, intent, requestCode);
+            return;
+        }
         // Activities start on the EDT, which is the main looper's thread.
         android.os.Looper.prepareMainLooper();
         // A component's package, and an implicit intent's setPackage(), are

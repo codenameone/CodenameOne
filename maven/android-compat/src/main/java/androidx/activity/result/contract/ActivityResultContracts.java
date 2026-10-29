@@ -148,4 +148,92 @@ public final class ActivityResultContracts {
             return intent == null || resultCode != Activity.RESULT_OK ? null : intent.getData();
         }
     }
+
+    /// Opens one document of the given MIME types (`ACTION_OPEN_DOCUMENT`)
+    /// and answers its `Uri`, or null when the user cancels.
+    public static class OpenDocument extends ActivityResultContract<String[], Uri> {
+        @Override
+        public Intent createIntent(Context context, String[] input) {
+            return new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
+                    .putExtra(Intent.EXTRA_MIME_TYPES, input).setType("*/*");
+        }
+
+        @Override
+        public Uri parseResult(int resultCode, Intent intent) {
+            return intent == null || resultCode != Activity.RESULT_OK ? null : intent.getData();
+        }
+    }
+
+    /// Opens several documents and answers their `Uri`s, empty when the
+    /// user cancels.
+    public static class OpenMultipleDocuments extends ActivityResultContract<String[], java.util.List<Uri>> {
+        @Override
+        public Intent createIntent(Context context, String[] input) {
+            return new OpenDocument().createIntent(context, input).putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+        }
+
+        @Override
+        public java.util.List<Uri> parseResult(int resultCode, Intent intent) {
+            return urisOf(resultCode, intent);
+        }
+    }
+
+    /// `GetContent` for several items.
+    public static class GetMultipleContents extends ActivityResultContract<String, java.util.List<Uri>> {
+        @Override
+        public Intent createIntent(Context context, String input) {
+            return new GetContent().createIntent(context, input).putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+        }
+
+        @Override
+        public java.util.List<Uri> parseResult(int resultCode, Intent intent) {
+            return urisOf(resultCode, intent);
+        }
+    }
+
+    /// Creates a document of a MIME type (`ACTION_CREATE_DOCUMENT`); the
+    /// input is the suggested file name. Answers the `Uri` to write, or null
+    /// when the user cancels.
+    public static class CreateDocument extends ActivityResultContract<String, Uri> {
+        private final String mimeType;
+
+        public CreateDocument(String mimeType) {
+            this.mimeType = mimeType;
+        }
+
+        /// The deprecated form, for any type.
+        public CreateDocument() {
+            this("*/*");
+        }
+
+        @Override
+        public Intent createIntent(Context context, String input) {
+            return new Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
+                    .setType(mimeType).putExtra(Intent.EXTRA_TITLE, input);
+        }
+
+        @Override
+        public Uri parseResult(int resultCode, Intent intent) {
+            return intent == null || resultCode != Activity.RESULT_OK ? null : intent.getData();
+        }
+    }
+
+    static java.util.List<Uri> urisOf(int resultCode, Intent intent) {
+        java.util.ArrayList<Uri> out = new java.util.ArrayList<Uri>();
+        if (intent == null || resultCode != Activity.RESULT_OK) {
+            return out;
+        }
+        android.content.ClipData clip = intent.getClipData();
+        if (clip != null) {
+            for (int i = 0; i < clip.getItemCount(); i++) {
+                Uri u = clip.getItemAt(i).getUri();
+                if (u != null) {
+                    out.add(u);
+                }
+            }
+        } else if (intent.getData() != null) {
+            out.add(intent.getData());
+        }
+        return out;
+    }
 }
