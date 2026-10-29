@@ -239,6 +239,10 @@ public final class DocumentIntents {
                 Display.getInstance().showSaveDialog(request, new SuccessCallback<FileDialogResult>() {
                     @Override
                     public void onSucess(FileDialogResult value) {
+                        // Deleted on a cancel too. The staged copy lives in a
+                        // directory the user cannot reach, so keeping it would
+                        // recover nothing; the guide says a cancelled Save
+                        // exports nothing and is not reported.
                         FileSystemStorage.getInstance().delete(path);
                         FileSystemStorage.getInstance().delete(pending[2]);
                     }
@@ -266,8 +270,9 @@ public final class DocumentIntents {
             return null;
         }
         for (String t : types) {
-            // A list that also admits anything filters nothing.
-            if (t == null || "*/*".equals(t) || "*".equals(t)) {
+            // A wildcard filters nothing: ports disagree on `text/*`, and a
+            // picker showing too much beats one that hides the document.
+            if (t == null || t.indexOf('*') >= 0) {
                 return null;
             }
         }

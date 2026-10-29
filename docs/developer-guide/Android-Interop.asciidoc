@@ -510,7 +510,9 @@ document picker can only export a file that already exists, so
 the application's storage. The Save dialog opens when the application closes
 the stream it wrote through `ContentResolver.openOutputStream()`, and places
 the file where the user chooses. The application has already received
-`RESULT_OK` by then, so it isn't told when the user cancels the Save dialog.
+`RESULT_OK` by then, so it isn't told when the user cancels the Save dialog,
+and the document is saved only if the user confirms it. Keep the data until
+the application no longer needs it rather than relying on the export.
 Write the document straight away in the result callback, as most applications
 already do.
 
