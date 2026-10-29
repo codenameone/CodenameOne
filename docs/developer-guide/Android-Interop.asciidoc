@@ -536,8 +536,8 @@ The runtime maps each Android mechanism to the nearest iOS one:
   application.
 
 | Other work in a foreground service (`startForeground()`)
-| Runs in a background execution window that iOS ends after about thirty
-  seconds, with the notification shown as a local notification. Long downloads
+| Runs in a background execution window that iOS ends after a short time,
+  with the notification shown as a local notification. Long downloads
   and processing don't survive in the background; the next section shows the
   alternatives.
 

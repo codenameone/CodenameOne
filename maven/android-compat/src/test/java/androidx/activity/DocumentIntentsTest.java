@@ -167,6 +167,8 @@ public class DocumentIntentsTest {
                         got.add(result);
                     }
                 }).launch("track.gpx");
+        assertEquals("the result was delivered inside launch()", 0, got.size());
+        MainThreadRule.drain();
         assertEquals(1, got.size());
         Uri uri = got.get(0);
         assertTrue(uri.toString(), uri.toString().endsWith("/track.gpx"));
@@ -185,5 +187,34 @@ public class DocumentIntentsTest {
         out.close();
         MainThreadRule.drain();
         assertNull("a second close exported again", HeadlessImplementation.saveRequest);
+    }
+
+    /// A title with characters a URI treats specially still names the file
+    /// the stream goes to, so the export is not lost.
+    @Test
+    public void createDocumentWithSpecialCharactersStillExports() throws Exception {
+        AndroidTestSupport.context();
+        ResultActivity a = new ResultActivity();
+        a.startActivityForResult(new Intent(Intent.ACTION_CREATE_DOCUMENT).setType("text/plain")
+                .putExtra(Intent.EXTRA_TITLE, "Report #3 50%?.txt"), 4);
+        MainThreadRule.drain();
+        Uri uri = ((Intent) a.results.get(0)[2]).getData();
+        OutputStream out = a.getContentResolver().openOutputStream(uri);
+        out.write(1);
+        out.close();
+        MainThreadRule.drain();
+        assertNotNull("the export was lost", HeadlessImplementation.saveRequest);
+        assertEquals("Report #3 50%?.txt", HeadlessImplementation.saveRequest.getSuggestedName());
+    }
+
+    /// Append mode on a file that does not exist yet is a plain write.
+    @Test
+    public void appendModeOnANewFileWrites() throws Exception {
+        Context c = AndroidTestSupport.context();
+        Uri uri = Uri.parse("file:///home/append-new.txt");
+        OutputStream out = c.getContentResolver().openOutputStream(uri, "wa");
+        out.write("x".getBytes("UTF-8"));
+        out.close();
+        assertEquals("x", new String(HeadlessImplementation.FILES.get("file:///home/append-new.txt"), "UTF-8"));
     }
 }

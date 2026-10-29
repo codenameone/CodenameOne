@@ -60,10 +60,18 @@ public class ContentResolver {
     public final java.io.OutputStream openOutputStream(Uri uri, String mode) throws java.io.FileNotFoundException {
         if (mode != null && mode.indexOf('a') >= 0) {
             String path = storagePath(uri);
+            com.codename1.io.FileSystemStorage fs = com.codename1.io.FileSystemStorage.getInstance();
+            long length = fs.exists(path) ? fs.getLength(path) : 0;
+            if (length <= 0) {
+                // Nothing to append to: a new or empty file is a plain write.
+                return openOutputStream(uri);
+            }
+            if (length > Integer.MAX_VALUE) {
+                throw new java.io.FileNotFoundException("Cannot append past 2 GB: " + uri);
+            }
             try {
                 return com.codename1.androidcompat.runtime.DocumentIntents.wrapForExport(path,
-                        com.codename1.io.FileSystemStorage.getInstance().openOutputStream(path,
-                        (int) com.codename1.io.FileSystemStorage.getInstance().getLength(path)));
+                        fs.openOutputStream(path, (int) length));
             } catch (java.io.IOException e) {
                 throw new java.io.FileNotFoundException(uri.toString());
             }

@@ -54,7 +54,9 @@ import java.util.Map;
 /// shown to put the written file where the user chooses. The visible
 /// difference is the order (the file is written, then placed) and that a
 /// cancelled Save is not reported back: the application has already seen
-/// `RESULT_OK`.
+/// `RESULT_OK`, and Android has no result to revoke it with. The staged
+/// file is removed once the dialog closes either way; one never closed is
+/// removed when the next run first creates a document.
 public final class DocumentIntents {
 
     /// Staging path to the export it is waiting for: name and MIME type.
@@ -123,24 +125,76 @@ public final class DocumentIntents {
         });
     }
 
-    private static void create(Intent intent, Result result) {
+    private static void create(Intent intent, final Result result) {
         String name = intent.getStringExtra(Intent.EXTRA_TITLE);
         if (name == null || name.length() == 0) {
             name = "Untitled";
         }
-        // Any separator would leave the staging directory.
-        name = name.replace('/', '_').replace('\\', '_');
+        String stagedName = stagingName(name);
         FileSystemStorage fs = FileSystemStorage.getInstance();
-        String dir = fs.getAppHomePath() + "cn1-documents/" + (++stagingCounter) + "-"
-                + System.currentTimeMillis() + "/";
-        fs.mkdir(fs.getAppHomePath() + "cn1-documents");
+        String root = fs.getAppHomePath() + STAGING_DIR;
+        if (stagingCounter == 0) {
+            // Left by an earlier run that never closed its stream: nothing
+            // can export it any more.
+            deleteTree(root);
+        }
+        String dir = root + (++stagingCounter) + "/";
+        fs.mkdir(root);
         fs.mkdir(dir);
-        String path = dir + name;
-        PENDING_EXPORTS.put(path, new String[] {name, intent.getType()});
-        Intent data = new Intent();
+        String path = dir + stagedName;
+        PENDING_EXPORTS.put(path, new String[] {name, intent.getType(), dir});
+        final Intent data = new Intent();
         data.setData(toUri(path));
         data.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
-        result.onResult(-1, data);
+        // Android delivers a result after the launching call returns, never
+        // inside it; code that sets state after launch() relies on that.
+        Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                result.onResult(-1, data);
+            }
+        });
+    }
+
+    private static final String STAGING_DIR = "cn1-documents/";
+
+    /// The staged file's name: the title with every character a URI or a
+    /// file system treats specially replaced, so the `file:` URI handed to
+    /// the application names exactly this file when it comes back. The Save
+    /// dialog still suggests the title as given.
+    static String stagingName(String name) {
+        StringBuilder b = new StringBuilder(name.length());
+        for (int i = 0; i < name.length(); i++) {
+            char c = name.charAt(i);
+            boolean safe = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+                    || c == '.' || c == '-' || c == '_';
+            b.append(safe ? c : '_');
+        }
+        String s = b.toString();
+        return s.startsWith(".") ? "_" + s : s;
+    }
+
+    private static void deleteTree(String dir) {
+        FileSystemStorage fs = FileSystemStorage.getInstance();
+        if (!fs.exists(dir)) {
+            return;
+        }
+        try {
+            String[] children = fs.listFiles(dir);
+            if (children != null) {
+                for (String c : children) {
+                    String child = dir + c;
+                    if (fs.isDirectory(child)) {
+                        deleteTree(child.endsWith("/") ? child : child + "/");
+                    } else {
+                        fs.delete(child);
+                    }
+                }
+            }
+        } catch (IOException e) {
+            // Best effort: a leftover staging file costs space, nothing else.
+        }
+        fs.delete(dir);
     }
 
     /// Wraps the stream the `ContentResolver` opened on `path`: for a
@@ -186,6 +240,7 @@ public final class DocumentIntents {
                     @Override
                     public void onSucess(FileDialogResult value) {
                         FileSystemStorage.getInstance().delete(path);
+                        FileSystemStorage.getInstance().delete(pending[2]);
                     }
                 });
             }
@@ -211,7 +266,8 @@ public final class DocumentIntents {
             return null;
         }
         for (String t : types) {
-            if (t == null || "*/*".equals(t)) {
+            // A list that also admits anything filters nothing.
+            if (t == null || "*/*".equals(t) || "*".equals(t)) {
                 return null;
             }
         }
