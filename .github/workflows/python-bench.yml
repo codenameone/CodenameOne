@@ -33,6 +33,9 @@ on:
 
 permissions:
   contents: read
+  # The pr-ci-container image lives on ghcr; without this the job dies in
+  # "Initialize containers" with a bare "denied".
+  packages: read
 
 env:
   # Pinned, like flutter-bench's FLUTTER_REF: the ratios are against this
