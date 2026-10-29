@@ -17,7 +17,7 @@ If you write Spring Boot during the day, most of this will look familiar on purp
 
 ## A bounded cache
 
-Bastion looks up prices on every quote. Calling the price feed on every quote is slow and burns the feed's quota. Caching forever shows stale prices. The new cache has a size bound, expiry, a removal listener and metrics:
+Bastion looks up prices on every quote. Calling the price feed on every quote is slow and burns the feed's quota. Caching forever shows stale prices. The new [cache](/developer-guide/backend-observability/#_application_caches) has a size bound, expiry, a removal listener and metrics:
 
 ```java {class="cn1-no-try"}
 private static final Cache<String, Price> PRICES = Cache.<String, Price>builder("prices")
@@ -33,7 +33,7 @@ private static final Cache<String, Price> PRICES = Cache.<String, Price>builder(
 
 ## Tokens for calling other services
 
-Your server calls other servers: a Google API with a service account, a billing service with client credentials. `AccessTokenProvider` fetches the token, caches it and refreshes it before it expires:
+Your server calls other servers: a Google API with a service account, a billing service with client credentials. [`AccessTokenProvider`](/developer-guide/backend-security/#backend-security-outbound) fetches the token, caches it and refreshes it before it expires:
 
 ```java {class="cn1-no-try"}
 AccessTokenProvider billing(Config config) throws IOException {
@@ -45,11 +45,11 @@ AccessTokenProvider billing(Config config) throws IOException {
 }
 ```
 
-The same change added importing users from an existing identity store, so moving an app's accounts over doesn't mean asking everyone to reset a password.
+The same change added [importing users from an existing identity store](/developer-guide/backend-security/#backend-security-migration), so moving an app's accounts over doesn't mean asking everyone to reset a password.
 
 ## Certificates without OpenSSL on the command line
 
-Banks and partners love mutual TLS and private certificate authorities. The PKI API parses PEM, validates a chain against your own anchors, creates certificate signing requests and reads and writes PKCS#12:
+Banks and partners love mutual TLS and private certificate authorities. The [PKI API](/developer-guide/backend-security/#backend-security-pki) parses PEM, validates a chain against your own anchors, creates certificate signing requests and reads and writes PKCS#12:
 
 ```java {class="cn1-no-try"}
 List<Certificate> anchors = Certificate.listFromPem(KeyFiles.read("/etc/app/partner-ca.pem"));
@@ -60,7 +60,7 @@ List<Certificate> path = new CertificateValidator(anchors)
 
 ## Errors in one place
 
-`@RestControllerAdvice` and `@ExceptionHandler` turn exceptions into responses once, instead of a try and catch in every handler. Interceptors and validation came with the same change.
+[`@RestControllerAdvice` and `@ExceptionHandler`](/developer-guide/backend-web/#backend-web-errors) turn exceptions into responses once, instead of a try and catch in every handler. [Interceptors](/developer-guide/backend-web/#backend-web-interceptors) and [validation](/developer-guide/backend-web/#backend-web-validation) came with the same change.
 
 ```java {class="cn1-no-try"}
 @RestControllerAdvice
@@ -74,15 +74,76 @@ public class ApiErrors {
 
 ## Streaming bodies and a proxy
 
-Reel's uploads are video files. Reading them into memory isn't an option. `request.getBodyStream()` hands you the body as it arrives, large uploads spool to disk, and `HttpProxy` forwards a request to an internal service, with an allow list of the hosts it may reach.
+Reel's uploads are video files. Reading them into memory isn't an option. [`request.getBodyStream()`](/developer-guide/backend-web/#_large_uploads_and_downloads) hands you the body as it arrives, and large uploads, multipart ones included, spool to disk instead of the heap:
+
+```java {class="cn1-no-try"}
+@PostMapping("/archive")
+public Map<String, Long> archive(HttpServer.Request request) throws IOException {
+    long total = 0;
+    byte[] buffer = new byte[64 * 1024];
+    InputStream in = request.getBodyStream();
+    try {
+        for (int n = in.read(buffer); n > 0; n = in.read(buffer)) {
+            total += n;                 // store, hash or forward each block
+        }
+    } finally {
+        in.close();
+    }
+    return Collections.singletonMap("bytes", total);
+}
+```
+
+[`HttpProxy`](/developer-guide/backend-web/#_forwarding_to_another_service) forwards a request to an internal service. It reaches only its target and the hosts you allow, so a crafted path can't turn your server into an open proxy:
+
+```java {class="cn1-no-try"}
+images = new HttpProxy("https://images.internal:8443")
+        .allowHost("cdn.internal");
+
+@RequestMapping("/images/{name}")
+public HttpServer.Response image(HttpServer.Request request) {
+    return images.forward(request);  // the same path and query, upstream
+}
+```
 
 ## JSON codecs and java.time in the ORM
 
-These two apply to the client as well as the server. JSON mapping gained custom codecs through `JsonTypeAdapter`, constructor based creators, generics, arrays and explicit null handling. The ORM now maps `Instant` and `LocalDateTime` as epoch milliseconds and `LocalDate` as an epoch day, so a date column is a number you can index and compare.
+These two apply to the client as well as the server. [JSON mapping](/developer-guide/backend-web/#backend-json-contract) gained custom codecs through `JsonTypeAdapter`, constructor based creators, generics, arrays and explicit null handling. A codec turns a type into JSON and back, here a money amount kept as a decimal string so it never passes through a `double`:
+
+```java {class="cn1-no-try"}
+public final class MoneyAdapter implements JsonTypeAdapter<Money> {
+    public Object toJson(Money m) {
+        return m == null ? null : m.toDecimalString();
+    }
+    public Money fromJson(Object json) {
+        if (json == null) {
+            return null;
+        }
+        if (!(json instanceof String)) {
+            throw new IllegalArgumentException("expected an amount");
+        }
+        return Money.parse((String) json);
+    }
+}
+```
+
+Put `@JsonAdapter(MoneyAdapter.class)` on the field or the class and the mapper uses it.
+
+The [ORM now maps `java.time`](/developer-guide/annotation-sqlite-orm/#orm-native-dates) without an annotation: `Instant` and `LocalDateTime` as epoch milliseconds and `LocalDate` as an epoch day, so a date column is a number you can index and compare:
+
+```java {class="cn1-no-try"}
+@Entity
+public class Booking {
+    @Id
+    private long id;
+    private Instant created;        // epoch milliseconds
+    private LocalDate checkIn;      // epoch day
+    private LocalDateTime pickup;   // epoch milliseconds
+}
+```
 
 ## Tests that start only what they need
 
-`@WebMvcTest` starts one controller and the beans you list, not the whole application, and `MockMvc` calls it without a socket:
+[`@WebMvcTest`](/developer-guide/backend-testing/#_testing_one_slice_of_the_application) starts one controller and the beans you list, not the whole application, and `MockMvc` calls it without a socket:
 
 ```java {class="cn1-no-try"}
 @WebMvcTest(value = GreetingApi.class, includes = Greetings.class)
@@ -99,7 +160,7 @@ class GreetingSliceTest {
 }
 ```
 
-The same change defined a metric schema and probes for observability, so a dashboard means the same thing for every Codename One service.
+The same change defined a [metric schema](/developer-guide/backend-observability/#_the_metric_schema) and [probes](/developer-guide/backend-observability/#_probes_and_draining) for observability, so a dashboard means the same thing for every Codename One service.
 
 The backend is still a tech preview. The [backend chapters](/developer-guide/backend/) of the developer guide cover each of these, with the code that the snippets above come from.
 
@@ -107,7 +168,7 @@ The backend is still a tech preview. The [backend chapters](/developer-guide/bac
 
 Here's a bug you've probably shipped. The login form looks great in the simulator. On a phone, the keyboard slides up and covers the password field, or the layout jumps, and nobody noticed because the simulator never had a keyboard.
 
-Now it does. **Simulate > Virtual Keyboard** slides up a keyboard styled after the skin's platform, and it behaves the way that platform does:
+Now it [does](/developer-guide/mcp-headless-api/#_simulator_keyboard_touches_and_recording). **Simulate > Virtual Keyboard** slides up a keyboard styled after the skin's platform, and it behaves the way that platform does:
 
 - **iOS:** the screen keeps its size, `Display.getInvisibleAreaUnderVKB()` reports the keyboard height, and the focused field scrolls into view.
 - **Android, resize mode:** the form gets a `sizeChanged` and lays out again.
@@ -136,7 +197,7 @@ sim_keyboard_key   {"key": "done"}
 sim_record_stop
 ```
 
-It's an emulation of each platform's keyboard behavior, not the native keyboard itself, so do a final pass on a device. But the covered password field shows up on your desk now, not in a one-star review. The [headless and MCP chapter](/developer-guide/mcp-headless-api/) lists every tool.
+It's an emulation of each platform's keyboard behavior, not the native keyboard itself, so do a final pass on a device. But the covered password field shows up on your desk now, not in a one-star review. The [simulator keyboard and recording section](/developer-guide/mcp-headless-api/#_simulator_keyboard_touches_and_recording) of the MCP chapter lists every tool.
 
 ## That's the week
 

@@ -128,8 +128,6 @@ image::img/bastion-cards.png["The cards screen with a card, its masked number, i
 
 *Exchange* lists the markets, BTC-USD and ETH-USD, with their last price and the index price the bank values coins at, and the customer's recent trades.
 
-image::img/bastion-exchange.png["The exchange screen listing the BTC/USD and ETH/USD markets with their prices",scaledwidth=40%]
-
 image::img/bastion-order-book.png["The BTC/USD market: the last price, the bid and ask, hourly candles with the volume under them, and the order book",scaledwidth=40%]
 
 A market opens the last day in hourly candles, a rising hour in green and a falling one in red over its high-low range, the volume traded each hour, its order book and a ticket:

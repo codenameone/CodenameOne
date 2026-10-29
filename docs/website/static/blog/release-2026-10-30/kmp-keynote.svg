@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 400" font-family="Helvetica,Arial,sans-serif" font-size="13">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="450" y="24" text-anchor="middle" font-size="16" font-weight="bold" fill="#1d1b20">Keynote on an iPhone 17 Pro simulator, lower is better</text>
+<text x="20" y="64" font-weight="bold" fill="#1d1b20">Recompose on a day change (ms)</text>
+<text x="20" y="95" fill="#49454f" font-size="12">Compose / CN1</text>
+<rect x="170" y="81" width="64.3" height="22" rx="3" fill="#2f7de1"/>
+<text x="239.3" y="97" fill="#1d1b20">4.58 ms</text>
+<text x="20" y="131" fill="#49454f" font-size="12">Java / CN1</text>
+<rect x="170" y="117" width="20.9" height="22" rx="3" fill="#22a06b"/>
+<text x="195.9" y="133" fill="#1d1b20">1.49 ms</text>
+<text x="20" y="167" fill="#49454f" font-size="12">Compose Multiplatform</text>
+<rect x="170" y="153" width="270.0" height="22" rx="3" fill="#9a9aa5"/>
+<text x="445.0" y="169" fill="#1d1b20">19.24 ms</text>
+<text x="470" y="64" font-weight="bold" fill="#1d1b20">Scroll work per frame (ms)</text>
+<text x="470" y="95" fill="#49454f" font-size="12">Compose / CN1</text>
+<rect x="620" y="81" width="64.1" height="22" rx="3" fill="#2f7de1"/>
+<text x="689.1" y="97" fill="#1d1b20">4.04 ms</text>
+<text x="470" y="131" fill="#49454f" font-size="12">Java / CN1</text>
+<rect x="620" y="117" width="27.9" height="22" rx="3" fill="#22a06b"/>
+<text x="652.9" y="133" fill="#1d1b20">1.76 ms</text>
+<text x="470" y="167" fill="#49454f" font-size="12">Compose Multiplatform</text>
+<rect x="620" y="153" width="270.0" height="22" rx="3" fill="#9a9aa5"/>
+<text x="895.0" y="169" fill="#1d1b20">17.03 ms</text>
+<text x="20" y="234" font-weight="bold" fill="#1d1b20">Executable, stripped (MB)</text>
+<text x="20" y="265" fill="#49454f" font-size="12">Compose / CN1</text>
+<rect x="170" y="251" width="198.1" height="22" rx="3" fill="#2f7de1"/>
+<text x="373.1" y="267" fill="#1d1b20">16.8 MB</text>
+<text x="20" y="301" fill="#49454f" font-size="12">Java / CN1</text>
+<rect x="170" y="287" width="104.9" height="22" rx="3" fill="#22a06b"/>
+<text x="279.9" y="303" fill="#1d1b20">8.9 MB</text>
+<text x="20" y="337" fill="#49454f" font-size="12">Compose Multiplatform</text>
+<rect x="170" y="323" width="270.0" height="22" rx="3" fill="#9a9aa5"/>
+<text x="445.0" y="339" fill="#1d1b20">22.9 MB</text>
+<text x="470" y="234" font-weight="bold" fill="#1d1b20">Cold start (ms)</text>
+<text x="470" y="265" fill="#49454f" font-size="12">Compose / CN1</text>
+<rect x="620" y="251" width="257.4" height="22" rx="3" fill="#2f7de1"/>
+<text x="882.4" y="267" fill="#1d1b20">961 ms</text>
+<text x="470" y="301" fill="#49454f" font-size="12">Java / CN1</text>
+<rect x="620" y="287" width="215.6" height="22" rx="3" fill="#22a06b"/>
+<text x="840.6" y="303" fill="#1d1b20">805 ms</text>
+<text x="470" y="337" fill="#49454f" font-size="12">Compose Multiplatform</text>
+<rect x="620" y="323" width="270.0" height="22" rx="3" fill="#9a9aa5"/>
+<text x="895.0" y="339" fill="#1d1b20">1008 ms</text>
+</svg>

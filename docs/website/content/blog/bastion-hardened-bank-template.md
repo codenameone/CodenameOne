@@ -4,7 +4,7 @@ slug: bastion-hardened-bank-template
 url: /blog/bastion-hardened-bank-template/
 date: '2026-11-02'
 author: Shai Almog
-description: "Bastion is a virtual bank and small exchange, app and server in one Java project, built as a reference for how to harden a financial app: passkeys, TOTP, signed requests, device keys, pinning, a hash chained audit log and a double entry ledger. Codename One also gained wallet APIs for Ethereum, Bitcoin and Solana."
+description: "Bastion is a virtual bank and small exchange, app and server in one Java project, built as a reference for how to harden a financial app: passkeys, TOTP, signed requests, device keys, pinning, a hash chained audit log and a double entry ledger. Codename One also gained wallet, exchange and custody APIs for Ethereum, Bitcoin and Solana, benchmarked against libsecp256k1 and OpenSSL."
 feed_html: "<img src=\"https://www.codenameone.com/blog/bastion-hardened-bank-template.jpg\" alt=\"The Bastion banking app and its Security Center\" /> Bastion is a virtual bank and exchange built as a reference for hardening a financial app, and Codename One now has wallet APIs for Ethereum, Bitcoin and Solana."
 series: ["release-2026-10-30"]
 ---
@@ -18,7 +18,7 @@ A large share of the teams building on Codename One are banks and financial inst
 {{< guide-block >}}
 <div class="release-screenshots" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:16px;align-items:start;margin:24px 0">
 <figure style="margin:0"><a href="/developer-guide/img/bastion-dashboard.png"><img width="420" height="860" src="/developer-guide/img/bastion-dashboard.png" alt="The Bastion dashboard" loading="lazy" style="width:100%;height:auto" /></a><figcaption>Accounts in four currencies.</figcaption></figure>
-<figure style="margin:0"><a href="/developer-guide/img/bastion-exchange.png"><img width="420" height="860" src="/developer-guide/img/bastion-exchange.png" alt="The Bastion exchange screen" loading="lazy" style="width:100%;height:auto" /></a><figcaption>A small exchange.</figcaption></figure>
+<figure style="margin:0"><a href="/developer-guide/img/bastion-order-book.png"><img width="420" height="860" src="/developer-guide/img/bastion-order-book.png" alt="The BTC/USD market with candles and the order book" loading="lazy" style="width:100%;height:auto" /></a><figcaption>The BTC/USD market.</figcaption></figure>
 <figure style="margin:0"><a href="/developer-guide/img/bastion-withdraw.png"><img width="420" height="860" src="/developer-guide/img/bastion-withdraw.png" alt="Withdrawing coins to an allow-listed address" loading="lazy" style="width:100%;height:auto" /></a><figcaption>Withdrawals to allowed addresses.</figcaption></figure>
 <figure style="margin:0"><a href="/developer-guide/img/bastion-security-center.png"><img width="420" height="860" src="/developer-guide/img/bastion-security-center.png" alt="The Bastion Security Center" loading="lazy" style="width:100%;height:auto" /></a><figcaption>What is on, on this device.</figcaption></figure>
 </div>
@@ -82,11 +82,23 @@ Money is a double entry ledger, not a balance column. The admin console has the 
 <figure style="margin:24px 0"><a href="/developer-guide/img/bastion-console-overview.png"><img width="1440" height="900" src="/developer-guide/img/bastion-console-overview.png" alt="The Bastion admin console overview on the desktop" loading="lazy" style="width:100%;height:auto" /></a><figcaption>The back office console.</figcaption></figure>
 {{< /guide-block >}}
 
-## Crypto wallets, in core
+## Crypto wallets, exchanges and custody, in core
 
-I'm not a fan of crypto currency. I know plenty of people who are, and a few of them are customers. We're here to serve, and if we serve, we should be the best at it.
+I'm not a fan of crypto currency. I know plenty of people who are, and a few of them are customers. We're here to serve, and if we serve, we should be the best at it. So this isn't a wallet library bolted on the side. It's the largest feature in this release: everything a wallet, an exchange or a custodian needs, in core, with no third party library, and the same classes run in the app and in a Codename One backend.
 
-The new `com.codename1.crypto` packages cover Ethereum and other EVM chains, Bitcoin and Solana: BIP-39 recovery phrases, HD derivation, addresses, transactions, signing, typed data, ERC-20 tokens, PSBT, node clients and price feeds. Addresses match MetaMask, Electrum, Sparrow and Phantom on the standard paths.
+| Package | What's in it |
+| --- | --- |
+| `crypto.hd` | BIP-39 recovery phrases, BIP-32 and SLIP-10 derivation, `DerivationPath` |
+| `crypto.evm` | EIP-55 addresses; legacy, EIP-2930 and EIP-1559 transactions; EIP-191 and EIP-712 signing; the Solidity ABI and ERC-20 |
+| `crypto.bitcoin` | P2PKH, P2SH, P2WPKH, P2WSH and Taproot addresses, scripts, transactions, PSBT and WIF |
+| `crypto.solana` | Transactions, the system and SPL token programs, priority fees |
+| `crypto.wallet` | `Wallet`, `Signer`, `SeedSigner` and `VaultSigner` |
+| `crypto.rpc` | EVM JSON-RPC, Esplora for Bitcoin, Solana JSON-RPC |
+| `crypto.market` | Price feeds: CoinGecko, any JSON price API, and a caching decorator |
+
+### A wallet
+
+One recovery phrase gives you addresses on every chain, and they match MetaMask, Electrum, Sparrow and Phantom on the standard paths, so a user can restore the same phrase in another wallet and find the same money:
 
 ```java {class="cn1-no-try"}
 String words = Mnemonic.generate(256);           // 24 words
@@ -95,28 +107,89 @@ EvmAddress eth = wallet.getEvmAddress(0, 0);                 // m/44'/60'/0'/0/0
 BitcoinAddress btc = wallet.getBitcoinAddress(BitcoinNetwork.MAINNET,
         Wallet.BIP84, 0, 0, 0);                              // bc1q...
 SolanaAddress sol = wallet.getSolanaAddress(0);              // m/44'/501'/0'/0'
-String shown = eth.toChecksumString();
 ```
 
-`VaultSigner` keeps the phrase sealed behind biometrics or a password and refuses to sign while locked. `revealMnemonic` returns a `char[]` you can wipe, not a `String` that lingers on the heap.
+Bitcoin covers legacy, nested SegWit, native SegWit and Taproot, on mainnet, testnet, signet and regtest. Sending ether is an EIP-1559 transaction with the fees the node suggests:
 
-The expensive parts (secp256k1, Schnorr, Ed25519 and the hashes) run as native C on iOS, macOS, Android, Windows, and Linux. CI benchmarks every kernel against libsecp256k1, libsodium, OpenSSL and BouncyCastle, and a pull request that makes one slower fails. Even the portable Java engine, used in the simulator, holds its own against BouncyCastle on the JVM:
+```java {class="cn1-no-try"}
+EvmRpc rpc = new EvmRpc(new NetworkTransport(), "https://ethereum-sepolia-rpc.publicnode.com");
+DerivationPath path = Wallet.evmPath(0, 0);
+EvmAddress from = wallet.getEvmAddress(path);
+long nonce = rpc.getTransactionCount(from, "pending");
+UInt256[] fees = rpc.suggestFees();                     // {tip, fee cap}
+long gas = rpc.estimateGas(from, to, value, null);
 
-| Operation | Codename One | BouncyCastle | Ratio |
-| --- | --- | --- | --- |
-| secp256k1 public key | 30,583/s | 17,391/s | 1.76x |
-| ECDSA sign | 24,109/s | 16,220/s | 1.49x |
-| ECDSA verify | 14,252/s | 12,748/s | 1.12x |
-| Schnorr sign | 15,297/s | 16,051/s | 0.95x |
-| Keccak-256, 1 KB | 484,694/s | 503,524/s | 0.96x |
+EvmTransaction tx = EvmTransaction.eip1559(rpc.chainId(), nonce, fees[0], fees[1],
+        gas, to, value, null);
+String hash = rpc.sendRawTransaction(wallet.signEvmTransaction(tx, path));
+```
 
-For an exchange or an indexer that checks thousands of signatures at once, `CryptoBatch` hands a whole batch to the engine, which spreads it across every core and, for large batches, the GPU: Metal on Apple, Vulkan elsewhere and WebGPU in the browser. The benchmark charts are in the [crypto wallets chapter](/developer-guide/crypto-wallets/).
+Bitcoin goes through a PSBT, so the same code works with a hardware signer that only sees the partially signed transaction. Taproot inputs are signed with BIP-340 Schnorr automatically:
 
-Bastion uses this: ether can settle on a real network, while bitcoin stays a ledger balance in the sample.
+```java {class="cn1-no-try"}
+EsploraClient.Utxo coin = esplora.getUtxos(from).get(0);
+BitcoinTransaction tx = new BitcoinTransaction();
+tx.addInput(coin.getTxid(), coin.getVout());
+tx.addOutput(coin.getValue() - feeSats, BitcoinAddress.parse(recipient, net));
+
+Psbt psbt = Psbt.fromTransaction(tx);
+psbt.setWitnessUtxo(0, coin.toOutput());
+psbt.signAll(wallet.getBitcoinKey(path));
+psbt.finalizeAll();
+String txid = esplora.broadcast(psbt.extract());
+```
+
+Keys are handled the way a security review expects. `VaultSigner` keeps the phrase sealed behind biometrics or a password and refuses to sign while it's locked. `revealMnemonic` returns a `char[]` you can wipe, not a `String` that lingers on the heap, and `SeedSigner.destroy()` wipes the key.
+
+### An exchange
+
+An exchange is mostly the server side, and that's what Bastion's backend shows. It derives a deposit address per customer (`m/44'/60'/0'/0/n`), scans new blocks, credits deposits once they're deep enough, and sweeps them to a hot wallet on a separate account. It stops scanning and writes an audit event on a reorganization deeper than its confirmation depth. Before every withdrawal it checks that reserves cover what customers hold, and withdrawals go only to addresses the customer allowed in advance. Order prices are collared against the index price, so a fat finger can't sell bitcoin for a dollar.
+
+{{< mermaid >}}
+flowchart LR
+    D[Customer deposit address] --> S[Block scanner]
+    S -->|confirmed| C[Credit the ledger]
+    C --> H[Sweep to the hot wallet]
+    W[Withdrawal request] --> L[Limits, allow list, step up]
+    L --> R{Reserves cover it?}
+    R -->|yes| T[Sign, wipe the key, broadcast]
+    R -->|no| A[Audit event, refused]
+{{< /mermaid >}}
+
+Every one of those steps lands in the double entry ledger and the hash chained audit log from the previous section, which is what lets the auditor trace a coin from deposit to withdrawal.
+
+### Performance
+
+The expensive parts (secp256k1, Schnorr, Ed25519, the hashes and PBKDF2) run as native C on iOS, macOS, Android, Windows and Linux, with a portable Java engine as the fallback. CI benchmarks every kernel against libsecp256k1, OpenSSL and BouncyCastle on the same machine, and a pull request that makes one slower fails.
+
+{{< guide-block >}}
+<figure style="margin:24px 0"><img src="/developer-guide/img/crypto-bench-ratios.svg" alt="Codename One throughput as a multiple of the reference library's, on the JVM, native and Android" loading="lazy" style="width:100%;height:auto" /><figcaption>Throughput as a multiple of the reference library. Above 1 is faster.</figcaption></figure>
+{{< /guide-block >}}
+
+Natively, ECDSA signing matches libsecp256k1 (60,770 against 59,453 signatures a second), and Ed25519 signs 2.44 times as fast as OpenSSL. Even the portable Java engine, which the simulator uses, beats BouncyCastle on the JVM: 1.76 times on public key derivation, 1.49 on ECDSA signing, and 20 times the JDK's own Ed25519 provider. On Android the native engine verifies ECDSA signatures six times as fast as BouncyCastle on ART:
+
+{{< guide-block >}}
+<figure style="margin:24px 0"><img src="/developer-guide/img/crypto-bench-android.svg" alt="Both Android engines as a multiple of BouncyCastle on ART" loading="lazy" style="width:100%;height:auto" /><figcaption>Android: the native and Java engines against BouncyCastle on ART.</figcaption></figure>
+{{< /guide-block >}}
+
+A phone signs one transaction at a time. An exchange or an indexer checks thousands of signatures at once, so `CryptoBatch` takes a whole batch:
+
+```java {class="cn1-no-try"}
+boolean[] valid = CryptoBatch.verifySecp256k1(hashes, signatures, publicKeys);
+```
+
+It spreads the batch across every core, and for large batches the GPU too: Metal on Apple, Vulkan elsewhere and WebGPU in the browser, split by measured speed. The GPU never sees a private key. On every core, a batch of 1,024 verifies ECDSA 7.46 times as fast as libsecp256k1 called once per signature, and Ed25519 15.6 times as fast. In the browser, WebGPU verifies ECDSA 8.5 times as fast as the portable engine.
+
+{{< guide-block >}}
+<figure style="margin:24px 0"><img src="/developer-guide/img/crypto-bench-multicore.svg" alt="A native batch on every core as a multiple of the reference library called once per entry" loading="lazy" style="width:100%;height:auto" /><figcaption>A batch on every core, against the reference library one call at a time.</figcaption></figure>
+<figure style="margin:24px 0"><img src="/developer-guide/img/crypto-bench-gpu.svg" alt="Signatures verified per second by the CPU, the GPU and both together" loading="lazy" style="width:100%;height:auto" /><figcaption>CPU, GPU and both together on an M4 Max.</figcaption></figure>
+{{< /guide-block >}}
+
+The GPU's gain on a machine with 12 fast cores is modest, up to 1.63 times for Ed25519, and the chapter says so. Where it pays is a smaller CPU and the browser. Every table and chart is in the [crypto wallets chapter](/developer-guide/crypto-wallets/), with the machine, the library versions and how to rerun them.
 
 ## What's simulated
 
-Bastion is a reference, not a licensed bank. Deposits, card spending and the market (a random walk) are simulated, and Android integrity checks trust every device in the dev profile. There's no KYC or sanctions screening, no payment rail, no HSM and no regulatory reporting. The [implementor's guide](/developer-guide/bastion-implementors-guide/) has a section for each of those that says what a production deployment needs. On the crypto side, only the three chain families above are supported, and the node clients are blocking calls, so keep them off the UI thread.
+Bastion is a reference, not a licensed bank. Deposits, card spending and the market (a random walk) are simulated, and Android integrity checks trust every device in the dev profile. There's no KYC or sanctions screening, no payment rail, no HSM and no regulatory reporting. The [implementor's guide](/developer-guide/bastion-implementors-guide/) has a section for each of those that says what a production deployment needs. On the crypto side, ether can settle on a real Ethereum node, while bitcoin stays a ledger balance in the sample. Only the three chain families above are supported, and the node clients are blocking calls, so keep them off the UI thread.
 
 ## Try it
 

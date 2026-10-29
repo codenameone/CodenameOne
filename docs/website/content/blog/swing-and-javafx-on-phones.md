@@ -67,12 +67,13 @@ On Linux, the same app as a `jlink` image against a Codename One native build:
 | Address book (JavaFX) | 39.1 MB | 6.5 MB | 6.0x |
 
 {{< guide-block >}}
-<img src="/developer-guide/img/desktop-compat-linux-startup-cold.svg" alt="Cold start on Linux: each sample on the default JVM, a tuned JVM and the Codename One native build" loading="lazy" style="width:100%;height:auto;margin:16px 0" />
+<figure style="margin:24px 0"><img src="/developer-guide/img/desktop-compat-linux-size-zipped.svg" alt="Zipped download size on Linux: a jlink JVM image against the Codename One native build, per sample" loading="lazy" style="width:100%;height:auto" /><figcaption>Download size, zipped.</figcaption></figure>
+<figure style="margin:24px 0"><img src="/developer-guide/img/desktop-compat-linux-startup-cold.svg" alt="Cold start on Linux: each sample on the default JVM, a tuned JVM and the Codename One native build" loading="lazy" style="width:100%;height:auto" /><figcaption>Cold start on Linux.</figcaption></figure>
 {{< /guide-block >}}
 
 On Linux, warm start-up is faster than the default JVM in all 8 apps, by 1.4x to 6.0x. Against a JVM tuned with the serial GC, C1 only and an AppCDS archive, the native build is faster in 7 of 8, by up to 4.1x. The falling blocks game is the exception: 74 ms native against 70 ms tuned. The JavaFX gallery starts in 100 ms native against 603 ms on the default JVM. The same apps build for iOS at 25 to 29 MB and as 2.8 to 4.4 MB Android APKs.
 
-Memory is closer than you might expect. At idle the native Swing gallery uses 64.5 MB against 84.2 MB on a tuned JVM. After a scripted session of clicks and drags, though, it's 81.8 MB against 80.5 MB. The tuned JVM wins that one by a hair, and I'd rather tell you than have you find it.
+Memory is closer than you might expect. At idle the native Swing gallery uses 64.5 MB against 84.2 MB on a tuned JVM. After a scripted session of clicks and drags, though, it's 81.8 MB against 80.5 MB.
 
 ## What isn't supported
 
@@ -117,14 +118,16 @@ The same goes for JSON and XML mapping, REST and GraphQL clients and the SQLite 
 
 ## What desktop Java never gave you
 
-Once the app is a Codename One app, it can use everything Codename One has, mixed into the same screens:
+Desktop Java was built for a desk. It never had a camera API, never knew where it was, and treated a phone as somebody else's problem. Once your app is a Codename One app, all of that is a method call away, mixed into the same screens as your Swing panels and JavaFX scenes:
 
-- **A real browser component** with two way calls between Java and JavaScript.
-- **Camera, barcode scanning, Bluetooth LE, NFC, location and push.**
-- **REST, GraphQL and WebSocket clients** generated from annotations.
-- **SQLite with an ORM** whose mapping mistakes fail the build.
-- **CSS styling**, light and dark themes, and live reload in the simulator.
-- **A Java backend** in the same project, sharing your types.
+- **Camera and media.** [`Capture`](/developer-guide/miscellaneous-features/#_capture_photos_video_audio) takes photos, video and audio, and [`CodeScanner`](/developer-guide/ai-and-speech/#_scanning_a_barcode_or_qr_code) reads barcodes and QR codes. An inventory screen that used to need a USB scanner now uses the phone in the warehouse worker's pocket.
+- **Bluetooth and NFC.** The [Bluetooth API](/developer-guide/bluetooth/) covers BLE as central and peripheral, plus L2CAP and classic RFCOMM, and [NFC](/developer-guide/near-field-communication/) reads and writes tags. That's the device on the factory floor your desktop tool could only reach through a serial port.
+- **Location.** [`LocationManager`](/developer-guide/miscellaneous-features/#_location_gps) with [geofencing in the background](/developer-guide/miscellaneous-features/#_location_in_the_background_geofencing), so a field service app knows when the technician arrived.
+- **Push, biometrics and sign in.** [Push notifications](/developer-guide/push-notifications/), [Face ID and fingerprint](/developer-guide/biometric-authentication/), and [OAuth, Google and Sign in with Apple](/developer-guide/authentication-and-identity/), without a hand rolled browser redirect.
+- **Generated network clients.** Point [`cn1:generate-openapi`](/developer-guide/maven-appendix-goals/#_generate_openapi_client_generate_openapi) at an OpenAPI 3 spec and you get a typed client. GraphQL and gRPC have goals of their own, and REST and WebSocket clients are generated from annotations.
+- **In app purchase.** [`Purchase`](/developer-guide/monetization/) handles store billing on both phones, if the internal tool turns into a product.
+- **SQLite with an ORM** whose mapping mistakes fail the build, **CSS styling** with light and dark themes and live reload, and **a Java backend** in the same project, sharing your types.
+- **A real browser component** with two way calls between Java and JavaScript, for the parts of the app that are already a web page.
 
 `SwingInterop.asComponent()` and `FxInterop.asComponent()` wrap a Swing component or a JavaFX node as a Codename One component, so you can migrate one panel at a time and put a Codename One map or camera view next to your existing table.
 

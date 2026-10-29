@@ -46,7 +46,7 @@ Today is the Flutter story and the numbers behind it. Then one post a day:
 - **Sunday, November 1:** {{< post-link path="/blog/swing-and-javafx-on-phones" text="Your Swing and JavaFX Code on iPhone, Android and the Web" >}}. What carries over, what doesn't, and why you might not miss the parts that don't.
 - **Monday, November 2:** {{< post-link path="/blog/bastion-hardened-bank-template" text="Bastion: A Hardened Bank Template, and Crypto Wallets in Core" >}}. A virtual bank and exchange with passkeys, signed requests and a double entry ledger, plus wallets for Ethereum, Bitcoin, and Solana.
 - **Tuesday, November 3:** {{< post-link path="/blog/reel-streaming-and-courses-template" text="Reel: Your Own Streaming Service or Course Platform" >}}. Community uploads, courses, DRM and moderation in one Java project.
-- **Wednesday, November 4:** {{< post-link path="/blog/android-apps-everywhere-even-without-google" text="Your Android App on iPhone, and on GrapheneOS, LineageOS and /e/OS" >}}. Room, WorkManager and document pickers in the Android layer, and apps that run on GrapheneOS as they are.
+- **Wednesday, November 4:** {{< post-link path="/blog/android-apps-everywhere-even-without-google" text="GrapheneOS, LineageOS, /e/OS and Others Are Now Officially Supported" >}}. Room, WorkManager and document pickers in the Android layer, and apps that run on GrapheneOS as they are.
 - **Thursday, November 5:** {{< post-link path="/blog/backend-caches-certificates-and-a-simulator-that-types" text="Caches, Certificates, Streaming Uploads and a Simulator That Types" >}}. Eight backend upgrades and a simulator with a virtual keyboard and video recording.
 
 {{< guide-block >}}
@@ -171,9 +171,9 @@ None of these fixes are specific to Flutter. If you write Codename One apps in p
 
 ## More This Week
 
-### Kotlin Multiplatform, from a fan
+### Your Compose code, on more screens
 
-If Codename One didn't exist, Kotlin Multiplatform is probably what I'd pick. Early on it leaned on heavyweight native widgets, much like React Native, and the team learned from that. Compose Multiplatform today is fast and well designed. Ours runs the same Compose code on more targets, used about a quarter of the CPU per frame on our benchmark screen, and lets you drop to Java where it counts.
+Kotlin Multiplatform is a good platform, and Compose Multiplatform is well built. Codename One now runs the same Compose code on more targets, used about a quarter of the CPU per frame on our benchmark screen, and lets you drop to Java where it counts.
 
 {{< guide-block >}}
 <figure style="margin:24px 0"><a href="/developer-guide/img/kmp-keynote-schedule.png"><img width="1024" height="907" src="/developer-guide/img/kmp-keynote-schedule.png" alt="The same Compose schedule screen rendered by Compose Multiplatform and by Codename One" loading="lazy" style="width:100%;height:auto;max-width:640px;display:block;margin:0 auto" /></a><figcaption>The same Compose screen: Compose Multiplatform on the left, Codename One on the right.</figcaption></figure>
@@ -218,7 +218,7 @@ A large share of our users are banks and financial institutions. **Bastion** is 
 {{< guide-block >}}
 <div class="release-screenshots" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,140px),1fr));gap:16px;align-items:start;margin:24px 0">
 <figure style="margin:0"><img width="420" height="860" src="/developer-guide/img/bastion-dashboard.png" alt="The Bastion dashboard" loading="lazy" style="width:100%;height:auto" /><figcaption>Four currencies.</figcaption></figure>
-<figure style="margin:0"><img width="420" height="860" src="/developer-guide/img/bastion-exchange.png" alt="The Bastion exchange" loading="lazy" style="width:100%;height:auto" /><figcaption>The exchange.</figcaption></figure>
+<figure style="margin:0"><img width="420" height="860" src="/developer-guide/img/bastion-order-book.png" alt="The BTC/USD market with candles and the order book" loading="lazy" style="width:100%;height:auto" /><figcaption>The BTC/USD market.</figcaption></figure>
 <figure style="margin:0"><img width="420" height="860" src="/developer-guide/img/bastion-security-center.png" alt="The Bastion Security Center" loading="lazy" style="width:100%;height:auto" /><figcaption>The Security Center.</figcaption></figure>
 </div>
 {{< /guide-block >}}
@@ -251,7 +251,7 @@ Tuesday's {{< post-link path="/blog/reel-streaming-and-courses-template" text="R
 
 ### Android code everywhere, including GrapheneOS
 
-The Android compatibility layer now covers Room, WorkManager, location, sensors, foreground services and the document picker intents, all running on iOS too. And Codename One apps now run on GrapheneOS, LineageOS, CalyxOS and /e/OS out of the box: one APK checks for Play Services at run time, and push works through UnifiedPush.
+The Android compatibility layer now covers Room, WorkManager, location, sensors, foreground services and the document picker intents, all running on iOS too. And GrapheneOS, LineageOS, CalyxOS and /e/OS are now officially supported, with a boundary CI verifies: one APK checks for Play Services at run time, and push works through UnifiedPush.
 
 {{< guide-block >}}
 <div class="release-screenshots" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:16px;align-items:start;margin:24px 0">
@@ -276,6 +276,6 @@ Last week I made the case that [a Java word processor beats its Rust twin](/blog
 
 Instead of coding to an operating system, you code to Codename One, and Codename One becomes the operating system. The usual price for that kind of abstraction is performance. We don't charge it. You get more performance, more features, more compatibility and more platforms, and it's free and open source.
 
-If you have a Flutter app, run the import on a copy and build it for the simulator. Tell me which screen breaks first; that's the most useful bug report I can get right now. If you're on Kotlin, Swing, JavaFX or Android, the rest of this week is for you. And if you think a number above is wrong, the benchmark is in the repository. Rerun it and open an issue.
+If you have a Flutter app, run the import on a copy and build it for the simulator. Tell us which screen breaks first; that's the most useful bug report we can get right now. If you're on Kotlin, Swing, JavaFX or Android, the rest of this week is for you. And if you think a number above is wrong, the benchmark is in the repository. Rerun it and open an issue.
 
 {{< giscus >}}
