@@ -53,8 +53,11 @@ final class PythonExtensionStubs {
     static final String INDEX = "cn1-native-modules.properties";
     static final String PACKAGE = "com.codename1.python.ext";
 
+    // Possessive: the module part may be empty, so with greedy quantifiers the
+    // two blank runs around it could split a long run of blanks every way
+    // there is, which is quadratic on a hostile line.
     private static final Pattern FROM = Pattern.compile(
-            "^([ \\t]*)from[ \\t]+(\\.*)([\\w.]*)[ \\t]+import[ \\t]+\\(?([^#)\\n]*)", Pattern.MULTILINE);
+            "^([ \\t]*+)from[ \\t]++(\\.*+)([\\w.]*+)[ \\t]+import[ \\t]+\\(?([^#)\\n]*)", Pattern.MULTILINE);
     private static final Pattern IMPORT = Pattern.compile(
             "^([ \\t]*)import[ \\t]+([\\w.]+)(?:[ \\t]+as[ \\t]+(\\w+))?", Pattern.MULTILINE);
 
@@ -203,7 +206,7 @@ final class PythonExtensionStubs {
 
     /// The start offset and indent of every import of `module` in `text`,
     /// adding the names taken from it to `names` when that is given.
-    private static java.util.List<int[]> imports(String text, String pkg, String module, TreeSet<String> names) {
+    static java.util.List<int[]> imports(String text, String pkg, String module, TreeSet<String> names) {
         java.util.List<int[]> at = new java.util.ArrayList<int[]>();
         String leaf = module.substring(module.lastIndexOf('.') + 1);
         Matcher m = FROM.matcher(text);

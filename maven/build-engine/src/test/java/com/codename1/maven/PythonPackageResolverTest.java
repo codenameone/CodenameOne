@@ -220,4 +220,40 @@ public class PythonPackageResolverTest {
                         "[project]\nname = \"x\"\ndependencies = [\"requests[socks]>=2\", 'attrs']\n",
                         "# c\nnumpy==2.1  # pinned\n-r other.txt\n"));
     }
+
+    /// A tar header's size is untrusted: one claiming more bytes than the
+    /// archive holds is refused, not truncated into a negative cast.
+    @Test
+    public void aTarEntryLargerThanTheArchiveIsRefused() throws Exception {
+        byte[] header = new byte[512];
+        byte[] name = "pkg/big.py".getBytes(StandardCharsets.US_ASCII);
+        System.arraycopy(name, 0, header, 0, name.length);
+        byte[] size = "77777777777\0".getBytes(StandardCharsets.US_ASCII);
+        System.arraycopy(size, 0, header, 124, size.length);
+        header[156] = '0';
+        byte[] tar = new byte[2048];
+        System.arraycopy(header, 0, tar, 0, 512);
+        ByteArrayOutputStream gz = new ByteArrayOutputStream();
+        try (java.util.zip.GZIPOutputStream out = new java.util.zip.GZIPOutputStream(gz)) {
+            out.write(tar);
+        }
+        try {
+            PythonPackageResolver.untar(gz.toByteArray());
+            fail("an oversized entry was accepted");
+        } catch (IOException expected) {
+            assertTrue(expected.getMessage(), expected.getMessage().contains("Corrupt sdist archive"));
+        }
+    }
+
+    /// `from` followed by a long run of blanks and no module must not
+    /// backtrack quadratically through the import pattern.
+    @Test(timeout = 5000)
+    public void aLongBlankRunAfterFromIsLinear() {
+        StringBuilder line = new StringBuilder("from");
+        for (int i = 0; i < 200000; i++) {
+            line.append('\t');
+        }
+        line.append("x\nfrom ._core import fast_sum\n");
+        assertEquals(1, PythonExtensionStubs.imports(line.toString(), "fastlib", "fastlib._core", null).size());
+    }
 }

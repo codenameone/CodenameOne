@@ -475,7 +475,7 @@ public final class PythonPackageResolver {
     }
 
     /// A ustar/pax reader: enough for source distributions.
-    private static Map<String, byte[]> untar(byte[] archive) throws IOException {
+    static Map<String, byte[]> untar(byte[] archive) throws IOException {
         Map<String, byte[]> out = new TreeMap<String, byte[]>();
         byte[] tar;
         try (InputStream in = new GZIPInputStream(new ByteArrayInputStream(archive))) {
@@ -492,8 +492,15 @@ public final class PythonPackageResolver {
             long size = Long.parseLong(field(tar, pos + 124, 12).trim().isEmpty() ? "0" : field(tar, pos + 124, 12).trim(), 8);
             char type = (char) tar[pos + 156];
             int data = pos + 512;
+            // The header's size is the archive's word, not ours: an entry that
+            // claims more than is left would truncate the casts below.
+            if (size < 0 || size > tar.length - data) {
+                throw new IOException("Corrupt sdist archive: an entry claims " + size
+                        + " bytes with " + (tar.length - data) + " left");
+            }
+            int len = (int) size;
             if (type == 'x' || type == 'L') {
-                String body = new String(tar, data, (int) size, StandardCharsets.UTF_8);
+                String body = new String(tar, data, len, StandardCharsets.UTF_8);
                 if (type == 'L') {
                     longName = body.trim();
                 } else {
@@ -508,14 +515,14 @@ public final class PythonPackageResolver {
                 String full = longName != null ? longName : prefix.isEmpty() ? name : prefix + "/" + name;
                 longName = null;
                 if (safe(full)) {
-                    byte[] b = new byte[(int) size];
-                    System.arraycopy(tar, data, b, 0, (int) size);
+                    byte[] b = new byte[len];
+                    System.arraycopy(tar, data, b, 0, len);
                     out.put(full, b);
                 }
             } else {
                 longName = null;
             }
-            pos = data + (int) ((size + 511) / 512 * 512);
+            pos = data + (len + 511) / 512 * 512;
         }
         return out;
     }
