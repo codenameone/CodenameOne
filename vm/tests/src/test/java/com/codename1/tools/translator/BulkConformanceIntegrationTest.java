@@ -157,7 +157,19 @@ class BulkConformanceIntegrationTest {
             }
         }
         Path outputDir = Files.createDirectories(work.resolve("output"));
-        CleanTargetIntegrationTest.runTranslator(classesDir, outputDir, "BulkApp");
+        // CryptoChecks compares the native crypto kernels with the Java engine, so
+        // this translation links them, as a builder does for an application using them.
+        String originalKernels = System.getProperty("cn1.cryptoKernels");
+        System.setProperty("cn1.cryptoKernels", "true");
+        try {
+            CleanTargetIntegrationTest.runTranslator(classesDir, outputDir, "BulkApp");
+        } finally {
+            if (originalKernels == null) {
+                System.clearProperty("cn1.cryptoKernels");
+            } else {
+                System.setProperty("cn1.cryptoKernels", originalKernels);
+            }
+        }
         Path distDir = outputDir.resolve("dist");
         Path cmakeLists = distDir.resolve("CMakeLists.txt");
         assertTrue(Files.exists(cmakeLists), "Translator should emit a CMake project");
@@ -304,15 +316,94 @@ class BulkConformanceIntegrationTest {
 
     /// Core classes compiled into the bulk program, from `CodenameOne/src`
     /// itself: the pure-Java digests a built application's host answers
-    /// `MessageDigest` with, so the program digests through the same code an
-    /// application does rather than through a copy. All are
+    /// `MessageDigest` with, and the `com.codename1.crypto` stack over them, so
+    /// the program runs the same code an application does rather than a copy. All are
     /// `@SharedWithBackend`, i.e. depend on the JDK subset alone. Each is in
     /// the `paths` of `.github/workflows/parparvm-tests.yml`.
     static final String[] CORE_SOURCES = {
         "com/codename1/impl/SharedWithBackend.java",
+        "com/codename1/io/CharArrayReader.java",
+        "com/codename1/io/JSONParseCallback.java",
+        "com/codename1/io/JSONParser.java",
+        "com/codename1/io/PrettyPrinter.java",
+        "com/codename1/io/JSONSanitizer.java",
+        "com/codename1/crypto/UInt256.java",
+        "com/codename1/util/BigInteger.java",
+        "com/codename1/util/MathUtil.java",
+        "com/codename1/util/TBigInteger.java",
+        "com/codename1/util/TBitLevel.java",
+        "com/codename1/util/TConversion.java",
+        "com/codename1/util/TDivision.java",
+        "com/codename1/util/TElementary.java",
+        "com/codename1/util/TLogical.java",
+        "com/codename1/util/TMultiplication.java",
+        "com/codename1/util/TPrimality.java",
+        "com/codename1/crypto/bitcoin/BitcoinAddress.java",
+        "com/codename1/crypto/bitcoin/BitcoinKey.java",
+        "com/codename1/crypto/bitcoin/BitcoinNetwork.java",
+        "com/codename1/crypto/bitcoin/BitcoinTransaction.java",
+        "com/codename1/crypto/bitcoin/Der.java",
+        "com/codename1/crypto/bitcoin/Psbt.java",
+        "com/codename1/crypto/bitcoin/Script.java",
+        "com/codename1/crypto/bitcoin/Taproot.java",
+        "com/codename1/crypto/bitcoin/Wif.java",
+        "com/codename1/crypto/bitcoin/Wire.java",
+        "com/codename1/crypto/encoding/Base58.java",
+        "com/codename1/crypto/encoding/Base58Check.java",
+        "com/codename1/crypto/encoding/Bech32.java",
+        "com/codename1/crypto/encoding/Rlp.java",
+        "com/codename1/crypto/evm/Abi.java",
+        "com/codename1/crypto/evm/Erc20.java",
+        "com/codename1/crypto/evm/EvmAddress.java",
+        "com/codename1/crypto/evm/EvmTransaction.java",
+        "com/codename1/crypto/evm/PersonalSign.java",
+        "com/codename1/crypto/evm/TypedData.java",
+        "com/codename1/crypto/hd/Bip32.java",
+        "com/codename1/crypto/hd/Bip39English.java",
+        "com/codename1/crypto/hd/DerivationPath.java",
+        "com/codename1/crypto/hd/Mnemonic.java",
+        "com/codename1/crypto/hd/Slip10.java",
+        "com/codename1/crypto/market/CachingPriceFeed.java",
+        "com/codename1/crypto/market/CoinGeckoFeed.java",
+        "com/codename1/crypto/market/JsonPriceFeed.java",
+        "com/codename1/crypto/market/PriceFeed.java",
+        "com/codename1/crypto/market/PriceFeeds.java",
+        "com/codename1/crypto/market/Quote.java",
+        "com/codename1/crypto/rpc/EsploraClient.java",
+        "com/codename1/crypto/rpc/EvmRpc.java",
+        "com/codename1/crypto/rpc/JsonRpc.java",
+        "com/codename1/crypto/rpc/RpcException.java",
+        "com/codename1/crypto/rpc/RpcTransport.java",
+        "com/codename1/crypto/rpc/SolanaRpc.java",
+        "com/codename1/crypto/solana/AccountMeta.java",
+        "com/codename1/crypto/solana/ComputeBudget.java",
+        "com/codename1/crypto/solana/Instruction.java",
+        "com/codename1/crypto/solana/ShortVec.java",
+        "com/codename1/crypto/solana/SolanaAddress.java",
+        "com/codename1/crypto/solana/SolanaMessage.java",
+        "com/codename1/crypto/solana/SolanaTransaction.java",
+        "com/codename1/crypto/solana/SystemProgram.java",
+        "com/codename1/crypto/solana/TokenProgram.java",
+        "com/codename1/crypto/wallet/SeedSigner.java",
+        "com/codename1/crypto/wallet/Signer.java",
+        "com/codename1/crypto/wallet/Wallet.java",
+        "com/codename1/security/Base32.java",
+        "com/codename1/security/CryptoBatch.java",
+        "com/codename1/security/CryptoEngine.java",
         "com/codename1/security/CryptoException.java",
-        "com/codename1/security/MessageDigestImpl.java",
+        "com/codename1/security/Ed25519.java",
+        "com/codename1/security/Ed25519Math.java",
         "com/codename1/security/Hash.java",
+        "com/codename1/security/Hkdf.java",
+        "com/codename1/security/Hmac.java",
+        "com/codename1/security/MessageDigestImpl.java",
+        "com/codename1/security/NativeCryptoEngine.java",
+        "com/codename1/security/NativeCryptoKernels.java",
+        "com/codename1/security/Otp.java",
+        "com/codename1/security/Pbkdf2.java",
+        "com/codename1/security/Schnorr.java",
+        "com/codename1/security/Secp256k1.java",
+        "com/codename1/security/Secp256k1Math.java",
     };
 
     /// `CodenameOne/src`: `-Dbulk.repo` names the checkout, otherwise it is

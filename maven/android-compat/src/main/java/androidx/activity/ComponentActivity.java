@@ -265,7 +265,8 @@ public class ComponentActivity extends Activity
                 String[] permissions = intent.getStringArrayExtra(
                         ActivityResultContracts.RequestMultiplePermissions.EXTRA_PERMISSIONS);
                 requestPermissions(permissions == null ? new String[0] : permissions, requestCode);
-            } else if (Intent.ACTION_GET_CONTENT.equals(action)) {
+            } else if (Intent.ACTION_GET_CONTENT.equals(action)
+                    && !com.codename1.androidcompat.runtime.DocumentIntents.handles(intent)) {
                 pickContent(requestCode, intent.getType());
             } else {
                 startActivityForResult(intent, requestCode);

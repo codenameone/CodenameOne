@@ -153,6 +153,13 @@
       "tests": ["DesktopCompatSwingControlsScreenshotTest","DesktopCompatSwingTablesScreenshotTest","DesktopCompatSwingTreesScreenshotTest","DesktopCompatSwingPaintingScreenshotTest","DesktopCompatSwingContainersScreenshotTest","DesktopCompatSwingOptionPaneScreenshotTest","DesktopCompatSwingXScreenshotTest","DesktopCompatFxControlsScreenshotTest","DesktopCompatFxDataScreenshotTest","DesktopCompatFxShapesScreenshotTest","DesktopCompatFxFxmlScreenshotTest","DesktopCompatFxPanesScreenshotTest","DesktopCompatFxAlertScreenshotTest"]
     },
     {
+      "id": "kmp-compose-compatibility",
+      "category": "Application runtime",
+      "name": "Kotlin Multiplatform and Compose applications (androidx.compose.*)",
+      "description": "Runs Compose Multiplatform code from a Kotlin Multiplatform commonMain -- Box, Row and Column with modifiers, the Material 3 type scale, buttons, cards, Scaffold with a top app bar over a LazyColumn, state, effects and AnimatedVisibility -- on the unmodified Compose runtime, with every node a Codename One component, embedded in a Codename One form.",
+      "tests": ["KmpCompatLayoutScreenshotTest","KmpCompatTypographyScreenshotTest","KmpCompatListScreenshotTest","KmpCompatStateScreenshotTest"]
+    },
+    {
       "id": "ads",
       "category": "Application runtime",
       "name": "Advertising components",
@@ -1695,6 +1702,22 @@
     {
       "pattern": "DesktopCompatFxAlert",
       "test": "DesktopCompatFxAlertScreenshotTest"
+    },
+    {
+      "pattern": "KmpCompatLayout",
+      "test": "KmpCompatLayoutScreenshotTest"
+    },
+    {
+      "pattern": "KmpCompatTypography",
+      "test": "KmpCompatTypographyScreenshotTest"
+    },
+    {
+      "pattern": "KmpCompatList",
+      "test": "KmpCompatListScreenshotTest"
+    },
+    {
+      "pattern": "KmpCompatState",
+      "test": "KmpCompatStateScreenshotTest"
     }
   ]
 }

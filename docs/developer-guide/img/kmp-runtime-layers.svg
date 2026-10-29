@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="430" viewBox="0 0 880 430">
+  <rect x="0" y="0" width="880" height="430" fill="#ffffff"/>
+  <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#555555"/></marker></defs>
+  <text x="440.0" y="24" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#222222">How a composable becomes Codename One components</text>
+  <text x="440.0" y="43" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">Only the UI layer is replaced. Composition, state and coroutines are the real libraries,</text>
+  <text x="440.0" y="57" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">and every node they emit is a Codename One container that the port draws natively.</text>
+  <rect x="40" y="80" width="560" height="52" rx="4" fill="#f4f7fb" stroke="#4a6fa5" stroke-width="1.5"/>
+  <text x="320.0" y="102.5" font-family="Arial, sans-serif" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#4a6fa5">Your composables</text>
+  <text x="320.0" y="117.5" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#444444">Scaffold { LazyColumn { items(sessions) { Card { ... } } } }</text>
+  <line x1="320" y1="132" x2="320" y2="146" stroke="#555555" stroke-width="1.4" marker-end="url(#a)"/>
+  <rect x="40" y="146" width="560" height="52" rx="4" fill="#f4f7fb" stroke="#4a6fa5" stroke-width="1.5"/>
+  <text x="320.0" y="168.5" font-family="Arial, sans-serif" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#4a6fa5">Compose runtime (unmodified)</text>
+  <text x="320.0" y="183.5" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#444444">Composer, slot table, snapshots, Recomposer, remember, LaunchedEffect</text>
+  <line x1="320" y1="198" x2="320" y2="212" stroke="#555555" stroke-width="1.4" marker-end="url(#a)"/>
+  <rect x="40" y="212" width="560" height="52" rx="4" fill="#fbf4ec" stroke="#b5651d" stroke-width="1.5"/>
+  <text x="320.0" y="234.5" font-family="Arial, sans-serif" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#b5651d">compose-compat (Codename One)</text>
+  <text x="320.0" y="249.5" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#444444">Modifier chains, Box/Row/Column/Lazy policies, Text, material3, animation</text>
+  <line x1="320" y1="264" x2="320" y2="278" stroke="#555555" stroke-width="1.4" marker-end="url(#a)"/>
+  <rect x="40" y="278" width="560" height="52" rx="4" fill="#f2f8f3" stroke="#3c8a4e" stroke-width="1.5"/>
+  <text x="320.0" y="300.5" font-family="Arial, sans-serif" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#3c8a4e">Codename One core</text>
+  <text x="320.0" y="315.5" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#444444">UiNode is a Container: Graphics, fonts, text fields, scrolling, accessibility</text>
+  <line x1="320" y1="330" x2="320" y2="344" stroke="#555555" stroke-width="1.4" marker-end="url(#a)"/>
+  <rect x="40" y="344" width="560" height="52" rx="4" fill="#f6f6f6" stroke="#666666" stroke-width="1.5"/>
+  <text x="320.0" y="366.5" font-family="Arial, sans-serif" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#666666">Port</text>
+  <text x="320.0" y="381.5" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#444444">iOS (UIKit + Metal), Android, JavaScript, desktop, watch, TV</text>
+  <rect x="630" y="80" width="220" height="118" rx="4" fill="#fbf4ec" stroke="#b5651d" stroke-width="1.5"/>
+  <text x="740.0" y="113.0" font-family="Arial, sans-serif" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#b5651d">ComposeHost</text>
+  <text x="740.0" y="128.0" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#444444">runs the Recomposer</text>
+  <text x="740.0" y="143.0" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#444444">BroadcastFrameClock fed by</text>
+  <text x="740.0" y="158.0" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#444444">Form.registerAnimated</text>
+  <text x="740.0" y="173.0" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#444444">= one frame per CN1 animation tick</text>
+  <rect x="630" y="212" width="220" height="64" rx="4" fill="#f2f8f3" stroke="#3c8a4e" stroke-width="1.5"/>
+  <text x="740.0" y="233.0" font-family="Arial, sans-serif" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#3c8a4e">Dispatchers.Main</text>
+  <text x="740.0" y="248.0" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#444444">the EDT, found through a</text>
+  <text x="740.0" y="263.0" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#444444">build-time service registry</text>
+  <rect x="630" y="290" width="220" height="78" rx="4" fill="#f6f6f6" stroke="#666666" stroke-width="1.5"/>
+  <text x="740.0" y="310.5" font-family="Arial, sans-serif" font-size="10.5" font-weight="bold" text-anchor="middle" fill="#666666">Measuring</text>
+  <text x="740.0" y="325.5" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#444444">Compose constraints, outermost</text>
+  <text x="740.0" y="340.5" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#444444">modifier first; CN1 layout only</text>
+  <text x="740.0" y="355.5" font-family="Arial, sans-serif" font-size="9.5" text-anchor="middle" fill="#444444">copies the result out</text>
+  <line x1="628" y1="139" x2="602" y2="175" stroke="#555555" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#a)"/>
+  <line x1="628" y1="244" x2="602" y2="175" stroke="#555555" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#a)"/>
+  <line x1="628" y1="329" x2="602" y2="241" stroke="#555555" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#a)"/>
+</svg>

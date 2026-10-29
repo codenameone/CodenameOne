@@ -1321,6 +1321,66 @@ Traps that have already cost a fix:
   port turns Space and Enter into the same key code, and drops every
   Ctrl/Alt/Meta combination before the form sees it.
 
+### Kotlin Multiplatform: Compose code as a Codename One app
+
+A KMP module's `commonMain` (and its JVM source set, minus the file that opens a
+desktop window) dropped into `common/src/main/kmp` -- or imported with
+`cn1:import-kmp-project` (`KmpProjectImporter`) -- builds as a Codename One
+application. There is no transpiler: kotlinc compiles it for the JVM, with the
+Compose compiler plugin, and ParparVM translates the classes like any others.
+
+- **The Compose runtime and `kotlinx.coroutines` ship as they are.** Only the
+  UI layer is ours: `maven/compose-compat` is `androidx.compose.{ui,foundation,
+  material3,animation}` written over Codename One components and `Graphics`,
+  authored under the real names. `androidx/compose/` is **never relocated**
+  (`Relocation.isCompose`), not even when the Android layer is active: the
+  runtime the application was compiled against is the one it runs.
+- **Measuring is Compose's, not Codename One's.** `UiNode` is a `Container`
+  whose layout walks the modifier chain outermost first under Compose
+  constraints (`BoxPolicy`, `LinearPolicy`, `LeafPolicy`); the Codename One
+  layout pass only copies the result out. `ComposeHost` runs the `Recomposer`
+  with a `BroadcastFrameClock` fed by `Form.registerAnimated`.
+- **`Dispatchers.Main` is the EDT**, found by kotlinx.coroutines through
+  `META-INF/services/kotlinx.coroutines.internal.MainDispatcherFactory`
+  (`EdtDispatcherFactory`). The translator compiles that file into a registry;
+  there is no service loader on the device.
+- **JVM 11, not 8.** The Compose runtime's inline functions are JVM 11
+  bytecode, so the archetype's `compose` profile (active when `src/main/kmp`
+  exists) sets kotlinc's `jvmTarget` and javac's source/target to 11. The
+  compiler plugin version must equal the Kotlin version.
+- **Gradle**: the plugin adds compose-compat and the kmp source roots, and
+  refuses the build, naming the line to add, unless
+  `org.jetbrains.kotlin.plugin.compose` is applied; `convert-to-gradle` writes
+  it. The settings plugin adds Google's repository, limited to `androidx.*`.
+
+Traps that have already cost a fix:
+
+- **The runtime's own dependencies are in Gradle metadata only.**
+  `runtime-desktop`'s pom does not name `androidx.collection`, so Maven
+  resolved the runtime without it, every JVM test passed, and the Xcode build
+  failed on a missing `androidx_collection_ScatterSet.h`. compose-compat
+  declares them itself.
+- **A public inline function cannot call internal code**, and the Compose
+  layer's internals are internal: `Box`, `Row` and `Column` are not inline
+  here, as they are upstream.
+- **Tests need JDK 17** (class version 55); on JDK 8 the module builds and
+  the `jdk8-no-tests` profile skips them. SpotBugs still runs on the JDK 8 leg.
+- **`--` ends an XML comment.** A `spotbugs-exclude.xml` with one in a comment
+  is rejected without an error, and every finding comes back.
+- **`LazyColumn`/`LazyRow` compose only what is in view** (`LazyListNode`):
+  every item is a composition of its own under the list's, made within a
+  quarter view of the window and disposed of half a view past it. Sizes of
+  items never measured are estimated from the average, and every pass anchors
+  on the first visible item, so learning a size above the view cannot move
+  what is on screen. `scrollToItem` repeats until the target's real position
+  holds. `reverseLayout = true` throws; it is not implemented.
+
+`maven/integration-tests/kmp-compat-test.sh` imports every sample under
+`scripts/kmp-compat-samples`, builds it with Maven and Gradle and stages every
+target's upload (`.github/workflows/kmp-compat.yml`). `scripts/kmp-bench` runs
+the same Compose source against Compose Multiplatform on an iOS simulator; see
+its README for the numbers and what they do not show.
+
 ### Integration Tests
 
 Located in `maven/integration-tests/`:

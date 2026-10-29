@@ -239,6 +239,58 @@ class SafeAreaBottomBarStabilityTest extends UITestBase {
     }
 
     @FormTest
+    void aBarNoLongerAtTheEdgeDropsTheInsetInOneRevalidate() {
+        // Measured at the edge with the inset, then pushed up by a footer: the
+        // first layout applies none, so that same revalidate must re-measure.
+        Form f = build();
+        int content = contentHeight();
+        assertEquals(content + INSET, tabs.getHeight());
+        // Taller than the inset, so the bar clears the unsafe edge entirely.
+        Label footer = new Label("Footer");
+        footer.setPreferredH(INSET * 2);
+        tabs.getParent().add(footer);
+        f.revalidate();
+        assertEquals(content, tabs.getHeight(), "the bar keeps an inset it no longer gets");
+    }
+
+    @FormTest
+    void aBarPartlyOverTheEdgeGetsOnlyTheOverlap() {
+        // A footer shorter than the inset leaves the bar over the unsafe edge
+        // by the difference, and that is all the padding it should take.
+        Form f = build();
+        int content = contentHeight();
+        Label footer = new Label("Footer");
+        footer.setPreferredH(INSET - 8);
+        tabs.getParent().add(footer);
+        f.revalidate();
+        int safeLine = Display.getInstance().getDisplayHeight() - INSET;
+        int overlap = tabs.getAbsoluteY() + tabs.getHeight() - safeLine;
+        assertTrue(overlap > 0 && overlap < INSET, "the bar ends inside the unsafe edge: " + overlap);
+        assertEquals(content + overlap, tabs.getHeight(), "the bar's inset is the part of it over the edge");
+        int settled = tabs.getHeight();
+        f.revalidate();
+        assertEquals(settled, tabs.getHeight(), "and it stays there");
+    }
+
+    @FormTest
+    void aBarTakesANewInsetInOneRevalidate() {
+        // Laid out with no inset, then the display gains one (a rotation, a
+        // safe area reported late): the inset that last layout applied must not
+        // hold the new measurement at zero.
+        Form f = build();
+        int content = contentHeight();
+        int w = Display.getInstance().getDisplayWidth();
+        int h = Display.getInstance().getDisplayHeight();
+        implementation.setDisplaySafeArea(new Rectangle(0, 0, w, h));
+        f.revalidate();
+        f.revalidate();
+        assertEquals(content, tabs.getHeight());
+        implementation.setDisplaySafeArea(new Rectangle(0, TOP_INSET, w, h - TOP_INSET - INSET));
+        f.revalidate();
+        assertEquals(content + INSET, tabs.getHeight(), "the bar gets the new inset in the same revalidate");
+    }
+
+    @FormTest
     void aSafeAreaBarInsideASafeAreaPaneGetsOneInset() {
         Form f = notched();
         Container pane = new Container(new BorderLayout());

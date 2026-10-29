@@ -31,6 +31,8 @@
     <maven.compiler.testSource>17</maven.compiler.testSource>
     <maven.compiler.testTarget>17</maven.compiler.testTarget>
     <kotlin.compiler.jvmTarget>17</kotlin.compiler.jvmTarget>
+    <!-- What the Compose runtime asks for (see the archetype). -->
+    <kotlin.annotations.version>23.0.0</kotlin.annotations.version>
     <cn1app.name>hellocodenameone</cn1app.name>
   </properties>
   <dependencyManagement>
@@ -69,6 +71,13 @@
         <artifactId>codenameone-javafx-compat</artifactId>
         <version>${cn1.version}</version>
         <scope>provided</scope>
+      </dependency>
+      <!-- Compose UI over Codename One, which common/src/main/kmp compiles
+           against. Not provided: it and the Compose runtime ship in the app. -->
+      <dependency>
+        <groupId>com.codenameone</groupId>
+        <artifactId>codenameone-compose-compat</artifactId>
+        <version>${cn1.version}</version>
       </dependency>
       <dependency>
         <groupId>com.codenameone</groupId>

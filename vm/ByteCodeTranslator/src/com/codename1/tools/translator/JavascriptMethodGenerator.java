@@ -1286,6 +1286,18 @@ final class JavascriptMethodGenerator {
         }
         if (cls.isIsInterface()) {
             out.append("  I: 1,\n");
+            // ``D`` marks an interface that declares a default (non-abstract,
+            // non-static) method. JVMS 5.5 initializes such an interface along
+            // with any class implementing it, and the runtime relies on this
+            // flag to do so: the default method's body reads the interface's
+            // own statics without an init guard (see
+            // defaultMethodInterfacesToInit in parparvm_runtime.js).
+            for (BytecodeMethod m : cls.getMethods()) {
+                if (!m.isAbstract() && !m.isStatic() && !m.isEliminated()) {
+                    out.append("  D: 1,\n");
+                    break;
+                }
+            }
         }
         if (cls.isIsAbstract()) {
             out.append("  A: 1,\n");

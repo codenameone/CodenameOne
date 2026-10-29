@@ -1136,17 +1136,8 @@ class CleanTargetIntegrationTest {
         org.junit.jupiter.api.Assumptions.assumeFalse(configs.isEmpty(), "No JDK available to translate with");
         CompilerHelper.CompilerConfig config = configs.get(0);
 
-        // Stage the Kotlin stdlib (the app is Kotlin) into a translator source root.
-        Path kotlinDir = Files.createTempDirectory("winhello-kotlin");
-        Path m2 = Paths.get(System.getProperty("user.home"), ".m2", "repository", "org", "jetbrains", "kotlin");
-        for (String[] ga : new String[][] {
-                { "kotlin-stdlib", "1.6.0" }, { "kotlin-stdlib-jdk7", "1.6.0" }, { "kotlin-stdlib-jdk8", "1.6.0" },
-                { "kotlin-stdlib-common", "1.6.0" }, { "kotlin-annotations-jvm", "1.6.0" } }) {
-            Path jar = m2.resolve(ga[0]).resolve(ga[1]).resolve(ga[0] + "-" + ga[1] + ".jar");
-            if (Files.exists(jar)) {
-                extractJar(jar, kotlinDir);
-            }
-        }
+        // Kotlin's runtime comes with the application's other libraries, in
+        // libraryClasses (translation-libs), at the version it was compiled against.
 
         Parser.cleanup();
         Path sourceDir = Files.createTempDirectory("winhello-sources");
@@ -1156,7 +1147,7 @@ class CleanTargetIntegrationTest {
 
         CompilerHelper.compileJavaAPI(javaApiDir, config);
         String cp = coreClasses + java.io.File.pathSeparator + portClasses
-                + java.io.File.pathSeparator + commonClasses + java.io.File.pathSeparator + kotlinDir
+                + java.io.File.pathSeparator + commonClasses
                 + java.io.File.pathSeparator + libraryClasses;
         List<String> appCompile = new java.util.ArrayList<>(Arrays.asList(
                 "-source", config.targetVersion, "-target", config.targetVersion,
@@ -1176,7 +1167,7 @@ class CleanTargetIntegrationTest {
         }
 
         Path outputDir = Files.createTempDirectory("winhello-out");
-        String sources = classesDir + ";" + commonClasses + ";" + kotlinDir + ";" + coreClasses + ";"
+        String sources = classesDir + ";" + commonClasses + ";" + coreClasses + ";"
                 + portClasses + ";" + javaApiDir + ";" + nativeStage + ";" + libraryClasses;
         // The "windows" app type binds CodenameOneImplementation to its @Concrete
         // win() target (WindowsImplementation) during translation -- no override.
@@ -2047,11 +2038,14 @@ class CleanTargetIntegrationTest {
         // four-core Linux runner a healthy build takes close to 30 minutes, and
         // one was stopped at 5,248 of 5,413 steps; it must not share the
         // ten-minute deadline used to detect a hung test executable either.
+        // The Compose screens added about 1,600 more (the Compose runtime and
+        // kotlinx.coroutines), and a healthy build then ran past 45 minutes at
+        // 7,024 of 7,025 steps.
         // This is a guard against a hang, not a performance budget: the perf
         // gate is what judges speed.
         ProcessBuilder builder = new ProcessBuilder("cmake", "--build", buildDir.toString());
         builder.directory(workingDir.toFile());
-        return runCommand(builder, 45, java.util.concurrent.TimeUnit.MINUTES);
+        return runCommand(builder, 80, java.util.concurrent.TimeUnit.MINUTES);
     }
 
     static String runCommand(List<String> command, Path workingDir) throws Exception {

@@ -682,6 +682,7 @@ public class MacOSNativeBuilder extends Executor {
         // Apple target sets it.
         parparCmd.add("-DconcatenateFiles=true");
         parparCmd.add("-Dcn1.sqlite=" + databaseUsage.usesDatabase());
+        parparCmd.add("-Dcn1.cryptoKernels=" + databaseUsage.usesCryptoKernels());
         parparCmd.add("-Dcn1.sqlcipher=" + databaseUsage.usesDatabaseCipher());
         NativeVerifyOption.addTo(parparCmd, request, "mac");
         parparCmd.add("-jar");

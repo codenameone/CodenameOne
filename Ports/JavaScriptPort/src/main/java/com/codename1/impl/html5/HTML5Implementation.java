@@ -5566,7 +5566,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 String fallback = isAndroid_() ? "/android_holo_light.res" : "/iOS7Theme.res";
                 r = Resources.open(fallback);
             }
-            Hashtable tp = r.getTheme(r.getThemeResourceNames()[0]);
+            HashMap<String, Object> tp = r.getThemeMap(r.getThemeResourceNames()[0]);
 
             // The browser has no OS status bar / notch, so the app must not
             // reserve a status-bar strip at the top of the Form the way iOS
@@ -5593,7 +5593,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             // native menu bar at that moment -- which it does until the HTML chrome exists. Forms
             // without a Toolbar then never published their MenuBar to it.
             installDesktopChromeIfRequested();
-            UIManager.getInstance().setThemeProps(tp);
+            UIManager.getInstance().setThemeMap(tp);
             return;
     	} catch (IOException ex){
             Log.e(ex);
@@ -14637,6 +14637,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
             return true;
         }
         return com.codename1.impl.html5.database.SQLiteNative.exists(databaseName);
+    }
+
+    /// Large signature and hash batches go to the GPU through WebGPU; see [HTML5CryptoEngine].
+    @Override
+    public com.codename1.security.CryptoEngine createCryptoEngine() {
+        return new HTML5CryptoEngine(this);
     }
 
     /// The browser's non-prompting secure store.

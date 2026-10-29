@@ -306,6 +306,16 @@
         <Bug pattern="EQ_DOESNT_OVERRIDE_EQUALS" />
     </Match>
 
+    <!--
+    Same idiom for the crypto RPC transport: NetworkTransport's one-shot
+    ConnectionRequest subclass records the failure and error code of a single
+    blocking call and is never compared or used as a map key.
+    -->
+    <Match>
+        <Class name="com.codename1.crypto.rpc.NetworkTransport$Request" />
+        <Bug pattern="EQ_DOESNT_OVERRIDE_EQUALS" />
+    </Match>
+
     <!-- The class has too many casts like this to go over -->
     <Match>
         <Class name="~com\.codename1\.facebook\.FaceBookAccess.*" />
@@ -366,6 +376,27 @@
     <Match>
         <Class name="com.codename1.ui.util.MutableResource" />
         <Method name="saveL10N" />
+        <Bug pattern="WMI_WRONG_MAP_ITERATOR" />
+    </Match>
+
+    <!-- Theme tables are walked by keySet() on purpose: ParparVM lowers a for-each
+         over an exact HashMap's keySet() to a direct table walk with no iterator,
+         while entrySet() builds an Entry per mapping, 5,000 of them per theme. -->
+    <Match>
+        <Class name="com.codename1.ui.plaf.UIManager" />
+        <Or>
+            <Method name="buildThemeImpl" />
+            <Method name="recordNativeThemeOwnership" />
+        </Or>
+        <Bug pattern="WMI_WRONG_MAP_ITERATOR" />
+    </Match>
+    <Match>
+        <Class name="com.codename1.ui.util.Resources" />
+        <Or>
+            <Method name="getTheme" />
+            <Method name="getThemeMap" />
+            <Method name="loadTheme" />
+        </Or>
         <Bug pattern="WMI_WRONG_MAP_ITERATOR" />
     </Match>
 

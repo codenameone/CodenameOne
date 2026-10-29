@@ -108,6 +108,11 @@ final class AppSupport {
         if (desktopProject) {
             addFramework(project, "compileOnly", version, "codenameone-swing-compat", "codenameone-javafx-compat");
         }
+        // Compose sources (src/main/kmp) compile against compose-compat.
+        if (com.codename1.maven.KmpProjectImporter.isKmpProject(
+                com.codename1.maven.KmpProjectImporter.kmpDir(layout.projectDir()))) {
+            addFramework(project, "implementation", version, com.codename1.maven.KmpProjectImporter.COMPOSE_ARTIFACT);
+        }
         addFramework(project, "testImplementation", version, "codenameone-core", "codenameone-javase");
         Configuration framework = resolvable(project, "cn1Framework", "codenameone-core and java-runtime, for local builds");
         framework.setTransitive(false);
@@ -140,6 +145,14 @@ final class AppSupport {
                     .plus(simulator)
                     .plus(project.getConfigurations().getByName(Cn1libs.configurationName("javase"))));
         });
+        // The JVM targets upload this source set's runtime class path beside the
+        // application's. Resolved on its own it can pick another version of a
+        // library both reach -- the Kotlin plugin gives every source set
+        // kotlin-stdlib, which brings org.jetbrains:annotations 13.0 while the
+        // Compose runtime asks for 23.0.0 -- and the desktop upload then held
+        // both, as duplicate entries. Maven resolves one tree and ships one.
+        project.getConfigurations().getByName(javase.getRuntimeClasspathConfigurationName())
+                .shouldResolveConsistentlyWith(project.getConfigurations().getByName(main.getRuntimeClasspathConfigurationName()));
 
         TaskProvider<TranscodeSvgTask> svg = project.getTasks().register("transcodeSvg", TranscodeSvgTask.class, t -> {
             common(t, project, layout, ext, userProperties);
@@ -379,12 +392,32 @@ final class AppSupport {
         // Kotlin's source set already includes the Java directories (and so
         // src/main/android/java and the generated R classes); the Android
         // module's own kotlin/ directory is added to it here.
+        // Kotlin Multiplatform sources (cn1:import-kmp-project) are Compose
+        // code: they compile against compose-compat (added with the framework,
+        // above), which ships in the application like any library, and need
+        // the Compose compiler plugin,
+        // which only the build script can apply -- it is a Gradle plugin of
+        // Kotlin's, versioned with the Kotlin plugin the project chose.
+        final File kmpDir = com.codename1.maven.KmpProjectImporter.kmpDir(layout.projectDir());
+        if (com.codename1.maven.KmpProjectImporter.isKmpProject(kmpDir)) {
+            project.afterEvaluate(p -> {
+                if (!p.getPluginManager().hasPlugin(com.codename1.maven.KmpProjectImporter.COMPOSE_GRADLE_PLUGIN)) {
+                    throw new org.gradle.api.GradleException(kmpDir + " holds Compose sources, which need the "
+                            + "Compose compiler: add id(\"" + com.codename1.maven.KmpProjectImporter.COMPOSE_GRADLE_PLUGIN
+                            + "\") version \"<your Kotlin version>\" to the plugins block of "
+                            + p.getBuildFile().getName());
+                }
+            });
+        }
         project.getPluginManager().withPlugin("org.jetbrains.kotlin.jvm", kotlin -> {
             Object kotlinSources = ((org.gradle.api.plugins.ExtensionAware) main).getExtensions().findByName("kotlin");
             if (kotlinSources instanceof org.gradle.api.file.SourceDirectorySet) {
                 ((org.gradle.api.file.SourceDirectorySet) kotlinSources).srcDir(new File(androidDir, "kotlin"));
                 ((org.gradle.api.file.SourceDirectorySet) kotlinSources).srcDir(
                         com.codename1.maven.DesktopSources.kotlinDir(desktopDir));
+                for (File d : com.codename1.maven.KmpProjectImporter.kotlinDirs(kmpDir)) {
+                    ((org.gradle.api.file.SourceDirectorySet) kotlinSources).srcDir(d);
+                }
             }
             // Kotlin's classes are relocated after javac rather than right after
             // Kotlin compiles: they are javac's classpath, and Java calling a

@@ -49,4 +49,19 @@ public abstract class ClassLoader extends Object {
         throw new UnsupportedOperationException();
     }
 
+    /// Always empty: nothing on a device can be listed by name the way a class path's
+    /// entries can. Code that discovers services this way (kotlinx.coroutines'
+    /// fast loader) then falls back to [java.util.ServiceLoader], which the translator
+    /// fills from the `META-INF/services` files it was given.
+    public Class<?> loadClass(String name) throws ClassNotFoundException {
+        throw new ClassNotFoundException(name);
+    }
+
+    /// There is no class path to search. Fails rather than answering an empty
+    /// enumeration, so that a service lookup scanning `META-INF/services` falls back to
+    /// [java.util.ServiceLoader], which the translator fills in at build time.
+    public java.util.Enumeration<java.net.URL> getResources(String name) throws java.io.IOException {
+        throw new java.io.IOException("no class path on this platform: " + name);
+    }
+
 }

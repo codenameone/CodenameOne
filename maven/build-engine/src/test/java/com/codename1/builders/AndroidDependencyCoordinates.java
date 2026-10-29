@@ -83,10 +83,13 @@ public final class AndroidDependencyCoordinates {
     static final Map<String, String> NOT_SHIPPED = new LinkedHashMap<String, String>();
 
     static {
+        // GRADLE_PROVIDED_LIBRARIES: a Compose application's copies, declared instead.
+        INJECTED.put("androidx.annotation:annotation", "1.9.1");
         INJECTED.put("androidx.appcompat:appcompat", "1.6.1");
         INJECTED.put("androidx.browser:browser", "1.8.0");
         INJECTED.put("androidx.car.app:app", "1.4.0");
         INJECTED.put("androidx.car.app:app-projected", "1.4.0");
+        INJECTED.put("androidx.collection:collection", "1.5.0");
         INJECTED.put("androidx.concurrent:concurrent-futures", "1.1.0");
         INJECTED.put("androidx.credentials:credentials", "1.3.0");
         INJECTED.put("androidx.credentials:credentials-play-services-auth", "1.3.0");
@@ -117,6 +120,7 @@ public final class AndroidDependencyCoordinates {
         INJECTED.put("com.huawei.hms:push", "6.3.0.302");
         INJECTED.put("com.scottyab:rootbeer-lib", "0.1.2");
         INJECTED.put("org.jetbrains.kotlin:kotlin-stdlib", "1.9.22");
+        INJECTED.put("org.jetbrains.kotlinx:kotlinx-coroutines-core", "1.10.2");
         INJECTED.put("org.unifiedpush.android:connector", "3.3.5");
 
         NOT_SHIPPED.put("com.android.tools.build:gradle", "the Android Gradle plugin");

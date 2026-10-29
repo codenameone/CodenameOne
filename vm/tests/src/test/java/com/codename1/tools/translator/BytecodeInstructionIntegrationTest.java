@@ -1091,7 +1091,7 @@ class BytecodeInstructionIntegrationTest {
                 "ios",
                 sourceDir.toAbsolutePath().toString(),
                 outputDir.toAbsolutePath().toString(),
-                "MyAppIOS", "com.example", "My App", "1.0", "ios", "libc++.tbd"
+                "MyAppIOS", "com.example", "My App", "1.0", "ios", "libc++.tbd;libz.dylib"
         };
 
         ByteCodeTranslator.OutputType originalOutput = ByteCodeTranslator.output;
@@ -1141,7 +1141,7 @@ class BytecodeInstructionIntegrationTest {
             assertFalse(buildPhase(pbxproj, "PBXResourcesBuildPhase").contains("libc++.tbd"),
                     "SDK library stubs must not be copied as application resources");
             assertTrue(buildPhase(pbxproj, "PBXFrameworksBuildPhase").contains("libz.dylib"),
-                    "legacy dylib hints must continue to link");
+                    "a .dylib named in the hints (ios.add_libs) must still link; the translator no longer adds libz itself");
 
             // The assembly file must be typed AND filed as a source. An extension
             // Xcode does not recognise gets `lastKnownFileType = file` and lands in

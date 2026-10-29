@@ -1,0 +1,77 @@
+{
+  "codename_one": {
+    "cold_start_ms": 961,
+    "warm_start_median_ms": 580.0,
+    "starts_ms": [
+      961,
+      621,
+      592,
+      566,
+      568
+    ],
+    "executable_stripped_bytes": 17617384,
+    "bundle_bytes": 19152896,
+    "bundle_without_executable_bytes": 1405874,
+    "footprint_bytes": 49283072,
+    "perf_median_of_runs_us": {
+      "recompose-p95-us": 6173,
+      "scroll-work-p95-us": 6601,
+      "recompose-median-us": 4576,
+      "scroll-frames": 144,
+      "scroll-work-median-us": 4039,
+      "scroll-frame-p95-us": 38122,
+      "scroll-frame-median-us": 35447,
+      "scroll-jank-frames": 0
+    }
+  },
+  "codename_one_java": {
+    "cold_start_ms": 805,
+    "warm_start_median_ms": 572.0,
+    "starts_ms": [
+      805,
+      663,
+      567,
+      573,
+      571
+    ],
+    "executable_stripped_bytes": 9354120,
+    "bundle_bytes": 10731520,
+    "bundle_without_executable_bytes": 1324542,
+    "footprint_bytes": 49283072,
+    "perf_median_of_runs_us": {
+      "recompose-p95-us": 2013,
+      "scroll-work-p95-us": 2677,
+      "recompose-median-us": 1487,
+      "scroll-frames": 144,
+      "scroll-work-median-us": 1759,
+      "scroll-frame-p95-us": 37944,
+      "scroll-frame-median-us": 34789,
+      "scroll-jank-frames": 0
+    }
+  },
+  "compose_multiplatform": {
+    "cold_start_ms": 1008,
+    "warm_start_median_ms": 604.0,
+    "starts_ms": [
+      1008,
+      713,
+      597,
+      603,
+      605
+    ],
+    "executable_stripped_bytes": 24041184,
+    "bundle_bytes": 24051712,
+    "bundle_without_executable_bytes": 2510,
+    "footprint_bytes": 50331648,
+    "perf_median_of_runs_us": {
+      "recompose-p95-us": 23015,
+      "scroll-work-p95-us": 18207,
+      "recompose-median-us": 19238,
+      "scroll-frames": 144,
+      "scroll-work-median-us": 17030,
+      "scroll-frame-p95-us": 34740,
+      "scroll-frame-median-us": 33349,
+      "scroll-jank-frames": 0
+    }
+  }
+}

@@ -833,7 +833,7 @@ public class ResourceEditorApp extends SingleFrameApplication {
         stateMachineBaseSource.append("            String[] themes = res.getThemeResourceNames();\n");
         stateMachineBaseSource.append("            Resources.setGlobalResources(res);\n");
         stateMachineBaseSource.append("            if(themes != null && themes.length > 0) {\n");
-        stateMachineBaseSource.append("                UIManager.getInstance().setThemeProps(res.getTheme(themes[0]));\n");
+        stateMachineBaseSource.append("                UIManager.getInstance().setThemeMap(res.getThemeMap(themes[0]));\n");
         stateMachineBaseSource.append("            }\n");
         stateMachineBaseSource.append("    }\n\n\n");
         stateMachineBaseSource.append("    public StateMachineBase() {\n    instance = this;\n");

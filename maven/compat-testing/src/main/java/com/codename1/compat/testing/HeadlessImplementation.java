@@ -75,6 +75,31 @@ public class HeadlessImplementation extends CodenameOneImplementation {
         gallery = response;
     }
 
+    /// The request and callback of the last `showOpenDialog` call, which the
+    /// headless implementation never answers itself. A test that reads them
+    /// must reset them.
+    public static com.codename1.io.filechooser.OpenFileRequest openRequest;
+    public static com.codename1.util.SuccessCallback<com.codename1.io.filechooser.FileDialogResult> openCallback;
+
+    @Override
+    public void showOpenDialog(com.codename1.io.filechooser.OpenFileRequest request,
+            com.codename1.util.SuccessCallback<com.codename1.io.filechooser.FileDialogResult> callback) {
+        openRequest = request;
+        openCallback = callback;
+    }
+
+    /// The request and callback of the last `showSaveDialog` call, as for
+    /// `#openRequest`.
+    public static com.codename1.io.filechooser.SaveFileRequest saveRequest;
+    public static com.codename1.util.SuccessCallback<com.codename1.io.filechooser.FileDialogResult> saveCallback;
+
+    @Override
+    public void showSaveDialog(com.codename1.io.filechooser.SaveFileRequest request,
+            com.codename1.util.SuccessCallback<com.codename1.io.filechooser.FileDialogResult> callback) {
+        saveRequest = request;
+        saveCallback = callback;
+    }
+
     /// The image encoder `ImageIO.getImageIO()` answers; none by default. A
     /// test that sets it must reset it.
     public static com.codename1.ui.util.ImageIO imageIO;

@@ -649,18 +649,20 @@ class Geometry {
                     n() == 3 ? ShapeUtil.intersectCubic(x[0], y[0], x[1], y[1], x[2], y[2], x[3], y[3], rect.getX(), rect.getY(), rect.getX() + rect.getWidth(), rect.getHeight() + rect.getY()) :
                             n() == 1 ? ShapeUtil.intersectLine(x[0], y[0], x[1], y[1], rect.getX(), rect.getY(), rect.getX() + rect.getWidth(), rect.getY() + rect.getHeight()) :
                                     -1;
-            if (numIntersections == -1) {
+            if (n() < 1 || n() > 3) {
                 throw new IllegalArgumentException("Cannot segment bezier curve of this order: " + n());
             }
 
+            // The intersect functions return a signed crossing count (-1 for a
+            // curve running right to left) or CROSSING, not a number of points,
+            // so only zero is meaningful here.
             if (numIntersections == 0) {
                 out.add(new BezierCurve(this));
                 return;
             }
 
-
-            // To store t values of intersection points
-            double[] tvals = new double[numIntersections];
+            // To store t values of intersection points: up to n() per edge.
+            double[] tvals = new double[4 * n()];
             int nextTvalIndex = 0;
             double[] res = new double[3];
             int numMatches = 0;

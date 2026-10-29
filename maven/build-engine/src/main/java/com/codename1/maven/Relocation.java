@@ -128,6 +128,9 @@ public final class Relocation {
     /// The relocated name when `internalName` falls under this layer's bridge
     /// package or one of its prefixes, else null.
     String relocate(String internalName) {
+        if (isCompose(internalName)) {
+            return null;
+        }
         if (runtimePackage != null && internalName.startsWith(runtimePackage)) {
             return runtimeTarget + internalName.substring(runtimePackage.length());
         }
@@ -143,6 +146,9 @@ public final class Relocation {
     /// part of the API this layer provides. Unlike [#relocate] this leaves the
     /// bridge package out: that one is the layer's own, never an API name.
     boolean owns(String internalName) {
+        if (isCompose(internalName)) {
+            return false;
+        }
         for (String p : prefixes) {
             if (internalName.startsWith(p)) {
                 return true;
@@ -155,12 +161,28 @@ public final class Relocation {
     /// this layer's packages (`javax.swing.`), in an import or anywhere else.
     boolean namedInSource(String source) {
         for (String p : prefixes) {
-            if (source.indexOf(p.replace('/', '.')) >= 0) {
-                return true;
+            String dotted = p.replace('/', '.');
+            int at = source.indexOf(dotted);
+            while (at >= 0) {
+                if (!source.startsWith(COMPOSE_DOTTED, at)) {
+                    return true;
+                }
+                at = source.indexOf(dotted, at + 1);
             }
         }
         return false;
     }
+
+    /// Compose's `androidx.compose` packages belong to the Compose layer, which
+    /// ships them under their own names: the Android layer's `androidx/` prefix
+    /// must neither relocate them nor take an application naming them for an
+    /// Android one.
+    static boolean isCompose(String internalName) {
+        return internalName.startsWith(COMPOSE);
+    }
+
+    static final String COMPOSE = "androidx/compose/";
+    private static final String COMPOSE_DOTTED = "androidx.compose.";
 
     /// The name the application was compiled against, when `relocated` is one
     /// this layer produced from a prefix, else null. Build messages use it:
