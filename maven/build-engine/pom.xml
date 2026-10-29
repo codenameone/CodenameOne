@@ -178,6 +178,12 @@
             <artifactId>httpclient</artifactId>
         </dependency>
         <dependency>
+            <!-- FlutterProjectBuilder: the transpile both build plugins run. -->
+            <groupId>${project.groupId}</groupId>
+            <artifactId>codenameone-dart-transpiler</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
             <groupId>org.ow2.asm</groupId>
             <artifactId>asm</artifactId>
         </dependency>

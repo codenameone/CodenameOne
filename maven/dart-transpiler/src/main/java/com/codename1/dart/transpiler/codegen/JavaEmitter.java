@@ -134,8 +134,34 @@ public final class JavaEmitter {
         return pruned;
     }
 
+    /// The Dart file each generated Java file was emitted from, by its relative path.
+    private final Map<String, String> dartFileOf = new java.util.HashMap<String, String>();
+
     public List<GeneratedFile> emit() {
-        return pruneDynamicCases(emitAll());
+        List<GeneratedFile> pruned = pruneDynamicCases(emitAll());
+        // After the pruning, which drops lines: the table pairs final Java lines.
+        List<GeneratedFile> mapped = new ArrayList<GeneratedFile>(pruned.size());
+        for (GeneratedFile g : pruned) {
+            String dart = g == null ? null : dartFileOf.get(g.relativePath);
+            mapped.add(dart == null ? g : new GeneratedFile(g.relativePath, DartLineTable.apply(g.content, dart)));
+        }
+        return mapped;
+    }
+
+    /// Adds `g` to `out`, remembering the Dart file it came from for its line table.
+    private void addMapped(List<GeneratedFile> out, GeneratedFile g, String dartFile) {
+        out.add(g);
+        if (g != null && dartFile != null) {
+            dartFileOf.put(g.relativePath, dartFile);
+        }
+    }
+
+    /// Writes the line mark ahead of what `n` lowers to (see DartLineTable).
+    private void lineMark(Node n, Ctx ctx) {
+        String mark = n == null ? null : DartLineTable.mark(n.file, n.line);
+        if (mark != null) {
+            ctx.writer().line(mark);
+        }
     }
 
     private List<GeneratedFile> emitAll() {
@@ -151,12 +177,13 @@ public final class JavaEmitter {
         for (Library lib : program.libraries) {
             for (ClassDecl c : lib.classes) {
                 try {
+                    String dart = c.file != null ? c.file : lib.fileName;
                     if (c.extensionOn != null) {
-                        out.add(emitExtension(c));
+                        addMapped(out, emitExtension(c), dart);
                     } else if (c.isMixin) {
-                        out.add(emitMixin(c));
+                        addMapped(out, emitMixin(c), dart);
                     } else {
-                        out.add(emitClass(c));
+                        addMapped(out, emitClass(c), dart);
                     }
                 } catch (RuntimeException | StackOverflowError ex) {
                     emitCrash(lib, "class " + c.name, ex);
@@ -164,14 +191,14 @@ public final class JavaEmitter {
             }
             for (EnumDecl e : lib.enums) {
                 try {
-                    out.add(emitEnum(e));
+                    addMapped(out, emitEnum(e), e.file != null ? e.file : lib.fileName);
                 } catch (RuntimeException | StackOverflowError ex) {
                     emitCrash(lib, "enum " + e.name, ex);
                 }
             }
             if (!lib.functions.isEmpty() || !lib.topLevelVars.isEmpty()) {
                 try {
-                    out.add(emitLibClass(lib));
+                    addMapped(out, emitLibClass(lib), lib.fileName);
                 } catch (RuntimeException | StackOverflowError ex) {
                     emitCrash(lib, "library " + lib.fileName, ex);
                 }
@@ -2421,6 +2448,7 @@ public final class JavaEmitter {
                 ctx.writer().line("return Future.value(null);");
             }
         } else if (m.exprBody != null) {
+            lineMark(m.exprBody, ctx);
             if (asyncFuture) {
                 Out o = emitExpr(m.exprBody, null, ctx);
                 ctx.importClass("dart.async.Future");
@@ -2517,6 +2545,9 @@ public final class JavaEmitter {
     }
 
     private void emitStatement(Stmt s, Ctx ctx) {
+        if (s != null && !(s instanceof Block)) {
+            lineMark(s, ctx);
+        }
         if (s != null && s.labels != null && !isLoop(s)) {
             // A labeled non-loop statement is a labeled Java block, which `break label;`
             // leaves. A loop carries its label on its own header (loopLabel), where
@@ -7153,7 +7184,7 @@ public final class JavaEmitter {
             // break-loop for no change in behaviour.
             Ctx.Writer w = ctx.writer();
             for (String line : lifted.split("\n")) {
-                if (!line.trim().isEmpty()) {
+                if (!line.trim().isEmpty() && !DartLineTable.isMark(line)) {
                     w.line(line.trim());
                 }
             }
@@ -7170,7 +7201,7 @@ public final class JavaEmitter {
     private static boolean onlyTempDeclarations(String lifted) {
         for (String line : lifted.split("\n")) {
             String t = line.trim();
-            if (!t.isEmpty() && !TEMP_DECLARATION.matcher(t).matches()) {
+            if (!t.isEmpty() && !DartLineTable.isMark(t) && !TEMP_DECLARATION.matcher(t).matches()) {
                 return false;
             }
         }
