@@ -23,8 +23,6 @@
  */
 package com.codename1.io;
 
-import com.codename1.processing.Result;
-
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -32,6 +30,7 @@ import java.io.Reader;
 import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Vector;
 
@@ -186,6 +185,7 @@ import java.util.Vector;
 ///     }
 /// }
 /// ```
+@com.codename1.impl.SharedWithBackend
 public class JSONParser implements JSONParseCallback {
 
     private static boolean useLongsDefault;
@@ -197,7 +197,7 @@ public class JSONParser implements JSONParseCallback {
     private boolean includeNulls = includeNullsDefault;
     private boolean modern;
     private Map<String, Object> state;
-    private java.util.List<Object> parseStack;
+    private List<Object> parseStack;
     private String currentKey;
     /// If strict is set to false, then the parser will attempt to sanitize the JSON
     /// input before parsing.  I.e. it will accept invalid JSON, such as unquoted keys, etc..
@@ -359,8 +359,8 @@ public class JSONParser implements JSONParseCallback {
                                     c = (char) Integer.parseInt(unicode, 16);
                                 } catch (NumberFormatException err) {
                                     // problem in parsing the u notation!
-                                    Log.e(err);
-                                    Log.p("Error in parsing \\u" + unicode);
+                                    logError(err);
+                                    logMessage("Error in parsing \\u" + unicode);
                                 }
                             } else {
                                 switch (c) {
@@ -395,7 +395,7 @@ public class JSONParser implements JSONParseCallback {
                                 }
                             } else {
                                 // parsing error....
-                                Log.p("Expected null for key value while parsing JSON token at row: " + row + " column: " + column + " buffer: " + currentToken);
+                                logMessage("Expected null for key value while parsing JSON token at row: " + row + " column: " + column + " buffer: " + currentToken);
                             }
 
                             continue;
@@ -416,7 +416,7 @@ public class JSONParser implements JSONParseCallback {
                                 }
                             } else {
                                 // parsing error....
-                                Log.p("Expected true for key value while parsing JSON token at row: " + row + " column: " + column + " buffer: " + currentToken);
+                                logMessage("Expected true for key value while parsing JSON token at row: " + row + " column: " + column + " buffer: " + currentToken);
                             }
 
                             continue;
@@ -444,7 +444,7 @@ public class JSONParser implements JSONParseCallback {
                                 }
                             } else {
                                 // parsing error....
-                                Log.p("Expected false for key value while parsing JSON token at row: " + row + " column: " + column + " buffer: " + currentToken);
+                                logMessage("Expected false for key value while parsing JSON token at row: " + row + " column: " + column + " buffer: " + currentToken);
                             }
 
                             continue;
@@ -480,7 +480,7 @@ public class JSONParser implements JSONParseCallback {
                                     }
 
                                 } catch (NumberFormatException err) {
-                                    Log.e(err);
+                                    logError(err);
                                     // this isn't a number!
                                 }
                             }
@@ -585,8 +585,8 @@ public class JSONParser implements JSONParseCallback {
     }
 
     private static void handleParsingException(Reader i, Exception err, int row, int column, StringBuilder currentToken) throws IOException {
-        Log.e(err);
-        Log.p("Exception during JSON parsing at row: " + row + " column: " + column + " buffer: " + currentToken);
+        logError(err);
+        logMessage("Exception during JSON parsing at row: " + row + " column: " + column + " buffer: " + currentToken);
         i.close();
     }
 
@@ -733,7 +733,21 @@ public class JSONParser implements JSONParseCallback {
     ///
     /// The JSON string
     public static String mapToJson(Map<String, ?> map) {
-        return Result.fromContent(map).toString();
+        return PrettyPrinter.print(map);
+    }
+
+    /// Converts a list to an indented JSON array, written the way [#mapToJson(Map)]
+    /// writes the values of a map.
+    ///
+    /// #### Parameters
+    ///
+    /// - `list`: the list to convert
+    ///
+    /// #### Returns
+    ///
+    /// the JSON string
+    public static String listToJson(List<?> list) {
+        return PrettyPrinter.printList(list, 0);
     }
 
     /// Convenience: parse a JSON object from a UTF-8 byte array. The
@@ -752,7 +766,7 @@ public class JSONParser implements JSONParseCallback {
             try {
                 r.close();
             } catch (IOException ignored) {
-                Log.e(ignored);
+                logError(ignored);
             }
         }
     }
@@ -867,9 +881,9 @@ public class JSONParser implements JSONParseCallback {
             sb.append('}');
             return;
         }
-        if (o instanceof java.util.List) {
+        if (o instanceof List) {
             sb.append('[');
-            java.util.List l = (java.util.List) o;
+            List l = (List) o;
             for (int i = 0; i < l.size(); i++) {
                 if (i > 0) {
                     sb.append(',');
@@ -940,11 +954,11 @@ public class JSONParser implements JSONParseCallback {
     /// Cast helper for list-typed values pulled out of a parsed JSON
     /// tree. Same null behavior as [#asMap].
     @SuppressWarnings("unchecked")
-    public static java.util.List<Object> asList(Object o) {
+    public static List<Object> asList(Object o) {
         if (o == null) {
             return null;
         }
-        return (java.util.List<Object>) o;
+        return (List<Object>) o;
     }
 
     /// Retrieves a String field from a parsed JSON object. Returns
@@ -1193,7 +1207,7 @@ public class JSONParser implements JSONParseCallback {
         parseStack = new ArrayList<Object>();
         currentKey = null;
         if (!strict) {
-            i = new CharArrayReader(JSONSanitizer.sanitize(Util.readToString(i)).toCharArray());
+            i = new CharArrayReader(JSONSanitizer.sanitize(readAll(i)).toCharArray());
         }
         parse(i, this);
         return state;
@@ -1223,7 +1237,7 @@ public class JSONParser implements JSONParseCallback {
         parseStack = new Vector<Object>();
         currentKey = null;
         if (!strict) {
-            String cleaned = JSONSanitizer.sanitize(Util.readToString(i));
+            String cleaned = JSONSanitizer.sanitize(readAll(i));
             i = new CharArrayReader(cleaned.toCharArray());
         }
         parse(i, this);
@@ -1239,8 +1253,8 @@ public class JSONParser implements JSONParseCallback {
         return (Map) parseStack.get(parseStack.size() - 1);
     }
 
-    private java.util.List<Object> getStackVec() {
-        return (java.util.List<Object>) parseStack.get(parseStack.size() - 1);
+    private List<Object> getStackVec() {
+        return (List<Object>) parseStack.get(parseStack.size() - 1);
     }
 
     /// {@inheritDoc}
@@ -1334,7 +1348,7 @@ public class JSONParser implements JSONParseCallback {
     /// {@inheritDoc}
     @Override
     public void startArray(String arrayName) {
-        java.util.List<Object> currentVector;
+        List<Object> currentVector;
         if (modern) {
             currentVector = new ArrayList<Object>();
         } else {
@@ -1421,6 +1435,432 @@ public class JSONParser implements JSONParseCallback {
     public boolean isAlive() {
         return true;
     }
+
+    /// Where the lenient parser's diagnostics go.
+    ///
+    /// This class is shared with the backend runtime, which has no [Log]: the
+    /// parser cannot name it. [Log] installs itself here from its static
+    /// initializer, so on a device every diagnostic still reaches the log; until
+    /// it does (and always on a server) they go to the console.
+    interface Diagnostics {
+        /// Reports an exception.
+        void error(Throwable t);
+
+        /// Reports a message.
+        void message(String text);
+    }
+
+    private static Diagnostics diagnostics;
+
+    /// Called by [Log]'s static initializer.
+    static void installDiagnostics(Diagnostics d) {
+        diagnostics = d;
+    }
+
+    private static void logError(Throwable t) {
+        Diagnostics d = diagnostics;
+        if (d != null) {
+            d.error(t);
+        } else {
+            t.printStackTrace();
+        }
+    }
+
+    private static void logMessage(String text) {
+        Diagnostics d = diagnostics;
+        if (d != null) {
+            d.message(text);
+        } else {
+            System.out.println(text); // NOPMD SystemPrintln - no Log on a server; see Diagnostics
+        }
+    }
+
+    private static String readAll(Reader reader) throws IOException {
+        StringBuilder sb = new StringBuilder();
+        char[] buf = new char[1024];
+        int len;
+        while ((len = reader.read(buf)) != -1) {
+            sb.append(buf, 0, len);
+        }
+        return sb.toString();
+    }
+
+    /// Parses one complete JSON document strictly, by the RFC 8259 grammar.
+    ///
+    /// Unlike [#parseJSON(String)], which is lenient and logs what it cannot read,
+    /// anything malformed -- trailing content, an unescaped control character, a
+    /// number such as `01` or `1.`, nesting deeper than 512 -- throws. The result
+    /// is the value itself, not a wrapping map: an object reads as a
+    /// `LinkedHashMap<String, Object>` in document order, an array as an
+    /// `ArrayList<Object>`, a string as `String`, `true`/`false` as `Boolean`,
+    /// `null` as `null`, an integer as `Long` and any other number as `Double`. An
+    /// integer beyond the range of a `long` throws.
+    ///
+    /// #### Parameters
+    ///
+    /// - `json`: the document
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: for a null or malformed document, naming the offset
+    public static Object parseStrict(String json) throws IOException {
+        return parseStrict(json, false);
+    }
+
+    /// Parses one complete JSON document strictly, as [#parseStrict(String)] does.
+    ///
+    /// With `exactIntegers` an integer beyond the range of a `long` is not refused
+    /// but answered as a [RawJson] holding its digits exactly, which
+    /// [#toJson(Object)] writes back unchanged. Use it where a `double` must never
+    /// stand in for an integer, such as an amount on a blockchain.
+    ///
+    /// #### Parameters
+    ///
+    /// - `json`: the document
+    ///
+    /// - `exactIntegers`: true to answer out-of-range integers as [RawJson]
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: for a null or malformed document, naming the offset
+    public static Object parseStrict(String json, boolean exactIntegers) throws IOException {
+        if (json == null) {
+            throw new IOException("No JSON to parse");
+        }
+        StrictReader p = new StrictReader(json, exactIntegers);
+        p.skipWhitespace();
+        Object value = p.readValue();
+        p.skipWhitespace();
+        if (p.pos < json.length()) {
+            throw new IOException("Trailing content at offset " + p.pos);
+        }
+        return value;
+    }
+
+    /// The recursive-descent reader behind [#parseStrict(String, boolean)].
+    private static final class StrictReader {
+        /// How deep a document may nest before it is refused. The reader is
+        /// recursive, so nesting depth is stack depth, and a server parses whatever
+        /// a client sent: without a bound a few kilobytes of brackets reach
+        /// StackOverflowError, an Error no handler's catch of Exception sees. 512
+        /// is far past any real document and far short of the stack, including a
+        /// packaged server's 64KB virtual-thread stack (a translated frame keeps
+        /// its locals on a heap array); BackendHttpIntegrationTest answers a body
+        /// nested 511 deep on it.
+        private static final int MAX_DEPTH = 512;
+
+        private final String src;
+        private final boolean exactIntegers;
+        private int pos;
+        private int depth;
+
+        StrictReader(String src, boolean exactIntegers) {
+            this.src = src;
+            this.exactIntegers = exactIntegers;
+        }
+
+        Object readValue() throws IOException {
+            if (pos >= src.length()) {
+                throw new IOException("Unexpected end of JSON");
+            }
+            char c = src.charAt(pos);
+            switch (c) {
+                case '{':
+                    return readNested(true);
+                case '[':
+                    return readNested(false);
+                case '"':
+                    return readString();
+                case 't':
+                    return readLiteral("true", Boolean.TRUE);
+                case 'f':
+                    return readLiteral("false", Boolean.FALSE);
+                case 'n':
+                    return readLiteral("null", null);
+                default:
+                    return readNumber();
+            }
+        }
+
+        private Object readNested(boolean object) throws IOException {
+            if (depth >= MAX_DEPTH) {
+                throw new IOException("JSON nested deeper than " + MAX_DEPTH);
+            }
+            depth++;
+            try {
+                if (object) {
+                    return readObject();
+                }
+                return readArray();
+            } finally {
+                depth--;
+            }
+        }
+
+        private Map<String, Object> readObject() throws IOException {
+            Map<String, Object> out = new LinkedHashMap<String, Object>();
+            pos++;
+            skipWhitespace();
+            if (peek() == '}') {
+                pos++;
+                return out;
+            }
+            while (true) {
+                skipWhitespace();
+                if (peek() != '"') {
+                    throw new IOException("Expected a key at offset " + pos);
+                }
+                String key = readString();
+                skipWhitespace();
+                if (peek() != ':') {
+                    throw new IOException("Expected ':' at offset " + pos);
+                }
+                pos++;
+                skipWhitespace();
+                out.put(key, readValue());
+                skipWhitespace();
+                char c = peek();
+                pos++;
+                if (c == '}') {
+                    return out;
+                }
+                if (c != ',') {
+                    throw new IOException("Expected ',' or '}' at offset " + (pos - 1));
+                }
+            }
+        }
+
+        private List<Object> readArray() throws IOException {
+            List<Object> out = new ArrayList<Object>();
+            pos++;
+            skipWhitespace();
+            if (peek() == ']') {
+                pos++;
+                return out;
+            }
+            while (true) {
+                skipWhitespace();
+                out.add(readValue());
+                skipWhitespace();
+                char c = peek();
+                pos++;
+                if (c == ']') {
+                    return out;
+                }
+                if (c != ',') {
+                    throw new IOException("Expected ',' or ']' at offset " + (pos - 1));
+                }
+            }
+        }
+
+        private static int hexDigit(char c) {
+            if (c >= '0' && c <= '9') {
+                return c - '0';
+            }
+            if (c >= 'a' && c <= 'f') {
+                return c - 'a' + 10;
+            }
+            if (c >= 'A' && c <= 'F') {
+                return c - 'A' + 10;
+            }
+            return -1;
+        }
+
+        @SuppressWarnings("PMD.SwitchStmtsShouldHaveDefault")
+        private String readString() throws IOException {
+            pos++;
+            StringBuilder out = new StringBuilder();
+            while (true) {
+                if (pos >= src.length()) {
+                    throw new IOException("Unterminated string");
+                }
+                char c = src.charAt(pos++);
+                if (c == '"') {
+                    return out.toString();
+                }
+                if (c != '\\') {
+                    // RFC 8259: everything below U+0020 arrives escaped; taking it
+                    // literally accepts documents a conforming parser upstream
+                    // rejects, and the two then disagree about where a string ends.
+                    if (c < 0x20) {
+                        throw new IOException("A control character must be escaped in a "
+                                + "JSON string, at offset " + (pos - 1));
+                    }
+                    out.append(c);
+                    continue;
+                }
+                if (pos >= src.length()) {
+                    throw new IOException("Unterminated escape");
+                }
+                char esc = src.charAt(pos++);
+                switch (esc) {
+                    case '"':
+                        out.append('"');
+                        break;
+                    case '\\':
+                        out.append('\\');
+                        break;
+                    case '/':
+                        out.append('/');
+                        break;
+                    case 'b':
+                        out.append('\b');
+                        break;
+                    case 'f':
+                        out.append('\f');
+                        break;
+                    case 'n':
+                        out.append('\n');
+                        break;
+                    case 'r':
+                        out.append('\r');
+                        break;
+                    case 't':
+                        out.append('\t');
+                        break;
+                    case 'u':
+                        if (pos + 4 > src.length()) {
+                            throw new IOException("Truncated unicode escape");
+                        }
+                        // Four ASCII hex digits, exactly: parseInt took a sign and
+                        // any Unicode digit, three spellings of one character
+                        // that defeat a filter checking for one of them.
+                        int escaped = 0;
+                        for (int k = 0; k < 4; k++) {
+                            int d = hexDigit(src.charAt(pos + k));
+                            if (d < 0) {
+                                throw new IOException("Malformed unicode escape at offset " + pos);
+                            }
+                            escaped = escaped * 16 + d;
+                        }
+                        out.append((char) escaped);
+                        pos += 4;
+                        break;
+                    default:
+                        throw new IOException("Unknown escape \\" + esc);
+                }
+            }
+        }
+
+        private Object readLiteral(String literal, Object value) throws IOException {
+            if (!src.startsWith(literal, pos)) {
+                throw new IOException("Expected " + literal + " at offset " + pos);
+            }
+            pos += literal.length();
+            return value;
+        }
+
+        private static boolean isDigit(char c) {
+            return c >= '0' && c <= '9';
+        }
+
+        /// A number by the grammar rather than by what Java happens to parse:
+        /// `+1`, `01`, `.5` and `1.` are not JSON numbers.
+        private Object readNumber() throws IOException {
+            int start = pos;
+            boolean floating = false;
+            if (pos < src.length() && src.charAt(pos) == '-') {
+                pos++;
+            }
+            int intStart = pos;
+            if (pos < src.length() && src.charAt(pos) == '0') {
+                pos++;
+                if (pos < src.length() && isDigit(src.charAt(pos))) {
+                    throw new IOException("A leading zero is not a JSON number, at offset " + start);
+                }
+            } else {
+                while (pos < src.length() && isDigit(src.charAt(pos))) {
+                    pos++;
+                }
+            }
+            if (pos == intStart) {
+                throw new IOException("Expected a digit at offset " + intStart);
+            }
+            if (pos < src.length() && src.charAt(pos) == '.') {
+                floating = true;
+                pos++;
+                int fracStart = pos;
+                while (pos < src.length() && isDigit(src.charAt(pos))) {
+                    pos++;
+                }
+                if (pos == fracStart) {
+                    throw new IOException("Expected a digit after '.' at offset " + fracStart);
+                }
+            }
+            if (pos < src.length() && (src.charAt(pos) == 'e' || src.charAt(pos) == 'E')) {
+                floating = true;
+                pos++;
+                if (pos < src.length() && (src.charAt(pos) == '-' || src.charAt(pos) == '+')) {
+                    pos++;
+                }
+                int expStart = pos;
+                while (pos < src.length() && isDigit(src.charAt(pos))) {
+                    pos++;
+                }
+                if (pos == expStart) {
+                    throw new IOException("Expected a digit in the exponent at offset " + expStart);
+                }
+            }
+            String text = src.substring(start, pos);
+            if (floating) {
+                double parsed;
+                try {
+                    parsed = Double.parseDouble(text);
+                } catch (NumberFormatException err) {
+                    throw new IOException("Malformed number '" + text + "'", err);
+                }
+                // parseDouble answers Infinity for 1e999 rather than throwing, and
+                // the writer emits null for it: refuse it here instead.
+                if (Double.isNaN(parsed) || Double.isInfinite(parsed)) {
+                    throw new IOException("Number out of range for JSON: '" + text + "'");
+                }
+                return Double.valueOf(parsed);
+            }
+            // Integers stay integers: a long through a double loses precision above
+            // 2^53, and ids and amounts are exactly the values that get large.
+            if (fitsLong(text)) {
+                return Long.valueOf(Long.parseLong(text));
+            }
+            if (exactIntegers) {
+                return new RawJson(text);
+            }
+            throw new IOException("Malformed number '" + text + "'");
+        }
+
+        /// The token is digits with an optional minus sign; decides without
+        /// relying on parseLong throwing.
+        private static boolean fitsLong(String text) {
+            boolean negative = text.charAt(0) == '-';
+            int digits = negative ? text.length() - 1 : text.length();
+            if (digits < 19) {
+                return true;
+            }
+            if (digits > 19) {
+                return false;
+            }
+            String limit = negative ? "9223372036854775808" : "9223372036854775807";
+            return text.substring(negative ? 1 : 0).compareTo(limit) <= 0;
+        }
+
+        private char peek() throws IOException {
+            if (pos >= src.length()) {
+                throw new IOException("Unexpected end of JSON");
+            }
+            return src.charAt(pos);
+        }
+
+        void skipWhitespace() {
+            while (pos < src.length()) {
+                char c = src.charAt(pos);
+                if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+                    pos++;
+                } else {
+                    return;
+                }
+            }
+        }
+    }
+
 
     static class ReaderClass {
         char[] buffer;

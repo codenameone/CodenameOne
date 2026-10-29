@@ -73,8 +73,8 @@ concurrency:
 jobs:
   archetype-smoke:
     runs-on: ubuntu-24.04
-    # master already ran 29.5 minutes against the old 30-minute limit, so any
-    # module added to the build tipped it over mid-step.
+    # A green run takes about 28 minutes (the reactor build alone is 8-9), so 30 left
+    # no room for a slow runner and cancelled healthy runs mid-step.
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v6

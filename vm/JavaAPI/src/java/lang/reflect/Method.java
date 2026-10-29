@@ -23,6 +23,25 @@
 package java.lang.reflect;
 
 public class Method {
+    public Object invoke(Object obj, Object... args) throws IllegalAccessException, InvocationTargetException {
+        throw new IllegalAccessException("reflection is not supported on this platform");
+    }
+
+    public void setAccessible(boolean flag) {
+    }
+
+    public Class<?>[] getParameterTypes() {
+        return new Class<?>[0];
+    }
+
+    public Class<?> getReturnType() {
+        return null;
+    }
+
+    public int getModifiers() {
+        return 0;
+    }
+
     public String getName() {
         return null;
     }

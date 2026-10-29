@@ -58,6 +58,10 @@ import com.codenameone.examples.hellocodenameone.tests.desktopcompat.DesktopComp
 import com.codenameone.examples.hellocodenameone.tests.desktopcompat.DesktopCompatSwingTreesScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.desktopcompat.DesktopCompatSwingPaintingScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.desktopcompat.DesktopCompatSwingContainersScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.kmpcompat.KmpCompatLayoutScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.kmpcompat.KmpCompatTypographyScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.kmpcompat.KmpCompatListScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.kmpcompat.KmpCompatStateScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.desktopcompat.DesktopCompatSwingOptionPaneScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.desktopcompat.DesktopCompatSwingXScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.desktopcompat.DesktopCompatFxControlsScreenshotTest;
@@ -708,6 +712,11 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new DesktopCompatFxFxmlScreenshotTest(),
             new DesktopCompatFxPanesScreenshotTest(),
             new DesktopCompatFxAlertScreenshotTest(),
+            // Compose (common/src/main/kmp), embedded through ComposeView.
+            new KmpCompatLayoutScreenshotTest(),
+            new KmpCompatTypographyScreenshotTest(),
+            new KmpCompatListScreenshotTest(),
+            new KmpCompatStateScreenshotTest(),
             // After every test that shows a dialog. It asks for the notification
             // permission, and on iOS the system alert nobody answers leaves the
             // application inactive for the rest of the run: Display.isMinimized()

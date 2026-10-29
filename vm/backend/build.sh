@@ -228,6 +228,13 @@ if [ "${CN1_BACKEND_SQLITE:-1}" = "0" ]; then
     # answer "could not open" instead, which Db already turns into an IOException.
     CN1_BACKEND_CFLAGS="$CN1_BACKEND_CFLAGS -DCN1_BACKEND_NO_SQLITE"
 fi
+# The native crypto kernels (libsecp256k1, ed25519-donna) are linked only when
+# asked, as the packager links them only for a server that uses them. Set
+# CN1_BACKEND_CRYPTO_KERNELS=1 to compile them in; without them the Java engine runs.
+CRYPTO_OPT=""
+if [ "${CN1_BACKEND_CRYPTO_KERNELS:-0}" = "1" ]; then
+    CRYPTO_OPT="-Dcn1.cryptoKernels=true"
+fi
 # Checked casts are OFF by default in ParparVM and ON here, which is the one place
 # the server target deliberately departs from the mobile one.
 #
@@ -242,7 +249,7 @@ fi
 # CN1_BACKEND_CHECKED_CASTS=0 turns it off to measure what it costs.
 CAST_OPT="-Dcn1.checkedCasts=true"
 if [ "${CN1_BACKEND_CHECKED_CASTS:-1}" = "0" ]; then CAST_OPT=""; fi
-"$J8/bin/java" $SQLITE_OPT $CAST_OPT $CN1_BACKEND_TRANSLATOR_OPTS -cp "$RUNTIME_RESOURCES:$TRANSLATOR" \
+"$J8/bin/java" $SQLITE_OPT $CRYPTO_OPT $CAST_OPT $CN1_BACKEND_TRANSLATOR_OPTS -cp "$RUNTIME_RESOURCES:$TRANSLATOR" \
     com.codename1.tools.translator.ByteCodeTranslator \
     clean "$JAVAAPI;$WORK/classes" "$WORK/out" "$MAIN" "$PKG" "$MAIN" 1.0 clean none \
     > "$WORK/translate.log" 2>&1 || { echo "TRANSLATE FAILED"; tail -30 "$WORK/translate.log"; exit 1; }

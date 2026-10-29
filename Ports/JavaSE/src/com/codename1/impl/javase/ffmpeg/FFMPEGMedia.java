@@ -51,6 +51,8 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.FloatControl;
@@ -321,11 +323,14 @@ public final class FFMPEGMedia {
             }
             if (SwingUtilities.isEventDispatchThread()) {
                 videoComponent = new JavaSEPort.Peer(frame, panel);
+                panel.attach(videoComponent);
             } else {
                 SwingUtilities.invokeLater(new Runnable() {
                     @Override
                     public void run() {
-                        videoComponent = new JavaSEPort.Peer(frame, panel);
+                        JavaSEPort.Peer created = new JavaSEPort.Peer(frame, panel);
+                        panel.attach(created);
+                        videoComponent = created;
                     }
                 });
                 CN.invokeAndBlock(new Runnable() {
@@ -706,6 +711,8 @@ public final class FFMPEGMedia {
     private static class VideoPanel extends JPanel implements HierarchyListener {
         private volatile BufferedImage image;
         private volatile int frameCount;
+        private final AtomicReference<JavaSEPort.Peer> peer = new AtomicReference<JavaSEPort.Peer>();
+        private final AtomicBoolean framePending = new AtomicBoolean();
 
         VideoPanel(int width, int height) {
             setBackground(Color.BLACK);
@@ -730,6 +737,38 @@ public final class FFMPEGMedia {
             image = next;
             frameCount++;
             repaint();
+            showFrameInPeer();
+        }
+
+        void attach(JavaSEPort.Peer p) {
+            peer.set(p);
+        }
+
+        // A new frame repaints this Swing panel, but the Codename One form
+        // draws the peer from a buffer copied out of it, and nothing else
+        // asks for that copy or for the form to repaint. It used to work by
+        // accident: a safe-area form relaid itself out every EDT cycle, which
+        // repainted the peer, which refreshed the buffer. Each frame now
+        // copies the buffer on the AWT thread and repaints the peer on the
+        // EDT itself, coalesced so a fast decoder queues at most one of each.
+        private void showFrameInPeer() {
+            final JavaSEPort.Peer p = peer.get();
+            if (p == null || !framePending.compareAndSet(false, true)) {
+                return;
+            }
+            SwingUtilities.invokeLater(new Runnable() {
+                @Override
+                public void run() {
+                    framePending.set(false);
+                    p.paintOnBuffer();
+                    CN.callSerially(new Runnable() {
+                        @Override
+                        public void run() {
+                            p.repaint();
+                        }
+                    });
+                }
+            });
         }
 
         boolean hasFrame() {

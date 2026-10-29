@@ -1,0 +1,34 @@
+# android: sdk_gphone64_arm64, API 36, arm64-v8a; BouncyCastle 1.84
+## Java engine
+secp256k1.pubkey       core=       45203 ref=       13278 ratio=  3.40
+secp256k1.sign         core=       31338 ref=       14790 ratio=  2.12
+secp256k1.verify       core=       16757 ref=       10026 ratio=  1.67
+secp256k1.verify.u     core=       18615 ref=       10035 ratio=  1.85
+secp256k1.verify.dec   core=       17141 ref=        8237 ratio=  2.08
+keccak256.1k           core=      384908 ref=      393528 ratio=  0.98
+sha256.1k              core=      287546 ref=      265310 ratio=  1.08
+pbkdf2.sha512.bip39    core=        1033 ref=         757 ratio=  1.36
+ripemd160.1k           core=      205703 ref=      300024 ratio=  0.69
+ed25519.pubkey         core=       63837 ref=       70923 ratio=  0.90
+ed25519.sign           core=       53194 ref=       68977 ratio=  0.77
+ed25519.verify         core=       19633 ref=       27398 ratio=  0.72
+# the JDK has no Ed25519; its rows are skipped
+schnorr.sign           core=       21627 ref=       14572 ratio=  1.48
+schnorr.verify         core=       17163 ref=       10181 ratio=  1.69
+## native kernels
+# core rows on the native kernels (cn1crypto), which match the Java engine
+secp256k1.pubkey       core=      116210 ref=       13770 ratio=  8.44
+secp256k1.sign         core=       71125 ref=       14232 ratio=  5.00
+secp256k1.verify       core=       59615 ref=        9940 ratio=  6.00
+secp256k1.verify.u     core=       68085 ref=        9594 ratio=  7.10
+secp256k1.verify.dec   core=       60472 ref=        7443 ratio=  8.12
+keccak256.1k           core=      762149 ref=      388709 ratio=  1.96
+sha256.1k              core=      292535 ref=      270445 ratio=  1.08
+pbkdf2.sha512.bip39    core=        1037 ref=         761 ratio=  1.36
+ripemd160.1k           core=      214766 ref=      304410 ratio=  0.71
+ed25519.pubkey         core=      125396 ref=       71998 ratio=  1.74
+ed25519.sign           core=      117185 ref=       69038 ratio=  1.70
+ed25519.verify         core=       39721 ref=       27571 ratio=  1.44
+# the JDK has no Ed25519; its rows are skipped
+schnorr.sign           core=       52972 ref=       14953 ratio=  3.54
+schnorr.verify         core=       60243 ref=       10094 ratio=  5.97

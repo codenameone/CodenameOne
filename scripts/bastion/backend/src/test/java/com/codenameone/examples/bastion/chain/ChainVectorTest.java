@@ -18,12 +18,13 @@
  */
 package com.codenameone.examples.bastion.chain;
 
+import com.codename1.security.Hash;
+import com.codename1.crypto.UInt256;
+import com.codename1.crypto.evm.EvmAddress;
+import com.codename1.crypto.evm.EvmTransaction;
+import com.codename1.crypto.hd.Bip32;
 import org.junit.jupiter.api.Test;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -41,34 +42,17 @@ class ChainVectorTest {
             + "9a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4";
 
     @Test
-    void rlpMatchesTheSpecificationExamples() {
-        assertEquals("83646f67", hex(Rlp.string(ascii("dog"))));
-        List<byte[]> catDog = new ArrayList<byte[]>();
-        catDog.add(Rlp.string(ascii("cat")));
-        catDog.add(Rlp.string(ascii("dog")));
-        assertEquals("c88363617483646f67", hex(Rlp.list(catDog)));
-        assertEquals("80", hex(Rlp.string(new byte[0])));
-        assertEquals("c0", hex(Rlp.list(new ArrayList<byte[]>())));
-        assertEquals("80", hex(Rlp.quantity(0)));
-        assertEquals("0f", hex(Rlp.quantity(15)));
-        assertEquals("820400", hex(Rlp.quantity(1024)));
-        String lorem = "Lorem ipsum dolor sit amet, consectetur adipisicing elit";
-        assertEquals("b838" + hex(ascii(lorem)), hex(Rlp.string(ascii(lorem))));
-    }
-
-    @Test
     void weiAndGweiConvertExactlyAndRoundDown() {
-        assertEquals("14d1120d7b160000", hex(Wei.fromGwei(1500000000L)));
-        assertEquals(1500000000L, Wei.toGwei(Wei.fromGwei(1500000000L)));
-        byte[] dusty = Wei.parseQuantity("0x14d1120d7b160001");
-        assertEquals(1500000000L, Wei.toGwei(dusty));
-        assertTrue(Wei.hasDust(dusty));
+        assertEquals("14d1120d7b160000", hex(Chain.fromGwei(1500000000L).toMinimalBytes()));
+        assertEquals(1500000000L, Chain.gwei(Chain.fromGwei(1500000000L)));
+        UInt256 dusty = UInt256.parse("0x14d1120d7b160001");
+        assertEquals(1500000000L, Chain.gwei(dusty));
         assertEquals(1500000001L, Chain.ceilGwei(dusty));
-        assertEquals("0x0", Wei.quantity(0));
-        assertEquals("0x539", Wei.quantity(1337));
-        assertEquals(1337L, Wei.parseLong("0x539"));
-        assertThrows(ArithmeticException.class, () -> Wei.toGwei(Hex32.decode("ffffffffffffffffffffffffffffffff")));
-        assertEquals("0202", hex(Chain.add(Hex32.decode("ff"), Hex32.decode("0103"))));
+        assertEquals("0x0", UInt256.valueOf(0).toQuantity());
+        assertEquals("0x539", UInt256.valueOf(1337).toQuantity());
+        assertEquals(1337L, UInt256.parse("0x539").longValueExact());
+        assertThrows(ArithmeticException.class,
+                () -> Chain.gwei(UInt256.parse("0xffffffffffffffffffffffffffffffffffffffff")));
     }
 
     @Test
@@ -80,49 +64,49 @@ class ChainVectorTest {
             "0xD1220A0cf47c7B9Be7A2E6BA89F429762e7b9aDb",
         };
         for (String a : good) {
-            assertEquals(a, EthAddress.checksum(a.toLowerCase()));
-            assertTrue(EthAddress.valid(a), a);
+            assertEquals(a, EvmAddress.parse(a.toLowerCase(java.util.Locale.ROOT)).toChecksumString());
+            assertTrue(EvmAddress.isValid(a), a);
         }
         // One character's case flipped: the checksum catches it.
-        assertFalse(EthAddress.valid("0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAeD"));
+        assertFalse(EvmAddress.isValid("0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAeD"));
         // No checksum at all is accepted, as wallets do.
-        assertTrue(EthAddress.valid("0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed"));
-        assertFalse(EthAddress.valid("0x5aaeb6053f3e94c9b9a09f33669435e7ef1beae"));
-        assertFalse(EthAddress.valid("5aaeb6053f3e94c9b9a09f33669435e7ef1beaed00"));
-        assertFalse(EthAddress.valid("0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaeg"));
+        assertTrue(EvmAddress.isValid("0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed"));
+        assertFalse(EvmAddress.isValid("0x5aaeb6053f3e94c9b9a09f33669435e7ef1beae"));
+        assertFalse(EvmAddress.isValid("5aaeb6053f3e94c9b9a09f33669435e7ef1beaed00"));
+        assertFalse(EvmAddress.isValid("0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaeg"));
     }
 
     @Test
     void aKeyHasItsKnownAddress() {
         assertEquals("0x2c7536e3605d9c16a7a3d7b1898e529396a65c23",
-                EthAddress.of(EthKeys.publicKey(Hex32.decode(KEY))));
+                EvmAddress.fromPrivateKey(Hash.fromHex(KEY)).toLowerCaseString());
     }
 
     @Test
     void anEip1559TransferSignsToTheKnownBytes() {
-        Eip1559Tx tx = new Eip1559Tx(1337, 3, Wei.fromGwei(2), Wei.fromGwei(100), 21000,
-                "0x3535353535353535353535353535353535353535", Wei.fromGwei(1500000000L), null);
+        EvmTransaction tx = EvmTransaction.eip1559(1337, 3, Chain.fromGwei(2), Chain.fromGwei(100), 21000,
+                EvmAddress.parse("0x3535353535353535353535353535353535353535"),
+                Chain.fromGwei(1500000000L), null);
         assertEquals("0b1bd411c9eb4da68dee78e282b1a66831167368952179f857f69a680f642cba",
                 hex(tx.signingHash()));
-        byte[] signature = EthKeys.sign(Hex32.decode(KEY), tx.signingHash());
-        byte[] raw = tx.raw(signature);
+        EvmTransaction signed = tx.sign(Hash.fromHex(KEY));
         assertEquals("02f87582053903847735940085174876e8008252089435353535353535353535353535353535"
                 + "353535358814d1120d7b16000080c001a0c34cfde89d316325c60fc29e10403b382c28543668c155"
                 + "2957112c5496125a30a0453e3bcbf326db30b59ea3015c8faf5c190800bddf6f53c83d1967df5c06"
-                + "4dbc", hex(raw));
-        assertEquals("0xf0a0c01af56fcf57face413edf956894ebd29855b1143abde08823d6b4827b8e",
-                Eip1559Tx.hash(raw));
+                + "4dbc", hex(signed.encode()));
+        assertEquals("f0a0c01af56fcf57face413edf956894ebd29855b1143abde08823d6b4827b8e", hex(signed.hash()));
         // The signature names its signer: what a node checks.
-        assertArrayEquals(EthKeys.publicKey(Hex32.decode(KEY)), EthKeys.recover(tx.signingHash(), signature));
+        assertEquals(EvmAddress.fromPrivateKey(Hash.fromHex(KEY)), signed.sender());
     }
 
     @Test
     void depositAndHotKeysDeriveAsStandardWalletsDo() {
-        byte[] seed = Hex32.decode(SEED);
-        Bip32 first = Bip32.ethereum(seed, 0);
+        byte[] seed = Hash.fromHex(SEED);
+        Bip32 first = Bip32.master(seed).derive("m/44'/60'/0'/0/0");
         assertEquals("1ab42cc412b618bdea3a599e3c9bae199ebf030895b039e9db1e30dafb12b727",
                 hex(first.privateKey()));
-        assertEquals("0x9858effd232b4033e47d90003d41ec34ecaeda94", first.address());
+        assertEquals("0x9858effd232b4033e47d90003d41ec34ecaeda94",
+                EvmAddress.fromPublicKey(first.publicKey()).toLowerCaseString());
         SeedSigner signer = new SeedSigner(seed);
         assertEquals("0x593814d3309e2df31d112824f0bb5aa7cb0d7d47", signer.depositAddress(7));
         assertEquals("0x78839f6054d7ed13918bae0473ba31b1ca9d7265", signer.hotAddress());
@@ -130,27 +114,19 @@ class ChainVectorTest {
 
     @Test
     void aTransactionRefusesBadFields() {
-        assertThrows(IllegalArgumentException.class, () -> new Eip1559Tx(0, 0, new byte[0],
-                new byte[0], 21000, "0x3535353535353535353535353535353535353535", new byte[0], null));
-        assertThrows(IllegalArgumentException.class, () -> new Eip1559Tx(1, 0, new byte[0],
-                new byte[0], 21000, "0x35", new byte[0], null));
-        Eip1559Tx tx = new Eip1559Tx(1, 0, new byte[0], new byte[0], 21000,
-                "0x3535353535353535353535353535353535353535", new byte[0], null);
+        EvmAddress to = EvmAddress.parse("0x3535353535353535353535353535353535353535");
+        assertThrows(IllegalArgumentException.class, () -> EvmTransaction.eip1559(0, 0, UInt256.ZERO,
+                UInt256.ZERO, 21000, to, UInt256.ZERO, null));
+        assertThrows(IllegalArgumentException.class, () -> EvmAddress.parse("0x35"));
+        EvmTransaction tx = EvmTransaction.eip1559(1, 0, UInt256.ZERO, UInt256.ZERO, 21000, to,
+                UInt256.ZERO, null);
         byte[] bad = new byte[65];
         bad[64] = 2;
-        assertThrows(IllegalArgumentException.class, () -> tx.raw(bad));
+        assertThrows(IllegalArgumentException.class, () -> tx.withSignature(bad));
         assertThrows(IllegalArgumentException.class, () -> new EthRpc("http://node.example:8545"));
     }
 
-    private static byte[] ascii(String text) {
-        byte[] out = new byte[text.length()];
-        for (int iter = 0; iter < out.length; iter++) {
-            out[iter] = (byte) text.charAt(iter);
-        }
-        return out;
-    }
-
     private static String hex(byte[] bytes) {
-        return Hex32.encode(bytes);
+        return Hash.toHex(bytes);
     }
 }

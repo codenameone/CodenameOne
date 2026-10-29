@@ -58,4 +58,12 @@ public class WeakReference extends java.lang.ref.Reference{
     public WeakReference(java.lang.Object ref){
          super(ref, STRENGTH_WEAK);
     }
+
+    /**
+     * Creates a weak reference registered with a queue. The collector never posts to
+     * a {@link ReferenceQueue} here, so the queue is accepted and not kept.
+     */
+    public WeakReference(java.lang.Object ref, ReferenceQueue q){
+         super(ref, STRENGTH_WEAK);
+    }
 }

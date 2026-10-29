@@ -5349,6 +5349,31 @@ public class HTML5Implementation extends CodenameOneImplementation {
         );
     }
 
+    /// Remembers the application's light/dark choice for the loading screen of the NEXT launch:
+    /// `light` or `dark`, or null/anything else to follow the browser again. The page reads the
+    /// key in `<head>` before any Java runs (`JavascriptBundleWriter.splashTheme` in the
+    /// ByteCodeTranslator, which also names the key); a build whose `javascript.splash.appearance`
+    /// is `light` or `dark` ignores it.
+    private static void setSplashAppearance(String value) {
+        // The cast stays outside the try: a CHECKCAST is unchecked on ParparVM, so a handler
+        // around it would never run (scripts/check-cast-semantics.sh).
+        WindowExt win = (WindowExt) Window.current();
+        try {
+            JSOImplementations.JSStorage storage = win.getLocalStorage();
+            if (storage == null) {
+                return;
+            }
+            if ("light".equals(value) || "dark".equals(value)) {
+                storage.setItem("cn1.splashAppearance", value);
+            } else {
+                storage.removeItem("cn1.splashAppearance");
+            }
+        } catch (RuntimeException e) {
+            // Storage disabled (private mode, a sandboxed frame): the splash follows the browser.
+            Log.e(e);
+        }
+    }
+
     @JSBody(params={"msg"}, script="window.onbeforeunload=function(){return msg;}")
     private native static void setBeforeUnloadMessage(String msg);
     
@@ -5357,6 +5382,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
     
     @Override
     public void setPlatformHint(String key, String value) {
+        if ("platformHint.javascript.splashAppearance".equalsIgnoreCase(key)) {
+            setSplashAppearance(value);
+        }
         if ("platformHint.javascript.beforeUnloadMessage".equalsIgnoreCase(key)) {
             if (value == null) {
                 removeBeforeUnload();
@@ -5538,7 +5566,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 String fallback = isAndroid_() ? "/android_holo_light.res" : "/iOS7Theme.res";
                 r = Resources.open(fallback);
             }
-            Hashtable tp = r.getTheme(r.getThemeResourceNames()[0]);
+            HashMap<String, Object> tp = r.getThemeMap(r.getThemeResourceNames()[0]);
 
             // The browser has no OS status bar / notch, so the app must not
             // reserve a status-bar strip at the top of the Form the way iOS
@@ -5565,7 +5593,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             // native menu bar at that moment -- which it does until the HTML chrome exists. Forms
             // without a Toolbar then never published their MenuBar to it.
             installDesktopChromeIfRequested();
-            UIManager.getInstance().setThemeProps(tp);
+            UIManager.getInstance().setThemeMap(tp);
             return;
     	} catch (IOException ex){
             Log.e(ex);
@@ -14655,6 +14683,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
             return true;
         }
         return com.codename1.impl.html5.database.SQLiteNative.exists(databaseName);
+    }
+
+    /// Large signature and hash batches go to the GPU through WebGPU; see [HTML5CryptoEngine].
+    @Override
+    public com.codename1.security.CryptoEngine createCryptoEngine() {
+        return new HTML5CryptoEngine(this);
     }
 
     /// The browser's non-prompting secure store.

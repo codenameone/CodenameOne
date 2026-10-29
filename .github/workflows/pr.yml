@@ -402,7 +402,7 @@ jobs:
             -Dcn1.binaries="${CN1_BINARIES}" \
             -Pcompile-android \
             -DbackendAnalysis \
-            -pl android,ios,project-model,build-engine,codenameone-maven-plugin,codenameone-gradle-plugin,backend,backend-test,backend-parparvm,javac,android-res-compiler,android-compat,swing-compat,javafx-compat,fxml-compiler,desktop-compat-runtime,python-transpiler -am verify
+            -pl android,ios,project-model,build-engine,codenameone-maven-plugin,codenameone-gradle-plugin,backend,backend-test,backend-parparvm,javac,android-res-compiler,android-compat,swing-compat,javafx-compat,compose-compat,fxml-compiler,desktop-compat-runtime,python-transpiler -am verify
       # The Python runtime compiles at release 17, so it cannot join the JDK 8
       # reactor above; it runs against the core that reactor installed. It ships
       # inside applications, so it is held to the same zero-findings gate.
@@ -628,7 +628,7 @@ jobs:
       - name: Generate static analysis HTML summaries
         if: ${{ !cancelled() && matrix.java-version == 8 }}
         env:
-          QUALITY_REPORT_TARGET_DIRS: maven/core-unittests/target:maven/android/target:maven/ios/target:vm/ByteCodeTranslator/target:maven/codenameone-maven-plugin/target:maven/build-engine/target:maven/project-model/target:maven/codenameone-gradle-plugin/target:maven/build-hint-catalog/target:maven/build-hint-tools/target:maven/backend/target:maven/backend-test/target:maven/backend-parparvm/target:maven/javac/target:maven/android-res-compiler/target:maven/android-compat/target:maven/swing-compat/target:maven/javafx-compat/target:maven/fxml-compiler/target:maven/desktop-compat-runtime/target:maven/python-transpiler/target:maven/python-runtime/target
+          QUALITY_REPORT_TARGET_DIRS: maven/core-unittests/target:maven/android/target:maven/ios/target:vm/ByteCodeTranslator/target:maven/codenameone-maven-plugin/target:maven/build-engine/target:maven/project-model/target:maven/codenameone-gradle-plugin/target:maven/build-hint-catalog/target:maven/build-hint-tools/target:maven/backend/target:maven/backend-test/target:maven/backend-parparvm/target:maven/javac/target:maven/android-res-compiler/target:maven/android-compat/target:maven/swing-compat/target:maven/javafx-compat/target:maven/compose-compat/target:maven/fxml-compiler/target:maven/desktop-compat-runtime/target:maven/python-transpiler/target:maven/python-runtime/target
           QUALITY_REPORT_SERVER_URL: ${{ github.server_url }}
           QUALITY_REPORT_REPOSITORY: ${{ github.repository }}
           QUALITY_REPORT_REF: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -652,6 +652,7 @@ jobs:
             "android-compat:maven/android-compat/target" \
             "swing-compat:maven/swing-compat/target" \
             "javafx-compat:maven/javafx-compat/target" \
+            "compose-compat:maven/compose-compat/target" \
             "fxml-compiler:maven/fxml-compiler/target" \
             "desktop-compat-runtime:maven/desktop-compat-runtime/target" \
             "project-model:maven/project-model/target" \
@@ -784,11 +785,11 @@ jobs:
       - name: Generate quality report summary
         if: ${{ !cancelled() && matrix.java-version == 8 }}
         env:
-          QUALITY_REPORT_TARGET_DIRS: maven/core-unittests/target:maven/android/target:maven/ios/target:vm/ByteCodeTranslator/target:maven/codenameone-maven-plugin/target:maven/build-engine/target:maven/project-model/target:maven/codenameone-gradle-plugin/target:maven/build-hint-catalog/target:maven/build-hint-tools/target:maven/backend/target:maven/backend-test/target:maven/backend-parparvm/target:maven/javac/target:maven/android-res-compiler/target:maven/android-compat/target:maven/swing-compat/target:maven/javafx-compat/target:maven/fxml-compiler/target:maven/desktop-compat-runtime/target:maven/python-transpiler/target:maven/python-runtime/target
+          QUALITY_REPORT_TARGET_DIRS: maven/core-unittests/target:maven/android/target:maven/ios/target:vm/ByteCodeTranslator/target:maven/codenameone-maven-plugin/target:maven/build-engine/target:maven/project-model/target:maven/codenameone-gradle-plugin/target:maven/build-hint-catalog/target:maven/build-hint-tools/target:maven/backend/target:maven/backend-test/target:maven/backend-parparvm/target:maven/javac/target:maven/android-res-compiler/target:maven/android-compat/target:maven/swing-compat/target:maven/javafx-compat/target:maven/compose-compat/target:maven/fxml-compiler/target:maven/desktop-compat-runtime/target:maven/python-transpiler/target:maven/python-runtime/target
           # Every project listed here must produce a SpotBugs report and that
           # report must be empty. A missing report fails the gate too, so a
           # SpotBugs run that silently stops running is not mistaken for clean.
-          QUALITY_REPORT_REQUIRED_SPOTBUGS: core-unittests:android:ios:ByteCodeTranslator:codenameone-maven-plugin:build-engine:project-model:codenameone-gradle-plugin:build-hint-catalog:build-hint-tools:backend:backend-test:javac:android-res-compiler:android-compat:swing-compat:javafx-compat:fxml-compiler:desktop-compat-runtime:python-transpiler:python-runtime
+          QUALITY_REPORT_REQUIRED_SPOTBUGS: core-unittests:android:ios:ByteCodeTranslator:codenameone-maven-plugin:build-engine:project-model:codenameone-gradle-plugin:build-hint-catalog:build-hint-tools:backend:backend-test:javac:android-res-compiler:android-compat:swing-compat:javafx-compat:compose-compat:fxml-compiler:desktop-compat-runtime:python-transpiler:python-runtime
           # PMD and Checkstyle run on the core, the backend runtime and the Python
           # transpiler and runtime, and each must produce its report: without one,
           # the PMD gate below it has nothing to read and passes.

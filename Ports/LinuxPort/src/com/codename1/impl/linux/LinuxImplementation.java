@@ -345,6 +345,14 @@ public class LinuxImplementation extends CodenameOneImplementation {
         }
     }
 
+    /// The C crypto kernels when the translator linked them (an
+    /// application that uses the elliptic-curve or Keccak APIs), otherwise
+    /// the default engine.
+    @Override
+    public com.codename1.security.CryptoEngine createCryptoEngine() {
+        return com.codename1.security.NativeCryptoEngine.create(super.createCryptoEngine());
+    }
+
     /// True on the embedded target (DRM/KMS or fbdev, no window system). Fixed at
     /// build time: the native is a constant in each of the two display units.
     /// The port's JVM unit tests run with no native library; they exercise the
@@ -486,7 +494,7 @@ public class LinuxImplementation extends CodenameOneImplementation {
             com.codename1.ui.util.Resources r = com.codename1.ui.util.Resources.open(in);
             String[] names = r.getThemeResourceNames();
             if (names != null && names.length > 0) {
-                com.codename1.ui.plaf.UIManager.getInstance().setThemeProps(r.getTheme(names[0]));
+                com.codename1.ui.plaf.UIManager.getInstance().setThemeMap(r.getThemeMap(names[0]));
             }
         } catch (Throwable t) {
             // A bad/absent theme must not stop the app from starting.

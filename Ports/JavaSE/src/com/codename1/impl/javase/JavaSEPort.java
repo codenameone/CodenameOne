@@ -3446,7 +3446,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (nativeTheme != null) {
             try {
                 Resources r = Resources.open(nativeTheme);
-                Hashtable h = r.getTheme(r.getThemeResourceNames()[0]);
+                HashMap<String, Object> h = r.getThemeMap(r.getThemeResourceNames()[0]);
                 Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
                 boolean desktopSkin = pref.getBoolean("desktopSkin", false);
                 if(desktopSkin) {
@@ -3455,15 +3455,15 @@ public class JavaSEPort extends CodenameOneImplementation {
                     h.remove("@paintsTitleBarBool");
                 }
                 injectDesktopThemeConstants(h);
-                UIManager.getInstance().setThemeProps(h);
+                UIManager.getInstance().setThemeMap(h);
             } catch (IOException ex) {
                 ex.printStackTrace();
             }
         } else {
             if (nativeThemeRes != null) {
-                Hashtable h = nativeThemeRes.getTheme(nativeThemeRes.getThemeResourceNames()[0]);
+                HashMap<String, Object> h = nativeThemeRes.getThemeMap(nativeThemeRes.getThemeResourceNames()[0]);
                 injectDesktopThemeConstants(h);
-                UIManager.getInstance().setThemeProps(h);
+                UIManager.getInstance().setThemeMap(h);
             }
         }
     }
@@ -3474,7 +3474,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     /// them on mobile because this method is a no-op there. Values come from the static config
     /// (set by the generated desktop Stub) with a {@code codename1.arg.desktop.*} system-property
     /// fallback so build hints work too.
-    private void injectDesktopThemeConstants(Hashtable h) {
+    private void injectDesktopThemeConstants(HashMap<String, Object> h) {
         if (h == null || !isDesktop()) {
             return;
         }

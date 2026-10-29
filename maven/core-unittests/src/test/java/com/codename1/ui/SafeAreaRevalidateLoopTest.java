@@ -33,11 +33,14 @@ import com.codename1.ui.events.StyleListener;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * A safe-area container writes inset padding onto its own style, measures or lays out
  * with it, and hands the padding straight back. That round trip must be silent.
+ *
+ * <p>The comment below is kept as the history of why.</p>
  *
  * <p>It used to announce the setting half as a PADDING style change, and
  * {@link Component#styleChanged} answers a PADDING change by queueing a
@@ -80,7 +83,7 @@ class SafeAreaRevalidateLoopTest extends UITestBase {
     }
 
     @FormTest
-    void measuringASafeAreaContainerAnnouncesItsPadding() {
+    void measuringASafeAreaContainerIsSilent() {
         Form f = Display.getInstance().getCurrent();
         Container inner = notchedSafeAreaForm(f);
 
@@ -88,18 +91,33 @@ class SafeAreaRevalidateLoopTest extends UITestBase {
         inner.getStyle().addStyleListener(rec);
         inner.setShouldCalcPreferredSize(true);
         inner.getPreferredSize();
+        inner.layoutContainer();
         inner.getStyle().removeStyleListener(rec);
 
-        // It DOES announce, and that is load-bearing -- see the comment on the
-        // snapToSafeAreaInternal call in Container. Suppressing it removes the
-        // revalidate treadmill, and with it the repaints that peer components
-        // depend on: the JavaSE video peer fills its buffer from the AWT side
-        // and never requests a repaint itself, so with nothing else repainting
-        // the form its frames decode correctly and never reach the screen.
-        // Pinned so the optimisation is not reinstated without first making
-        // peers drive their own repaints.
-        assertTrue(rec.properties.size() > 0,
-                "measuring a safe-area container must still announce its padding");
+        assertTrue(rec.properties.isEmpty(),
+                "the safe-area round trip announced " + rec.properties);
+    }
+
+    /**
+     * What the announcement used to hide: a component painted by its parent
+     * kept the flag its own full repaint() set, so each later region repaint --
+     * a peer's new video frame -- was dropped as already covered.
+     */
+    @FormTest
+    void aRegionRepaintAfterAParentPaintIsKept() {
+        Form f = Display.getInstance().getCurrent();
+        f.setLayout(new BorderLayout());
+        Label child = new Label("peer");
+        f.add(BorderLayout.CENTER, child);
+        f.show();
+        f.layoutContainer();
+
+        child.repaint();
+        Image img = Image.createImage(f.getWidth(), f.getHeight());
+        f.paintComponent(img.getGraphics(), true);
+
+        child.repaint(child.getAbsoluteX(), child.getAbsoluteY(), 4, 4);
+        assertNotNull(child.getDirtyRegion(), "a region repaint after the parent painted was dropped");
     }
 
 }

@@ -36,6 +36,9 @@
 #include <process.h>   /* _beginthreadex */
 #include <stdlib.h>
 #include <errno.h>
+#include <stdio.h>
+#include <string.h>
+#include <wchar.h>
 
 #include "cn1_win_compat.h"
 
@@ -563,6 +566,71 @@ int cn1_win_zone_offset_millis(const char* zoneId, long long millis, int* offset
         *rawOut = (int) zoneOffset;
     }
     return 1;
+}
+
+FILE* cn1_win_fopen_utf8(const char* path, const char* mode) {
+    wchar_t wmode[8];
+    wchar_t* wide;
+    wchar_t* full;
+    wchar_t* target;
+    DWORD fullLen;
+    int wideLen;
+    int i;
+    FILE* f;
+    for(i = 0; mode[i] != 0 && i < 7; i++) {
+        wmode[i] = (wchar_t)(unsigned char)mode[i];
+    }
+    wmode[i] = 0;
+    wideLen = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path, -1, NULL, 0);
+    if(wideLen <= 0) {
+        errno = EINVAL;
+        return NULL;
+    }
+    wide = (wchar_t*)malloc(sizeof(wchar_t) * (size_t)wideLen);
+    if(wide == NULL) {
+        errno = ENOMEM;
+        return NULL;
+    }
+    MultiByteToWideChar(CP_UTF8, 0, path, -1, wide, wideLen);
+    /* Already prefixed, or short enough for the classic API: as given. */
+    if(wideLen - 1 < MAX_PATH - 12 || wcsncmp(wide, L"\\\\?\\", 4) == 0) {
+        f = _wfopen(wide, wmode);
+        free(wide);
+        return f;
+    }
+    fullLen = GetFullPathNameW(wide, 0, NULL, NULL);
+    if(fullLen == 0) {
+        f = _wfopen(wide, wmode);
+        free(wide);
+        return f;
+    }
+    /* Room for \\?\ or \\?\UNC\ in front of the resolved path. */
+    full = (wchar_t*)malloc(sizeof(wchar_t) * ((size_t)fullLen + 8));
+    if(full == NULL) {
+        free(wide);
+        errno = ENOMEM;
+        return NULL;
+    }
+    target = full + 8;
+    if(GetFullPathNameW(wide, fullLen, target, NULL) == 0) {
+        f = _wfopen(wide, wmode);
+        free(full);
+        free(wide);
+        return f;
+    }
+    if(target[0] == L'\\' && target[1] == L'\\') {
+        /* \\server\share\x becomes \\?\UNC\server\share\x */
+        target += 2;
+        target -= 8;
+        memcpy(target, L"\\\\?\\UNC\\", 8 * sizeof(wchar_t));
+    } else {
+        target -= 4;
+        memcpy(target, L"\\\\?\\", 4 * sizeof(wchar_t));
+    }
+    f = _wfopen(target, wmode);
+    free(full);
+    free(wide);
+    return f;
 }
 
 #endif /* _WIN32 */

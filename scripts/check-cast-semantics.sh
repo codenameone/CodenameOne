@@ -26,7 +26,9 @@ TRANSLATOR="$REPO_ROOT/vm/ByteCodeTranslator/target/classes"
 # Android sources -- maven/android-compat, whose runtime the build relocates into
 # the application's own classes. An application with Swing, SwingX or JavaFX sources gets the same
 # treatment from maven/swing-compat and maven/javafx-compat: their classes are
-# relocated into the application and translated with it. Nothing else of ours,
+# relocated into the application and translated with it, and so does
+# maven/compose-compat for an application with Kotlin Multiplatform sources.
+# Nothing else of ours,
 # but for OPTIONAL_ROOTS below.
 # Deliberately NOT covered, for the one reason: the code runs on a VM whose
 # CHECKCAST does throw, so its catch(ClassCastException) handlers are live and
@@ -44,6 +46,7 @@ DEFAULT_ROOTS=(
   "maven/javafx-compat/target/classes"
   # The Python runtime ships inside every application with Python sources.
   "maven/python-runtime/target/classes"
+  "maven/compose-compat/target/classes"
 )
 # Translated too, but built only under the unity-compat Maven profile, which
 # needs the .NET SDK: maven/unity-compat, the runtime an application with Unity

@@ -303,8 +303,8 @@ public class TypeInstruction extends Instruction {
                     // set, so it never takes the class monitor and cannot rely on
                     // the monitor's release. Pairs with the __ATOMIC_RELEASE store
                     // in ByteCodeClass. A plain load here let a thread see the flag
-                    // set while the vtable / classToInterfaceMap rows it describes
-                    // were still invisible.
+                    // set while the vtable it describes was still invisible. (Interface
+                    // dispatch maps were once built here too; they are constant data now.)
                     if(stackBuilderBytes > 0) {
                         b.append("cn1StackBufferReset(&__cn1sbscope_").append(stackAllocId).append("); ");
                     }

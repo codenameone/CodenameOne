@@ -191,6 +191,29 @@ class GeneralPathTest extends UITestBase {
         assertFalse(path.intersect(noOverlap));
     }
 
+    /// A rounded rectangle cut by a clip that crosses its corners: the curves
+    /// running right to left made the crossing count -1, which segmenting
+    /// mistook for an unsupported curve order and threw.
+    @Test
+    void testIntersectRoundedRectangleAcrossCorners() {
+        GeneralPath path = new GeneralPath();
+        path.moveTo(10, 0);
+        path.lineTo(90, 0);
+        path.quadTo(100, 0, 100, 10);
+        path.lineTo(100, 40);
+        path.quadTo(100, 50, 90, 50);
+        path.lineTo(10, 50);
+        path.quadTo(0, 50, 0, 40);
+        path.lineTo(0, 10);
+        path.quadTo(0, 0, 10, 0);
+        path.closePath();
+        assertTrue(path.intersect(new Rectangle(-5, 5, 110, 30)));
+        Rectangle bounds = path.getBounds();
+        assertEquals(0, bounds.getX());
+        assertEquals(100, bounds.getX() + bounds.getWidth());
+        assertTrue(bounds.getY() >= 5 && bounds.getY() + bounds.getHeight() <= 35);
+    }
+
     @Test
     void testEqualsWithTransform() {
         GeneralPath original = new GeneralPath();

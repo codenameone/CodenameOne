@@ -82,6 +82,7 @@ public final class Backend {
         // The class library's host: MessageDigest and SecureRandom ask it for
         // digests and random bytes on a ParparVM server (a no-op on the JDK).
         ClassLibraryHost.install();
+        Crypto.installCryptoEngine();
     }
 
     private final HttpServer server;

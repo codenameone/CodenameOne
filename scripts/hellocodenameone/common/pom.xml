@@ -87,6 +87,50 @@
             </dependencies>
         </profile>
 
+        <!-- Kotlin Multiplatform and Compose, as the archetype's compose profile:
+             active while src/main/kmp exists. The KmpCompat* screenshot tests
+             embed those screens through com.codename1.compose.ComposeView. The
+             Compose compiler is a kotlinc plugin added to the kotlin profile's
+             compiler. Java and Kotlin already target 17 here, above the 11 that
+             Compose's inline functions need. -->
+        <profile>
+            <id>compose</id>
+            <activation>
+                <file>
+                    <exists>${basedir}/src/main/kmp</exists>
+                </file>
+            </activation>
+            <repositories>
+                <!-- androidx.compose.runtime is published to Google's repository only. -->
+                <repository>
+                    <id>google</id>
+                    <url>https://maven.google.com</url>
+                </repository>
+            </repositories>
+            <dependencies>
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>codenameone-compose-compat</artifactId>
+                </dependency>
+            </dependencies>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.jetbrains.kotlin</groupId>
+                        <artifactId>kotlin-maven-plugin</artifactId>
+                        <version>${kotlin.version}</version>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.jetbrains.kotlin</groupId>
+                                <artifactId>kotlin-compose-compiler-plugin-embeddable</artifactId>
+                                <version>${kotlin.version}</version>
+                            </dependency>
+                        </dependencies>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
         <!-- A profile to install Codename One support libraries to your home directory
             if they aren't installed yet. -->
         <profile>
@@ -148,7 +192,9 @@
                 </file>
             </activation>
             <properties>
-                <kotlin.version>1.6.0</kotlin.version>
+                <!-- One Kotlin for the module: the one codenameone-compose-compat and
+                     the archetype use, which the Compose compiler plugin must equal. -->
+                <kotlin.version>2.2.10</kotlin.version>
                 <kotlin.compiler.incremental>true</kotlin.compiler.incremental>
             </properties>
             <dependencies>
@@ -163,7 +209,7 @@
                 <dependency>
                     <groupId>org.jetbrains</groupId>
                     <artifactId>annotations</artifactId>
-                    <version>13.0</version>
+                    <version>${kotlin.annotations.version}</version>
                 </dependency>
                 <dependency>
                     <groupId>com.codenameone</groupId>
@@ -212,6 +258,9 @@
                                         <sourceDir>${android.gallery.dir}/kotlin</sourceDir>
                                         <sourceDir>${android.gallery.dir}/java</sourceDir>
                                         <sourceDir>${project.build.directory}/generated-sources/android</sourceDir>
+                                        <!-- Compose sources (src/main/kmp), as cn1:import-kmp-project lays them out. -->
+                                        <sourceDir>${project.basedir}/src/main/kmp/commonMain/kotlin</sourceDir>
+                                        <sourceDir>${project.basedir}/src/main/kmp/jvmMain/kotlin</sourceDir>
                                     </sourceDirs>
                                     <args>
                                         <arg>-no-reflect</arg>
@@ -517,8 +566,7 @@
                  build that does not used to name the libraries one by one, and
                  the one nobody had named was left out of the translation - the
                  application then failed in C, on the header of a class no
-                 source directory supplied. Kotlin's runtime is the exception:
-                 those builds stage it themselves. -->
+                 source directory supplied. -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-dependency-plugin</artifactId>
@@ -532,7 +580,13 @@
                         </goals>
                         <configuration>
                             <includeScope>runtime</includeScope>
-                            <excludeGroupIds>org.jetbrains.kotlin,org.jetbrains</excludeGroupIds>
+                            <!-- Nothing excluded, Kotlin's runtime included: these
+                                 builds must translate the stdlib the application was
+                                 compiled against (a Compose app needs 2.x classes such
+                                 as kotlin.coroutines.jvm.internal.SpillingKt). An
+                                 excludeGroupIds of org.jetbrains also matched
+                                 org.jetbrains.kotlinx as a prefix and dropped
+                                 kotlinx.coroutines. -->
                             <excludes>META-INF/**</excludes>
                             <outputDirectory>${project.build.directory}/translation-libs</outputDirectory>
                         </configuration>

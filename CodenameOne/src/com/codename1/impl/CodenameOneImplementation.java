@@ -13788,7 +13788,7 @@ public abstract class CodenameOneImplementation {
     ///
     /// #### Parameters
     ///
-    /// - `hashAlgorithm`: the PRF hash, currently always `"SHA-256"`
+    /// - `hashAlgorithm`: the PRF hash, `"SHA-256"` or `"SHA-512"`
     ///
     /// - `password`: the password bytes, already UTF-8 encoded by the caller. Implementations
     ///   must not re-encode, normalise or null-terminate them: the derived bytes have to match
@@ -13813,6 +13813,13 @@ public abstract class CodenameOneImplementation {
     /// translated JavaScript; it does not.
     public byte[] pbkdf2(String hashAlgorithm, byte[] password, byte[] salt, int iterations, int length) {
         return null;
+    }
+
+    /// The [com.codename1.security.CryptoEngine] Codename One installs when it initializes
+    /// this port. The default routes PBKDF2 to [#pbkdf2] and accelerates nothing else; a port
+    /// with native kernels returns an engine that overrides more of it. Never null.
+    public com.codename1.security.CryptoEngine createCryptoEngine() {
+        return new com.codename1.security.PortCryptoEngine(this);
     }
 
     /// One storage entry is definitely absent.

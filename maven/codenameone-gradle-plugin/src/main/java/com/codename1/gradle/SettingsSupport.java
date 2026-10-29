@@ -71,6 +71,10 @@ final class SettingsSupport {
             repo.setUrl(toUri(url));
         });
         repositories.mavenCentral();
+        // The Compose runtime that Kotlin Multiplatform sources compile against
+        // (through compose-compat) is published only to Google's repository.
+        // Limited to androidx, so it never answers for anything else.
+        repositories.google(repo -> repo.content(c -> c.includeGroupByRegex("androidx\\..*")));
     }
 
     /// Adds the repositories to a project that has none, when the plugin was

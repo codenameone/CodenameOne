@@ -157,6 +157,11 @@ public class Font extends CN {
 
     private static final Hashtable bitmapCache = new Hashtable();
     private static final HashMap<String, Font> derivedFontCache = new HashMap<String, Font>();
+    /// What [#derive(float, int)] made, per unique id. A hit costs a map lookup
+    /// and a short scan, and allocates nothing: a String key of id, size and
+    /// weight made three objects per call even when the font was already there,
+    /// and a theme load derives every font of every style.
+    private static final HashMap<String, Font[]> derivedBySize = new HashMap<String, Font[]>();
 
     /// Internal theme hook: inherit only native UI fonts, never icon or bundled fonts.
     public Font deriveNativeThemeFont(String family, float size) {
@@ -187,12 +192,14 @@ public class Font extends CN {
     /// constants instead of returning a stale pre-theme paint.
     public static void clearDerivedFontCache() {
         derivedFontCache.clear();
+        derivedBySize.clear();
     }
     private static Font defaultFont = new Font(null);
     private static boolean enableBitmapFont = true;
     private static float fontReturnedHeight;
     private Object font;
     private boolean ttf;
+    private int derivedWeight;
     private float pixelSize = -1;    // for derived fonts only, the size that was requested
     private String fontUniqueId;
 
@@ -725,16 +732,39 @@ public class Font extends CN {
     public Font derive(float sizePixels, int weight) {
         if (fontUniqueId != null) {
             // derive should recycle instances of Font to allow smarter caching and logic on the native side of the fence
+            Font[] derived = derivedBySize.get(fontUniqueId);
+            int count = 0;
+            if (derived != null) {
+                int bits = Float.floatToIntBits(sizePixels);
+                for (; count < derived.length && derived[count] != null; count++) {
+                    Font d = derived[count];
+                    if (d.derivedWeight == weight && Float.floatToIntBits(d.pixelSize) == bits) {
+                        return d;
+                    }
+                }
+            }
+            // A miss falls back to the shared cache, whose keys createTrueTypeFont
+            // also writes: a derive of a font it made, at that font's own size,
+            // answers that font rather than a second native one, and the reverse.
             String key = fontUniqueId + "_" + sizePixels + "_" + weight;
             Font f = derivedFontCache.get(key);
-            if (f != null) {
-                return f;
+            if (f == null) {
+                f = new Font(Display.impl.deriveTrueTypeFont(font, sizePixels, weight));
+                f.pixelSize = sizePixels;
+                f.fontUniqueId = fontUniqueId;
+                f.ttf = true;
+                derivedFontCache.put(key, f);
             }
-            f = new Font(Display.impl.deriveTrueTypeFont(font, sizePixels, weight));
-            f.pixelSize = sizePixels;
-            f.fontUniqueId = fontUniqueId;
-            f.ttf = true;
-            derivedFontCache.put(key, f);
+            f.derivedWeight = weight;
+            if (derived == null || count == derived.length) {
+                Font[] grown = new Font[derived == null ? 4 : derived.length * 2];
+                if (derived != null) {
+                    System.arraycopy(derived, 0, grown, 0, derived.length);
+                }
+                derived = grown;
+                derivedBySize.put(fontUniqueId, derived);
+            }
+            derived[count] = f;
             return f;
         } else {
             // not sure if this ever happens but don't want to break that code

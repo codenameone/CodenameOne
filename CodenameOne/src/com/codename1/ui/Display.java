@@ -563,6 +563,7 @@ public final class Display extends CN1Constants {
 
             impl.setDisplayLock(lock);
             impl.initImpl(m);
+            com.codename1.security.CryptoEngine.install(impl.createCryptoEngine());
             INSTANCE.codenameOneGraphics = new Graphics(impl.getNativeGraphics());
             // A monitor listener registered before this point could not start the
             // port watching for display changes, because there was no implementation

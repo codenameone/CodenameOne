@@ -2932,6 +2932,13 @@ public class Container extends Component implements Iterable<Component> {
         }
 
         boolean changed = false;
+        // The padding set here lives for one measurement: the caller hands it
+        // straight back to TmpInsets.restore, which suppresses its events too.
+        // Announcing it made Component.styleChanged queue a revalidate of the
+        // whole Form from inside its own layout, so every pass queued the next
+        // and a form with a safe-area container never stopped laying out.
+        boolean suppressEvents = style.isSuppressChangeEvents();
+        style.setSuppressChangeEvents(true);
         if (newPaddingTop != paddingTop || newPaddingBottom != paddingBottom) {
             if (!hasScrollableYParentInternal()) {
                 changed = true;
@@ -2964,31 +2971,26 @@ public class Container extends Component implements Iterable<Component> {
 
             }
         }
+        style.setSuppressChangeEvents(suppressEvents);
+        if (changed && !shouldCalcPreferredSize) {
+            // What the suppressed PADDING event did, minus its revalidateLater
+            // of the parent: this and every nested container measure and lay
+            // out again against the snapped padding. Without it a nested
+            // container kept a layout made for the unsnapped one.
+            setShouldCalcPreferredSize(true);
+        }
         return changed;
 
     }
 
-    // NOT suppressed, deliberately -- see the history before changing this.
-    //
-    // The padding written by the safe-area snap is scaffolding: doLayout and
-    // calcPreferredSize set it, use it for one measurement, and hand it straight
-    // back to TmpInsets.restore, which has always suppressed events. Only the
-    // SETTING half announces, and a padding change is exactly what
-    // Component.styleChanged answers with revalidateLater() on the parent -- so
-    // laying out a safe-area container queues another revalidate of the whole
-    // Form, which lays it out again, which queues another. On a busy event
-    // dispatch thread that treadmill measured ~200ms per pass against ~15ms of
-    // real painting.
-    //
-    // Suppressing the announcement removes the treadmill and is WRONG here
-    // anyway: peer components rely on those repaints. The JavaSE video peer
-    // fills its buffer from the AWT side and never asks for a repaint itself
-    // (Peer.paint deliberately calls paintOnBuffer rather than cnt.repaint, to
-    // avoid a loop), so with nothing else repainting the form its frames never
-    // reach the screen -- a video that decoded correctly and displayed nothing.
-    //
-    // Fixing the treadmill therefore needs the peers to drive their own
-    // repaints first; until then the wasted passes are the cheaper defect.
+    // The safe-area snap's padding is suppressed (see snapToSafeAreaInternal).
+    // It was once left announcing because peers seemed to depend on the
+    // resulting treadmill: the JavaSE video peer showed nothing without it. The
+    // real cause was Component.repaint(int, int, int, int) dropping every
+    // region repaint while repaintPending was still set, and that flag was only
+    // cleared when the component was painted as a root -- never when a parent
+    // painted it. Component.paintInternal now clears it too, so a peer's own
+    // region repaints reach the screen without the form laying out each cycle.
 
     void doLayout() {
         doLayoutDepth++;

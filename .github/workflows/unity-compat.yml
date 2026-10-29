@@ -330,7 +330,7 @@ jobs:
         run: |
           rm -rf ~/.m2/repository/com/codenameone/codenameone-unity-compat ~/.m2/repository/com/codenameone/codenameone-cil-translator
           cd maven
-          bash ../scripts/ci/retry.sh xvfb-run -a mvn -B install -Plocal-dev-javase -DskipTests -Darchetype.test.skip=true -Dmaven.javadoc.skip=true -pl codenameone-maven-plugin,cn1-ads-mock,android-compat -am
+          bash ../scripts/ci/retry.sh xvfb-run -a mvn -B install -Plocal-dev-javase -DskipTests -Darchetype.test.skip=true -Dmaven.javadoc.skip=true -pl codenameone-maven-plugin,cn1-ads-mock,compose-compat,android-compat -am
           test ! -e ~/.m2/repository/com/codenameone/codenameone-unity-compat
       - name: Unpack the Unity gallery prebuilt
         uses: ./.github/actions/unity-gallery-prebuilt

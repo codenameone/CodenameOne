@@ -34,6 +34,7 @@ package com.codename1.util;
 /// - Modular exponentiation between `TBigInteger` numbers.
 ///
 /// - Modular inverse of a `TBigInteger` numbers.
+@com.codename1.impl.SharedWithBackend
 final class TDivision {
 
     private TDivision() {}
@@ -472,8 +473,8 @@ final class TDivision {
     /// - #gcdBinary(TBigInteger, TBigInteger)
     static long gcdBinary(long op1, long op2) {
         // PRE: (op1 > 0) and (op2 > 0)
-        int lsb1 = TBigDecimal.numberOfTrailingZeros(op1);
-        int lsb2 = TBigDecimal.numberOfTrailingZeros(op2);
+        int lsb1 = TBitLevel.numberOfTrailingZeros(op1);
+        int lsb2 = TBitLevel.numberOfTrailingZeros(op2);
         int pow2Count = Math.min(lsb1, lsb2);
 
         if (lsb1 != 0) {
@@ -485,10 +486,10 @@ final class TDivision {
         do {
             if (op1 >= op2) {
                 op1 -= op2;
-                op1 >>>= TBigDecimal.numberOfTrailingZeros(op1);
+                op1 >>>= TBitLevel.numberOfTrailingZeros(op1);
             } else {
                 op2 -= op1;
-                op2 >>>= TBigDecimal.numberOfTrailingZeros(op2);
+                op2 >>>= TBitLevel.numberOfTrailingZeros(op2);
             }
         } while (op1 != 0);
         return (op2 << pow2Count);

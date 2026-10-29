@@ -42,6 +42,7 @@ public class ByteCodeField {
     private Object value;
     private boolean privateField;
     private final boolean volatileField;
+    private final String descriptor;
     
     public ByteCodeField(String clsName, int access, String name, String desc, String signature, Object value) {
         this.clsName = clsName;
@@ -54,6 +55,7 @@ public class ByteCodeField {
         finalField = (access & Opcodes.ACC_FINAL) == Opcodes.ACC_FINAL;
         volatileField = (access & Opcodes.ACC_VOLATILE) == Opcodes.ACC_VOLATILE;
         fieldName = name.replace('$', '_').replace('-', '_');
+        descriptor = desc;
 
         arrayDimensions = 0;
         while(desc.startsWith("[")) {
@@ -101,6 +103,11 @@ public class ByteCodeField {
                 primitiveType = PrimitiveType.CHAR;
                 break;
         }
+    }
+
+    /// The JVM descriptor the field was declared with, e.g. `Ljava/lang/Object;`.
+    public String getDescriptor() {
+        return descriptor;
     }
 
     public String getFieldName() {

@@ -42,6 +42,7 @@ on:
       # The device key, request signing, the vault, the shield and the second
       # factor are all the core's.
       - 'CodenameOne/src/com/codename1/security/**'
+      - 'CodenameOne/src/com/codename1/crypto/**'
       # P-256 runs on the core's big numbers.
       - 'CodenameOne/src/com/codename1/util/BigInteger.java'
       - 'CodenameOne/src/com/codename1/util/BigDecimal.java'
@@ -97,6 +98,7 @@ on:
       # The device key, request signing, the vault, the shield and the second
       # factor are all the core's.
       - 'CodenameOne/src/com/codename1/security/**'
+      - 'CodenameOne/src/com/codename1/crypto/**'
       # P-256 runs on the core's big numbers.
       - 'CodenameOne/src/com/codename1/util/BigInteger.java'
       - 'CodenameOne/src/com/codename1/util/BigDecimal.java'

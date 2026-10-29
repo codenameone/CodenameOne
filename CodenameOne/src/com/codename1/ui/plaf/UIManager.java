@@ -289,7 +289,7 @@ public class UIManager {
         nativeBorderDerived.clear();
     }
 
-    private void recordNativeThemeOwnership(Hashtable incoming) {
+    private void recordNativeThemeOwnership(HashMap<String, Object> incoming) {
         if (refreshingTheme) {
             return;
         }
@@ -303,14 +303,14 @@ public class UIManager {
                 nativeBaseFontSize = nativeFontSize((Font) base);
             }
         }
-        for (Object item : incoming.keySet()) {
-            String key = (String) item;
+        for (Map.Entry<String, Object> e : incoming.entrySet()) {
+            String key = e.getKey();
             if (key.startsWith("@")) {
                 if (!nativeLayer) {
                     applicationConstants.add(key.substring(1));
                 }
             } else if (nativeLayer) {
-                if (incoming.get(key) instanceof Font) {
+                if (e.getValue() instanceof Font) {
                     nativeFontKeys.add(key);
                 }
                 if (key.endsWith("border")) {
@@ -566,7 +566,7 @@ public class UIManager {
     /// Resources theme = null;
     /// try {
     ///     theme = Resources.openLayered(resourceFile);
-    ///     UIManager.getInstance().setThemeProps(theme.getTheme(theme.getThemeResourceNames()[0]));
+    ///     UIManager.getInstance().setThemeMap(theme.getThemeMap(theme.getThemeResourceNames()[0]));
     /// } catch (IOException e) {
     ///     Log.e(e);
     /// }
@@ -582,7 +582,7 @@ public class UIManager {
     public static Resources initFirstTheme(String resourceFile) {
         try {
             Resources theme = Resources.openLayered(resourceFile);
-            UIManager.getInstance().setThemeProps(theme.getTheme(theme.getThemeResourceNames()[0]));
+            UIManager.getInstance().setThemeMap(theme.getThemeMap(theme.getThemeResourceNames()[0]));
             Resources.setGlobalResources(theme);
             return theme;
         } catch (IOException e) {
@@ -605,7 +605,7 @@ public class UIManager {
     public static Resources initNamedTheme(String resourceFile, String resName) {
         try {
             Resources theme = Resources.openLayered(resourceFile);
-            UIManager.getInstance().setThemeProps(theme.getTheme(resName));
+            UIManager.getInstance().setThemeMap(theme.getThemeMap(resName));
             Resources.setGlobalResources(theme);
             return theme;
         } catch (IOException e) {
@@ -1113,11 +1113,46 @@ public class UIManager {
     ///
     /// - `themeProps`: the properties of the given theme
     public void setThemeProps(Hashtable themeProps) {
+        setThemePropsFrom(themeMap(themeProps), themeProps);
+    }
+
+    /// Allows manual theme loading from a map of key/value pairs. Prefer this to
+    /// [#setThemeProps(Hashtable)]: a `HashMap` is what the theme is built from,
+    /// so nothing is copied, and its loops compile to direct table walks with
+    /// no iterator and no locking.
+    ///
+    /// #### Parameters
+    ///
+    /// - `themeProps`: the properties of the given theme
+    public void setThemeMap(HashMap<String, Object> themeProps) {
+        setThemePropsFrom(themeProps, themeProps);
+    }
+
+    /// A legacy theme table as the map the theme is built from. Keys that are
+    /// not strings are not theme entries and are left out.
+    private static HashMap<String, Object> themeMap(Hashtable themeProps) {
+        if (themeProps == null) {
+            return null;
+        }
+        HashMap<String, Object> map = new HashMap<String, Object>(themeProps.size() * 2);
+        Enumeration e = themeProps.keys();
+        while (e.hasMoreElements()) {
+            Object key = e.nextElement();
+            if (key instanceof String) {
+                map.put((String) key, themeProps.get(key));
+            }
+        }
+        return map;
+    }
+
+    /// `source` is what the theme listeners are handed: the table the caller
+    /// passed, so a listener written against the legacy API still sees one.
+    private void setThemePropsFrom(HashMap<String, Object> themeProps, Object source) {
         // Replacing the whole theme supersedes a deferred base theme: it would be
         // reset away here before anything saw it. See setDeferredBaseTheme.
         deferredBaseTheme = null;
         if (accessible) {
-            setThemePropsImpl(themeProps);
+            setThemePropsImpl(themeProps, source);
         }
         wasThemeInstalled = true;
     }
@@ -1129,7 +1164,7 @@ public class UIManager {
     /// - `installedTheme`: @param installedTheme the theme to be installed or null, this is used
     /// to check if style inheritance is used in which case we must NOT init
     /// style defaults for that particular component
-    private void resetThemeProps(Hashtable installedTheme) {
+    private void resetThemeProps(HashMap<String, Object> installedTheme) {
         themeProps = new HashMap<String, Object>();
         wasThemeInstalled = false;
         if (current == null) {
@@ -2064,6 +2099,17 @@ public class UIManager {
     ///
     /// - `themeProps`: the properties of the given theme
     public void addThemeProps(Hashtable themeProps) {
+        addThemeMap(themeMap(themeProps));
+    }
+
+    /// Adds the given theme properties on top of the existing properties without
+    /// clearing the existing theme first. Prefer this to [#addThemeProps(Hashtable)],
+    /// which copies the table into a map first.
+    ///
+    /// #### Parameters
+    ///
+    /// - `themeProps`: the properties of the given theme
+    public void addThemeMap(HashMap<String, Object> themeProps) {
         // Layered ON the base theme, so a deferred one has to be installed first.
         ensureBaseTheme();
         if (accessible) {
@@ -2098,17 +2144,11 @@ public class UIManager {
     /// staying in place). For each style key being re-set by the incoming
     /// load that does NOT re-assert its binding, drop the matching binding
     /// from `themeConstants` so the new literal wins.
-    private void dropSupersededBindings(Hashtable themeProps) {
+    private void dropSupersededBindings(HashMap<String, Object> themeProps) {
         if (themeProps == null || themeConstants == null || themeConstants.isEmpty()) {
             return;
         }
-        Enumeration e = themeProps.keys();
-        while (e.hasMoreElements()) {
-            Object keyObj = e.nextElement();
-            if (!(keyObj instanceof String)) {
-                continue;
-            }
-            String key = (String) keyObj;
+        for (String key : themeProps.keySet()) {
             if (key.startsWith("@")) {
                 continue;
             }
@@ -2232,10 +2272,7 @@ public class UIManager {
         }
         restoreLargerTextFonts();
         restoreNativeThemeValues();
-        Hashtable props = new Hashtable();
-        for (Map.Entry<String, Object> e : themeProps.entrySet()) {
-            props.put(e.getKey(), e.getValue());
-        }
+        HashMap<String, Object> props = new HashMap<String, Object>(themeProps);
         // buildTheme strips `@`-prefixed constants into themeConstants and
         // drops them from the main themeProps map. Round-tripping through
         // setThemePropsImpl would therefore lose every constant - so
@@ -2248,7 +2285,7 @@ public class UIManager {
         }
         refreshingTheme = true;
         try {
-            setThemePropsImpl(props);
+            setThemePropsImpl(props, props);
         } finally {
             refreshingTheme = false;
         }
@@ -2377,7 +2414,12 @@ public class UIManager {
         return o;
     }
 
+    // for internal use by the resource editor, which installs a theme it is editing
     void setThemePropsImpl(Hashtable themeProps) {
+        setThemePropsImpl(themeMap(themeProps), themeProps);
+    }
+
+    void setThemePropsImpl(HashMap<String, Object> themeProps, Object source) {
         if (!refreshingTheme && buildThemeDepth == 0) {
             restoreNativeBorderColors();
             nativeFontKeys.clear();
@@ -2394,7 +2436,7 @@ public class UIManager {
         themeGeneration++;
         imageCache.clear();
         if (themelisteners != null) {
-            themelisteners.fireActionEvent(new ActionEvent(themeProps, ActionEvent.Type.Theme));
+            themelisteners.fireActionEvent(new ActionEvent(source, ActionEvent.Type.Theme));
         }
         buildTheme(themeProps);
         breakTitleAreaToolbarDeriveCycle();
@@ -2444,7 +2486,7 @@ public class UIManager {
         }
     }
 
-    private void buildTheme(Hashtable themeProps) {
+    private void buildTheme(HashMap<String, Object> themeProps) {
         buildThemeDepth++;
         try {
             buildThemeImpl(themeProps);
@@ -2453,7 +2495,7 @@ public class UIManager {
         }
     }
 
-    private void buildThemeImpl(Hashtable themeProps) {
+    private void buildThemeImpl(HashMap<String, Object> themeProps) {
         // A new theme may change constants that the platform consults while deriving
         // fonts (e.g. a native theme's text letter spacing). Flush the derived-font
         // cache so those fonts are rebuilt against the incoming constants rather than
@@ -2472,16 +2514,14 @@ public class UIManager {
         if (!refreshingTheme && !"true".equals(themeProps.get("@nativeThemeDefaultsBool"))) {
             dropSupersededBindings(themeProps);
         }
-        Enumeration e = themeProps.keys();
-        while (e.hasMoreElements()) {
-            String key = (String) e.nextElement();
-
+        for (Map.Entry<String, Object> e : themeProps.entrySet()) {
+            String key = e.getKey();
             // this is a constant not a theme entry
             if (key.startsWith("@")) {
-                themeConstants.put(key.substring(1), themeProps.get(key));
+                themeConstants.put(key.substring(1), e.getValue());
                 continue;
             }
-            this.themeProps.put(key, themeProps.get(key));
+            this.themeProps.put(key, e.getValue());
         }
 
         String overlayThemes = (String) themeProps.get("@OverlayThemes");
@@ -2496,7 +2536,7 @@ public class UIManager {
                     Resources res = Resources.openLayered("/" + th);
                     boolean a = accessible;
                     accessible = true;
-                    addThemeProps(res.getTheme(res.getThemeResourceNames()[0]));
+                    addThemeMap(res.getThemeMap(res.getThemeResourceNames()[0]));
                     accessible = a;
                 } catch (Exception ex) {
                     System.err.println("Failed to load overlay theme file specified by @overlayThemes theme constant: " + th);
@@ -2586,6 +2626,10 @@ public class UIManager {
             return;
         }
         final String prefix = "cn1-bind:";
+        // One normalized copy per override: every key bound to `--accent-color`
+        // shares the String it resolves to, where normalizing per key stored 230
+        // equal copies of the same few colors in the theme.
+        HashMap<String, String> normalized = null;
         for (Map.Entry<String, Object> entry : themeConstants.entrySet()) {
             String constantKey = entry.getKey();
             if (constantKey == null || !constantKey.startsWith(prefix)) {
@@ -2616,9 +2660,17 @@ public class UIManager {
             }
             String overrideValue = (String) override;
             if (themeKey.endsWith("Color")) {
-                overrideValue = normalizeBoundColorValue(overrideValue);
+                if (normalized == null) {
+                    normalized = new HashMap<String, String>();
+                }
+                String raw = overrideValue;
+                overrideValue = normalized.get(raw);
                 if (overrideValue == null) {
-                    continue;
+                    overrideValue = normalizeBoundColorValue(raw);
+                    if (overrideValue == null) {
+                        continue;
+                    }
+                    normalized.put(raw, overrideValue);
                 }
             }
             themeProps.put(themeKey, overrideValue);
@@ -2657,6 +2709,9 @@ public class UIManager {
         }
     }
 
+    /// Scratch for `normalizeBoundColorValue`, which always produces 6 digits.
+    private static final char[] HEX_COLOR_BUFFER = new char[6];
+
     /// `loadTheme` stores color theme entries as plain hex strings (no `#`,
     /// lowercase). User-supplied overrides may use either form, so trim a
     /// leading `#` and lowercase the value before assigning it to a bound
@@ -2667,29 +2722,34 @@ public class UIManager {
             return null;
         }
         String value = raw.trim();
-        if (value.length() == 0) {
+        int len = value.length();
+        int start = len > 0 && value.charAt(0) == '#' ? 1 : 0;
+        int digits = len - start;
+        if (digits != 3 && digits != 6) {
             return null;
         }
-        if (value.charAt(0) == '#') {
-            value = value.substring(1);
-        }
-        if (value.length() == 3) {
-            char r = value.charAt(0);
-            char g = value.charAt(1);
-            char b = value.charAt(2);
-            value = "" + r + r + g + g + b + b;
-        }
-        if (value.length() != 6) {
-            return null;
-        }
-        for (int i = 0; i < 6; i++) {
-            char c = value.charAt(i);
-            boolean hex = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
-            if (!hex) {
+        // One pass into a reused buffer: validate, expand the 3-digit form and
+        // fold hex digits by hand, since toLowerCase() is locale sensitive.
+        // Themes are installed from one thread at a time, as the rest of
+        // UIManager assumes.
+        char[] c = HEX_COLOR_BUFFER;
+        boolean changed = start != 0 || digits == 3;
+        for (int i = 0; i < digits; i++) {
+            char x = value.charAt(start + i);
+            if (x >= 'A' && x <= 'F') {
+                x = (char) (x + 32);
+                changed = true;
+            } else if (!((x >= '0' && x <= '9') || (x >= 'a' && x <= 'f'))) {
                 return null;
             }
+            if (digits == 3) {
+                c[2 * i] = x;
+                c[2 * i + 1] = x;
+            } else {
+                c[i] = x;
+            }
         }
-        return value.toLowerCase();
+        return changed ? new String(c) : value;
     }
 
     private Map<String, String> parseCache() {

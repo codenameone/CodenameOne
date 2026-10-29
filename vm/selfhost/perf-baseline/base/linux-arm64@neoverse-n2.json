@@ -25,7 +25,7 @@
  },
  "hello": {
   "all": {
-   "memory": 0.932,
+   "memory": 0.66,
    "runs": 7,
    "time": 1.021,
    "tolerance": {

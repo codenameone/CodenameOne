@@ -97,6 +97,8 @@
         <module>android-compat</module>
         <module>swing-compat</module>
         <module>javafx-compat</module>
+        <!-- Compose Multiplatform: Compose UI over Codename One components. -->
+        <module>compose-compat</module>
         <module>fxml-compiler</module>
         <module>lottie-transcoder</module>
         <!--
