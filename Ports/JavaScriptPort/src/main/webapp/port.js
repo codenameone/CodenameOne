@@ -4983,6 +4983,8 @@ const html5HideSplashWorkerSymbol = "cn1_com_codename1_impl_html5_HTML5Implement
     if (typeof document !== "undefined"
             && typeof globalThis !== "undefined" && typeof globalThis.jQuery === "function") {
       try {
+        // Same as the host handler: the page drops the splash background once started.
+        document.documentElement.setAttribute("data-cn1-started", "");
         globalThis.jQuery("div#cn1-splash").fadeOut(100, function() {
           globalThis.jQuery(this).remove();
         });

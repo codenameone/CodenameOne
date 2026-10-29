@@ -108,6 +108,29 @@ class JavaScriptBuildHintsTest {
     }
 
     @Test
+    void splashHintsReachTheTranslatorAndTheIconIsTheDefaultLogo() {
+        BuildRequest r = request("javascript.splash.appearance", " dark ",
+                "javascript.splash.darkBackground", "#1e1e1e");
+        List<String> opts = JavaScriptBuildHints.translatorOptions(r);
+        assertTrue(opts.contains("-Dcodename1.javascript.splash.appearance=dark"), opts.toString());
+        assertTrue(opts.contains("-Dcodename1.javascript.splash.darkBackground=#1e1e1e"), opts.toString());
+        // No icon: the PWA step writes a placeholder square, which is not worth showing.
+        assertFalse(opts.toString().contains("splash.logo"), opts.toString());
+
+        r.setIcon(new byte[] {1});
+        opts = JavaScriptBuildHints.translatorOptions(r);
+        assertTrue(opts.contains("-Dcodename1.javascript.splash.logo=" + JavaScriptBuildHints.SPLASH_DEFAULT_LOGO),
+                opts.toString());
+
+        r = request("javascript.splash.logo", "none");
+        r.setIcon(new byte[] {1});
+        opts = JavaScriptBuildHints.translatorOptions(r);
+        assertTrue(opts.contains("-Dcodename1.javascript.splash.logo=none"), opts.toString());
+        assertFalse(opts.contains("-Dcodename1.javascript.splash.logo=" + JavaScriptBuildHints.SPLASH_DEFAULT_LOGO),
+                opts.toString());
+    }
+
+    @Test
     void noHintsShipsOnlyTheLegacyPair() {
         assertEquals(set("iOS7Theme", "android_holo_light"), ship(request()));
     }

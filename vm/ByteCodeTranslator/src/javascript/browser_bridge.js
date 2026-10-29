@@ -4118,6 +4118,12 @@
         w.parent.postMessage({ type: 'cn1-app-ready' }, '*');
       }
     } catch (_pmErr) { /* cross-origin parent -- ignore */ }
+    // The page background is the splash colour only while the splash is up; from the
+    // first form on, the page is transparent again as it always was, so an embed and any
+    // area the canvas leaves uncovered show what they showed before (index.html).
+    if (doc.documentElement) {
+      doc.documentElement.setAttribute('data-cn1-started', '');
+    }
     var splash = doc.getElementById('cn1-splash');
     if (!splash) {
       return null;
