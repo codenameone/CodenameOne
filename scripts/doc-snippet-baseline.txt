@@ -321,7 +321,6 @@ CodenameOne/src/com/codename1/ui/list/CellRenderer.java#5eca0098701e
 CodenameOne/src/com/codename1/ui/list/ListCellRenderer.java#500e2416fe67
 CodenameOne/src/com/codename1/ui/list/ListModel.java#8d4d9b014972
 CodenameOne/src/com/codename1/ui/list/ListModel.java#d0795f2aa202
-CodenameOne/src/com/codename1/ui/plaf/UIManager.java#6aaadca1b2ce
 CodenameOne/src/com/codename1/util/regex/RE.java#32627ff643a4
 CodenameOne/src/com/codename1/vpn/profile/Vpn.java#aaa2e660926c
 CodenameOne/src/com/codename1/vpn/profile/VpnProfile.java#a1cc6689b4e5

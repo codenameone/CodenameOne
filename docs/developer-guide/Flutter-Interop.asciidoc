@@ -128,11 +128,7 @@ package that is unsupported itself:
 
 [source,json]
 ----
-{"package": "ui_kit", "status": "unsupported",
- "note": "depends on vector_graphics_compiler, which needs dart:ffi",
- "cause": "needs dart:ffi",
- "chain": ["ui_kit", "vector_graphics_compiler"],
- "reachedFrom": ["lib/login/login_screen.dart"]}
+include::../demos/common/src/main/snippets/developer-guide/flutter-import-report.json[tag=flutter-import-report-json-001,indent=0]
 ----
 
 The report also lists, under `googleFonts`, every Google Fonts family the
@@ -544,13 +540,7 @@ stands in for the package:
 
 [source,dart]
 ----
-// cn1:covers lottie Lottie.asset over a Codename One animation
-@JavaName('com.example.lottie.Lottie')
-class Lottie extends Widget {
-  @Unapplied('fit')
-  external static Lottie asset(String name, {double? width, double? height,
-      bool repeat, BoxFit? fit});
-}
+include::../demos/common/src/main/snippets/developer-guide/flutter-stub-pack.dart[tag=flutter-stub-pack-dart-001,indent=0]
 ----
 
 Stub types share one namespace. When two packages export the same name -- the
@@ -561,16 +551,9 @@ name is never shadowed by a stub of a package it does not import.
 
 The Java half is an ordinary class with the members the declarations map to:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
-package com.example.lottie;
-
-public class Lottie extends com.codename1.flutter.Widget {
-    public static Lottie asset(String name, Double width, Double height,
-            Boolean repeat, Object fit) {
-        // ...
-    }
-}
+include::../demos/common/src/main/java/com/codenameone/developerguide/flutter/Lottie.java[tag=flutter-stub-pack-java-001,indent=0]
 ----
 
 The mapping rules:
