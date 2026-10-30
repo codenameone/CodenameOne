@@ -325,10 +325,26 @@ public abstract class Labeled extends Control {
     }
 
     /// Whether the control is one that gives up padding: a native label
-    /// with padding of its theme, and no graphic whose room is kept in it.
+    /// with padding of its theme. A graphic's room in that padding is never
+    /// given up (see [#sheddable(Component, Node, int, boolean)]), but the
+    /// theme's part of it is: a tab bar of icon-over-text buttons otherwise
+    /// cut "Home" to "Ho..." between margins wide enough for the word.
     private boolean sheds(Component c, Node graphic) {
-        return c instanceof com.codename1.ui.Label && graphic == null && !paddedForGraphic && !cn1BareText()
-                && !ownsGraphic();
+        return c instanceof com.codename1.ui.Label && !cn1BareText() && !ownsGraphic()
+                && (graphic != null || !paddedForGraphic);
+    }
+
+    /// How much of a side's padding, `full` device pixels of it, may be
+    /// given up: three quarters of it without a graphic, and with one only
+    /// three quarters of what the theme put there, so the graphic's room
+    /// stays whole.
+    private int sheddable(Component c, Node graphic, int full, boolean left) {
+        if (graphic == null) {
+            return full - kept(full);
+        }
+        Style base = UIManager.getInstance().getComponentStyle(c.getUIID());
+        int theme = left ? base.getPaddingLeftNoRTL() : base.getPaddingRightNoRTL();
+        return Math.max(0, Math.min(full, theme) - kept(theme));
     }
 
     /// The least of its padding a control keeps on a side: a quarter.
@@ -358,11 +374,12 @@ public abstract class Labeled extends Control {
         int left = 0;
         int right = 0;
         if (missing > 0) {
-            int most = fullLeft - kept(fullLeft) + fullRight - kept(fullRight);
-            int give = Math.min(missing, most);
-            left = Math.min(fullLeft - kept(fullLeft), (give + 1) / 2);
-            right = Math.min(fullRight - kept(fullRight), give - left);
-            left = Math.min(fullLeft - kept(fullLeft), give - right);
+            int maxLeft = sheddable(c, graphic, fullLeft, true);
+            int maxRight = sheddable(c, graphic, fullRight, false);
+            int give = Math.min(missing, maxLeft + maxRight);
+            left = Math.min(maxLeft, (give + 1) / 2);
+            right = Math.min(maxRight, give - left);
+            left = Math.min(maxLeft, give - right);
         }
         if (left == shedLeft && right == shedRight) {
             return;
@@ -396,10 +413,11 @@ public abstract class Labeled extends Control {
         Insets in = getInsets();
         // The area the label lays its content out in, less the room made
         // for the graphic: where graphic and text sit together.
-        int areaX = Units.toPixels(in.getLeft()) + base.getPaddingLeftNoRTL();
+        // Less what was given up of the theme's padding (fitPadding).
+        int areaX = Units.toPixels(in.getLeft()) + base.getPaddingLeftNoRTL() - shedLeft;
         int areaY = Units.toPixels(in.getTop()) + base.getPaddingTop();
         int areaW = Units.toPixels(getWidth() - in.getLeft() - in.getRight()) - base.getPaddingLeftNoRTL()
-                - base.getPaddingRightNoRTL();
+                - base.getPaddingRightNoRTL() + shedLeft + shedRight;
         int areaH = Units.toPixels(getHeight() - in.getTop() - in.getBottom()) - base.getPaddingTop()
                 - base.getPaddingBottom();
         int gw = box[4];
