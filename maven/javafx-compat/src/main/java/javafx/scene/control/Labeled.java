@@ -535,12 +535,14 @@ public abstract class Labeled extends Control {
         String t = label.getText();
         // Before any of the text goes, the padding beside it does.
         int padding = 0;
-        if (sheds(c, shownGraphic())) {
+        Node graphic = shownGraphic();
+        if (sheds(c, graphic)) {
             shed(c);
             Style s = c.getUnselectedStyle();
             int left = s.getPaddingLeftNoRTL() + shedLeft;
             int right = s.getPaddingRightNoRTL() + shedRight;
-            padding = left - kept(left) + right - kept(right);
+            // Only what fitPadding can give up: the graphic's room stays.
+            padding = sheddable(c, graphic, left, true) + sheddable(c, graphic, right, false);
         }
         if (f == null || t == null || t.length() == 0 || !label.isEndsWith3Points()) {
             return Math.max(0, pref - Units.toLogical(padding));
