@@ -145,7 +145,7 @@ dashboard.show();
 
 ## Similar in spirit
 
-Flutter and Codename One made the same bet. Neither wraps the platform's widgets. Both draw every component themselves on a lightweight surface, so a screen looks and behaves the same on every device and you control it to the pixel. That shared architecture is why a Flutter widget tree maps onto Codename One so naturally. The differences are in what sits around that core: the threading model, how apps are built and how features ship.
+Flutter and Codename One made the same bet. Neither wraps the platform's widgets. Both draw every component themselves on a lightweight surface, so you control every pixel and the behavior doesn't drift between platforms. Codename One still ships native themes, so an app can look like iOS on an iPhone and like Material on Android, or look like your brand everywhere. That shared architecture is why a Flutter widget tree maps onto Codename One so naturally. The differences are in what sits around that core: the threading model, how apps are built and how features ship.
 
 ## Can't Flutter do the same?
 
@@ -173,11 +173,11 @@ A Codename One app is a Java project. The build of a native app happens in a bui
 
 Codename One used to aim for a modular core, with features broken out into cn1libs. Flutter is going through that phase now, moving pieces such as its Material and Cupertino themes out of the framework into independent packages. We went the opposite way. The Codename One core now covers what Flutter does, plus most of what people reach for in Flutter's most popular packages, and this week's posts add more.
 
-A bigger core costs you nothing, because you don't pay for what you don't use. ParparVM drops every class your app doesn't reach, which is how the builds above stay smaller than Flutter's. What you get instead:
+A bigger core costs you nothing, because you don't pay for what you don't use, and that works on two levels. ParparVM drops every class your app doesn't reach. The builder goes further: it looks at what your compiled code calls and adds a native library only when a feature needs it. This week's crypto support is a good example. Its native kernels for secp256k1, Ed25519 and the hashes are what make it fast, and an app that never touches the crypto API shouldn't carry them. It doesn't. Call a wallet or a signature API and the builder links them in, and you get native speed that our CI holds against libsecp256k1, libsodium and OpenSSL. That's how the builds above stay smaller than Flutter's. What you get instead:
 
 - **One version.** No matrix of package versions to keep compatible, and no upgrade that breaks because two packages disagree.
 - **Nothing abandoned.** No package your app depends on that its author stopped maintaining two years ago.
-- **A short supply chain.** Your app's dependencies are one project, not a tree of packages from strangers.
+- **A short supply chain.** This is the big one. Every package in a dependency tree is a person you trust with your users' devices. A maintainer who burns out, sells the package, gets angry or gets hacked can push code into your app on the next update, and attacks on open source packages have done exactly that. With the features in core, your app's dependencies are one project with one review process, not a tree of packages from strangers. That fits the rest of this week: the [Bastion](/blog/bastion-hardened-bank-template/) template is a hardened bank because security is something we take seriously, and banks and other regulated organizations build on Codename One. For them, a short supply chain is a requirement.
 - **Everything moves together.** When we fix rendering, add a platform or change the build, every feature comes along, including the niche ones.
 - **One source of truth.** The developer guide documents all of it, and when something breaks there is one team responsible for the answer.
 
