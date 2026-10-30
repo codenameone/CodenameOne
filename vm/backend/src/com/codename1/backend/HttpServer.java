@@ -9271,10 +9271,9 @@ public final class HttpServer {
         }
 
         if (streamed) {
-            // A writer that will never run is closed BEFORE the head goes out, not
-            // after. Once the client has the head it may act on the response, and a
-            // close that follows the write was observed losing that race (the
-            // writer's resources were still held when the client moved on).
+            // A bodiless response's writer is closed before the head is written, so
+            // the close happens-before anything the client does after reading the
+            // status. Closing it after the write let the client run ahead of it.
             if (noBody) {
                 response.discard();
             }

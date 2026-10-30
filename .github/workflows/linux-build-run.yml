@@ -240,9 +240,12 @@ jobs:
       # the runner was shut down mid-build, twice at the same step; extra swap
       # lets the peak spill instead of taking the machine down. x64 joined it once
       # the suite grew (#6118, #6106): every x64 run since went silent in
-      # `cmake --build` and was shut down about an hour in, while arm64 passed.
+      # `cmake --build` and was shut down about an hour in, while arm64 passed --
+      # the arm64 symptom exactly. `df` is here so a recurrence shows whether the
+      # disk, not memory, is what ran out.
       - name: Add swap
         run: |
+          df -h /
           free -m
           sudo fallocate -l 12G /cn1-swapfile
           sudo chmod 600 /cn1-swapfile
