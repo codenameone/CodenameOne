@@ -151,6 +151,8 @@ public class Container extends Component implements Iterable<Component> {
     private int[] laidOutSafeInsets;
     // What laidOutSafeInsets was computed against (see safeAreaContext).
     private int[] laidOutSafeContext;
+    // The padding before the snap, while a layout holds the snapped one.
+    private int[] snappedFromPadding;
     // Written by every safeAreaPadding call: the safe margins and surface the
     // answer depended on. EDT only, like layoutNesting.
     private static final int[] safeAreaContext = new int[6];
@@ -3164,6 +3166,7 @@ public class Container extends Component implements Iterable<Component> {
     private void doLayoutImpl() {
         doLayoutDepth++;
         boolean restoreBounds = false;
+        int[] tmpSnappedFrom = null;
         if (safeArea && doLayoutDepth == 1) {
             // If this container is marked as a safe area
             // then we may need to add padding to make it *safe*
@@ -3193,19 +3196,30 @@ public class Container extends Component implements Iterable<Component> {
                 System.arraycopy(safeAreaContext, 0, laidOutSafeContext, 0, safeAreaContext.length);
                 checkMeasuredSafeArea(applied);
                 restoreBounds = snapToSafeAreaInternal(pad, false);
+                tmpSnappedFrom = base;
             } else {
                 laidOutSafeInsets = null;
             }
         }
-        layout.layoutContainer(this);
-        int count = getComponentCount();
-        for (int i = 0; i < count; i++) {
-            Component c = getComponentAt(i);
-            if (c instanceof Container) {
-                ((Container) c).layoutContainer();
-            } else {
-                c.laidOut();
+        // Saved, not cleared: a nested layout of this container must not drop
+        // the outer one's snapped padding while that layout still holds it.
+        int[] outerSnappedFrom = snappedFromPadding;
+        if (restoreBounds) {
+            snappedFromPadding = tmpSnappedFrom;
+        }
+        try {
+            layout.layoutContainer(this);
+            int count = getComponentCount();
+            for (int i = 0; i < count; i++) {
+                Component c = getComponentAt(i);
+                if (c instanceof Container) {
+                    ((Container) c).layoutContainer();
+                } else {
+                    c.laidOut();
+                }
             }
+        } finally {
+            snappedFromPadding = outerSnappedFrom;
         }
         if (restoreBounds && tmpInsets != null) {
             tmpInsets.restore(getStyle());
@@ -3825,6 +3839,17 @@ public class Container extends Component implements Iterable<Component> {
                     // Hidden, rotated, a new safe area or another surface: the
                     // last layout's inset says nothing about this one.
                     laidOut = null;
+                }
+                int[] snappedFrom = snappedFromPadding;
+                if (snappedFrom != null) {
+                    // Measured from inside its own layout, which holds the
+                    // snapped padding: the inset is already in the style, so
+                    // it is counted once, against the padding it replaced.
+                    laidOut = new int[4];
+                    for (int i = 0; i < 4; i++) {
+                        laidOut[i] = Math.max(0, base[i] - snappedFrom[i]);
+                        base[i] = snappedFrom[i];
+                    }
                 }
                 int[] measured = measuredSafeInsets;
                 if (measured == null) {

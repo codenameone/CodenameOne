@@ -291,6 +291,32 @@ class SafeAreaBottomBarStabilityTest extends UITestBase {
     }
 
     @FormTest
+    void aBarMeasuredDuringItsOwnLayoutCountsTheInsetOnce() {
+        // A bottom Tabs bar is measured again from inside its own layout, when
+        // its style already holds the snapped padding; adding the inset to
+        // that again made its preferred size an inset too tall.
+        notched();
+        Form f = Display.getInstance().getCurrent();
+        Tabs t = new Tabs(Component.BOTTOM);
+        t.addTab("A", new Label("first"));
+        t.addTab("B", new Label("second"));
+        f.add(BorderLayout.CENTER, t);
+        f.revalidate();
+        t.setSelectedIndex(1);
+        f.revalidate();
+        Container bar = t.getTabsContainer();
+        int content = 0;
+        for (Component c : bar) {
+            content = Math.max(content, c.getOuterHeight());
+        }
+        int overlap = bar.getAbsoluteY() + bar.getHeight() - (Display.getInstance().getDisplayHeight() - INSET);
+        assertTrue(overlap > 0, "the bar reaches into the unsafe edge: " + overlap);
+        assertEquals(content + bar.getStyle().getVerticalPadding() + overlap, bar.getPreferredH(),
+                "the bar is measured with one inset");
+        assertEquals(bar.getPreferredH(), bar.getHeight());
+    }
+
+    @FormTest
     void aSafeAreaBarInsideASafeAreaPaneGetsOneInset() {
         Form f = notched();
         Container pane = new Container(new BorderLayout());
