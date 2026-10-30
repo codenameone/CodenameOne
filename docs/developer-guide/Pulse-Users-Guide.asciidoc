@@ -99,7 +99,15 @@ profile the code is printed on the server's console and filled in for you. Befor
 the first booking the app asks the account holder to sign the studio's waiver, for
 themselves and for each child they add.
 
+image::img/pulse-welcome.png["The Pulse welcome screen with buttons to sign in and to create an account",scaledwidth=40%]
+
 === The member
+
+The member's home leads with the next class booked, with the time, the trainer and
+the room, and how long until it starts. Under it are this month's visits, the
+week streak, the points and level, and the badges.
+
+image::img/pulse-member-home.png["The member's home with the next class, the month's visits, the points and level, and the shelf of badges",scaledwidth=40%]
 
 ==== The timetable and booking
 
@@ -116,6 +124,8 @@ A booking is refused when the class has already started, when the person is
 outside the class's age range on the day of the class, when the waiver isn't
 signed, or when no membership covers the class.
 
+image::img/pulse-timetable.png["The timetable for one day, each class a card with its time, trainer, room and the places left",scaledwidth=40%]
+
 ==== The household
 
 An account holder books for up to eight people: themselves and their children.
@@ -131,6 +141,8 @@ so it works with no signal. A pass is good once: a screenshot shown a second tim
 is refused as already used. A child without a phone gets an NFC fob or wristband
 instead. If a phone is lost, replacing the pass makes the old codes and the old
 fob stop opening the door at once.
+
+image::img/pulse-pass.png["The door pass: a QR code with a bar counting down to the next code",scaledwidth=40%]
 
 ==== The membership
 
@@ -157,10 +169,26 @@ the last twelve weeks. Workouts recorded by the phone's health store or the watc
 are kept with their heart rate. A member can share their heart rate with the
 trainer during a class.
 
+image::img/pulse-workouts.png["The workouts list with the duration, average heart rate and time in each zone of every workout",scaledwidth=40%]
+
+==== Points, levels and badges
+
+Coming to a class, recording a workout and keeping a weekly streak earn points,
+and points raise the member's level. A workout recorded with a heart-rate strap or
+a watch earns extra points, since it shows how hard the member really worked.
+Badges mark milestones: the first class, ten and fifty classes, a four- and a
+twelve-week streak, a first workout with heart rate, a class worn with a strap or a
+watch, a minute in zone 5, and ten hours of workouts. Tapping a badge says how it
+is earned.
+
 Friends are added by the e-mail they sign in with, and nothing about a member is
 shown to someone they haven't accepted. The feed shows friends' visits and the
 workouts they chose to share, kudos can be given for them, and a friend can be
 invited to a class.
+
+image::img/pulse-social.png["The friends feed with friends' visits and shared workouts, each with its kudos",scaledwidth=40%]
+
+The timetable shows which friends are booked into each class.
 
 ==== Messages and quiet hours
 
@@ -171,7 +199,21 @@ a visit. Neither is sent to a member who is away or who turned promotions off, a
 neither arrives during quiet hours, which are 10 PM to 7 AM until the member
 changes them in the settings.
 
+image::img/pulse-settings.png["The settings with the theme, the language, notifications and quiet hours",scaledwidth=40%]
+
+==== The watch
+
+On a paired watch, Pulse shows the next class, the door code with a bar counting
+down to the next one, and the member's points, level and week streak. The code is
+the same one the phone's pass shows, so the watch opens the door with the phone
+left in the locker.
+
 === The trainer
+
+The trainer's home leads with the class on now, or the next one, with a button for
+its roster.
+
+image::img/pulse-trainer-home.png["The trainer's home with the class on now featured above the week's classes",scaledwidth=40%]
 
 The trainer sees the classes they teach in the coming week. Each class's roster
 lists who is booked, who is waiting and who came, with what the trainer needs to
@@ -180,6 +222,8 @@ didn't see, and corrected for 30 minutes after the class ends.
 
 During a class, members who share their heart rate appear with their current zone,
 one to five, worked out from their age.
+
+image::img/pulse-live.png["The live class view with each member's heart rate and zone",scaledwidth=40%]
 
 A trainer offers a shift they can't work to the others, and any other trainer can
 take it.
@@ -200,6 +244,11 @@ The desk's day shows who came, what was taken and what starts soon. Signed in on
 tablet by the door, the desk account runs as the kiosk: a member holds up their
 pass and the screen turns green or red.
 
+The desk's home has three parts: today's numbers, the classes coming up with how
+many are booked, and the people who just came in, admitted or turned away.
+
+image::img/pulse-desk.png["The front desk's home with today's numbers, the classes coming up and the latest check-ins",scaledwidth=40%]
+
 === The owner
 
 The dashboard shows monthly recurring revenue, the share of places taken in the
@@ -207,11 +256,17 @@ last week's classes, the members who haven't been in for two weeks and didn't sa
 they'd be away, the most booked kinds of class, and the classes in the next two
 days that are under half full.
 
+image::img/pulse-owner.png["The owner's dashboard with revenue, how full the classes were, members at risk and the quiet classes ahead",scaledwidth=40%]
+
 The owner adds and changes plans (a change reaches members at their next renewal),
 puts classes on the timetable for a number of weeks, manages the staff and their
 roles, and sends campaigns to everyone who took a kind of class, to every active
 member, or to the members who haven't been in for a month. Each campaign counts
 how many were sent, opened, and booked.
+
+image::img/pulse-owner-timetable.png["The owner's timetable for scheduling classes",scaledwidth=40%]
+
+image::img/pulse-campaigns.png["The campaigns with what was sent, opened and booked for each",scaledwidth=40%]
 
 === In a browser
 

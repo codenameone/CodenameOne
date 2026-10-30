@@ -3,14 +3,15 @@ title: "Build a Gym and Fitness Studio App in Java with Pulse"
 description: "Pulse is a fitness studio application: class booking with waitlists, family accounts, a rotating QR door pass and NFC fobs, memberships and billing, trainer and front-desk tools, an owner dashboard and a Java backend. Free MIT-0 source."
 url: "/pulse/"
 summary: "A complete full-stack gym and studio application you can brand and extend."
+images: ["/developer-guide/img/pulse-member-home.png"]
 ShowToc: true
 ---
 
 Pulse is a complete, full-stack fitness studio application in Java. Members book classes for themselves and their children, open the door with a pass on their phone, pay for their membership and train with friends; trainers run their classes and follow heart rate zones live; the front desk checks people in and takes walk-ins; the owner reads the numbers and fills the quiet classes. Use it to build your own gym, studio or club app with Codename One.
 
-**[Read the user's guide](/developer-guide/pulse-users-guide/)** · **[Browse the source](https://github.com/codenameone/CodenameOne/tree/master/scripts/pulse)**
+**[Generate your project](/initializr/)** · **[Read the user's guide](/developer-guide/pulse-users-guide/)** · **[Browse the source](https://github.com/codenameone/CodenameOne/tree/master/scripts/pulse)**
 
-The application source is licensed under [MIT-0](https://github.com/codenameone/CodenameOne/blob/master/scripts/pulse/LICENSE): you can modify it, use it commercially and keep your changes private without royalties.
+In the Initializr, choose the **Pulse** fitness studio template, set your application name and package, and generate the project. The application source is licensed under [MIT-0](https://github.com/codenameone/CodenameOne/blob/master/scripts/pulse/LICENSE): you can modify it, use it commercially and keep your changes private without royalties.
 
 ## What comes with the application?
 
@@ -24,6 +25,11 @@ The application source is licensed under [MIT-0](https://github.com/codenameone/
 | Shared code | API contracts and data classes shared between the client and server |
 
 The account's roles decide which screens a person sees. The same client project targets iOS, Android, desktop and the web, and the server runs on SQLite, PostgreSQL, MySQL and MariaDB.
+
+![Pulse member home with points and badges](/developer-guide/img/pulse-member-home.png)
+![Pulse class timetable](/developer-guide/img/pulse-timetable.png)
+![Pulse live class with heart rate zones](/developer-guide/img/pulse-live.png)
+![Pulse owner dashboard](/developer-guide/img/pulse-owner.png)
 
 ## From first run to customization
 
