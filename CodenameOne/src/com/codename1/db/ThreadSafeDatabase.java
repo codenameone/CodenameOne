@@ -526,7 +526,7 @@ public class ThreadSafeDatabase extends Database {
         Object run() throws IOException;
     }
 
-    private class RowWrapper implements RowExt, TypedRow {
+    private class RowWrapper implements RowExt {
         private final Row underlyingRow;
 
         public RowWrapper(Row underlyingRow) {
@@ -619,7 +619,7 @@ public class ThreadSafeDatabase extends Database {
             return (Integer) invokeWithException(new RunnableWithResponseOrIOException() {
                 @Override
                 public Object run() throws IOException {
-                    return Database.getColumnType(underlyingRow, index);
+                    return underlyingRow.getColumnType(index);
                 }
             });
         }

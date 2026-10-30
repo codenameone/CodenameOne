@@ -37,7 +37,7 @@ import java.io.IOException;
  * slower rather than faster. The externally visible behaviour is the same either way, and the
  * portable conformance suite checks that.
  */
-public class AndroidCursor implements Cursor, CursorExt, RowExt, com.codename1.db.TypedRow {
+public class AndroidCursor implements Cursor, CursorExt, RowExt {
 
     private android.database.Cursor c;
     private int last_read_column_index = -1;

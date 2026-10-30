@@ -5287,6 +5287,10 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
             return (short) 0;
         }
 
+        public int getColumnType(int index) {
+            return com.codename1.db.Database.COLUMN_UNKNOWN;
+        }
+
         public String getString(int index) throws IOException {
             Object value = getValue(index);
             if (value == null) {

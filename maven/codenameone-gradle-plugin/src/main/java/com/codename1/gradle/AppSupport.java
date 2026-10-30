@@ -194,6 +194,10 @@ final class AppSupport {
                     }
                     t.getJavaClassPath().from(project.getConfigurations().getByName("compileClasspath"));
                     t.getOutputDirectory().set(new File(layout.buildDir(), "generated/sources/cn1-python"));
+                    File javaDir = project.file("src/main/java");
+                    t.getJavaSourceDirectory().set(javaDir);
+                    t.getJavaSources().from(project.fileTree(javaDir, f -> f.include("**/*.java")));
+                    t.getJavaImportsDirectory().set(new File(layout.buildDir(), "cn1-python-java-imports"));
                 });
         main.getJava().srcDir(python.flatMap(com.codename1.gradle.tasks.TranspilePythonTask::getOutputDirectory));
 

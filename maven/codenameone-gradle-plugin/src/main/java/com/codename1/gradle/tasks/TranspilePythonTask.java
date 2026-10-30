@@ -70,6 +70,20 @@ public abstract class TranspilePythonTask extends Cn1Task {
     @Optional
     public abstract Property<String> getVirtualThreadStack();
 
+    /// `src/main/java`: a class Python imports from it is compiled before
+    /// the transpile, for its signatures.
+    @InputFiles
+    @PathSensitive(PathSensitivity.RELATIVE)
+    public abstract ConfigurableFileCollection getJavaSources();
+
+    /// The project's Java source directory itself.
+    @Internal
+    public abstract DirectoryProperty getJavaSourceDirectory();
+
+    /// Where the classes Python imports from `src/main/java` are compiled.
+    @OutputDirectory
+    public abstract DirectoryProperty getJavaImportsDirectory();
+
     @OutputDirectory
     public abstract DirectoryProperty getOutputDirectory();
 
@@ -79,6 +93,8 @@ public abstract class TranspilePythonTask extends Cn1Task {
             new PythonProjectBuilder(getPythonDirectory().get().getAsFile(), getOutputDirectory().get().getAsFile(),
                     getMainModule().getOrNull(), log())
                     .classPath(new java.util.ArrayList<java.io.File>(getJavaClassPath().getFiles()))
+                    .javaSources(getJavaSourceDirectory().get().getAsFile(),
+                            getJavaImportsDirectory().get().getAsFile())
                     .virtualThreadStack(getVirtualThreadStack().getOrNull()).run();
         } catch (BuildException ex) {
             throw new GradleException(ex.getMessage(), ex.getCause() == null ? ex : ex.getCause());

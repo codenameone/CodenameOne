@@ -85,7 +85,7 @@ Any class on the project's class path is importable under the `java.` prefix:
 
 [source,python]
 ----
-include::../demos/common/src/main/snippets/developer-guide/python-interop.py[tag=python-interop-python-001,indent=0]
+include::../demos/common/src/main/python/developer_guide/hello_form.py[tag=python-interop-python-001,indent=0]
 ----
 
 A Python function or lambda passed where Java expects a listener or another
@@ -140,7 +140,7 @@ arrives. Pull the list down, or tap the toolbar button, to load it again.
 
 [source,python]
 ----
-include::../demos/common/src/main/snippets/developer-guide/python-interop.py[tag=python-interop-python-002,indent=0]
+include::../demos/common/src/main/python/developer_guide/releases.py[tag=python-interop-python-002,indent=0]
 ----
 
 Three conventions carry over from Codename One's Java API:
@@ -162,7 +162,7 @@ form. The editor saves when the user goes back, and asks before deleting.
 
 [source,python]
 ----
-include::../demos/common/src/main/snippets/developer-guide/python-interop.py[tag=python-interop-python-003,indent=0]
+include::../demos/common/src/main/python/developer_guide/notes.py[tag=python-interop-python-003,indent=0]
 ----
 
 The structure is the one a Python developer would write for any user
@@ -314,7 +314,7 @@ The application starts the server the way it always does:
 
 [source,python]
 ----
-include::../demos/common/src/main/snippets/developer-guide/python-interop.py[tag=python-interop-python-004,indent=0]
+include::../demos/common/src/main/python/developer_guide/flask_fib.py[tag=python-interop-python-004,indent=0]
 ----
 
 `app.run()` and `uvicorn.run(app)` are lowered onto the Codename One backend's
@@ -353,7 +353,7 @@ The engine URL picks the database, as it does under CPython:
 
 [source,python]
 ----
-include::../demos/common/src/main/snippets/developer-guide/python-interop.py[tag=python-interop-python-007,indent=0]
+include::../demos/common/src/main/python/developer_guide/library.py[tag=python-interop-python-007,indent=0]
 ----
 
 Declarative models with `Mapped` annotations, relationships in both
@@ -520,7 +520,7 @@ The integer kernel in Python:
 
 [source,python]
 ----
-include::../demos/common/src/main/snippets/developer-guide/python-interop.py[tag=python-interop-python-005,indent=0]
+include::../demos/common/src/main/python/developer_guide/int_arithmetic.py[tag=python-interop-python-005,indent=0]
 ----
 
 The same function in Java, under `common/src/main/java`:
@@ -534,7 +534,7 @@ And the Python that calls it:
 
 [source,python]
 ----
-include::../demos/common/src/main/snippets/developer-guide/python-interop.py[tag=python-interop-python-006,indent=0]
+include::../demos/common/src/main/python/developer_guide/call_java.py[tag=python-interop-python-006,indent=0]
 ----
 
 The Java `int` wraps by itself, so the masks disappear and the loop compiles

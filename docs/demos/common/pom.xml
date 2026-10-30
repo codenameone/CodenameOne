@@ -364,6 +364,15 @@
 
                 <executions>
                     <execution>
+                        <!-- The Python chapter's examples (src/main/python), so
+                             the guide shows code that transpiles and compiles. -->
+                        <id>transpile-python</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>transpile-python</goal>
+                        </goals>
+                    </execution>
+                    <execution>
                         <id>generate-gui-sources</id>
                         <phase>process-sources</phase>
                         <goals>

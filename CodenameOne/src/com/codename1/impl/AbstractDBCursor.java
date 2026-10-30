@@ -55,7 +55,7 @@ import java.io.IOException;
 ///
 /// Ports whose underlying cursor is genuinely random access, such as Android's, do not need this
 /// class.
-public abstract class AbstractDBCursor implements Cursor, CursorExt, Row, RowExt, com.codename1.db.TypedRow {
+public abstract class AbstractDBCursor implements Cursor, CursorExt, Row, RowExt {
 
     /// Position of the cursor, -1 before the first row, and the row count once exhausted.
     private int position = -1;

@@ -152,6 +152,51 @@ public class PythonProjectTest {
     }
 
     @Test
+    public void importsTheProjectsOwnJavaClasses() throws Exception {
+        File src = tmp.newFolder("py");
+        File java = tmp.newFolder("java");
+        File out = tmp.newFolder("gen");
+        write(new File(java, "demo/Calc.java"),
+                "package demo;\npublic class Calc {\n    public static int twice(int x) {\n"
+                + "        return Util.times(x, 2);\n    }\n}\n");
+        // Reached through the source path, not named by the Python.
+        write(new File(java, "demo/Util.java"),
+                "package demo;\nclass Util {\n    static int times(int x, int y) {\n        return x * y;\n    }\n}\n");
+        write(new File(src, "main.py"), "from java.demo import (\n    Calc,\n)\n\nprint(Calc.twice(2))\n");
+        try {
+            builder(src, out, null).run();
+            fail("without the project's Java sources the import cannot resolve");
+        } catch (BuildException expected) {
+            assertTrue(expected.getMessage(), expected.getMessage().contains("demo.Calc"));
+        }
+        File scratch = new File(tmp.getRoot(), "imports");
+        assertTrue(builder(src, out, null).javaSources(java, scratch).run());
+        // The interop class the import binds calls the Java class directly.
+        StringBuilder all = new StringBuilder();
+        try (java.util.stream.Stream<java.nio.file.Path> files = Files.walk(out.toPath())) {
+            for (java.nio.file.Path p : (Iterable<java.nio.file.Path>) files.filter(Files::isRegularFile)::iterator) {
+                all.append(read(p.toFile()));
+            }
+        }
+        assertTrue(all.toString().contains("demo.Calc.twice("));
+        assertTrue(String.valueOf(new File(scratch, "demo").exists()), new File(scratch, "demo/Util.class").isFile());
+    }
+
+    @Test
+    public void projectJavaThatDoesNotCompileIsReported() throws Exception {
+        File src = tmp.newFolder("py");
+        File java = tmp.newFolder("java");
+        write(new File(java, "demo/Calc.java"), "package demo;\npublic class Calc {\n    Missing m;\n}\n");
+        write(new File(src, "main.py"), "from java.demo import Calc\n");
+        try {
+            builder(src, tmp.newFolder("gen"), null).javaSources(java, new File(tmp.getRoot(), "imports")).run();
+            fail();
+        } catch (BuildException expected) {
+            assertTrue(expected.getMessage(), expected.getMessage().contains("Missing"));
+        }
+    }
+
+    @Test
     public void functionEntryPointIsCalled() throws Exception {
         File src = tmp.newFolder("py");
         File out = tmp.newFolder("gen");

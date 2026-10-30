@@ -73,11 +73,6 @@ public final class PythonProjectBuilder {
         this.log = log;
     }
 
-    /// The jars and class directories `from java.<package> import <Class>`
-    /// resolves against: the project's compile class path, whose
-    /// `java-runtime` supplies the device's `java.*`. The project's own Java
-    /// sources are not
-    /// compiled yet when Python is transpiled, so they cannot be imported.
     /// The build hint naming the C stack a served request's virtual thread
     /// gets, such as `2MB`; see [#virtualThreadStack(String)].
     public static final String VIRTUAL_THREAD_STACK_HINT = "codename1.arg.python.virtualThreadStack";
@@ -92,9 +87,83 @@ public final class PythonProjectBuilder {
         return this;
     }
 
+    /// The jars and class directories `from java.<package> import <Class>`
+    /// resolves against: the project's compile class path, whose
+    /// `java-runtime` supplies the device's `java.*`. The project's own
+    /// Java sources come from [#javaSources(File, File)].
     public PythonProjectBuilder classPath(java.util.List<File> entries) {
         this.classPath = entries;
         return this;
+    }
+
+    private File javaSourceDir;
+    private File javaScratchDir;
+
+    /// The project's own Java sources (`src/main/java`), and a directory to
+    /// compile them into. They are not compiled yet when Python is
+    /// transpiled, so a class Python imports from them is compiled here
+    /// first, with whatever it needs from the same tree, and only for its
+    /// signatures: javac compiles the project again afterwards. Such a class
+    /// cannot itself use the Java generated from Python.
+    public PythonProjectBuilder javaSources(File dir, File scratch) {
+        this.javaSourceDir = dir;
+        this.javaScratchDir = scratch;
+        return this;
+    }
+
+    private static final java.util.regex.Pattern JAVA_IMPORT = java.util.regex.Pattern.compile(
+            "^[ \\t]*from[ \\t]+java\\.([\\w.]+)[ \\t]+import[ \\t]+(?:\\(([^)]*)\\)|([\\w, \\t]+))",
+            java.util.regex.Pattern.MULTILINE);
+
+    /// The class path with the project's own Java classes that `sources`
+    /// import compiled in front of it, or the class path as it is when they
+    /// import none.
+    private java.util.List<File> withProjectClasses(Map<String, String> sources) throws BuildException {
+        if (javaSourceDir == null || javaScratchDir == null || !javaSourceDir.isDirectory()) {
+            return classPath;
+        }
+        Set<String> files = new java.util.TreeSet<String>();
+        for (String text : sources.values()) {
+            java.util.regex.Matcher m = JAVA_IMPORT.matcher(text);
+            while (m.find()) {
+                String pkg = m.group(1).replace('.', File.separatorChar);
+                for (String name : (m.group(2) != null ? m.group(2) : m.group(3)).split("[,\\s]+")) {
+                    File java = new File(javaSourceDir, pkg + File.separator + name + ".java");
+                    if (!name.isEmpty() && java.isFile()) {
+                        files.add(java.getAbsolutePath());
+                    }
+                }
+            }
+        }
+        if (files.isEmpty()) {
+            return classPath;
+        }
+        javax.tools.JavaCompiler javac = javax.tools.ToolProvider.getSystemJavaCompiler();
+        if (javac == null) {
+            throw new BuildException("Python imports Java classes of this project, which have to be compiled "
+                    + "before the Python is transpiled, and this JVM has no Java compiler. Run the build on a JDK.");
+        }
+        javaScratchDir.mkdirs();
+        StringBuilder cp = new StringBuilder();
+        for (File f : classPath) {
+            cp.append(cp.length() == 0 ? "" : File.pathSeparator).append(f.getAbsolutePath());
+        }
+        List<String> args = new ArrayList<String>(Arrays.asList("-proc:none", "-implicit:class", "-nowarn",
+                "-encoding", "UTF-8", "-d", javaScratchDir.getAbsolutePath(),
+                "-sourcepath", javaSourceDir.getAbsolutePath(), "-classpath", cp.toString()));
+        args.addAll(files);
+        java.io.ByteArrayOutputStream err = new java.io.ByteArrayOutputStream();
+        int status = javac.run(null, null, err, args.toArray(new String[0]));
+        if (status != 0) {
+            throw new BuildException("Python imports Java classes of this project (" + files.size()
+                    + " file(s)), which are compiled before the Python is transpiled and so cannot use the "
+                    + "Java generated from it. javac reported:\n"
+                    + new String(err.toByteArray(), StandardCharsets.UTF_8));
+        }
+        List<File> r = new ArrayList<File>();
+        r.add(javaScratchDir);
+        r.addAll(classPath);
+        return r;
     }
 
     /// Whether `dir` holds at least one `.py` file.
@@ -154,7 +223,8 @@ public final class PythonProjectBuilder {
         }
         Map<String, String> out;
         try {
-            out = PythonTranspiler.transpile(sources, entry, classPath, nativeModules, stackBytes());
+            out = PythonTranspiler.transpile(sources, entry, withProjectClasses(sources), nativeModules,
+                    stackBytes());
         } catch (PythonSyntaxError e) {
             throw new BuildException("src/main/python/" + e.file + ":" + e.line + ":" + e.col + ": " + e.reason, e);
         } catch (IllegalArgumentException e) {

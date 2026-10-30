@@ -147,7 +147,7 @@ class AbstractDBCursorColumnTypeTest {
         cursor.next();
         Row row = cursor.getRow();
         assertEquals("0", row.getString(0));
-        assertEquals(Database.COLUMN_INTEGER, Database.getColumnType(row, 0));
+        assertEquals(Database.COLUMN_INTEGER, row.getColumnType(0));
         assertEquals(Database.COLUMN_INTEGER, cursor.getColumnType(0));
     }
 
@@ -194,6 +194,6 @@ class AbstractDBCursorColumnTypeTest {
         UntypedCursor cursor = new UntypedCursor();
         cursor.next();
         cursor.getString(0);
-        assertEquals(Database.COLUMN_UNKNOWN, Database.getColumnType(cursor.getRow(), 0));
+        assertEquals(Database.COLUMN_UNKNOWN, cursor.getRow().getColumnType(0));
     }
 }

@@ -30,7 +30,7 @@ import java.io.IOException;
 
 /// SQLite through Codename One's `Database`: the platform's own engine on
 /// every target. Values come back in their storage class where the port
-/// reports it ([Database#getColumnType(Row, int)]), and are inferred from
+/// reports it ([Row#getColumnType(int)]), and are inferred from
 /// their text where it does not.
 public final class Cn1Sql extends PySql {
     private static final java.util.concurrent.atomic.AtomicInteger MEMORY_COUNT =
@@ -117,7 +117,7 @@ public final class Cn1Sql extends PySql {
         }
 
         private static Object value(Row row, int i) throws IOException {
-            switch (Database.getColumnType(row, i)) {
+            switch (row.getColumnType(i)) {
                 case Database.COLUMN_NULL:
                     return null;
                 case Database.COLUMN_INTEGER:
