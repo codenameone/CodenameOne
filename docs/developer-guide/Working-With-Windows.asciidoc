@@ -209,7 +209,7 @@ publisher, and writes it beside the package as `<MainClass>-dev.cer`. Set
 
 [source,properties]
 ----
-codename1.arg.windows.xbox=true
+include::../demos/common/src/main/snippets/developer-guide/working-with-windows.properties[tag=working-with-windows-properties-002,indent=0]
 ----
 
 Features that need a desktop report unsupported in this build: secondary windows,
