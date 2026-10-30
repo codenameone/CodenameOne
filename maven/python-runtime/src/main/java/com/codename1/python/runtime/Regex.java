@@ -434,12 +434,12 @@ final class Regex {
     /// A growable int stack: the trail holds (register, old value) pairs and
     /// the choice points six ints each.
     private static final class Ints {
-        int[] a = new int[48];
+        int[] a = NO_INTS;
         int n;
 
         void push(int v) {
             if (n == a.length) {
-                int[] b = new int[n * 2];
+                int[] b = new int[n == 0 ? 24 : n * 2];
                 System.arraycopy(a, 0, b, 0, n);
                 a = b;
             }
@@ -464,9 +464,12 @@ final class Regex {
     }
 
     /// Runs `prog` from `start`; the end position, or -1.
-    private static int exec(Op[] prog, Text t, int start, int endpos, int[] regs, boolean full, int forbid, int li) {
-        Ints stack = new Ints();
-        Ints trail = new Ints();
+    private static int exec(Op[] prog, Text t, int start, int endpos, int[] regs, boolean full, int forbid, int li,
+            Ints stack, Ints trail) {
+        // One pair of stacks serves every start position a search tries;
+        // they are emptied rather than allocated per attempt.
+        stack.n = 0;
+        trail.n = 0;
         int pc = 0;
         int pos = start;
         while (true) {
@@ -594,9 +597,9 @@ final class Regex {
                     int end;
                     if (op.behind) {
                         int s = pos - op.width;
-                        end = s < 0 ? -1 : exec(op.sub, t, s, pos, inner, true, -1, li);
+                        end = s < 0 ? -1 : exec(op.sub, t, s, pos, inner, true, -1, li, new Ints(), new Ints());
                     } else {
-                        end = exec(op.sub, t, pos, endpos, inner, false, -1, li);
+                        end = exec(op.sub, t, pos, endpos, inner, false, -1, li, new Ints(), new Ints());
                     }
                     if (op.neg) {
                         if (end < 0) {
@@ -616,7 +619,7 @@ final class Regex {
                 }
                 case ATOMIC: {
                     int[] inner = copy(regs);
-                    int end = exec(op.sub, t, pos, endpos, inner, false, -1, li);
+                    int end = exec(op.sub, t, pos, endpos, inner, false, -1, li, new Ints(), new Ints());
                     if (end < 0) {
                         ok = false;
                         break;
@@ -766,6 +769,8 @@ final class Regex {
         boolean full = mode == 1;
         int start = pos;
         int[] regs = new int[size + 1 + p.marks];
+        Ints stack = new Ints();
+        Ints trail = new Ints();
         while (start <= endpos) {
             if (mode == 2 && p.prefix != null) {
                 int found = find(t, p.prefix, start, endpos);
@@ -775,7 +780,7 @@ final class Regex {
                 start = found;
             }
             java.util.Arrays.fill(regs, -1);
-            int end = exec(p.ops, t, start, endpos, regs, full, forbid, size);
+            int end = exec(p.ops, t, start, endpos, regs, full, forbid, size, stack, trail);
             if (end >= 0) {
                 regs[0] = start;
                 regs[1] = end;
