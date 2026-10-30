@@ -61,6 +61,66 @@ RealtimeThread t = Realtime.getInstance().start("motor",
 allocation violations. Check them on the target board under load: they are the
 only real evidence that the loop meets its deadline.
 
+=== Parameters
+
+[cols="2,1,4"]
+|===
+| Setter | Default | Meaning
+
+| `setPeriodNanos(long)` | 1 ms | The period. At least 10 microseconds.
+| `setPriority(int)` | 50 | The `SCHED_FIFO` priority, 1 to 99. Keep it below the
+  kernel's own interrupt threads (50 on most PREEMPT_RT systems) unless the loop
+  matters more than the devices it reads.
+| `setCpu(int)` | -1 | The core to pin the thread to; -1 leaves it unpinned.
+| `setIsolateCpu(boolean)` | true | With a CPU given, move the process's other threads
+  off that core.
+| `setAllocationBudget(int)` | 0 | Allocations a cycle may make before the thread
+  fails.
+| `setSchedulingRequired(boolean)` | false | Fail the thread when real-time
+  scheduling cannot be applied, instead of running it normally.
+|===
+
+=== Life cycle
+
+A thread goes through `RealtimeThread.STATE_STARTING`, `STATE_RUNNING` and ends in
+`STATE_STOPPED` or `STATE_FAILED`; `getState()` reads it.
+
+* `setup()` runs once, on the thread, before the first period.
+* `cycle()` runs once per period, and `periodsMissed(n)` before it when `n`
+  releases were missed. The loop then continues from the current time; missed
+  periods are not run late in a burst.
+* `stop()` asks the loop to end after the current cycle, and `join(millis)` waits
+  for it. `stopped()` runs on the thread last, after a stop and after a failure
+  alike, and may allocate.
+* An exception or error from the task, including `RealtimeAllocationError`, ends
+  the thread in `STATE_FAILED`. `failed(Throwable)` receives it on the thread, and
+  `getFailure()` returns it afterwards. The default `failed` prints the stack trace.
+
+`isSchedulingApplied()` and `isCpuPinned()` say what the platform actually granted.
+Check them at start-up and log them: a loop that silently runs at normal priority
+looks fine on the bench and misses deadlines in the field.
+
+`getStatistics()` returns a snapshot. `getLatencyPercentileNanos(0.9999)` reads a
+percentile off the histogram, as an upper bound of its power-of-two bucket.
+
+=== What the platform supports
+
+`Realtime.getInstance().isSupported(feature)` answers for each part separately:
+
+[cols="2,4"]
+|===
+| Feature | Meaning
+
+| `FEATURE_SCHEDULING` | `SCHED_FIFO` priorities can be requested.
+| `FEATURE_CPU_AFFINITY` | Threads can be pinned to a core.
+| `FEATURE_MEMORY_LOCK` | `lockMemory()` can lock the process into RAM.
+| `FEATURE_GC_ISOLATION` | The collector does not stop real-time threads.
+| `FEATURE_ALLOCATION_CHECK` | Every allocation in a cycle is caught at run time.
+  Without it only allocations that need a new memory page are caught, and the
+  build-time check is the guarantee.
+| `FEATURE_PREEMPT_RT_KERNEL` | The kernel is PREEMPT_RT.
+|===
+
 === The rules a cycle follows
 
 *A cycle allocates nothing.* In steady state a real-time loop must not create

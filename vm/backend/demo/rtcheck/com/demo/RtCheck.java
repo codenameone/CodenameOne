@@ -112,6 +112,32 @@ public final class RtCheck {
         }
     }
 
+    /// Allocates `perCycle` arrays a cycle, through an interface so the build cannot
+    /// see it, against a budget of 2.
+    static final class Budgeted extends RealtimeTask {
+        private final Sample[] samples = {new Cached(), new Fresh()};
+        private final int perCycle;
+        private int cycles;
+
+        Budgeted(int perCycle) {
+            this.perCycle = perCycle;
+        }
+
+        @Override
+        public void cycle() {
+            for (int i = 0; i < perCycle; i++) {
+                samples[1].take();
+            }
+            if (samples[cycles++ & 1].take() == null) {
+                cycles = 0;
+            }
+        }
+
+        @Override
+        public void failed(Throwable t) {
+        }
+    }
+
     public static void main(String[] args) throws Exception {
         int seconds = args.length > 0 ? Integer.parseInt(args[0]) : 5;
         long maxLatencyMicros = args.length > 1 ? Long.parseLong(args[1]) : 0;
@@ -205,6 +231,27 @@ public final class RtCheck {
             if (!(f instanceof RealtimeAllocationError) || f.getMessage().indexOf("long") < 0) {
                 System.out.println("RTCHECK FAIL the allocation in the cycle was not refused");
                 ok = false;
+            }
+        }
+
+        // 2b. a budget above zero is a budget, not a pass
+        if (rt.isSupported(Realtime.FEATURE_ALLOCATION_CHECK)) {
+            for (int per = 1; per <= 2; per++) {
+                RealtimeThread bt = rt.start("budget" + per, new RealtimeParameters()
+                        .setPeriodNanos(1000000L).setPriority(70).setAllocationBudget(2),
+                        new Budgeted(per));
+                Thread.sleep(300);
+                bt.stop();
+                bt.join(2000);
+                // per=1: one array plus, every other cycle, one more -- 2 at most, within.
+                // per=2: 3 on every other cycle -- over the budget.
+                boolean failed = bt.getFailure() instanceof RealtimeAllocationError;
+                System.out.println("RTCHECK budget 2, " + (per + 1) + " allocations at most: "
+                        + (failed ? "refused" : "allowed") + " after " + bt.getStatistics().getCycles() + " cycles");
+                if (failed != (per == 2)) {
+                    System.out.println("RTCHECK FAIL the allocation budget was not applied");
+                    ok = false;
+                }
             }
         }
 

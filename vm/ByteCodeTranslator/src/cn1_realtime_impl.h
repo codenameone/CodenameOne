@@ -112,6 +112,14 @@ static int cn1RtKernelIsPreemptRt(void) {
     return c == '1';
 }
 
+/* The threads cn1RtIsolateCpu moved, so cn1RtRestoreCpu gives the core back to exactly
+ * those when the real-time thread ends -- otherwise the process would keep one core
+ * fewer for good. Only the real-time thread that isolated touches its own list. */
+#define CN1_RT_MAX_MOVED 512
+static __thread pid_t cn1RtMoved[CN1_RT_MAX_MOVED];
+static __thread int cn1RtMovedCount = 0;
+static __thread int cn1RtIsolatedCpu = -1;
+
 /* Takes `cpu` away from every other thread of the process, so the real-time thread has
  * it to itself. Threads started later inherit their creator's mask, and a real-time
  * thread never creates one, so they stay off it too. Best effort: a thread that exits
@@ -138,15 +146,38 @@ static int cn1RtIsolateCpu(int cpu) {
             CPU_CLR(cpu, &set);
             if (sched_setaffinity(tid, sizeof(set), &set) == 0) {
                 moved++;
+                if (cn1RtMovedCount < CN1_RT_MAX_MOVED) {
+                    cn1RtMoved[cn1RtMovedCount++] = tid;
+                }
             }
         }
     }
     closedir(d);
+    cn1RtIsolatedCpu = cpu;
     return moved;
 }
 
+/* Gives the isolated core back to the threads that had it. A thread that has exited,
+ * or whose id was reused, fails or gains a core it may use anyway: best effort. */
+static void cn1RtRestoreCpu(void) {
+    int i;
+    if (cn1RtIsolatedCpu < 0) {
+        return;
+    }
+    for (i = 0; i < cn1RtMovedCount; i++) {
+        cpu_set_t set;
+        if (sched_getaffinity(cn1RtMoved[i], sizeof(set), &set) == 0) {
+            CPU_SET(cn1RtIsolatedCpu, &set);
+            sched_setaffinity(cn1RtMoved[i], sizeof(set), &set);
+        }
+    }
+    cn1RtMovedCount = 0;
+    cn1RtIsolatedCpu = -1;
+}
+
 /* Touches the stack the thread will run on, so a page fault never lands in a period.
- * With mlockall(MCL_FUTURE) the pages then stay. */
+ * With mlockall(MCL_FUTURE) the pages then stay. 128KB is well inside the
+ * CN1_THREAD_STACK_BYTES (16MB) every VM thread is created with. */
 static void cn1RtPrefaultStack(void) {
     volatile char buf[128 * 1024];
     size_t i;
@@ -253,6 +284,7 @@ static JAVA_VOID cn1RtImpl_rtLeave(CODENAME_ONE_THREAD_STATE) {
         pthread_setschedparam(pthread_self(), cn1RtOldPolicy, &cn1RtOldParam);
         cn1RtOldPolicy = -1;
     }
+    cn1RtRestoreCpu();
 #endif
 }
 

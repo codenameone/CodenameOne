@@ -21405,13 +21405,12 @@ void cn1RtLeave(CODENAME_ONE_THREAD_STATE) {
     }
 }
 
-void cn1RtFreeze(CODENAME_ONE_THREAD_STATE, JAVA_INT budget) {
+// The trap itself, without touching the budget: cn1RtTrappedAlloc lifts and restores it
+// around an allocation inside the budget, and must not refill the budget doing so.
+static void cn1RtTrapOn(CODENAME_ONE_THREAD_STATE) {
     if(threadStateData->rtAllocTrap) {
-        threadStateData->rtAllocBudgetLeft = threadStateData->rtAllocBudget;
         return;
     }
-    threadStateData->rtAllocBudget = budget < 0 ? 0 : budget;
-    threadStateData->rtAllocBudgetLeft = threadStateData->rtAllocBudget;
 #ifdef CN1_VIRTUAL_THREADS
     threadStateData->rtSavedBibopCur = threadStateData->bibopCur;
     threadStateData->bibopCur = cn1RtNoPages;
@@ -21419,7 +21418,7 @@ void cn1RtFreeze(CODENAME_ONE_THREAD_STATE, JAVA_INT budget) {
     threadStateData->rtAllocTrap = JAVA_TRUE;
 }
 
-void cn1RtThaw(CODENAME_ONE_THREAD_STATE) {
+static void cn1RtTrapOff(CODENAME_ONE_THREAD_STATE) {
     if(!threadStateData->rtAllocTrap) {
         return;
     }
@@ -21430,6 +21429,17 @@ void cn1RtThaw(CODENAME_ONE_THREAD_STATE) {
         threadStateData->rtSavedBibopCur = 0;
     }
 #endif
+}
+
+// Enters the steady state with a full budget of `budget` allocations per period.
+void cn1RtFreeze(CODENAME_ONE_THREAD_STATE, JAVA_INT budget) {
+    threadStateData->rtAllocBudget = budget < 0 ? 0 : budget;
+    threadStateData->rtAllocBudgetLeft = threadStateData->rtAllocBudget;
+    cn1RtTrapOn(threadStateData);
+}
+
+void cn1RtThaw(CODENAME_ONE_THREAD_STATE) {
+    cn1RtTrapOff(threadStateData);
 }
 
 // Starts a new period's allocation budget without leaving the steady state.
@@ -21450,9 +21460,9 @@ JAVA_OBJECT cn1RtTrappedAlloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz*
     // array back in place for the call, and trap again afterwards.
     if(threadStateData->rtAllocBudgetLeft > 0) {
         threadStateData->rtAllocBudgetLeft--;
-        cn1RtThaw(threadStateData);
+        cn1RtTrapOff(threadStateData);
         o = codenameOneGcMalloc(threadStateData, size, parent);
-        cn1RtFreeze(threadStateData, threadStateData->rtAllocBudget);
+        cn1RtTrapOn(threadStateData);
         return o;
     }
     // Over it. The steady state is over: thaw first, because building the error's stack
@@ -21538,10 +21548,15 @@ static void cn1RtAccount(int size) {
     if(step < 1024 * 1024) {
         step = 1024 * 1024;
     }
-    if(__atomic_add_fetch(&cn1RtBytesSinceCheck, (long long)size, __ATOMIC_RELAXED) < step) {
+    long long seen = __atomic_add_fetch(&cn1RtBytesSinceCheck, (long long)size, __ATOMIC_RELAXED);
+    if(seen < step) {
         return;
     }
-    __atomic_store_n(&cn1RtBytesSinceCheck, 0, __ATOMIC_RELAXED);
+    // One thread takes the step (bytes added meanwhile stay counted); a racer reads on.
+    if(!__atomic_compare_exchange_n(&cn1RtBytesSinceCheck, &seen, seen - step, 0,
+                                    __ATOMIC_RELAXED, __ATOMIC_RELAXED)) {
+        return;
+    }
     long long rss = cn1RtResidentBytes();
     if(rss <= 0) {
         return;

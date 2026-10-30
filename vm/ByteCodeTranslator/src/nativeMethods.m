@@ -2768,7 +2768,10 @@ void cn1RetireVirtualThread(struct cn1VirtualThread* vt) {
 void cn1ResumeVirtualThreadOn(CODENAME_ONE_THREAD_STATE, struct cn1VirtualThread* vt) {
     struct ThreadLocalData* state = (struct ThreadLocalData*)cn1VirtualThreadState(vt);
     if(state != 0) {
-        state->bibopCur = threadStateData->bibopCur;
+        // A real-time carrier in its steady state has swapped in an empty page array
+        // (cn1RtFreeze); the virtual thread is not trapped and gets the real one.
+        state->bibopCur = (threadStateData->rtAllocTrap && threadStateData->rtSavedBibopCur != 0)
+                ? threadStateData->rtSavedBibopCur : threadStateData->bibopCur;
     }
     cn1VirtualThreadResume(vt);
 }
