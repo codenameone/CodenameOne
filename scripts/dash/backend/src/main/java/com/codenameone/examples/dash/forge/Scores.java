@@ -28,6 +28,7 @@ import com.codenameone.examples.dash.api.ScoreDto;
 import com.codenameone.examples.dash.domain.CrewMember;
 import com.codenameone.examples.dash.domain.Profile;
 import com.codenameone.examples.dash.domain.Score;
+import com.codenameone.examples.dash.push.GamePushes;
 import com.codenameone.examples.dash.repository.CrewMemberRepository;
 import com.codenameone.examples.dash.repository.ProfileRepository;
 import com.codenameone.examples.dash.repository.ScoreRepository;
@@ -64,13 +65,15 @@ public class Scores {
     private final ProfileRepository profiles;
     private final CrewMemberRepository members;
     private final Referrals referrals;
+    private final GamePushes pushes;
 
     public Scores(ScoreRepository scores, ProfileRepository profiles, CrewMemberRepository members,
-            Referrals referrals) {
+            Referrals referrals, GamePushes pushes) {
         this.scores = scores;
         this.profiles = profiles;
         this.members = members;
         this.referrals = referrals;
+        this.pushes = pushes;
     }
 
     public static int today() {
@@ -100,7 +103,10 @@ public class Scores {
             return 0;
         }
         Runner r = played.runner(0);
-        enter(ALL, level, p, replay, played);
+        int before = enter(ALL, level, p, replay, played);
+        if (before != NOT_BETTER) {
+            tellFriendsBeaten(p, level, before, r.score());
+        }
         if (replay.seed() == Content.weeklySeed(today() / 7, level)) {
             enter(weekBoard(), level, p, replay, played);
         }
@@ -111,13 +117,44 @@ public class Scores {
         return above == null ? 1 : above.intValue() + 1;
     }
 
-    private void enter(String board, String level, Profile p, Replay replay, Run played) {
+    /// What [#enter] answers when the run is no better than the player's
+    /// best on that board.
+    private static final int NOT_BETTER = -2;
+
+    /// The most friends one improved score is pushed to.
+    private static final int MAX_BEATEN_PUSHES = 20;
+
+    /// Friends whose best the new score passed, and that the player's old best
+    /// had not: an improvement that passes nobody new sends nothing.
+    // tag::dash-beaten-push[]
+    private void tellFriendsBeaten(Profile p, String level, int before, int score) throws IOException {
+        int sent = 0;
+        for (String f : friends(p.getUsername())) {
+            if (sent >= MAX_BEATEN_PUSHES) {
+                return;
+            }
+            if (f.equals(p.getUsername())) {
+                continue;
+            }
+            Score theirs = scores.findById(ALL + "|" + level + "|" + f);
+            if (theirs != null && theirs.getScore() < score && theirs.getScore() >= before) {
+                pushes.scoreBeaten(f, p.getDisplayName(), level, score);
+                sent++;
+            }
+        }
+    }
+    // end::dash-beaten-push[]
+
+    /// Answers the player's previous best on the board (-1 when there was
+    /// none), or [#NOT_BETTER] when the run did not improve on it.
+    private int enter(String board, String level, Profile p, Replay replay, Run played) {
         Runner r = played.runner(0);
         String id = board + "|" + level + "|" + p.getUsername();
         Score s = scores.findById(id);
         if (s != null && s.getScore() >= r.score()) {
-            return;
+            return NOT_BETTER;
         }
+        int before = s == null ? -1 : s.getScore();
         boolean fresh = s == null;
         if (fresh) {
             s = new Score();
@@ -139,6 +176,7 @@ public class Scores {
         } else {
             scores.save(s);
         }
+        return before;
     }
 
     /// A board, best first. `friends` is the caller, the players they

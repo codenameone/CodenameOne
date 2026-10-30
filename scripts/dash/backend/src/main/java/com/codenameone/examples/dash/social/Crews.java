@@ -28,6 +28,7 @@ import com.codenameone.examples.dash.api.CrewDto;
 import com.codenameone.examples.dash.domain.Crew;
 import com.codenameone.examples.dash.domain.CrewMember;
 import com.codenameone.examples.dash.domain.Profile;
+import com.codenameone.examples.dash.push.GamePushes;
 import com.codenameone.examples.dash.repository.CrewMemberRepository;
 import com.codenameone.examples.dash.repository.CrewRepository;
 import com.codenameone.examples.dash.repository.ProfileRepository;
@@ -46,11 +47,30 @@ public class Crews {
     private final CrewRepository crews;
     private final CrewMemberRepository members;
     private final ProfileRepository profiles;
+    private final GamePushes pushes;
 
-    public Crews(CrewRepository crews, CrewMemberRepository members, ProfileRepository profiles) {
+    public Crews(CrewRepository crews, CrewMemberRepository members, ProfileRepository profiles,
+            GamePushes pushes) {
         this.crews = crews;
         this.members = members;
         this.profiles = profiles;
+        this.pushes = pushes;
+    }
+
+    /// The host opened a party for their crew: every other member hears about
+    /// it. Only a member may call their crew, so a crew code alone cannot be
+    /// used to push strangers.
+    @Transactional(readOnly = true)
+    public void callToRace(String host, String hostName, String code, String party) throws IOException {
+        Crew c = code == null ? null : crews.findById(code);
+        if (c == null || members.findById(code + "|" + host) == null) {
+            return;
+        }
+        for (CrewMember m : members.members(code, new PageRequest(0, MAX_MEMBERS))) {
+            if (!m.getUsername().equals(host)) {
+                pushes.crewRacing(m.getUsername(), hostName, c.getName(), party);
+            }
+        }
     }
 
     @Transactional(readOnly = true)

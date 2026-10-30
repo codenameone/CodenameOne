@@ -47,6 +47,27 @@ public class GamePushes {
                 .data("challenge", code));
     }
 
+    /// A friend's run went past the player's best on a level they both ran.
+    /// One per level at a time: a newer one replaces it in the tray.
+    public void scoreBeaten(String username, String friend, String level, int score) {
+        send(username, PushNotification.builder()
+                .title(friend + " beat your score")
+                .body(score + " points on " + level + ". Run it again?")
+                .collapseKey("beaten-" + level)
+                .ttlSeconds(86400)
+                .data("screen", "level:" + level));
+    }
+
+    /// A crewmate opened a party: the crew's race is about to start.
+    public void crewRacing(String username, String host, String crew, String code) {
+        send(username, PushNotification.builder()
+                .title(crew + " is racing")
+                .body(host + " opened a party. Jump in before the start")
+                .collapseKey("party-" + code)
+                .ttlSeconds(900)
+                .data("challenge", code));
+    }
+
     /// The daily rewarded-ad allowance is back.
     public void rewardsReady(String username) {
         send(username, PushNotification.builder()

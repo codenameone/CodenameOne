@@ -114,6 +114,9 @@ public final class Nav {
             RunForm.daily();
         } else if ("crews".equals(name)) {
             CrewsForm.show();
+        } else if (name != null && name.startsWith("level:")) {
+            // "A friend beat your score": that level's board, to see by how much.
+            ScoresForm.show(name.substring(6), null);
         } else {
             home();
         }

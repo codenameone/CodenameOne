@@ -89,9 +89,14 @@ public final class RaceLobby implements GameLink.Listener, Voice.Listener {
 
     /// A party of one's own, on `level`.
     public static void host(String level) {
+        host(level, null);
+    }
+
+    /// A party for a crew: the server pushes the invite to the other members.
+    public static void host(String level, String crew) {
         String l = level == null ? Content.CAUSEWAY : level;
-        RaceLobby r = new RaceLobby("{\"type\":\"" + GameProtocol.HOST + "\",\"level\":" + Json.write(l) + "}",
-                false);
+        RaceLobby r = new RaceLobby("{\"type\":\"" + GameProtocol.HOST + "\",\"level\":" + Json.write(l)
+                + (crew == null ? "" : ",\"crew\":" + Json.write(crew)) + "}", false);
         r.level = l;
         r.host = true;
         r.party("Your party");

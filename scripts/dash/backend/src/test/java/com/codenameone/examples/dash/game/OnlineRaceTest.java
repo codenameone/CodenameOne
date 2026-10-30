@@ -24,11 +24,16 @@ import com.codename1.backend.test.MockMvc;
 import com.codenameone.examples.dash.Api;
 import com.codenameone.examples.dash.account.Accounts;
 import com.codenameone.examples.dash.api.GameProtocol;
+import com.codenameone.examples.dash.api.PushDeviceDto;
 import com.codenameone.examples.dash.domain.Profile;
+import com.codenameone.examples.dash.push.PushDevices;
+import com.codenameone.examples.dash.push.PushSender;
+import com.codenameone.examples.dash.push.RecordingPushSender;
 import com.codenameone.examples.dash.rules.Content;
 import com.codenameone.examples.dash.rules.Input;
 import com.codenameone.examples.dash.rules.Replay;
 import com.codenameone.examples.dash.rules.Run;
+import com.codenameone.examples.dash.social.Crews;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -50,13 +55,38 @@ class OnlineRaceTest {
     private Accounts accounts;
     @Autowired
     private Rooms rooms;
+    @Autowired
+    private Crews crews;
+    @Autowired
+    private PushDevices devices;
+    @Autowired
+    private PushSender sender;
+
+    /// Opening a party for a crew pushes everyone else in it, and only them.
+    @Test
+    void aCrewPartyCallsTheRestOfTheCrew() throws Exception {
+        String host = Api.player(accounts, "crewhost");
+        String mate = Api.player(accounts, "crewmate");
+        String stranger = Api.player(accounts, "stranger");
+        devices.register(mate, new PushDeviceDto("fcm", "tok-mate", "android"));
+        devices.register(stranger, new PushDeviceDto("fcm", "tok-stranger", "android"));
+        String code = crews.create(host, "Night Shift").code();
+        crews.join(mate, code);
+        RecordingPushSender pushes = (RecordingPushSender) sender;
+        rooms.host(profile(host), null, Content.CAUSEWAY, code);
+        assertEquals(1, pushes.sentTo("tok-mate").size(), "the crewmate hears about the party");
+        assertTrue(pushes.sentTo("tok-stranger").isEmpty(), "nobody outside the crew does");
+        // A crew code alone does not let a non-member call that crew.
+        rooms.host(profile(stranger), null, Content.CAUSEWAY, code);
+        assertEquals(1, pushes.sentTo("tok-mate").size());
+    }
 
     // tag::dash-race-test[]
     @Test
     void aPartyRacesIsRecordedAndReplaysToTheSameScores() throws Exception {
         String host = Api.player(accounts, "host");
         String guest = Api.player(accounts, "guest");
-        rooms.host(profile(host), null, Content.CAUSEWAY);
+        rooms.host(profile(host), null, Content.CAUSEWAY, null);
         String code = rooms.partyCode(host);
         assertFalse(code.isEmpty());
         rooms.join(profile(guest), null, code);

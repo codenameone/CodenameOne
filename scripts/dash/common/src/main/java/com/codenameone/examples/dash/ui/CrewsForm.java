@@ -95,7 +95,7 @@ public final class CrewsForm {
         share.setUIID("DialogButton");
         share.setTextToShare("Join my crew in Dash: code " + c.code());
         card.add(BorderLayout.SOUTH, Ui.row(
-                Ui.button("Party", "ClaimButton", "crewParty-" + c.code(), e -> RaceLobby.host(null)),
+                Ui.button("Party", "ClaimButton", "crewParty-" + c.code(), e -> RaceLobby.host(null, c.code())),
                 Ui.button("Board", "DialogButton", "crewBoard-" + c.code(),
                         e -> ScoresForm.show(Content.CAUSEWAY, CrewsForm::show)),
                 share,

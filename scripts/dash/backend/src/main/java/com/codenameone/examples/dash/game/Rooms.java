@@ -33,6 +33,7 @@ import com.codenameone.examples.dash.api.LiveRaceDto;
 import com.codenameone.examples.dash.domain.Profile;
 import com.codenameone.examples.dash.forge.Levels;
 import com.codenameone.examples.dash.rules.Run;
+import com.codenameone.examples.dash.social.Crews;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -63,6 +64,7 @@ public class Rooms {
     private final Challenges challenges;
     private final AdminChannel admins;
     private final Levels levels;
+    private final Crews crews;
     private final long botAfterMillis;
 
     private final Map<String, RaceRoom> byId = new HashMap<String, RaceRoom>();
@@ -103,7 +105,8 @@ public class Rooms {
     }
 
     public Rooms(Results results, Flags flags, Challenges challenges, AdminChannel admins, Levels levels,
-            @Value("${dash.race.bot-after-ms:6000}") long botAfterMillis) {
+            Crews crews, @Value("${dash.race.bot-after-ms:6000}") long botAfterMillis) {
+        this.crews = crews;
         this.results = results;
         this.flags = flags;
         this.challenges = challenges;
@@ -183,8 +186,9 @@ public class Rooms {
 
     // ------------------------------------------------------------ parties
 
-    /// Opens a party on `level` and answers its share link.
-    void host(Profile player, WebSocketSession session, String level) throws IOException {
+    /// Opens a party on `level` and answers its share link. With a `crew`
+    /// code the host belongs to, the rest of that crew is pushed the invite.
+    void host(Profile player, WebSocketSession session, String level, String crew) throws IOException {
         String ref = levels.normalize(level);
         if (ref == null) {
             send(session, Messages.error("No such level"));
@@ -202,6 +206,9 @@ public class Rooms {
             parties.put(party.code, party);
             partyOf.put(player.getUsername(), party.code);
             broadcast(party, partyMessage(party));
+        }
+        if (crew != null) {
+            crews.callToRace(player.getUsername(), player.getDisplayName(), crew, c.code());
         }
     }
 

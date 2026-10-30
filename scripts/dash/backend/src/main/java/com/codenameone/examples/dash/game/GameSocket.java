@@ -92,7 +92,7 @@ public class GameSocket implements WebSocket {
         } else if (GameProtocol.QUICK.equals(type)) {
             rooms.quick(accounts.profile(username), session, string(m, "level"));
         } else if (GameProtocol.HOST.equals(type)) {
-            rooms.host(accounts.profile(username), session, string(m, "level"));
+            rooms.host(accounts.profile(username), session, string(m, "level"), string(m, "crew"));
         } else if (GameProtocol.JOIN.equals(type)) {
             rooms.join(accounts.profile(username), session, string(m, "code"));
         } else if (GameProtocol.GO.equals(type)) {
