@@ -41,6 +41,9 @@ public class OwnerTest extends E2e {
         at.set(Calendar.MILLISECOND, 0);
         final long startsAt = at.getTime().getTime();
 
+        // The suite starts every test in the member's mode; the owner opens
+        // the mode the account is for.
+        onEdt(() -> AppConfig.setMode(""));
         signIn(OWNER, "Owner");
         until(() -> findByName("revenueChart") != null, 20000, "the dashboard's charts");
         shot("owner-dashboard");

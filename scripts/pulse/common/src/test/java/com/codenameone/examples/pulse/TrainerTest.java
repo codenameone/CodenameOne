@@ -24,9 +24,9 @@ import java.util.Map;
 
 /// A trainer marks a member present from the class roster.
 ///
-/// The class is made for the test, through the owner's API, to start in half
-/// an hour: attendance can be marked from an hour before a class, and none of
-/// the demo timetable is guaranteed to be that close. The member books it the
+/// The class is made for the test, through the owner's API, to start within
+/// the hour: attendance can be marked from an hour before a class, and none
+/// of the demo timetable is guaranteed to be that close. The member books it the
 /// same way, so all the test drives through the screens is the trainer's part.
 public class TrainerTest extends E2e {
     @Override
@@ -36,7 +36,7 @@ public class TrainerTest extends E2e {
         Actor trainer = Actor.signIn(TRAINER);
         Actor member = Actor.signIn(MEMBER);
         String coach = Actor.text(trainer.get("/api/me"), "username");
-        String sessionId = schedule(owner, coach, System.currentTimeMillis() + 30 * 60000L);
+        String sessionId = schedule(owner, coach, clearTrainersHour(owner, trainer));
         assertTrue(sessionId.length() > 0, "a class for the trainer could be scheduled");
         try {
             Map<String, Object> booking = member.post("/api/bookings",
@@ -44,6 +44,7 @@ public class TrainerTest extends E2e {
             assertEqual(200, member.status, "the member books the class");
             final String bookingId = Actor.text(booking, "id");
 
+            onEdt(() -> AppConfig.setMode(""));
             signIn(TRAINER, "Trainer");
             click("class-" + sessionId);
             waitForForm("Roster");
@@ -58,6 +59,37 @@ public class TrainerTest extends E2e {
             owner.post("/api/owner/classes/" + sessionId + "/cancel",
                     "{\"reason\":\"End of the trainer test\"}");
         }
+    }
+
+    /// Makes the next hour the trainer's own and answers when a class may
+    /// start in it. The demo studio keeps the trainer busy all day, and a
+    /// trainer cannot be in two classes at once: the classes still to come in
+    /// that hour are cancelled (this server is the test's), and one already
+    /// under way can only be waited out, so the new class starts after it.
+    /// Attendance is open from an hour before a class, so it starts within it.
+    @SuppressWarnings("unchecked")
+    private static long clearTrainersHour(Actor owner, Actor trainer) {
+        long now = System.currentTimeMillis();
+        long start = now + 10 * 60000L;
+        for (Object found : trainer.list("/api/trainer/classes")) {
+            if (!(found instanceof Map)) {
+                continue;
+            }
+            Map<String, Object> session = (Map<String, Object>) found;
+            long begins = ((Number) session.get("startsAt")).longValue();
+            long ends = ((Number) session.get("endsAt")).longValue();
+            if (!"SCHEDULED".equals(Actor.text(session, "state")) || ends <= now
+                    || begins > now + 3 * 3600000L) {
+                continue;
+            }
+            if (begins > now) {
+                owner.post("/api/owner/classes/" + Actor.text(session, "id") + "/cancel",
+                        "{\"reason\":\"Clearing the trainer's hour for the trainer test\"}");
+            } else {
+                start = Math.max(start, ends + 2 * 60000L);
+            }
+        }
+        return start;
     }
 
     @SuppressWarnings("unchecked")

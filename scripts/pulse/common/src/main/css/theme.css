@@ -1457,12 +1457,12 @@ SvInk { background-color: var(--ink); border-radius: 3.4mm; padding: 3.4mm; marg
 SvInkEyebrow { background-color: transparent; font-family: "native:MainBold"; font-size: 2.4mm; color: var(--lime); padding: 0; margin: 0; }
 SvInkTitle { background-color: transparent; font-family: "native:MainBold"; font-size: 5mm; color: var(--ink-text); padding: 0.6mm 0 0.6mm 0; margin: 0; }
 SvInkText { background-color: transparent; font-size: 2.9mm; color: var(--ink-muted); padding: 0; margin: 0; }
-SvInkChip { font-family: "native:MainBold"; font-size: 2.6mm; color: var(--ink); background-color: var(--lime); border-radius: 3mm; padding: 1mm 2.4mm 1mm 2.4mm; margin: 0 1.4mm 0 0; }
+SvInkChip { font-family: "native:MainBold"; font-size: 2.6mm; color: var(--ink); background-color: var(--lime); border-radius: 3mm; padding: 1mm 2.8mm 1mm 2.8mm; margin: 0 1.4mm 0 0; }
 SvInkButton { font-family: "native:MainBold"; font-size: 3mm; color: var(--ink); background-color: var(--lime); border-radius: 4mm; padding: 1.8mm 3.6mm 1.8mm 3.6mm; margin: 2mm 0 0 0; text-align: center; }
 SvInkButton.pressed { background-color: #ffffff; }
 SvBeat { background-color: transparent; color: var(--lime); padding: 0; margin: 0; }
 SvTile { background-color: var(--surface-alt); border-radius: 3mm; padding: 2mm 0.6mm 2mm 0.6mm; margin: 0.8mm; }
-SvInkRow { background-color: transparent; padding: 0; margin: 0; }
+SvInkRow { background-color: transparent; padding: 0; margin: 1.6mm 0 0 0; }
 SvLevelBox { background-color: transparent; padding: 0 0 0 3mm; margin: 0; }
 SvTileValue { background-color: transparent; font-family: "native:MainBold"; font-size: 4.4mm; color: var(--text); padding: 0; margin: 0; }
 SvTileLabel { background-color: transparent; font-size: 2.3mm; color: var(--text-muted); padding: 0; margin: 0; }
@@ -1589,7 +1589,6 @@ SvWelcomeFeatureText { background-color: transparent; font-size: 3.1mm; color: v
     SvBannerTitle { color: var(--text-dark); }
     SvBannerText { color: var(--text-muted-dark); }
     SvAmount { color: var(--text-dark); }
-    SvTile { background-color: var(--surface-dark); border: 1px solid var(--line-dark); }
     SvChart { color: var(--brand-dark); }
     SvChartPeak { color: var(--brand-pressed-dark); }
     SvChartGrid { color: var(--line-dark); }
@@ -1688,6 +1687,34 @@ SvWelcomeFeatureText { background-color: transparent; font-size: 3.1mm; color: v
     SvQueueRow { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
     SvQueueRow.pressed { background-color: var(--surface-alt-dark); }
     SvQueueRowPicked { background-color: var(--brand-tint-dark); border-bottom: 1px solid var(--line-dark); }
+
+    /* Class cards, medals, kudos and tiles. */
+    SvWorkoutWorn { color: var(--violet-dark); }
+    SvPoints { color: var(--ink-dark); }
+    SvKudos { color: var(--brand-dark); background-color: var(--surface-alt-dark); }
+    SvKudos.pressed { background-color: var(--surface-press-dark); }
+    SvKudos.disabled { color: var(--text-muted-dark); background-color: var(--surface-alt-dark); }
+    SvKudosGiven { background-color: var(--brand-dark); }
+    SvKudosGiven.disabled { background-color: var(--brand-dark); }
+    SvKudosMine { color: var(--text-muted-dark); }
+    SvKudosMine.disabled { color: var(--text-muted-dark); }
+    SvClassClock { color: var(--text-dark); }
+    SvClassLength { color: var(--text-muted-dark); }
+    SvClassName { color: var(--text-dark); }
+    SvClassWho { color: var(--text-muted-dark); }
+    SvClassLeft { color: var(--text-muted-dark); }
+    SvClassFull { color: var(--danger-dark); }
+    SvPillBook { color: var(--brand-contrast-dark); }
+    SvPillBook.pressed { background-color: var(--brand-pressed-dark); }
+    SvPillBooked { color: var(--success-dark); background-color: var(--success-tint-dark); }
+    SvMedalLocked { color: var(--text-muted-dark); }
+    SvMedalName { color: var(--text-dark); }
+    SvMedalNameLocked { color: var(--text-muted-dark); }
+    SvInkChip { color: var(--ink-dark); }
+    SvInkButton { color: var(--ink-dark); }
+    SvTileValue { color: var(--text-dark); }
+    SvTileLabel { color: var(--text-muted-dark); }
+    SvRowAmount { color: var(--text-dark); }
 }
 SvRowAmount { background-color: transparent; font-family: "native:MainBold"; font-size: 3.6mm; color: var(--text); padding: 0 0 0 2mm; margin: 0; }
 SvClassTile { background-color: transparent; padding: 2mm; margin: 0 3mm 0 0; }

@@ -134,7 +134,9 @@ public class TrainerForm extends LiveChannel.Adapter implements Nav.Home {
         live.addActionListener(e -> LiveClassForm.show(form, session));
         Button roster = new Button(Lang.tr("Roster"), "SvInkText");
         roster.getAllStyles().setBgTransparency(0);
-        roster.setName("openRoster");
+        // Named as a class in the list below is, since both open its roster:
+        // the class leaves the list while it is the one featured here.
+        roster.setName("class-" + session.id());
         roster.addActionListener(e -> RosterForm.show(form, session));
         Container actions = new Container(new BorderLayout(), "SvInkRow");
         actions.add(BorderLayout.WEST, live).add(BorderLayout.EAST, roster);

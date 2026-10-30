@@ -238,8 +238,10 @@ public final class Classes {
             body.add(fill);
         }
         if (session.friendsGoing() > 0) {
-            Label friends = new Label(session.friendsGoing() == 1 ? Lang.tr("A friend is going")
-                    : Lang.tr("{0} friends going", Integer.valueOf(session.friendsGoing())),
+            // Short: it shares the line's width with the Book button, and
+            // the group icon says the rest.
+            Label friends = new Label(session.friendsGoing() == 1 ? Lang.tr("1 friend")
+                    : Lang.tr("{0} friends", Integer.valueOf(session.friendsGoing())),
                     "SvClassFriends");
             Ui.icon(friends, FontImage.MATERIAL_GROUP, 2.6f);
             body.add(friends);

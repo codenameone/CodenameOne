@@ -175,9 +175,13 @@ public class MemberForm extends LiveChannel.Adapter implements Nav.Home {
             final BookingDto booking = first;
             SessionDto session = booking.session();
             next.add(Ui.text(session.name(), "SvInkTitle"));
-            next.add(Ui.text(Classes.detail(session), "SvInkText"));
+            // Two short lines rather than one that runs off a narrow card.
+            next.add(Ui.plain(Ui.when(session.startsAt()), "SvInkText"));
+            next.add(Ui.plain((session.trainerName() == null ? "" : session.trainerName())
+                    + (session.roomName() == null ? "" : Ui.DOT + session.roomName()),
+                    "SvInkText"));
             Container chips = new Container(new FlowLayout(), "SvInkRow");
-            chips.add(Ui.label(until(session.startsAt()), "SvInkChip"));
+            chips.add(Ui.plain(until(session.startsAt()), "SvInkChip"));
             if (Classes.WAITLISTED.equals(booking.state())) {
                 chips.add(Ui.label(Lang.tr("Queue #{0}", Integer.valueOf(booking.position())),
                         "SvInkChip"));
@@ -234,7 +238,7 @@ public class MemberForm extends LiveChannel.Adapter implements Nav.Home {
         tiles.add(stat(found.visitsThisMonth(), "visits", "visits"));
         tiles.add(stat(found.minutesThisMonth(), "minutes", "minutes"));
         tiles.add(stat(found.caloriesThisMonth(), "kcal", "calories"));
-        stats.add(Ui.label("This month", "SvHeading"));
+        Ui.section(stats, "This month");
         stats.add(tiles);
         List<Integer> weekly = found.weeklyVisits();
         if (weekly != null && !weekly.isEmpty()) {
@@ -247,7 +251,7 @@ public class MemberForm extends LiveChannel.Adapter implements Nav.Home {
                     Integer.valueOf(values.length)), Lang.tr("This week")));
         }
         stats.add(Ui.label(Lang.tr("Badges  {0}/{1}", Integer.valueOf(Badges.count(found.badges())),
-                Integer.valueOf(Badges.total())), "SvHeading"));
+                Integer.valueOf(Badges.total())), "SvSection"));
         stats.add(Badges.shelf(found.badges()));
         if (!Badges.has(found.badges(), "STRAPPED_IN")) {
             Container callout = new Container(new BorderLayout());

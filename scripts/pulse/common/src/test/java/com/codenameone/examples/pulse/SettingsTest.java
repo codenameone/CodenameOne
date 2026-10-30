@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.pulse;
 
+import com.codename1.components.Switch;
 import java.util.Map;
 
 /// The settings: a language and a theme that change the app on the spot, and
@@ -57,10 +58,10 @@ public class SettingsTest extends E2e {
         click("theme-system");
 
         // Class reminders off, on the account, and back on.
-        click("notifyClasses");
+        flip("notifyClasses");
         until(() -> "false".equals(String.valueOf(member.get("/api/account/preferences")
                 .get("notifyClasses"))), 20000, "the reminders to be off on the account");
-        click("notifyClasses");
+        flip("notifyClasses");
         until(() -> {
             Map<String, Object> kept = member.get("/api/account/preferences");
             return "true".equals(String.valueOf(kept.get("notifyClasses")))
@@ -70,5 +71,14 @@ public class SettingsTest extends E2e {
         click("signOut");
         waitForForm("Welcome");
         return true;
+    }
+
+    /// Turns the switch called `name` the other way, as a tap on it does.
+    private void flip(final String name) {
+        until(() -> findByName(name) instanceof Switch, 20000, "a switch called " + name);
+        onEdt(() -> {
+            Switch toggle = (Switch) findByName(name);
+            toggle.setValue(!toggle.isValue());
+        });
     }
 }

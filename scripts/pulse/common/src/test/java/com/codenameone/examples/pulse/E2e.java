@@ -22,7 +22,6 @@ import com.codename1.components.SpanLabel;
 import com.codename1.io.FileSystemStorage;
 import com.codename1.io.oidc.OidcTokens;
 import com.codename1.io.oidc.TokenStore;
-import com.codename1.maps.MapView;
 import com.codename1.testing.AbstractTest;
 import com.codename1.ui.Button;
 import com.codename1.ui.CN;
@@ -42,7 +41,6 @@ import com.codenameone.examples.pulse.net.Session;
 import com.codenameone.examples.pulse.ui.Lang;
 import com.codenameone.examples.pulse.ui.Look;
 import com.codenameone.examples.pulse.ui.Nav;
-import com.codenameone.examples.pulse.ui.Photos;
 
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -150,7 +148,6 @@ public abstract class E2e extends AbstractTest {
                 }
             }
         }
-        Photos.useSource(null);
     }
 
     @Override
@@ -173,12 +170,35 @@ public abstract class E2e extends AbstractTest {
     /// Clicks the button called `name` on the screen that is showing, once it
     /// is there.
     protected void click(final String name) {
-        until(() -> findByName(name) instanceof Button, 20000, "a button called " + name);
+        until(() -> button(name) != null, 20000, "a button called " + name);
         onEdt(() -> {
-            Button button = (Button) findByName(name);
+            Button button = button(name);
             button.pressed();
             button.released();
         });
+    }
+
+    /// The button called `name`, or null. A tappable card is named like its
+    /// lead button and is found first by name, so the tree is searched for the
+    /// button itself.
+    protected Button button(String name) {
+        Form current = Display.getInstance().getCurrent();
+        return current == null ? null : button(current, name);
+    }
+
+    private static Button button(Component from, String name) {
+        if (from instanceof Button && name.equals(from.getName())) {
+            return (Button) from;
+        }
+        if (from instanceof Container) {
+            for (Component child : (Container) from) {
+                Button found = button(child, name);
+                if (found != null) {
+                    return found;
+                }
+            }
+        }
+        return null;
     }
 
     /// Clicks the button called `name` if it is on the screen at this moment.
@@ -415,14 +435,10 @@ public abstract class E2e extends AbstractTest {
                 || Math.abs((a & 0xff) - (b & 0xff)) > 60;
     }
 
-    /// Waits for the screen to stop moving: transitions over, the map drawn.
+    /// Waits for the screen to stop moving: transitions and the level ring's
+    /// sweep over.
     private void settle() {
-        waitFor(1500);
-        until(() -> {
-            Component map = findByName("map");
-            return !(map instanceof MapView) || ((MapView) map).isMapReady();
-        }, 20000, "the map");
-        waitFor(500);
+        waitFor(2000);
     }
 
     /// Tokens kept for the length of the run and nowhere else.

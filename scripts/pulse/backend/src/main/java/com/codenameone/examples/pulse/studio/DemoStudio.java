@@ -35,6 +35,7 @@ import com.codenameone.examples.pulse.domain.Friend;
 import com.codenameone.examples.pulse.domain.Invoice;
 import com.codenameone.examples.pulse.domain.Location;
 import com.codenameone.examples.pulse.domain.Member;
+import com.codenameone.examples.pulse.domain.Kudos;
 import com.codenameone.examples.pulse.domain.Workout;
 import com.codenameone.examples.pulse.domain.Membership;
 import com.codenameone.examples.pulse.domain.MembershipPlan;
@@ -47,6 +48,7 @@ import com.codenameone.examples.pulse.repository.CheckInRepository;
 import com.codenameone.examples.pulse.repository.ClassSessionRepository;
 import com.codenameone.examples.pulse.repository.ClassTypeRepository;
 import com.codenameone.examples.pulse.repository.FriendRepository;
+import com.codenameone.examples.pulse.repository.KudosRepository;
 import com.codenameone.examples.pulse.repository.InvoiceRepository;
 import com.codenameone.examples.pulse.repository.LocationRepository;
 import com.codenameone.examples.pulse.repository.MemberRepository;
@@ -114,6 +116,7 @@ public class DemoStudio {
     private final InvoiceRepository invoices;
     private final WorkoutRepository workouts;
     private final FriendRepository friends;
+    private final KudosRepository kudos;
     private final ShiftRepository shifts;
     private final CampaignRepository campaigns;
     /// A fixed sequence, so that every demo database has the same history.
@@ -124,7 +127,7 @@ public class DemoStudio {
             StaffRepository staff, MembershipPlanRepository plans,
             MembershipRepository memberships, MemberRepository members,
             BookingRepository bookings, CheckInRepository checkIns, InvoiceRepository invoices,
-            WorkoutRepository workouts, FriendRepository friends,
+            WorkoutRepository workouts, FriendRepository friends, KudosRepository kudos,
             ShiftRepository shifts, CampaignRepository campaigns) {
         this.accounts = accounts;
         this.config = config;
@@ -141,6 +144,7 @@ public class DemoStudio {
         this.invoices = invoices;
         this.workouts = workouts;
         this.friends = friends;
+        this.kudos = kudos;
         this.shifts = shifts;
         this.campaigns = campaigns;
     }
@@ -723,6 +727,18 @@ public class DemoStudio {
         row.setShared(kind != 5);
         row.setCreatedAt(session.getEndsAt());
         workouts.insert(row);
+        // A shared workout gathers a little applause from the class, so the
+        // friends' feed shows what kudos look like.
+        int cheers = row.isShared() ? next(4) : 0;
+        for (int iter = 0; iter < cheers; iter++) {
+            Kudos one = new Kudos();
+            one.setId(Ids.next());
+            one.setFromAccount("demo-guest-" + (iter + 1) + "@pulse.example");
+            one.setToAccount(member.getAccount());
+            one.setWorkoutId(row.getId());
+            one.setCreatedAt(session.getEndsAt().plusSeconds(600L * (iter + 1)));
+            kudos.insert(one);
+        }
     }
 
     private void befriend(String account, String other, Instant at) throws IOException {
