@@ -178,7 +178,36 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
             mc.xmlRootName = deriveXmlRoot(mc.simpleName);
         }
 
-        for (FieldInfo f : cls.getFields()) {
+        // Properties are the class's own fields plus those it inherits. A
+        // @Mapped class commonly extends a plain (non-@Mapped, often abstract)
+        // model base holding id/name/...; reading only the class's own fields
+        // silently dropped every inherited property in both directions. The
+        // chain is walked up to java.lang.Object (or the first class not on
+        // the classpath), base fields first so the JSON order reads naturally,
+        // and a field hidden by a same-named field lower down is skipped.
+        // Accessors are looked up from the subclass upward, so an override wins.
+        List<AnnotatedClass> chain = new ArrayList<AnnotatedClass>();
+        chain.add(cls);
+        if (!isRecord) {
+            String sup = cls.getSuperInternalName();
+            while (sup != null && !"java/lang/Object".equals(sup) && chain.size() < 64) {
+                AnnotatedClass sc = ctx.lookupWithDependencies(sup);
+                if (sc == null) break;
+                chain.add(sc);
+                sup = sc.getSuperInternalName();
+            }
+        }
+        List<FieldInfo> allFields = new ArrayList<FieldInfo>();
+        java.util.Set<String> seenNames = new java.util.HashSet<String>();
+        for (AnnotatedClass c : chain) {
+            List<FieldInfo> own = new ArrayList<FieldInfo>();
+            for (FieldInfo f : c.getFields()) {
+                if (f.isStatic() || !seenNames.add(f.getName())) continue;
+                own.add(f);
+            }
+            allFields.addAll(0, own);
+        }
+        for (FieldInfo f : allFields) {
             if (f.isStatic()) continue;
             if (f.getName().startsWith("this$")) continue; // inner-class outer ref
             boolean useAccessor = false;
@@ -193,7 +222,7 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
                 // replaced, only its inner value mutated through .set(...) /
                 // .add(...).
                 PropertyTypeKind probeKind = PropertyTypeKind.of(f);
-                String getter = findGetter(cls, f, probeKind);
+                String getter = findGetter(chain, f, probeKind);
                 if (getter == null) {
                     ctx.getLog().debug("cn1: @Mapped skipping private field "
                             + f.getName() + " on " + cls.getBinaryName()
@@ -202,7 +231,7 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
                 }
                 boolean needsSetter = !(probeKind.kind == PropertyTypeKind.Kind.PROPERTY
                         || probeKind.kind == PropertyTypeKind.Kind.LIST_PROPERTY);
-                String setter = needsSetter ? findSetter(cls, f) : null;
+                String setter = needsSetter ? findSetter(chain, f) : null;
                 // A @JsonCreator class sets what it needs through the creator, so a
                 // getter alone is enough: the field is written, and read only if the
                 // creator takes it.
@@ -441,7 +470,51 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
         }
     }
 
+    /// Generates the mapper source, then rewrites every nested type it names
+    /// from its binary form (`pkg.Outer$Inner`) to the canonical form
+    /// (`pkg.Outer.Inner`). The model keeps binary names because class-file
+    /// lookups need them, and the emitters append them as-is in dozens of
+    /// places (class literals, casts, generics, `valueOf`, `instanceof`); but
+    /// javac does not resolve `Outer$Inner` in source, so a field whose type
+    /// is a nested class or enum produced a mapper that did not compile.
+    /// Only the exact names this mapper references are rewritten, and only as
+    /// whole tokens, so the mapper's own `Outer$InnerCn1Mapper` name (a legal
+    /// identifier) is left alone.
     private static String generateMapperSource(MappedClass mc) {
+        String src = generateMapperSourceRaw(mc);
+        java.util.Set<String> nested = new java.util.TreeSet<String>();
+        collectNestedNames(mc, nested);
+        for (String bin : nested) {
+            src = src.replaceAll("(?<![A-Za-z0-9_$.])" + java.util.regex.Pattern.quote(bin)
+                    + "(?![A-Za-z0-9_$])",
+                    java.util.regex.Matcher.quoteReplacement(bin.replace('$', '.')));
+        }
+        return src;
+    }
+
+    private static void collectNestedNames(MappedClass mc, java.util.Set<String> out) {
+        addNested(mc.binaryName, out);
+        for (MappedField f : mc.fields) {
+            if (f.kind != null) {
+                addNested(f.kind.binaryName, out);
+                addNested(f.kind.elementBinaryName, out);
+            }
+            addNested(f.adapter, out);
+            addNested(f.adapterCast, out);
+            addNested(f.elemAdapter, out);
+        }
+        for (MappedClass sp : mc.specs) {
+            collectNestedNames(sp, out);
+        }
+    }
+
+    private static void addNested(String bin, java.util.Set<String> out) {
+        if (bin != null && bin.indexOf('$') > 0) {
+            out.add(bin);
+        }
+    }
+
+    private static String generateMapperSourceRaw(MappedClass mc) {
         StringBuilder sb = new StringBuilder(2048);
         if (mc.packageName.length() > 0) {
             sb.append("package ").append(mc.packageName).append(";\n\n");
@@ -1439,6 +1512,24 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
     /// `active`), then the literal-prefix variant (`getURL` when the
     /// field is `URL`). Returns the method name or null when no accessor
     /// matches.
+    /// [#findGetter] over a class and its superclasses, nearest first.
+    private static String findGetter(List<AnnotatedClass> chain, FieldInfo f, PropertyTypeKind kind) {
+        for (AnnotatedClass c : chain) {
+            String g = findGetter(c, f, kind);
+            if (g != null) return g;
+        }
+        return null;
+    }
+
+    /// [#findSetter] over a class and its superclasses, nearest first.
+    private static String findSetter(List<AnnotatedClass> chain, FieldInfo f) {
+        for (AnnotatedClass c : chain) {
+            String s = findSetter(c, f);
+            if (s != null) return s;
+        }
+        return null;
+    }
+
     private static String findGetter(AnnotatedClass cls, FieldInfo f, PropertyTypeKind kind) {
         String fieldName = f.getName();
         String fieldDesc = f.getDescriptor();
