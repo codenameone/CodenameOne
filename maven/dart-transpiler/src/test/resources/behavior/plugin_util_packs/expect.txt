@@ -1,0 +1,20 @@
+timezone true
+zones has local true
+settings opened
+referrer unsupported
+no placemark
+geocoder false
+picked true
+custom needs extensions
+dir null
+player p1 PlayerState.stopped
+after play PlayerState.playing ReleaseMode.loop
+after pause PlayerState.paused
+after dispose PlayerState.disposed
+mixpanel id user-1 queued 4
+mixpanel after headless flush 4
+mixpanel opted out true 0
+auth UNAVAILABLE
+compress unsupported
+photo picker true
+image true

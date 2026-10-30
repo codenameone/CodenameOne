@@ -130,6 +130,7 @@ final class AppSupport {
         // classpath as it is at that moment.
         final TaskProvider<com.codename1.gradle.tasks.CompileUnityTask> unity =
                 registerUnity(project, layout, ext, userProperties, main);
+        registerFlutter(project, layout, ext, userProperties, main);
 
         // The simulator's native-interface implementations: a real source set, so
         // src/javase/java compiles against the application and the JavaSE port and
@@ -357,7 +358,8 @@ final class AppSupport {
                     // The FXML documents are compiled by this action, first:
                     // after javac, so that a document can name a class of
                     // the application, and before the relocation.
-                    .withFxmlSourceDirectory(new File(layout.buildDir(), "generated/cn1-fxml")));
+                    .withFxmlSourceDirectory(new File(layout.buildDir(), "generated/cn1-fxml"))
+                    .withFlutterSourceDirectory(flutterSourceDir(layout)));
             compile.doLast("cn1Compliance", new com.codename1.gradle.tasks.ComplianceAction(layout.rootDir(),
                     layout.projectDir(), compile.getDestinationDirectory().getAsFile(), project.getName(),
                     main.getCompileClasspath(), compileArtifacts, complianceProperties)
@@ -898,6 +900,70 @@ final class AppSupport {
         main.getOutput().dir(classes);
         main.setCompileClasspath(main.getCompileClasspath().plus(project.files(classes)));
         return unity;
+    }
+
+    /// `src/main/flutter`.
+    static File flutterSourceDir(ProjectLayout layout) {
+        return new File(layout.projectDir(), "src" + File.separator + "main" + File.separator + "flutter");
+    }
+
+    /// `transcodeFlutter`, for an application with `src/main/flutter`: the
+    /// Dart sources become a main source root and their flattened assets a
+    /// directory of the main output. The runtime is an `implementation`
+    /// dependency, added here as it is for Unity, at the plugin's own version.
+    /// The generated package is the `cn1.flutter.package` Gradle property (or
+    /// `-D` system property), as the Maven goal reads it.
+    static void registerFlutter(final Project project, final ProjectLayout layout, final CodenameOneExtension ext,
+            final Provider<Map<String, String>> userProperties, final SourceSet main) {
+        final File flutterDir = flutterSourceDir(layout);
+        final File flutterOut = new File(layout.buildDir(), "generated" + File.separator + "sources"
+                + File.separator + "cn1-flutter");
+        if (com.codename1.maven.FlutterProjectBuilder.isFlutterProject(flutterDir)) {
+            addFramework(project, "implementation", ext.getVersion(),
+                    com.codename1.maven.FlutterProjectBuilder.RUNTIME_ARTIFACT);
+        }
+        // The configuration, not the source set's classpath, which is about to
+        // include this task's own output.
+        final org.gradle.api.file.FileCollection stubs = project.getConfigurations()
+                .getByName(main.getCompileClasspathConfigurationName());
+        TaskProvider<com.codename1.gradle.tasks.TranscodeFlutterTask> flutter = project.getTasks().register(
+                "transcodeFlutter", com.codename1.gradle.tasks.TranscodeFlutterTask.class, t -> {
+                    common(t, project, layout, ext, userProperties);
+                    t.setDescription("Transpiles the Flutter/Dart sources in src/main/flutter to Java");
+                    t.getFlutterDirectory().set(flutterDir);
+                    t.getStubClasspath().from(stubs);
+                    // The application's own Java roots: every root of the main
+                    // source set outside the build directory, and Kotlin's.
+                    // Roots other tasks generate are left out -- reading them
+                    // would need a dependency on each of those tasks, this
+                    // one's own output among them, and generated SVG, GUI or
+                    // Unity code never names a Flutter plugin pack.
+                    t.getJavaSourceRoots().from(project.provider(() -> {
+                        List<File> roots = new ArrayList<File>();
+                        // Canonical: a build directory reached through a symlink
+                        // (/tmp and /private/tmp on macOS) is still the same one.
+                        String build = layout.buildDir().getCanonicalPath() + File.separator;
+                        for (File dir : main.getJava().getSrcDirs()) {
+                            if (!dir.getCanonicalPath().startsWith(build)) {
+                                roots.add(dir);
+                            }
+                        }
+                        roots.add(new File(layout.projectDir(), "src" + File.separator + "main"
+                                + File.separator + "kotlin"));
+                        return roots;
+                    }));
+                    t.getPackageName().set(project.getProviders().gradleProperty("cn1.flutter.package")
+                            .orElse(project.getProviders().systemProperty("cn1.flutter.package"))
+                            .orElse(com.codename1.maven.FlutterProjectBuilder.DEFAULT_PACKAGE));
+                    t.getOutputDirectory().set(flutterOut);
+                    t.getAssetsDirectory().set(new File(layout.buildDir(), "cn1-flutter/resources"));
+                    t.getStateDirectory().set(new File(layout.buildDir(), "cn1-flutter/state"));
+                    // The task itself is asked, through the argument, so the
+                    // spec holds no reference to it for the configuration cache.
+                    t.onlyIf(x -> ((com.codename1.gradle.tasks.TranscodeFlutterTask) x).hasWork());
+                });
+        main.getJava().srcDir(flutter.flatMap(com.codename1.gradle.tasks.TranscodeFlutterTask::getOutputDirectory));
+        main.getOutput().dir(flutter.flatMap(com.codename1.gradle.tasks.TranscodeFlutterTask::getAssetsDirectory));
     }
 
     /// `generateGuiSources`, whose generated views are a main source root. An

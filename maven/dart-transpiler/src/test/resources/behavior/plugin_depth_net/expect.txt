@@ -1,0 +1,14 @@
+conn DioExceptionType.connectionError null
+req1,req2,err1 DioExceptionType.connectionError,err2
+cancel DioExceptionType.cancel true
+post DioExceptionType.connectionError progress=0
+download DioExceptionType.connectionError
+form 1 1
+types ResponseType.json ResponseType.plain ResponseType.bytes
+kinds DioExceptionType.receiveTimeout DioExceptionType.sendTimeout DioExceptionType.badResponse
+modes 5 inAppBrowserView
+canLaunch false
+launch false
+share ShareResultStatus.unavailable
+picked null
+many 0

@@ -1,0 +1,13 @@
+password password
+google.com gid gat null
+apple.com aid raw null
+apple.com n
+google.com apple.com password
+google.com [drive]
+oauth operation-not-allowed
+apple operation-not-allowed
+empty invalid-credential
+[openid, email, profile, drive]
+null false null
+google sign_in_failed
+out null

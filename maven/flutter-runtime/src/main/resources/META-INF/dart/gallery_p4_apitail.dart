@@ -303,6 +303,9 @@ class SchedulerBinding {
 // url_launcher package
 // ======================================================================
 
+@JavaName('com.codename1.flutter.services.LaunchMode')
+enum LaunchMode { platformDefault, inAppWebView, inAppBrowserView, externalApplication, externalNonBrowserApplication }
+
 @JavaName('com.codename1.flutter.services.UrlLauncher.launchUrl')
 external Future<bool> launchUrl(Uri url, {Object? mode, Object? webOnlyWindowName});
 

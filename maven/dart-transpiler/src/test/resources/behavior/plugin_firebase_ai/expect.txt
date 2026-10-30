@@ -1,0 +1,16 @@
+[DEFAULT] null europe-west4
+{"candidateCount":1,"maxOutputTokens":256,"temperature":0.5,"topP":0.9,"topK":40,"stopSequences":["END"],"responseMimeType":"text/plain"}
+{"category":"HARM_CATEGORY_HATE_SPEECH","threshold":"BLOCK_MEDIUM_AND_ABOVE"}
+{"role":"user","parts":[{"text":"hi"}]}
+{"role":"model","parts":[{"text":"yo"}]}
+{"role":"user","parts":[{"text":"a"},{"inlineData":{"mimeType":"image/png","data":"AQID"}}]}
+Hello world 2
+true true
+model 2
+3 5 8
+error API key not valid
+blocked Response was blocked due to SAFETY
+generate failed
+stream failed
+count failed
+chat failed 1

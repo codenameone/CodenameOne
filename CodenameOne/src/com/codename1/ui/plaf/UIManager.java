@@ -565,7 +565,7 @@ public class UIManager {
     /// ```java
     /// Resources theme = null;
     /// try {
-    ///     theme = Resources.openLayered(resourceFile);
+    ///     theme = Resources.openLayered("/theme");
     ///     UIManager.getInstance().setThemeMap(theme.getThemeMap(theme.getThemeResourceNames()[0]));
     /// } catch (IOException e) {
     ///     Log.e(e);

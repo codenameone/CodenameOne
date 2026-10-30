@@ -160,6 +160,8 @@ public final class Ast {
         /** Names a `show` lists; null when there is no show combinator. */
         public List<String> show;
         public List<String> hide = new ArrayList<String>();
+        /** The {@code as} name of an import, else null. */
+        public String prefix;
 
         /** Whether a declaration named {@code name} passes this directive's combinators. */
         public boolean admits(String name) {
@@ -327,6 +329,7 @@ public final class Ast {
         public SuperInit superInit;               // nullable
         public SuperInit redirect;                // `: this(...)` / `: this.named(...)`; nullable
         public Block body;                        // nullable (";" body)
+        public java.util.Set<String> unapplied;   // stub @Unapplied('a, b'): accepted, not applied
     }
 
     public static class FieldInit extends Node {
@@ -340,6 +343,7 @@ public final class Ast {
     }
 
     public static class MethodDecl extends Node {
+        public java.util.Set<String> unapplied;   // stub @Unapplied('a, b'): accepted, not applied
         public TypeRef returnType;                // may be VAR (=> inferred) or VOID
         public String name;
         public List<String> typeParams = new ArrayList<String>();  // generic method: m<T>(...)

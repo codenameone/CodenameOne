@@ -47,6 +47,15 @@ class InfoWindow {
 class BitmapDescriptor {
   external static BitmapDescriptor get defaultMarker;
   external static BitmapDescriptor defaultMarkerWithHue(double hue);
+  external static BitmapDescriptor fromBytes(Uint8List byteData, {Object? size});
+  external static BitmapDescriptor bytes(Uint8List byteData, {double? imagePixelRatio, double? width,
+      double? height, Object? bitmapScaling});
+  external static Future<BitmapDescriptor> fromAssetImage(Object configuration, String assetName);
+  external static Future<BitmapDescriptor> asset(Object configuration, String assetName, {double? width,
+      double? height, Object? bitmapScaling});
+  external double hue();
+  external bool hasBytes();
+  external static int hueToRgb(double hue);
   external static double get hueRed;
   external static double get hueOrange;
   external static double get hueYellow;
@@ -69,6 +78,44 @@ class Marker {
   external InfoWindow get infoWindow;
   external bool get draggable;
   external bool get visible;
+  external BitmapDescriptor? get icon;
+}
+
+@JavaName('com.codename1.flutter.plugins.googlemaps.PolylineId')
+class PolylineId {
+  external PolylineId(String value);
+  external String get value;
+}
+
+@JavaName('com.codename1.flutter.plugins.googlemaps.Polyline')
+class Polyline {
+  external Polyline({required PolylineId polylineId, List<LatLng> points, Color color, int width,
+      bool visible, bool geodesic, int zIndex, bool consumeTapEvents, Object? patterns,
+      Object? startCap, Object? endCap, Object? jointType, void Function()? onTap});
+  external PolylineId get polylineId;
+  external int get width;
+  external bool get visible;
+  external bool hitTest(LatLng at, double toleranceMeters);
+  external bool tapAt(LatLng at, double toleranceMeters);
+}
+
+@JavaName('com.codename1.flutter.plugins.googlemaps.CircleId')
+class CircleId {
+  external CircleId(String value);
+  external String get value;
+}
+
+@JavaName('com.codename1.flutter.plugins.googlemaps.Circle')
+class Circle {
+  external Circle({required CircleId circleId, LatLng center, double radius, Color fillColor,
+      Color strokeColor, int strokeWidth, bool visible, int zIndex, bool consumeTapEvents,
+      void Function()? onTap});
+  external CircleId get circleId;
+  external LatLng get center;
+  external double get radius;
+  external bool get visible;
+  external bool hitTest(LatLng at);
+  external bool tapAt(LatLng at);
 }
 
 @JavaName('com.codename1.flutter.plugins.googlemaps.MapType')
