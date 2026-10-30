@@ -1,0 +1,166 @@
+== Real-time threads
+
+A control loop has to run at its rate -- a motor drive every millisecond, a
+sensor fusion step every 2.5 -- while the user interface, the network and the
+garbage collector compete for the same processor. `com.codename1.realtime` gives
+such a loop its own thread. The kernel schedules that thread ahead of everything
+else, and the collector never stops it.
+
+The target is *firm* real time on a PREEMPT_RT Linux kernel, which mainline Linux
+includes since 6.12. On such a kernel the latency of a periodic thread is bounded
+by the kernel and the hardware, not by the virtual machine. That is not a
+certified hard real-time system: Codename One makes no claim under IEC 61508,
+ISO 26262 or DO-178C, and a loop whose failure can hurt someone needs an
+independent safety mechanism, such as a hardware watchdog or an interlock.
+
+=== A periodic task
+
+[source,java]
+----
+class MotorLoop extends RealtimeTask {
+    private final double[] samples = new double[64];   // <1>
+    private PwmChannel pwm;
+    private boolean failed;
+
+    public void setup() {                              // <2>
+        pwm = Hardware.getInstance().openPwm(0, 0);
+    }
+
+    public void cycle() {                              // <3>
+        double out = 0;
+        for (int i = 0; i < samples.length; i++) {
+            out += samples[i] * GAINS[i];
+        }
+        try {
+            pwm.setDutyCycle(out);
+        } catch (HardwareException e) {
+            failed = true;                             // no allocation on this path
+        }
+    }
+
+    public void periodsMissed(int count) {             // <4>
+        // the loop overran; hold the output, count it, alarm if it persists
+    }
+}
+
+RealtimeThread t = Realtime.getInstance().start("motor",
+        new RealtimeParameters()
+            .setPeriodNanos(1000000)    // 1 kHz
+            .setPriority(80)            // SCHED_FIFO 1..99
+            .setCpu(3),                 // pin to core 3
+        new MotorLoop());
+----
+<1> Everything the loop needs is allocated before it starts.
+<2> `setup()` runs on the real-time thread before the first period. It may allocate.
+<3> `cycle()` runs once per period, released on an absolute clock, so the period
+    does not drift with the execution time.
+<4> Called instead of skipping silently when releases were missed.
+
+`getStatistics()` reports the cycles, the missed periods, the release latency
+(maximum, mean and a histogram with percentiles), the execution time and the
+allocation violations. Check them on the target board under load: they are the
+only real evidence that the loop meets its deadline.
+
+=== The rules a cycle follows
+
+*A cycle allocates nothing.* In steady state a real-time loop must not create
+objects. Each allocation adds work for the collector, and an allocating thread can
+be asked to wait for it. Codename One checks this twice:
+
+* *At build time*, the translator follows every call `cycle()` and
+  `periodsMissed()` can make. It fails the build on `new`, array creation, boxing
+  and string concatenation, and the error names the method and the line. An
+  allocation that is meant to happen, such as in a path that runs only on a fault,
+  is marked with `@AllocationAllowed`.
+* *At run time*, an allocation the build could not see -- through an interface
+  with several implementations, say -- stops the thread with a
+  `RealtimeAllocationError` naming the class. The thread's `failed()` method
+  receives it. `setAllocationBudget(n)` allows up to `n` allocations per period for
+  code that cannot avoid them yet.
+
+*The collector does not stop a real-time thread.* An ordinary thread pauses
+briefly while the collector reads its stack. A real-time thread is released
+immediately, and its references stay visible to the collector through the write
+barrier. While any real-time thread runs, the collector also never enters its
+stop-the-world phases.
+
+*Keep the hand-off lock-free.* `synchronized` between the real-time thread and
+the rest of the application works: the virtual machine's monitors use
+priority-inheriting mutexes on Linux, so a low-priority holder is raised until it
+releases. The wait is still as long as the holder's critical section. Pass data
+through preallocated buffers and `java.util.concurrent.atomic` instead.
+
+*Avoid the slow paths of the runtime in a cycle.* Do not do these in `cycle()`:
+
+* Throw exceptions. Building a stack trace allocates.
+* Initialize a class for the first time. Touch it in `setup()`.
+* Do I/O that blocks.
+* Use the hardware API calls that return new arrays. Use the variants that fill a
+  buffer you pass.
+
+=== Memory and the rest of the system
+
+`Realtime.lockMemory()` locks the process into RAM, so that its memory is never
+paged out. Each page is locked the first time it is touched (`MCL_ONFAULT`), because
+the heap is a large address reservation of which only part is used. The real-time
+thread's stack is touched before its first period. Touch your own buffers in
+`setup()`, so that no first touch happens in a cycle. Call `lockMemory()` once,
+early. It needs `CAP_IPC_LOCK` or a `memlock` limit large enough for the process.
+
+`Realtime.setMemoryLimit(bytes)` caps the process's resident memory, on Linux.
+When the process is over the cap, an allocation in an ordinary thread throws
+`OutOfMemoryError` at once. Without the cap, the whole process slows down while the
+collector struggles. Real-time threads are exempt, because they do not allocate.
+The application decides what to drop and carries on.
+
+The measurement is resident memory, which is what a device runs out of. Two things
+follow from that:
+
+* It counts memory the heap is holding but has not returned to the system yet, so
+  the cap applies to the process's footprint, not its live objects.
+* An allocation is refused when a collection ends with the process still over the
+  cap. Without waiting for a collection, it is refused once the process is a
+  quarter over.
+
+Set the cap with headroom over what the application needs at its peak.
+
+The rest of the system gets what the real-time threads leave. With
+`setIsolateCpu(true)`, which is the default when a CPU is given, every other thread
+of the process is moved off that core. For a hard split, add `isolcpus=` and
+`nohz_full=` on the kernel command line, and limit the other services with a
+cgroup `cpu.max`.
+
+=== Where it runs
+
+[cols="1,3"]
+|===
+| Platform | Behaviour
+
+| Linux and embedded Linux (PREEMPT_RT)
+| `SCHED_FIFO` priority, CPU pinning and isolation, memory locking, collector
+  isolation, allocation trap, memory limit. `isSupported(FEATURE_PREEMPT_RT_KERNEL)`
+  tells you whether the kernel is real-time.
+
+| Linux (standard kernel)
+| The same, but latency is the scheduler's best effort.
+
+| Backend server (ParparVM)
+| The same as the Linux port on Linux.
+
+| Simulator and other platforms
+| The loop runs on an ordinary thread at its period, with statistics, so the logic
+  can be developed and tested. No scheduling guarantee.
+|===
+
+Real-time scheduling needs the `CAP_SYS_NICE` capability, or an `rtprio` limit in
+`/etc/security/limits.conf`. Without it the thread runs normally, and
+`isSchedulingApplied()` returns false. Call `setSchedulingRequired(true)` to make
+the thread fail instead.
+
+=== Measuring
+
+`vm/backend/demo/rtcheck` is the check CI runs. A 1 kHz loop runs while the main
+thread allocates hard enough to keep the collector busy all the time. It then
+checks that a cycle allocating through an interface is stopped, and that the
+memory limit throws. Run it on your board to see the release latency the hardware
+gives you before you rely on a deadline.

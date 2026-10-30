@@ -2800,11 +2800,33 @@ JAVA_LONG currentThreadId() {
     return i->threadId;
 }
 
+// Priority inheritance for the VM's mutexes and every Java monitor, in an application
+// with real-time threads on Linux (CN1_REALTIME, switched on by the translator). A
+// real-time thread blocked on a lock that a normal thread holds then lends it its
+// priority, instead of waiting behind every thread that preempts the holder -- the
+// priority inversion a SCHED_FIFO thread otherwise meets on its first contended
+// monitor. glibc takes an uncontended PI mutex in user space like any other, so it
+// costs nothing until two threads actually meet on it.
+static void cn1InitVmMutex(pthread_mutex_t* m) {
+#if defined(CN1_REALTIME) && defined(__linux__)
+    pthread_mutexattr_t attr;
+    if(pthread_mutexattr_init(&attr) == 0) {
+        if(pthread_mutexattr_setprotocol(&attr, PTHREAD_PRIO_INHERIT) == 0
+           && pthread_mutex_init(m, &attr) == 0) {
+            pthread_mutexattr_destroy(&attr);
+            return;
+        }
+        pthread_mutexattr_destroy(&attr);
+    }
+#endif
+    pthread_mutex_init(m, NULL);
+}
+
 pthread_mutex_t* criticalSection = NULL;
 pthread_mutex_t* getCriticalSection() {
     if(criticalSection == NULL) {
         criticalSection = malloc(sizeof(pthread_mutex_t));
-        pthread_mutex_init(criticalSection, NULL);
+        cn1InitVmMutex(criticalSection);
     }
     return criticalSection;
 }
@@ -2820,7 +2842,7 @@ pthread_mutex_t* threadHeapMutex = NULL;
 pthread_mutex_t* getThreadHeapMutex() {
     if(threadHeapMutex == NULL) {
         threadHeapMutex = malloc(sizeof(pthread_mutex_t));
-        pthread_mutex_init(threadHeapMutex, NULL);
+        cn1InitVmMutex(threadHeapMutex);
     }
     return threadHeapMutex;
 }
@@ -2846,6 +2868,9 @@ JAVA_BOOLEAN gcCurrentlyRunning = JAVA_FALSE;
 extern void cn1GcProbeCycle(double markMs, double sweepMs, int threw);
 double cn1GcProbeMarkMs = 0, cn1GcProbeSweepMs = 0;
 int cn1GcProbeThrew = 0;
+#endif
+#if defined(__linux__)
+static uint64_t cn1LinuxResidentBytes(void);
 #endif
 JAVA_VOID java_lang_System_gcMarkSweep__(CODENAME_ONE_THREAD_STATE) {
     // FREEZE: refuse to start a cycle at all once the exit census has claimed the
@@ -2950,6 +2975,13 @@ JAVA_VOID java_lang_System_gcMarkSweep__(CODENAME_ONE_THREAD_STATE) {
     codenameOneGCSweep();
 #endif
         threadStateData->tryBlockOffset = __gcSavedTryBlock;
+#if defined(__linux__)
+        // The memory limit of com.codename1.realtime, measured when the heap is as
+        // small as it gets. Nothing is read unless a limit was set.
+        if(cn1RtMemoryLimitSet()) {
+            cn1RtAfterCycle((JAVA_LONG)cn1LinuxResidentBytes());
+        }
+#endif
     } else {
         threadStateData->tryBlockOffset = __gcSavedTryBlock;
         threadStateData->exception = JAVA_NULL;
@@ -3092,7 +3124,7 @@ JAVA_VOID monitorEnter(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
         if(!data) {
             data = malloc(sizeof(struct CN1ThreadData));
             memset(data, 0, sizeof(struct CN1ThreadData));
-            pthread_mutex_init(&data->__codenameOneMutex, NULL);
+            cn1InitVmMutex(&data->__codenameOneMutex);
             pthread_cond_init(&data->__codenameOneCondition, NULL);
             // cn1MonitorDataSet also flags a BiBOP slot's page (see there).
             cn1MonitorDataSet(obj, data);
@@ -3968,6 +4000,11 @@ static uint64_t cn1LinuxResidentBytes(void) {
         return 0;
     }
     return (uint64_t)resident * (uint64_t)ps;
+}
+
+// The memory limit of com.codename1.realtime reads this from the allocation slow path.
+long long cn1RtResidentBytes(void) {
+    return (long long)cn1LinuxResidentBytes();
 }
 #endif
 

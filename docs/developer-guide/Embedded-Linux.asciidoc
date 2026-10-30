@@ -323,3 +323,9 @@ application that never browses Bonjour or opens a Bluetooth connection carries
 none of that code.
 
 include::embedded-benchmarks.adoc[]
+
+=== Control loops with deadlines
+
+A loop that must run at a fixed rate beside the user interface -- motor control,
+sampling, a fieldbus cycle -- belongs on a real-time thread. See
+<<_real_time_threads,Real-time threads>>.

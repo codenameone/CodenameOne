@@ -744,6 +744,16 @@ static JAVA_BOOLEAN cn1GcUnheldThreadPresent(void) {
 }
 void cn1GcReleaseAllBlockedThreadsPublic(void);
 
+// How many threads are real-time (com.codename1.realtime, cn1RtEnter). While any is,
+// every cycle is concurrent: a stop-the-world cycle holds every thread until its sweep
+// ends, which is the whole collection charged to a thread whose period may be a
+// millisecond. Same rule, and same two places, as a virtual thread or an unheld native
+// thread: cn1GcHybridDecide, and the prologue's re-check for one that arrived since.
+extern volatile int cn1RtThreadCount;
+static JAVA_BOOLEAN cn1RtThreadsPresent(void) {
+    return __atomic_load_n(&cn1RtThreadCount, __ATOMIC_SEQ_CST) > 0 ? JAVA_TRUE : JAVA_FALSE;
+}
+
 // Monotonic nanoseconds, for the collector's own short waits and policy timing. Same
 // split as cn1MonotonicMillis: clock_gettime / CLOCK_MONOTONIC do not exist on the
 // clang-cl Windows target, so it reads the QueryPerformanceCounter-backed clock there
@@ -5836,7 +5846,7 @@ void codenameOneGCMark() {
         // scanned -- so the cycle simply becomes a concurrent one.
         __atomic_store_n(&cn1GcStwInProgress, 1, __ATOMIC_SEQ_CST);
         if(__atomic_load_n(&cn1GcVirtualThreadsSeen, __ATOMIC_SEQ_CST)
-           || cn1GcUnheldThreadPresent()) {
+           || cn1GcUnheldThreadPresent() || cn1RtThreadsPresent()) {
             __atomic_store_n(&cn1GcStwInProgress, 0, __ATOMIC_SEQ_CST);
             cn1GcStwCycle = JAVA_FALSE;
 #ifndef CN1_DISABLE_BIBOP
@@ -6307,7 +6317,11 @@ void codenameOneGCMark() {
                         // stop cannot work, and retrying past it would rebuild the root
                         // snapshot every 250ms for the rest of a wait that is already
                         // never going to end.
-                        if(totalwait >= nextEscalation && t->gcPthreadValid) {
+                        // Never for a real-time thread. It reaches its safepoint when its
+                        // period's work is done (cn1RtPark), so waiting delays only the
+                        // collector; a signal stop would freeze it mid-period, which is
+                        // the one pause it exists to avoid.
+                        if(totalwait >= nextEscalation && t->gcPthreadValid && !t->realtimeThread) {
                             nextEscalation += (long long)CN1_GC_SAFEPOINT_WAIT_MAX_US;
                             // The snapshot rebuild MUST happen here, BEFORE the freeze: it
                             // reallocs, and a thread frozen mid-malloc holds the libc
@@ -6441,6 +6455,11 @@ void codenameOneGCMark() {
                     } else {
                         agressiveAllocator = allocSize > CN1_AGRESSIVE_ALLOCATOR_THREAD_HEAP_ALLOCATIONS_THRESHOLD;
                     }
+                    // A real-time thread is never held to the sweep: see the early
+                    // release above.
+                    if(t->realtimeThread) {
+                        agressiveAllocator = JAVA_FALSE;
+                    }
                 }
 #endif
                 if (CN1_EDT_THREAD_ID == t->threadId && agressiveAllocator) {
@@ -6563,6 +6582,21 @@ void codenameOneGCMark() {
                 cn1GcScanThreadNativeStack(d, t);
 #ifdef CN1_GC_CONFORM
                 cn1GcStackNs += cn1GcNowNs();
+#endif
+#if !defined(CN1_DISABLE_SATB)
+                // A REAL-TIME THREAD GOES AS SOON AS ITS OWN STACKS ARE TAKEN, before the
+                // statics below. Its roots are in the mark queue now, and SATB has been
+                // armed since before this loop began, so a reference it moves out of a
+                // static or a field from here on is logged -- the same argument that lets
+                // every other thread go before the drain, applied one step earlier. That
+                // step is what bounds its pause by its own (shallow, parked between
+                // periods) stack rather than by the program's statics. Never in a
+                // stop-the-world cycle, where every thread is held to the sweep; none
+                // starts while a real-time thread exists (cn1RtThreadsPresent).
+                if(t->realtimeThread && !cn1GcStwCycle) {
+                    __atomic_store_n(&t->threadBlockedByGC, JAVA_FALSE, __ATOMIC_RELEASE);
+                    cn1GcWakeUnblocked();
+                }
 #endif
 #ifdef CN1_GC_CAN_FORCE_STOP
                 // Released as soon as this thread's roots are captured, which is HERE and
@@ -8952,7 +8986,7 @@ static JAVA_BOOLEAN cn1GcHybridDecide(void) {
     cn1GcHybridPrevStartNs = cn1GcHybridAnyStartNs;
     cn1GcHybridAnyStartNs = cn1GcHybridNowNs();
     if(__atomic_load_n(&cn1GcVirtualThreadsSeen, __ATOMIC_SEQ_CST)
-       || cn1GcUnheldThreadPresent()) {
+       || cn1GcUnheldThreadPresent() || cn1RtThreadsPresent()) {
         if(cn1GcHybridGen) {
             cn1GcHybridGen = 0;
         }
@@ -12003,7 +12037,9 @@ static JAVA_BOOLEAN cn1SweepRemoving = JAVA_FALSE;
 // attempt (REGISTRY Rounds 38 and 39). Answers 0 when there is no current page or its free
 // list is empty; the caller then takes __NEW_X exactly as before.
 JAVA_OBJECT cn1BibopAllocRecycled(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent, int ci) {
-    if(ci < 0 || constantPoolObjects == 0) {
+    // A trapped real-time cycle falls through to __NEW_X and codenameOneGcMalloc,
+    // where cn1RtTrappedAlloc decides; a recycled slot taken here would bypass it.
+    if(ci < 0 || constantPoolObjects == 0 || threadStateData->rtAllocTrap) {
         return 0;
     }
 #ifndef CN1_CONSERVATIVE_GC_ROOTS
@@ -12037,7 +12073,7 @@ JAVA_OBJECT cn1BibopAllocRecycled(CODENAME_ONE_THREAD_STATE, int size, struct cl
 // The free-list half of cn1BibopFastAllocNoZero, kept out of line so the bump path
 // stays small enough to inline at every allocation site (see the note there).
 JAVA_OBJECT cn1BibopAllocRecycledNoZero(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent, int ci) {
-    if(ci < 0) return (JAVA_OBJECT)0;
+    if(ci < 0 || threadStateData->rtAllocTrap) return (JAVA_OBJECT)0;  // see cn1BibopAllocRecycled
     CN1BibopPage* p = CN1_BIBOP_CUR(threadStateData)[ci];
     // A RECYCLED page: take a slot its last sweep freed. This used to fall through to
     // __NEW_X and the full slow path for EVERY object once pages came back partial --
@@ -15931,7 +15967,23 @@ static void cn1GcSelfCheckThreadStack(struct ThreadLocalData* t, int stackSize) 
 #endif
 #endif /* CN1_CONSERVATIVE_GC_ROOTS */
 
+// The memory limit of com.codename1.realtime; defined with the rest of it at the end.
+static long long cn1RtMemoryLimitBytes;
+static void cn1RtAccount(int size);
 JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent) {
+    // Real-time admission, ahead of everything: a steady-state real-time cycle reaches
+    // here for EVERY allocation (cn1RtFreeze took its fast path away), and a thread over
+    // the memory limit is refused before it can wait for a collection. Both are one
+    // byte or int load on a path that is already the slow one.
+    if(__builtin_expect(threadStateData->rtAllocTrap, 0)) {
+        return cn1RtTrappedAlloc(threadStateData, size, parent);
+    }
+    if(__builtin_expect(cn1RtMemoryLimitBytes > 0, 0)) {
+        cn1RtAccount(size);
+        if(cn1RtOverMemoryLimit) {
+            cn1RtRefuseOverLimit(threadStateData);
+        }
+    }
 #ifdef CN1_GC_CONFORM
     cn1RecordAllocation(parent, size);
 #endif
@@ -21299,4 +21351,210 @@ static void cn1NoteNativeAllocation(size_t bytes) {
         }
     }
 #endif
+}
+
+// ============================================================================================
+// REAL-TIME THREADS (com.codename1.realtime)
+//
+// What the VM does for a thread that cn1RtEnter made real-time. The scheduling side --
+// SCHED_FIFO, CPU affinity, memory locking, the periodic clock -- is the operating system's
+// and lives in cn1_realtime_impl.h; this half is the part only the VM can do:
+//
+// - The collector never holds one for a whole cycle. Cycles stay concurrent while one
+//   exists (cn1RtThreadsPresent), it is never signal-stopped, and it is released as soon as
+//   its own stacks are scanned (codenameOneGCMark). Between periods it is parked in
+//   cn1RtPark, where the collector scans it without stopping anything; a scan that is still
+//   running when the next period starts holds it for that one shallow stack.
+// - A steady-state cycle cannot allocate behind its own back. cn1RtFreeze points the
+//   thread's current-page array at cn1RtNoPages, which is all null, so every inline BiBOP
+//   bump misses; the recycled-slot paths refuse it (rtAllocTrap); and everything then lands
+//   in codenameOneGcMalloc, which hands it to cn1RtTrappedAlloc. That costs the thread
+//   nothing while it does not allocate and costs every other thread nothing at all: the
+//   inline fast path is untouched. Where CN1_BIBOP_CUR is the thread's own array rather
+//   than a pointer to it (targets without virtual threads: Windows, 32-bit ARM), the
+//   inline bump into a page the thread already holds cannot be redirected, so the trap
+//   sees only allocations that need a new page or the slow path; the build-time check
+//   (RealtimeAllocationVerifier) is the whole of the guarantee there.
+// - A memory limit refuses allocation with OutOfMemoryError instead of letting a thread
+//   wait for collections that cannot free enough (cn1RtAfterCycle, cn1RtRefuseOverLimit).
+// ============================================================================================
+
+volatile int cn1RtThreadCount = 0;
+volatile int cn1RtOverMemoryLimit = 0;
+static long long cn1RtMemoryLimitBytes = 0;
+static JAVA_OBJECT cn1RtOomError = JAVA_NULL;
+#ifdef CN1_VIRTUAL_THREADS
+// Never written with anything but 0: cn1BibopAlloc is the only writer of a non-null page
+// and a trapped thread never reaches it with the swap in place (cn1RtTrappedAlloc swaps
+// back first). Two real-time threads storing 0 into it is the only possible write.
+static CN1BibopPage* cn1RtNoPages[CN1_BIBOP_NUM_CLASSES];
+#endif
+
+void cn1RtEnter(CODENAME_ONE_THREAD_STATE) {
+    if(!threadStateData->realtimeThread) {
+        threadStateData->realtimeThread = JAVA_TRUE;
+        __atomic_fetch_add(&cn1RtThreadCount, 1, __ATOMIC_SEQ_CST);
+    }
+}
+
+void cn1RtLeave(CODENAME_ONE_THREAD_STATE) {
+    cn1RtThaw(threadStateData);
+    if(threadStateData->realtimeThread) {
+        threadStateData->realtimeThread = JAVA_FALSE;
+        __atomic_fetch_sub(&cn1RtThreadCount, 1, __ATOMIC_SEQ_CST);
+    }
+}
+
+void cn1RtFreeze(CODENAME_ONE_THREAD_STATE, JAVA_INT budget) {
+    if(threadStateData->rtAllocTrap) {
+        threadStateData->rtAllocBudgetLeft = threadStateData->rtAllocBudget;
+        return;
+    }
+    threadStateData->rtAllocBudget = budget < 0 ? 0 : budget;
+    threadStateData->rtAllocBudgetLeft = threadStateData->rtAllocBudget;
+#ifdef CN1_VIRTUAL_THREADS
+    threadStateData->rtSavedBibopCur = threadStateData->bibopCur;
+    threadStateData->bibopCur = cn1RtNoPages;
+#endif
+    threadStateData->rtAllocTrap = JAVA_TRUE;
+}
+
+void cn1RtThaw(CODENAME_ONE_THREAD_STATE) {
+    if(!threadStateData->rtAllocTrap) {
+        return;
+    }
+    threadStateData->rtAllocTrap = JAVA_FALSE;
+#ifdef CN1_VIRTUAL_THREADS
+    if(threadStateData->rtSavedBibopCur != 0) {
+        threadStateData->bibopCur = threadStateData->rtSavedBibopCur;
+        threadStateData->rtSavedBibopCur = 0;
+    }
+#endif
+}
+
+// Starts a new period's allocation budget without leaving the steady state.
+void cn1RtNewPeriod(CODENAME_ONE_THREAD_STATE) {
+    threadStateData->rtAllocBudgetLeft = threadStateData->rtAllocBudget;
+}
+
+// The class of the allocation that ended the last steady state, for the error's message.
+// Read by the thread itself after it has caught the error, so no synchronization.
+static __thread const char* cn1RtViolationClass = 0;
+const char* cn1RtLastViolationClass(void) {
+    return cn1RtViolationClass;
+}
+
+JAVA_OBJECT cn1RtTrappedAlloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent) {
+    JAVA_OBJECT o;
+    // Inside the budget: allocate exactly as an ordinary thread would, with the real page
+    // array back in place for the call, and trap again afterwards.
+    if(threadStateData->rtAllocBudgetLeft > 0) {
+        threadStateData->rtAllocBudgetLeft--;
+        cn1RtThaw(threadStateData);
+        o = codenameOneGcMalloc(threadStateData, size, parent);
+        cn1RtFreeze(threadStateData, threadStateData->rtAllocBudget);
+        return o;
+    }
+    // Over it. The steady state is over: thaw first, because building the error's stack
+    // trace allocates, then throw the error the thread handed us when it froze. It was
+    // allocated before the freeze, so the throw itself never needs the allocation that
+    // was just refused.
+    threadStateData->rtAllocViolations++;
+    cn1RtViolationClass = parent != 0 ? parent->clsName : "array";
+    cn1RtThaw(threadStateData);
+    if(threadStateData->rtAllocError != JAVA_NULL) {
+        throwException(threadStateData, threadStateData->rtAllocError);
+    }
+    return codenameOneGcMalloc(threadStateData, size, parent);
+}
+
+int cn1RtMemoryLimitSet(void) {
+    return cn1RtMemoryLimitBytes > 0;
+}
+
+void cn1RtSetMemoryLimit(JAVA_LONG bytes, JAVA_OBJECT error) {
+    if(error != JAVA_NULL && cn1RtOomError == JAVA_NULL) {
+        cn1AddImmortalRoot(error);
+        cn1RtOomError = error;
+    }
+    cn1RtMemoryLimitBytes = bytes;
+    if(bytes <= 0) {
+        cn1RtOverMemoryLimit = 0;
+    }
+}
+
+// Runs on the collector thread at the end of every cycle (java_lang_System_gcMarkSweep__),
+// with the process's resident bytes, so the measurement is taken when the heap is as small
+// as it is going to get. The limit is on the PROCESS, not the Java heap: on a device that
+// is what runs out, and with memory locked it is all of it.
+void cn1RtAfterCycle(JAVA_LONG residentBytes) {
+    long long limit = cn1RtMemoryLimitBytes;
+    if(limit <= 0 || residentBytes <= 0) {
+        return;
+    }
+    __atomic_store_n(&cn1RtOverMemoryLimit, residentBytes > limit ? 1 : 0, __ATOMIC_RELEASE);
+}
+
+// An allocation that needs the slow path while the last collection left the process over
+// its limit. A real-time thread is exempt: its allocations are bounded by its own budget,
+// and failing a control loop because a background thread leaked would be backwards.
+// Refusing only on the slow path is deliberate: a slot in a page a thread already holds
+// costs no new memory.
+// Throwing allocates too (the stack trace), so after a refusal the thread's next
+// CN1_RT_REFUSAL_GRACE slow-path allocations pass: enough to build and deliver the
+// error, and a thread that catches it and keeps allocating is refused again soon after.
+#define CN1_RT_REFUSAL_GRACE 64
+void cn1RtRefuseOverLimit(CODENAME_ONE_THREAD_STATE) {
+    if(threadStateData->realtimeThread || threadStateData->nativeAllocationMode
+       || cn1RtOomError == JAVA_NULL) {
+        return;
+    }
+    if(threadStateData->rtOomEpoch > 0) {
+        threadStateData->rtOomEpoch--;
+        return;
+    }
+    threadStateData->rtOomEpoch = CN1_RT_REFUSAL_GRACE;
+    throwException(threadStateData, cn1RtOomError);
+}
+
+// The measurement between collections. A collection is what decides (cn1RtAfterCycle),
+// but nothing makes one run promptly: a process allocating large live arrays on a host
+// with memory to spare measured ONE cycle across 3.4GB. So the slow path also reads the
+// resident size, once per 1/64 of the limit allocated: over the limit it asks for a
+// collection to decide, and past a quarter over it refuses without waiting for one --
+// fail fast is the point of the limit.
+static long long cn1RtBytesSinceCheck = 0;
+#if defined(__linux__)
+extern long long cn1RtResidentBytes(void);   // nativeMethods.m
+#else
+// The limit is documented as Linux only; elsewhere it never measures anything.
+static long long cn1RtResidentBytes(void) {
+    return 0;
+}
+#endif
+static void cn1RtAccount(int size) {
+    long long limit = cn1RtMemoryLimitBytes;
+    long long step = limit / 64;
+    if(step < 1024 * 1024) {
+        step = 1024 * 1024;
+    }
+    if(__atomic_add_fetch(&cn1RtBytesSinceCheck, (long long)size, __ATOMIC_RELAXED) < step) {
+        return;
+    }
+    __atomic_store_n(&cn1RtBytesSinceCheck, 0, __ATOMIC_RELAXED);
+    long long rss = cn1RtResidentBytes();
+    if(rss <= 0) {
+        return;
+    }
+    if(rss <= limit) {
+        __atomic_store_n(&cn1RtOverMemoryLimit, 0, __ATOMIC_RELEASE);
+    } else if(rss > limit + limit / 4) {
+        __atomic_store_n(&cn1RtOverMemoryLimit, 1, __ATOMIC_RELEASE);
+    } else {
+        cn1RequestGcFromParkedThread();
+    }
+}
+
+JAVA_LONG cn1RtThreadAllocViolations(CODENAME_ONE_THREAD_STATE) {
+    return threadStateData->rtAllocViolations;
 }

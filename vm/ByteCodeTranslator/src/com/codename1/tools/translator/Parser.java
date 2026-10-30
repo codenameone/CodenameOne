@@ -54,6 +54,7 @@ public class Parser extends ClassVisitor {
     private static final String DISABLE_NULL_AND_ARRAY_BOUNDS_CHECKS_ANNOTATION =
             "Lcom/codename1/annotations/DisableNullChecksAndArrayBoundsChecks;";
     private static final String CONCRETE_ANNOTATION = "Lcom/codename1/annotations/Concrete;";
+    private static final String ALLOCATION_ALLOWED_ANNOTATION = "Lcom/codename1/realtime/AllocationAllowed;";
     private static final String STACK_ALLOCATE_ANNOTATION = "Lcom/codename1/annotations/StackAllocate;";
     private static final String FUSED_ANNOTATION = "Lcom/codename1/annotations/Fused;";
     private ByteCodeClass cls;
@@ -1495,6 +1496,9 @@ public class Parser extends ClassVisitor {
             // Until computeInstantiated runs below, every class counts as instantiated.
             ByteCodeClass.resetInstantiated();
             ByteCodeClass.computePureClinits(classes);
+            // Real-time tasks must not allocate in steady state. Raw bytecode again, and
+            // before anything can drop or rewrite the instructions it looks for.
+            RealtimeAllocationVerifier.run(classes);
             // Also on the raw bytecode, where every field access is still a plain
             // GETFIELD/PUTFIELD: see DeadFieldElimination. Not for the JavaScript target
             // (its own field model), and not under on-device debugging, whose sidecar
@@ -3294,6 +3298,8 @@ public class Parser extends ClassVisitor {
                 mtd.setDisableDebugInfo(true);
             } else if (DISABLE_NULL_AND_ARRAY_BOUNDS_CHECKS_ANNOTATION.equals(desc)) {
                 mtd.setDisableNullAndArrayBoundsChecks(true);
+            } else if (ALLOCATION_ALLOWED_ANNOTATION.equals(desc)) {
+                mtd.setAllocationAllowed(true);
             }
             if (mv == null) return null;
             return new AnnotationVisitorWrapper(super.visitAnnotation(desc, visible));
