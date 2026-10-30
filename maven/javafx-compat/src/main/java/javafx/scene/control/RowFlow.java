@@ -88,6 +88,7 @@ final class RowFlow extends Region {
     private double pressOffset;
     private boolean dragging;
     private int pendingRow = -1;
+    private final com.codename1.fxcompat.runtime.ScrollIndicator indicator;
     /// Glides on after a touch scroll, as a phone's list does.
     private final com.codename1.fxcompat.runtime.Fling fling = new com.codename1.fxcompat.runtime.Fling(
             new com.codename1.fxcompat.runtime.Fling.Target() {
@@ -107,6 +108,7 @@ final class RowFlow extends Region {
         thumb.setBackground(new Background(new BackgroundFill(Color.color(0, 0, 0, 0.35), new CornerRadii(2),
                 Insets.EMPTY)));
         cn1Children().add(thumb);
+        indicator = new com.codename1.fxcompat.runtime.ScrollIndicator(thumb);
         addEventHandler(ScrollEvent.SCROLL, new EventHandler<ScrollEvent>() {
             @Override
             public void handle(ScrollEvent event) {
@@ -359,7 +361,7 @@ final class RowFlow extends Region {
         if (max > 0 && h > 0) {
             double total = count * rh;
             double th = Math.max(16, total > 0 ? h * h / total : h);
-            thumb.setVisible(true);
+            thumb.setVisible(indicator.at(offset));
             thumb.resizeRelocate(w - 5, offset / max * (h - th), 3, th);
         } else {
             thumb.setVisible(false);

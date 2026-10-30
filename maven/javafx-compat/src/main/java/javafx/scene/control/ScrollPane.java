@@ -125,6 +125,10 @@ public class ScrollPane extends Control {
     private final Viewport viewport = new Viewport();
     private final Region hbar = thumb();
     private final Region vbar = thumb();
+    private final com.codename1.fxcompat.runtime.ScrollIndicator indicatorX =
+            new com.codename1.fxcompat.runtime.ScrollIndicator(hbar);
+    private final com.codename1.fxcompat.runtime.ScrollIndicator indicatorY =
+            new com.codename1.fxcompat.runtime.ScrollIndicator(vbar);
     private double contentWidth;
     private double contentHeight;
     private double pressX;
@@ -333,13 +337,17 @@ public class ScrollPane extends Control {
                 || old.getHeight() != vh) {
             viewportBounds.set(new BoundingBox(-ox, -oy, vw, vh));
         }
-        placeThumb(hbar, true, getHbarPolicy(), extentX, vw, vh, contentWidth, ox);
-        placeThumb(vbar, false, getVbarPolicy(), extentY, vh, vw, contentHeight, oy);
+        // Both are read every time: each records where it last saw the pane.
+        boolean movedX = indicatorX.at(ox);
+        boolean movedY = indicatorY.at(oy);
+        placeThumb(hbar, true, getHbarPolicy(), extentX, vw, vh, contentWidth, ox, movedX);
+        placeThumb(vbar, false, getVbarPolicy(), extentY, vh, vw, contentHeight, oy, movedY);
     }
 
     private void placeThumb(Region bar, boolean horizontal, ScrollBarPolicy policy, double extent, double along,
-            double across, double contentLength, double scrolled) {
-        boolean shown = policy == ScrollBarPolicy.ALWAYS || (policy != ScrollBarPolicy.NEVER && extent > 0.5);
+            double across, double contentLength, double scrolled, boolean moving) {
+        boolean shown = policy == ScrollBarPolicy.ALWAYS
+                || (policy != ScrollBarPolicy.NEVER && extent > 0.5 && moving);
         double track = along - 2 * BAR_GAP;
         if (!shown || !(track > 0)) {
             bar.setVisible(false);

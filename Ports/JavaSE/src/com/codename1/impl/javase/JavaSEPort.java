@@ -15213,11 +15213,26 @@ public class JavaSEPort extends CodenameOneImplementation {
         return stringWidth(nativeFont, new String(ch, offset, length));
     }
 
+    /**
+     * The context text is measured in: the screen's hints without its zoom.
+     * Codename One lays text out in device pixels, and the screen buffer is
+     * scaled by the simulator's zoom; measured through that transform, every
+     * glyph advance was rounded at the zoomed size, so a string came out up
+     * to a pixel per glyph narrower than it draws anywhere unzoomed -- in a
+     * mutable image, a screenshot, a device. Wrapped text then ran past the
+     * edge it was wrapped for, and a word drawn after another overlapped
+     * the space between them.
+     */
+    private FontRenderContext measureFRC() {
+        FontRenderContext screen = canvas.getFRC();
+        return new FontRenderContext(null, screen.getAntiAliasingHint(), screen.getFractionalMetricsHint());
+    }
+
     private Rectangle2D getStringBoundsWithEmojis(java.awt.Font font, String str) {
         if (hasUnsupportedChars(font, str)) {
-            return mixedFontBounds(createAttributedString(font, str).getIterator(), canvas.getFRC());
+            return mixedFontBounds(createAttributedString(font, str).getIterator(), measureFRC());
         } else {
-            return font.getStringBounds(str, canvas.getFRC());
+            return font.getStringBounds(str, measureFRC());
         }
     }
 
@@ -15398,7 +15413,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (isEmojiFontLoaded() && !Character.isHighSurrogate(ch) && !fnt.canDisplay(ch)) {
             fnt = deriveEmojiFont(fnt.getSize2D());
         }
-        int w = (int) Math.ceil(fnt.getStringBounds(strch, canvas.getFRC()).getWidth());
+        int w = (int) Math.ceil(fnt.getStringBounds(strch, measureFRC()).getWidth());
         return w;
     }
 

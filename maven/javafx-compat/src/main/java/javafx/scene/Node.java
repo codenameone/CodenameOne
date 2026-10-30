@@ -1273,6 +1273,14 @@ public abstract class Node implements EventTarget, Styleable, StyleTarget, Dirty
         if (by == null) {
             return null;
         }
+        if (by instanceof javafx.scene.shape.Shape) {
+            // A shape clips to its outline, not to its box: a circle over
+            // a photo is how an avatar is made round.
+            FxPath outline = ((javafx.scene.shape.Shape) by).cn1Outline();
+            if (!outline.isEmpty()) {
+                return outline.transformed(by.localToParentMatrix());
+            }
+        }
         Bounds b = by.getBoundsInParent();
         FxPath path = new FxPath();
         path.addRect(b.getMinX(), b.getMinY(), Math.max(0, b.getWidth()), Math.max(0, b.getHeight()));
