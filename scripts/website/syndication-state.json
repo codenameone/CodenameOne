@@ -3091,6 +3091,11 @@
         "status": "submitted",
         "published": false,
         "syndicated_at": "2026-10-30T01:01:52+00:00"
+      },
+      "devto": {
+        "id": 4949758,
+        "url": "https://dev.to/codenameone/rewrite-everything-in-java-not-rust-5co8",
+        "syndicated_at": "2026-10-30T22:46:41+00:00"
       }
     }
   }
