@@ -31,11 +31,10 @@ import com.codename1.realtime.RealtimeTask;
 import com.codename1.realtime.RealtimeThread;
 
 class RealtimeMotorLoopSnippet {
-    static final double[] GAINS = new double[64];
-
     // tag::realtime-motor-loop[]
     class MotorLoop extends RealtimeTask {
         private final double[] samples = new double[64];   // <1>
+        private final double[] gains = new double[64];
         private PwmChannel pwm;
         private boolean failed;
 
@@ -53,7 +52,7 @@ class RealtimeMotorLoopSnippet {
             }
             double out = 0;
             for (int i = 0; i < samples.length; i++) {
-                out += samples[i] * GAINS[i];
+                out += samples[i] * gains[i];
             }
             try {
                 pwm.setDutyCycle(out);
