@@ -348,6 +348,17 @@ public class ParentPeer extends Container implements FxPeer {
     /// Runs JavaFX layout from the peer of a root.
     static final class Bridge extends Layout {
 
+        /// JavaFX children overlap freely -- a labeled control's graphic
+        /// lies over the native component that draws its text -- and only a
+        /// layout that says so makes Codename One paint what lies above a
+        /// component that repaints alone. Without it a native button
+        /// redrawing its pressed state on a device painted over its own
+        /// icon, which stayed missing until something repainted the parent.
+        @Override
+        public boolean isOverlapSupported() {
+            return true;
+        }
+
         @Override
         public void layoutContainer(Container parent) {
             if (!(parent instanceof ParentPeer)) {

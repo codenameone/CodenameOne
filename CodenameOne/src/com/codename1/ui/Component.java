@@ -3194,7 +3194,7 @@ public class Component implements Animation, StyleListener, Editable {
 
     private void paintBackgroundLayerImpl(Graphics g) {
         float backdropBlur = getStyle().getBackdropFilterBlurRadius();
-        if (backdropBlur > 0) {
+        if (backdropBlur > 0 && !opaqueFillHidesBackdrop()) {
             // The glass surface's material INTENT comes from a typed, named
             // recipe (GlassRecipe -- plain blur, chrome bar, floating pill,
             // glass panel), resolved per UIID via <UIID>GlassRecipe /
@@ -3235,6 +3235,28 @@ public class Component implements Animation, StyleListener, Editable {
             }
         }
         paintComponentBackground(g);
+    }
+
+    /// Whether this component's own background paints every pixel of its
+    /// bounds opaquely, so a backdrop blurred under it could never be seen.
+    /// A theme can give an opaque surface a backdrop filter -- the iOS theme
+    /// does for `TextField` -- and the blur is then computed on every repaint
+    /// for nothing: one field in a scrolling screen spent most of the frame
+    /// in it. Only a plain fill or a `RoundRectBorder`, which fills from the
+    /// same style colour and opacity over the same shape the glass takes, is
+    /// trusted; an image, a gradient or any other border keeps the blur.
+    private boolean opaqueFillHidesBackdrop() {
+        Style s = getStyle();
+        // With no image, every image type paints the plain fill; only the
+        // gradients paint something else.
+        byte type = s.getBackgroundType();
+        boolean gradient = (type >= Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL && type <= Style.BACKGROUND_GRADIENT_RADIAL)
+                || type >= Style.BACKGROUND_GRADIENT_LINEAR;
+        if (s.getBgTransparency() != (byte) 0xff || s.getBgImage() != null || gradient) {
+            return false;
+        }
+        Border b = s.getBorder();
+        return b == null || !b.isBackgroundPainter() || b instanceof RoundRectBorder;
     }
 
     void internalPaintImpl(Graphics g, boolean paintIntersects) {

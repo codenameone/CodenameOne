@@ -88,6 +88,16 @@ final class RowFlow extends Region {
     private double pressOffset;
     private boolean dragging;
     private int pendingRow = -1;
+    /// Glides on after a touch scroll, as a phone's list does.
+    private final com.codename1.fxcompat.runtime.Fling fling = new com.codename1.fxcompat.runtime.Fling(
+            new com.codename1.fxcompat.runtime.Fling.Target() {
+                @Override
+                public boolean flingBy(double delta) {
+                    double before = offset;
+                    scrollTo(offset + delta);
+                    return Math.abs(offset - before - delta) < 0.5;
+                }
+            });
 
     RowFlow(Rows rows) {
         this.rows = rows;
@@ -110,6 +120,7 @@ final class RowFlow extends Region {
         addEventHandler(MouseEvent.MOUSE_PRESSED, new EventHandler<MouseEvent>() {
             @Override
             public void handle(MouseEvent event) {
+                fling.stop();
                 pressY = event.getSceneY();
                 pressOffset = offset;
                 dragging = false;
@@ -124,7 +135,17 @@ final class RowFlow extends Region {
                 }
                 if (dragging) {
                     scrollTo(pressOffset - moved);
+                    fling.track(offset);
                 }
+            }
+        });
+        addEventHandler(MouseEvent.MOUSE_RELEASED, new EventHandler<MouseEvent>() {
+            @Override
+            public void handle(MouseEvent event) {
+                if (dragging) {
+                    fling.release();
+                }
+                dragging = false;
             }
         });
     }

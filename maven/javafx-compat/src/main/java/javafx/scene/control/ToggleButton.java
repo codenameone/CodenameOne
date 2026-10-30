@@ -124,7 +124,14 @@ public class ToggleButton extends ButtonBase implements Toggle {
 
     @Override
     protected Component cn1CreateNative() {
-        com.codename1.ui.CheckBox b = new com.codename1.ui.CheckBox();
+        com.codename1.ui.CheckBox b = new com.codename1.ui.CheckBox() {
+            @Override
+            public void repaint() {
+                if (!repaintThroughNode()) {
+                    super.repaint();
+                }
+            }
+        };
         b.setToggle(true);
         if (unstyled(b.getUIID())) {
             // A theme with no look for a toggle button, as the desktop

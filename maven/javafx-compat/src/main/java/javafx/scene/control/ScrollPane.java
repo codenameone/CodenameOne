@@ -153,6 +153,22 @@ public class ScrollPane extends Control {
         return r;
     }
 
+    /// Glides on after a touch pan, as a phone's scroll view does.
+    private final com.codename1.fxcompat.runtime.Fling fling = new com.codename1.fxcompat.runtime.Fling(
+            new com.codename1.fxcompat.runtime.Fling.Target() {
+                @Override
+                public boolean flingBy(double delta) {
+                    double extentY = contentHeight - viewport.getHeight();
+                    if (!(extentY > 0) || vvalue.isBound()) {
+                        return false;
+                    }
+                    double before = offset(getVvalue(), getVmin(), getVmax(), extentY);
+                    scrollBy(0, delta);
+                    double after = offset(getVvalue(), getVmin(), getVmax(), extentY);
+                    return Math.abs(after - before - delta) < 0.5;
+                }
+            });
+
     private void init() {
         getStyleClass().add("scroll-pane");
         setFocusTraversable(false);
@@ -168,6 +184,7 @@ public class ScrollPane extends Control {
         addEventHandler(MouseEvent.MOUSE_PRESSED, new EventHandler<MouseEvent>() {
             @Override
             public void handle(MouseEvent event) {
+                fling.stop();
                 rememberPress(event);
                 panning = isPannable() || (Display.isInitialized() && !Display.getInstance().isDesktop());
             }
@@ -176,6 +193,7 @@ public class ScrollPane extends Control {
             @Override
             public void handle(MouseEvent event) {
                 if (panning && panTo(pressX - event.getSceneX(), pressY - event.getSceneY())) {
+                    fling.track(offset(getVvalue(), getVmin(), getVmax(), contentHeight - viewport.getHeight()));
                     event.consume();
                 }
             }
@@ -183,6 +201,9 @@ public class ScrollPane extends Control {
         addEventHandler(MouseEvent.MOUSE_RELEASED, new EventHandler<MouseEvent>() {
             @Override
             public void handle(MouseEvent event) {
+                if (panning) {
+                    fling.release();
+                }
                 panning = false;
             }
         });
