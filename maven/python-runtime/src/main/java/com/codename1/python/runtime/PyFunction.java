@@ -176,27 +176,92 @@ public final class PyFunction extends PyObject {
 
     @Override
     public Object call0() {
-        return body0 != null ? body0.run() : call(Py.NO_ARGS, Py.NO_KW);
+        if (body0 != null) {
+            return body0.run();
+        }
+        return widen(0) ? fill(0, null, null, null) : call(Py.NO_ARGS, Py.NO_KW);
     }
 
     @Override
     public Object call1(Object a) {
-        return body1 != null ? body1.run(a) : call(new Object[] {a}, Py.NO_KW);
+        if (body1 != null) {
+            return body1.run(a);
+        }
+        return widen(1) ? fill(1, a, null, null) : call(new Object[] {a}, Py.NO_KW);
     }
 
     @Override
     public Object call2(Object a, Object b) {
-        return body2 != null ? body2.run(a, b) : call(new Object[] {a, b}, Py.NO_KW);
+        if (body2 != null) {
+            return body2.run(a, b);
+        }
+        return widen(2) ? fill(2, a, b, null) : call(new Object[] {a, b}, Py.NO_KW);
     }
 
     @Override
     public Object call3(Object a, Object b, Object c) {
-        return body3 != null ? body3.run(a, b, c) : call(new Object[] {a, b, c}, Py.NO_KW);
+        if (body3 != null) {
+            return body3.run(a, b, c);
+        }
+        return widen(3) ? fill(3, a, b, c) : call(new Object[] {a, b, c}, Py.NO_KW);
     }
 
     @Override
     public Object call4(Object a, Object b, Object c, Object d) {
         return body4 != null ? body4.run(a, b, c, d) : call(new Object[] {a, b, c, d}, Py.NO_KW);
+    }
+
+    /// Whether a positional call with `n` arguments can go straight to the
+    /// fixed-arity body by filling the rest from the defaults: a function of
+    /// at most four plain parameters, every one past `n` defaulted. Most
+    /// library functions are that shape (`match(self, string, pos=0)`), and
+    /// binding them through `call` built a second argument array per call.
+    private boolean widen(int n) {
+        return n < positional && positional <= 4 && !varArgs && kwOnly == 0 && !varKw
+                && positional - defaults.length <= n;
+    }
+
+    /// Runs the fixed-arity body with the first `n` of `a`, `b`, `c` and the
+    /// defaults after them; `n` was checked by `widen`. A function built
+    /// without a body of its own arity binds them through `call` as before.
+    private Object fill(int n, Object a, Object b, Object c) {
+        int first = positional - defaults.length;
+        Object x = n > 0 ? a : defaults[-first];
+        Object y = positional > 1 ? (n > 1 ? b : defaults[1 - first]) : null;
+        Object z = positional > 2 ? (n > 2 ? c : defaults[2 - first]) : null;
+        switch (positional) {
+            case 1:
+                if (body1 != null) {
+                    return body1.run(x);
+                }
+                break;
+            case 2:
+                if (body2 != null) {
+                    return body2.run(x, y);
+                }
+                break;
+            case 3:
+                if (body3 != null) {
+                    return body3.run(x, y, z);
+                }
+                break;
+            default:
+                if (body4 != null) {
+                    return body4.run(x, y, z, defaults[3 - first]);
+                }
+                break;
+        }
+        Object[] args = new Object[n];
+        if (n > 0) {
+            args[0] = a;
+        }
+        if (n > 1) {
+            args[1] = b;
+        }
+        if (n > 2) {
+            args[2] = c;
+        }
+        return call(args, Py.NO_KW);
     }
 
     public PyFunction pure(PureD1 p) {

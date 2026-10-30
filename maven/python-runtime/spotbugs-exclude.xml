@@ -111,4 +111,10 @@
         <Field name="types"/>
         <Bug pattern="UWF_UNWRITTEN_PUBLIC_OR_PROTECTED_FIELD"/>
     </Match>
+    <!-- gc.collect() is a program asking for a collection: the System.gc()
+         call is the whole of what it does. -->
+    <Match>
+        <Class name="com.codename1.python.runtime.StdModules"/>
+        <Bug pattern="DM_GC"/>
+    </Match>
 </FindBugsFilter>

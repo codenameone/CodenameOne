@@ -49,6 +49,10 @@ public final class StdModules {
             PyModule.registerModule(atexit());
             return true;
         }
+        if ("_cn1re".equals(name)) {
+            PyModule.registerModule(Regex.module());
+            return true;
+        }
         if ("gc".equals(name)) {
             PyModule.registerModule(gc());
             return true;
@@ -220,7 +224,7 @@ public final class StdModules {
     private static PyModule gc() {
         PyModule m = new PyModule("gc", new String[0]);
         m.setAttr("collect", new PyBuiltin("collect", (args, kwNames) -> {
-            System.gc();
+            System.gc(); //NOPMD DoNotCallGarbageCollectionExplicitly - gc.collect() is the request for exactly this
             return PyInt.of(0);
         }));
         m.setAttr("enable", PyBuiltin.positional("enable", a -> {
