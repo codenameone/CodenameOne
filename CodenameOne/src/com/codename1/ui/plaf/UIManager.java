@@ -563,6 +563,7 @@ public class UIManager {
     /// where we would be out of options if something like that happens. Effectively this is the same as writing:
     ///
     /// ```java
+    /// String resourceFile = "/theme";
     /// Resources theme = null;
     /// try {
     ///     theme = Resources.openLayered("/theme");
