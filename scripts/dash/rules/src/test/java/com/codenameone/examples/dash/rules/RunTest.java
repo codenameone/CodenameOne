@@ -216,4 +216,26 @@ class RunTest {
             assertTrue(run.runner(0).z > 200 * Track.UNIT, "seed " + seed + " fell at " + run.runner(0).z);
         }
     }
+
+    @Test
+    void levelsRoundTripThroughJsonWithTheirOwnDefinitions() {
+        for (LevelDef d : Content.levels()) {
+            LevelCodec.Decoded back = LevelCodec.decode(LevelCodec.encode(d));
+            assertEquals(d.contentHash(), back.level.contentHash(), d.id);
+            assertEquals(LevelCodec.encode(d), LevelCodec.encode(back.level), d.id);
+        }
+        LevelDef d = flat("u:me:spikes", 1);
+        java.util.List<Object> defs = new java.util.ArrayList<Object>();
+        defs.add(new ObstacleDef("u:me:spikes", Clearance.JUMP, 500, 300, true));
+        java.util.Map<String, String> art = new java.util.HashMap<String, String>();
+        art.put("u:me:spikes", "asset-1");
+        LevelCodec.Decoded back = LevelCodec.decode(LevelCodec.encode(d, defs, art, "asset-2"));
+        assertEquals("asset-1", back.art.get("u:me:spikes"));
+        assertEquals("asset-2", back.runnerArt);
+        assertFalse(Validator.hasErrors(Validator.check(back.level, back.catalog())));
+        assertTrue(runWith(back.level, ticksBefore(3), Input.JUMP).runner(0).finished);
+        defs.set(0, new ObstacleDef(Content.HURDLE, Clearance.JUMP, 500, 300, true));
+        assertThrows(IllegalArgumentException.class, () -> LevelCodec.decode(LevelCodec.encode(d, defs, null, null)));
+        assertThrows(IllegalArgumentException.class, () -> LevelCodec.decode("{\"placements\":[[1.5,\"coin\",0]]}"));
+    }
 }

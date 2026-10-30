@@ -167,4 +167,10 @@ public final class Content {
     public static long dailySeed(int day) {
         return new Rng(0xDA11L * 1000003L + day).nextLong();
     }
+
+    /// The seed of a level's weekly board for a week number (days since the
+    /// epoch divided by seven). A weekly score only counts on this seed.
+    public static long weeklySeed(int week, String levelId) {
+        return new Rng(0x3EE7L * 1000003L + week * 31L + new Hash().add(levelId).value()).nextLong();
+    }
 }
