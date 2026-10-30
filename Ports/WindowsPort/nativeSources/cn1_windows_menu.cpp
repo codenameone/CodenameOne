@@ -52,6 +52,8 @@
  */
 
 #include "cn1_windows.h"
+
+#if !defined(CN1_WINDOWS_UWP) /* desktop only: stubbed for UWP in cn1_windows_uwp_stubs.c */
 #include <stdlib.h>
 #include <string.h>
 
@@ -485,3 +487,5 @@ JAVA_INT com_codename1_impl_windows_WindowsNative_currentModifiers___R_int(
 }
 
 }
+
+#endif /* !CN1_WINDOWS_UWP */

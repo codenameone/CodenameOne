@@ -47,6 +47,22 @@
 #include <stdlib.h> /* _putenv_s */
 #include <stdio.h>  /* FILE, for cn1_win_fopen_utf8 */
 
+#if defined(WINAPI_FAMILY) && (WINAPI_FAMILY == WINAPI_FAMILY_APP)
+/* A UWP app has no process environment and the app-partition CRT declares no
+ * getenv. The runtime only reads diagnostic switches from it, and "not set" is
+ * the true answer inside the app container. */
+static __inline char* cn1_uwp_getenv(const char* name) {
+    (void)name;
+    return NULL;
+}
+#define getenv cn1_uwp_getenv
+/* No TZ to re-read either (setenv is a no-op here), so the zone switch in
+ * nativeMethods resolves against the system zone; tzset has nothing to do. */
+static __inline void cn1_uwp_tzset(void) {
+}
+#define tzset cn1_uwp_tzset
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -195,6 +211,20 @@ FILE* cn1_win_fopen_utf8(const char* path, const char* mode);
 /* --- environment / time.h POSIX helpers absent from MSVC ---
    Thin static-inline wrappers over the MSVC equivalents; used by the date /
    timezone runtime in nativeMethods. */
+#if defined(WINAPI_FAMILY) && (WINAPI_FAMILY == WINAPI_FAMILY_APP)
+/* A UWP app (the Xbox Developer Mode target) has no process environment: the
+ * app-partition CRT declares neither _putenv_s nor getenv. Reporting failure
+ * leaves TZ unset, and the Windows named-zone path never reads it anyway. */
+static __inline int setenv(const char* name, const char* value, int overwrite) {
+    (void)name; (void)value; (void)overwrite;
+    return -1;
+}
+
+static __inline int unsetenv(const char* name) {
+    (void)name;
+    return -1;
+}
+#else
 static __inline int setenv(const char* name, const char* value, int overwrite) {
     (void)overwrite; /* the runtime always overwrites, which _putenv_s does */
     return _putenv_s(name, value);
@@ -203,6 +233,7 @@ static __inline int setenv(const char* name, const char* value, int overwrite) {
 static __inline int unsetenv(const char* name) {
     return _putenv_s(name, "");
 }
+#endif
 
 /* Civil fields to a UTC epoch second, by arithmetic rather than through the
  * CRT. _mkgmtime is documented to support only dates from 1970-01-01 and

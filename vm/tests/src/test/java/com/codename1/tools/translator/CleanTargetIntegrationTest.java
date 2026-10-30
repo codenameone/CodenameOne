@@ -756,17 +756,52 @@ class CleanTargetIntegrationTest {
 
         // --- translate (host-agnostic): compile a real Form app against core+port,
         // stage the native layer, run the translator with the "windows" app type ---
+        Path cmakeRoot = translateWindowsApp("WinFormApp", winFormAppSource(), coreClasses, portClasses, config);
+
+        // --- cross-compile that dist to a Windows x64 PE with clang-cl + xwin ---
+        Path exe = crossBuildDist(cmakeRoot, sys, clangCl, "WinFormApp");
+        System.out.println("CN1_XWIN_EXE=" + exe.toAbsolutePath() + " (" + (Files.size(exe) / 1024) + "KB)");
+
+        // --- and the UWP (Xbox Developer Mode) build of the same dist. It links
+        // WindowsApp.lib and nothing else that imports a DLL, so a native that
+        // calls outside the app container fails this link rather than the
+        // console's loader. ---
+        Path uwpExe = crossBuildDist(cmakeRoot, sys, clangCl, "WinFormApp", true);
+        System.out.println("CN1_XWIN_UWP_EXE=" + uwpExe.toAbsolutePath() + " (" + (Files.size(uwpExe) / 1024) + "KB)");
+
+        // --- the UWP smoke app the Windows CI job installs and launches as a real
+        // UWP activation (windows-cross-compile.yml). It writes a marker into its
+        // package LocalState once its first form has painted, which is the only
+        // place outside the container the job can read it from. ---
+        String uwpOut = System.getenv("CN1_UWP_EXE_OUT");
+        if (uwpOut != null && !uwpOut.trim().isEmpty()) {
+            Path smokeRoot = translateWindowsApp("UwpSmokeApp", uwpSmokeAppSource(), coreClasses, portClasses, config);
+            Path smokeExe = crossBuildDist(smokeRoot, sys, clangCl, "UwpSmokeApp", true);
+            Path dest = Paths.get(uwpOut.trim());
+            if (dest.getParent() != null) {
+                Files.createDirectories(dest.getParent());
+            }
+            Files.copy(smokeExe, dest, StandardCopyOption.REPLACE_EXISTING);
+            System.out.println("UWP smoke exe copied to " + dest.toAbsolutePath());
+        }
+    }
+
+    /// Compiles one app class against core + the Windows port, stages the native
+    /// sources and runs the translator with the "windows" app type. Answers the
+    /// emitted CMake root.
+    static Path translateWindowsApp(String className, String source, Path coreClasses, Path portClasses,
+            CompilerHelper.CompilerConfig config) throws Exception {
         Parser.cleanup();
         Path sourceDir = Files.createTempDirectory("xwin-src");
         Path classesDir = Files.createTempDirectory("xwin-cls");
         Path javaApiDir = Files.createTempDirectory("xwin-japi");
-        Files.write(sourceDir.resolve("WinFormApp.java"), winFormAppSource().getBytes(StandardCharsets.UTF_8));
+        Files.write(sourceDir.resolve(className + ".java"), source.getBytes(StandardCharsets.UTF_8));
         CompilerHelper.compileJavaAPI(javaApiDir, config);
         assertEquals(0, CompilerHelper.compile(config.jdkHome, Arrays.asList(
                 "-source", config.targetVersion, "-target", config.targetVersion,
                 "-classpath", coreClasses + java.io.File.pathSeparator + portClasses,
-                "-d", classesDir.toString(), sourceDir.resolve("WinFormApp.java").toString())),
-                "WinFormApp should compile:\n" + CompilerHelper.getLastErrorLog());
+                "-d", classesDir.toString(), sourceDir.resolve(className + ".java").toString())),
+                className + " should compile:\n" + CompilerHelper.getLastErrorLog());
         Path nativeDir = Paths.get("..", "..", "Ports", "WindowsPort", "nativeSources").normalize().toAbsolutePath();
         Path nativeStage = Files.createTempDirectory("xwin-native");
         try (java.util.stream.Stream<Path> s = Files.list(nativeDir)) {
@@ -778,13 +813,53 @@ class CleanTargetIntegrationTest {
         }
         Path outputDir = Files.createTempDirectory("xwin-out");
         String sources = classesDir + ";" + coreClasses + ";" + portClasses + ";" + javaApiDir + ";" + nativeStage;
-        runTranslatorMultiSource(sources, outputDir, "WinFormApp", "windows");
+        runTranslatorMultiSource(sources, outputDir, className, "windows");
         Path cmakeRoot = outputDir.resolve("dist");
         assertTrue(Files.exists(cmakeRoot.resolve("CMakeLists.txt")), "translator should emit a CMake project");
 
-        // --- cross-compile that dist to a Windows x64 PE with clang-cl + xwin ---
-        Path exe = crossBuildDist(cmakeRoot, sys, clangCl, "WinFormApp");
-        System.out.println("CN1_XWIN_EXE=" + exe.toAbsolutePath() + " (" + (Files.size(exe) / 1024) + "KB)");
+        return cmakeRoot;
+    }
+
+    /// The app the UWP smoke run launches: one form, then a marker file with the
+    /// display size in the app home (the package LocalState under UWP), written a
+    /// cycle after show() so it means the first frame went through.
+    static String uwpSmokeAppSource() {
+        return "import com.codename1.ui.Display;\n" +
+                "import com.codename1.ui.Form;\n" +
+                "import com.codename1.ui.Label;\n" +
+                "import com.codename1.ui.Button;\n" +
+                "import com.codename1.ui.layouts.BoxLayout;\n" +
+                "import com.codename1.io.FileSystemStorage;\n" +
+                "import java.io.OutputStream;\n" +
+                "public class UwpSmokeApp {\n" +
+                "    public static void main(String[] args) {\n" +
+                "        Display.init(null);\n" +
+                "        Display.getInstance().callSerially(new Runnable() {\n" +
+                "            public void run() {\n" +
+                "                Form f = new Form(\"UWP smoke\", BoxLayout.y());\n" +
+                "                f.add(new Label(\"Codename One in the UWP app container\"));\n" +
+                "                f.add(new Button(\"Press A\"));\n" +
+                "                f.show();\n" +
+                "                Display.getInstance().callSerially(new Runnable() {\n" +
+                "                    public void run() { writeMarker(); }\n" +
+                "                });\n" +
+                "            }\n" +
+                "        });\n" +
+                "        com.codename1.impl.windows.WindowsImplementation.runMainEventLoop();\n" +
+                "    }\n" +
+                "    static void writeMarker() {\n" +
+                "        Display d = Display.getInstance();\n" +
+                "        String text = \"CN1-UWP-STARTED \" + d.getDisplayWidth() + \"x\" + d.getDisplayHeight() + \"\\n\";\n" +
+                "        try {\n" +
+                "            FileSystemStorage fs = FileSystemStorage.getInstance();\n" +
+                "            OutputStream out = fs.openOutputStream(fs.getAppHomePath() + \"uwp-smoke.txt\");\n" +
+                "            out.write(text.getBytes(\"UTF-8\"));\n" +
+                "            out.close();\n" +
+                "        } catch (Exception e) {\n" +
+                "            e.printStackTrace();\n" +
+                "        }\n" +
+                "    }\n" +
+                "}\n";
     }
 
     /**
@@ -798,6 +873,13 @@ class CleanTargetIntegrationTest {
      * BrowserComponent peer; otherwise the browser natives compile as stubs.
      */
     static Path crossBuildDist(Path cmakeRoot, Path sys, String clangCl, String exeName) throws Exception {
+        return crossBuildDist(cmakeRoot, sys, clangCl, exeName, false);
+    }
+
+    /// `uwp` builds the UWP (Xbox Developer Mode) variant: `-DCN1_WINDOWS_UWP=ON`,
+    /// which compiles the app API partition and links WindowsApp.lib alone.
+    static Path crossBuildDist(Path cmakeRoot, Path sys, String clangCl, String exeName, boolean uwp)
+            throws Exception {
         String target = "x86_64-pc-windows-msvc";
         String libArch = "x86_64";
         String inc = String.join(" ",
@@ -821,9 +903,10 @@ class CleanTargetIntegrationTest {
                 "-I", sys.resolve("crt/include").toString(),
                 "-I", sys.resolve("sdk/include/ucrt").toString());
         String llvmRc = System.getenv().getOrDefault("CN1_LLVM_RC", "llvm-rc");
-        Path buildDir = cmakeRoot.resolve("xbuild");
+        Path buildDir = cmakeRoot.resolve(uwp ? "xbuild-uwp" : "xbuild");
         Files.createDirectories(buildDir);
         runCommand(Arrays.asList("cmake", "-S", cmakeRoot.toString(), "-B", buildDir.toString(),
+                "-DCN1_WINDOWS_UWP=" + (uwp ? "ON" : "OFF"),
                 "-G", "Ninja",
                 "-DCMAKE_SYSTEM_NAME=Windows",
                 "-DCMAKE_SYSTEM_PROCESSOR=AMD64",

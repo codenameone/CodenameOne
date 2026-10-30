@@ -100,6 +100,11 @@ static unsigned __stdcall cn1_cp_log_reader_thread(void *arg) {
 }
 
 static void cn1_cp_log_install(void) {
+#if defined(CN1_WINDOWS_UWP)
+    /* The UWP CRT has no _pipe, and an app container has no stderr anyone
+     * reads; the crash record still works, only the log tail is empty. */
+    return;
+#else
     int pipefds[2];
     if (_pipe(pipefds, 4096, _O_BINARY) != 0) return;
     cn1_cp_stderr_dup_fd = _dup(_fileno(stderr));
@@ -115,6 +120,7 @@ static void cn1_cp_log_install(void) {
     HANDLE h = (HANDLE)_beginthreadex(NULL, 0, cn1_cp_log_reader_thread,
                                        (void *)(intptr_t)pipefds[0], 0, NULL);
     if (h != NULL) CloseHandle(h);
+#endif /* CN1_WINDOWS_UWP */
 }
 
 char * cn1_crash_protection_log_snapshot(void) {
@@ -139,7 +145,19 @@ char * cn1_crash_protection_log_snapshot(void) {
 
 static void cn1_cp_resolve_pending_path(void) {
     wchar_t *wlocal = NULL;
+#if defined(CN1_WINDOWS_UWP)
+    /* The package's own local folder: the only place the container may write. */
+    static wchar_t uwpLocal[MAX_PATH];
+    if (cn1UwpLocalFolder(uwpLocal, MAX_PATH)) {
+        wlocal = (wchar_t *)CoTaskMemAlloc(sizeof(uwpLocal));
+        if (wlocal != NULL) {
+            memcpy(wlocal, uwpLocal, sizeof(uwpLocal));
+        }
+    }
+    if (wlocal == NULL) {
+#else
     if (SHGetKnownFolderPath(&FOLDERID_LocalAppData, 0, NULL, &wlocal) != S_OK) {
+#endif
         snprintf(cn1_cp_pending_path, sizeof(cn1_cp_pending_path),
                  "C:\\Temp\\.cn1_pending_native_crash");
         cn1_cp_pending_path_set = 1;

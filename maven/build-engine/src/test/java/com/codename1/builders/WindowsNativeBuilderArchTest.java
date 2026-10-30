@@ -87,4 +87,51 @@ class WindowsNativeBuilderArchTest {
         assertTrue(withOptIn.contains("<uap:Capability Name=\"appointments\"/>"));
         assertFalse(withOptIn.contains("<rescap:Capability Name=\"appointments\"/>"));
     }
+
+    @Test
+    void xboxManifestIsAnAppContainerUwpPackage() {
+        BuildRequest request = new BuildRequest();
+        request.setPackageName("com.example.xbox");
+        request.setDisplayName("Pad, \"Test\"");
+        request.setVendor("Example");
+        request.setVersion("2.1");
+        String publisher = WindowsNativeBuilder.xboxPublisher(request);
+        // the display name's comma and quotes would make a different DN than the cert's
+        assertEquals("CN=Pad Test", publisher);
+        String manifest = WindowsNativeBuilder.buildXboxAppxManifest(request, "x64", publisher);
+        assertTrue(manifest.contains("Publisher=\"CN=Pad Test\""));
+        assertTrue(manifest.contains("<TargetDeviceFamily Name=\"Windows.Universal\""));
+        assertTrue(manifest.contains("Version=\"2.1.0.0\""));
+        assertTrue(manifest.contains("<Capability Name=\"internetClient\"/>"));
+        // Xbox runs nothing full trust outside the GDK
+        assertFalse(manifest.contains("runFullTrust"));
+        assertFalse(manifest.contains("FullTrustApplication"));
+
+        request.putArgument("windows.msix.publisher", "CN=Example, O=Example Ltd");
+        assertEquals("CN=Example, O=Example Ltd", WindowsNativeBuilder.xboxPublisher(request));
+    }
+
+    /// windows-cross-compile.yml installs and launches a UWP package on a Windows
+    /// runner, which has no makemsix and no build-engine build, so it packs with
+    /// this committed manifest. Pinning it to the generator keeps that run a test
+    /// of the manifest the builder actually ships.
+    @Test
+    void xboxSmokeManifestMatchesTheGenerator() throws Exception {
+        BuildRequest request = new BuildRequest();
+        request.setPackageName("com.codename1.uwpsmoke");
+        request.setDisplayName("UwpSmoke");
+        request.setVendor("Codename One");
+        request.setVersion("1.0");
+        String generated = WindowsNativeBuilder.buildXboxAppxManifest(request, "x64",
+                WindowsNativeBuilder.xboxPublisher(request));
+        java.io.InputStream in = getClass().getResourceAsStream("xbox-smoke-AppxManifest.xml");
+        java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+        byte[] buf = new byte[4096];
+        for (int n = in.read(buf); n > 0; n = in.read(buf)) {
+            bytes.write(buf, 0, n);
+        }
+        in.close();
+        assertEquals(generated, new String(bytes.toByteArray(), "UTF-8"),
+                "regenerate src/test/resources/com/codename1/builders/xbox-smoke-AppxManifest.xml");
+    }
 }

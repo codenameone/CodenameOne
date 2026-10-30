@@ -1,0 +1,55 @@
+[appendix]
+[#gaming-consoles]
+== Gaming consoles
+
+Codename One apps and games run on phones, desktops, the browser and TVs. Gaming
+consoles are a longer-term goal, and this appendix tracks where that work stands.
+Everything here is *experimental*: build hints, behaviour and packaging can change
+without notice, and nothing here is supported for production use.
+
+=== Why consoles are different
+
+A console doesn't run arbitrary binaries. Each platform holder controls which
+packages install, which SDK they're built with, and which APIs they may call. A
+retail console title also needs a publishing agreement with that platform holder,
+which gives access to its SDK, development hardware and certification process.
+None of that can be shipped as open source, so a console port has two parts:
+
+* The *portable* part, which belongs in Codename One itself: rendering through the
+platform's graphics stack, controller input mapped to Codename One's game actions,
+TV overscan reported as the display safe area, and an app model without a desktop
+window.
+* The *platform* part, which depends on each platform holder's SDK and terms and
+can't be published.
+
+=== Xbox in Developer Mode
+
+The first step is the one console that can be reached without a publishing
+agreement. Any retail Xbox can switch to Developer Mode and sideload UWP apps, and
+`windows.xbox=true` builds the native Windows port as such an app. See
+<<xbox-developer-mode>> for how to build and install it.
+
+What this target exercises:
+
+* The port running inside the Windows app container on a `CoreWindow`, with
+Direct2D rendering into a Direct3D swap chain instead of a desktop window.
+* Linking against `WindowsApp.lib` alone, which proves at build time that every
+system call the port makes exists inside the container.
+* The controller arriving as key events: the D-pad and left stick map to the four
+directions, *A* to fire and *B* to back, through `Display.getGameAction()`.
+* The visible bounds the console reports, exposed through
+`Display.getDisplaySafeArea()`.
+
+Continuous integration cross-compiles this target on Linux, then installs and
+launches the package on a Windows machine and checks that it reaches its first
+frame. Controller input and TV overscan can only be observed on a console, and
+haven't been verified on one.
+
+=== Beyond Developer Mode
+
+Developer Mode is a sandbox for testing, not a distribution channel: a game sold on
+Xbox is built with Microsoft's Game Development Kit under a publishing agreement,
+and PlayStation and Nintendo consoles likewise require their platform holder's
+SDK. The portable parts above (the windowless host, controller mapping, safe area,
+and game code from <<unity-interop-porting,Unity projects>> or `com.codename1.gaming`) are
+what such a port would reuse.

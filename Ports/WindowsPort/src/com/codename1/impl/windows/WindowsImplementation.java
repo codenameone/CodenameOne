@@ -2721,19 +2721,96 @@ public class WindowsImplementation extends CodenameOneImplementation {
         return 8;
     }
 
+    /* Windows virtual-key codes, which is what reaches Codename One unchanged
+     * from both hosts. The gamepad ones arrive only in the UWP (Xbox) build: a
+     * CoreWindow app gets the controller as keys, a Win32 window never does. */
+    private static final int VK_RETURN = 0x0D;
+    private static final int VK_LEFT = 0x25;
+    private static final int VK_UP = 0x26;
+    private static final int VK_RIGHT = 0x27;
+    private static final int VK_DOWN = 0x28;
+    private static final int VK_GAMEPAD_A = 0xC3;
+    private static final int VK_GAMEPAD_B = 0xC4;
+    private static final int VK_GAMEPAD_DPAD_UP = 0xCB;
+    private static final int VK_GAMEPAD_DPAD_DOWN = 0xCC;
+    private static final int VK_GAMEPAD_DPAD_LEFT = 0xCD;
+    private static final int VK_GAMEPAD_DPAD_RIGHT = 0xCE;
+    private static final int VK_GAMEPAD_LEFT_THUMBSTICK_UP = 0xD3;
+    private static final int VK_GAMEPAD_LEFT_THUMBSTICK_DOWN = 0xD4;
+    private static final int VK_GAMEPAD_LEFT_THUMBSTICK_RIGHT = 0xD5;
+    private static final int VK_GAMEPAD_LEFT_THUMBSTICK_LEFT = 0xD6;
+
+    /// B on a controller, the console's universal "back". A Win32 window never
+    /// receives it, so on the desktop this changes nothing.
     @Override
     public int getBackKeyCode() {
-        return -1;
+        return VK_GAMEPAD_B;
     }
 
+    /// The arrows and Return, plus the controller's D-pad, left stick and A.
+    ///
+    /// This used to answer 0 for everything, so no GAME_* comparison in Form, List
+    /// or any focus traversal ever matched on this port: the arrows did not move
+    /// focus and Return pressed no button. On an Xbox, where the controller is the
+    /// only input, an application could not be used at all.
     @Override
     public int getGameAction(int keyCode) {
-        return 0;
+        switch (keyCode) {
+            case VK_UP:
+            case VK_GAMEPAD_DPAD_UP:
+            case VK_GAMEPAD_LEFT_THUMBSTICK_UP:
+                return Display.GAME_UP;
+            case VK_DOWN:
+            case VK_GAMEPAD_DPAD_DOWN:
+            case VK_GAMEPAD_LEFT_THUMBSTICK_DOWN:
+                return Display.GAME_DOWN;
+            case VK_LEFT:
+            case VK_GAMEPAD_DPAD_LEFT:
+            case VK_GAMEPAD_LEFT_THUMBSTICK_LEFT:
+                return Display.GAME_LEFT;
+            case VK_RIGHT:
+            case VK_GAMEPAD_DPAD_RIGHT:
+            case VK_GAMEPAD_LEFT_THUMBSTICK_RIGHT:
+                return Display.GAME_RIGHT;
+            case VK_RETURN:
+            case VK_GAMEPAD_A:
+                return Display.GAME_FIRE;
+            default:
+                return 0;
+        }
     }
 
+    /// The reverse of `#getGameAction(int)`, answering with the keyboard key.
     @Override
     public int getKeyCode(int gameAction) {
-        return 0;
+        switch (gameAction) {
+            case Display.GAME_UP:
+                return VK_UP;
+            case Display.GAME_DOWN:
+                return VK_DOWN;
+            case Display.GAME_LEFT:
+                return VK_LEFT;
+            case Display.GAME_RIGHT:
+                return VK_RIGHT;
+            case Display.GAME_FIRE:
+                return VK_RETURN;
+            default:
+                return 0;
+        }
+    }
+
+    /// The main window minus the edges a television may crop (UWP/Xbox build
+    /// only); the whole window everywhere else.
+    @Override
+    public com.codename1.ui.geom.Rectangle getDisplaySafeArea(com.codename1.ui.geom.Rectangle rect) {
+        rect = super.getDisplaySafeArea(rect);
+        int[] insets = new int[4];
+        if (WindowsNative.safeAreaInsets(insets)) {
+            rect.setBounds(insets[0], insets[1],
+                    Math.max(0, rect.getWidth() - insets[0] - insets[2]),
+                    Math.max(0, rect.getHeight() - insets[1] - insets[3]));
+        }
+        return rect;
     }
 
     /* ------------------------------------------------------------ network */

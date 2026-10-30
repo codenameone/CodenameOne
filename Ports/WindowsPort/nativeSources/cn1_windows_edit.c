@@ -38,7 +38,7 @@
 
 #include "cn1_windows.h"
 
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(CN1_WINDOWS_UWP) /* desktop only: stubbed for UWP in cn1_windows_uwp_stubs.c */
 
 #define CN1_EDIT_OP_CREATE  1
 #define CN1_EDIT_OP_DESTROY 2

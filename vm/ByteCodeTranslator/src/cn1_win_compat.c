@@ -401,7 +401,16 @@ long long cn1_win_available_memory(void) {
 }
 
 int cn1_win_cpu_count(void) {
+#if defined(WINAPI_FAMILY) && (WINAPI_FAMILY == WINAPI_FAMILY_APP)
+    /* GetActiveProcessorCount is desktop only. A UWP app (the Xbox target) is
+     * never spread over processor groups, so the system info count is the same
+     * number there. */
+    SYSTEM_INFO info;
+    GetNativeSystemInfo(&info);
+    return (int) info.dwNumberOfProcessors;
+#else
     return (int) GetActiveProcessorCount(ALL_PROCESSOR_GROUPS);
+#endif
 }
 
 void cn1_win_current_stack_limits(void** low, void** high) {
