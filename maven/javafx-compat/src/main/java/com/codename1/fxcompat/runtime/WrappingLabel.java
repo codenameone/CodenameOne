@@ -61,11 +61,13 @@ public class WrappingLabel extends com.codename1.ui.Label {
             out.add("");
             return out;
         }
+        // A tab breaks a line as a space does, in layout and paint alike.
+        String t = text.replace('\t', ' ');
         int start = 0;
         while (true) {
-            int nl = text.indexOf('\n', start);
-            int end = nl < 0 ? text.length() : nl;
-            breakParagraph(font, text.substring(start, end), width, out);
+            int nl = t.indexOf('\n', start);
+            int end = nl < 0 ? t.length() : nl;
+            breakParagraph(font, t.substring(start, end), width, out);
             if (nl < 0) {
                 break;
             }
@@ -128,7 +130,7 @@ public class WrappingLabel extends com.codename1.ui.Label {
     /// breaking measures substrings and a list repaints every frame.
     private List<String> cachedLines(Font f, String text, int width) {
         if (cachedLines == null || width != cachedWidth || f != cachedFont || !text.equals(cachedText)) {
-            cachedLines = lines(f, text.replace('\t', ' '), width);
+            cachedLines = lines(f, text, width);
             cachedText = text;
             cachedFont = f;
             cachedWidth = width;
