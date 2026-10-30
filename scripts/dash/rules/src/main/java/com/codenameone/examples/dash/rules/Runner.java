@@ -84,7 +84,9 @@ public final class Runner {
         return z / Track.UNIT + points;
     }
 
-    boolean took(int entry) {
+    /// Whether this runner already collected, or crashed through, track entry
+    /// `entry`. The renderer hides what the player took.
+    public boolean took(int entry) {
         int w = entry >>> 5;
         return w < taken.length && (taken[w] & (1 << (entry & 31))) != 0;
     }

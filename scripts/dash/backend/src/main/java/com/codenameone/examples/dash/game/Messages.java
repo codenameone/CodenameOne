@@ -42,17 +42,23 @@ final class Messages {
     static String start(RaceRoom room, int you, long startIn) {
         StringBuilder names = new StringBuilder();
         StringBuilder runners = new StringBuilder();
+        StringBuilder players = new StringBuilder();
         for (int i = 0; i < room.seats.length; i++) {
             if (i > 0) {
                 names.append(',');
                 runners.append(',');
+                players.append(',');
             }
             names.append(Json.write(room.seats[i].name));
             runners.append(Json.write(room.seats[i].runner));
+            // A bot has no account, so no username: an empty one, which a
+            // client knows not to call.
+            String u = room.seats[i].username;
+            players.append(Json.write(u == null ? "" : u));
         }
         return "{\"type\":\"" + GameProtocol.START + "\",\"race\":\"" + room.id + "\",\"level\":"
                 + Json.write(room.level) + ",\"seed\":\"" + room.run.seed() + "\",\"you\":" + you
-                + ",\"names\":[" + names + "],\"runners\":[" + runners + "],\"rules\":"
+                + ",\"names\":[" + names + "],\"runners\":[" + runners + "],\"players\":[" + players + "],\"rules\":"
                 + Json.write(RulesVersion.ID) + ",\"tick\":" + room.run.tick() + ",\"startIn\":"
                 + Math.max(0, startIn) + ",\"log\":" + Json.write(inputs(room.log, 0)) + "}";
     }
@@ -66,17 +72,24 @@ final class Messages {
         return "{\"type\":\"" + GameProtocol.HASH + "\",\"t\":" + tick + ",\"h\":\"" + Long.toHexString(hash) + "\"}";
     }
 
-    static String party(String code, String url, String level, String host, List<String> names) {
+    /// `players` are the members' usernames, in the order of `names`: what a
+    /// client addresses voice signaling to.
+    static String party(String code, String url, String level, String host, List<String> names,
+            List<String> players) {
+        return "{\"type\":\"" + GameProtocol.PARTY + "\",\"code\":" + Json.write(code) + ",\"url\":"
+                + Json.write(url) + ",\"level\":" + Json.write(level) + ",\"host\":" + Json.write(host)
+                + ",\"names\":[" + array(names) + "],\"players\":[" + array(players) + "]}";
+    }
+
+    private static String array(List<String> items) {
         StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < names.size(); i++) {
+        for (int i = 0; i < items.size(); i++) {
             if (i > 0) {
                 sb.append(',');
             }
-            sb.append(Json.write(names.get(i)));
+            sb.append(Json.write(items.get(i)));
         }
-        return "{\"type\":\"" + GameProtocol.PARTY + "\",\"code\":" + Json.write(code) + ",\"url\":"
-                + Json.write(url) + ",\"level\":" + Json.write(level) + ",\"host\":" + Json.write(host)
-                + ",\"names\":[" + sb + "]}";
+        return sb.toString();
     }
 
     static String emote(String from, String id) {

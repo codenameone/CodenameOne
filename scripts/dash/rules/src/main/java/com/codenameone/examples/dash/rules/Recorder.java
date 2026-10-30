@@ -25,8 +25,14 @@ public final class Recorder {
     private final Replay replay;
 
     public Recorder(Run run) {
+        this(run, run.level().id);
+    }
+
+    /// Records under `levelId`, which for a community level is its content
+    /// reference (`pack@hash#level`) rather than the bare id the level carries.
+    public Recorder(Run run, String levelId) {
         this.run = run;
-        this.replay = new Replay(run.level().id, run.level().contentHash(), run.seed(), run.runnerCount());
+        this.replay = new Replay(levelId, run.level().contentHash(), run.seed(), run.runnerCount());
     }
 
     public void step(int[] inputs) {

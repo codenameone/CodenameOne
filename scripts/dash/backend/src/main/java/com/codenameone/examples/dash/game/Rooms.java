@@ -277,10 +277,12 @@ public class Rooms {
 
     private static String partyMessage(Party party) {
         List<String> names = new ArrayList<String>();
+        List<String> players = new ArrayList<String>();
         for (Waiting w : party.members) {
             names.add(w.profile.getDisplayName());
+            players.add(w.profile.getUsername());
         }
-        return Messages.party(party.code, party.url, party.level, party.host, names);
+        return Messages.party(party.code, party.url, party.level, party.host, names, players);
     }
 
     // ------------------------------------------------------------ quick races

@@ -1,0 +1,108 @@
+= Dash
+
+A real-time card battler and its server, in one Maven project and one language.
+Two players drop troops, buildings and spells onto a small 3D field, and the first
+to topple the other's towers wins. Around the battle is what a live game needs:
+accounts, deck building, matchmaking and challenge links, replays, a training
+battle, levels, daily quests, chests and achievements, a shop with in-app
+purchases and rewarded ads, push notifications, and a console for moderating
+players.
+
+The rules of the game are one module, `rules`, that the app, the server and the
+tests all compile. It uses no floating point and no clock, so a battle plays out
+identically on a phone, on the server and in a replay.
+
+It is a sample of what Codename One does for games, and the project the
+Initializr generates when you start from the card-battler template.
+
+== Start here
+
+One chapter of the developer guide covers this project:
+
+* https://www.codenameone.com/developer-guide/#dash-implementors-guide[The Dash chapter]
+  (link:../../docs/developer-guide/Dash-Implementors-Guide.asciidoc[source])
+  tours what the game does screen by screen, with the demo accounts, then
+  explains how it is built and what to change to make it yours: new cards and
+  their models, balance, the look, store products, ads, push and moderation.
+
+== The modules
+
+[cols="1,3"]
+|===
+| Module | What it holds
+
+| `rules` | The deterministic simulation: cards, arena, units, the bot, replays.
+| `shared` | The data transfer objects and `@RestClient` interfaces.
+| `common` | The app: the 3D battle, the menus, the store, the admin console.
+| `backend` | The server: accounts, matchmaking, the authoritative match rooms,
+  replays, progression, receipts, push and moderation.
+| `ios` | The iOS build, for generating the Xcode project.
+|===
+
+== Running it
+
+Start the server on the development profile. It needs nothing installed: the
+database is in memory, purchases and push notifications are simulated, and the
+demo accounts `player@`, `rival@`, `trouble@` and `admin@dash.example` exist,
+each with the password `dash-demo`.
+
+[source,bash]
+----
+CN1_PROFILE=dev backend/server.sh run
+----
+
+Then run the app in the simulator:
+
+[source,bash]
+----
+mvn verify -Psimulator -DskipTests -Dcodename1.platform=javase
+----
+
+The app looks for the server at `http://localhost:8080/`; *Settings* changes it.
+`backend/server.sh run --port N` serves on another port.
+
+For the native iOS app, generate the Xcode project on a Mac, open it and run it
+from Xcode:
+
+[source,bash]
+----
+mvn package -DskipTests -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-source -Dopen=false
+----
+
+== Tests
+
+[source,bash]
+----
+mvn -pl rules test   # <1>
+mvn -pl rules,shared,backend -Dcodename1.platform=backend test   # <2>
+./run-e2e.sh   # <3>
+./check-template.sh   # <4>
+----
+<1> Determinism: the same seed and plays give the same battle, the golden
+    replays still end the way they were recorded, and bot-against-bot soaks
+    keep the invariants.
+<2> The server's tests: whole online matches over its sockets, receipts,
+    progression and moderation.
+<3> Starts the server on the `test` profile and runs the app's tests against it
+    in the simulator. The screenshots the developer guide shows land in
+    `target/e2e-shots`.
+<4> Generates a project from the Initializr template, under another name and
+    package, and builds it.
+
+`.github/workflows/dash.yml` runs them, and builds the app for Android and
+iOS.
+
+== The Initializr template
+
+`scripts/sync-initializr-template.py dash --write` copies this project into the
+Initializr's resources; without `--write` it fails when they differ, which is what
+CI runs. Change the project here, never the copies.
+
+== Licence
+
+Dash is released under MIT No Attribution (see `LICENSE`), not under the
+GPLv2 with Classpath Exception that covers Codename One itself. Take any of it
+into your own application, under any licence, with no notice to keep.
+
+The characters and buildings in `common/src/main/resources/model_*.glb` are KayKit
+models by Kay Lousberg (https://kaylousberg.com), released under CC0.
