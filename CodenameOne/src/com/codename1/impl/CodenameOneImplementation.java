@@ -8074,13 +8074,15 @@ public abstract class CodenameOneImplementation {
         InputStream i = null; //NOPMD CloseResource
         try {
             i = createStorageInputStream(name);
-            long val = i.skip(1000000);
-            if (val > -1) {
-                size = 0;
-                while (val > -1) {
-                    size += val;
-                    val = i.skip(1000000);
-                }
+            // Counted with read(), never skip(): skip() answers 0 at the end
+            // of a stream, not -1, so a loop waiting for -1 from it never
+            // ended on a stream that honours that contract.
+            byte[] buffer = new byte[8192];
+            size = 0;
+            int val = i.read(buffer);
+            while (val > -1) {
+                size += val;
+                val = i.read(buffer);
             }
         } catch (IOException err) {
             Log.e(err);
