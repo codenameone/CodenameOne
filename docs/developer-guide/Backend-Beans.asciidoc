@@ -419,11 +419,7 @@ beside the client parts:
 +
 [source,xml]
 ----
-<dependency>
-  <groupId>com.example</groupId>
-  <artifactId>notelib-backend</artifactId>
-  <version>1.0</version>
-</dependency>
+include::../demos/common/src/main/snippets/developer-guide/backend-beans.xml[tag=backend-beans-library-dependency,indent=0]
 ----
 * A Gradle cn1lib puts the server classes in `src/backend/java` and publishes
   them as `<library>-backend`, marked.
