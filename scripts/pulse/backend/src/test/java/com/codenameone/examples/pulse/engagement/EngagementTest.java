@@ -73,7 +73,7 @@ class EngagementTest {
         Preference row = new Preference();
         row.setUsername(account);
         row.setTheme("system");
-        row.setUnits("metric");
+        row.setUnits("km");
         row.setNotifyClasses(true);
         row.setNotifyPromotions(true);
         row.setQuietFrom(0);
