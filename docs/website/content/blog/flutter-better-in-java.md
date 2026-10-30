@@ -143,6 +143,10 @@ dashboard.add(new Button("Also Codename One"));
 dashboard.show();
 ```
 
+## Similar in spirit
+
+Flutter and Codename One made the same bet. Neither wraps the platform's widgets. Both draw every component themselves on a lightweight surface, so a screen looks and behaves the same on every device and you control it to the pixel. That shared architecture is why a Flutter widget tree maps onto Codename One so naturally. The differences are in what sits around that core: the threading model, how apps are built and how features ship.
+
 ## Can't Flutter do the same?
 
 No. Flutter could, in theory, run a Codename One app the way we run a Flutter app. It would be slow, because the two models point in opposite directions.
@@ -152,6 +156,31 @@ Flutter is asynchronous to the core. Dart runs in an event loop, platform calls 
 The same reason explains why Flutter can't catch Codename One on most platforms. Operating systems, graphics APIs and hardware are synchronous. Codename One calls them directly. Flutter goes through a message channel and its own engine to reach them.
 
 Android makes it obvious. The native platform on Android is Java. Codename One compiles to it and talks to Android the way Android expects. Flutter avoids it, shipping its own VM and engine beside the one the phone already has. That's why Android shows the biggest gap: a third of the start-up time and a quarter of the code.
+
+## Two differences you feel every day
+
+The threading model shows up in the benchmarks. These two don't, but you notice them every day you work.
+
+### Builders
+
+A Codename One app is a Java project. The build of a native app happens in a builder: our cloud build servers or a local build, which take your compiled code and produce the iOS, Android or desktop binary. That moves the hard part of the developer experience into our hands:
+
+- **Build iOS apps from Windows or Linux.** The cloud builder holds the Mac, Xcode and the signing steps. You don't need to own a Mac to ship to the App Store.
+- **Cheap CI.** Your unit and UI tests run in Java, in the simulator, on any CI runner. No emulator to boot and no macOS runner to pay for on every commit.
+- **New features without migration work.** When Apple or Google change a requirement, or we add a capability, we update the builder. Your project picks it up on the next build, with nothing to upgrade or reconfigure.
+
+### Everything in one place
+
+Codename One used to aim for a modular core, with features broken out into cn1libs. Flutter is going through that phase now, moving pieces such as its Material and Cupertino themes out of the framework into independent packages. We went the opposite way. The Codename One core now covers what Flutter does, plus most of what people reach for in Flutter's most popular packages, and this week's posts add more.
+
+That isn't bloat, because you don't pay for what you don't use. ParparVM drops every class your app doesn't reach, which is how the builds above stay smaller than Flutter's. What you get instead:
+
+- **One version.** No matrix of package versions to keep compatible, and no upgrade that breaks because two packages disagree.
+- **Nothing abandoned.** No package your app depends on that its author stopped maintaining two years ago.
+- **A short supply chain.** Your app's dependencies are one project, not a tree of packages from strangers.
+- **Everything moves together.** When we fix rendering, add a platform or change the build, every feature comes along, including the niche ones.
+- **One source of truth.** The developer guide documents all of it, and when something breaks there is one team responsible for the answer.
+
 
 ## We can finally show the code
 
