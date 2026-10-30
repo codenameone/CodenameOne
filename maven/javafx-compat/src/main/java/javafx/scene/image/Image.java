@@ -209,6 +209,12 @@ public class Image {
     /// Has a view told when the pixels change: a decoded image never
     /// changes, a remote one changes once, when it arrives.
     void addPixelListener(Runnable listener) {
+        // Only a remote load still under way changes; holding a view's
+        // listener for any other image would keep that view reachable for
+        // as long as the image is.
+        if (!pending) {
+            return;
+        }
         if (listeners == null) {
             listeners = new java.util.ArrayList<Runnable>();
         }
@@ -224,11 +230,16 @@ public class Image {
 
     private java.util.ArrayList<Runnable> listeners;
 
+    /// Whether a remote picture is still on its way.
+    private boolean pending;
+
     private void firePixelsChanged() {
+        pending = false;
         if (listeners == null) {
             return;
         }
         Runnable[] all = listeners.toArray(new Runnable[listeners.size()]);
+        listeners = null;
         for (Runnable r : all) {
             r.run();
         }
@@ -237,12 +248,14 @@ public class Image {
     /// Fetches a remote picture into `Storage`, or reads it from there when
     /// an earlier run fetched it, and applies it on the EDT.
     private void download(final String remote) {
+        pending = true;
+        final String key = storageKey(remote);
         com.codename1.io.ConnectionRequest req = new com.codename1.io.ConnectionRequest(remote, false);
         // A missing picture is the image's error, never the application's
         // global network error dialog.
         req.setFailSilently(true);
         req.setReadResponseForErrors(false);
-        req.downloadImageToStorage(storageKey(remote), new com.codename1.util.SuccessCallback<com.codename1.ui.Image>() {
+        req.downloadImageToStorage(key, new com.codename1.util.SuccessCallback<com.codename1.ui.Image>() {
             @Override
             public void onSucess(com.codename1.ui.Image value) {
                 try {
@@ -251,8 +264,10 @@ public class Image {
                     }
                     apply(value);
                 } catch (IOException failed) {
+                    forget(key);
                     fail(failed);
                 } catch (RuntimeException failed) {
+                    forget(key);
                     fail(failed);
                 }
                 firePixelsChanged();
@@ -260,11 +275,23 @@ public class Image {
         }, new com.codename1.util.FailureCallback<com.codename1.ui.Image>() {
             @Override
             public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
+                forget(key);
                 fail(new IOException("Could not load " + remote + " (" + errorCode + "): "
                         + (err != null ? err.toString() : errorMessage)));
                 firePixelsChanged();
             }
         }, true);
+    }
+
+    /// Drops a cached entry that did not decode or was cut short, so the
+    /// next request downloads the picture again instead of failing on the
+    /// same bytes for good.
+    private static void forget(String key) {
+        try {
+            com.codename1.io.Storage.getInstance().deleteStorageFile(key);
+        } catch (RuntimeException ignored) {
+            // Nothing cached to drop.
+        }
     }
 
     /// A `Storage` name for a URL: storage names are flat and short, so the

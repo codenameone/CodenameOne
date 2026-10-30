@@ -32,6 +32,10 @@ import javafx.beans.value.ObservableValue;
 /// The value behind `ObservableValue.map`, `flatMap` and `orElse`: computed
 /// from its source when asked, and invalid whenever the source (or, for
 /// `flatMap`, the value the source maps to) is.
+///
+/// As in JavaFX, it observes its source only while something observes it:
+/// a value mapped and dropped (in a cell's `updateItem`, say) adds nothing to
+/// the source and can be collected.
 public final class DerivedValue<S, U> implements ObservableValue<U> {
 
     private static final int MAP = 0;
@@ -44,6 +48,9 @@ public final class DerivedValue<S, U> implements ObservableValue<U> {
     private final int kind;
     private ValueListeners<U> helper;
     private ObservableValue<?> inner;
+    /// The listeners registered here, so the source is observed exactly
+    /// while there is at least one.
+    private final java.util.ArrayList<Object> registered = new java.util.ArrayList<Object>();
     private final InvalidationListener relay = new InvalidationListener() {
         @Override
         public void invalidated(Observable observable) {
@@ -59,9 +66,25 @@ public final class DerivedValue<S, U> implements ObservableValue<U> {
         this.function = function;
         this.other = other;
         this.kind = kind;
-        source.addListener(relay);
-        if (kind == FLAT) {
-            follow();
+    }
+
+    private void registered(Object listener) {
+        registered.add(listener);
+        if (registered.size() == 1) {
+            source.addListener(relay);
+            if (kind == FLAT) {
+                follow();
+            }
+        }
+    }
+
+    private void unregistered(Object listener) {
+        if (registered.remove(listener) && registered.isEmpty()) {
+            source.removeListener(relay);
+            if (inner != null) {
+                inner.removeListener(relay);
+                inner = null;
+            }
         }
     }
 
@@ -95,7 +118,7 @@ public final class DerivedValue<S, U> implements ObservableValue<U> {
                 inner.removeListener(relay);
             }
             inner = next;
-            if (inner != null) {
+            if (inner != null && !registered.isEmpty()) {
                 inner.addListener(relay);
             }
         }
@@ -116,6 +139,11 @@ public final class DerivedValue<S, U> implements ObservableValue<U> {
             case OR_ELSE:
                 return v == null ? other : (U) v;
             case FLAT:
+                if (registered.isEmpty()) {
+                    // Unobserved: asked fresh, nothing subscribed.
+                    Object o = v == null ? null : function.apply(v);
+                    return o instanceof ObservableValue ? (U) ((ObservableValue<?>) o).getValue() : null;
+                }
                 follow();
                 return inner == null ? null : (U) inner.getValue();
             default:
@@ -126,20 +154,24 @@ public final class DerivedValue<S, U> implements ObservableValue<U> {
     @Override
     public void addListener(InvalidationListener listener) {
         helper = ValueListeners.add(helper, this, listener);
+        registered(listener);
     }
 
     @Override
     public void removeListener(InvalidationListener listener) {
         helper = ValueListeners.remove(helper, listener);
+        unregistered(listener);
     }
 
     @Override
     public void addListener(ChangeListener<? super U> listener) {
         helper = ValueListeners.add(helper, this, listener);
+        registered(listener);
     }
 
     @Override
     public void removeListener(ChangeListener<? super U> listener) {
         helper = ValueListeners.remove(helper, listener);
+        unregistered(listener);
     }
 }

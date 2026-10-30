@@ -119,12 +119,31 @@ public class WrappingLabel extends com.codename1.ui.Label {
         }
     }
 
+    private String cachedText;
+    private Font cachedFont;
+    private int cachedWidth = -1;
+    private List<String> cachedLines;
+
+    /// The lines of the last paint, kept while text, font and width stay:
+    /// breaking measures substrings and a list repaints every frame.
+    private List<String> cachedLines(Font f, String text, int width) {
+        if (cachedLines == null || width != cachedWidth || f != cachedFont || !text.equals(cachedText)) {
+            cachedLines = lines(f, text.replace('\t', ' '), width);
+            cachedText = text;
+            cachedFont = f;
+            cachedWidth = width;
+        }
+        return cachedLines;
+    }
+
     @Override
     public void paint(Graphics g) {
         String text = getText();
         Style s = getStyle();
         Font f = s.getFont();
-        if (!wrap || f == null || text == null || text.length() == 0) {
+        // An icon on the native label is drawn by the single line path; the
+        // layer places a graphic as a child node, so a wrapping label has none.
+        if (!wrap || f == null || text == null || text.length() == 0 || getIcon() != null) {
             super.paint(g);
             return;
         }
@@ -137,7 +156,7 @@ public class WrappingLabel extends com.codename1.ui.Label {
             super.paint(g);
             return;
         }
-        List<String> lines = lines(f, text, area);
+        List<String> lines = cachedLines(f, text, area);
         int lh = f.getHeight();
         int block = lh * lines.size();
         int y = getY() + top + Math.max(0, (getHeight() - top - bottom - block) / 2);

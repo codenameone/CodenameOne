@@ -101,6 +101,54 @@ public class RemoteImageTest {
     }
 
     @Test
+    public void corruptCachedEntryFailsOnceAndIsDropped() throws Exception {
+        String url = "https://example.invalid/corrupt.png";
+        OutputStream out = Storage.getInstance().createOutputStream(cacheKey(url));
+        out.write(new byte[] {1, 2, 3, 4, 5});
+        out.close();
+        final Image image = new Image(url);
+        waitFor(image);
+        assertTrue("undecodable bytes are an error", image.isError());
+        assertFalse("and are not served again", Storage.getInstance().exists(cacheKey(url)));
+    }
+
+    @Test
+    public void cachedRemoteImageIsScaledToTheRequestedSize() throws Exception {
+        String url = "https://example.invalid/scaled.png";
+        seed(url, 20, 10);
+        final Image image = new Image(url, 10, 0, true, false, true);
+        waitFor(image);
+        assertFalse(String.valueOf(image.getException()), image.isError());
+        assertEquals(10, image.getWidth(), 0);
+        assertEquals(5, image.getHeight(), 0);
+    }
+
+    private static void seed(String url, int w, int h) throws Exception {
+        java.awt.image.BufferedImage picture = new java.awt.image.BufferedImage(w, h,
+                java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        ByteArrayOutputStream png = new ByteArrayOutputStream();
+        javax.imageio.ImageIO.write(picture, "png", png);
+        OutputStream out = Storage.getInstance().createOutputStream(cacheKey(url));
+        out.write(png.toByteArray());
+        out.close();
+    }
+
+    private static void waitFor(final Image image) {
+        com.codename1.ui.Display.getInstance().invokeAndBlock(new Runnable() {
+            @Override
+            public void run() {
+                for (int i = 0; i < 500 && image.getProgress() < 1 && !image.isError(); i++) {
+                    try {
+                        Thread.sleep(10);
+                    } catch (InterruptedException stop) {
+                        return;
+                    }
+                }
+            }
+        });
+    }
+
+    @Test
     public void storageKeysAreFlatAndDistinct() {
         String a = cacheKey("https://example.com/a/b/c.png?x=1");
         String b = cacheKey("https://example.com/a/b/c.png?x=2");

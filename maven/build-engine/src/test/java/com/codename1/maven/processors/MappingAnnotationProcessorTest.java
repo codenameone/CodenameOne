@@ -233,6 +233,52 @@ public class MappingAnnotationProcessorTest {
     }
 
     @Test
+    public void genericSuperclassFieldsAreSkippedNotMistyped() throws Exception {
+        File classes = tmp.newFolder("classes");
+        Map<String, String> sources = new LinkedHashMap<String, String>();
+        sources.put("com.example.Holder",
+                "package com.example;\n"
+                        + "import java.util.List;\n"
+                        + "public abstract class Holder<T> {\n"
+                        + "    private T value;\n"
+                        + "    private List<T> values;\n"
+                        + "    private String label;\n"
+                        + "    public T getValue() { return value; }\n"
+                        + "    public void setValue(T v) { value = v; }\n"
+                        + "    public List<T> getValues() { return values; }\n"
+                        + "    public void setValues(List<T> v) { values = v; }\n"
+                        + "    public String getLabel() { return label; }\n"
+                        + "    public void setLabel(String v) { label = v; }\n"
+                        + "}\n");
+        sources.put("com.example.NameHolder",
+                "package com.example;\n"
+                        + "import com.codename1.annotations.Mapped;\n"
+                        + "@Mapped public class NameHolder extends Holder<String> {\n"
+                        + "    public NameHolder() {}\n"
+                        + "}\n");
+        JavaSourceCompiler.compile(sources, classes, Arrays.asList(testClassesDir()));
+        runProcessorOrFail(classes);
+
+        try (URLClassLoader cl = childLoader(classes)) {
+            Class<?> cls = cl.loadClass("com.example.NameHolder");
+            Class<?> mapperCls = cl.loadClass("com.example.NameHolderCn1Mapper");
+            Object mapper = mapperCls.newInstance();
+            Map<String, Object> in = new LinkedHashMap<String, Object>();
+            in.put("label", "l");
+            in.put("value", "v");
+            Object o = mapperCls.getMethod("fromMap", Map.class).invoke(mapper, in);
+            assertEquals("l", cls.getMethod("getLabel").invoke(o));
+            // The type-variable fields are left alone rather than mapped as Object.
+            assertEquals(null, cls.getMethod("getValue").invoke(o));
+            @SuppressWarnings("unchecked")
+            Map<String, Object> out = (Map<String, Object>) mapperCls.getMethod("toMap", cls).invoke(mapper, o);
+            assertEquals("l", out.get("label"));
+            assertFalse(out.containsKey("value"));
+            assertFalse(out.containsKey("values"));
+        }
+    }
+
+    @Test
     public void enumFieldsRoundTripThroughJson() throws Exception {
         File classes = tmp.newFolder("classes");
         Map<String, String> sources = new LinkedHashMap<String, String>();

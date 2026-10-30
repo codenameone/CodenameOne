@@ -203,6 +203,15 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
             List<FieldInfo> own = new ArrayList<FieldInfo>();
             for (FieldInfo f : c.getFields()) {
                 if (f.isStatic() || !seenNames.add(f.getName())) continue;
+                if (c != cls && usesTypeVariable(f)) {
+                    // Base<T>'s `T value` is erased here: its type depends on
+                    // the subclass's type arguments, which this pass does not
+                    // resolve, so mapping it would read or write the wrong type.
+                    ctx.getLog().warn("cn1: @Mapped skipping inherited field " + f.getName()
+                            + " of " + c.getBinaryName() + " on " + cls.getBinaryName()
+                            + " (its type is a type variable of the superclass)");
+                    continue;
+                }
                 own.add(f);
             }
             allFields.addAll(0, own);
@@ -1579,6 +1588,24 @@ public final class MappingAnnotationProcessor extends AbstractAnnotationProcesso
             }
         }
         return null;
+    }
+
+    /// Whether a field's generic signature names a type variable (`TT;`),
+    /// anywhere, including as a type argument (`Ljava/util/List<TT;>;`).
+    static boolean usesTypeVariable(FieldInfo f) {
+        String sig = f.getSignature();
+        if (sig == null) {
+            return false;
+        }
+        for (int i = 0; i < sig.length(); i++) {
+            char c = sig.charAt(i);
+            if (c == 'T' && (i == 0 || sig.charAt(i - 1) == '<' || sig.charAt(i - 1) == ';'
+                    || sig.charAt(i - 1) == '[' || sig.charAt(i - 1) == '+' || sig.charAt(i - 1) == '-'
+                    || sig.charAt(i - 1) == '*')) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean hasInstanceMethod(AnnotatedClass cls, String name, String descriptor) {
