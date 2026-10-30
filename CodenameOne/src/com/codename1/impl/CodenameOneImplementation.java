@@ -8060,7 +8060,10 @@ public abstract class CodenameOneImplementation {
     /// the names of all the storage files
     public abstract String[] listStorageEntries();
 
-    /// Returns the size of the entry in bytes
+    /// Returns the size of the entry in bytes, asked of the platform's own
+    /// storage. Every implementation answers it directly: reading the entry
+    /// through to count it was what a missing override cost, and a large
+    /// cached download made that painfully slow.
     ///
     /// #### Parameters
     ///
@@ -8068,29 +8071,9 @@ public abstract class CodenameOneImplementation {
     ///
     /// #### Returns
     ///
-    /// the size
-    public int getStorageEntrySize(String name) {
-        long size = -1;
-        InputStream i = null; //NOPMD CloseResource
-        try {
-            i = createStorageInputStream(name);
-            // Counted with read(), never skip(): skip() answers 0 at the end
-            // of a stream, not -1, so a loop waiting for -1 from it never
-            // ended on a stream that honours that contract.
-            byte[] buffer = new byte[8192];
-            size = 0;
-            int val = i.read(buffer);
-            while (val > -1) {
-                size += val;
-                val = i.read(buffer);
-            }
-        } catch (IOException err) {
-            Log.e(err);
-        } finally {
-            Util.cleanup(i);
-        }
-        return (int) size;
-    }
+    /// the size; 0 or -1 when there is no such entry, so a caller that must
+    /// tell a missing entry from an empty one asks `storageFileExists`
+    public abstract int getStorageEntrySize(String name);
 
     /// Returns the filesystem roots from which the structure of the file system
     /// can be traversed

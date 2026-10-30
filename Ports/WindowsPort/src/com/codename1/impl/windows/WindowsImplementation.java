@@ -3056,6 +3056,15 @@ public class WindowsImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public int getStorageEntrySize(String name) {
+        String path = storagePath(name);
+        if (!WindowsNative.fileExists(path)) {
+            return -1;
+        }
+        return (int) WindowsNative.fileLength(path);
+    }
+
+    @Override
     public boolean storageFileExists(String name) {
         return WindowsNative.fileExists(storagePath(name));
     }

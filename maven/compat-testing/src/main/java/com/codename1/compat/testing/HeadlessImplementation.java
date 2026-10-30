@@ -1457,6 +1457,12 @@ public class HeadlessImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public int getStorageEntrySize(java.lang.String a0) {
+        byte[] b = STORAGE.get(a0);
+        return b == null ? -1 : b.length;
+    }
+
+    @Override
     public boolean storageFileExists(java.lang.String a0) {
         return STORAGE.containsKey(a0);
     }
