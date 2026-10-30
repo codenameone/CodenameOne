@@ -22,6 +22,7 @@ on:
       - 'scripts/wayline/common/src/test/**'
       - 'scripts/savor/common/src/test/**'
       - 'scripts/skirmish/common/src/test/**'
+      - 'scripts/dash/common/src/test/**'
       - 'scripts/parley/common/src/test/**'
       - 'scripts/reel/common/src/test/**'
       - 'scripts/bastion/common/src/test/**'
@@ -44,7 +45,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        template: [BAREBONES, KOTLIN, WAYLINE, SAVOR, SKIRMISH, PARLEY, BASTION, REEL]
+        template: [BAREBONES, KOTLIN, WAYLINE, SAVOR, SKIRMISH, DASH, PARLEY, BASTION, REEL]
         java: ['17']
         # Developers download on current JDKs too: Kotlin 1.6.0 crashed on 25
         # ("IllegalArgumentException: 25") while every 17 leg was green.

@@ -135,6 +135,11 @@ Skirmish sample 3D models (scripts/skirmish/common/src/main/resources/model_*.gl
   Hexagon Pack and Halloween Bits by Kay Lousberg (www.kaylousberg.com),
   released under CC0 1.0. Repacked by scripts/skirmish/tools/pack-models.py.
 
+Dash sample 3D models (scripts/dash/common/src/main/resources/model_*.glb)
+  KayKit Character Pack: Adventurers, Character Pack: Skeletons, Medieval
+  Hexagon Pack and Halloween Bits by Kay Lousberg (www.kaylousberg.com), released under CC0 1.0.
+  Repacked by scripts/dash/tools/pack-models.py.
+
 ================================================================================
 .NET Standard reference assembly
 ================================================================================

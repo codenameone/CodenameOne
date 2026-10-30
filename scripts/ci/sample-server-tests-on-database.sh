@@ -93,7 +93,7 @@ print("\n".join([user, password, p.hostname or "localhost", str(p.port or 3306),
 
 cd "$SAMPLE"
 reset_schema
-# A sample whose server depends on another reactor module (Skirmish's rules)
+# A sample whose server depends on another reactor module (Skirmish and Dash rules)
 # builds it in the same run; -pl alone would resolve it from the repository.
 MODULES=shared,backend
 if [ -f rules/pom.xml ]; then

@@ -130,6 +130,7 @@ public final class Content {
         return d;
     }
 
+    // tag::dash-causeway[]
     /// Opens side-on and swings into the chase camera at 300 metres, where the
     /// lanes appear: the faux-2D-to-3D level.
     public static LevelDef causeway() {
@@ -149,6 +150,7 @@ public final class Content {
         d.chunks.addAll(chunks());
         return d;
     }
+    // end::dash-causeway[]
 
     /// The chase-view endless run every leaderboard and the daily challenge use.
     public static LevelDef endless() {

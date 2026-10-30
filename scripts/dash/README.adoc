@@ -1,19 +1,22 @@
 = Dash
 
-A real-time card battler and its server, in one Maven project and one language.
-Two players drop troops, buildings and spells onto a small 3D field, and the first
-to topple the other's towers wins. Around the battle is what a live game needs:
-accounts, deck building, matchmaking and challenge links, replays, a training
-battle, levels, daily quests, chests and achievements, a shop with in-app
-purchases and rewarded ads, push notifications, and a console for moderating
-players.
+An endless runner and its server, in one Maven project and one language. A runner
+dashes down a track of lanes, jumping hurdles, sliding under barriers and changing
+lanes around traffic, while the camera can start side on, like a 2D platformer,
+and swing behind the runner into full 3D halfway through a level. Around the run
+is what a live game needs: accounts, levels with stars, leaderboards for every
+level (all time, this week, today, friends and crews), live races between friends
+on the same track with voice chat, ghosts and replays, a track editor with
+publishing and moderation, crews, a shop with in-app purchases and rewarded ads,
+push notifications, and a console for running the game.
 
-The rules of the game are one module, `rules`, that the app, the server and the
-tests all compile. It uses no floating point and no clock, so a battle plays out
-identically on a phone, on the server and in a replay.
+The rules are one module, `rules`, that the app, the server and the tests all
+compile. It uses no floating point and no clock, so a run plays out identically
+on a phone, on the server and in a replay. That is what makes the leaderboards
+honest: the app sends its input log, and the server plays it again.
 
 It is a sample of what Codename One does for games, and the project the
-Initializr generates when you start from the card-battler template.
+Initializr generates when you start from the endless-runner template.
 
 == Start here
 
@@ -21,9 +24,10 @@ One chapter of the developer guide covers this project:
 
 * https://www.codenameone.com/developer-guide/#dash-implementors-guide[The Dash chapter]
   (link:../../docs/developer-guide/Dash-Implementors-Guide.asciidoc[source])
-  tours what the game does screen by screen, with the demo accounts, then
-  explains how it is built and what to change to make it yours: new cards and
-  their models, balance, the look, store products, ads, push and moderation.
+  tours what the game does, with the demo accounts, then explains how it is
+  built and what to change to make it yours: levels and their camera, new
+  obstacles and pickups, runners, the look, store products, ads, push and
+  moderation.
 
 == The modules
 
@@ -31,11 +35,13 @@ One chapter of the developer guide covers this project:
 |===
 | Module | What it holds
 
-| `rules` | The deterministic simulation: cards, arena, units, the bot, replays.
+| `rules` | The deterministic simulation: tracks, runners, obstacles, pickups,
+  camera cues, the bot, replays and level packs.
 | `shared` | The data transfer objects and `@RestClient` interfaces.
-| `common` | The app: the 3D battle, the menus, the store, the admin console.
-| `backend` | The server: accounts, matchmaking, the authoritative match rooms,
-  replays, progression, receipts, push and moderation.
+| `common` | The app: the 3D track, the menus, the track editor, the race lobby and
+  voice, the store, the admin console.
+| `backend` | The server: accounts, re-simulated scores and leaderboards, the
+  lockstep race rooms, level packs and moderation, progression, receipts, push.
 | `ios` | The iOS build, for generating the Xcode project.
 |===
 
@@ -78,11 +84,11 @@ mvn -pl rules,shared,backend -Dcodename1.platform=backend test   # <2>
 ./run-e2e.sh   # <3>
 ./check-template.sh   # <4>
 ----
-<1> Determinism: the same seed and plays give the same battle, the golden
-    replays still end the way they were recorded, and bot-against-bot soaks
-    keep the invariants.
-<2> The server's tests: whole online matches over its sockets, receipts,
-    progression and moderation.
+<1> Determinism: the same seed and inputs give the same run, the golden
+    replays still end the way they were recorded, and the bot can finish every
+    official level.
+<2> The server's tests: whole races over its rooms and sockets, re-simulated
+    scores, level packs, receipts, progression and moderation.
 <3> Starts the server on the `test` profile and runs the app's tests against it
     in the simulator. The screenshots the developer guide shows land in
     `target/e2e-shots`.
@@ -104,5 +110,5 @@ Dash is released under MIT No Attribution (see `LICENSE`), not under the
 GPLv2 with Classpath Exception that covers Codename One itself. Take any of it
 into your own application, under any licence, with no notice to keep.
 
-The characters and buildings in `common/src/main/resources/model_*.glb` are KayKit
+The runners in `common/src/main/resources/model_*.glb` are KayKit
 models by Kay Lousberg (https://kaylousberg.com), released under CC0.
