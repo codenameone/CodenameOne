@@ -124,7 +124,7 @@ and the host in each one once.
 |Maven goal |Gradle task |What it does
 
 |`cn1:buildLinuxLocal` |`buildLinuxLocal` |Builds the native executable on this machine into
-`linux/target/linux-native`. With `-Dcn1.board=<board>` it is an embedded build for
+`linux/target/linux-native`. With `-Dcn1.board=<board>` it's an embedded build for
 that board.
 |`cn1:runOnDevice` |`cn1RunOnDevice` |`buildLinuxLocal`, then `deploy-device`, then follows the log.
 |`cn1:deploy-device` |`cn1DeployDevice` |Installs the last build on the device as a service.
@@ -134,11 +134,11 @@ that board.
 
 Gradle takes the same properties with `-P` instead of `-D`.
 
-A build for a board of another architecture, an arm64 board from an x64 laptop say,
-needs a cross compiler. Install https://ziglang.org/download/[zig] and put it on the
+A build for a board of another architecture, an arm64 board from a laptop say,
+needs a cross-compiler. Install https://ziglang.org/download/[zig] and put it on the
 `PATH`, or set `CN1_ZIG`. The build then links against an old glibc, so the
-executable runs on any current distribution. If no cross compiler is found the build
-stops and says so. `linux.cc` names any other cross compiler, and `linux.sysroot` a
+executable runs on any current distribution. If no cross-compiler is found the build
+stops and says so. `linux.cc` names any other cross-compiler, and `linux.sysroot` a
 board SDK (below).
 
 `-Dcn1.board` is a shortcut. To make a project always build for its board, set the
