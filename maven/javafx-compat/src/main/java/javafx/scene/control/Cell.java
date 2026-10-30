@@ -212,17 +212,34 @@ public class Cell<T> extends Labeled {
             }
             if (show) {
                 Insets in = getInsets();
-                double w = g.prefWidth(-1);
-                double h = g.prefHeight(-1);
+                double x = in.getLeft() + leading() + Units.toLogical(Math.max(0, basePadding));
+                // As JavaFX's skin does, a graphic gets the cell's width at
+                // most, and a graphic that wraps is as tall as it is there:
+                // a cell of a list as wide as the screen otherwise drew its
+                // text on one line, past the edge.
+                double w = graphicWidth(g, getWidth() - x - in.getRight());
+                double h = graphicHeight(g, w);
                 double space = getHeight() - in.getTop() - in.getBottom();
                 if (g.isResizable()) {
                     g.resize(w, h);
                 }
-                g.relocate(in.getLeft() + leading() + Units.toLogical(Math.max(0, basePadding))
+                g.relocate(x
                         - g.getLayoutBounds().getMinX(),
                         in.getTop() + (space - h) / 2 - g.getLayoutBounds().getMinY());
             }
         }
+    }
+
+    /// The width a graphic is laid out at: its preferred width, no wider
+    /// than `room` but no narrower than its minimum.
+    private static double graphicWidth(Node g, double room) {
+        double pref = g.prefWidth(-1);
+        return room > 0 && pref > room ? Math.max(g.minWidth(-1), room) : pref;
+    }
+
+    /// The height of a graphic laid out `width` wide.
+    private static double graphicHeight(Node g, double width) {
+        return g.getContentBias() == javafx.geometry.Orientation.HORIZONTAL ? g.prefHeight(width) : g.prefHeight(-1);
     }
 
     @Override
@@ -231,7 +248,9 @@ public class Cell<T> extends Labeled {
         Node g = shownGraphic();
         if (g != null) {
             Insets in = getInsets();
-            h = Math.max(h, in.getTop() + g.prefHeight(-1) + in.getBottom());
+            double x = in.getLeft() + leading() + Units.toLogical(Math.max(0, basePadding));
+            double gw = width < 0 ? g.prefWidth(-1) : graphicWidth(g, width - x - in.getRight());
+            h = Math.max(h, in.getTop() + graphicHeight(g, gw) + in.getBottom());
         }
         return h;
     }

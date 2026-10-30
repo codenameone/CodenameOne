@@ -80,6 +80,9 @@ final class RowFlow extends Region {
     private final Region thumb = new Region();
     private double offset;
     private double measured;
+    /// The width the row height was measured at: a cell that wraps is as
+    /// tall as its lines at the width it is given.
+    private double measuredWidth = -1;
     private boolean force;
     private double pressY;
     private double pressOffset;
@@ -256,9 +259,17 @@ final class RowFlow extends Region {
         return slot;
     }
 
-    private void measure(int columns, int count) {
+    private void measure(int columns, int count, double width) {
+        if (measured > 0 && Math.abs(width - measuredWidth) > 0.5) {
+            measured = 0;
+        }
         if (rows.fixedCellSize() > 0 || measured > 0 || columns == 0) {
             return;
+        }
+        double[] xs = new double[columns];
+        double[] ws = new double[columns];
+        if (width > 0) {
+            rows.columns(width, xs, ws);
         }
         if (slots.isEmpty()) {
             slots.add(newSlot(columns));
@@ -267,10 +278,11 @@ final class RowFlow extends Region {
         double h = 0;
         for (int c = 0; c < slot.length; c++) {
             rows.updateCell(slot[c], c, count > 0 ? 0 : -1, true);
-            h = Math.max(h, slot[c].prefHeight(-1));
+            h = Math.max(h, slot[c].prefHeight(ws[c] > 0 ? ws[c] : -1));
         }
         if (h > 0 && count > 0) {
             measured = h;
+            measuredWidth = width;
         }
     }
 
@@ -281,8 +293,8 @@ final class RowFlow extends Region {
         if (!slots.isEmpty() && slots.get(0).length != columns) {
             rebuild();
         }
-        measure(columns, count);
         double w = getWidth();
+        measure(columns, count, w);
         double h = getHeight();
         double rh = rowHeight();
         if (pendingRow >= 0) {
