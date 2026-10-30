@@ -72,7 +72,7 @@ jobs:
           RETRY_DELAY_SECONDS: '60'
         run: |
           cd maven
-          bash ../scripts/ci/retry.sh mvn -B -pl core,linux -am install \
+          bash ../scripts/ci/retry.sh mvn -B -pl core,linux,backend,codenameone-maven-plugin -am install \
             -DskipTests -Dmaven.javadoc.skip=true -Plocal-dev-javase \
             -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
             -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"

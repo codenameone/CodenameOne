@@ -114,6 +114,19 @@ public final class DeviceDeployer {
         return this;
     }
 
+    /// Follows the log of the service a deploy installed, without deploying: the
+    /// service is `cn1.device.service`, else the name of `binary`.
+    public void tailLogs() throws BuildException {
+        String name = service != null && !service.trim().isEmpty() ? service.trim()
+                : binary != null ? binary.getName() : null;
+        if (name == null) {
+            throw new BuildException("Name the service: set cn1.device.service (or build the app, whose"
+                    + " executable names it)");
+        }
+        String target = checkedTarget(name);
+        run(ssh(target, true, "sudo journalctl -f -n 100 -u " + name + ".service"));
+    }
+
     public void deploy() throws BuildException {
         if (host == null || host.trim().isEmpty()) {
             throw new BuildException("No device host: set cn1.device.host (an address or an ~/.ssh/config alias)");
@@ -126,6 +139,24 @@ public final class DeviceDeployer {
             throw new BuildException(binary + " is not a Linux executable (no ELF header)");
         }
         String name = service != null && !service.trim().isEmpty() ? service.trim() : binary.getName();
+        String target = checkedTarget(name);
+        String remoteBinary = remoteDir + "/" + name;
+
+        log.info("Copying " + binary.getName() + " (" + (binary.length() / 1024) + " KB) to " + target
+                + " and installing the " + name + " service");
+        run(ssh(target, false, installScript(name, remoteBinary, unameFor(binary))), binary);
+        log.info("Deployed " + remoteBinary + "; it starts on boot and restarts if it exits");
+        if (followLogs) {
+            run(ssh(target, true, "sudo journalctl -f -n 50 -u " + name + ".service"));
+        }
+    }
+
+    /// Validates the host, user, service name and remote directory and returns the
+    /// ssh destination.
+    private String checkedTarget(String name) throws BuildException {
+        if (host == null || host.trim().isEmpty()) {
+            throw new BuildException("No device host: set cn1.device.host (an address or an ~/.ssh/config alias)");
+        }
         // The first character is a letter or digit so that nothing here can reach
         // ssh, install or systemctl as an option ("-oProxyCommand=..." runs a
         // local command), and a name cannot be "." or "..".
@@ -140,16 +171,7 @@ public final class DeviceDeployer {
             throw new BuildException("cn1.device.host and cn1.device.user must start with a letter or digit and use"
                     + " only letters, digits and _.-: (" + h + ")");
         }
-        String target = u.isEmpty() ? h : u + "@" + h;
-        String remoteBinary = remoteDir + "/" + name;
-
-        log.info("Copying " + binary.getName() + " (" + (binary.length() / 1024) + " KB) to " + target
-                + " and installing the " + name + " service");
-        run(ssh(target, false, installScript(name, remoteBinary)), binary);
-        log.info("Deployed " + remoteBinary + "; it starts on boot and restarts if it exits");
-        if (followLogs) {
-            run(ssh(target, true, "sudo journalctl -f -n 50 -u " + name + ".service"));
-        }
+        return u.isEmpty() ? h : u + "@" + h;
     }
 
     /// The shell run on the device: read the binary from standard input into a
@@ -160,6 +182,14 @@ public final class DeviceDeployer {
     /// root's; a device whose deploy user has no passwordless sudo fails here
     /// with sudo's own message.
     String installScript(String name, String remoteBinary) {
+        return installScript(name, remoteBinary, null);
+    }
+
+    /// As above, refusing before anything is installed when the device's
+    /// `uname -m` does not match `machines` (a `case` pattern, see [#unameFor]).
+    /// A binary for the wrong architecture would otherwise fail with "Exec format
+    /// error" and the unit's `Restart=always` would retry it every second.
+    String installScript(String name, String remoteBinary, String machines) {
         StringBuilder unit = new StringBuilder();
         unit.append("[Unit]\n")
                 .append("Description=Codename One application ").append(name).append('\n')
@@ -170,6 +200,10 @@ public final class DeviceDeployer {
                 .append("ExecStart=").append(remoteBinary).append('\n')
                 .append("WorkingDirectory=").append(remoteDir).append('\n')
                 .append("Restart=always\nRestartSec=1\n")
+                // The service runs as root, which may use SCHED_FIFO and lock memory;
+                // the limits are raised too so a real-time thread
+                // (com.codename1.realtime) gets them under any User= a site adds.
+                .append("LimitRTPRIO=infinity\nLimitMEMLOCK=infinity\n")
                 .append("StandardInput=tty\nTTYPath=/dev/tty1\nTTYReset=yes\nTTYVHangup=yes\n")
                 .append("StandardOutput=journal\nStandardError=journal\n");
         String pairs = environment;
@@ -190,6 +224,9 @@ public final class DeviceDeployer {
                 + "d=$(mktemp -d)\n"
                 + "trap 'rm -rf \"$d\"' EXIT\n"
                 + "cat > \"$d/upload\"\n"
+                + (machines == null ? "" : "case \"$(uname -m)\" in " + machines + ") ;; *) echo \"" + name
+                        + " was built for " + machines + ", but this device is $(uname -m): build with"
+                        + " -Dcn1.board=<board>\" >&2; exit 1;; esac\n")
                 + "sudo mkdir -p -- " + remoteDir + "\n"
                 + "sudo install -m 0755 -- \"$d/upload\" " + remoteBinary + "\n"
                 + "printf '%s' '" + unit.toString().replace("'", "'\\''") + "' > \"$d/unit\"\n"
@@ -235,6 +272,36 @@ public final class DeviceDeployer {
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
             throw new BuildException("Interrupted", ex);
+        }
+    }
+
+    /// The `uname -m` values that can run `f`, as a shell `case` pattern, from its
+    /// ELF `e_machine`; `null` for an unreadable file or a machine not listed. A
+    /// 32-bit binary also accepts the 64-bit kernel of its family: Raspberry Pi OS
+    /// 32-bit runs an aarch64 kernel on a Pi 4 or 5 and runs armhf binaries.
+    static String unameFor(File f) {
+        byte[] h = new byte[20];
+        try (InputStream in = new FileInputStream(f)) {
+            if (in.read(h) != 20) {
+                return null;
+            }
+        } catch (IOException ex) {
+            return null;
+        }
+        int m = h[5] == 2 ? ((h[18] & 0xff) << 8) | (h[19] & 0xff) : (h[18] & 0xff) | ((h[19] & 0xff) << 8);
+        switch (m) {
+            case 62:
+                return "x86_64";
+            case 183:
+                return "aarch64|arm64";
+            case 40:
+                return "arm*|aarch64";
+            case 243:
+                return "riscv64";
+            case 3:
+                return "i?86|x86_64";
+            default:
+                return null;
         }
     }
 

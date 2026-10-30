@@ -17,38 +17,7 @@ independent safety mechanism, such as a hardware watchdog or an interlock.
 
 [source,java]
 ----
-class MotorLoop extends RealtimeTask {
-    private final double[] samples = new double[64];   // <1>
-    private PwmChannel pwm;
-    private boolean failed;
-
-    public void setup() {                              // <2>
-        pwm = Hardware.getInstance().openPwm(0, 0);
-    }
-
-    public void cycle() {                              // <3>
-        double out = 0;
-        for (int i = 0; i < samples.length; i++) {
-            out += samples[i] * GAINS[i];
-        }
-        try {
-            pwm.setDutyCycle(out);
-        } catch (HardwareException e) {
-            failed = true;                             // no allocation on this path
-        }
-    }
-
-    public void periodsMissed(int count) {             // <4>
-        // the loop overran; hold the output, count it, alarm if it persists
-    }
-}
-
-RealtimeThread t = Realtime.getInstance().start("motor",
-        new RealtimeParameters()
-            .setPeriodNanos(1000000)    // 1 kHz
-            .setPriority(80)            // SCHED_FIFO 1..99
-            .setCpu(3),                 // pin to core 3
-        new MotorLoop());
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/RealtimeMotorLoopSnippet.java[tag=realtime-motor-loop,indent=0]
 ----
 <1> Everything the loop needs is allocated before it starts.
 <2> `setup()` runs on the real-time thread before the first period. It may allocate.
@@ -205,6 +174,32 @@ The rest of the system gets what the real-time threads leave. With
 of the process is moved off that core. For a hard split, add `isolcpus=` and
 `nohz_full=` on the kernel command line, and limit the other services with a
 cgroup `cpu.max`.
+
+=== Building and running on a board
+
+A real-time application is an ordinary Codename One project. Nothing needs to be
+enabled for it:
+
+* The allocation check runs in every native build that contains a `RealtimeTask`.
+  That covers a local build, a cloud build and the backend's.
+* The runtime parts are in every Linux executable.
+
+Build it, install it on the board and watch its log with one command, as for any
+embedded application (see <<_building_for_a_board,Building for a board>>):
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/embedded-linux.sh[tag=embedded-linux-bash-002,indent=0]
+----
+
+The service `deploy-device` installs runs as root, with `LimitRTPRIO` and
+`LimitMEMLOCK` raised, so `SCHED_FIFO` and `lockMemory()` work without further setup.
+Log the thread's statistics from time to time, for example `getStatistics()` once a
+minute from an ordinary thread. They then appear in `cn1:device-logs`.
+
+A backend with a real-time loop is built for the board with `cn1:backend-package`
+(`-Dcn1.backend.target=glibc-arm64` for a 64-bit ARM board). Install it with
+`cn1:deploy-device -Dcn1.device.binary=<the packaged executable>`.
 
 === Where it runs
 

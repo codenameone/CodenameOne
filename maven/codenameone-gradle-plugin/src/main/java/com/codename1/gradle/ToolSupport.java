@@ -70,6 +70,17 @@ final class ToolSupport {
             t.setGroup(AppSupport.GROUP);
             t.setDescription("Copies the native Linux build to a device over SSH and runs it as a service.");
         });
+        project.getTasks().register("cn1RunOnDevice", com.codename1.gradle.tasks.DeployDeviceTask.class, t -> {
+            t.setGroup(AppSupport.GROUP);
+            t.setDescription("Builds the native Linux executable locally, deploys it to a device over SSH and"
+                    + " follows its log.");
+            t.dependsOn(AppSupport.LINUX_LOCAL_BUILD_TASK);
+            t.setFollowLogsByDefault(true);
+        });
+        project.getTasks().register("cn1DeviceLogs", com.codename1.gradle.tasks.DeviceLogsTask.class, t -> {
+            t.setGroup(AppSupport.GROUP);
+            t.setDescription("Follows the log of the app's service on a device.");
+        });
         register(project, layout, ext, userProperties, roots, javaRoot, encoding, "settings",
                 DesktopTool.SETTINGS, "Opens Codename One Settings for this project");
         register(project, layout, ext, userProperties, roots, javaRoot, encoding, "guibuilder",

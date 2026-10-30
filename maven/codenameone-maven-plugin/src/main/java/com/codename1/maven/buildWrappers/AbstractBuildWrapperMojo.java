@@ -74,6 +74,14 @@ public abstract class AbstractBuildWrapperMojo extends AbstractMojo {
         if (open != null) {
             properties.setProperty("open", open.toString());
         }
+        // The child build is a separate Maven run and sees none of this one's -D
+        // options, so the ones a build reads are passed on: cn1.* (cn1.board, the
+        // device options) and codename1.arg.* (build hints given on the command line).
+        for (String key : System.getProperties().stringPropertyNames()) {
+            if ((key.startsWith("cn1.") || key.startsWith("codename1.arg.")) && !properties.containsKey(key)) {
+                properties.setProperty(key, System.getProperty(key));
+            }
+        }
         request.setProperties(properties);
 
         if (buildExecutableJar()) {
@@ -87,9 +95,19 @@ public abstract class AbstractBuildWrapperMojo extends AbstractMojo {
             if (result.getExitCode() != 0) {
                 throw new MojoFailureException("Failed to build project with exit code " + result.getExitCode());
             }
+            afterBuild();
         } catch (MavenInvocationException e) {
             throw new MojoExecutionException("Failed to invoke Maven", e);
         }
+    }
+
+    /// Runs in this Maven run once the child build has succeeded.
+    protected void afterBuild() throws MojoExecutionException {
+    }
+
+    /// The project this goal was started in.
+    protected MavenProject getProject() {
+        return project;
     }
 
     protected abstract String getPlatform();

@@ -79,6 +79,12 @@ final class AppSupport {
     /// `buildJavascriptLocal`, made for a server that is not a servlet container.
     static final String WEB_APP_BUILD_TASK = "buildJavascriptWebApp";
 
+    /// The local native Linux build, which `cn1RunOnDevice` deploys.
+    static final String LINUX_LOCAL_BUILD_TASK = "buildLinuxLocal";
+
+    /// The embedded board of a local Linux build (`-Pcn1.board=rpi5`).
+    static final String BOARD_PROPERTY = "cn1.board";
+
     private AppSupport() {
     }
 
@@ -535,6 +541,15 @@ final class AppSupport {
         registerBuild(project, WEB_APP_BUILD_TASK, "javascript", "local-javascript",
                 "Builds the JavaScript port locally for the backend to host (see backendWebApp)",
                 layout, main, javase, framework, ext, hosted, queue);
+        // The native Linux executable, built here; -Pcn1.board=rpi5 makes it an
+        // embedded cross build, as -Dcn1.board does for the Maven goal. Only
+        // codename1.* properties reach the builder, so the board travels as the
+        // hints the Maven shortcut sets.
+        final Provider<String> board = project.getProviders().gradleProperty(BOARD_PROPERTY)
+                .orElse(project.getProviders().systemProperty(BOARD_PROPERTY)).orElse("");
+        registerBuild(project, LINUX_LOCAL_BUILD_TASK, "linux", "local-linux-device",
+                "Builds the native Linux executable locally (-Pcn1.board=rpi5 for an embedded board)",
+                layout, main, javase, framework, ext, userProperties.zip(board, (given, b) -> boardProperties(given, b, settingsFile)), queue);
         // The bundle is found by looking in the build directory, so one an
         // earlier build left there must not be this build's answer.
         final Provider<File> bundle = project.getLayout().getBuildDirectory()
@@ -1164,6 +1179,32 @@ final class AppSupport {
     /// same-origin and never proxied anyway -- so the build is told not to wire
     /// one in, unless the project has chosen for itself: on the command line, in
     /// `codenameone { buildHints }` or in its settings file.
+    /// `given` with the hints `cn1.board` stands for: the board, and
+    /// `linux.embedded` unless the command line or the settings already say.
+    static Map<String, String> boardProperties(Map<String, String> given, String board, File settingsFile) {
+        if (board == null || board.trim().isEmpty()) {
+            return given;
+        }
+        Map<String, String> out = new java.util.LinkedHashMap<String, String>(given);
+        out.put("codename1.arg.linux.embedded.board", board.trim());
+        if (!out.containsKey("codename1.arg.linux.embedded") && !settingsDeclare(settingsFile, "codename1.arg.linux.embedded")) {
+            out.put("codename1.arg.linux.embedded", "true");
+        }
+        return out;
+    }
+
+    private static boolean settingsDeclare(File settingsFile, String key) {
+        java.util.Properties p = new java.util.Properties();
+        if (settingsFile.isFile()) {
+            try (java.io.InputStream in = new java.io.FileInputStream(settingsFile)) {
+                p.load(in);
+            } catch (java.io.IOException ignored) {
+                // An unreadable settings file declares nothing; the build reports it.
+            }
+        }
+        return p.getProperty(key) != null;
+    }
+
     static Map<String, String> hostedProperties(Map<String, String> given, File settingsFile) {
         Map<String, String> out = new java.util.LinkedHashMap<String, String>(given);
         try {

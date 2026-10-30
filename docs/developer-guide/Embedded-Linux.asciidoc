@@ -105,8 +105,45 @@ Raspberry Pi OS), or the board vendor's equivalents.
 
 === Building for a board
 
-Add the `linux.embedded` build hint to a native Linux build and name the board, and
-the builder picks the architecture, the display defaults and the libraries to link:
+One command builds the application for a board on your machine, with no cloud
+build, installs it on the device and shows its log:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/embedded-linux.sh[tag=embedded-linux-bash-002,indent=0]
+----
+
+The same commands are in the project's `build.sh` and `build.bat`
+(`./build.sh device`, with `CN1_BOARD` and `CN1_DEVICE_HOST` set). The IDE files a new
+project carries -- IntelliJ IDEA, VS Code, NetBeans and Eclipse -- have *Linux Local
+Build*, *Run on Device* and *Device Logs* entries beside the cloud build. Edit the board
+and the host in each one once.
+
+[cols="<2,<2,<4",options="header"]
+|===
+|Maven goal |Gradle task |What it does
+
+|`cn1:buildLinuxLocal` |`buildLinuxLocal` |Builds the native executable on this machine into
+`linux/target/linux-native`. With `-Dcn1.board=<board>` it is an embedded build for
+that board.
+|`cn1:runOnDevice` |`cn1RunOnDevice` |`buildLinuxLocal`, then `deploy-device`, then follows the log.
+|`cn1:deploy-device` |`cn1DeployDevice` |Installs the last build on the device as a service.
+|`cn1:device-logs` |`cn1DeviceLogs` |Follows the log of the installed service, without deploying.
+|`cn1:buildLinuxDevice` |`buildLinuxDevice` |The same executable, built by the cloud build service.
+|===
+
+Gradle takes the same properties with `-P` instead of `-D`.
+
+A build for a board of another architecture, an arm64 board from an x64 laptop say,
+needs a cross compiler. Install https://ziglang.org/download/[zig] and put it on the
+`PATH`, or set `CN1_ZIG`. The build then links against an old glibc, so the
+executable runs on any current distribution. If no cross compiler is found the build
+stops and says so. `linux.cc` names any other cross compiler, and `linux.sysroot` a
+board SDK (below).
+
+`-Dcn1.board` is a shortcut. To make a project always build for its board, set the
+`linux.embedded` build hint and name the board in its settings. The builder then picks
+the architecture, the display defaults and the libraries to link:
 
 [source,properties]
 ----
@@ -153,7 +190,10 @@ include::../demos/common/src/main/snippets/developer-guide/embedded-linux.sh[tag
 It uses the system's `ssh`, so keys, agents and `~/.ssh/config` aliases
 work as they do in a terminal. `cn1.device.env` passes environment variables to the
 service (`CN1_ROTATION=90,CN1_DISPLAY=fbdev`), and `cn1.device.logs=true` follows its
-log after the restart.
+log after the restart. `cn1:device-logs` follows it later, without deploying again.
+
+The service runs as root, with no limit on real-time priority or locked memory, so
+<<_real_time_threads,real-time threads>> get their scheduling without further setup.
 
 A project's `backend` module can run in the cloud and on a board, and each side
 usually needs some controllers the other doesn't. The deployed service runs with

@@ -81,11 +81,19 @@ public class DeployDeviceMojo extends AbstractMojo {
     @Parameter(defaultValue = "${project.build.directory}", readonly = true)
     private File buildDirectory;
 
+    /// The newest executable a local Linux build left: `target/linux-native` of this
+    /// module, or of the `linux` module beside it when the goal runs at the root.
+    static File findBuiltBinary(File buildDirectory) {
+        File root = buildDirectory.getParentFile();
+        return DeviceDeployer.findBinary(buildDirectory, new File(buildDirectory, "linux-native"),
+                root == null ? null : new File(root, "linux" + File.separator + "target" + File.separator + "linux-native"));
+    }
+
     @Override
     public void execute() throws MojoExecutionException {
         File bin = binary;
         if (bin == null && buildDirectory != null) {
-            bin = DeviceDeployer.findBinary(buildDirectory, new File(buildDirectory, "linux-native"));
+            bin = findBuiltBinary(buildDirectory);
         }
         try {
             new DeviceDeployer(MavenLog.of(getLog())).host(host).user(user).port(port).binary(bin)
