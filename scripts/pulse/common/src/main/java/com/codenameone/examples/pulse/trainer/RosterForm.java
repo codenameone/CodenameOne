@@ -50,8 +50,8 @@ public final class RosterForm {
                 Ui.failed(list, load[0])));
         Ui.pull(list, load[0]);
         form.add(BorderLayout.CENTER, list);
-        form.add(BorderLayout.SOUTH, Ui.primary("Live view", "live",
-                e -> LiveClassForm.show(form, session)));
+        form.add(BorderLayout.SOUTH, Ui.dock(Ui.primary("Live view", "live",
+                e -> LiveClassForm.show(form, session))));
         form.show();
         load[0].run();
     }

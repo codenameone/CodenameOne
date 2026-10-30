@@ -25,6 +25,8 @@ import com.codename1.calendar.CalendarDateTime;
 import com.codename1.calendar.CalendarEvent;
 import com.codename1.calendar.CalendarMutationScope;
 import com.codename1.calendar.LocalCalendarSource;
+import com.codename1.ui.Button;
+import com.codename1.ui.Sheet;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.FontImage;
@@ -39,6 +41,8 @@ import com.codenameone.examples.pulse.api.BookingDto;
 import com.codenameone.examples.pulse.api.MemberDto;
 import com.codenameone.examples.pulse.api.SessionDto;
 import com.codenameone.examples.pulse.net.Api;
+import com.codenameone.examples.pulse.net.Session;
+import com.codenameone.examples.pulse.api.UserDto;
 import com.codenameone.examples.pulse.net.Net;
 import com.codenameone.examples.pulse.ui.Lang;
 import com.codenameone.examples.pulse.ui.Ui;
@@ -155,6 +159,25 @@ public final class Classes {
     /// where, how full it is, and `action` -- a Book button or how the member
     /// stands -- at the end.
     public static Container card(SessionDto session, Component action) {
+        return card(session, action, null);
+    }
+
+    /// The first name of whoever `booking` is for, or null when it is the
+    /// member's own.
+    public static String forWhom(BookingDto booking) {
+        UserDto user = Session.user();
+        String name = booking.memberName();
+        if (name == null || user != null && name.equals(user.displayName())) {
+            return null;
+        }
+        int space = name.indexOf(' ');
+        return space > 0 ? name.substring(0, space) : name;
+    }
+
+    /// The same card for a booking made for someone else in the household.
+    ///
+    /// @param who the first name of the one it is for, or null for the member
+    public static Container card(SessionDto session, Component action, String who) {
         int color = color(session.color());
         Container card = new Container(new BorderLayout());
         card.setUIID("SvClass");
@@ -165,6 +188,13 @@ public final class Classes {
         time.add(new Label(clock(session.startsAt()), "SvClassClock"));
         time.add(new Label(Lang.tr("{0} min", Integer.valueOf(
                 (int) ((session.endsAt() - session.startsAt()) / 60000L))), "SvClassLength"));
+        // The kind of class sits under its time, which leaves the name the
+        // whole width of the card's middle.
+        Label glyph = new Label("", "SvClassGlyph");
+        glyph.getAllStyles().setFgColor(color);
+        glyph.setIcon(FontImage.createMaterial(glyph(session.category()),
+                glyph.getUnselectedStyle(), 3.2f));
+        time.add(glyph);
         Label stripe = new Label("", "SvClassStripe");
         stripe.getAllStyles().setBgColor(color);
         stripe.getAllStyles().setBgTransparency(255);
@@ -175,16 +205,11 @@ public final class Classes {
 
         Container body = new Container(BoxLayout.y());
         body.setUIID("SvClassBody");
-        com.codename1.components.SpanLabel title = new com.codename1.components.SpanLabel(
-                session.name(), "SvClassName");
-        Container head = new Container(new BorderLayout());
-        Label glyph = new Label("", "SvClassGlyph");
-        glyph.getAllStyles().setFgColor(color);
-        glyph.setIcon(FontImage.createMaterial(glyph(session.category()),
-                glyph.getUnselectedStyle(), 3.2f));
-        head.add(BorderLayout.WEST, glyph).add(BorderLayout.CENTER, title);
-        body.add(head);
+        body.add(new com.codename1.components.SpanLabel(session.name(), "SvClassName"));
         body.add(new Label(nullToEmpty(session.trainerName()), "SvClassWho"));
+        if (who != null) {
+            body.add(new Label(Lang.tr("for {0}", who), "SvClassWho"));
+        }
         if ("CANCELLED".equals(session.state())) {
             body.add(new Label(Lang.tr("Cancelled by the studio"), "SvClassFull"));
         } else {
@@ -221,6 +246,33 @@ public final class Classes {
                 .toLocalTime();
         return (time.getHour() < 10 ? "0" : "") + time.getHour() + ":"
                 + (time.getMinute() < 10 ? "0" : "") + time.getMinute();
+    }
+
+    /// How `booking` stands, as a pill; a tap on it offers what a member does
+    /// with a booking -- put it in the calendar or cancel it.
+    public static Button bookedPill(final SessionDto session, final BookingDto booking,
+            final Runnable changed) {
+        final Button pill = new Button(WAITLISTED.equals(booking.state())
+                ? Lang.tr("Queue #{0}", Integer.valueOf(booking.position()))
+                : Lang.tr("Booked"), WAITLISTED.equals(booking.state())
+                ? "SvPillQueue" : "SvPillBooked");
+        pill.setName("booked-" + session.id());
+        pill.addActionListener(e -> {
+            final Sheet sheet = new Sheet(null, session.name());
+            Container content = sheet.getContentPane();
+            content.setLayout(BoxLayout.y());
+            content.add(Ui.text(detail(session), "SvMuted"));
+            content.add(Ui.secondary("Add to calendar", "calendar-" + session.id(), ev -> {
+                sheet.back();
+                addToCalendar(session);
+            }));
+            content.add(Ui.link("Cancel this booking", "cancel-" + session.id(), ev -> {
+                sheet.back();
+                cancel(booking, changed);
+            }));
+            sheet.show();
+        });
+        return pill;
     }
 
     /// The icon for a kind of training.

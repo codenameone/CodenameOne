@@ -20,6 +20,7 @@ package com.codenameone.examples.pulse.member;
 
 import com.codename1.components.SpanLabel;
 import com.codename1.ui.Button;
+import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
@@ -53,8 +54,8 @@ public final class HouseholdForm {
                 load[0]), Ui.failed(list, load[0])));
         Ui.pull(list, load[0]);
         form.add(BorderLayout.CENTER, list);
-        form.add(BorderLayout.SOUTH, Ui.primary("Add a child", "addChild",
-                e -> add(form, load[0])));
+        form.add(BorderLayout.SOUTH, Ui.dock(Ui.primary("Add a child", "addChild",
+                e -> add(form, load[0]))));
         form.show();
         load[0].run();
     }
@@ -65,23 +66,27 @@ public final class HouseholdForm {
         for (int iter = 0; members != null && iter < members.size(); iter++) {
             final MemberDto member = members.get(iter);
             boolean child = "CHILD".equals(member.relation());
+            Component end;
+            if (member.waiverSigned()) {
+                end = Ui.flat(FontImage.MATERIAL_QR_CODE,
+                        Lang.tr("Pass for {0}", member.name()), "pass-" + iter,
+                        e -> PassForm.show(form, member.id()));
+            } else {
+                Button sign = new Button(Lang.tr("Sign waiver"), "SvPillQueue");
+                sign.setName("waiver-" + iter);
+                sign.addActionListener(e -> Api.household().signWaiver(member.id(),
+                        Net.to(signed -> load.run(), Ui::fail)));
+                end = sign;
+            }
             Container row = Ui.row(child ? FontImage.MATERIAL_CHILD_CARE
                     : FontImage.MATERIAL_PERSON, member.name(),
                     Lang.tr("Age {0}", Integer.valueOf(member.age()))
-                    + (member.planName() == null ? "" : " - " + member.planName()),
-                    Ui.badge(member.waiverSigned() ? Lang.tr("Waiver signed")
-                            : Lang.tr("Waiver needed"),
-                            member.waiverSigned() ? "SvBadgeGood" : "SvBadgeWarn"));
+                    + (member.planName() == null ? "" : "  \u00b7  " + member.planName())
+                    + (member.waiverSigned() ? "" : "\n" + Lang.tr("Waiver needed before class")),
+                    end);
             row.setName("member-" + iter);
-            list.add(row);
-            Container actions = new Container(new FlowLayout(com.codename1.ui.Component.RIGHT));
-            if (!member.waiverSigned()) {
-                actions.add(Ui.link("Sign waiver", "waiver-" + iter,
-                        e -> Api.household().signWaiver(member.id(),
-                                Net.to(signed -> load.run(), Ui::fail))));
-            }
-            actions.add(Ui.link("Pass", "pass-" + iter, e -> PassForm.show(form, member.id())));
-            list.add(actions);
+            list.add(member.waiverSigned() ? Ui.tap(row, "open-" + iter,
+                    e -> PassForm.show(form, member.id())) : row);
         }
         Ui.refresh(form);
     }

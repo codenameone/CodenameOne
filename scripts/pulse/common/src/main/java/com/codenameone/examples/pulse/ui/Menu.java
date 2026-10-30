@@ -87,12 +87,14 @@ public final class Menu {
 
     /// The round button that opens the menu, for the screen to place.
     public Button button() {
-        return Ui.round(FontImage.MATERIAL_MENU, "menu-open", e -> open());
+        Button button = Ui.round(FontImage.MATERIAL_MENU, "menu-open", e -> open());
+        button.setAccessibilityText(Lang.tr("Menu"));
+        return button;
     }
 
     /// The button that opens the menu, for a screen with a bar and no map.
     public Button flatButton() {
-        return Ui.flat(FontImage.MATERIAL_MENU, "menu-open", e -> open());
+        return Ui.flat(FontImage.MATERIAL_MENU, "Menu", "menu-open", e -> open());
     }
 
     /// Adds one of the mode's own places.

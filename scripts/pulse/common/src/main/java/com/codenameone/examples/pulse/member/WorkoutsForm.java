@@ -23,6 +23,12 @@ import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codenameone.examples.pulse.ui.ZoneBar;
+import com.codenameone.examples.pulse.ui.Beat;
+import com.codename1.ui.layouts.FlowLayout;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.CN;
+import com.codename1.ui.Button;
 import com.codenameone.examples.pulse.api.BookingDto;
 import com.codenameone.examples.pulse.api.SessionDto;
 import com.codenameone.examples.pulse.api.WorkoutDto;
@@ -74,12 +80,31 @@ public final class WorkoutsForm {
         final SessionDto now = recording != null ? recording
                 : Workouts.classNow(booked, System.currentTimeMillis());
         if (now != null) {
-            Ui.section(list, now.name());
-            final Label rate = Ui.label(recording != null ? Lang.tr("Recording") : "", "SvMuted");
+            // The class on now, on the same ink card as the home's next class,
+            // with the heart rate big enough to read mid-set.
+            Container live = new Container(BoxLayout.y(), "SvInk");
+            live.setName("live");
+            Container head = new Container(new BorderLayout(), "SvInkRow");
+            head.add(BorderLayout.CENTER, Ui.label(recording != null ? "RECORDING" : "ON NOW",
+                    "SvInkEyebrow"));
+            Beat beat = new Beat("SvBeat", recording != null);
+            beat.setPreferredW(CN.convertToPixels(14));
+            beat.setPreferredH(CN.convertToPixels(5));
+            head.add(BorderLayout.EAST, beat);
+            live.add(head);
+            live.add(Ui.text(now.name(), "SvInkTitle"));
+            final Label rate = Ui.label(recording != null ? "--" : "", "SvInkBpm");
             rate.setName("bpm");
-            list.add(rate);
+            live.add(rate);
+            live.add(Ui.text(recording != null
+                    ? "Wear a strap or your watch and this fills in. Worn sensors earn a bonus."
+                    : "Record it to log the workout and earn points for the class.",
+                    "SvInkText"));
+            Button act;
             if (recording == null) {
-                list.add(Ui.primary("Record this class", "recordClass", e -> {
+                act = new Button(Lang.tr("Record this class"), "SvInkButton");
+                act.setName("recordClass");
+                act.addActionListener(e -> {
                     Workouts.startClass(now, share, new Workouts.Progress() {
                         @Override
                         public void beat(int bpm) {
@@ -89,15 +114,22 @@ public final class WorkoutsForm {
 
                         @Override
                         public void ended(WorkoutDto posted, String error) {
-                            Ui.say(error == null ? Lang.tr("Workout saved") : error);
+                            Ui.say(error != null ? error : posted != null && posted.points() > 0
+                                    ? Lang.tr("Workout saved: +{0} points",
+                                            Integer.valueOf(posted.points()))
+                                    : Lang.tr("Workout saved"));
                             load.run();
                         }
                     });
                     load.run();
-                }));
+                });
             } else {
-                list.add(Ui.danger("End workout", "endClass", e -> Workouts.stopClass()));
+                act = new Button(Lang.tr("End workout"), "SvInkButton");
+                act.setName("endClass");
+                act.addActionListener(e -> Workouts.stopClass());
             }
+            live.add(FlowLayout.encloseIn(act));
+            list.add(live);
         }
         if (Workouts.storeAvailable()) {
             list.add(Ui.secondary("Bring in recent workouts", "importHealth",
@@ -110,19 +142,7 @@ public final class WorkoutsForm {
         }
         Ui.section(list, "Recent");
         for (int iter = 0; workouts != null && iter < workouts.size(); iter++) {
-            WorkoutDto workout = workouts.get(iter);
-            StringBuilder detail = new StringBuilder(Ui.when(workout.startedAt()));
-            detail.append(Ui.DOT).append(Lang.tr("{0} min", Integer.valueOf(workout.minutes())));
-            if (workout.avgHr() > 0) {
-                detail.append(Ui.DOT).append(Lang.tr("avg {0} bpm",
-                        Integer.valueOf(workout.avgHr())));
-            }
-            if (workout.calories() > 0) {
-                detail.append(Ui.DOT).append(workout.calories()).append(" kcal");
-            }
-            list.add(Ui.row(FontImage.MATERIAL_DIRECTIONS_RUN, title(workout.activity()),
-                    detail.toString(), workout.shared() ? Ui.badge(Lang.tr("Shared"),
-                    "SvBadgeGood") : null));
+            list.add(row(workouts.get(iter), iter));
         }
         if (workouts == null || workouts.isEmpty()) {
             list.add(Ui.text("No workouts yet.", "SvMuted"));
@@ -130,10 +150,52 @@ public final class WorkoutsForm {
         Ui.refresh(form);
     }
 
-    /// `HIGH_INTENSITY_INTERVAL_TRAINING` as "High intensity interval training".
+    private static Container row(WorkoutDto workout, int index) {
+        boolean strap = Workouts.SOURCE_STRAP.equals(workout.source());
+        boolean watch = Workouts.SOURCE_WATCH.equals(workout.source());
+        Container row = new Container(new BorderLayout(), "SvRow");
+        row.setName("workout-" + index);
+        Label icon = new Label("", strap || watch ? "SvWorkoutWorn" : "SvRowIcon");
+        Ui.icon(icon, strap ? FontImage.MATERIAL_MONITOR_HEART : watch ? FontImage.MATERIAL_WATCH
+                : FontImage.MATERIAL_DIRECTIONS_RUN, 4f);
+        icon.setAccessibilityText(strap ? Lang.tr("Measured by a strap")
+                : watch ? Lang.tr("Measured by a watch") : "");
+        row.add(BorderLayout.WEST, icon);
+        Container lines = new Container(BoxLayout.y());
+        lines.add(Ui.label(title(workout.activity()), "SvRowTitle"));
+        StringBuilder detail = new StringBuilder(Ui.when(workout.startedAt()));
+        detail.append(Ui.DOT).append(Lang.tr("{0} min", Integer.valueOf(workout.minutes())));
+        if (workout.avgHr() > 0) {
+            detail.append(Ui.DOT).append(Lang.tr("{0} bpm", Integer.valueOf(workout.avgHr())));
+        }
+        if (workout.calories() > 0) {
+            detail.append(Ui.DOT).append(workout.calories()).append(" kcal");
+        }
+        lines.add(Ui.text(detail.toString(), "SvRowDetail"));
+        ZoneBar zones = new ZoneBar(workout.zones());
+        if (zones.hasData()) {
+            lines.add(zones);
+        }
+        row.add(BorderLayout.CENTER, lines);
+        if (workout.points() > 0) {
+            Label points = Ui.label("+" + workout.points(), "SvPoints");
+            points.setAccessibilityText(Lang.tr("{0} points", Integer.valueOf(workout.points())));
+            row.add(BorderLayout.EAST, FlowLayout.encloseCenterMiddle(points));
+        }
+        return row;
+    }
+
+    /// `HIGH_INTENSITY_INTERVAL_TRAINING` as "High intensity interval training";
+    /// a name that is not shouted, "HIIT Burn", as it is.
     static String title(String activity) {
         if (activity == null || activity.length() == 0) {
             return Lang.tr("Workout");
+        }
+        for (int iter = 0; iter < activity.length(); iter++) {
+            char c = activity.charAt(iter);
+            if (c >= 'a' && c <= 'z') {
+                return activity;
+            }
         }
         String words = activity.replace('_', ' ');
         StringBuilder out = new StringBuilder(words.length());

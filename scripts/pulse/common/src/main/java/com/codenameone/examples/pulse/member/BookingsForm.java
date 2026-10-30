@@ -61,18 +61,11 @@ public final class BookingsForm {
             if (booking.session() == null || Classes.CANCELLED.equals(booking.state())) {
                 continue;
             }
-            Container row = Ui.row(FontImage.MATERIAL_FITNESS_CENTER, booking.session().name(),
-                    Classes.detail(booking.session()) + "\n" + booking.memberName(),
-                    Ui.badge(Classes.WAITLISTED.equals(booking.state())
-                            ? Lang.tr("Queue #{0}", Integer.valueOf(booking.position()))
-                            : Lang.tr("Booked"), Classes.WAITLISTED.equals(booking.state())
-                            ? "SvBadgeWarn" : "SvBadgeGood"));
-            row.setName("booking-" + iter);
-            list.add(row);
-            list.add(FlowLayout.encloseRight(
-                    Ui.link("Add to calendar", "calendar-" + iter,
-                            e -> Classes.addToCalendar(booking.session())),
-                    Ui.link("Cancel", "cancel-" + iter, e -> Classes.cancel(booking, load))));
+            Container card = Classes.card(booking.session(),
+                    Classes.bookedPill(booking.session(), booking, load),
+                    Classes.forWhom(booking));
+            card.setName("booking-" + iter);
+            list.add(card);
             shown++;
         }
         if (shown == 0) {

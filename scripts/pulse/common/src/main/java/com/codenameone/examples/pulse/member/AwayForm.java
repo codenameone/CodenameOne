@@ -47,8 +47,8 @@ public final class AwayForm {
         load[0] = () -> Api.engagement().away(Net.to(found -> fill(form, list, found, load[0]),
                 Ui.failed(list, load[0])));
         form.add(BorderLayout.CENTER, list);
-        form.add(BorderLayout.SOUTH, Ui.primary("I'll be away", "addAway",
-                e -> add(form, load[0])));
+        form.add(BorderLayout.SOUTH, Ui.dock(Ui.primary("I'll be away", "addAway",
+                e -> add(form, load[0]))));
         form.show();
         load[0].run();
     }
@@ -70,7 +70,7 @@ public final class AwayForm {
             list.add(Ui.row(FontImage.MATERIAL_BEACH_ACCESS, reason(period.reason()),
                     period.startsOn() + " - " + period.endsOn()
                     + (period.freezeBilling() ? "\n" + Lang.tr("Billing paused") : ""),
-                    Ui.flat(FontImage.MATERIAL_DELETE_OUTLINE, "removeAway-" + iter,
+                    Ui.flat(FontImage.MATERIAL_DELETE_OUTLINE, "Remove", "removeAway-" + iter,
                             e -> Api.engagement().removeAway(period.id(),
                                     Net.to(gone -> load.run(), Ui::fail)))));
         }

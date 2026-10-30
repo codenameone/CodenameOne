@@ -61,8 +61,8 @@ public final class MembershipForm {
                 Ui.failed(list, load[0])));
         Ui.pull(list, load[0]);
         form.add(BorderLayout.CENTER, list);
-        form.add(BorderLayout.SOUTH, Ui.primary("See plans", "plans",
-                e -> plans(form, load[0])));
+        form.add(BorderLayout.SOUTH, Ui.dock(Ui.primary("See plans", "plans",
+                e -> plans(form, load[0]))));
         form.show();
         load[0].run();
     }

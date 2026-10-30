@@ -20,6 +20,8 @@ package com.codenameone.examples.pulse.ui;
 
 import com.codename1.components.SpanLabel;
 import com.codename1.ui.Button;
+import com.codename1.ui.Component;
+import com.codename1.ui.plaf.RoundBorder;
 import com.codename1.ui.Container;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Label;
@@ -63,6 +65,7 @@ public final class Badges {
         Container row = new Container(BoxLayout.x());
         row.setUIID("SvShelf");
         row.setScrollableX(true);
+        row.setScrollVisible(false);
         row.setName("badges");
         for (int iter = 0; iter < IDS.length; iter++) {
             row.add(medal(iter, earned != null && earned.contains(IDS[iter])));
@@ -96,6 +99,7 @@ public final class Badges {
         Ui.icon(disc, earned ? ICONS[index] : FontImage.MATERIAL_LOCK, 4.4f);
         disc.setName("badge-" + IDS[index]);
         disc.getAllStyles().setAlignment(Label.CENTER);
+        round(disc);
         String name = Lang.tr(NAMES[index]);
         disc.setAccessibilityText(earned ? name : Lang.tr("{0}, not earned yet", name));
         disc.addActionListener(e -> explain(index, earned));
@@ -108,10 +112,17 @@ public final class Badges {
         return cell;
     }
 
+    // A circle in the style's own background colour, whatever the icon's size.
+    private static void round(Component disc) {
+        disc.getAllStyles().setBorder(RoundBorder.create()
+                .color(disc.getUnselectedStyle().getBgColor()).rectangle(false));
+    }
+
     private static void explain(int index, boolean earned) {
         Container body = new Container(BoxLayout.y());
         Label disc = new Label("", earned ? "SvMedal" : "SvMedalLocked");
         Ui.icon(disc, ICONS[index], 6f);
+        round(disc);
         disc.getAllStyles().setAlignment(Label.CENTER);
         body.add(FlowLayout.encloseCenter(disc));
         Label title = new Label(Lang.tr(NAMES[index]), "SvHeading");

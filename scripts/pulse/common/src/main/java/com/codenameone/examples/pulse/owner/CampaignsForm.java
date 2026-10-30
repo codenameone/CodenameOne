@@ -69,8 +69,8 @@ public final class CampaignsForm {
         }, Ui.failed(list, load[0])));
         Ui.pull(list, load[0]);
         form.add(BorderLayout.CENTER, list);
-        form.add(BorderLayout.SOUTH, Ui.primary("New campaign", "newCampaign",
-                e -> compose(form, null)));
+        form.add(BorderLayout.SOUTH, Ui.dock(Ui.primary("New campaign", "newCampaign",
+                e -> compose(form, null))));
         form.show();
         load[0].run();
     }

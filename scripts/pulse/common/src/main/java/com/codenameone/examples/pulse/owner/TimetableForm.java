@@ -58,8 +58,8 @@ public final class TimetableForm {
                 Net.to(classes -> fill(form, list, classes, load[0]), Ui.failed(list, load[0])));
         Ui.pull(list, load[0]);
         form.add(BorderLayout.CENTER, list);
-        form.add(BorderLayout.SOUTH, Ui.primary("Schedule a class", "scheduleClass",
-                e -> schedule(form, load[0])));
+        form.add(BorderLayout.SOUTH, Ui.dock(Ui.primary("Schedule a class", "scheduleClass",
+                e -> schedule(form, load[0]))));
         form.show();
         load[0].run();
     }

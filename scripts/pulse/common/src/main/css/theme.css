@@ -123,6 +123,13 @@ SvForm {
     margin: 0;
 }
 
+SvDock {
+    background-color: var(--surface);
+    border-top: 1px solid var(--line);
+    padding: 2.4mm 3.6mm 3mm 3.6mm;
+    margin: 0;
+}
+
 SvPage {
     background-color: var(--surface);
     padding: 3mm 3.6mm 4mm 3.6mm;
@@ -819,6 +826,19 @@ SvGroup {
     margin: 0 0 0.8mm 0;
 }
 /* A chart or a breakdown, boxed with its title. */
+SvInkBpm { background-color: transparent; font-family: "native:MainBold"; font-size: 9mm; color: var(--lime); padding: 1mm 0 1mm 0; margin: 0; }
+SvZoneBar { background-color: transparent; padding: 0; margin: 1.2mm 0 0 0; }
+SvWorkoutWorn { background-color: transparent; color: var(--violet); padding: 0 3mm 0 0.4mm; margin: 0; }
+SvPoints { font-family: "native:MainBold"; font-size: 2.9mm; color: var(--ink); background-color: var(--lime); border-radius: 3mm; padding: 1mm 2.4mm 1mm 2.4mm; margin: 0; }
+SvAvatarLines { background-color: transparent; padding: 0 0 0 2.6mm; margin: 0; }
+SvKudos { font-family: "native:MainBold"; font-size: 2.8mm; color: var(--brand); background-color: var(--surface-alt); border-radius: 4mm; padding: 1.2mm 2.6mm 1.2mm 2.4mm; margin: 0; }
+SvKudos.pressed { background-color: var(--surface-press); }
+SvKudos.disabled { color: var(--text-muted); background-color: var(--surface-alt); }
+SvKudosGiven, SvKudosGiven.disabled { font-family: "native:MainBold"; font-size: 2.8mm; color: #ffffff; background-color: var(--brand); border-radius: 4mm; padding: 1.2mm 2.6mm 1.2mm 2.4mm; margin: 0; }
+SvKudosMine, SvKudosMine.disabled { font-family: "native:MainBold"; font-size: 2.8mm; color: var(--text-muted); background-color: transparent; padding: 1.2mm 2.6mm 1.2mm 2.4mm; margin: 0; }
+SvPassQr { background-color: transparent; padding: 0; margin: 0; }
+SvPassPanel { background-color: #ffffff; border-radius: 3mm; padding: 3mm; margin: 3mm 0 2mm 0; }
+SvPassCode { background-color: transparent; font-family: "native:MainBold"; font-size: 7mm; color: var(--lime); padding: 0; margin: 0; }
 SvTile {
     background-color: var(--surface);
     border: 1px solid var(--line);
@@ -1443,7 +1463,19 @@ SvTileLabel { background-color: transparent; font-size: 2.3mm; color: var(--text
 SvCallout { background-color: var(--violet-tint); border-radius: 3mm; padding: 2.6mm; margin: 1.4mm 0 1.4mm 0; }
 SvCalloutText { font-size: 2.9mm; color: var(--violet); padding: 0; margin: 0; }
 
+SvWelcome { background-color: var(--ink); padding: 10mm 5mm 4mm 5mm; margin: 0; }
+SvWelcomeActions { background-color: transparent; padding: 2mm 5mm 4mm 5mm; margin: 0; }
+SvWelcomeIcon { background-color: transparent; color: var(--lime); padding: 0 2mm 0 0; margin: 0; }
+SvWelcomeTitle { background-color: transparent; font-family: "native:MainBold"; font-size: 11mm; color: var(--ink-text); padding: 4mm 0 0 0; margin: 0; }
+SvWelcomeTag { background-color: transparent; font-size: 4.2mm; color: var(--ink-muted); padding: 0 0 6mm 0; margin: 0; }
+SvWelcomeFeature { background-color: var(--ink-raised); border-radius: 3mm; padding: 2.6mm; margin: 1.2mm 0 1.2mm 0; }
+SvWelcomeFeatureIcon { background-color: transparent; color: var(--lime); padding: 0 2.6mm 0 0; margin: 0; }
+SvWelcomeFeatureText { background-color: transparent; font-size: 3.1mm; color: var(--ink-text); padding: 0; margin: 0; }
+
 @media (prefers-color-scheme: dark) {
+    SvDock { background-color: var(--surface-dark); border-top: 1px solid var(--surface-press-dark); }
+    SvWelcome { background-color: var(--ink-dark); }
+    SvWelcomeFeature { background-color: var(--ink-raised-dark); }
     SvClass { background-color: var(--surface-alt-dark); border: 1px solid var(--surface-press-dark); }
     SvClassStripe { background-color: var(--brand-dark); }
     SvClassScarce { color: var(--brand-dark); }

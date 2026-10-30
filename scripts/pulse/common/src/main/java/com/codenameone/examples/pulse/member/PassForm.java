@@ -23,10 +23,13 @@ import com.codename1.qrcode.QrCodeImage;
 import com.codename1.security.Hash;
 import com.codename1.security.Otp;
 import com.codename1.ui.CN;
+import com.codename1.ui.Component;
 import com.codename1.ui.Container;
+import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.util.UITimer;
 import com.codenameone.examples.pulse.api.MemberDto;
@@ -57,8 +60,8 @@ public final class PassForm {
 
     private final Form form = Ui.form("Membership pass", "Pass");
     private final Container body = Ui.page();
-    private final Label qr = new Label("", "SvPicture");
-    private final Label digits = new Label("", "SvAmount");
+    private final Label qr = new Label("", "SvPassQr");
+    private final Label digits = new Label("", "SvPassCode");
     private final Ring ring = new Ring();
     private PassDto pass;
     private byte[] secret;
@@ -108,14 +111,32 @@ public final class PassForm {
         secret = bytes(found.secret());
         shownCounter = -1;
         body.removeAll();
-        body.add(Ui.label(found.memberName(), "SvTitle"));
-        body.add(Ui.text(Lang.tr("Show this at the front desk. It changes every {0} seconds.",
+        // The pass is a card, like the one in a wallet: who it is for, the
+        // code on a white panel so any scanner reads it, and the digits for a
+        // desk whose scanner is down.
+        Container card = new Container(BoxLayout.y(), "SvInk");
+        card.setName("pass-card");
+        Container head = new Container(new BorderLayout(), "SvInkRow");
+        head.add(BorderLayout.CENTER, Ui.label("PULSE MEMBER", "SvInkEyebrow"));
+        Label mark = new Label("", "SvWelcomeIcon");
+        Ui.icon(mark, FontImage.MATERIAL_MONITOR_HEART, 4f);
+        head.add(BorderLayout.EAST, mark);
+        card.add(head);
+        card.add(Ui.label(found.memberName(), "SvInkTitle"));
+        Container panel = new Container(new BorderLayout(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE), "SvPassPanel");
+        panel.add(BorderLayout.CENTER, qr);
+        card.add(panel);
+        Container code = new Container(new BorderLayout(BorderLayout.CENTER_BEHAVIOR_CENTER),
+                "SvInkRow");
+        code.add(BorderLayout.CENTER, digits);
+        code.add(BorderLayout.EAST, ring);
+        card.add(code);
+        body.add(card);
+        body.add(Ui.text(Lang.tr("Show this at the front desk. It changes every {0} seconds, "
+                + "so a screenshot of it is no use to anyone.",
                 Integer.valueOf(found.periodSeconds())), "SvMuted"));
-        body.add(FlowLayout.encloseCenter(qr));
-        body.add(FlowLayout.encloseCenter(digits));
-        body.add(FlowLayout.encloseCenter(ring));
-        body.add(Ui.fact(Lang.tr("Key fob (NFC)"), found.nfcId()));
-        body.add(Ui.secondary("Lost your phone or fob? Replace the pass", "rotate",
+        body.add(Ui.text(Lang.tr("Key fob {0}", fob(found.nfcId())), "SvMuted"));
+        body.add(Ui.link("Lost your phone or fob? Replace the pass", "rotate",
                 e -> Api.household().rotatePass(found.memberId(), Net.to(rotated -> {
                     Ui.say("Your old pass and fob no longer open the door");
                     showPass(rotated);
@@ -139,7 +160,8 @@ public final class PassForm {
             String code = code(secret, counter, pass.digits());
             qr.setIcon(QrCodeImage.create(QrCode.encode(PREFIX + pass.memberId() + ":" + code,
                     QrCode.ECC_MEDIUM), Math.max(4, CN.convertToPixels(1.2f))));
-            digits.setText(code);
+            digits.setText(code.length() == 8 ? code.substring(0, 4) + " " + code.substring(4)
+                    : code);
             ring.start((int) (period - (now / 1000L) % period), period);
             form.revalidate();
         }
@@ -150,6 +172,15 @@ public final class PassForm {
             timer.cancel();
             timer = null;
         }
+    }
+
+    // The fob's id is long; its first eight characters are what the desk
+    // reads off a fob's label to match it.
+    private static String fob(String id) {
+        if (id == null || id.length() <= 8) {
+            return id == null ? "" : id;
+        }
+        return id.substring(0, 4) + " " + id.substring(4, 8) + "...";
     }
 
     /// The code a pass shows for `counter`, exactly as the server works it out.

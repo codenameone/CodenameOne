@@ -62,13 +62,18 @@ public final class Points {
     static int score(int visits, int streak, List<Workout> workouts) {
         int points = visits * VISIT + streak * STREAK_WEEK;
         for (int iter = 0; iter < workouts.size(); iter++) {
-            Workout row = workouts.get(iter);
-            points += row.getMinutes() / 5 * FIVE_MINUTES;
-            if (row.getAvgHr() > 0) {
-                points += HEART_RATE;
-                if (worn(row.getSource())) {
-                    points += WORN_SENSOR;
-                }
+            points += of(workouts.get(iter));
+        }
+        return points;
+    }
+
+    /// The points one workout earned.
+    public static int of(Workout row) {
+        int points = row.getMinutes() / 5 * FIVE_MINUTES;
+        if (row.getAvgHr() > 0) {
+            points += HEART_RATE;
+            if (worn(row.getSource())) {
+                points += WORN_SENSOR;
             }
         }
         return points;

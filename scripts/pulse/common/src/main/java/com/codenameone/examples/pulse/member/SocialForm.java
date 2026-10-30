@@ -25,6 +25,11 @@ import com.codename1.ui.Form;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codenameone.examples.pulse.net.Session;
+import com.codenameone.examples.pulse.api.UserDto;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.Sheet;
+import com.codename1.ui.Button;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codenameone.examples.pulse.api.FeedItemDto;
 import com.codenameone.examples.pulse.api.FriendDto;
@@ -67,6 +72,23 @@ public final class SocialForm {
     private static void fill(final Form form, Container list, List<FriendDto> friends,
             List<FeedItemDto> feed, final Runnable load) {
         list.removeAll();
+        Ui.section(list, "Friends");
+        for (int iter = 0; friends != null && iter < friends.size(); iter++) {
+            list.add(friend(form, friends.get(iter), iter, load));
+        }
+        if (friends == null || friends.isEmpty()) {
+            list.add(Ui.text("No friends yet. Training is better together.", "SvMuted"));
+        }
+
+        Ui.section(list, "Feed");
+        UserDto me = Session.user();
+        for (int iter = 0; feed != null && iter < feed.size(); iter++) {
+            list.add(feedRow(feed.get(iter), iter, me, load));
+        }
+        if (feed == null || feed.isEmpty()) {
+            list.add(Ui.text("Your friends' classes and workouts appear here.", "SvMuted"));
+        }
+
         Ui.section(list, "Add a friend");
         final TextField email = Ui.field(list, "Their email", "friendEmail",
                 "friend@example.com", TextArea.EMAILADDR);
@@ -81,56 +103,99 @@ public final class SocialForm {
                 load.run();
             }, Ui::fail));
         }));
-
-        Ui.section(list, "Friends");
-        for (int iter = 0; friends != null && iter < friends.size(); iter++) {
-            final FriendDto friend = friends.get(iter);
-            String detail = INCOMING.equals(friend.state()) ? Lang.tr("Wants to be friends")
-                    : REQUESTED.equals(friend.state()) ? Lang.tr("Asked, waiting for them")
-                    : Lang.tr("{0} week streak", Integer.valueOf(friend.weekStreak()));
-            list.add(Ui.row(FontImage.MATERIAL_PERSON, friend.name(), detail, null));
-            Container actions = new Container(new FlowLayout(Component.RIGHT));
-            if (INCOMING.equals(friend.state())) {
-                actions.add(Ui.link("Accept", "accept-" + iter,
-                        e -> Api.social().accept(friend.account(), Net.to(done -> load.run(),
-                                Ui::fail))));
-            }
-            if (FRIENDS.equals(friend.state())) {
-                actions.add(Ui.link("Invite to a class", "invite-" + iter,
-                        e -> invite(form, friend)));
-            }
-            actions.add(Ui.link(INCOMING.equals(friend.state()) ? "Decline" : "Remove",
-                    "remove-" + iter, e -> Api.social().remove(friend.account(),
-                            Net.to(done -> load.run(), Ui::fail))));
-            list.add(actions);
-        }
-        if (friends == null || friends.isEmpty()) {
-            list.add(Ui.text("No friends yet. Training is better together.", "SvMuted"));
-        }
-
-        Ui.section(list, "Feed");
-        for (int iter = 0; feed != null && iter < feed.size(); iter++) {
-            final FeedItemDto item = feed.get(iter);
-            StringBuilder detail = new StringBuilder(Ui.when(item.at()));
-            if (item.minutes() > 0) {
-                detail.append(Ui.DOT).append(Lang.tr("{0} min", Integer.valueOf(item.minutes())));
-            }
-            if (item.avgHr() > 0) {
-                detail.append(Ui.DOT).append(item.avgHr()).append(" bpm");
-            }
-            list.add(Ui.row(FontImage.MATERIAL_DIRECTIONS_RUN, item.name() + ": " + item.title(),
-                    detail.toString(), Ui.badge(String.valueOf(item.kudos()),
-                    item.kudoed() ? "SvBadgeGood" : "SvBadge")));
-            if (!item.kudoed()) {
-                list.add(FlowLayout.encloseRight(Ui.link("Give kudos", "kudos-" + iter,
-                        e -> Api.social().kudos(item.id(), Net.to(done -> load.run(),
-                                Ui::fail)))));
-            }
-        }
-        if (feed == null || feed.isEmpty()) {
-            list.add(Ui.text("Your friends' classes and workouts appear here.", "SvMuted"));
-        }
         Ui.refresh(form);
+    }
+
+    // A friend: a tap offers what can be done with them, and a request that
+    // came in has its Accept right on the row.
+    private static Container friend(final Form form, final FriendDto friend, int iter,
+            final Runnable load) {
+        boolean incoming = INCOMING.equals(friend.state());
+        String detail = incoming ? Lang.tr("Wants to be friends")
+                : REQUESTED.equals(friend.state()) ? Lang.tr("Asked, waiting for them")
+                : friend.weekStreak() > 0 ? Lang.tr("{0} week streak",
+                        Integer.valueOf(friend.weekStreak())) : Lang.tr("Getting started");
+        Component end = null;
+        if (incoming) {
+            Button accept = new Button(Lang.tr("Accept"), "SvPillBook");
+            accept.setName("accept-" + iter);
+            accept.addActionListener(e -> Api.social().accept(friend.account(),
+                    Net.to(done -> load.run(), Ui::fail)));
+            end = accept;
+        } else if (FRIENDS.equals(friend.state())) {
+            Button invite = new Button(Lang.tr("Invite"), "SvPillQueue");
+            invite.setName("invite-" + iter);
+            invite.addActionListener(e -> invite(form, friend));
+            end = invite;
+        }
+        Container row = new Container(new BorderLayout(), "SvRow");
+        row.setName("friend-" + iter);
+        row.add(BorderLayout.WEST, Ui.avatar(friend.name()));
+        Container lines = new Container(BoxLayout.y(), "SvAvatarLines");
+        lines.add(Ui.label(friend.name(), "SvRowTitle"));
+        lines.add(Ui.label(detail, "SvRowDetail"));
+        Container east = new Container(new FlowLayout(Component.RIGHT, Component.CENTER));
+        if (end != null) {
+            east.add(end);
+        }
+        // The rarer actions are a tap on the friend, not a button of their
+        // own, which left too little room for the name.
+        row.add(BorderLayout.CENTER, Ui.tap(lines, "remove-" + iter, e -> {
+            final Sheet sheet = new Sheet(null, friend.name());
+            sheet.getContentPane().setLayout(BoxLayout.y());
+            sheet.getContentPane().add(Ui.link(incoming ? "Decline" : "Remove friend",
+                    "confirm-remove-" + iter, ev -> {
+                        sheet.back();
+                        Api.social().remove(friend.account(), Net.to(done -> load.run(),
+                                Ui::fail));
+                    }));
+            sheet.show();
+        }));
+        row.add(BorderLayout.EAST, east);
+        return row;
+    }
+
+    // One thing a friend did. Kudos is a pill with the count on it: a tap
+    // gives kudos once, and after that it shows they were given.
+    private static Container feedRow(final FeedItemDto item, int iter, UserDto me,
+            final Runnable load) {
+        boolean mine = me != null && item.name() != null && item.name().equals(me.displayName());
+        StringBuilder detail = new StringBuilder(Ui.when(item.at()));
+        if (item.minutes() > 0) {
+            detail.append(Ui.DOT).append(Lang.tr("{0} min", Integer.valueOf(item.minutes())));
+        }
+        if (item.avgHr() > 0) {
+            detail.append(Ui.DOT).append(item.avgHr()).append(" bpm");
+        }
+        Container row = new Container(new BorderLayout(), "SvRow");
+        row.setName("feed-" + iter);
+        row.add(BorderLayout.WEST, Ui.avatar(item.name()));
+        Container lines = new Container(BoxLayout.y(), "SvAvatarLines");
+        lines.add(Ui.text(Lang.tr(mine ? "You did {1}" : "{0} did {1}",
+                first(item.name()), WorkoutsForm.title(item.title())), "SvRowTitle"));
+        lines.add(Ui.label(detail.toString(), "SvRowDetail"));
+        row.add(BorderLayout.CENTER, lines);
+        final Button kudos = new Button(String.valueOf(item.kudos()),
+                mine ? "SvKudosMine" : item.kudoed() ? "SvKudosGiven" : "SvKudos");
+        Ui.icon(kudos, item.kudoed() ? FontImage.MATERIAL_FAVORITE
+                : FontImage.MATERIAL_FAVORITE_BORDER, 2.8f);
+        kudos.setName("kudos-" + iter);
+        kudos.setAccessibilityText(Lang.tr("{0} kudos", Integer.valueOf(item.kudos())));
+        if (!item.kudoed() && !mine) {
+            kudos.addActionListener(e -> {
+                kudos.setEnabled(false);
+                Api.social().kudos(item.id(), Net.to(done -> load.run(), Ui::fail));
+            });
+        } else {
+            kudos.setEnabled(false);
+        }
+        row.add(BorderLayout.EAST, FlowLayout.encloseCenterMiddle(kudos));
+        return row;
+    }
+
+    private static String first(String name) {
+        int space = name == null ? -1 : name.indexOf(' ');
+        return space > 0 ? name.substring(0, space) : name == null ? "" : name;
     }
 
     /// Picks one of the classes the member is booked into and invites

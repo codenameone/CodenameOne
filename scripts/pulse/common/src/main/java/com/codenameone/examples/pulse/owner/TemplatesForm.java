@@ -48,8 +48,8 @@ public final class TemplatesForm {
                 Ui.failed(list, load[0])));
         Ui.pull(list, load[0]);
         form.add(BorderLayout.CENTER, list);
-        form.add(BorderLayout.SOUTH, Ui.primary("New template", "newTemplate",
-                e -> edit(form, null, load[0])));
+        form.add(BorderLayout.SOUTH, Ui.dock(Ui.primary("New template", "newTemplate",
+                e -> edit(form, null, load[0]))));
         form.show();
         load[0].run();
     }

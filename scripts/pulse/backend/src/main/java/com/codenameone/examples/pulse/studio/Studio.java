@@ -169,6 +169,12 @@ public class Studio {
         return id == null || id.length() == 0 || id.length() > 32 ? null : sessions.findById(id);
     }
 
+    /// The name of the kind of class `session` is, or null.
+    public String className(ClassSession session) {
+        ClassType type = session == null ? null : types.findById(session.getClassTypeId());
+        return type == null ? null : type.getName();
+    }
+
     /// A class, or 404.
     public ClassSession session(String id) {
         ClassSession row = sessionOrNull(id);

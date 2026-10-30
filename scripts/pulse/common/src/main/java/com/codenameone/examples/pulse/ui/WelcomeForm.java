@@ -31,21 +31,44 @@ public final class WelcomeForm {
     private WelcomeForm() {
     }
 
+    private static Container feature(char glyph, String text) {
+        Container row = new Container(new BorderLayout(), "SvWelcomeFeature");
+        Label icon = new Label("", "SvWelcomeFeatureIcon");
+        Ui.icon(icon, glyph, 3.6f);
+        row.add(BorderLayout.WEST, icon);
+        row.add(BorderLayout.CENTER, Ui.text(text, "SvWelcomeFeatureText"));
+        return row;
+    }
+
     public static void show() {
         final Form form = Ui.form("", "Welcome");
+        form.getContentPane().setUIID("SvWelcome");
         form.getToolbar().hideToolbar();
 
         Container hero = new Container(BoxLayout.y());
-        hero.setUIID("SvHero");
+        hero.setUIID("SvWelcome");
         hero.setSafeArea(true);
-        Label icon = new Label("", "SvHeroIcon");
-        Ui.icon(icon, FontImage.MATERIAL_RESTAURANT_MENU, 10f);
-        hero.add(icon);
-        hero.add(Ui.label("Pulse", "SvHeroTitle"));
-        hero.add(Ui.text("Good food from places nearby, brought to your door.", "SvHeroText"));
+        Container mark = new Container(new BorderLayout(), "SvInkRow");
+        Label icon = new Label("", "SvWelcomeIcon");
+        Ui.icon(icon, FontImage.MATERIAL_MONITOR_HEART, 7f);
+        mark.add(BorderLayout.WEST, icon);
+        Beat beat = new Beat("SvBeat", true);
+        beat.setPreferredH(com.codename1.ui.CN.convertToPixels(9));
+        mark.add(BorderLayout.CENTER, beat);
+        hero.add(mark);
+        hero.add(Ui.label("Pulse", "SvWelcomeTitle"));
+        hero.add(Ui.text("Your studio in your pocket.", "SvWelcomeTag"));
+        hero.add(feature(FontImage.MATERIAL_EVENT_AVAILABLE,
+                "Book classes for you and your family in two taps"));
+        hero.add(feature(FontImage.MATERIAL_QR_CODE,
+                "Walk in with a pass on your phone or your watch"));
+        hero.add(feature(FontImage.MATERIAL_EMOJI_EVENTS,
+                "Earn points and badges for every class you show up to"));
 
         Container actions = Ui.page();
         actions.setScrollableY(false);
+        actions.setUIID("SvWelcomeActions");
+        actions.setSafeArea(true);
         actions.add(Ui.primary("Sign in", "signIn", e -> SignInForm.show(form)));
         actions.add(Ui.secondary("Create an account", "register", e -> RegisterForm.show(form)));
         if (AppConfig.serverSwitchable()) {

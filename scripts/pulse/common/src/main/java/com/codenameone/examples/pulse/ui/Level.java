@@ -115,7 +115,9 @@ public final class Level extends Component {
         String text = String.valueOf(level);
         Font font = style.getFont();
         g.setFont(font);
-        g.setColor(style.getFgColor());
+        // The number takes the track's dark colour: lime text on a light page
+        // could not be read.
+        g.setColor(track);
         g.drawString(text, getX() + (getWidth() - font.stringWidth(text)) / 2,
                 getY() + (getHeight() - font.getHeight()) / 2);
     }

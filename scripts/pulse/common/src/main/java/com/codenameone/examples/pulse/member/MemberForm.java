@@ -91,7 +91,7 @@ public class MemberForm extends LiveChannel.Adapter implements Nav.Home {
         bar.add(BorderLayout.WEST, menu.flatButton());
         bar.add(BorderLayout.CENTER, Ui.label(Lang.tr(greeting(),
                 user == null ? "" : first(user.displayName())), "SvTitle"));
-        bar.add(BorderLayout.EAST, Ui.flat(FontImage.MATERIAL_QR_CODE, "home-pass",
+        bar.add(BorderLayout.EAST, Ui.flat(FontImage.MATERIAL_QR_CODE, "Membership pass", "home-pass",
                 e -> PassForm.show(form, null)));
 
         Container page = Ui.page();

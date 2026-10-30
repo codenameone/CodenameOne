@@ -117,8 +117,8 @@ public final class StaffForm {
         }, Ui.failed(list, load[0])));
         Ui.pull(list, load[0]);
         form.add(BorderLayout.CENTER, list);
-        form.add(BorderLayout.SOUTH, Ui.primary("Add a shift", "addShift",
-                e -> addShift(form, load[0])));
+        form.add(BorderLayout.SOUTH, Ui.dock(Ui.primary("Add a shift", "addShift",
+                e -> addShift(form, load[0]))));
         form.show();
         load[0].run();
     }

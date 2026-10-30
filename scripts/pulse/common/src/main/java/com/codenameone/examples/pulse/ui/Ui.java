@@ -163,6 +163,11 @@ public final class Ui {
         Command back = form.getToolbar().setBackCommand(window ? Lang.tr("Back") : "",
                 e -> leave.run());
         if (!window) {
+            Button arrow = form.getToolbar().findCommandComponent(back);
+            if (arrow != null) {
+                arrow.setAccessibilityText(Lang.tr("Back"));
+                arrow.setName("back");
+            }
             return;
         }
         back.setDesktopMenu(Command.DESKTOP_MENU_VIEW);
@@ -237,18 +242,32 @@ public final class Ui {
         return button(text, name, "SvLink", onClick);
     }
 
-    /// A round button that floats over the map.
+    /// A round button that floats over the content.
     public static Button round(char icon, String name, ActionListener<ActionEvent> onClick) {
         Button button = button("", name, "SvMapButton", onClick);
         icon(button, icon, 4f);
         return button;
     }
 
+    /// A screen's main action, docked under its content with the page's own
+    /// margins, so that it never runs edge to edge.
+    public static Container dock(Component action) {
+        Container dock = new Container(new BorderLayout());
+        dock.setUIID("SvDock");
+        dock.setSafeArea(true);
+        dock.add(BorderLayout.CENTER, action);
+        return dock;
+    }
+
     /// The same button for a bar that is a surface of its own: flat, since a
     /// shadow says "this floats", and on a bar nothing does.
-    public static Button flat(char icon, String name, ActionListener<ActionEvent> onClick) {
+    ///
+    /// @param spoken what a screen reader says for it, since it has no text
+    public static Button flat(char icon, String spoken, String name,
+            ActionListener<ActionEvent> onClick) {
         Button button = button("", name, "SvBarButton", onClick);
         icon(button, icon, 4f);
+        button.setAccessibilityText(Lang.tr(spoken));
         return button;
     }
 
@@ -277,6 +296,12 @@ public final class Ui {
         // Initials are not words: looking them up would translate "OK".
         avatar.setShouldLocalize(false);
         avatar.setText(initials(name));
+        // One colour per person, so two people with the same initials still
+        // read as two people.
+        int[] palette = {0xdc3418, 0x7c4dff, 0x1f9d6b, 0x2f6fd6, 0xe08a00, 0xc2185b};
+        int hash = name == null ? 0 : name.hashCode();
+        avatar.getAllStyles().setBorder(com.codename1.ui.plaf.RoundBorder.create()
+                .color(palette[(hash & 0x7fffffff) % palette.length]));
         return avatar;
     }
 

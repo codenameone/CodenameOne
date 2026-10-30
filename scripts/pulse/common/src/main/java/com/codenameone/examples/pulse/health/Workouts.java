@@ -71,6 +71,10 @@ public final class Workouts {
     /// Where a posted workout came from.
     public static final String SOURCE_HEALTH = "HEALTH";
     public static final String SOURCE_CLASS = "CLASS";
+    /// A class measured by a heart rate strap: the server gives it a bonus.
+    public static final String SOURCE_STRAP = "STRAP";
+    /// A class measured by the watch the platform's workout collects from.
+    public static final String SOURCE_WATCH = "WATCH";
     /// The heart rate is sent no more often than this.
     private static final long SEND_EVERY = 5000L;
 
@@ -87,6 +91,9 @@ public final class Workouts {
     private static SessionDto recordingClass;
     private static SensorScan scan;
     private static SensorSession strap;
+    // What measured the class being recorded: the strap, the watch, or
+    // nothing worn ([#SOURCE_CLASS]).
+    private static String measuredBy = SOURCE_CLASS;
     private static Progress progress;
     private static boolean shared;
     private static long lastSent;
@@ -181,7 +188,7 @@ public final class Workouts {
     private static WorkoutDto shared(WorkoutDto workout, boolean share) {
         return new WorkoutDto(workout.id(), workout.sessionId(), workout.activity(),
                 workout.startedAt(), workout.minutes(), workout.avgHr(), workout.maxHr(),
-                workout.calories(), workout.zones(), workout.source(), share);
+                workout.calories(), workout.zones(), workout.source(), share, workout.points());
     }
 
     private static WorkoutDto dto(WorkoutSample workout, String sessionId, String source,
@@ -193,7 +200,7 @@ public final class Workouts {
                 HealthUnit.KILOCALORIE));
         return new WorkoutDto(null, sessionId, activityName(workout.getActivityType()),
                 workout.getStartMillis(), (int) (millis / 60000L), avg, max, calories, null,
-                source, false);
+                source, false, 0);
     }
 
     private static String activityName(WorkoutActivityType type) {
@@ -236,6 +243,7 @@ public final class Workouts {
         progress = listener;
         shared = share;
         beats = 0;
+        measuredBy = SOURCE_CLASS;
         beatTotal = 0;
         maxBeat = 0;
         lastSent = 0;
@@ -354,7 +362,7 @@ public final class Workouts {
             finish(new WorkoutDto(null, session.id(), activityName(activity(session.category())),
                     session.startsAt(), (int) ((Math.min(System.currentTimeMillis(),
                     session.endsAt()) - session.startsAt()) / 60000L), avg, max, 0, null,
-                    SOURCE_CLASS, shared));
+                    measuredBy, shared, 0));
             return;
         }
         workout.removeListener(WORKOUT_LISTENER);
@@ -363,10 +371,10 @@ public final class Workouts {
                 finish(new WorkoutDto(null, session.id(), activityName(activity(
                         session.category())), workout.getStartedAtMillis(),
                         (int) (workout.getElapsedMillis() / 60000L), avg, max, 0, null,
-                        SOURCE_CLASS, shared));
+                        measuredBy, shared, 0));
                 return;
             }
-            finish(shared(dto(written, session.id(), SOURCE_CLASS, avg, max), shared));
+            finish(shared(dto(written, session.id(), measuredBy, avg, max), shared));
         });
     }
 
@@ -405,6 +413,7 @@ public final class Workouts {
         public void sensorSample(SensorSession session, HealthSample sample) {
             if (sample instanceof QuantitySample
                     && HealthDataType.HEART_RATE.equals(sample.getType())) {
+                measuredBy = SOURCE_STRAP;
                 beat((int) Math.round(((QuantitySample) sample).getValue(
                         HealthUnit.COUNT_PER_MINUTE)));
             }
@@ -436,6 +445,7 @@ public final class Workouts {
             HealthQuantity average = session.getStatistic(HealthDataType.HEART_RATE,
                     AggregateMetric.AVERAGE);
             if (average != null) {
+                measuredBy = SOURCE_WATCH;
                 beat((int) Math.round(average.getValue(HealthUnit.COUNT_PER_MINUTE)));
             }
         }

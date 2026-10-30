@@ -36,5 +36,6 @@ public record WorkoutDto(
         int calories,
         List<Integer> zones,
         String source,
-        boolean shared) {
+        boolean shared,
+        int points) {
 }

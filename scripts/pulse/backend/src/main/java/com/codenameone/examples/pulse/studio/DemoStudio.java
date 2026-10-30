@@ -29,6 +29,7 @@ import com.codenameone.examples.pulse.domain.Booking;
 import com.codenameone.examples.pulse.domain.CheckIn;
 import com.codenameone.examples.pulse.domain.ClassSession;
 import com.codenameone.examples.pulse.domain.ClassType;
+import com.codenameone.examples.pulse.domain.Friend;
 import com.codenameone.examples.pulse.domain.Invoice;
 import com.codenameone.examples.pulse.domain.Location;
 import com.codenameone.examples.pulse.domain.Member;
@@ -41,6 +42,7 @@ import com.codenameone.examples.pulse.repository.BookingRepository;
 import com.codenameone.examples.pulse.repository.CheckInRepository;
 import com.codenameone.examples.pulse.repository.ClassSessionRepository;
 import com.codenameone.examples.pulse.repository.ClassTypeRepository;
+import com.codenameone.examples.pulse.repository.FriendRepository;
 import com.codenameone.examples.pulse.repository.InvoiceRepository;
 import com.codenameone.examples.pulse.repository.LocationRepository;
 import com.codenameone.examples.pulse.repository.MemberRepository;
@@ -106,6 +108,7 @@ public class DemoStudio {
     private final CheckInRepository checkIns;
     private final InvoiceRepository invoices;
     private final WorkoutRepository workouts;
+    private final FriendRepository friends;
     /// A fixed sequence, so that every demo database has the same history.
     private long seed = 20261030L;
 
@@ -114,7 +117,7 @@ public class DemoStudio {
             StaffRepository staff, MembershipPlanRepository plans,
             MembershipRepository memberships, MemberRepository members,
             BookingRepository bookings, CheckInRepository checkIns, InvoiceRepository invoices,
-            WorkoutRepository workouts) {
+            WorkoutRepository workouts, FriendRepository friends) {
         this.accounts = accounts;
         this.config = config;
         this.locations = locations;
@@ -129,6 +132,7 @@ public class DemoStudio {
         this.checkIns = checkIns;
         this.invoices = invoices;
         this.workouts = workouts;
+        this.friends = friends;
     }
 
     @PostConstruct
@@ -249,6 +253,17 @@ public class DemoStudio {
         sign(rae);
         Membership raes = membership(rae, OFF_PEAK, "PAST_DUE", 60, 0, now);
         overdue(raes, 5900L, now);
+        // Robin trains with Riley: friends both ways, so each sees the
+        // other's classes in the feed and on the timetable.
+        Member robin = self(DemoAccounts.SECOND_MEMBER);
+        if (robin != null) {
+            sign(robin);
+            membership(robin, UNLIMITED, "ACTIVE", 300, 0, now);
+            if (rileySelf != null) {
+                befriend(rileySelf.getAccount(), robin.getAccount(), now);
+                befriend(robin.getAccount(), rileySelf.getAccount(), now);
+            }
+        }
         Member lee = self(DemoAccounts.LAPSED_MEMBER);
         sign(lee);
         membership(lee, PACK, "ACTIVE", 200, 4, now);
@@ -265,6 +280,10 @@ public class DemoStudio {
             if (rileySelf != null && (HIIT.equals(type) || "type-yoga".equals(type))
                     && DOWNTOWN.equals(session.getLocationId()) && next(5) == 0) {
                 attended(rileySelf, session, next(9) != 0);
+            }
+            if (robin != null && (HIIT.equals(type) || "type-ride".equals(type))
+                    && DOWNTOWN.equals(session.getLocationId()) && next(4) == 0) {
+                attended(robin, session, true);
             }
             if (kai != null && LITTLE_MOVERS.equals(type) && next(3) != 0) {
                 attended(kai, session, true);
@@ -530,7 +549,8 @@ public class DemoStudio {
         row.setId(Ids.next());
         row.setAccount(member.getAccount());
         row.setSessionId(session.getId());
-        row.setActivity("CLASS");
+        String name = className(session);
+        row.setActivity(name == null ? "Class" : name);
         row.setStartedAt(session.getStartsAt());
         row.setMinutes(minutes);
         row.setAvgHr(avg);
@@ -547,6 +567,21 @@ public class DemoStudio {
         row.setShared(kind != 5);
         row.setCreatedAt(session.getEndsAt());
         workouts.insert(row);
+    }
+
+    private void befriend(String account, String other, Instant at) throws IOException {
+        Friend row = new Friend();
+        row.setId(Ids.next());
+        row.setAccount(account);
+        row.setFriend(other);
+        row.setState("ACCEPTED");
+        row.setCreatedAt(at);
+        friends.insert(row);
+    }
+
+    private String className(ClassSession session) {
+        ClassType type = types.findById(session.getClassTypeId());
+        return type == null ? null : type.getName();
     }
 
     private void book(Member member, ClassSession session) throws IOException {

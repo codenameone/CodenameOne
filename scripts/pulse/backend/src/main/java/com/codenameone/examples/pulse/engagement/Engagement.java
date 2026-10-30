@@ -348,14 +348,18 @@ public class Engagement {
             }
         }
         String sessionId = request.sessionId() == null ? "" : request.sessionId();
-        if (sessionId.length() > 0 && studio.sessionOrNull(sessionId) == null) {
+        ClassSession attended = studio.sessionOrNull(sessionId);
+        if (attended == null) {
             sessionId = "";
         }
         Workout row = new Workout();
         row.setId(Ids.next());
         row.setAccount(account);
         row.setSessionId(sessionId);
-        row.setActivity(cut(text(request.activity(), "Workout"), 60));
+        // A class's workout is called what the class is called, whatever the
+        // device named it, so the history and the friends' feed say "HIIT Burn".
+        String named = attended == null ? null : studio.className(attended);
+        row.setActivity(cut(named != null ? named : text(request.activity(), "Workout"), 60));
         row.setStartedAt(started);
         row.setMinutes(request.minutes());
         row.setAvgHr(request.avgHr());
@@ -397,7 +401,8 @@ public class Engagement {
         }
         return new WorkoutDto(row.getId(), row.getSessionId(), row.getActivity(),
                 row.getStartedAt().toEpochMilli(), row.getMinutes(), row.getAvgHr(),
-                row.getMaxHr(), row.getCalories(), zones, row.getSource(), row.isShared());
+                row.getMaxHr(), row.getCalories(), zones, row.getSource(), row.isShared(),
+                Points.of(row));
     }
 
     private static String zones(List<Integer> minutes) {

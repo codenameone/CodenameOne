@@ -213,27 +213,7 @@ public final class ScheduleForm extends LiveChannel.Adapter {
                 : Classes.bookingOf(bookings, session.id(), member.id());
         Component action = null;
         if (held != null) {
-            // Booked: the pill says so, and a tap on it offers what a member
-            // does with a booking -- cancel it or put it in the calendar.
-            final Button pill = new Button(Classes.WAITLISTED.equals(held.state())
-                    ? Lang.tr("Queue #{0}", Integer.valueOf(held.position()))
-                    : Lang.tr("Booked"), "SvPillBooked");
-            pill.setName("booked-" + session.id());
-            pill.addActionListener(e -> {
-                Sheet sheet = new Sheet(null, session.name());
-                Container content = sheet.getContentPane();
-                content.setLayout(BoxLayout.y());
-                content.add(Ui.secondary("Add to calendar", "calendar-" + session.id(), ev -> {
-                    sheet.back();
-                    Classes.addToCalendar(session);
-                }));
-                content.add(Ui.link("Cancel this booking", "cancel-" + session.id(), ev -> {
-                    sheet.back();
-                    Classes.cancel(held, this::load);
-                }));
-                sheet.show();
-            });
-            action = pill;
+            action = Classes.bookedPill(session, held, this::load);
         } else if (!"CANCELLED".equals(session.state())) {
             boolean full = session.booked() >= session.capacity();
             final Button book = new Button(full ? Lang.tr("Queue") : Lang.tr("Book"),
