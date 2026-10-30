@@ -63,6 +63,13 @@ public final class Classes {
 
     /// Books `member` into `session`; a full class puts them in its queue.
     public static void book(SessionDto session, MemberDto member, final Runnable done) {
+        book(session, member, done, null);
+    }
+
+    /// The same, with `failed` run after a refusal has been shown, so the
+    /// caller can offer the button again.
+    public static void book(SessionDto session, MemberDto member, final Runnable done,
+            final Runnable failed) {
         final boolean child = member != null && "CHILD".equals(member.relation());
         Api.bookings().book(new BookRequestDto(session.id(), member == null ? null : member.id(),
                 null), Net.to(booking -> {
@@ -72,7 +79,12 @@ public final class Classes {
                             Integer.valueOf(booking.position())) : Lang.tr("Booked"));
                     Reminders.refresh();
                     done.run();
-                }, Ui::fail));
+                }, (status, message) -> {
+                    Ui.fail(status, message);
+                    if (failed != null) {
+                        failed.run();
+                    }
+                }));
     }
 
     public static void cancel(BookingDto booking, final Runnable done) {

@@ -22,20 +22,24 @@ import com.codename1.ui.Container;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codenameone.examples.pulse.api.SessionDto;
+import com.codenameone.examples.pulse.live.LiveChannel;
+import com.codenameone.examples.pulse.member.Classes;
+import com.codenameone.examples.pulse.net.Api;
+import com.codenameone.examples.pulse.net.Net;
 import com.codenameone.examples.pulse.ui.Lang;
 import com.codenameone.examples.pulse.ui.Menu;
 import com.codenameone.examples.pulse.ui.Nav;
 import com.codenameone.examples.pulse.ui.Ui;
+import java.util.List;
 
-/// The trainer's home: today's classes, rosters and the live class view.
-///
-/// STUB: the home and its menu entries are in place so navigation by role
-/// works end to end; the screens behind them are built in the next phase.
-/// Each menu entry below names the screen it will open and the `TrainerApi`
-/// call that feeds it.
-public class TrainerForm implements Nav.Home {
+/// The trainer's home: the classes they teach this week, each leading to its
+/// roster, and from there to the live view of the class.
+public class TrainerForm extends LiveChannel.Adapter implements Nav.Home {
     private final Form form = Ui.home("Trainer");
     private final Menu menu = new Menu(form, Nav.TRAINER);
+    private final Container list = Ui.list("trainer");
+    private List<SessionDto> classes;
 
     @Override
     public Form form() {
@@ -44,31 +48,82 @@ public class TrainerForm implements Nav.Home {
 
     @Override
     public void start() {
-        // STUB: TrainerClassesForm (TrainerApi.classes)
-        menu.item(FontImage.MATERIAL_EVENT, "My classes", "classes", this::soon);
-        // STUB: RosterForm: mark attendance (TrainerApi.roster/attendance)
-        menu.item(FontImage.MATERIAL_CHECK_CIRCLE, "Roster", "roster", this::soon);
-        // STUB: LiveClassForm: heart rate zones (LiveChannel.heartRate)
-        menu.item(FontImage.MATERIAL_FAVORITE, "Live class", "live", this::soon);
-        // STUB: ShiftsForm: availability and swaps (TrainerApi.shifts)
-        menu.item(FontImage.MATERIAL_SCHEDULE, "Shifts", "shifts", this::soon);
+        menu.item(FontImage.MATERIAL_EVENT, "My classes", "classes", () -> form.showBack());
+        menu.item(FontImage.MATERIAL_FAVORITE, "Live class", "live", this::live);
+        menu.item(FontImage.MATERIAL_SCHEDULE, "Shifts", "shifts", () -> ShiftsForm.show(form));
         Container bar = new Container(new BorderLayout());
         bar.setUIID("SvHomeBar");
         bar.add(BorderLayout.WEST, menu.flatButton());
         bar.add(BorderLayout.CENTER, Ui.label("Coaching", "SvTitle"));
-        Container page = Ui.page();
-        page.setName("trainer");
-        page.add(Ui.empty(FontImage.MATERIAL_SPORTS, Lang.tr("Coaching"),
-                Lang.tr("Your classes, rosters and live heart rate zones are on their way.")));
+        Ui.pull(list, this::load);
         Container shell = new Container(new BorderLayout());
         shell.add(BorderLayout.NORTH, bar);
-        shell.add(BorderLayout.CENTER, page);
+        shell.add(BorderLayout.CENTER, list);
         form.add(shell);
         menu.install();
+        form.addShowListener(e -> {
+            LiveChannel.listen(this);
+            load();
+        });
     }
 
-    // STUB: replaced by the real screen in the next phase.
-    private void soon() {
-        Ui.say("Coming soon");
+    private void load() {
+        Api.trainer().classes(Net.to(found -> {
+            classes = found;
+            fill();
+        }, Ui.failed(list, this::load)));
+    }
+
+    private void fill() {
+        list.removeAll();
+        Ui.section(list, "This week");
+        for (int iter = 0; classes != null && iter < classes.size(); iter++) {
+            final SessionDto session = classes.get(iter);
+            boolean cancelled = Classes.CANCELLED.equals(session.state());
+            Container row = Ui.row(FontImage.MATERIAL_FITNESS_CENTER, session.name(),
+                    Ui.when(session.startsAt()) + Ui.DOT + session.roomName(),
+                    Ui.badge(cancelled ? Lang.tr("Cancelled")
+                            : session.booked() + "/" + session.capacity(),
+                            cancelled ? "SvBadgeBad" : "SvBadge"));
+            list.add(Ui.tap(row, "class-" + session.id(), e -> RosterForm.show(form, session)));
+        }
+        if (classes == null || classes.isEmpty()) {
+            list.add(Ui.empty(FontImage.MATERIAL_SPORTS, Lang.tr("No classes this week"),
+                    Lang.tr("Classes the studio gives you appear here.")));
+        }
+        Ui.refresh(form);
+    }
+
+    /// Opens the class that is on now, or the next one.
+    private void live() {
+        SessionDto now = current(classes, System.currentTimeMillis());
+        if (now == null) {
+            Ui.say(Lang.tr("No class today"));
+            return;
+        }
+        LiveClassForm.show(form, now);
+    }
+
+    /// The class running at `at`, else the next to start; cancelled ones never.
+    static SessionDto current(List<SessionDto> classes, long at) {
+        SessionDto next = null;
+        for (int iter = 0; classes != null && iter < classes.size(); iter++) {
+            SessionDto session = classes.get(iter);
+            if (Classes.CANCELLED.equals(session.state()) || session.endsAt() < at) {
+                continue;
+            }
+            if (session.startsAt() <= at) {
+                return session;
+            }
+            if (next == null || session.startsAt() < next.startsAt()) {
+                next = session;
+            }
+        }
+        return next;
+    }
+
+    @Override
+    public void sessionChanged(String id, int booked, int waitlisted, String state) {
+        load();
     }
 }

@@ -28,6 +28,7 @@ import com.codenameone.examples.pulse.api.StatsDto;
 import com.codenameone.examples.pulse.api.UserDto;
 import com.codenameone.examples.pulse.live.LiveChannel;
 import com.codenameone.examples.pulse.net.Api;
+import com.codenameone.examples.pulse.watch.WatchBridge;
 import com.codenameone.examples.pulse.net.Net;
 import com.codenameone.examples.pulse.net.Session;
 import com.codenameone.examples.pulse.ui.Chart;
@@ -73,6 +74,9 @@ public class MemberForm extends LiveChannel.Adapter implements Nav.Home {
                 () -> MembershipForm.show(form));
         menu.item(FontImage.MATERIAL_BEACH_ACCESS, "Away", "away", () -> AwayForm.show(form));
         menu.item(FontImage.MATERIAL_INBOX, "Inbox", "nudges", () -> NudgesForm.show(form));
+        menu.item(FontImage.MATERIAL_GROUP, "Friends", "social", () -> SocialForm.show(form));
+        menu.item(FontImage.MATERIAL_DIRECTIONS_RUN, "Workouts", "workouts",
+                () -> WorkoutsForm.show(form));
 
         UserDto user = Session.user();
         Container bar = new Container(new BorderLayout());
@@ -113,6 +117,9 @@ public class MemberForm extends LiveChannel.Adapter implements Nav.Home {
         Api.bookings().upcoming(Net.to(this::showNext, Ui::fail));
         Api.engagement().stats(Net.to(this::showStats, Ui::fail));
         Api.membership().memberships(Net.to(this::showPlan, Ui::fail));
+        // The watch shows the next class and the door code; it is told again
+        // whenever the home is, which is after anything that changes either.
+        WatchBridge.publish();
     }
 
     private void showNext(List<BookingDto> bookings) {

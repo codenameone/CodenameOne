@@ -227,7 +227,7 @@ public final class ScheduleForm extends LiveChannel.Adapter {
                     : Ui.primary("Book", "book-" + session.id(), null);
             book.addActionListener(e -> {
                 book.setEnabled(false);
-                Classes.book(session, member, this::load);
+                Classes.book(session, member, this::load, () -> book.setEnabled(true));
             });
             actions.add(book);
         }
