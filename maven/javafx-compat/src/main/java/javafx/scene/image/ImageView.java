@@ -312,4 +312,42 @@ public class ImageView extends Node {
         double[] size = shownSize();
         renderer.drawImage(picture, getX(), getY(), size[0], size[1]);
     }
+
+    // -------------------------------------------------------------- styling
+
+    @Override
+    protected Object cn1StyleValue(String property) {
+        if ("-fx-fit-width".equals(property)) {
+            return Double.valueOf(getFitWidth());
+        } else if ("-fx-fit-height".equals(property)) {
+            return Double.valueOf(getFitHeight());
+        } else if ("-fx-preserve-ratio".equals(property)) {
+            return Boolean.valueOf(isPreserveRatio());
+        }
+        return super.cn1StyleValue(property);
+    }
+
+    @Override
+    protected boolean cn1SetStyleValue(String property, Object value) {
+        boolean w = "-fx-fit-width".equals(property);
+        if (w || "-fx-fit-height".equals(property)) {
+            if (!(value instanceof Number)) {
+                return false;
+            }
+            double d = ((Number) value).doubleValue();
+            if (w) {
+                setFitWidth(d);
+            } else {
+                setFitHeight(d);
+            }
+            return true;
+        } else if ("-fx-preserve-ratio".equals(property)) {
+            if (!(value instanceof Boolean)) {
+                return false;
+            }
+            setPreserveRatio(((Boolean) value).booleanValue());
+            return true;
+        }
+        return super.cn1SetStyleValue(property, value);
+    }
 }

@@ -204,7 +204,12 @@ public class Cell<T> extends Labeled {
         Node g = getGraphic();
         if (g != null) {
             boolean show = shownGraphic() != null;
-            g.setVisible(show);
+            // A graphic whose visibility the application bound must not be
+            // set (JavaFX's skin never touches it); it already says itself
+            // whether it shows.
+            if (!g.visibleProperty().isBound()) {
+                g.setVisible(show);
+            }
             if (show) {
                 Insets in = getInsets();
                 double w = g.prefWidth(-1);

@@ -118,4 +118,25 @@ public final class ValueListeners<T> {
             }
         }
     }
+
+    /// Tells every listener the content of the held value changed in place:
+    /// the change listeners are handed the same object as old and new value,
+    /// as JavaFX does for a list property whose list was modified.
+    public static <T> void fireContentChanged(ValueListeners<T> helper) {
+        if (helper == null) {
+            return;
+        }
+        ListenerSet<ChangeListener<? super T>> set = helper.set;
+        ListenerSet.fireInvalidation(set, helper.observable);
+        List<ChangeListener<? super T>> listeners = ListenerSet.changeListeners(set);
+        if (!listeners.isEmpty()) {
+            T value = helper.observable.getValue();
+            T oldValue = helper.currentValue;
+            helper.currentValue = value;
+            T before = oldValue == value ? value : oldValue;
+            for (int i = 0; i < listeners.size(); i++) {
+                listeners.get(i).changed(helper.observable, before, value);
+            }
+        }
+    }
 }

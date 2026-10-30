@@ -152,7 +152,9 @@ public abstract class ListPropertyBase<E> extends ListProperty<E> {
     private void contentChanged(ListChangeListener.Change<? extends E> change) {
         fireDerived();
         invalidated();
-        fireValueChangedEvent();
+        // JavaFX tells change listeners about a modification of the held
+        // list too, with the list as both old and new value.
+        ValueListeners.fireContentChanged(helper);
         fireValueChangedEvent(new Changes.Relayed<E>(this, change));
     }
 
