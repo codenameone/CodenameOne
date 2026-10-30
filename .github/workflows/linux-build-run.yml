@@ -238,9 +238,10 @@ jobs:
       # The suite's C build compiles ~7,000 translation units, several of them
       # large, with full debug info. On ubuntu-24.04-arm it exhausted memory and
       # the runner was shut down mid-build, twice at the same step; extra swap
-      # lets the peak spill instead of taking the machine down.
-      - name: Add swap (arm64)
-        if: matrix.arch == 'arm64'
+      # lets the peak spill instead of taking the machine down. x64 joined it once
+      # the suite grew (#6118, #6106): every x64 run since went silent in
+      # `cmake --build` and was shut down about an hour in, while arm64 passed.
+      - name: Add swap
         run: |
           free -m
           sudo fallocate -l 12G /cn1-swapfile
