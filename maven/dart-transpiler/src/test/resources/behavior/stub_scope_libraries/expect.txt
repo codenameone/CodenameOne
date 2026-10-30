@@ -1,0 +1,3 @@
+app
+picker true
+settings s

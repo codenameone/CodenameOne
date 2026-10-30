@@ -59,9 +59,10 @@ def lit(s):
         elif o == 13:
             out.append('\\r')
         else:
-            # Octal for the rest of ASCII: a backslash-u escape of a line
-            # break or quote is replaced before javac lexes the literal.
-            out.append('\\%03o' % o if o < 128 else '\\u%04x' % o)
+            # Line breaks, the quote and the backslash are handled above: a
+            # backslash-u escape of those is replaced before javac lexes the
+            # literal. No octal, which PMD reads as suspicious before a digit.
+            out.append('\\u%04x' % o)
     return '"' + ''.join(out) + '"'
 
 

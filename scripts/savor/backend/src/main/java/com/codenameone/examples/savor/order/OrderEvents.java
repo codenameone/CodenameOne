@@ -24,6 +24,7 @@ import com.codenameone.examples.savor.api.OrderState;
 import com.codenameone.examples.savor.domain.OrderEvent;
 import com.codenameone.examples.savor.repository.OrderEventRepository;
 import java.io.IOException;
+import java.time.Instant;
 
 /// The history of an order: one row per move, with who made it. Written in
 /// the transaction that made the move.
@@ -41,7 +42,7 @@ public class OrderEvents {
         event.setOrderId(orderId);
         event.setState(state);
         event.setActor(actor == null ? "" : actor);
-        event.setCreatedAt(System.currentTimeMillis());
+        event.setCreatedAt(Instant.now());
         events.insert(event);
     }
 }

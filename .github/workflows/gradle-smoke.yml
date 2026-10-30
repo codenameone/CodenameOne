@@ -12,6 +12,8 @@ name: Gradle build smoke
 #                                the Gradle plugin reuses the Maven engine
 #   gradle-cn1lib-test.sh        a Gradle-built cn1lib consumed by a Gradle app
 #                                AND a Maven app
+#   gradle-flutter-test.sh       src/main/flutter: same classes and assets both ways,
+#                                mapped to the Dart source; removed sources leave nothing
 #   gradle-migrate-test.sh       Ant and Maven to Gradle; legacy .cn1lib refused
 #   gradle-tools-test.sh         Settings opens, and renders, from cn1:settings and
 #                                from ./gradlew settings
@@ -34,6 +36,9 @@ on:
       - 'maven/css-compiler/**'
       - 'maven/css-cli/**'
       - 'maven/build-engine/**'
+      - 'maven/dart-transpiler/**'
+      - 'maven/dart-runtime/**'
+      - 'maven/flutter-runtime/**'
       - 'maven/project-model/**'
       - 'maven/cn1app-archetype/**'
       - 'maven/backend/**'
@@ -58,6 +63,9 @@ on:
       - 'maven/css-compiler/**'
       - 'maven/css-cli/**'
       - 'maven/build-engine/**'
+      - 'maven/dart-transpiler/**'
+      - 'maven/dart-runtime/**'
+      - 'maven/flutter-runtime/**'
       - 'maven/project-model/**'
       - 'maven/cn1app-archetype/**'
       - 'maven/backend/**'
@@ -135,12 +143,21 @@ jobs:
           cd maven
           mvn archetype:update-local-catalog -Plocal-dev-javase
           mvn archetype:crawl -Plocal-dev-javase
+      # The Flutter runtime compiles at release 17, so the JDK 8 reactor
+      # above leaves it out (the flutter-modules profile is JDK activated).
+      - name: Build the Flutter runtime
+        run: |
+          cd maven
+          JAVA_HOME="$GRADLE_JAVA_HOME" mvn -B -ntp install -pl dart-runtime,flutter-runtime -DskipTests -Dmaven.javadoc.skip=true
       - name: Gradle application
         working-directory: maven/integration-tests
         run: xvfb-run -a bash gradle-app-test.sh
       - name: Maven and Gradle upload parity
         working-directory: maven/integration-tests
         run: bash gradle-maven-parity-test.sh
+      - name: Flutter sources, Maven and Gradle
+        working-directory: maven/integration-tests
+        run: bash gradle-flutter-test.sh
       - name: Gradle cn1lib, consumed by Gradle and Maven
         working-directory: maven/integration-tests
         # DISPLAY and WAYLAND_DISPLAY are cleared on purpose, and this must

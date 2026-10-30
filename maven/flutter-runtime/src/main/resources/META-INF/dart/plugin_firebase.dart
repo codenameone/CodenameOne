@@ -1,6 +1,7 @@
 // package:firebase_core, firebase_auth, firebase_analytics and firebase_messaging.
 // Auth talks to the Identity Toolkit REST API with the apiKey from
-// Firebase.initializeApp (email/password and anonymous accounts). Analytics logs,
+// Firebase.initializeApp (email/password, anonymous, and federated credentials
+// through signInWithIdp; Google's and Apple's interactive sign-in are their own packs). Analytics logs,
 // and forwards screen views to AnalyticsService. Messaging reads the device push key
 // and delivers foreground pushes through onMessage.
 
@@ -68,6 +69,64 @@ class UserCredential {
   external Object? get credential;
 }
 
+@JavaName('com.codename1.flutter.plugins.firebase.AuthCredential')
+class AuthCredential {
+  external String get providerId;
+  external String get signInMethod;
+  external int? get token;
+  external String? get accessToken;
+}
+
+@JavaName('com.codename1.flutter.plugins.firebase.OAuthCredential')
+class OAuthCredential extends AuthCredential {
+  external String? get idToken;
+  external String? get rawNonce;
+  external String? get secret;
+}
+
+@JavaName('com.codename1.flutter.plugins.firebase.EmailAuthProvider')
+class EmailAuthProvider {
+  external EmailAuthProvider();
+  external static String get PROVIDER_ID;
+  external static String get EMAIL_PASSWORD_SIGN_IN_METHOD;
+  external static AuthCredential credential({required String email, required String password});
+}
+
+@JavaName('com.codename1.flutter.plugins.firebase.OAuthProvider')
+class OAuthProvider {
+  external OAuthProvider(String providerId);
+  external String get providerId;
+  external List<String> get scopes;
+  external OAuthProvider addScope(String scope);
+  external OAuthProvider setCustomParameters(Map<dynamic, dynamic> customOAuthParameters);
+  external OAuthCredential credential({String? accessToken, String? secret, String? idToken, String? rawNonce,
+      String? signInMethod});
+}
+
+@JavaName('com.codename1.flutter.plugins.firebasegoogle.GoogleAuthProvider')
+class GoogleAuthProvider {
+  external GoogleAuthProvider();
+  external static String get PROVIDER_ID;
+  external static String get GOOGLE_SIGN_IN_METHOD;
+  external static OAuthCredential credential({String? idToken, String? accessToken});
+  external String get providerId;
+  external List<String> get scopes;
+  external GoogleAuthProvider addScope(String scope);
+  external GoogleAuthProvider setCustomParameters(Map<dynamic, dynamic> customOAuthParameters);
+}
+
+@JavaName('com.codename1.flutter.plugins.firebaseapple.AppleAuthProvider')
+class AppleAuthProvider {
+  external AppleAuthProvider();
+  external static String get PROVIDER_ID;
+  external static String get APPLE_SIGN_IN_METHOD;
+  external static OAuthCredential credentialWithIDToken(String idToken, String rawNonce, Object? appleFullPersonName);
+  external String get providerId;
+  external List<String> get scopes;
+  external AppleAuthProvider addScope(String scope);
+  external AppleAuthProvider setCustomParameters(Map<dynamic, dynamic> customOAuthParameters);
+}
+
 @JavaName('com.codename1.flutter.plugins.firebase.FirebaseAuth')
 class FirebaseAuth {
   external static FirebaseAuth get instance;
@@ -80,7 +139,7 @@ class FirebaseAuth {
   external Future<UserCredential> createUserWithEmailAndPassword({required String email,
       required String password});
   external Future<UserCredential> signInAnonymously();
-  external Future<UserCredential> signInWithCredential(Object credential);
+  external Future<UserCredential> signInWithCredential(AuthCredential credential);
   external Future<UserCredential> signInWithProvider(Object provider);
   external Future<void> signOut();
   external Future<void> sendPasswordResetEmail({required String email, Object? actionCodeSettings});

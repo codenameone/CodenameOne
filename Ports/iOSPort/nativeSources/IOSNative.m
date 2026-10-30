@@ -14651,7 +14651,19 @@ static BOOL cn1RegisteredFontMatches(CFStringRef psName, CGFontRef candidate) {
         if (existingGraphics != NULL) {
             CFDataRef a = CGFontCopyTableForTag(existingGraphics, 'head');
             CFDataRef b = CGFontCopyTableForTag(candidate, 'head');
-            same = a != NULL && b != NULL && CFEqual(a, b);
+            if (a != NULL && b != NULL) {
+                same = CFEqual(a, b);
+            } else {
+                // A font Core Text registered from a file may not hand its
+                // tables back, so the
+                // shape of the font has to stand in for the checksum there.
+                same = CGFontGetNumberOfGlyphs(existingGraphics) == CGFontGetNumberOfGlyphs(candidate)
+                        && CGFontGetUnitsPerEm(existingGraphics) == CGFontGetUnitsPerEm(candidate);
+            }
+            if (!same) {
+                NSLog(@"registerFontData: a different font is registered as %@ (head tables %s)",
+                        (BRIDGE_CAST NSString *)psName, a != NULL && b != NULL ? "differ" : "unavailable");
+            }
             if (a != NULL) {
                 CFRelease(a);
             }
@@ -14693,6 +14705,10 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_registerFontData___byte_1ARRAY_R_ja
             if (!usable && error != NULL
                     && CFErrorGetCode(error) == kCTFontManagerErrorAlreadyRegistered) {
                 usable = cn1RegisteredFontMatches(psName, cgFont);
+            }
+            if (!usable) {
+                NSLog(@"registerFontData: Core Text refused %@ (error %ld)", (BRIDGE_CAST NSString *)psName,
+                        error != NULL ? (long)CFErrorGetCode(error) : 0L);
             }
             if (error != NULL) {
                 CFRelease(error);

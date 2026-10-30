@@ -46,6 +46,11 @@ public final class Uint8List {
         this.bytes = bytes;
     }
 
+    /// A Uint8List over {@code bytes} itself, not a copy: a ByteBuffer's view.
+    static Uint8List view(byte[] bytes) {
+        return new Uint8List(bytes);
+    }
+
     /// A Uint8List holding a copy of {@code bytes}: how a Java byte buffer crosses into
     /// Dart (a platform channel's binary result, as Flutter's codec delivers it).
     public static Uint8List fromBytes(byte[] bytes) {
@@ -129,5 +134,18 @@ public final class Uint8List {
     /** The raw backing array (used by image decoders). */
     public byte[] toBytes() {
         return bytes;
+    }
+
+    /// `[1, 2, 3]`, as Dart prints any list; it printed the Java object id.
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < bytes.length; i++) {
+            if (i > 0) {
+                sb.append(", ");
+            }
+            sb.append(bytes[i] & 0xff);
+        }
+        return sb.append(']').toString();
     }
 }

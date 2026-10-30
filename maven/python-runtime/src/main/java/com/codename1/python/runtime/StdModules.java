@@ -560,24 +560,22 @@ public final class StdModules {
 
     /// `_cn1tz`: `offset(key, t)` answers the zone's offset from UTC in
     /// seconds at the instant `t`, `raw(key)` its standard offset,
-    /// `known(key)` whether the platform knows the zone (an unknown ID
-    /// resolves to GMT), and `available()` the IDs the platform lists.
+    /// `known(key)` whether the key names an IANA zone, and `available()`
+    /// those keys ([TimeZoneNames]).
     private static PyModule tz() {
         PyModule m = new PyModule("_cn1tz", new String[0]);
         m.setAttr("offset", PyBuiltin.positional("offset", a ->
                 PyInt.of(utcOffset(java.util.TimeZone.getTimeZone(Py.toStr(a[0])), Py.asDouble(a[1])))));
         m.setAttr("raw", PyBuiltin.positional("raw", a ->
                 PyInt.of(java.util.TimeZone.getTimeZone(Py.toStr(a[0])).getRawOffset() / 1000)));
-        m.setAttr("known", PyBuiltin.positional("known", a -> {
-            String key = Py.toStr(a[0]);
-            String id = java.util.TimeZone.getTimeZone(key).getID();
-            return Py.bool(id != null && (id.equals(key) || !"GMT".equals(id)));
-        }));
+        // From a table rather than the platform: ParparVM's TimeZone answers
+        // a zone named after any ID, so it cannot say a key does not exist.
+        m.setAttr("known", PyBuiltin.positional("known", a ->
+                Py.bool(java.util.Arrays.binarySearch(TimeZoneNames.NAMES, Py.toStr(a[0])) >= 0)));
         m.setAttr("available", PyBuiltin.positional("available", a -> {
-            String[] ids = java.util.TimeZone.getAvailableIDs();
-            Object[] out = new Object[ids.length];
-            for (int i = 0; i < ids.length; i++) {
-                out[i] = Py.str(ids[i]);
+            Object[] out = new Object[TimeZoneNames.NAMES.length];
+            for (int i = 0; i < out.length; i++) {
+                out[i] = Py.str(TimeZoneNames.NAMES[i]);
             }
             return new PyList(out);
         }));

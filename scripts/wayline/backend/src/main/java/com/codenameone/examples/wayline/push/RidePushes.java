@@ -43,6 +43,7 @@ import com.codenameone.examples.wayline.repository.RideRepository;
 import com.codenameone.examples.wayline.ride.Rides;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -151,9 +152,9 @@ public class RidePushes {
     /// end that failed again is reported once the rest have been tried.
     @Scheduled(fixedDelay = 60000, initialDelay = 50000, lock = "wayline-activity-ends")
     public void endLeftBehind() throws IOException {
-        long now = System.currentTimeMillis();
-        dropEndedBefore(now - END_RETRY_MILLIS);
-        List<RideActivity> left = leftBehind(now - END_GRACE_MILLIS);
+        Instant now = Instant.now();
+        dropEndedBefore(now.minusMillis(END_RETRY_MILLIS));
+        List<RideActivity> left = leftBehind(now.minusMillis(END_GRACE_MILLIS));
         Exception failed = null;
         for (int iter = 0; iter < left.size(); iter++) {
             String id = left.get(iter).getRideId();
@@ -174,13 +175,13 @@ public class RidePushes {
     }
 
     @Transactional
-    private void dropEndedBefore(long before) {
-        activities.dropEndedBefore(before);
+    private void dropEndedBefore(Instant before) {
+        activities.dropEndedBefore(before, Instant.EPOCH);
     }
 
     @Transactional(readOnly = true)
-    private List<RideActivity> leftBehind(long before) {
-        return activities.leftBehind(before, new PageRequest(0, 50));
+    private List<RideActivity> leftBehind(Instant before) {
+        return activities.leftBehind(before, Instant.EPOCH, new PageRequest(0, 50));
     }
 
     @Transactional
@@ -252,11 +253,11 @@ public class RidePushes {
             row.setRideId(rideId);
             row.setUsername(rider);
             row.setActivityId(activityId);
-            row.setSentAt(System.currentTimeMillis());
+            row.setSentAt(Instant.now());
             activities.insert(row);
         } else {
             row.setActivityId(activityId);
-            row.setSentAt(System.currentTimeMillis());
+            row.setSentAt(Instant.now());
         }
         return new RideActivityDto(activityId);
     }
@@ -376,7 +377,7 @@ public class RidePushes {
         }
         // end::wayline-push-messages[]
         if (!state.isActive() && activity != null) {
-            activities.markEnded(id, System.currentTimeMillis());
+            activities.markEnded(id, Instant.now(), Instant.EPOCH);
         }
         if (toRider != null && !wants(rider, RideState.COMPLETED == state)) {
             toRider = null;
@@ -423,10 +424,10 @@ public class RidePushes {
         if (activity == null) {
             return out;
         }
-        long now = System.currentTimeMillis();
+        Instant now = Instant.now();
         // A conditional update, so that two reports arriving together send one
         // update between them.
-        if (activities.claim(rideId, now, now - activityMillis) != 1) {
+        if (activities.claim(rideId, now, now.minusMillis(activityMillis)) != 1) {
             return out;
         }
         Ride ride = rides.findById(rideId);

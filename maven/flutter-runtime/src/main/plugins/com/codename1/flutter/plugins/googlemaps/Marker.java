@@ -61,8 +61,15 @@ public class Marker {
         onTap = v;
     }
 
-    /** Accepted and ignored: markers use the platform's default pin. */
+    /** The pin: a {@link BitmapDescriptor}, applied as the Codename One marker icon. */
     public void icon(Object v) {
+        icon = v instanceof BitmapDescriptor ? (BitmapDescriptor) v : null;
+    }
+
+    BitmapDescriptor icon;
+
+    public BitmapDescriptor icon() {
+        return icon;
     }
 
     public void alpha(double v) {

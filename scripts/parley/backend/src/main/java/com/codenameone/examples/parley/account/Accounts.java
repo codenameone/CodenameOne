@@ -40,6 +40,7 @@ import com.codenameone.examples.parley.repository.ClosedAccountRepository;
 import com.codenameone.examples.parley.repository.ProfileRepository;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -156,7 +157,7 @@ public class Accounts {
         profile.setDisplayName(displayName);
         profile.setPhone(phone);
         profile.setPhoneVerified(phoneVerified);
-        profile.setCreatedAt(openedAt);
+        profile.setCreatedAt(Instant.ofEpochMilli(openedAt));
         profile.setLanguage("");
         profiles.insert(profile);
     }
@@ -393,7 +394,7 @@ public class Accounts {
         if (!closed.existsById(hash)) {
             ClosedAccount row = new ClosedAccount();
             row.setUsernameHash(hash);
-            row.setClosedAt(System.currentTimeMillis());
+            row.setClosedAt(Instant.now());
             closed.insert(row);
         }
     }

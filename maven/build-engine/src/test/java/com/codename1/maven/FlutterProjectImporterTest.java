@@ -716,6 +716,149 @@ public class FlutterProjectImporterTest {
         assertTrue(all.contains("com.codename1.push.Push.subscribeToTopic(topic);"));
     }
 
+    /// package:http's shape: a conditional import whose io branch is taken, and a
+    /// `web` dependency that only the js_interop branch imports. Neither the browser
+    /// file nor package:web is reached, so http transpiles and web is never blamed.
+    @Test
+    public void aWebOnlyBranchAndItsDependencyAreNotFollowed() throws Exception {
+        File root = Files.createTempDirectory("flutter-conditional").toFile();
+        File app = new File(root, "demo");
+        write(new File(app, "pubspec.yaml"), "name: demo\nversion: 1.0.0\n"
+                + "dependencies:\n  flutter:\n    sdk: flutter\n  http: 1.0.0\n");
+        write(new File(app, "lib/main.dart"), "import 'package:http/http.dart';\nvoid main() {}\n");
+        File http = new File(root, "cache/http-1.0.0");
+        write(new File(http, "pubspec.yaml"), "name: http\ndependencies:\n  web: 1.0.0\n");
+        write(new File(http, "lib/http.dart"), "import 'src/client_stub.dart'\n"
+                + "    if (dart.library.js_interop) 'src/browser_client.dart'\n"
+                + "    if (dart.library.io) 'src/io_client.dart';\nint h() => 1;\n");
+        write(new File(http, "lib/src/io_client.dart"), "import 'dart:io';\nint io() => 1;\n");
+        write(new File(http, "lib/src/browser_client.dart"),
+                "import 'package:web/web.dart';\nimport 'dart:js_interop';\nint b() => 1;\n");
+        write(new File(http, "lib/src/client_stub.dart"), "int s() => 1;\n");
+        File web = new File(root, "cache/web-1.0.0");
+        write(new File(web, "lib/web.dart"), "import 'dart:js_interop';\n");
+        packageConfig(app, "http", http, "web", web);
+
+        File common = new File(root, "common");
+        FlutterProjectImporter.Result r = new FlutterProjectImporter(new com.codename1.build.SystemStreamLog())
+                .importProject(app, common, null, null);
+
+        assertTrue(r.unsupportedPackages.toString(), r.unsupportedPackages.isEmpty());
+        assertEquals(Integer.valueOf(2), r.transpiledPackages.get("http"));
+        assertTrue(new File(common, "src/main/flutter/packages/http/src/io_client.dart").exists());
+        assertFalse(new File(common, "src/main/flutter/packages/http/src/browser_client.dart").exists());
+        assertFalse(r.reachedFrom.toString(), r.reachedFrom.containsKey("web"));
+    }
+
+    /// A plugin with only desktop platforms is transpiled as Dart, not reported as an
+    /// unsupported plugin that takes every package above it down with it.
+    @Test
+    public void aDesktopOnlyPluginIsTranspiledNotBlamed() throws Exception {
+        File root = Files.createTempDirectory("flutter-desktop-plugin").toFile();
+        File app = new File(root, "demo");
+        write(new File(app, "pubspec.yaml"), "name: demo\nversion: 1.0.0\n"
+                + "dependencies:\n  flutter:\n    sdk: flutter\n  ui_oauth: 1.0.0\n");
+        write(new File(app, "lib/main.dart"), "import 'package:ui_oauth/ui_oauth.dart';\nvoid main() {}\n");
+        File ui = new File(root, "cache/ui_oauth-1.0.0");
+        write(new File(ui, "lib/ui_oauth.dart"), "import 'package:desk_auth/desk_auth.dart';\nint u() => 1;\n");
+        File desk = new File(root, "cache/desk_auth-1.0.0");
+        write(new File(desk, "pubspec.yaml"), "name: desk_auth\nflutter:\n  plugin:\n    platforms:\n"
+                + "      macos:\n        pluginClass: DeskAuthPlugin\n      windows:\n"
+                + "        pluginClass: DeskAuthPlugin\n");
+        write(new File(desk, "lib/desk_auth.dart"), "import 'dart:developer';\nint d() => 1;\n");
+        File mobile = new File(root, "cache/mobile-1.0.0");
+        write(new File(mobile, "pubspec.yaml"), "name: mobile\nflutter:\n  plugin:\n    platforms:\n"
+                + "      android:\n        package: a.b\n        pluginClass: P\n      web:\n"
+                + "        pluginClass: W\n");
+        packageConfig(app, "ui_oauth", ui, "desk_auth", desk);
+
+        File common = new File(root, "common");
+        FlutterProjectImporter.Result r = new FlutterProjectImporter(new com.codename1.build.SystemStreamLog())
+                .importProject(app, common, null, null);
+
+        assertTrue(r.unsupportedPackages.toString(), r.unsupportedPackages.isEmpty());
+        assertEquals("macos/windows", r.foreignPlugins.get("desk_auth"));
+        assertTrue(new File(common, "src/main/flutter/packages/desk_auth/desk_auth.dart").exists());
+        assertEquals("[android, web]", String.valueOf(FlutterProjectImporter.pluginPlatforms(new File(mobile, "lib"))));
+        assertFalse(FlutterProjectImporter.isForeignPlatformPlugin(
+                FlutterProjectImporter.pluginPlatforms(new File(mobile, "lib"))));
+    }
+
+    /// A third-party stub pack's `// cn1:covers` line makes its package covered: reported
+    /// with the pack's note, and its platform-plugin sources never followed.
+    @Test
+    public void aStubPackDeclaresTheCoverageOfItsPackage() throws Exception {
+        File root = Files.createTempDirectory("flutter-stub-pack").toFile();
+        File app = new File(root, "demo");
+        write(new File(app, "pubspec.yaml"), "name: demo\nversion: 1.0.0\n"
+                + "dependencies:\n  flutter:\n    sdk: flutter\n  lottie_like: 1.0.0\n");
+        write(new File(app, "lib/main.dart"), "import 'package:lottie_like/lottie_like.dart';\nvoid main() {}\n");
+        File plugin = new File(root, "cache/lottie_like-1.0.0");
+        write(new File(plugin, "pubspec.yaml"), "name: lottie_like\nflutter:\n  plugin:\n    platforms:\n"
+                + "      android:\n        package: a.b\n        pluginClass: P\n");
+        write(new File(plugin, "lib/lottie_like.dart"), "int l() => 1;\n");
+        packageConfig(app, "lottie_like", plugin, "lottie_like", plugin);
+        File common = new File(root, "common");
+        write(new File(common, "src/main/resources/META-INF/dart/plugin_lottie_like.dart"),
+                "// cn1:covers lottie_like animations over a Codename One player\n");
+
+        FlutterProjectImporter.Result r = new FlutterProjectImporter(new com.codename1.build.SystemStreamLog())
+                .importProject(app, common, null, null);
+
+        assertTrue(r.unsupportedPackages.toString(), r.unsupportedPackages.isEmpty());
+        assertTrue(r.covered.toString(), r.covered.contains("lottie_like (animations over a Codename One player)"));
+        assertFalse(new File(common, "src/main/flutter/packages/lottie_like/lottie_like.dart").exists());
+    }
+
+    /// The families named through google_fonts, which the stub can only draw bundled.
+    @Test
+    public void googleFontFamiliesAreNamedFromTheirMethods() {
+        java.util.Set<String> f = new java.util.TreeSet<String>();
+        FlutterProjectImporter.googleFontFamilies("final a = GoogleFonts.openSans(fontSize: 12);\n"
+                + "final b = GoogleFonts.notoSansHebrewTextTheme(base);\n"
+                + "final c = GoogleFonts.baloo2();\n"
+                + "final d = GoogleFonts.getFont('Rubik', fontSize: 3);\n"
+                + "final e = GoogleFonts.asMap(); GoogleFonts.config.allowRuntimeFetching = false;\n", f);
+        assertEquals("[Baloo 2, Noto Sans Hebrew, Open Sans, Rubik]", f.toString());
+    }
+
+    /// The JSON report names the chain behind a verdict and the app file behind it.
+    @Test
+    public void theReportCarriesTheTransitiveCause() throws Exception {
+        File root = Files.createTempDirectory("flutter-report").toFile();
+        File app = new File(root, "demo");
+        write(new File(app, "pubspec.yaml"), "name: demo\nversion: 1.0.0\n"
+                + "dependencies:\n  flutter:\n    sdk: flutter\n  outer: 1.0.0\n");
+        write(new File(app, "lib/screens/login.dart"), "import 'package:outer/outer.dart';\nint l() => 1;\n");
+        write(new File(app, "lib/main.dart"), "void main() {}\n");
+        File outer = new File(root, "cache/outer-1.0.0");
+        write(new File(outer, "lib/outer.dart"), "import 'package:inner/inner.dart';\nint o() => 1;\n");
+        File inner = new File(root, "cache/inner-1.0.0");
+        write(new File(inner, "lib/inner.dart"), "import 'dart:ffi';\nint i() => 1;\n");
+        packageConfig(app, "outer", outer, "inner", inner);
+
+        FlutterProjectImporter.Result r = new FlutterProjectImporter(new com.codename1.build.SystemStreamLog())
+                .importProject(app, new File(root, "common"), null, null);
+
+        assertEquals("[outer, inner]", r.unsupportedChains.get("outer").toString());
+        assertEquals("[screens/login.dart]", r.reachedFrom.get("inner").toString());
+        String json = r.toJson();
+        assertTrue(json, json.contains("{\"package\": \"outer\", \"status\": \"unsupported\", "
+                + "\"note\": \"depends on inner, which is unsupported\", "
+                + "\"cause\": \"needs dart:ffi, which has no Codename One counterpart (inner.dart)\", "
+                + "\"chain\": [\"outer\", \"inner\"], \"reachedFrom\": [\"screens/login.dart\"]}"));
+    }
+
+    private static void packageConfig(File app, String n1, File d1, String n2, File d2) throws Exception {
+        write(new File(app, ".dart_tool/package_config.json"), "{\n  \"configVersion\": 2,\n"
+                + "  \"packages\": [\n"
+                + "    {\n      \"name\": \"" + n1 + "\",\n      \"rootUri\": \"" + d1.toURI()
+                + "\",\n      \"packageUri\": \"lib/\"\n    },\n"
+                + "    {\n      \"name\": \"" + n2 + "\",\n      \"rootUri\": \"" + d2.toURI()
+                + "\",\n      \"packageUri\": \"lib/\"\n    }\n"
+                + "  ]\n}\n");
+    }
+
     @Test
     public void pluginPacksAreCovered() {
         for (String p : new String[] {"share_plus", "geolocator", "image_picker", "firebase_auth",

@@ -191,12 +191,22 @@ public class TextRenderElement extends RenderElement {
             }
         }
         TextAlign a = text().getTextAlign();
+        // Flutter's default is TextAlign.start, the right edge under right-to-left text.
+        boolean rtl = isRtl();
+        if (a == null && rtl) {
+            a = TextAlign.start;
+        }
         if (a != null) {
             int cn1Align;
             switch (a) {
                 case right:
-                case end:
                     cn1Align = Component.RIGHT;
+                    break;
+                case end:
+                    cn1Align = rtl ? Component.LEFT : Component.RIGHT;
+                    break;
+                case start:
+                    cn1Align = rtl ? Component.RIGHT : Component.LEFT;
                     break;
                 case center:
                     cn1Align = Component.CENTER;

@@ -3066,6 +3066,31 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-10-29T01:01:47+00:00"
+      },
+      "devto": {
+        "id": 4943089,
+        "url": "https://dev.to/codenameone/a-java-ide-in-your-browser-with-your-files-in-your-browser-1g9p",
+        "syndicated_at": "2026-10-29T19:19:55+00:00"
+      }
+    },
+    "rewrite-everything-in-java-not-rust": {
+      "hashnode": {
+        "url": "https://debugagent.com/rewrite-everything-in-java-not-rust",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6ae3ec20499df2d19b1ca9b9",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-10-30T01:01:12+00:00"
+      },
+      "foojay": {
+        "id": 175,
+        "url": "https://github.com/foojayio/website/pull/175",
+        "pull_request_url": "https://github.com/foojayio/website/pull/175",
+        "status": "submitted",
+        "published": false,
+        "syndicated_at": "2026-10-30T01:01:52+00:00"
       }
     }
   }

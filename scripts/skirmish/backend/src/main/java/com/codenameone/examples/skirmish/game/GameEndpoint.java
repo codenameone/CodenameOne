@@ -92,7 +92,7 @@ public class GameEndpoint implements GameApiServer {
             out.add(new MatchSummaryDto(m.getId(), seat == 0 ? m.getPlayer1() : m.getPlayer0(),
                     seat == 0 ? m.getName1() : m.getName0(), result,
                     seat == 0 ? m.getCrowns0() : m.getCrowns1(), seat == 0 ? m.getCrowns1() : m.getCrowns0(),
-                    seat == 0 ? m.getTrophies0() : m.getTrophies1(), m.getEndedAt(), m.getTicks()));
+                    seat == 0 ? m.getTrophies0() : m.getTrophies1(), m.getEndedAt().toEpochMilli(), m.getTicks()));
         }
         return out;
     }
@@ -107,7 +107,7 @@ public class GameEndpoint implements GameApiServer {
             throw new ResponseStatusException(404, "No such match");
         }
         return new ReplayDto(m.getId(), m.getPlayer0(), m.getPlayer1(), m.getName0(), m.getName1(),
-                m.getResult(), m.getCrowns0(), m.getCrowns1(), m.getReplay(), m.getRulesVersion(), m.getEndedAt());
+                m.getResult(), m.getCrowns0(), m.getCrowns1(), m.getReplay(), m.getRulesVersion(), m.getEndedAt().toEpochMilli());
     }
 
     @Override

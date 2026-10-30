@@ -94,12 +94,19 @@ class AndroidNotificationChannel {
   external AndroidNotificationChannel(String id, String name, {Object? android, Object? iOS, Object? macOS, Object? linux, Object? windows, Object? importance, Object? priority, Object? channelDescription, Object? icon, Object? playSound, Object? enableVibration, Object? sound, Object? ticker, Object? styleInformation, Object? color, Object? largeIcon, Object? showWhen, Object? autoCancel, Object? ongoing, Object? category, Object? groupKey, Object? channelShowBadge, Object? visibility, Object? fullScreenIntent, Object? presentAlert, Object? presentBadge, Object? presentSound, Object? presentBanner, Object? presentList, Object? badgeNumber, Object? subtitle, Object? threadIdentifier, Object? attachments, Object? requestAlertPermission, Object? requestBadgePermission, Object? requestSoundPermission, Object? defaultPresentAlert, Object? defaultPresentBadge, Object? defaultPresentSound, Object? defaultPresentBanner, Object? defaultPresentList, Object? notificationCategories, Object? enableLights, Object? ledColor, Object? timeoutAfter, Object? onlyAlertOnce, Object? actions, Object? number, Object? tag});
 }
 
+@JavaName('com.codename1.flutter.plugins.notifications.RawResourceAndroidNotificationSound')
+class RawResourceAndroidNotificationSound {
+  external RawResourceAndroidNotificationSound(String sound);
+  external String get sound;
+  external String? alertSoundPath();
+}
+
 @JavaName('com.codename1.flutter.plugins.notifications.FlutterLocalNotificationsPlugin')
 class FlutterLocalNotificationsPlugin {
   external FlutterLocalNotificationsPlugin();
   external Future<bool?> initialize(InitializationSettings initializationSettings,
       {void Function(NotificationResponse details)? onDidReceiveNotificationResponse,
-      Object? onDidReceiveBackgroundNotificationResponse});
+      void Function(NotificationResponse details)? onDidReceiveBackgroundNotificationResponse});
   external Future<void> show(int id, String? title, String? body, NotificationDetails? notificationDetails,
       {String? payload});
   external Future<void> periodicallyShow(int id, String? title, String? body, RepeatInterval repeatInterval,
@@ -115,8 +122,8 @@ class FlutterLocalNotificationsPlugin {
   external T? resolvePlatformSpecificImplementation<T>([Type? witness]);
 }
 
-// What resolvePlatformSpecificImplementation would return; it returns null here,
-// so the usual `?.requestNotificationsPermission()` is skipped.
+// What resolvePlatformSpecificImplementation returns: the plugin itself, for every
+// platform type.
 @JavaName('com.codename1.flutter.plugins.notifications.FlutterLocalNotificationsPlugin')
 class AndroidFlutterLocalNotificationsPlugin {
   external Future<bool?> requestNotificationsPermission();

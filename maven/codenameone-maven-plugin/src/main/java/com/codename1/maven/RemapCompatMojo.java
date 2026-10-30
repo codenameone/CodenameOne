@@ -59,6 +59,11 @@ public class RemapCompatMojo extends AbstractCN1Mojo {
             defaultValue = "${project.build.directory}/generated-resources/desktop")
     private File desktopResourcesOutputDir;
 
+    /// `transcode-flutter`'s source directory, under the same property: the
+    /// classes transpiled from it are mapped to the Dart source.
+    @Parameter(property = "cn1.flutter.sourceDir", defaultValue = "${project.basedir}/src/main/flutter")
+    private File flutterSourceDir;
+
     @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
         List<File> classpath = new ArrayList<File>();
@@ -67,13 +72,24 @@ public class RemapCompatMojo extends AbstractCN1Mojo {
                 classpath.add(artifact.getFile());
             }
         }
+        File compiled = new File(project.getBuild().getOutputDirectory());
         // Classes translated from Python get the Python file and lines, so
         // a debugger and a stack trace show the Python source.
-        File compiled = new File(project.getBuild().getOutputDirectory());
         try {
             PythonLineMapper.apply(compiled);
         } catch (java.io.IOException ex) {
             throw new MojoExecutionException("Could not map Python line numbers in " + compiled, ex);
+        }
+        // Classes transpiled from Dart get the Dart file and lines, so a
+        // debugger and a stack trace show the Dart source. Before the
+        // early return: a Flutter app needs no compatibility layer. Only
+        // for a project with Dart sources, since it reads every class.
+        if (FlutterProjectBuilder.isFlutterProject(flutterSourceDir)) {
+            try {
+                DartLineMapper.apply(compiled);
+            } catch (java.io.IOException ex) {
+                throw new MojoExecutionException("Could not map Dart line numbers in " + compiled, ex);
+            }
         }
         // By the jars alone: whether a desktop layer is also used can only be
         // read from the classes, and Kotlin's are not all in place yet.

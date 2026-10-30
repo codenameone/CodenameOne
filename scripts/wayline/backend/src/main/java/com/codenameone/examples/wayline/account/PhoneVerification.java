@@ -31,6 +31,7 @@ import com.codenameone.examples.wayline.repository.PhoneCodeRepository;
 import com.codenameone.examples.wayline.sms.SmsSender;
 
 import java.io.IOException;
+import java.time.Instant;
 
 /// Proves an account's phone number by texting it a code.
 ///
@@ -72,7 +73,7 @@ public class PhoneVerification {
         UserDto user = accounts.describe(username);
         String code = newCode();
         String codeHash = hash(username, code);
-        store(username, codeHash, System.currentTimeMillis());
+        store(username, codeHash, Instant.now());
         try {
             sms.send(user.phone(), "Your Wayline code is " + code);
         } catch (IOException failed) {
@@ -98,20 +99,20 @@ public class PhoneVerification {
     /// one is kept, so at most two codes are live, and only one whose guesses
     /// were not used up.
     @Transactional
-    void store(String username, String codeHash, long now) throws IOException {
+    void store(String username, String codeHash, Instant now) throws IOException {
         // Before the code is read: two requests for one account take turns,
         // so the second finds the code the first just stored and is told to
         // wait. Otherwise both pass the check below and both send a text.
         accounts.hold(username);
         PhoneCode pending = codes.findById(username);
-        if (pending != null && now - pending.getSentAt() < RESEND_SECONDS * 1000L) {
+        if (pending != null && pending.getSentAt().plusSeconds(RESEND_SECONDS).isAfter(now)) {
             throw new ResponseStatusException(429, "Wait a moment before asking for another code");
         }
         boolean first = pending == null;
         if (first) {
             pending = new PhoneCode();
             pending.setUsername(username);
-        } else if (pending.getExpiresAt() >= now && pending.getAttempts() < MAX_ATTEMPTS) {
+        } else if (!pending.getExpiresAt().isBefore(now) && pending.getAttempts() < MAX_ATTEMPTS) {
             // With the guesses it has used: asking for another code must not
             // buy the old one a fresh set.
             pending.setPreviousHash(pending.getCodeHash());
@@ -119,11 +120,11 @@ public class PhoneVerification {
             pending.setPreviousAttempts(pending.getAttempts());
         } else {
             pending.setPreviousHash("");
-            pending.setPreviousExpiresAt(0L);
+            pending.setPreviousExpiresAt(Instant.EPOCH);
             pending.setPreviousAttempts(0);
         }
         pending.setCodeHash(codeHash);
-        pending.setExpiresAt(now + CODE_SECONDS * 1000L);
+        pending.setExpiresAt(now.plusSeconds(CODE_SECONDS));
         pending.setAttempts(0);
         pending.setSentAt(now);
         if (first) {
@@ -148,7 +149,7 @@ public class PhoneVerification {
             return;
         }
         if (pending.getPreviousHash().length() == 0
-                || pending.getPreviousExpiresAt() < System.currentTimeMillis()) {
+                || pending.getPreviousExpiresAt().isBefore(Instant.now())) {
             codes.deleteById(username);
             return;
         }
@@ -156,9 +157,9 @@ public class PhoneVerification {
         pending.setExpiresAt(pending.getPreviousExpiresAt());
         pending.setAttempts(pending.getPreviousAttempts());
         pending.setPreviousHash("");
-        pending.setPreviousExpiresAt(0L);
+        pending.setPreviousExpiresAt(Instant.EPOCH);
         pending.setPreviousAttempts(0);
-        pending.setSentAt(0L);
+        pending.setSentAt(Instant.EPOCH);
     }
 
     /// Checks the code the user typed. Answers 400 for a wrong or expired one
@@ -186,7 +187,7 @@ public class PhoneVerification {
         // row the other has.
         accounts.hold(username);
         PhoneCode pending = codes.findById(username);
-        if (pending == null || pending.getExpiresAt() < System.currentTimeMillis()) {
+        if (pending == null || pending.getExpiresAt().isBefore(Instant.now())) {
             throw new ResponseStatusException(400, "That code has expired. Ask for a new one");
         }
         if (pending.getAttempts() >= MAX_ATTEMPTS) {
@@ -222,7 +223,7 @@ public class PhoneVerification {
         boolean previous = Crypto.equalsConstantTime(given,
                 pending.getPreviousHash().getBytes("UTF-8"))
                 && pending.getPreviousHash().length() > 0
-                && pending.getPreviousExpiresAt() >= System.currentTimeMillis()
+                && !pending.getPreviousExpiresAt().isBefore(Instant.now())
                 && counted != null && counted.getPreviousAttempts() <= MAX_ATTEMPTS;
         if (!current && !previous) {
             return false;

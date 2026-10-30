@@ -91,7 +91,8 @@ public class LicensePage extends StatelessWidget {
         padded.child(body);
 
         AppBar bar = new AppBar();
-        bar.title(new com.codename1.flutter.widgets.Text("Licenses"));
+        bar.title(new com.codename1.flutter.widgets.Text(
+                com.codename1.flutter.l10n.MaterialLocalizations.of(context).licensesPageTitle()));
         Scaffold page = new Scaffold();
         page.appBar(bar);
         page.body(padded);

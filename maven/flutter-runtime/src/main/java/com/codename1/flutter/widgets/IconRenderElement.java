@@ -133,11 +133,11 @@ public class IconRenderElement extends RenderElement {
         s.setBgTransparency(0);
         try {
             long g0 = System.currentTimeMillis();
-            l.setIcon(FontImage.createMaterial(icon().getIcon().codePoint(), s,
+            l.setIcon(FontImage.createMaterial(glyph(), s,
                     Dp.mm(sizeLp(themed))));
             glyphMs += System.currentTimeMillis() - g0;
             glyphCount++;
-            GLYPHS.add(icon().getIcon().codePoint() + "/" + (int) sizeLp(themed)
+            GLYPHS.add(glyph() + "/" + (int) sizeLp(themed)
                     + "/" + (fg == null ? -1 : fg.rgb()));
         } catch (Exception err) {
             // headless or missing icon font: layout still reserves the box
@@ -148,5 +148,46 @@ public class IconRenderElement extends RenderElement {
     protected Size performLayout(BoxConstraints constraints) {
         double px = Dp.px(sizeLp());
         return constraints.constrain(new Size(px, px));
+    }
+
+    /**
+     * The glyph to draw. Under right-to-left text a directional arrow or chevron is drawn
+     * as its mirror image -- Flutter's {@code matchTextDirection}, which the Material
+     * icons that point along the reading direction set -- by swapping in the glyph that
+     * points the other way.
+     */
+    private char glyph() {
+        char c = icon().getIcon().codePoint();
+        if (!isRtl()) {
+            return c;
+        }
+        char[][] pairs = mirroredGlyphs();
+        for (char[] p : pairs) {
+            if (p[0] == c) {
+                return p[1];
+            }
+            if (p[1] == c) {
+                return p[0];
+            }
+        }
+        return c;
+    }
+
+    private static char[][] mirrored;
+
+    private static char[][] mirroredGlyphs() {
+        if (mirrored == null) {
+            mirrored = new char[][] {
+                {com.codename1.flutter.Icons.arrow_back().codePoint(),
+                        com.codename1.flutter.Icons.arrow_forward().codePoint()},
+                {com.codename1.flutter.Icons.arrow_back_ios().codePoint(),
+                        com.codename1.flutter.Icons.arrow_forward_ios().codePoint()},
+                {com.codename1.flutter.Icons.chevron_left().codePoint(),
+                        com.codename1.flutter.Icons.chevron_right().codePoint()},
+                {com.codename1.flutter.Icons.keyboard_arrow_left().codePoint(),
+                        com.codename1.flutter.Icons.keyboard_arrow_right().codePoint()},
+            };
+        }
+        return mirrored;
     }
 }
