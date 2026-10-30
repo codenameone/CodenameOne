@@ -1,0 +1,252 @@
+[[pulse-implementors-guide]]
+== Pulse: Building on the sample
+
+Pulse shares its shape with <<savor-implementors-guide,Savor>> and
+<<wayline-implementors-guide,Wayline>>: the module layout, accounts and sign-in,
+cards and the payment provider, text messages, push notifications, the live
+channel and hosting the app in a browser. This chapter covers what a studio
+changes: households, a timetable that never oversells, a door pass, recurring
+billing, and the marketing that runs by itself.
+
+[[pulse-launch]]
+=== Running it
+
+The project is in `scripts/pulse`. Start the server on the development profile,
+which seeds the demo studio and its accounts and simulates the cards:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/pulse.sh[tag=pulse-sh-server,indent=0]
+----
+
+Then run the app in the simulator:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/pulse.sh[tag=pulse-sh-simulator,indent=0]
+----
+
+=== The modules
+
+`shared` holds the data classes and the `@RestClient` interfaces both sides build
+from, so a change one side didn't follow is a compile error. `common` is the app,
+for every platform. `backend` is the server, in packages by subject:
+
+[cols="1,3"]
+|===
+| Package | What it holds
+
+| `account`
+| Accounts, phone verification, preferences and quiet hours, moderation, and the
+  demo accounts.
+
+| `studio`
+| Locations, the timetable, households, bookings and the waitlist, door passes,
+  and the demo studio.
+
+| `desk`
+| Check-in at the desk and the kiosk, member lookup, walk-ins and the desk's day.
+
+| `trainer`
+| Rosters, attendance, shifts and live heart rates.
+
+| `billing`
+| Memberships, invoices, proration, freezes, dunning and referral credits.
+
+| `pay`
+| The payment provider: simulated or Stripe.
+
+| `engagement`
+| Visit statistics, workouts, away periods and the automatic nudges.
+
+| `social`
+| Friends, the feed, kudos and class invites.
+
+| `owner`
+| The dashboard, plans, the timetable, staff and campaigns.
+
+| `live`, `push`, `sms`
+| The WebSocket, push notifications and text messages.
+|===
+
+Roles are `MEMBER`, `TRAINER`, `DESK` and `OWNER`, in `Roles`. Every account is a
+member; the others are granted by an owner. The kiosk is a desk account on a
+tablet, so it needs no role of its own.
+
+=== A class that never oversells
+
+The rule that must never break is that a class isn't booked past its capacity,
+however many people tap Book at once. `Bookings` leaves it to the database: the
+places taken are a column of the class, and the only statement that raises it does
+so on condition that it's still below capacity. A booking whose statement changed
+no row joins the waitlist instead. Two requests for the last place both run that
+statement, and the database makes the second find the class full.
+
+Everything else is checked first: the class is still to come, the person fits its
+age range on the day, the waiver is signed, and a membership covers it. A place
+given back promotes the first person on the waitlist, one promotion at a time per
+class, and a job settles finished classes, turning the absent into no-shows.
+
+The same pattern takes a trainer's offered shift: two trainers tapping Take
+together are told apart by one conditional statement.
+
+=== The door pass
+
+A pass on a phone is a QR code reading `pulse:<member id>:<code>`, where the code
+is an HOTP (RFC 4226, SHA-256, eight digits) of the pass's secret over the number
+of 30-second periods since the epoch. The phone and the server make the same
+`com.codename1.security.Otp` call, so the phone needs no signal. The server takes
+a code one period either side of now, for a phone whose clock is slightly off, and
+keeps every code it accepted until it could no longer be valid, so a screenshot
+shown twice is refused as a replay.
+
+An NFC id is the other kind of pass, for a fob or wristband. It doesn't change, so
+it's as good as the thing it's written on; replacing the pass's secret replaces it
+too.
+
+A check-in always answers, admitted or refused with a reason, and never fails for
+a member who simply isn't allowed in. The kiosk turns that answer into a green or
+a red screen. Each check-in is also sent to staff over the live channel.
+
+=== Billing
+
+`Billing` charges in three steps and only the middle one talks to the processor:
+a transaction writes the invoice and claims it, the card is charged with no
+transaction open, and a second transaction records the result. The invoice id is
+the processor's idempotency key, so a server that dies between the charge and the
+record charges the same invoice again on the next run and is answered the first
+charge, not a second one.
+
+* *Proration.* A member moving plans has what's left of the old period taken off
+  the first invoice of the new one.
+* *Freezes.* One week to three months.
+* *The dunning ladder.* A declined renewal is retried after one, three and seven
+  days. From the second failure the membership is past due and the door says so;
+  after the last, the invoice waits to be paid by hand.
+* *Referral credits.* A member whose referral first pays gets a credit.
+* *Amounts* are `long` minor units in `pulse.currency`.
+
+The processor is behind `PaymentProvider`: a customer, a card saved to it once as
+a token, and charges against that token with nobody present. The server keeps the
+token, a brand and four digits, never a card number. `SimulatedPayments` takes the
+test cards; `StripePayments` adds cards on Stripe's hosted page. Another processor
+is one more implementation of the interface, chosen in `Services`.
+
+=== Nudges and campaigns
+
+The nudge job in `engagement` runs every 15 minutes and sends two kinds of message on its own: a class
+starting in 3 to 36 hours that's under 60% full is offered to members who took
+that kind of class before, at most three per empty place; and a member who hasn't
+been in for 14 days is told the studio misses them, at most every 21 days.
+Neither reaches a member who is away, one who turned promotions off, or one inside
+their quiet hours; those are left for a later run. Each message is its own
+transaction, checked again inside it, so two servers running the job send it once.
+
+Campaigns are the owner's: a message to those who took a kind of class, every
+active member, or the lapsed, counted as sent, opened, and booked.
+
+=== Live heart rates
+
+A member's watch sends heart rate readings during a class. `HeartRates` keeps the
+latest per member in memory only: a reading matters for a few seconds, and the
+workout, which is kept, arrives whole when it ends. The zone, one to five, is the
+reading's share of 220 less the member's age, in fifths from 50%. Readings go to
+the class's trainer over the live channel.
+
+The live channel carries four frames: a class's places changing, one of an
+account's bookings changing, a heart rate, and a check-in. The connections are
+those of one process; running more than one instance needs a channel between them,
+such as a database `LISTEN`/`NOTIFY` or a message broker, feeding the same
+methods.
+
+=== Settings
+
+`backend/application.properties` lists every setting. A deployment sets the
+database (`DATABASE_URL`), the issuer and signing key, the first owner
+(`pulse.admin.email`, `pulse.admin.password`), and the providers:
+
+[cols="1,3"]
+|===
+| Setting | Choices
+
+| `pulse.sms.provider`
+| `twilio`, `vonage`, `messagebird`, or `console` on a development profile.
+
+| `pulse.payments.provider`
+| `stripe`, or `simulated` on a development profile.
+
+| `pulse.push.provider`
+| `cloud` (with `pulse.push.app` and `pulse.push.key`), or `console` and
+  `recording` on development profiles.
+
+| `pulse.currency`, `pulse.timezone`
+| The studio's currency and the time zone quiet hours are counted in.
+|===
+
+Unset, each provider is the development one on a development profile and the real
+one elsewhere. A real provider with missing settings is logged at start-up, naming
+them, and every call to it fails with the same message; nothing falls back to a
+development stand-in. Secrets go in the environment, in upper case with `_` for
+each dot (`PULSE_PAYMENTS_STRIPE_SECRET`).
+
+=== Tests
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/pulse.sh[tag=pulse-sh-tests,indent=0]
+----
+
+The server's tests run on in-memory SQLite, which accepts any value in any column.
+`sample-server-tests-on-database.sh` runs them against PostgreSQL or MySQL, where
+the ORM checks every mapping against its migration. CI runs both, in
+`.github/workflows/pulse.yml`.
+
+=== Making it yours
+
+* *Your studio.* Replace `DemoStudio` with your locations, rooms, class types and
+  plans, or create them from the owner's screens on an empty database.
+* *Your brand.* Colors and shapes are in `common/src/main/css/theme.css`, text in
+  `common/src/main/l10n`.
+* *Your rules.* The late-cancellation window, the dunning ladder, freeze limits,
+  the referral credit and the nudge thresholds are constants beside the code that
+  uses them, in `Bookings`, `Billing` and the nudge job in `engagement`.
+* *A chain of studios.* Locations are already a dimension of the timetable and the
+  desk; a chain adds location-scoped staff roles and reporting.
+
+[[pulse-before-product]]
+=== Before it's a product
+
+The sample is complete as a demonstration and stops where a studio's legal and
+physical systems begin. A product needs at least:
+
+* *A real payment processor and PCI scope.* Wire `PaymentProvider` to your
+  processor and test it with its test keys. Keep card entry on the processor's
+  hosted page so card numbers never reach your app or server, and confirm your PCI
+  DSS self-assessment with the processor. Add receipts, tax, refunds and the
+  disputes process your market expects.
+* *Waivers and medical consent that hold up.* The waiver is a flag and a date. A
+  binding waiver needs the text your lawyer approves for your jurisdiction, a
+  record of exactly which version was signed, by whom and how, and a health
+  questionnaire or medical consent where the law or your insurer asks for one.
+  Minors usually need a parent or guardian to consent for them.
+* *Child safeguarding.* Children's classes need background checks for the staff who
+  teach them, rules on who may collect a child, consent for photos, and limits on
+  what other members can see about a child. Check what your country's safeguarding
+  rules require.
+* *Door hardware.* The kiosk decides; it doesn't open anything. A real door needs
+  an access controller and reader, integrated through their vendor's API, with a
+  fail-safe for fire exits and a plan for when the network is down.
+* *Health data privacy.* Heart rates and workouts are health data. Under GDPR
+  that's special category data, needing explicit consent, a stated purpose, a
+  retention limit and deletion on request. In the United States, check whether
+  your service falls under HIPAA (for example through a healthcare partner) and
+  what state privacy laws ask. Follow Apple's and Google's rules for data read from
+  HealthKit and Health Connect.
+* *Marketing consent.* Nudges and campaigns respect the promotion switch and quiet
+  hours. Check your market's rules on marketing messages, such as opt-in
+  requirements and an unsubscribe in every message.
+* *Reviewed translations.* The non-English bundles are machine translations; have
+  them reviewed before release.
+* *Operations.* Monitoring, backups that have been restored in a test, a support
+  process for members, and a channel between server instances before you run more
+  than one.

@@ -1,0 +1,226 @@
+[[pulse-users-guide]]
+== Pulse: A fitness studio app from every side
+
+Pulse is a sample app with a server behind it, for a gym or a studio that runs
+classes. Members book classes for themselves and their children, open the door
+with their phone, pay for a membership and train with their friends. Trainers run
+their classes, the front desk lets people in, and the owner reads the numbers and
+fills the quiet classes. The app and the server are one Maven project, written in
+Java on both sides.
+
+This chapter is the user's guide: what each kind of user sees and can do.
+<<pulse-implementors-guide>> is the other half. It explains how the project is
+built and what to change to make it yours.
+
+One app serves everyone. The server gives every account a set of roles, and the
+app offers a mode for each role the account holds. Someone who holds more than one
+switches between them from the menu.
+
+[cols="1,3"]
+|===
+| Role | What it adds
+
+| Member
+| Every account is a member. Book classes for yourself and your household, show
+  the door pass, manage the membership, say when you're away, see your visits and
+  workouts, and keep up with friends.
+
+| Trainer
+| Granted by the owner. See the week's classes and who's coming, mark
+  attendance, follow heart rate zones live in class, and swap shifts.
+
+| Front desk
+| Granted by the owner. Check people in by pass, fob or name, take walk-ins, and
+  read the day at a location. A tablet signed in as the desk runs as the kiosk by
+  the door.
+
+| Owner
+| Runs the studio: the dashboard, plans, the timetable, staff, campaigns and
+  accounts.
+|===
+
+=== Trying it
+
+Start the server on the development profile. It needs nothing installed: the
+database is in memory, text messages and push notifications are printed on the
+console, and cards are simulated.
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/pulse.sh[tag=pulse-sh-server,indent=0]
+----
+
+Then run the app in the simulator, from another terminal:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/pulse.sh[tag=pulse-sh-simulator,indent=0]
+----
+
+The development profile seeds a studio with two locations, a timetable of adult
+and children's classes from three weeks back to three weeks ahead, the plans on
+sale, and a few weeks of bookings, visits and paid invoices, so every screen has
+something to show. Every demo account has the password `pulse-demo`:
+
+[cols="2,3"]
+|===
+| Account | Who
+
+| `member@pulse.example`
+| A member with two children in the household and a card on file.
+
+| `member2@pulse.example`
+| A new member: no household and no card.
+
+| `member3@pulse.example`
+| A member the owner has flagged.
+
+| `member4@pulse.example`
+| A member who hasn't been in for weeks.
+
+| `trainer@pulse.example`, `trainer2@pulse.example`
+| Trainers.
+
+| `desk@pulse.example`
+| The front desk and the door kiosk.
+
+| `owner@pulse.example`
+| The owner.
+|===
+
+The simulated card `4242 4242 4242 4242` is accepted and `4000 0000 0000 0002`
+is declined. No money moves.
+
+=== Getting in
+
+A new member registers with a name, an e-mail address, a password and a phone
+number, which is confirmed with a code sent by text message. On the development
+profile the code is printed on the server's console and filled in for you. Before
+the first booking the app asks the account holder to sign the studio's waiver, for
+themselves and for each child they add.
+
+=== The member
+
+==== The timetable and booking
+
+The timetable lists the classes at each location by day, with the places left,
+which update live as other members book. Booking takes a place if one is free and
+joins the waitlist if not. When someone gives a place back, the first person
+waiting is moved into the class and told so at once.
+
+A place given back at least 12 hours before the class is free. Later than that it
+counts as a late cancellation, and a class from a pack is spent. Someone booked
+who never comes is marked a no-show once the class is over.
+
+A booking is refused when the class has already started, when the person is
+outside the class's age range on the day of the class, when the waiver isn't
+signed, or when no membership covers the class.
+
+==== The household
+
+An account holder books for up to eight people: themselves and their children.
+Each child has their own membership, their own place in a class and their own door
+pass, but only the account holder signs in. A child's age is worked out from their
+birth date on the day of each class, so a child grows into the next age band
+without anyone changing anything.
+
+==== The door pass
+
+The pass is a QR code that changes every 30 seconds. It's computed on the phone,
+so it works with no signal. A pass is good once: a screenshot shown a second time
+is refused as already used. A child without a phone gets an NFC fob or wristband
+instead. If a phone is lost, replacing the pass makes the old codes and the old
+fob stop opening the door at once.
+
+==== The membership
+
+The plans on sale are monthly, annual, class packs and drop-ins. Joining takes the
+first payment; changing plan takes what's left of the old period off the first
+invoice. A membership can be frozen for one week to three months, and cancelled.
+
+When a renewal is declined the card is tried again after one, three and seven
+days. The membership stays usable through the first retry; from the second
+failure it's past due and the door says so; after the last retry the invoice
+waits to be paid by hand from the wallet. A member who brings a friend gets a
+credit when the friend first pays.
+
+==== Away periods
+
+A member who is travelling or injured says when they'll be away. No marketing
+reaches them meanwhile, and they can choose to freeze their billing for the same
+time.
+
+==== Visits, workouts and friends
+
+The member's page shows this month's visits, the streak of weeks with a visit, and
+the last twelve weeks. Workouts recorded by the phone's health store or the watch
+are kept with their heart rate. A member can share their heart rate with the
+trainer during a class.
+
+Friends are added by the e-mail they sign in with, and nothing about a member is
+shown to someone they haven't accepted. The feed shows friends' visits and the
+workouts they chose to share, kudos can be given for them, and a friend can be
+invited to a class.
+
+==== Messages and quiet hours
+
+Two kinds of message arrive without anyone sending them: an invitation to a class
+starting within a day and a half that's still under 60% full, sent to members who
+have taken that kind of class before, and a reminder that the studio misses them after two weeks without
+a visit. Neither is sent to a member who is away or who turned promotions off, and
+neither arrives during quiet hours, which are 10 PM to 7 AM until the member
+changes them in the settings.
+
+=== The trainer
+
+The trainer sees the classes they teach in the coming week. Each class's roster
+lists who is booked, who is waiting and who came, with what the trainer needs to
+know about each person. Attendance can be marked by hand for someone the door
+didn't see, and corrected for 30 minutes after the class ends.
+
+During a class, members who share their heart rate appear with their current zone,
+one to five, worked out from their age.
+
+A trainer offers a shift they can't work to the others, and any other trainer can
+take it.
+
+=== The front desk and the kiosk
+
+The desk checks people in by scanning the pass, reading a fob, or finding the
+member by name. Every check-in answers: admitted, or refused with the reason to
+read out, such as a membership that's past due or a class the person isn't booked
+into. A booking counts for a visit from an hour before its class until 30 minutes
+after it starts.
+
+Someone who comes in without a membership is recorded as a walk-in: a guest, a day
+pass or a free trial, paid in cash, by card or not at all. The owner's campaigns
+follow up on them.
+
+The desk's day shows who came, what was taken and what starts soon. Signed in on a
+tablet by the door, the desk account runs as the kiosk: a member holds up their
+pass and the screen turns green or red.
+
+=== The owner
+
+The dashboard shows monthly recurring revenue, the share of places taken in the
+last week's classes, the members who haven't been in for two weeks and didn't say
+they'd be away, the most booked kinds of class, and the classes in the next two
+days that are under half full.
+
+The owner adds and changes plans (a change reaches members at their next renewal),
+puts classes on the timetable for a number of weeks, manages the staff and their
+roles, and sends campaigns to everyone who took a kind of class, to every active
+member, or to the members who haven't been in for a month. Each campaign counts
+how many were sent, opened, and booked.
+
+=== In a browser
+
+The server can host the app itself, so the whole studio can be tried in a browser:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/pulse.sh[tag=pulse-sh-web,indent=0]
+----
+
+Then open `http://localhost:8080/`. A browser offers less than a phone: the door
+pass, health data and the watch are features of the phone app.
