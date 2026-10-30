@@ -86,7 +86,9 @@ public final class AdminConsole {
 
     private static final String[] TABS = {"Overview", "Flags", "Players", "Live", "Audit", "Forge", "Query",
         "Pipelines", "Promote"};
-    private static final char[] ICONS = {FontImage.MATERIAL_DASHBOARD, FontImage.MATERIAL_FLAG,
+    // Not MATERIAL_DASHBOARD: the Initializr renames every "Dash" in this
+    // template to the new app's name, and the constant would be renamed too.
+    private static final char[] ICONS = {FontImage.MATERIAL_ANALYTICS, FontImage.MATERIAL_FLAG,
         FontImage.MATERIAL_PEOPLE, FontImage.MATERIAL_SPORTS_ESPORTS, FontImage.MATERIAL_HISTORY,
         FontImage.MATERIAL_BUILD, FontImage.MATERIAL_SEARCH, FontImage.MATERIAL_ALT_ROUTE,
         FontImage.MATERIAL_CAMPAIGN};

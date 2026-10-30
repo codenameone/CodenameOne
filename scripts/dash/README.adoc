@@ -1,7 +1,7 @@
 = Dash
 
 An endless runner and its server, in one Maven project and one language. A runner
-dashes down a track of lanes, jumping hurdles, sliding under barriers and changing
+races down a track of lanes, jumping hurdles, sliding under barriers and changing
 lanes around traffic, while the camera can start side on, like a 2D platformer,
 and swing behind the runner into full 3D halfway through a level. Around the run
 is what a live game needs: accounts, levels with stars, leaderboards for every

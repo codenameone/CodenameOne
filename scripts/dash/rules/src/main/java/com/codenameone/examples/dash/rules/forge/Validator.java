@@ -47,7 +47,7 @@ public final class Validator {
         List<String> errors = new ArrayList<String>();
         List<String> warnings = new ArrayList<String>();
         if (!isSlug(p.id, 3, 40)) {
-            errors.add("The pack id is 3 to 40 lower-case letters, digits or dashes");
+            errors.add("The pack id is 3 to 40 lower-case letters, digits or hyphens");
         }
         if (p.name.trim().length() == 0 || p.name.length() > 60) {
             errors.add("The pack needs a name of up to 60 characters");
@@ -73,7 +73,7 @@ public final class Validator {
             LevelDef d = p.levels.get(i);
             String name = "Level " + (d.name == null ? d.id : d.name) + ": ";
             if (!isSlug(d.id, 1, 32) || seen.contains(d.id)) {
-                errors.add(name + "needs a unique id of lower-case letters, digits or dashes");
+                errors.add(name + "needs a unique id of lower-case letters, digits or hyphens");
             }
             seen.add(d.id);
             int placements = d.placements.size();
