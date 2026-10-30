@@ -2747,6 +2747,26 @@ final class TypedEmit {
                 sub.put(ls.get(i), new E("o" + i, Ty.INT));
                 continue;
             }
+            // An int is boxed inside the slow path, never at the call: a
+            // call that boxes puts objects on ParparVM's operand stack, which
+            // gives the typed function a frame the C compiler will not
+            // inline, and that call is what a small arithmetic function
+            // costs (spectral_norm's a(i, j): 33ms out of line, 12ms inlined).
+            if (v.t.k == Ty.K.INT && v.ll != null) {
+                params.append(sep).append("long ").append(pn).append(", Object q").append(i);
+                args.append(sep).append(v.ll).append(", ").append(v.bg);
+                takes.append("        Object o").append(i).append(" = q").append(i).append(" != null ? q").append(i)
+                        .append(" : Long.valueOf(").append(pn).append(");\n");
+                sub.put(ls.get(i), new E("o" + i, Ty.INT));
+                continue;
+            }
+            if (v.t.k == Ty.K.INT && v.lc != null) {
+                params.append(sep).append("long ").append(pn);
+                args.append(sep).append(v.lc);
+                takes.append("        Object o").append(i).append(" = Long.valueOf(").append(pn).append(");\n");
+                sub.put(ls.get(i), new E("o" + i, Ty.INT));
+                continue;
+            }
             params.append(sep).append(jt(v.t)).append(' ').append(pn);
             args.append(sep).append(v.t.k == Ty.K.INT ? box(v) : v.c);
             sub.put(ls.get(i), new E(pn, v.t));

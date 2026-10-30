@@ -49,6 +49,10 @@ public final class StdModules {
             PyModule.registerModule(atexit());
             return true;
         }
+        if ("gc".equals(name)) {
+            PyModule.registerModule(gc());
+            return true;
+        }
         if ("_weakref".equals(name)) {
             PyModule.registerModule(weakref());
             return true;
@@ -127,6 +131,7 @@ public final class StdModules {
 
     /// The `atexit` handlers, each its function followed by its arguments
     /// (the trailing ones named by the matching entry of `EXIT_KW`).
+    private static boolean gcEnabled = true;
     private static final java.util.List<Object[]> EXIT_CALLS = new java.util.ArrayList<Object[]>();
     private static final java.util.List<String[]> EXIT_KW = new java.util.ArrayList<String[]>();
 
@@ -204,6 +209,39 @@ public final class StdModules {
                 System.err.println(e.getMessage());
             }
         }
+    }
+
+    /// Codename One's collector is a tracing one, so there are no reference
+    /// counts and no generations for Python to see. `collect` asks the VM for a
+    /// cycle and answers 0, the number of unreachable objects CPython reports,
+    /// which this collector does not count. `disable` is recorded and answered by
+    /// `isenabled` but does not stop the collector: a program that disables it
+    /// to avoid pauses still gets a concurrent one, which is what it wanted.
+    private static PyModule gc() {
+        PyModule m = new PyModule("gc", new String[0]);
+        m.setAttr("collect", new PyBuiltin("collect", (args, kwNames) -> {
+            System.gc();
+            return PyInt.of(0);
+        }));
+        m.setAttr("enable", PyBuiltin.positional("enable", a -> {
+            gcEnabled = true;
+            return Py.NONE;
+        }));
+        m.setAttr("disable", PyBuiltin.positional("disable", a -> {
+            gcEnabled = false;
+            return Py.NONE;
+        }));
+        m.setAttr("isenabled", PyBuiltin.positional("isenabled", a -> Py.bool(gcEnabled)));
+        m.setAttr("get_count", PyBuiltin.positional("get_count",
+                a -> new PyTuple(new Object[] {PyInt.of(0), PyInt.of(0), PyInt.of(0)})));
+        m.setAttr("get_threshold", PyBuiltin.positional("get_threshold",
+                a -> new PyTuple(new Object[] {PyInt.of(700), PyInt.of(10), PyInt.of(10)})));
+        m.setAttr("set_threshold", new PyBuiltin("set_threshold", (args, kwNames) -> Py.NONE));
+        m.setAttr("freeze", PyBuiltin.positional("freeze", a -> Py.NONE));
+        m.setAttr("unfreeze", PyBuiltin.positional("unfreeze", a -> Py.NONE));
+        m.setAttr("garbage", new PyList(new Object[0]));
+        m.setAttr("callbacks", new PyList(new Object[0]));
+        return m;
     }
 
     private static PyModule atexit() {
