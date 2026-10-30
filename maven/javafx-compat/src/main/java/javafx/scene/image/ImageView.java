@@ -109,6 +109,12 @@ public class ImageView extends Node {
         shown = null;
         shownValid = false;
         super.cn1Invalidated(Dirty.PAINT);
+        // A remote image changes size when it arrives, which changes this
+        // view's preferred size.
+        javafx.scene.Parent p = getParent();
+        if (p != null) {
+            p.requestLayout();
+        }
     }
 
     /// Returns the image, or `null`.
