@@ -312,6 +312,37 @@ static HRESULT cn1UwpOnWheel(IPointerEventArgs* args) {
     return S_OK;
 }
 
+/* The TV-safe insets in pixels (left, top, right, bottom). ApplicationView and
+ * the window bounds answer only on the view thread, while the EDT asks during
+ * layout, so the view thread computes them (initDisplay, SizeChanged) and the
+ * native only copies these out. */
+static volatile LONG g_safeInsets[4];
+static volatile LONG g_safeKnown;
+
+static void cn1UwpUpdateSafeArea(void) {
+    using namespace ABI::Windows::UI::ViewManagement;
+    ComPtr<IApplicationViewStatics2> statics;
+    ComPtr<IApplicationView> view;
+    ComPtr<IApplicationView2> view2;
+    Rect visible = {};
+    Rect bounds = {};
+    if (!g_window || FAILED(GetActivationFactory(
+            HStringReference(RuntimeClass_Windows_UI_ViewManagement_ApplicationView).Get(), &statics))
+            || FAILED(statics->GetForCurrentView(&view)) || FAILED(view.As(&view2))
+            || FAILED(view2->get_VisibleBounds(&visible)) || FAILED(g_window->get_Bounds(&bounds))) {
+        return;
+    }
+    int edge[4];
+    edge[0] = cn1UwpToPixels(visible.X - bounds.X);
+    edge[1] = cn1UwpToPixels(visible.Y - bounds.Y);
+    edge[2] = cn1UwpToPixels((bounds.X + bounds.Width) - (visible.X + visible.Width));
+    edge[3] = cn1UwpToPixels((bounds.Y + bounds.Height) - (visible.Y + visible.Height));
+    for (int i = 0; i < 4; i++) {
+        InterlockedExchange(&g_safeInsets[i], edge[i] > 0 ? edge[i] : 0);
+    }
+    InterlockedExchange(&g_safeKnown, 1);
+}
+
 /* Handled lives on ICoreWindowEventArgs, which every key event also implements. */
 static void cn1UwpMarkHandled(IKeyEventArgs* a) {
     ComPtr<ICoreWindowEventArgs> base;
@@ -358,6 +389,7 @@ static void cn1UwpRegisterInput(void) {
         int w, h;
         g_scale = cn1UwpScale();
         cn1UwpWindowPixels(&w, &h);
+        cn1UwpUpdateSafeArea();
         if (w == cn1Win.width && h == cn1Win.height) {
             return S_OK;
         }
@@ -513,22 +545,48 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_initDisplay___java_lang_Strin
         com_codename1_impl_windows_WindowsNative_mainWindowSetTitle___java_lang_String(threadStateData, __cn1Arg1);
     }
     g_window->Activate();
+    cn1UwpUpdateSafeArea();
     cn1WindowsLog("initDisplay(uwp): CoreWindow swap chain created");
+}
+
+/* Sets the title on the view thread, the only one ApplicationView answers on. */
+static void cn1UwpApplyTitle(const WCHAR* title) {
+    using namespace ABI::Windows::UI::ViewManagement;
+    ComPtr<IApplicationViewStatics2> statics;
+    ComPtr<IApplicationView> view;
+    if (SUCCEEDED(GetActivationFactory(HStringReference(RuntimeClass_Windows_UI_ViewManagement_ApplicationView).Get(),
+            &statics)) && SUCCEEDED(statics->GetForCurrentView(&view))) {
+        view->put_Title(HStringReference(title != NULL ? title : L"").Get());
+    }
 }
 
 JAVA_VOID com_codename1_impl_windows_WindowsNative_mainWindowSetTitle___java_lang_String(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1) {
-    using namespace ABI::Windows::UI::ViewManagement;
-    ComPtr<IApplicationViewStatics2> statics;
-    ComPtr<IApplicationView> view;
-    if (FAILED(GetActivationFactory(HStringReference(RuntimeClass_Windows_UI_ViewManagement_ApplicationView).Get(),
-            &statics)) || FAILED(statics->GetForCurrentView(&view))) {
-        return;   /* not on the window's thread, or no view yet */
+    if (!g_dispatcher) {
+        return;
     }
     UINT32 len = 0;
     WCHAR* title = __cn1Arg1 != JAVA_NULL ? cn1WinJavaStringToWide(threadStateData, __cn1Arg1, &len) : NULL;
-    view->put_Title(HStringReference(title != NULL ? title : L"").Get());
-    free(title);
+    boolean onViewThread = 0;
+    if (SUCCEEDED(g_dispatcher->get_HasThreadAccess(&onViewThread)) && onViewThread) {
+        cn1UwpApplyTitle(title);
+        free(title);
+        return;
+    }
+    /* From the EDT: RunAsync is callable from any thread, runs the handler on
+     * the view thread and wakes the pump that is blocked in ProcessEvents. The
+     * handler owns the string. */
+    typedef ABI::Windows::UI::Core::IDispatchedHandler DispatchedHandler;
+    ComPtr<ABI::Windows::Foundation::IAsyncAction> action;
+    HRESULT hr = g_dispatcher->RunAsync(ABI::Windows::UI::Core::CoreDispatcherPriority_Normal,
+            Callback<DispatchedHandler>([title]() {
+                cn1UwpApplyTitle(title);
+                free(title);
+                return S_OK;
+            }).Get(), &action);
+    if (FAILED(hr)) {
+        free(title);
+    }
 }
 
 JAVA_INT com_codename1_impl_windows_WindowsNative_getDisplayWidth___R_int(CODENAME_ONE_THREAD_STATE) {
@@ -590,29 +648,13 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_pumpMessages___R_boolean(C
  * the picture, so an Xbox reports an inset there; anything else reports none. */
 JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_safeAreaInsets___int_1ARRAY_R_boolean(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1) {
-    using namespace ABI::Windows::UI::ViewManagement;
-    if (__cn1Arg1 == JAVA_NULL || (*(JAVA_ARRAY) __cn1Arg1).length < 4 || !g_window) {
-        return JAVA_FALSE;
-    }
-    ComPtr<IApplicationViewStatics2> statics;
-    ComPtr<IApplicationView> view;
-    ComPtr<IApplicationView2> view2;
-    Rect visible = {};
-    Rect bounds = {};
-    if (FAILED(GetActivationFactory(HStringReference(RuntimeClass_Windows_UI_ViewManagement_ApplicationView).Get(),
-            &statics)) || FAILED(statics->GetForCurrentView(&view)) || FAILED(view.As(&view2))
-            || FAILED(view2->get_VisibleBounds(&visible)) || FAILED(g_window->get_Bounds(&bounds))) {
+    if (__cn1Arg1 == JAVA_NULL || (*(JAVA_ARRAY) __cn1Arg1).length < 4 || !g_safeKnown) {
         return JAVA_FALSE;
     }
     JAVA_ARRAY_INT* out = (JAVA_ARRAY_INT*) CN1_ARRAY_DATA(__cn1Arg1);
-    int left = cn1UwpToPixels(visible.X - bounds.X);
-    int top = cn1UwpToPixels(visible.Y - bounds.Y);
-    int right = cn1UwpToPixels((bounds.X + bounds.Width) - (visible.X + visible.Width));
-    int bottom = cn1UwpToPixels((bounds.Y + bounds.Height) - (visible.Y + visible.Height));
-    out[0] = left > 0 ? left : 0;
-    out[1] = top > 0 ? top : 0;
-    out[2] = right > 0 ? right : 0;
-    out[3] = bottom > 0 ? bottom : 0;
+    for (int i = 0; i < 4; i++) {
+        out[i] = (JAVA_ARRAY_INT) g_safeInsets[i];
+    }
     return JAVA_TRUE;
 }
 

@@ -994,6 +994,9 @@ int cn1WinInitRuntime(void) {
         return 0; /* already initialised */
     }
 
+    /* Under UWP the view thread is already initialised by CoreApplication and
+     * this answers RPC_E_CHANGED_MODE, which is harmless: the apartment the
+     * view thread has is the one the WinRT calls need. */
     CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
     cn1PreviousUnhandled = SetUnhandledExceptionFilter(cn1WinUnhandled);
     /* First-chance: turn null-deref / stack-overflow faults into catchable Java

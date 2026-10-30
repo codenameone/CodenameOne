@@ -66,6 +66,15 @@ DESKTOP_ONLY = [
 # though their desktop version lives in one of the files above.
 IMPLEMENTED_BY_UWP_HOST = set()
 
+# Natives where 0 is a success the Java side acts on, so the stub must answer
+# the failure value instead. Keyed by the Java method name. Every other stub's
+# 0 / null / false was checked to read as "unsupported" at its call sites; a new
+# int-returning native needs the same check.
+RETURN_OVERRIDES = {
+    "desktopWindowCreate": "-1",   # a slot; 0 is a real window (WindowsWindowManager)
+    "printDocument": "-1",         # 0 is "completed", 1 "cancelled"
+}
+
 DEF_RE = re.compile(
     r"^(?:extern \"C\"\s+)?(JAVA_[A-Z]+)\s+(com_codename1_\w+)\s*\(([^)]*)\)\s*\{",
     re.M)
@@ -126,7 +135,15 @@ def collect():
     return natives
 
 
+def java_name(fn):
+    return fn[len("com_codename1_impl_windows_WindowsNative_"):].split("__")[0]
+
+
 def render(natives):
+    names = set(java_name(fn) for fn in natives)
+    for name in RETURN_OVERRIDES:
+        if name not in names:
+            sys.exit("RETURN_OVERRIDES names %s, which is not a stubbed native" % name)
     out = []
     out.append("""/*
  * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
@@ -170,7 +187,7 @@ extern "C" {
         out.append("\n/* %s */\n" % src)
         out.append("%s %s(%s) {\n" % (ret, fn, params))
         if ret != "JAVA_VOID":
-            out.append("    return 0;\n")
+            out.append("    return %s;\n" % RETURN_OVERRIDES.get(java_name(fn), "0"))
         out.append("}\n")
     out.append("""
 } /* extern "C" */

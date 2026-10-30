@@ -1111,6 +1111,20 @@ public class WindowsNativeBuilder extends Executor {
      */
     private void buildXboxPackage(BuildRequest request, String arch) {
         log("Packaging UWP MSIX for Xbox Developer Mode (windows.xbox=true)");
+        // A package installs only when its manifest Publisher equals the signing
+        // certificate's subject. The generated dev certificate is made to match;
+        // a supplied one (often the exe's Authenticode certificate) is not, and
+        // guessing would ship a package every install refuses.
+        boolean hasCert = request.getArg("windows.msix.pfx",
+                request.getArg("windows.signing.pkcs12", null)) != null
+                || (request.getCertificate() != null && request.getCertificate().length > 0);
+        String publisherHint = request.getArg("windows.msix.publisher", null);
+        if (hasCert && (publisherHint == null || publisherHint.trim().length() == 0)) {
+            throw new BuildException("windows.xbox=true is signing with your certificate, so set "
+                    + "windows.msix.publisher to that certificate's subject exactly as Windows shows "
+                    + "it (for example CN=Example, O=Example Ltd); the console refuses a package whose "
+                    + "Publisher differs. Leave out the certificate to have a development one created.");
+        }
         try {
             File layout = new File(getBuildDirectory(), "uwp-layout");
             File assets = new File(layout, "Assets");
@@ -1139,13 +1153,10 @@ public class WindowsNativeBuilder extends Executor {
                 throw new BuildException("MSIX packaging failed. Ensure the `makemsix` tool "
                         + "(from the msix-packaging project) is on PATH, or point CN1_MAKEMSIX at it.");
             }
-            boolean hasCert = request.getArg("windows.msix.pfx",
-                    request.getArg("windows.signing.pkcs12", null)) != null
-                    || (request.getCertificate() != null && request.getCertificate().length > 0);
             if (hasCert) {
                 signMsixPackage(msix, request);
             } else {
-                File pfx = createXboxDevCertificate(publisher,
+                File pfx = createXboxDevCertificate(new File(getBuildDirectory(), "uwp-devcert"), publisher,
                         new File(resultDir, request.getMainClass() + "-dev.cer"));
                 signMsixWith(msix, pfx, "", "sha256");
             }
@@ -1174,11 +1185,11 @@ public class WindowsNativeBuilder extends Executor {
 
     /**
      * A self-signed code-signing certificate for sideloading, made with
-     * openssl. Returns the PKCS#12 (empty password) and writes the DER
-     * certificate to {@code cerOut}.
+     * openssl, in {@code dir}. Returns the PKCS#12 (empty password) and writes
+     * the DER certificate to {@code cerOut}. Package visible because CI creates
+     * one through this method and installs a package signed with it on Windows.
      */
-    private File createXboxDevCertificate(String publisher, File cerOut) throws Exception {
-        File dir = new File(getBuildDirectory(), "uwp-devcert");
+    File createXboxDevCertificate(File dir, String publisher, File cerOut) throws Exception {
         dir.mkdirs();
         File key = new File(dir, "key.pem");
         File cert = new File(dir, "cert.pem");

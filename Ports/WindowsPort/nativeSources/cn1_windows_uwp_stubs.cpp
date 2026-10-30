@@ -127,7 +127,7 @@ JAVA_INT com_codename1_impl_windows_WindowsNative_currentModifiers___R_int(CODEN
 
 /* cn1_windows_desktopwindow.cpp */
 JAVA_INT com_codename1_impl_windows_WindowsNative_desktopWindowCreate___int_java_lang_String_int_int_int_int_boolean_boolean_int_boolean_R_int(CODENAME_ONE_THREAD_STATE, JAVA_INT windowId, JAVA_OBJECT title, JAVA_INT x, JAVA_INT y, JAVA_INT width, JAVA_INT height, JAVA_BOOLEAN decorated, JAVA_BOOLEAN resizable, JAVA_INT ownerSlot, JAVA_BOOLEAN positionSet) {
-    return 0;
+    return -1;
 }
 
 /* cn1_windows_desktopwindow.cpp */
@@ -308,7 +308,7 @@ JAVA_INT com_codename1_impl_windows_WindowsNative_primaryMonitor___R_int(CODENAM
 
 /* cn1_windows_print.cpp */
 JAVA_INT com_codename1_impl_windows_WindowsNative_printDocument___java_lang_String_java_lang_String_java_lang_String_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT pathObj, JAVA_OBJECT mimeObj, JAVA_OBJECT jobNameObj) {
-    return 0;
+    return -1;
 }
 
 /* cn1_windows_print.cpp */

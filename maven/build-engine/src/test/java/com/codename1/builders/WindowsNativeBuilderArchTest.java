@@ -134,4 +134,27 @@ class WindowsNativeBuilderArchTest {
         assertEquals(generated, new String(bytes.toByteArray(), "UTF-8"),
                 "regenerate src/test/resources/com/codename1/builders/xbox-smoke-AppxManifest.xml");
     }
+
+    /// Creates the development certificate through the builder's own openssl
+    /// commands. windows-cross-compile.yml sets CN1_XBOX_DEVCERT_OUT and signs
+    /// the package it installs on Windows with the result, so a certificate
+    /// Windows would refuse fails there; elsewhere it runs when openssl is on
+    /// the PATH and checks the files appear.
+    @Test
+    void xboxDevCertificateIsCreatedForTheSmokePublisher() throws Exception {
+        String out = System.getenv("CN1_XBOX_DEVCERT_OUT");
+        java.io.File dir = out != null && out.length() > 0 ? new java.io.File(out)
+                : java.nio.file.Files.createTempDirectory("xbox-devcert").toFile();
+        java.io.File cer = new java.io.File(dir, "dev.cer");
+        java.io.File pfx;
+        try {
+            pfx = new WindowsNativeBuilder().createXboxDevCertificate(dir, "CN=UwpSmoke", cer);
+        } catch (BuildException ex) {
+            org.junit.jupiter.api.Assumptions.assumeTrue(out != null && out.length() > 0,
+                    "openssl is not available: " + ex.getMessage());
+            throw ex;
+        }
+        assertTrue(pfx.isFile() && pfx.length() > 0);
+        assertTrue(cer.isFile() && cer.length() > 0);
+    }
 }

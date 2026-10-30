@@ -2806,7 +2806,7 @@ public class WindowsImplementation extends CodenameOneImplementation {
         rect = super.getDisplaySafeArea(rect);
         int[] insets = new int[4];
         if (WindowsNative.safeAreaInsets(insets)) {
-            rect.setBounds(insets[0], insets[1],
+            rect.setBounds(rect.getX() + insets[0], rect.getY() + insets[1],
                     Math.max(0, rect.getWidth() - insets[0] - insets[2]),
                     Math.max(0, rect.getHeight() - insets[1] - insets[3]));
         }
