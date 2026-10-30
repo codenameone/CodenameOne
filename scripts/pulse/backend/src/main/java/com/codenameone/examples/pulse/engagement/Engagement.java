@@ -141,9 +141,36 @@ public class Engagement {
             calories += done.get(iter).getCalories();
         }
         Instant last = checkIns.lastVisit(account);
+        int visits = (int) checkIns.countByAccount(account);
+        int streak = streak(seen);
+        List<Workout> all = workouts.findByAccountOrderByStartedAtDesc(account);
+        int points = Points.score(visits, streak, all);
+        int level = Points.level(points);
         return new StatsDto((int) checkIns.countByAccountAndAtGreaterThanEqual(account, month),
-                (int) checkIns.countByAccount(account), streak(seen), minutes, calories,
-                last == null ? 0 : last.toEpochMilli(), weeks);
+                visits, streak, minutes, calories, last == null ? 0 : last.toEpochMilli(), weeks,
+                points, level, Points.floor(level), Points.next(level),
+                Points.badges(visits, streak, all));
+    }
+
+    /// The minutes a stored zone list (`"m1,m2,m3,m4,m5"`) spent in `zone`,
+    /// counted from 1; 0 for a zone it does not have.
+    static int zoneMinutes(String zones, int zone) {
+        if (zones == null || zone < 1) {
+            return 0;
+        }
+        int at = 0;
+        for (int iter = 1; iter < zone; iter++) {
+            at = zones.indexOf(',', at) + 1;
+            if (at <= 0) {
+                return 0;
+            }
+        }
+        int end = zones.indexOf(',', at);
+        try {
+            return Integer.parseInt(zones.substring(at, end < 0 ? zones.length() : end).trim());
+        } catch (NumberFormatException bad) {
+            return 0;
+        }
     }
 
     /// Weeks in a row with a visit, counting back from this week -- or from

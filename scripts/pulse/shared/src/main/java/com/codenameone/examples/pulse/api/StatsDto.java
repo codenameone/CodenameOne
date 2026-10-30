@@ -22,7 +22,13 @@ import com.codename1.annotations.Mapped;
 
 import java.util.List;
 
-/// How a member is doing: visits, the current weekly streak, minutes trained.
+/// How a member is doing: visits, the current weekly streak, minutes trained,
+/// and the points, level and badges they earned for it.
+///
+/// `levelFloor` and `nextLevel` are the points the current level starts at and
+/// the next one does, for drawing progress between them; `nextLevel` equals
+/// `levelFloor` at the top level. `badges` are the ids of the badges earned,
+/// in the order they are listed in `Points.BADGES` on the server.
 @Mapped
 public record StatsDto(
         int visitsThisMonth,
@@ -31,5 +37,10 @@ public record StatsDto(
         int minutesThisMonth,
         int caloriesThisMonth,
         long lastVisit,
-        List<Integer> weeklyVisits) {
+        List<Integer> weeklyVisits,
+        int points,
+        int level,
+        int levelFloor,
+        int nextLevel,
+        List<String> badges) {
 }

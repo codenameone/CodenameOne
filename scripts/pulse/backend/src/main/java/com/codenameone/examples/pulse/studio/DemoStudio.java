@@ -32,6 +32,7 @@ import com.codenameone.examples.pulse.domain.ClassType;
 import com.codenameone.examples.pulse.domain.Invoice;
 import com.codenameone.examples.pulse.domain.Location;
 import com.codenameone.examples.pulse.domain.Member;
+import com.codenameone.examples.pulse.domain.Workout;
 import com.codenameone.examples.pulse.domain.Membership;
 import com.codenameone.examples.pulse.domain.MembershipPlan;
 import com.codenameone.examples.pulse.domain.Room;
@@ -47,6 +48,7 @@ import com.codenameone.examples.pulse.repository.MembershipPlanRepository;
 import com.codenameone.examples.pulse.repository.MembershipRepository;
 import com.codenameone.examples.pulse.repository.RoomRepository;
 import com.codenameone.examples.pulse.repository.StaffRepository;
+import com.codenameone.examples.pulse.repository.WorkoutRepository;
 
 import java.io.IOException;
 import java.time.DayOfWeek;
@@ -103,6 +105,7 @@ public class DemoStudio {
     private final BookingRepository bookings;
     private final CheckInRepository checkIns;
     private final InvoiceRepository invoices;
+    private final WorkoutRepository workouts;
     /// A fixed sequence, so that every demo database has the same history.
     private long seed = 20261030L;
 
@@ -110,7 +113,8 @@ public class DemoStudio {
             RoomRepository rooms, ClassTypeRepository types, ClassSessionRepository sessions,
             StaffRepository staff, MembershipPlanRepository plans,
             MembershipRepository memberships, MemberRepository members,
-            BookingRepository bookings, CheckInRepository checkIns, InvoiceRepository invoices) {
+            BookingRepository bookings, CheckInRepository checkIns, InvoiceRepository invoices,
+            WorkoutRepository workouts) {
         this.accounts = accounts;
         this.config = config;
         this.locations = locations;
@@ -124,6 +128,7 @@ public class DemoStudio {
         this.bookings = bookings;
         this.checkIns = checkIns;
         this.invoices = invoices;
+        this.workouts = workouts;
     }
 
     @PostConstruct
@@ -501,8 +506,47 @@ public class DemoStudio {
             visit.setAt(at);
             visit.setStaff(DemoAccounts.DESK);
             checkIns.insert(visit);
+            if ("SELF".equals(member.getRelation())) {
+                worked(member, session);
+            }
         }
         bookings.insert(row);
+    }
+
+    /// The workout an adult recorded in a class they came to. Most wore a
+    /// strap or a watch; some only had the phone's estimate, and a few
+    /// recorded nothing at all, so the points and badges have something to
+    /// tell apart.
+    private void worked(Member member, ClassSession session) throws IOException {
+        int kind = next(6);
+        if (kind == 0) {
+            return;
+        }
+        int minutes = (int) ((session.getEndsAt().toEpochMilli()
+                - session.getStartsAt().toEpochMilli()) / 60000L);
+        int avg = kind == 1 ? 0 : 118 + next(30);
+        int peak = avg == 0 ? 0 : avg + 18 + next(20);
+        Workout row = new Workout();
+        row.setId(Ids.next());
+        row.setAccount(member.getAccount());
+        row.setSessionId(session.getId());
+        row.setActivity("CLASS");
+        row.setStartedAt(session.getStartsAt());
+        row.setMinutes(minutes);
+        row.setAvgHr(avg);
+        row.setMaxHr(peak);
+        row.setCalories(minutes * (avg == 0 ? 6 : avg / 18));
+        if (avg == 0) {
+            row.setZones("0,0,0,0,0");
+        } else {
+            int top = peak > 175 ? 2 + next(4) : 0;
+            row.setZones((minutes / 6) + "," + (minutes / 5) + "," + (minutes / 4) + ","
+                    + (minutes - minutes / 6 - minutes / 5 - minutes / 4 - top) + "," + top);
+        }
+        row.setSource(kind == 1 ? "HEALTH" : kind == 2 ? "WATCH" : "STRAP");
+        row.setShared(kind != 5);
+        row.setCreatedAt(session.getEndsAt());
+        workouts.insert(row);
     }
 
     private void book(Member member, ClassSession session) throws IOException {

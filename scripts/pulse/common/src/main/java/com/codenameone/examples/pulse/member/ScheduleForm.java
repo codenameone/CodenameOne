@@ -24,6 +24,8 @@ import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.Component;
+import com.codename1.ui.Sheet;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codenameone.examples.pulse.api.BookingDto;
 import com.codenameone.examples.pulse.api.MemberDto;
@@ -187,6 +189,7 @@ public final class ScheduleForm extends LiveChannel.Adapter {
         int shown = 0;
         for (final SessionDto session : sessions) {
             if (session.startsAt() < from || session.startsAt() >= to
+                    || session.endsAt() < System.currentTimeMillis()
                     || !Classes.inBand(session, band)
                     || member != null && !Classes.fits(session, member.age())) {
                 continue;
@@ -206,33 +209,42 @@ public final class ScheduleForm extends LiveChannel.Adapter {
     }
 
     private Container row(final SessionDto session, final MemberDto member) {
-        Container row = Ui.row(FontImage.MATERIAL_FITNESS_CENTER, session.name(),
-                Classes.detail(session) + "\n" + Classes.places(session), null);
-        row.setName("class-" + session.id());
-        Container actions = new Container(new FlowLayout());
         final BookingDto held = member == null ? null
                 : Classes.bookingOf(bookings, session.id(), member.id());
+        Component action = null;
         if (held != null) {
-            actions.add(Ui.badge(Classes.WAITLISTED.equals(held.state())
+            // Booked: the pill says so, and a tap on it offers what a member
+            // does with a booking -- cancel it or put it in the calendar.
+            final Button pill = new Button(Classes.WAITLISTED.equals(held.state())
                     ? Lang.tr("Queue #{0}", Integer.valueOf(held.position()))
-                    : Lang.tr("Booked"), "SvBadgeGood"));
-            actions.add(Ui.link("Cancel", "cancel-" + session.id(),
-                    e -> Classes.cancel(held, this::load)));
-            actions.add(Ui.flat(FontImage.MATERIAL_EVENT_AVAILABLE, "calendar-" + session.id(),
-                    e -> Classes.addToCalendar(session)));
+                    : Lang.tr("Booked"), "SvPillBooked");
+            pill.setName("booked-" + session.id());
+            pill.addActionListener(e -> {
+                Sheet sheet = new Sheet(null, session.name());
+                Container content = sheet.getContentPane();
+                content.setLayout(BoxLayout.y());
+                content.add(Ui.secondary("Add to calendar", "calendar-" + session.id(), ev -> {
+                    sheet.back();
+                    Classes.addToCalendar(session);
+                }));
+                content.add(Ui.link("Cancel this booking", "cancel-" + session.id(), ev -> {
+                    sheet.back();
+                    Classes.cancel(held, this::load);
+                }));
+                sheet.show();
+            });
+            action = pill;
         } else if (!"CANCELLED".equals(session.state())) {
             boolean full = session.booked() >= session.capacity();
-            final Button book = full
-                    ? Ui.secondary("Join the queue", "book-" + session.id(), null)
-                    : Ui.primary("Book", "book-" + session.id(), null);
+            final Button book = new Button(full ? Lang.tr("Queue") : Lang.tr("Book"),
+                    full ? "SvPillQueue" : "SvPillBook");
+            book.setName("book-" + session.id());
             book.addActionListener(e -> {
                 book.setEnabled(false);
                 Classes.book(session, member, this::load, () -> book.setEnabled(true));
             });
-            actions.add(book);
+            action = book;
         }
-        Container block = new Container(BoxLayout.y());
-        block.add(row).add(actions);
-        return block;
+        return Classes.card(session, action);
     }
 }

@@ -22,6 +22,14 @@ import com.codename1.ui.Container;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codenameone.examples.pulse.ui.Level;
+import com.codenameone.examples.pulse.ui.Beat;
+import com.codenameone.examples.pulse.ui.Badges;
+import com.codenameone.examples.pulse.api.SessionDto;
+import com.codename1.ui.layouts.FlowLayout;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.Label;
+import com.codename1.ui.Button;
 import com.codenameone.examples.pulse.api.BookingDto;
 import com.codenameone.examples.pulse.api.MembershipDto;
 import com.codenameone.examples.pulse.api.StatsDto;
@@ -36,7 +44,6 @@ import com.codenameone.examples.pulse.ui.Lang;
 import com.codenameone.examples.pulse.ui.Menu;
 import com.codenameone.examples.pulse.ui.Nav;
 import com.codenameone.examples.pulse.ui.SettingsForm;
-import com.codenameone.examples.pulse.ui.StatRow;
 import com.codenameone.examples.pulse.ui.Ui;
 import java.util.List;
 
@@ -82,8 +89,8 @@ public class MemberForm extends LiveChannel.Adapter implements Nav.Home {
         Container bar = new Container(new BorderLayout());
         bar.setUIID("SvHomeBar");
         bar.add(BorderLayout.WEST, menu.flatButton());
-        bar.add(BorderLayout.CENTER, Ui.label(Lang.tr("Hi, {0}",
-                user == null ? "" : user.displayName()), "SvTitle"));
+        bar.add(BorderLayout.CENTER, Ui.label(Lang.tr(greeting(),
+                user == null ? "" : first(user.displayName())), "SvTitle"));
         bar.add(BorderLayout.EAST, Ui.flat(FontImage.MATERIAL_QR_CODE, "home-pass",
                 e -> PassForm.show(form, null)));
 
@@ -93,8 +100,19 @@ public class MemberForm extends LiveChannel.Adapter implements Nav.Home {
         stats.setName("stats");
         plan.setName("plan");
         page.add(next).add(stats).add(plan);
-        page.add(Ui.primary("Book a class", "home-book", e -> ScheduleForm.show(form)));
-        page.add(Ui.secondary("Settings", "home-settings", e -> SettingsForm.show(form)));
+        next.setUIID("SvInk");
+        Container quick = new Container(new com.codename1.ui.layouts.GridLayout(1, 4));
+        quick.add(tile(FontImage.MATERIAL_EVENT, "Timetable", "home-book",
+                () -> ScheduleForm.show(form)));
+        quick.add(tile(FontImage.MATERIAL_QR_CODE, "Pass", "home-pass-tile",
+                () -> PassForm.show(form, null)));
+        quick.add(tile(FontImage.MATERIAL_GROUP, "Friends", "home-friends",
+                () -> SocialForm.show(form)));
+        quick.add(tile(FontImage.MATERIAL_DIRECTIONS_RUN, "Workouts", "home-workouts",
+                () -> WorkoutsForm.show(form)));
+        page.removeAll();
+        page.add(next).add(quick).add(stats).add(plan);
+        page.add(Ui.link("Settings", "home-settings", e -> SettingsForm.show(form)));
         Ui.pull(page, this::load);
 
         Container shell = new Container(new BorderLayout());
@@ -128,7 +146,7 @@ public class MemberForm extends LiveChannel.Adapter implements Nav.Home {
         }
         Reminders.sync(bookings);
         next.removeAll();
-        next.add(Ui.label("Next class", "SvHeading"));
+        next.setLayout(BoxLayout.y());
         BookingDto first = null;
         for (int iter = 0; bookings != null && iter < bookings.size(); iter++) {
             BookingDto booking = bookings.get(iter);
@@ -138,16 +156,50 @@ public class MemberForm extends LiveChannel.Adapter implements Nav.Home {
                 first = booking;
             }
         }
+        Container head = new Container(new BorderLayout(), "SvInkRow");
+        head.add(BorderLayout.CENTER, Ui.label("NEXT CLASS", "SvInkEyebrow"));
+        Beat beat = new Beat("SvBeat", true);
+        beat.setPreferredW(com.codename1.ui.CN.convertToPixels(14));
+        beat.setPreferredH(com.codename1.ui.CN.convertToPixels(5));
+        head.add(BorderLayout.EAST, beat);
+        next.add(head);
         if (first == null) {
-            next.add(Ui.text("Nothing booked yet. The timetable is a tap away.", "SvMuted"));
+            next.add(Ui.label("Nothing booked yet", "SvInkTitle"));
+            next.add(Ui.text("Pick a class and your pass and reminder are ready.",
+                    "SvInkText"));
+            Button find = new Button(Lang.tr("Find a class"), "SvInkButton");
+            find.setName("next-find");
+            find.addActionListener(e -> ScheduleForm.show(form));
+            next.add(FlowLayout.encloseIn(find));
         } else {
             final BookingDto booking = first;
-            next.add(Ui.tap(Ui.row(FontImage.MATERIAL_FITNESS_CENTER, booking.session().name(),
-                    Classes.detail(booking.session()) + " - " + booking.memberName(),
-                    Ui.badge(Classes.WAITLISTED.equals(booking.state())
-                            ? Lang.tr("Queue #{0}", Integer.valueOf(booking.position()))
-                            : Lang.tr("Booked"), "SvBadgeGood")), "next-class",
-                    e -> BookingsForm.show(form)));
+            SessionDto session = booking.session();
+            next.add(Ui.text(session.name(), "SvInkTitle"));
+            next.add(Ui.text(Classes.detail(session), "SvInkText"));
+            Container chips = new Container(new FlowLayout(), "SvInkRow");
+            chips.add(Ui.label(until(session.startsAt()), "SvInkChip"));
+            if (Classes.WAITLISTED.equals(booking.state())) {
+                chips.add(Ui.label(Lang.tr("Queue #{0}", Integer.valueOf(booking.position())),
+                        "SvInkChip"));
+            }
+            UserDto user = Session.user();
+            if (booking.memberName() != null && user != null
+                    && !booking.memberName().equals(user.displayName())) {
+                chips.add(Ui.label(Lang.tr("for {0}", first(booking.memberName())),
+                        "SvInkChip"));
+            }
+            next.add(chips);
+            Button pass = new Button(Lang.tr("Show my pass"), "SvInkButton");
+            pass.setName("next-pass");
+            pass.addActionListener(e -> PassForm.show(form, null));
+            Button more = new Button(Lang.tr("Details"), "SvInkText");
+            more.getAllStyles().setBgTransparency(0);
+            more.setName("next-class");
+            more.addActionListener(e -> BookingsForm.show(form));
+            Container actions = new Container(new BorderLayout(), "SvInkRow");
+            actions.add(BorderLayout.WEST, pass).add(BorderLayout.EAST,
+                    more);
+            next.add(actions);
         }
         Ui.refresh(form);
     }
@@ -157,13 +209,33 @@ public class MemberForm extends LiveChannel.Adapter implements Nav.Home {
             return;
         }
         stats.removeAll();
-        stats.add(Ui.label("Your training", "SvHeading"));
-        StatRow row = Ui.stats(3);
-        row.stat(String.valueOf(found.weekStreak()), Lang.tr("week streak"), "streak");
-        row.stat(String.valueOf(found.visitsThisMonth()), Lang.tr("visits this month"),
-                "visits");
-        row.stat(String.valueOf(found.minutesThisMonth()), Lang.tr("minutes"), "minutes");
-        stats.add(row);
+        int span = Math.max(1, found.nextLevel() - found.levelFloor());
+        Level ring = new Level(found.level(), Math.min(1.0,
+                (found.points() - found.levelFloor()) / (double) span));
+        ring.setName("level");
+        Container about = new Container(BoxLayout.y(), "SvLevelBox");
+        about.add(Ui.label(Lang.tr("Level {0}", Integer.valueOf(found.level())), "SvHeading"));
+        about.add(Ui.label(Lang.tr("{0} points", Integer.valueOf(found.points())), "SvRowTitle"));
+        about.add(Ui.label(found.nextLevel() > found.points()
+                ? Lang.tr("{0} to the next level",
+                        Integer.valueOf(found.nextLevel() - found.points()))
+                : Lang.tr("Top level"), "SvMuted"));
+        if (found.weekStreak() > 0) {
+            Label streak = Ui.label(Lang.tr("{0} week streak",
+                    Integer.valueOf(found.weekStreak())), "SvBadgeGood");
+            Ui.icon(streak, FontImage.MATERIAL_LOCAL_FIRE_DEPARTMENT, 2.6f);
+            about.add(FlowLayout.encloseIn(streak));
+        }
+        Container levelRow = new Container(new BorderLayout());
+        levelRow.add(BorderLayout.WEST, ring).add(BorderLayout.CENTER, about);
+        stats.add(levelRow);
+
+        Container tiles = new Container(new com.codename1.ui.layouts.GridLayout(1, 3));
+        tiles.add(stat(found.visitsThisMonth(), "visits", "visits"));
+        tiles.add(stat(found.minutesThisMonth(), "minutes", "minutes"));
+        tiles.add(stat(found.caloriesThisMonth(), "kcal", "calories"));
+        stats.add(Ui.label("This month", "SvHeading"));
+        stats.add(tiles);
         List<Integer> weekly = found.weeklyVisits();
         if (weekly != null && !weekly.isEmpty()) {
             double[] values = new double[weekly.size()];
@@ -174,7 +246,70 @@ public class MemberForm extends LiveChannel.Adapter implements Nav.Home {
             stats.add(Chart.of("weekly", values, Lang.tr("{0} weeks ago",
                     Integer.valueOf(values.length)), Lang.tr("This week")));
         }
+        stats.add(Ui.label(Lang.tr("Badges  {0}/{1}", Integer.valueOf(Badges.count(found.badges())),
+                Integer.valueOf(Badges.total())), "SvHeading"));
+        stats.add(Badges.shelf(found.badges()));
+        if (!Badges.has(found.badges(), "STRAPPED_IN")) {
+            Container callout = new Container(new BorderLayout());
+            callout.setUIID("SvCallout");
+            callout.setName("strap-callout");
+            Label icon = new Label("", "SvCalloutText");
+            Ui.icon(icon, FontImage.MATERIAL_MONITOR_HEART, 5f);
+            callout.add(BorderLayout.WEST, icon);
+            callout.add(BorderLayout.CENTER, Ui.text(
+                    "Wear a heart rate strap or your watch to class: +25 points a class "
+                    + "and the Strapped in badge.", "SvCalloutText"));
+            Ui.tap(callout, "strap-callout", e -> WorkoutsForm.show(form));
+            stats.add(callout);
+        }
         Ui.refresh(form);
+    }
+
+    private static Container stat(int value, String label, String name) {
+        Container tile = new Container(BoxLayout.y());
+        tile.setUIID("SvTile");
+        tile.setName("stat-" + name);
+        tile.add(new Label(String.valueOf(value), "SvTileValue"));
+        tile.add(new Label(Lang.tr(label), "SvTileLabel"));
+        return tile;
+    }
+
+    private static Container tile(char icon, String text, String name, Runnable open) {
+        Button button = new Button(Lang.tr(text), "SvTileLabel");
+        Ui.icon(button, icon, 4.4f);
+        button.setTextPosition(Label.BOTTOM);
+        button.getAllStyles().setAlignment(Label.CENTER);
+        button.setName(name);
+        button.addActionListener(e -> open.run());
+        Container tile = new Container(new BorderLayout());
+        tile.setUIID("SvTile");
+        tile.add(BorderLayout.CENTER, button);
+        return tile;
+    }
+
+    private static String greeting() {
+        int hour = java.time.LocalTime.now().getHour();
+        return hour < 12 ? "Morning, {0}" : hour < 18 ? "Afternoon, {0}"
+                : "Evening, {0}";
+    }
+
+    private static String first(String name) {
+        int space = name == null ? -1 : name.indexOf(' ');
+        return space > 0 ? name.substring(0, space) : name == null ? "" : name;
+    }
+
+    private static String until(long startsAt) {
+        long minutes = (startsAt - System.currentTimeMillis()) / 60000L;
+        if (minutes < 0) {
+            return Lang.tr("On now");
+        }
+        if (minutes < 60) {
+            return Lang.tr("In {0} min", Long.valueOf(minutes));
+        }
+        if (minutes < 24 * 60) {
+            return Lang.tr("In {0} h", Long.valueOf(minutes / 60));
+        }
+        return Lang.tr("In {0} days", Long.valueOf(minutes / (24 * 60)));
     }
 
     private void showPlan(List<MembershipDto> memberships) {
@@ -189,7 +324,7 @@ public class MemberForm extends LiveChannel.Adapter implements Nav.Home {
         for (int iter = 0; memberships != null && iter < memberships.size(); iter++) {
             MembershipDto membership = memberships.get(iter);
             plan.add(Ui.row(FontImage.MATERIAL_CARD_MEMBERSHIP, membership.planName(),
-                    membership.memberName(), Ui.badge(MembershipForm.state(membership.state()),
+                    first(membership.memberName()), Ui.badge(MembershipForm.state(membership.state()),
                             MembershipForm.badge(membership.state()))));
         }
         plan.add(Ui.link("Manage membership", "home-membership",

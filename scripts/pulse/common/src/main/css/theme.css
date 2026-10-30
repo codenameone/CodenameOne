@@ -44,10 +44,20 @@
     switchTrackOffOutlineWidthMM: "0";
     switchTrackOnOutlineWidthMM: "0";
     switchThumbWidthScale: "1.0";
-    --brand: #ff5a1f;
-    --brand-pressed: #ff7c4a;
-    /* Dark lettering on the orange: white on it reads at barely 3:1. */
-    --brand-contrast: #1c0800;
+    /* A deep orange-red that white lettering reads on at 4.6:1. */
+    --brand: #db3416;
+    --brand-pressed: #f0532f;
+    --brand-contrast: #ffffff;
+    /* The studio at night: the hero cards, and the accents only they use --
+       lime for points and effort, violet for levels and badges. */
+    --ink: #17111f;
+    --ink-raised: #261d33;
+    --ink-text: #ffffff;
+    --ink-muted: #b9aecb;
+    --lime: #c6f432;
+    --violet: #7b4dff;
+    --violet-tint: #efe9ff;
+    --locked: #d9d3e0;
     --surface: #ffffff;
     --surface-alt: #f3f1f5;
     --surface-press: #e6e2ea;
@@ -65,9 +75,14 @@
     --warning-tint: #fcf0df;
     --danger-tint: #fcebeb;
 
-    --brand-dark: #ff7a45;
-    --brand-pressed-dark: #ff5a1f;
+    --brand-dark: #ff5f3d;
+    --brand-pressed-dark: #ff7c5f;
     --brand-contrast-dark: #1c0800;
+    --ink-dark: #221a2e;
+    --ink-raised-dark: #30263f;
+    --violet-dark: #a487ff;
+    --violet-tint-dark: #2a2142;
+    --locked-dark: #3a3147;
     --surface-dark: #120f17;
     --surface-alt-dark: #1f1a27;
     --surface-press-dark: #352d40;
@@ -733,7 +748,7 @@ SvCalloutTitle {
     padding: 0;
     margin: 0;
 }
-SvCalloutText {
+SvCalloutText { background-color: transparent;
     color: var(--text);
     background-color: transparent;
     font-family: "native:MainRegular";
@@ -1375,7 +1390,73 @@ SvWatchTitle { color: #ffffff; background-color: #000000; font-family: "native:M
 SvWatchText { color: #b0b3b8; background-color: #000000; font-family: "native:MainRegular"; font-size: 2.4mm; padding: 0.5mm 1mm 0.5mm 1mm; margin: 0; }
 SvWatchCode { color: #17bebb; background-color: #000000; font-family: "native:MainBold"; font-size: 6mm; text-align: center; padding: 1mm; margin: 0; }
 
+/* ----------------------------------------------------------- class cards */
+
+SvClass {
+    background-color: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 3mm;
+    padding: 2.4mm 2.4mm 2.4mm 0;
+    margin: 1.2mm 0 1.2mm 0;
+}
+SvClassTime { background-color: transparent; padding: 0 2mm 0 2.6mm; margin: 0; }
+SvClassClock { background-color: transparent; font-family: "native:MainBold"; font-size: 3.6mm; color: var(--text); padding: 0; margin: 0; }
+SvClassLength { background-color: transparent; font-size: 2.6mm; color: var(--text-muted); padding: 0; margin: 0; }
+SvClassStripe { background-color: var(--brand); padding: 0 0.5mm 0 0.5mm; margin: 0.5mm 0 0.5mm 0; border-radius: 1mm; }
+SvClassBody { background-color: transparent; padding: 0 1.6mm 0 2.4mm; margin: 0; }
+SvClassName { background-color: transparent; font-family: "native:MainBold"; font-size: 3.2mm; color: var(--text); padding: 0; margin: 0; }
+SvClassGlyph { background-color: transparent; padding: 0 1.2mm 0 0; margin: 0; }
+SvClassWho { background-color: transparent; font-size: 2.7mm; color: var(--text-muted); padding: 0.6mm 0 0.8mm 0; margin: 0; }
+SvClassFill { background-color: transparent; padding: 0.4mm 0 0 0; margin: 0; }
+SvClassLeft { background-color: transparent; font-size: 2.5mm; color: var(--text-muted); padding: 0 0 0 1.6mm; margin: 0; }
+SvClassScarce { background-color: transparent; font-family: "native:MainBold"; font-size: 2.5mm; color: var(--brand); padding: 0 0 0 1.6mm; margin: 0; }
+SvClassFull { background-color: transparent; font-family: "native:MainBold"; font-size: 2.5mm; color: var(--danger); padding: 0 0 0 1.6mm; margin: 0; }
+SvClassFriends { background-color: transparent; font-size: 2.6mm; color: var(--violet); padding: 0.8mm 0 0 0; margin: 0; }
+SvPillBook { font-family: "native:MainBold"; font-size: 2.9mm; color: var(--brand-contrast); background-color: var(--brand); border-radius: 4mm; padding: 1.4mm 2.8mm 1.4mm 2.8mm; margin: 0; text-align: center; }
+SvPillBook.pressed { background-color: var(--brand-pressed); }
+SvPillQueue { font-family: "native:MainBold"; font-size: 2.9mm; color: var(--violet); background-color: var(--violet-tint); border-radius: 4mm; padding: 1.4mm 2.8mm 1.4mm 2.8mm; margin: 0; text-align: center; }
+SvPillBooked { font-family: "native:MainBold"; font-size: 2.9mm; color: var(--success); background-color: var(--success-tint); border-radius: 4mm; padding: 1.4mm 2.8mm 1.4mm 2.8mm; margin: 0; text-align: center; }
+
+/* --------------------------------------------------------- gamification */
+
+SvLevel { background-color: transparent; font-family: "native:MainBold"; font-size: 5mm; color: var(--lime); padding: 0; margin: 0; }
+SvLevelTrack { color: var(--ink-raised); }
+SvShelf { background-color: transparent; padding: 1mm 0 1mm 0; margin: 0; }
+SvMedalCell { background-color: transparent; padding: 0 1.4mm 0 1.4mm; margin: 0; }
+SvMedal { color: #ffffff; background-color: var(--violet); border-radius: 50%; padding: 2.6mm; margin: 0; }
+SvMedalLocked { color: var(--text-muted); background-color: var(--locked); border-radius: 50%; padding: 2.6mm; margin: 0; }
+SvMedalName { background-color: transparent; font-size: 2.4mm; color: var(--text); padding: 0.8mm 0 0 0; margin: 0; }
+SvMedalNameLocked { background-color: transparent; font-size: 2.4mm; color: var(--text-muted); padding: 0.8mm 0 0 0; margin: 0; }
+SvInk { background-color: var(--ink); border-radius: 3.4mm; padding: 3.4mm; margin: 1.4mm 0 1.4mm 0; }
+SvInkEyebrow { background-color: transparent; font-family: "native:MainBold"; font-size: 2.4mm; color: var(--lime); padding: 0; margin: 0; }
+SvInkTitle { background-color: transparent; font-family: "native:MainBold"; font-size: 5mm; color: var(--ink-text); padding: 0.6mm 0 0.6mm 0; margin: 0; }
+SvInkText { background-color: transparent; font-size: 2.9mm; color: var(--ink-muted); padding: 0; margin: 0; }
+SvInkChip { font-family: "native:MainBold"; font-size: 2.6mm; color: var(--ink); background-color: var(--lime); border-radius: 3mm; padding: 1mm 2.4mm 1mm 2.4mm; margin: 0 1.4mm 0 0; }
+SvInkButton { font-family: "native:MainBold"; font-size: 3mm; color: var(--ink); background-color: var(--lime); border-radius: 4mm; padding: 1.8mm 3.6mm 1.8mm 3.6mm; margin: 2mm 0 0 0; text-align: center; }
+SvInkButton.pressed { background-color: #ffffff; }
+SvBeat { background-color: transparent; color: var(--lime); padding: 0; margin: 0; }
+SvTile { background-color: var(--surface-alt); border-radius: 3mm; padding: 2mm 0.6mm 2mm 0.6mm; margin: 0.8mm; }
+SvInkRow { background-color: transparent; padding: 0; margin: 0; }
+SvLevelBox { background-color: transparent; padding: 0 0 0 3mm; margin: 0; }
+SvTileValue { background-color: transparent; font-family: "native:MainBold"; font-size: 4.4mm; color: var(--text); padding: 0; margin: 0; }
+SvTileLabel { background-color: transparent; font-size: 2.3mm; color: var(--text-muted); padding: 0; margin: 0; }
+SvCallout { background-color: var(--violet-tint); border-radius: 3mm; padding: 2.6mm; margin: 1.4mm 0 1.4mm 0; }
+SvCalloutText { font-size: 2.9mm; color: var(--violet); padding: 0; margin: 0; }
+
 @media (prefers-color-scheme: dark) {
+    SvClass { background-color: var(--surface-alt-dark); border: 1px solid var(--surface-press-dark); }
+    SvClassStripe { background-color: var(--brand-dark); }
+    SvClassScarce { color: var(--brand-dark); }
+    SvClassFriends { color: var(--violet-dark); }
+    SvPillBook { background-color: var(--brand-dark); }
+    SvPillQueue { color: var(--violet-dark); background-color: var(--violet-tint-dark); }
+    SvInk { background-color: var(--ink-dark); }
+    SvLevelTrack { color: var(--ink-raised-dark); }
+    SvMedal { background-color: var(--violet-dark); }
+    SvMedalLocked { background-color: var(--locked-dark); }
+    SvTile { background-color: var(--surface-alt-dark); }
+    SvCallout { background-color: var(--violet-tint-dark); }
+    SvCalloutText { color: var(--violet-dark); }
     SvForm { background-color: var(--surface-dark); }
     SvPage { background-color: var(--surface-dark); }
     SvHero { background-color: var(--brand-dark); }

@@ -117,7 +117,7 @@ public final class WalletForm {
             row.add(BorderLayout.WEST, FlowLayout.encloseCenterMiddle(icon));
             Container lines = new Container(BoxLayout.y());
             lines.add(Ui.plain(label(method), "SvRowTitle"));
-            lines.add(Ui.plain(cash ? Lang.tr("Pay the courier directly")
+            lines.add(Ui.plain(cash ? Lang.tr("Pay at the front desk")
                     : Lang.tr("Expires {0}", expiry(method)), "SvRowDetail"));
             row.add(BorderLayout.CENTER, lines);
             Container end = new Container(new FlowLayout(Label.RIGHT, Label.CENTER));

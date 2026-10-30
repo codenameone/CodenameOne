@@ -524,7 +524,7 @@ public final class Ui {
     }
 
     /// Asks why, before something an admin does to someone else's account or
-    /// delivery. The reason is kept with what was done, so it is not optional.
+    /// class. The reason is kept with what was done, so it is not optional.
     ///
     /// @param action what the button says, which is what will be done
     public static void reason(final Form previous, String title, String text, String action,

@@ -25,6 +25,14 @@ import com.codename1.calendar.CalendarDateTime;
 import com.codename1.calendar.CalendarEvent;
 import com.codename1.calendar.CalendarMutationScope;
 import com.codename1.calendar.LocalCalendarSource;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.FontImage;
+import com.codename1.ui.Label;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.FlowLayout;
+import com.codenameone.examples.pulse.ui.Chart;
 import com.codenameone.examples.pulse.Telemetry;
 import com.codenameone.examples.pulse.api.BookRequestDto;
 import com.codenameone.examples.pulse.api.BookingDto;
@@ -140,6 +148,109 @@ public final class Classes {
                     Integer.valueOf(session.capacity()));
         }
         return Lang.tr("Full, {0} waiting", Integer.valueOf(session.waitlisted()));
+    }
+
+    /// A class as a card: the time in its own column, a stripe in the class
+    /// type's colour, the name with its kind of training, who teaches it and
+    /// where, how full it is, and `action` -- a Book button or how the member
+    /// stands -- at the end.
+    public static Container card(SessionDto session, Component action) {
+        int color = color(session.color());
+        Container card = new Container(new BorderLayout());
+        card.setUIID("SvClass");
+        card.setName("class-" + session.id());
+
+        Container time = new Container(BoxLayout.y());
+        time.setUIID("SvClassTime");
+        time.add(new Label(clock(session.startsAt()), "SvClassClock"));
+        time.add(new Label(Lang.tr("{0} min", Integer.valueOf(
+                (int) ((session.endsAt() - session.startsAt()) / 60000L))), "SvClassLength"));
+        Label stripe = new Label("", "SvClassStripe");
+        stripe.getAllStyles().setBgColor(color);
+        stripe.getAllStyles().setBgTransparency(255);
+        stripe.setPreferredW(com.codename1.ui.CN.convertToPixels(0.9f));
+        Container west = new Container(new BorderLayout());
+        west.add(BorderLayout.CENTER, time).add(BorderLayout.EAST, stripe);
+        card.add(BorderLayout.WEST, west);
+
+        Container body = new Container(BoxLayout.y());
+        body.setUIID("SvClassBody");
+        com.codename1.components.SpanLabel title = new com.codename1.components.SpanLabel(
+                session.name(), "SvClassName");
+        Container head = new Container(new BorderLayout());
+        Label glyph = new Label("", "SvClassGlyph");
+        glyph.getAllStyles().setFgColor(color);
+        glyph.setIcon(FontImage.createMaterial(glyph(session.category()),
+                glyph.getUnselectedStyle(), 3.2f));
+        head.add(BorderLayout.WEST, glyph).add(BorderLayout.CENTER, title);
+        body.add(head);
+        body.add(new Label(nullToEmpty(session.trainerName()), "SvClassWho"));
+        if ("CANCELLED".equals(session.state())) {
+            body.add(new Label(Lang.tr("Cancelled by the studio"), "SvClassFull"));
+        } else {
+            int left = session.capacity() - session.booked();
+            Chart.Meter meter = new Chart.Meter(session.capacity() <= 0 ? 0
+                    : session.booked() / (double) session.capacity());
+            meter.getAllStyles().setFgColor(color);
+            Container fill = new Container(new BorderLayout(BorderLayout.CENTER_BEHAVIOR_CENTER));
+            fill.setUIID("SvClassFill");
+            fill.add(BorderLayout.CENTER, meter);
+            fill.add(BorderLayout.EAST, new Label(left > 0
+                    ? Lang.tr("{0} left", Integer.valueOf(left))
+                    : Lang.tr("{0} waiting", Integer.valueOf(session.waitlisted())),
+                    left > 0 && left <= 3 ? "SvClassScarce" : left > 0 ? "SvClassLeft"
+                            : "SvClassFull"));
+            body.add(fill);
+        }
+        if (session.friendsGoing() > 0) {
+            Label friends = new Label(session.friendsGoing() == 1 ? Lang.tr("A friend is going")
+                    : Lang.tr("{0} friends going", Integer.valueOf(session.friendsGoing())),
+                    "SvClassFriends");
+            Ui.icon(friends, FontImage.MATERIAL_GROUP, 2.6f);
+            body.add(friends);
+        }
+        card.add(BorderLayout.CENTER, body);
+        if (action != null) {
+            card.add(BorderLayout.EAST, FlowLayout.encloseCenterMiddle(action));
+        }
+        return card;
+    }
+
+    private static String clock(long millis) {
+        java.time.LocalTime time = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault())
+                .toLocalTime();
+        return (time.getHour() < 10 ? "0" : "") + time.getHour() + ":"
+                + (time.getMinute() < 10 ? "0" : "") + time.getMinute();
+    }
+
+    /// The icon for a kind of training.
+    public static char glyph(String category) {
+        if ("MIND".equals(category)) {
+            return FontImage.MATERIAL_SELF_IMPROVEMENT;
+        }
+        if ("CARDIO".equals(category)) {
+            return FontImage.MATERIAL_DIRECTIONS_BIKE;
+        }
+        if ("KIDS".equals(category)) {
+            return FontImage.MATERIAL_CHILD_CARE;
+        }
+        return FontImage.MATERIAL_FITNESS_CENTER;
+    }
+
+    /// A `#rrggbb` colour from the server, or the brand's when it is not one.
+    public static int color(String hex) {
+        if (hex != null && hex.length() == 7 && hex.charAt(0) == '#') {
+            int value = 0;
+            for (int iter = 1; iter < 7; iter++) {
+                int digit = Character.digit(hex.charAt(iter), 16);
+                if (digit < 0) {
+                    return 0xdb3416;
+                }
+                value = value * 16 + digit;
+            }
+            return value;
+        }
+        return 0xdb3416;
     }
 
     /// The trainer, room and time of `session` on one line.
