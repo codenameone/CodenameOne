@@ -111,6 +111,79 @@ final class BuildHintsDesktop {
                         + "lock in its default Dynamic mode only; its Filter, Filter+ and Static modes "
                         + "ignore it. Set to `false` to omit the tag."));
 
+        h.add(new Hint("javascript.splash.appearance")
+                .group(HintGroup.JAVASCRIPT)
+                .values("SplashAppearance", "auto", "light", "dark")
+                .platform("javascript")
+                .doc("Which colors the loading screen uses. Defaults to `auto` when any "
+                        + "`javascript.splash.dark*` color is set and to `light` otherwise, so an app "
+                        + "that never asked for a dark loading screen doesn't get one. `auto` follows the "
+                        + "browser's light/dark preference, or the choice the app remembered with "
+                        + "`Display.setProperty(\"platformHint.javascript.splashAppearance\", \"dark\")`. "
+                        + "`light` and `dark` always use that set, for apps with one appearance."));
+
+        h.add(new Hint("javascript.splash.background")
+                .group(HintGroup.JAVASCRIPT)
+                .type(HintType.STRING)
+                .def("#ffffff")
+                .platform("javascript")
+                .doc("The loading screen's background in light appearance, as a hex color (`#rgb`, `#rrggbb`, "
+                        + "with optional alpha) or a CSS color name. Applied from the first frame the "
+                        + "page paints until the first form shows."));
+
+        h.add(new Hint("javascript.splash.textColor")
+                .group(HintGroup.JAVASCRIPT)
+                .type(HintType.STRING)
+                .def("#666666")
+                .platform("javascript")
+                .doc("The loading screen's text color in light appearance, as a hex color (`#rgb`, `#rrggbb`, "
+                        + "with optional alpha) or a CSS color name. Applied from the first frame the "
+                        + "page paints until the first form shows."));
+
+        h.add(new Hint("javascript.splash.accentColor")
+                .group(HintGroup.JAVASCRIPT)
+                .type(HintType.STRING)
+                .def("#0072ff")
+                .platform("javascript")
+                .doc("The loading screen's progress bar color in light appearance, as a hex color (`#rgb`, `#rrggbb`, "
+                        + "with optional alpha) or a CSS color name. Applied from the first frame the "
+                        + "page paints until the first form shows."));
+
+        h.add(new Hint("javascript.splash.darkBackground")
+                .group(HintGroup.JAVASCRIPT)
+                .type(HintType.STRING)
+                .def("#121212")
+                .platform("javascript")
+                .doc("The loading screen's background in dark appearance, as a hex color (`#rgb`, `#rrggbb`, "
+                        + "with optional alpha) or a CSS color name. Applied from the first frame the "
+                        + "page paints until the first form shows."));
+
+        h.add(new Hint("javascript.splash.darkTextColor")
+                .group(HintGroup.JAVASCRIPT)
+                .type(HintType.STRING)
+                .def("#b3b3b3")
+                .platform("javascript")
+                .doc("The loading screen's text color in dark appearance, as a hex color (`#rgb`, `#rrggbb`, "
+                        + "with optional alpha) or a CSS color name. Applied from the first frame the "
+                        + "page paints until the first form shows."));
+
+        h.add(new Hint("javascript.splash.darkAccentColor")
+                .group(HintGroup.JAVASCRIPT)
+                .type(HintType.STRING)
+                .def("#4da3ff")
+                .platform("javascript")
+                .doc("The loading screen's progress bar color in dark appearance, as a hex color (`#rgb`, `#rrggbb`, "
+                        + "with optional alpha) or a CSS color name. Applied from the first frame the "
+                        + "page paints until the first form shows."));
+
+        h.add(new Hint("javascript.splash.logo")
+                .group(HintGroup.JAVASCRIPT)
+                .type(HintType.STRING)
+                .platform("javascript")
+                .doc("The image the loading screen shows above the progress bar, as a path relative to "
+                        + "the bundle's `index.html` (letters, digits, `/`, `.`, `-` and `_`). Defaults to the "
+                        + "app icon; `none` shows no image."));
+
         h.add(new Hint("javascript.desktopTheme")
                 .group(HintGroup.JAVASCRIPT)
                 .type(HintType.STRING)
@@ -197,6 +270,66 @@ final class BuildHintsDesktop {
                 .group(HintGroup.LINUX)
                 .type(HintType.STRING)
                 .platform("linux"));
+
+        h.add(new Hint("linux.embedded")
+                .group(HintGroup.LINUX)
+                .type(HintType.BOOLEAN)
+                .def("false")
+                .platform("linux")
+                .doc("Builds for an embedded Linux device: the application owns the screen through "
+                        + "DRM/KMS or the framebuffer, with no window system and no GTK, and reads "
+                        + "touch, mouse, keyboard and rotary input straight from evdev."));
+
+        h.add(new Hint("linux.embedded.board")
+                .group(HintGroup.LINUX)
+                .type(HintType.STRING)
+                .def("generic-arm64")
+                .platform("linux")
+                .doc("Board profile for `linux.embedded`, which sets the architecture and display "
+                        + "defaults: `rpi5`, `rpi4`, `rpi3`, `rpi-zero2`, `rpi-armv7`, `rpi-touch7`, "
+                        + "`imx8`, `imx6`, `rk3588`, `jetson`, `beagleplay`, `visionfive2`, "
+                        + "`generic-arm64`, `generic-armv7`, `generic-x64` or `generic-riscv64`."));
+
+        h.add(new Hint("linux.embedded.display")
+                .group(HintGroup.LINUX)
+                .type(HintType.STRING)
+                .def("auto")
+                .platform("linux")
+                .doc("Default display backend for `linux.embedded`: `auto` (KMS, then the "
+                        + "framebuffer), `kms`, `fbdev`, `memory` or `headless`. `CN1_DISPLAY` on the "
+                        + "device overrides it."));
+
+        h.add(new Hint("linux.embedded.renderer")
+                .group(HintGroup.LINUX)
+                .type(HintType.STRING)
+                .platform("linux")
+                .doc("Renderer for `linux.embedded`: `gpu` draws with OpenGL ES 2 on a GBM surface "
+                        + "over KMS, `software` with the CPU. Defaults to the board profile's choice, "
+                        + "`gpu` for boards with a reliable Mesa driver. A `gpu` build links libgbm, "
+                        + "libEGL and libGLESv2 and still falls back to software on a device where "
+                        + "they find no GPU."));
+
+        h.add(new Hint("linux.embedded.rotation")
+                .group(HintGroup.LINUX)
+                .type(HintType.INT)
+                .def("0")
+                .platform("linux")
+                .doc("Clockwise panel rotation for `linux.embedded`: 0, 90, 180 or 270."));
+
+        h.add(new Hint("linux.embedded.dpi")
+                .group(HintGroup.LINUX)
+                .type(HintType.INT)
+                .def("0")
+                .platform("linux")
+                .doc("Panel density for `linux.embedded` when the display doesn't report its "
+                        + "physical size; 0 uses what the panel reports."));
+
+        h.add(new Hint("linux.sysroot")
+                .group(HintGroup.LINUX)
+                .type(HintType.STRING)
+                .platform("linux")
+                .doc("Target sysroot (a Yocto SDK, Buildroot staging directory or a mounted device "
+                        + "image) whose headers and libraries a cross build compiles and links against."));
 
         h.add(new Hint("linux.nativeVerify")
                 .group(HintGroup.LINUX)

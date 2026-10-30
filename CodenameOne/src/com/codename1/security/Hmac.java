@@ -97,6 +97,11 @@ public final class Hmac {
         if ("SHA384".equals(a) || "SHA512".equals(a)) {
             return 128;
         }
+        if ("SHA3256".equals(a) || "KECCAK256".equals(a)) {
+            // FIPS 202: the block size of a sponge is its rate, 136 bytes for
+            // a 256-bit output.
+            return 136;
+        }
         throw new CryptoException("unsupported HMAC algorithm: " + algorithm);
     }
 
@@ -166,6 +171,10 @@ public final class Hmac {
 
     /// One-shot HMAC-SHA-256 (recommended default).
     public static byte[] sha256(byte[] key, byte[] data) {
+        byte[] fast = key == null || data == null ? null : CryptoEngine.get().hmac(Hash.SHA256, key, data);
+        if (fast != null) {
+            return fast;
+        }
         return create(Hash.SHA256, key).doFinal(data);
     }
 
@@ -176,6 +185,10 @@ public final class Hmac {
 
     /// One-shot HMAC-SHA-512.
     public static byte[] sha512(byte[] key, byte[] data) {
+        byte[] fast = key == null || data == null ? null : CryptoEngine.get().hmac(Hash.SHA512, key, data);
+        if (fast != null) {
+            return fast;
+        }
         return create(Hash.SHA512, key).doFinal(data);
     }
 

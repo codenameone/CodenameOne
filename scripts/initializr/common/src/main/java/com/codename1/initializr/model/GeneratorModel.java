@@ -45,7 +45,7 @@ import java.util.Map;
 import static com.codename1.ui.CN.*;
 
 public class GeneratorModel {
-    private static final String CN1_PLUGIN_VERSION = "7.0.279";
+    private static final String CN1_PLUGIN_VERSION = "7.0.280";
     /// Whether the Codename One Gradle plugin is published at [CN1_PLUGIN_VERSION].
     /// A Gradle download resolves the plugin by that version, so until a release
     /// carrying the plugin is what the initializr generates against, a Gradle
@@ -80,6 +80,24 @@ public class GeneratorModel {
     /// neither offered nor generated for a release before this one.
     static final String FULL_STACK_SINCE = "7.0.277";
 
+    /// The first release whose core has the protected-playback API the streaming
+    /// template plays its titles through (`com.codename1.media.drm`). Before it the
+    /// template's app does not compile, so it is neither offered nor generated.
+    static final String REEL_SINCE = "7.0.280";
+
+    /// The first release whose framework has what the banking template's app calls:
+    /// timed clipboard clearing, the P-256 key and signature API it signs requests
+    /// with, and the `BigDecimal` arithmetic its ledger rounds with. Against an
+    /// older release its download does not compile, so it is neither offered nor
+    /// generated there.
+    static final String BASTION_SINCE = "7.0.280";
+
+    /// The first release a template can be generated against.
+    static String templateSince(Template template) {
+        return template == Template.BASTION ? BASTION_SINCE
+                : template == Template.REEL ? REEL_SINCE : FULL_STACK_SINCE;
+    }
+
     /// The brand colour of the full-stack template as it ships: the `--brand` its
     /// theme.css declares, which is what the UI paints the icon with when no other
     /// colour is chosen. GeneratorModelMatrixTest holds the two together.
@@ -88,17 +106,29 @@ public class GeneratorModel {
     /// The food-delivery template's `--brand`, held to its theme.css the same way.
     public static final int SAVOR_BRAND = 0x7ac943;
 
+    /// The banking template's `--brand`, held to its theme.css the same way.
+    public static final int BASTION_BRAND = 0x1f3a8a;
+
     /// The card-battle template's accent, used for its icon: it has no `--brand`.
     public static final int SKIRMISH_BRAND = 0xc8862f;
 
     /// The messaging template's `--brand`, held to its theme.css the same way.
     public static final int PARLEY_BRAND = 0x0a7d6b;
 
+    /// The streaming template's `--brand`, held to its theme.css the same way.
+    public static final int REEL_BRAND = 0xd93a42;
+
     /// The brand colour `template` ships with: the one its icon is painted with
     /// when the developer keeps the template's own scheme.
     public static int brandOf(Template template) {
         if (template == Template.PARLEY) {
             return PARLEY_BRAND;
+        }
+        if (template == Template.REEL) {
+            return REEL_BRAND;
+        }
+        if (template == Template.BASTION) {
+            return BASTION_BRAND;
         }
         return template == Template.SAVOR ? SAVOR_BRAND
                 : template == Template.SKIRMISH ? SKIRMISH_BRAND : FULL_STACK_BRAND;
@@ -107,7 +137,7 @@ public class GeneratorModel {
     /// Whether `template` can be generated at [CN1_PLUGIN_VERSION]: the UI offers
     /// only the templates this answers true for.
     public static boolean isTemplateOffered(Template template) {
-        return !template.isFullStack() || isVersionAtLeast(CN1_PLUGIN_VERSION, FULL_STACK_SINCE);
+        return !template.isFullStack() || isVersionAtLeast(CN1_PLUGIN_VERSION, templateSince(template));
     }
 
     /// The plugin version a download is generated against.
@@ -974,6 +1004,9 @@ public class GeneratorModel {
                 throw new IOException("This template shares a contract module between the app and its server, "
                         + "which needs Codename One " + FULL_STACK_SINCE + " or newer.");
             }
+            if (!isVersionAtLeast(pluginVersion, templateSince(template))) {
+                throw new IOException("This template needs Codename One " + templateSince(template) + " or newer.");
+            }
             if (options.projectType != ProjectOptions.ProjectType.APP_WITH_BACKEND) {
                 throw new IOException("This template is an app and its server; choose \""
                         + ProjectOptions.ProjectType.APP_WITH_BACKEND.label + "\".");
@@ -1501,6 +1534,12 @@ public class GeneratorModel {
         return replaced;
     }
 
+    /// The skill's files and the two pointers to it: [#addAgentSkillEntries(Map)].
+    static boolean isAgentSkillPath(String targetPath) {
+        return targetPath.startsWith(AGENT_SKILL_TARGET_PREFIX) || CLAUDE_SKILL_STUB_PATH.equals(targetPath)
+                || "AGENTS.md".equals(targetPath);
+    }
+
     private byte[] applyDataReplacements(String targetPath, byte[] sourceData) throws IOException {
         if (!isTextFile(targetPath)) {
             return sourceData;
@@ -1511,10 +1550,19 @@ public class GeneratorModel {
             // Ahead of the replacements below, which the template's hints get too.
             content = (content.endsWith("\n") ? content : content + "\n") + readResourceToString(template.SETTINGS);
         }
+        // The agent skill names the demo applications (Wayline, Savor, ...) on purpose,
+        // so an agent can go and read them; renaming the template's own name inside it
+        // would turn "read Wayline's map code" into a pointer at a demo that does not
+        // exist. It still gets the generic placeholders below.
+        boolean agentSkillFile = isAgentSkillPath(targetPath);
         content = StringUtil.replaceAll(content, "com.example.myapp", packageName);
-        content = StringUtil.replaceAll(content, template.SOURCE_PACKAGE, packageName);
+        if (!agentSkillFile) {
+            content = StringUtil.replaceAll(content, template.SOURCE_PACKAGE, packageName);
+        }
         content = StringUtil.replaceAll(content, "MyAppName", appName);
-        content = StringUtil.replaceAll(content, template.SOURCE_MAIN_CLASS, appName);
+        if (!agentSkillFile) {
+            content = StringUtil.replaceAll(content, template.SOURCE_MAIN_CLASS, appName);
+        }
         content = StringUtil.replaceAll(content, "myappname", toLowerCaseInvariant(appName));
         // The name in capitals is how an environment variable spells a setting
         // that starts with it: myappname.payments.key is read from
@@ -1832,12 +1880,14 @@ public class GeneratorModel {
             // washed out to white, and in dark mode barely lifted off the
             // near-black surface. The stock values are these same mixes of the
             // stock brand, so every scheme keeps the template's proportions.
-            css = setCssVariable(css, "--brand-tint", toCssColor(lightenColor(brand, 0.92f)));
-            css = setCssVariable(css, "--brand-tint-dark", toCssColor(mixColor(DARK_SURFACE, brand, 0.16f)));
+            // Bastion's theme has no tint (its selected states are the brand
+            // itself), so these two are set only where the template declares them.
+            css = setDeclaredCssVariable(css, "--brand-tint", toCssColor(lightenColor(brand, 0.92f)));
+            css = setDeclaredCssVariable(css, "--brand-tint-dark", toCssColor(mixColor(DARK_SURFACE, brand, 0.16f)));
         }
         if (!effective.roundedButtons) {
             css = setCssVariable(css, "--radius", "0.6mm");
-            css = setCssVariable(css, "--radius-small", "0.4mm");
+            css = setDeclaredCssVariable(css, "--radius-small", "0.4mm");
         }
         return css;
     }
@@ -1853,6 +1903,13 @@ public class GeneratorModel {
             throw new IOException("Refusing to generate project: theme.css does not declare " + name);
         }
         return css.substring(0, at) + name + ": " + value + css.substring(end);
+    }
+
+    /// `css` with `name` given `value` when the stylesheet declares it, and
+    /// unchanged when it does not: for the variables only some templates have.
+    /// Everything a scheme always needs goes through [#setCssVariable] instead.
+    private static String setDeclaredCssVariable(String css, String name, String value) throws IOException {
+        return css.indexOf(name + ":") < 0 ? css : setCssVariable(css, name, value);
     }
 
     /// Near-black or white, whichever reads on `color`.
@@ -1995,12 +2052,18 @@ public class GeneratorModel {
                     .append("On Windows: `run-server.bat`, then `run.bat`. Your IDE's run menu has both: ")
                     .append("\"Run Server\" and the simulator.\n\n")
                     .append("`./mvnw -pl backend -am -Dcodename1.platform=backend test` runs the server's tests.\n\n");
+        } else if (template == Template.BASTION) {
+            appendBankSection(out, toLowerCaseInvariant(appName));
         } else if (template.isFullStack()) {
             boolean food = template == Template.SAVOR;
             boolean chat = template == Template.PARLEY;
+            boolean video = template == Template.REEL;
             String lower = toLowerCaseInvariant(appName);
             out.append("## The app and its server\n\n")
-                    .append(chat
+                    .append(video
+                            ? "This project is a working video streaming service: a viewer, a creator studio, "
+                            + "moderation and an admin console in one "
+                            : chat
                             ? "This project is a working messaging app: chats, groups, media, calls and an admin "
                             + "console in one "
                             : food
@@ -2010,7 +2073,11 @@ public class GeneratorModel {
                     .append("app, chosen by the role of whoever signs in, and the server they talk to.\n\n")
                     .append("- `shared/` is the contract: the REST interfaces and the objects they carry. The app's ")
                     .append("client and the server's dispatcher are both generated from it, so the two cannot drift.\n")
-                    .append(chat
+                    .append(video
+                            ? "- `backend/` is the server: accounts and profiles, the catalog, playback and "
+                            + "licences, subscriptions and payments, uploads, moderation, the live channel and "
+                            + "the database migrations.\n"
+                            : chat
                             ? "- `backend/` is the server: accounts and devices, contacts, conversations and "
                             + "messages, media, calls, the live channel and the database migrations.\n"
                             : food
@@ -2031,7 +2098,11 @@ public class GeneratorModel {
                     .append("Bash or WSL.\n\n")
                     .append("On the `dev` profile the server creates demonstration accounts, all with the ")
                     .append("password `").append(lower).append("-demo`: ")
-                    .append(chat
+                    .append(video
+                            ? "`viewer@" + lower + ".example`, `viewer2@" + lower + ".example`, `creator@" + lower
+                            + ".example`, who uploads the catalog, `moderator@" + lower + ".example`, `admin@"
+                            + lower + ".example` and `viewer3@" + lower + ".example`, who has been flagged "
+                            : chat
                             ? "`alice@" + lower + ".example`, `bob@" + lower + ".example`, `carol@" + lower
                             + ".example` and `dan@" + lower + ".example`, who already share chats and a group, "
                             + "`admin@" + lower + ".example`, who sees the console, and `mallory@" + lower
@@ -2042,7 +2113,7 @@ public class GeneratorModel {
                             + ".example` and `applicant@" + lower + ".example`, who has applied to deliver "
                             : "`rider@" + lower + ".example`, `driver@" + lower + ".example`, `admin@" + lower
                             + ".example` and `applicant@" + lower + ".example`, who has applied to drive ")
-                    .append(chat ? "for the admin to act on. " : "and waits for the admin's decision. ")
+                    .append(chat || video ? "for the admin to act on. " : "and waits for the admin's decision. ")
                     .append("Verification codes are written to the server's log until an SMS provider is ")
                     .append(chat
                             ? "configured. Calls use a public STUN server until the server is given a TURN "
@@ -2105,6 +2176,39 @@ public class GeneratorModel {
                 .append("- Windows Command Prompt: `set CN1_TELEMETRY=0`\n\n")
                 .append("or delete the `cn1.telemetry.project` and `cn1.telemetry.events` entries from ")
                 .append(options.isGradle() ? "`gradle.properties`" : "`pom.xml`").append(".\n\n");
+    }
+
+    /// The README section of the banking template: what the project is, how to run
+    /// it and the accounts its development profile creates.
+    private static void appendBankSection(StringBuilder out, String lower) {
+        out.append("## The app and its server\n\n")
+                .append("This project is a working bank: a customer and an admin mode in one app, chosen by the ")
+                .append("role of whoever signs in, and the server they talk to.\n\n")
+                .append("- `shared/` is the contract: the REST interfaces and the objects they carry. The app's ")
+                .append("client and the server's dispatcher are both generated from it, so the two cannot drift.\n")
+                .append("- `backend/` is the server: the double-entry ledger, sign-in with a second factor and ")
+                .append("passkeys, transfers with signed requests and limits, cards, the exchange, the audit chain ")
+                .append("and the database migrations.\n")
+                .append("- `common/` is the app. `src/main/css/theme.css` opens with the colours and corner ")
+                .append("radius every screen takes its look from.\n\n")
+                .append("Start the server, then, in a second terminal, the app:\n\n```\n")
+                .append("CN1_PROFILE=dev backend/server.sh run\n")
+                .append("./run.sh\n```\n\n")
+                .append("`server.sh` is a few lines of shell around Maven; on Windows run what it runs, ")
+                .append("with `mvnw.cmd`, or use a Unix shell such as Git Bash or WSL.\n\n")
+                .append("On the `dev` profile the server creates demonstration accounts, all with the ")
+                .append("password `").append(lower).append("-demo-password`: `customer@").append(lower)
+                .append(".example` and `customer2@").append(lower).append(".example`, customers with money in ")
+                .append("their checking accounts, and `admin@").append(lower).append(".example`. ")
+                .append("Deposits, card spending and the coins are simulated; the passwords, authenticator codes, ")
+                .append("passkeys, device keys and request signatures are real.\n\n")
+                .append("`./mvnw -pl backend -am -Dcodename1.platform=backend test` runs the server's tests.\n\n")
+                .append("`backend/server.sh run --web` also builds the app for the browser and serves it at ")
+                .append("`http://localhost:8080/`.\n\n")
+                .append("Two chapters of the developer guide, at https://www.codenameone.com/developer-guide/, ")
+                .append("cover the sample this project started as: \"A bank that shows its locks\" walks through ")
+                .append("it as a customer and an admin see it, and \"Building on the sample\" explains how it is ")
+                .append("built and what to change.\n\n");
     }
 
     private void appendIdeSection(StringBuilder out) {
@@ -2847,6 +2951,8 @@ public class GeneratorModel {
                 || path.endsWith(".launch")
                 || path.endsWith(".css")
                 || path.endsWith(".xsd")
+                // A migration's comments can name the app's settings (Bastion's do).
+                || path.endsWith(".sql")
                 || path.endsWith(".md")
                 || path.endsWith(".txt")
                 || path.endsWith(".adoc")

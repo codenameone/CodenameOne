@@ -22,30 +22,29 @@
  */
 package com.codename1.backend;
 
+import com.codename1.io.JSONParser;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/// A self-contained JSON reader/writer for server-side binaries.
+/// JSON for server-side binaries: the core's strict reader and a streaming writer.
 ///
-/// Deliberately not com.codename1.io.JSONParser: that class reaches
-/// com.codename1.processing.Result, which reaches com.codename1.xml.Element, so
-/// reusing it would link an XML DOM into every server binary to parse a request
-/// body. The mapping package has the same problem (Mapper imports Element).
+/// Reading is com.codename1.io.JSONParser#parseStrict, the same code the device
+/// runs (JSONParser is shared with the backend). This class once carried a parser
+/// of its own because JSONParser reached com.codename1.processing.Result and,
+/// through it, the XML DOM; that dependency is gone. Writing stays here because it
+/// streams into a ByteSink and honours Writable and Encoder, which the core writer
+/// has no notion of.
 ///
 /// Values map as: object to LinkedHashMap (insertion-ordered so a round trip is
 /// stable), array to ArrayList, string to String, number to Double or Long,
-/// true/false to Boolean, null to null.
+/// true/false to Boolean, null to null. Anything malformed -- trailing content, a
+/// raw control character in a string, a number outside the JSON grammar or a
+/// long, nesting deeper than 512 -- throws IOException.
 public final class Json {
-    private final String src;
-    private int pos;
-
-    private Json(String src) {
-        this.src = src;
+    private Json() {
     }
 
     /// Parses a JSON object. Throws IOException on anything malformed.
@@ -57,296 +56,9 @@ public final class Json {
         return (Map) value;
     }
 
+    /// Parses any JSON value. Throws IOException on anything malformed.
     public static Object parse(String json) throws IOException {
-        if (json == null) {
-            throw new IOException("No JSON to parse");
-        }
-        Json p = new Json(json);
-        p.skipWhitespace();
-        Object value = p.readValue();
-        p.skipWhitespace();
-        if (p.pos < p.src.length()) {
-            throw new IOException("Trailing content at offset " + p.pos);
-        }
-        return value;
-    }
-
-    /// How deep a document may nest before it is refused.
-    ///
-    /// The parser is recursive, so nesting depth is stack depth, and a body is
-    /// whatever the client sent. Without a bound a few kilobytes of "\[\[\[\[..." reach
-    /// StackOverflowError -- which is an Error, so neither the handler's catch nor
-    /// the server's catch of Exception sees it, and the thread dies rather than the
-    /// request failing. 512 is far past any real document and far short of the
-    /// stack.
-    ///
-    /// "Far short of the stack" holds on the PACKAGED runtime too, where handlers
-    /// run on a 64KB virtual-thread stack rather than a platform thread's 16MB,
-    /// and it is worth saying why because the arithmetic looks alarming until you
-    /// know: a translated Java frame keeps its locals and operand stack in
-    /// threadStateData->threadObjectStack, a HEAP array, so nesting costs a small
-    /// C frame rather than a whole Java one -- that is the reason these stacks
-    /// can be small at all (see cn1_virtual_thread.h). Both of the limits that
-    /// deep recursion can actually reach are guarded and throw a catchable
-    /// StackOverflowError instead of running off the end: the call depth
-    /// (CN1_MAX_STACK_CALL_DEPTH) and the object stack itself.
-    ///
-    /// Measured rather than argued: a body nested 511 deep -- one under this cap,
-    /// so the cap does not hide the recursion -- is answered cleanly by the
-    /// packaged server on the default 64KB stack, with the server still serving
-    /// afterwards. BackendHttpIntegrationTest keeps that as a regression test.
-    private static final int MAX_DEPTH = 512;
-
-    private int depth;
-
-    private Object readValue() throws IOException {
-        if (pos >= src.length()) {
-            throw new IOException("Unexpected end of JSON");
-        }
-        char c = src.charAt(pos);
-        switch (c) {
-            case '{': return readNested(true);
-            case '[': return readNested(false);
-            case '"': return readString();
-            case 't': return readLiteral("true", Boolean.TRUE);
-            case 'f': return readLiteral("false", Boolean.FALSE);
-            case 'n': return readLiteral("null", null);
-            default: return readNumber();
-        }
-    }
-
-    /// Depth is counted here so both containers share one bound and one release.
-    private Object readNested(boolean object) throws IOException {
-        if (depth >= MAX_DEPTH) {
-            throw new IOException("JSON nested deeper than " + MAX_DEPTH);
-        }
-        depth++;
-        try {
-            return object ? (Object) readObject() : (Object) readArray();
-        } finally {
-            depth--;
-        }
-    }
-
-    private Map readObject() throws IOException {
-        Map out = new LinkedHashMap();
-        pos++; // {
-        skipWhitespace();
-        if (peek() == '}') {
-            pos++;
-            return out;
-        }
-        while (true) {
-            skipWhitespace();
-            if (peek() != '"') {
-                throw new IOException("Expected a key at offset " + pos);
-            }
-            String key = readString();
-            skipWhitespace();
-            if (peek() != ':') {
-                throw new IOException("Expected ':' at offset " + pos);
-            }
-            pos++;
-            skipWhitespace();
-            out.put(key, readValue());
-            skipWhitespace();
-            char c = peek();
-            pos++;
-            if (c == '}') {
-                return out;
-            }
-            if (c != ',') {
-                throw new IOException("Expected ',' or '}' at offset " + (pos - 1));
-            }
-        }
-    }
-
-    private List readArray() throws IOException {
-        List out = new ArrayList();
-        pos++; // [
-        skipWhitespace();
-        if (peek() == ']') {
-            pos++;
-            return out;
-        }
-        while (true) {
-            skipWhitespace();
-            out.add(readValue());
-            skipWhitespace();
-            char c = peek();
-            pos++;
-            if (c == ']') {
-                return out;
-            }
-            if (c != ',') {
-                throw new IOException("Expected ',' or ']' at offset " + (pos - 1));
-            }
-        }
-    }
-
-    private String readString() throws IOException {
-        pos++; // opening quote
-        StringBuilder out = new StringBuilder();
-        while (true) {
-            if (pos >= src.length()) {
-                throw new IOException("Unterminated string");
-            }
-            char c = src.charAt(pos++);
-            if (c == '"') {
-                return out.toString();
-            }
-            if (c != '\\') {
-                // RFC 8259: everything below U+0020 has to arrive escaped. Taking
-                // it literally accepted documents that a conforming parser -- or
-                // whatever validates upstream of this one -- rejects, which is
-                // how the two disagree about where a string ends.
-                if (c < 0x20) {
-                    throw new IOException("A control character must be escaped in a "
-                            + "JSON string, at offset " + (pos - 1));
-                }
-                out.append(c);
-                continue;
-            }
-            if (pos >= src.length()) {
-                throw new IOException("Unterminated escape");
-            }
-            char esc = src.charAt(pos++);
-            switch (esc) {
-                case '"':  out.append('"');  break;
-                case '\\': out.append('\\'); break;
-                case '/':  out.append('/');  break;
-                case 'b':  out.append('\b'); break;
-                case 'f':  out.append('\f'); break;
-                case 'n':  out.append('\n'); break;
-                case 'r':  out.append('\r'); break;
-                case 't':  out.append('\t'); break;
-                case 'u':
-                    if (pos + 4 > src.length()) {
-                        throw new IOException("Truncated \\u escape");
-                    }
-                    // Four ASCII hex digits, exactly. parseInt took a sign and any
-                    // Unicode digit, so "\\u+041" decoded to U+0041 and so did an
-                    // Arabic-Indic spelling -- three ways to write one character,
-                    // where a filter that checked for one of them is defeated by
-                    // the others.
-                    int escaped = Hex.parse(src, pos, pos + 4);
-                    if (escaped < 0) {
-                        throw new IOException("Malformed \\u escape at offset " + pos);
-                    }
-                    out.append((char) escaped);
-                    pos += 4;
-                    break;
-                default:
-                    throw new IOException("Unknown escape \\" + esc);
-            }
-        }
-    }
-
-    private Object readLiteral(String literal, Object value) throws IOException {
-        if (!src.startsWith(literal, pos)) {
-            throw new IOException("Expected " + literal + " at offset " + pos);
-        }
-        pos += literal.length();
-        return value;
-    }
-
-    /// A JSON number, by the grammar rather than by what Java happens to parse.
-    ///
-    /// Scanning a run of "-+0-9.eE" and handing it to Long.parseLong accepted "+1",
-    /// "01", ".5" and "1." -- none of which is a JSON number, and all of which a
-    /// conforming client or an upstream validator rejects. A parser that takes
-    /// documents its own clients cannot produce is worse than a strict one.
-    ///
-    /// RFC 8259: \[ '-' \] ( '0' | \[1-9\]\[0-9\]* ) \[ '.' \[0-9\]+ \] \[ ('e'|'E') \[+-\] \[0-9\]+ \]
-    private static boolean isDigit(char c) {
-        return c >= '0' && c <= '9';
-    }
-
-    private Object readNumber() throws IOException {
-        int start = pos;
-        boolean floating = false;
-        if (pos < src.length() && src.charAt(pos) == '-') {
-            pos++;                          // '+' is not a JSON sign
-        }
-        int intStart = pos;
-        if (pos < src.length() && src.charAt(pos) == '0') {
-            pos++;
-            if (pos < src.length() && isDigit(src.charAt(pos))) {
-                throw new IOException("A leading zero is not a JSON number, at offset "
-                        + start);
-            }
-        } else {
-            while (pos < src.length() && isDigit(src.charAt(pos))) {
-                pos++;
-            }
-        }
-        if (pos == intStart) {
-            throw new IOException("Expected a digit at offset " + intStart);
-        }
-        if (pos < src.length() && src.charAt(pos) == '.') {
-            floating = true;
-            pos++;
-            int fracStart = pos;
-            while (pos < src.length() && isDigit(src.charAt(pos))) {
-                pos++;
-            }
-            if (pos == fracStart) {
-                throw new IOException("Expected a digit after '.' at offset " + fracStart);
-            }
-        }
-        if (pos < src.length() && (src.charAt(pos) == 'e' || src.charAt(pos) == 'E')) {
-            floating = true;
-            pos++;
-            if (pos < src.length() && (src.charAt(pos) == '-' || src.charAt(pos) == '+')) {
-                pos++;
-            }
-            int expStart = pos;
-            while (pos < src.length() && isDigit(src.charAt(pos))) {
-                pos++;
-            }
-            if (pos == expStart) {
-                throw new IOException("Expected a digit in the exponent at offset "
-                        + expStart);
-            }
-        }
-        String text = src.substring(start, pos);
-        try {
-            // Integers stay integers: a long round-tripped through double loses
-            // precision above 2^53, and ids are exactly the values that get large.
-            if (floating) {
-                double parsed = Double.parseDouble(text);
-                // parseDouble answers Infinity for "1e999" rather than throwing, so a
-                // number JSON cannot represent was accepted and handed on as one an
-                // amount or a threshold could be built from -- and the writer emits
-                // null for a non-finite double, so parsing and writing it back
-                // silently turned the value into null.
-                if (Double.isNaN(parsed) || Double.isInfinite(parsed)) {
-                    throw new IOException("Number out of range for JSON: '" + text + "'");
-                }
-                return (Object) Double.valueOf(parsed);
-            }
-            return (Object) Long.valueOf(Long.parseLong(text));
-        } catch (NumberFormatException err) {
-            throw new IOException("Malformed number '" + text + "'", err);
-        }
-    }
-
-    private char peek() throws IOException {
-        if (pos >= src.length()) {
-            throw new IOException("Unexpected end of JSON");
-        }
-        return src.charAt(pos);
-    }
-
-    private void skipWhitespace() {
-        while (pos < src.length()) {
-            char c = src.charAt(pos);
-            if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
-                pos++;
-            } else {
-                break;
-            }
-        }
+        return JSONParser.parseStrict(json);
     }
 
     // ------------------------------------------------------------------
@@ -383,6 +95,19 @@ public final class Json {
     /// one-field object, just removing the per-request map was worth 22%.
     public interface Writable {
         void writeTo(ByteSink out);
+    }
+
+    /// Writes values of one type as JSON, shared by every request that answers
+    /// with that type.
+    ///
+    /// The stateless counterpart of [Writable]. A Writable carries the value it
+    /// writes, so a route answering with a codec had to allocate one per request
+    /// to hold that value; an Encoder is handed the value instead, so a generated
+    /// route keeps ONE in a static field and a request allocates only what the
+    /// method returned. See `HttpServer.Request.respondJson(int, Object, Encoder)`.
+    public interface Encoder {
+        /// Writes `value`, never null, into `out`.
+        void write(Object value, ByteSink out);
     }
 
     /// One JSON string, escaped, straight into `out`.

@@ -492,7 +492,7 @@ public class Invoke extends Instruction {
                 // CLOSED-WORLD DEVIRT FOR INTERFACES. This was not attempted at all --
                 // the block above is gated on INVOKEVIRTUAL -- and interface dispatch is
                 // the most expensive call this VM makes: a class id load, a
-                // classToInterfaceMap row, an offset, a vtable slot, then an indirect
+                // interface map row (cn1_itix_), an offset, a vtable slot, then an indirect
                 // branch, none of which the C compiler can see through.
                 //
                 // A closed world does not have to guess. If exactly one reachable class

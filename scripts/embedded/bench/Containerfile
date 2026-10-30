@@ -1,0 +1,31 @@
+# Every competitor's workload, built and run on the same Debian bookworm base
+# as the Codename One binary. Native arm64 on an Apple silicon or arm64 Linux
+# host; anything else runs under emulation and only the ratios mean anything.
+FROM debian:bookworm
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential cmake pkg-config git ca-certificates curl procps \
+        qt6-base-dev libgl-dev fonts-dejavu-core fontconfig libfontconfig-dev \
+        chromium \
+        libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf-2.0-0 \
+        libcurl4 libdrm2 \
+    && rm -rf /var/lib/apt/lists/*
+RUN curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.90.0
+ENV PATH=/root/.cargo/bin:$PATH
+# JavaFX: a JDK to build with, and the JavaFX 26 SDK and jmods. 26 is the first
+# release with a display-less glass platform (Headless); Gluon's Monocle builds
+# for boards are not published. The gauge then runs on a jlink'd runtime holding
+# only the modules it uses, which is how a device image ships a Java application.
+RUN mkdir -p /opt/jdk /opt/fx && cd /opt \
+    && curl -sSL -o jdk.tgz "https://api.adoptium.net/v3/binary/latest/25/ga/linux/aarch64/jdk/hotspot/normal/eclipse" \
+    && tar xzf jdk.tgz -C /opt/jdk --strip-components=1 \
+    && curl -sSL -o fx.zip https://download2.gluonhq.com/openjfx/26.0.2/openjfx-26.0.2_linux-aarch64_bin-sdk.zip \
+    && curl -sSL -o fxmods.zip https://download2.gluonhq.com/openjfx/26.0.2/openjfx-26.0.2_linux-aarch64_bin-jmods.zip \
+    && python3 -c "import zipfile; [zipfile.ZipFile(z).extractall('/opt/fx') for z in ('fx.zip', 'fxmods.zip')]" \
+    && /opt/jdk/bin/jlink --module-path /opt/fx/javafx-jmods-26.0.2 --add-modules java.base,javafx.graphics,jdk.unsupported \
+        --strip-debug --no-header-files --no-man-pages --output /opt/fxrt
+COPY . /bench
+RUN cd /bench/qt && cmake -S . -B build -DCMAKE_BUILD_TYPE=Release >/dev/null && cmake --build build \
+    && strip build/qtgauge
+RUN cd /bench/slint && cargo build --release -q
+RUN cd /bench/javafx && /opt/jdk/bin/javac --module-path /opt/fx/javafx-sdk-26.0.2/lib \
+        --add-modules javafx.graphics -d classes Gauge.java

@@ -40,6 +40,22 @@ public final class ByteData {
         this.buffer = new byte[(int) length];
     }
 
+    private ByteData(byte[] buffer) {
+        this.buffer = buffer;
+    }
+
+    /// A ByteData holding {@code bytes} itself: how a Java encoder's output crosses into
+    /// Dart without a copy (`ui.Image.toByteData`).
+    public static ByteData fromBytes(byte[] bytes) {
+        return new ByteData(bytes == null ? new byte[0] : bytes);
+    }
+
+    /// {@code byteData.buffer}: the bytes this view is over, shared, so
+    /// {@code buffer.asUint8List()} reads what the ByteData holds.
+    public ByteBuffer buffer() {
+        return new ByteBuffer(buffer);
+    }
+
     /**
      * The offset as an array index, after checking the whole access fits -- on the
      * long, before narrowing. The cast came first before, so an offset of 2^32 wrapped

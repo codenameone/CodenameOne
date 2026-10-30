@@ -28,7 +28,7 @@ package com.codename1.unitycompat.system;
 /// class, which `$sameType` cannot tell apart; the closed type a delegate
 /// was made as travels in `Delegate.$typeKey`, and `Delegate.Combine`
 /// compares that as well.
-@SuppressWarnings("PMD.MethodNamingConventions") // C# member names: translated code binds to them by name
+@SuppressWarnings({"PMD.MethodNamingConventions", "PMD.ClassNamingConventions"}) // C# member and type names: translated code binds to them by name
 public abstract class Action_1 extends MulticastDelegate {
     public abstract void Invoke(Object a0);
 

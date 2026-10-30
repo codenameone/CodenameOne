@@ -345,6 +345,31 @@ public class LinuxImplementation extends CodenameOneImplementation {
         }
     }
 
+    /// The C crypto kernels when the translator linked them (an
+    /// application that uses the elliptic-curve or Keccak APIs), otherwise
+    /// the default engine.
+    @Override
+    public com.codename1.security.CryptoEngine createCryptoEngine() {
+        return com.codename1.security.NativeCryptoEngine.create(super.createCryptoEngine());
+    }
+
+    /// True on the embedded target (DRM/KMS or fbdev, no window system). Fixed at
+    /// build time: the native is a constant in each of the two display units.
+    /// The port's JVM unit tests run with no native library; they exercise the
+    /// desktop behaviour, so a missing native reads as "not embedded". Caught as
+    /// LinkageError: the device class library has no UnsatisfiedLinkError.
+    private static final class Embedded {
+        static final boolean VALUE = query();
+
+        private static boolean query() {
+            try {
+                return LinuxNative.isEmbeddedDisplay();
+            } catch (LinkageError notLinked) {
+                return false;
+            }
+        }
+    }
+
     @Override
     public void init(Object m) {
         // The class library (vm/JavaAPI) reaches the EDT, the log, secure
@@ -469,7 +494,7 @@ public class LinuxImplementation extends CodenameOneImplementation {
             com.codename1.ui.util.Resources r = com.codename1.ui.util.Resources.open(in);
             String[] names = r.getThemeResourceNames();
             if (names != null && names.length > 0) {
-                com.codename1.ui.plaf.UIManager.getInstance().setThemeProps(r.getTheme(names[0]));
+                com.codename1.ui.plaf.UIManager.getInstance().setThemeMap(r.getThemeMap(names[0]));
             }
         } catch (Throwable t) {
             // A bad/absent theme must not stop the app from starting.
@@ -571,6 +596,31 @@ public class LinuxImplementation extends CodenameOneImplementation {
     // Android EncryptedSharedPreferences non-prompting store). Used by the
     // networking layer to read API keys / tokens at rest; see LinuxSecureStorage.
     private com.codename1.security.SecureStorage secureStorage;
+
+    @Override
+    protected com.codename1.io.bonjour.BonjourPlatform createBonjourPlatform() {
+        return new LinuxBonjourPlatform();
+    }
+
+    private LinuxHardware hardware;
+
+    @Override
+    public com.codename1.nfc.Nfc getNfc() {
+        if (nfc == null) {
+            nfc = new LinuxNfc();
+        }
+        return nfc;
+    }
+
+    private LinuxNfc nfc;
+
+    @Override
+    public com.codename1.hardware.Hardware getHardware() {
+        if (hardware == null) {
+            hardware = new LinuxHardware();
+        }
+        return hardware;
+    }
 
     @Override
     public com.codename1.security.SecureStorage getSecureStorage() {
@@ -2419,14 +2469,14 @@ public class LinuxImplementation extends CodenameOneImplementation {
      */
     @Override
     public boolean isNativeInputSupported() {
-        return true;
+        return !Embedded.VALUE;
     }
 
     private final LinuxTextInput lowLevelTextInput = new LinuxTextInput();
 
     @Override
     public boolean isTextInputSupported() {
-        return true;
+        return !Embedded.VALUE;
     }
 
     @Override
@@ -2458,7 +2508,7 @@ public class LinuxImplementation extends CodenameOneImplementation {
      */
     @Override
     public boolean isAsyncEditMode() {
-        return true;
+        return !Embedded.VALUE;
     }
 
     /**
@@ -2471,6 +2521,10 @@ public class LinuxImplementation extends CodenameOneImplementation {
      */
     @Override
     public void editString(final Component cmp, int maxSize, int constraint, String text, int initiatingKeycode) {
+        if (Embedded.VALUE) {
+            LinuxEmbeddedEditor.edit(cmp, maxSize, constraint, text);
+            return;
+        }
         lowLevelTextInput.stopCurrent();
         // Tapping straight from one field into another: finish the first cleanly
         // before overlaying the new one, so two controls never float at once.
@@ -3077,6 +3131,30 @@ public class LinuxImplementation extends CodenameOneImplementation {
     @Override
     public void setHttpMethod(Object connection, String method) throws IOException {
         LinuxNative.httpSetCustomMethod(((LinuxHttpConnection) connection).peer, method);
+    }
+
+    @Override
+    public void setInsecure(Object connection, boolean insecure) {
+        LinuxNative.httpSetInsecure(((LinuxHttpConnection) connection).peer, insecure);
+    }
+
+    @Override
+    public boolean isClientCertificateSupported() {
+        return true;
+    }
+
+    /// libcurl takes the key as PEM, so the PKCS#8 bytes are wrapped here.
+    @Override
+    public void setClientCertificate(Object connection, String certificateChainPem, String keyAlgorithm,
+            byte[] privateKeyPkcs8) {
+        String body = java.util.Base64.getEncoder().encodeToString(privateKeyPkcs8);
+        StringBuilder pem = new StringBuilder("-----BEGIN PRIVATE KEY-----\n");
+        for (int i = 0; i < body.length(); i += 64) {
+            pem.append(body.substring(i, Math.min(body.length(), i + 64))).append('\n');
+        }
+        pem.append("-----END PRIVATE KEY-----\n");
+        LinuxNative.httpSetClientCertificate(((LinuxHttpConnection) connection).peer, certificateChainPem,
+                pem.toString());
     }
 
     /// True: [#setReadTimeout(Object, int)] is honoured, so a caller that checks
@@ -3813,9 +3891,13 @@ public class LinuxImplementation extends CodenameOneImplementation {
     ///
     /// The list in that paragraph is now shorter by one: @desktopTitleBarMode is read here,
     /// because this port has a native menu bar to hand the commands to.
+    ///
+    /// The embedded target is the exception: an appliance panel has no window,
+    /// menu bar or title bar, and is driven by touch or a rotary encoder, so it
+    /// takes the mobile resource and theme layers.
     @Override
     public boolean isDesktop() {
-        return true;
+        return !Embedded.VALUE;
     }
 
 

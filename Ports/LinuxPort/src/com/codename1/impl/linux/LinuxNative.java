@@ -306,6 +306,11 @@ public final class LinuxNative {
      */
     public static native boolean isTouchDevice();
 
+    /// True on the embedded target, where the application owns the whole screen
+    /// through DRM/KMS or fbdev with no window system: there are no native text
+    /// editors, menus or extra windows, and text is edited in place.
+    public static native boolean isEmbeddedDisplay();
+
     /**
      * Parks the calling (main) thread to keep the process alive in headless
      * screenshot mode, where there is no window message loop. The EDT exits the
@@ -673,6 +678,12 @@ public final class LinuxNative {
 
     /// A method other than the GET or POST [#httpSetMethod] selects.
     public static native void httpSetCustomMethod(long connection, String method);
+
+    /// Presents a client certificate: the PEM chain and the PEM private key.
+    public static native void httpSetClientCertificate(long connection, String chainPem, String keyPem);
+
+    /// Skips checking the server's certificate and host name.
+    public static native void httpSetInsecure(long connection, boolean insecure);
 
     public static native void httpSetConnectTimeout(long connection, int millis);
 
@@ -1171,4 +1182,50 @@ public final class LinuxNative {
     public static native byte[] sqlColBlob(long stmtPeer, int col) throws java.io.IOException;
     public static native double sqlColDouble(long stmtPeer, int col) throws java.io.IOException;
     public static native long sqlColLong(long stmtPeer, int col) throws java.io.IOException;
+
+    // ---- com.codename1.hardware (cn1_linux_hardware.c). Each returns a value
+    // >= 0 or -errno; -ETIMEDOUT reports a timeout.
+    public static native int hwGpioOpen(String chip, int line, boolean output, boolean high, int bias, int edges);
+    public static native int hwGpioRead(int handle);
+    public static native int hwGpioWrite(int handle, boolean high);
+    public static native int hwGpioWaitEdge(int handle, int timeoutMs, long[] timestampOut);
+    public static native int hwI2cOpen(int bus, int address);
+    public static native int hwI2cTransfer(int handle, byte[] write, int writeLen, byte[] read, int readLen);
+    public static native int hwSpiOpen(int bus, int chipSelect, int mode, int speedHz, int bitsPerWord);
+    public static native int hwSpiTransfer(int handle, byte[] tx, byte[] rx, int len);
+    public static native int hwSerialOpen(String device, int baud, int dataBits, int parity, int stopBits);
+    public static native int hwSerialRead(int handle, byte[] buf, int off, int len, int timeoutMs);
+    public static native int hwSerialWrite(int handle, byte[] buf, int off, int len);
+    public static native int hwPwmOpen(int chip, int channel);
+    public static native int hwPwmConfigure(int handle, long periodNanos, long dutyNanos, boolean enabled);
+    public static native int hwCanOpen(String iface);
+    public static native int hwCanSend(int handle, int id, boolean extended, byte[] data, int len);
+    public static native int hwCanReceive(int handle, int[] idOut, byte[] data, int timeoutMs);
+    public static native int hwWatchdogOpen(int timeoutSeconds);
+    public static native int hwWatchdogKick(int handle);
+    public static native void hwClose(int handle, boolean disarm);
+
+    // ---- multicast DNS (cn1_linux_mdns.c), the socket under LinuxMdns. Each
+    // returns a value >= 0 or -errno.
+    public static native int mdnsOpen();
+    public static native int mdnsSend(int fd, byte[] packet, int length);
+    public static native int mdnsReceive(int fd, byte[] buffer, int timeoutMs);
+    public static native String mdnsHostInfo();
+    public static native void mdnsClose(int fd);
+    public static native String hwList(int kind);
+    public static native int hwBacklight(int op, int value);
+
+    /** True when libpcsclite loads and a PC/SC context can be established. */
+    public static native boolean nfcAvailable();
+    /**
+     * Blocks until a card is on a reader. Returns a card handle (positive), 0 on
+     * timeout, -1 on a PC/SC failure or -2 when nfcCancel() was called.
+     */
+    public static native long nfcWaitCard(int timeoutMs);
+    /** Wakes a pending nfcWaitCard() so it returns -2. */
+    public static native void nfcCancel();
+    /** Sends one APDU; returns the response including SW1 SW2, or null on failure. */
+    public static native byte[] nfcTransmit(long card, byte[] apdu);
+    /** Releases a card handle returned by nfcWaitCard(). */
+    public static native void nfcDisconnect(long card);
 }

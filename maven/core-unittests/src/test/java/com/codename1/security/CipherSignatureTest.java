@@ -1,6 +1,24 @@
 /*
- * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
- * Distributed under the same terms as the rest of Codename One.
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
  */
 package com.codename1.security;
 
@@ -74,6 +92,70 @@ class CipherSignatureTest extends UITestBase {
         // tamper detection
         data[0] ^= 0x01;
         assertFalse(Signature.verify(Signature.SHA256_WITH_RSA, kp.getPublicKey(), data, sig));
+    }
+
+    @Test
+    void ecSignAndVerify() {
+        KeyPair kp = KeyGenerator.ec(256);
+        assertEquals(PublicKey.EC, kp.getPublicKey().getAlgorithm());
+        assertEquals(PublicKey.EC, kp.getPrivateKey().getAlgorithm());
+        // SubjectPublicKeyInfo for P-256 is a fixed 26-byte header plus the
+        // 65-byte uncompressed point.
+        assertEquals(91, kp.getPublicKey().getEncoded().length);
+        byte[] data = "ledger transfer".getBytes();
+        byte[] sig = Signature.sign(Signature.SHA256_WITH_ECDSA, kp.getPrivateKey(), data);
+        assertEquals(0x30, sig[0] & 0xff, "ECDSA signatures are DER on every port");
+        assertTrue(Signature.verify(Signature.SHA256_WITH_ECDSA, kp.getPublicKey(), data, sig));
+        data[0] ^= 0x01;
+        assertFalse(Signature.verify(Signature.SHA256_WITH_ECDSA, kp.getPublicKey(), data, sig));
+        KeyPair other = KeyGenerator.ec(256);
+        data[0] ^= 0x01;
+        assertFalse(Signature.verify(Signature.SHA256_WITH_ECDSA, other.getPublicKey(), data, sig));
+    }
+
+    /// java.security omits the optional public point from an EC PKCS#8 key;
+    /// the iOS port cannot import such a key, so the signing form adds it.
+    @Test
+    void ecPkcs8GainsItsPublicPoint() throws Exception {
+        java.security.KeyPairGenerator g = java.security.KeyPairGenerator.getInstance("EC");
+        g.initialize(new java.security.spec.ECGenParameterSpec("secp256r1"));
+        for (int i = 0; i < 5; i++) {
+            java.security.KeyPair jkp = g.generateKeyPair();
+            byte[] pkcs8 = jkp.getPrivate().getEncoded();
+            byte[] completed = EcKeys.withPublicPoint(pkcs8);
+            assertEquals(138, completed.length);
+            assertSame(completed, EcKeys.withPublicPoint(completed));
+            java.security.KeyFactory kf = java.security.KeyFactory.getInstance("EC");
+            java.security.interfaces.ECPrivateKey back = (java.security.interfaces.ECPrivateKey)
+                    kf.generatePrivate(new java.security.spec.PKCS8EncodedKeySpec(completed));
+            assertEquals(((java.security.interfaces.ECPrivateKey) jkp.getPrivate()).getS(), back.getS());
+            byte[] spki = jkp.getPublic().getEncoded();
+            byte[] point = new byte[65];
+            System.arraycopy(spki, 26, point, 0, 65);
+            byte[] embedded = new byte[65];
+            System.arraycopy(completed, 73, embedded, 0, 65);
+            assertArrayEquals(point, embedded);
+
+            PrivateKey key = PrivateKey.fromPkcs8(PublicKey.EC, pkcs8);
+            byte[] data = "x".getBytes();
+            byte[] sig = Signature.sign(Signature.SHA256_WITH_ECDSA, key, data);
+            assertTrue(Signature.verify(Signature.SHA256_WITH_ECDSA,
+                    PublicKey.fromX509(PublicKey.EC, spki), data, sig));
+        }
+    }
+
+    @Test
+    void jwtEs256RoundTrip() {
+        KeyPair kp = KeyGenerator.ec(256);
+        Map<String, Object> claims = new LinkedHashMap<String, Object>();
+        claims.put("sub", "alice");
+        String token = Jwt.sign(claims, kp.getPrivateKey(), Jwt.ES256);
+        Jwt parsed = Jwt.parse(token);
+        assertEquals("ES256", parsed.getAlgorithm());
+        // JOSE R||S form: 64 bytes, base64url without padding is 86 chars.
+        assertEquals(86, token.substring(token.lastIndexOf('.') + 1).length());
+        assertTrue(parsed.verify(kp.getPublicKey()));
+        assertFalse(parsed.verify(KeyGenerator.ec(256).getPublicKey()));
     }
 
     @Test

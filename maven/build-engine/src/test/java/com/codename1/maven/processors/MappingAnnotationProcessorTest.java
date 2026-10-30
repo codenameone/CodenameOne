@@ -624,4 +624,397 @@ public class MappingAnnotationProcessorTest {
                 .getCodeSource().getLocation();
         return new File(url.toURI());
     }
+
+    // ---------------------------------------------------------------
+    // JSON options shared with the backend codecs (#5995)
+    // ---------------------------------------------------------------
+
+    @Test
+    public void namesAliasesRequiredStrictAndOmitNull() throws Exception {
+        Map<String, String> src = new LinkedHashMap<String, String>();
+        src.put("jx.names.Task", "package jx.names;\n"
+                + "import com.codename1.annotations.*;\n"
+                + "@Mapped @JsonStrict @JsonOmitNull public class Task {\n"
+                + "    @JsonProperty(value = \"title\", aliases = {\"name\", \"label\"}) public String t;\n"
+                + "    @JsonProperty(aliases = {\"old_due\"}) public String due;\n"
+                + "    @JsonProperty(required = true) public String id;\n"
+                + "    public Integer count;\n"
+                + "    public int n;\n"
+                + "    @JsonProperty(aliases = {\"when\"}) public java.util.Date at;\n"
+                + "    public Task() {}\n"
+                + "}\n");
+        src.put("jx.names.Loose", "package jx.names;\n"
+                + "@com.codename1.annotations.Mapped public class Loose {\n"
+                + "    public String a;\n"
+                + "    public Loose() {}\n"
+                + "}\n");
+        src.put("jx.names.Box", "package jx.names;\n"
+                + "@com.codename1.annotations.Mapped public class Box {\n"
+                + "    public java.util.List<Task> items;\n"
+                + "    public Box() {}\n"
+                + "}\n");
+        try (URLClassLoader cl = buildAndRegister(src, "jx.names.Task", "jx.names.Loose", "jx.names.Box")) {
+            Class<?> task = cl.loadClass("jx.names.Task");
+            Object t = fromJson(cl, "{\"name\":\"x\",\"old_due\":\"d\",\"id\":null}", task);
+            assertEquals("x", task.getField("t").get(t));
+            assertEquals("d", task.getField("due").get(t));
+            assertNull("explicit null satisfies required", task.getField("id").get(t));
+            t = fromJson(cl, "{\"label\":\"l\",\"title\":\"a\",\"name\":\"b\",\"id\":\"1\"}", task);
+            assertEquals("the primary name wins over aliases", "a", task.getField("t").get(t));
+
+            assertEquals("$.id: required member is missing", failure(cl, "{\"title\":\"a\"}", task));
+            assertEquals("$.zzz: unknown member", failure(cl, "{\"id\":\"1\",\"zzz\":1}", task));
+            // A refused value is reported under the alias it came in, and a
+            // date is checked against its month and the clock.
+            for (String bad : new String[] {"2026-02-30", "2025-02-29", "2026-04-31",
+                    "2026-10-25T24:30:00Z", "2026-10-25T10:00:60Z", "2026-10-25T10:00+99:00"}) {
+                String why = failure(cl, "{\"id\":\"1\",\"when\":\"" + bad + "\"}", task);
+                assertTrue(bad + " -> " + why, why.startsWith("$.when: "));
+            }
+            t = fromJson(cl, "{\"id\":\"1\",\"when\":\"2024-02-29T23:59:59Z\"}", task);
+            assertEquals(1709251199000L, ((java.util.Date) task.getField("at").get(t)).getTime());
+            Object loose = fromJson(cl, "{\"a\":\"v\",\"zzz\":1}", cl.loadClass("jx.names.Loose"));
+            assertEquals("v", loose.getClass().getField("a").get(loose));
+            assertEquals("$.items[2].id: required member is missing",
+                    failure(cl, "{\"items\":[{\"id\":\"1\"},{\"id\":\"2\"},{}]}", cl.loadClass("jx.names.Box")));
+
+            Object w = task.newInstance();
+            task.getField("id").set(w, "i");
+            assertEquals("{\"id\":\"i\",\"n\":0}", toJson(cl, w));
+            task.getField("t").set(w, "x");
+            task.getField("count").set(w, Integer.valueOf(3));
+            assertEquals("{\"title\":\"x\",\"id\":\"i\",\"count\":3,\"n\":0}", toJson(cl, w));
+            assertDirectMatchesMap(cl, cl.loadClass("jx.names.TaskCn1Mapper"),
+                    cl.loadClass("jx.names.TaskCn1Mapper").newInstance(), w);
+        }
+    }
+
+    @Test
+    public void jsonFormatWritesStringsAndReadsBothShapes() throws Exception {
+        Map<String, String> src = new LinkedHashMap<String, String>();
+        src.put("jx.fmt.Ev", "package jx.fmt;\n"
+                + "import com.codename1.annotations.*;\n"
+                + "import java.util.Date;\n"
+                + "@Mapped public class Ev {\n"
+                + "    @JsonFormat(JsonFormat.Shape.STRING) public Date at;\n"
+                + "    public Date plain;\n"
+                + "    @JsonFormat(JsonFormat.Shape.NUMBER) public Date num;\n"
+                + "    @JsonFormat(JsonFormat.Shape.STRING) public long big;\n"
+                + "    @JsonFormat(JsonFormat.Shape.STRING) public Double ratio;\n"
+                + "    public Ev() {}\n"
+                + "}\n");
+        try (URLClassLoader cl = buildAndRegister(src, "jx.fmt.Ev")) {
+            Class<?> ev = cl.loadClass("jx.fmt.Ev");
+            Object e = ev.newInstance();
+            ev.getField("at").set(e, new java.util.Date(1700000000123L));
+            ev.getField("num").set(e, new java.util.Date(5L));
+            ev.getField("big").setLong(e, 12345678901234L);
+            ev.getField("ratio").set(e, Double.valueOf(1.5));
+            String json = toJson(cl, e);
+            assertEquals("{\"at\":\"2023-11-14T22:13:20.123Z\",\"plain\":null,\"num\":5,"
+                    + "\"big\":\"12345678901234\",\"ratio\":\"1.5\"}", json);
+            assertDirectMatchesMap(cl, cl.loadClass("jx.fmt.EvCn1Mapper"),
+                    cl.loadClass("jx.fmt.EvCn1Mapper").newInstance(), e);
+
+            Object back = fromJson(cl, json, ev);
+            assertEquals(new java.util.Date(1700000000123L), ev.getField("at").get(back));
+            assertEquals(12345678901234L, ev.getField("big").getLong(back));
+            assertEquals(Double.valueOf(1.5), ev.getField("ratio").get(back));
+
+            back = fromJson(cl, "{\"at\":1700000000123,\"plain\":\"2023-11-14\","
+                    + "\"num\":\"2023-11-15T00:13:20.123+02:00\",\"big\":7,\"ratio\":2}", ev);
+            assertEquals(new java.util.Date(1700000000123L), ev.getField("at").get(back));
+            assertEquals(new java.util.Date(1699920000000L), ev.getField("plain").get(back));
+            assertEquals(new java.util.Date(1700000000123L), ev.getField("num").get(back));
+            assertEquals(7L, ev.getField("big").getLong(back));
+            assertEquals(Double.valueOf(2), ev.getField("ratio").get(back));
+            assertTrue(failure(cl, "{\"at\":\"yesterday\"}", ev).startsWith("$.at: "));
+        }
+    }
+
+    @Test
+    public void adaptersOnFieldAndOnClass() throws Exception {
+        Map<String, String> src = new LinkedHashMap<String, String>();
+        src.put("jx.ad.Money", "package jx.ad;\n"
+                + "public class Money { public final long cents; public Money(long c) { cents = c; } }\n");
+        src.put("jx.ad.MoneyAdapter", "package jx.ad;\n"
+                + "public class MoneyAdapter implements com.codename1.annotations.JsonTypeAdapter<Money> {\n"
+                + "    public Object toJson(Money m) { return \"$\" + m.cents; }\n"
+                + "    public Money fromJson(Object j) {\n"
+                + "        if (!(j instanceof String) || !((String) j).startsWith(\"$\")) throw new IllegalArgumentException(\"bad money\");\n"
+                + "        return new Money(Long.parseLong(((String) j).substring(1)));\n"
+                + "    }\n"
+                + "}\n");
+        src.put("jx.ad.Point", "package jx.ad;\n"
+                + "@com.codename1.annotations.JsonAdapter(PointAdapter.class)\n"
+                + "public class Point { public int x, y; public Point(int x, int y) { this.x = x; this.y = y; } }\n");
+        src.put("jx.ad.PointAdapter", "package jx.ad;\n"
+                + "import java.util.*;\n"
+                + "public class PointAdapter implements com.codename1.annotations.JsonTypeAdapter<Point> {\n"
+                + "    public Object toJson(Point p) { return Arrays.asList(Integer.valueOf(p.x), Integer.valueOf(p.y)); }\n"
+                + "    public Point fromJson(Object j) {\n"
+                + "        List l = (List) j;\n"
+                + "        return new Point(((Number) l.get(0)).intValue(), ((Number) l.get(1)).intValue());\n"
+                + "    }\n"
+                + "}\n");
+        src.put("jx.ad.Order", "package jx.ad;\n"
+                + "import com.codename1.annotations.*;\n"
+                + "@Mapped public class Order {\n"
+                + "    @JsonAdapter(MoneyAdapter.class) public Money total;\n"
+                + "    public Point at;\n"
+                + "    public java.util.List<Point> path;\n"
+                + "    public Point[] marks;\n"
+                + "    public Order() {}\n"
+                + "}\n");
+        try (URLClassLoader cl = buildAndRegister(src, "jx.ad.Order")) {
+            Class<?> order = cl.loadClass("jx.ad.Order");
+            String json = "{\"total\":\"$150\",\"at\":[1,2],\"path\":[[3,4]],\"marks\":[[5,6]]}";
+            Object o = fromJson(cl, json, order);
+            Object total = order.getField("total").get(o);
+            assertEquals(150L, total.getClass().getField("cents").getLong(total));
+            Object at = order.getField("at").get(o);
+            assertEquals(2, at.getClass().getField("y").getInt(at));
+            assertEquals(json, toJson(cl, o));
+            assertDirectMatchesMap(cl, cl.loadClass("jx.ad.OrderCn1Mapper"),
+                    cl.loadClass("jx.ad.OrderCn1Mapper").newInstance(), o);
+            assertEquals("$.total: bad money", failure(cl, "{\"total\":\"150\"}", order));
+            // The adapter decides what an explicit null is, as on the server.
+            assertEquals("$.total: bad money", failure(cl, "{\"total\":null}", order));
+        }
+    }
+
+    @Test
+    public void jsonCreatorBuildsImmutableClasses() throws Exception {
+        Map<String, String> src = new LinkedHashMap<String, String>();
+        src.put("jx.cr.Imm", "package jx.cr;\n"
+                + "import com.codename1.annotations.*;\n"
+                + "@Mapped public class Imm {\n"
+                + "    private final String name;\n"
+                + "    private final int age;\n"
+                + "    public final String tag;\n"
+                + "    @JsonCreator public Imm(@JsonProperty(\"name\") String name,\n"
+                + "            @JsonProperty(value = \"age\", required = true) int age) {\n"
+                + "        this.name = name; this.age = age; this.tag = \"t\" + age;\n"
+                + "    }\n"
+                + "    public String getName() { return name; }\n"
+                + "    public int getAge() { return age; }\n"
+                + "}\n");
+        src.put("jx.cr.Code", "package jx.cr;\n"
+                + "import com.codename1.annotations.*;\n"
+                + "@Mapped public class Code {\n"
+                + "    public final String v;\n"
+                + "    private Code(String v) { this.v = v; }\n"
+                + "    @JsonCreator public static Code of(@JsonProperty(\"v\") String v) { return new Code(v == null ? \"none\" : v); }\n"
+                + "}\n");
+        try (URLClassLoader cl = buildAndRegister(src, "jx.cr.Imm", "jx.cr.Code")) {
+            Class<?> imm = cl.loadClass("jx.cr.Imm");
+            Object o = fromJson(cl, "{\"name\":\"b\",\"age\":4,\"tag\":\"ignored\"}", imm);
+            assertEquals("b", imm.getMethod("getName").invoke(o));
+            assertEquals(4, imm.getMethod("getAge").invoke(o));
+            assertEquals("t4", imm.getField("tag").get(o));
+            assertEquals("{\"name\":\"b\",\"age\":4,\"tag\":\"t4\"}", toJson(cl, o));
+            assertEquals("$.age: required member is missing", failure(cl, "{\"name\":\"b\"}", imm));
+            o = fromJson(cl, "{\"age\":1}", imm);
+            assertNull(imm.getMethod("getName").invoke(o));
+            Class<?> code = cl.loadClass("jx.cr.Code");
+            Object c = fromJson(cl, "{}", code);
+            assertEquals("none", code.getField("v").get(c));
+        }
+    }
+
+    @Test
+    public void genericFieldResolvesItsTypeArguments() throws Exception {
+        Map<String, String> src = new LinkedHashMap<String, String>();
+        src.put("jx.gen.Page", "package jx.gen;\n"
+                + "@com.codename1.annotations.Mapped public class Page<T> {\n"
+                + "    public java.util.List<T> items;\n"
+                + "    public T first;\n"
+                + "    public T[] more;\n"
+                + "    public int total;\n"
+                + "    public Page() {}\n"
+                + "}\n");
+        src.put("jx.gen.User", "package jx.gen;\n"
+                + "@com.codename1.annotations.Mapped public class User { public String name; public User() {} }\n");
+        src.put("jx.gen.Holder", "package jx.gen;\n"
+                + "@com.codename1.annotations.Mapped public class Holder {\n"
+                + "    public Page<User> page;\n"
+                + "    public Holder() {}\n"
+                + "}\n");
+        try (URLClassLoader cl = buildAndRegister(src, "jx.gen.Page", "jx.gen.User", "jx.gen.Holder")) {
+            Class<?> holder = cl.loadClass("jx.gen.Holder");
+            Class<?> user = cl.loadClass("jx.gen.User");
+            String json = "{\"page\":{\"items\":[{\"name\":\"a\"},{\"name\":\"b\"}],\"first\":{\"name\":\"c\"},"
+                    + "\"more\":[{\"name\":\"d\"}],\"total\":2}}";
+            Object h = fromJson(cl, json, holder);
+            Object page = holder.getField("page").get(h);
+            List<?> items = (List<?>) page.getClass().getField("items").get(page);
+            assertTrue(user.isInstance(items.get(1)));
+            assertEquals("b", user.getField("name").get(items.get(1)));
+            assertTrue(user.isInstance(page.getClass().getField("first").get(page)));
+            Object[] more = (Object[]) page.getClass().getField("more").get(page);
+            assertTrue(user.isInstance(more[0]));
+            assertEquals(json, toJson(cl, h));
+        }
+    }
+
+    @Test
+    public void arraysMapToJsonArrays() throws Exception {
+        Map<String, String> src = new LinkedHashMap<String, String>();
+        src.put("jx.arr.Color", "package jx.arr;\npublic enum Color { RED, GREEN }\n");
+        src.put("jx.arr.Dto", "package jx.arr;\n"
+                + "@com.codename1.annotations.Mapped public class Dto { public String name; public Dto() {} }\n");
+        src.put("jx.arr.Arr", "package jx.arr;\n"
+                + "@com.codename1.annotations.Mapped public class Arr {\n"
+                + "    public int[] nums;\n"
+                + "    public boolean[] flags;\n"
+                + "    public String[] tags;\n"
+                + "    public Dto[] dtos;\n"
+                + "    public Color[] colors;\n"
+                + "    public java.util.Date[] when;\n"
+                + "    public byte[] raw;\n"
+                + "    public Arr() {}\n"
+                + "}\n");
+        try (URLClassLoader cl = buildAndRegister(src, "jx.arr.Dto", "jx.arr.Arr")) {
+            Class<?> arr = cl.loadClass("jx.arr.Arr");
+            String json = "{\"nums\":[1,2],\"flags\":[true,false],\"tags\":[\"a\",null],"
+                    + "\"dtos\":[{\"name\":\"u\"},null],\"colors\":[\"RED\"],\"when\":[5],\"raw\":\"AQI=\"}";
+            Object a = fromJson(cl, json, arr);
+            assertTrue(Arrays.equals(new int[] {1, 2}, (int[]) arr.getField("nums").get(a)));
+            Object[] dtos = (Object[]) arr.getField("dtos").get(a);
+            assertEquals("jx.arr.Dto", dtos.getClass().getComponentType().getName());
+            assertEquals("u", dtos[0].getClass().getField("name").get(dtos[0]));
+            assertEquals(json, toJson(cl, a));
+            assertDirectMatchesMap(cl, cl.loadClass("jx.arr.ArrCn1Mapper"),
+                    cl.loadClass("jx.arr.ArrCn1Mapper").newInstance(), a);
+            assertTrue(failure(cl, "{\"nums\":[1,{}]}", arr).startsWith("$.nums[1]: expected a number"));
+            // Refused, not truncated or dropped, as the server refuses them.
+            assertTrue(failure(cl, "{\"nums\":[1.5]}", arr).startsWith("$.nums[0]: expected a whole number"));
+            assertTrue(failure(cl, "{\"nums\":[3000000000]}", arr).startsWith("$.nums[0]: expected a whole number"));
+            assertTrue(failure(cl, "{\"dtos\":[1]}", arr).startsWith("$.dtos[0]: expected a JSON object"));
+        }
+    }
+
+    @Test
+    public void unsupportedJsonShapesAreBuildErrors() throws Exception {
+        assertBuildError("grid", "jx.err1.Grid", "package jx.err1;\n"
+                + "@com.codename1.annotations.Mapped public class Grid { public int[][] grid; public Grid() {} }\n");
+        assertBuildError("jx.err2.Fmt.name", "jx.err2.Fmt", "package jx.err2;\n"
+                + "import com.codename1.annotations.*;\n"
+                + "@Mapped public class Fmt { @JsonFormat(JsonFormat.Shape.STRING) public String name; public Fmt() {} }\n");
+        assertBuildError("jx.err3.Two", "jx.err3.Two", "package jx.err3;\n"
+                + "import com.codename1.annotations.*;\n"
+                + "@Mapped public class Two {\n"
+                + "    public String a;\n"
+                + "    @JsonCreator public Two(@JsonProperty(\"a\") String a) { this.a = a; }\n"
+                + "    @JsonCreator public static Two of(@JsonProperty(\"a\") String a) { return new Two(a); }\n"
+                + "}\n");
+        assertBuildError("jx.err4.NoName", "jx.err4.NoName", "package jx.err4;\n"
+                + "import com.codename1.annotations.*;\n"
+                + "@Mapped public class NoName {\n"
+                + "    public final String a;\n"
+                + "    @JsonCreator public NoName(String a) { this.a = a; }\n"
+                + "}\n");
+        Map<String, String> src = new LinkedHashMap<String, String>();
+        src.put("jx.err5.Bad", "package jx.err5;\n"
+                + "public class Bad implements com.codename1.annotations.JsonTypeAdapter<String> {\n"
+                + "    public Bad(int x) {}\n"
+                + "    public Object toJson(String s) { return s; }\n"
+                + "    public String fromJson(Object o) { return String.valueOf(o); }\n"
+                + "}\n");
+        src.put("jx.err5.Holder", "package jx.err5;\n"
+                + "import com.codename1.annotations.*;\n"
+                + "@Mapped public class Holder { @JsonAdapter(Bad.class) public String s; public Holder() {} }\n");
+        assertBuildError("jx.err5.Holder.s", src);
+    }
+
+    @Test
+    public void explicitNullAndAbsentMemberFollowTheBackend() throws Exception {
+        Map<String, String> src = new LinkedHashMap<String, String>();
+        src.put("jx.nul.N", "package jx.nul;\n"
+                + "import com.codename1.annotations.*;\n"
+                + "@Mapped public class N {\n"
+                + "    public String note = \"unset\";\n"
+                + "    public int plain = 7;\n"
+                + "    @JsonProperty(required = true) public int must;\n"
+                + "    public java.util.List<Integer> nums;\n"
+                + "    public Integer[] boxes;\n"
+                + "    public N() {}\n"
+                + "}\n");
+        src.put("jx.nul.S", "package jx.nul;\n"
+                + "@com.codename1.annotations.Mapped @com.codename1.annotations.JsonStrict\n"
+                + "public class S { public String note = \"unset\"; public S() {} }\n");
+        try (URLClassLoader cl = buildAndRegister(src, "jx.nul.N", "jx.nul.S")) {
+            Class<?> n = cl.loadClass("jx.nul.N");
+            Object o = fromJson(cl, "{\"must\":1}", n);
+            assertEquals("absent keeps the initializer", "unset", n.getField("note").get(o));
+            o = fromJson(cl, "{\"must\":1,\"note\":null,\"plain\":null,"
+                    + "\"nums\":[1,null],\"boxes\":[2,null]}", n);
+            // Before these options the parser dropped a null member, so a class
+            // that opts into none of them keeps its value exactly as it did.
+            assertEquals("explicit null keeps the value by default", "unset", n.getField("note").get(o));
+            Class<?> strict = cl.loadClass("jx.nul.S");
+            Object so = fromJson(cl, "{\"note\":null}", strict);
+            assertNull("explicit null clears a reference in a @JsonStrict class",
+                    strict.getField("note").get(so));
+            assertEquals("a primitive ignores null", 7, n.getField("plain").getInt(o));
+            assertEquals(Arrays.asList(Integer.valueOf(1), null), n.getField("nums").get(o));
+            assertTrue(Arrays.equals(new Integer[] {2, null}, (Integer[]) n.getField("boxes").get(o)));
+            assertEquals("$.must: expected a value, got null", failure(cl, "{\"must\":null}", n));
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // Helpers for the JSON option tests
+    // ---------------------------------------------------------------
+
+    private URLClassLoader buildAndRegister(Map<String, String> sources, String... mapped) throws Exception {
+        File classes = tmp.newFolder();
+        JavaSourceCompiler.compile(sources, classes, Arrays.asList(testClassesDir()));
+        runProcessorOrFail(classes);
+        URLClassLoader cl = childLoader(classes);
+        for (String m : mapped) {
+            cl.loadClass(m + "Cn1Mapper").getMethod("register").invoke(null);
+        }
+        return cl;
+    }
+
+    private void assertBuildError(String expected, String fqn, String source) throws Exception {
+        assertBuildError(expected, JavaSourceCompiler.singleSource(fqn, source));
+    }
+
+    private void assertBuildError(String expected, Map<String, String> sources) throws Exception {
+        File classes = tmp.newFolder();
+        JavaSourceCompiler.compile(sources, classes, Arrays.asList(testClassesDir()));
+        ProcessorContext ctx = runProcessor(classes);
+        assertTrue("expected a build error naming " + expected, ctx.hasErrors());
+        StringBuilder all = new StringBuilder();
+        for (ProcessorContext.ProcessingError e : ctx.getErrors()) all.append(e).append('\n');
+        assertTrue("error should name " + expected + ": " + all, all.indexOf(expected) >= 0);
+    }
+
+    private static Object fromJson(ClassLoader cl, String json, Class<?> type) throws Exception {
+        try {
+            return cl.loadClass("com.codename1.mapping.Mappers")
+                    .getMethod("fromJson", String.class, Class.class).invoke(null, json, type);
+        } catch (java.lang.reflect.InvocationTargetException e) {
+            if (e.getCause() instanceof Exception) throw (Exception) e.getCause();
+            throw e;
+        }
+    }
+
+    private static String toJson(ClassLoader cl, Object o) throws Exception {
+        return (String) cl.loadClass("com.codename1.mapping.Mappers")
+                .getMethod("toJson", Object.class).invoke(null, o);
+    }
+
+    /// The message of the IllegalArgumentException reading `json` must fail with.
+    private static String failure(ClassLoader cl, String json, Class<?> type) throws Exception {
+        try {
+            fromJson(cl, json, type);
+        } catch (IllegalArgumentException e) {
+            return e.getMessage();
+        }
+        fail("expected " + json + " to be refused");
+        return null;
+    }
 }

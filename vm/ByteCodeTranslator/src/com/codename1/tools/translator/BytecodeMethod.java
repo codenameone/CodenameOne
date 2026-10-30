@@ -2413,8 +2413,8 @@ public class BytecodeMethod implements SignatureSet {
             b.append("\n#if CN1_TAGGED_ACTIVE\n    if(CN1_TAG_CODE(__cn1ThisObject) == CN1_TAG_INTEGER && CN1_TAG_CODE(__cn1Arg1) == CN1_TAG_INTEGER) { return (__cn1ThisObject == __cn1Arg1) ? JAVA_TRUE : JAVA_FALSE; }\n#endif\n    ");
         }
 
-        // An eagerly initialized interface (no <clinit>) had its classToInterfaceMap
-        // rows written in initConstantPool before any Java thread existed, so there is
+        // An eagerly initialized interface (no <clinit>) had its vtable written in
+        // initConstantPool before any Java thread existed, so there is
         // nothing left for this guard to publish -- see
         // ByteCodeClass.isEagerInitEligible.
         if(includeStaticInitializer && !ByteCodeClass.eagerInit(cls)) {
@@ -2432,9 +2432,9 @@ public class BytecodeMethod implements SignatureSet {
             // self time doing nothing but returning.
             //
             // The flag is the right thing to test and the ordering is not incidental:
-            // class__X.initialized is RELEASE-stored after the vtable and the
-            // classToInterfaceMap rows are written, and this thunk is about to index
-            // exactly those rows -- so the ACQUIRE load here is what makes them visible.
+            // class__X.initialized is RELEASE-stored after the interface's vtable is
+            // written, and this thunk may read it -- so the ACQUIRE load here is what
+            // makes it visible. (The dispatch map itself is constant data.)
             // Testing __X_LOADED__ instead would be a weaker gate that publishes
             // nothing; that distinction is why the inline guards were moved onto this
             // flag in the first place.
@@ -2450,8 +2450,8 @@ public class BytecodeMethod implements SignatureSet {
         // CN1_CLASS_OF is not a field load when tagged values are compiled in: it
         // masks the pointer, tests the tag and selects between a proxy and the object
         // before it loads anything. The interface form of this thunk used it twice --
-        // once for the vtable and once for the classId that indexes
-        // classToInterfaceMap -- so resolving it once here removes that work from
+        // once for the vtable and once for the classId that indexes the
+        // interface map -- so resolving it once here removes that work from
         // every interface dispatch, which is the hottest indirect call the VM makes.
         // Skip the tagged resolve where a tagged value cannot arrive: this thunk only
         // ever sees objects whose class is its owner or below, and a boxed immediate
@@ -2467,7 +2467,7 @@ public class BytecodeMethod implements SignatureSet {
         /* A SWITCH ON THE CLASS ID, ahead of the indirect dispatch below.
          *
          * The indirect form is six dependent loads -- class pointer, class id, the
-         * classToInterfaceMap row, the offset within it, the vtable, the slot -- and
+         * interface map row, the offset within it, the vtable, the slot -- and
          * then a branch the C compiler cannot see through, so nothing on either side
          * of the call is optimised across it. The switch is ONE load and a jump table,
          * and every arm is a named callee that ThinLTO can inline.
@@ -2851,10 +2851,30 @@ public class BytecodeMethod implements SignatureSet {
         return -1;
     }
 
+    /// The instruction that produced the value on top of the operand stack just
+    /// before `from + 1`, or -1 when no single instruction did.
+    ///
+    /// Stops at a jump target, like srNextRealNoJoin: past a join the value can
+    /// arrive from a predecessor that never executed the instruction before the
+    /// label. javac compiles `for (x : c ? a : b)` to
+    ///
+    ///     IFEQ L2 ; <a> ; GOTO L3 ; L2: ALOAD b ; L3: INVOKE iterator
+    ///
+    /// and skipping L3 made `ALOAD b` the loop's receiver: intrinsifyForEach
+    /// folded it into the setup and deleted it from the else branch, so the
+    /// loop always walked `b` -- a NullPointerException when `b` was null and
+    /// `c` true -- while the value `a` pushed was never popped. Every caller
+    /// pairs a consumer with its producer, so none may look through a join.
     private int prevExecutable(int from) {
         for (int i = from; i >= 0; i--) {
             Instruction ins = instructions.get(i);
-            if (ins instanceof LabelInstruction || ins instanceof LineNumber || ins instanceof TryCatch) {
+            if (ins instanceof LabelInstruction) {
+                if (LabelInstruction.isJumpTarget(((LabelInstruction) ins).getLabel())) {
+                    return -1;
+                }
+                continue;
+            }
+            if (ins instanceof LineNumber || ins instanceof TryCatch) {
                 continue;
             }
             return i;
@@ -2961,15 +2981,14 @@ public class BytecodeMethod implements SignatureSet {
                     || !"()Ljava/util/Iterator;".equals(inv.getDesc())) {
                 continue;
             }
+            // -1 when the receiver arrives through a join (a `?:`): there is no
+            // one producer to fold, and the loop reads it off the stack below.
             int recvIdx = prevExecutable(i - 1);
-            if (recvIdx < 0) {
-                continue;
-            }
             // Fold an expression when it is already available. Raw stack
             // producers remain in the IR and use a non-assignable consumer,
             // so later expression folding cannot discard their evaluation.
             StringBuilder recvCode = new StringBuilder();
-            Instruction recv = instructions.get(recvIdx);
+            Instruction recv = recvIdx < 0 ? null : instructions.get(recvIdx);
             Invoke foldedMapView = null;
             int viewIndex = -1;
             if (recv instanceof Invoke) {

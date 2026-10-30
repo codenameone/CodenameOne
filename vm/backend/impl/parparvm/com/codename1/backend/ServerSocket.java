@@ -163,6 +163,18 @@ public final class ServerSocket {
         return rc > 0;
     }
 
+    /// Parks the calling virtual thread until the socket is readable, without
+    /// asking first. For a caller that already knows nothing is there -- its last
+    /// read came back short or would have blocked -- so a probe could only answer
+    /// "not yet". Off a virtual thread this is [#awaitReadable] with no deadline.
+    public static boolean parkUntilReadable(int fd) throws IOException {
+        return awaitReadable(fd, PARK_WITHOUT_PROBE);
+    }
+
+    /// The timeout [#parkUntilReadable] hands the native: park on a virtual thread
+    /// with no probe, wait with no deadline on a platform thread.
+    private static final int PARK_WITHOUT_PROBE = -2;
+
     /// -1 at end of stream, as InputStream does.
     public static int read(int fd, byte[] buffer, int offset, int length) throws IOException {
         checkRange(buffer, offset, length);

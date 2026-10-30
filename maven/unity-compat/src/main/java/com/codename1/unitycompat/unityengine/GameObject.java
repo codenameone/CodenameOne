@@ -27,7 +27,7 @@ import java.util.ArrayList;
 
 /// `UnityEngine.GameObject`: a named bag of components with a transform.
 @SuppressWarnings("PMD.MethodNamingConventions") // C# member names: translated code binds to them by name
-public final class GameObject extends Object {
+public final class GameObject extends Object { // NOPMD ExtendsObject - UnityEngine.Object, not java.lang.Object
     final ArrayList components = new ArrayList();
     final Transform transform;
     boolean active = true;

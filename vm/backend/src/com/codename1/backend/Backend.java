@@ -26,6 +26,7 @@ import com.codename1.backend.metrics.MetricReader;
 import com.codename1.backend.orm.EntityDefinition;
 import com.codename1.backend.orm.EntityManager;
 import com.codename1.impl.backend.BackendApplication;
+import com.codename1.impl.backend.JsonCodec;
 import com.codename1.impl.backend.Management;
 import com.codename1.impl.backend.RequestSecurity;
 import com.codename1.impl.backend.WiringEnvironment;
@@ -78,6 +79,10 @@ public final class Backend {
         // First, so code in another package reaching for the internals while
         // anything below initializes still finds them.
         com.codename1.impl.backend.BackendAccess.install(new Access());
+        // The class library's host: MessageDigest and SecureRandom ask it for
+        // digests and random bytes on a ParparVM server (a no-op on the JDK).
+        ClassLibraryHost.install();
+        Crypto.installCryptoEngine();
     }
 
     private final HttpServer server;
@@ -1795,6 +1800,8 @@ public final class Backend {
         /// waiting. Tests want this; a process wants [#run].
         public Backend start() throws Exception {
             claimProcess();
+            // Before the application's started() callback, which may open a pin.
+            BoardHardware.install();
             Backend running = null;
             try {
                 running = startOnce();
@@ -2214,6 +2221,9 @@ public final class Backend {
                         }
                     };
                 }
+                JsonCodec.setMaxDepth(config.getInt(
+                        JsonCodec.MAX_DEPTH_SETTING,
+                        JsonCodec.MAX_DEPTH));
                 Cors cors = Cors.fromConfig(config);
                 if (cors != null) {
                     // Whether a request arrives over TLS, for telling a same-origin

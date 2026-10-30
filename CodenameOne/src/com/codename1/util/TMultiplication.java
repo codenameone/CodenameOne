@@ -18,6 +18,7 @@
 package com.codename1.util;
 
 /// Static library that provides all multiplication of `TBigInteger` methods.
+@com.codename1.impl.SharedWithBackend
 final class TMultiplication {
 
     /// Break point in digits (number of `int` elements)

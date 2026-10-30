@@ -28,8 +28,25 @@
 ///   authenticator application shows. Being the same class the client runs,
 ///   a code made on a device is the code a server expects.
 /// - [Base32] -- the encoding an authenticator's shared secret travels in.
-/// - [Hash] / [Hmac] -- MD5, SHA-1 and the SHA-2 family, and HMAC over each,
-///   written in Java. They are what [Otp] computes with.
+/// - [Hash] / [Hmac] -- MD5, SHA-1, the SHA-2 family, SHA3-256 and Keccak-256
+///   (Ethereum's hash), and HMAC over each, written in Java. They are what
+///   [Otp] computes with.
+/// - [Secp256k1] -- ECDSA over the curve of Bitcoin and Ethereum: key
+///   derivation, deterministic low-S signing, verification and public key
+///   recovery. A server can sign a chain transaction, or check the signature
+///   a wallet made on the device, with the class the device used.
+/// - [Schnorr] and [Ed25519] -- BIP-340 signatures (Bitcoin's Taproot) and
+///   RFC 8032 signatures (Solana and many protocols beside).
+/// - [Pbkdf2] -- the key derivation behind a BIP-39 recovery phrase.
+/// - [CryptoBatch] -- many verifications or hashes in one call: the deposits
+///   of a block an exchange scans. Each entry gets the single call's answer.
+/// - [CertificateRequest] -- PKCS#10 certificate signing requests. A headless
+///   device enrolls for its mutual TLS client certificate with it, signing
+///   through [com.codename1.backend.Crypto].
+///
+/// Where native kernels are compiled in -- a packaged ParparVM server -- the
+/// curves, the hashes and the batches run in C through [CryptoEngine], a
+/// batch on every core; the bytes are the same as the Java implementation's.
 ///
 /// A server reaches for these to verify a second factor and for little else.
 /// What a request path computes -- a password hash, a token's signature, a

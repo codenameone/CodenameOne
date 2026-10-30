@@ -25,7 +25,7 @@ package com.codename1.unitycompat.system.collections.generic;
 import com.codename1.unitycompat.system.collections.IEnumerable;
 
 /// `System.Collections.Generic.IEnumerable<T>`.
-@SuppressWarnings("PMD.MethodNamingConventions") // C# member names: translated code binds to them by name
+@SuppressWarnings({"PMD.MethodNamingConventions", "PMD.ClassNamingConventions"}) // C# member and type names: translated code binds to them by name
 public interface IEnumerable_1 extends IEnumerable {
     @Override
     IEnumerator_1 GetEnumerator();

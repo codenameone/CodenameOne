@@ -695,7 +695,7 @@ class TBigDecimal {
     /// The number of trailing zeros.
     ///
     static int numberOfTrailingZeros(long lng) {
-        return bitCount((lng & -lng) - 1);
+        return TBitLevel.numberOfTrailingZeros(lng);
     }
 
     /// Determines the number of leading zeros in the `long` passed
@@ -731,14 +731,7 @@ class TBigDecimal {
     /// The number of 1 bits.
     ///
     static int bitCount(long lng) {
-        lng = (lng & 0x5555555555555555L) + ((lng >> 1) & 0x5555555555555555L);
-        lng = (lng & 0x3333333333333333L) + ((lng >> 2) & 0x3333333333333333L);
-        // adjust for 64-bit integer
-        int i = (int) ((lng >>> 32) + lng);
-        i = (i & 0x0F0F0F0F) + ((i >> 4) & 0x0F0F0F0F);
-        i = (i & 0x00FF00FF) + ((i >> 8) & 0x00FF00FF);
-        i = (i & 0x0000FFFF) + ((i >> 16) & 0x0000FFFF);
-        return i;
+        return TBitLevel.bitCount(lng);
     }
 
     /// The `signum` function for `long` values. This
@@ -758,10 +751,7 @@ class TBigDecimal {
     }
 
     static char forDigit(int digit, int radix) {
-        if (radix < 2 || radix > 36 || digit >= radix) {
-            return '\0';
-        }
-        return digit < 10 ? (char) ('0' + digit) : (char) ('a' + digit - 10);
+        return TBitLevel.forDigit(digit, radix);
     }
 
     /// Determines the highest (leftmost) bit that is 1 and returns the value
@@ -1039,7 +1029,7 @@ class TBigDecimal {
         if (smallValue < 0) {
             smallValue = ~smallValue;
         }
-        return 32 - numberOfLeadingZeros(smallValue);
+        return 32 - TBitLevel.numberOfLeadingZeros(smallValue);
     }
 
     /// Returns a new `BigDecimal` whose value is `this + augend`.

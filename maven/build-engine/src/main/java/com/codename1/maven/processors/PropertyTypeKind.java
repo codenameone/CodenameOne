@@ -71,6 +71,19 @@ public final class PropertyTypeKind {
         return new PropertyTypeKind(Kind.ENUM, binaryName, null);
     }
 
+    /// A reference to another (presumably mapped) class, for a type the
+    /// classifier did not see as a field descriptor -- a resolved type
+    /// argument or an array element.
+    public static PropertyTypeKind reference(String binaryName) {
+        return new PropertyTypeKind(Kind.REFERENCE, binaryName, null);
+    }
+
+    /// A `java.util.List` of `elementBinaryName`, for a list whose element
+    /// type was resolved from a type argument.
+    public static PropertyTypeKind list(String elementBinaryName) {
+        return new PropertyTypeKind(Kind.LIST, "java.util.List", elementBinaryName);
+    }
+
     public static PropertyTypeKind scalar(String binary) {
         String[] types={"java.lang.String","java.lang.Integer","java.lang.Long","java.lang.Short","java.lang.Byte","java.lang.Character","java.lang.Double","java.lang.Float","java.lang.Boolean","java.util.Date","byte[]"};
         Kind[] kinds={Kind.STRING,Kind.INT,Kind.LONG,Kind.SHORT,Kind.BYTE,Kind.CHAR,Kind.DOUBLE,Kind.FLOAT,Kind.BOOLEAN,Kind.DATE,Kind.BYTE_ARRAY};
@@ -78,7 +91,12 @@ public final class PropertyTypeKind {
         return new PropertyTypeKind(Kind.UNSUPPORTED,binary,null);
     }
     public static PropertyTypeKind of(FieldInfo field) {
-        String desc = field.getDescriptor();
+        return of(field.getDescriptor(), field.getSignature());
+    }
+
+    /// Classifies a type given as a descriptor and optional generic signature,
+    /// for a type that is not a field of its own -- an array element.
+    public static PropertyTypeKind of(String desc, String signature) {
         if (desc == null || desc.length() == 0) {
             return new PropertyTypeKind(Kind.UNSUPPORTED, "?", null);
         }
@@ -142,7 +160,7 @@ public final class PropertyTypeKind {
                     || "com.codename1.properties.BooleanProperty".equals(binary)
                     || "com.codename1.properties.ByteProperty".equals(binary)
                     || "com.codename1.properties.CharProperty".equals(binary)) {
-                String elem = firstGenericArg(field.getSignature());
+                String elem = firstGenericArg(signature);
                 if (!"com.codename1.properties.Property".equals(binary) || elem == null) {
                     // Typed subclasses carry the owner, not the value, as their generic argument:
                     if ("com.codename1.properties.StringProperty".equals(binary)) elem = "java.lang.String";
@@ -159,12 +177,12 @@ public final class PropertyTypeKind {
             }
             if ("com.codename1.properties.ListProperty".equals(binary)
                     || "com.codename1.properties.SetProperty".equals(binary)) {
-                String elem = firstGenericArg(field.getSignature());
+                String elem = firstGenericArg(signature);
                 if (elem == null) elem = "java.lang.String";
                 return new PropertyTypeKind(Kind.LIST_PROPERTY, binary, elem);
             }
             if ("java.util.List".equals(binary) || "java.util.ArrayList".equals(binary)) {
-                String elem = firstGenericArg(field.getSignature());
+                String elem = firstGenericArg(signature);
                 if (elem == null) elem = "java.lang.String";
                 return new PropertyTypeKind(Kind.LIST, binary, elem);
             }

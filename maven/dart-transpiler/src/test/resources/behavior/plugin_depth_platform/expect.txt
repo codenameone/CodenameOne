@@ -1,0 +1,22 @@
+recording true
+ops 1 recording false
+image 4x3
+png 137 80 78 71
+marker bytes 119 true
+raw 48
+azure 210.0 rgb 65280
+rose 330.0
+bytes true default -1.0
+marker icon 210.0
+line p 4 circle c 100.0
+launched false null
+sound bells /notification_sound_bells.mp3
+perm true
+shown
+before AuthorizationStatus.notDetermined
+provisional AuthorizationStatus.provisional
+full AuthorizationStatus.authorized
+initial null
+appcheck null
+auto false
+limited failed

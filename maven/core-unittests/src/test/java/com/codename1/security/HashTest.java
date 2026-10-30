@@ -1,6 +1,24 @@
 /*
  * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
- * Distributed under the same terms as the rest of Codename One.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
  */
 package com.codename1.security;
 
@@ -80,5 +98,94 @@ class HashTest {
     void hexRoundTrip() {
         byte[] random = new byte[] { (byte)0x00, (byte)0x7f, (byte)0x80, (byte)0xff, 0x12, 0x34 };
         assertArrayEquals(random, Hash.fromHex(Hash.toHex(random)));
+    }
+
+    // ----------------------------------------------------------------
+    // Keccak-256 (Ethereum) and SHA3-256 (FIPS 202) share the sponge and
+    // differ only in the padding byte, so each gets its own known answers.
+
+    @Test
+    void keccak256_emptyAndShort() {
+        // the Keccak-256 of the empty string every Ethereum client prints
+        assertEquals("c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470",
+                Hash.toHex(Hash.keccak256(new byte[0])));
+        assertEquals("4e03657aea45a94fc7d47ba826c8d667c0d1e6e33a64a036ec44f58fa12d6c45",
+                Hash.toHex(Hash.keccak256(ascii("abc"))));
+        assertEquals("5f16f4c7f149ac4f9510d9cf8cf384038ad348b3bcdc01915f95de12df9d1b02",
+                Hash.toHex(Hash.keccak256(ascii("testing"))));
+        assertEquals("4d741b6f1eb29cb2a9b9911c82f56fa8d73b04959d3d9d222895df6c0b28aa15",
+                Hash.toHex(Hash.keccak256(ascii("The quick brown fox jumps over the lazy dog"))));
+    }
+
+    @Test
+    void keccak256_isNotSha3() {
+        // FIPS 202 appendix vectors: the 0x06 domain byte changes everything
+        assertEquals("a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a",
+                Hash.toHex(Hash.create(Hash.SHA3_256).digest(new byte[0])));
+        assertEquals("3a985da74fe225b2045c172d6bd390bd855f086e3e9d525b46bfe24511431532",
+                Hash.toHex(Hash.create(Hash.SHA3_256).digest(ascii("abc"))));
+        assertEquals(32, Hash.create(Hash.KECCAK256).digestLength());
+    }
+
+    @Test
+    void sha3_256_millionA_multiBlock() {
+        byte[] data = new byte[1_000_000];
+        for (int i = 0; i < data.length; i++) data[i] = 'a';
+        // NIST SHA3-256("a" * 1_000_000): over seven thousand sponge blocks
+        assertEquals("5c8875ae474a3634ba4fd55ec85bffd661f32aca75c6d699d0cdcb6c115891c1",
+                Hash.toHex(Hash.create(Hash.SHA3_256).digest(data)));
+    }
+
+    @Test
+    void keccak256_streamingMatchesOneShotAcrossBlockBoundaries() {
+        // 1000 bytes is seven full 136-byte blocks and a partial one; feed it
+        // in chunk sizes that straddle every boundary
+        byte[] data = new byte[1000];
+        for (int i = 0; i < data.length; i++) data[i] = (byte) (i * 7 + 3);
+        byte[] expected = Hash.keccak256(data);
+        for (int chunk : new int[] { 1, 5, 135, 136, 137, 300 }) {
+            Hash h = Hash.create(Hash.KECCAK256);
+            for (int off = 0; off < data.length; off += chunk) {
+                h.update(data, off, Math.min(chunk, data.length - off));
+            }
+            assertArrayEquals(expected, h.digest(), "chunk " + chunk);
+        }
+        Hash byteAtATime = Hash.create(Hash.KECCAK256);
+        for (byte b : data) byteAtATime.update(b);
+        assertArrayEquals(expected, byteAtATime.digest());
+    }
+
+    @Test
+    void hmacKeccak256_usesTheSpongeRate() {
+        // HMAC over a sponge pads the key to the rate (136 bytes); a key of
+        // exactly that length is used as it is, one byte longer is hashed first
+        byte[] key136 = new byte[136];
+        byte[] key137 = new byte[137];
+        for (int i = 0; i < key137.length; i++) key137[i] = (byte) i;
+        System.arraycopy(key137, 0, key136, 0, 136);
+        byte[] msg = ascii("message");
+        byte[] direct = Hmac.create(Hash.KECCAK256, key136).doFinal(msg);
+        byte[] viaHashedKey = Hmac.create(Hash.KECCAK256, Hash.keccak256(key137)).doFinal(msg);
+        assertArrayEquals(viaHashedKey, Hmac.create(Hash.KECCAK256, key137).doFinal(msg));
+        assertFalse(java.util.Arrays.equals(direct, viaHashedKey));
+    }
+
+    @Test
+    void ripemd160_referenceVectors() {
+        // The RIPEMD-160 authors' published test vectors
+        assertEquals("9c1185a5c5e9fc54612808977ee8f548b2258d31", Hash.toHex(Hash.ripemd160(new byte[0])));
+        assertEquals("0bdc9d2d256b3ee9daae347be6f4dc835a467ffe", Hash.toHex(Hash.ripemd160(ascii("a"))));
+        assertEquals("8eb208f7e05d987a9b044a8e98c6b087f15a0bfc", Hash.toHex(Hash.ripemd160(ascii("abc"))));
+        assertEquals("5d0689ef49d2fae572b881b123a85ffa21595f36",
+                Hash.toHex(Hash.ripemd160(ascii("message digest"))));
+        byte[] million = new byte[1000000];
+        java.util.Arrays.fill(million, (byte) 'a');
+        assertEquals("52783243c1697bdbe16d37f97f68f08325dc1528", Hash.toHex(Hash.ripemd160(million)));
+    }
+
+    @Test
+    void hash160_isRipemdOfSha256() {
+        byte[] in = ascii("abc");
+        assertArrayEquals(Hash.ripemd160(Hash.sha256(in)), Hash.hash160(in));
     }
 }

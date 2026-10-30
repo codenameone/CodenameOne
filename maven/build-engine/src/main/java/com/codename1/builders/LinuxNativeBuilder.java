@@ -80,9 +80,15 @@ public class LinuxNativeBuilder extends Executor {
     /// Whether the application touches com.codename1.db. Held as a field because the class scan
     /// and the stub generation happen in different methods.
     private boolean usesDatabase;
+    /// Whether the application's classes use the elliptic-curve or Keccak APIs, so the translator
+    /// compiles in the native crypto kernels (`-Dcn1.cryptoKernels`).
+    private boolean usesCryptoKernels;
     /** Supported target architectures for {@code linux.arch}. */
     public static final String ARCH_X64 = "x64";
     public static final String ARCH_ARM64 = "arm64";
+    /// 32-bit ARM, hard-float (armhf). Embedded boards on a 32-bit OS.
+    public static final String ARCH_ARMV7 = "armv7";
+    public static final String ARCH_RISCV64 = "riscv64";
 
     private File resultDir;
     private File linuxExecutable;
@@ -137,6 +143,12 @@ public class LinuxNativeBuilder extends Executor {
         if (a.equals("x64") || a.equals("x86_64") || a.equals("amd64") || a.equals("x86-64")) {
             return ARCH_X64;
         }
+        if (a.equals("armv7") || a.equals("armhf") || a.equals("arm") || a.equals("armv7l")) {
+            return ARCH_ARMV7;
+        }
+        if (a.equals("riscv64") || a.equals("riscv")) {
+            return ARCH_RISCV64;
+        }
         // Unknown values fall back to x64 rather than failing the build.
         return ARCH_X64;
     }
@@ -149,7 +161,15 @@ public class LinuxNativeBuilder extends Executor {
      * (Alpine). A glibc binary and a musl binary are not interchangeable.
      */
     public static String targetTriple(String arch, boolean musl) {
-        String a = ARCH_ARM64.equals(normalizeArch(arch)) ? "aarch64" : "x86_64";
+        String n = normalizeArch(arch);
+        if (ARCH_ARMV7.equals(n)) {
+            return musl ? "arm-linux-musleabihf" : "arm-linux-gnueabihf.2.28";
+        }
+        if (ARCH_RISCV64.equals(n)) {
+            // glibc gained riscv64 in 2.27; 2.28 is still the floor.
+            return musl ? "riscv64-linux-musl" : "riscv64-linux-gnu.2.28";
+        }
+        String a = ARCH_ARM64.equals(n) ? "aarch64" : "x86_64";
         return musl ? (a + "-linux-musl") : (a + "-linux-gnu.2.28");
     }
 
@@ -182,7 +202,51 @@ public class LinuxNativeBuilder extends Executor {
         if (a.contains("aarch64") || a.contains("arm64")) {
             return ARCH_ARM64;
         }
+        if (a.startsWith("arm")) {
+            return ARCH_ARMV7;
+        }
+        if (a.contains("riscv64")) {
+            return ARCH_RISCV64;
+        }
         return ARCH_X64;
+    }
+
+    /// True for `linux.embedded=true`: the application owns the screen through
+    /// DRM/KMS or fbdev with no window system and no GTK (see
+    /// `cn1_linux_embedded.c`).
+    static boolean isEmbeddedRequested(BuildRequest request) {
+        return "true".equalsIgnoreCase(request.getArg("linux.embedded", "false"));
+    }
+
+    /// Preprocessor defaults the embedded display unit reads when the matching
+    /// `CN1_*` environment variable is not set on the device: the board profile's,
+    /// overridden by the individual hints.
+    static String embeddedDefines(BuildRequest request, EmbeddedBoardProfile profile) {
+        String display = EmbeddedBoardProfile.normalizeDisplay(
+                request.getArg("linux.embedded.display", profile.display));
+        int rotation = EmbeddedBoardProfile.normalizeRotation(
+                parseIntOr(request.getArg("linux.embedded.rotation", null), profile.rotation));
+        int dpi = Math.max(0, parseIntOr(request.getArg("linux.embedded.dpi", null), profile.dpi));
+        return "CN1_DEFAULT_DISPLAY_NAME=" + display + ";CN1_DEFAULT_ROTATION=" + rotation
+                + ";CN1_DEFAULT_DPI=" + dpi;
+    }
+
+    /// True when the embedded build compiles the GPU renderer: the
+    /// `linux.embedded.renderer` hint, or the board profile's default.
+    static boolean isGpuRenderer(BuildRequest request, EmbeddedBoardProfile profile) {
+        return EmbeddedBoardProfile.RENDERER_GPU.equals(EmbeddedBoardProfile.normalizeRenderer(
+                request.getArg("linux.embedded.renderer", null), profile.renderer));
+    }
+
+    private static int parseIntOr(String value, int def) {
+        if (value == null || value.trim().isEmpty()) {
+            return def;
+        }
+        try {
+            return Integer.parseInt(value.trim());
+        } catch (NumberFormatException ex) {
+            return def;
+        }
     }
 
     @Override
@@ -192,7 +256,14 @@ public class LinuxNativeBuilder extends Executor {
 
     @Override
     public boolean build(File sourceZip, BuildRequest request) throws BuildException {
-        String arch = normalizeArch(request.getArg("linux.arch", ARCH_X64));
+        boolean embedded = isEmbeddedRequested(request);
+        EmbeddedBoardProfile board = EmbeddedBoardProfile.forBoard(request.getArg("linux.embedded.board", null));
+        // A board implies its architecture; linux.arch still wins when given.
+        String arch = normalizeArch(request.getArg("linux.arch", embedded ? board.arch : ARCH_X64));
+        if (embedded) {
+            log("Embedded Linux target, board profile " + board.name + " (" + board.description + "), "
+                    + (isGpuRenderer(request, board) ? "GPU" : "software") + " renderer");
+        }
         log("Building native Linux app for arch=" + arch + " (triple " + targetTriple(arch, isMuslRequested(request)) + ")");
 
         File tmpFile = getBuildDirectory();
@@ -290,6 +361,7 @@ public class LinuxNativeBuilder extends Executor {
             throw new BuildException("Failed to scan for database usage", ex);
         }
         usesDatabase = databaseUsage.usesDatabase();
+        usesCryptoKernels = databaseUsage.usesCryptoKernels();
         final boolean usesDatabaseCipher = databaseUsage.usesDatabaseCipher();
 
         // Native interface binding + app bootstrap (see WindowsNativeBuilder for the
@@ -362,7 +434,9 @@ public class LinuxNativeBuilder extends Executor {
             parparCmd.add("-Xmx" + heapMB + "m");
         }
         parparCmd.add("-Dcn1.sqlite=" + usesDatabase);
+        parparCmd.add("-Dcn1.cryptoKernels=" + usesCryptoKernels);
         parparCmd.add("-Dcn1.sqlcipher=" + usesDatabaseCipher);
+        parparCmd.add("-Dcn1.linux.embedded=" + embedded);
         NativeVerifyOption.addTo(parparCmd, request, "linux");
         parparCmd.add("-jar");
         parparCmd.add(parparVMCompilerJar.getAbsolutePath());
@@ -439,6 +513,16 @@ public class LinuxNativeBuilder extends Executor {
         // Drive the .incbin ASM unit through the same compiler so a zig cc wrapper
         // links the whole binary.
         configure.add("-DCMAKE_ASM_COMPILER=" + cc);
+        if (embedded) {
+            configure.add("-DCN1_EXTRA_DEFINES=" + embeddedDefines(request, board));
+            configure.add("-DCN1_EMBEDDED_GPU=" + (isGpuRenderer(request, board) ? "ON" : "OFF"));
+        }
+        // A board's own sysroot (Yocto SDK, Buildroot staging, a Pi OS image's
+        // root): headers and pkg-config data for the target architecture.
+        String sysroot = request.getArg("linux.sysroot", null);
+        if (sysroot != null && !sysroot.trim().isEmpty()) {
+            configure.add("-DCMAKE_TOOLCHAIN_FILE=" + writeSysrootToolchain(sysroot.trim(), arch).getAbsolutePath());
+        }
 
         try {
             if (!exec(cmakeRoot, 1800000, configure.toArray(new String[0]))) {
@@ -532,6 +616,35 @@ public class LinuxNativeBuilder extends Executor {
                 + "The binary will require the build host's glibc version -- install zig for a "
                 + "portable old-glibc binary.");
         return "cc";
+    }
+
+    /// A CMake toolchain file that points the compiler and pkg-config at a
+    /// target sysroot, so the cairo/pango/drm the embedded build links are the
+    /// board's and not the build host's.
+    private File writeSysrootToolchain(String sysroot, String arch) {
+        String n = normalizeArch(arch);
+        String multiarch = ARCH_ARM64.equals(n) ? "aarch64-linux-gnu"
+                : ARCH_ARMV7.equals(n) ? "arm-linux-gnueabihf"
+                : ARCH_RISCV64.equals(n) ? "riscv64-linux-gnu" : "x86_64-linux-gnu";
+        File file = new File(getBuildDirectory(), "sysroot-toolchain.cmake");
+        String root = sysroot.replace("\\", "/");
+        StringBuilder sb = new StringBuilder();
+        sb.append("set(CMAKE_SYSTEM_NAME Linux)\n");
+        sb.append("set(CMAKE_SYSROOT \"").append(root).append("\")\n");
+        sb.append("set(CMAKE_FIND_ROOT_PATH \"").append(root).append("\")\n");
+        sb.append("set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)\n");
+        sb.append("set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)\n");
+        sb.append("set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)\n");
+        sb.append("set(ENV{PKG_CONFIG_SYSROOT_DIR} \"").append(root).append("\")\n");
+        sb.append("set(ENV{PKG_CONFIG_LIBDIR} \"").append(root).append("/usr/lib/pkgconfig:")
+                .append(root).append("/usr/share/pkgconfig:")
+                .append(root).append("/usr/lib/").append(multiarch).append("/pkgconfig\")\n");
+        try (OutputStream out = new FileOutputStream(file)) {
+            out.write(sb.toString().getBytes(StandardCharsets.UTF_8));
+        } catch (IOException ex) {
+            throw new BuildException("Failed to write the sysroot toolchain file", ex);
+        }
+        return file;
     }
 
     /**

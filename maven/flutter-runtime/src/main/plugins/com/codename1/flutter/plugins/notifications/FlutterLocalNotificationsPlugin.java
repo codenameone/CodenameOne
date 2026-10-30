@@ -39,11 +39,22 @@ import dart.runtime.Funcs;
  * {@code onDidReceiveNotificationResponse} callback through {@link #notificationTapped},
  * which the imported app's entry point calls from its LocalNotificationCallback.
  * Notifications are identified to the platform as {@code "cn1flutter-" + id}.
+ *
+ * <p>{@code onDidReceiveBackgroundNotificationResponse} is called too, for a tap that
+ * reaches the app while it is minimized or before its first form is shown (Codename One
+ * has no background isolate, so it runs on the app's own thread, before the foreground
+ * callback). {@code resolvePlatformSpecificImplementation} answers this object for every
+ * platform type; {@code createNotificationChannel} records the channel's sound
+ * ({@link RawResourceAndroidNotificationSound}) and a notification shown on that channel
+ * plays it. Channel importance, lights and vibration are accepted and not applied:
+ * LocalNotification has no channel of its own.
  */
 public class FlutterLocalNotificationsPlugin {
     private static final String PREFIX = "cn1flutter-";
     private static final Map<String, String> PAYLOADS = new HashMap<String, String>();
     private static Funcs.VoidFunc1<NotificationResponse> onTap;
+    private static Funcs.VoidFunc1<NotificationResponse> onBackgroundTap;
+    private static final Map<String, String> CHANNEL_SOUNDS = new HashMap<String, String>();
     private static NotificationResponse launchResponse;
     private static int shown;
 
@@ -52,8 +63,9 @@ public class FlutterLocalNotificationsPlugin {
 
     public Future<Boolean> initialize(NotificationOptions settings,
             Funcs.VoidFunc1<NotificationResponse> onDidReceiveNotificationResponse,
-            Object onDidReceiveBackgroundNotificationResponse) {
+            Funcs.VoidFunc1<NotificationResponse> onDidReceiveBackgroundNotificationResponse) {
         onTap = onDidReceiveNotificationResponse;
+        onBackgroundTap = onDidReceiveBackgroundNotificationResponse;
         return Future.value(Boolean.TRUE);
     }
 
@@ -70,6 +82,12 @@ public class FlutterLocalNotificationsPlugin {
         }
         NotificationResponse response = new NotificationResponse(id, payload(notificationId));
         Funcs.VoidFunc1<NotificationResponse> cb = onTap;
+        Funcs.VoidFunc1<NotificationResponse> bg = onBackgroundTap;
+        boolean background = !Display.isInitialized() || Display.getInstance().getCurrent() == null
+                || Display.getInstance().isMinimized();
+        if (background && bg != null) {
+            bg.call(response);
+        }
         if (cb != null) {
             cb.call(response);
         } else {
@@ -145,9 +163,9 @@ public class FlutterLocalNotificationsPlugin {
         n.setId(key);
         n.setAlertTitle(title == null ? "" : title);
         n.setAlertBody(body == null ? "" : body);
-        Object sound = details == null ? null : details.find("sound");
-        if (sound instanceof String) {
-            n.setAlertSound((String) sound);
+        String sound = soundOf(details);
+        if (sound != null) {
+            n.setAlertSound(sound);
         }
         Object badge = details == null ? null : details.find("badgeNumber");
         if (badge instanceof Number) {
@@ -155,6 +173,33 @@ public class FlutterLocalNotificationsPlugin {
         }
         n.setForeground(true);
         Display.getInstance().scheduleLocalNotification(n, at, repeat);
+    }
+
+    /// The sound a notification plays: its own, else its Android channel's.
+    static String soundOf(NotificationOptions details) {
+        if (details == null) {
+            return null;
+        }
+        String own = soundPath(details.find("sound"));
+        if (own != null) {
+            return own;
+        }
+        Object android = details.get("android");
+        Object channel = android instanceof NotificationOptions
+                ? ((NotificationOptions) android).get("arg0") : details.get("arg0");
+        return channel instanceof String ? CHANNEL_SOUNDS.get(channel) : null;
+    }
+
+    private static String soundPath(Object sound) {
+        if (sound instanceof RawResourceAndroidNotificationSound) {
+            return ((RawResourceAndroidNotificationSound) sound).alertSoundPath();
+        }
+        return sound instanceof String ? (String) sound : null;
+    }
+
+    /** The sound a notification with these details would play; null when none. */
+    public static String alertSoundFor(NotificationOptions details) {
+        return soundOf(details);
     }
 
     public Future<Object> cancel(long id, String tag) {
@@ -316,17 +361,20 @@ public class FlutterLocalNotificationsPlugin {
 
     /**
      * The platform-specific plugin object ({@code AndroidFlutterLocalNotificationsPlugin}
-     * and so on). There is none here; callers use {@code ?.}, which skips the call.
+     * and so on): this object, which implements all of them.
      */
+    @SuppressWarnings("unchecked")
     public <T> T resolvePlatformSpecificImplementation(Class<T> witness) {
-        return null;
+        // Every platform type of the stub names this class, so this is the right object
+        // whichever one the app asked for; no cast happens here (T is erased).
+        return (T) this;
     }
 
     /**
      * The platform-specific permission requests. Reached only through the stub's
-     * {@code Android/IOSFlutterLocalNotificationsPlugin} types, which map to this class;
-     * {@link #resolvePlatformSpecificImplementation} returns null, so they normally never
-     * run. Codename One asks for notification permission when it first shows one.
+     * {@code Android/IOSFlutterLocalNotificationsPlugin} types, which map to this class.
+     * Codename One asks for notification permission when it first shows one, so they
+     * answer true.
      */
     public Future<Boolean> requestNotificationsPermission() {
         return Future.value(Boolean.TRUE);
@@ -342,6 +390,14 @@ public class FlutterLocalNotificationsPlugin {
     }
 
     public Future<Object> createNotificationChannel(Object channel) {
+        if (channel instanceof NotificationOptions) {
+            NotificationOptions c = (NotificationOptions) channel;
+            Object id = c.get("arg0");
+            String sound = soundPath(c.get("sound"));
+            if (id instanceof String && sound != null) {
+                CHANNEL_SOUNDS.put((String) id, sound);
+            }
+        }
         return Future.value(null);
     }
 }

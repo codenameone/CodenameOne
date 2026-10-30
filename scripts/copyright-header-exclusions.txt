@@ -165,7 +165,7 @@ CodenameOne/src/com/codename1/maps/providers/TiledProvider.java | Itiner.pl cont
 CodenameOne/src/com/codename1/processing/Evaluator.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
 CodenameOne/src/com/codename1/processing/EvaluatorFactory.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
 CodenameOne/src/com/codename1/processing/JSONContent.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
-CodenameOne/src/com/codename1/processing/PrettyPrinter.java | Sun Microsystems BSD-licensed source retaining its original notice
+CodenameOne/src/com/codename1/io/PrettyPrinter.java | Sun Microsystems BSD-licensed source retaining its original notice
 CodenameOne/src/com/codename1/processing/StructuredContent.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
 CodenameOne/src/com/codename1/ui/html/HTMLEventsListener.java | LWUIT (Oracle) source whose package siblings carry the Oracle header; it shipped without one, which is not ours to add
 CodenameOne/src/com/codename1/ui/layouts/GridBagConstraints.java | Apache Software Foundation (Harmony-derived) source retaining its original Apache-2.0 notice
@@ -248,6 +248,7 @@ vm/JavaAPI/src/java/text/Format.java | Codename One contribution whose copyright
 vm/JavaAPI/src/java/text/ParseException.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
 vm/JavaAPI/src/java/text/SimpleDateFormat.java | Codename One contribution whose copyright line names its contributor; the notice is kept as written
 maven/build-engine/src/main/java/com/codename1/builders/util/JSONSanitizer.java | Adapted from the OWASP JSON Sanitizer (Apache-2.0), whose documentation it keeps verbatim
+maven/android-compat/src/main/java/android/hardware/SensorMath.java | Rewritten from the static methods of AOSP android.hardware.SensorManager, Apache-2.0, retaining its original notice; adapted to the Codename One runtime
 maven/android-compat/src/main/java/androidx/constraintlayout/core/ArrayLinkedVariables.java | Vendored AOSP androidx.constraintlayout (constraintlayout-core 1.0.4 sources, Google Maven), Apache-2.0, retaining its original notice; adapted to the Codename One runtime
 maven/android-compat/src/main/java/androidx/constraintlayout/core/ArrayRow.java | Vendored AOSP androidx.constraintlayout (constraintlayout-core 1.0.4 sources, Google Maven), Apache-2.0, retaining its original notice; adapted to the Codename One runtime
 maven/android-compat/src/main/java/androidx/constraintlayout/core/Cache.java | Vendored AOSP androidx.constraintlayout (constraintlayout-core 1.0.4 sources, Google Maven), Apache-2.0, retaining its original notice; adapted to the Codename One runtime
@@ -420,3 +421,18 @@ Ports/CLDC11/src/java/util/Collections.java | Apache Harmony class library sourc
 vm/JavaAPI/src/java/io/ByteArrayOutputStream.java | Apache Harmony class library source retaining its original Apache-2.0 notice
 vm/JavaAPI/src/java/lang/CharSequence.java | Apache Harmony class library source retaining its original Apache-2.0 notice
 vm/JavaAPI/src/java/util/Objects.java | Apache Harmony class library source retaining its original Apache-2.0 notice
+vm/JavaAPI/src/java/lang/ClassLoader.java | TeaVM class library source retaining its original Apache-2.0 notice (Copyright 2014 Alexey Andreev)
+CodenameOne/src/com/codename1/util/BigDecimal.java | Bouncy Castle derived source with its original provenance note
+CodenameOne/src/com/codename1/util/TBigDecimal.java | Apache Harmony source retaining its original Apache-2.0 notice
+CodenameOne/src/com/codename1/util/TBigInteger.java | Apache Harmony source retaining its original Apache-2.0 notice
+CodenameOne/src/com/codename1/util/TBitLevel.java | Apache Harmony source retaining its original Apache-2.0 notice
+CodenameOne/src/com/codename1/util/TDivision.java | Apache Harmony source retaining its original Apache-2.0 notice
+CodenameOne/src/com/codename1/util/TConversion.java | Apache Harmony source retaining its original Apache-2.0 notice
+CodenameOne/src/com/codename1/util/TElementary.java | Apache Harmony source retaining its original Apache-2.0 notice
+CodenameOne/src/com/codename1/util/TLogical.java | Apache Harmony source retaining its original Apache-2.0 notice
+CodenameOne/src/com/codename1/util/TMultiplication.java | Apache Harmony source retaining its original Apache-2.0 notice
+CodenameOne/src/com/codename1/util/TPrimality.java | Apache Harmony source retaining its original Apache-2.0 notice
+CodenameOne/src/com/codename1/util/BigInteger.java | Bouncy Castle source (MIT); its header records the origin and Bouncy Castle ships no per-file notice
+CodenameOne/src/com/codename1/io/CharArrayReader.java | Apache Harmony source retaining its original Apache-2.0 notice
+CodenameOne/src/com/codename1/io/JSONSanitizer.java | Google json-sanitizer source retaining its original Apache-2.0 notice
+vm/ByteCodeTranslator/src/cn1_crypto_kernels_amalgamation.h | libsecp256k1 (MIT, notice reproduced in the file) and public-domain ed25519-donna, generated by scripts/crypto-kernels/amalgamate.py

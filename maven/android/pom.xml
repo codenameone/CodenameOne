@@ -129,6 +129,12 @@
                                      app that referenced com.codename1.webrtc; the
                                      builder deletes the package for everyone else. -->
                                 <exclude>com/codename1/impl/android/webrtc/**</exclude>
+                                <!-- The UnifiedPush glue names org.unifiedpush,
+                                     which AndroidGradleBuilder adds only for a
+                                     PushClient app that turned UnifiedPush on
+                                     (android.unifiedPush.vapidKey); the builder
+                                     deletes the package for everyone else. -->
+                                <exclude>com/codename1/impl/android/unifiedpush/**</exclude>
                                 <!-- The Play Install Referrer implementation
                                      names com.android.installreferrer, which
                                      PlatformFeatureCatalog adds only for an app

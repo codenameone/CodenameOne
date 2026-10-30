@@ -81,7 +81,7 @@ fi
 RUNTIME_RESOURCES="$WORK/runtime-resources"
 mkdir -p "$RUNTIME_RESOURCES"
 for f in cn1_globals.h cn1_globals.m nativeMethods.m cn1_intrinsics.h cn1_sqlite3.c \
-         cn1_process.h cn1_process_vm.h \
+         cn1_process.h cn1_process_vm.h cn1_hardware_impl.h cn1_mdns_impl.h \
          cn1_virtual_thread.h cn1_virtual_thread.c cn1_virtual_thread_asm.S; do
     cp "$REPO/vm/ByteCodeTranslator/src/$f" "$RUNTIME_RESOURCES/$f"
 done
@@ -219,6 +219,13 @@ if [ "${CN1_BACKEND_SQLITE:-1}" = "0" ]; then
     # answer "could not open" instead, which Db already turns into an IOException.
     CN1_BACKEND_CFLAGS="$CN1_BACKEND_CFLAGS -DCN1_BACKEND_NO_SQLITE"
 fi
+# The native crypto kernels (libsecp256k1, ed25519-donna) are linked only when
+# asked, as the packager links them only for a server that uses them. Set
+# CN1_BACKEND_CRYPTO_KERNELS=1 to compile them in; without them the Java engine runs.
+CRYPTO_OPT=""
+if [ "${CN1_BACKEND_CRYPTO_KERNELS:-0}" = "1" ]; then
+    CRYPTO_OPT="-Dcn1.cryptoKernels=true"
+fi
 # Checked casts are OFF by default in ParparVM and ON here, which is the one place
 # the server target deliberately departs from the mobile one.
 #
@@ -233,7 +240,7 @@ fi
 # CN1_BACKEND_CHECKED_CASTS=0 turns it off to measure what it costs.
 CAST_OPT="-Dcn1.checkedCasts=true"
 if [ "${CN1_BACKEND_CHECKED_CASTS:-1}" = "0" ]; then CAST_OPT=""; fi
-"$J8/bin/java" $SQLITE_OPT $CAST_OPT $CN1_BACKEND_TRANSLATOR_OPTS -cp "$RUNTIME_RESOURCES:$TRANSLATOR" \
+"$J8/bin/java" $SQLITE_OPT $CRYPTO_OPT $CAST_OPT $CN1_BACKEND_TRANSLATOR_OPTS -cp "$RUNTIME_RESOURCES:$TRANSLATOR" \
     com.codename1.tools.translator.ByteCodeTranslator \
     clean "$JAVAAPI;$WORK/classes" "$WORK/out" "$MAIN" "$PKG" "$MAIN" 1.0 clean none \
     > "$WORK/translate.log" 2>&1 || { echo "TRANSLATE FAILED"; tail -30 "$WORK/translate.log"; exit 1; }
@@ -243,9 +250,19 @@ if [ "${CN1_BACKEND_CHECKED_CASTS:-1}" = "0" ]; then CAST_OPT=""; fi
 # their dependencies; a fully static build needs static versions, which is why this
 # is a switch rather than an assumption.
 CURL_LIB="-lcurl -lssl -lcrypto -lnghttp2"
+CURL_CFLAGS=""
+# On Linux libcurl is opened on the first outbound request instead (see
+# CN1_BACKEND_CURL_DLOPEN in cn1_backend_web.c), so an idle server never maps it.
+if [ "$(uname -s)" = "Linux" ]; then
+    CURL_LIB="-lssl -lcrypto -lnghttp2 -ldl"
+    # Not on CN1_BACKEND_CFLAGS: those travel to package.sh, whose static link
+    # keeps -lcurl and has no libcurl to open.
+    CURL_CFLAGS="-DCN1_BACKEND_CURL_DLOPEN"
+fi
 SSL_FLAGS=""
 if [ "${CN1_BACKEND_HTTPS:-1}" = "0" ]; then
     CURL_LIB=""
+    CURL_CFLAGS=""
 else
     # macOS ships libcrypto but not its headers; Homebrew's OpenSSL is the usual
     # source. On Linux the distro's -dev package puts them where clang looks.
@@ -290,7 +307,7 @@ if [ "${CN1_BACKEND_DEAD_STRIP:-1}" = "0" ]; then GC_CFLAGS=""; GC_LDFLAGS=""; f
 # -fwrapv -fno-strict-aliasing -fno-builtin-fmod(f) are MANDATORY for generated C
 # (Java wrapping arithmetic; clang -O3 provably miscompiles without them).
 $CC -O3 -w -fwrapv -fno-strict-aliasing -fno-builtin-fmod -fno-builtin-fmodf -ffp-contract=off $GC_CFLAGS \
-    $CN1_BACKEND_CFLAGS $EXTRA $SSL_FLAGS -I"$SRCDIR" "$SRCDIR"/*.c "$SRCDIR"/*.S \
+    $CN1_BACKEND_CFLAGS $CURL_CFLAGS $EXTRA $SSL_FLAGS -I"$SRCDIR" "$SRCDIR"/*.c "$SRCDIR"/*.S \
     -lm -lpthread $CURL_LIB $GC_LDFLAGS -o "$OUTBIN" \
     2> "$WORK/cc.log" || { echo "COMPILE FAILED"; tail -40 "$WORK/cc.log"; exit 1; }
 echo "built $OUTBIN (workdir $WORK)"

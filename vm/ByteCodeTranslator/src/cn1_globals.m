@@ -1153,6 +1153,68 @@ static void cn1GcRsetLegacyRecentClear(void);
 static void cn1GcHybridEndCycle(void);
 static void cn1GcRsetScan(struct ThreadLocalData* d, JAVA_BOOLEAN trace);
 #endif
+// The cores this process may actually run on -- not the machine's. A server pinned
+// with taskset, a container started with --cpus or a cgroup quota sees fewer cores than
+// _SC_NPROCESSORS_ONLN reports, and sizing threads by the machine then puts more
+// runnable threads on the allowed cores than they can run: the backend's host threads
+// and the collector's markers both contend with the mutator they exist to serve.
+// Measured on two pinned cores of a five-core host, the backend's JSON route served
+// a third fewer requests than Go and Rust, which both read the affinity mask.
+// Linux reads the affinity mask, then caps it by a cgroup v2 quota (cpu.max), rounded
+// up as Go and Rust round it. Other platforms keep the online count. Cached: the
+// answer is read when pools are sized, and a later change would not resize them.
+int cn1UsableCpuCount(void) {
+    static int cached = 0;
+    int n = cached;
+    if(n > 0) {
+        return n;
+    }
+#if defined(_WIN32)
+    n = cn1_win_cpu_count();
+#else
+    n = (int)sysconf(_SC_NPROCESSORS_ONLN);
+#if defined(__linux__)
+    {
+        cpu_set_t set;
+        CPU_ZERO(&set);
+        if(sched_getaffinity(0, sizeof(set), &set) == 0) {
+            int allowed = CPU_COUNT(&set);
+            if(allowed > 0 && (n <= 0 || allowed < n)) {
+                n = allowed;
+            }
+        }
+        FILE* f = fopen("/sys/fs/cgroup/cpu.max", "r");
+        if(f != NULL) {
+            // fgets + strtol, never fscanf: glibc 2.38 headers redirect it
+            // to __isoc23_fscanf, which the target libc lacks (link error).
+            char line[64];
+            long period = 0;
+            char* end = NULL;
+            long q = 0;
+            if(fgets(line, sizeof(line), f) != NULL && strncmp(line, "max", 3) != 0) {
+                q = strtol(line, &end, 10);
+                period = strtol(end, NULL, 10);
+            }
+            if(period > 0) {
+                if(q > 0) {
+                    int limit = (int)((q + period - 1) / period);
+                    if(limit > 0 && (n <= 0 || limit < n)) {
+                        n = limit;
+                    }
+                }
+            }
+            fclose(f);
+        }
+    }
+#endif
+#endif
+    if(n < 1) {
+        n = 1;
+    }
+    cached = n;
+    return n;
+}
+
 static int cn1GcSingleCore(void) {
     static int cached = -1;
     if(cached < 0) {
@@ -1163,7 +1225,7 @@ static int cn1GcSingleCore(void) {
 #if defined(_WIN32)
             cached = 0;   // the Win32 shim exposes no CPU count here; stay concurrent
 #else
-            cached = sysconf(_SC_NPROCESSORS_ONLN) <= 1;
+            cached = cn1UsableCpuCount() <= 1;
 #endif
         }
     }
@@ -8415,6 +8477,13 @@ static void cn1BibopExitReport(void) {
     // that no cycle can start, because starting one means winning IDLE -> RUNNING.
     // Polling gcCurrentlyRunning instead left the window this replaces -- a collector
     // preempted between its check and setting that flag.
+    // The allocation totals FIRST, before the freeze and every walk: they are
+    // counters, read in microseconds and needing no quiescent heap, while a
+    // server's other threads can finish exiting the process at any point after
+    // this starts -- a backend's main returns as soon as its reactor stops, so a
+    // second exit() races this one. Printed after the accounting line, they were
+    // lost on every server exit.
+    cn1AllocCensus("exit");
     set_static_java_lang_System_gcShouldLoop(JAVA_FALSE);
     {
         // BOUNDED: a diagnostic must not turn a hung collector into a hung exit. On
@@ -8448,7 +8517,6 @@ static void cn1BibopExitReport(void) {
     }
 #endif
     cn1LiveCensus("exit");
-    cn1AllocCensus("exit");
 #ifdef CN1_ALLOC_CENSUS
     cn1CapacityHistogram();
 #endif
@@ -11199,7 +11267,7 @@ static inline void cn1BibopOwnPage(CN1BibopPage* np) {
 
 static CN1BibopPage* cn1BibopAcquirePage(CODENAME_ONE_THREAD_STATE, int ci) {
     pthread_mutex_lock(&bibopMutex);
-    CN1BibopPage* old = threadStateData->bibopCurrent[ci];
+    CN1BibopPage* old = CN1_BIBOP_CUR(threadStateData)[ci];
     if(old != 0) {
         cn1BibopAccountBump(threadStateData, old);
         old->gcRetiredBy = threadStateData->threadId;
@@ -11211,7 +11279,7 @@ static CN1BibopPage* cn1BibopAcquirePage(CODENAME_ONE_THREAD_STATE, int ci) {
             old->nextPool = sh;
         } while(!atomic_compare_exchange_weak_explicit(&bibopSweepStack, &sh, old,
                     memory_order_release, memory_order_relaxed));
-        threadStateData->bibopCurrent[ci] = 0;
+        CN1_BIBOP_CUR(threadStateData)[ci] = 0;
     }
     CN1BibopPage* np = bibopPartialPool[ci];
     if(np != 0) {
@@ -11274,7 +11342,7 @@ static CN1BibopPage* cn1BibopAcquirePage(CODENAME_ONE_THREAD_STATE, int ci) {
     np->owned = JAVA_TRUE;
     np->nextPool = 0;
     cn1BibopOwnPage(np);
-    threadStateData->bibopCurrent[ci] = np;
+    CN1_BIBOP_CUR(threadStateData)[ci] = np;
     return np;
 }
 
@@ -11943,7 +12011,7 @@ JAVA_OBJECT cn1BibopAllocRecycled(CODENAME_ONE_THREAD_STATE, int size, struct cl
         return 0;
     }
 #endif
-    CN1BibopPage* p = threadStateData->bibopCurrent[ci];
+    CN1BibopPage* p = CN1_BIBOP_CUR(threadStateData)[ci];
     if(p == 0 || p->freeList == 0) {
         return 0;
     }
@@ -11970,7 +12038,7 @@ JAVA_OBJECT cn1BibopAllocRecycled(CODENAME_ONE_THREAD_STATE, int size, struct cl
 // stays small enough to inline at every allocation site (see the note there).
 JAVA_OBJECT cn1BibopAllocRecycledNoZero(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent, int ci) {
     if(ci < 0) return (JAVA_OBJECT)0;
-    CN1BibopPage* p = threadStateData->bibopCurrent[ci];
+    CN1BibopPage* p = CN1_BIBOP_CUR(threadStateData)[ci];
     // A RECYCLED page: take a slot its last sweep freed. This used to fall through to
     // __NEW_X and the full slow path for EVERY object once pages came back partial --
     // which is every allocation in a heap small enough to be reused. Profiled at an 8MB
@@ -12022,7 +12090,7 @@ static JAVA_OBJECT cn1BibopAlloc(CODENAME_ONE_THREAD_STATE, int size, struct cla
     if(ci < 0) {
         return 0;
     }
-    CN1BibopPage* p = threadStateData->bibopCurrent[ci];
+    CN1BibopPage* p = CN1_BIBOP_CUR(threadStateData)[ci];
     JAVA_OBJECT o = 0;
     for(;;) {
         if(p != 0) {
@@ -17622,8 +17690,7 @@ static int gcMarkResolveThreadCount() {
         n = CN1_GC_MARK_THREAD_CAP;
     }
 #else
-    long ncpu = sysconf(_SC_NPROCESSORS_ONLN);
-    int n = (int)(ncpu - 1);
+    int n = cn1UsableCpuCount() - 1;
     if(n > CN1_GC_MARK_THREAD_CAP) {
         n = CN1_GC_MARK_THREAD_CAP;
     }
@@ -21003,9 +21070,21 @@ CN1_COLD JAVA_INT cn1ThrowNullPointer_R_int(CODENAME_ONE_THREAD_STATE) {
 
 void** interfaceVtableGlobal = 0;
 
+// Slots 9 and 10 of java.lang.Object's vtable are the protected clone() and finalize().
+// An array reaches slot 9 when clone is invoked on it as java/lang/Object.clone, which is
+// how kotlinc compiles an enum's values() -- javac names the array type, and the
+// translator turns that into cloneArray without any dispatch. The table used to stop at
+// slot 8, so that call read past the end of this allocation and jumped to garbage.
+static JAVA_OBJECT cn1ArrayVirtualClone(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array) {
+    return cloneArray(array);
+}
+
+static JAVA_VOID cn1ArrayVirtualFinalize(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array) {
+}
+
 void** initVtableForInterface() {
     if(interfaceVtableGlobal == 0) {
-        interfaceVtableGlobal = malloc(9 * sizeof(void*));
+        interfaceVtableGlobal = malloc(11 * sizeof(void*));
         interfaceVtableGlobal[0] = &java_lang_Object_equals___java_lang_Object_R_boolean;
         interfaceVtableGlobal[1] = &java_lang_Object_getClass___R_java_lang_Class;
         interfaceVtableGlobal[2] = &java_lang_Object_hashCode___R_int;
@@ -21015,6 +21094,8 @@ void** initVtableForInterface() {
         interfaceVtableGlobal[6] = &java_lang_Object_wait__;
         interfaceVtableGlobal[7] = &java_lang_Object_wait___long;
         interfaceVtableGlobal[8] = &java_lang_Object_wait___long_int;
+        interfaceVtableGlobal[9] = &cn1ArrayVirtualClone;
+        interfaceVtableGlobal[10] = &cn1ArrayVirtualFinalize;
         class_array1__JAVA_BOOLEAN.vtable = interfaceVtableGlobal;
         class_array2__JAVA_BOOLEAN.vtable = interfaceVtableGlobal;
         class_array3__JAVA_BOOLEAN.vtable = interfaceVtableGlobal;

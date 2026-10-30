@@ -1,0 +1,22 @@
+true
+err http://127.0.0.1:9/a.png true
+true
+true
+err http://127.0.0.1:9/a.png true|empty|ph u1|p 50 200 0.25 u2|p 7 null null u2
+true
+5
+true
+false
+true
+false
+true
+true
+false
+true
+false
+true
+false
+true
+false
+false
+line,circle

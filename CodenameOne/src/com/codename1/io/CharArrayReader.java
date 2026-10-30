@@ -26,6 +26,7 @@ import java.io.Reader;
 /// #### See also
 ///
 /// - CharArrayWriter
+@com.codename1.impl.SharedWithBackend
 public class CharArrayReader extends Reader {
     /// The buffer for characters.
     protected char[] buf;

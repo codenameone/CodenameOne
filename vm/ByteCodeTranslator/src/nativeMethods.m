@@ -1275,7 +1275,11 @@ JAVA_LONG java_io_FileInputStream_openImpl___java_lang_String_R_long(CODENAME_ON
            valid across the safepoint. */
         FILE* f;
         CN1_YIELD_THREAD;
+#if defined(_WIN32)
+        f = cn1_win_fopen_utf8(path, "rb");
+#else
         f = fopen(path, "rb");
+#endif
         if(f != NULL) {
             /* Same reasoning, and the same 16KB ceiling for the same reason: it is
              * dirty memory held per open stream. */
@@ -1301,7 +1305,9 @@ JAVA_LONG java_io_FileInputStream_openImpl___java_lang_String_R_long(CODENAME_ON
  *
  * 2. PATHS ARE PASSED TO THE NARROW CRT. stringToUTF8 produces UTF-8, and the
  *    Windows CRT's fopen reads it in the active ANSI code page, so a path holding
- *    a non-ASCII user or file name fails to open. The same mismatch runs through
+ *    a non-ASCII user or file name fails to open. The two stream opens below no
+ *    longer do (cn1_win_fopen_utf8, which also lifts MAX_PATH: the self-hosted
+ *    translator failed on a 270-character Kotlin class path); the rest still do. The same mismatch runs through
  *    java_io_File.m's stat/access/FindFirstFile calls. cn1_db_sqlite_impl.h around
  *    line 196 already documents this exact problem and converts UTF-8 to UTF-16
  *    before calling the wide API; the file layer needs the same treatment applied
@@ -1459,7 +1465,11 @@ JAVA_LONG java_io_FileOutputStream_openImpl___java_lang_String_boolean_R_long(CO
         /* The mirror of the read side: opening a FIFO for write waits for a reader. */
         FILE* f;
         CN1_YIELD_THREAD;
+#if defined(_WIN32)
+        f = cn1_win_fopen_utf8(path, append ? "ab" : "wb");
+#else
         f = fopen(path, append ? "ab" : "wb");
+#endif
         if(f != NULL) {
             /* stdio's default buffer is a few kilobytes, so writing a file of any
              * size becomes that many write(2) calls. A bigger one cuts them by the
@@ -2377,6 +2387,10 @@ struct ThreadLocalData* cn1CreateThreadLocalData(JAVA_BOOLEAN bindToCallingOsThr
         return NULL;
     }
     i->threadId = nativeThreadId;
+#ifdef CN1_VIRTUAL_THREADS
+    // Its own pages until a carrier lends it theirs (cn1ResumeVirtualThreadOn).
+    i->bibopCur = i->bibopCurrent;
+#endif
     i->tryBlockOffset = 0;
     i->nativeBuffers = NULL;
     
@@ -2737,6 +2751,26 @@ void cn1RetireVirtualThread(struct cn1VirtualThread* vt) {
         unlockCriticalSection();
     }
     cn1VirtualThreadFree(vt);
+}
+
+/**
+ * Lend the carrier's pages, then run. Re-pointed at EVERY resume, not once: a
+ * virtual thread can be resumed by a different carrier each time, and must never
+ * allocate into the pages of one that is running something else. The carrier's own
+ * pointer is taken rather than its array, so a virtual thread resumed from inside
+ * another shares that one's carrier.
+ *
+ * Nothing here needs the collector's cooperation. The carrier is inside a native
+ * call with threadActive raised for the whole of the run, so it is never held while
+ * the virtual thread allocates on its behalf; and the virtual thread's own array is
+ * never written, so the collector, which reads only own arrays, sees nothing move.
+ */
+void cn1ResumeVirtualThreadOn(CODENAME_ONE_THREAD_STATE, struct cn1VirtualThread* vt) {
+    struct ThreadLocalData* state = (struct ThreadLocalData*)cn1VirtualThreadState(vt);
+    if(state != 0) {
+        state->bibopCur = threadStateData->bibopCur;
+    }
+    cn1VirtualThreadResume(vt);
 }
 #endif /* CN1_VIRTUAL_THREADS -- see the capability gate in cn1_virtual_thread.h */
 

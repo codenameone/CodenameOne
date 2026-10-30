@@ -254,6 +254,14 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
     }
 
+    /// The C crypto kernels when the translator linked them (an
+    /// application that uses the elliptic-curve or Keccak APIs), otherwise
+    /// the default engine.
+    @Override
+    public com.codename1.security.CryptoEngine createCryptoEngine() {
+        return com.codename1.security.NativeCryptoEngine.create(super.createCryptoEngine());
+    }
+
     
     public void init(Object m) {
         // The class library (vm/JavaAPI) reaches the EDT, the log, secure
@@ -3157,9 +3165,9 @@ public class IOSImplementation extends CodenameOneImplementation {
                 InputStream sub = getResourceAsStream("/" + subclassTheme + ".res");
                 if (sub != null) {
                     r = Resources.open(sub);
-                    Hashtable tp = r.getTheme(r.getThemeResourceNames()[0]);
+                    HashMap<String, Object> tp = r.getThemeMap(r.getThemeResourceNames()[0]);
                     injectDesktopThemeConstants(tp);
-                    UIManager.getInstance().setThemeProps(tp);
+                    UIManager.getInstance().setThemeMap(tp);
                     return;
                 }
                 // Not in the bundle (a framework build that has not generated it yet):
@@ -3192,9 +3200,9 @@ public class IOSImplementation extends CodenameOneImplementation {
                 }
                 if (in != null) {
                     r = Resources.open(in);
-                    Hashtable tp = r.getTheme(r.getThemeResourceNames()[0]);
+                    HashMap<String, Object> tp = r.getThemeMap(r.getThemeResourceNames()[0]);
                     injectDesktopThemeConstants(tp);
-                    UIManager.getInstance().setThemeProps(tp);
+                    UIManager.getInstance().setThemeMap(tp);
                     return;
                 }
                 // Modern theme isn't in the jar (e.g. framework build hasn't
@@ -3202,19 +3210,19 @@ public class IOSImplementation extends CodenameOneImplementation {
             }
             if(mode.equals("ios7") || mode.equals("flat") || mode.equals("auto") || mode.equals("modern") || mode.equals("liquid")) {
                 r = Resources.open("/iOS7Theme.res");
-                Hashtable tp = r.getTheme(r.getThemeResourceNames()[0]);
+                HashMap<String, Object> tp = r.getThemeMap(r.getThemeResourceNames()[0]);
                 if(!nativeInstance.isIOS7()) {
                     tp.put("TitleArea.padding", "0,0,0,0");
                 }
                 injectDesktopThemeConstants(tp);
-                UIManager.getInstance().setThemeProps(tp);
+                UIManager.getInstance().setThemeMap(tp);
                 return;
             }
             // "legacy" / "iphone" / anything else: pre-flat iPhone theme.
             r = Resources.open("/iPhoneTheme.res");
-            Hashtable tp = r.getTheme(r.getThemeResourceNames()[0]);
+            HashMap<String, Object> tp = r.getThemeMap(r.getThemeResourceNames()[0]);
             injectDesktopThemeConstants(tp);
-            UIManager.getInstance().setThemeProps(tp);
+            UIManager.getInstance().setThemeMap(tp);
         } catch (IOException ex) {
             ex.printStackTrace();
         }
@@ -3226,7 +3234,7 @@ public class IOSImplementation extends CodenameOneImplementation {
      * native menu bar). These theme constants are injected only on the desktop so iOS
      * phones/tablets are unaffected. Mirrors JavaSEPort.injectDesktopThemeConstants.
      */
-    private void injectDesktopThemeConstants(Hashtable tp) {
+    private void injectDesktopThemeConstants(HashMap<String, Object> tp) {
         if (tp == null || !isDesktop()) {
             return;
         }
@@ -3264,7 +3272,7 @@ public class IOSImplementation extends CodenameOneImplementation {
      * system accent is used rather than a colour invented here, and the guard
      * leaves any theme that does define the UIID alone.
      */
-    private void injectListFocusStyle(Hashtable tp) {
+    private void injectListFocusStyle(HashMap<String, Object> tp) {
         // Any entry at all under the UIID means the theme has an opinion; leave it.
         for (Object key : tp.keySet()) {
             if (key instanceof String && ((String) key).indexOf("ListRendererFocus") > -1) {
@@ -7227,6 +7235,10 @@ public class IOSImplementation extends CodenameOneImplementation {
         private boolean embedNativeControls=true;
         private List<Runnable> completionHandlers;
         private boolean prepareToPlay;
+        // Set for a FairPlay stream: getVideoComponent creates the player through
+        // the content key session instead of a plain URL.
+        private com.codename1.media.DrmConfig fairPlay;
+        private int pendingTime = -1;
         
         
         
@@ -7444,6 +7456,10 @@ public class IOSImplementation extends CodenameOneImplementation {
                 } else {
                     nativeInstance.setAudioTime(moviePlayerPeer, time);
                 }
+            } else if(isVideo) {
+                // The video peer is created lazily by getVideoComponent; a resume
+                // position set before that is applied once the peer exists.
+                pendingTime = time;
             }
         }
 
@@ -7484,7 +7500,17 @@ public class IOSImplementation extends CodenameOneImplementation {
         @Override
         public Component getVideoComponent() {
             if (component == null) {
-                if(uri != null) {
+                if(uri != null && fairPlay != null) {
+                    moviePlayerPeer = nativeInstance.createFairPlayVideoComponent(uri, fairPlay.getCertificateUrl(),
+                            fairPlay.getLicenseUrl(), fairPlay.getContentId(), encodeHeaders(fairPlay.getLicenseHeaders()),
+                            onCompletionCallbackId);
+                    if (moviePlayerPeer == 0) {
+                        fireMediaError(new MediaException(MediaErrorType.SrcNotSupported, "FairPlay is not supported on this device"));
+                        return null;
+                    }
+                    nativeInstance.setNativeVideoControlsEmbedded(moviePlayerPeer, embedNativeControls);
+                    component = PeerComponent.create(new long[] { nativeInstance.getVideoViewPeer(moviePlayerPeer) });
+                } else if(uri != null) {
                     moviePlayerPeer = nativeInstance.createVideoComponent(uri, onCompletionCallbackId);
                     nativeInstance.setNativeVideoControlsEmbedded(moviePlayerPeer, embedNativeControls);
                     component = PeerComponent.create(new long[] { nativeInstance.getVideoViewPeer(moviePlayerPeer) });
@@ -7504,6 +7530,10 @@ public class IOSImplementation extends CodenameOneImplementation {
             }
             if (prepareToPlay && isVideo && !isPlaying()) {
                 prepare();
+            }
+            if (moviePlayerPeer != 0 && pendingTime > 0) {
+                nativeInstance.setMediaTimeMS(moviePlayerPeer, pendingTime);
+                pendingTime = -1;
             }
             return component;
         }
@@ -7580,6 +7610,43 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     public Media createMedia(String uri, boolean isVideo, Runnable onCompletion) throws IOException {
         return new IOSMedia(uri, isVideo, onCompletion);
+    }
+
+    @Override
+    public boolean isDrmSupported(com.codename1.media.DrmScheme scheme) {
+        if (scheme == com.codename1.media.DrmScheme.AES_128) {
+            // AVPlayer decrypts HLS #EXT-X-KEY METHOD=AES-128 by itself.
+            return true;
+        }
+        return scheme == com.codename1.media.DrmScheme.FAIRPLAY && nativeInstance.isFairPlaySupported();
+    }
+
+    @Override
+    public Media createStreamingMedia(com.codename1.media.StreamRequest request) throws IOException {
+        com.codename1.media.DrmConfig drm = request.getDrm();
+        if (drm == null || drm.getScheme() != com.codename1.media.DrmScheme.FAIRPLAY) {
+            return super.createStreamingMedia(request);
+        }
+        if (!nativeInstance.isFairPlaySupported()) {
+            throw new IOException("FairPlay is not supported on this device");
+        }
+        IOSMedia m = new IOSMedia(request.getUrl(), true, request.getOnCompletion());
+        m.fairPlay = drm;
+        if (request.getStartPosition() > 0) {
+            m.setTime(request.getStartPosition());
+        }
+        return m;
+    }
+
+    private static String encodeHeaders(java.util.Map<String, String> headers) {
+        if (headers == null || headers.isEmpty()) {
+            return null;
+        }
+        StringBuilder sb = new StringBuilder();
+        for (java.util.Map.Entry<String, String> e : headers.entrySet()) {
+            sb.append(e.getKey()).append('\n').append(e.getValue()).append('\n');
+        }
+        return sb.toString();
     }
 
     @Override
@@ -10631,6 +10698,9 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public void copyToClipboard(Object obj) {
+        // Whatever is copied now replaces the last restricted copy, expiry and all: a plain
+        // copy has no expiry, so a clear scheduled for it must not be skipped as if it had.
+        clipboardExpires = false;
         if(obj instanceof com.codename1.ui.ClipboardContent) {
             com.codename1.ui.ClipboardContent content = (com.codename1.ui.ClipboardContent)obj;
             // Every representation, now, including any registered as a provider. The pasteboard
@@ -10664,6 +10734,14 @@ public class IOSImplementation extends CodenameOneImplementation {
                     nativeInstance.addClipboardRepresentation(offered[iter], bytes);
                 }
             }
+            // Armed BEFORE the publish so the clip goes out local only and expiring on the
+            // very same pasteboard write; restricting it afterwards left a window in which
+            // Universal Clipboard could sync a sensitive value to the user's other devices.
+            if(content.isSensitive() || content.getClearAfter() > 0) {
+                // Rounded up, so a short time still expires rather than meaning "never".
+                clipboardExpires = nativeInstance.restrictClipboard(content.getClearAfter() <= 0 ? 0
+                        : (content.getClearAfter() + 999) / 1000);
+            }
             nativeInstance.setClipboardContent(
                     clipboardText(content, com.codename1.ui.ClipboardContent.MIME_TEXT),
                     clipboardText(content, com.codename1.ui.ClipboardContent.MIME_HTML),
@@ -10683,6 +10761,19 @@ public class IOSImplementation extends CodenameOneImplementation {
         nativeInstance.setClipboardString(null);
         super.copyToClipboard(obj);
     }
+
+    @Override
+    public void clearClipboardContent(com.codename1.ui.ClipboardContent content) {
+        // On iOS the pasteboard expires it by itself (restrictClipboard), even if this
+        // application is suspended by then; clearing here as well could only wipe something
+        // copied since. macOS has no expiry, so there the default clear runs.
+        if(!clipboardExpires) {
+            super.clearClipboardContent(content);
+        }
+    }
+
+    /// Whether the last restricted copy was given a pasteboard expiry date.
+    private boolean clipboardExpires;
 
     /// True when setClipboardContent already has an argument for this type, so it must not be
     /// published a second time beside itself.

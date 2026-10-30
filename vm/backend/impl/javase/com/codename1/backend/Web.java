@@ -703,4 +703,326 @@ public final class Web {
             }
         }
     }
+
+    /// The request has no body.
+    public static final long NO_BODY = -2;
+    /// The request has a body whose length is not known in advance: chunked on
+    /// HTTP/1.1, DATA frames until the end on HTTP/2.
+    public static final long UNKNOWN_LENGTH = -1;
+
+    /// Opens a streamed exchange; see [Exchange]. Every default, no pool.
+    public static Exchange open(String method, String url, List headers, long requestLength)
+            throws IOException {
+        return open(null, method, url, headers, requestLength);
+    }
+
+    static Exchange open(WebClient client, String method, String url, List headers,
+                         long requestLength) throws IOException {
+        if (client != null && client.isRequireHttp2()) {
+            throw new IOException("The local Java SE runtime cannot make an HTTP/2 "
+                    + "request; see Web.request");
+        }
+        Urls.requireHttp(url);
+        HeaderLines.requireMethod(method);
+        HeaderLines.validate(headers);
+        if (requestLength < NO_BODY) {
+            throw new IllegalArgumentException("requestLength " + requestLength);
+        }
+        int connectTimeout = 30000;
+        int readTimeout = 30000;
+        SSLSocketFactory sockets = null;
+        if (client != null) {
+            connectTimeout = client.getConnectTimeoutMillis();
+            readTimeout = client.getReadTimeoutMillis();
+            sockets = ((Transport) client.transport(TRANSPORTS)).sockets;
+        }
+        HttpURLConnection connection;
+        try {
+            connection = (HttpURLConnection) new URL(url).openConnection();
+        } catch (IOException err) {
+            throw new IOException("Request to " + Urls.forMessage(url) + " failed: "
+                    + err.getMessage(), err);
+        }
+        if (sockets != null && connection instanceof HttpsURLConnection) {
+            ((HttpsURLConnection) connection).setSSLSocketFactory(sockets);
+        }
+        String verb = method == null ? "GET" : method;
+        try {
+            connection.setRequestMethod(verb);
+        } catch (java.net.ProtocolException unsupported) {
+            connection.disconnect();
+            throw new IOException("The local Java SE runtime cannot send " + verb
+                    + "; see Web.request", unsupported);
+        }
+        if (requestLength != NO_BODY && "GET".equals(verb)) {
+            connection.disconnect();
+            throw new IOException("The local Java SE runtime cannot send a GET with a "
+                    + "body; see Web.request");
+        }
+        connection.setConnectTimeout(connectTimeout);
+        connection.setReadTimeout(readTimeout);
+        // Never followed by the transport: a streamed body cannot be sent twice,
+        // and a caller that follows redirects (HttpProxy) has to see each hop to
+        // apply its own destination rules to it.
+        connection.setInstanceFollowRedirects(false);
+        connection.setRequestProperty("User-Agent", "codenameone-backend");
+        if (headers != null) {
+            for (Object line : headers) {
+                String header = String.valueOf(line);
+                int colon = header.indexOf(':');
+                if (colon > 0) {
+                    connection.addRequestProperty(header.substring(0, colon).trim(),
+                            header.substring(colon + 1).trim());
+                }
+            }
+        }
+        if (requestLength != NO_BODY) {
+            connection.setDoOutput(true);
+            if (requestLength >= 0) {
+                connection.setFixedLengthStreamingMode(requestLength);
+            } else {
+                connection.setChunkedStreamingMode(16 * 1024);
+            }
+        }
+        return new Exchange(client, connection, url, requestLength != NO_BODY);
+    }
+
+    /// One streamed HTTP exchange: the request body written as it is produced,
+    /// the response read as it arrives, neither held in memory whole. The way to
+    /// move a large upload or download, or to forward one (see HttpProxy).
+    ///
+    /// Use it from one thread, in order: write and close [#getRequestBody] when
+    /// the request has one, then [#getStatus] and the headers, then read
+    /// [#getResponseBody]. Writes block until the transport has taken the bytes
+    /// and reads until some have arrived, so a slow peer at either end slows the
+    /// producer rather than filling memory -- each direction buffers a fixed
+    /// window. [#close] ends the exchange whatever state it is in; before the
+    /// response has been read to its end that CANCELS it, closing the upstream
+    /// connection rather than draining it. Always close it, in a finally.
+    ///
+    /// Redirects are never followed here: a streamed body cannot be replayed.
+    /// The request timeout of a WebClient does not apply either -- a stream may
+    /// legitimately run for as long as it moves -- while its connect and read
+    /// timeouts do, the read timeout bounding each wait for the peer.
+    public static final class Exchange {
+        private final WebClient client;
+        private final HttpURLConnection connection;
+        private final String url;
+        private final boolean hasBody;
+        private OutputStream requestBody;
+        private boolean requestDone;
+        private int status = -1;
+        private Map values;
+        private Map firstValues;
+        private InputStream responseBody;
+        private boolean closed;
+        private boolean finished;
+
+        Exchange(WebClient client, HttpURLConnection connection, String url, boolean hasBody) {
+            this.client = client;
+            this.connection = connection;
+            this.url = url;
+            this.hasBody = hasBody;
+            this.requestDone = !hasBody;
+        }
+
+        /// Where the request body goes. Closing it ends the request body; the
+        /// stream is the exchange's and closing it does not end the exchange.
+        public OutputStream getRequestBody() throws IOException {
+            if (!hasBody) {
+                throw new IllegalStateException("this exchange was opened with NO_BODY");
+            }
+            requireOpen();
+            if (requestBody == null) {
+                final OutputStream raw; //NOPMD CloseResource - the wrapper below closes it, and close() of the exchange disconnects
+                try {
+                    raw = connection.getOutputStream();
+                } catch (IOException err) {
+                    throw failed(err);
+                }
+                requestBody = new OutputStream() {
+                    @Override
+                    public void write(int b) throws IOException {
+                        write(new byte[] {(byte) b}, 0, 1);
+                    }
+
+                    @Override
+                    public void write(byte[] data, int offset, int length) throws IOException {
+                        if (requestDone) {
+                            throw new IOException("the request body has been closed");
+                        }
+                        requireOpen();
+                        try {
+                            raw.write(data, offset, length);
+                        } catch (IOException err) {
+                            throw failed(err);
+                        }
+                    }
+
+                    @Override
+                    public void flush() throws IOException {
+                        if (!requestDone) {
+                            raw.flush();
+                        }
+                    }
+
+                    @Override
+                    public void close() throws IOException {
+                        if (!requestDone) {
+                            requestDone = true;
+                            try {
+                                raw.close();
+                            } catch (IOException err) {
+                                throw failed(err);
+                            }
+                        }
+                    }
+                };
+            }
+            return requestBody;
+        }
+
+        /// The response status, waiting for the response headers. Ends a request
+        /// body that is still open first.
+        public int getStatus() throws IOException {
+            awaitResponse();
+            return status;
+        }
+
+        /// "HTTP/1.1" here; the packaged runtime also answers "HTTP/2".
+        public String getProtocol() throws IOException {
+            awaitResponse();
+            return protocolOf(connection.getHeaderField(0));
+        }
+
+        /// The first value of every response header, by lower-case name.
+        public Map getHeaders() throws IOException {
+            awaitResponse();
+            return firstValues;
+        }
+
+        /// Every response header, by lower-case name, each a List of values in
+        /// arrival order -- Set-Cookie and the like keep every line.
+        public Map getHeaderValueMap() throws IOException {
+            awaitResponse();
+            return values;
+        }
+
+        public String getHeader(String name) throws IOException {
+            List all = getHeaderValues(name);
+            return all.isEmpty() ? null : (String) all.get(0);
+        }
+
+        public List getHeaderValues(String name) throws IOException {
+            awaitResponse();
+            List all = name == null ? null : (List) values.get(asciiLower(name));
+            return all == null ? new ArrayList() : all;
+        }
+
+        /// The response body as it arrives. Reading it to the end completes the
+        /// exchange; [#close] before that cancels it.
+        public InputStream getResponseBody() throws IOException {
+            awaitResponse();
+            if (responseBody == null) {
+                InputStream in; //NOPMD CloseResource - the wrapper below owns it; close() of the exchange disconnects
+                try {
+                    in = status >= 400 ? connection.getErrorStream() : connection.getInputStream();
+                } catch (IOException err) {
+                    in = connection.getErrorStream();
+                }
+                final InputStream raw = in; //NOPMD CloseResource - closed by the wrapper it is handed to
+                responseBody = new InputStream() {
+                    @Override
+                    public int read() throws IOException {
+                        byte[] one = new byte[1];
+                        int n = read(one, 0, 1);
+                        return n <= 0 ? -1 : one[0] & 0xff;
+                    }
+
+                    @Override
+                    public int read(byte[] target, int offset, int length) throws IOException {
+                        requireOpen();
+                        if (raw == null || finished) {
+                            return -1;
+                        }
+                        int n;
+                        try {
+                            n = raw.read(target, offset, length);
+                        } catch (IOException err) {
+                            throw failed(err);
+                        }
+                        if (n < 0) {
+                            finished = true;
+                        }
+                        return n;
+                    }
+
+                    @Override
+                    public void close() throws IOException {
+                        Exchange.this.close();
+                    }
+                };
+            }
+            return responseBody;
+        }
+
+        /// Ends the exchange. Before the response body has been read to its end
+        /// this cancels it: the connection is closed, never drained or reused.
+        public void close() {
+            if (closed) {
+                return;
+            }
+            closed = true;
+            connection.disconnect();
+            if (client != null) {
+                client.exchangeEnded();
+            }
+        }
+
+        private void awaitResponse() throws IOException {
+            requireOpen();
+            if (status >= 0) {
+                return;
+            }
+            if (hasBody && !requestDone) {
+                getRequestBody().close();
+            }
+            try {
+                status = connection.getResponseCode();
+            } catch (IOException err) {
+                throw failed(err);
+            }
+            values = new LinkedHashMap();
+            firstValues = new LinkedHashMap();
+            for (int iter = 0 ; ; iter++) {
+                String name = connection.getHeaderFieldKey(iter);
+                String value = connection.getHeaderField(iter);
+                if (name == null && value == null) {
+                    break;
+                }
+                if (name == null) {
+                    continue;
+                }
+                String key = asciiLower(name);
+                List all = (List) values.get(key);
+                if (all == null) {
+                    all = new ArrayList();
+                    values.put(key, all);
+                    firstValues.put(key, value);
+                }
+                all.add(value);
+            }
+        }
+
+        private void requireOpen() throws IOException {
+            if (closed) {
+                throw new IOException("this exchange has been closed");
+            }
+        }
+
+        private IOException failed(IOException cause) {
+            return new IOException("Request to " + Urls.forMessage(url) + " failed: "
+                    + cause.getMessage(), cause);
+        }
+    }
 }

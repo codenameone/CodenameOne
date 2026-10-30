@@ -112,7 +112,7 @@ jobs:
         if: steps.pack.outputs.cache-hit != 'true'
         run: |
           cd maven
-          bash ../scripts/ci/retry.sh xvfb-run -a mvn -B install -Plocal-dev-javase -Dunity-compat -DskipTests -Darchetype.test.skip=true -Dmaven.javadoc.skip=true -pl codenameone-maven-plugin,cn1-ads-mock,android-compat,cil-translator,unity-compat -am
+          bash ../scripts/ci/retry.sh xvfb-run -a mvn -B install -Plocal-dev-javase -Dunity-compat -DskipTests -Darchetype.test.skip=true -Dmaven.javadoc.skip=true -pl codenameone-maven-plugin,cn1-ads-mock,compose-compat,android-compat,cil-translator,unity-compat -am
 
       # generate-sources is as far as the application has to go: compile-unity
       # is bound to it, and nothing after it writes what the archive carries.

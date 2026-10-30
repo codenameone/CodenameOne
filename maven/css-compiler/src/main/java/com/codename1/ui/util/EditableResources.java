@@ -1724,14 +1724,14 @@ public class EditableResources extends Resources implements TreeModel {
     /**
      * Adapts loaded themes to the new resource selected/unselected modes
      */
-    Hashtable loadTheme(String id, boolean newerVersion) throws IOException {
+    HashMap<String, Object> loadThemeMap(String id, boolean newerVersion) throws IOException {
         if(overrideResource != null) {
-            Hashtable h = overrideResource.loadTheme(id, newerVersion);
+            HashMap<String, Object> h = overrideResource.loadThemeMap(id, newerVersion);
             if(h != null) {
                 return h;
             }
         }
-        Hashtable h = super.loadTheme(id, newerVersion);
+        HashMap<String, Object> h = super.loadThemeMap(id, newerVersion);
 
         Iterator keyIter = h.keySet().iterator();
         while(keyIter.hasNext()) {

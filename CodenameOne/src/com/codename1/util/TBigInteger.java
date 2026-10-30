@@ -31,6 +31,7 @@ import java.util.Random;
 /// are treated separately. Hence such operations are inefficient and should be
 /// discouraged. In simple words: Do NOT implement any bit fields based on
 /// BigInteger.
+@com.codename1.impl.SharedWithBackend
 class TBigInteger {
 
 
@@ -768,7 +769,7 @@ class TBigInteger {
         }
         // (sign != 0) implies that exists some non zero digit
         int i = getFirstNonzeroDigit();
-        return ((i << 5) + TBigDecimal.numberOfTrailingZeros(digits[i]));
+        return ((i << 5) + TBitLevel.numberOfTrailingZeros(digits[i]));
     }
 
     /// Use `bitLength(0)` if you want to know the length of the binary
@@ -1358,7 +1359,7 @@ class TBigInteger {
         }
 
         // From now on: (m > 1)
-        TBigInteger res = TDivision.modInverseMontgomery(abs().mod(m), m);
+        TBigInteger res = TDivision.modInverseEuclid(abs().mod(m), m);
         if (res.sign == 0) {
             throw new ArithmeticException("BigInteger not invertible.");
         }

@@ -31,6 +31,7 @@ import java.util.Map;
 
 import com.codename1.backend.Base64Url;
 import com.codename1.backend.ByteSink;
+import com.codename1.backend.Cache;
 import com.codename1.backend.Crypto;
 import com.codename1.backend.Database;
 import com.codename1.backend.Db;
@@ -223,10 +224,12 @@ public class SelfTest {
         foreignBuffer();
         fairness();
         web();
+        messageDigest();
         clientTls();
         rotatedCaBundlesAreReRead();
         futures();
         jsonCodec();
+        cache();
 
         System.out.println("passed=" + passed + " failed=" + failures.size());
         for(int iter = 0 ; iter < failures.size() ; iter++) {
@@ -247,6 +250,83 @@ public class SelfTest {
     /// work on ParparVM.
     /// What the build's generated JSON codecs call, on the translated runtime:
     /// the typed reads, the refusal messages with their paths, and the dates.
+    /**
+     * The application cache on the translated runtime: the same contract
+     * CacheTest pins on the JVM -- one load per key under concurrency, expiry
+     * on a controlled clock, LRU eviction, and removal notifications.
+     */
+    private static void cache() throws Exception {
+        final long[] now = new long[] {1000};
+        final List removals = new ArrayList();
+        Cache.Clock clock = new Cache.Clock() {
+            public long millis() {
+                return now[0];
+            }
+        };
+        Cache.RemovalListener listener = new Cache.RemovalListener() {
+            public void removed(Object key, Object value, int cause) {
+                synchronized (removals) {
+                    removals.add(key + "=" + value + ":" + cause);
+                }
+            }
+        };
+        Cache c = Cache.builder("selftest").maximumSize(2).expireAfterWriteMillis(100)
+                .clock(clock).removalListener(listener).build();
+        c.put("a", "1");
+        c.put("b", "2");
+        c.getIfPresent("a");
+        c.put("c", "3");
+        check("cache evicts the least recently used", "null", String.valueOf(c.getIfPresent("b")));
+        check("cache notifies a size eviction", "[b=2:" + Cache.SIZE + "]", removals.toString());
+        now[0] += 100;
+        check("cache expires after write", "null", String.valueOf(c.getIfPresent("a")));
+        check("cache size counts live entries", "0", String.valueOf(c.size()));
+
+        final Cache shared = Cache.builder("selftest.shared").build();
+        final int[] loads = new int[1];
+        final Cache.Loader slow = new Cache.Loader() {
+            public Object load(Object key) throws Exception {
+                synchronized (loads) {
+                    loads[0]++;
+                }
+                Thread.sleep(300);
+                return "v";
+            }
+        };
+        final String[] got = new String[6];
+        Thread[] threads = new Thread[got.length];
+        for (int i = 0; i < threads.length; i++) {
+            final int at = i;
+            threads[i] = new Thread(new Runnable() {
+                public void run() {
+                    got[at] = String.valueOf(shared.get("k", slow));
+                }
+            });
+            threads[i].start();
+        }
+        for (int i = 0; i < threads.length; i++) {
+            threads[i].join(10000);
+        }
+        check("concurrent cache callers share one load", "1", String.valueOf(loads[0]));
+        StringBuilder all = new StringBuilder();
+        for (int i = 0; i < got.length; i++) {
+            all.append(got[i]);
+        }
+        check("every concurrent caller gets the loaded value", "vvvvvv", all.toString());
+
+        final Cache failing = Cache.builder("selftest.failing").build();
+        checkThrows("a failed load is rethrown", new Body() {
+            public void run() throws Exception {
+                failing.get("k", new Cache.Loader() {
+                    public Object load(Object key) throws Exception {
+                        throw new IOException("down");
+                    }
+                });
+            }
+        });
+        check("a failed load stores nothing", "0", String.valueOf(failing.size()));
+    }
+
     private static void jsonCodec() throws Exception {
         JsonCodec.Path root = JsonCodec.Path.ROOT;
         check("codec: a whole number", "42", String.valueOf(JsonCodec.readLong(
@@ -439,6 +519,33 @@ public class SelfTest {
         overridesSet.remove();
         retry.remove();
         removesDuringInitialization.remove();
+    }
+
+    /// `java.security.MessageDigest` through the class library. On ParparVM it
+    /// resolves digests through the host `Backend` installs; with none installed
+    /// every algorithm threw `NoSuchAlgorithmException`. This program uses the
+    /// runtime's pieces directly and never touches `Backend`, so it initializes
+    /// that class first, as every real server's generated main does.
+    private static void messageDigest() throws Exception {
+        com.codename1.backend.Backend.builder();
+        String[][] vectors = {
+            {"MD5", "900150983cd24fb0d6963f7d28e17f72"},
+            {"SHA-1", "a9993e364706816aba3e25717850c26c9cd0d89d"},
+            {"SHA-256", "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"},
+            {"SHA-384", "cb00753f45a35e8bb5a03d699ac65007272c32ab0eded1631a8b605a43ff5bed"
+                    + "8086072ba1e7cc2358baeca134c825a7"},
+            {"SHA-512", "ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a"
+                    + "2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f"},
+        };
+        for(int iter = 0 ; iter < vectors.length ; iter++) {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance(vectors[iter][0]);
+            // Incremental: two updates, then digest() resets for a second use.
+            md.update(bytes("a"));
+            md.update(bytes("bc"));
+            check("MessageDigest " + vectors[iter][0], vectors[iter][1], hex(md.digest()));
+            check("MessageDigest " + vectors[iter][0] + " after reset", vectors[iter][1],
+                    hex(md.digest(bytes("abc"))));
+        }
     }
 
     private static void crypto() throws Exception {

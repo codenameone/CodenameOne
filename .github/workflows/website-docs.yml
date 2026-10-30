@@ -64,8 +64,10 @@ on:
       # requests: developer-guide-docs.yml already renders the guide for those.
       - 'scripts/wayline/**'
       - 'scripts/savor/**'
+      - 'scripts/bastion/**'
       - 'scripts/skirmish/**'
       - 'scripts/parley/**'
+      - 'scripts/hellocodenameone/common/src/main/kmp/**'
       - 'scripts/website/**'
       - 'scripts/skindesigner/**'
       - 'Ports/JavaScriptPort/**'

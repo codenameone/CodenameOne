@@ -272,20 +272,6 @@ static struct JavaArrayPrototype* cn1BackendEnsureWouldBlockArray(void) {
 }
 
 /*
- * Whether awaitReadable probes with poll() before parking. Read once; see the
- * discussion at the call site. 1 (probe) is the shipped default until the A/B
- * on an idle host says otherwise.
- */
-static int cn1BackendSpeculativePoll(void) {
-    static int cached = -1;
-    if(cached < 0) {
-        const char* v = getenv("CN1_HTTP_SPECULATIVE_POLL");
-        cached = (v != 0 && v[0] == '0') ? 0 : 1;
-    }
-    return cached;
-}
-
-/*
  * The poller's event array, one per thread, grown on demand and reused.
  *
  * This ran as a malloc/free pair on EVERY poller wait. The read path above is
@@ -598,64 +584,34 @@ JAVA_INT com_codename1_backend_ServerSocket_awaitReadableImpl___int_int_R_int(CO
     // resumes a parked virtual thread once the poller reports its descriptor
     // ready, so coming back IS the readiness answer.
     if(cn1BackendCanPark()) {
-        // ASK FIRST, and this poll is an optimisation rather than the waste it
-        // looks like in a syscall census.
+        // -2 is parkUntilReadable: the caller's last read came back short or
+        // would have blocked, so a probe could only say "not yet". Anything else
+        // asks once without blocking, so a caller that does not know gets its
+        // answer for one cheap syscall instead of a park and a resume.
         //
-        // It was removed once on the grounds that Go does not do it -- its
-        // FD.Read calls read() straight away and parks on EAGAIN -- and that the
-        // census showed 1.9 ppoll per request against Go's zero. Throughput fell
-        // from 1047890 requests to about 110000 and /json died. The census was
-        // counting a cheap syscall that PREVENTS an expensive one: when the next
-        // request has already arrived, which under keep-alive it usually has,
-        // this answers immediately and the virtual thread never parks. Without
-        // it every keep-alive wait costs a park, an epoll round trip and a
-        // resume.
-        //
-        // The lesson generalises: syscall COUNT is not cost. Go can afford to
-        // skip this because its park is a goroutine switch inside a scheduler
-        // that is already awake; ours goes out to the poller and back.
-        // Left switchable rather than deleted, because the case against it is
-        // real and the case for it was measured on an older scheduler.
-        //
-        // Against: the caller's next move is a recv, and on a virtual thread that
-        // recv already parks on EAGAIN and retries when the poller says the
-        // descriptor is ready. Polling here first costs one extra syscall on
-        // EVERY request to learn what the read is about to learn anyway -- a
-        // corrected census puts it at exactly 1.0 ppoll per request, the only
-        // syscall in our profile that Go does not make at all.
-        //
-        // For: removing it costs almost all of the throughput, and that is still
-        // true after the host loop learned to drain a local run queue before
-        // polling -- which was the reason to expect otherwise. RE-MEASURED, four
-        // arms interleaved on a quiet host, /plaintext at 64 connections, medians
-        // of four steady-state reps:
-        //
-        //     go                       243,161 req/s
-        //     virtual threads, probe   207,808        0.854 of go
-        //     virtual threads, NO probe 20,134        0.082 of go   <-- 12x worse
-        //
-        // The syscall census makes the trap explicit: without the probe a request
-        // costs 2.05 syscalls against Go's 2.64 -- FEWER than Go -- and it is ten
-        // times slower, because the ppoll it saves is replaced by a park, and a
-        // park is a poller round trip plus a resume. Syscall COUNT is not cost.
-        // Do not re-run this experiment expecting a different answer; run it only
-        // after the PARK itself gets cheaper.
-        //
-        // A zero timeout is a genuine probe (a caller asking "is anything there"
-        // without wanting to wait), so that one still has to ask regardless.
-        if(!cn1BackendSpeculativePoll() && timeoutMillis != 0) {
-            return 1;
-        }
-        p.revents = 0;
-        rc = poll(&p, 1, 0);
-        if(rc > 0) {
-            return 1;
-        }
-        if(rc < 0 && errno != EINTR) {
-            return -1;
-        }
-        if(timeoutMillis == 0) {
-            return 0;               // a pure probe: no data, do not park
+        // The HTTP keep-alive loop no longer comes through here per request. It
+        // used to probe before EVERY read, one ppoll per request that neither
+        // Rust's nor Go's server makes, because the zero-copy read could not park
+        // when nothing had arrived. That read now parks through the -2 path, and
+        // only after a short read -- tokio's rule: a read that did not fill the
+        // buffer drained the socket, so wait for the poller rather than read
+        // again to learn EAGAIN. Measured under a profiler, two pinned cores, 32
+        // connections: 87,551 requests/s with the probe, 162,875 reading first
+        // (still one EAGAIN recv and one ppoll per request), 175,295 parking
+        // after a short read -- one recvfrom and one sendto per request, the
+        // same two syscalls axum makes, which measured 181,815 in that run.
+        if(timeoutMillis != -2) {
+            p.revents = 0;
+            rc = poll(&p, 1, 0);
+            if(rc > 0) {
+                return 1;
+            }
+            if(rc < 0 && errno != EINTR) {
+                return -1;
+            }
+            if(timeoutMillis == 0) {
+                return 0;               // a pure probe: no data, do not park
+            }
         }
         // YIELD around the park, and this is not optional bookkeeping.
         //
@@ -1434,7 +1390,7 @@ JAVA_INT com_codename1_backend_VirtualThread_resumeImpl___long_R_int(CODENAME_ON
         return 0;
     }
     cn1VirtualThreadSetYieldReason(CN1_VT_YIELD_IO);   /* the default for a plain park */
-    cn1VirtualThreadResume(vt);
+    cn1ResumeVirtualThreadOn(threadStateData, vt);
     if(cn1VirtualThreadFinished(vt)) {
         atomic_fetch_add(&cn1VtFinished, 1);
         return 0;
@@ -1758,7 +1714,8 @@ JAVA_INT com_codename1_backend_ServerSocket_availableProcessorsImpl___R_int(CODE
 #ifdef _WIN32
     return 1;
 #else
-    long n = sysconf(_SC_NPROCESSORS_ONLN);
-    return n > 0 ? (JAVA_INT)n : 1;
+    // The affinity mask and cgroup quota, not the machine: host threads past the
+    // cores the process may use only contend for them.
+    return cn1UsableCpuCount();
 #endif
 }

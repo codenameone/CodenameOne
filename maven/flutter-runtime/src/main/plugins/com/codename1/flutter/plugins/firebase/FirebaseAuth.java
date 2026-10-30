@@ -165,13 +165,66 @@ public class FirebaseAuth {
         return signIn("signUp", DartMap.<String, Object>of("returnSecureToken", Boolean.TRUE), true);
     }
 
+    /// An email credential signs in with its password; a federated one is exchanged
+    /// through Identity Toolkit's `accounts:signInWithIdp`, which is what the native SDKs
+    /// call too. `requestUri` must be a URL, and Firebase only checks it for the
+    /// redirect flows, which a token exchange is not -- hence the fixed `localhost`.
     public Future<UserCredential> signInWithCredential(Object credential) {
-        return Future.error(new FirebaseAuthException("operation-not-allowed",
-                "Only email/password and anonymous sign-in are supported in Codename One"));
+        if (credential instanceof OAuthCredential) {
+            OAuthCredential c = (OAuthCredential) credential;
+            if (c.idToken == null && c.accessTokenValue == null) {
+                return Future.error(new FirebaseAuthException("invalid-credential",
+                        "The credential carries neither an ID token nor an access token"));
+            }
+            return signIn("signInWithIdp", DartMap.<String, Object>of("postBody", c.postBody(),
+                    "requestUri", "http://localhost", "returnSecureToken", Boolean.TRUE,
+                    "returnIdpCredential", Boolean.TRUE), false);
+        }
+        if (credential instanceof AuthCredential) {
+            AuthCredential c = (AuthCredential) credential;
+            if (EmailAuthProvider.PROVIDER_ID.equals(c.providerId)) {
+                return signInWithEmailAndPassword(c.email, c.password);
+            }
+        }
+        return Future.error(new FirebaseAuthException("invalid-credential",
+                "Unsupported credential " + credential));
     }
 
+    /// Runs the provider's own sign-in (see [FederatedSignIn]) and exchanges what it
+    /// answers. A provider that cannot run interactively here fails, never hangs.
     public Future<UserCredential> signInWithProvider(Object provider) {
-        return signInWithCredential(provider);
+        if (!(provider instanceof FederatedSignIn)) {
+            return Future.error(new FirebaseAuthException("operation-not-allowed",
+                    "signInWithProvider supports the Google, Apple and OAuth providers"));
+        }
+        final Completer<UserCredential> done = new Completer<UserCredential>();
+        ((FederatedSignIn) provider).obtainCredential(Firebase.find(appName)).then(
+                new Funcs.Func1<OAuthCredential, Object>() {
+                    @Override
+                    public Object call(OAuthCredential c) {
+                        signInWithCredential(c).then(new Funcs.Func1<UserCredential, Object>() {
+                            @Override
+                            public Object call(UserCredential u) {
+                                done.complete(u);
+                                return null;
+                            }
+                        }, new Funcs.Func1<Object, Object>() {
+                            @Override
+                            public Object call(Object err) {
+                                done.completeError(err);
+                                return null;
+                            }
+                        });
+                        return null;
+                    }
+                }, new Funcs.Func1<Object, Object>() {
+                    @Override
+                    public Object call(Object err) {
+                        done.completeError(err);
+                        return null;
+                    }
+                });
+        return done.future();
     }
 
     public Future<Object> signOut() {
@@ -196,6 +249,7 @@ public class FirebaseAuth {
             public void call(Map<String, Object> r) {
                 User u = new User(FirebaseAuth.this, str(r.get("localId")), str(r.get("email")), anonymous);
                 u.displayName = str(r.get("displayName"));
+                u.photoURL = str(r.get("photoUrl"));
                 u.idToken = str(r.get("idToken"));
                 u.refreshToken = str(r.get("refreshToken"));
                 u.expiresAt = expiry(r.get("expiresIn"));
@@ -523,6 +577,7 @@ public class FirebaseAuth {
         Preferences.set(pref + "uid", current.uid);
         Preferences.set(pref + "email", current.email == null ? "" : current.email);
         Preferences.set(pref + "name", current.displayName == null ? "" : current.displayName);
+        Preferences.set(pref + "photo", current.photoURL == null ? "" : current.photoURL);
         Preferences.set(pref + "refresh", current.refreshToken == null ? "" : current.refreshToken);
         Preferences.set(pref + "anonymous", current.anonymous ? "true" : "false");
         Preferences.set(pref + "verified", current.emailVerified ? "true" : "false");
@@ -540,6 +595,7 @@ public class FirebaseAuth {
         User u = new User(this, uid, blankToNull(Preferences.get(pref + "email", "")),
                 "true".equals(Preferences.get(pref + "anonymous", "false")));
         u.displayName = blankToNull(Preferences.get(pref + "name", ""));
+        u.photoURL = blankToNull(Preferences.get(pref + "photo", ""));
         u.emailVerified = "true".equals(Preferences.get(pref + "verified", "false"));
         u.refreshToken = blankToNull(Preferences.get(pref + "refresh", ""));
         current = u;

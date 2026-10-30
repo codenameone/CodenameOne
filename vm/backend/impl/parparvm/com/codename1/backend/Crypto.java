@@ -55,6 +55,37 @@ public final class Crypto {
     private Crypto() {
     }
 
+    /// Installs the server's [com.codename1.security.CryptoEngine]: PBKDF2
+    /// through the native derivation [#pbkdf2(String, byte[], byte[], int, int)]
+    /// uses, and secp256k1, Schnorr, Ed25519 and Keccak through the C kernels
+    /// when the build linked them. Called once, as the backend loads.
+    public static void installCryptoEngine() {
+        com.codename1.security.CryptoEngine.install(
+                com.codename1.security.NativeCryptoEngine.create(new ServerEngine()));
+    }
+
+    private static final class ServerEngine extends com.codename1.security.CryptoEngine {
+        @Override
+        public boolean randomBytes(byte[] out) {
+            byte[] r = randomBytesImpl(out.length);
+            if (r == null) {
+                return false;
+            }
+            System.arraycopy(r, 0, out, 0, out.length);
+            return true;
+        }
+
+        @Override
+        public byte[] pbkdf2(String hashAlgorithm, byte[] password, byte[] salt, int iterations, int length) {
+            try {
+                return Crypto.pbkdf2(hashAlgorithm, password, salt, iterations, length);
+            } catch (IOException err) {
+                // the portable derivation answers instead
+                return null;
+            }
+        }
+    }
+
     public static byte[] sha256(byte[] data) {
         return sha256Impl(data);
     }
@@ -179,6 +210,11 @@ public final class Crypto {
     /// ECDSA over P-256 with SHA-256, and over P-384 with SHA-384.
     public static final String ES256 = "ES256";
     public static final String ES384 = "ES384";
+    /// The NIST P-256 curve, for [#generateEcKey].
+    public static final String P256 = "P-256";
+    /// The NIST P-384 curve, for [#generateEcKey].
+    public static final String P384 = "P-384";
+
 
     /// SHA-384; null for null.
     public static byte[] sha384(byte[] data) {
@@ -321,6 +357,113 @@ public final class Crypto {
         return aesGcmImpl(false, key, iv, aad, sealed);
     }
 
+    /// A new EC private key as PKCS#8 DER, on [#P256] or [#P384], carrying its
+    /// public point so `Der.publicKeyOf` can give the public half.
+    ///
+    /// @param curve `"P-256"` or `"P-384"`
+    public static byte[] generateEcKey(String curve) throws IOException {
+        byte[] out = generateEcKeyImpl(curveCode(curve));
+        if (out == null) {
+            throw new IOException("Could not generate a " + curve + " key");
+        }
+        return out;
+    }
+
+    /// ECDH key agreement: the x coordinate of the shared point, 32 bytes on
+    /// P-256 and 48 on P-384, as SEC 1 and every TLS stack define it.
+    ///
+    /// The result is key material, not a key: run it through a KDF (HKDF, or the
+    /// protocol's own) before using it. Both keys must be on the same curve; a
+    /// public point that is not on its curve is refused.
+    ///
+    /// @param privateKey this side's PKCS#8 EC private key
+    /// @param peerPublicKey the other side's SubjectPublicKeyInfo
+    /// @throws IOException when either key cannot be read, they are on different
+    /// curves, or the curve is not P-256 or P-384
+    public static byte[] ecdh(byte[] privateKey, byte[] peerPublicKey) throws IOException {
+        if (privateKey == null || peerPublicKey == null) {
+            throw new IOException("ECDH needs a private key and a peer public key");
+        }
+        byte[] out = ecdhImpl(privateKey, peerPublicKey);
+        if (out == null) {
+            throw new IOException("ECDH failed: the keys are not EC keys on one curve, "
+                    + "P-256 or P-384");
+        }
+        return out;
+    }
+
+    /// Encrypts with AES-CBC over whole blocks, with no padding.
+    ///
+    /// This is the raw mode a format defined over CBC needs -- PKCS#12 and
+    /// encrypted PKCS#8 -- and nothing more. CBC is not authenticated, so it is
+    /// deliberately not a general cipher: there is no padding, and so no padding
+    /// check whose pass or fail an attacker could probe (the padding oracle). A
+    /// format that pads removes the padding itself, and only after it has
+    /// verified the data's integrity some other way, as PKCS#12 does with its
+    /// MAC. Seal new data with [#aesGcmEncrypt].
+    ///
+    /// Encryption and decryption are two methods rather than one with a mode
+    /// flag, so the rule that matters -- an encrypting IV is random and never
+    /// repeated under one key -- applies to exactly the method it is about.
+    /// Decrypting takes whatever IV the data carries, a fixed test vector
+    /// included.
+    ///
+    /// @param key 16, 24 or 32 bytes
+    /// @param iv 16 bytes, random and never repeated under one key; use
+    /// [#randomBytes]
+    /// @param blocks a whole number of 16 byte blocks
+    public static byte[] aesCbcEncryptBlocks(byte[] key, byte[] iv, byte[] blocks)
+            throws IOException {
+        checkCbc(key, iv, blocks);
+        byte[] out = aesCbcImpl(true, key, iv, blocks);
+        if (out == null) {
+            throw new IOException("AES-CBC failed");
+        }
+        return out;
+    }
+
+    /// Decrypts AES-CBC over whole blocks, with no padding: the inverse of
+    /// [#aesCbcEncryptBlocks]. Nothing is unpadded or checked here; see that
+    /// method for why.
+    ///
+    /// @param key 16, 24 or 32 bytes
+    /// @param iv the 16 byte IV the data was encrypted under
+    /// @param blocks a whole number of 16 byte blocks
+    public static byte[] aesCbcDecryptBlocks(byte[] key, byte[] iv, byte[] blocks)
+            throws IOException {
+        checkCbc(key, iv, blocks);
+        byte[] out = aesCbcImpl(false, key, iv, blocks);
+        if (out == null) {
+            throw new IOException("AES-CBC failed");
+        }
+        return out;
+    }
+
+    private static int curveCode(String curve) throws IOException {
+        if (P256.equals(curve)) {
+            return 1;
+        }
+        if (P384.equals(curve)) {
+            return 2;
+        }
+        throw new IOException("Not a supported curve: " + curve + "; P-256 or P-384");
+    }
+
+    private static void checkCbc(byte[] key, byte[] iv, byte[] blocks) throws IOException {
+        if (key == null || iv == null || blocks == null) {
+            throw new IOException("AES-CBC needs a key, an IV and data");
+        }
+        if (key.length != 16 && key.length != 24 && key.length != 32) {
+            throw new IOException("An AES key is 16, 24 or 32 bytes, not " + key.length);
+        }
+        if (iv.length != 16) {
+            throw new IOException("An AES-CBC IV is 16 bytes, not " + iv.length);
+        }
+        if (blocks.length % 16 != 0) {
+            throw new IOException("AES-CBC data is a whole number of 16 byte blocks");
+        }
+    }
+
     private static int digestCode(String digest) {
         if (SHA256.equals(digest)) {
             return 2;
@@ -423,6 +566,9 @@ public final class Crypto {
     private static native byte[] signImpl(int algorithm, byte[] pkcs8, byte[] data);
     private static native int verifyImpl(int algorithm, byte[] spki, byte[] data, byte[] signature);
     private static native byte[] generateRsaKeyImpl(int bits);
+    private static native byte[] generateEcKeyImpl(int curve);
+    private static native byte[] ecdhImpl(byte[] pkcs8, byte[] spki);
+    private static native byte[] aesCbcImpl(boolean encrypt, byte[] key, byte[] iv, byte[] input);
     private static native byte[] aesGcmImpl(boolean encrypt, byte[] key, byte[] iv, byte[] aad,
                                             byte[] input);
 }

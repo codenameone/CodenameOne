@@ -423,6 +423,11 @@ public final class GradleConversion {
                 // nothing: the app would build, minus its Kotlin classes.
                 addKotlinPlugin(new File(targetDir, "build.gradle.kts"), true);
             }
+            if (KmpProjectImporter.isKmpProject(KmpProjectImporter.kmpDir(targetDir))) {
+                // Compose sources compile only with the Compose compiler, and
+                // the plugin refuses the build without it rather than guess.
+                addComposePlugin(new File(targetDir, "build.gradle.kts"));
+            }
         } catch (IOException ex) {
             throw new BuildFailureException("Could not convert " + sourceDir + ": " + ex.getMessage(), ex);
         }
@@ -1044,6 +1049,26 @@ public final class GradleConversion {
         Files.write(buildScript.toPath(), updated.getBytes(StandardCharsets.UTF_8));
     }
 
+    /// Adds the Compose compiler plugin, at the Kotlin plugin's version (the two
+    /// are released together and must match), to the `plugins {}` block
+    /// [#addKotlinPlugin] wrote.
+    static void addComposePlugin(File buildScript) throws IOException {
+        String text = new String(Files.readAllBytes(buildScript.toPath()), StandardCharsets.UTF_8);
+        if (text.contains(KmpProjectImporter.COMPOSE_GRADLE_PLUGIN)) {
+            return;
+        }
+        int at = text.indexOf("kotlin(\"jvm\")");
+        int eol = at < 0 ? -1 : text.indexOf('\n', at);
+        if (eol < 0) {
+            addKotlinPlugin(buildScript, true);
+            addComposePlugin(buildScript);
+            return;
+        }
+        String line = "\n    id(\"" + KmpProjectImporter.COMPOSE_GRADLE_PLUGIN + "\") version \"" + KOTLIN_VERSION + "\"";
+        Files.write(buildScript.toPath(), (text.substring(0, eol) + line + text.substring(eol))
+                .getBytes(StandardCharsets.UTF_8));
+    }
+
     /// The iOS app extensions and localized strings, from wherever the source
     /// build tool keeps them to the Gradle layout's own directories.
     private static void copyIosExtras(ProjectLayout from, ProjectLayout to) throws IOException {
@@ -1077,7 +1102,11 @@ public final class GradleConversion {
             // Added by the plugin for a project with src/main/unity, at its own
             // version, together with the translator of that version: a
             // declaration carried over from the pom could name another one.
-            "codenameone-unity-compat"));
+            "codenameone-unity-compat",
+            // Likewise for a project with src/main/kmp,
+            "codenameone-compose-compat",
+            // and for one with src/main/flutter.
+            "codenameone-flutter-runtime"));
 
     /// `build.gradle.kts` lines for the dependencies a module's pom declares
     /// itself, leaving out the framework, which the plugin adds. A dependency of

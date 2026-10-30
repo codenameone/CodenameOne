@@ -87,9 +87,27 @@ public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V> {
      * <p>There are no node objects in this representation, so unlike the
      * chained layout this replaced -- where the Entry WAS the storage and cost
      * an allocation per mapping -- an Entry is built only when an iterator
-     * hands one out, and only for {@code entrySet()}. It keeps the table and
+     * hands one out from {@code entrySet()}. It keeps the table and
      * slot so {@link #setValue} still writes through.
      */
+    /**
+     * Markers for key and value iterators, which {@link HashIterator#at} reads
+     * from the slot without building an Entry; never called.
+     */
+    @SuppressWarnings("rawtypes")
+    private static final MapEntry.Type KEYS = new MapEntry.Type() {
+        public Object get(MapEntry entry) {
+            return entry.key;
+        }
+    };
+
+    @SuppressWarnings("rawtypes")
+    private static final MapEntry.Type VALUES = new MapEntry.Type() {
+        public Object get(MapEntry entry) {
+            return entry.value;
+        }
+    };
+
     private static class Entry<K, V> extends MapEntry<K, V> {
         private final Hashtable<K, V> table;
 
@@ -240,6 +258,23 @@ public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V> {
             expectedModCount = modCount;
         }
 
+        /**
+         * The element at an occupied slot. A key or value iterator reads the
+         * slot directly; only an entry iterator builds an {@link Entry}. A
+         * theme load walks its tables' keys several times, and an Entry per
+         * key was 16,000 objects of garbage per launch.
+         */
+        @SuppressWarnings("unchecked")
+        final E at(int idx) {
+            if (type == KEYS) {
+                return (E) NativeStorage.get(cn1Keys, idx);
+            }
+            if (type == VALUES) {
+                return (E) NativeStorage.get(NativeStorage.part(cn1Keys, VALS), idx);
+            }
+            return type.get(new Entry<K, V>(Hashtable.this, idx));
+        }
+
         /** Advance past empty and tombstoned slots. */
         final boolean advance() {
             long meta = NativeStorage.part(cn1Keys, META);
@@ -266,7 +301,7 @@ public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V> {
             lastPosition = position;
             position++;
             canRemove = true;
-            return type.get(new Entry<K, V>(Hashtable.this, lastPosition));
+            return at(lastPosition);
         }
 
         public void remove() {
@@ -448,11 +483,7 @@ public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V> {
         if (elementCount == 0) {
             return (java.util.Enumeration<V>) EMPTY_ENUMERATION;
         }
-        return new HashEnumIterator<V>(new MapEntry.Type<V, K, V>() {
-            public V get(MapEntry<K, V> entry) {
-                return entry.value;
-            }
-        }, true);
+        return new HashEnumIterator<V>((MapEntry.Type<V, K, V>) VALUES, true);
     }
 
     /**
@@ -614,11 +645,7 @@ public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V> {
         if (elementCount == 0) {
             return (java.util.Enumeration<K>) EMPTY_ENUMERATION;
         }
-        return new HashEnumIterator<K>(new MapEntry.Type<K, K, V>() {
-            public K get(MapEntry<K, V> entry) {
-                return entry.key;
-            }
-        }, true);
+        return new HashEnumIterator<K>((MapEntry.Type<K, K, V>) KEYS, true);
     }
 
     /**
@@ -659,11 +686,7 @@ public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V> {
                 if (this.size() == 0) {
                     return (Iterator<K>) EMPTY_ITERATOR;
                 }
-                return new HashEnumIterator<K>(new MapEntry.Type<K, K, V>() {
-                    public K get(MapEntry<K, V> entry) {
-                        return entry.key;
-                    }
-                });
+                return new HashEnumIterator<K>((MapEntry.Type<K, K, V>) KEYS);
             }
         }, this);
     }
@@ -715,7 +738,7 @@ public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V> {
                 }
                 int idx = position;
                 position++;
-                return type.get(new Entry<K, V>(Hashtable.this, idx));
+                return at(idx);
             }
             return super.next();
         }
@@ -925,11 +948,7 @@ public class Hashtable<K, V> extends Dictionary<K, V> implements Map<K, V> {
                     @Override
                     public Iterator<V> iterator() {
                         return new HashIterator<V>(
-                                new MapEntry.Type<V, K, V>() {
-                                    public V get(MapEntry<K, V> entry) {
-                                        return entry.value;
-                                    }
-                                });
+                                (MapEntry.Type<V, K, V>) VALUES);
                     }
                 }, this);
     }

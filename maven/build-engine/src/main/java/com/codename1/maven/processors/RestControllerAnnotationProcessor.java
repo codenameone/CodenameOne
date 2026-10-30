@@ -252,6 +252,9 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         String routerSimpleName;
         List<String> basePaths = new ArrayList<String>();
         List<Route> routes = new ArrayList<Route>();
+        /** The controller's own @ExceptionHandler methods, deepest type first. */
+        List<BackendExceptionHandlers.Handler> handlers =
+                new ArrayList<BackendExceptionHandlers.Handler>();
     }
 
     private static final class Route {
@@ -272,6 +275,8 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
          * when Json writes it as it is.
          */
         String codecWrite;
+        /** Whether any parameter is checked before the call. */
+        boolean validates;
     }
 
     private static final class Param {
@@ -293,6 +298,24 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
          */
         String codecRead;
         String formBinding;
+        /**
+         * The checks of the parameter's constraints, against the local
+         * cn1Arg{index}, reporting into cn1Violations; null when it has none.
+         */
+        String validation;
+    }
+
+    /// The @ControllerAdvice classes: binary name to the resolver source.
+    private final Map<String, String> adviceSources = new LinkedHashMap<String, String>();
+
+    /// The validation checks, created with the first constrained parameter.
+    private BackendValidation validation;
+
+    private BackendValidation validation(ProcessorContext ctx) {
+        if (validation == null) {
+            validation = new BackendValidation(ctx);
+        }
+        return validation;
     }
 
     /// {AnnotatedClass, description} of every handler parameter the security
@@ -316,6 +339,8 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         out.add(CONTROLLER);
         out.add(MVC_CONTROLLER);
         out.add(WEBSOCKET_MAPPING);
+        out.add(BackendExceptionHandlers.CONTROLLER_ADVICE);
+        out.add(BackendExceptionHandlers.REST_CONTROLLER_ADVICE);
         return out;
     }
 
@@ -326,6 +351,17 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             // Falls through on purpose: nothing stops one class being both a
             // controller and a websocket endpoint, and refusing that would be an
             // arbitrary rule rather than a real constraint.
+        }
+        AnnotationValues advice = BackendExceptionHandlers.advice(cls);
+        if (advice != null && BuildHintAnnotationProcessor.hasBackingSource(cls,
+                ctx.getCompileSourceRoots(), ctx.getSourceEncoding())) {
+            List<BackendExceptionHandlers.Handler> handlers =
+                    BackendExceptionHandlers.collect(ctx, cls);
+            if (handlers == null) {
+                return;
+            }
+            adviceSources.put(BackendExceptionHandlers.adapterName(cls.getBinaryName()),
+                    BackendExceptionHandlers.adapter(cls, handlers, advice));
         }
         if (cls.getClassAnnotation(CONTROLLER) == null && cls.getClassAnnotation(MVC_CONTROLLER) == null) {
             return;
@@ -431,6 +467,11 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         if (!routeShapesAreDistinct(cls, controller, ctx)) {
             return;
         }
+        List<BackendExceptionHandlers.Handler> handlers = BackendExceptionHandlers.collect(ctx, cls);
+        if (handlers == null) {
+            return;
+        }
+        controller.handlers.addAll(handlers);
         controllers.put(controller.binaryName, controller);
     }
 
@@ -707,6 +748,42 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         return literal.matches(regex.toString());
     }
 
+    /// Compiles the constraints on one parameter into [Param#validation].
+    ///
+    /// The value is checked AFTER it is bound and BEFORE the method runs, so a
+    /// request breaking a constraint has no side effect: the controller never
+    /// sees it. Paths are stable -- the JSON property under the body, the
+    /// annotation's name for a scalar parameter.
+    private boolean prepareValidation(AnnotatedClass cls, MethodInfo m, Param p,
+            Map<String, AnnotationValues> annotations, String genericType, int index,
+            Route route, ProcessorContext ctx) {
+        if (!BackendValidation.constrained(annotations)) {
+            return true;
+        }
+        String where = "parameter " + (index + 1) + " of " + cls.getBinaryName() + "."
+                + m.getName();
+        boolean root = "BODY".equals(p.kind) || "FORM".equals(p.kind);
+        if (!root && !"PATH".equals(p.kind) && !"QUERY".equals(p.kind)
+                && !"HEADER".equals(p.kind)) {
+            ctx.error(cls, "Validation constraints apply to a @RequestBody, @ModelAttribute, "
+                    + "@PathVariable, @RequestParam or @RequestHeader parameter, and " + where
+                    + " is none of those");
+            return false;
+        }
+        String type = p.genericJavaType != null ? p.genericJavaType
+                : genericType != null ? genericType : p.javaType;
+        String path = root ? "" : p.name == null || p.name.length() == 0 ? "arg" + index : p.name;
+        try {
+            p.validation = validation(ctx).check(annotations, type, "cn1Arg" + index,
+                    quote(path), "cn1Violations", "", where);
+        } catch (IllegalArgumentException err) {
+            ctx.error(cls, err.getMessage());
+            return false;
+        }
+        route.validates = true;
+        return true;
+    }
+
     /**
      * Splits a route pattern into the parts the generated matcher needs.
      *
@@ -972,6 +1049,9 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                     p.genericJavaType = bodyType;
                     p.codecRead = codecs(ctx).readStatements(bodyType, "parsed", "com.codename1"
                             + ".impl.backend.JsonCodec.Path.ROOT", "null", "-1", "0", "target", "");
+                    if (!prepareValidation(cls, m, p, annotations, genericType, i, route, ctx)) {
+                        return null;
+                    }
                     route.params.add(p);
                     continue;
                 }
@@ -1029,6 +1109,9 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                         + " parameter, which is not a " + p.javaType + ". It would be "
                         + "silently replaced by zero, and the handler would run on a "
                         + "value nobody wrote.");
+                return null;
+            }
+            if (!prepareValidation(cls, m, p, annotations, genericType, i, route, ctx)) {
                 return null;
             }
             route.params.add(p);
@@ -1514,6 +1597,18 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             }
             sources.putAll(codecSources);
         }
+        Map<String, String> extra = new LinkedHashMap<String, String>(adviceSources);
+        if (validation != null) {
+            extra.putAll(validation.sources());
+        }
+        for (String generated : extra.keySet()) {
+            if (isNotOurOwnOutput(ctx, generated)) {
+                ctx.error(generated + " already exists, and the class generated under that "
+                        + "name would replace it. Rename that class.");
+                return;
+            }
+        }
+        sources.putAll(extra);
         boolean hasViews = false;
         for (Controller controller : controllers.values()) for (Route route : controller.routes) hasViews |= route.view;
         if (hasViews || hasMvcControllers()) {
@@ -1577,8 +1672,11 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         sb.append("// Generated from @RestController on ").append(c.binaryName)
           .append(". Do not edit.\n");
         sb.append("@com.codename1.backend.annotations.Generated\n");
+        boolean local = !c.handlers.isEmpty();
         sb.append("public final class ").append(c.routerSimpleName)
-          .append(" implements com.codename1.backend.HttpServer.Handler {\n\n");
+          .append(" implements com.codename1.backend.HttpServer.Handler,\n")
+          .append("        com.codename1.backend.web.ControllerHooks.Invocation")
+          .append(local ? ", com.codename1.backend.web.ExceptionResolver" : "").append(" {\n\n");
 
         List<Route> ordered = new ArrayList<Route>(c.routes);
         Collections.sort(ordered, new java.util.Comparator<Route>() {
@@ -1616,14 +1714,25 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 sb.append("    private static final String[] A").append(i).append(" = ")
                   .append(stringArrayLiteral(route.after)).append(";\n");
             }
+            sb.append("    private static final com.codename1.backend.web.HandlerMethod H").append(i)
+              .append(" = new com.codename1.backend.web.HandlerMethod(").append(quote(c.binaryName))
+              .append(", ").append(quote(route.javaMethod)).append(", ")
+              .append(quote(route.httpMethod)).append(", ").append(quote(route.pattern))
+              .append(");\n");
         }
 
         // The SOURCE name, qualified: the router sits in the controller's package,
         // but a member class is Notes.Api there and not Notes$Api, which javac
         // reads as a top-level identifier it cannot find.
-        sb.append("\n    private final ").append(c.sourceName).append(" impl;\n\n");
+        sb.append("\n    private final ").append(c.sourceName).append(" impl;\n");
+        // The interceptors and global exception handlers, from the wiring; empty
+        // for a router built on its own.
+        sb.append("    private final com.codename1.backend.web.ControllerHooks cn1Hooks;\n\n");
         sb.append("    public ").append(c.routerSimpleName).append("(").append(c.sourceName)
-          .append(" impl) {\n        this.impl = impl;\n    }\n\n");
+          .append(" impl) {\n        this(impl, com.codename1.backend.web.ControllerHooks.none());\n    }\n\n");
+        sb.append("    public ").append(c.routerSimpleName).append("(").append(c.sourceName)
+          .append(" impl, com.codename1.backend.web.ControllerHooks hooks) {\n")
+          .append("        this.impl = impl;\n        this.cn1Hooks = hooks;\n    }\n\n");
 
         // throws Exception because Handler does: a controller method that reads a
         // database throws IOException, and a router that could not pass it on would
@@ -1666,7 +1775,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 current = route.httpMethod;
                 open = true;
             }
-            emitRoute(sb, route, i, c);
+            emitMatch(sb, route, i, local);
         }
         if (open) {
             sb.append("        }\n");
@@ -1674,13 +1783,48 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         sb.append("        // No route here. Returning null lets the server answer 404, and\n");
         sb.append("        // lets another router be tried first when several are chained.\n");
         sb.append("        return null;\n    }\n\n");
+        // Each route's binding and call, in a method of its own so the hooks can
+        // run it in the middle of the interceptors and exception handlers.
+        sb.append("    public com.codename1.backend.HttpServer.Response proceed(int route,\n")
+          .append("            com.codename1.backend.HttpServer.Request request, String[] bound)\n")
+          .append("            throws Exception {\n        switch (route) {\n");
+        for (int i = 0; i < ordered.size(); i++) {
+            sb.append("            case ").append(i).append(": return cn1Route").append(i)
+              .append("(request, bound);\n");
+        }
+        sb.append("            default: return null;\n        }\n    }\n\n");
+        for (int i = 0; i < ordered.size(); i++) {
+            Route route = ordered.get(i);
+            sb.append("    // ").append(route.httpMethod).append(' ').append(route.pattern)
+              .append(" -> ").append(route.javaMethod).append('\n');
+            sb.append("    private com.codename1.backend.HttpServer.Response cn1Route").append(i)
+              .append("(\n            com.codename1.backend.HttpServer.Request request, ")
+              .append("String[] bound) throws Exception {\n");
+            emitRoute(sb, route, i, c);
+            sb.append("    }\n\n");
+            if (usesEncoder(route)) {
+                emitEncoder(sb, route, i);
+            }
+        }
+        if (local) {
+            sb.append("    public com.codename1.backend.HttpServer.Response resolve(\n")
+              .append("            com.codename1.backend.HttpServer.Request request,\n")
+              .append("            com.codename1.backend.web.HandlerMethod handler,\n")
+              .append("            Exception failure) throws Exception {\n");
+            sb.append(BackendExceptionHandlers.dispatch(c.handlers, "        "));
+            sb.append("    }\n\n");
+        }
         emitRouterHelpers(sb);
         sb.append("}\n");
         return sb.toString();
     }
 
-    private static void emitRoute(StringBuilder sb, Route route, int index, Controller c) {
+    /// The test for one route inside handle(), and the hand-off to its method:
+    /// straight to it while there is nothing to run around it, otherwise through
+    /// the hooks.
+    private static void emitMatch(StringBuilder sb, Route route, int index, boolean local) {
         String pad = "                ";
+        String bound = "null";
         if (route.after.isEmpty()) {
             sb.append("            if (request.pathIs(P").append(index).append(")) {\n");
         } else {
@@ -1689,7 +1833,25 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
               .append(".length), A").append(index).append(");\n");
             sb.append(pad).append("if (bound != null) {\n");
             pad = "                    ";
+            bound = "bound";
         }
+        String hooked = "cn1Hooks.invoke(request, H" + index + ", this, " + index + ", " + bound
+                + ", " + (local ? "this" : "null") + ")";
+        if (local || route.validates) {
+            sb.append(pad).append("return ").append(hooked).append(";\n");
+        } else {
+            sb.append(pad).append("return cn1Hooks.isEmpty() ? cn1Route").append(index)
+              .append("(request, ").append(bound).append(")\n").append(pad).append("        : ")
+              .append(hooked).append(";\n");
+        }
+        if (!route.after.isEmpty()) {
+            sb.append("                }\n");
+        }
+        sb.append("            }\n");
+    }
+
+    private static void emitRoute(StringBuilder sb, Route route, int index, Controller c) {
+        String pad = "        ";
         // The TEMPLATE names the span, never the path: /pets/7 and /pets/8 are
         // one operation, and a trace backend grouping by path would give every id
         // its own. Emitted in EVERY build, not only a traced one: a program can
@@ -1730,8 +1892,18 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 sb.append(pad).append("final Object cn1Principal = ").append(SECURITY_SUPPORT)
                   .append(".principal();\n");
             }
-            args.append(argumentExpression(p));
+            if (p.validation != null) {
+                // Bound once, into a local the checks and the call share.
+                String type = BackendJsonCodecs.source(p.genericJavaType != null
+                        && "BODY".equals(p.kind) ? p.genericJavaType : p.javaType);
+                sb.append(pad).append("final ").append(type).append(" cn1Arg").append(i)
+                  .append(" = ").append(argumentExpression(p)).append(";\n");
+                args.append("cn1Arg").append(i);
+            } else {
+                args.append(argumentExpression(p));
+            }
         }
+        emitValidation(sb, route, pad);
 
         String call = "impl." + route.javaMethod + "(" + args + ")";
         if (route.view) {
@@ -1763,11 +1935,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
               .append(";\n");
             sb.append(pad).append("return result == null ? request.respond(404, \"text/plain\", EMPTY)\n");
             sb.append(pad).append("        : request.respondJson(").append(route.status)
-              .append(", new com.codename1.backend.Json.Writable() {\n");
-            sb.append(pad).append("            public void writeTo(com.codename1.backend.ByteSink out) {\n");
-            appendIndented(sb, route.codecWrite, pad + "                ");
-            sb.append(pad).append("            }\n");
-            sb.append(pad).append("        });\n");
+              .append(", result, CN1_ENCODER").append(index).append(");\n");
         } else {
             // Everything else is JSON. respondJson writes into the connection's own
             // Response, so a route that returns a value still allocates only that value.
@@ -1776,11 +1944,51 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             sb.append(pad).append("        : request.respondJson(").append(route.status)
               .append(", result);\n");
         }
+    }
 
-        if (!route.after.isEmpty()) {
-            sb.append("                }\n");
+    /// The checks of every constrained parameter, before the call. A form
+    /// followed by a BindingResult reports into it, as Spring does, and the
+    /// method decides; every other failure is a ValidationException, thrown so
+    /// an exception handler can shape the answer.
+    private static void emitValidation(StringBuilder sb, Route route, String pad) {
+        if (!route.validates) {
+            return;
         }
-        sb.append("            }\n");
+        String violations = BackendValidation.VIOLATIONS;
+        for (int i = 0; i < route.params.size(); i++) {
+            Param p = route.params.get(i);
+            boolean toBindingResult = p.validation != null && "FORM".equals(p.kind)
+                    && i + 1 < route.params.size() && "ERRORS".equals(route.params.get(i + 1).kind);
+            if (toBindingResult) {
+                sb.append(pad).append("{\n");
+                sb.append(pad).append("    ").append(violations)
+                  .append(" cn1Violations = new ").append(violations).append("();\n");
+                appendIndented(sb, p.validation, pad + "    ");
+                sb.append(pad).append("    for (com.codename1.backend.validation.FieldError cn1Error"
+                        + " : cn1Violations.errors()) {\n");
+                sb.append(pad).append("        ").append(p.local).append("Errors.rejectValue("
+                        + "cn1Error.getField(), cn1Error.getMessage());\n");
+                sb.append(pad).append("    }\n");
+                sb.append(pad).append("}\n");
+            }
+        }
+        boolean declared = false;
+        for (int i = 0; i < route.params.size(); i++) {
+            Param p = route.params.get(i);
+            if (p.validation == null || "FORM".equals(p.kind) && i + 1 < route.params.size()
+                    && "ERRORS".equals(route.params.get(i + 1).kind)) {
+                continue;
+            }
+            if (!declared) {
+                declared = true;
+                sb.append(pad).append(violations).append(" cn1Violations = new ")
+                  .append(violations).append("();\n");
+            }
+            appendIndented(sb, p.validation, pad);
+        }
+        if (declared) {
+            sb.append(pad).append("cn1Violations.check();\n");
+        }
     }
 
     /**
@@ -2530,6 +2738,33 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             sb.append(pad).append(code, start, end).append('\n');
             start = end + 1;
         }
+    }
+
+    /// True exactly when emitRoute answers through CN1_ENCODER<index>: the same
+    /// tests in the same order as its branches, so the field and its one use
+    /// cannot disagree.
+    private static boolean usesEncoder(Route route) {
+        return !route.view && !"void".equals(route.returnJavaType)
+                && !isResponseType(route.returnJavaType)
+                && !"java.lang.String".equals(route.returnJavaType)
+                && route.codecWrite != null;
+    }
+
+    /// The route's codec as a static `Json.Encoder`. It used to be an anonymous
+    /// Writable built around the result on every request: one object per
+    /// response, which with the result itself was all a small JSON route
+    /// allocated. The encoder is handed the value instead, so it is made once.
+    private static void emitEncoder(StringBuilder sb, Route route, int index) {
+        String type = BackendJsonCodecs.source(route.returnJavaType);
+        sb.append("    private static final com.codename1.backend.Json.Encoder CN1_ENCODER")
+          .append(index).append(" =\n");
+        sb.append("            new com.codename1.backend.Json.Encoder() {\n");
+        sb.append("        @SuppressWarnings(\"unchecked\")\n");
+        sb.append("        public void write(Object cn1Value, com.codename1.backend.ByteSink out) {\n");
+        sb.append("            final ").append(type).append(" result = (").append(type)
+          .append(") cn1Value;\n");
+        appendIndented(sb, route.codecWrite, "            ");
+        sb.append("        }\n    };\n\n");
     }
 
     private static void emitRouterHelpers(StringBuilder sb) {

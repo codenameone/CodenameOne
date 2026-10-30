@@ -7,6 +7,7 @@ package com.codename1.util;
 import java.util.Random;
 
 /// A simplified version of big integer from the bouncy castle implementation
+@com.codename1.impl.SharedWithBackend
 public class BigInteger {
 
     public static final BigInteger ZERO = new BigInteger(0, new int[0]);

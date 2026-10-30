@@ -23,11 +23,13 @@
 package com.codename1.backend;
 
 import java.io.IOException;
+import java.math.BigInteger;
 import java.security.AlgorithmParameters;
 import java.security.GeneralSecurityException;
 import java.security.InvalidKeyException;
 import java.security.Key;
 import java.security.KeyFactory;
+import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.MessageDigest;
 import java.security.PrivateKey;
@@ -36,6 +38,8 @@ import java.security.SecureRandom;
 import java.security.Signature;
 import java.security.SignatureException;
 import java.security.interfaces.ECKey;
+import java.security.interfaces.ECPrivateKey;
+import java.security.interfaces.ECPublicKey;
 import java.security.spec.ECGenParameterSpec;
 import java.security.spec.ECParameterSpec;
 import java.security.spec.MGF1ParameterSpec;
@@ -43,11 +47,14 @@ import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.PSSParameterSpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import javax.crypto.Cipher;
+import javax.crypto.KeyAgreement;
 import javax.crypto.Mac;
 import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
 /// Java SE twin of Crypto, on the JDK's own providers.
@@ -78,6 +85,21 @@ public final class Crypto {
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private Crypto() {
+    }
+
+    /// Installs the server's [com.codename1.security.CryptoEngine]. The JVM
+    /// runs the portable Java engine, which is already its fastest path, so
+    /// this installs nothing; the ParparVM build links the C kernels here.
+    public static void installCryptoEngine() {
+        // Java SE runs every kernel in Java; the engine only supplies the CSPRNG that shared
+        // code (mnemonics, Schnorr nonces) draws on through CryptoEngine.random.
+        com.codename1.security.CryptoEngine.install(new com.codename1.security.CryptoEngine() {
+            @Override
+            public boolean randomBytes(byte[] out) {
+                RANDOM.nextBytes(out);
+                return true;
+            }
+        });
     }
 
     public static byte[] sha256(byte[] data) {
@@ -234,6 +256,11 @@ public final class Crypto {
     /// ECDSA over P-256 with SHA-256, and over P-384 with SHA-384.
     public static final String ES256 = "ES256";
     public static final String ES384 = "ES384";
+    /// The NIST P-256 curve, for [#generateEcKey].
+    public static final String P256 = "P-256";
+    /// The NIST P-384 curve, for [#generateEcKey].
+    public static final String P384 = "P-384";
+
 
     /// SHA-384; null for null.
     public static byte[] sha384(byte[] data) {
@@ -461,6 +488,199 @@ public final class Crypto {
             cipher.updateAAD(aad);
         }
         return cipher;
+    }
+
+    /// A new EC private key as PKCS#8 DER, on [#P256] or [#P384], carrying its
+    /// public point so `Der.publicKeyOf` can give the public half.
+    ///
+    /// @param curve `"P-256"` or `"P-384"`
+    public static byte[] generateEcKey(String curve) throws IOException {
+        int code = curveCode(curve);
+        try {
+            KeyPairGenerator generator = KeyPairGenerator.getInstance("EC");
+            generator.initialize(new ECGenParameterSpec(code == 1 ? "secp256r1" : "secp384r1"),
+                    RANDOM);
+            KeyPair pair = generator.generateKeyPair();
+            return ecPkcs8(code, (ECPrivateKey) pair.getPrivate(), (ECPublicKey) pair.getPublic());
+        } catch (GeneralSecurityException | RuntimeException err) {
+            throw new IOException("Could not generate a " + curve + " key", err);
+        }
+    }
+
+    /// The JDK's own PKCS#8 encoding of an EC key leaves the public point out,
+    /// and OpenSSL's puts it in. This writes the SEC 1 structure OpenSSL does,
+    /// so a key made on either runtime is the same shape and `Der.publicKeyOf`
+    /// works on both.
+    private static byte[] ecPkcs8(int code, ECPrivateKey key, ECPublicKey pub) throws IOException {
+        int size = code == 1 ? 32 : 48;
+        byte[] d = fixed(key.getS(), size);
+        byte[] point = new byte[1 + 2 * size];
+        point[0] = 4;
+        System.arraycopy(fixed(pub.getW().getAffineX(), size), 0, point, 1, size);
+        System.arraycopy(fixed(pub.getW().getAffineY(), size), 0, point, 1 + size, size);
+        byte[] oid = code == 1
+                ? new byte[] {6, 8, 0x2a, (byte) 0x86, 0x48, (byte) 0xce, 0x3d, 3, 1, 7}
+                : new byte[] {6, 5, 0x2b, (byte) 0x81, 4, 0, 0x22};
+        byte[] bits = new byte[point.length + 1];
+        System.arraycopy(point, 0, bits, 1, point.length);
+        byte[] sec1 = tlv(0x30, cat(new byte[] {2, 1, 1}, tlv(4, d), tlv(0xa0, oid),
+                tlv(0xa1, tlv(3, bits))));
+        Arrays.fill(d, (byte) 0);
+        return com.codename1.backend.security.crypto.Der.sec1ToPkcs8(sec1);
+    }
+
+    private static byte[] fixed(BigInteger value, int size) {
+        byte[] raw = value.toByteArray();
+        byte[] out = new byte[size];
+        int copy = Math.min(raw.length, size);
+        System.arraycopy(raw, raw.length - copy, out, size - copy, copy);
+        return out;
+    }
+
+    private static byte[] tlv(int tag, byte[] content) {
+        int n = content.length;
+        byte[] head = n < 128 ? new byte[] {(byte) tag, (byte) n}
+                : n < 256 ? new byte[] {(byte) tag, (byte) 0x81, (byte) n}
+                : new byte[] {(byte) tag, (byte) 0x82, (byte) (n >> 8), (byte) n};
+        return cat(head, content);
+    }
+
+    private static byte[] cat(byte[]... parts) {
+        int n = 0;
+        for (byte[] part : parts) {
+            n += part.length;
+        }
+        byte[] out = new byte[n];
+        int pos = 0;
+        for (byte[] part : parts) {
+            System.arraycopy(part, 0, out, pos, part.length);
+            pos += part.length;
+        }
+        return out;
+    }
+
+    /// ECDH key agreement: the x coordinate of the shared point, 32 bytes on
+    /// P-256 and 48 on P-384, as SEC 1 and every TLS stack define it.
+    ///
+    /// The result is key material, not a key: run it through a KDF (HKDF, or the
+    /// protocol's own) before using it. Both keys must be on the same curve; a
+    /// public point that is not on its curve is refused.
+    ///
+    /// @param privateKey this side's PKCS#8 EC private key
+    /// @param peerPublicKey the other side's SubjectPublicKeyInfo
+    /// @throws IOException when either key cannot be read, they are on different
+    /// curves, or the curve is not P-256 or P-384
+    public static byte[] ecdh(byte[] privateKey, byte[] peerPublicKey) throws IOException {
+        if (privateKey == null || peerPublicKey == null) {
+            throw new IOException("ECDH needs a private key and a peer public key");
+        }
+        try {
+            KeyFactory factory = KeyFactory.getInstance("EC");
+            PrivateKey mine = factory.generatePrivate(new PKCS8EncodedKeySpec(privateKey));
+            PublicKey theirs = factory.generatePublic(new X509EncodedKeySpec(peerPublicKey));
+            int code = curveOf(mine);
+            if (code == 0 || code != curveOf(theirs)) {
+                throw new InvalidKeyException("Not one curve");
+            }
+            KeyAgreement agreement = KeyAgreement.getInstance("ECDH");
+            agreement.init(mine);
+            agreement.doPhase(theirs, true);
+            return agreement.generateSecret();
+        } catch (GeneralSecurityException | RuntimeException err) {
+            throw new IOException("ECDH failed: the keys are not EC keys on one curve, "
+                    + "P-256 or P-384", err);
+        }
+    }
+
+    /// 1 for P-256, 2 for P-384, 0 for any other curve.
+    private static int curveOf(Key key) throws GeneralSecurityException {
+        for (int code = 5 ; code <= 6 ; code++) {
+            try {
+                requireCurve(key, code);
+                return code - 4;
+            } catch (InvalidKeyException other) {
+                // try the next curve
+            }
+        }
+        return 0;
+    }
+
+    /// Encrypts with AES-CBC over whole blocks, with no padding.
+    ///
+    /// This is the raw mode a format defined over CBC needs -- PKCS#12 and
+    /// encrypted PKCS#8 -- and nothing more. CBC is not authenticated, so it is
+    /// deliberately not a general cipher: there is no padding, and so no padding
+    /// check whose pass or fail an attacker could probe (the padding oracle). A
+    /// format that pads removes the padding itself, and only after it has
+    /// verified the data's integrity some other way, as PKCS#12 does with its
+    /// MAC. Seal new data with [#aesGcmEncrypt].
+    ///
+    /// Encryption and decryption are two methods rather than one with a mode
+    /// flag, so the rule that matters -- an encrypting IV is random and never
+    /// repeated under one key -- applies to exactly the method it is about.
+    /// Decrypting takes whatever IV the data carries, a fixed test vector
+    /// included.
+    ///
+    /// @param key 16, 24 or 32 bytes
+    /// @param iv 16 bytes, random and never repeated under one key; use
+    /// [#randomBytes]
+    /// @param blocks a whole number of 16 byte blocks
+    public static byte[] aesCbcEncryptBlocks(byte[] key, byte[] iv, byte[] blocks)
+            throws IOException {
+        checkCbc(key, iv, blocks);
+        try {
+            Cipher cipher = Cipher.getInstance("AES/CBC/NoPadding");
+            cipher.init(Cipher.ENCRYPT_MODE,
+                    new SecretKeySpec(key, "AES"), new IvParameterSpec(iv));
+            return cipher.doFinal(blocks);
+        } catch (GeneralSecurityException | RuntimeException err) {
+            throw new IOException("AES-CBC failed", err);
+        }
+    }
+
+    /// Decrypts AES-CBC over whole blocks, with no padding: the inverse of
+    /// [#aesCbcEncryptBlocks]. Nothing is unpadded or checked here; see that
+    /// method for why.
+    ///
+    /// @param key 16, 24 or 32 bytes
+    /// @param iv the 16 byte IV the data was encrypted under
+    /// @param blocks a whole number of 16 byte blocks
+    public static byte[] aesCbcDecryptBlocks(byte[] key, byte[] iv, byte[] blocks)
+            throws IOException {
+        checkCbc(key, iv, blocks);
+        try {
+            Cipher cipher = Cipher.getInstance("AES/CBC/NoPadding");
+            cipher.init(Cipher.DECRYPT_MODE,
+                    new SecretKeySpec(key, "AES"), new IvParameterSpec(iv));
+            return cipher.doFinal(blocks);
+        } catch (GeneralSecurityException | RuntimeException err) {
+            throw new IOException("AES-CBC failed", err);
+        }
+    }
+
+    private static int curveCode(String curve) throws IOException {
+        if (P256.equals(curve)) {
+            return 1;
+        }
+        if (P384.equals(curve)) {
+            return 2;
+        }
+        throw new IOException("Not a supported curve: " + curve + "; P-256 or P-384");
+    }
+
+    private static void checkCbc(byte[] key, byte[] iv, byte[] blocks) throws IOException {
+        if (key == null || iv == null || blocks == null) {
+            throw new IOException("AES-CBC needs a key, an IV and data");
+        }
+        if (key.length != 16 && key.length != 24 && key.length != 32) {
+            throw new IOException("An AES key is 16, 24 or 32 bytes, not " + key.length);
+        }
+        if (iv.length != 16) {
+            throw new IOException("An AES-CBC IV is 16 bytes, not " + iv.length);
+        }
+        if (blocks.length % 16 != 0) {
+            throw new IOException("AES-CBC data is a whole number of 16 byte blocks");
+        }
     }
 
     /// The JDK's name for HMAC over each digest, by [#digestCode].

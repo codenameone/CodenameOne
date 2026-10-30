@@ -26,7 +26,7 @@ package com.codename1.unitycompat.system;
 /// class written in C# overrides `ToString`, `Equals` and `GetHashCode` as
 /// the Java methods of the same meaning, so these mostly forward; what they
 /// add is the .NET spelling of the values that are JDK boxes.
-@SuppressWarnings("PMD.MethodNamingConventions") // C# member names: translated code binds to them by name
+@SuppressWarnings({"PMD.MethodNamingConventions", "PMD.ClassNamingConventions"}) // C# member and type names: translated code binds to them by name
 public final class Object_ {
     private Object_() {
     }

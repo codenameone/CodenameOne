@@ -1,0 +1,6 @@
+3
+google.com apple.com
+AppleProvider.appAttest
+true
+true
+true

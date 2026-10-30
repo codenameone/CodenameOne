@@ -143,6 +143,68 @@
                 </dependency>
             </dependencies>
         </profile>
+        <!-- Kotlin Multiplatform and Compose: the common and JVM sources of a
+             KMP module in src/main/kmp build for every Codename One target.
+             Compose's runtime and kotlinx.coroutines are translated as they
+             are; the UI packages (foundation, material3, ui) are
+             codenameone-compose-compat, which draws with Codename One
+             components. The Compose compiler is a kotlinc plugin, added to the
+             kotlin profile's compiler here, so the kotlin profile must be
+             active too: keep src/main/kotlin, where the main class lives. -->
+        <profile>
+            <id>compose</id>
+            <activation>
+                <file>
+                    <exists>${basedir}/src/main/kmp</exists>
+                </file>
+            </activation>
+            <properties>
+                <!-- Compose's inline functions (remember, key) are JVM 11 bytecode,
+                     and kotlinc refuses to inline them into an older target. -->
+                <kotlin.compiler.jvmTarget>11</kotlin.compiler.jvmTarget>
+                <!-- What the Compose runtime asks for, and what Gradle resolves:
+                     at 13.0 the two tools' uploads differ. -->
+                <kotlin.annotations.version>23.0.0</kotlin.annotations.version>
+            </properties>
+            <repositories>
+                <!-- androidx.compose.runtime is published to Google's repository only. -->
+                <repository>
+                    <id>google</id>
+                    <url>https://maven.google.com</url>
+                </repository>
+            </repositories>
+            <dependencies>
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>codenameone-compose-compat</artifactId>
+                </dependency>
+            </dependencies>
+            <build>
+                <plugins>
+                    <plugin>
+                        <!-- javac reads the Kotlin classes, so it has to accept JVM 11
+                             class files too. -->
+                        <artifactId>maven-compiler-plugin</artifactId>
+                        <configuration>
+                            <source>11</source>
+                            <target>11</target>
+                        </configuration>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.jetbrains.kotlin</groupId>
+                        <artifactId>kotlin-maven-plugin</artifactId>
+                        <version>${kotlin.version}</version>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.jetbrains.kotlin</groupId>
+                                <artifactId>kotlin-compose-compiler-plugin-embeddable</artifactId>
+                                <version>${kotlin.version}</version>
+                            </dependency>
+                        </dependencies>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
         <!-- Swing and JavaFX compatibility: a desktop application's java/,
              kotlin/ and resources/ placed in src/main/desktop build and run
              unchanged on every Codename One target. Both runtimes are on the
@@ -195,7 +257,7 @@
                 <dependency>
                     <groupId>org.jetbrains</groupId>
                     <artifactId>annotations</artifactId>
-                    <version>13.0</version>
+                    <version>${kotlin.annotations.version}</version>
                 </dependency>
                 <dependency>
                     <groupId>com.codenameone</groupId>
@@ -255,6 +317,11 @@
                                              application's Kotlin, and the Java it refers to. -->
                                         <sourceDir>${project.basedir}/src/main/desktop/kotlin</sourceDir>
                                         <sourceDir>${project.basedir}/src/main/desktop/java</sourceDir>
+                                        <!-- Kotlin Multiplatform sources (src/main/kmp): the common
+                                             code and the JVM target's, as cn1:import-kmp-project
+                                             copies them. -->
+                                        <sourceDir>${project.basedir}/src/main/kmp/commonMain/kotlin</sourceDir>
+                                        <sourceDir>${project.basedir}/src/main/kmp/jvmMain/kotlin</sourceDir>
                                     </sourceDirs>
                                     <args>
                                         <arg>-no-reflect</arg>

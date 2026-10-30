@@ -55,7 +55,8 @@ import java.util.Map;
 /// metrics are on -- every request is measured in
 /// `http.server.request.duration` (milliseconds, by route template, method
 /// and status), and the server's counters, the database pool, the task executors
-/// and the process's memory are published as gauges.
+/// and the process's memory are published as gauges. [MetricSchema] lists each
+/// one, with its unit, attributes and the runtimes that measure it.
 public final class Metrics {
     static {
         com.codename1.impl.backend.MetricsAccess.install(new com.codename1.impl.backend.MetricsAccess() {
@@ -438,7 +439,9 @@ public final class Metrics {
             if (!LIVE_SERVERS.contains(server)) {
                 LIVE_SERVERS.add(server);
             }
-            if (pool != null && !LIVE_POOLS.contains(pool)) {
+            // One entry per server using the pool, so a pool two servers share
+            // stays counted until the last of them stops; poolSum counts it once.
+            if (pool != null) {
                 LIVE_POOLS.add(pool);
             }
         }
@@ -458,49 +461,23 @@ public final class Metrics {
                 "Requests answered since start", "{request}");
         serverMetric("cn1.server.connections_refused", "connectionsRefused",
                 "Connections refused for being over the limit", "{connection}");
-        gauge("db.client.connection.count", "Open database connections", "{connection}",
-                new Gauge.Source() {
-                    @Override
-                    public double read() {
-                        return poolSum(false);
-                    }
-                });
-        gauge("db.client.connection.idle", "Idle database connections", "{connection}",
-                new Gauge.Source() {
-                    @Override
-                    public double read() {
-                        return poolSum(true);
-                    }
-                });
-        gauge("cn1.task.queue_depth", "Tasks waiting for a thread, by executor", "{task}",
-                new Gauge.MultiSource() {
-                    @Override
-                    public List read() {
-                        // Summed by name: two servers in the process each have a
-                        // "default" executor, and two points with one label set are one
-                        // series twice -- duplicate samples a scrape rejects.
-                        Map byName = new LinkedHashMap();
-                        // Only the servers that measure: one with metrics off keeps
-                        // its queues out of the others' telemetry, as its
-                        // requests and jobs are.
-                        List all = com.codename1.impl.backend.BackendAccess.get().executorsOf(liveServers());
-                        for (Object element : all) {
-                            com.codename1.backend.TaskExecutor e =
-                                    (com.codename1.backend.TaskExecutor) element;
-                            Long sum = (Long) byName.get(e.getName());
-                            byName.put(e.getName(), Long.valueOf((sum == null ? 0 : sum.longValue())
-                                    + e.getQueueDepth()));
-                        }
-                        List out = new ArrayList();
-                        Iterator names = byName.entrySet().iterator();
-                        while (names.hasNext()) {
-                            Map.Entry entry = (Map.Entry) names.next();
-                            out.add(Gauge.point("cn1.executor", (String) entry.getKey(),
-                                    ((Long) entry.getValue()).longValue()));
-                        }
-                        return out;
-                    }
-                });
+        poolMetric("db.client.connection.count", POOL_OPEN, "Open database connections",
+                "{connection}");
+        poolMetric("db.client.connection.idle", POOL_IDLE, "Idle database connections",
+                "{connection}");
+        poolMetric("db.client.connection.max", POOL_MAX, "Connections the pool may hold",
+                "{connection}");
+        poolMetric("db.client.connection.pending_requests", POOL_PENDING,
+                "Borrowers waiting for a connection", "{request}");
+        poolMetric("db.client.connection.timeouts", POOL_TIMEOUTS,
+                "Borrows that gave up waiting for a connection", "{timeout}");
+        executorMetric("cn1.task.queue_depth", EXECUTOR_QUEUED,
+                "Tasks waiting for a thread, by executor", "{task}");
+        executorMetric("cn1.task.active", EXECUTOR_ACTIVE, "Tasks running, by executor", "{task}");
+        executorMetric("cn1.task.completed", EXECUTOR_COMPLETED,
+                "Tasks finished since start, by executor", "{task}");
+        executorMetric("cn1.task.pool_size", EXECUTOR_SIZE,
+                "Threads the executor runs tasks on, by executor", "{thread}");
         gauge("process.runtime.memory.used", "Heap in use", "By", new Gauge.Source() {
             @Override
             public double read() {
@@ -508,6 +485,26 @@ public final class Metrics {
                 return r.totalMemory() - r.freeMemory();
             }
         });
+        gauge("process.runtime.memory.committed", "Heap the runtime holds from the system", "By",
+                new Gauge.Source() {
+                    @Override
+                    public double read() {
+                        return Runtime.getRuntime().totalMemory();
+                    }
+                });
+        // What only some runtimes can measure is registered only where it can be:
+        // an instrument absent from the views is a figure this runtime does not
+        // have, which a zero would misreport as measured. MetricSchema says which.
+        runtimeMetric("process.runtime.memory.limit", RUNTIME_HEAP_LIMIT,
+                "The most heap the process may use", "By");
+        runtimeMetric("jvm.thread.count", RUNTIME_THREADS, "Live platform threads", "{thread}");
+        runtimeMetric("jvm.class.count", RUNTIME_CLASSES, "Classes currently loaded", "{class}");
+        runtimeMetric("jvm.cpu.count", RUNTIME_CPUS, "Processors available to the runtime",
+                "{cpu}");
+        runtimeMetric("cn1.jvm.gc.collections", RUNTIME_GC_COUNT,
+                "Garbage collections since start", "{collection}");
+        runtimeMetric("cn1.jvm.gc.time", RUNTIME_GC_TIME, "Time spent collecting since start",
+                "ms");
         gauge("process.uptime", "Seconds since the process started", "s", new Gauge.Source() {
             @Override
             public double read() {
@@ -538,17 +535,148 @@ public final class Metrics {
         return new ArrayList(LIVE_SERVERS);
     }
 
-    private static double poolSum(boolean idle) {
-        List pools;
+    private static final int POOL_OPEN = 0;
+    private static final int POOL_IDLE = 1;
+    private static final int POOL_MAX = 2;
+    private static final int POOL_PENDING = 3;
+    private static final int POOL_TIMEOUTS = 4;
+
+    /// A gauge summed over the live servers' pools. With no pool it reads NaN, so
+    /// it reports no point: a server without a database has no pool to measure,
+    /// and a zero would read as an empty one.
+    private static void poolMetric(String name, final int which, String description,
+                                   String unit) {
+        gauge(name, description, unit, new Gauge.Source() {
+            @Override
+            public double read() {
+                return poolSum(which);
+            }
+        });
+    }
+
+    private static double poolSum(int which) {
+        List pools = new ArrayList();
         synchronized (Metrics.class) {
-            pools = new ArrayList(LIVE_POOLS);
+            for (Object p : LIVE_POOLS) {
+                if (!pools.contains(p)) {
+                    pools.add(p);
+                }
+            }
+        }
+        if (pools.isEmpty()) {
+            return Double.NaN;
         }
         double sum = 0;
         for (Object element : pools) {
             com.codename1.backend.DataSource p = (com.codename1.backend.DataSource) element;
-            sum += idle ? p.getIdleCount() : p.getOpenCount();
+            switch (which) {
+                case POOL_OPEN:
+                    sum += p.getOpenCount();
+                    break;
+                case POOL_IDLE:
+                    sum += p.getIdleCount();
+                    break;
+                case POOL_MAX:
+                    sum += p.getMaxSize();
+                    break;
+                case POOL_PENDING:
+                    sum += p.getPendingCount();
+                    break;
+                default:
+                    sum += p.getTimeoutCount();
+                    break;
+            }
         }
         return sum;
+    }
+
+    private static final int EXECUTOR_QUEUED = 0;
+    private static final int EXECUTOR_ACTIVE = 1;
+    private static final int EXECUTOR_COMPLETED = 2;
+    private static final int EXECUTOR_SIZE = 3;
+
+    /// A gauge with a point per executor name, over the live servers.
+    private static void executorMetric(String name, final int which, String description,
+                                       String unit) {
+        gauge(name, description, unit, new Gauge.MultiSource() {
+            @Override
+            public List read() {
+                // Summed by name: two servers in the process each have a
+                // "default" executor, and two points with one label set are one
+                // series twice -- duplicate samples a scrape rejects.
+                Map byName = new LinkedHashMap();
+                // Only the servers that measure: one with metrics off keeps its
+                // executors out of the others' telemetry, as its requests and
+                // jobs are.
+                List all = com.codename1.impl.backend.BackendAccess.get().executorsOf(liveServers());
+                for (Object element : all) {
+                    com.codename1.backend.TaskExecutor e = (com.codename1.backend.TaskExecutor) element;
+                    long v;
+                    switch (which) {
+                        case EXECUTOR_QUEUED:
+                            v = e.getQueueDepth();
+                            break;
+                        case EXECUTOR_ACTIVE:
+                            v = e.getActiveCount();
+                            break;
+                        case EXECUTOR_COMPLETED:
+                            v = e.getCompletedCount();
+                            break;
+                        default:
+                            v = e.getSize();
+                            break;
+                    }
+                    Long sum = (Long) byName.get(e.getName());
+                    byName.put(e.getName(), Long.valueOf((sum == null ? 0 : sum.longValue()) + v));
+                }
+                List out = new ArrayList();
+                Iterator names = byName.entrySet().iterator();
+                while (names.hasNext()) {
+                    Map.Entry entry = (Map.Entry) names.next();
+                    out.add(Gauge.point("cn1.executor", (String) entry.getKey(),
+                            ((Long) entry.getValue()).longValue()));
+                }
+                return out;
+            }
+        });
+    }
+
+    private static final int RUNTIME_HEAP_LIMIT = 0;
+    private static final int RUNTIME_THREADS = 1;
+    private static final int RUNTIME_CLASSES = 2;
+    private static final int RUNTIME_CPUS = 3;
+    private static final int RUNTIME_GC_COUNT = 4;
+    private static final int RUNTIME_GC_TIME = 5;
+
+    private static double runtimeReading(int which) {
+        switch (which) {
+            case RUNTIME_HEAP_LIMIT:
+                return com.codename1.impl.backend.RuntimeGauges.heapLimit();
+            case RUNTIME_THREADS:
+                return com.codename1.impl.backend.RuntimeGauges.threadCount();
+            case RUNTIME_CLASSES:
+                return com.codename1.impl.backend.RuntimeGauges.classCount();
+            case RUNTIME_CPUS:
+                return com.codename1.impl.backend.RuntimeGauges.cpuCount();
+            case RUNTIME_GC_COUNT:
+                return com.codename1.impl.backend.RuntimeGauges.gcCount();
+            default:
+                return com.codename1.impl.backend.RuntimeGauges.gcTime();
+        }
+    }
+
+    /// A gauge over a runtime reading, registered only when this runtime has it.
+    private static void runtimeMetric(String name, final int which, String description,
+                                      String unit) {
+        if (Double.isNaN(runtimeReading(which))) {
+            return;
+        }
+        gauge(name, description, unit, new Gauge.Source() {
+            @Override
+            public double read() {
+                return runtimeReading(which);
+            }
+        });
     }
 
     private static void serverMetric(String name, final String key, String description,
@@ -614,6 +742,9 @@ public final class Metrics {
         List all = instruments();
         for (Object element : all) {
             Instrument i = (Instrument) element;
+            if (unmeasured(i)) {
+                continue;
+            }
             Map m = new LinkedHashMap();
             m.put("kind", kindName(i.getKind()));
             if (i.getDescription().length() > 0) {
@@ -626,6 +757,19 @@ public final class Metrics {
             out.put(i.getName(), m);
         }
         return out;
+    }
+
+    /// A schema gauge that only some servers measure (a pool gauge on a server
+    /// with no database) and that reads no point here is left out of every view,
+    /// never shown as an instrument with no value. Everything else keeps its name
+    /// before its first point: an executor gauge has no series until an executor
+    /// exists, and a counter none until its first recording.
+    public static boolean unmeasured(Instrument i) {
+        if (i.getKind() != Instrument.GAUGE) {
+            return false;
+        }
+        MetricSchema.Entry e = MetricSchema.get(i.getName());
+        return e != null && !MetricSchema.ALWAYS.equals(e.getAvailability()) && i.points().isEmpty();
     }
 
     static String kindName(int kind) {
@@ -643,6 +787,9 @@ public final class Metrics {
         List all = instruments();
         for (Object entry : all) {
             Instrument i = (Instrument) entry;
+            if (unmeasured(i)) {
+                continue;
+            }
             String name = promName(i.getName());
             String type;
             switch (i.getKind()) {

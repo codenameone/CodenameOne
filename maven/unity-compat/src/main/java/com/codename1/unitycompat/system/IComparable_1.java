@@ -23,7 +23,7 @@
 package com.codename1.unitycompat.system;
 
 /// `System.IComparable<T>`.
-@SuppressWarnings("PMD.MethodNamingConventions") // C# member names: translated code binds to them by name
+@SuppressWarnings({"PMD.MethodNamingConventions", "PMD.ClassNamingConventions"}) // C# member and type names: translated code binds to them by name
 public interface IComparable_1 {
     int CompareTo(Object other);
 }

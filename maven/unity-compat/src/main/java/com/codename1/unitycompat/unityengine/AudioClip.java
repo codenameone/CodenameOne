@@ -30,7 +30,7 @@ package com.codename1.unitycompat.unityengine;
 /// answer without the sound being opened here. A compressed file's length
 /// is not known until something decodes it and reads as zero.
 @SuppressWarnings("PMD.MethodNamingConventions") // C# member names: translated code binds to them by name
-public final class AudioClip extends Object {
+public final class AudioClip extends Object { // NOPMD ExtendsObject - UnityEngine.Object, not java.lang.Object
     /// The resource the sound ships as.
     public final String resource;
     private final float length;

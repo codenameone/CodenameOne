@@ -3100,6 +3100,9 @@ public class Component implements Animation, StyleListener, Editable {
         if (!isVisible() || doNotPaint) {
             return;
         }
+        // Painted, whether as a root or by a parent: a later region repaint
+        // must not be dropped as already covered by a full one.
+        repaintPending = false;
 
         if (paintLockImage != null) {
             if (paintLockImage instanceof Image) {

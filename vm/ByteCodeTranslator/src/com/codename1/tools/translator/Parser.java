@@ -492,6 +492,7 @@ public class Parser extends ClassVisitor {
                     + " refused=" + BytecodeMethod.stackIterRefused);
         }
         LocalReceiverTypes.clear();
+        RuntimeLowering.cleanup();
         cn1SubclassIndex = null;
         cn1SubclassIndexSize = -1;
         nativeSources = null;
@@ -560,17 +561,42 @@ public class Parser extends ClassVisitor {
         try (InputStream in = new FileInputStream(sourceFile)) {
             r = new ClassReader(in);
         }
+        if (RuntimeLowering.isReplacedStub(r.getClassName())) {
+            // Regenerated from the inputs' service files once everything is parsed.
+            return;
+        }
         Parser p = new Parser();
         
         p.clsName = r.getClassName().replace('/', '_').replace('$', '_').replace('-', '_');
         p.cls = new ByteCodeClass(p.clsName, r.getClassName());
         readingClassDepth++;
         try {
-            r.accept(p, ClassReader.EXPAND_FRAMES);
+            r.accept(RuntimeLowering.adapt(p), ClassReader.EXPAND_FRAMES);
         } finally {
             readingClassDepth--;
         }
         
+        classes.add(p.cls);
+    }
+
+    /// Writes a class the translator generates itself into a [ClassVisitor], as a
+    /// class file would be read into one.
+    interface SyntheticEmitter {
+        void emit(ClassVisitor cv);
+    }
+
+    /// Parses a generated class exactly as [#parse(File)] parses one read from disk.
+    static void parseSynthetic(String internalName, SyntheticEmitter emitter) {
+        BytecodeMethod.setDependencyGraph(dependencyGraph);
+        Parser p = new Parser();
+        p.clsName = internalName.replace('/', '_').replace('$', '_').replace('-', '_');
+        p.cls = new ByteCodeClass(p.clsName, internalName);
+        readingClassDepth++;
+        try {
+            emitter.emit(p);
+        } finally {
+            readingClassDepth--;
+        }
         classes.add(p.cls);
     }
     
@@ -1390,6 +1416,9 @@ public class Parser extends ClassVisitor {
     }
     
     public static void writeOutput(File outputDirectory) throws Exception {
+        // Field updaters and service providers: classes generated from what the parse
+        // found, which every later pass has to see as if they had been read.
+        RuntimeLowering.writeSynthetics(outputDirectory);
         // Must run before anything is emitted: the instanceof call sites bake the
         // dense bit index in, so the assignment has to exist before the first one.
         collectTypeTests();
@@ -1643,6 +1672,7 @@ public class Parser extends ClassVisitor {
                 verifyNativeMethods(handWrittenNativeSources);
 
                 generateClassAndMethodIndexHeader(outputDirectory);
+                RuntimeLowering.pruneCulledSynthetics(outputDirectory);
 
                 boolean concatenate = "true".equals(Util.getProperty("concatenateFiles", "false"));
                 ConcatenatingFileOutputStream cos = concatenate ? new ConcatenatingFileOutputStream(outputDirectory) : null;

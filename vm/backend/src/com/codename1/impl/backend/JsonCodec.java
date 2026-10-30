@@ -47,7 +47,28 @@ public final class JsonCodec {
     /// would otherwise exhaust.
     public static final int MAX_DEPTH = 64;
 
+    /// The setting that replaces [#MAX_DEPTH] for this server.
+    public static final String MAX_DEPTH_SETTING = "cn1.json.maxDepth";
+
+    private static int maxDepth = MAX_DEPTH;
+
     private JsonCodec() {
+    }
+
+    /// How deep the codecs follow one object into another: [#MAX_DEPTH] unless
+    /// `cn1.json.maxDepth` says otherwise.
+    public static int maxDepth() {
+        return maxDepth;
+    }
+
+    /// Sets [#maxDepth()]; the server calls it once, from its configuration,
+    /// before it serves anything.
+    public static void setMaxDepth(int depth) {
+        if (depth < 1) {
+            throw new IllegalArgumentException(MAX_DEPTH_SETTING + " is " + depth
+                    + "; it has to be at least 1");
+        }
+        maxDepth = depth;
     }
 
     /// Where a value sits in a body. Built one level per nested object or array
@@ -122,13 +143,127 @@ public final class JsonCodec {
         return new IllegalArgumentException(out.toString());
     }
 
-    /// Refuses an object nested past [#MAX_DEPTH], which in a response means a
+    /// Refuses an object nested past [#maxDepth()], which in a response means a
     /// cycle: two objects that reach each other through their fields.
     public static IllegalStateException tooDeep(String type) {
-        return new IllegalStateException("A " + type + " nests more than " + MAX_DEPTH
+        return new IllegalStateException("A " + type + " nests more than " + maxDepth
                 + " objects deep while being written as JSON, which is a cycle between "
                 + "objects that refer to each other. Mark the field that points back "
                 + "with @JsonIgnore.");
+    }
+
+    /// The refusal of member `name` of `at`, which the body leaves out although
+    /// the class marks it `@JsonProperty(required = true)`.
+    public static IllegalArgumentException missing(Path at, String name) {
+        return located(at, name, -1, "required member is missing");
+    }
+
+    /// The refusal of member `name` of `at`, which a `@JsonStrict` class does
+    /// not declare.
+    public static IllegalArgumentException unknown(Path at, String name) {
+        return located(at, name, -1, "unknown member");
+    }
+
+    /// The refusal a `JsonTypeAdapter` made of the value at member `name` or
+    /// element `index` of `at`, with where it was put in front of its message.
+    public static IllegalArgumentException refused(Path at, String name, int index,
+                                                   IllegalArgumentException cause) {
+        String why = cause.getMessage();
+        return located(at, name, index, why == null || why.length() == 0
+                ? "refused by its JSON adapter" : why);
+    }
+
+    private static IllegalArgumentException located(Path at, String name, int index,
+                                                    String message) {
+        StringBuilder out = new StringBuilder();
+        at.append(out);
+        segment(out, name, index);
+        out.append(": ").append(message);
+        return new IllegalArgumentException(out.toString());
+    }
+
+    /// `json` for a number field marked `@JsonFormat(STRING)`, which reads its
+    /// own digits in quotes as well as a JSON number: a numeric string becomes
+    /// the Long or Double the parser would have made of it, anything else is
+    /// passed on for the typed read to refuse.
+    public static Object numberText(Object json) {
+        if (!(json instanceof String)) {
+            return json;
+        }
+        String s = ((String) json).trim();
+        if (s.length() == 0 || s.length() > 64) {
+            return json;
+        }
+        boolean whole = true;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c == '.' || c == 'e' || c == 'E' || c == '+' || (c == '-' && i > 0)) {
+                whole = false;
+            } else if (c < '0' || c > '9') {
+                if (i != 0 || c != '-') {
+                    return json;
+                }
+            }
+        }
+        try {
+            if (whole) {
+                return Long.valueOf(Long.parseLong(s));
+            }
+            return Double.valueOf(Double.parseDouble(s));
+        } catch (NumberFormatException e) {
+            return json;
+        }
+    }
+
+    /// A date as an ISO-8601 instant in UTC, `2026-10-25T08:30:00.000Z`, for a
+    /// field marked `@JsonFormat(STRING)`. [#readDate] reads it back.
+    public static void writeIsoDate(Date value, ByteSink out) {
+        if (value == null) {
+            out.putAscii("null");
+            return;
+        }
+        long millis = value.getTime();
+        // Floored by hand: vm/JavaAPI's Math has no floorDiv.
+        long days = millis / 86400000L;
+        if (millis % 86400000L < 0) {
+            days--;
+        }
+        long ms = millis - days * 86400000L;
+        // civil_from_days, Howard Hinnant's algorithm; the inverse of daysFromCivil.
+        long z = days + 719468;
+        long era = (z >= 0 ? z : z - 146096) / 146097;
+        long doe = z - era * 146097;
+        long yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+        long y = yoe + era * 400;
+        long doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+        long mp = (5 * doy + 2) / 153;
+        long d = doy - (153 * mp + 2) / 5 + 1;
+        long m = mp < 10 ? mp + 3 : mp - 9;
+        if (m <= 2) {
+            y++;
+        }
+        StringBuilder sb = new StringBuilder(24);
+        sb.append('"');
+        pad(sb, y, 4).append('-');
+        pad(sb, m, 2).append('-');
+        pad(sb, d, 2).append('T');
+        pad(sb, ms / 3600000L, 2).append(':');
+        pad(sb, ms / 60000L % 60, 2).append(':');
+        pad(sb, ms / 1000L % 60, 2).append('.');
+        pad(sb, ms % 1000L, 3).append("Z\"");
+        out.putAscii(sb.toString());
+    }
+
+    private static StringBuilder pad(StringBuilder sb, long v, int width) {
+        if (v < 0) {
+            sb.append('-');
+            v = -v;
+        }
+        String digits = Long.toString(v);
+        for (int i = digits.length(); i < width; i++) {
+            sb.append('0');
+        }
+        return sb.append(digits);
     }
 
     private static String describe(Object got) {

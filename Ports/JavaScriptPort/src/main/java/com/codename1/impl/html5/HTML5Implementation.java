@@ -727,6 +727,15 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
     
     private boolean hitTest(int x, int y) {
+        // With no native peer behind the canvas there is nothing a pointer could
+        // fall through to, so the canvas owns every point. Probing anyway cost a
+        // blocking round trip and a pixel read-back of the display canvas on every
+        // touchstart and wheel event, and Chrome answers repeated read-backs by
+        // taking the canvas off the GPU for good: on a low-end Android phone every
+        // later frame was then rasterized in software, ~80ms each (#6123).
+        if (!(Accessor.getActivePeerCount() > 0 && paintNativePeersBehind())) {
+            return true;
+        }
         if (outputCanvas != null) {
             // Single-pixel alpha probe of the display surface. A fully
             // transparent pixel means the pointer falls through (no component
@@ -1410,6 +1419,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                                 currentEditingField = ta;
                                 currentInputField = el;
                                 isEditing = true;
+                                editingSessionCount++;
                                 // Browser focus bypasses editStringImpl(), which normally
                                 // registers the session for form-level editing APIs.
                                 setFocusedEditingText(ta);
@@ -1870,6 +1880,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                         public void run() {
                             donePressed = false;
                             isEditing = true;
+                            editingSessionCount++;
                             inputEl.getStyle().setProperty("color", HTML5Graphics.color(ta.getStyle().getFgColor()));
                     
                             Font f = ta.getSelectedStyle().getFont();
@@ -2780,6 +2791,15 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 // clears the flag after Display.pointerPressed returns, then
                 // runs any release that onMouseUp deferred while waiting.
                 final PressSlot press = beginPressInFlight();
+                // The edit this press ends is the one open NOW, read before any JSO call
+                // yields. The runnable below is queued on the EDT behind those yields, and
+                // by the time it runs, this same click's release may already have opened
+                // the field it landed on -- it used to close that session again at once.
+                // With text selection on the form (which adds work to every press) it did
+                // so on nearly every click: the field blurred under the first keystrokes,
+                // the next session's commit replayed a stale value over the model, and
+                // typed characters were lost.
+                final int sessionAtPress = isEditing ? editingSessionCount : -1;
                 if (nativeEventListener != null) {
                     CancelableEvent cevt = (CancelableEvent)evt;
                     nativeEventListener.handleEvent(evt);
@@ -2825,7 +2845,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 callSerially(new Runnable() {
                     public void run() {
                         
-                        if (isEditing){
+                        if (isEditing && editingSessionCount == sessionAtPress){
                             finishTextEditing();
                         } 
                     }
@@ -4973,12 +4993,64 @@ public class HTML5Implementation extends CodenameOneImplementation {
         pointerWheelMoved(x, y, dx, dy, true, 0);
     }
     
+    /// The CSS color last given to the page, or null while it is the stylesheet's own.
+    private String pageBackground;
+
+    /// Gives the page behind the canvas the background of the form now showing (issue #6109).
+    ///
+    /// Resizing a canvas clears it, and the browser grows the viewport before the worker hears
+    /// of it, so until the form repaints at the new size the page itself shows -- white, behind
+    /// a dark form, on every keyboard open and window resize. Nothing is painted here and no
+    /// paint is added: the page is only seen in that gap, so its color is set when a form
+    /// arrives and when the canvas is resized, and the DOM is written only when it changes. A
+    /// dialog keeps the color of the form beneath it, which still fills the screen.
+    ///
+    /// A form without an opaque, single-color background leaves the page alone: what shows through it is
+    /// whatever was there, and a color guessed from the theme could be wrong.
+    private void syncPageBackground(Form f) {
+        if (f == null || f instanceof com.codename1.ui.Dialog) {
+            return;
+        }
+        Style s = f.getContentPane().getUnselectedStyle();
+        if ((s.getBgTransparency() & 0xff) != 0xff) {
+            s = f.getUnselectedStyle();
+        }
+        String color = null;
+        // An image or gradient is not one color; the page is left alone rather than given its base.
+        if ((s.getBgTransparency() & 0xff) == 0xff && s.getBgImage() == null
+                && !isGradientBackground(s.getBackgroundType())) {
+            String hex = Integer.toHexString(s.getBgColor() & 0xffffff);
+            color = "#000000".substring(0, 7 - hex.length()) + hex;
+        }
+        if (color == null ? pageBackground == null : color.equals(pageBackground)) {
+            return;
+        }
+        pageBackground = color;
+        if (color == null) {
+            doc().getDocumentElement().getStyle().removeProperty("background-color");
+            doc().getBody().getStyle().removeProperty("background-color");
+        } else {
+            doc().getDocumentElement().getStyle().setProperty("background-color", color);
+            doc().getBody().getStyle().setProperty("background-color", color);
+        }
+    }
+
+    // Not BACKGROUND_NONE: a style's type defaults to BACKGROUND_IMAGE_SCALED and a theme
+    // writes no type for a plain color, so a plain fill is any image type with no image.
+    private static boolean isGradientBackground(byte type) {
+        return type == Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL
+                || type == Style.BACKGROUND_GRADIENT_LINEAR_HORIZONTAL
+                || type == Style.BACKGROUND_GRADIENT_RADIAL
+                || type >= Style.BACKGROUND_GRADIENT_LINEAR && type <= Style.BACKGROUND_GRADIENT_REPEATING_RADIAL;
+    }
+
     private void updateCanvasSize() {
         refreshDevicePixelRatio();
         JavaScriptCanvasLayout.Dimensions dimensions = JavaScriptCanvasLayout.compute(
                 doc().getBody().getClientWidth(),
                 window.getInnerHeight() - chromeTopCss,
                 devicePixelRatioValue());
+        syncPageBackground(getCurrentForm());
         canvas.setWidth(dimensions.getBackingWidth());
         canvas.setHeight(dimensions.getBackingHeight());
         outputCanvas.setWidth(dimensions.getBackingWidth());
@@ -5219,6 +5291,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
         if (JavaScriptInputCoordinator.shouldInstallKeyboard(isPhoneOrTablet_())) {
             HTML5Keyboard.install();
         }
+        // Passkeys through the page's navigator.credentials.
+        HTML5WebAuthn.install();
         // Set the locale
         installBeforeUnload();
         
@@ -5275,6 +5349,31 @@ public class HTML5Implementation extends CodenameOneImplementation {
         );
     }
 
+    /// Remembers the application's light/dark choice for the loading screen of the NEXT launch:
+    /// `light` or `dark`, or null/anything else to follow the browser again. The page reads the
+    /// key in `<head>` before any Java runs (`JavascriptBundleWriter.splashTheme` in the
+    /// ByteCodeTranslator, which also names the key); a build whose `javascript.splash.appearance`
+    /// is `light` or `dark` ignores it.
+    private static void setSplashAppearance(String value) {
+        // The cast stays outside the try: a CHECKCAST is unchecked on ParparVM, so a handler
+        // around it would never run (scripts/check-cast-semantics.sh).
+        WindowExt win = (WindowExt) Window.current();
+        try {
+            JSOImplementations.JSStorage storage = win.getLocalStorage();
+            if (storage == null) {
+                return;
+            }
+            if ("light".equals(value) || "dark".equals(value)) {
+                storage.setItem("cn1.splashAppearance", value);
+            } else {
+                storage.removeItem("cn1.splashAppearance");
+            }
+        } catch (RuntimeException e) {
+            // Storage disabled (private mode, a sandboxed frame): the splash follows the browser.
+            Log.e(e);
+        }
+    }
+
     @JSBody(params={"msg"}, script="window.onbeforeunload=function(){return msg;}")
     private native static void setBeforeUnloadMessage(String msg);
     
@@ -5283,6 +5382,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
     
     @Override
     public void setPlatformHint(String key, String value) {
+        if ("platformHint.javascript.splashAppearance".equalsIgnoreCase(key)) {
+            setSplashAppearance(value);
+        }
         if ("platformHint.javascript.beforeUnloadMessage".equalsIgnoreCase(key)) {
             if (value == null) {
                 removeBeforeUnload();
@@ -5464,7 +5566,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 String fallback = isAndroid_() ? "/android_holo_light.res" : "/iOS7Theme.res";
                 r = Resources.open(fallback);
             }
-            Hashtable tp = r.getTheme(r.getThemeResourceNames()[0]);
+            HashMap<String, Object> tp = r.getThemeMap(r.getThemeResourceNames()[0]);
 
             // The browser has no OS status bar / notch, so the app must not
             // reserve a status-bar strip at the top of the Form the way iOS
@@ -5491,7 +5593,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             // native menu bar at that moment -- which it does until the HTML chrome exists. Forms
             // without a Toolbar then never published their MenuBar to it.
             installDesktopChromeIfRequested();
-            UIManager.getInstance().setThemeProps(tp);
+            UIManager.getInstance().setThemeMap(tp);
             return;
     	} catch (IOException ex){
             Log.e(ex);
@@ -6953,6 +7055,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private native static void scroll_();
     
     private boolean isEditing=false;
+    /// Counts editing sessions, so that work queued for one session cannot end the next.
+    /// See onMouseDown: its "a press elsewhere ends the edit" runnable was queued before
+    /// the same click's release had opened a new session, and ran after it.
+    private int editingSessionCount;
     
     /**
      * Text field that is used for editing.
@@ -7714,6 +7820,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
         text = origText;
         isEditing=true;
+        editingSessionCount++;
         
         // This Hack is specifically to work around an issue on iOS Safari
         // where the "touch" event circumvents the editing process, causing
@@ -8022,6 +8129,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 }
             }
             
+            final HTMLInputElement focusedInputEl = inputEl;
             final FocusListener focusListener = new FocusListener() {
 
                 @Override
@@ -8031,7 +8139,15 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
                 @Override
                 public void focusLost(Component cmpnt) {
-                    
+                    // Commit the value now, not only in the completion callback below. Focus
+                    // moves inside Form.pointerPressed, so this runs before the release of the
+                    // same click; the callback is queued, and a button whose action reads the
+                    // field (a sign-in form's "Sign in") could fire first and read the model
+                    // as it was before anything was typed.
+                    String value = focusedInputEl.getValue();
+                    if (value != null && !value.equals(ta.getText())) {
+                        ta.setText(value);
+                    }
                     finishTextEditing();
                 }
                 
@@ -13305,6 +13421,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // resolved then, so it is brought up to date as it appears rather than coming back in
         // the old palette.
         refreshThemeIfStale(f);
+        syncPageBackground(f);
         // Taken for every arrival, whatever is done with it: the framework queues one direction
         // per display asked for, and a queue read only on some paths would drift out of step
         // with what is still waiting.
@@ -14522,6 +14639,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
         return com.codename1.impl.html5.database.SQLiteNative.exists(databaseName);
     }
 
+    /// Large signature and hash batches go to the GPU through WebGPU; see [HTML5CryptoEngine].
+    @Override
+    public com.codename1.security.CryptoEngine createCryptoEngine() {
+        return new HTML5CryptoEngine(this);
+    }
+
     /// The browser's non-prompting secure store.
     ///
     /// Without one the base class answers "unknown" to every question, and ManagedKeys refuses to
@@ -15700,6 +15823,16 @@ public class HTML5Implementation extends CodenameOneImplementation {
             // bridged host object is not an instance of the JSO interface it is read through.
             HTMLElement target = (HTMLElement) evt.getTarget();
             if (target == null || !"codenameone-canvas".equals(target.getAttribute("id"))) {
+                return;
+            }
+            // Only a right-click, never a finger. Android Chrome fires contextmenu for a touch
+            // long press too, so a long press landing on the canvas rather than on a native text
+            // overlay opened this desktop menu, while one landing on the overlay got the
+            // browser's -- the menu alternated between attempts (issue #6108). A long press is
+            // already TextSelection's (LongPointerPress) on canvas text, and the menu was placed
+            // at lastMouseEvent, which a touch never updates. touchDown covers a browser whose
+            // contextmenu is not a PointerEvent: it fires while the finger is still down.
+            if (isTouchPointer(evt) || pointerState.isTouchDown()) {
                 return;
             }
             Form f = CN.getCurrentForm();

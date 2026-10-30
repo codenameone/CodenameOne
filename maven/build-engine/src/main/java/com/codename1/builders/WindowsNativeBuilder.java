@@ -74,6 +74,9 @@ public class WindowsNativeBuilder extends Executor {
     /// Whether the application touches com.codename1.db. Held as a field because the class scan
     /// and the stub generation happen in different methods.
     private boolean usesDatabase;
+    /// Whether the application's classes use the elliptic-curve or Keccak APIs, so the translator
+    /// compiles in the native crypto kernels (`-Dcn1.cryptoKernels`).
+    private boolean usesCryptoKernels;
     /** Supported target architectures for {@code windows.arch}. */
     public static final String ARCH_X64 = "x64";
     public static final String ARCH_ARM64 = "arm64";
@@ -272,6 +275,7 @@ public class WindowsNativeBuilder extends Executor {
             throw new BuildException("Failed to scan for database usage", ex);
         }
         usesDatabase = databaseUsage.usesDatabase();
+        usesCryptoKernels = databaseUsage.usesCryptoKernels();
         final boolean usesDatabaseCipher = databaseUsage.usesDatabaseCipher();
 
         // Native interface binding + app bootstrap. Scan the app classes for
@@ -345,6 +349,7 @@ public class WindowsNativeBuilder extends Executor {
             parparCmd.add("-Xmx" + heapMB + "m");
         }
         parparCmd.add("-Dcn1.sqlite=" + usesDatabase);
+        parparCmd.add("-Dcn1.cryptoKernels=" + usesCryptoKernels);
         parparCmd.add("-Dcn1.sqlcipher=" + usesDatabaseCipher);
         NativeVerifyOption.addTo(parparCmd, request, "windows");
         parparCmd.add("-jar");

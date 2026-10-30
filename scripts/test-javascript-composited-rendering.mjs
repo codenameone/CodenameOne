@@ -47,6 +47,8 @@
  *       cancelled those keys on the accessibility tree's listbox element);
  *   phone (Chromium with touch emulation):
  *     - a swipe scrolls the content (#5912: it did nothing at all);
+ *     - a swipe, a wheel and a mouse drag read no pixels back from the display: this app
+ *       has no native peers, and a read-back takes Chrome's canvas off the GPU (#6123);
  *     - a tap on the hamburger opens the side menu, and a tap on a button fires it (#5912);
  *     - with the side menu open, none of the form's DOM text floats over the menu's shade.
  *   iOS user agent (Chromium presenting itself as an iPhone):
@@ -137,6 +139,39 @@ function canvasPixels(page, points) {
     return pts.map(([x, y]) => Array.from(ctx.getImageData(Math.round(x * scale),
       Math.round((y - top) * scale), 1, 1).data));
   }, points);
+}
+
+// Pixel read-backs of the display while a pointer is used. An application without native
+// peers has nothing a pointer could fall through to, so it must read nothing back: each
+// touchstart and wheel event used to cost a worker round trip and a getImageData on the
+// display canvas, and Chrome answers repeated read-backs by taking that canvas off the GPU
+// for good -- a nine-row form then scrolled at ~12fps on a budget Android phone (#6123).
+// Both are counted: the worker's __cn1_surface_read__ requests catch the port asking, and a
+// direct getImageData on the display canvas catches any bridge path that reads it in place.
+// Installed after boot and read before the test itself samples pixels (canvasPixels).
+function watchReadbacks(page) {
+  return page.evaluate(() => {
+    const state = { surfaceReads: 0, displayReads: 0 };
+    const worker = window.__parparWorker;
+    if (!worker) throw new Error('no __parparWorker to observe');
+    worker.addEventListener('message', (e) => {
+      const d = e.data || {};
+      if (d.symbol === '__cn1_surface_read__') state.surfaceReads++;
+    });
+    const original = CanvasRenderingContext2D.prototype.getImageData;
+    CanvasRenderingContext2D.prototype.getImageData = function(...args) {
+      if (this.canvas && this.canvas.id === 'codenameone-canvas') state.displayReads++;
+      return original.apply(this, args);
+    };
+    window.__cn1ReadbackWatch = state;
+  });
+}
+
+async function checkNoReadbacks(page, label) {
+  const r = await page.evaluate(() => window.__cn1ReadbackWatch);
+  check(r && r.surfaceReads === 0 && r.displayReads === 0,
+    `${label} reads no pixels back from the display (no native peers)`,
+    r ? `${r.surfaceReads} surface read request(s), ${r.displayReads} display getImageData call(s)` : 'watch missing');
 }
 
 function luminance(px) {
@@ -340,9 +375,11 @@ async function desktop(name, browserType) {
       const title = await span(page, 'Hi World');
       const toolbarBottom = Math.max(20, Math.floor(title.bottom));
       const a = await page.screenshot({ path: path.join(outDir, `${name}-scroll-0.png`) });
+      await watchReadbacks(page);
       await page.mouse.move(500, 300);
       for (let i = 0; i < 8; i++) { await page.mouse.wheel(0, 120); await page.waitForTimeout(120); }
       await page.waitForTimeout(1500);
+      await checkNoReadbacks(page, `${name}: the wheel`);
       const b = await page.screenshot({ path: path.join(outDir, `${name}-scroll-1.png`) });
       const toolbarDiff = await diffFraction(page, a, b, [0, toolbarBottom]);
       const contentDiff = await diffFraction(page, a, b, [toolbarBottom + 20, 440]);
@@ -367,6 +404,7 @@ async function desktop(name, browserType) {
       await boot(page, logs);
       const title = await span(page, 'Hi World');
       const a = await page.screenshot();
+      await watchReadbacks(page);
       await page.mouse.move(600, 400);
       await page.mouse.down();
       for (let i = 1; i <= 15; i++) { await page.mouse.move(600, 400 - i * 15); await page.waitForTimeout(20); }
@@ -375,6 +413,16 @@ async function desktop(name, browserType) {
       const b = await page.screenshot({ path: path.join(outDir, `${name}-drag.png`) });
       const moved = await diffFraction(page, a, b, [Math.floor(title.bottom) + 20, 440]);
       check(moved > 0.05, `${name}: a mouse drag scrolls the content`, `${(moved * 100).toFixed(2)}% changed`);
+      // More presses from the same point: the first one of a page never probed (see the
+      // phone swipe).
+      for (let k = 0; k < 2; k++) {
+        await page.mouse.move(600, 400);
+        await page.mouse.down();
+        for (let i = 1; i <= 15; i++) { await page.mouse.move(600, 400 - i * 15); await page.waitForTimeout(20); }
+        await page.mouse.up();
+        await page.waitForTimeout(1000);
+      }
+      await checkNoReadbacks(page, `${name}: three mouse drags`);
       fs.writeFileSync(path.join(outDir, `${name}-drag-console.txt`), logs.join('\n'));
       await page.close();
     }
@@ -445,6 +493,7 @@ async function phone() {
       const band = [Math.floor(title.bottom) + 30, vp.height - 10];
       const a = await page.screenshot({ path: path.join(outDir, 'phone-swipe-0.png') });
       const cdp = await context.newCDPSession(page);
+      await watchReadbacks(page);
       const x = Math.round(vp.width / 2);
       const y0 = Math.round(vp.height * 0.8);
       const y1 = Math.round(vp.height * 0.3);
@@ -458,6 +507,19 @@ async function phone() {
       const b = await page.screenshot({ path: path.join(outDir, 'phone-swipe-1.png') });
       const moved = await diffFraction(page, a, b, band);
       check(moved > 0.05, 'phone: a swipe scrolls the content', `${(moved * 100).toFixed(2)}% changed`);
+      // More swipes from the same point: the probe never ran on the first press of a page,
+      // and a single gesture passed with the read-back still in place (measured on #6123's
+      // build: one read per press from the second on).
+      for (let k = 0; k < 2; k++) {
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y: y0 }] });
+        for (let i = 1; i <= 15; i++) {
+          await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: Math.round(y0 + (y1 - y0) * i / 15) }] });
+          await page.waitForTimeout(16);
+        }
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+        await page.waitForTimeout(1000);
+      }
+      await checkNoReadbacks(page, 'phone: three swipes');
       fs.writeFileSync(path.join(outDir, 'phone-swipe-console.txt'), logs.join('\n'));
       await page.close();
     }

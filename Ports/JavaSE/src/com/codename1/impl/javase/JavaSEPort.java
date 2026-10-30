@@ -279,6 +279,17 @@ public class JavaSEPort extends CodenameOneImplementation {
     static final int MAX_PERSISTED_WINDOW_DIMENSION = 32767;
 
     static {
+        // The canvas blits straight to the screen through getGraphics(), outside
+        // Swing's paint cycle, so a lightweight popup (painted into the same
+        // surface) is overwritten wherever it overlaps the canvas and smears
+        // (#5850). A heavyweight popup lives in its own native window above it.
+        // Set here, before any frame or menu exists: a JPopupMenu reads the default
+        // when it is constructed, and the native-chrome menu bars
+        // (buildNativeMenuBar) are built without installMenu ever running.
+        JPopupMenu.setDefaultLightWeightPopupEnabled(false);
+    }
+
+    static {
         IOS_NATIVE_FONT_CANDIDATES.put("native:MainThin", new String[] {
             "SF Pro Display", "SF Pro Text",
             ".SF NS Text", ".SF NS Display", "SF UI Text",
@@ -3435,7 +3446,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (nativeTheme != null) {
             try {
                 Resources r = Resources.open(nativeTheme);
-                Hashtable h = r.getTheme(r.getThemeResourceNames()[0]);
+                HashMap<String, Object> h = r.getThemeMap(r.getThemeResourceNames()[0]);
                 Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
                 boolean desktopSkin = pref.getBoolean("desktopSkin", false);
                 if(desktopSkin) {
@@ -3444,15 +3455,15 @@ public class JavaSEPort extends CodenameOneImplementation {
                     h.remove("@paintsTitleBarBool");
                 }
                 injectDesktopThemeConstants(h);
-                UIManager.getInstance().setThemeProps(h);
+                UIManager.getInstance().setThemeMap(h);
             } catch (IOException ex) {
                 ex.printStackTrace();
             }
         } else {
             if (nativeThemeRes != null) {
-                Hashtable h = nativeThemeRes.getTheme(nativeThemeRes.getThemeResourceNames()[0]);
+                HashMap<String, Object> h = nativeThemeRes.getThemeMap(nativeThemeRes.getThemeResourceNames()[0]);
                 injectDesktopThemeConstants(h);
-                UIManager.getInstance().setThemeProps(h);
+                UIManager.getInstance().setThemeMap(h);
             }
         }
     }
@@ -3463,7 +3474,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     /// them on mobile because this method is a no-op there. Values come from the static config
     /// (set by the generated desktop Stub) with a {@code codename1.arg.desktop.*} system-property
     /// fallback so build hints work too.
-    private void injectDesktopThemeConstants(Hashtable h) {
+    private void injectDesktopThemeConstants(HashMap<String, Object> h) {
         if (h == null || !isDesktop()) {
             return;
         }
@@ -4457,26 +4468,6 @@ public class JavaSEPort extends CodenameOneImplementation {
                                 updateEdtBufferSize();
                             }
                             
-                            if (window != null) {
-
-                                if (zoomLevel != 1) {
-                                    Graphics2D g2d = (Graphics2D) g;
-                                    g2d.setTransform(AffineTransform.getScaleInstance(1, 1));
-                                }
-                                
-                                if (window.getJMenuBar() != null) {
-                                    for (int i = 0; i < window.getJMenuBar().getComponentCount(); i++) {
-                                        JMenu m = (JMenu) window.getJMenuBar().getComponent(i);
-                                        if (m.isPopupMenuVisible()) {
-                                            JPopupMenu pop = m.getPopupMenu();
-                                            pop.getInvoker().getX();
-                                            g.translate(pop.getInvoker().getX(), 0);
-                                            pop.update(g);
-                                            g.translate(-pop.getInvoker().getX(), 0);
-                                        }
-                                    }
-                                }
-                            }
                             g.dispose();
                         }
                     }
@@ -4501,6 +4492,38 @@ public class JavaSEPort extends CodenameOneImplementation {
         
         @Override
         protected void paintChildren(java.awt.Graphics g) {
+        }
+
+        /// Paints the Swing children into the screen raster. In the simulated
+        /// keyboard's Android pan mode the native editor's bounds are raised by the
+        /// pan offset, so that it sits, and takes clicks, where the panned field is
+        /// drawn rather than under the keyboard. The raster itself is raised by that
+        /// same offset when it is composed (composeSimulatorOverlays), so painting the
+        /// editor at its bounds here raised it twice and the typed text appeared a
+        /// pan offset above the field. The editor is therefore painted lowered by the
+        /// offset, and clipped out of the regular pass.
+        private void paintChildrenIntoBuffer(Graphics2D bg) {
+            int pan = this == canvas ? simulatorPanOffset() : 0;
+            JComponent editor = textCmp;
+            if (pan == 0 || editor == null || editor.getParent() != this || !editor.isVisible()) {
+                super.paintChildren(bg);
+                return;
+            }
+            Rectangle eb = editor.getBounds();
+            java.awt.Shape oldClip = bg.getClip();
+            java.awt.geom.Area rest = new java.awt.geom.Area(oldClip != null ? oldClip
+                    : new Rectangle(0, 0, getWidth(), getHeight()));
+            rest.subtract(new java.awt.geom.Area(eb));
+            bg.setClip(rest);
+            super.paintChildren(bg);
+            bg.setClip(oldClip);
+            int shift = (int) Math.round(pan * zoomLevel);
+            Graphics2D eg = (Graphics2D) bg.create(eb.x, eb.y + shift, eb.width, eb.height);
+            try {
+                editor.paint(eg);
+            } finally {
+                eg.dispose();
+            }
         }
 
         private boolean drawScreenBuffer(java.awt.Graphics g) {
@@ -4532,11 +4555,11 @@ public class JavaSEPort extends CodenameOneImplementation {
                         AffineTransform af = bg.getTransform();
                         bg.setTransform(AffineTransform.getScaleInstance(1, 1));
                         bg.translate(-(screenCoord.x + x )* zoomLevel, -(screenCoord.y + y ) * zoomLevel);
-                        super.paintChildren(bg);
+                        paintChildrenIntoBuffer(bg);
                         bg.setTransform(af);
                     } else {
                         bg.translate(-screenCoord.x - x, -screenCoord.y - y);
-                        super.paintChildren(bg);
+                        paintChildrenIntoBuffer(bg);
                     }                    
                     bg.dispose();
                     painted = true;
@@ -12951,6 +12974,18 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         public void setPanOffset(int pixels) {
+            // The editor's bounds carry the pan offset (paintChildrenIntoBuffer
+            // relies on that), but they are only recomputed when the editor
+            // repaints. Ask it to now, so the frame after a pan change does not
+            // draw it from bounds made for the previous offset.
+            EventQueue.invokeLater(new Runnable() {
+                public void run() {
+                    JComponent editor = textCmp;
+                    if (editor != null && editor.getParent() != null) {
+                        editor.repaint();
+                    }
+                }
+            });
             requestOverlayRepaint();
         }
 
@@ -13524,7 +13559,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         int marginBottom = cmp.getSelectedStyle().getPadding(Component.BOTTOM);
         if (getSkin() != null) {
             textCmp.setBounds((int) ((cmp.getAbsoluteX() + cmp.getScrollX() + getScreenCoordinates().x + canvas.x + marginLeft) * zoomLevel),
-                    (int) ((cmp.getAbsoluteY() + cmp.getScrollY() + getScreenCoordinates().y + canvas.y + marginTop) * zoomLevel),
+                    (int) ((cmp.getAbsoluteY() + cmp.getScrollY() + getScreenCoordinates().y + canvas.y + marginTop - simulatorPanOffset()) * zoomLevel),
                     (int) ((cmp.getWidth() - marginLeft - marginRight) * zoomLevel), 
                     (int) ((cmp.getHeight() - marginTop - marginBottom)* zoomLevel));
             //System.out.println("Set bounds to "+textCmp.getBounds());
@@ -17346,6 +17381,14 @@ public class JavaSEPort extends CodenameOneImplementation {
     
 
     @Override
+    public boolean isDrmSupported(com.codename1.media.DrmScheme scheme) {
+        // The simulator plays through ffmpeg, whose HLS demuxer fetches the
+        // #EXT-X-KEY URI and decrypts AES-128 segments. It has no CDM, so the
+        // CENC schemes (ClearKey, Widevine, FairPlay) are answered honestly as no.
+        return scheme == com.codename1.media.DrmScheme.AES_128 && FFMPEGMedia.isConfigured();
+    }
+
+    @Override
     public AsyncResource<Media> createMediaAsync(String uriAddress, final boolean isVideo, final Runnable onCompletion) {
         if (FFMPEGMedia.isConfigured() && !"cef".equalsIgnoreCase(System.getProperty("cn1.javase.mediaImplementation", ""))) {
             return FFMPEGMedia.createMediaAsync(this, uriAddress, isVideo, onCompletion);
@@ -17788,6 +17831,24 @@ public class JavaSEPort extends CodenameOneImplementation {
             NetworkRequestObject o = new NetworkRequestObject();
             o.setTimeQueued(System.currentTimeMillis());
             netMonitor.addQueuedRequest(req, o);
+        }
+    }
+
+    @Override
+    public boolean isClientCertificateSupported() {
+        return true;
+    }
+
+    @Override
+    public void setClientCertificate(Object connection, String certificateChainPem, String keyAlgorithm,
+            byte[] privateKeyPkcs8) {
+        if (connection instanceof HttpsURLConnection) {
+            try {
+                ((HttpsURLConnection) connection).setSSLSocketFactory(TrustModifier.clientCertificateFactory(
+                        certificateChainPem, keyAlgorithm, privateKeyPkcs8, null));
+            } catch (Exception ex) {
+                throw new IllegalStateException("Cannot use the client certificate: " + ex, ex);
+            }
         }
     }
 
@@ -18621,6 +18682,22 @@ public class JavaSEPort extends CodenameOneImplementation {
             nfc = new JavaSENfc();
         }
         return nfc;
+    }
+
+    private JavaSEHardware hardware;
+
+    /// The simulator's virtual board (see [JavaSEHardware]), so hardware code
+    /// runs with nothing attached. A desktop application built from this port
+    /// has no such board and reports no hardware.
+    @Override
+    public com.codename1.hardware.Hardware getHardware() {
+        if (!isSimulator()) {
+            return null;
+        }
+        if (hardware == null) {
+            hardware = new JavaSEHardware();
+        }
+        return hardware;
     }
 
     @Override

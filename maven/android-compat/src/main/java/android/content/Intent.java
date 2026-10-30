@@ -46,6 +46,7 @@ public class Intent implements Parcelable, Cloneable {
     public static final String ACTION_SEND_MULTIPLE = "android.intent.action.SEND_MULTIPLE";
     public static final String ACTION_GET_CONTENT = "android.intent.action.GET_CONTENT";
     public static final String ACTION_OPEN_DOCUMENT = "android.intent.action.OPEN_DOCUMENT";
+    public static final String ACTION_CREATE_DOCUMENT = "android.intent.action.CREATE_DOCUMENT";
     public static final String ACTION_WEB_SEARCH = "android.intent.action.WEB_SEARCH";
     public static final String ACTION_CHOOSER = "android.intent.action.CHOOSER";
     public static final String ACTION_SEARCH = "android.intent.action.SEARCH";
@@ -97,6 +98,8 @@ public class Intent implements Parcelable, Cloneable {
     public Intent() {
     }
 
+    private ClipData clipData;
+
     public Intent(Intent o) {
         action = o.action;
         data = o.data;
@@ -107,6 +110,7 @@ public class Intent implements Parcelable, Cloneable {
         extras = o.extras == null ? null : new Bundle(o.extras);
         flags = o.flags;
         pkg = o.pkg;
+        clipData = o.clipData;
     }
 
     public Intent(String action) {
@@ -183,6 +187,16 @@ public class Intent implements Parcelable, Cloneable {
         this.data = data;
         this.type = null;
         return this;
+    }
+
+    /// The URIs a picker returns when several were chosen
+    /// (`EXTRA_ALLOW_MULTIPLE`), as Android reports them.
+    public ClipData getClipData() {
+        return clipData;
+    }
+
+    public void setClipData(ClipData clip) {
+        this.clipData = clip;
     }
 
     public String getType() {

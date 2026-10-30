@@ -86,6 +86,7 @@ The context belongs to the thread that serves the request, for the length of
 that request. It doesn't follow work handed to another thread: an `@Async`
 method or a `@Scheduled` job starts with none.
 
+[[backend-security-users]]
 === Users and passwords
 
 A chain that takes a password needs to know its users. It finds them in the
@@ -886,6 +887,69 @@ provider until they set one. The identities are kept in a
 `FederatedIdentityRepository`, in memory or in the `cn1_federated_identity`
 table.
 
+[[backend-security-outbound]]
+=== Calling other services
+
+A server that calls another API as itself, not on behalf of a user, needs an
+access token of its own. `AccessTokenProvider` gets one, keeps it until a
+minute before it expires, and gets the next one. Two grants are supported:
+
+* **Client credentials** (RFC 6749), with the client secret in an HTTP Basic
+  header, in the form, or replaced by a signed `private_key_jwt` assertion.
+* **JWT bearer** (RFC 7523), where the server signs an assertion with its own
+  key and trades it for a token. A Google service account works this way.
+
+A Google service account is read from the JSON file Google gives you. Its
+`private_key_id` becomes the assertion's `kid`:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/OutboundTokens.java[tag=backend-security-outbound-google,indent=0]
+----
+
+Any other provider's client credentials grant:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/OutboundTokens.java[tag=backend-security-outbound-client,indent=0]
+----
+
+Or the whole definition can come from configuration, under
+`cn1.security.oauth2.client.credentials.NAME.` (see
+<<backend-security-config-keys>>):
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/OutboundTokens.java[tag=backend-security-outbound-config,indent=0]
+----
+
+Each call then asks the provider for the header:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/OutboundTokens.java[tag=backend-security-outbound-use,indent=0]
+----
+
+What the provider promises:
+
+* **One refresh at a time.** Callers that arrive while a refresh is running
+  get the current token if it's still valid, and otherwise wait for that
+  refresh instead of starting their own.
+* **Never an expired token.** If a refresh fails after the token expired,
+  `getToken()` throws `TokenAcquisitionException`.
+* **A cooldown, not retries in place.** A failure the endpoint may recover from
+  (a 5xx, a 429, an unreachable host) puts the provider in a cooldown that
+  doubles with each failure, up to a minute, with jitter. Calls during it fail
+  at once rather than holding a request thread. A refused grant
+  (`invalid_client`, `invalid_grant`) is never retried, and the exception says
+  so.
+* **No secrets in errors.** An exception names the endpoint, the HTTP status
+  and the OAuth error code. It never includes the client secret, the
+  assertion, the token or the response body.
+
+Call `invalidate()` when the other service rejects a token before its
+expiry, for example after the provider revoked it.
+
 [[backend-security-authorization-server]]
 === The authorization server
 
@@ -1570,6 +1634,203 @@ recovery code and a rate limit's last permit.
 `OAuth2AuthorizationService.purgeExpired` remove rows nobody will present
 again. The first two are yours to call from a scheduled job.
 
+[[backend-security-migration]]
+=== Migrating an existing identity store
+
+Users move to a new server without resetting anything they sign in with, as
+long as the new server can verify what the old one stored. Part of the work
+is configuration the server already reads, and the rest is
+`IdentityMigration`, which imports the records.
+
+==== Password hashes
+
+`DelegatingPasswordEncoder` picks an encoder by the `{id}` in front of a
+stored hash, so the old store's hashes can stay as they are:
+
+* `{bcrypt}` reads `$2a$`, `$2b$` and `$2y$` hashes.
+* `{pbkdf2-sha256}` reads Spring Security's PBKDF2 format.
+* `ModularPbkdf2PasswordEncoder` reads Django
+  (`pbkdf2_sha256$...`), passlib (`$pbkdf2-sha256$...`) and Werkzeug
+  (`pbkdf2:sha256:...`) hashes, with the digest and the round count taken from
+  each stored value. Register it under an id of your choosing.
+* Any other algorithm is a `PasswordEncoder` you write and register under its
+  own id.
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/IdentityImport.java[tag=backend-security-migration-encoders,indent=0]
+----
+
+An imported hash is re-encoded with the default encoder the first time its
+owner signs in, as <<backend-security-users>> describes, so the old formats
+fade out without a reset.
+
+==== Importing the records
+
+The application reads its old store and passes each row to
+`IdentityMigration`, which writes it through the server's own stores:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/IdentityImport.java[tag=backend-security-migration-run,indent=0]
+----
+
+Usernames, authorities, federated subjects, credential ids and user handles
+are written exactly as given, so a token's `sub` and every link other systems
+hold stay the same. Nothing that already exists is overwritten, so a run can
+be repeated after fixing the rows it skipped. A dry run writes nothing and
+returns the same report.
+
+The `MigrationReport` lists every record with one outcome:
+
+* `MIGRATED`: carried over, and its owner signs in as before.
+* `NEEDS_ACTION`: carried over, but its owner has to act. A hash in a format
+  the encoder can't verify isn't imported; the user is created with a random
+  password and has to reset it. A passkey whose public key can't be read
+  has to be registered again.
+* `SKIPPED`: not carried over, with the reason. Examples are a user that
+  already exists, a credential id that's taken, or a user handle that belongs
+  to someone else.
+* `NOT_CARRIED`: state no migration moves, listed in the table below.
+
+A passkey works on the new server only if it has the same relying-party ID
+(the domain) as the old one. That's a rule of WebAuthn, not of this
+migration.
+
+==== Signing keys
+
+Tokens the old server issued keep verifying if the new server publishes the
+same keys under the same `kid`:
+
+* `cn1.security.authorizationserver.jwk.key-ids` gives each key in
+  `cn1.security.authorizationserver.jwk.keys` the `kid` it had, in the same
+  order. An empty entry keeps the derived ID.
+* `cn1.security.authorizationserver.jwk.verification-keys` lists keys that
+  only verify: a public key PEM, or a `.json` JWK Set, which keeps each key's
+  `kid`. Use it for an old key whose private half stays with the old
+  provider, and remove it when the last token it signed has expired. A private
+  key there is refused.
+
+==== What's kept and what isn't
+
+[cols="2,1,3", options="header"]
+|===
+| State | Kept | Why
+
+| Password hashes
+| Yes
+| Verified as stored, re-encoded on the next sign-in. A format no encoder
+  reads needs a reset.
+
+| Usernames, subjects, authorities
+| Yes
+| Written verbatim.
+
+| Federated identities
+| Yes
+| Linked by provider and subject.
+
+| Passkeys
+| Yes
+| Credential ID, public key, counter and user handle. Same relying-party ID
+  only.
+
+| TOTP secrets
+| Yes
+| Imported confirmed, so authenticator apps keep working.
+
+| Signing keys
+| Yes
+| Through `key-ids` and `verification-keys`.
+
+| Sessions
+| No
+| Bound to the old server. Every user signs in once.
+
+| Remembered sign-ins
+| No
+| Hashed or signed with the old server's secret.
+
+| Authorization codes
+| No
+| Single use and short lived. A sign-in in progress starts again.
+
+| Refresh tokens from the old server
+| No
+| The old server issued them. Its clients sign the user in again.
+
+| Recovery codes
+| No
+| Stored as hashes of the old server's choosing. Users generate new ones.
+|===
+
+[[backend-security-pki]]
+=== Certificates, key stores and key agreement
+
+`com.codename1.backend.security.pki` reads and writes the files a server
+exchanges with certificate authorities and partners. It's plain Java over the
+same primitives as the rest of the layer, so a local run and the native build
+give the same answers.
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/security/PkiSnippets.java[tag=backend-security-pki,indent=0]
+----
+
+Keys are bytes in two forms: PKCS#8 DER for a private key and
+SubjectPublicKeyInfo DER for a public one. `Crypto.sign`, `Crypto.verify` and
+`Crypto.ecdh` take those forms, `KeyFiles` reads them from PEM, and
+`Der.publicKeyOf` derives the public half of a private key.
+
+`Crypto.ecdh` returns the shared secret of two P-256 or P-384 keys, as SEC 1
+defines it. That secret is key material, not a key: derive the key from it
+with a KDF such as HKDF.
+
+A `CertificateValidator` trusts only the anchors it's given. There is no
+default trust store, so a server that accepts certificates from a partner
+trusts that partner's CA and no other. The validator builds a path from the
+leaf through the other certificates, which may come in any order, and checks:
+
+* every signature;
+* the validity periods, at the current time or the one `at` gives;
+* basic constraints, key usage and path length on every issuer;
+* that no critical extension is one it doesn't understand;
+* the host name and extended key usage, when `forHost` or `forPurpose` asks
+  for them.
+
+Host names match the subject alternative names only. The common name is never
+used, as RFC 9525 requires. The validator doesn't check revocation.
+
+The algorithm profile is the same on every runtime:
+
+[cols="1,2,2",options="header"]
+|===
+|Use |Supported |Refused
+
+|Signatures on certificates and requests
+|RSA with SHA-256, SHA-384 or SHA-512; RSASSA-PSS with SHA-256; ECDSA with
+P-256 and SHA-256, or P-384 and SHA-384
+|SHA-1, MD5, ECDSA with a digest that doesn't match its curve
+
+|Keys
+|RSA from 2048 to 8192 bits; EC on P-256 and P-384
+|Other curves, DSA, Ed25519
+
+|PKCS#12
+|PBES2 with PBKDF2 and AES-CBC, with an HMAC integrity check. This is what
+OpenSSL 3 and current JDKs write
+|The legacy RC2 and 3DES schemes (`openssl pkcs12 -legacy`), stores without
+an integrity check
+
+|Encoding
+|DER and PEM
+|BER indefinite lengths
+|===
+
+A file outside the profile is refused with a message that names what it uses.
+For a legacy PKCS#12 file, the message also gives the `openssl` command that
+re-exports it.
+
 [[backend-security-testing]]
 === Testing
 
@@ -1660,6 +1921,7 @@ That keeps the binary small, and it has consequences you can see:
   `cn1.security.user.*` keys are read by `formLogin`, `httpBasic` and
   `rememberMe` only.
 
+[[backend-security-config-keys]]
 === Configuration keys
 
 Every key here is read when the server starts, from wherever the server's
@@ -1720,6 +1982,22 @@ read by the build, because it decides what's linked into the server.
 | `cn1.security.authorizationserver.jwk.keys`
 | The PEM files of the signing keys, the signing one first. Required outside a
   development profile.
+
+| `cn1.security.authorizationserver.jwk.key-ids`
+| The `kid` of each key in `jwk.keys`, in the same order. An empty entry keeps
+  the ID derived from the public key. See <<backend-security-migration>>.
+
+| `cn1.security.authorizationserver.jwk.verification-keys`
+| Public keys that verify tokens and never sign: PEM files, or `.json` JWK
+  Sets that keep each key's `kid`.
+
+| `cn1.security.oauth2.client.credentials.NAME.grant`
+| `client_credentials`, `jwt_bearer` or `google_service_account`, for
+  `AccessTokenProviders.fromConfig(config, "NAME")`. The other keys under the
+  same prefix are `token-uri`, `client-id`, `client-secret`,
+  `client-authentication` (`basic`, `post` or `private_key_jwt`), `key-file`,
+  `key-id`, `issuer`, `subject`, `audience`, `google-json`, `scopes`,
+  `refresh-skew` and `max-backoff`. See <<backend-security-outbound>>.
 
 | `cn1.security.authorizationserver.device.verificationAttempts`, `cn1.security.authorizationserver.device.verificationWindowSeconds`
 | How many device codes one user may try, and in how many seconds. 10 and 300

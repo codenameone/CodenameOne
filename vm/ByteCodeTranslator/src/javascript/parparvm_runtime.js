@@ -1128,6 +1128,52 @@ const jvm = {
     }
     return cls.classObject;
   },
+  // JVMS 5.5 step 7: initializing a class also initializes every
+  // superinterface (direct or inherited through other interfaces; the superclass chain's own are initialized by the baseClass call before this walk)
+  // that declares a non-abstract, non-static method -- a default method. Such
+  // a method runs against an instance whose class never named the interface
+  // in a GETSTATIC, and the translator elides the init guard on a static read
+  // of the method's own class, so without this a Kotlin interface default
+  // like Compose's ``MonotonicFrameClock.getKey()`` (``= Key``) read the
+  // companion before the interface's <clinit> ran and answered null.
+  // The translator flags an interface declaring a default method with ``D``
+  // (its method map is no test: a devirtualized default is called directly
+  // and never listed). Only interfaces with a clinit matter.
+  // Computed once per class.
+  defaultMethodInterfacesToInit(cls) {
+    let out = cls.__defaultIfaceInit;
+    if (out !== undefined) {
+      return out;
+    }
+    out = [];
+    const seen = Object.create(null);
+    const visit = (ifaceName) => {
+      if (seen[ifaceName]) {
+        return;
+      }
+      seen[ifaceName] = 1;
+      const def = this.classes[ifaceName];
+      if (!def) {
+        return;
+      }
+      const supers = def.interfaces || [];
+      for (let i = 0; i < supers.length; i++) {
+        visit(supers[i]);
+      }
+      if (def.isInterface && def.D
+          && (def.clinit || this.nativeMethods["cn1_" + ifaceName + "___CLINIT__"])) {
+        out.push(ifaceName);
+      }
+    };
+    if (!cls.isInterface) {
+      const own = cls.interfaces || [];
+      for (let i = 0; i < own.length; i++) {
+        visit(own[i]);
+      }
+    }
+    cls.__defaultIfaceInit = out;
+    return out;
+  },
   ensureClassInitialized(className) {
     const cls = this.classes[className];
     if (!cls) {
@@ -1143,6 +1189,10 @@ const jvm = {
     cls.initializingThread = this.currentThread;
     if (cls.baseClass) {
       this.ensureClassInitialized(cls.baseClass);
+    }
+    const defaultIfaces = this.defaultMethodInterfacesToInit(cls);
+    for (let i = 0; i < defaultIfaces.length; i++) {
+      this.ensureClassInitialized(defaultIfaces[i]);
     }
     // NOTE: ``initialized`` is only set after the clinit completes
     // successfully (see end of this function). Re-entrant reads from
@@ -1285,6 +1335,10 @@ const jvm = {
     try {
       if (cls.baseClass) {
         yield* this.ensureClassInitializedSuspending(cls.baseClass);
+      }
+      const defaultIfaces = this.defaultMethodInterfacesToInit(cls);
+      for (let i = 0; i < defaultIfaces.length; i++) {
+        yield* this.ensureClassInitializedSuspending(defaultIfaces[i]);
       }
       const clinitMethodId = "cn1_" + className + "___CLINIT__";
       const clinit = this.nativeMethods[clinitMethodId] || cls.clinit;

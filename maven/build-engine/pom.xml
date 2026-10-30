@@ -126,6 +126,20 @@
             <artifactId>codenameone-android-res-compiler</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- RoomGeneratorTest compiles a Room application against the real
+             compatibility runtime, relocates it and runs it on the JVM. -->
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>codenameone-android-compat</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
         <!-- The FXML and style sheet compiler of the JavaFX layer: the build
              plugins call it before javac, and CompatRemapper calls its
              dispatch generator after relocation. -->
@@ -162,6 +176,12 @@
         <dependency>
             <groupId>org.apache.httpcomponents</groupId>
             <artifactId>httpclient</artifactId>
+        </dependency>
+        <dependency>
+            <!-- FlutterProjectBuilder: the transpile both build plugins run. -->
+            <groupId>${project.groupId}</groupId>
+            <artifactId>codenameone-dart-transpiler</artifactId>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>org.ow2.asm</groupId>

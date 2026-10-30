@@ -75,6 +75,31 @@ public class HeadlessImplementation extends CodenameOneImplementation {
         gallery = response;
     }
 
+    /// The request and callback of the last `showOpenDialog` call, which the
+    /// headless implementation never answers itself. A test that reads them
+    /// must reset them.
+    public static com.codename1.io.filechooser.OpenFileRequest openRequest;
+    public static com.codename1.util.SuccessCallback<com.codename1.io.filechooser.FileDialogResult> openCallback;
+
+    @Override
+    public void showOpenDialog(com.codename1.io.filechooser.OpenFileRequest request,
+            com.codename1.util.SuccessCallback<com.codename1.io.filechooser.FileDialogResult> callback) {
+        openRequest = request;
+        openCallback = callback;
+    }
+
+    /// The request and callback of the last `showSaveDialog` call, as for
+    /// `#openRequest`.
+    public static com.codename1.io.filechooser.SaveFileRequest saveRequest;
+    public static com.codename1.util.SuccessCallback<com.codename1.io.filechooser.FileDialogResult> saveCallback;
+
+    @Override
+    public void showSaveDialog(com.codename1.io.filechooser.SaveFileRequest request,
+            com.codename1.util.SuccessCallback<com.codename1.io.filechooser.FileDialogResult> callback) {
+        saveRequest = request;
+        saveCallback = callback;
+    }
+
     /// The image encoder `ImageIO.getImageIO()` answers; none by default. A
     /// test that sets it must reset it.
     public static com.codename1.ui.util.ImageIO imageIO;
@@ -1400,28 +1425,47 @@ public class HeadlessImplementation extends CodenameOneImplementation {
         return null;
     }
 
+    /// Storage held in memory for the life of the test JVM, so code that
+    /// persists through com.codename1.io.Storage (the AndroidKeyStore) can be
+    /// read back by a fresh instance.
+    public static final java.util.Map<String, byte[]> STORAGE =
+            java.util.Collections.synchronizedMap(new java.util.TreeMap<String, byte[]>());
+
     @Override
     public void deleteStorageFile(java.lang.String a0) {
+        STORAGE.remove(a0);
     }
 
     @Override
-    public java.io.OutputStream createStorageOutputStream(java.lang.String a0) throws java.io.IOException {
-        return null;
+    public java.io.OutputStream createStorageOutputStream(final java.lang.String a0) throws java.io.IOException {
+        return new java.io.ByteArrayOutputStream() {
+            @Override
+            public void close() throws java.io.IOException {
+                super.close();
+                STORAGE.put(a0, toByteArray());
+            }
+        };
     }
 
     @Override
     public java.io.InputStream createStorageInputStream(java.lang.String a0) throws java.io.IOException {
-        return null;
+        byte[] b = STORAGE.get(a0);
+        if (b == null) {
+            throw new java.io.IOException("No storage entry " + a0);
+        }
+        return new java.io.ByteArrayInputStream(b);
     }
 
     @Override
     public boolean storageFileExists(java.lang.String a0) {
-        return false;
+        return STORAGE.containsKey(a0);
     }
 
     @Override
     public java.lang.String[] listStorageEntries() {
-        return null;
+        synchronized (STORAGE) {
+            return STORAGE.keySet().toArray(new String[0]);
+        }
     }
 
     @Override
@@ -1518,5 +1562,56 @@ public class HeadlessImplementation extends CodenameOneImplementation {
     @Override
     public com.codename1.l10n.L10NManager getLocalizationManager() {
         return L10N;
+    }
+
+    /// The quiet half of SecureStorage, held in memory, for the tests that
+    /// install it with [#SECURE_STORAGE_ON]; otherwise the port has none, as on
+    /// a platform without a secure store.
+    public static final java.util.Map<String, String> SECURE = java.util.Collections.synchronizedMap(
+            new java.util.TreeMap<String, String>());
+
+    /// Whether [#getSecureStorage()] answers the in-memory store.
+    public static final java.util.concurrent.atomic.AtomicBoolean SECURE_STORAGE_ON =
+            new java.util.concurrent.atomic.AtomicBoolean();
+
+    private static final com.codename1.security.SecureStorage QUIET = new com.codename1.security.SecureStorage() {
+        @Override
+        public boolean set(String account, String value) {
+            SECURE.put(account, value);
+            return true;
+        }
+
+        @Override
+        public String get(String account) {
+            return SECURE.get(account);
+        }
+
+        @Override
+        public boolean remove(String account) {
+            return SECURE.remove(account) != null;
+        }
+    };
+
+    @Override
+    public com.codename1.security.SecureStorage getSecureStorage() {
+        return SECURE_STORAGE_ON.get() ? QUIET : null;
+    }
+
+    /// AES through the host JDK, the same contract the ports implement.
+    @Override
+    public byte[] aesEncrypt(String transformation, byte[] key, byte[] iv, byte[] aad, byte[] plaintext) {
+        return HeadlessAes.run(javax.crypto.Cipher.ENCRYPT_MODE, transformation, key, iv, aad, plaintext);
+    }
+
+    @Override
+    public byte[] aesDecrypt(String transformation, byte[] key, byte[] iv, byte[] aad, byte[] ciphertext) {
+        return HeadlessAes.run(javax.crypto.Cipher.DECRYPT_MODE, transformation, key, iv, aad, ciphertext);
+    }
+
+    private static final java.security.SecureRandom RANDOM = new java.security.SecureRandom();
+
+    @Override
+    public void secureRandomBytes(byte[] out) {
+        RANDOM.nextBytes(out);
     }
 }

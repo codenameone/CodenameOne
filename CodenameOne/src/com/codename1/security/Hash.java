@@ -31,6 +31,10 @@ package com.codename1.security;
 /// - [#SHA256]           -- 256 bit (SHA-2 family, recommended general-purpose hash)
 /// - [#SHA384]           -- 384 bit (SHA-2 family)
 /// - [#SHA512]           -- 512 bit (SHA-2 family)
+/// - [#SHA3_256]         -- 256 bit (SHA-3, FIPS 202)
+/// - [#KECCAK256]        -- 256 bit original Keccak, the hash Ethereum uses
+///   for addresses, transaction hashes and ABI selectors. It is NOT SHA3-256:
+///   the two differ in the padding byte and give different digests.
 ///
 /// #### Quick example
 ///
@@ -74,6 +78,18 @@ public final class Hash {
     /// SHA-512 algorithm identifier (512-bit digest, SHA-2 family).
     public static final String SHA512 = "SHA-512";
 
+    /// SHA3-256 algorithm identifier (256-bit digest, FIPS 202).
+    public static final String SHA3_256 = "SHA3-256";
+
+    /// Keccak-256 algorithm identifier (256-bit digest). This is the original
+    /// Keccak submission with the `0x01` padding byte, as used throughout
+    /// Ethereum; standardised SHA3-256 pads with `0x06` and is [#SHA3_256].
+    public static final String KECCAK256 = "KECCAK-256";
+
+    /// RIPEMD-160 algorithm identifier (160-bit digest). Bitcoin's address
+    /// hash is RIPEMD-160 over SHA-256; see [#hash160].
+    public static final String RIPEMD160 = "RIPEMD-160";
+
     private final MessageDigestImpl impl;
 
     private Hash(MessageDigestImpl impl) {
@@ -85,7 +101,8 @@ public final class Hash {
     /// #### Parameters
     ///
     /// - `algorithm`: one of [#MD5], [#SHA1], [#SHA224], [#SHA256], [#SHA384],
-    ///   [#SHA512] -- case insensitive, with or without the dash
+    ///   [#SHA512], [#SHA3_256], [#KECCAK256], [#RIPEMD160] -- case insensitive, with or
+    ///   without the dash
     ///
     /// #### Returns
     ///
@@ -171,6 +188,10 @@ public final class Hash {
 
     /// One-shot SHA-256 hash (recommended general-purpose hash).
     public static byte[] sha256(byte[] data) {
+        byte[] fast = data == null ? null : CryptoEngine.get().sha256(data, 0, data.length);
+        if (fast != null) {
+            return fast;
+        }
         return create(SHA256).digest(data);
     }
 
@@ -181,7 +202,35 @@ public final class Hash {
 
     /// One-shot SHA-512 hash.
     public static byte[] sha512(byte[] data) {
+        byte[] fast = data == null ? null : CryptoEngine.get().sha512(data, 0, data.length);
+        if (fast != null) {
+            return fast;
+        }
         return create(SHA512).digest(data);
+    }
+
+    /// One-shot Keccak-256 hash (Ethereum's hash, see [#KECCAK256]).
+    public static byte[] keccak256(byte[] data) {
+        byte[] fast = CryptoEngine.get().keccak256(data);
+        if (fast != null) {
+            return fast;
+        }
+        return create(KECCAK256).digest(data);
+    }
+
+    /// One-shot RIPEMD-160 hash.
+    public static byte[] ripemd160(byte[] data) {
+        byte[] fast = data == null ? null : CryptoEngine.get().ripemd160(data, 0, data.length);
+        if (fast != null) {
+            return fast;
+        }
+        return create(RIPEMD160).digest(data);
+    }
+
+    /// RIPEMD-160 of the SHA-256 of `data`: Bitcoin's `HASH160`, the hash
+    /// inside P2PKH and P2WPKH addresses.
+    public static byte[] hash160(byte[] data) {
+        return ripemd160(sha256(data));
     }
 
     // ----------------------------------------------------------------
@@ -201,21 +250,26 @@ public final class Hash {
         return b.toString();
     }
 
-    /// Decodes a hex string back into bytes. The string must contain an even
-    /// number of hex characters (whitespace and the `0x` prefix are not
-    /// stripped -- pass cleaned input).
+    /// Decodes a hex string back into bytes. Either case is accepted, as is a
+    /// leading `0x` or `0X`, the form Ethereum writes hex in; the rest must be
+    /// an even number of hex characters (whitespace is not stripped).
     public static byte[] fromHex(String hex) {
         if (hex == null) {
             return null;
         }
-        int len = hex.length();
+        int start = 0;
+        if (hex.length() >= 2 && hex.charAt(0) == '0'
+                && (hex.charAt(1) == 'x' || hex.charAt(1) == 'X')) {
+            start = 2;
+        }
+        int len = hex.length() - start;
         if ((len & 1) != 0) {
             throw new CryptoException("hex string must have even length");
         }
         byte[] out = new byte[len / 2];
         for (int i = 0; i < len; i += 2) {
-            int hi = nibble(hex.charAt(i));
-            int lo = nibble(hex.charAt(i + 1));
+            int hi = nibble(hex.charAt(start + i));
+            int lo = nibble(hex.charAt(start + i + 1));
             out[i / 2] = (byte) ((hi << 4) | lo);
         }
         return out;

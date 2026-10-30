@@ -566,7 +566,18 @@ public class HashMap<K, V> extends AbstractMap<K, V> implements Map<K, V> {
         }
     }
 
+    @SuppressWarnings("unchecked")
     private void putAllImpl(Map<? extends K, ? extends V> map) {
+        if (map instanceof HashMap) {
+            // Straight from the source's slots: the entry iterator below builds
+            // an Entry per mapping, which copying a 5,000-key theme made garbage.
+            HashMap<K, V> source = (HashMap<K, V>) map;
+            for (int i = source.cn1FirstIndex(); i >= 0; i = source.cn1NextIndex(i)) {
+                put((K) NativeStorage.get(source.cn1KeysBlock, i),
+                        (V) NativeStorage.get(NativeStorage.part(source.cn1KeysBlock, VALS), i));
+            }
+            return;
+        }
         Iterator it = map.entrySet().iterator();
         while (it.hasNext()) {
             Map.Entry<? extends K, ? extends V> entry = (Map.Entry<? extends K, ? extends V>) it.next();

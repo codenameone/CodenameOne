@@ -25,7 +25,7 @@ package com.codename1.unitycompat.system;
 /// The members of `System.Array`, for the arrays that have no class of
 /// their own to put them on: a JVM array for one dimension, an [MdArray]
 /// for more. Which one an `Array` is, is only known when it gets here.
-@SuppressWarnings("PMD.MethodNamingConventions") // C# member names: translated code binds to them by name
+@SuppressWarnings({"PMD.MethodNamingConventions", "PMD.ClassNamingConventions"}) // C# member and type names: translated code binds to them by name
 public final class Array_ {
     private Array_() {
     }

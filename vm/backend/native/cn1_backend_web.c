@@ -44,7 +44,71 @@
 #include <unistd.h> /* CN1_RESUME_THREAD expands to usleep */
 #include <poll.h>
 #endif
+#ifdef CN1_BACKEND_CURL_DLOPEN
+/* The type-checking wrappers are macros named after the functions, and the
+ * functions below become macros of their own. */
+#define CURL_DISABLE_TYPECHECK 1
+#endif
 #include <curl/curl.h>
+#ifdef CN1_BACKEND_CURL_DLOPEN
+/*
+ * libcurl is opened on the first outbound request instead of at start-up. A
+ * server that never calls out (most of them) then never maps libcurl and its TLS
+ * stack: on Debian that is GnuTLS, p11-kit, Kerberos, GMP, Nettle and Hogweed,
+ * about 5.5MB of an idle server's 13MB proportional set size. Set by the dynamic
+ * Linux links only; a static link has nothing to open and keeps -lcurl.
+ */
+#include <dlfcn.h>
+#define CN1_CURL_FUNCTIONS(X) \
+    X(curl_global_init) X(curl_easy_init) X(curl_easy_cleanup) X(curl_easy_setopt) \
+    X(curl_easy_getinfo) X(curl_easy_perform) X(curl_easy_pause) X(curl_easy_strerror) \
+    X(curl_multi_init) X(curl_multi_cleanup) X(curl_multi_setopt) X(curl_multi_add_handle) \
+    X(curl_multi_remove_handle) X(curl_multi_info_read) X(curl_multi_socket_action) \
+    X(curl_slist_append) X(curl_slist_free_all) X(curl_version_info)
+#define CN1_CURL_POINTER(name) static __typeof__(name)* cn1p_##name;
+CN1_CURL_FUNCTIONS(CN1_CURL_POINTER)
+/* Only Web.initialiseCurlOnce calls this, under its monitor, and every other
+ * entry point runs after it succeeded, so the pointers need no synchronisation. */
+static int cn1CurlLoad(void) {
+    void* library;
+    if (cn1p_curl_global_init != NULL) {
+        return 1;
+    }
+    library = dlopen("libcurl.so.4", RTLD_NOW | RTLD_LOCAL);
+    if (library == NULL) {
+        library = dlopen("libcurl.so", RTLD_NOW | RTLD_LOCAL);
+    }
+    if (library == NULL) {
+        return 0;
+    }
+#define CN1_CURL_RESOLVE(name) \
+    if ((*(void**) (&cn1p_##name) = dlsym(library, #name)) == NULL) { \
+        cn1p_curl_global_init = NULL; \
+        return 0; \
+    }
+    CN1_CURL_FUNCTIONS(CN1_CURL_RESOLVE)
+#undef CN1_CURL_RESOLVE
+    return 1;
+}
+#define curl_global_init (*cn1p_curl_global_init)
+#define curl_easy_init (*cn1p_curl_easy_init)
+#define curl_easy_cleanup (*cn1p_curl_easy_cleanup)
+#define curl_easy_setopt (*cn1p_curl_easy_setopt)
+#define curl_easy_getinfo (*cn1p_curl_easy_getinfo)
+#define curl_easy_perform (*cn1p_curl_easy_perform)
+#define curl_easy_pause (*cn1p_curl_easy_pause)
+#define curl_easy_strerror (*cn1p_curl_easy_strerror)
+#define curl_multi_init (*cn1p_curl_multi_init)
+#define curl_multi_cleanup (*cn1p_curl_multi_cleanup)
+#define curl_multi_setopt (*cn1p_curl_multi_setopt)
+#define curl_multi_add_handle (*cn1p_curl_multi_add_handle)
+#define curl_multi_remove_handle (*cn1p_curl_multi_remove_handle)
+#define curl_multi_info_read (*cn1p_curl_multi_info_read)
+#define curl_multi_socket_action (*cn1p_curl_multi_socket_action)
+#define curl_slist_append (*cn1p_curl_slist_append)
+#define curl_slist_free_all (*cn1p_curl_slist_free_all)
+#define curl_version_info (*cn1p_curl_version_info)
+#endif
 /* For the ALPN answer of a connection libcurl made through OpenSSL; see
    cn1WebRequireH2Prereq. Both packaging targets link OpenSSL, and this file is
    compiled only when TLS is (build.sh drops it with CN1_BACKEND_HTTPS=0). */
@@ -130,6 +194,77 @@ static void cn1WebWatchMulti(CURLM* multi, CN1WebWatch* watch) {
     curl_multi_setopt(multi, CURLMOPT_TIMERDATA, watch);
 }
 
+/* One wait and one round of socket actions on `multi`: what cn1WebDrive does
+ * per iteration, and what a streamed transfer (cn1WebStreamStep) does until it
+ * has what its caller asked for. */
+static void cn1WebTurn(CURLM* multi, CN1WebWatch* w, int park, int* running) {
+    int fds[CN1_WEB_MAX_SOCKETS];
+    int events[CN1_WEB_MAX_SOCKETS];
+    struct pollfd probe[CN1_WEB_MAX_SOCKETS];
+    int n = w->count;
+    int i;
+    int ready = 0;
+    long long timeout = (long long)w->timeoutMillis;
+    if(timeout == 0) {
+        w->timeoutMillis = -1;
+        curl_multi_socket_action(multi, CURL_SOCKET_TIMEOUT, 0, running);
+        return;
+    }
+    if(n == 0 && timeout < 0) {
+        /* Nothing to watch and no timer, which libcurl should never leave
+           us with while a transfer runs; look again shortly rather than
+           waiting for ever on nothing. */
+        timeout = 10;
+    }
+    for(i = 0 ; i < n ; i++) {
+        fds[i] = (int)w->fd[i];
+        events[i] = ((w->what[i] & CURL_POLL_IN) ? 1 : 0)
+                  | ((w->what[i] & CURL_POLL_OUT) ? 2 : 0);
+        probe[i].fd = fds[i];
+        probe[i].events = (short)(((events[i] & 1) ? POLLIN : 0)
+                                  | ((events[i] & 2) ? POLLOUT : 0));
+        probe[i].revents = 0;
+    }
+    /* Ask first, as every other wait here does: a socket that is already
+       ready costs no park. */
+    if(n > 0) {
+        ready = poll(probe, (nfds_t)n, 0);
+    }
+    if(ready <= 0 && !park) {
+        /* Off a virtual thread: block this thread, as curl_easy_perform
+           would. Nothing to watch means only a timer, so sleep it out in
+           poll() with no descriptors. */
+        ready = poll(probe, (nfds_t)n, timeout > 1000 ? 1000 : (int)timeout);
+    } else if(ready <= 0) {
+        cn1BackendVtWait(n, fds, events, timeout);
+        if(n > 0) {
+            for(i = 0 ; i < n ; i++) {
+                probe[i].revents = 0;
+            }
+            ready = poll(probe, (nfds_t)n, 0);
+        }
+    }
+    if(ready > 0) {
+        for(i = 0 ; i < n ; i++) {
+            int mask = 0;
+            if(probe[i].revents & (POLLIN | POLLHUP)) {
+                mask |= CURL_CSELECT_IN;
+            }
+            if(probe[i].revents & POLLOUT) {
+                mask |= CURL_CSELECT_OUT;
+            }
+            if(probe[i].revents & (POLLERR | POLLNVAL)) {
+                mask |= CURL_CSELECT_ERR;
+            }
+            if(mask != 0) {
+                curl_multi_socket_action(multi, (curl_socket_t)fds[i], mask, running);
+            }
+        }
+    } else {
+        curl_multi_socket_action(multi, CURL_SOCKET_TIMEOUT, 0, running);
+    }
+}
+
 /* Drives one transfer on `multi`, whose socket and timer callbacks report into
  * `watch` (cn1WebWatchMulti). With `park` the waits park the virtual thread;
  * without it they block this thread in poll(), which is what a WebClient's
@@ -166,71 +301,7 @@ static CURLcode cn1WebDrive(CURLM* pooled, CN1WebWatch* pooledWatch, CURL* curl,
     }
     curl_multi_socket_action(multi, CURL_SOCKET_TIMEOUT, 0, &running);
     while(running) {
-        int fds[CN1_WEB_MAX_SOCKETS];
-        int events[CN1_WEB_MAX_SOCKETS];
-        struct pollfd probe[CN1_WEB_MAX_SOCKETS];
-        int n = w->count;
-        int i;
-        int ready = 0;
-        long long timeout = (long long)w->timeoutMillis;
-        if(timeout == 0) {
-            w->timeoutMillis = -1;
-            curl_multi_socket_action(multi, CURL_SOCKET_TIMEOUT, 0, &running);
-            continue;
-        }
-        if(n == 0 && timeout < 0) {
-            /* Nothing to watch and no timer, which libcurl should never leave
-               us with while a transfer runs; look again shortly rather than
-               waiting for ever on nothing. */
-            timeout = 10;
-        }
-        for(i = 0 ; i < n ; i++) {
-            fds[i] = (int)w->fd[i];
-            events[i] = ((w->what[i] & CURL_POLL_IN) ? 1 : 0)
-                      | ((w->what[i] & CURL_POLL_OUT) ? 2 : 0);
-            probe[i].fd = fds[i];
-            probe[i].events = (short)(((events[i] & 1) ? POLLIN : 0)
-                                      | ((events[i] & 2) ? POLLOUT : 0));
-            probe[i].revents = 0;
-        }
-        /* Ask first, as every other wait here does: a socket that is already
-           ready costs no park. */
-        if(n > 0) {
-            ready = poll(probe, (nfds_t)n, 0);
-        }
-        if(ready <= 0 && !park) {
-            /* Off a virtual thread: block this thread, as curl_easy_perform
-               would. Nothing to watch means only a timer, so sleep it out in
-               poll() with no descriptors. */
-            ready = poll(probe, (nfds_t)n, timeout > 1000 ? 1000 : (int)timeout);
-        } else if(ready <= 0) {
-            cn1BackendVtWait(n, fds, events, timeout);
-            if(n > 0) {
-                for(i = 0 ; i < n ; i++) {
-                    probe[i].revents = 0;
-                }
-                ready = poll(probe, (nfds_t)n, 0);
-            }
-        }
-        if(ready > 0) {
-            for(i = 0 ; i < n ; i++) {
-                int mask = 0;
-                if(probe[i].revents & (POLLIN | POLLHUP)) {
-                    mask |= CURL_CSELECT_IN;
-                }
-                if(probe[i].revents & POLLOUT) {
-                    mask |= CURL_CSELECT_OUT;
-                }
-                if(probe[i].revents & (POLLERR | POLLNVAL)) {
-                    mask |= CURL_CSELECT_ERR;
-                }
-                if(mask != 0) {
-                    curl_multi_socket_action(multi, (curl_socket_t)fds[i], mask, &running);
-                }
-            }
-        } else {
-            curl_multi_socket_action(multi, CURL_SOCKET_TIMEOUT, 0, &running);
-        }
+        cn1WebTurn(multi, w, park, &running);
     }
     while((msg = curl_multi_info_read(multi, &left)) != NULL) {
         if(msg->msg == CURLMSG_DONE) {
@@ -257,6 +328,8 @@ typedef struct {
     /* CURLINFO_HTTP_VERSION: 1 HTTP/1.0, 2 HTTP/1.1, 3 HTTP/2, 30 HTTP/3, 0 unknown. */
     long httpVersion;
     char error[CURL_ERROR_SIZE];
+    /* A streamed exchange's state (CN1WebStream), or NULL; freeImpl ends it. */
+    void* stream;
 } CN1WebResponse;
 
 /*
@@ -569,6 +642,11 @@ static void cn1WebFreeSecret(char* secret, size_t length) {
 }
 
 JAVA_INT com_codename1_backend_Web_globalInitImpl___R_int(CODENAME_ONE_THREAD_STATE) {
+#ifdef CN1_BACKEND_CURL_DLOPEN
+    if (!cn1CurlLoad()) {
+        return (JAVA_INT)CURLE_FAILED_INIT;
+    }
+#endif
     return (JAVA_INT)curl_global_init(CURL_GLOBAL_DEFAULT);
 }
 
@@ -651,17 +729,239 @@ static int cn1WebRequireH2Prereq(void* clientp, char* primaryIp, char* localIp,
 
 /* Web.performImpl's flags; see Web.FLAG_*. */
 #define CN1_WEB_FLAG_REQUIRE_HTTP2 1
+#define CN1_WEB_FLAG_STREAM 8
+
+/*
+ * A streamed exchange (Web.Exchange): the transfer is set up exactly as
+ * performImpl sets up any other, then stepped from Java instead of driven to
+ * its end, so neither body is ever held whole.
+ *
+ * Both directions move through a fixed window. The write callback appends to
+ * `in` and PAUSES the receive side once the window is full, so a fast upstream
+ * waits on the Java reader; the read callback serves `out` and pauses the send
+ * side when Java has not supplied the next block yet, so a slow producer holds
+ * the request open rather than ending it. libcurl redelivers whatever it was
+ * refused on unpause, so a pause loses nothing. No callback ever calls into
+ * Java: Java calls in, and each call drives the multi until it has what it
+ * asked for (cn1WebStreamStep).
+ *
+ * The transfer has a multi of its own and is never pooled -- it can outlive
+ * any number of pooled requests -- and never follows redirects, because its
+ * body cannot be replayed and a caller that follows them has to see each hop.
+ */
+#define CN1_WEB_STREAM_WINDOW ((size_t)(256 * 1024))
+#ifndef _WIN32
+typedef struct {
+    CURLM* multi;
+    CN1WebWatch watch;
+    CURL* curl;
+    struct curl_slist* headers;
+    char* methodCopy;
+    char* urlCopy;
+    char* bodyCopy;
+    char* certCopy;
+    size_t certLength;
+    char* keyCopy;
+    size_t keyLength;
+    char* passwordCopy;
+    size_t passwordLength;
+    CN1WebH2Check h2check;
+    int flags;
+    int running;
+    int done;
+    CURLcode rc;
+    int headersReady;
+    /* The pause state libcurl was last given, as CURLPAUSE_* bits. */
+    int paused;
+    unsigned char* in;
+    size_t inLength;
+    size_t inOffset;
+    unsigned char* out;
+    size_t outLength;
+    size_t outOffset;
+    int outFinished;
+    CN1WebResponse* response;
+} CN1WebStream;
+
+static size_t cn1WebStreamWrite(void* contents, size_t size, size_t count, void* userp) {
+    CN1WebStream* st = (CN1WebStream*)userp;
+    size_t total = size * count;
+    st->headersReady = 1;
+    if(st->inLength - st->inOffset >= CN1_WEB_STREAM_WINDOW) {
+        st->paused |= CURLPAUSE_RECV;
+        return CURL_WRITEFUNC_PAUSE;
+    }
+    if(st->inOffset > 0) {
+        memmove(st->in, st->in + st->inOffset, st->inLength - st->inOffset);
+        st->inLength -= st->inOffset;
+        st->inOffset = 0;
+    }
+    if(total > 0) {
+        unsigned char* grown = (unsigned char*)realloc(st->in, st->inLength + total);
+        if(grown == NULL) {
+            return 0; /* aborts the transfer */
+        }
+        st->in = grown;
+        memcpy(st->in + st->inLength, contents, total);
+        st->inLength += total;
+    }
+    return total;
+}
+
+static size_t cn1WebStreamHeader(void* contents, size_t size, size_t count, void* userp) {
+    CN1WebStream* st = (CN1WebStream*)userp;
+    size_t total = size * count;
+    size_t taken = cn1WebHeader(contents, size, count, st->response);
+    const char* line = (const char*)contents;
+    /* The blank line ending a header block. Redirects are never followed here,
+       so the first final block is the response; a 1xx block is not. */
+    if(taken == total && ((total == 2 && line[0] == '\r' && line[1] == '\n')
+            || (total == 1 && line[0] == '\n'))) {
+        long code = 0;
+        curl_easy_getinfo(st->curl, CURLINFO_RESPONSE_CODE, &code);
+        if(code >= 200) {
+            st->headersReady = 1;
+        }
+    }
+    return taken;
+}
+
+static size_t cn1WebStreamRead(char* buffer, size_t size, size_t count, void* userp) {
+    CN1WebStream* st = (CN1WebStream*)userp;
+    size_t room = size * count;
+    if(st->outOffset < st->outLength) {
+        size_t n = st->outLength - st->outOffset;
+        if(n > room) {
+            n = room;
+        }
+        memcpy(buffer, st->out + st->outOffset, n);
+        st->outOffset += n;
+        return n;
+    }
+    if(st->outFinished) {
+        return 0;
+    }
+    st->paused |= CURLPAUSE_SEND;
+    return CURL_READFUNC_PAUSE;
+}
+
+#define CN1_WEB_WANT_HEADERS 1
+#define CN1_WEB_WANT_DATA 2
+#define CN1_WEB_WANT_SPACE 3
+
+static int cn1WebStreamSatisfied(CN1WebStream* st, int want) {
+    if(st->done) {
+        return 1;
+    }
+    switch(want) {
+        case CN1_WEB_WANT_HEADERS:
+            return st->headersReady;
+        case CN1_WEB_WANT_DATA:
+            return st->inLength > st->inOffset;
+        default:
+            return st->outOffset >= st->outLength;
+    }
+}
+
+/* Drives the transfer until `want` holds or it ends, resuming whichever side
+   now has room or data first. */
+static void cn1WebStreamStep(CN1WebStream* st, int want, int park) {
+    CURLMsg* msg;
+    int left;
+    while(!cn1WebStreamSatisfied(st, want)) {
+        int wanted = st->paused;
+        if((wanted & CURLPAUSE_RECV) && st->inLength - st->inOffset < CN1_WEB_STREAM_WINDOW) {
+            wanted &= ~CURLPAUSE_RECV;
+        }
+        if((wanted & CURLPAUSE_SEND) && (st->outOffset < st->outLength || st->outFinished)) {
+            wanted &= ~CURLPAUSE_SEND;
+        }
+        if(wanted != st->paused) {
+            /* Callbacks run inside this call may pause again; they OR their bit
+               back in, which is why the state is assigned first. */
+            st->paused = wanted;
+            curl_easy_pause(st->curl, wanted);
+            continue;
+        }
+        if(st->running) {
+            cn1WebTurn(st->multi, &st->watch, park, &st->running);
+        }
+        while((msg = curl_multi_info_read(st->multi, &left)) != NULL) {
+            if(msg->msg == CURLMSG_DONE) {
+                st->done = 1;
+                st->rc = msg->data.result;
+            }
+        }
+        if(!st->running && !st->done) {
+            st->done = 1;
+            st->rc = CURLE_OK;
+        }
+    }
+}
+
+/* Copies what the transfer now knows into the response Java reads. */
+static void cn1WebStreamReport(CN1WebStream* st) {
+    CN1WebResponse* r = st->response;
+    if(st->done && st->rc != CURLE_OK) {
+        r->status = -1;
+        if(r->error[0] == 0) {
+            const char* msg = curl_easy_strerror(st->rc);
+            strncpy(r->error, msg == NULL ? "transfer failed" : msg, CURL_ERROR_SIZE - 1);
+        }
+        if(st->h2check.refused || st->h2check.unverifiable) {
+            strncpy(r->error, "HTTP/2 is required, and the server did not negotiate it; "
+                    "the request was not sent", CURL_ERROR_SIZE - 1);
+        }
+        return;
+    }
+    if(st->headersReady || st->done) {
+        curl_easy_getinfo(st->curl, CURLINFO_RESPONSE_CODE, &r->status);
+#if LIBCURL_VERSION_NUM >= 0x073200
+        curl_easy_getinfo(st->curl, CURLINFO_HTTP_VERSION, &r->httpVersion);
+#endif
+        if((st->flags & CN1_WEB_FLAG_REQUIRE_HTTP2) && r->httpVersion != CURL_HTTP_VERSION_2_0
+                && r->httpVersion != 0) {
+            r->status = -1;
+            strncpy(r->error, "HTTP/2 is required, and the server answered over another "
+                    "protocol", CURL_ERROR_SIZE - 1);
+        }
+    }
+}
+
+static void cn1WebStreamFree(CN1WebStream* st) {
+    if(st == NULL) {
+        return;
+    }
+    /* Removing a transfer that has not finished aborts it and closes its
+       connection: this is what cancelling an exchange is. */
+    curl_multi_remove_handle(st->multi, st->curl);
+    curl_easy_cleanup(st->curl);
+    curl_multi_cleanup(st->multi);
+    curl_slist_free_all(st->headers);
+    cn1WebFreeSecret(st->certCopy, st->certLength);
+    cn1WebFreeSecret(st->keyCopy, st->keyLength);
+    cn1WebFreeSecret(st->passwordCopy, st->passwordLength);
+    free(st->urlCopy);
+    free(st->methodCopy);
+    free(st->bodyCopy);
+    free(st->in);
+    free(st->out);
+    free(st);
+}
+#endif
+
 #define CN1_WEB_FLAG_CLIENT 2
 #define CN1_WEB_FLAG_NO_REUSE 4
 /* ClientCertificate's types. */
 #define CN1_WEB_CERT_PEM 0
 #define CN1_WEB_CERT_PKCS12 1
 
-JAVA_LONG com_codename1_backend_Web_performImpl___long_java_lang_String_java_lang_String_byte_1ARRAY_byte_1ARRAY_boolean_int_int_int_int_byte_1ARRAY_byte_1ARRAY_int_java_lang_String_R_long(
+JAVA_LONG com_codename1_backend_Web_performImpl___long_java_lang_String_java_lang_String_byte_1ARRAY_byte_1ARRAY_boolean_int_int_int_int_byte_1ARRAY_byte_1ARRAY_int_java_lang_String_long_R_long(
         CODENAME_ONE_THREAD_STATE, JAVA_LONG poolHandle, JAVA_OBJECT method, JAVA_OBJECT url,
         JAVA_OBJECT headerLines, JAVA_OBJECT body, JAVA_BOOLEAN callerHeaders, JAVA_INT flags,
         JAVA_INT connectTimeoutMillis, JAVA_INT readTimeoutMillis, JAVA_INT requestTimeoutMillis,
-        JAVA_OBJECT certificate, JAVA_OBJECT key, JAVA_INT certificateType, JAVA_OBJECT password) {
+        JAVA_OBJECT certificate, JAVA_OBJECT key, JAVA_INT certificateType, JAVA_OBJECT password,
+        JAVA_LONG uploadLength) {
     CURL* curl;
     CURLcode rc;
     struct curl_slist* headers = NULL;
@@ -1164,6 +1464,76 @@ JAVA_LONG com_codename1_backend_Web_performImpl___long_java_lang_String_java_lan
     /* The transfer blocks; yield so the concurrent collector is not stalled by it.
        On a virtual thread it PARKS instead of blocking, so its host goes on
        running every other virtual thread; see cn1WebPerformParked. */
+    if(flags & CN1_WEB_FLAG_STREAM) {
+        /* Set up like any other transfer, stepped from Java from here on; see
+           CN1WebStream. uploadLength is -2 for no request body, -1 for one of
+           unknown length (chunked on HTTP/1.1), or its byte count. */
+#ifndef _WIN32
+        CN1WebStream* st = (CN1WebStream*)calloc(1, sizeof(CN1WebStream));
+        CURLM* multi = st == NULL ? NULL : curl_multi_init();
+        if(multi != NULL) {
+            st->multi = multi;
+            cn1WebWatchMulti(multi, &st->watch);
+            st->curl = curl;
+            st->headers = headers;
+            st->methodCopy = methodCopy;
+            st->urlCopy = urlCopy;
+            st->bodyCopy = bodyCopy;
+            st->certCopy = certCopy;
+            st->certLength = certLength;
+            st->keyCopy = keyCopy;
+            st->keyLength = keyLength;
+            st->passwordCopy = passwordCopy;
+            st->passwordLength = passwordLength;
+            st->h2check = h2check;
+            st->h2check.curl = curl;
+            st->flags = flags;
+            st->response = r;
+            r->stream = st;
+#if LIBCURL_VERSION_NUM >= 0x075000
+            if(flags & CN1_WEB_FLAG_REQUIRE_HTTP2) {
+                /* The stack copy performImpl registered dies when it returns. */
+                curl_easy_setopt(curl, CURLOPT_PREREQDATA, &st->h2check);
+            }
+#endif
+            curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 0L);
+            curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, cn1WebStreamWrite);
+            curl_easy_setopt(curl, CURLOPT_WRITEDATA, st);
+            curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, cn1WebStreamHeader);
+            curl_easy_setopt(curl, CURLOPT_HEADERDATA, st);
+            if(uploadLength >= -1) {
+                curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);
+                curl_easy_setopt(curl, CURLOPT_READFUNCTION, cn1WebStreamRead);
+                curl_easy_setopt(curl, CURLOPT_READDATA, st);
+                curl_easy_setopt(curl, CURLOPT_INFILESIZE_LARGE, (curl_off_t)uploadLength);
+            }
+            if(curl_multi_add_handle(multi, curl) == CURLM_OK) {
+                curl_multi_socket_action(multi, CURL_SOCKET_TIMEOUT, 0, &st->running);
+                return (JAVA_LONG)(intptr_t)r;
+            }
+            /* Never added, so the remove in cn1WebStreamFree is a no-op. */
+            r->stream = NULL;
+            strncpy(r->error, "could not start the streamed transfer", CURL_ERROR_SIZE - 1);
+            r->status = -1;
+            cn1WebStreamFree(st);
+            return (JAVA_LONG)(intptr_t)r;
+        }
+        free(st);
+        strncpy(r->error, "could not start the streamed transfer", CURL_ERROR_SIZE - 1);
+#else
+        strncpy(r->error, "streamed exchanges are not supported on Windows yet",
+                CURL_ERROR_SIZE - 1);
+#endif
+        r->status = -1;
+        curl_easy_cleanup(curl);
+        curl_slist_free_all(headers);
+        cn1WebFreeSecret(certCopy, certLength);
+        cn1WebFreeSecret(keyCopy, keyLength);
+        cn1WebFreeSecret(passwordCopy, passwordLength);
+        free(urlCopy); free(methodCopy); free(bodyCopy);
+        return (JAVA_LONG)(intptr_t)r;
+    }
+
     CN1_YIELD_THREAD;
 #ifndef _WIN32
     {
@@ -1288,8 +1658,109 @@ JAVA_OBJECT com_codename1_backend_Web_headersImpl___long_R_java_lang_String(CODE
 JAVA_VOID com_codename1_backend_Web_freeImpl___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
     CN1WebResponse* r = (CN1WebResponse*)(intptr_t)handle;
     if(r != NULL) {
+#ifndef _WIN32
+        cn1WebStreamFree((CN1WebStream*)r->stream);
+#endif
         free(r->data);
         free(r->headers);
         free(r);
     }
+}
+
+/*
+ * Web.Exchange's natives. Each takes the handle performImpl returned with
+ * CN1_WEB_FLAG_STREAM; on one that has no stream (setup failed, or Windows)
+ * they report the transfer as ended, and statusImpl/errorImpl say why.
+ */
+
+/* Drives until `want` (CN1_WEB_WANT_*) holds; answers bit 0 headers ready,
+   bit 1 ended. */
+JAVA_INT com_codename1_backend_Web_streamStepImpl___long_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_INT want) {
+    CN1WebResponse* r = (CN1WebResponse*)(intptr_t)handle;
+#ifndef _WIN32
+    CN1WebStream* st = r == NULL ? NULL : (CN1WebStream*)r->stream;
+    if(st != NULL) {
+        CN1_YIELD_THREAD;
+        cn1WebStreamStep(st, (int)want, cn1BackendCanPark());
+        CN1_RESUME_THREAD;
+        cn1WebStreamReport(st);
+        return (st->headersReady ? 1 : 0) | (st->done ? 2 : 0);
+    }
+#else
+    (void)want;
+#endif
+    (void)r;
+    return 3;
+}
+
+/* Takes up to `length` buffered response bytes; 0 when none are buffered. */
+JAVA_INT com_codename1_backend_Web_streamReadImpl___long_byte_1ARRAY_int_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_OBJECT buffer, JAVA_INT offset, JAVA_INT length) {
+    CN1WebResponse* r = (CN1WebResponse*)(intptr_t)handle;
+#ifndef _WIN32
+    CN1WebStream* st = r == NULL ? NULL : (CN1WebStream*)r->stream;
+    size_t n;
+    if(st == NULL || buffer == JAVA_NULL || length <= 0) {
+        return 0;
+    }
+    n = st->inLength - st->inOffset;
+    if(n > (size_t)length) {
+        n = (size_t)length;
+    }
+    memcpy((JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(buffer) + offset, st->in + st->inOffset, n);
+    st->inOffset += n;
+    if(st->inOffset == st->inLength) {
+        st->inOffset = 0;
+        st->inLength = 0;
+    }
+    return (JAVA_INT)n;
+#else
+    (void)r; (void)buffer; (void)offset; (void)length;
+    return 0;
+#endif
+}
+
+/* Hands the transfer the next block of the request body, which must be
+   called only once the previous one was taken (CN1_WEB_WANT_SPACE); the
+   count accepted. */
+JAVA_INT com_codename1_backend_Web_streamWriteImpl___long_byte_1ARRAY_int_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_OBJECT buffer, JAVA_INT offset, JAVA_INT length) {
+    CN1WebResponse* r = (CN1WebResponse*)(intptr_t)handle;
+#ifndef _WIN32
+    CN1WebStream* st = r == NULL ? NULL : (CN1WebStream*)r->stream;
+    size_t n = (size_t)length;
+    if(st == NULL || buffer == JAVA_NULL || length <= 0 || st->outOffset < st->outLength
+            || st->outFinished) {
+        return 0;
+    }
+    if(n > CN1_WEB_STREAM_WINDOW) {
+        n = CN1_WEB_STREAM_WINDOW;
+    }
+    if(st->out == NULL) {
+        st->out = (unsigned char*)malloc(CN1_WEB_STREAM_WINDOW);
+        if(st->out == NULL) {
+            /* -1, never 0: nothing will ever be pending, so the step that
+               answers 0 with would return at once and the writer loop spin. */
+            return -1;
+        }
+    }
+    memcpy(st->out, (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(buffer) + offset, n);
+    st->outOffset = 0;
+    st->outLength = n;
+    return (JAVA_INT)n;
+#else
+    (void)r; (void)buffer; (void)offset; (void)length;
+    return 0;
+#endif
+}
+
+/* The request body is complete. */
+JAVA_VOID com_codename1_backend_Web_streamEndUploadImpl___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
+    CN1WebResponse* r = (CN1WebResponse*)(intptr_t)handle;
+#ifndef _WIN32
+    CN1WebStream* st = r == NULL ? NULL : (CN1WebStream*)r->stream;
+    if(st != NULL) {
+        st->outFinished = 1;
+    }
+#else
+    (void)r;
+#endif
 }

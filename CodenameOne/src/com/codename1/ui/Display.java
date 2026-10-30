@@ -563,6 +563,7 @@ public final class Display extends CN1Constants {
 
             impl.setDisplayLock(lock);
             impl.initImpl(m);
+            com.codename1.security.CryptoEngine.install(impl.createCryptoEngine());
             INSTANCE.codenameOneGraphics = new Graphics(impl.getNativeGraphics());
             // A monitor listener registered before this point could not start the
             // port watching for display changes, because there was no implementation
@@ -665,6 +666,7 @@ public final class Display extends CN1Constants {
                 newEdt.start();
             }
             impl.postInit();
+            com.codename1.hardware.Hardware.install(impl.getHardware());
             INSTANCE.setCommandBehavior(commandBehaviour);
         } else {
             impl.confirmControlView();
@@ -6081,6 +6083,47 @@ public final class Display extends CN1Constants {
         return impl.createMedia(uri, isVideo, onCompletion);
     }
 
+    /// Creates the platform player for a streaming request. Applications call
+    /// `com.codename1.media.StreamRequest#create()`, which checks support first.
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: the stream to play
+    ///
+    /// #### Returns
+    ///
+    /// the media, or null when the platform cannot create a player
+    ///
+    /// #### Throws
+    ///
+    /// - `java.io.IOException`: if the stream cannot be opened
+    public Media createStreamingMedia(com.codename1.media.StreamRequest request) throws IOException {
+        return impl.createStreamingMedia(request);
+    }
+
+    /// Answers whether the platform player can play streams protected by a scheme.
+    ///
+    /// #### Parameters
+    ///
+    /// - `scheme`: the protection scheme
+    ///
+    /// #### Returns
+    ///
+    /// true when the scheme is supported
+    public boolean isDrmSupported(com.codename1.media.DrmScheme scheme) {
+        return impl.isDrmSupported(scheme);
+    }
+
+    /// Answers whether the platform player can attach HTTP headers to the manifest
+    /// and segment requests of a stream.
+    ///
+    /// #### Returns
+    ///
+    /// true when stream request headers are supported
+    public boolean isStreamHeadersSupported() {
+        return impl.isStreamHeadersSupported();
+    }
+
     /// Creates media asynchronously.
     ///
     /// #### Parameters
@@ -6224,16 +6267,38 @@ public final class Display extends CN1Constants {
     /// image objects be used to copy
     public void copyToClipboard(Object obj) {
         if (obj instanceof ClipboardContent) {
-            forgetProvidedValues((ClipboardContent) obj);
+            copyToClipboard((ClipboardContent) obj);
+            return;
         }
+        clipboardCopies++;
         impl.copyToClipboard(obj);
     }
+
+    /// Counts the copies made through this class, so a scheduled clear can tell whether the
+    /// content it was set up for is still the latest one this application copied.
+    private int clipboardCopies;
 
     /// Copies a set of alternative clipboard representations. The first entry should normally be
     /// `text/plain`; richer consumers can negotiate HTML, RTF, Markdown, AsciiDoc, or custom MIME data.
     public void copyToClipboard(ClipboardContent content) {
         forgetProvidedValues(content);
+        clipboardCopies++;
         impl.copyToClipboard(content);
+        if (content != null && content.getClearAfter() > 0) {
+            final int copy = clipboardCopies;
+            final ClipboardContent copied = content;
+            setTimeout(content.getClearAfter(), new Runnable() {
+                @Override
+                public void run() {
+                    // Only while nothing else was copied through this application since: a
+                    // later copy is the user's, and clearing it would throw away what they
+                    // just asked for.
+                    if (copy == clipboardCopies) {
+                        impl.clearClipboardContent(copied);
+                    }
+                }
+            });
+        }
     }
 
     /// Ends the previous transfer's memory of what its providers produced.
@@ -6804,6 +6869,13 @@ public final class Display extends CN1Constants {
     /// not implement NFC.
     public com.codename1.nfc.Nfc getNfc() {
         return impl.getNfc();
+    }
+    /// Returns the platform hardware entry point (GPIO, I2C, SPI, serial, PWM,
+    /// CAN, watchdog, backlight). Prefer
+    /// {@link com.codename1.hardware.Hardware#getInstance()} in application code,
+    /// which substitutes an unsupported stub when the port returns `null`.
+    public com.codename1.hardware.Hardware getHardware() {
+        return impl.getHardware();
     }
 
     /// Returns the active port's local device-calendar source. Applications

@@ -108,6 +108,11 @@ final class AppSupport {
         if (desktopProject) {
             addFramework(project, "compileOnly", version, "codenameone-swing-compat", "codenameone-javafx-compat");
         }
+        // Compose sources (src/main/kmp) compile against compose-compat.
+        if (com.codename1.maven.KmpProjectImporter.isKmpProject(
+                com.codename1.maven.KmpProjectImporter.kmpDir(layout.projectDir()))) {
+            addFramework(project, "implementation", version, com.codename1.maven.KmpProjectImporter.COMPOSE_ARTIFACT);
+        }
         addFramework(project, "testImplementation", version, "codenameone-core", "codenameone-javase");
         Configuration framework = resolvable(project, "cn1Framework", "codenameone-core and java-runtime, for local builds");
         framework.setTransitive(false);
@@ -125,6 +130,7 @@ final class AppSupport {
         // classpath as it is at that moment.
         final TaskProvider<com.codename1.gradle.tasks.CompileUnityTask> unity =
                 registerUnity(project, layout, ext, userProperties, main);
+        registerFlutter(project, layout, ext, userProperties, main);
 
         // The simulator's native-interface implementations: a real source set, so
         // src/javase/java compiles against the application and the JavaSE port and
@@ -140,6 +146,14 @@ final class AppSupport {
                     .plus(simulator)
                     .plus(project.getConfigurations().getByName(Cn1libs.configurationName("javase"))));
         });
+        // The JVM targets upload this source set's runtime class path beside the
+        // application's. Resolved on its own it can pick another version of a
+        // library both reach -- the Kotlin plugin gives every source set
+        // kotlin-stdlib, which brings org.jetbrains:annotations 13.0 while the
+        // Compose runtime asks for 23.0.0 -- and the desktop upload then held
+        // both, as duplicate entries. Maven resolves one tree and ships one.
+        project.getConfigurations().getByName(javase.getRuntimeClasspathConfigurationName())
+                .shouldResolveConsistentlyWith(project.getConfigurations().getByName(main.getRuntimeClasspathConfigurationName()));
 
         TaskProvider<TranscodeSvgTask> svg = project.getTasks().register("transcodeSvg", TranscodeSvgTask.class, t -> {
             common(t, project, layout, ext, userProperties);
@@ -344,7 +358,8 @@ final class AppSupport {
                     // The FXML documents are compiled by this action, first:
                     // after javac, so that a document can name a class of
                     // the application, and before the relocation.
-                    .withFxmlSourceDirectory(new File(layout.buildDir(), "generated/cn1-fxml")));
+                    .withFxmlSourceDirectory(new File(layout.buildDir(), "generated/cn1-fxml"))
+                    .withFlutterSourceDirectory(flutterSourceDir(layout)));
             compile.doLast("cn1Compliance", new com.codename1.gradle.tasks.ComplianceAction(layout.rootDir(),
                     layout.projectDir(), compile.getDestinationDirectory().getAsFile(), project.getName(),
                     main.getCompileClasspath(), compileArtifacts, complianceProperties)
@@ -379,12 +394,32 @@ final class AppSupport {
         // Kotlin's source set already includes the Java directories (and so
         // src/main/android/java and the generated R classes); the Android
         // module's own kotlin/ directory is added to it here.
+        // Kotlin Multiplatform sources (cn1:import-kmp-project) are Compose
+        // code: they compile against compose-compat (added with the framework,
+        // above), which ships in the application like any library, and need
+        // the Compose compiler plugin,
+        // which only the build script can apply -- it is a Gradle plugin of
+        // Kotlin's, versioned with the Kotlin plugin the project chose.
+        final File kmpDir = com.codename1.maven.KmpProjectImporter.kmpDir(layout.projectDir());
+        if (com.codename1.maven.KmpProjectImporter.isKmpProject(kmpDir)) {
+            project.afterEvaluate(p -> {
+                if (!p.getPluginManager().hasPlugin(com.codename1.maven.KmpProjectImporter.COMPOSE_GRADLE_PLUGIN)) {
+                    throw new org.gradle.api.GradleException(kmpDir + " holds Compose sources, which need the "
+                            + "Compose compiler: add id(\"" + com.codename1.maven.KmpProjectImporter.COMPOSE_GRADLE_PLUGIN
+                            + "\") version \"<your Kotlin version>\" to the plugins block of "
+                            + p.getBuildFile().getName());
+                }
+            });
+        }
         project.getPluginManager().withPlugin("org.jetbrains.kotlin.jvm", kotlin -> {
             Object kotlinSources = ((org.gradle.api.plugins.ExtensionAware) main).getExtensions().findByName("kotlin");
             if (kotlinSources instanceof org.gradle.api.file.SourceDirectorySet) {
                 ((org.gradle.api.file.SourceDirectorySet) kotlinSources).srcDir(new File(androidDir, "kotlin"));
                 ((org.gradle.api.file.SourceDirectorySet) kotlinSources).srcDir(
                         com.codename1.maven.DesktopSources.kotlinDir(desktopDir));
+                for (File d : com.codename1.maven.KmpProjectImporter.kotlinDirs(kmpDir)) {
+                    ((org.gradle.api.file.SourceDirectorySet) kotlinSources).srcDir(d);
+                }
             }
             // Kotlin's classes are relocated after javac rather than right after
             // Kotlin compiles: they are javac's classpath, and Java calling a
@@ -865,6 +900,70 @@ final class AppSupport {
         main.getOutput().dir(classes);
         main.setCompileClasspath(main.getCompileClasspath().plus(project.files(classes)));
         return unity;
+    }
+
+    /// `src/main/flutter`.
+    static File flutterSourceDir(ProjectLayout layout) {
+        return new File(layout.projectDir(), "src" + File.separator + "main" + File.separator + "flutter");
+    }
+
+    /// `transcodeFlutter`, for an application with `src/main/flutter`: the
+    /// Dart sources become a main source root and their flattened assets a
+    /// directory of the main output. The runtime is an `implementation`
+    /// dependency, added here as it is for Unity, at the plugin's own version.
+    /// The generated package is the `cn1.flutter.package` Gradle property (or
+    /// `-D` system property), as the Maven goal reads it.
+    static void registerFlutter(final Project project, final ProjectLayout layout, final CodenameOneExtension ext,
+            final Provider<Map<String, String>> userProperties, final SourceSet main) {
+        final File flutterDir = flutterSourceDir(layout);
+        final File flutterOut = new File(layout.buildDir(), "generated" + File.separator + "sources"
+                + File.separator + "cn1-flutter");
+        if (com.codename1.maven.FlutterProjectBuilder.isFlutterProject(flutterDir)) {
+            addFramework(project, "implementation", ext.getVersion(),
+                    com.codename1.maven.FlutterProjectBuilder.RUNTIME_ARTIFACT);
+        }
+        // The configuration, not the source set's classpath, which is about to
+        // include this task's own output.
+        final org.gradle.api.file.FileCollection stubs = project.getConfigurations()
+                .getByName(main.getCompileClasspathConfigurationName());
+        TaskProvider<com.codename1.gradle.tasks.TranscodeFlutterTask> flutter = project.getTasks().register(
+                "transcodeFlutter", com.codename1.gradle.tasks.TranscodeFlutterTask.class, t -> {
+                    common(t, project, layout, ext, userProperties);
+                    t.setDescription("Transpiles the Flutter/Dart sources in src/main/flutter to Java");
+                    t.getFlutterDirectory().set(flutterDir);
+                    t.getStubClasspath().from(stubs);
+                    // The application's own Java roots: every root of the main
+                    // source set outside the build directory, and Kotlin's.
+                    // Roots other tasks generate are left out -- reading them
+                    // would need a dependency on each of those tasks, this
+                    // one's own output among them, and generated SVG, GUI or
+                    // Unity code never names a Flutter plugin pack.
+                    t.getJavaSourceRoots().from(project.provider(() -> {
+                        List<File> roots = new ArrayList<File>();
+                        // Canonical: a build directory reached through a symlink
+                        // (/tmp and /private/tmp on macOS) is still the same one.
+                        String build = layout.buildDir().getCanonicalPath() + File.separator;
+                        for (File dir : main.getJava().getSrcDirs()) {
+                            if (!dir.getCanonicalPath().startsWith(build)) {
+                                roots.add(dir);
+                            }
+                        }
+                        roots.add(new File(layout.projectDir(), "src" + File.separator + "main"
+                                + File.separator + "kotlin"));
+                        return roots;
+                    }));
+                    t.getPackageName().set(project.getProviders().gradleProperty("cn1.flutter.package")
+                            .orElse(project.getProviders().systemProperty("cn1.flutter.package"))
+                            .orElse(com.codename1.maven.FlutterProjectBuilder.DEFAULT_PACKAGE));
+                    t.getOutputDirectory().set(flutterOut);
+                    t.getAssetsDirectory().set(new File(layout.buildDir(), "cn1-flutter/resources"));
+                    t.getStateDirectory().set(new File(layout.buildDir(), "cn1-flutter/state"));
+                    // The task itself is asked, through the argument, so the
+                    // spec holds no reference to it for the configuration cache.
+                    t.onlyIf(x -> ((com.codename1.gradle.tasks.TranscodeFlutterTask) x).hasWork());
+                });
+        main.getJava().srcDir(flutter.flatMap(com.codename1.gradle.tasks.TranscodeFlutterTask::getOutputDirectory));
+        main.getOutput().dir(flutter.flatMap(com.codename1.gradle.tasks.TranscodeFlutterTask::getAssetsDirectory));
     }
 
     /// `generateGuiSources`, whose generated views are a main source root. An

@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Intentional SpotBugs exceptions for this module. The report is a
+     zero-findings gate, so every entry is scoped and explained.
+
+     The module is Kotlin compiled with the Compose compiler plugin, and most of
+     what SpotBugs reads was written by one of those two compilers rather than
+     by hand. Each entry below names the construct that emits it. -->
+<FindBugsFilter>
+    <!--
+        Compose's API is named by Compose: a composable is a function with a
+        capital (Box, Text, Scaffold). Kotlin adds the rest: `$lambda$N` for
+        lambda bodies, and a hash suffix (`animateDpAsState-Kz89ssw`) on any
+        function taking a value class such as Dp or Color.
+    -->
+    <Match>
+        <Or>
+            <Package name="~androidx\.compose(\..*)?"/>
+            <Package name="~com\.codename1\.compose(\..*)?"/>
+        </Or>
+        <Bug pattern="NM_METHOD_NAMING_CONVENTION"/>
+    </Match>
+
+    <!--
+        `$stable` is the Compose compiler's stability marker, a static field on
+        every class it infers stable; the runtime of a separately compiled
+        module reads it, so nothing here does.
+    -->
+    <Match>
+        <Field name="$stable"/>
+        <Bug pattern="UUF_UNUSED_PUBLIC_OR_PROTECTED_FIELD"/>
+    </Match>
+
+    <!--
+        The Compose compiler's calling convention for a composable function:
+        the Composer parameter is declared nullable and then used, default
+        arguments are a `$default` bit mask that overwrites the parameter it
+        replaces, `$dirty` change flags are stored and not always read, and
+        `remember { }` reads Composer.rememberedValue(), which SpotBugs cannot
+        know is filled on the first composition. Kotlin's null safety already
+        holds the source to these, at compile time.
+    -->
+    <Match>
+        <Or>
+            <Package name="~androidx\.compose(\..*)?"/>
+            <Package name="~com\.codename1\.compose(\..*)?"/>
+        </Or>
+        <Or>
+            <Bug pattern="NP_PARAMETER_MUST_BE_NONNULL_BUT_MARKED_AS_NULLABLE"/>
+            <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"/>
+            <Bug pattern="NP_NONNULL_PARAM_VIOLATION"/>
+            <Bug pattern="IP_PARAMETER_IS_DEAD_BUT_OVERWRITTEN"/>
+            <Bug pattern="DLS_DEAD_LOCAL_STORE"/>
+            <Bug pattern="RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE"/>
+        </Or>
+    </Match>
+
+    <!--
+        Kotlin lambdas, suspend lambdas included, are Serializable, and capture
+        what they close over in fields. Nothing here is ever serialized.
+    -->
+    <Match>
+        <Class name="~.*\$\d+(\$\d+)*"/>
+        <Bug pattern="SE_BAD_FIELD"/>
+    </Match>
+
+    <!--
+        A private inline function is inlined at every call site, and kotlinc
+        still emits its body as a method that nothing calls.
+    -->
+    <Match>
+        <Or>
+            <And>
+                <Class name="androidx.compose.foundation.layout.Arrangement$SpacedAligned"/>
+                <Method name="place"/>
+            </And>
+            <And>
+                <Class name="com.codename1.compose.internal.Cn1DrawScope"/>
+                <Method name="~paint-.*"/>
+            </And>
+        </Or>
+        <Bug pattern="UPM_UNCALLED_PRIVATE_METHOD"/>
+    </Match>
+
+    <!--
+        Compose's own shape: `Modifier` the interface has a companion that is
+        the empty Modifier, so the interface's initializer creates an instance
+        of an implementing class.
+    -->
+    <Match>
+        <Class name="androidx.compose.ui.Modifier"/>
+        <Bug pattern="IC_SUPERCLASS_USES_SUBCLASS_DURING_INITIALIZATION"/>
+    </Match>
+
+    <!--
+        The internal Density object is the androidx Density for this display,
+        and a Kotlin `object` keeps its state in static fields: its cached
+        density is written from the instance's getter.
+    -->
+    <Match>
+        <Class name="com.codename1.compose.internal.Density"/>
+        <Or>
+            <Bug pattern="NM_SAME_SIMPLE_NAME_AS_INTERFACE"/>
+            <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD"/>
+        </Or>
+    </Match>
+
+    <!--
+        Shared by reference, which is the point: a node holds the Codename One
+        component, font, image or modifier chain it is given and hands back the
+        same one; a lazy list item holds the content lambda and list it renders;
+        ComposeForm.view is the view the form shows; a gradient is the list of
+        colors it was made with. A copy would be a different object to the
+        caller that passed it in.
+    -->
+    <Match>
+        <Or>
+            <Package name="~androidx\.compose(\..*)?"/>
+            <Package name="~com\.codename1\.compose(\..*)?"/>
+        </Or>
+        <Or>
+            <Bug pattern="EI_EXPOSE_REP"/>
+            <Bug pattern="EI_EXPOSE_REP2"/>
+        </Or>
+    </Match>
+    <!--
+        Painting is a Kotlin object: its fields compile to statics and its
+        functions to instance methods of the singleton. poly and scratch are
+        the polygon clipper's reusable buffers, touched only on the EDT while
+        painting, so swapping them is the point and not a shared write.
+    -->
+    <Match>
+        <Class name="com.codename1.compose.internal.Painting"/>
+        <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD"/>
+    </Match>
+</FindBugsFilter>

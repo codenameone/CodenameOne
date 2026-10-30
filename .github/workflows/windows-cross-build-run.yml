@@ -31,6 +31,7 @@ on:
       - 'scripts/unity-compat-samples/gallery/**'
       - 'maven/cil-translator/**'
       - 'maven/unity-compat/**'
+      - 'maven/compose-compat/**'
       - 'maven/build-engine/src/main/java/com/codename1/maven/Unity*'
       - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*'
       - 'scripts/unity-gallery-prebuilt.sh'
@@ -59,6 +60,7 @@ on:
       - 'scripts/unity-compat-samples/gallery/**'
       - 'maven/cil-translator/**'
       - 'maven/unity-compat/**'
+      - 'maven/compose-compat/**'
       - 'maven/build-engine/src/main/java/com/codename1/maven/Unity*'
       - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*'
       - 'scripts/unity-gallery-prebuilt.sh'
@@ -219,7 +221,7 @@ jobs:
         run: |
           cd maven
           JAVA_HOME="$JDK_8_HOME" bash ../scripts/ci/retry.sh \
-            mvn -B -pl windows,codenameone-maven-plugin,cn1-ads-mock -am \
+            mvn -B -pl windows,codenameone-maven-plugin,cn1-ads-mock,compose-compat -am \
             -DskipTests '-Dmaven.javadoc.skip=true' '-Plocal-dev-javase' install
           test -f core/target/classes/com/codename1/ui/Form.class
           test -f windows/target/classes/com/codename1/impl/windows/WindowsImplementation.class

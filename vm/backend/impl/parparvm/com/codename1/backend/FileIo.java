@@ -156,6 +156,33 @@ public final class FileIo {
         }
     }
 
+    /// A new spool file in `dir` (null for the system temporary directory),
+    /// already unlinked, so closing the descriptor is all the cleanup it needs.
+    /// The descriptor, or -1.
+    public static int createTemp(String dir) {
+        if (holdsNul(dir)) {
+            return -1;
+        }
+        return createTempImpl(dir);
+    }
+
+    /// Writes the whole slice at the file's position; false on any failure.
+    public static boolean write(int fd, byte[] buffer, int offset, int length) {
+        checkRange(buffer, offset, length);
+        return writeImpl(fd, buffer, offset, length) == length;
+    }
+
+    /// Reads at `position` without moving the file's own position. The count,
+    /// 0 at the end, or -1.
+    public static int pread(int fd, byte[] buffer, int offset, int length, long position) {
+        checkRange(buffer, offset, length);
+        return preadImpl(fd, buffer, offset, length, position);
+    }
+
+    private static native int createTempImpl(String dir);
+    private static native int writeImpl(int fd, byte[] buffer, int offset, int length);
+    private static native int preadImpl(int fd, byte[] buffer, int offset, int length,
+                                        long position);
     private static native int readImpl(int fd, byte[] buffer, int offset, int length);
     private static native String realPathImpl(String path);
     private static native void closeImpl(int fd);

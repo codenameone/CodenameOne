@@ -126,54 +126,219 @@ temporality. `cn1.otel.metrics.enabled=false` turns metrics off while leaving
 traces on. The management endpoints described below record and serve the same
 metrics whether anything exports them or not.
 
-==== What the server records
+==== The metric schema
 
-[cols="3,1,2", options="header"]
+The metrics the server records about itself have a published schema. Their names,
+units and attributes are stable, so a dashboard or an alert written against them
+keeps working when the server is upgraded, and it works the same against a server
+running on the JVM and a packaged native one. Each metric has one of three
+availabilities: *always*, *database* (when the server has a database pool), or
+*JVM* (the packaged server has no equivalent).
+
+[cols="3,2,3,1,3", options="header"]
 |===
-| Instrument | Kind | Attributes
+| Instrument | Kind | Attributes | Measured | Micrometer equivalent
 
-| `http.server.request.duration`, in milliseconds
-| histogram
-| `http.route` (the route template), `http.request.method`,
-  `http.response.status_code`
+| `http.server.request.duration`
+| histogram, ms
+| `http.route`, `http.request.method`, `http.response.status_code`
+| always
+| `http.server.requests`
 
 | `http.server.active_requests`
 | gauge
-|
+| 
+| always
+| `http.server.requests.active`
 
 | `http.server.open_connections`
 | gauge
-|
+| 
+| always
+| `tomcat.connections.current`
 
 | `cn1.server.websocket_connections`
 | gauge
-|
+| 
+| always
+| none
 
-| `cn1.server.requests_served`, `cn1.server.connections_refused`
-| gauge
-|
+| `cn1.server.requests_served`
+| gauge, cumulative
+| 
+| always
+| none
 
-| `db.client.connection.count`, `db.client.connection.idle`
+| `cn1.server.connections_refused`
+| gauge, cumulative
+| 
+| always
+| none
+
+| `db.client.connection.count`
 | gauge
-| (when the server has a database)
+| 
+| database
+| `hikaricp.connections`
+
+| `db.client.connection.idle`
+| gauge
+| 
+| database
+| `hikaricp.connections.idle`
+
+| `db.client.connection.max`
+| gauge
+| 
+| database
+| `hikaricp.connections.max`
+
+| `db.client.connection.pending_requests`
+| gauge
+| 
+| database
+| `hikaricp.connections.pending`
+
+| `db.client.connection.timeouts`
+| gauge, cumulative
+| 
+| database
+| `hikaricp.connections.timeout`
 
 | `cn1.task.queue_depth`
 | gauge
 | `cn1.executor`
+| always
+| `executor.queued`
 
-| `cn1.scheduler.run.duration`, in milliseconds
-| histogram
-| `cn1.job`, `cn1.outcome` (`success` or `failure`)
-
-| `process.runtime.memory.used`, `process.uptime`
+| `cn1.task.active`
 | gauge
-|
+| `cn1.executor`
+| always
+| `executor.active`
+
+| `cn1.task.completed`
+| gauge, cumulative
+| `cn1.executor`
+| always
+| `executor.completed`
+
+| `cn1.task.pool_size`
+| gauge
+| `cn1.executor`
+| always
+| `executor.pool.size`
+
+| `cn1.scheduler.run.duration`
+| histogram, ms
+| `cn1.job`, `cn1.outcome`
+| always
+| `tasks.scheduled.execution`
+
+| `process.runtime.memory.used`
+| gauge, bytes
+| 
+| always
+| `jvm.memory.used`
+
+| `process.runtime.memory.committed`
+| gauge, bytes
+| 
+| always
+| `jvm.memory.committed`
+
+| `process.runtime.memory.limit`
+| gauge, bytes
+| 
+| JVM
+| `jvm.memory.max`
+
+| `process.uptime`
+| gauge, seconds
+| 
+| always
+| `process.uptime`
+
+| `jvm.thread.count`
+| gauge
+| 
+| JVM
+| `jvm.threads.live`
+
+| `jvm.class.count`
+| gauge
+| 
+| JVM
+| `jvm.classes.loaded`
+
+| `jvm.cpu.count`
+| gauge
+| 
+| JVM
+| `system.cpu.count`
+
+| `cn1.jvm.gc.collections`
+| gauge, cumulative
+| 
+| JVM
+| `jvm.gc.pause` (count)
+
+| `cn1.jvm.gc.time`
+| gauge, cumulative, ms
+| 
+| JVM
+| `jvm.gc.pause` (total)
 |===
 
 The route attribute is the template -- `GET /notes/{id}` is recorded as
 `/notes/{id}` -- so a server's metric count doesn't grow with the ids its clients
 ask for. A request that fails, whether in a handler or in the session store, is
 recorded with status 500.
+
+`GET /manage/schema` returns this table for the running server as JSON: its
+runtime (`jvm` or `native`) and, for each metric, its kind, unit, attributes,
+temporality, Micrometer name and whether this server measures it.
+
+==== An unmeasured metric is absent, not zero
+
+A metric a server can't measure isn't reported as `0`. Its instrument isn't registered, or reads
+no value, so it's absent from the JSON view, the Prometheus scrape and the OTLP
+export, and `/manage/schema` lists it with `"available": false` and the reason.
+On a packaged server that means the JVM-only rows above; on a server with no
+database it means the pool rows. A gauge whose source can't be read at collection
+time is likewise left out rather than written as zero. An alert on "thread count is
+0" therefore never fires on a native server by accident: query the series' absence
+instead, or read the schema.
+
+The schema also lists, under `unmeasured`, the Micrometer meters a Spring Boot
+dashboard commonly reads that neither runtime reports, each with its reason:
+`jvm.gc.pause` as a per-pause histogram, `jvm.gc.memory.allocated` and
+`jvm.gc.memory.promoted`, per-pool `jvm.memory.used`, `jvm.buffer.memory.used`,
+`jvm.threads.states`, `process.cpu.usage`, `system.cpu.usage`,
+`system.load.average.1m`, `process.files.open`, `hikaricp.connections.usage`,
+`hikaricp.connections.acquire` and `logback.events`.
+
+==== Moving a Spring Boot dashboard
+
+The Micrometer column says which series to switch to. In Prometheus form a name's
+dots become underscores, so a panel on `hikaricp_connections_active` reads
+`db_client_connection_count - db_client_connection_idle`, one on
+`http_server_requests_seconds_count` reads `http_server_request_duration_count`,
+and `tomcat_connections_current_connections` becomes
+`http_server_open_connections`. Two differences to adjust for:
+
+* **Units.** Durations are milliseconds, not seconds, so a latency threshold of
+  `0.5` becomes `500`, and histogram buckets are in milliseconds.
+* **Attribute names.** Requests carry the OpenTelemetry attributes
+  `http.route`, `http.request.method` and `http.response.status_code` rather than
+  Micrometer's `uri`, `method` and `status`.
+
+`vm/backend/dashboards/backend-overview.json` in the Codename One repository is a
+Grafana dashboard written against the schema: request rate, latency percentiles,
+errors, connections, the database pool, executors, scheduled jobs, memory and
+uptime. Import it and pick the Prometheus data source that scrapes
+`/manage/prometheus`. It uses only metrics every runtime measures, so its panels
+are filled on the JVM and on a packaged server alike.
 
 ==== Managed beans
 
@@ -262,6 +427,9 @@ load balancer and for an operator:
 
 ----
 GET  /manage/health        public; 503 while starting or draining
+GET  /manage/health/liveness   public; 200 while the process serves at all
+GET  /manage/health/readiness  public; 503 while starting or draining
+GET  /manage/schema        the metric schema, as JSON
 GET  /manage/metrics       every metric, as JSON
 GET  /manage/prometheus    every metric, in the Prometheus text format
 GET  /manage/jobs          the scheduled jobs and their last runs
@@ -291,7 +459,9 @@ still fail to start.
   links the endpoints into a packaged server.
 
 | `cn1.management.token`
-| The bearer token every endpoint but health requires. Outside a development
+| The bearer token every endpoint but health and the probes requires, sent as
+  `Authorization: Bearer <token>`. A missing or wrong token is answered with 401, and an operation on a server
+  that has no token set with 403. Outside a development
   profile the server refuses to start with the endpoints on and no token, since
   the metrics and managed beans would be readable by anyone who can reach the
   port.
@@ -322,6 +492,23 @@ On a development profile without a token, the read-only views are open to anyone
 who can reach the port, which is a laptop. An operation needs the token on every
 profile, because it changes the running server.
 
+==== Probes and draining
+
+The two probes follow the split Kubernetes and Spring Boot's
+`/actuator/health/liveness` and `/actuator/health/readiness` make. Liveness says
+the process is running and answering, and stays 200 while it starts and drains;
+point a liveness probe at it, so a slow start or a drain never gets the container
+restarted. Readiness is 503 until start-up finishes and again from the moment the
+server begins to stop; point a readiness probe or a load balancer health check at
+it. `/manage/health` answers as readiness does, with the state in the body.
+
+When the server is told to stop (SIGTERM, or the platform's equivalent), it turns
+readiness to 503, stops accepting new connections, lets the requests in flight
+finish within `cn1.server.shutdownTimeoutMillis`, runs the exporters' last export,
+and exits. Give the platform's termination grace period a few seconds more than
+that timeout. The probes need no token on any profile, since a load balancer has
+none to send.
+
 Health answers 503 while the server drains, so a load balancer stops sending it
 new requests before it stops accepting them. The Prometheus view turns each name
 into a Prometheus one, replacing the dots with underscores and adding `_total` to a
@@ -330,3 +517,88 @@ counter, so `http.server.request.duration` is scraped as
 
 The management endpoints are served before the application's routes, so a
 catch-all route can't answer them.
+
+=== Application caches
+
+`Cache` keeps values a server would otherwise fetch or compute again, with a bound
+on how many it holds and how long each one lives. It's plain Java, so the same cache
+runs on the JVM and in the packaged native server:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/CacheSnippets.java[tag=backend-cache,indent=0]
+----
+
+A builder sets the bounds, and nothing is bounded unless it's asked for:
+
+[cols="2,5"]
+|===
+| Setting | Meaning
+
+| `maximumSize(n)` | At most `n` entries; the least recently used go first.
+| `maximumWeight(w, weigher)` | At most `w` in total, as the weigher weighs each entry. An entry heavier than the whole bound isn't kept: it's reported as a `SIZE` removal, and the other entries stay.
+| `expireAfterWriteMillis(ms)` | An entry lives this long after it's stored.
+| `expireAfterAccessMillis(ms)` | An entry lives this long after it was last read or stored.
+| `expiry(expiry)` | Each entry's lifetime, chosen when it's stored. It replaces the write lifetime for that entry; the access lifetime still applies. A lifetime of zero or less isn't stored and removes the key's old value, so a `get` of such a value calls its loader every time.
+| `removalListener(listener)` | Called for every entry that leaves, with the cause: `EXPLICIT`, `REPLACED`, `EXPIRED` or `SIZE`.
+| `clock(clock)` | Where the cache reads the time. Tests replace it to move time without waiting.
+|===
+
+==== Loading
+
+`get(key, loader)` returns the entry, or runs the loader on the calling thread when
+there's none. Requests asking for a key while its load runs don't load it again:
+they wait for that load and get its result. A waiting request on a virtual thread
+yields, so a slow load holds back only the requests that want its key.
+
+A loader that throws stores nothing. Every request waiting for it gets the same
+failure: an unchecked exception as it was thrown, a checked one wrapped in
+`Cache.LoadException`. The next request loads again. A loader that returns null
+stores nothing either. When the key is invalidated or `put` while its load runs,
+the loaded value goes to the requests waiting for it and isn't stored over the newer
+state. A loader can use the cache, but asking for its own key is refused rather than
+waiting forever for itself.
+
+The loader runs as part of the request that started the load, with that request's
+transaction, security context and trace. The others only receive its value, so a
+loader shouldn't return anything specific to one user.
+
+==== Expiry and removal
+
+An expired entry is never returned. It's removed when a read finds it, by a
+periodic sweep during writes, or by `cleanUp()`. `size()` cleans up first, so it
+counts live entries only.
+
+The removal listener runs on the thread whose call removed the entry, after the
+cache has released its lock, so it may use the cache. A listener that throws is
+reported on standard error and changes nothing else.
+
+==== Metrics
+
+Every cache publishes its figures to `Metrics` under its name:
+
+[cols="2,1,4"]
+|===
+| Name | Kind | Meaning
+
+| `cache.<name>.hits` | counter | Lookups answered from the cache.
+| `cache.<name>.misses` | counter | Lookups that weren't.
+| `cache.<name>.loads` | counter | Loads that finished, including those that returned null.
+| `cache.<name>.load_failures` | counter | Loads that threw.
+| `cache.<name>.evictions` | counter | Entries removed for the size or weight bound.
+| `cache.<name>.load.duration` | histogram | Time spent in the loader, in milliseconds.
+| `cache.<name>.size`, `.weight` | gauge | Entries held, and their total weight.
+|===
+
+The same figures are on the cache itself, from `hitCount()` to `evictionCount()`.
+Give each cache its own name; two caches with one name share the counters.
+
+==== Scope and memory
+
+A cache belongs to one process. Two instances of a server each hold their own, and
+invalidating a key in one doesn't reach the other. Values are held by reference, so
+treat them as read only.
+
+Each entry costs about a hundred bytes beyond its key and value: a map entry with
+its links in access order, and a node holding the value, its weight and its
+timestamps.

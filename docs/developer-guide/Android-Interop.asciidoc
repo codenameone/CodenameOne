@@ -1,3 +1,4 @@
+[[android-interop]]
 == Running Android applications
 
 A classic Android application -- activities, XML layouts, `res/values`,
@@ -165,6 +166,28 @@ view class the Codename One Android runtime implements (android2cn1:E0201)`.
 * XML: `getResources().getXml()` returns a pull parser over the compiled
   resource, and `Xml.newPullParser()` and `Xml.newSerializer()` read and write
   XML text.
+* Room: entities, DAOs, type converters, `@Embedded`, `@Upsert`, `@RawQuery`,
+  `LiveData` queries and migrations. The build generates the `_Impl` classes
+  that the Room annotation processor would, so nothing is found by reflection.
+* WorkManager: one-time and periodic work, chains whose outputs merge into the
+  next worker's input, unique work, retries with a growing delay and `LiveData` status
+  queries. Pending work is saved and resumes on the next run.
+* Location and sensors: `LocationManager` with its listeners, last known and
+  current location, and `SensorManager` with the accelerometer, gyroscope,
+  magnetometer, gravity, rotation vector and orientation, including
+  `getRotationMatrix()` and `getOrientation()`.
+* Services declared in the manifest: started and bound services,
+  `IntentService`, and `startForeground()`, which runs as a Codename One
+  `ForegroundService`. Notifications and channels posted through
+  `NotificationManager` and `NotificationCompat` are shown as local
+  notifications.
+* Document intents: `ACTION_OPEN_DOCUMENT`, `ACTION_CREATE_DOCUMENT` and
+  `ACTION_GET_CONTENT` for types other than images and video open the
+  platform's Open and Save dialogs, through `startActivityForResult` or the
+  `OpenDocument`, `OpenMultipleDocuments`, `CreateDocument`, `GetContent` and
+  `GetMultipleContents` contracts. See <<android-interop-documents>>.
+* The `AndroidKeyStore` with AES keys from `KeyGenerator` and
+  `KeyGenParameterSpec`, used through `Cipher` in GCM or CBC mode.
 
 === AndroidX
 
@@ -321,11 +344,13 @@ the gallery and automated tests cover a subset of those behaviors.
   elements. Code that depends on serialization making a snapshot, creator-side
   validation, or restoring state after process death needs an explicit storage
   or copy implementation.
-* SQLite uses one Codename One database connection. A competing thread's
-  operations can throw `SQLiteDatabaseLockedException` while a transaction is
-  open; Android's connection-pool waiting behavior isn't implemented.
-  Serialize database work through one worker when sharing a database across
-  tasks. Full Android SQLite concurrency parity is outside this release's scope.
+* SQLite uses one Codename One database connection. While one thread's
+  transaction is open, another thread's statements wait for it to end, as on
+  Android, and throw `SQLiteDatabaseLockedException` after ten seconds. On the
+  main thread the wait is two seconds, because the UI is frozen while it
+  waits and the other thread may be waiting for the main thread itself.
+  Threads don't read concurrently: one thread's long transaction holds up every
+  other thread's queries.
 * Switching only a locale's script, such as `zh-Hans` to `zh-Hant` with the
   same region, updates resource selection but doesn't notify or recreate
   existing activities. Already-inflated text and layouts can retain the old
@@ -373,9 +398,32 @@ the gallery and automated tests cover a subset of those behaviors.
 * Gradle recompiles all Java sources in an imported Android project after a
   source edit, because relocation rewrites the compiler output. Unchanged
   builds still use Gradle's up-to-date checks.
-* Content providers, services, broadcast intents from the system and
-  notifications through `NotificationManager` aren't available; use the
-  corresponding Codename One APIs through native interfaces or directly.
+* Content providers and broadcast intents from the system aren't available;
+  use the corresponding Codename One APIs through native interfaces or
+  directly.
+* `AndroidKeyStore` keys aren't hardware backed or non-extractable. Their
+  material is kept in Codename One's `SecureStorage` without a prompt: the
+  keychain on iOS, and a key of the platform's own keystore on Android. A
+  port without a secure store keeps the material in the application's private
+  storage, which a rooted device or a backup can read.
+  `setUserAuthenticationRequired()` isn't enforced; for a key the user must
+  unlock, use `SecureStorage` with a reason, which prompts for biometrics.
+  GCM supports only 128-bit tags.
+* Room rejects `@Relation`, `suspend` DAO methods, `Flow`, RxJava and Paging
+  return types, `@AutoMigration`, `@DatabaseView` and full-text tables at
+  build time, naming the member. `createFromAsset()` fails when the database
+  is built.
+* A `ListenableWorker` subclass returns a `java.util.concurrent.Future`
+  rather than Guava's `ListenableFuture`; `Worker` subclasses are unaffected.
+  A network constraint is treated as met, and charging, idle, battery and
+  storage constraints are checked only where Codename One's `BackgroundWork`
+  supports them. Work saved by an earlier run resumes once the application
+  calls `WorkManager.getInstance()`.
+* A manifest that asks for location access gets the iOS location usage
+  descriptions, and with `ACCESS_BACKGROUND_LOCATION` or
+  `FOREGROUND_SERVICE_LOCATION` the `location` background mode, added to
+  `codenameone_settings.properties` when the project doesn't set them. Edit
+  the added text to change what the iOS permission prompt says.
 * `ViewModelProvider` creates view models without reflection: the build
   registers every public, concrete `ViewModel` class whose public constructor
   takes nothing, an `Application`, a `SavedStateHandle`, or an `Application`
@@ -448,6 +496,92 @@ the gallery and automated tests cover a subset of those behaviors.
   to its rounded corners, and badges, centered toolbar titles and the
   `prefixText` and `suffixText` of a text field aren't shown; the build's
   compatibility report lists the ones an application uses.
+
+[[android-interop-documents]]
+=== Opening and creating documents
+
+An opened document arrives as a `file:` URI that `ContentResolver.openInputStream()`
+reads; with `EXTRA_ALLOW_MULTIPLE` every chosen document is in the result's
+`getClipData()`. `takePersistableUriPermission()` has nothing to do, because
+the application can read the file again later.
+
+Creating a document works in a different order than on Android. The iOS
+document picker can only export a file that already exists, so
+`ACTION_CREATE_DOCUMENT` answers at once with a file of the requested name in
+the application's storage. The Save dialog opens when the application closes
+the stream it wrote through `ContentResolver.openOutputStream()`, and places
+the file where the user chooses. The application has already received
+`RESULT_OK` by then, so it isn't told when the user cancels the Save dialog,
+and the document is saved only if the user confirms it. Keep the data until
+the application no longer needs it rather than relying on the export.
+Write the document straight away in the result callback, as most applications
+already do.
+
+[[android-interop-background]]
+=== Background execution on iOS
+
+Android lets an application keep running in the background through a foreground
+service, and schedules deferred work through WorkManager. iOS has neither. An
+application in the background is suspended within seconds unless it declared
+one of a few background modes, and deferred work runs when the system chooses.
+The runtime maps each Android mechanism to the nearest iOS one:
+
+[cols="1,2",options="header"]
+|===
+| Android | On iOS
+
+| `LocationManager` updates in a foreground service (track recording, navigation)
+| Continue in the background. A manifest with `ACCESS_BACKGROUND_LOCATION` or
+  `FOREGROUND_SERVICE_LOCATION` adds the `location` background mode and the
+  location usage descriptions, and the location stream then keeps the
+  application running while it's in the background. The blue location
+  indicator is shown, and the stream stops if the user force-quits the
+  application.
+
+| Other work in a foreground service (`startForeground()`)
+| Runs in a background execution window that iOS ends after a short time,
+  with the notification shown as a local notification. Long downloads
+  and processing don't survive in the background; the next section shows the
+  alternatives.
+
+| WorkManager work while the application runs
+| Runs at once, in the application process, as on Android.
+
+| WorkManager work with charging, idle, battery or storage constraints
+| Handed to Codename One's `BackgroundWork`, which uses `BGTaskScheduler`. iOS
+  decides when to run it, often overnight while charging, and gives it a
+  limited time.
+
+| Periodic work
+| Runs on its interval while the application runs. In the background it
+  runs only when it has one of the constraints above, at times iOS chooses.
+
+| Work left when the application was closed
+| Saved, and resumed the next time the application calls
+  `WorkManager.getInstance()`.
+
+| `PendingIntent` location updates, geofences, boot receivers
+| Not available. Use `com.codename1.location.LocationManager`
+  `setBackgroundLocationListener()` or geofencing, which iOS can deliver to an
+  application that isn't running.
+|===
+
+==== Porting long-running work
+
+* *Large downloads*: download while the application is open, in pieces the
+  worker can resume from (HTTP range requests). WorkManager saves the request,
+  so a download interrupted by suspension continues from the last piece when
+  the application returns, rather than starting over.
+* *Recording while the screen is off*: keep it tied to the location stream.
+  As long as location updates run, the code they call runs, so write each fix
+  to the database from the location listener rather than from a separate
+  worker thread that waits on a timer.
+* *Processing that can wait*: give the WorkManager request a constraint such
+  as `setRequiresCharging(true)` so that it goes to `BGTaskScheduler`, and make
+  the worker able to stop part way and resume.
+
+On Android the same application keeps its foreground services and WorkManager
+behaviour unchanged.
 
 === Mixing Codename One and Android code
 

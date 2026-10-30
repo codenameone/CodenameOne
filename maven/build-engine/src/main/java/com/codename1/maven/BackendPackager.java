@@ -873,6 +873,48 @@ public class BackendPackager {
         return inputs;
     }
 
+    private static final String[] CRYPTO_KERNEL_TYPES = {
+        "com/codename1/security/Secp256k1", "com/codename1/security/Schnorr",
+        "com/codename1/security/Ed25519", "com/codename1/crypto/"
+    };
+
+    /// Whether a class outside `com/codename1` under `dir` names one of the
+    /// [#CRYPTO_KERNEL_TYPES]. A constant-pool search rather than a parse: a
+    /// string literal that happens to match costs only binary size.
+    static boolean usesCryptoKernels(File dir) throws BuildExecutionException {
+        if (dir == null || !dir.isDirectory()) {
+            return false;
+        }
+        return usesCryptoKernels(dir, "");
+    }
+
+    private static boolean usesCryptoKernels(File dir, String path) throws BuildExecutionException {
+        File[] children = dir.listFiles();
+        if (children == null) {
+            return false;
+        }
+        for (File child : children) {
+            String childPath = path.length() == 0 ? child.getName() : path + "/" + child.getName();
+            if (child.isDirectory()) {
+                if (!"com/codename1".equals(childPath) && usesCryptoKernels(child, childPath)) {
+                    return true;
+                }
+            } else if (child.getName().endsWith(".class")) {
+                try {
+                    String text = new String(java.nio.file.Files.readAllBytes(child.toPath()), "ISO-8859-1");
+                    for (String type : CRYPTO_KERNEL_TYPES) {
+                        if (text.indexOf(type) >= 0) {
+                            return true;
+                        }
+                    }
+                } catch (IOException ex) {
+                    throw new BuildExecutionException("Could not read " + child, ex);
+                }
+            }
+        }
+        return false;
+    }
+
     private void translate(File jdk, File compilerJar, File javaApi, File classes,
             File nativeSources, File translated, File dependencyClasses)
             throws BuildExecutionException, BuildFailureException {
@@ -907,6 +949,11 @@ public class BackendPackager {
         command.add(new File(jdk, "bin/java").getAbsolutePath());
         if (sqlite) {
             command.add("-Dcn1.sqlite=true");
+        }
+        // The kernels are about 4 MB of C; only a server whose own classes use
+        // the elliptic-curve APIs compiles them, the way the client builders decide.
+        if (usesCryptoKernels(classes) || usesCryptoKernels(dependencyClasses)) {
+            command.add("-Dcn1.cryptoKernels=true");
         }
         if (checkedCasts) {
             command.add("-Dcn1.checkedCasts=true");
@@ -1008,8 +1055,15 @@ public class BackendPackager {
                 command.add(file.getAbsolutePath());
             }
         }
-        command.addAll(Arrays.asList("-lm", "-lpthread",
-                "-lcurl", "-lssl", "-lcrypto", "-lnghttp2"));
+        command.addAll(Arrays.asList("-lm", "-lpthread", "-lssl", "-lcrypto", "-lnghttp2"));
+        if (System.getProperty("os.name", "").startsWith("Linux")) {
+            // libcurl is opened on the first outbound request (cn1_backend_web.c),
+            // so an idle server never maps it or the TLS stack it was built with.
+            command.add("-DCN1_BACKEND_CURL_DLOPEN");
+            command.add("-ldl");
+        } else {
+            command.add("-lcurl");
+        }
         command.add(deadStripFlag(System.getProperty("os.name", "")));
         command.add("-o");
         command.add(binary.getAbsolutePath());

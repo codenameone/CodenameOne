@@ -23,7 +23,7 @@
 package com.codename1.unitycompat.system;
 
 /// ``System.EventHandler`1``. The event argument is erased.
-@SuppressWarnings("PMD.MethodNamingConventions") // C# member names: translated code binds to them by name
+@SuppressWarnings({"PMD.MethodNamingConventions", "PMD.ClassNamingConventions"}) // C# member and type names: translated code binds to them by name
 public abstract class EventHandler_1 extends MulticastDelegate {
     public abstract void Invoke(Object sender, Object e);
 

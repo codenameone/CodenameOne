@@ -377,6 +377,11 @@ public class IOSNative {
     native void addClipboardRepresentation(String mimeType, byte[] value);
     native void setClipboardContent(String plain, String html, String rtf, String markdown, String asciidoc, byte[] image, String fileUris);
     native String getClipboardContent(String mimeType);
+    /// Makes the NEXT setClipboardContent publish local only (no Universal Clipboard) and, when
+    /// `expireSeconds` is above zero, set to expire after that many seconds; the options go out
+    /// on the same pasteboard write as the content. False where the pasteboard has no such
+    /// options (macOS), so the content is published as it is.
+    native boolean restrictClipboard(int expireSeconds);
 
     /// How many representations the system pasteboard is offering, so they can be read by
     /// index rather than joined into one string -- see addNativeDragFiles for what a
@@ -532,6 +537,10 @@ public class IOSNative {
     native long createVideoComponent(String url, int onCompletionCallbackId);
     native long createVideoComponent(byte[] video, int onCompletionCallbackId);
     native long createVideoComponentNSData(long video, int onCompletionCallbackId);
+    // FairPlay: licenseHeaders is name\nvalue\n pairs (null for none).
+    native long createFairPlayVideoComponent(String url, String certificateUrl, String licenseUrl,
+            String contentId, String licenseHeaders, int onCompletionCallbackId);
+    native boolean isFairPlaySupported();
     native long createNativeVideoComponent(String url, int onCompletionCallbackId);
     native long createNativeVideoComponent(byte[] video, int onCompletionCallbackId);
     native long createNativeVideoComponentNSData(long video, int onCompletionCallbackId);
