@@ -507,11 +507,14 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 true, false, ProjectOptions.PreviewLanguage.ENGLISH, ProjectOptions.JavaVersion.JAVA_8, null,
                 ProjectOptions.BuildTool.MAVEN, ProjectOptions.ProjectType.APP_WITH_BACKEND);
         assertRefused(GeneratorModel.createForPluginVersion(IDE.INTELLIJ, Template.WAYLINE, "NoJava8",
-                "com.acme.nojava8", java8, FULL_STACK_VERSION), "Java 17", "A full-stack template is Java 17");
+                "com.acme.nojava8", java8, WAYLINE_VERSION), "Java 17", "A full-stack template is Java 17");
         // Bastion's app calls framework API newer than the other templates need.
         assertRefused(GeneratorModel.createForPluginVersion(IDE.INTELLIJ, Template.BASTION, "TooOld",
                 "com.acme.tooold", mavenOptions(ProjectOptions.ProjectType.APP_WITH_BACKEND, false),
                 FULL_STACK_VERSION), GeneratorModel.BASTION_SINCE, "Bastion must refuse a release before its own");
+        assertRefused(GeneratorModel.createForPluginVersion(IDE.INTELLIJ, Template.WAYLINE, "OldTime",
+                "com.acme.oldtime", base, FULL_STACK_VERSION), GeneratorModel.JAVA_TIME_ENTITIES_SINCE,
+                "Wayline's server stores java.time entity fields, which a release before its gate cannot map");
         ProjectOptions forced = java8.withBuild(ProjectOptions.BuildTool.GRADLE, ProjectOptions.ProjectType.APP)
                 .forFullStack();
         assertTrue(!forced.isGradle() && forced.projectType == ProjectOptions.ProjectType.APP_WITH_BACKEND
@@ -519,7 +522,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 "forFullStack should settle the build, the project type and the Java level");
 
         String themePath = "common/src/main/css/theme.css";
-        String stock = getText(mavenEntries(FULL_STACK_VERSION, Template.WAYLINE, IDE.INTELLIJ, "StockApp",
+        String stock = getText(mavenEntries(WAYLINE_VERSION, Template.WAYLINE, IDE.INTELLIJ, "StockApp",
                 "com.acme.stock", base), themePath);
         String brand = Integer.toHexString(GeneratorModel.FULL_STACK_BRAND);
         assertContains(stock, "--brand: #" + brand + ";",
@@ -529,7 +532,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 "The stock scheme must leave the stylesheet exactly as the template has it");
 
         byte[] icon = new byte[] {(byte) 0x89, 'P', 'N', 'G', 1, 2, 3};
-        Map<String, byte[]> styled = mavenEntries(FULL_STACK_VERSION, Template.WAYLINE, IDE.INTELLIJ, "StyledApp",
+        Map<String, byte[]> styled = mavenEntries(WAYLINE_VERSION, Template.WAYLINE, IDE.INTELLIJ, "StyledApp",
                 "com.acme.styled", base.withScheme(0x0f766e, false).withIcon(icon));
         String css = getText(styled, themePath);
         assertContains(css, "--brand: #0f766e;", "The chosen brand colour should be the theme's");
@@ -545,7 +548,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 "Choosing a scheme should rewrite declarations and add no rules");
         assertTrue(java.util.Arrays.equals(icon, styled.get("common/icon.png")),
                 "The chosen icon should replace the stock one");
-        assertFalse(java.util.Arrays.equals(icon, mavenEntries(FULL_STACK_VERSION, Template.WAYLINE, IDE.INTELLIJ,
+        assertFalse(java.util.Arrays.equals(icon, mavenEntries(WAYLINE_VERSION, Template.WAYLINE, IDE.INTELLIJ,
                         "StockApp", "com.acme.stock", base).get("common/icon.png")),
                 "Without a chosen icon the project keeps the stock one");
 
@@ -576,6 +579,8 @@ public class GeneratorModelMatrixTest extends AbstractTest {
     private static final String LAYOUTS_VERSION = "7.0.275";
     /// The version the full-stack combinations are generated for.
     private static final String FULL_STACK_VERSION = GeneratorModel.FULL_STACK_SINCE;
+    /// The version Wayline is generated for: its own gate, past the contract module's.
+    private static final String WAYLINE_VERSION = GeneratorModel.templateSince(Template.WAYLINE);
 
     /// The streaming template needs a newer core than the other complete apps:
     /// below its own gate it is refused, and the page does not list it.
