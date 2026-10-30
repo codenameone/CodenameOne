@@ -9271,15 +9271,20 @@ public final class HttpServer {
         }
 
         if (streamed) {
+            // A writer that will never run is closed BEFORE the head goes out, not
+            // after. Once the client has the head it may act on the response, and a
+            // close that follows the write was observed losing that race (the
+            // writer's resources were still held when the client moved on).
+            if (noBody) {
+                response.discard();
+            }
             try {
                 writeTo(fd, session, conn.out, 0, conn.outLength);
             } catch (IOException | RuntimeException headFailed) {
                 response.discard();
                 throw headFailed;
             }
-            if (noBody) {
-                response.discard();
-            } else {
+            if (!noBody) {
                 ResponseOutput output = new ResponseOutput(fd, session, chunked, null, 0); //NOPMD CloseResource - complete flushes on success; failure must abort and the connection owns the socket.
                 response.bodyWriter.writeTo(output);
                 output.complete();
