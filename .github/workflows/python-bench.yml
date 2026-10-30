@@ -192,7 +192,11 @@ jobs:
         run: scripts/python-bench/conformance_parparvm.sh
 
       - name: Measure and gate
+        # Each kernel's clang pass compiled one file at a time, six minutes
+        # a kernel. In parallel, with -flto=thin on the compile and the link,
+        # the binary is the one a single clang invocation makes.
         run: |
+          export CN1_COMPILE_JOBS="$(nproc)"
           python3 scripts/python-bench/parparvm_table.py --json python-bench-parparvm.json --check \
               | tee -a "$GITHUB_STEP_SUMMARY"
 

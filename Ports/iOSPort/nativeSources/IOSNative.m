@@ -14702,8 +14702,11 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_registerFontData___byte_1ARRAY_R_ja
         if (psName != NULL) {
             CFErrorRef error = NULL;
             BOOL usable = CTFontManagerRegisterGraphicsFont(cgFont, &error) ? YES : NO;
+            // Core Text can report a font the bundle already registered as a duplicated
+            // name (305, seen on iOS 27) rather than already registered (105).
             if (!usable && error != NULL
-                    && CFErrorGetCode(error) == kCTFontManagerErrorAlreadyRegistered) {
+                    && (CFErrorGetCode(error) == kCTFontManagerErrorAlreadyRegistered
+                        || CFErrorGetCode(error) == kCTFontManagerErrorDuplicatedName)) {
                 usable = cn1RegisteredFontMatches(psName, cgFont);
             }
             if (!usable) {
