@@ -45,7 +45,7 @@ import java.util.Map;
 import static com.codename1.ui.CN.*;
 
 public class GeneratorModel {
-    private static final String CN1_PLUGIN_VERSION = "7.0.279";
+    private static final String CN1_PLUGIN_VERSION = "7.0.280";
     /// Whether the Codename One Gradle plugin is published at [CN1_PLUGIN_VERSION].
     /// A Gradle download resolves the plugin by that version, so until a release
     /// carrying the plugin is what the initializr generates against, a Gradle
