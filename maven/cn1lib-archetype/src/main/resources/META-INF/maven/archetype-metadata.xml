@@ -78,6 +78,22 @@
         </fileSet>
       </fileSets>
     </module>
+    <module id="${rootArtifactId}-backend" dir="backend" name="${rootArtifactId}-backend">
+      <fileSets>
+        <fileSet filtered="true" packaged="true" encoding="UTF-8">
+          <directory>src/main/java</directory>
+          <includes>
+            <include>**/*.java</include>
+          </includes>
+        </fileSet>
+        <fileSet encoding="UTF-8">
+          <directory>src/main/resources</directory>
+          <includes>
+            <include>**/*</include>
+          </includes>
+        </fileSet>
+      </fileSets>
+    </module>
     <module id="${rootArtifactId}-javase" dir="javase" name="${rootArtifactId}-javase">
       <fileSets>
         <fileSet filtered="true" packaged="true" encoding="UTF-8">

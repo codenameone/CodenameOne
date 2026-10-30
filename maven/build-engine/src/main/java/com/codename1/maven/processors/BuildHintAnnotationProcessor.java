@@ -322,6 +322,11 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
     /// forever and failing its placement check on every incremental build.
     public static boolean hasBackingSource(AnnotatedClass cls, List<String> compileSourceRoots,
                                            String sourceEncoding) {
+        if (cls.isFromBackendLibrary()) {
+            // A backend library's class, merged into the module: its source is
+            // the library's, and it is as live as the dependency.
+            return true;
+        }
         List<String> roots = compileSourceRoots;
         if (roots == null || roots.isEmpty()) {
             return true;

@@ -58,7 +58,7 @@ final class BackendModules {
         return true;
     }
 
-    private static boolean dependsOnBackend(MavenProject project) {
+    static boolean dependsOnBackend(MavenProject project) {
         Set<Artifact> artifacts = project.getArtifacts();
         if (artifacts == null) {
             return false;

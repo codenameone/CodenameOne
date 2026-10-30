@@ -123,6 +123,22 @@ public class GreeterAndroid {
 }
 EOF
 echo "// ios" > "$LIB/src/ios/objectivec/greeter_ios.m"
+# The server half, published as greeter-backend and marked as a backend library.
+mkdir -p "$LIB/src/backend/java/$GROUP_PATH"
+cat > "$LIB/src/backend/java/$GROUP_PATH/GreeterEndpoint.java" <<EOF
+package $GROUP;
+
+import com.codename1.backend.annotations.GetMapping;
+import com.codename1.backend.annotations.RestController;
+
+@RestController
+public class GreeterEndpoint {
+    @GetMapping("/greet")
+    public String greet() {
+        return "hello";
+    }
+}
+EOF
 
 run_gradle "$LIB" publish > "$WORKDIR/publish.log" 2>&1 || { cat "$WORKDIR/publish.log"; fail "publishing the library"; }
 
@@ -136,6 +152,7 @@ for f in greeter-common/$LIBVER/greeter-common-$LIBVER.jar \
          greeter-android/$LIBVER/greeter-android-$LIBVER.jar \
          greeter-ios/$LIBVER/greeter-ios-$LIBVER.jar \
          greeter-javase/$LIBVER/greeter-javase-$LIBVER.jar \
+         greeter-backend/$LIBVER/greeter-backend-$LIBVER.jar \
          greeter-lib/$LIBVER/greeter-lib-$LIBVER.pom; do
   [ -f "$P/$f" ] || { find "$LIBREPO" -type f; fail "the library did not publish $f"; }
 done
@@ -145,6 +162,11 @@ assert_zip_has "$P/greeter-common/$LIBVER/greeter-common-$LIBVER.jar" \
 assert_zip_has "$P/greeter-common/$LIBVER/greeter-common-$LIBVER-cn1css.zip" "css/theme\.css$"
 assert_zip_has "$P/greeter-android/$LIBVER/greeter-android-$LIBVER.jar" "^$GROUP_PATH/GreeterAndroid\.java$"
 assert_zip_has "$P/greeter-ios/$LIBVER/greeter-ios-$LIBVER.jar" "^greeter_ios\.m$"
+assert_zip_has "$P/greeter-backend/$LIBVER/greeter-backend-$LIBVER.jar" "^$GROUP_PATH/GreeterEndpoint\.class$"
+assert_zip_has "$P/greeter-backend/$LIBVER/greeter-backend-$LIBVER.jar" "^META-INF/codenameone/backend-library$"
+if unzip -l "$P/greeter-backend/$LIBVER/greeter-backend-$LIBVER.jar" | grep -q "Router\.class"; then
+  fail "greeter-backend holds generated wiring; the server that uses it generates that"
+fi
 grep -q "<name>codename1.platform</name>" "$P/greeter-lib/$LIBVER/greeter-lib-$LIBVER.pom" \
   || fail "the -lib pom has no codename1.platform profiles"
 # A Maven consumer reaches the inner library through this dependency, which only

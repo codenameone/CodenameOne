@@ -117,6 +117,15 @@ public final class AnnotatedClass {
     /// guess and this is not.
     public String getSourceFile() { return sourceFile; }
 
+    private boolean fromBackendLibrary;
+
+    /// Whether a backend library contributed this class to the module's output.
+    /// Such a class is the module's to wire, though no source of the module
+    /// declares it.
+    public boolean isFromBackendLibrary() { return fromBackendLibrary; }
+
+    void setFromBackendLibrary(boolean fromBackendLibrary) { this.fromBackendLibrary = fromBackendLibrary; }
+
     /**
      * The name to write in generated JAVA SOURCE.
      *
