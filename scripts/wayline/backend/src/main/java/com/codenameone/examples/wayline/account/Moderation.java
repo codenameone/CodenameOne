@@ -26,6 +26,7 @@ import com.codenameone.examples.wayline.domain.ModerationEvent;
 import com.codenameone.examples.wayline.repository.ModerationEventRepository;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -57,15 +58,16 @@ public class Moderation {
         // came with it -- would otherwise be listed in either order. The later
         // one is stamped after the one before it, so the list is the order in
         // which things were done.
-        Long newest = events.newest(username);
-        long after = newest == null ? 0L : newest.longValue() + 1L;
-        record(username, by, action, reason, Math.max(System.currentTimeMillis(), after));
+        Instant newest = events.newest(username);
+        Instant now = Instant.now();
+        Instant stamp = newest != null && !newest.isBefore(now) ? newest.plusMillis(1L) : now;
+        record(username, by, action, reason, stamp);
     }
 
     /// As [#record(String, String, String, String)], at a time of the caller's
     /// choosing; the demo data is the one caller that has a past to write.
     @Transactional
-    public void record(String username, String by, String action, String reason, long at)
+    public void record(String username, String by, String action, String reason, Instant at)
             throws IOException {
         String why = reason == null ? "" : reason.trim();
         ModerationEvent event = new ModerationEvent();
@@ -85,8 +87,8 @@ public class Moderation {
         List<ModerationEventDto> out = new ArrayList<ModerationEventDto>();
         for (int iter = 0; iter < rows.size(); iter++) {
             ModerationEvent row = rows.get(iter);
-            out.add(new ModerationEventDto(row.getCreatedAt(), row.getActor(), row.getAction(),
-                    row.getReason()));
+            out.add(new ModerationEventDto(row.getCreatedAt().toEpochMilli(), row.getActor(),
+                    row.getAction(), row.getReason()));
         }
         return out;
     }

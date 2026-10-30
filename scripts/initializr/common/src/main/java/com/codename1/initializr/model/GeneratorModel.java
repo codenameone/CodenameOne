@@ -92,10 +92,16 @@ public class GeneratorModel {
     /// generated there.
     static final String BASTION_SINCE = "7.0.280";
 
+    /// The first release whose ORM maps `java.time.Instant` entity fields, which
+    /// every other full-stack template's server stores its timestamps in. Against
+    /// an older release its backend does not compile, so it is neither offered nor
+    /// generated there.
+    static final String JAVA_TIME_ENTITIES_SINCE = "7.0.280";
+
     /// The first release a template can be generated against.
     static String templateSince(Template template) {
         return template == Template.BASTION ? BASTION_SINCE
-                : template == Template.REEL ? REEL_SINCE : FULL_STACK_SINCE;
+                : template == Template.REEL ? REEL_SINCE : JAVA_TIME_ENTITIES_SINCE;
     }
 
     /// The brand colour of the full-stack template as it ships: the `--brand` its

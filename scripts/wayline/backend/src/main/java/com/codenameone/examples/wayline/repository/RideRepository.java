@@ -27,6 +27,7 @@ import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.wayline.api.RideState;
 import com.codenameone.examples.wayline.domain.Ride;
 
+import java.time.Instant;
 import java.util.List;
 
 /// Rides.
@@ -70,11 +71,11 @@ public interface RideRepository extends CrudRepository<Ride, String> {
     /// `paymentStatus` and which ended after `since`, is to be charged to
     /// this method.
     boolean existsByRiderAndStateAndPaymentStatusAndUpdatedAtGreaterThanAndMethodId(
-            String rider, RideState state, String paymentStatus, long since, String methodId);
+            String rider, RideState state, String paymentStatus, Instant since, String methodId);
 
     /// The same, to be charged to any method but `methodId`.
     boolean existsByRiderAndStateAndPaymentStatusAndUpdatedAtGreaterThanAndMethodIdNot(
-            String rider, RideState state, String paymentStatus, long since, String methodId);
+            String rider, RideState state, String paymentStatus, Instant since, String methodId);
 
     /// A rider's rides whose payment is `paymentStatus` and that carry a tip.
     List<Ride> findByRiderAndPaymentStatusAndTipCentsGreaterThan(String rider,
@@ -99,18 +100,18 @@ public interface RideRepository extends CrudRepository<Ride, String> {
     List<Ride> newest(PageRequest page);
 
     /// The rides in `state` whose offer ran out before `now`.
-    List<Ride> findByStateAndOfferExpiresAtLessThan(RideState state, long now);
+    List<Ride> findByStateAndOfferExpiresAtLessThan(RideState state, Instant now);
 
     /// The rides in `state`, the one that has waited longest first.
     List<Ride> findByStateOrderByRequestedAtAsc(RideState state);
 
     /// A driver's rides in `state` that changed at or after a time.
     List<Ride> findByDriverAndStateAndUpdatedAtGreaterThanEqual(String driver,
-            RideState state, long since);
+            RideState state, Instant since);
 
     long countByDriverAndState(String driver, RideState state);
 
-    long countByRequestedAtGreaterThanEqual(long since);
+    long countByRequestedAtGreaterThanEqual(Instant since);
 
     long countByStateIn(RideState[] states);
 
@@ -128,14 +129,14 @@ public interface RideRepository extends CrudRepository<Ride, String> {
     @Query("update Ride r set r.state = :to, r.updatedAt = :now "
             + "where r.id = :id and r.state in :from and r.rider = :rider")
     int moveAsRider(@Param("id") String id, @Param("from") RideState[] from,
-            @Param("to") RideState to, @Param("now") long now, @Param("rider") String rider);
+            @Param("to") RideState to, @Param("now") Instant now, @Param("rider") String rider);
 
     /// Moves a ride of `driver`'s from one of `from` to `to`.
     @Modifying(clearAutomatically = true)
     @Query("update Ride r set r.state = :to, r.updatedAt = :now "
             + "where r.id = :id and r.state in :from and r.driver = :driver")
     int moveAsDriver(@Param("id") String id, @Param("from") RideState[] from,
-            @Param("to") RideState to, @Param("now") long now, @Param("driver") String driver);
+            @Param("to") RideState to, @Param("now") Instant now, @Param("driver") String driver);
 
     // tag::wayline-ride-move[]
     /// Takes an offer made to `driver`: refused once the offer has lapsed, as
@@ -145,7 +146,7 @@ public interface RideRepository extends CrudRepository<Ride, String> {
             + "where r.id = :id and r.state in :from and r.driver = :driver "
             + "and r.offerExpiresAt >= :now")
     int takeOffer(@Param("id") String id, @Param("from") RideState[] from,
-            @Param("to") RideState to, @Param("now") long now, @Param("driver") String driver);
+            @Param("to") RideState to, @Param("now") Instant now, @Param("driver") String driver);
     // end::wayline-ride-move[]
 
     /// Gives a ride of `driver`'s back to be offered again, writing
@@ -154,7 +155,7 @@ public interface RideRepository extends CrudRepository<Ride, String> {
     @Query("update Ride r set r.state = :to, r.updatedAt = :now, r.driver = :newDriver "
             + "where r.id = :id and r.state in :from and r.driver = :driver")
     int giveBack(@Param("id") String id, @Param("from") RideState[] from,
-            @Param("to") RideState to, @Param("now") long now, @Param("driver") String driver,
+            @Param("to") RideState to, @Param("now") Instant now, @Param("driver") String driver,
             @Param("newDriver") String newDriver);
 
     /// Holds `rider`'s ride while it is in one of `states`, answering 0 when
@@ -174,15 +175,15 @@ public interface RideRepository extends CrudRepository<Ride, String> {
     @Query("update Ride r set r.state = :to, r.updatedAt = :now "
             + "where r.id = :id and r.state in :from")
     int moveByServer(@Param("id") String id, @Param("from") RideState[] from,
-            @Param("to") RideState to, @Param("now") long now);
+            @Param("to") RideState to, @Param("now") Instant now);
 
     /// Offers a ride to `driver` until `expiresAt`.
     @Modifying(clearAutomatically = true)
     @Query("update Ride r set r.state = :to, r.updatedAt = :now, r.driver = :driver, "
             + "r.offerExpiresAt = :expiresAt where r.id = :id and r.state in :from")
     int offer(@Param("id") String id, @Param("from") RideState[] from,
-            @Param("to") RideState to, @Param("now") long now, @Param("driver") String driver,
-            @Param("expiresAt") long expiresAt);
+            @Param("to") RideState to, @Param("now") Instant now, @Param("driver") String driver,
+            @Param("expiresAt") Instant expiresAt);
 
     // ----------------------------------------------------------- the rest
 
@@ -200,7 +201,7 @@ public interface RideRepository extends CrudRepository<Ride, String> {
     /// behind the new arrivals until they aged out of the window unsettled.
     @Query("select r from Ride r where r.state = 'COMPLETED' and r.paymentStatus = 'PENDING' "
             + "and r.updatedAt < :before and r.updatedAt > :after order by r.updatedAt asc")
-    List<Ride> unsettled(@Param("after") long after, @Param("before") long before,
+    List<Ride> unsettled(@Param("after") Instant after, @Param("before") Instant before,
             PageRequest page);
 
     /// Records how the charge for a ride came out. A statement of its own and
@@ -262,13 +263,13 @@ public interface RideRepository extends CrudRepository<Ride, String> {
     @Query("select count(r), coalesce(sum(r.driverCents), 0) from Ride r "
             + "where r.driver = :driver and r.state = 'COMPLETED' and r.paymentStatus = 'PAID' "
             + "and r.updatedAt >= :since")
-    Object[] paidTotalsSince(@Param("driver") String driver, @Param("since") long since);
+    Object[] paidTotalsSince(@Param("driver") String driver, @Param("since") Instant since);
 
     /// What the driver's share of their completed, paid rides came to since
     /// a time.
     @Query("select coalesce(sum(r.driverCents), 0) from Ride r where r.driver = :driver "
             + "and r.state = 'COMPLETED' and r.paymentStatus = 'PAID' and r.updatedAt >= :since")
-    Long paidSince(@Param("driver") String driver, @Param("since") long since);
+    Long paidSince(@Param("driver") String driver, @Param("since") Instant since);
 
     /// The driver's share of the fares of every ride they completed and that
     /// was paid for -- in cash, or by a card whose charge came back. A charge
@@ -295,7 +296,7 @@ public interface RideRepository extends CrudRepository<Ride, String> {
     @Query("select r.id from Ride r where r.driver = :driver and r.state = 'COMPLETED' "
             + "and r.updatedAt >= :since and r.methodId <> 'cash' and r.paymentStatus = 'PAID' "
             + "and r.id in (select p.rideId from Payment p where p.tipRef <> '')")
-    List<String> tipChargedSince(@Param("driver") String driver, @Param("since") long since);
+    List<String> tipChargedSince(@Param("driver") String driver, @Param("since") Instant since);
 
     /// What riders paid in fares for rides in `state` whose payment is `paid`.
     @Query("select coalesce(sum(r.fareCents), 0) from Ride r "
@@ -305,22 +306,22 @@ public interface RideRepository extends CrudRepository<Ride, String> {
     /// The fares of the rides in `state` asked for since `since`, paid or not.
     @Query("select coalesce(sum(r.fareCents), 0) from Ride r "
             + "where r.requestedAt >= :since and r.state = :state")
-    Long faresSince(@Param("since") long since, @Param("state") RideState state);
+    Long faresSince(@Param("since") Instant since, @Param("state") RideState state);
 
     /// The rides asked for since `since`, counted by state: `{state, count}`.
     @Query("select r.state, count(r) from Ride r where r.requestedAt >= :since group by r.state")
-    List<Object[]> countByState(@Param("since") long since);
+    List<Object[]> countByState(@Param("since") Instant since);
 
     /// The same by product: `{product, count}`.
     @Query("select r.product, count(r) from Ride r where r.requestedAt >= :since "
             + "group by r.product")
-    List<Object[]> countByProduct(@Param("since") long since);
+    List<Object[]> countByProduct(@Param("since") Instant since);
 
     /// The rides in `state` asked for since `since`, counted by driver:
     /// `{driver, count}`.
     @Query("select r.driver, count(r) from Ride r where r.requestedAt >= :since "
             + "and r.state = :state group by r.driver")
-    List<Object[]> countByDriver(@Param("since") long since, @Param("state") RideState state);
+    List<Object[]> countByDriver(@Param("since") Instant since, @Param("state") RideState state);
 
     /// One row for each ride asked for since `since`: `{id, requestedAt,
     /// state, fareCents, paymentStatus}`.
@@ -333,7 +334,7 @@ public interface RideRepository extends CrudRepository<Ride, String> {
     /// word does not see those as one expression.
     @Query("select r.id, r.requestedAt, r.state, r.fareCents, r.paymentStatus from Ride r "
             + "where r.requestedAt >= :since")
-    List<Object[]> timeline(@Param("since") long since);
+    List<Object[]> timeline(@Param("since") Instant since);
 
     /// What a rider paid for rides in `state` whose payment is `paid`:
     /// `{fares, fees, tips}`.

@@ -36,6 +36,7 @@ import com.codenameone.examples.skirmish.repository.MatchRecordRepository;
 import com.codenameone.examples.skirmish.repository.ProfileRepository;
 import com.codenameone.examples.skirmish.repository.ReferralRepository;
 import com.codenameone.examples.skirmish.repository.StorePurchaseRepository;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -80,15 +81,15 @@ public class Insights {
         List<Profile> all = profiles.findAll();
         int[] joined = new int[n];
         for (Profile p : all) {
-            bump(joined, first, p.getCreatedAt());
+            bump(joined, first, p.getCreatedAt().toEpochMilli());
         }
         int[] battles = new int[n];
         List<Set<String>> fought = new ArrayList<>();
         for (int i = 0; i < n; i++) {
             fought.add(new HashSet<String>());
         }
-        for (MatchRecord m : matches.since(first)) {
-            int d = dayIndex(first, m.getEndedAt(), n);
+        for (MatchRecord m : matches.since(Instant.ofEpochMilli(first))) {
+            int d = dayIndex(first, m.getEndedAt().toEpochMilli(), n);
             if (d >= 0) {
                 battles[d]++;
                 fought.get(d).add(m.getPlayer0());
@@ -106,10 +107,10 @@ public class Insights {
             active[i] = fought.get(i).size();
         }
         int[] gems = new int[n];
-        List<StorePurchase> sales = purchases.since(0);
+        List<StorePurchase> sales = purchases.since(Instant.EPOCH);
         Set<String> paid = new HashSet<>();
         for (StorePurchase s : sales) {
-            int d = dayIndex(first, s.getCreatedAt(), n);
+            int d = dayIndex(first, s.getCreatedAt().toEpochMilli(), n);
             if (d >= 0) {
                 gems[d] += s.getGems();
             }
@@ -149,9 +150,9 @@ public class Insights {
             int cohort = 0;
             int back = 0;
             for (Profile p : all) {
-                if (p.getCreatedAt() <= now - span) {
+                if (p.getCreatedAt().toEpochMilli() <= now - span) {
                     cohort++;
-                    if (p.getLastSeen() - p.getCreatedAt() >= span) {
+                    if (p.getLastSeen().toEpochMilli() - p.getCreatedAt().toEpochMilli() >= span) {
                         back++;
                     }
                 }
@@ -184,8 +185,8 @@ public class Insights {
     public QueryResultDto query(QueryDto q) {
         Audience audience = audience(q == null ? null : q.conditions());
         List<Profile> found = audience.filter(profiles.findAll());
-        Collections.sort(found, (a, b) -> a.getLastSeen() < b.getLastSeen() ? -1
-                : a.getLastSeen() > b.getLastSeen() ? 1 : a.getUsername().compareTo(b.getUsername()));
+        Collections.sort(found, (a, b) -> a.getLastSeen().isBefore(b.getLastSeen()) ? -1
+                : a.getLastSeen().isAfter(b.getLastSeen()) ? 1 : a.getUsername().compareTo(b.getUsername()));
         List<PlayerDto> listed = new ArrayList<>();
         for (int i = 0; i < found.size() && i < LISTED; i++) {
             listed.add(accounts.toDto(found.get(i)));
@@ -197,7 +198,7 @@ public class Insights {
     /// the conditions may ask about.
     public Audience audience(List<ConditionDto> conditions) {
         Audience.check(conditions);
-        return Audience.of(conditions, purchases.since(0), referrals.findAll());
+        return Audience.of(conditions, purchases.since(Instant.EPOCH), referrals.findAll());
     }
     // end::skirmish-insights[]
 
