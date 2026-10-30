@@ -173,7 +173,7 @@ A Codename One app is a Java project. The build of a native app happens in a bui
 
 Codename One used to aim for a modular core, with features broken out into cn1libs. Flutter is going through that phase now, moving pieces such as its Material and Cupertino themes out of the framework into independent packages. We went the opposite way. The Codename One core now covers what Flutter does, plus most of what people reach for in Flutter's most popular packages, and this week's posts add more.
 
-That isn't bloat, because you don't pay for what you don't use. ParparVM drops every class your app doesn't reach, which is how the builds above stay smaller than Flutter's. What you get instead:
+A bigger core costs you nothing, because you don't pay for what you don't use. ParparVM drops every class your app doesn't reach, which is how the builds above stay smaller than Flutter's. What you get instead:
 
 - **One version.** No matrix of package versions to keep compatible, and no upgrade that breaks because two packages disagree.
 - **Nothing abandoned.** No package your app depends on that its author stopped maintaining two years ago.
