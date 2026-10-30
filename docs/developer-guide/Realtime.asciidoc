@@ -105,7 +105,8 @@ looks fine on the bench and misses deadlines in the field.
 * `getCycles()` and `getMissedPeriods()`.
 * `getMaxLatencyNanos()` and `getMeanLatencyNanos()`: how late each release woke
   the thread, against its scheduled time.
-* `getMaxExecutionNanos()` and `getMeanExecutionNanos()`: how long `cycle()` took.
+* `getMaxExecutionNanos()` and `getMeanExecutionNanos()`: the time from each wake-up
+  to the next wait -- `cycle()`, plus `periodsMissed()` when it ran.
 * `getAllocationViolations()`.
 * `getLatencyHistogram()`: `HISTOGRAM_BUCKETS` (16) counts. Index `i` counts
   releases less than 2^i microseconds late. The last bucket holds everything from
