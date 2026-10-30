@@ -223,7 +223,7 @@ local folder, which is the only file system root.
 Microsoft describes, then turn on *Remote Access* (Device Portal) in Dev Home.
 . Open the Device Portal address Dev Home shows (`https://<console address>:11443`)
 in a browser on the same network.
-. Under *Home*, choose *Add*, pick the `.msix`, and when asked for a certificate,
+. Under *Home*, select *Add* and pick the `.msix`. When asked for a certificate,
 pick the `.cer` that came with it.
 . The app appears in Dev Home's list and among the console's games and apps; launch it from
 either.
