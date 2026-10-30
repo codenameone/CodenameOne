@@ -1406,9 +1406,15 @@ SvZoneName { color: #ffffff; font-family: "native:MainRegular"; font-size: 2.4mm
 SvZoneRate { color: #ffffff; font-family: "native:MainBold"; font-size: 5mm; padding: 0.5mm 0 0 0; margin: 0; background-color: transparent; }
 
 /* The watch app: large type on black. */
-SvWatchTitle { color: #ffffff; background-color: #000000; font-family: "native:MainBold"; font-size: 3.2mm; padding: 1mm; margin: 0; }
-SvWatchText { color: #b0b3b8; background-color: #000000; font-family: "native:MainRegular"; font-size: 2.4mm; padding: 0.5mm 1mm 0.5mm 1mm; margin: 0; }
-SvWatchCode { color: #17bebb; background-color: #000000; font-family: "native:MainBold"; font-size: 6mm; text-align: center; padding: 1mm; margin: 0; }
+SvWatchForm { background-color: #000000; padding: 0.5mm 0.5mm 2mm 0.5mm; }
+SvWatchEyebrow { color: #c6f432; background-color: transparent; font-family: "native:MainBold"; font-size: 1.8mm; padding: 1mm 1mm 0 1mm; margin: 0; }
+SvWatchTitle { color: #ffffff; background-color: transparent; font-family: "native:MainBold"; font-size: 3mm; padding: 0.3mm 1mm; margin: 0; }
+SvWatchText { color: #b0b3b8; background-color: transparent; font-family: "native:MainRegular"; font-size: 2.4mm; padding: 0.2mm 1mm; margin: 0; }
+SvWatchCard { background-color: #1a1a1f; border-radius: 2.5mm; padding: 0.8mm 0.5mm; margin: 1.2mm 0 0.8mm 0; }
+SvWatchCode { color: #ffffff; background-color: transparent; font-family: "native:MainBold"; font-size: 3.4mm; text-align: center; padding: 0.5mm 0; margin: 0; }
+SvWatchBar { background-color: transparent; padding: 0.5mm 1mm; margin: 0; }
+SvWatchStat { color: #c6f432; background-color: transparent; font-family: "native:MainBold"; font-size: 2.2mm; text-align: center; padding: 1mm 1mm 0 1mm; margin: 0; }
+SvWatchStreak { color: #b0b3b8; background-color: transparent; font-family: "native:MainRegular"; font-size: 2mm; text-align: center; padding: 0 1mm; margin: 0; }
 
 /* ----------------------------------------------------------- class cards */
 
@@ -1683,3 +1689,5 @@ SvWelcomeFeatureText { background-color: transparent; font-size: 3.1mm; color: v
     SvQueueRow.pressed { background-color: var(--surface-alt-dark); }
     SvQueueRowPicked { background-color: var(--brand-tint-dark); border-bottom: 1px solid var(--line-dark); }
 }
+SvRowAmount { background-color: transparent; font-family: "native:MainBold"; font-size: 3.6mm; color: var(--text); padding: 0 0 0 2mm; margin: 0; }
+SvClassTile { background-color: transparent; padding: 2mm; margin: 0 3mm 0 0; }

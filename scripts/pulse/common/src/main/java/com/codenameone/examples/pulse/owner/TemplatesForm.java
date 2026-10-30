@@ -59,11 +59,14 @@ public final class TemplatesForm {
         list.removeAll();
         for (int iter = 0; types != null && iter < types.size(); iter++) {
             final ClassTypeDto type = types.get(iter);
-            list.add(Ui.tap(Ui.row(FontImage.MATERIAL_FITNESS_CENTER, type.name(),
-                    Lang.tr("{0} min, {1} places, intensity {2}", Integer.valueOf(type.minutes()),
-                            Integer.valueOf(type.capacity()), Integer.valueOf(type.intensity())),
-                    type.active() ? null : Ui.badge(Lang.tr("Retired"), "SvBadgeBad")),
-                    "template-" + iter, e -> edit(form, type, load)));
+            Container row = Ui.row((char) 0, type.name(),
+                    Lang.tr("{0} min", Integer.valueOf(type.minutes())) + Ui.DOT
+                    + Lang.tr("{0} places", Integer.valueOf(type.capacity())) + Ui.DOT
+                    + Lang.tr("intensity {0} of 5", Integer.valueOf(type.intensity())),
+                    type.active() ? null : Ui.badge(Lang.tr("Retired"), "SvBadgeBad"));
+            row.add(BorderLayout.WEST, com.codenameone.examples.pulse.member.Classes.tile(
+                    type.category(), type.color()));
+            list.add(Ui.tap(row, "template-" + iter, e -> edit(form, type, load)));
         }
         Ui.refresh(form);
     }

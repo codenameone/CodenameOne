@@ -25,7 +25,9 @@ import com.codename1.backend.annotations.Transactional;
 import com.codenameone.examples.pulse.Days;
 import com.codenameone.examples.pulse.Ids;
 import com.codenameone.examples.pulse.account.DemoAccounts;
+import com.codenameone.examples.pulse.trainer.Trainers;
 import com.codenameone.examples.pulse.domain.Booking;
+import com.codenameone.examples.pulse.domain.Campaign;
 import com.codenameone.examples.pulse.domain.CheckIn;
 import com.codenameone.examples.pulse.domain.ClassSession;
 import com.codenameone.examples.pulse.domain.ClassType;
@@ -37,8 +39,10 @@ import com.codenameone.examples.pulse.domain.Workout;
 import com.codenameone.examples.pulse.domain.Membership;
 import com.codenameone.examples.pulse.domain.MembershipPlan;
 import com.codenameone.examples.pulse.domain.Room;
+import com.codenameone.examples.pulse.domain.Shift;
 import com.codenameone.examples.pulse.domain.Staff;
 import com.codenameone.examples.pulse.repository.BookingRepository;
+import com.codenameone.examples.pulse.repository.CampaignRepository;
 import com.codenameone.examples.pulse.repository.CheckInRepository;
 import com.codenameone.examples.pulse.repository.ClassSessionRepository;
 import com.codenameone.examples.pulse.repository.ClassTypeRepository;
@@ -49,6 +53,7 @@ import com.codenameone.examples.pulse.repository.MemberRepository;
 import com.codenameone.examples.pulse.repository.MembershipPlanRepository;
 import com.codenameone.examples.pulse.repository.MembershipRepository;
 import com.codenameone.examples.pulse.repository.RoomRepository;
+import com.codenameone.examples.pulse.repository.ShiftRepository;
 import com.codenameone.examples.pulse.repository.StaffRepository;
 import com.codenameone.examples.pulse.repository.WorkoutRepository;
 
@@ -109,6 +114,8 @@ public class DemoStudio {
     private final InvoiceRepository invoices;
     private final WorkoutRepository workouts;
     private final FriendRepository friends;
+    private final ShiftRepository shifts;
+    private final CampaignRepository campaigns;
     /// A fixed sequence, so that every demo database has the same history.
     private long seed = 20261030L;
 
@@ -117,7 +124,8 @@ public class DemoStudio {
             StaffRepository staff, MembershipPlanRepository plans,
             MembershipRepository memberships, MemberRepository members,
             BookingRepository bookings, CheckInRepository checkIns, InvoiceRepository invoices,
-            WorkoutRepository workouts, FriendRepository friends) {
+            WorkoutRepository workouts, FriendRepository friends,
+            ShiftRepository shifts, CampaignRepository campaigns) {
         this.accounts = accounts;
         this.config = config;
         this.locations = locations;
@@ -133,6 +141,8 @@ public class DemoStudio {
         this.invoices = invoices;
         this.workouts = workouts;
         this.friends = friends;
+        this.shifts = shifts;
+        this.campaigns = campaigns;
     }
 
     @PostConstruct
@@ -195,6 +205,143 @@ public class DemoStudio {
                 false);
         timetable();
         households();
+        liveClass();
+        shifts();
+        campaigns();
+    }
+
+    /// A HIIT of Tess's that started a quarter of an hour ago, whatever the
+    /// time the server comes up, with six people checked in: the trainer's
+    /// live screen has a roster, and [DemoHeartRates] gives it pulses.
+    private void liveClass() throws IOException {
+        Instant now = Instant.now();
+        ClassSession live = session(now.minusMillis(15L * 60000L), HIIT, DOWNTOWN,
+                "room-studio-a", DemoAccounts.TRAINER);
+        LocalDate today = LocalDate.now();
+        attended(self(DemoAccounts.SECOND_MEMBER), live, true);
+        String[] names = {"Jordan Reyes", "Priya Natarajan", "Marcus Bell", "Hannah Okafor",
+            "Sam Whitfield"};
+        int[] ages = {27, 34, 45, 22, 58};
+        // Start days that fall on different days of the billing month, so the
+        // owner's revenue chart is not one bar.
+        int[] joined = {37, 52, 98, 143, 176};
+        List<ClassSession> past = sessions.findByStartsAtGreaterThanEqualAndStartsAtLessThanOrderByStartsAtAsc(
+                now.minusMillis(WEEKS_BACK * 7L * Days.MILLIS), now);
+        for (int iter = 0; iter < names.length; iter++) {
+            // Households with no sign-in of their own: members the desk
+            // signed up, so the roster is not only the demo accounts.
+            Member row = new Member();
+            row.setId("member-guest-" + (iter + 1));
+            row.setAccount("demo-guest-" + (iter + 1) + "@pulse.example");
+            row.setName(names[iter]);
+            row.setBirthDate(today.minusYears(ages[iter]).minusDays(30L * iter + 11L));
+            row.setRelation("SELF");
+            row.setCreatedAt(now.minusMillis((200L + 40L * iter) * Days.MILLIS));
+            sign(row);
+            members.insert(row);
+            Membership plan = membership(row, iter == 3 ? OFF_PEAK : UNLIMITED, "ACTIVE",
+                    joined[iter], 0, now);
+            // The odd drop-in for a friend and a class pack on top, on days
+            // of their own.
+            purchase(plan, row, DROP_IN, 2 + 5 * iter, now);
+            purchase(plan, row, iter % 2 == 0 ? DROP_IN : PACK, 4 + 6 * iter, now);
+            for (int each = 0; each < past.size(); each++) {
+                ClassSession session = past.get(each);
+                if (session.getEndsAt().isBefore(now) && DOWNTOWN.equals(session.getLocationId())
+                        && !LITTLE_MOVERS.equals(session.getClassTypeId())
+                        && !TEEN.equals(session.getClassTypeId()) && next(7) == 0) {
+                    attended(row, session, next(10) != 0);
+                }
+            }
+            attended(row, live, true);
+        }
+    }
+
+    /// A week of shifts for both trainers, one of Theo's offered for swap so
+    /// Tess has something under "Offered by others".
+    private void shifts() throws IOException {
+        LocalDate today = LocalDate.now(ZoneId.of(ZONE));
+        for (int day = 1; day <= 7; day++) {
+            LocalDate on = today.plusDays(day);
+            if (on.getDayOfWeek() != DayOfWeek.SUNDAY) {
+                shift(DemoAccounts.TRAINER, on, 6, 6, day % 2 == 0 ? "Classes" : "Floor",
+                        Trainers.ASSIGNED);
+            }
+            if (day % 2 == 1) {
+                shift(DemoAccounts.SECOND_TRAINER, on, 12, 5, day == 3 ? "Front desk" : "Classes",
+                        day == 3 ? Trainers.SWAP_REQUESTED : Trainers.ASSIGNED);
+            }
+        }
+    }
+
+    /// A one-off purchase -- a drop-in or a class pack -- paid `daysAgo`.
+    private void purchase(Membership membership, Member member, String planId, int daysAgo,
+            Instant now) throws IOException {
+        if (membership == null) {
+            return;
+        }
+        MembershipPlan plan = plans.findById(planId);
+        Instant at = now.minusMillis(daysAgo * Days.MILLIS + 3L * 3600000L);
+        Invoice row = invoice(membership, member, plan.getName(), plan.getPriceCents(), at, at);
+        row.setStatus("PAID");
+        row.setAttempts(1);
+        row.setChargeRef("demo-" + row.getId().substring(0, 8));
+        row.setMethodId("");
+        row.setPaidAt(at);
+        invoices.insert(row);
+    }
+
+    /// Three campaigns the owner sent over the last weeks: filling a quiet
+    /// Barbell Club, calling back the lapsed, and a referral offer.
+    private void campaigns() throws IOException {
+        Instant now = Instant.now();
+        List<ClassSession> past = sessions.findByStartsAtGreaterThanEqualAndStartsAtLessThanOrderByStartsAtAsc(
+                now.minusMillis(14L * Days.MILLIS), now);
+        String barbell = "";
+        for (int iter = 0; iter < past.size() && barbell.length() == 0; iter++) {
+            if ("type-barbell".equals(past.get(iter).getClassTypeId())) {
+                barbell = past.get(iter).getId();
+            }
+        }
+        campaign("Fill Barbell Club", "CLASS", barbell, "Four places left at Barbell Club",
+                "Squat, press, pull with Tess tonight. Book before it fills.", 12, 38, 29, 6);
+        campaign("We miss you", "LAPSED", "", "Your mat misses you",
+                "It has been a while. Come back this week, your first class is on us.", 9, 22,
+                14, 3);
+        campaign("Bring a friend", "ALL", "", "Train with a friend, both get a free week",
+                "Share your code: when they join, you both get seven days free.", 3, 146, 97,
+                11);
+    }
+
+    private void campaign(String name, String kind, String sessionId, String title, String body,
+            int daysAgo, int sent, int opened, int booked) throws IOException {
+        Campaign row = new Campaign();
+        row.setId(Ids.next());
+        row.setName(name);
+        row.setKind(kind);
+        row.setSessionId(sessionId);
+        row.setTitle(title);
+        row.setBody(body);
+        row.setCreatedBy(DemoAccounts.OWNER);
+        row.setCreatedAt(Instant.now().minusMillis(daysAgo * Days.MILLIS + 5L * 3600000L));
+        row.setSent(sent);
+        row.setOpened(opened);
+        row.setBooked(booked);
+        campaigns.insert(row);
+    }
+
+    private void shift(String trainer, LocalDate day, int hour, int hours, String duty,
+            String state) throws IOException {
+        Instant start = ZonedDateTime.of(day, LocalTime.of(hour, 0), ZoneId.of(ZONE)).toInstant();
+        Shift row = new Shift();
+        row.setId(Ids.next());
+        row.setLocationId(DOWNTOWN);
+        row.setStaff(trainer);
+        row.setDuty(duty);
+        row.setStartsAt(start);
+        row.setEndsAt(start.plusMillis(hours * 3600000L));
+        row.setState(state);
+        shifts.insert(row);
     }
 
     private void timetable() throws IOException {
@@ -246,9 +393,9 @@ public class DemoStudio {
         sign(rileySelf);
         sign(kai);
         sign(mia);
-        membership(rileySelf, UNLIMITED, "ACTIVE", 120, 0, now);
-        membership(kai, KIDS, "ACTIVE", 90, 0, now);
-        membership(mia, KIDS, "ACTIVE", 90, 0, now);
+        membership(rileySelf, UNLIMITED, "ACTIVE", 124, 0, now);
+        membership(kai, KIDS, "ACTIVE", 96, 0, now);
+        membership(mia, KIDS, "ACTIVE", 103, 0, now);
         Member rae = self(DemoAccounts.FLAGGED_MEMBER);
         sign(rae);
         Membership raes = membership(rae, OFF_PEAK, "PAST_DUE", 60, 0, now);
@@ -258,7 +405,7 @@ public class DemoStudio {
         Member robin = self(DemoAccounts.SECOND_MEMBER);
         if (robin != null) {
             sign(robin);
-            membership(robin, UNLIMITED, "ACTIVE", 300, 0, now);
+            membership(robin, UNLIMITED, "ACTIVE", 289, 0, now);
             if (rileySelf != null) {
                 befriend(rileySelf.getAccount(), robin.getAccount(), now);
                 befriend(robin.getAccount(), rileySelf.getAccount(), now);
@@ -387,9 +534,13 @@ public class DemoStudio {
 
     private void session(LocalDate day, int hour, int minute, String typeId, String location,
             String room, String trainer) throws IOException {
+        session(ZonedDateTime.of(day, LocalTime.of(hour, minute), ZoneId.of(ZONE)).toInstant(),
+                typeId, location, room, trainer);
+    }
+
+    private ClassSession session(Instant start, String typeId, String location, String room,
+            String trainer) throws IOException {
         ClassType type = types.findById(typeId);
-        Instant start = ZonedDateTime.of(day, LocalTime.of(hour, minute), ZoneId.of(ZONE))
-                .toInstant();
         ClassSession row = new ClassSession();
         row.setId(Ids.next());
         row.setClassTypeId(typeId);
@@ -402,6 +553,7 @@ public class DemoStudio {
         row.setState(start.plusMillis(type.getMinutes() * 60000L + Bookings.SETTLE_MILLIS)
                 .isBefore(Instant.now()) ? Studio.DONE : Studio.SCHEDULED);
         sessions.insert(row);
+        return row;
     }
 
     private Member self(String account) {
@@ -510,6 +662,9 @@ public class DemoStudio {
 
     /// A past class, attended -- or booked and missed, for `came` false.
     private void attended(Member member, ClassSession session, boolean came) throws IOException {
+        if (member == null) {
+            return;
+        }
         Booking row = booking(member, session, came ? Bookings.CHECKED_IN : Bookings.NO_SHOW);
         session.setBooked(session.getBooked() + 1);
         if (came) {
@@ -525,7 +680,8 @@ public class DemoStudio {
             visit.setAt(at);
             visit.setStaff(DemoAccounts.DESK);
             checkIns.insert(visit);
-            if ("SELF".equals(member.getRelation())) {
+            if ("SELF".equals(member.getRelation())
+                    && session.getEndsAt().isBefore(Instant.now())) {
                 worked(member, session);
             }
         }

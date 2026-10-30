@@ -18,15 +18,20 @@
  */
 package com.codenameone.examples.pulse.trainer;
 
+import com.codename1.ui.Button;
+import com.codename1.ui.CN;
 import com.codename1.ui.Container;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
+import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
 import com.codenameone.examples.pulse.api.SessionDto;
 import com.codenameone.examples.pulse.live.LiveChannel;
 import com.codenameone.examples.pulse.member.Classes;
 import com.codenameone.examples.pulse.net.Api;
 import com.codenameone.examples.pulse.net.Net;
+import com.codenameone.examples.pulse.ui.Beat;
 import com.codenameone.examples.pulse.ui.Lang;
 import com.codenameone.examples.pulse.ui.Menu;
 import com.codenameone.examples.pulse.ui.Nav;
@@ -76,22 +81,89 @@ public class TrainerForm extends LiveChannel.Adapter implements Nav.Home {
 
     private void fill() {
         list.removeAll();
-        Ui.section(list, "This week");
+        long at = System.currentTimeMillis();
+        SessionDto featured = current(classes, at);
+        if (featured != null) {
+            list.add(featured(featured, featured.startsAt() <= at));
+        }
+        // The rest of the week as the members see it, a day at a time, with
+        // the room's fill instead of a booking button.
+        String day = null;
         for (int iter = 0; classes != null && iter < classes.size(); iter++) {
             final SessionDto session = classes.get(iter);
+            if (session == featured || session.endsAt() < at) {
+                continue;
+            }
+            String heading = dayName(session.startsAt(), at);
+            if (!heading.equals(day)) {
+                day = heading;
+                Ui.section(list, heading);
+            }
             boolean cancelled = Classes.CANCELLED.equals(session.state());
-            Container row = Ui.row(FontImage.MATERIAL_FITNESS_CENTER, session.name(),
-                    Ui.when(session.startsAt()) + Ui.DOT + session.roomName(),
-                    Ui.badge(cancelled ? Lang.tr("Cancelled")
-                            : session.booked() + "/" + session.capacity(),
-                            cancelled ? "SvBadgeBad" : "SvBadge"));
-            list.add(Ui.tap(row, "class-" + session.id(), e -> RosterForm.show(form, session)));
+            Label fill = Ui.badge(cancelled ? Lang.tr("Cancelled")
+                    : session.booked() + "/" + session.capacity(),
+                    cancelled ? "SvBadgeBad" : "SvBadge");
+            list.add(Ui.tap(Classes.card(session, fill, null), "class-" + session.id(),
+                    e -> RosterForm.show(form, session)));
         }
         if (classes == null || classes.isEmpty()) {
             list.add(Ui.empty(FontImage.MATERIAL_SPORTS, Lang.tr("No classes this week"),
                     Lang.tr("Classes the studio gives you appear here.")));
         }
         Ui.refresh(form);
+    }
+
+    // The class on now, or the next one: the one thing a coach opens the app
+    // for, so it leads on the dark card the member's home uses for theirs.
+    private Container featured(final SessionDto session, boolean running) {
+        Container card = new Container(BoxLayout.y(), "SvInk");
+        card.setName("featured");
+        Container head = new Container(new BorderLayout(), "SvInkRow");
+        head.add(BorderLayout.CENTER, Ui.label(running ? "ON NOW" : "UP NEXT", "SvInkEyebrow"));
+        Beat beat = new Beat("SvBeat", running);
+        beat.setPreferredW(CN.convertToPixels(14));
+        beat.setPreferredH(CN.convertToPixels(5));
+        head.add(BorderLayout.EAST, beat);
+        card.add(head);
+        card.add(Ui.text(session.name(), "SvInkTitle"));
+        card.add(Ui.text(Ui.when(session.startsAt()) + Ui.DOT + session.roomName() + Ui.DOT
+                + Lang.tr("{0} of {1} booked", Integer.valueOf(session.booked()),
+                        Integer.valueOf(session.capacity())), "SvInkText"));
+        Button live = new Button(Lang.tr("Open live view"), "SvInkButton");
+        live.setName("openLive");
+        live.addActionListener(e -> LiveClassForm.show(form, session));
+        Button roster = new Button(Lang.tr("Roster"), "SvInkText");
+        roster.getAllStyles().setBgTransparency(0);
+        roster.setName("openRoster");
+        roster.addActionListener(e -> RosterForm.show(form, session));
+        Container actions = new Container(new BorderLayout(), "SvInkRow");
+        actions.add(BorderLayout.WEST, live).add(BorderLayout.EAST, roster);
+        card.add(actions);
+        return card;
+    }
+
+    private static String dayName(long millis, long now) {
+        java.util.Calendar a = java.util.Calendar.getInstance();
+        a.setTime(new java.util.Date(millis));
+        java.util.Calendar b = java.util.Calendar.getInstance();
+        b.setTime(new java.util.Date(now));
+        int days = (int) ((start(a) - start(b)) / 86400000L);
+        if (days == 0) {
+            return Lang.tr("Today");
+        }
+        if (days == 1) {
+            return Lang.tr("Tomorrow");
+        }
+        return new com.codename1.l10n.SimpleDateFormat("EEEE, MMM d").format(
+                new java.util.Date(millis));
+    }
+
+    private static long start(java.util.Calendar day) {
+        day.set(java.util.Calendar.HOUR_OF_DAY, 12);
+        day.set(java.util.Calendar.MINUTE, 0);
+        day.set(java.util.Calendar.SECOND, 0);
+        day.set(java.util.Calendar.MILLISECOND, 0);
+        return day.getTime().getTime();
     }
 
     /// Opens the class that is on now, or the next one.

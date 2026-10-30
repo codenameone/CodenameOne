@@ -234,10 +234,10 @@ try {
 
   // 3. The home screen.
   // The member's home: the next class, read from the server, and the
-  // membership the demo member holds.
+  // member's level. The eyebrow is set in capitals, so compare without case.
   await waitFor('the home screen', stepSeconds, async () => {
-    const text = await screenText();
-    return text.includes('Next class') && text.includes('Membership');
+    const text = (await screenText()).toLowerCase();
+    return text.includes('next class') && text.includes('level');
   });
   await waitFor('the home screen to ask for the timetable', stepSeconds, async () =>
       requests.some(r => /^200 GET \/api\/(studio\/classes|bookings)/.test(r)));

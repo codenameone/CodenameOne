@@ -24,6 +24,7 @@ import com.codenameone.examples.pulse.api.BookingDto;
 import com.codenameone.examples.pulse.api.MemberDto;
 import com.codenameone.examples.pulse.api.PassDto;
 import com.codenameone.examples.pulse.api.SessionDto;
+import com.codenameone.examples.pulse.api.StatsDto;
 import com.codenameone.examples.pulse.net.Api;
 import com.codenameone.examples.pulse.net.Net;
 import java.util.List;
@@ -43,6 +44,8 @@ public final class WatchBridge {
     public static final String NEXT = "/pulse/next";
     /// The pass: `memberId`, `name`, `secret` (hex), `period`, `digits`.
     public static final String PASS = "/pulse/pass";
+    /// How the member is doing: `points`, `level`, `streak` (weeks).
+    public static final String STATS = "/pulse/stats";
 
     private WatchBridge() {
     }
@@ -53,11 +56,13 @@ public final class WatchBridge {
         return WearableConnection.isSupported() && WearableConnection.isPaired();
     }
 
-    /// Reads the next booked class and the member's pass, and publishes both.
+    /// Reads the next booked class and the member's pass, and publishes both,
+    /// with the member's points.
     public static void publish() {
         if (!paired()) {
             return;
         }
+        Api.engagement().stats(Net.to(WatchBridge::stats, (status, message) -> { }));
         Api.bookings().upcoming(Net.to(WatchBridge::next, (status, message) -> { }));
         Api.household().members(Net.to(members -> {
             String self = self(members);
@@ -87,6 +92,14 @@ public final class WatchBridge {
                     .put("trainer", next.trainerName());
         }
         WearableConnection.putData(data);
+    }
+
+    static void stats(StatsDto stats) {
+        if (stats == null) {
+            return;
+        }
+        WearableConnection.putData(new WearableMessage(STATS).put("points", stats.points())
+                .put("level", stats.level()).put("streak", stats.weekStreak()));
     }
 
     static void pass(PassDto pass) {

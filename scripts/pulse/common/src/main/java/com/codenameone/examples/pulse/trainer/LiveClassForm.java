@@ -44,6 +44,8 @@ public final class LiveClassForm extends LiveChannel.Adapter {
     private final SessionDto session;
     private final Form form;
     private final Container grid = new Container(new GridLayout(2));
+    private final Container empty = new Container(BoxLayout.y());
+    private final Map<String, Label> zones = new HashMap<String, Label>();
     private final Map<String, Label> rates = new HashMap<String, Label>();
     private final Map<String, Container> tiles = new HashMap<String, Container>();
 
@@ -55,6 +57,7 @@ public final class LiveClassForm extends LiveChannel.Adapter {
         Container page = Ui.page();
         page.add(Ui.text(Lang.tr("Heart rate zones, live. Zone 5 is flat out."), "SvMuted"));
         page.add(grid);
+        page.add(empty);
         form.add(BorderLayout.CENTER, page);
         form.addShowListener(e -> {
             LiveChannel.listen(this);
@@ -72,6 +75,8 @@ public final class LiveClassForm extends LiveChannel.Adapter {
 
     private void fill(List<RosterEntryDto> roster) {
         grid.removeAll();
+        empty.removeAll();
+        zones.clear();
         rates.clear();
         tiles.clear();
         for (int iter = 0; roster != null && iter < roster.size(); iter++) {
@@ -84,13 +89,17 @@ public final class LiveClassForm extends LiveChannel.Adapter {
             tile.add(Ui.label(entry.name(), "SvZoneName"));
             Label rate = Ui.label("", "SvZoneRate");
             tile.add(rate);
+            Label zone = Ui.label("", "SvZoneName");
+            tile.add(zone);
+            zones.put(entry.memberId(), zone);
             rates.put(entry.memberId(), rate);
             tiles.put(entry.memberId(), tile);
             show(entry.memberId(), entry.heartRate(), entry.zone());
             grid.add(tile);
         }
         if (rates.isEmpty()) {
-            grid.add(Ui.empty(FontImage.MATERIAL_FAVORITE, Lang.tr("Nobody in yet"),
+            // Beside the grid, not in it: a cell of the grid is half the width.
+            empty.add(Ui.empty(FontImage.MATERIAL_FAVORITE, Lang.tr("Nobody in yet"),
                     Lang.tr("Members appear here once they are booked.")));
         }
         Ui.refresh(form);
@@ -103,6 +112,8 @@ public final class LiveClassForm extends LiveChannel.Adapter {
             return;
         }
         rate.setText(bpm > 0 ? bpm + " bpm" : "--");
+        zones.get(memberId).setText(bpm > 0 ? Lang.tr("Zone {0}",
+                Integer.valueOf(Math.max(1, Math.min(5, zone)))) : Lang.tr("No reading"));
         tile.setUIID(bpm > 0 ? "SvZone" + Math.max(1, Math.min(5, zone)) : "SvZone0");
     }
 

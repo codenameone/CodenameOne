@@ -185,7 +185,10 @@ public class OwnerForm implements Nav.Home {
         renderer.setLabelsTextSize(CN.convertToPixels(2.2f));
         renderer.setMargins(new int[] {CN.convertToPixels(2), CN.convertToPixels(8),
             CN.convertToPixels(2), CN.convertToPixels(2)});
-        renderer.setMarginsColor(0);
+        // The margins are painted, and 0 paints them black: give them the
+        // page's own colour, which follows dark mode.
+        renderer.setMarginsColor(0xff000000 | com.codename1.ui.plaf.UIManager.getInstance()
+                .getComponentStyle("SvPage").getBgColor());
         renderer.setApplyBackgroundColor(false);
         renderer.setLabelsColor(0xff7a7a7a);
         renderer.setXLabelsColor(0xff7a7a7a);

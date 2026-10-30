@@ -21,7 +21,9 @@ package com.codenameone.examples.pulse.member;
 import com.codename1.ui.Container;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
+import com.codename1.ui.Sheet;
 import com.codename1.ui.TextField;
+import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codenameone.examples.pulse.Telemetry;
@@ -100,39 +102,26 @@ public final class MembershipForm {
         }
         for (int iter = 0; memberships != null && iter < memberships.size(); iter++) {
             final MembershipDto membership = memberships.get(iter);
-            String detail = membership.memberName();
+            String detail = membership.planName();
             if ("FROZEN".equals(membership.state())) {
-                detail += " - " + Lang.tr("frozen until {0}", Ui.day(membership.frozenUntil()));
+                detail += Ui.DOT + Lang.tr("frozen until {0}", Ui.day(membership.frozenUntil()));
             } else if (membership.cancelAtPeriodEnd()) {
-                detail += " - " + Lang.tr("ends {0}", Ui.day(membership.currentPeriodEnd()));
+                detail += Ui.DOT + Lang.tr("ends {0}", Ui.day(membership.currentPeriodEnd()));
             } else if (membership.currentPeriodEnd() > 0) {
-                detail += " - " + Lang.tr("renews {0}", Ui.day(membership.currentPeriodEnd()));
+                detail += Ui.DOT + Lang.tr("renews {0}", Ui.day(membership.currentPeriodEnd()));
             }
             if ("CLASS_PACK".equals(membership.kind())) {
-                detail += " - " + Lang.tr("{0} classes left",
+                detail += Ui.DOT + Lang.tr("{0} classes left",
                         Integer.valueOf(membership.creditsLeft()));
             }
-            Container row = Ui.row(FontImage.MATERIAL_CARD_MEMBERSHIP, membership.planName(),
+            final int index = iter;
+            // Who it is for leads, since a household holds several of the
+            // same plan. Freezing and cancelling are rare, so they wait in a
+            // sheet behind a tap on the plan rather than under every row.
+            Container row = Ui.row(FontImage.MATERIAL_CARD_MEMBERSHIP, membership.memberName(),
                     detail, Ui.badge(state(membership.state()), badge(membership.state())));
-            row.setName("membership-" + iter);
-            list.add(row);
-            Container actions = new Container(new FlowLayout(com.codename1.ui.Component.RIGHT));
-            if ("FROZEN".equals(membership.state())) {
-                actions.add(Ui.link("Unfreeze", "unfreeze-" + iter,
-                        e -> Api.membership().unfreeze(membership.id(),
-                                Net.to(done -> load.run(), Ui::fail))));
-            } else if ("ACTIVE".equals(membership.state())) {
-                actions.add(Ui.link("Freeze", "freeze-" + iter,
-                        e -> freeze(form, membership, load)));
-            }
-            if (!membership.cancelAtPeriodEnd() && !"CANCELLED".equals(membership.state())) {
-                actions.add(Ui.link("Cancel", "cancelPlan-" + iter,
-                        e -> Api.membership().cancel(membership.id(), Net.to(done -> {
-                            Ui.say("Your plan ends at the end of this period");
-                            load.run();
-                        }, Ui::fail))));
-            }
-            list.add(actions);
+            list.add(Ui.tap(row, "membership-" + iter,
+                    e -> actions(form, membership, index, load)));
         }
         Ui.section(list, "Invoices");
         if (invoices == null || invoices.isEmpty()) {
@@ -141,13 +130,16 @@ public final class MembershipForm {
         for (int iter = 0; invoices != null && iter < invoices.size(); iter++) {
             final InvoiceDto invoice = invoices.get(iter);
             boolean due = "OPEN".equals(invoice.status()) || "FAILED".equals(invoice.status());
-            String detail = Ui.day(invoice.createdAt()) + " - " + invoice.memberName();
+            // The description already names the member; the line under it says
+            // where the money stands.
+            String detail = Ui.day(invoice.createdAt()) + Ui.DOT + (due ? Lang.tr("Due")
+                    : "PAID".equals(invoice.status()) ? Lang.tr("Paid") : invoice.status());
             if (invoice.failure() != null && invoice.failure().length() > 0) {
                 detail += "\n" + invoice.failure();
             }
             list.add(Ui.row(FontImage.MATERIAL_RECEIPT_LONG, invoice.description(), detail,
                     Ui.plain(Ui.money(invoice.amountCents() - invoice.creditCents(),
-                            invoice.currency()), "SvAmount")));
+                            invoice.currency()), "SvRowAmount")));
             if (due) {
                 list.add(FlowLayout.encloseRight(Ui.link("Pay now", "pay-" + iter,
                         e -> WalletForm.pick(form, null, method ->
@@ -165,6 +157,34 @@ public final class MembershipForm {
                 Lang.tr("Travelling or injured? No nudges, and billing can pause"), null),
                 "away", e -> AwayForm.show(form)));
         Ui.refresh(form);
+    }
+
+    private static void actions(final Form form, final MembershipDto membership, int iter,
+            final Runnable load) {
+        final Sheet sheet = new Sheet(null, membership.memberName());
+        sheet.getContentPane().setLayout(BoxLayout.y());
+        if ("FROZEN".equals(membership.state())) {
+            sheet.getContentPane().add(Ui.link("Unfreeze", "unfreeze-" + iter, e -> {
+                sheet.back();
+                Api.membership().unfreeze(membership.id(), Net.to(done -> load.run(), Ui::fail));
+            }));
+        } else if ("ACTIVE".equals(membership.state())) {
+            sheet.getContentPane().add(Ui.link("Freeze", "freeze-" + iter, e -> {
+                sheet.back();
+                freeze(form, membership, load);
+            }));
+        }
+        if (!membership.cancelAtPeriodEnd() && !"CANCELLED".equals(membership.state())) {
+            sheet.getContentPane().add(Ui.link("Cancel at the end of this period",
+                    "cancelPlan-" + iter, e -> {
+                        sheet.back();
+                        Api.membership().cancel(membership.id(), Net.to(done -> {
+                            Ui.say("Your plan ends at the end of this period");
+                            load.run();
+                        }, Ui::fail));
+                    }));
+        }
+        sheet.show();
     }
 
     private static void freeze(final Form previous, final MembershipDto membership,

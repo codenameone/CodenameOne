@@ -19,6 +19,10 @@
 package com.codenameone.examples.pulse.owner;
 
 import com.codename1.ui.Container;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.FlowLayout;
+import com.codename1.ui.Component;
+import com.codename1.ui.Sheet;
 import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
@@ -65,18 +69,37 @@ public final class StaffForm {
         list.removeAll();
         for (int iter = 0; staff != null && iter < staff.size(); iter++) {
             final StaffDto person = staff.get(iter);
-            list.add(Ui.row(FontImage.MATERIAL_PERSON, person.name(), person.title() + Ui.DOT
-                    + Lang.tr("{0} classes this week", Integer.valueOf(person.classesThisWeek())),
-                    null));
+            // One row a person, their roles as chips; the switches that change
+            // them are a tap away, in a sheet, rather than three rows each.
+            Container chips = new Container(new FlowLayout(Component.RIGHT));
             for (int role = 0; role < ROLES.length; role++) {
-                final String name = ROLES[role];
-                boolean has = person.roles() != null && person.roles().contains(name);
-                list.add(Ui.row((char) 0, Lang.tr(ROLE_NAMES[role]), null,
-                        Ui.toggle("role-" + iter + "-" + name, has,
-                                on -> setRole(person, name, on, load))));
+                if (person.roles() != null && person.roles().contains(ROLES[role])) {
+                    chips.add(Ui.badge(Lang.tr(ROLE_NAMES[role]), "SvBadge"));
+                }
             }
+            Container row = Ui.row((char) 0, person.name(), person.title() + Ui.DOT
+                    + Lang.tr("{0} classes this week", Integer.valueOf(person.classesThisWeek())),
+                    chips);
+            row.add(BorderLayout.WEST, Ui.avatar(person.name()));
+            final int index = iter;
+            list.add(Ui.tap(row, "staff-" + iter, e -> roles(person, index, load)));
         }
         Ui.refresh(form);
+    }
+
+    private static void roles(final StaffDto person, int iter, final Runnable load) {
+        final Sheet sheet = new Sheet(null, person.name());
+        sheet.getContentPane().setLayout(BoxLayout.y());
+        for (int role = 0; role < ROLES.length; role++) {
+            final String name = ROLES[role];
+            boolean has = person.roles() != null && person.roles().contains(name);
+            sheet.getContentPane().add(Ui.row((char) 0, Lang.tr(ROLE_NAMES[role]), null,
+                    Ui.toggle("role-" + iter + "-" + name, has, on -> {
+                        sheet.back();
+                        setRole(person, name, on, load);
+                    })));
+        }
+        sheet.show();
     }
 
     private static void setRole(StaffDto person, String role, boolean on, final Runnable load) {

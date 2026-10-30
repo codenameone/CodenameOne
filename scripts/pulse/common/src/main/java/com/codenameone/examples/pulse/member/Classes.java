@@ -178,6 +178,13 @@ public final class Classes {
     ///
     /// @param who the first name of the one it is for, or null for the member
     public static Container card(SessionDto session, Component action, String who) {
+        return card(session, action, who, null);
+    }
+
+    /// The card, with where it is beside who teaches it, for those who see
+    /// every location's classes.
+    public static Container card(SessionDto session, Component action, String who,
+            String where) {
         int color = color(session.color());
         Container card = new Container(new BorderLayout());
         card.setUIID("SvClass");
@@ -207,6 +214,9 @@ public final class Classes {
         body.setUIID("SvClassBody");
         body.add(new com.codename1.components.SpanLabel(session.name(), "SvClassName"));
         body.add(new Label(nullToEmpty(session.trainerName()), "SvClassWho"));
+        if (where != null) {
+            body.add(new Label(where, "SvClassWho"));
+        }
         if (who != null) {
             body.add(new Label(Lang.tr("for {0}", who), "SvClassWho"));
         }
@@ -276,6 +286,28 @@ public final class Classes {
     }
 
     /// The icon for a kind of training.
+    /// The kind of class as a small round tile: its glyph in its colour, on
+    /// a pale wash of the same colour. Lists of classes and templates lead
+    /// with it where a member's card has its stripe.
+    public static Label tile(String category, String hex) {
+        int color = color(hex);
+        Label tile = new Label("", "SvClassTile");
+        tile.getAllStyles().setFgColor(color);
+        tile.setIcon(FontImage.createMaterial(glyph(category), tile.getUnselectedStyle(), 3.4f));
+        tile.getAllStyles().setAlignment(Label.CENTER);
+        int wash = mix(color, 0xffffff, 0.84f);
+        tile.getAllStyles().setBorder(com.codename1.ui.plaf.RoundBorder.create().color(wash)
+                .rectangle(false));
+        return tile;
+    }
+
+    private static int mix(int a, int b, float share) {
+        int r = (int) (((a >> 16) & 0xff) * (1 - share) + ((b >> 16) & 0xff) * share);
+        int g = (int) (((a >> 8) & 0xff) * (1 - share) + ((b >> 8) & 0xff) * share);
+        int bl = (int) ((a & 0xff) * (1 - share) + (b & 0xff) * share);
+        return (r << 16) | (g << 8) | bl;
+    }
+
     public static char glyph(String category) {
         if ("MIND".equals(category)) {
             return FontImage.MATERIAL_SELF_IMPROVEMENT;

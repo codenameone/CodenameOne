@@ -24,11 +24,13 @@ import com.codename1.nfc.Nfc;
 import com.codename1.nfc.NfcReadOptions;
 import com.codename1.nfc.Tag;
 import com.codename1.ui.CN;
+import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.GridLayout;
 import com.codenameone.examples.pulse.Telemetry;
 import com.codenameone.examples.pulse.api.CheckInRequestDto;
@@ -37,6 +39,7 @@ import com.codenameone.examples.pulse.api.DeskDayDto;
 import com.codenameone.examples.pulse.api.MemberSummaryDto;
 import com.codenameone.examples.pulse.api.SessionDto;
 import com.codenameone.examples.pulse.live.LiveChannel;
+import com.codenameone.examples.pulse.member.Classes;
 import com.codenameone.examples.pulse.net.Api;
 import com.codenameone.examples.pulse.net.Net;
 import com.codenameone.examples.pulse.ui.Lang;
@@ -63,7 +66,7 @@ public class DeskForm extends LiveChannel.Adapter implements Nav.Home {
     private final Form form = Ui.home("Desk");
     private final Menu menu = new Menu(form, Nav.DESK);
     private final Container verdict = Ui.card();
-    private final Container today = Ui.card();
+    private final Container today = new Container(BoxLayout.y());
     private String locationId = "";
 
     @Override
@@ -225,25 +228,38 @@ public class DeskForm extends LiveChannel.Adapter implements Nav.Home {
             return;
         }
         today.removeAll();
-        today.add(Ui.label("Today", "SvHeading"));
+        Ui.section(today, "Today");
         StatRow stats = Ui.stats(3);
         stats.stat(String.valueOf(day.checkIns()), Lang.tr("check-ins"), "checkIns");
         stats.stat(String.valueOf(day.walkIns()), Lang.tr("walk-ins"), "walkIns");
         stats.stat(Ui.money(day.walkInCents(), null), Lang.tr("taken"), "takings");
         today.add(stats);
+        if (day.upcoming() != null && !day.upcoming().isEmpty()) {
+            Ui.section(today, "Coming up");
+        }
         for (int iter = 0; day.upcoming() != null && iter < day.upcoming().size()
                 && iter < 4; iter++) {
             SessionDto session = day.upcoming().get(iter);
-            today.add(Ui.row(FontImage.MATERIAL_FITNESS_CENTER, session.name(),
-                    Ui.when(session.startsAt()) + " - " + session.booked() + "/"
-                    + session.capacity(), null));
+            today.add(Classes.card(session, Ui.badge(session.booked() + "/"
+                    + session.capacity(), "SvBadge"), null));
+        }
+        if (day.recent() != null && !day.recent().isEmpty()) {
+            Ui.section(today, "Just in");
         }
         for (int iter = 0; day.recent() != null && iter < day.recent().size()
                 && iter < 6; iter++) {
             CheckInResultDto recent = day.recent().get(iter);
-            today.add(Ui.row(recent.admitted() ? FontImage.MATERIAL_CHECK_CIRCLE
-                    : FontImage.MATERIAL_CANCEL, recent.memberName() == null ? ""
-                    : recent.memberName(), recent.admitted() ? null : recent.reason(), null));
+            String name = recent.memberName() == null ? "" : recent.memberName();
+            Container row = Ui.row(FontImage.MATERIAL_PERSON, name,
+                    recent.admitted() ? Lang.tr("Checked in") : recent.reason(),
+                    Ui.badge(recent.admitted() ? Lang.tr("In") : Lang.tr("Turned away"),
+                            recent.admitted() ? "SvBadgeGood" : "SvBadgeBad"));
+            BorderLayout layout = (BorderLayout) row.getLayout();
+            Component icon = layout.getWest();
+            if (icon != null) {
+                row.replace(icon, Ui.avatar(name), null);
+            }
+            today.add(row);
         }
         Ui.refresh(form);
     }
@@ -262,7 +278,7 @@ public class DeskForm extends LiveChannel.Adapter implements Nav.Home {
                 final MemberSummaryDto member = found.get(iter);
                 results.add(Ui.tap(Ui.row(FontImage.MATERIAL_PERSON, member.name(),
                         member.planName() == null ? member.membershipState()
-                        : member.planName() + " - " + member.membershipState(), null),
+                        : member.planName() + Ui.DOT + member.membershipState(), null),
                         "found-" + iter, ev -> {
                             form.showBack();
                             checkIn(new CheckInRequestDto(null, null, member.id(), locationId),

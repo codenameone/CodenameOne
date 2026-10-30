@@ -76,12 +76,13 @@ public final class TimetableForm {
                 day = today;
             }
             boolean cancelled = Classes.CANCELLED.equals(session.state());
-            list.add(Ui.tap(Ui.row(FontImage.MATERIAL_FITNESS_CENTER, session.name(),
-                    Ui.when(session.startsAt()) + Ui.DOT + session.trainerName() + Ui.DOT
-                    + session.locationName(), Ui.badge(cancelled ? Lang.tr("Cancelled")
+            // The members' card, with the room's fill where they have a
+            // booking button, and the location as "who" since an owner runs
+            // more than one.
+            list.add(Ui.tap(Classes.card(session, Ui.badge(cancelled ? Lang.tr("Cancelled")
                     : session.booked() + "/" + session.capacity(),
-                    cancelled ? "SvBadgeBad" : "SvBadge")), "session-" + iter,
-                    e -> manage(form, session, load)));
+                    cancelled ? "SvBadgeBad" : "SvBadge"), null, session.locationName()),
+                    "session-" + iter, e -> manage(form, session, load)));
         }
         if (classes == null || classes.isEmpty()) {
             list.add(Ui.text("Nothing on the timetable this week.", "SvMuted"));
