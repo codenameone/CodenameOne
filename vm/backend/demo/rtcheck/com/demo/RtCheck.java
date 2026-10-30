@@ -138,6 +138,22 @@ public final class RtCheck {
         }
     }
 
+    /// Catches the refusal itself and carries on allocating: every period must be
+    /// refused again, not just the first.
+    static final class Catcher extends RealtimeTask {
+        private final Sample[] samples = {new Cached(), new Fresh()};
+        private int caught;
+
+        @Override
+        public void cycle() {
+            try {
+                samples[1].take();
+            } catch (RealtimeAllocationError e) {
+                caught++;
+            }
+        }
+    }
+
     public static void main(String[] args) throws Exception {
         int seconds = args.length > 0 ? Integer.parseInt(args[0]) : 5;
         long maxLatencyMicros = args.length > 1 ? Long.parseLong(args[1]) : 0;
@@ -252,6 +268,21 @@ public final class RtCheck {
                     System.out.println("RTCHECK FAIL the allocation budget was not applied");
                     ok = false;
                 }
+            }
+        }
+
+        // 2c. a cycle that catches the refusal stays checked
+        if (rt.isSupported(Realtime.FEATURE_ALLOCATION_CHECK)) {
+            RealtimeThread ct = rt.start("catcher", new RealtimeParameters()
+                    .setPeriodNanos(1000000L).setPriority(70), new Catcher());
+            Thread.sleep(300);
+            ct.stop();
+            ct.join(2000);
+            long v = ct.getStatistics().getAllocationViolations();
+            System.out.println("RTCHECK catcher violations=" + v + " cycles=" + ct.getStatistics().getCycles());
+            if (v < 100) {
+                System.out.println("RTCHECK FAIL a caught refusal turned the check off");
+                ok = false;
             }
         }
 

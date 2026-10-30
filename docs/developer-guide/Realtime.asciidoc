@@ -100,8 +100,19 @@ A thread goes through `RealtimeThread.STATE_STARTING`, `STATE_RUNNING` and ends 
 Check them at start-up and log them: a loop that silently runs at normal priority
 looks fine on the bench and misses deadlines in the field.
 
-`getStatistics()` returns a snapshot. `getLatencyPercentileNanos(0.9999)` reads a
-percentile off the histogram, as an upper bound of its power-of-two bucket.
+`getStatistics()` returns a `RealtimeStatistics` snapshot:
+
+* `getCycles()` and `getMissedPeriods()`.
+* `getMaxLatencyNanos()` and `getMeanLatencyNanos()`: how late each release woke
+  the thread, against its scheduled time.
+* `getMaxExecutionNanos()` and `getMeanExecutionNanos()`: how long `cycle()` took.
+* `getAllocationViolations()`.
+* `getLatencyHistogram()`: `HISTOGRAM_BUCKETS` (16) counts. Index `i` counts
+  releases less than 2^i microseconds late. The last bucket holds everything from
+  about 16 milliseconds up.
+* `getLatencyPercentileNanos(0.9999)`: a percentile read off the histogram, as the
+  upper bound of its bucket.
+* `toString()`: all of the above on one line, for a log.
 
 === What the platform supports
 
@@ -137,6 +148,10 @@ be asked to wait for it. Codename One checks this twice:
   `RealtimeAllocationError` naming the class. The thread's `failed()` method
   receives it. `setAllocationBudget(n)` allows up to `n` allocations per period for
   code that cannot avoid them yet.
++
+Catching the error inside `cycle()` does not turn the check off. The allocation
+that failed is counted, and from the next period on the check applies again, so
+each later allocation fails the same way.
 
 *The collector does not stop a real-time thread.* An ordinary thread pauses
 briefly while the collector reads its stack. A real-time thread is released
@@ -224,3 +239,10 @@ thread allocates hard enough to keep the collector busy all the time. It then
 checks that a cycle allocating through an interface is stopped, and that the
 memory limit throws. Run it on your board to see the release latency the hardware
 gives you before you rely on a deadline.
+
+=== Porting
+
+A port supplies its implementation by returning a `Realtime` subclass from
+`CodenameOneImplementation.getRealtime()`; `Display` installs it with
+`Realtime.install()` when it starts, and the backend installs its own. An
+application never calls `install()`.

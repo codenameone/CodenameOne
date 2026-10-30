@@ -2189,6 +2189,7 @@ struct ThreadLocalData {
     // cn1RtFreeze in cn1_globals.m.
     JAVA_BOOLEAN realtimeThread;
     JAVA_BOOLEAN rtAllocTrap;
+    JAVA_BOOLEAN rtFrozen;          // in the steady state (cn1RtFreeze), trap lifted or not
     JAVA_INT rtAllocBudget;
     JAVA_INT rtAllocBudgetLeft;
     JAVA_LONG rtAllocViolations;

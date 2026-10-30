@@ -21435,16 +21435,23 @@ static void cn1RtTrapOff(CODENAME_ONE_THREAD_STATE) {
 void cn1RtFreeze(CODENAME_ONE_THREAD_STATE, JAVA_INT budget) {
     threadStateData->rtAllocBudget = budget < 0 ? 0 : budget;
     threadStateData->rtAllocBudgetLeft = threadStateData->rtAllocBudget;
+    threadStateData->rtFrozen = JAVA_TRUE;
     cn1RtTrapOn(threadStateData);
 }
 
 void cn1RtThaw(CODENAME_ONE_THREAD_STATE) {
+    threadStateData->rtFrozen = JAVA_FALSE;
     cn1RtTrapOff(threadStateData);
 }
 
 // Starts a new period's allocation budget without leaving the steady state.
+// Re-arms the trap too: the over-budget path lifts it to build the error, and a cycle
+// that catches the error itself would otherwise allocate unchecked from then on.
 void cn1RtNewPeriod(CODENAME_ONE_THREAD_STATE) {
     threadStateData->rtAllocBudgetLeft = threadStateData->rtAllocBudget;
+    if(threadStateData->rtFrozen) {
+        cn1RtTrapOn(threadStateData);
+    }
 }
 
 // The class of the allocation that ended the last steady state, for the error's message.
@@ -21471,7 +21478,7 @@ JAVA_OBJECT cn1RtTrappedAlloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz*
     // was just refused.
     threadStateData->rtAllocViolations++;
     cn1RtViolationClass = parent != 0 ? parent->clsName : "array";
-    cn1RtThaw(threadStateData);
+    cn1RtTrapOff(threadStateData);
     if(threadStateData->rtAllocError != JAVA_NULL) {
         throwException(threadStateData, threadStateData->rtAllocError);
     }
