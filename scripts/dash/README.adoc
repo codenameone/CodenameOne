@@ -12,10 +12,10 @@ push notifications, and a console for running the game.
 
 The rules are one module, `rules`, that the app, the server and the tests all
 compile. It uses no floating point and no clock, so a run plays out identically
-on a phone, on the server and in a replay. That is what makes the leaderboards
+on a phone, on the server and in a replay. That's what makes the leaderboards
 honest: the app sends its input log, and the server plays it again.
 
-It is a sample of what Codename One does for games, and the project the
+It's a sample of what Codename One does for games, and the project the
 Initializr generates when you start from the endless-runner template.
 
 == Start here
@@ -24,7 +24,7 @@ One chapter of the developer guide covers this project:
 
 * https://www.codenameone.com/developer-guide/#dash-implementors-guide[The Dash chapter]
   (link:../../docs/developer-guide/Dash-Implementors-Guide.asciidoc[source])
-  tours what the game does, with the demo accounts, then explains how it is
+  tours what the game does, with the demo accounts, then explains how it's
   built and what to change to make it yours: levels and their camera, new
   obstacles and pickups, runners, the look, store products, ads, push and
   moderation.
