@@ -26,6 +26,8 @@ import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.FlowLayout;
+import com.codenameone.examples.pulse.api.NameCountDto;
 import com.codenameone.examples.pulse.api.SessionDto;
 import com.codenameone.examples.pulse.api.TrainerStatsDto;
 import com.codenameone.examples.pulse.live.LiveChannel;
@@ -33,13 +35,17 @@ import com.codenameone.examples.pulse.member.Classes;
 import com.codenameone.examples.pulse.net.Api;
 import com.codenameone.examples.pulse.net.Net;
 import com.codenameone.examples.pulse.owner.OwnerForm;
+import com.codenameone.examples.pulse.owner.MembersForm;
+import com.codenameone.examples.pulse.ui.Badges;
 import com.codenameone.examples.pulse.ui.Beat;
 import com.codenameone.examples.pulse.ui.Chart;
 import com.codenameone.examples.pulse.ui.StatRow;
 import com.codenameone.examples.pulse.ui.Lang;
+import com.codenameone.examples.pulse.ui.Level;
 import com.codenameone.examples.pulse.ui.Menu;
 import com.codenameone.examples.pulse.ui.Nav;
 import com.codenameone.examples.pulse.ui.Ui;
+import com.codenameone.examples.pulse.watch.WatchBridge;
 import java.util.List;
 
 /// The trainer's home: the classes they teach this week, each leading to its
@@ -98,8 +104,10 @@ public class TrainerForm extends LiveChannel.Adapter implements Nav.Home {
         if (featured != null) {
             list.add(featured(featured, featured.startsAt() <= at));
         }
+        WatchBridge.coach(featured, stats);
         // Above the week rather than under it: below twenty class cards nobody found it.
         if (stats != null) {
+            game(stats);
             month(stats);
         }
         // The rest of the week as the members see it, a day at a time, with
@@ -129,6 +137,68 @@ public class TrainerForm extends LiveChannel.Adapter implements Nav.Home {
         Ui.refresh(form);
     }
 
+    /// The coach's game: their level and streak, their badges, and where they
+    /// stand among the studio's coaches. Members play for visits; a coach plays
+    /// for full rooms and people who keep coming back.
+    private void game(TrainerStatsDto game) {
+        Ui.section(list, "Your game");
+        int span = Math.max(1, game.nextLevel() - game.levelFloor());
+        Level ring = new Level(game.level(), Math.min(1.0,
+                (game.points() - game.levelFloor()) / (double) span));
+        ring.setName("coachLevel");
+        Container about = new Container(BoxLayout.y(), "SvLevelBox");
+        about.add(Ui.label(Lang.tr("{0} points", Integer.valueOf(game.points())), "SvHeading"));
+        about.add(Ui.label(Lang.tr("{0} more to level {1}",
+                Integer.valueOf(game.nextLevel() - game.points()),
+                Integer.valueOf(game.level() + 1)), "SvMuted"));
+        Container chips = new Container(new FlowLayout());
+        if (game.weekStreak() > 0) {
+            Label streak = Ui.badge(Lang.tr("{0} week streak",
+                    Integer.valueOf(game.weekStreak())), "SvBadgeGood");
+            Ui.icon(streak, FontImage.MATERIAL_LOCAL_FIRE_DEPARTMENT, 2.6f);
+            streak.getAllStyles().setMarginLeft(0);
+            chips.add(streak);
+        }
+        if (game.rank() > 0) {
+            Label rank = Ui.badge(Lang.tr("Rank {0} of {1}", Integer.valueOf(game.rank()),
+                    Integer.valueOf(game.leaderboard().size())),
+                    game.rank() == 1 ? "SvBadgeWarn" : "SvBadge");
+            Ui.icon(rank, FontImage.MATERIAL_EMOJI_EVENTS, 2.6f);
+            chips.add(rank);
+        }
+        about.add(chips);
+        Container row = new Container(new BorderLayout());
+        row.add(BorderLayout.WEST, ring).add(BorderLayout.CENTER, about);
+        list.add(row);
+        list.add(Ui.text(Lang.tr("10 points a check-in, 5 a kudos and 25 a full class."),
+                "SvMuted"));
+
+        list.add(Ui.label(Lang.tr("Badges  {0}/{1}",
+                Integer.valueOf(Badges.coachCount(game.badges())),
+                Integer.valueOf(Badges.coachTotal())), "SvChartTitle"));
+        list.add(Badges.coachShelf(game.badges()));
+
+        List<NameCountDto> board = game.leaderboard();
+        if (board != null && board.size() > 1) {
+            list.add(Ui.label("Leaderboard", "SvChartTitle"));
+            Container ranks = new Container(BoxLayout.y());
+            ranks.setName("leaderboard");
+            for (int iter = 0; iter < board.size(); iter++) {
+                NameCountDto coach = board.get(iter);
+                boolean me = iter + 1 == game.rank();
+                Container line = MembersForm.line(coach.name(), Lang.tr("{0} check-ins",
+                        Integer.valueOf(coach.count())), me ? Ui.badge(Lang.tr("You"),
+                        "SvBadgeGood") : null);
+                line.add(BorderLayout.WEST, BorderLayout.centerAbsolute(
+                        Ui.label(String.valueOf(iter + 1), iter == 0 ? "SvRankFirst"
+                        : "SvRankPlace")).add(BorderLayout.EAST,
+                        FlowLayout.encloseCenterMiddle(Ui.avatar(coach.name()))));
+                ranks.add(line);
+            }
+            list.add(ranks);
+        }
+    }
+
     /// The trainer's last four weeks: how many they taught and coached, how
     /// full and how faithfully attended their classes were, and what for.
     private void month(TrainerStatsDto month) {
@@ -147,7 +217,7 @@ public class TrainerForm extends LiveChannel.Adapter implements Nav.Home {
             Integer value = weeks.get(iter);
             values[iter] = value == null ? 0 : value.intValue();
         }
-        list.add(Ui.label("People a week", "SvChartTitle"));
+        list.add(Ui.label("Check-ins a week", "SvChartTitle"));
         list.add(Chart.of("trainerAttendance", values, Lang.tr("7 weeks ago"),
                 Lang.tr("This week")));
         if (month.topClasses() != null && !month.topClasses().isEmpty()) {

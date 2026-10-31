@@ -21,13 +21,26 @@ package com.codenameone.examples.pulse.api;
 import com.codename1.annotations.Mapped;
 import java.util.List;
 
-/// A trainer's own numbers over the last four weeks.
+/// A trainer's own numbers over the last four weeks, and the game made of them.
 ///
 /// @param regulars members who came to three or more of their classes.
 /// @param attendeesByWeek people who came, a week at a time for eight weeks,
 ///     oldest first.
 /// @param topClasses their kinds of class by attendance, most first.
+/// @param points what the last eight weeks earned: 10 a check-in, 5 a kudos and
+///     25 a full class.
+/// @param level the level those points reach; `levelFloor` and `nextLevel` are
+///     the points it starts at and the next one starts at.
+/// @param weekStreak weeks running, back from this one, with a class taught.
+/// @param fullHouses classes in the four weeks with every place booked.
+/// @param rank where the trainer stands among the coaches by check-ins in the
+///     four weeks, 1 the most; 0 when they taught nothing.
+/// @param badges the coach badges earned, by id.
+/// @param leaderboard every coach who taught in the four weeks with their
+///     check-ins, most first.
 @Mapped
 public record TrainerStatsDto(int classes, int attendees, int fillPercent, int showPercent,
-        int regulars, int kudos, List<Integer> attendeesByWeek, List<NameCountDto> topClasses) {
+        int regulars, int kudos, List<Integer> attendeesByWeek, List<NameCountDto> topClasses,
+        int points, int level, int levelFloor, int nextLevel, int weekStreak, int fullHouses,
+        int rank, List<String> badges, List<NameCountDto> leaderboard) {
 }

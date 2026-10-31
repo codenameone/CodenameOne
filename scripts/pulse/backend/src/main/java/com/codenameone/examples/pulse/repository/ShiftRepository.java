@@ -38,6 +38,8 @@ public interface ShiftRepository extends CrudRepository<Shift, String> {
     List<Shift> findByLocationIdAndEndsAtGreaterThanOrderByStartsAtAsc(String locationId,
             Instant after);
 
+    List<Shift> findByEndsAtGreaterThanOrderByStartsAtAsc(Instant after);
+
     /// Hands an offered shift to `taker`. 1 when it did; 0 when somebody took
     /// it first or it was withdrawn.
     @Modifying

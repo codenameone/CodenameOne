@@ -47,6 +47,10 @@ import java.util.Date;
 /// - **Week** -- progress to the next level, the weekly streak and eight
 ///   weeks of visits.
 /// - **Coming up** -- the next few classes booked, in order.
+/// - **Coaching** -- for a trainer only: the class they teach now or next, how
+///   long until it starts or ends, how full it is, and their level and place
+///   among the studio's coaches. The page is added when the phone first says
+///   its wearer coaches, and taken away when that is withdrawn.
 ///
 /// This is the class `codename1.watchMain` names, so the watch build starts
 /// here and carries only what it reaches -- not the phone's screens or its
@@ -77,6 +81,16 @@ public class PulseWatch extends Lifecycle {
     private WeekBars weeks;
     private Container agenda;
     private PageDots dots;
+    private Tabs pages;
+    private Container coachPage;
+    private Label coachTitle;
+    private Label coachUntil;
+    private Label coachWhere;
+    private FillBar coachFill;
+    private Label coachFillText;
+    private Label coachStanding;
+    private long coachStarts;
+    private long coachEnds;
     private long startsAt;
     private byte[] secret;
     private int period = 30;
@@ -90,7 +104,7 @@ public class PulseWatch extends Lifecycle {
         // A watch face has no room for a title bar; the eyebrows say it all.
         form.getToolbar().setHidden(true);
         form.setName("Watch");
-        Tabs pages = new Tabs();
+        pages = new Tabs();
         pages.setUIID("SvWatchForm");
         pages.getContentPane().setUIID("SvWatchForm");
         pages.hideTabs();
@@ -119,6 +133,7 @@ public class PulseWatch extends Lifecycle {
         show(stored(WatchBridge.PASS));
         show(stored(WatchBridge.STATS));
         show(stored(WatchBridge.AGENDA));
+        show(stored(WatchBridge.COACH));
         UITimer.timer(1000, true, form, this::tick);
         form.show();
     }
@@ -177,6 +192,20 @@ public class PulseWatch extends Lifecycle {
         return page.add(agenda);
     }
 
+    private Container coachPage() {
+        Container page = page("watchCoach", "COACHING");
+        coachTitle = new Label("", "SvWatchTitle");
+        coachTitle.setName("watchCoachClass");
+        coachUntil = new Label("", "SvWatchBig");
+        coachWhere = new Label("", "SvWatchText");
+        coachFill = new FillBar();
+        coachFillText = new Label("", "SvWatchSmall");
+        coachStanding = new Label("", "SvWatchStanding");
+        coachStanding.setName("watchCoachStanding");
+        return page.add(coachTitle).add(coachUntil).add(coachWhere).add(coachFill)
+                .add(coachFillText).add(coachStanding);
+    }
+
     private static WearableMessage stored(String path) {
         WearableMessage found = WearableConnection.getData(path);
         return found == null ? new WearableMessage(path) : found;
@@ -190,6 +219,8 @@ public class PulseWatch extends Lifecycle {
             showStats(data);
         } else if (WatchBridge.AGENDA.equals(path)) {
             showAgenda(data);
+        } else if (WatchBridge.COACH.equals(path)) {
+            showCoach(data);
         } else if (WatchBridge.PASS.equals(path)) {
             secret = hex(data.getString("secret", ""));
             period = Math.max(1, data.getInt("period", 30));
@@ -258,6 +289,65 @@ public class PulseWatch extends Lifecycle {
         }
     }
 
+    private void showCoach(WearableMessage data) {
+        if (!data.getBoolean("coaching", false)) {
+            if (coachPage != null) {
+                pages.removeTabAt(pages.getTabCount() - 1);
+                coachPage = null;
+                dots.setCount(pages.getTabCount());
+            }
+            return;
+        }
+        if (coachPage == null) {
+            coachPage = coachPage();
+            pages.addTab("Coaching", coachPage);
+            dots.setCount(pages.getTabCount());
+        }
+        coachStarts = data.getLong("startsAt", 0L);
+        coachEnds = data.getLong("endsAt", 0L);
+        if (coachStarts == 0L) {
+            coachTitle.setText("No class today");
+            coachWhere.setText("");
+            coachFill.set(-1f, 0);
+            coachFillText.setText("");
+            coachUntil.setText("");
+        } else {
+            coachTitle.setText(data.getString("name", ""));
+            coachWhere.setText(room(data.getString("room", "")) + " \u00b7 "
+                    + new SimpleDateFormat("HH:mm").format(new Date(coachStarts)));
+            int capacity = data.getInt("capacity", 0);
+            int booked = data.getInt("booked", 0);
+            coachFill.set(capacity <= 0 ? -1f : Math.min(1f, booked / (float) capacity),
+                    parse(data.getString("color", ""), LIME));
+            coachFillText.setText(capacity <= 0 ? "" : booked + " of " + capacity + " booked");
+        }
+        int rank = data.getInt("rank", 0);
+        int level = data.getInt("level", 0);
+        coachStanding.setText(level <= 0 ? "" : "Level " + level + (rank > 0 ? " \u00b7 #"
+                + rank + " of " + data.getInt("coaches", 0) : ""));
+        tickCoach();
+    }
+
+    /// "in 25 min" before the class, "12 min left" during it.
+    private void tickCoach() {
+        if (coachUntil == null || coachStarts == 0L) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        String text;
+        if (now < coachStarts) {
+            long minutes = (coachStarts - now + 59999L) / 60000L;
+            text = minutes < 60 ? "in " + minutes + " min"
+                    : "in " + minutes / 60 + "h " + minutes % 60 + "m";
+        } else {
+            long minutes = Math.max(0L, (coachEnds - now + 59999L) / 60000L);
+            text = minutes + " min left";
+        }
+        if (!text.equals(coachUntil.getText())) {
+            coachUntil.setText(text);
+        }
+    }
+
     /// The phone sends "location, room"; the room is what a member walks to,
     /// and the wrist has no room for both.
     private static String room(String text) {
@@ -267,6 +357,7 @@ public class PulseWatch extends Lifecycle {
 
     private void tick() {
         tickUntil();
+        tickCoach();
         if (code == null) {
             return;
         }
@@ -497,7 +588,7 @@ public class PulseWatch extends Lifecycle {
 
     /// Which of the pages is showing.
     static final class PageDots extends Component {
-        private final int count;
+        private int count;
         private int selected;
 
         PageDots(int count) {
@@ -507,6 +598,12 @@ public class PulseWatch extends Lifecycle {
 
         void select(int index) {
             selected = index;
+            repaint();
+        }
+
+        void setCount(int count) {
+            this.count = count;
+            selected = Math.min(selected, count - 1);
             repaint();
         }
 

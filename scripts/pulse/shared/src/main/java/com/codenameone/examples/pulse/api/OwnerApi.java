@@ -87,6 +87,7 @@ public interface OwnerApi {
     @PUT("/api/owner/staff")
     void saveStaff(@Body StaffDto staff, OnComplete<Response<StaffDto>> callback);
 
+    /// Shifts to come at `location`; an empty one is every location.
     @GET("/api/owner/shifts")
     void shifts(@Query("location") String location, OnComplete<Response<List<ShiftDto>>> callback);
 

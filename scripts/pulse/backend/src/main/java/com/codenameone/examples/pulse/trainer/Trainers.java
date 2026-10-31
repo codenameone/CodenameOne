@@ -38,6 +38,7 @@ import com.codenameone.examples.pulse.domain.Kudos;
 import com.codenameone.examples.pulse.domain.Member;
 import com.codenameone.examples.pulse.domain.Profile;
 import com.codenameone.examples.pulse.domain.Shift;
+import com.codenameone.examples.pulse.domain.Staff;
 import com.codenameone.examples.pulse.domain.Workout;
 import com.codenameone.examples.pulse.repository.BookingRepository;
 import com.codenameone.examples.pulse.repository.CheckInRepository;
@@ -47,6 +48,7 @@ import com.codenameone.examples.pulse.repository.KudosRepository;
 import com.codenameone.examples.pulse.repository.MemberRepository;
 import com.codenameone.examples.pulse.repository.ProfileRepository;
 import com.codenameone.examples.pulse.repository.ShiftRepository;
+import com.codenameone.examples.pulse.repository.StaffRepository;
 import com.codenameone.examples.pulse.repository.WorkoutRepository;
 import com.codenameone.examples.pulse.studio.Bookings;
 import com.codenameone.examples.pulse.studio.Studio;
@@ -71,6 +73,13 @@ public class Trainers {
     /// class is settled and its absentees become no-shows.
     static final long CORRECT_MILLIS = 30L * 60000L;
 
+    /// What a coach earns. A full class is worth a lot because it is the
+    /// thing a studio needs most from a coach.
+    static final int POINTS_CHECK_IN = 10;
+    static final int POINTS_KUDOS = 5;
+    static final int POINTS_FULL_HOUSE = 25;
+    static final int LEVEL_POINTS = 400;
+
     private final ClassSessionRepository sessions;
     private final BookingRepository bookings;
     private final MemberRepository members;
@@ -82,11 +91,13 @@ public class Trainers {
     private final ClassTypeRepository types;
     private final WorkoutRepository workouts;
     private final KudosRepository kudos;
+    private final StaffRepository staff;
 
     public Trainers(ClassSessionRepository sessions, BookingRepository bookings,
             MemberRepository members, CheckInRepository checkIns, ShiftRepository shifts,
             ProfileRepository profiles, Studio studio, HeartRates rates, ClassTypeRepository types,
-            WorkoutRepository workouts, KudosRepository kudos) {
+            WorkoutRepository workouts, KudosRepository kudos, StaffRepository staff) {
+        this.staff = staff;
         this.types = types;
         this.workouts = workouts;
         this.kudos = kudos;
@@ -278,7 +289,10 @@ public class Trainers {
         int missed;
         int kudos;
         int regulars;
+        int fullHouses;
         int[] byWeek = new int[8];
+        /// Classes taught, a week at a time, as `byWeek` counts people.
+        int[] taughtByWeek = new int[8];
         Map<String, int[]> byType = new HashMap<String, int[]>();
 
         int fillPercent() {
@@ -305,8 +319,74 @@ public class Trainers {
                     entry.getValue()[0]));
         }
         top.sort((a, b) -> b.count() - a.count());
+
+        // The game: points from the eight weeks, so a coach who stops
+        // teaching drifts down rather than keeping a level for ever.
+        int seen = 0;
+        for (int iter = 0; iter < tally.byWeek.length; iter++) {
+            seen += tally.byWeek[iter];
+        }
+        int points = seen * POINTS_CHECK_IN + tally.kudos * POINTS_KUDOS
+                + tally.fullHouses * POINTS_FULL_HOUSE;
+        int level = points / LEVEL_POINTS + 1;
+        int streak = 0;
+        // This week counts once it has a class; until then the streak runs
+        // to last week, so Monday morning does not break it.
+        int last = tally.byWeek.length - 1;
+        int from = tally.taughtByWeek[last] > 0 ? last : last - 1;
+        for (int iter = from; iter >= 0 && tally.taughtByWeek[iter] > 0; iter--) {
+            streak++;
+        }
+        List<NameCountDto> board = leaderboard();
+        int rank = 0;
+        String name = displayName(trainer);
+        for (int iter = 0; iter < board.size(); iter++) {
+            if (board.get(iter).name().equals(name) && tally.classes > 0) {
+                rank = iter + 1;
+                break;
+            }
+        }
+        List<String> badges = new ArrayList<String>();
+        earn(badges, "FULL_HOUSE", tally.fullHouses >= 1);
+        earn(badges, "FIVE_FULL", tally.fullHouses >= 5);
+        earn(badges, "TEN_REGULARS", tally.regulars >= 10);
+        earn(badges, "KUDOS_25", tally.kudos >= 25);
+        earn(badges, "SHOW_90", tally.attendees >= 20 && tally.showPercent() >= 90);
+        earn(badges, "STREAK_8", streak >= tally.byWeek.length);
+        earn(badges, "HUNDRED", seen >= 100);
+        earn(badges, "TOP_COACH", rank == 1);
         return new TrainerStatsDto(tally.classes, tally.attendees, tally.fillPercent(),
-                tally.showPercent(), tally.regulars, tally.kudos, weeks, top);
+                tally.showPercent(), tally.regulars, tally.kudos, weeks, top, points, level,
+                (level - 1) * LEVEL_POINTS, level * LEVEL_POINTS, streak, tally.fullHouses, rank,
+                badges, board);
+    }
+
+    private static void earn(List<String> badges, String id, boolean earned) {
+        if (earned) {
+            badges.add(id);
+        }
+    }
+
+    private String displayName(String trainer) {
+        Profile who = profiles.findById(trainer);
+        return who == null ? trainer : who.getDisplayName();
+    }
+
+    /// Every active coach who taught in the four weeks, by the people who
+    /// came to them, most first. A studio has a handful of coaches, so each
+    /// is tallied in turn, as the owner's insights do.
+    private List<NameCountDto> leaderboard() {
+        List<NameCountDto> board = new ArrayList<NameCountDto>();
+        List<Staff> team = staff.findByActiveTrueOrderByUsernameAsc();
+        for (int iter = 0; iter < team.size(); iter++) {
+            String coach = team.get(iter).getUsername();
+            Tally their = tally(coach);
+            if (their.classes > 0) {
+                board.add(new NameCountDto(displayName(coach), their.attendees));
+            }
+        }
+        board.sort((a, b) -> b.count() - a.count());
+        return board;
     }
 
     /// The same four weeks as the owner's insights show them.
@@ -340,7 +420,15 @@ public class Trainers {
                 continue;
             }
             ids.add(row.getId());
+            int taughtWeek = (int) ((row.getStartsAt().atZone(zone).toLocalDate().toEpochDay()
+                    - firstWeek.toEpochDay()) / 7);
+            if (taughtWeek >= 0 && taughtWeek < tally.taughtByWeek.length) {
+                tally.taughtByWeek[taughtWeek]++;
+            }
             if (!row.getStartsAt().isBefore(month)) {
+                if (row.getCapacity() > 0 && row.getBooked() >= row.getCapacity()) {
+                    tally.fullHouses++;
+                }
                 recent.put(row.getId(), row);
                 tally.classes++;
                 tally.booked += row.getBooked();

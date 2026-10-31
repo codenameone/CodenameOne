@@ -18,11 +18,13 @@
  */
 package com.codenameone.examples.pulse.trainer;
 
+import com.codename1.ui.Button;
 import com.codename1.ui.Container;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
-import com.codename1.ui.layouts.FlowLayout;
 import com.codenameone.examples.pulse.api.ShiftDto;
 import com.codenameone.examples.pulse.net.Api;
 import com.codenameone.examples.pulse.net.Net;
@@ -67,13 +69,15 @@ public final class ShiftsForm {
                 continue;
             }
             boolean offered = SWAP_REQUESTED.equals(shift.state());
-            list.add(row(shift, offered ? Ui.badge(Lang.tr("Offered"), "SvBadgeWarn") : null));
-            list.add(FlowLayout.encloseRight(Ui.link(offered ? "Withdraw offer" : "Offer swap",
-                    "offer-" + iter, e -> Api.trainer().offer(shift.id(), Net.to(changed -> {
+            // The action sits on the row it is about rather than under it.
+            Button offer = action(offered ? "Withdraw" : "Offer swap", "offer-" + iter,
+                    offered, e -> Api.trainer().offer(shift.id(), Net.to(changed -> {
                         Ui.say(SWAP_REQUESTED.equals(changed.state())
                                 ? Lang.tr("Offered to the team") : Lang.tr("Offer withdrawn"));
                         load.run();
-                    }, Ui::fail)))));
+                    }, Ui::fail)));
+            list.add(Ui.row(FontImage.MATERIAL_SCHEDULE, shift.duty(), span(shift)
+                    + (offered ? Ui.DOT + Lang.tr("Offered") : ""), offer));
             mine++;
         }
         if (mine == 0) {
@@ -86,8 +90,7 @@ public final class ShiftsForm {
             if (me.equals(shift.staff()) || !SWAP_REQUESTED.equals(shift.state())) {
                 continue;
             }
-            list.add(row(shift, null));
-            list.add(FlowLayout.encloseRight(Ui.link("Take", "take-" + iter,
+            list.add(row(shift, action("Take", "take-" + iter, false,
                     e -> Api.trainer().take(shift.id(), Net.to(taken -> {
                         Ui.say(Lang.tr("The shift is yours"));
                         load.run();
@@ -100,9 +103,32 @@ public final class ShiftsForm {
         Ui.refresh(form);
     }
 
-    /// A shift as a row of a list, with `value` at its end.
+    /// A shift as a row of a list, with who works it and `value` at its end.
     public static Container row(ShiftDto shift, com.codename1.ui.Component value) {
-        return Ui.row(FontImage.MATERIAL_SCHEDULE, shift.duty(), Ui.when(shift.startsAt())
-                + " - " + Ui.when(shift.endsAt()) + Ui.DOT + shift.staffName(), value);
+        return Ui.row(FontImage.MATERIAL_SCHEDULE, shift.duty(), span(shift) + Ui.DOT
+                + shift.staffName(), value);
+    }
+
+    /// "06:00 - 12:00", for a list already headed by the day.
+    public static String hours(ShiftDto shift) {
+        String span = span(shift);
+        return span.substring(span.indexOf(", ") + 2);
+    }
+
+    /// "Nov 2, 06:00 - 12:00", naming the end's day only when it is another.
+    static String span(ShiftDto shift) {
+        String start = Ui.when(shift.startsAt());
+        String end = Ui.when(shift.endsAt());
+        String day = start.substring(0, start.lastIndexOf(' '));
+        return end.startsWith(day + " ") ? start + " - " + end.substring(day.length() + 1)
+                : start + " - " + end;
+    }
+
+    private static Button action(String text, String name, boolean quiet,
+            ActionListener<ActionEvent> onClick) {
+        Button button = new Button(text, quiet ? "SvRowActionQuiet" : "SvRowAction");
+        button.setName(name);
+        button.addActionListener(onClick);
+        return button;
     }
 }

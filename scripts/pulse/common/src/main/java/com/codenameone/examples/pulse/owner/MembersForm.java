@@ -63,7 +63,7 @@ public final class MembersForm {
 
     private void open(Form previous) {
         Ui.back(form, previous);
-        search.setUIID("SvField");
+        search.setUIID("SvSearchField");
         search.getHintLabel().setUIID("SvFieldHint");
         search.setName("memberSearch");
         search.addDataChangedListener((type, index) -> fill());
@@ -151,14 +151,14 @@ public final class MembersForm {
 
     /// A row about a person: their initials, their name as it is, a line under
     /// it and `value` at the end.
-    static Container person(String name, String detail, Component value) {
+    public static Container person(String name, String detail, Component value) {
         Container row = line(name, detail, value);
         row.add(BorderLayout.WEST, FlowLayout.encloseCenterMiddle(Ui.avatar(name)));
         return row;
     }
 
     /// A row of a title, a detail line and a value on the trailing edge, with no avatar.
-    static Container line(String name, String detail, Component value) {
+    public static Container line(String name, String detail, Component value) {
         Container row = new Container(new BorderLayout(), "SvRow");
         Container lines = new Container(BoxLayout.y());
         lines.add(Ui.plain(name, "SvRowTitle"));

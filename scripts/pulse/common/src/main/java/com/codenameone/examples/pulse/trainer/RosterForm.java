@@ -20,7 +20,6 @@ package com.codenameone.examples.pulse.trainer;
 
 import com.codename1.components.Switch;
 import com.codename1.ui.Container;
-import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codenameone.examples.pulse.api.AttendanceDto;
@@ -29,6 +28,7 @@ import com.codenameone.examples.pulse.api.SessionDto;
 import com.codenameone.examples.pulse.member.Classes;
 import com.codenameone.examples.pulse.net.Api;
 import com.codenameone.examples.pulse.net.Net;
+import com.codenameone.examples.pulse.owner.MembersForm;
 import com.codenameone.examples.pulse.ui.Lang;
 import com.codenameone.examples.pulse.ui.Ui;
 import java.util.List;
@@ -71,8 +71,12 @@ public final class RosterForm {
             if (Classes.CANCELLED.equals(entry.state())) {
                 continue;
             }
-            StringBuilder detail = new StringBuilder(Lang.tr("Age {0}",
-                    Integer.valueOf(entry.age())));
+            StringBuilder detail = new StringBuilder();
+            if (entry.firstVisit()) {
+                // A newcomer is who a coach greets first, so it leads the line.
+                detail.append(Lang.tr("First visit")).append(Ui.DOT);
+            }
+            detail.append(Lang.tr("Age {0}", Integer.valueOf(entry.age())));
             if (entry.heartRate() > 0) {
                 detail.append(Ui.DOT).append(entry.heartRate()).append(" bpm");
             }
@@ -81,13 +85,9 @@ public final class RosterForm {
             }
             final Switch present = Ui.toggle("present-" + entry.bookingId(),
                     Classes.CHECKED_IN.equals(entry.state()), on -> mark(session, entry, on));
-            Container row = Ui.row(entry.firstVisit() ? FontImage.MATERIAL_NEW_RELEASES
-                    : FontImage.MATERIAL_PERSON, entry.name(), detail.toString(), present);
+            Container row = MembersForm.person(entry.name(), detail.toString(), present);
             row.setName("roster-" + iter);
             list.add(row);
-            if (entry.firstVisit()) {
-                list.add(Ui.badge(Lang.tr("First visit"), "SvBadgeWarn"));
-            }
         }
         if (queued > 0) {
             list.add(Ui.text(Lang.tr("{0} waiting for a place", Integer.valueOf(queued)),

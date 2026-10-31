@@ -593,11 +593,14 @@ public class Owner {
 
     @Transactional(readOnly = true)
     public List<ShiftDto> shifts(String location) {
-        if (blank(location) || locations.findById(location) == null) {
+        // No location is every location: the owner's shift list is the
+        // whole studio's unless they narrow it.
+        if (!blank(location) && locations.findById(location) == null) {
             throw new ResponseStatusException(404, "No such location");
         }
-        List<Shift> rows = shifts.findByLocationIdAndEndsAtGreaterThanOrderByStartsAtAsc(location,
-                Instant.now().minusMillis(DAY));
+        Instant after = Instant.now().minusMillis(DAY);
+        List<Shift> rows = blank(location) ? shifts.findByEndsAtGreaterThanOrderByStartsAtAsc(after)
+                : shifts.findByLocationIdAndEndsAtGreaterThanOrderByStartsAtAsc(location, after);
         List<ShiftDto> out = new ArrayList<ShiftDto>();
         for (int iter = 0; iter < rows.size(); iter++) {
             out.add(trainers.dto(rows.get(iter)));

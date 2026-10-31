@@ -56,19 +56,59 @@ public final class Badges {
         "Wear a heart-rate strap or a watch in a class.",
         "Spend a minute flat out, in zone 5.", "Record ten hours of workouts."};
 
+    /// The coach's badges, as `Trainers.stats` on the server earns them.
+    static final String[] COACH_IDS = {"FULL_HOUSE", "FIVE_FULL", "TEN_REGULARS", "KUDOS_25",
+        "SHOW_90", "STREAK_8", "HUNDRED", "TOP_COACH"};
+    static final char[] COACH_ICONS = {FontImage.MATERIAL_EVENT_SEAT,
+        FontImage.MATERIAL_STADIUM, FontImage.MATERIAL_DIVERSITY_3,
+        FontImage.MATERIAL_THUMB_UP, FontImage.MATERIAL_VERIFIED,
+        FontImage.MATERIAL_LOCAL_FIRE_DEPARTMENT, FontImage.MATERIAL_GROUPS,
+        FontImage.MATERIAL_EMOJI_EVENTS};
+    static final String[] COACH_NAMES = {"Full house", "Packed month", "Ten regulars",
+        "Crowd favourite", "No empty mats", "Eight-week run", "Hundred club", "Top coach"};
+    static final String[] COACH_HOW = {"Fill every place in a class.",
+        "Fill five classes in four weeks.",
+        "Have ten members come to three or more of your classes in four weeks.",
+        "Collect 25 kudos on workouts from your classes in four weeks.",
+        "Have nine in ten booked members show up, over twenty or more check-ins.",
+        "Teach every week for eight weeks running.",
+        "Coach a hundred check-ins in eight weeks.",
+        "Coach more people than anyone in the studio over four weeks."};
+
     private Badges() {
     }
 
     /// A row of every badge, earned ones in colour and the rest greyed out,
     /// each opening a sheet that says how it is earned.
     public static Container shelf(List<String> earned) {
+        return shelf(earned, IDS, ICONS, NAMES, HOW, "badges");
+    }
+
+    /// The coach's shelf: the same medals, for the coach's own badges.
+    public static Container coachShelf(List<String> earned) {
+        return shelf(earned, COACH_IDS, COACH_ICONS, COACH_NAMES, COACH_HOW, "coachBadges");
+    }
+
+    /// How many coach badges there are to earn.
+    public static int coachTotal() {
+        return COACH_IDS.length;
+    }
+
+    /// How many of the coach badges are earned.
+    public static int coachCount(List<String> earned) {
+        return count(earned, COACH_IDS);
+    }
+
+    private static Container shelf(List<String> earned, String[] ids, char[] icons,
+            String[] names, String[] how, String name) {
         Container row = new Container(BoxLayout.x());
         row.setUIID("SvShelf");
         row.setScrollableX(true);
         row.setScrollVisible(false);
-        row.setName("badges");
-        for (int iter = 0; iter < IDS.length; iter++) {
-            row.add(medal(iter, earned != null && earned.contains(IDS[iter])));
+        row.setName(name);
+        for (int iter = 0; iter < ids.length; iter++) {
+            row.add(medal(ids[iter], icons[iter], names[iter], how[iter],
+                    earned != null && earned.contains(ids[iter])));
         }
         return row;
     }
@@ -80,9 +120,13 @@ public final class Badges {
 
     /// How many of the badges are earned.
     public static int count(List<String> earned) {
+        return count(earned, IDS);
+    }
+
+    private static int count(List<String> earned, String[] ids) {
         int count = 0;
-        for (int iter = 0; earned != null && iter < IDS.length; iter++) {
-            if (earned.contains(IDS[iter])) {
+        for (int iter = 0; earned != null && iter < ids.length; iter++) {
+            if (earned.contains(ids[iter])) {
                 count++;
             }
         }
@@ -94,15 +138,16 @@ public final class Badges {
         return earned != null && earned.contains(id);
     }
 
-    private static Container medal(final int index, final boolean earned) {
+    private static Container medal(String id, final char icon, final String key,
+            final String how, final boolean earned) {
         Button disc = new Button("", earned ? "SvMedal" : "SvMedalLocked");
-        Ui.icon(disc, earned ? ICONS[index] : FontImage.MATERIAL_LOCK, 4.4f);
-        disc.setName("badge-" + IDS[index]);
+        Ui.icon(disc, earned ? icon : FontImage.MATERIAL_LOCK, 4.4f);
+        disc.setName("badge-" + id);
         disc.getAllStyles().setAlignment(Label.CENTER);
         round(disc);
-        String name = Lang.tr(NAMES[index]);
+        String name = Lang.tr(key);
         disc.setAccessibilityText(earned ? name : Lang.tr("{0}, not earned yet", name));
-        disc.addActionListener(e -> explain(index, earned));
+        disc.addActionListener(e -> explain(icon, key, how, earned));
         Container cell = new Container(new BoxLayout(BoxLayout.Y_AXIS));
         cell.setUIID("SvMedalCell");
         cell.add(FlowLayout.encloseCenter(disc));
@@ -118,21 +163,21 @@ public final class Badges {
                 .color(disc.getUnselectedStyle().getBgColor()).rectangle(false));
     }
 
-    private static void explain(int index, boolean earned) {
+    private static void explain(char icon, String key, String how, boolean earned) {
         Container body = new Container(BoxLayout.y());
         Label disc = new Label("", earned ? "SvMedal" : "SvMedalLocked");
-        Ui.icon(disc, ICONS[index], 6f);
+        Ui.icon(disc, icon, 6f);
         round(disc);
         disc.getAllStyles().setAlignment(Label.CENTER);
         body.add(FlowLayout.encloseCenter(disc));
-        Label title = new Label(Lang.tr(NAMES[index]), "SvHeading");
+        Label title = new Label(Lang.tr(key), "SvHeading");
         title.getAllStyles().setAlignment(Label.CENTER);
         body.add(title);
-        SpanLabel how = new SpanLabel(Lang.tr(HOW[index]), "SvMuted");
-        how.setTextBlockAlign(Label.CENTER);
-        body.add(how);
-        body.add(Ui.badge(earned ? Lang.tr("Earned") : Lang.tr("Not earned yet"),
-                earned ? "SvBadgeGood" : "SvBadge"));
+        SpanLabel text = new SpanLabel(Lang.tr(how), "SvMuted");
+        text.setTextBlockAlign(Label.CENTER);
+        body.add(text);
+        body.add(FlowLayout.encloseCenter(Ui.badge(earned ? Lang.tr("Earned")
+                : Lang.tr("Not earned yet"), earned ? "SvBadgeGood" : "SvBadge")));
         Sheet sheet = new Sheet(null, "");
         sheet.getContentPane().setLayout(new BorderLayout());
         sheet.getContentPane().add(BorderLayout.CENTER, body);

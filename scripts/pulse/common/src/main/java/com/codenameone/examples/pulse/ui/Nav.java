@@ -38,6 +38,7 @@ import com.codenameone.examples.pulse.net.Session;
 import com.codenameone.examples.pulse.notify.Notifications;
 import com.codenameone.examples.pulse.owner.OwnerForm;
 import com.codenameone.examples.pulse.trainer.TrainerForm;
+import com.codenameone.examples.pulse.watch.WatchBridge;
 
 /// Decides which screen the app is on.
 ///
@@ -221,6 +222,7 @@ public final class Nav {
     private static void leave(final String reason, boolean forgetDevice) {
         Account.flush();
         Reminders.clear();
+        WatchBridge.clear();
         LiveChannel.stop();
         homeForm = null;
         homeMode = "";
@@ -256,6 +258,7 @@ public final class Nav {
         // notifying it about that account's classes.
         Account.flush();
         Reminders.clear();
+        WatchBridge.clear();
         LiveChannel.stop();
         homeForm = null;
         homeMode = "";

@@ -28,6 +28,7 @@ import com.codenameone.examples.pulse.api.OwnerMemberDto;
 import com.codenameone.examples.pulse.api.TrainerStatsDto;
 import com.codenameone.examples.pulse.api.TypeFillDto;
 import com.codenameone.examples.pulse.owner.Insights;
+import com.codenameone.examples.pulse.owner.Owner;
 import com.codenameone.examples.pulse.trainer.Trainers;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -46,6 +47,8 @@ class InsightsTest {
     private Insights insights;
     @Autowired
     private Trainers trainers;
+    @Autowired
+    private Owner owner;
 
     @Test
     void insightsHaveTheShapeTheAppDraws() throws Exception {
@@ -130,9 +133,29 @@ class InsightsTest {
         assertEquals(8, tess.attendeesByWeek().size());
         assertPercent(tess.fillPercent());
         assertPercent(tess.showPercent());
+        assertTrue(tess.points() > 0, "Tess has points");
+        assertTrue(tess.points() >= tess.levelFloor() && tess.points() < tess.nextLevel());
+        assertTrue(tess.rank() >= 1 && tess.rank() <= tess.leaderboard().size());
+        for (int iter = 1; iter < tess.leaderboard().size(); iter++) {
+            assertTrue(tess.leaderboard().get(iter - 1).count()
+                    >= tess.leaderboard().get(iter).count(), "leaderboard is ranked");
+        }
         TrainerStatsDto nobody = trainers.stats("nobody@pulse.example");
         assertEquals(0, nobody.classes());
+        assertEquals(0, nobody.rank());
+        assertEquals(0, nobody.points());
+        assertTrue(nobody.badges().isEmpty());
         assertEquals(8, nobody.attendeesByWeek().size());
+    }
+
+    @Test
+    void anOwnerSeesEveryLocationsShiftsWithNoLocation() throws Exception {
+        int all = owner.shifts("").size();
+        assertTrue(all > 0, "the demo studio has shifts");
+        assertTrue(all >= owner.shifts("loc-downtown").size());
+        ResponseStatusException missing = assertThrows(ResponseStatusException.class,
+                () -> owner.shifts("no-such-location"));
+        assertEquals(404, missing.getStatus());
     }
 
     private static boolean has(List<OwnerMemberDto> list, String account) {

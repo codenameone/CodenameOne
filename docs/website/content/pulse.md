@@ -35,9 +35,15 @@ The account's roles decide which screens a person sees. The same client project 
 ![Pulse coaches ranked with fill, attendance and kudos](/developer-guide/img/pulse-insights-coaches.png)
 ![Pulse member page with visits a week and favourite classes](/developer-guide/img/pulse-member-detail.png)
 ![Pulse billing with collected, outstanding and failed](/developer-guide/img/pulse-billing.png)
-![Pulse trainer home with the trainer's month](/developer-guide/img/pulse-trainer-home.png)
+![Pulse trainer home with the coach's level, streak, rank and badges](/developer-guide/img/pulse-trainer-home.png)
+![Pulse coaches' leaderboard and the trainer's month](/developer-guide/img/pulse-trainer-month.png)
+![Pulse trainer shifts with swaps](/developer-guide/img/pulse-trainer-shifts.png)
+![Pulse accounts administration](/developer-guide/img/pulse-accounts.png)
+![Pulse account with roles and moderation](/developer-guide/img/pulse-account.png)
+![Pulse staff rota](/developer-guide/img/pulse-owner-shifts.png)
 ![Pulse watch next class](/developer-guide/img/pulse-watch.png)
 ![Pulse watch week with level ring and streak](/developer-guide/img/pulse-watch-week.png)
+![Pulse watch coaching page](/developer-guide/img/pulse-watch-coach.png)
 
 ## From first run to customization
 

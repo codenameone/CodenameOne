@@ -597,8 +597,7 @@ public final class Ui {
         form.show();
     }
 
-    /// What [#reason] asks with, for a caller that has its own place to put
-    /// it: the admin console shows it beside the list on a wide screen.
+    /// What [#reason] asks with, for a caller that has its own place to put it.
     public static Container reasonPage(String text, String action, final Reason reason) {
         final Container page = page();
         page.add(text(text, "SvText"));
@@ -713,6 +712,11 @@ public final class Ui {
     /// A day, without the time.
     public static String day(long millis) {
         return new SimpleDateFormat("MMM d, yyyy").format(new Date(millis));
+    }
+
+    /// A day as a list heading: "Monday, Nov 2".
+    public static String weekday(long millis) {
+        return new SimpleDateFormat("EEEE, MMM d").format(new Date(millis));
     }
 
     /// A moment, as a short date and time.

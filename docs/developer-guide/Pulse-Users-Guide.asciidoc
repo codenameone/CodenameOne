@@ -204,7 +204,7 @@ image::img/pulse-settings.png["The settings with the theme, the language, notifi
 
 ==== The watch
 
-On a paired watch, Pulse is four pages, swiped sideways. The first is the next class:
+On a paired watch, Pulse is four pages, swiped sideways, and a fifth for a trainer. The first is the next class:
 its name, a countdown, the room and the trainer, and a bar of how full it is.
 
 image::img/pulse-watch.png["The watch's first page with the next class, the time until it starts, the room, the trainer and how full the class is",scaledwidth=25%]
@@ -224,23 +224,49 @@ The last lists the classes booked after the next one.
 
 image::img/pulse-watch-agenda.png["The watch's list of the classes booked in the coming days",scaledwidth=25%]
 
+A trainer's watch adds a coaching page: the class they teach now or next, the
+minutes until it starts or until it ends, the room and how full it is, and the
+trainer's level and place among the studio's coaches.
+
+image::img/pulse-watch-coach.png["The watch's coaching page with the class on now, the minutes left, how full it is and the coach's level and rank",scaledwidth=25%]
+
 === The trainer
 
-The trainer's home leads with the class on now, or the next one, with a button for
-its roster. The trainer's month follows: the classes taught, the check-ins,
-how full the classes were and how many of those booked came, the regulars who came
-three times or more, and the kudos received. A chart shows the check-ins of
-each of the last eight weeks, and under it the kinds of class that drew the most
-people.
-The week's classes follow, each with how many places are taken, and a full class
-says so.
+The trainer's home leads with the class on now, or the next one, on a dark card with
+a button for the live view and one for the roster.
 
-image::img/pulse-trainer-home.png["The trainer's home with the class on now and the trainer's month: classes, check-ins, places filled, attendance, regulars and kudos",scaledwidth=40%]
+Under it is the trainer's own game. Members earn points for coming; a trainer earns
+them for the people they coach: 10 for each check-in to their classes, 5 for each
+kudos on a workout from them, and 25 for a class with every place booked. The points
+count over the last eight weeks, so a level reflects how the trainer is coaching now
+rather than how they once did, and every 400 points is a level. The ring shows the
+level and the way to the next one, and beside it are the weeks running in which the
+trainer taught, and their place among the studio's coaches.
 
-The trainer sees the classes they teach in the coming week. The roster of each class
-shows the members booked, the ones waiting and the ones who came, with what the trainer needs to
-know about each person. Attendance can be marked by hand for someone the door
-didn't see, and corrected for 30 minutes after the class ends.
+image::img/pulse-trainer-home.png["The trainer's home with the class on now, the coach's level ring with points, streak and rank, and the coach badges",scaledwidth=40%]
+
+The badges reward what a studio needs from a coach: a full class, five full classes in
+four weeks, ten regulars, 25 kudos, nine in ten booked members turning up, eight weeks
+of teaching without a gap, a hundred check-ins, and being the studio's top coach.
+Tapping a badge says how it's earned and whether it is.
+
+image::img/pulse-trainer-badge.png["A coach badge opened, saying what it takes to earn it and that it's earned",scaledwidth=40%]
+
+The leaderboard ranks every coach who taught in the last four weeks by the people
+who came, with the trainer's own row marked. The trainer's month follows: the
+classes taught, the check-ins, how full the classes were and how many of those
+booked came, the regulars who came three times or more, and the kudos received. A
+chart shows the check-ins of each of the last eight weeks, and under it the kinds of
+class that drew the most people.
+
+image::img/pulse-trainer-month.png["The coaches' leaderboard and the trainer's month: classes, check-ins, places filled, attendance, regulars, kudos and check-ins a week",scaledwidth=40%]
+
+The week's classes follow, a day at a time, each with how many places are taken,
+and a full class says so. The roster of each class shows the members booked, the
+ones waiting and the ones who came, with what the trainer needs to know about each
+person: a first visit, their age, their heart rate, and any medical note.
+Attendance can be marked by hand for someone the door didn't see, and corrected for
+30 minutes after the class ends.
 
 image::img/pulse-roster.png["The roster of a class with each member's age and heart rate and a switch for attendance",scaledwidth=40%]
 
@@ -249,8 +275,11 @@ one to five, worked out from their age.
 
 image::img/pulse-live.png["The live class view with each member's heart rate and zone",scaledwidth=40%]
 
-A trainer offers a shift they can't work to the others, and any other trainer can
-take it.
+The trainer's shifts list the ones to come. A trainer offers a shift they can't work
+to the others, withdraws the offer while nobody has taken it, and takes a shift
+another trainer offered.
+
+image::img/pulse-trainer-shifts.png["The trainer's shifts with a button to offer each, and a shift another trainer offered with a button to take it",scaledwidth=40%]
 
 === The front desk and the kiosk
 
@@ -337,15 +366,66 @@ void a failed or open invoice, with a reason.
 
 image::img/pulse-billing.png["Billing with the money collected, outstanding and failed, and the list of invoices",scaledwidth=40%]
 
-The owner adds and changes plans (a change reaches members at their next renewal),
-puts classes on the timetable for a number of weeks, manages the staff and their
-roles, and sends campaigns to everyone who took a kind of class, to every active
-member, or to the members who haven't been in for a month. Each campaign counts
-how many were sent, opened, and booked.
+==== Plans, classes and the timetable
+
+The plans list every way to pay: drop-ins, monthly and annual memberships, class
+packs, and plans for children or off-peak hours. The owner adds and changes them,
+and a change of price reaches members at their next renewal.
+
+image::img/pulse-plans.png["The plans with the price and how each is paid",scaledwidth=40%]
+
+The class templates are the kinds of class the studio gives, each with its length,
+its places, and how hard it is. A template is what the timetable schedules: the
+owner puts a class on the timetable for a number of weeks, with its trainer and its
+room, and cancels a single class with a reason the members booked into it are told.
+
+image::img/pulse-templates.png["The class templates with the length, places and intensity of each",scaledwidth=40%]
 
 image::img/pulse-owner-timetable.png["The owner's timetable for scheduling classes",scaledwidth=40%]
 
+==== Staff and shifts
+
+The staff list shows each person's title and their classes this week, and the owner
+gives or takes away their roles. The shifts are the whole studio's rota a day at a
+time: who works, the duty, the hours, and the site when there is more than one. A
+shift a trainer offered to the others is marked, and the owner adds shifts.
+
+image::img/pulse-staff.png["The staff with their titles, classes this week and roles",scaledwidth=40%]
+
+image::img/pulse-owner-shifts.png["The rota a day at a time with who works, the duty, the hours and the site",scaledwidth=40%]
+
+==== Campaigns
+
+A campaign goes to everyone who took a kind of class, to every active member, or to
+the members who haven't been in for a month, as a push notification and a message in
+the member's inbox. Each campaign counts how many were sent, opened, and booked. The
+dashboard's quiet classes and its members at risk each open a new campaign aimed at
+them.
+
 image::img/pulse-campaigns.png["The campaigns with what was sent, opened and booked for each",scaledwidth=40%]
+
+image::img/pulse-campaign-new.png["A new campaign with its audience, its name, title and message",scaledwidth=40%]
+
+==== Accounts
+
+Accounts is the administration of everyone who can sign in: members and staff
+alike, searched by name or e-mail and filtered to the staff, the flagged, or the
+blocked. Each row carries the account's highest role or its standing.
+
+image::img/pulse-accounts.png["The accounts filtered to the staff, each with their role",scaledwidth=40%]
+
+An account's page has its visits, its no-shows and what it has spent, its roles as
+switches, the people in its household with any missing waiver, and its history:
+every flag, block and change of roles, with who did it, when, and why. An owner can't
+take away their own owner role, which would leave nobody to give it back.
+
+image::img/pulse-account.png["An account flagged for no-shows, with its visits, no-shows and spending and its roles",scaledwidth=40%]
+
+The owner flags an account for the other owners to look at, which leaves it working,
+or blocks it, which signs it out at once and stops it signing in, booking, or
+checking in. Both ask for a reason, which the history keeps.
+
+image::img/pulse-account-block.png["Blocking an account, with the reason the record will keep",scaledwidth=40%]
 
 === In a browser
 

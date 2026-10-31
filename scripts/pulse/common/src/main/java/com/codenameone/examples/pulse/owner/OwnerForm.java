@@ -48,7 +48,8 @@ import java.util.List;
 
 /// The studio owner's home, which is the dashboard: what the studio earns,
 /// how full it is, who is drifting away and which classes carry it. The menu
-/// leads to plans, class templates, the timetable, staff, shifts and campaigns.
+/// leads to plans, class templates, the timetable, staff, shifts, campaigns and
+/// the accounts.
 public class OwnerForm implements Nav.Home {
     /// The colours of the charts' series. The charts draw themselves and
     /// read no theme, so they are given the brand's colours here.
@@ -84,6 +85,8 @@ public class OwnerForm implements Nav.Home {
                 () -> StaffForm.shifts(form));
         menu.item(FontImage.MATERIAL_CAMPAIGN, "Campaigns", "campaigns",
                 () -> CampaignsForm.show(form));
+        menu.item(FontImage.MATERIAL_MANAGE_ACCOUNTS, "Accounts", "accounts",
+                () -> AccountsForm.show(form));
         Container bar = new Container(new BorderLayout());
         bar.setUIID("SvHomeBar");
         bar.add(BorderLayout.WEST, menu.flatButton());

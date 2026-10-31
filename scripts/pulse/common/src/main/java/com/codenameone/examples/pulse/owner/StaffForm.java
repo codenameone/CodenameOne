@@ -38,7 +38,9 @@ import com.codenameone.examples.pulse.trainer.ShiftsForm;
 import com.codenameone.examples.pulse.ui.Lang;
 import com.codenameone.examples.pulse.ui.Ui;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /// The studio's staff and what each may do, and the rota of shifts. Roles
 /// are switches: the server keeps a trainer with classes still to teach from
@@ -126,17 +128,16 @@ public final class StaffForm {
         Ui.back(form, previous);
         final Container list = Ui.list("ownerShifts");
         final Runnable[] load = new Runnable[1];
-        load[0] = () -> Api.owner().shifts("", Net.to(shifts -> {
-            list.removeAll();
-            for (int iter = 0; shifts != null && iter < shifts.size(); iter++) {
-                ShiftDto shift = shifts.get(iter);
-                list.add(ShiftsForm.row(shift, ShiftsForm.SWAP_REQUESTED.equals(shift.state())
-                        ? Ui.badge(Lang.tr("Offered"), "SvBadgeWarn") : null));
+        // The locations are asked for once, for their names: a studio with
+        // two sites shows each shift's.
+        final Map<String, String> sites = new HashMap<String, String>();
+        load[0] = () -> Api.studio().locations(Net.to(found -> {
+            sites.clear();
+            for (int iter = 0; found != null && iter < found.size(); iter++) {
+                sites.put(found.get(iter).id(), found.get(iter).name());
             }
-            if (shifts == null || shifts.isEmpty()) {
-                list.add(Ui.text("No shifts on the rota.", "SvMuted"));
-            }
-            Ui.refresh(form);
+            Api.owner().shifts("", Net.to(shifts -> rota(form, list, shifts, sites),
+                    Ui.failed(list, load[0])));
         }, Ui.failed(list, load[0])));
         Ui.pull(list, load[0]);
         form.add(BorderLayout.CENTER, list);
@@ -144,6 +145,30 @@ public final class StaffForm {
                 e -> addShift(form, load[0]))));
         form.show();
         load[0].run();
+    }
+
+    /// The rota a day at a time: who works, what, when and where.
+    private static void rota(Form form, Container list, List<ShiftDto> shifts,
+            Map<String, String> sites) {
+        list.removeAll();
+        String day = null;
+        for (int iter = 0; shifts != null && iter < shifts.size(); iter++) {
+            ShiftDto shift = shifts.get(iter);
+            String heading = Ui.weekday(shift.startsAt());
+            if (!heading.equals(day)) {
+                day = heading;
+                Ui.section(list, heading);
+            }
+            String site = sites.size() > 1 ? sites.get(shift.locationId()) : null;
+            list.add(MembersForm.person(shift.staffName(), shift.duty() + Ui.DOT
+                    + ShiftsForm.hours(shift) + (site == null ? "" : Ui.DOT + site),
+                    ShiftsForm.SWAP_REQUESTED.equals(shift.state())
+                    ? Ui.badge(Lang.tr("Offered"), "SvBadgeWarn") : null));
+        }
+        if (shifts == null || shifts.isEmpty()) {
+            list.add(Ui.text("No shifts on the rota.", "SvMuted"));
+        }
+        Ui.refresh(form);
     }
 
     private static void addShift(final Form previous, final Runnable added) {

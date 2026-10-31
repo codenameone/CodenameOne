@@ -181,9 +181,18 @@ public abstract class E2e extends AbstractTest {
     /// The button called `name`, or null. A tappable card is named like its
     /// lead button and is found first by name, so the tree is searched for the
     /// button itself.
-    protected Button button(String name) {
-        Form current = Display.getInstance().getCurrent();
-        return current == null ? null : button(current, name);
+    ///
+    /// The tree is walked on the event thread: walked from the test's thread,
+    /// a screen the event thread is filling changes a container's children
+    /// under the iteration and throws ConcurrentModificationException.
+    protected Button button(final String name) {
+        if (CN.isEdt()) {
+            Form current = Display.getInstance().getCurrent();
+            return current == null ? null : button(current, name);
+        }
+        final Button[] found = new Button[1];
+        onEdt(() -> found[0] = button(name));
+        return found[0];
     }
 
     private static Button button(Component from, String name) {

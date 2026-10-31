@@ -25,6 +25,7 @@ import com.codenameone.examples.pulse.api.MemberDto;
 import com.codenameone.examples.pulse.api.PassDto;
 import com.codenameone.examples.pulse.api.SessionDto;
 import com.codenameone.examples.pulse.api.StatsDto;
+import com.codenameone.examples.pulse.api.TrainerStatsDto;
 import com.codenameone.examples.pulse.net.Api;
 import com.codenameone.examples.pulse.net.Net;
 import java.util.ArrayList;
@@ -53,6 +54,11 @@ public final class WatchBridge {
     /// The classes booked next, soonest first: `count`, then `name<i>`,
     /// `at<i>` and `room<i>` for each.
     public static final String AGENDA = "/pulse/agenda";
+    /// A coach's class, for a trainer: `name`, `startsAt`, `endsAt`, `room`,
+    /// `booked`, `capacity` and `color` of the class on now or next, and the
+    /// coach's `points`, `level`, `rank` and `coaches`. Absent for anyone who
+    /// does not coach, and the watch then has no coaching page.
+    public static final String COACH = "/pulse/coach";
     /// How many classes [#AGENDA] carries: what fits on a watch page.
     static final int AGENDA_SIZE = 3;
 
@@ -116,6 +122,42 @@ public final class WatchBridge {
             count++;
         }
         WearableConnection.putData(agenda.put("count", count));
+    }
+
+    /// Publishes the trainer's class on now or next and their standing; with
+    /// no class, only the standing.
+    public static void coach(SessionDto session, TrainerStatsDto stats) {
+        if (!paired()) {
+            return;
+        }
+        WearableMessage data = new WearableMessage(COACH).put("coaching", true);
+        if (session != null) {
+            data.put("name", session.name()).put("startsAt", session.startsAt())
+                    .put("endsAt", session.endsAt())
+                    .put("room", session.locationName() + ", " + session.roomName())
+                    .put("booked", session.booked()).put("capacity", session.capacity())
+                    .put("color", session.color() == null ? "" : session.color());
+        }
+        if (stats != null) {
+            data.put("points", stats.points()).put("level", stats.level())
+                    .put("rank", stats.rank())
+                    .put("coaches", stats.leaderboard() == null ? 0 : stats.leaderboard().size());
+        }
+        WearableConnection.putData(data);
+    }
+
+    /// Takes everything off the watch: whoever signs in next has their own
+    /// pass, classes and numbers, and nobody's are left on a wrist after
+    /// signing out.
+    public static void clear() {
+        if (!WearableConnection.isSupported()) {
+            return;
+        }
+        WearableConnection.removeData(NEXT);
+        WearableConnection.removeData(PASS);
+        WearableConnection.removeData(STATS);
+        WearableConnection.removeData(AGENDA);
+        WearableConnection.removeData(COACH);
     }
 
     static void stats(StatsDto stats) {

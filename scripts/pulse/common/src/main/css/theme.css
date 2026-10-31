@@ -398,6 +398,15 @@ SvField.selected {
     background-color: var(--brand-tint);
 }
 
+/* A search field over a row of chips: the gap keeps the chips off it. */
+SvSearchField {
+    cn1-derive: SvField;
+    margin: 0 0 2.4mm 0;
+}
+SvSearchField.selected {
+    background-color: var(--brand-tint);
+}
+
 SvField.disabled {
     color: var(--text-muted);
 }
@@ -899,6 +908,40 @@ SvRankRow {
     background-color: transparent;
     padding: 2mm 0 0.8mm 0;
     margin: 0;
+}
+
+/* An action on the trailing edge of a row: offering a shift, taking one. */
+SvRowAction {
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+    color: var(--brand);
+    background-color: var(--brand-tint);
+    border-radius: 4mm;
+    padding: 1.4mm 2.8mm 1.4mm 2.8mm;
+    margin: 0;
+    text-align: center;
+}
+SvRowAction.pressed {
+    background-color: var(--surface-alt);
+}
+SvRowActionQuiet {
+    cn1-derive: SvRowAction;
+    color: var(--text-muted);
+    background-color: var(--surface-alt);
+}
+
+/* A coach's place on the leaderboard; first place in the brand colour. */
+SvRankPlace {
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 3.4mm;
+    color: var(--text-muted);
+    padding: 0 2.4mm 0 0;
+    margin: 0;
+}
+SvRankFirst {
+    cn1-derive: SvRankPlace;
+    color: var(--brand);
 }
 
 SvRankBar {
@@ -1474,6 +1517,7 @@ SvWatchStat { color: #c6f432; background-color: transparent; font-family: "nativ
 SvWatchStreak { color: #b0b3b8; background-color: transparent; font-family: "native:MainRegular"; font-size: 2mm; text-align: center; padding: 0 1mm; margin: 0; }
 SvWatchPage { background-color: #000000; padding: 0; margin: 0; }
 SvWatchBig { color: #c6f432; background-color: transparent; font-family: "native:MainBold"; font-size: 4.2mm; padding: 0.3mm 1mm; margin: 0; }
+SvWatchStanding { color: #c6f432; background-color: transparent; font-family: "native:MainBold"; font-size: 2mm; padding: 1mm 1mm 0 1mm; margin: 0; }
 SvWatchSmall { color: #8a8d93; background-color: transparent; font-family: "native:MainRegular"; font-size: 1.9mm; padding: 0.2mm 1mm; margin: 0; }
 SvWatchSmallCenter { color: #8a8d93; background-color: transparent; font-family: "native:MainRegular"; font-size: 1.9mm; text-align: center; padding: 0.3mm 1mm; margin: 0; }
 SvWatchEyebrowMuted { color: #c6f432; background-color: transparent; font-family: "native:MainBold"; font-size: 1.7mm; padding: 0; margin: 0; }
@@ -1612,6 +1656,9 @@ SvWelcomeFeatureText { background-color: transparent; font-size: 3.1mm; color: v
     SvBarButton { background: cn1-round-border; color: var(--text-dark); background-color: var(--surface-dark); }
     SvBarButton.pressed { background: cn1-round-border; background-color: var(--surface-alt-dark); }
     SvField { color: var(--text-dark); background-color: var(--surface-alt-dark); }
+    SvSearchField { color: var(--text-dark); background-color: var(--surface-alt-dark); }
+    SvRowAction { background-color: var(--brand-tint-dark); }
+    SvRowActionQuiet { color: var(--text-muted-dark); background-color: var(--surface-alt-dark); }
     SvFieldHint { color: var(--text-muted-dark); }
     SvRow { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
     SvRow.pressed { background-color: var(--surface-alt-dark); }
@@ -1703,6 +1750,7 @@ SvWelcomeFeatureText { background-color: transparent; font-size: 3.1mm; color: v
     SvRowPicked { background-color: var(--surface-alt-dark); }
     SvSecondary.disabled, SvDanger.disabled, SvLink.disabled { color: var(--line-strong-dark); }
     SvField.selected { background-color: var(--brand-tint-dark); }
+    SvSearchField.selected { background-color: var(--brand-tint-dark); }
     SvField.disabled { color: var(--text-muted-dark); }
     Switch { color: #ffffff; background-color: var(--line-strong-dark); }
     Switch.selected { color: #ffffff; background-color: var(--brand-dark); }

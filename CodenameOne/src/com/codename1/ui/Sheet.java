@@ -779,8 +779,14 @@ public class Sheet extends Container {
         contentPane.setSafeArea(true);
         titleBar.setSafeArea(true);
         add(BorderLayout.NORTH, titleBar);
+        // The button is an icon alone, so a screen reader (and anything else
+        // that finds controls by what they are called) would otherwise get an
+        // unnamed button.
         if (parentSheet != null) {
             FontImage.setMaterialIcon(backButton, FontImage.MATERIAL_ARROW_BACK);
+            backButton.setAccessibilityText(UIManager.getInstance().localize("Back", "Back"));
+        } else {
+            backButton.setAccessibilityText(UIManager.getInstance().localize("Close", "Close"));
         }
         add(BorderLayout.CENTER, contentPane);
         backButton.addActionListener(new ActionListener() {
