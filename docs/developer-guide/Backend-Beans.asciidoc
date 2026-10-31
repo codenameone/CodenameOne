@@ -404,8 +404,8 @@ if the server had compiled them itself. The server's own code can inject the
 library's beans like any other.
 
 A jar opts in by carrying the empty resource
-`META-INF/codenameone/backend-library`. A jar without it is an ordinary
-dependency: its classes are on the classpath, but nothing in it is wired.
+`META-INF/codenameone/backend-library`. A jar without the marker is an ordinary
+dependency: its classes are on the classpath, but none of them are wired.
 
 A cn1lib carries its server half inside the `.cn1lib` file, as `backend.zip`
 beside the client parts:
@@ -426,7 +426,7 @@ include::../demos/common/src/main/snippets/developer-guide/backend-beans.xml[tag
 * A library with no client side is a plain jar that depends on
   `codenameone-backend` with `provided` scope and carries the marker.
 
-The library itself is never wired when it is built; only the server that uses
+The library itself is never wired at its own build; only the server that uses
 it generates the routes and beans. When the server defines a class with the
 same name as one in a library, the server's class is used.
 
