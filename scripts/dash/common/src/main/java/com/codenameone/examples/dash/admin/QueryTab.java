@@ -81,7 +81,7 @@ final class QueryTab {
         if (r.count() > r.players().size()) {
             results.add(Desk.help("The first " + r.players().size() + ", longest away first."));
         }
-        results.add(Desk.tableRow(true, "Player", "Trophies", "Battles", "Gems"));
+        results.add(Desk.tableRow(true, "Player", "Trophies", "Races", "Gems"));
         for (final PlayerDto p : r.players()) {
             Container row = Desk.tableRow(false, "", String.valueOf(p.trophies()),
                     String.valueOf(p.wins() + p.losses() + p.draws()), String.valueOf(p.gems()));

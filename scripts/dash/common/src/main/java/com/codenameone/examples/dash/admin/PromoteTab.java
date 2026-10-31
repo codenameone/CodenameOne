@@ -55,8 +55,8 @@ final class PromoteTab {
     private static final String[] SEGMENTS = {"all", "lapsed", "new", "invited"};
     private static final String[] SEGMENT_NAMES = {"Everyone", "Away for a while", "Joined recently",
         "Came through an invite"};
-    static final String[] SCREENS = {"", "shop", "forge", "friends", "deck", "battle"};
-    static final String[] SCREEN_NAMES = {"Home", "Shop", "Forge", "Friends", "Deck", "Battle"};
+    static final String[] SCREENS = {"", "shop", "forge", "friends", "runner", "race", "daily", "crews"};
+    static final String[] SCREEN_NAMES = {"Home", "Shop", "Forge", "Friends", "Runner", "Quick race", "Daily run", "Crews"};
 
     private final Container col = Desk.page();
     private String segment = SEGMENTS[0];
@@ -101,7 +101,7 @@ final class PromoteTab {
                 Desk.card("Players", String.valueOf(p.players()), null),
                 Desk.card("New this week", String.valueOf(p.joinedThisWeek()), null),
                 Desk.card("Invited", String.valueOf(p.invited()), "joined through a link"),
-                Desk.card("Played", String.valueOf(p.invitedPlayed()), "of those, fought a battle")));
+                Desk.card("Played", String.valueOf(p.invitedPlayed()), "of those, ran a race")));
         if (!p.inviters().isEmpty()) {
             col.add(Desk.tableRow(true, "Top inviters", "Joined", "Played"));
             for (InviterDto i : p.inviters()) {
