@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+    <!-- Python has reference semantics: a list holds the very objects put in
+         it, a function its default values, a property its accessor
+         functions, and `tuple(x)` of a fresh array owns that array. Every
+         one of these is a reference the language requires the object to
+         share, and a defensive copy would change what a program observes
+         (mutating a default argument is visible on the next call). -->
+    <Match>
+        <Package name="com.codename1.python.runtime"/>
+        <Or>
+            <Bug pattern="EI_EXPOSE_REP"/>
+            <Bug pattern="EI_EXPOSE_REP2"/>
+            <Bug pattern="EI_EXPOSE_STATIC_REP2"/>
+        </Or>
+    </Match>
+    <!-- Python's == on floats is exact IEEE comparison; `0.1 + 0.2 == 0.3`
+         must be False and `1 == 1.0` True. A tolerance would be a different
+         language. -->
+    <Match>
+        <Or>
+            <Class name="com.codename1.python.runtime.PyFloat"/>
+            <Class name="com.codename1.python.runtime.PyInt"/>
+            <Class name="com.codename1.python.runtime.TypeMethods"/>
+            <Class name="com.codename1.python.runtime.PyComplex"/>
+        </Or>
+        <Bug pattern="FE_FLOATING_POINT_EQUALITY"/>
+    </Match>
+    <!-- Attribute names are interned (`AttrSite`, the generated code), so the
+         identity test is the fast path; `equals` follows for any name that
+         was built at run time. -->
+    <Match>
+        <Class name="com.codename1.python.runtime.Shape"/>
+        <Bug pattern="ES_COMPARING_PARAMETER_STRING_WITH_EQ"/>
+    </Match>
+    <!-- `PyType.version` is one epoch for every class namespace: any class
+         change must invalidate every inline cache, so the instance methods
+         that change a namespace bump the shared counter on purpose. -->
+    <Match>
+        <Class name="com.codename1.python.runtime.PyType"/>
+        <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD"/>
+    </Match>
+    <!-- A Python exception carries a live Python object, which has no Java
+         serialized form; the exception is never serialized. -->
+    <Match>
+        <Class name="com.codename1.python.runtime.PyException"/>
+        <Bug pattern="SE_TRANSIENT_FIELD_NOT_RESTORED"/>
+    </Match>
+    <!-- The surrogate-count cache is keyed by identity on purpose: a hit
+         must be the very string counted, and equals() would scan it, which
+         is the work the cache exists to skip. -->
+    <Match>
+        <Class name="com.codename1.python.runtime.PyStr"/>
+        <Method name="surrogates"/>
+        <Bug pattern="ES_COMPARING_PARAMETER_STRING_WITH_EQ"/>
+    </Match>
+    <!-- Typed.yes is a guard generated code reads so that javac cannot
+         fold it: final would make the code after the guard unreachable, and
+         generated code is the only reader. -->
+    <Match>
+        <Class name="com.codename1.python.runtime.Typed"/>
+        <Field name="yes"/>
+        <Bug pattern="MS_SHOULD_BE_FINAL,URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD"/>
+    </Match>
+    <!-- The generated generator subclasses (python-transpiler output, not
+         in this module) store any iterator in `delegate`, read `exc`, and
+         rely on `next()` answering null at exhaustion, which overrides of
+         PyObject.next do. Analysed alone, the runtime sees only the one
+         PyGenerator it stores itself and the base next() that throws. -->
+    <Match>
+        <Class name="com.codename1.python.runtime.PyGenerator"/>
+        <Or>
+            <Bug pattern="BC_VACUOUS_INSTANCEOF"/>
+            <Bug pattern="RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE"/>
+            <Bug pattern="UUF_UNUSED_PUBLIC_OR_PROTECTED_FIELD"/>
+        </Or>
+    </Match>
+    <!-- null is the documented "not bytes-like" answer every caller tests
+         for; an empty array would be indistinguishable from b"". -->
+    <Match>
+        <Class name="com.codename1.python.runtime.PyBytes"/>
+        <Method name="like"/>
+        <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
+    </Match>
+    <!-- The file system is a replaceable service: get() hands out the
+         installed instance by design (install() swaps it for a host that
+         is not a Codename One application). -->
+    <Match>
+        <Class name="com.codename1.python.runtime.PyFileSystem"/>
+        <Method name="get"/>
+        <Bug pattern="MS_EXPOSE_REP"/>
+    </Match>
+    <!-- Identity is the right equality for a request: it adds only the
+         headers it received and its failure, and ConnectionRequest's own
+         equals is what the network queue uses to recognise duplicates. -->
+    <Match>
+        <Class name="com.codename1.python.runtime.Cn1Http$Request"/>
+        <Bug pattern="EQ_DOESNT_OVERRIDE_EQUALS"/>
+    </Match>
+    <!-- Read by the BackendServer class the transpiler generates for an
+         application that serves HTTP, which is not part of this module. -->
+    <Match>
+        <Class name="com.codename1.python.runtime.PyServer$Response"/>
+        <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD"/>
+    </Match>
+    <!-- PySql.Result.types is written by the BackendDb the transpiler
+         generates into a backend application (from Database.columnTypes),
+         never inside this module; SQLite leaves it null. -->
+    <Match>
+        <Class name="com.codename1.python.runtime.PySql$Result"/>
+        <Field name="types"/>
+        <Bug pattern="UWF_UNWRITTEN_PUBLIC_OR_PROTECTED_FIELD"/>
+    </Match>
+    <!-- gc.collect() is a program asking for a collection: the System.gc()
+         call is the whole of what it does. -->
+    <Match>
+        <Class name="com.codename1.python.runtime.StdModules"/>
+        <Bug pattern="DM_GC"/>
+    </Match>
+</FindBugsFilter>

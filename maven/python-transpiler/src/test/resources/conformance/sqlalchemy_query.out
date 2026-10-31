@@ -1,0 +1,26 @@
+True sqlalchemy.engine.Engine False
+[('Ann', 2), ('bob', 1), ('Cid', 0), ('dee', 0)]
+[('Ann', 2), ('bob', 1)]
+['Ann', 'bob']
+['Cid', 'dee']
+['Ann', 'bob']
+['Ann', 'bob']
+['Cid']
+['Ann', 'bob', 'Cid']
+['Cid', 'dee']
+[19, 19, 25, 25]
+['Ann', 'dee']
+[('bob', 'Ann'), ('Cid', 'Ann')]
+Cid
+[('Ann', 'adult'), ('bob', 'adult'), ('Cid', 'senior'), ('dee', 'teen')]
+['30y', '25y', '41y', '19y']
+13
+[('ann', 'ANN', 3), ('bob', 'BOB', 3), ('cid', 'CID', 3), ('dee', 'DEE', 3)]
+[-1, 1, 1, -1]
+['Ann']
+['Ann', 'bob']
+['ann@a.com', 'ann@b.org']
+[['Ann', 'bob'], ['Cid', 'dee']]
+[[30, 25, 41], [19]]
+Ann ['bob', 'Cid', 'dee']
+True

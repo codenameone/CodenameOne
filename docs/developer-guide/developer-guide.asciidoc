@@ -284,6 +284,8 @@ include::Android-Interop.asciidoc[]
 
 include::Unity-Interop.asciidoc[]
 
+include::Python-Interop.asciidoc[]
+
 include::Desktop-Interop.asciidoc[]
 
 include::Kotlin-Multiplatform-Interop.asciidoc[]

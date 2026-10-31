@@ -1,0 +1,26 @@
+Hello, World! Hello, World!     Hello, World!   hello, world!     HELLO, WORLD!     Hello, World!     hELLO, wORLD!  
+['Hello', 'World!'] ['a', 'b', '', 'c'] ['a', 'b', 'c'] ['a', 'b,c'] ['a,b', 'c']
+x-y-z aBBc 2 3 1
+True True 2 True True True
+***abc*** abc  |   abc 007 -007
+a   b ['line1', 'line2', 'line3'] axbxc hello
+('hello', ' ', 'world') ('a.b', '.', 'c') bc ab
+"it's" 'say "hi"' 'both \' and "' '\n\t\\' '\x00\x7fÿĀ'
+1.0 1e+16 1.5e-05 0.1 123456789.12345679 inf -inf
+left    |   right|  mid   | 003 -3 3.500000e+00 25.000000% 1,234.5
+1100 14 FF A s    |7   | aba 1-2
+    a|b    |00042|ff|10|1.234568e+04|0.0001|%
+6 😀 b'w\xc3\xb6rld\xf0\x9f\x98\x80' True ['d', '😀']
+b'bytes\x00\xff' 7 98 255 b'yt' b'bytes\x00\xff!' 627974657300ff b'AB' b'ABC'
+8364 True b'\xe2\x82\xac' x
+True True  True True ['e', 'h', 'l', 'l', 'o'] o
+MiSSissippi bcab    x
+café b'caf\xe9' � b'x'
+encode error UnicodeEncodeError
+1 -4 1152921504606846977 -230584300921369408 1224995262755759164 16777216 -3550055125485641917 5740354900026072187 -9148893311433065316 -2 True
+{(1, 2), (2, 1), (3, 4), (0, 0)} {1099511627776, 100, 7, 1000, 10, -1} {0.5, 1.5, 2.25} {2, 5, 8, 11, 14, 17, 20}
+'\u2014a\u4e00\uac01\U0001f600' b'\\N{x}' b'\\N'
+'alpha' 'beta' 'gamma' 'delta' 'eps' 22
+a
+b
+1 3 3 41

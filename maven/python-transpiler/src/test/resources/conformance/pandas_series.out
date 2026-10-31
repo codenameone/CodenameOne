@@ -1,0 +1,156 @@
+0    1
+1    2
+2    3
+3    4
+dtype: int64
+int64 4 10 2.5 4 1
+a    1.50
+b    2.25
+c    3.00
+Name: price, dtype: float64
+2.25 3.0 1.5
+['a', 'b', 'c'] price
+a    3.0
+b    4.5
+c    6.0
+Name: price, dtype: float64
+a    4.50
+b    4.25
+c    4.00
+dtype: float64
+0    False
+1    False
+2     True
+3     True
+dtype: bool
+2    3
+3    4
+dtype: int64
+0    1
+1    2
+dtype: int64
+2    3
+3    4
+dtype: int64
+1.290994 4 2.5
+0    a
+1    b
+2    a
+3    c
+4    a
+Name: letter, dtype: str
+letter
+a    3
+b    1
+c    1
+Name: count, dtype: int64
+['a', 'b', 'c']
+0    1.0
+1    NaN
+2    3.0
+dtype: float64
+0    False
+1     True
+2    False
+dtype: bool
+0    1.0
+1    0.0
+2    3.0
+dtype: float64
+0    1.0
+2    3.0
+dtype: float64
+4.0 2 2.0
+0    10
+1    20
+2    30
+3    40
+dtype: int64
+0    1
+1    2
+2    1
+3    3
+4    1
+Name: letter, dtype: int64
+0    1.0
+1    2.0
+2    3.0
+3    4.0
+dtype: float64
+a    1
+b    2
+c    3
+Name: price, dtype: int64
+1    1
+2    2
+0    3
+dtype: int64
+x    1
+y    2
+z    3
+dtype: int64
+0    3
+2    2
+1    1
+dtype: int64
+0     1
+1     3
+2     6
+3    10
+dtype: int64
+0     Apple
+1    banana
+2    Cherry
+dtype: str
+0     apple 
+1     banana
+2     cherry
+dtype: str
+0     APPLE 
+1     BANANA
+2     CHERRY
+dtype: str
+0    7
+1    6
+2    6
+dtype: int64
+0    False
+1     True
+2    False
+dtype: bool
+[1, 2, 3, 4] [1 2 3 4]
+[1 2 3 4]
+0     True
+1    False
+2     True
+dtype: bool
+0    1.0
+1    NaN
+2    3.0
+dtype: float64
+1    2
+2    3
+dtype: int64
+0   -1
+1   -2
+2   -3
+3   -4
+dtype: int64
+0    False
+1     True
+2    False
+3    False
+dtype: bool
+2
+x    10
+y    20
+dtype: int64
+0     0.123457
+1    12.500000
+dtype: float64
+RangeIndex(start=0, stop=4, step=1)
+Index(['a', 'b', 'c'], dtype='str')
+0    11.0
+1    22.0
+2     NaN
+dtype: float64

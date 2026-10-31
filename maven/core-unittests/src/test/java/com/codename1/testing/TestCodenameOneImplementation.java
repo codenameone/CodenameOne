@@ -3309,6 +3309,32 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         this.trueTypeSupported = trueTypeSupported;
     }
 
+    private boolean trueTypeStreamSupported = true;
+    private int trueTypeDataLoads;
+
+    public void setTrueTypeStreamSupported(boolean supported) {
+        this.trueTypeStreamSupported = supported;
+    }
+
+    /// How many times loadTrueTypeFontFromData(String, byte[]) reached this implementation.
+    public int getTrueTypeDataLoads() {
+        return trueTypeDataLoads;
+    }
+
+    @Override
+    public boolean isTrueTypeStreamSupported() {
+        return trueTypeStreamSupported;
+    }
+
+    @Override
+    public Object loadTrueTypeFontFromData(String fontName, byte[] data) {
+        trueTypeDataLoads++;
+        if (data.length == 0) {
+            return null;
+        }
+        return new TestFont(defaultFont.charWidth, defaultFont.height);
+    }
+
     @Override
     public boolean isNativeFontSchemeSupported() {
         return nativeFontSchemeSupported;
@@ -5259,6 +5285,10 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
                 return Short.parseShort((String) value);
             }
             return (short) 0;
+        }
+
+        public int getColumnType(int index) {
+            return com.codename1.db.Database.COLUMN_UNKNOWN;
         }
 
         public String getString(int index) throws IOException {

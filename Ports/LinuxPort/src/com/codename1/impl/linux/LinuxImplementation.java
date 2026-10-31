@@ -2332,6 +2332,35 @@ public class LinuxImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public boolean isTrueTypeStreamSupported() {
+        return true;
+    }
+
+    /// True when data starts with a TrueType (0x00010000 or 'true'), OpenType
+    /// CFF ('OTTO') or collection ('ttcf') tag.
+    private static boolean isSfntHeader(byte[] data) {
+        if (data == null || data.length < 12) {
+            return false;
+        }
+        int tag = ((data[0] & 0xff) << 24) | ((data[1] & 0xff) << 16)
+                | ((data[2] & 0xff) << 8) | (data[3] & 0xff);
+        return tag == 0x00010000 || tag == 0x74727565 || tag == 0x4f54544f
+                || tag == 0x74746366;
+    }
+
+    @Override
+    public Object loadTrueTypeFontFromData(String fontName, byte[] data) {
+        // The contract for data that is not a font is null. Bytes without an
+        // SFNT header are rejected here; bytes with one that the native loader
+        // still cannot parse or register make it answer 0, which is null too.
+        if (!isSfntHeader(data)) {
+            return null;
+        }
+        long font = LinuxNative.loadTrueTypeFontFromMemory(fontName, data);
+        return font == 0 ? null : Long.valueOf(font);
+    }
+
+    @Override
     public Object loadTrueTypeFont(String fontName, String fileName) {
         long font = 0;
         // Bundled TTFs (material-design-font.ttf and any app font) ship as

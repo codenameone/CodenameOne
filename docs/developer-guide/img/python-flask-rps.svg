@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="164" viewBox="0 0 760 164" font-family="Helvetica, Arial, sans-serif">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="150" y="24" font-size="16" font-weight="bold" fill="#202124">Flask JSON API throughput (higher is better)</text>
+<rect x="150" y="36" width="12" height="12" fill="#9aa0a6"/>
+<text x="168" y="47" font-size="12" fill="#202124">CPython</text>
+<rect x="350" y="36" width="12" height="12" fill="#f9ab00"/>
+<text x="368" y="47" font-size="12" fill="#202124">PyPy</text>
+<rect x="550" y="36" width="12" height="12" fill="#a142f4"/>
+<text x="568" y="47" font-size="12" fill="#202124">GraalPy</text>
+<rect x="150" y="58" width="12" height="12" fill="#1a73e8"/>
+<text x="168" y="69" font-size="12" fill="#202124">Codename One Python</text>
+<line x1="150.0" y1="80" x2="150.0" y2="134" stroke="#e8eaed"/>
+<text x="150.0" y="150" font-size="11" fill="#5f6368" text-anchor="middle">0 </text>
+<line x1="415.0" y1="80" x2="415.0" y2="134" stroke="#e8eaed"/>
+<text x="415.0" y="150" font-size="11" fill="#5f6368" text-anchor="middle">10k </text>
+<line x1="680.0" y1="80" x2="680.0" y2="134" stroke="#e8eaed"/>
+<text x="680.0" y="150" font-size="11" fill="#5f6368" text-anchor="middle">20k </text>
+<text x="142" y="106" font-size="12" fill="#202124" text-anchor="end">requests/s</text>
+<rect x="150" y="84" width="16.2" height="8" fill="#9aa0a6"/>
+<text x="170.2" y="91" font-size="9" fill="#5f6368">611</text>
+<rect x="150" y="93" width="16.2" height="8" fill="#f9ab00"/>
+<text x="170.2" y="100" font-size="9" fill="#5f6368">610</text>
+<rect x="150" y="102" width="12.4" height="8" fill="#a142f4"/>
+<text x="166.4" y="109" font-size="9" fill="#5f6368">468</text>
+<rect x="150" y="111" width="443.8" height="8" fill="#1a73e8"/>
+<text x="597.8" y="118" font-size="9" fill="#5f6368">16749</text>
+</svg>

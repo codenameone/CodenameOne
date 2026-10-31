@@ -819,6 +819,19 @@ public abstract class Database {
                 "Changing the database key is not supported on this platform");
     }
 
+    /// `Row#getColumnType(int)`: the value is SQL NULL.
+    public static final int COLUMN_NULL = 0;
+    /// `Row#getColumnType(int)`: the value is stored as a signed integer.
+    public static final int COLUMN_INTEGER = 1;
+    /// `Row#getColumnType(int)`: the value is stored as a floating point number.
+    public static final int COLUMN_FLOAT = 2;
+    /// `Row#getColumnType(int)`: the value is stored as text.
+    public static final int COLUMN_TEXT = 3;
+    /// `Row#getColumnType(int)`: the value is stored as a blob.
+    public static final int COLUMN_BLOB = 4;
+    /// `Row#getColumnType(int)`: the port cannot tell how the value is stored.
+    public static final int COLUMN_UNKNOWN = -1;
+
     /// Checks if the last value accessed from a given row was null.  Not all platforms
     /// support wasNull().  If the platform does not support it, this will just return false.
     ///

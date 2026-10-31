@@ -85,6 +85,22 @@ public final class Tcp {
     /// fails to load would verify against roots the caller deliberately did not
     /// choose, so that is an error rather than a fallback.
     public void startTls(String host, String caFile) throws IOException {
+        startTls(host, caFile, true);
+    }
+
+    /// As [#startTls(String,String)], with the name check optional.
+    ///
+    /// `verifyHost` false still verifies the chain against `caFile` and skips
+    /// only the match between the certificate and `host`: what
+    /// `sslmode=verify-ca` asks for. It is refused without a `caFile`, because
+    /// a public root vouches for names, and a chain to one without the name is
+    /// a certificate for anybody.
+    public void startTls(String host, String caFile, boolean verifyHost)
+            throws IOException {
+        if (!verifyHost && caFile == null) {
+            throw new IOException("Skipping the host name check needs a trust "
+                    + "root of its own (sslrootcert)");
+        }
         // BOTH STRINGS, and the name is the one that decides who the peer is
         // allowed to be. It crosses to a native as a C string, so a NUL inside it
         // ends the name there and OpenSSL verifies the certificate against the
@@ -116,7 +132,7 @@ public final class Tcp {
         long session;
         claim(claimed);
         try {
-            session = startTlsImpl(claimed[0], host, caFile);
+            session = startTlsImpl(claimed[0], host, caFile, verifyHost);
         } finally {
             release();
         }
@@ -365,7 +381,8 @@ public final class Tcp {
     private static native int setReadTimeoutImpl(long handle, int millis);
     private static native int writeImpl(long handle, byte[] buffer, int offset, int length);
     private static native int closeImpl(long handle);
-    private static native long startTlsImpl(long handle, String host, String caFile);
+    private static native long startTlsImpl(long handle, String host, String caFile,
+            boolean verifyHost);
     private static native String tlsErrorImpl();
     private static native int tlsReadImpl(long session, byte[] buffer, int offset, int length);
     private static native int tlsWriteImpl(long session, byte[] buffer, int offset, int length);

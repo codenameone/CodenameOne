@@ -1,0 +1,32 @@
+12
+w a.txt False
+True
+'hello\nworld\nline three'
+'hello\n'
+'world\n'
+'line three'
+['hello\n', 'world\n', 'line three']
+'hello\n' 'wor' 9
+'hello\nworld\nline three\nappended'
+b'\x00\x01' b'\xffab'
+b'\x01' 2
+b'\x00\x01\xffabZ'
+b'caf\xc3\xa9 \xe2\x82\xac\n'
+café €
+
+'a\nb\nc\n'
+'a\r\nb\rc\n'
+xyz
+Ayz
+['1', '2']
+FileNotFoundError 2 No such file or directory missing.txt
+[Errno 2] No such file or directory: 'missing.txt'
+[Errno 17] File exists: 'w.txt'
+must have exactly one of create/read/write/append mode
+invalid mode: 'q'
+can't have text and binary mode at once
+binary mode doesn't take an encoding argument
+I/O operation on closed file.
+UnsupportedOperation
+UnsupportedOperation
+write() argument must be str, not int

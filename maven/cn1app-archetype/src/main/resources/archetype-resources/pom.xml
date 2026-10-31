@@ -76,6 +76,11 @@
             </dependency>
             <dependency>
                 <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-python-runtime</artifactId>
+                <version>${cn1.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
                 <artifactId>codenameone-swing-compat</artifactId>
                 <version>${cn1.version}</version>
                 <scope>provided</scope>

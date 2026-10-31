@@ -143,6 +143,24 @@
                 </dependency>
             </dependencies>
         </profile>
+        <!-- Python: the .py modules in src/main/python are transpiled to Java
+             and run on every Codename One target (no Python install
+             required; JDK 17+). The transpile-python goal below is a no-op
+             without this directory. -->
+        <profile>
+            <id>python</id>
+            <activation>
+                <file>
+                    <exists>${basedir}/src/main/python</exists>
+                </file>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>codenameone-python-runtime</artifactId>
+                </dependency>
+            </dependencies>
+        </profile>
         <!-- Kotlin Multiplatform and Compose: the common and JVM sources of a
              KMP module in src/main/kmp build for every Codename One target.
              Compose's runtime and kotlinx.coroutines are translated as they
@@ -539,6 +557,14 @@
                         <phase>generate-sources</phase>
                         <goals>
                             <goal>compile-android-res</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <!-- Python sources (src/main/python) as generated Java source. -->
+                        <id>transpile-python</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>transpile-python</goal>
                         </goals>
                     </execution>
                     <execution>

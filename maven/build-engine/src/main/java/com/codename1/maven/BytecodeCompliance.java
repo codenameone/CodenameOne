@@ -1311,8 +1311,15 @@ public class BytecodeCompliance {
         @Override
         public BasicValue merge(BasicValue value1, BasicValue value2) {
             boolean alloca = isAllocaValue(value1) || isAllocaValue(value2);
-            if (value1.equals(value2)) {
-                return new SimdAllocaValue(value1.getType(), alloca);
+            // Compare the types, not the values: BasicInterpreter's own
+            // constants (LCONST_1 pushes BasicValue.LONG_VALUE) are not
+            // SimdAllocaValues, so equals() fails against ours for the same
+            // type and super.merge() would widen a long to a one-slot
+            // UNINITIALIZED_VALUE -- the next DUP2 then reports "Illegal use
+            // of DUP2" on bytecode ASM's plain analyzer accepts.
+            Type t1 = value1.getType();
+            if (t1 != null && t1.equals(value2.getType())) {
+                return new SimdAllocaValue(t1, alloca);
             }
             if (isReferenceValue(value1) && isReferenceValue(value2)) {
                 return new SimdAllocaValue(Type.getObjectType("java/lang/Object"), alloca);

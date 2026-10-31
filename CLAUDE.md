@@ -113,8 +113,9 @@ PR CI (`.github/workflows/pr.yml`, Java 8 leg) runs SpotBugs over
 `codenameone-maven-plugin`, `build-engine` (the Maven-free build logic both
 build plugins share), `project-model` (the project-layout API),
 `android-res-compiler` and `android-compat` (the Android compatibility
-runtime), `codenameone-gradle-plugin` and `javac` (the in-tree Java compiler,
-`vm/JavaCompiler`), then enforces the result in
+runtime), `codenameone-gradle-plugin`, `javac` (the in-tree Java compiler,
+`vm/JavaCompiler`) and `python-transpiler`, plus `python-runtime` in a step of
+its own on JDK 17 (it compiles at release 17), then enforces the result in
 `.github/scripts/generate-quality-report.py`. `cil-translator` and
 `unity-compat` (the Unity compatibility translator and runtime) are held to the
 same script with SpotBugs, PMD and Checkstyle all three, but in
@@ -133,6 +134,7 @@ any of them cannot skip it.
   `maven/build-engine/`, `maven/project-model/`,
   `maven/android-res-compiler/`, `maven/android-compat/`,
   `maven/codenameone-gradle-plugin/`, `maven/javac/`,
+  `maven/python-transpiler/`, `maven/python-runtime/`,
   `maven/cil-translator/`, `maven/unity-compat/`), scoped to the
   class or method it applies to and with a comment explaining why. Keep the
   generated report at zero rather than tolerating known noise.
@@ -377,7 +379,8 @@ The scope is what a translation actually sees -- `maven/core`, `maven/ios`,
 `vm/JavaAPI` and `maven/android-compat`, whose runtime an application with
 Android sources ships relocated inside its own classes, and
 `maven/swing-compat` and `maven/javafx-compat`, which are relocated into an
-application with desktop sources the same way. **The Android port is not covered**, and adding it back would be a
+application with desktop sources the same way. `maven/python-runtime` is in
+scope too: an application with Python sources ships it. **The Android port is not covered**, and adding it back would be a
 mistake: ART implements `CHECKCAST` to spec, so a `catch (Throwable)` around a
 `(NotificationManager) getSystemService(...)` there is live, correct code, and
 `Ports/Android` is never translated. That is the same reason `Ports/CLDC11` is

@@ -1,0 +1,54 @@
+ExceptionGroup('many', [ValueError(1), TypeError(2), ExceptionGroup('inner', [ValueError(3), KeyError(4)])])
+ExceptionGroup: many (3 sub-exceptions)
+  ValueError(1)
+  TypeError(2)
+  ExceptionGroup: inner (2 sub-exceptions)
+    ValueError(3)
+    KeyError(4)
+ExceptionGroup: many (2 sub-exceptions)
+  ValueError(1)
+  ExceptionGroup: inner (1 sub-exception)
+    ValueError(3)
+ExceptionGroup: many (2 sub-exceptions)
+  TypeError(2)
+  ExceptionGroup: inner (1 sub-exception)
+    KeyError(4)
+ExceptionGroup: many (1 sub-exception)
+  ExceptionGroup: inner (1 sub-exception)
+    KeyError(4)
+None
+ExceptionGroup BaseExceptionGroup
+values:
+ExceptionGroup: many (2 sub-exceptions)
+  ValueError(1)
+  ExceptionGroup: inner (1 sub-exception)
+    ValueError(3)
+types:
+ExceptionGroup: many (1 sub-exception)
+  TypeError(2)
+keys
+only values
+left:
+ExceptionGroup: many (2 sub-exceptions)
+  TypeError(2)
+  ExceptionGroup: inner (1 sub-exception)
+    KeyError(4)
+naked caught:
+ExceptionGroup:  (1 sub-exception)
+  OSError('naked')
+unchanged OSError('plain')
+raised in handler:
+RuntimeError('from handler')
+raised with rest:
+ExceptionGroup:  (2 sub-exceptions)
+  RuntimeError('from handler 2')
+  ExceptionGroup: g (1 sub-exception)
+    TypeError(2)
+bare raise:
+ExceptionGroup: g (2 sub-exceptions)
+  ValueError(1)
+  TypeError(2)
+TypeError catching ExceptionGroup with except* is not allowed. Use except instead.
+in f
+finally
+ok

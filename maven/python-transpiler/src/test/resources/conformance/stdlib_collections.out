@@ -1,0 +1,31 @@
+deque([0, 2, 3, 4], maxlen=4) 4 0 4 4
+deque([0, 2], maxlen=4) 3 4 [2, 0] False
+deque([15, 16, 17, 18, 19]) 2 1
+deque([101, 100, 15, 16, 17, 18, 19]) True
+IndexError pop from an empty deque
+defaultdict(<class 'list'>, {'a': [1, 3], 'b': [2], 'zz': []}) [] ['a', 'b', 'zz'] True
+{'m': 1, 'i': 4, 's': 4, 'p': 2}
+Counter({'a': 5, 'b': 2, 'r': 2, 'c': 1, 'd': 1}) [('a', 5), ('b', 2)] 0 11
+['a', 'a', 'a', 'a', 'a', 'b'] Counter({'b': 7, 'a': 5, 'r': 2, 'c': 1, 'd': 1, 'z': 1}) Counter({'b': 2, 'r': 2, 'c': 1, 'd': 1, 'z': 1}) Counter({'a': 1}) Counter({'a': 4})
+Counter({'dogs': 8, 'cats': 4}) Counter({'a': 2}) Counter({'b': 2})
+OrderedDict({'z': 3}) ('x', 1) ('y', 2) OrderedDict({'z': 3})
+['w', 'z'] OrderedDict({'a': 0, 'b': 0})
+Point(x=1, y=2) 3 1 {'x': 1, 'y': 2} Point(x=10, y=2) ('x', 'y') Point(x=5, y=6)
+1 2 True True 2
+P3(a=1, b=2, c=0) P3(a=1, b=2, c=3) {'c': 0}
+TypeError Point.__new__() missing 1 required positional argument: 'y'
+matched 2
+1 3 2 ['a', 'b'] True
+{'a': 1, 'c': 9} 0 2
+True True True
+True False True
+True False
+3 [0, 1, 4, 9] True 2 [9, 4, 1, 0] 1
+True False
+{'b': [3, 4]} {'b': [3]} False (1, [2])
+[1, 2] [1] Box
+True False
+abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ 0123456789 !"#$%&'()*+,-./:;<=>?@[\]^_`{|}~
+Hello Big World
+tim likes pie; $5 x likes ${what}; $5
+KeyError 'what'

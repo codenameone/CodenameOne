@@ -72,11 +72,18 @@ public class RemapCompatMojo extends AbstractCN1Mojo {
                 classpath.add(artifact.getFile());
             }
         }
+        File compiled = new File(project.getBuild().getOutputDirectory());
+        // Classes translated from Python get the Python file and lines, so
+        // a debugger and a stack trace show the Python source.
+        try {
+            PythonLineMapper.apply(compiled);
+        } catch (java.io.IOException ex) {
+            throw new MojoExecutionException("Could not map Python line numbers in " + compiled, ex);
+        }
         // Classes transpiled from Dart get the Dart file and lines, so a
         // debugger and a stack trace show the Dart source. Before the
         // early return: a Flutter app needs no compatibility layer. Only
         // for a project with Dart sources, since it reads every class.
-        File compiled = new File(project.getBuild().getOutputDirectory());
         if (FlutterProjectBuilder.isFlutterProject(flutterSourceDir)) {
             try {
                 DartLineMapper.apply(compiled);

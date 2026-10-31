@@ -1767,8 +1767,54 @@ public final class HttpServer {
     ///
     /// The same "null means not mine" the Handler chain uses, so a generated router
     /// can answer for the routes it knows and leave the rest alone.
+    ///
+    /// A router that wants a refusal other than 404 returns [#refuseUpgrade]
+    /// instead of null: the handshake is then answered with that response.
     public interface WebSocketHandler {
         WebSocket open(Request request) throws Exception;
+    }
+
+    /// An endpoint a [WebSocketHandler] returns to refuse the upgrade with
+    /// `status` and `body` rather than the 404 a null answers -- a 403 for a
+    /// client that is not allowed in, a 400 for a handshake missing what the
+    /// endpoint needs. The status must be 400 or higher; anything else is
+    /// answered as a 500, because a refusal that reads as a success would leave
+    /// the client waiting for a session that never starts. The body is sent as
+    /// `text/plain` and may be null.
+    public static WebSocket refuseUpgrade(int status, String body) {
+        return new UpgradeRefusal(Response.text(status, body == null ? "" : body));
+    }
+
+    /// [#refuseUpgrade(int, String)] with a whole response, so the refusal can
+    /// carry its own headers and content type.
+    public static WebSocket refuseUpgrade(Response response) {
+        if (response == null) {
+            throw new IllegalArgumentException("a refusal needs a response");
+        }
+        return new UpgradeRefusal(response);
+    }
+
+    /// The marker [#refuseUpgrade] answers. It is never opened: the server sees
+    /// it before the handshake and writes its response instead.
+    static final class UpgradeRefusal implements WebSocket {
+        final Response response;
+
+        UpgradeRefusal(Response response) {
+            this.response = response;
+        }
+
+        @Override
+        public void onOpen(WebSocketSession session) {
+        }
+
+        @Override
+        public void onText(WebSocketSession session, String message) {
+        }
+
+        @Override
+        public void onBinary(WebSocketSession session, byte[] message, int offset,
+                             int length) {
+        }
     }
 
     /// Where websocket routes come from.
@@ -2138,7 +2184,50 @@ public final class HttpServer {
     /// they live in the virtual thread's own VM state, mapped lazily -- so this
     /// buys call depth rather than data. 64KB holds a few hundred nested Java
     /// frames, well past what an HTTP handler needs, and is mapped lazily too.
-    private static final int VT_STACK_BYTES = envIntAtLeast("CN1_HTTP_VT_STACK", 64 * 1024, 1);
+    ///
+    /// Not final: an application whose handlers are deeper than that raises it
+    /// with `requireVirtualThreadStack` before starting a server. Transpiled
+    /// Python is one: its frames are large and `re` recurses, and a FastAPI
+    /// request overflowed 64KB on its first route match -- a SIGBUS on the
+    /// connection's host with nothing but an empty reply to show for it. Plain
+    /// static rather than atomic: it is written before the server starts, and
+    /// every reader runs on a host thread that start created afterwards.
+    private static int vtStackBytes = envIntAtLeast("CN1_HTTP_VT_STACK", 64 * 1024, 1);
+
+    /// Makes every virtual thread this process creates from now on have at
+    /// least `bytes` of C stack. Call it before `start`; it only ever raises
+    /// the size, so it composes with `CN1_HTTP_VT_STACK` and with other callers.
+    /// The stack is mapped lazily, so a generous size costs address space, not
+    /// memory.
+    ///
+    /// #### Parameters
+    ///
+    /// - `bytes`: the C stack a connection's handler needs
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalStateException`: when a server has already started and `bytes`
+    ///   would raise the size. Hosts and connections that exist keep the stack
+    ///   they were created with, so a late raise would protect only some of the
+    ///   handlers and overflow the others the same way. A call that asks for no
+    ///   more than the current size is a no-op at any time.
+    public static void requireVirtualThreadStack(int bytes) {
+        if (bytes > vtStackBytes) {
+            if (LIVE_SERVERS.get() > 0) {
+                throw new IllegalStateException("requireVirtualThreadStack(" + bytes
+                        + ") was called after a server started; call it before "
+                        + "HttpServer.start so every connection gets the stack");
+            }
+            vtStackBytes = bytes;
+        }
+    }
+
+    /// Servers that bound their listener and have not been stopped. While any
+    /// is live a stack raise could no longer reach every connection, so it is
+    /// refused rather than silently partial; a start that failed to bind never
+    /// counts, and once the last server stops a raise is accepted again.
+    private static final java.util.concurrent.atomic.AtomicInteger LIVE_SERVERS =
+            new java.util.concurrent.atomic.AtomicInteger();
 
     /// How often a virtual-thread host sweeps its deadlines, however busy it is.
     /// The same 250ms the idle poll waits, so a quiet host behaves exactly as
@@ -2549,6 +2638,9 @@ public final class HttpServer {
         final HttpServer server = new HttpServer(listener, reactor,
                 useVirtualThreads ? null : Executors.newFixedThreadPool(workerCount),
                 workerCount, handler, tls);
+        // Counted only now, with the listener bound: a start that threw above
+        // leaves the stack size free to raise.
+        LIVE_SERVERS.incrementAndGet();
         if (tracer != null) {
             server.serverTracer = tracer;
         }
@@ -2660,6 +2752,11 @@ public final class HttpServer {
     /// goes out of its way to avoid -- a failed start is not a reason to take the
     /// process down with it.
     private static void abandonStart(ServerSocket listener, HttpServer server) {
+        // The caller never gets this server, so nothing will stop() it: give
+        // back the live count start() took, or every later stack raise is refused.
+        if (server.stopClaimed.compareAndSet(false, true)) {
+            LIVE_SERVERS.decrementAndGet();
+        }
         server.running = false;
         if (server.pollLoopsEnded(POLL_LOOP_JOIN_MILLIS)) {
             server.closePollers();
@@ -2787,7 +2884,9 @@ public final class HttpServer {
         // wedge itself against a drain that is waiting for that same handler: the
         // bound is the whole teardown the winner is allowed, and after it this
         // returns whether or not the winner finished.
-        if (!stopClaimed.compareAndSet(false, true)) {
+        if (stopClaimed.compareAndSet(false, true)) {
+            LIVE_SERVERS.decrementAndGet();
+        } else {
             long limit = System.currentTimeMillis() + drainMillis
                     + SESSION_RELEASE_GRACE_MILLIS + POLL_LOOP_JOIN_MILLIS;
             synchronized (stopped) {
@@ -3414,7 +3513,7 @@ public final class HttpServer {
             synchronized (VIRTUAL_TASKS) {
                 queued = (Runnable) VIRTUAL_TASKS.get(Long.valueOf(token));
             }
-            long handle = VirtualThread.createTask(token, VT_STACK_BYTES);
+            long handle = VirtualThread.createTask(token, vtStackBytes);
             if (handle != 0 && queued != null) {
                 // Kept so a task abandoned at shutdown can still be told.
                 me.tasks.put(Long.valueOf(handle), queued);
@@ -4380,7 +4479,7 @@ public final class HttpServer {
             return;
         }
         if (handle == 0) {
-            handle = VirtualThread.create(fd, VT_STACK_BYTES);
+            handle = VirtualThread.create(fd, vtStackBytes);
             if (handle == 0) {
                 // No stack. Serving it on this thread is not an option here: the
                 // keep-alive wait is indefinite because it expects to park, so
@@ -4862,6 +4961,18 @@ public final class HttpServer {
                     .withHeaders(upgrade == null ? null : upgrade.extraHeaders));
             return false;
         }
+        if (endpoint instanceof UpgradeRefusal) {
+            Response refused = ((UpgradeRefusal) endpoint).response;
+            if (refused.status < 400 || refused.status > 599) {
+                System.err.println("websocket refusal with status " + refused.status
+                        + " answered as 500");
+                refused = Response.text(500, "internal error");
+            }
+            writeRefusedUpgrade(conn, fd, session, refused.withHeaders(
+                    mergeHeaders(refused.extraHeaders,
+                            upgrade == null ? null : upgrade.extraHeaders)));
+            return false;
+        }
 
         String subprotocol;
         try {
@@ -4877,6 +4988,20 @@ public final class HttpServer {
                     .withHeaders(upgrade == null ? null : upgrade.extraHeaders));
             return false;
         }
+
+        Map endpointHeaders;
+        try {
+            // Application code too, and asked before the borrow ends for the same
+            // reason: a failure is still answerable with a status.
+            endpointHeaders = endpoint.getHandshakeHeaders();
+        } catch (RuntimeException err) {
+            System.err.println("websocket endpoint getHandshakeHeaders failed: " + err);
+            writeRefusedUpgrade(conn, fd, session, Response.text(500, "internal error")
+                    .withHeaders(upgrade == null ? null : upgrade.extraHeaders));
+            return false;
+        }
+        Map handshakeExtra = mergeHeaders(upgrade == null ? null : upgrade.extraHeaders,
+                endpointHeaders);
 
         // Snapshot what the session needs BEFORE the buffer the Request was parsed
         // from stops being the one this connection holds. getHeaders() builds
@@ -4903,7 +5028,8 @@ public final class HttpServer {
         conn.releaseIdleMemory();
 
         try {
-            writeHandshakeResponse(conn, WebSocketHandshake.accept(key), subprotocol, upgrade);
+            writeHandshakeResponse(conn, WebSocketHandshake.accept(key), subprotocol,
+                    handshakeExtra);
         } catch (IOException err) {
             trace("fd=" + fd + " handshake write failed: " + err);
             // Handled here, not by the caller: this path reports the connection
@@ -5318,7 +5444,7 @@ public final class HttpServer {
     /// fresh connection two writes are two segments, and the client waits a round
     /// trip before it can send anything.
     private void writeHandshakeResponse(Conn conn, String accept, String subprotocol,
-                                        Response upgrade)
+                                        Map extraHeaders)
             throws IOException {
         conn.reset();
         conn.put("HTTP/1.1 101 Switching Protocols\r\n");
@@ -5336,8 +5462,8 @@ public final class HttpServer {
             conn.put(subprotocol);
             conn.put("\r\n");
         }
-        if (upgrade != null && upgrade.extraHeaders != null) {
-            java.util.Iterator entries = upgrade.extraHeaders.entrySet().iterator();
+        if (extraHeaders != null) {
+            java.util.Iterator entries = extraHeaders.entrySet().iterator();
             while (entries.hasNext()) {
                 Map.Entry entry = (Map.Entry) entries.next();
                 String name = String.valueOf(entry.getKey());
@@ -5363,6 +5489,60 @@ public final class HttpServer {
         }
         conn.put("\r\n");
         writeTo(conn.fd, conn.session, conn.out, 0, conn.outLength);
+    }
+
+    /// Both header maps in one, `first`'s entries before `second`'s; a name in
+    /// both keeps every value. Header names are case-insensitive, so a name in
+    /// `second` that differs from one in `first` only by case is merged into
+    /// `first`'s spelling rather than written as a second header. Null when
+    /// neither has any.
+    static Map mergeHeaders(Map first, Map second) {
+        if (first == null || first.isEmpty()) {
+            return second;
+        }
+        if (second == null || second.isEmpty()) {
+            return first;
+        }
+        Map merged = new LinkedHashMap(first);
+        java.util.Iterator entries = second.entrySet().iterator();
+        while (entries.hasNext()) {
+            Map.Entry entry = (Map.Entry) entries.next();
+            Object key = sameHeaderKey(merged, entry.getKey());
+            Object had = merged.get(key);
+            if (had == null) {
+                merged.put(key, entry.getValue());
+                continue;
+            }
+            List values = new ArrayList();
+            addValues(values, had);
+            addValues(values, entry.getValue());
+            merged.put(key, values);
+        }
+        return merged;
+    }
+
+    /// The key of `map` that names the same header as `name`, compared without
+    /// regard to case; `name` itself when there is none.
+    private static Object sameHeaderKey(Map map, Object name) {
+        if (map.containsKey(name) || !(name instanceof String)) {
+            return name;
+        }
+        java.util.Iterator keys = map.keySet().iterator();
+        while (keys.hasNext()) {
+            Object key = keys.next();
+            if (key instanceof String && ((String) key).equalsIgnoreCase((String) name)) {
+                return key;
+            }
+        }
+        return name;
+    }
+
+    private static void addValues(List into, Object value) {
+        if (value instanceof List) {
+            into.addAll((List) value);
+        } else {
+            into.add(value);
+        }
     }
 
     /// 426, naming the version this server speaks. RFC 6455 4.2.2 requires it.
@@ -5477,7 +5657,11 @@ public final class HttpServer {
         boolean drained;
 
         /// Memoised request targets for this connection. See internTarget.
-        private final String[] targetCache = new String[TARGET_CACHE_SLOTS];
+        /// Null until the connection's second distinct target: a connection
+        /// that serves one request (no keep-alive) never memoises anything,
+        /// and that one target is held in soleTarget instead of a table.
+        private String[] targetCache;
+        private String soleTarget;
         /// The Host value of the previous request on this connection.
         private String lastHost;
 
@@ -5518,11 +5702,23 @@ public final class HttpServer {
             // Capped rather than cleared when idle: clearing would throw the
             // memoisation away on every keep-alive request, which is the case it
             // was measured to help.
-            if (targetCache.length == 0 || length > MAX_CACHED_TARGET_BYTES) {
+            if (TARGET_CACHE_SLOTS == 0 || length > MAX_CACHED_TARGET_BYTES) {
                 // Cache disabled (CN1_HTTP_TARGET_CACHE=0), for A/B measurement.
                 // Guarded because the slot arithmetic below is a modulo, and a zero
                 // size would divide by it rather than politely doing nothing.
                 return asciiString(data, start, length);
+            }
+            if (targetCache == null) {
+                if (sameTarget(soleTarget, data, start, length)) {
+                    return soleTarget;
+                }
+                if (soleTarget == null) {
+                    soleTarget = asciiString(data, start, length);
+                    return soleTarget;
+                }
+                targetCache = new String[TARGET_CACHE_SLOTS];
+                targetCache[targetSlot(soleTarget)] = soleTarget;
+                soleTarget = null;
             }
             int hash = 0;
             for (int iter = 0 ; iter < length ; iter++) {
@@ -5546,6 +5742,28 @@ public final class HttpServer {
             // overwriting lets whichever is currently hot keep the slot.
             targetCache[slot] = fresh;
             return fresh;
+        }
+
+        private static boolean sameTarget(String cached, byte[] data, int start, int length) {
+            if (cached == null || cached.length() != length) {
+                return false;
+            }
+            for (int iter = 0 ; iter < length ; iter++) {
+                if (cached.charAt(iter) != (char) (data[start + iter] & 0xff)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        /// The slot internTarget's hash gives a target already held as a
+        /// String: the same sum over its chars, which are its bytes.
+        private static int targetSlot(String target) {
+            int hash = 0;
+            for (int iter = 0 ; iter < target.length() ; iter++) {
+                hash = hash * 31 + (byte) target.charAt(iter);
+            }
+            return (hash & 0x7fffffff) % TARGET_CACHE_SLOTS;
         }
 
         /// Where a response is assembled, reused for the life of the connection.
@@ -5627,7 +5845,16 @@ public final class HttpServer {
         // Not final: an oversized one is REPLACED rather than carried, see
         // releaseIdleMemory. reset() only rewinds the length, which is the right
         // thing per request and the wrong thing across an idle wait.
-        ByteSink bodySink = new ByteSink(512);
+        // Made on first use: only a deferred JSON response needs it, and a
+        // connection that never sends one should not pay for it.
+        ByteSink bodySink;
+
+        ByteSink bodySink() {
+            if (bodySink == null) {
+                bodySink = new ByteSink(512);
+            }
+            return bodySink;
+        }
 
         void reset() {
             outLength = 0;
@@ -5667,7 +5894,9 @@ public final class HttpServer {
         private byte[] ctBytes;
 
         void putContentType(String ct) {
-            if (ct == ctKey) { //NOPMD CompareObjectsWithEquals - identity on purpose, see above
+            // ctBytes is tested for SpotBugs: ct is never null, so a match
+            // implies the cache was filled, which it cannot prove.
+            if (ct == ctKey && ctBytes != null) { //NOPMD CompareObjectsWithEquals - identity on purpose, see above
                 System.arraycopy(ctBytes, 0, out, ensureAt(ctBytes.length), ctBytes.length);
                 outLength += ctBytes.length;
                 return;
@@ -6209,8 +6438,8 @@ public final class HttpServer {
                 out = new byte[1024];
                 outLength = 0;
             }
-            if (bodySink.bytes().length > MAX_IDLE_BUFFER_BYTES) {
-                bodySink = new ByteSink(512);
+            if (bodySink != null && bodySink.bytes().length > MAX_IDLE_BUFFER_BYTES) {
+                bodySink = null;
             }
             if (pooledResponse != null) {
                 pooledResponse.releaseRetained();
@@ -6478,8 +6707,8 @@ public final class HttpServer {
                 // the write it dropped the connection with nothing sent.
                 if (response.hasDeferredJson) {
                     try {
-                        conn.bodySink.reset();
-                        response.writeDeferredJson(conn.bodySink);
+                        conn.bodySink().reset();
+                        response.writeDeferredJson(conn.bodySink());
                     } catch (Throwable err) {
                         rethrowIfFatal(err);
                         System.err.println("handler failed: " + err);
@@ -7962,8 +8191,8 @@ public final class HttpServer {
         }
         try {
             if (refused.hasDeferredJson) {
-                conn.bodySink.reset();
-                refused.writeDeferredJson(conn.bodySink);
+                conn.bodySink().reset();
+                refused.writeDeferredJson(conn.bodySink());
             }
             writeResponse(conn, fd, session, refused, false, false, true);
             conn.writtenStatus = status;
@@ -9137,8 +9366,8 @@ public final class HttpServer {
         byte[] deferred = null;
         int deferredLength = 0;
         if (response.hasDeferredJson) {
-            deferred = conn.bodySink.bytes();
-            deferredLength = conn.bodySink.length();
+            deferred = conn.bodySink().bytes();
+            deferredLength = conn.bodySink().length();
         }
         long bodyLength = response.fileFd >= 0 ? response.fileLength
                 : (deferred != null ? deferredLength : response.body.length);

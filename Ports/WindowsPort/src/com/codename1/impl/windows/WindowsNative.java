@@ -484,6 +484,12 @@ public final class WindowsNative {
      */
     public static native long loadTrueTypeFontFromMemory(String fontName, byte[] data);
 
+    /**
+     * Whether DirectWrite can load a font from memory on this system (it needs
+     * IDWriteFactory5, Windows 10 1703 and later).
+     */
+    public static native boolean isFontMemoryLoadingSupported();
+
     /** Derives a new font peer at the given pixel size and CN1 style/weight bits. */
     public static native long deriveTrueTypeFont(long font, float size, int weight);
 

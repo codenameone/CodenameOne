@@ -213,6 +213,10 @@ class AttachmentReconciliationTest extends UITestBase {
             return (short) position;
         }
 
+        public int getColumnType(int index) {
+            return Database.COLUMN_UNKNOWN;
+        }
+
         public String getString(int index) {
             Attachment row = rows.get(position);
             return index == 1 ? row.schema : (index == 2 ? row.file : String.valueOf(position));

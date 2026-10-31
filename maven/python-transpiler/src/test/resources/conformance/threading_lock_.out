@@ -1,0 +1,13 @@
+counter 800
+timed out False True
+non-blocking False
+acquired after release True
+RuntimeError release unlocked lock
+rlock order ['owner', 'other']
+rlock release unowned: RuntimeError
+spin [(0, 10000), (1, 19999), (2, 30000), (3, 40000), (4, 49996), (5, 59997)]
+condition True [1]
+event timeout False
+event set True
+semaphore timeout False
+both progressed True True

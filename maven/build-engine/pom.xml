@@ -74,6 +74,11 @@
         </dependency>
         <dependency>
             <groupId>${project.groupId}</groupId>
+            <artifactId>codenameone-python-transpiler</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>${project.groupId}</groupId>
             <artifactId>codenameone-project-model</artifactId>
             <version>${project.version}</version>
         </dependency>

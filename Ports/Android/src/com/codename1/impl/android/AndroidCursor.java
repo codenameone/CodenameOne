@@ -633,6 +633,31 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
     }
 
     @Override
+    public int getColumnType(int index) throws IOException {
+        checkOpen();
+        checkOnARow();
+        checkColumn(index);
+        try {
+            switch (c.getType(index)) {
+                case android.database.Cursor.FIELD_TYPE_NULL:
+                    return Database.COLUMN_NULL;
+                case android.database.Cursor.FIELD_TYPE_INTEGER:
+                    return Database.COLUMN_INTEGER;
+                case android.database.Cursor.FIELD_TYPE_FLOAT:
+                    return Database.COLUMN_FLOAT;
+                case android.database.Cursor.FIELD_TYPE_STRING:
+                    return Database.COLUMN_TEXT;
+                case android.database.Cursor.FIELD_TYPE_BLOB:
+                    return Database.COLUMN_BLOB;
+                default:
+                    return Database.COLUMN_UNKNOWN;
+            }
+        } catch (RuntimeException failed) {
+            throw readFailed(index, failed);
+        }
+    }
+
+    @Override
     public boolean wasNull() throws IOException {
         // Checked first: without it a Row retained past the close of its cursor reached straight
         // into an already-closed native cursor below.

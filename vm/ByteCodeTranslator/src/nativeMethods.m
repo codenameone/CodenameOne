@@ -1914,6 +1914,47 @@ static JAVA_OBJECT cn1ConcatFallback(CODENAME_ONE_THREAD_STATE, JAVA_ARRAY_BYTE*
     return so;
 }
 
+// String.join over Latin-1 Strings. cn1JoinLatin1 has checked every part and
+// summed the length (total fits an int), so this only copies bytes.
+JAVA_OBJECT java_lang_String_cn1FusedJoin___java_lang_String_java_lang_Object_1ARRAY_int_int_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT sep, JAVA_OBJECT parts, JAVA_INT n, JAVA_INT total) {
+    JAVA_ARRAY_BYTE* dst;
+    JAVA_OBJECT so = cn1FusedLatin1Begin(threadStateData, total, &dst);
+    int fused = so != JAVA_NULL;
+    if(!fused) {
+        enteringNativeAllocations();
+        JAVA_ARRAY dat = (JAVA_ARRAY)allocArray(threadStateData, total, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
+        dst = (JAVA_ARRAY_BYTE*) CN1_ARRAY_DATA(dat);
+        so = __NEW_java_lang_String(threadStateData);
+        java_lang_String___INIT____(threadStateData, so);
+        ((struct obj__java_lang_String*)so)->java_lang_String_value = (JAVA_OBJECT)dat;
+        ((struct obj__java_lang_String*)so)->java_lang_String_count = total;
+    }
+    // Pointers are taken only now: the allocation above may run a collection.
+    JAVA_OBJECT* items = (JAVA_OBJECT*) CN1_ARRAY_DATA((JAVA_ARRAY)parts);
+    JAVA_ARRAY_BYTE* sp = CN1_SB_PTR(sep);
+    int sl = CN1_SB_LEN(sep);
+    int o = 0;
+    // Short parts (words, separators) are copied by a loop: a memcpy call
+    // costs more than the bytes it moves.
+    for(int q = 0 ; q < n ; q++) {
+        if(q > 0) {
+            if(sl > 16) { memcpy(dst + o, sp, sl); } else { for(int i = 0 ; i < sl ; i++) dst[o + i] = sp[i]; }
+            o += sl;
+        }
+        JAVA_OBJECT it = items[q];
+        int l = CN1_SB_LEN(it);
+        JAVA_ARRAY_BYTE* ip = CN1_SB_PTR(it);
+        if(l > 16) { memcpy(dst + o, ip, l); } else { for(int i = 0 ; i < l ; i++) dst[o + i] = ip[i]; }
+        o += l;
+    }
+    if(fused) {
+        cn1FusedLatin1End(so, total);
+    } else {
+        finishedNativeAllocations();
+    }
+    return so;
+}
+
 JAVA_OBJECT java_lang_String_cn1FusedConcat2___java_lang_String_java_lang_String_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT a, JAVA_OBJECT b) {
     JAVA_ARRAY_BYTE* p[2] = { CN1_SB_PTR(a), CN1_SB_PTR(b) };
     int l[2] = { CN1_SB_LEN(a), CN1_SB_LEN(b) };
@@ -2374,6 +2415,60 @@ JAVA_LONG threadKeyCounter = 1;
    below unwinds a partially built state through it. */
 static void cn1FreeThreadLocalDataFields(struct ThreadLocalData* head);
 
+/*
+ * A virtual thread's per-thread buffers -- the three call-stack arrays, the
+ * pending-allocation table and the try-block array -- from ONE anonymous mapping,
+ * where an OS thread callocs each.
+ *
+ * A server runs a virtual thread per connection, and a retired one's state is
+ * released only when the next collection drains it (cn1RetireVirtualThread), so
+ * a busy server holds every connection one cycle served. Measured on the Flask
+ * sample under ab -c 8, about 1,500 requests ran per cycle and the process grew
+ * past 600MB with a Java heap under 200MB: these buffers are ~60KB a thread,
+ * and calloc'd from the allocator they were resident in full -- a recycled block
+ * is zeroed by storing to it -- and stayed resident after free, kept by the
+ * allocator as idle. A fresh mapping is zero-filled by the kernel and commits per
+ * page on first touch, so a request commits the few pages its frames reach, and
+ * munmap gives them back to the system when the state is released.
+ *
+ * OS threads keep calloc: they are few and long-lived. Windows keeps it too
+ * (see cn1AllocThreadStack). The pending table can still grow past its mapped
+ * piece; the grow path frees the old table only when it is not in the mapping.
+ */
+static int cn1MapThreadBuffers(struct ThreadLocalData* i) {
+#if defined(_WIN32)
+    (void)i;
+    return 0;
+#else
+    /* Packed, not page aligned: what a request touches is the head of each buffer,
+       and packed those heads share a page or two (pages are 16KB on Apple silicon)
+       where page-aligned pieces would commit one page each. 64-byte steps keep the
+       try blocks' jmp_bufs aligned. */
+    size_t callBytes = ((CN1_MAX_STACK_CALL_DEPTH * sizeof(int)) + 63) & ~(size_t)63;
+    size_t blockBytes = ((CN1_MAX_TRY_BLOCKS * sizeof(struct TryBlock)) + 63) & ~(size_t)63;
+    size_t pendingBytes = PER_THREAD_ALLOCATION_COUNT * sizeof(void*);
+    size_t bytes = 3 * callBytes + blockBytes + pendingBytes;
+    char* p = (char*)mmap(NULL, bytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if(p == MAP_FAILED) {
+        return 0;
+    }
+    i->threadBuffersMap = p;
+    i->threadBuffersMapBytes = bytes;
+    i->callStackClass = (int*)p;
+    i->callStackLine = (int*)(p + callBytes);
+    i->callStackMethod = (int*)(p + 2 * callBytes);
+    i->blocks = (struct TryBlock*)(p + 3 * callBytes);
+    i->pendingHeapAllocations = (void**)(p + 3 * callBytes + blockBytes);
+    return 1;
+#endif
+}
+
+/* Whether p lies in the state's buffer mapping, and so must not be passed to free. */
+int cn1InThreadBuffersMap(struct ThreadLocalData* i, void* p) {
+    char* m = i->threadBuffersMap;
+    return m != 0 && (char*)p >= m && (char*)p < m + i->threadBuffersMapBytes;
+}
+
 struct ThreadLocalData* cn1CreateThreadLocalData(JAVA_BOOLEAN bindToCallingOsThread) {
     struct ThreadLocalData* i;
         JAVA_LONG nativeThreadId = threadKeyCounter;
@@ -2427,9 +2522,11 @@ struct ThreadLocalData* cn1CreateThreadLocalData(JAVA_BOOLEAN bindToCallingOsThr
     i->threadObjectStack = cn1AllocThreadStack(&i->threadObjectStackMapped);
     i->threadObjectStackOffset = 0;
 
-    i->callStackClass = calloc(CN1_MAX_STACK_CALL_DEPTH, sizeof(int));
-    i->callStackLine = calloc(CN1_MAX_STACK_CALL_DEPTH, sizeof(int));
-    i->callStackMethod = calloc(CN1_MAX_STACK_CALL_DEPTH, sizeof(int));
+    if(bindToCallingOsThread || !cn1MapThreadBuffers(i)) {
+        i->callStackClass = calloc(CN1_MAX_STACK_CALL_DEPTH, sizeof(int));
+        i->callStackLine = calloc(CN1_MAX_STACK_CALL_DEPTH, sizeof(int));
+        i->callStackMethod = calloc(CN1_MAX_STACK_CALL_DEPTH, sizeof(int));
+    }
 
 #ifdef CN1_ON_DEVICE_DEBUG
     i->callStackLocalsAddresses = malloc(CN1_MAX_STACK_CALL_DEPTH * sizeof(void**));
@@ -2471,7 +2568,9 @@ struct ThreadLocalData* cn1CreateThreadLocalData(JAVA_BOOLEAN bindToCallingOsThr
         i->nativeStackLimit = 1;
     }
 
-    i->pendingHeapAllocations = calloc(PER_THREAD_ALLOCATION_COUNT, sizeof(void *));
+    if(i->threadBuffersMap == 0) {
+        i->pendingHeapAllocations = calloc(PER_THREAD_ALLOCATION_COUNT, sizeof(void *));
+    }
     i->heapAllocationSize = 0;
     i->threadHeapTotalSize = PER_THREAD_ALLOCATION_COUNT;
     // ThreadLocalData is malloc'd, NOT zeroed. bibopBytesLocal feeds the GC
@@ -2495,7 +2594,9 @@ struct ThreadLocalData* cn1CreateThreadLocalData(JAVA_BOOLEAN bindToCallingOsThr
     i->gcQueuedForDrain = JAVA_FALSE;
     i->gcReleaseRequested = JAVA_FALSE;
     
-    i->blocks = malloc(CN1_MAX_TRY_BLOCKS * sizeof(struct TryBlock));
+    if(i->threadBuffersMap == 0) {
+        i->blocks = malloc(CN1_MAX_TRY_BLOCKS * sizeof(struct TryBlock));
+    }
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
     // PHASE 3b: record this thread's pthread handle + TLS self pointer so the GC can
     // signal-stop it and the async-signal-safe stop handler can find its state.
@@ -2723,6 +2824,12 @@ extern void cn1ReleaseThreadLocalData(struct ThreadLocalData* head);
  * stack that body is running on. Retire it from whoever resumed it, after
  * cn1VirtualThreadFinished reports true.
  */
+/* What a retired virtual thread's state is charged against the collection trigger:
+   roughly what one holds resident until the drain frees it -- the heads of its
+   buffer mapping and of its object stack, a few 16KB pages. */
+#ifndef CN1_RETIRED_THREAD_STATE_BYTES
+#define CN1_RETIRED_THREAD_STATE_BYTES (64 * 1024)
+#endif
 void cn1RetireVirtualThread(struct cn1VirtualThread* vt) {
     struct ThreadLocalData* state;
     if(vt == 0) {
@@ -2749,6 +2856,15 @@ void cn1RetireVirtualThread(struct cn1VirtualThread* vt) {
         lockCriticalSection();
         state->gcReleaseRequested = JAVA_TRUE;
         unlockCriticalSection();
+        // The state is garbage the next collection frees, so it counts toward that
+        // collection as garbage does. A server retires a state per connection, and
+        // uncharged they piled up for as long as the heap took to fill: measured on
+        // the Flask sample under ab -c 8, ~4,000 retired states awaiting the drain,
+        // 300MB resident beside a Java heap of 180MB.
+#ifndef CN1_DISABLE_BIBOP
+        atomic_fetch_add_explicit(&bibopBytesSinceGc, CN1_RETIRED_THREAD_STATE_BYTES,
+                                  memory_order_relaxed);
+#endif
     }
     cn1VirtualThreadFree(vt);
 }
@@ -3524,20 +3640,31 @@ JAVA_VOID java_lang_Thread_setPriorityImpl___int(CODENAME_ONE_THREAD_STATE, JAVA
    path in cn1CreateThreadLocalData, which must NOT touch nThreadsToKill -- a state
    that never reached allThreads was never counted as living. */
 static void cn1FreeThreadLocalDataFields(struct ThreadLocalData *head) {
-    free(head->blocks);
+    if(head->threadBuffersMap == 0) {
+        free(head->blocks);
+    }
     /* Free it the way it was ALLOCATED -- see cn1AllocThreadStack, which falls back
        to calloc when mmap is out of mappings. Neither mismatch is survivable: free()
        on a mapping is undefined behaviour, and munmap on an allocator block leaks the
        stack at best. */
     cn1FreeThreadStack(head->threadObjectStack, head->threadObjectStackMapped);
-    free(head->callStackClass);
-    free(head->callStackLine);
-    free(head->callStackMethod);
+    if(head->threadBuffersMap == 0) {
+        free(head->callStackClass);
+        free(head->callStackLine);
+        free(head->callStackMethod);
+    }
 #ifdef CN1_ON_DEVICE_DEBUG
     free(head->callStackLocalsAddresses);
     free(head->callStackFrameInfo);
 #endif
-    free(head->pendingHeapAllocations);
+    if(!cn1InThreadBuffersMap(head, head->pendingHeapAllocations)) {
+        free(head->pendingHeapAllocations);
+    }
+#if !defined(_WIN32)
+    if(head->threadBuffersMap != 0) {
+        munmap(head->threadBuffersMap, head->threadBuffersMapBytes);
+    }
+#endif
     free(head);
 }
 

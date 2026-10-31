@@ -1,0 +1,22 @@
+['address', 'user_account'] user_account ['id', 'email', 'user_id']
+None True
+1 2 3 40 None
+[2, 3] 2
+1 spongebob Spongebob Squarepants 18
+2 sandy Sandy Cheeks 18
+True ['sandy@sqlalchemy.org', 'sandy@squirrelpower.org']
+sandy True
+None
+3
+[('spongebob', 'spongebob@sqlalchemy.org'), ('sandy', 'sandy@sqlalchemy.org'), ('sandy', 'sandy@squirrelpower.org')]
+['sandy']
+['patrick', 'sandy']
+Patrick Star ['pat@star.org']
+['sandy@squirrelpower.org']
+['sandy@sqlalchemy.org', 'sandy@squirrelpower.org']
+True 4
+3
+['sandy', 'patrick']
+['sandy@sqlalchemy.org', 'sandy@squirrelpower.org', 'pat@star.org']
+patrick 40 1 patrick
+[]

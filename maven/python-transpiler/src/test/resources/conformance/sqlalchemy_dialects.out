@@ -1,0 +1,23 @@
+postgresql://scott:***@db.example:5433/app?sslmode=require postgresql postgresql psycopg
+   scott tiger db.example 5433 app {'sslmode': 'require'}
+postgresql+psycopg://u@localhost/app postgresql+psycopg postgresql psycopg
+   u None localhost None app {}
+mysql://root:***@127.0.0.1/shop mysql mysql mysqldb
+   root pw 127.0.0.1 None shop {}
+mysql+pymysql://root:***@[::1]:3307/shop?charset=utf8mb4 mysql+pymysql mysql pymysql
+   root p@ss ::1 3307 shop {'charset': 'utf8mb4'}
+mariadb://u:***@host/db mariadb mariadb mysqldb
+   u p host None db {}
+sqlite:///file.db sqlite sqlite pysqlite
+   None None None None file.db {}
+sqlite:// sqlite sqlite pysqlite
+   None None None None None {}
+mysql://a:b@h/d
+postgresql://a@h/other
+postgresql True
+mysql False
+sqlite False
+sqlite pysqlite qmark
+(1,)
+[('a', True)]
+[('b',)]

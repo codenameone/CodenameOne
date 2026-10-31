@@ -183,6 +183,19 @@ extern "C" int cn1dwRegisterFontFile(const wchar_t* path, wchar_t* outFamily, in
  * caller's buffer need not outlive this call. Returns 1 and the family name on
  * success.
  */
+extern "C" int cn1dwFontMemorySupported(void) {
+    IDWriteFactory* f = dwFactory();
+    if (f == nullptr) {
+        return 0;
+    }
+    IDWriteFactory5* f5 = nullptr;
+    if (FAILED(f->QueryInterface(__uuidof(IDWriteFactory5), reinterpret_cast<void**>(&f5))) || f5 == nullptr) {
+        return 0;
+    }
+    f5->Release();
+    return 1;
+}
+
 extern "C" int cn1dwRegisterFontMemory(const void* data, unsigned int len, wchar_t* outFamily, int outLen) {
     IDWriteFactory* f = dwFactory();
     if (f == nullptr || data == nullptr || len == 0) {

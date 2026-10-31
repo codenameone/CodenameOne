@@ -147,6 +147,12 @@ if [ -d contract ] && [ "$STANDALONE_DEMO" != "1" ]; then
 fi
 GEN=""
 if [ -d gen ]; then GEN="gen"; fi
+# CN1_BACKEND_EXTRA_CLASSES=<dir> adds classes compiled elsewhere -- a Python
+# backend's transpiled modules and their runtime -- to the demo's class path
+# and to the translation.
+if [ -n "${CN1_BACKEND_EXTRA_CLASSES:-}" ]; then
+    GEN="${GEN:+$GEN:}$CN1_BACKEND_EXTRA_CLASSES"
+fi
 # src/ is the shared runtime -- protocol logic, pure Java, identical on every
 # target. impl/parparvm holds the classes backed by natives; impl/javase holds
 # their Java SE twins and is what the local dev loop compiles instead.
@@ -168,7 +174,10 @@ SHARED=()
 while IFS= read -r f; do SHARED+=("$f"); done <<< "$SHARED_LIST"
 "$J8/bin/javac" -nowarn -encoding UTF-8 -bootclasspath "$JAVAAPI" ${GEN:+-cp "$GEN"} -source 1.8 -target 1.8 \
     -d "$WORK/classes" $(find src impl/parparvm $COMMON "$DEMO" -name '*.java') "${SHARED[@]}"
-if [ -n "$GEN" ]; then cp -r "$GEN/." "$WORK/classes/"; fi
+if [ -n "$GEN" ]; then
+    IFS=: read -r -a GEN_DIRS <<< "$GEN"
+    for g in "${GEN_DIRS[@]}"; do cp -r "$g/." "$WORK/classes/"; done
+fi
 
 mkdir -p "$WORK/out"
 # The native sources have to be in the source root BEFORE the translator runs, not

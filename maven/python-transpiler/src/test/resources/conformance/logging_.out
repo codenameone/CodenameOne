@@ -1,0 +1,23 @@
+True True True 10
+NOTICE 25 Level 7 40
+DEBUG|app|debug 1
+INFO|app.db|query select took 2.2ms
+WARNING|app.db|dict args
+Level 25|app|custom
+NOTICE|app|named
+WARNING app:both
+CRITICALapp:templ
+CRITICAL templ [ada]
+ERROR   app:n=1
+ERROR   app:n=3
+a False; a.b True; a.b.c True; a.bc False; 
+failed ZeroDivisionError: division by zero
+'req1 adapted\np [p] pref\n'
+<Logger app (DEBUG)> <RootLogger root (WARNING)> <LoggerAdapter exc (WARNING)> False True
+False True
+Unknown level: 'LOUD'
+level must be an integer
+hi there hi there
+invalid format: no fields
+'INFO:root info\nWARNING:propagated\n' 20
+[('CRITICAL', 50), ('DEBUG', 10), ('ERROR', 40)] app.db.x ['app.db']

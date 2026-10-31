@@ -91,6 +91,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
     private static final String WEBSOCKET_MAPPING = PKG + "WebSocketMapping;";
     private static final String WEBSOCKET_INTERFACE = "com/codename1/backend/WebSocket";
     static final String OPEN_TELEMETRY = PKG + "OpenTelemetry;";
+    static final String VIRTUAL_THREAD_STACK = PKG + "VirtualThreadStack;";
 
     /// The application.properties key that enables tracing without touching the
     /// source, read at build time from the module directory -- where Config reads
@@ -231,6 +232,10 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
     /// The settings annotations, and whether the build asked for the management
     /// and MCP endpoints. Settled in [#finish] beside [#telemetry].
     BackendSettings settings;
+
+    /// The C stack `@VirtualThreadStack` asks for, in bytes, or 0 when no class
+    /// asks. Settled in [#finish] beside [#telemetry].
+    int virtualThreadStack;
 
     private final Map<String, String> routeShapes = new LinkedHashMap<String, String>();
 
@@ -1536,6 +1541,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             return;
         }
         resolveTelemetry(ctx);
+        resolveVirtualThreadStack(ctx);
         if (ctx.hasErrors()) {
             return;
         }
@@ -3211,6 +3217,12 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         // runtime's internal access, so none of them is public API.
         sb.append("        com.codename1.impl.backend.BackendAccess cn1Access =\n")
           .append("                com.codename1.impl.backend.BackendAccess.get();\n");
+        if (virtualThreadStack > 0) {
+            // Before the builder exists, so before any server can start: the
+            // runtime reads the size when it creates a connection's thread.
+            sb.append("        com.codename1.backend.HttpServer.requireVirtualThreadStack(")
+              .append(virtualThreadStack).append(");\n");
+        }
         sb.append("        com.codename1.backend.Backend.Builder cn1Builder = "
                 + "com.codename1.backend.Backend.builder()");
         if (telemetry) {
@@ -3375,6 +3387,44 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         if (!telemetry && propertyEnablesTelemetry(ctx)) {
             telemetry = true;
         }
+    }
+
+    /// The C stack `@VirtualThreadStack` asks for, across the whole class index
+    /// the way [#resolveTelemetry] looks for `@OpenTelemetry`.
+    ///
+    /// Several classes may carry it and the LARGEST size wins rather than the
+    /// build failing: the runtime call only ever raises the size, so a module
+    /// that combines two libraries each asking for its own floor gets what both
+    /// need. A value that is not a size is a build error naming the class.
+    void resolveVirtualThreadStack(ProcessorContext ctx) {
+        virtualThreadStack = 0;
+        for (AnnotatedClass cls : ctx.getClassIndex().values()) {
+            AnnotationValues vts = cls.getClassAnnotation(VIRTUAL_THREAD_STACK);
+            if (vts == null) {
+                continue;
+            }
+            if (!BuildHintAnnotationProcessor.hasBackingSource(cls, ctx.getCompileSourceRoots(),
+                    ctx.getSourceEncoding())) {
+                continue;
+            }
+            String raw = vts.getStringOrDefault("value", "");
+            int bytes = parseStackSize(raw);
+            if (bytes <= 0) {
+                ctx.error(cls, "@VirtualThreadStack(\"" + raw + "\") on " + cls.getBinaryName()
+                        + " is not a stack size. Write a positive number of bytes, or a number "
+                        + "followed by KB or MB, such as \"512KB\" or \"1MB\".");
+                return;
+            }
+            if (bytes > virtualThreadStack) {
+                virtualThreadStack = bytes;
+            }
+        }
+    }
+
+    /// Parses a size the way the Python build hint does, so the annotation and
+    /// the hint accept exactly the same spellings.
+    static int parseStackSize(String raw) {
+        return com.codename1.python.transpiler.api.PythonTranspiler.parseStackSize(raw);
     }
 
     /// `cn1.otel.enabled` from the module's application properties, the files

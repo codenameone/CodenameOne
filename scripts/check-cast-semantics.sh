@@ -44,6 +44,8 @@ DEFAULT_ROOTS=(
   "maven/android-compat/target/classes"
   "maven/swing-compat/target/classes"
   "maven/javafx-compat/target/classes"
+  # The Python runtime ships inside every application with Python sources.
+  "maven/python-runtime/target/classes"
   "maven/compose-compat/target/classes"
 )
 # Translated too, but built only under the unity-compat Maven profile, which

@@ -30,8 +30,10 @@
  *
  * NOTE: implemented against Pango/PangoCairo but not yet compiled/run on a
  * Linux/GTK host. In-memory TrueType registration (loadTrueTypeFontFromMemory)
- * currently falls back to a system family -- wiring the bytes through
- * FcConfigAppFontAddMemFace/FreeType is a later refinement.
+ * spools the bytes to a temp file, adds it to FontConfig and names the family
+ * from the face via FreeType. Bytes that are not a font still answer a system
+ * family here, so LinuxImplementation.loadTrueTypeFontFromData rejects anything
+ * without an SFNT header before calling it.
  */
 
 #define _GNU_SOURCE
@@ -481,37 +483,51 @@ JAVA_LONG com_codename1_impl_linux_LinuxNative_loadTrueTypeFontFromMemory___java
     }
     bytes = (unsigned char*) CN1_ARRAY_DATA(data);
 
-    fd = mkstemp(tmpl);
-    if (fd >= 0) {
-        if (write(fd, bytes, (size_t) len) == len) {
-            close(fd);
-            FcConfigAppFontAddFile(FcConfigGetCurrent(), (const FcChar8*) tmpl);
-            /* Reset Pango's default font map (and our cached context) so the next
-             * layout sees the freshly registered family. */
-            pango_cairo_font_map_set_default(0);
-            cn1Pango = 0;
-            /* A family that fell back to a system face until now may resolve to
-             * the new one, so every cached answer is suspect. */
-            if (cn1MetricsCache != NULL) {
-                g_hash_table_remove_all(cn1MetricsCache);
-            }
-            cn1WidthCacheClear();
-        } else {
-            close(fd);
-        }
+    /* Parse the face first: bytes FreeType cannot open are not a font, and the
+     * caller is told so (0) instead of being handed a system family that Pango
+     * would substitute for a name nothing registered. The font's own family name
+     * is the reliable handle for Pango. */
+    if (FT_Init_FreeType(&lib) != 0) {
+        return 0;
     }
-
-    /* The font's own family name is the reliable handle for Pango. */
-    if (FT_Init_FreeType(&lib) == 0) {
-        if (FT_New_Memory_Face(lib, bytes, len, 0, &face) == 0) {
-            if (face->family_name) {
-                strncpy(family, face->family_name, sizeof(family) - 1);
-                family[sizeof(family) - 1] = 0;
-            }
-            FT_Done_Face(face);
-        }
+    if (FT_New_Memory_Face(lib, bytes, len, 0, &face) != 0) {
         FT_Done_FreeType(lib);
+        return 0;
     }
+    if (face->family_name) {
+        strncpy(family, face->family_name, sizeof(family) - 1);
+        family[sizeof(family) - 1] = 0;
+    }
+    FT_Done_Face(face);
+    FT_Done_FreeType(lib);
+
+    /* The spooled file is deliberately not unlinked: FontConfig records the path
+     * and Pango/cairo open the face from it lazily, at every later layout. */
+    fd = mkstemp(tmpl);
+    if (fd < 0) {
+        return 0;
+    }
+    if (write(fd, bytes, (size_t) len) != len) {
+        close(fd);
+        unlink(tmpl);
+        return 0;
+    }
+    close(fd);
+    if (!FcConfigAppFontAddFile(FcConfigGetCurrent(), (const FcChar8*) tmpl)) {
+        unlink(tmpl);
+        return 0;
+    }
+    /* Reset Pango's default font map (and our cached context) so the next
+     * layout sees the freshly registered family. */
+    pango_cairo_font_map_set_default(0);
+    cn1Pango = 0;
+    /* A family that fell back to a system face until now may resolve to
+     * the new one, so every cached answer is suspect. */
+    if (cn1MetricsCache != NULL) {
+        g_hash_table_remove_all(cn1MetricsCache);
+    }
+    cn1WidthCacheClear();
+
     if (family[0] == 0) {
         /* Fall back to the requested name (minus the native: scheme). */
         strncpy(family, strncmp(name, "native:", 7) == 0 ? name + 7 : name, sizeof(family) - 1);

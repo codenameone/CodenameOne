@@ -1,0 +1,23 @@
+b'' True b'' b'' b'' b'' b'' b''
+b'Zg==' True b'Zg==' b'MY======' b'CO======' b'66' b'W&' b'Ac'
+b'Zm8=' True b'Zm8=' b'MZXQ====' b'CPNG====' b'666F' b'W^V' b'Ao@'
+b'Zm9v' True b'Zm9v' b'MZXW6===' b'CPNMU===' b'666F6F' b'W^Zo' b'AoDS'
+b'Zm9vYg==' True b'Zm9vYg==' b'MZXW6YQ=' b'CPNMUOG=' b'666F6F62' b'W^Zp|' b'AoDTs'
+b'Zm9vYmE=' True b'Zm9vYmE=' b'MZXW6YTB' b'CPNMUOJ1' b'666F6F6261' b'W^Zp|VE' b'AoDTs@/'
+b'Zm9vYmFy' True b'Zm9vYmFy' b'MZXW6YTBOI======' b'CPNMUOJ1E8======' b'666F6F626172' b'W^Zp|VR8' b'AoDTs@<)'
+b'AAcOFRwjKjE4P0ZNVFtiaXB3foWMk5qhqK+2vcTL0tng5+71/A==' True b'AAcOFRwjKjE4P0ZNVFtiaXB3foWMk5qhqK-2vcTL0tng5-71_A==' b'AADQ4FI4EMVDCOB7IZGVIW3CNFYHO7UFRSJZVINIV63L3RGL2LM6BZ7O6X6A====' b'003GS58S4CL32E1V8P6L8MR2D5O7EVK5HI9PL8D8LURBRH6BQBCU1PVEUNU0====' b'00070E151C232A31383F464D545B626970777E858C939AA1A8AFB6BDC4CBD2D9E0E7EEF5FC' b'00#~g93v_*I6p>BR9j+caCd%%jFXz7sIRuY#LLpz;OFl3`~' b"!!`uK*$Zpf3'Tl,<*NgGE-HbbN0B^(W3<YC`66T^i90P$qu"
+b'//79' True b'__79' b'777P2===' b'VVVFQ===' b'FFFEFD' b'|Ni{' b's8Mr'
+b'-_8=' b'\xfb\xff' b'foobar'
+b'foo' b'VPazd' b'y' b'<~zBOu!rDZ~>' b'Hello World!'
+b'HelloWorld' b'\x86O\xd2o\xb5Y\xf7['
+b'eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4\neHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eA==\n' b'xxx' b'foo'
+Error: Invalid base64-encoded string: number of data characters (5) cannot be 1 more than a multiple of 4
+Error: Incorrect padding
+Error: Invalid base64-encoded string: number of data characters (1) cannot be 1 more than a multiple of 4
+Only base64 data is allowed
+a bytes-like object is required, not 'str'
+Non-base16 digit found
+b'01ab' b'01-ab-cd' b'\x01\xab' b'aGk=\n'
+222957957 222957957 50018
+Odd-length string
+True

@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="214" viewBox="0 0 760 214" font-family="Helvetica, Arial, sans-serif">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="150" y="24" font-size="16" font-weight="bold" fill="#202124">Startup, a program that prints one line (lower is better)</text>
+<rect x="150" y="36" width="12" height="12" fill="#9aa0a6"/>
+<text x="168" y="47" font-size="12" fill="#202124">CPython</text>
+<rect x="350" y="36" width="12" height="12" fill="#f9ab00"/>
+<text x="368" y="47" font-size="12" fill="#202124">PyPy</text>
+<rect x="550" y="36" width="12" height="12" fill="#a142f4"/>
+<text x="568" y="47" font-size="12" fill="#202124">GraalPy</text>
+<rect x="150" y="58" width="12" height="12" fill="#1a73e8"/>
+<text x="168" y="69" font-size="12" fill="#202124">Codename One Python</text>
+<line x1="150.0" y1="80" x2="150.0" y2="184" stroke="#e8eaed"/>
+<text x="150.0" y="200" font-size="11" fill="#5f6368" text-anchor="middle">0 </text>
+<line x1="415.0" y1="80" x2="415.0" y2="184" stroke="#e8eaed"/>
+<text x="415.0" y="200" font-size="11" fill="#5f6368" text-anchor="middle">100 </text>
+<line x1="680.0" y1="80" x2="680.0" y2="184" stroke="#e8eaed"/>
+<text x="680.0" y="200" font-size="11" fill="#5f6368" text-anchor="middle">200 </text>
+<text x="142" y="106" font-size="12" fill="#202124" text-anchor="end">wall time (ms)</text>
+<rect x="150" y="84" width="39.9" height="8" fill="#9aa0a6"/>
+<text x="193.9" y="91" font-size="9" fill="#5f6368">15</text>
+<rect x="150" y="93" width="36.8" height="8" fill="#f9ab00"/>
+<text x="190.8" y="100" font-size="9" fill="#5f6368">14</text>
+<rect x="150" y="102" width="74.6" height="8" fill="#a142f4"/>
+<text x="228.6" y="109" font-size="9" fill="#5f6368">28</text>
+<rect x="150" y="111" width="12.6" height="8" fill="#1a73e8"/>
+<text x="166.6" y="118" font-size="9" fill="#5f6368">4.7</text>
+<text x="142" y="156" font-size="12" fill="#202124" text-anchor="end">peak memory (MB)</text>
+<rect x="150" y="134" width="38.1" height="8" fill="#9aa0a6"/>
+<text x="192.1" y="141" font-size="9" fill="#5f6368">14</text>
+<rect x="150" y="143" width="77.2" height="8" fill="#f9ab00"/>
+<text x="231.2" y="150" font-size="9" fill="#5f6368">29</text>
+<rect x="150" y="152" width="314.2" height="8" fill="#a142f4"/>
+<text x="468.2" y="159" font-size="9" fill="#5f6368">119</text>
+<rect x="150" y="161" width="22.8" height="8" fill="#1a73e8"/>
+<text x="176.8" y="168" font-size="9" fill="#5f6368">8.6</text>
+</svg>

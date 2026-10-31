@@ -1,0 +1,34 @@
+True True {'a': 1, 'b': [2, 3]}
+{'a': 1, 'b': [2, 3]}
+True
+P {}
+P(1, [2, 3]) True
+P(1, [2, 3]) False
+P(1, [2, 3])
+reduce called
+reduce called
+reduce called
+10 20 30
+setstate ['v']
+1 rebuilt
+setstate ['v']
+1 rebuilt
+setstate ['v']
+1 rebuilt
+(None, {'x': 1, 'y': [1]})
+1 [1]
+1 [1]
+1 [1]
+new 4
+new 4
+4
+new 5
+new 5
+5
+newkw 7
+newkw 7
+7
+a b True True
+True
+True
+103 103

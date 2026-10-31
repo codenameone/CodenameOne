@@ -1,0 +1,17 @@
+main __main__
+init pkg pkg
+init a pkg.a
+pkg 21 5
+init sub pkg.sub
+pkg.sub.b 44
+True b in pkg.sub
+42 pkg.a
+46
+1 two
+hidden not exported
+yes
+unlisted not exported
+4 True
+ModuleNotFoundError
+ImportError from
+['VALUE', 'a', 'allstar', 'helper', 'star', 'sub', 'twice']

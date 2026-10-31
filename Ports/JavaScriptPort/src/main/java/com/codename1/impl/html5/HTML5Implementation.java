@@ -11424,6 +11424,52 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     }
 
+    @Override
+    public boolean isTrueTypeStreamSupported() {
+        return true;
+    }
+
+    @Override
+    public Object loadTrueTypeFontFromData(String fontName, byte[] data) {
+        // The bytes travel as a data: URL, which both the worker's FontFace
+        // (measuring) and the host's document.fonts (painting) load as they load
+        // a bundled file. Encoded here in Java: the arrayBufferToBase64 helper
+        // goes through Window.current, which the worker cannot reach.
+        // FontFace rejects bytes that are not a font asynchronously, after this
+        // has already answered; the contract is null, so check the SFNT tag
+        // (0x00010000, 'true', 'OTTO', 'ttcf') up front as the other ports do.
+        //
+        // Because the browser loads the face asynchronously, a font whose header
+        // is valid but whose tables are corrupt is not detected here: it answers a
+        // font, and the browser draws its text in the fallback family.
+        if (!isSfntHeader(data)) {
+            return null;
+        }
+        // The browser family is keyed by content as well as name, so the same name
+        // given different bytes registers a second face instead of drawing with
+        // the first one loaded under that name.
+        int h = 1;
+        for (byte b : data) {
+            h = 31 * h + b;
+        }
+        String family = fontName + "_" + data.length + "_" + Integer.toHexString(h);
+        if (!loadedFonts.contains(family)) {
+            loadTrueTypeFont_(family,
+                    "data:font/ttf;base64," + com.codename1.util.Base64.encodeNoNewline(data), "truetype");
+            loadedFonts.add(family);
+        }
+        return createFallbackTrueTypeFont(family, null);
+    }
+
+    private static boolean isSfntHeader(byte[] data) {
+        if (data == null || data.length < 12) {
+            return false;
+        }
+        int tag = ((data[0] & 0xff) << 24) | ((data[1] & 0xff) << 16)
+                | ((data[2] & 0xff) << 8) | (data[3] & 0xff);
+        return tag == 0x00010000 || tag == 0x74727565 || tag == 0x4f54544f || tag == 0x74746366;
+    }
+
     /**
      * The format hint handed to the FontFace constructor. Browsers treat
      * "truetype" and "opentype" as the same SFNT container, but naming the

@@ -44,6 +44,16 @@ List rows = db.query("SELECT id, body FROM note WHERE id > ?",
         return rows;
     }
 
+    public static String[] types(DataSource db) throws IOException {
+// tag::backend-database-column-types[]
+List rows = db.query("SELECT total, placed FROM orders", new Object[0]);
+String[] types = Database.columnTypes(rows);
+// types[0] is "decimal": the value is a String of digits, such as "19.90"
+// types[1] is "date", "datetime" or "datetimetz", depending on the column
+// end::backend-database-column-types[]
+        return types;
+    }
+
     public static long insert(DataSource db) throws IOException {
 // tag::backend-database-insert[]
 long id = db.insert("INSERT INTO note (body) VALUES (?)",

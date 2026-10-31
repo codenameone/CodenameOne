@@ -125,6 +125,22 @@ public final class Tcp {
     /// As [#startTls(String)], verifying against the PEM bundle at `caFile`
     /// INSTEAD of the system trust store. See the translated twin for why.
     public void startTls(String host, String caFile) throws IOException {
+        startTls(host, caFile, true);
+    }
+
+    /// As [#startTls(String,String)], with the name check optional.
+    ///
+    /// `verifyHost` false still verifies the chain against `caFile` and skips
+    /// only the match between the certificate and `host`: what
+    /// `sslmode=verify-ca` asks for. It is refused without a `caFile`, because
+    /// a public root vouches for names, and a chain to one without the name is
+    /// a certificate for anybody.
+    public void startTls(String host, String caFile, boolean verifyHost)
+            throws IOException {
+        if (!verifyHost && caFile == null) {
+            throw new IOException("Skipping the host name check needs a trust "
+                    + "root of its own (sslrootcert)");
+        }
         // BOTH STRINGS, and the name is the one that decides who the peer is
         // allowed to be. It crosses to a native as a C string, so a NUL inside it
         // ends the name there and OpenSSL verifies the certificate against the
@@ -153,7 +169,9 @@ public final class Tcp {
         }
         SSLSocket upgraded = (SSLSocket) created; //NOPMD CloseResource - becomes this connection's socket in rebind()
         SSLParameters parameters = upgraded.getSSLParameters();
-        parameters.setEndpointIdentificationAlgorithm("HTTPS");
+        if (verifyHost) {
+            parameters.setEndpointIdentificationAlgorithm("HTTPS");
+        }
         upgraded.setSSLParameters(parameters);
         // BOUNDED, for the reason the packaged arm's comment gives at its own
         // SSL_connect: connectTimeout was spent reaching the port, and a peer that

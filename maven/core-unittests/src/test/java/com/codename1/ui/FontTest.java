@@ -28,6 +28,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.lang.reflect.Field;
 import java.util.HashMap;
 
@@ -40,6 +42,7 @@ class FontTest extends UITestBase {
         setFontReturnedHeight(0f);
         implementation.setTrueTypeSupported(true);
         implementation.setNativeFontSchemeSupported(true);
+        implementation.setTrueTypeStreamSupported(true);
     }
 
     @EdtTest
@@ -119,6 +122,50 @@ class FontTest extends UITestBase {
         assertFalse(Font.isTrueTypeFileSupported());
         implementation.setTrueTypeSupported(true);
         assertTrue(Font.isTrueTypeFileSupported());
+    }
+
+    @EdtTest
+    void testCreateTrueTypeFontFromStreamCachesByNameAndDerives() throws IOException {
+        int loads = implementation.getTrueTypeDataLoads();
+        Font first = Font.createTrueTypeFontFromData("DataFont", new ByteArrayInputStream(new byte[]{1, 2, 3}));
+        assertNotNull(first);
+        assertTrue(first.isTTFNativeFont());
+        assertTrue(Font.isTrueTypeStreamSupported());
+        Font second = Font.createTrueTypeFontFromData("DataFont", new byte[]{1, 2, 3});
+        assertSame(first, second);
+        assertEquals(loads + 1, implementation.getTrueTypeDataLoads());
+
+        Font derived = first.derive(24f, Font.STYLE_BOLD);
+        assertSame(derived, first.derive(24f, Font.STYLE_BOLD));
+        assertEquals(24f, derived.getPixelSize(), 0.001f);
+
+        // A file-based font with the same name is a different font.
+        Font fromFile = Font.createTrueTypeFont("DataFont", "DataFont.ttf");
+        assertNotSame(first, fromFile);
+        assertNotSame(derived, fromFile.derive(24f, Font.STYLE_BOLD));
+    }
+
+    @EdtTest
+    void testSameNameWithDifferentBytesIsADifferentFont() {
+        int loads = implementation.getTrueTypeDataLoads();
+        Font first = Font.createTrueTypeFontFromData("SharedName", new byte[]{1, 2, 3});
+        Font other = Font.createTrueTypeFontFromData("SharedName", new byte[]{1, 2, 4});
+        Font longer = Font.createTrueTypeFontFromData("SharedName", new byte[]{1, 2, 3, 0});
+        assertNotNull(first);
+        assertNotNull(other);
+        assertNotSame(first, other);
+        assertNotSame(first, longer);
+        assertSame(first, Font.createTrueTypeFontFromData("SharedName", new byte[]{1, 2, 3}));
+        assertEquals(loads + 3, implementation.getTrueTypeDataLoads());
+    }
+
+    @EdtTest
+    void testCreateTrueTypeFontFromDataReturnsNullWhenUnsupportedOrInvalid() {
+        assertNull(Font.createTrueTypeFontFromData("Empty", new byte[0]));
+        implementation.setTrueTypeStreamSupported(false);
+        assertFalse(Font.isTrueTypeStreamSupported());
+        assertNull(Font.createTrueTypeFontFromData("Unsupported", new byte[]{1}));
+        assertThrows(IllegalArgumentException.class, () -> Font.createTrueTypeFontFromData("NoData", (byte[]) null));
     }
 
     private HashMap<String, Font> getDerivedFontCache() throws Exception {
