@@ -52,6 +52,20 @@ CN1_BACKEND_CFLAGS="${CN1_BACKEND_CFLAGS:-} -DCN1_VIRTUAL_THREADS=1"
 # #ifndef-guarded precisely so a deployment can choose its own floor at build
 # time, which is what this is.
 CN1_BACKEND_CFLAGS="$CN1_BACKEND_CFLAGS -DCN1_BIBOP_GC_MIN_TRIGGER_BYTES=$((4*1024*1024))"
+
+# Grow the trigger only while two thirds of the swept heap survives, not a quarter.
+#
+# The collector doubles its trigger after two sweeps at or above this survival, so
+# the value sets the heap it settles at relative to the live set: 25% lets the heap
+# grow to about four times what is live, 66% to about one and a half. That is the
+# classic memory-for-CPU trade, and a device app and a server want different ends
+# of it -- this is the server choosing its end, the same way it chooses its own
+# minimum above, not a pinned size: the trigger still follows the live set.
+# Measured on the Flask sample, 100k requests at 8 connections, three interleaved
+# runs per arm: physical footprint after load 137-191MB -> 75-98MB, RSS 166-223MB
+# -> 128-146MB, footprint five seconds later 101-139MB -> 68-70MB, for 27.7-29.2k
+# -> 25.7-25.9k requests per second.
+CN1_BACKEND_CFLAGS="$CN1_BACKEND_CFLAGS -DCN1_BIBOP_TRIGGER_SURVIVAL_PERCENT=66"
 J8="${JDK_8_HOME:?set JDK_8_HOME to a JDK 8 home}"
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/cn1backend.XXXXXX")"
 

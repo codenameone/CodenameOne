@@ -7943,6 +7943,26 @@ JAVA_BOOLEAN java_lang_System_isHighFrequencyGC___R_boolean(CODENAME_ONE_THREAD_
 // isHighFrequencyGC() is called unconditionally and exactly once because it RESETS
 // allocationsSinceLastGC as part of answering; short-circuiting it would let that counter
 // accumulate across the whole busy period and then misreport the first quiet one.
+// ONE SETTLE CYCLE AFTER A BURST. A cycle only starts when allocation crosses the trigger
+// or the long idle expires, so when a busy stretch stops the heap is left exactly as the
+// last allocation-driven cycle found it: every page the burst dirtied, the warm cache sized
+// to the burst's demand, and malloc's freed blocks still charged. Nothing moves for 30
+// seconds, and the process sits at its peak footprint while doing nothing -- measured on a
+// Flask server after a load test, 124MB physical footprint ten seconds after the last
+// request against 14MB before the first one.
+//
+// So the first quiet pass after a busy one idles CN1_GC_SETTLE_IDLE_MS instead of the long
+// idle. The cycle that follows allocated almost nothing, which is precisely what makes it a
+// QUIET cycle: it takes the major sweep (partial pools spliced in), trims the warm cache to
+// its floor because this cycle's demand was small, and runs the malloc relief. It is one
+// cycle per burst, never a loop: the flag is cleared when it is taken and only a busy pass
+// sets it again, so an app that stays idle goes back to the 30 second idle after it.
+#ifndef CN1_GC_SETTLE_IDLE_MS
+#define CN1_GC_SETTLE_IDLE_MS 1000
+#endif
+// GC thread only: gcIdleWaitMillis is called solely from the collector's loop.
+static JAVA_BOOLEAN cn1GcBusySinceSettle = JAVA_FALSE;
+
 JAVA_INT java_lang_System_gcIdleWaitMillis___R_int(CODENAME_ONE_THREAD_STATE) {
     // isHighFrequencyGC() is called unconditionally and exactly once: it RESETS
     // allocationsSinceLastGC as part of answering, so short-circuiting it would let that
@@ -8003,6 +8023,7 @@ JAVA_INT java_lang_System_gcIdleWaitMillis___R_int(CODENAME_ONE_THREAD_STATE) {
         long long trigger = (long long)atomic_load_explicit(&bibopGcTriggerBytes,
                                                             memory_order_relaxed);
         if(uncollected >= trigger) {
+            cn1GcBusySinceSettle = JAVA_TRUE;
 #ifdef CN1_GC_CONFORM
             atomic_fetch_add_explicit(&cn1GcCyclesOnDemand, 1, memory_order_relaxed);
 #endif
@@ -8078,7 +8099,15 @@ JAVA_INT java_lang_System_gcIdleWaitMillis___R_int(CODENAME_ONE_THREAD_STATE) {
             >= CN1_GC_DEAD_THREAD_DEMAND) {
         return 200;
     }
-    return highFrequency ? 200 : 30000;
+    if(highFrequency) {
+        cn1GcBusySinceSettle = JAVA_TRUE;
+        return 200;
+    }
+    if(cn1GcBusySinceSettle) {
+        cn1GcBusySinceSettle = JAVA_FALSE;
+        return CN1_GC_SETTLE_IDLE_MS;
+    }
+    return 30000;
 }
 
 JAVA_INT java_lang_System_identityHashCode___java_lang_Object_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1) {
