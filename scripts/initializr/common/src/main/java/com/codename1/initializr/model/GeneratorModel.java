@@ -561,16 +561,23 @@ public class GeneratorModel {
 
     /// build.bat with the launch report just before it jumps to the target, and
     /// the exit report in its :finish block, which every target falls through to.
-    String withBatchTelemetry(String script) throws IOException {
+    /// The launcher ships with CRLF endings and so does the result: cmd.exe finds a
+    /// goto label by re-reading the file in 512-byte blocks and, in an LF-only file,
+    /// can miss one that straddles a block boundary and run the wrong target. The
+    /// markers are matched on LF, so the script is folded to LF, filled, and widened
+    /// back -- the telemetry resources included, whatever endings they carry.
+    String withBatchTelemetry(String original) throws IOException {
+        String script = StringUtil.replaceAll(original, "\r\n", "\n");
         int jump = script.indexOf(BAT_GOTO_LINE);
         int finish = script.lastIndexOf(BAT_FINISH_BLOCK);
         if (jump < 0 || finish < jump || finish + BAT_FINISH_BLOCK.length() != script.length()) {
-            return script;
+            return original;
         }
-        return script.substring(0, jump + 1)
+        String filled = script.substring(0, jump + 1)
                 + fillTelemetryTokens(readResourceToString(LAUNCHER_TELEMETRY_BAT_START))
                 + script.substring(jump + 1, finish)
                 + fillTelemetryTokens(readResourceToString(LAUNCHER_TELEMETRY_BAT_FINISH));
+        return StringUtil.replaceAll(StringUtil.replaceAll(filled, "\r\n", "\n"), "\n", "\r\n");
     }
 
     /// The root pom with the same reporting for builds the launchers never see: the
