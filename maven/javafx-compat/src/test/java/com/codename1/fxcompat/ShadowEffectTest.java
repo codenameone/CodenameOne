@@ -215,6 +215,54 @@ public class ShadowEffectTest {
     }
 
     @Test
+    public void aChangeInsideAnOpaqueShadowedRegionKeepsItsPicture() {
+        Rectangle button = new Rectangle(10, 10, 30, 20);
+        button.setFill(Color.RED);
+        Pane drawer = new Pane(button);
+        drawer.setStyle("-fx-background-color: white;");
+        drawer.setPrefSize(120, 60);
+        drawer.relocate(40, 40);
+        Stage stage = new Stage();
+        stage.setScene(new Scene(new Group(drawer), 300, 200));
+        stage.show();
+        drawer.applyCss();
+        drawer.setEffect(new DropShadow(BlurType.GAUSSIAN, Color.BLACK, 6, 0, 2, 3));
+        paint();
+        int made = Effects.captureCount();
+
+        // A press: the colour changes, the outline does not.
+        for (int i = 0; i < 5; i++) {
+            button.setFill(i % 2 == 0 ? Color.BLUE : Color.RED);
+            button.setOpacity(i % 2 == 0 ? 0.5 : 1);
+            paint();
+        }
+        assertEquals("the drawer is not captured again", made, Effects.captureCount());
+
+        // A child that reaches past the drawer changes its outline.
+        button.setWidth(200);
+        paint();
+        assertEquals(made + 1, Effects.captureCount());
+        // And while it does, even a colour change there is in the outline.
+        button.setFill(Color.GREEN);
+        paint();
+        assertEquals(made + 2, Effects.captureCount());
+        // Hiding it changes the outline too.
+        button.setVisible(false);
+        paint();
+        assertEquals(made + 3, Effects.captureCount());
+        // A transparent background has no box of its own to hide behind.
+        button.setVisible(true);
+        button.setWidth(30);
+        drawer.setStyle("-fx-background-color: transparent;");
+        drawer.applyCss();
+        paint();
+        int clear = Effects.captureCount();
+        button.setFill(Color.BLUE);
+        paint();
+        assertEquals(clear + 1, Effects.captureCount());
+    }
+
+    @Test
     public void aStyleSheetsEffectIsADropShadowOrAnInnerShadow() {
         Pane card = new Pane();
         Stage stage = new Stage();

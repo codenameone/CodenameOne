@@ -427,7 +427,10 @@ public abstract class Node implements EventTarget, Styleable, StyleTarget, Dirty
     @Override
     public void cn1Invalidated(int what) {
         // Whatever changed, the picture an effect above keeps of it is old.
-        Effects.invalidate(this);
+        // A change that moved and resized nothing leaves the outline of an
+        // opaque shadowed ancestor as it was; see Effects.invalidate.
+        Effects.invalidate(this, (what & (Dirty.LAYOUT | Dirty.BOUNDS | Dirty.GEOMETRY | Dirty.NATIVE
+                | VISIBILITY)) == 0);
         if ((what & VISIBILITY) != 0 && peer != null) {
             peer.setVisible(isVisible());
         }
