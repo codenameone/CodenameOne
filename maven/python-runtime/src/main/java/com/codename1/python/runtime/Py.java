@@ -1657,6 +1657,14 @@ public final class Py {
         return Py.obj(f).call4(a, b, c, d);
     }
 
+    public static Object call(Object f, Object a, Object b, Object c, Object d, Object e) {
+        return Py.obj(f).call5(a, b, c, d, e);
+    }
+
+    public static Object call(Object f, Object a, Object b, Object c, Object d, Object e, Object g) {
+        return Py.obj(f).call6(a, b, c, d, e, g);
+    }
+
     public static Object call(Object f, Object... args) {
         return Py.obj(f).call(args, NO_KW);
     }

@@ -91,23 +91,23 @@ public final class Builtins {
         return Py.NONE;
     });
 
-    public static final Object LEN = PyBuiltin.positional("len", a -> PyInt.of(Py.len(one("len", a))));
+    public static final Object LEN = PyBuiltin.unary("len", x -> PyInt.of(Py.len(x)));
     /// `object.__hash__`, which the object type reads without defining it.
     static final Object OBJECT_HASH = PyBuiltin.positional("__hash__", a -> Py.of((long) System.identityHashCode(a[0])));
 
-    public static final Object REPR = PyBuiltin.positional("repr", a -> Py.str(Py.toRepr(one("repr", a))));
-    public static final Object ASCII = PyBuiltin.positional("ascii", a -> Py.str(asciiOnly(Py.toRepr(one("ascii", a)))));
-    public static final Object HASH = PyBuiltin.positional("hash", a -> PyInt.of(Py.hashOf(one("hash", a))));
-    public static final Object ID = PyBuiltin.positional("id", a -> PyInt.of(System.identityHashCode(one("id", a))));
-    public static final Object ABS = PyBuiltin.positional("abs", a -> abs(one("abs", a)));
-    public static final Object CALLABLE = PyBuiltin.positional("callable", a -> Py.bool(isCallable(one("callable", a))));
+    public static final Object REPR = PyBuiltin.unary("repr", x -> Py.str(Py.toRepr(x)));
+    public static final Object ASCII = PyBuiltin.unary("ascii", x -> Py.str(asciiOnly(Py.toRepr(x))));
+    public static final Object HASH = PyBuiltin.unary("hash", x -> PyInt.of(Py.hashOf(x)));
+    public static final Object ID = PyBuiltin.unary("id", x -> PyInt.of(System.identityHashCode(x)));
+    public static final Object ABS = PyBuiltin.unary("abs", x -> abs(x));
+    public static final Object CALLABLE = PyBuiltin.unary("callable", x -> Py.bool(isCallable(x)));
     public static final Object ITER = PyBuiltin.positional("iter", a -> iter(a));
     public static final Object NEXT = PyBuiltin.positional("next", a -> next(a));
-    public static final Object AITER = PyBuiltin.positional("aiter", a -> Py.callMethod(one("aiter", a), "__aiter__"));
+    public static final Object AITER = PyBuiltin.unary("aiter", x -> Py.callMethod(x, "__aiter__"));
     // anext with a default is an awaitable that answers the default on StopAsyncIteration; the
     // asyncio module supplies that wrapper, so the builtin covers the one-argument form.
-    public static final Object ANEXT = PyBuiltin.positional("anext", a -> Py.callMethod(one("anext", a), "__anext__"));
-    public static final Object ORD = PyBuiltin.positional("ord", a -> ord(one("ord", a)));
+    public static final Object ANEXT = PyBuiltin.unary("anext", x -> Py.callMethod(x, "__anext__"));
+    public static final Object ORD = PyBuiltin.unary("ord", x -> ord(x));
     public static final Object CHR = PyBuiltin.positional("chr", a -> {
         long c = Py.asLong(one("chr", a));
         if (c < 0 || c > 0x10ffff) {
@@ -115,16 +115,20 @@ public final class Builtins {
         }
         return Py.str(new String(Character.toChars((int) c)));
     });
-    public static final Object HEX = PyBuiltin.positional("hex", a -> Py.str(Formatting.format(one("hex", a), "#x")));
-    public static final Object OCT = PyBuiltin.positional("oct", a -> Py.str(Formatting.format(one("oct", a), "#o")));
-    public static final Object BIN = PyBuiltin.positional("bin", a -> Py.str(Formatting.format(one("bin", a), "#b")));
+    public static final Object HEX = PyBuiltin.unary("hex", x -> Py.str(Formatting.format(x, "#x")));
+    public static final Object OCT = PyBuiltin.unary("oct", x -> Py.str(Formatting.format(x, "#o")));
+    public static final Object BIN = PyBuiltin.unary("bin", x -> Py.str(Formatting.format(x, "#b")));
     public static final Object FORMAT = PyBuiltin.positional("format", a -> Py.format(a[0], a.length > 1 ? Py.toStr(a[1]) : ""));
     public static final Object DIVMOD = PyBuiltin.positional("divmod", a -> PyTuple.of(Py.floordiv(a[0], a[1]), Py.mod(a[0], a[1])));
     public static final Object POW = PyBuiltin.positional("pow", a -> pow(a));
     public static final Object ROUND = new PyBuiltin("round", (args, kw) -> round(new Args("round", args, kw).check(2, "number", "ndigits")));
-    public static final Object ISINSTANCE = PyBuiltin.positional("isinstance", a -> Py.bool(Py.isinstance(a[0], a[1])));
-    public static final Object ISSUBCLASS = PyBuiltin.positional("issubclass", a -> Py.bool(issubclass(a[0], a[1])));
-    public static final Object GETATTR = PyBuiltin.positional("getattr", a -> getattr(a));
+    public static final Object ISINSTANCE = PyBuiltin.positional("isinstance", a -> Py.bool(Py.isinstance(a[0], a[1])))
+            .with2((x, t) -> Py.bool(Py.isinstance(x, t)));
+    public static final Object ISSUBCLASS = PyBuiltin.positional("issubclass", a -> Py.bool(issubclass(a[0], a[1])))
+            .with2((x, t) -> Py.bool(issubclass(x, t)));
+    public static final Object GETATTR = PyBuiltin.positional("getattr", a -> getattr(a))
+            .with2((o, n) -> Py.obj(o).getAttr(Py.toStr(n)))
+            .with3(Builtins::getattr3);
     public static final Object SETATTR = PyBuiltin.positional("setattr", a -> {
         Py.obj(a[0]).setAttr(Py.toStr(a[1]), a[2]);
         return Py.NONE;
@@ -143,8 +147,8 @@ public final class Builtins {
         Py.obj(a[0]).delAttr(Py.toStr(a[1]));
         return Py.NONE;
     });
-    public static final Object VARS = PyBuiltin.positional("vars", a -> Py.obj(one("vars", a)).getAttr("__dict__"));
-    public static final Object DIR = PyBuiltin.positional("dir", a -> dir(one("dir", a)));
+    public static final Object VARS = PyBuiltin.unary("vars", x -> Py.obj(x).getAttr("__dict__"));
+    public static final Object DIR = PyBuiltin.unary("dir", x -> dir(x));
     public static final Object SUM = new PyBuiltin("sum", (args, kw) -> sum(new Args("sum", args, kw).check(2, "start")));
     public static final Object MIN = new PyBuiltin("min", (args, kw) -> minMax("min", args, kw, true));
     public static final Object MAX = new PyBuiltin("max", (args, kw) -> minMax("max", args, kw, false));
@@ -174,7 +178,7 @@ public final class Builtins {
         l.sort(a.kw("key"), rev != null && Py.isTrue(rev));
         return l;
     });
-    public static final Object REVERSED = PyBuiltin.positional("reversed", a -> reversed(one("reversed", a)));
+    public static final Object REVERSED = PyBuiltin.unary("reversed", x -> reversed(x));
     public static final Object ENUMERATE = new PyBuiltin("enumerate", (args, kw) -> {
         Args a = new Args("enumerate", args, kw).check(2, "iterable", "start");
         final Object it = Py.iter(a.required(0, "iterable"));
@@ -514,6 +518,10 @@ public final class Builtins {
             }
             return toInt(x);
         };
+        Py.INT_TYPE.unary = Builtins::toInt;
+        Py.STR_TYPE.unary = x -> Py.str(Py.toStr(x));
+        Py.FLOAT_TYPE.unary = Builtins::toFloat;
+        Py.BOOL_TYPE.unary = x -> Py.bool(Py.isTrue(x));
         Py.BOOL_TYPE.factory = (t, args, kw) -> Py.bool(args.length > 0 && Py.isTrue(args[0]));
         Py.FLOAT_TYPE.factory = (t, args, kw) -> args.length == 0 ? Py.ofFloat(0) : toFloat(args[0]);
         Py.STR_TYPE.factory = (t, args, kw) -> {
@@ -1063,17 +1071,21 @@ public final class Builtins {
 
     private static Object getattr(Object[] a) {
         if (a.length == 3) {
-            try {
-                Object v = Py.obj(a[0]).getAttrOrNull(Py.toStr(a[1]));
-                return v != null ? v : a[2];
-            } catch (PyException e) {
-                if (e.matches(Py.ATTRIBUTE_ERROR)) {
-                    return a[2];
-                }
-                throw e;
-            }
+            return getattr3(a[0], a[1], a[2]);
         }
         return Py.obj(a[0]).getAttr(Py.toStr(a[1]));
+    }
+
+    private static Object getattr3(Object o, Object name, Object dflt) {
+        try {
+            Object v = Py.obj(o).getAttrOrNull(Py.toStr(name));
+            return v != null ? v : dflt;
+        } catch (PyException e) {
+            if (e.matches(Py.ATTRIBUTE_ERROR)) {
+                return dflt;
+            }
+            throw e;
+        }
     }
 
     private static Object dir(Object o) {

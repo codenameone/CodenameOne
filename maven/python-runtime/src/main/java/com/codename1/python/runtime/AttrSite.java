@@ -438,9 +438,40 @@ public final class AttrSite {
         return f != null ? Py.obj(f).call4(o, a, b, c) : Py.obj(Py.obj(o).getAttr(name)).call3(a, b, c);
     }
 
+    public Object call4(Object o, Object a, Object b, Object c, Object d) {
+        Object f = method(o);
+        return f != null ? Py.obj(f).call5(o, a, b, c, d) : Py.obj(Py.obj(o).getAttr(name)).call4(a, b, c, d);
+    }
+
+    public Object call5(Object o, Object a, Object b, Object c, Object d, Object e) {
+        Object f = method(o);
+        return f != null ? Py.obj(f).call6(o, a, b, c, d, e)
+                : Py.obj(Py.obj(o).getAttr(name)).call5(a, b, c, d, e);
+    }
+
+    /// `o.name(...)` with six arguments: a module's function (`_cn1re.run`)
+    /// takes them directly; a method, which needs a seventh for the
+    /// receiver, gets the array.
+    public Object call6(Object o, Object a, Object b, Object c, Object d, Object e, Object f) {
+        Object m = method(o);
+        if (m != null) {
+            return Py.obj(m).call(new Object[] {o, a, b, c, d, e, f}, Py.NO_KW);
+        }
+        return Py.obj(Py.obj(o).getAttr(name)).call6(a, b, c, d, e, f);
+    }
+
+    /// `o.name(...)` with seven or more arguments. `args[0]` is a slot the
+    /// call site leaves empty for the receiver, so calling the function
+    /// with `o` prepended writes it there instead of copying the array.
     public Object callN(Object o, Object[] args) {
         Object f = method(o);
-        return f != null ? Py.obj(f).call(Py.prepend(o, args), Py.NO_KW) : Py.obj(Py.obj(o).getAttr(name)).call(args, Py.NO_KW);
+        if (f != null) {
+            args[0] = o;
+            return Py.obj(f).call(args, Py.NO_KW);
+        }
+        Object[] rest = new Object[args.length - 1];
+        System.arraycopy(args, 1, rest, 0, rest.length);
+        return Py.obj(Py.obj(o).getAttr(name)).call(rest, Py.NO_KW);
     }
 
     /// The function to call with the receiver prepended, when the call needs

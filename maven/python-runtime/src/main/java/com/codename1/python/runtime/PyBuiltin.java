@@ -37,12 +37,39 @@ public final class PyBuiltin extends PyObject {
         Object call(Object[] args);
     }
 
+    /// A fixed-arity implementation. A call with exactly that many
+    /// positional arguments runs it without building an argument array;
+    /// any other call goes through [Impl], which reports the arity error.
+    public interface One {
+        Object call(Object a);
+    }
+
+    /// [One] for two arguments.
+    public interface Two {
+        Object call(Object a, Object b);
+    }
+
+    /// [One] for three arguments.
+    public interface Three {
+        Object call(Object a, Object b, Object c);
+    }
+
     public final String name;
     final Impl impl;
+    private One one;
+    private Two two;
+    private Three three;
+    /// The builtin type a [#method] belongs to; null for a function.
+    private final PyType owner;
 
     public PyBuiltin(String name, Impl impl) {
+        this(name, impl, null);
+    }
+
+    private PyBuiltin(String name, Impl impl, PyType owner) {
         this.name = name;
         this.impl = impl;
+        this.owner = owner;
     }
 
     /// A builtin that rejects keyword arguments, as most C functions do.
@@ -58,11 +85,100 @@ public final class PyBuiltin extends PyObject {
         });
     }
 
+    /// A builtin of exactly one argument: `len`, `ord`, `repr`.
+    public static PyBuiltin unary(final String name, final One f) {
+        PyBuiltin b = positional(name, a -> {
+            if (a.length != 1) {
+                throw Py.typeError(name + "() takes exactly one argument (" + a.length + " given)");
+            }
+            return f.call(a[0]);
+        });
+        b.one = f;
+        return b;
+    }
+
+    /// Adds the array-free path for a call with one positional argument;
+    /// `f` must answer what [Impl] answers for that call.
+    public PyBuiltin with1(One f) {
+        one = f;
+        return this;
+    }
+
+    /// [#with1] for two arguments.
+    public PyBuiltin with2(Two f) {
+        two = f;
+        return this;
+    }
+
+    /// [#with1] for three arguments.
+    public PyBuiltin with3(Three f) {
+        three = f;
+        return this;
+    }
+
+    @Override
+    public Object call1(Object a) {
+        if (one == null) {
+            return super.call1(a);
+        }
+        if (owner == null) {
+            return one.call(a);
+        }
+        Object s = receiver(a);
+        return result(a, s, one.call(s));
+    }
+
+    @Override
+    public Object call2(Object a, Object b) {
+        if (two == null) {
+            return super.call2(a, b);
+        }
+        if (owner == null) {
+            return two.call(a, b);
+        }
+        Object s = receiver(a);
+        return result(a, s, two.call(s, b));
+    }
+
+    @Override
+    public Object call3(Object a, Object b, Object c) {
+        if (three == null) {
+            return super.call3(a, b, c);
+        }
+        if (owner == null) {
+            return three.call(a, b, c);
+        }
+        Object s = receiver(a);
+        return result(a, s, three.call(s, b, c));
+    }
+
+    /// [#checkReceiver] and [#unwrap] for the receiver of a fixed-arity
+    /// method call: the value the implementation works on.
+    private Object receiver(Object self) {
+        if (!Py.typeOf(self).isSubtype(owner)) {
+            throw Py.typeError("descriptor '" + name + "' for '" + owner.name + "' objects doesn't apply to a '"
+                    + Py.typeOf(self).name + "' object");
+        }
+        if (owner != Py.OBJECT_TYPE && self instanceof PyInstance) { //NOPMD CompareObjectsWithEquals - identity is meant
+            Object b = ((PyInstance) self).base;
+            if (b != null) {
+                return b;
+            }
+        }
+        return self;
+    }
+
+    /// As in [#method]: a method returning the unwrapped value it was
+    /// given hands back the instance instead.
+    private Object result(Object self, Object s, Object r) {
+        return s != self && r == s && BuiltinSubclass.mutable(owner) ? self : r; //NOPMD CompareObjectsWithEquals - identity is meant
+    }
+
     /// A method of builtin type `owner`. The receiver is checked before the
     /// implementation runs, so it may cast `args[0]` to the owner's class:
     /// `bytes.hex(5)` is a TypeError here rather than an unchecked cast.
     public static PyBuiltin method(final PyType owner, final String name, final Positional p) {
-        return new PyBuiltin(name, new Impl() {
+        PyBuiltin b = new PyBuiltin(name, new Impl() {
             @Override
             public Object call(Object[] args, String[] kwNames) {
                 checkReceiver(owner, name, args);
@@ -73,12 +189,13 @@ public final class PyBuiltin extends PyObject {
                 Object r = p.call(a);
                 return a != args && r == a[0] && BuiltinSubclass.mutable(owner) ? args[0] : r; //NOPMD CompareObjectsWithEquals - identity is meant
             }
-        });
+        }, owner);
+        return b;
     }
 
     /// [#method] for an implementation that takes keyword arguments.
     public static PyBuiltin methodKw(final PyType owner, final String name, final Impl p) {
-        return new PyBuiltin(name, new Impl() {
+        PyBuiltin b = new PyBuiltin(name, new Impl() {
             @Override
             public Object call(Object[] args, String[] kwNames) {
                 checkReceiver(owner, name, args);
@@ -86,7 +203,8 @@ public final class PyBuiltin extends PyObject {
                 Object r = p.call(a, kwNames);
                 return a != args && r == a[0] && BuiltinSubclass.mutable(owner) ? args[0] : r; //NOPMD CompareObjectsWithEquals - identity is meant
             }
-        });
+        }, owner);
+        return b;
     }
 
     /// The arguments with an instance of a subclass of builtin `owner`

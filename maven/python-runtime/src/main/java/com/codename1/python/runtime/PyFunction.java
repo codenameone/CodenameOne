@@ -39,7 +39,7 @@ public final class PyFunction extends PyObject {
         Object run(Object[] a);
     }
 
-    // A function with only positional parameters (at most four, defaults
+    // A function with only positional parameters (at most six, defaults
     // allowed) is also compiled to take them directly: the transpiler picks
     // the matching constructor, and a call with exactly that many positional
     // arguments then allocates no argument array.
@@ -62,6 +62,14 @@ public final class PyFunction extends PyObject {
 
     public interface Body4 {
         Object run(Object a, Object b, Object c, Object d);
+    }
+
+    public interface Body5 {
+        Object run(Object a, Object b, Object c, Object d, Object e);
+    }
+
+    public interface Body6 {
+        Object run(Object a, Object b, Object c, Object d, Object e, Object f);
     }
 
     /// A function whose body is one float expression of its parameters
@@ -98,6 +106,9 @@ public final class PyFunction extends PyObject {
         double run(long a, long b);
     }
 
+    /// [#bindDirect]'s "not this way"; never a Python value.
+    private static final Object UNBOUND = new Object();
+
     public final String name;
     private String qualname;
     final String[] params;
@@ -113,6 +124,8 @@ public final class PyFunction extends PyObject {
     private Body2 body2;
     private Body3 body3;
     private Body4 body4;
+    private Body5 body5;
+    private Body6 body6;
     private PureD1 pure1;
     private PureD2 pure2;
     private PureD3 pure3;
@@ -174,12 +187,26 @@ public final class PyFunction extends PyObject {
         body4 = b;
     }
 
+    public PyFunction(String name, String[] params, int positional, boolean varArgs, int kwOnly,
+            boolean varKw, Object[] defaults, Object[] kwDefaults, Body5 b) {
+        this(name, params, positional, varArgs, kwOnly, varKw, defaults, kwDefaults,
+                (Object[] a) -> b.run(a[0], a[1], a[2], a[3], a[4]));
+        body5 = b;
+    }
+
+    public PyFunction(String name, String[] params, int positional, boolean varArgs, int kwOnly,
+            boolean varKw, Object[] defaults, Object[] kwDefaults, Body6 b) {
+        this(name, params, positional, varArgs, kwOnly, varKw, defaults, kwDefaults,
+                (Object[] a) -> b.run(a[0], a[1], a[2], a[3], a[4], a[5]));
+        body6 = b;
+    }
+
     @Override
     public Object call0() {
         if (body0 != null) {
             return body0.run();
         }
-        return widen(0) ? fill(0, null, null, null) : call(Py.NO_ARGS, Py.NO_KW);
+        return widen(0) ? fill(0, null, null, null, null, null) : call(Py.NO_ARGS, Py.NO_KW);
     }
 
     @Override
@@ -187,7 +214,7 @@ public final class PyFunction extends PyObject {
         if (body1 != null) {
             return body1.run(a);
         }
-        return widen(1) ? fill(1, a, null, null) : call(new Object[] {a}, Py.NO_KW);
+        return widen(1) ? fill(1, a, null, null, null, null) : call(new Object[] {a}, Py.NO_KW);
     }
 
     @Override
@@ -195,7 +222,7 @@ public final class PyFunction extends PyObject {
         if (body2 != null) {
             return body2.run(a, b);
         }
-        return widen(2) ? fill(2, a, b, null) : call(new Object[] {a, b}, Py.NO_KW);
+        return widen(2) ? fill(2, a, b, null, null, null) : call(new Object[] {a, b}, Py.NO_KW);
     }
 
     @Override
@@ -203,64 +230,86 @@ public final class PyFunction extends PyObject {
         if (body3 != null) {
             return body3.run(a, b, c);
         }
-        return widen(3) ? fill(3, a, b, c) : call(new Object[] {a, b, c}, Py.NO_KW);
+        return widen(3) ? fill(3, a, b, c, null, null) : call(new Object[] {a, b, c}, Py.NO_KW);
     }
 
     @Override
     public Object call4(Object a, Object b, Object c, Object d) {
-        return body4 != null ? body4.run(a, b, c, d) : call(new Object[] {a, b, c, d}, Py.NO_KW);
+        if (body4 != null) {
+            return body4.run(a, b, c, d);
+        }
+        return widen(4) ? fill(4, a, b, c, d, null) : call(new Object[] {a, b, c, d}, Py.NO_KW);
+    }
+
+    @Override
+    public Object call5(Object a, Object b, Object c, Object d, Object e) {
+        if (body5 != null) {
+            return body5.run(a, b, c, d, e);
+        }
+        return widen(5) ? fill(5, a, b, c, d, e) : call(new Object[] {a, b, c, d, e}, Py.NO_KW);
+    }
+
+    @Override
+    public Object call6(Object a, Object b, Object c, Object d, Object e, Object f) {
+        return body6 != null ? body6.run(a, b, c, d, e, f) : call(new Object[] {a, b, c, d, e, f}, Py.NO_KW);
     }
 
     /// Whether a positional call with `n` arguments can go straight to the
     /// fixed-arity body by filling the rest from the defaults: a function of
-    /// at most four plain parameters, every one past `n` defaulted. Most
+    /// at most six plain parameters, every one past `n` defaulted. Most
     /// library functions are that shape (`match(self, string, pos=0)`), and
     /// binding them through `call` built a second argument array per call.
     private boolean widen(int n) {
-        return n < positional && positional <= 4 && !varArgs && kwOnly == 0 && !varKw
+        return n < positional && positional <= 6 && !varArgs && kwOnly == 0 && !varKw
                 && positional - defaults.length <= n;
     }
 
-    /// Runs the fixed-arity body with the first `n` of `a`, `b`, `c` and the
+    /// Parameter `i` of a call that passed `n` arguments: `v` when it was
+    /// passed, its default otherwise.
+    private Object pick(int i, int n, Object v) {
+        return i < n ? v : defaults[i - (positional - defaults.length)];
+    }
+
+    /// Runs the fixed-arity body with the first `n` of `a`..`e` and the
     /// defaults after them; `n` was checked by `widen`. A function built
     /// without a body of its own arity binds them through `call` as before.
-    private Object fill(int n, Object a, Object b, Object c) {
-        int first = positional - defaults.length;
-        Object x = n > 0 ? a : defaults[-first];
-        Object y = positional > 1 ? (n > 1 ? b : defaults[1 - first]) : null;
-        Object z = positional > 2 ? (n > 2 ? c : defaults[2 - first]) : null;
+    private Object fill(int n, Object a, Object b, Object c, Object d, Object e) {
         switch (positional) {
             case 1:
                 if (body1 != null) {
-                    return body1.run(x);
+                    return body1.run(pick(0, n, a));
                 }
                 break;
             case 2:
                 if (body2 != null) {
-                    return body2.run(x, y);
+                    return body2.run(pick(0, n, a), pick(1, n, b));
                 }
                 break;
             case 3:
                 if (body3 != null) {
-                    return body3.run(x, y, z);
+                    return body3.run(pick(0, n, a), pick(1, n, b), pick(2, n, c));
+                }
+                break;
+            case 4:
+                if (body4 != null) {
+                    return body4.run(pick(0, n, a), pick(1, n, b), pick(2, n, c), pick(3, n, d));
+                }
+                break;
+            case 5:
+                if (body5 != null) {
+                    return body5.run(pick(0, n, a), pick(1, n, b), pick(2, n, c), pick(3, n, d), pick(4, n, e));
                 }
                 break;
             default:
-                if (body4 != null) {
-                    return body4.run(x, y, z, defaults[3 - first]);
+                if (body6 != null) {
+                    return body6.run(pick(0, n, a), pick(1, n, b), pick(2, n, c), pick(3, n, d), pick(4, n, e),
+                            pick(5, n, null));
                 }
                 break;
         }
         Object[] args = new Object[n];
-        if (n > 0) {
-            args[0] = a;
-        }
-        if (n > 1) {
-            args[1] = b;
-        }
-        if (n > 2) {
-            args[2] = c;
-        }
+        Object[] given = {a, b, c, d, e};
+        System.arraycopy(given, 0, args, 0, n);
         return call(args, Py.NO_KW);
     }
 
@@ -455,7 +504,120 @@ public final class PyFunction extends PyObject {
         if (kwNames.length == 0 && !varArgs && kwOnly == 0 && !varKw && args.length == positional) {
             return body.run(args);
         }
+        if (positional <= 6 && !varArgs && kwOnly == 0 && !varKw && args.length <= positional) {
+            Object r = bindDirect(args, kwNames);
+            if (r != UNBOUND) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return r;
+            }
+        }
         return body.run(bindArgs(args, kwNames));
+    }
+
+    /// A call to a function of at most six plain parameters, keywords
+    /// included (`f(x, key=y)`, `f(**kw)`): the arguments are matched to
+    /// parameters in locals and the fixed-arity body runs, so no second
+    /// array is bound. Null when the call is not that simple -- an unknown
+    /// or repeated keyword, a missing argument, no body of this arity --
+    /// it answers [#UNBOUND] before running anything, and [#bindArgs] then
+    /// reports the call exactly as before.
+    private Object bindDirect(Object[] args, String[] kwNames) {
+        int nPos = args.length - kwNames.length;
+        Object x0 = null;
+        Object x1 = null;
+        Object x2 = null;
+        Object x3 = null;
+        Object x4 = null;
+        Object x5 = null;
+        for (int i = 0; i < args.length; i++) {
+            int slot = i;
+            if (i >= nPos) {
+                slot = slotOf(kwNames[i - nPos]);
+                if (slot < 0) {
+                    return UNBOUND;
+                }
+            }
+            Object v = args[i];
+            switch (slot) {
+                case 0:
+                    if (x0 != null) {
+                        return UNBOUND;
+                    }
+                    x0 = v;
+                    break;
+                case 1:
+                    if (x1 != null) {
+                        return UNBOUND;
+                    }
+                    x1 = v;
+                    break;
+                case 2:
+                    if (x2 != null) {
+                        return UNBOUND;
+                    }
+                    x2 = v;
+                    break;
+                case 3:
+                    if (x3 != null) {
+                        return UNBOUND;
+                    }
+                    x3 = v;
+                    break;
+                case 4:
+                    if (x4 != null) {
+                        return UNBOUND;
+                    }
+                    x4 = v;
+                    break;
+                default:
+                    if (x5 != null) {
+                        return UNBOUND;
+                    }
+                    x5 = v;
+                    break;
+            }
+        }
+        int first = positional - defaults.length;
+        x0 = x0 != null || positional < 1 ? x0 : dflt(0, first);
+        x1 = x1 != null || positional < 2 ? x1 : dflt(1, first);
+        x2 = x2 != null || positional < 3 ? x2 : dflt(2, first);
+        x3 = x3 != null || positional < 4 ? x3 : dflt(3, first);
+        x4 = x4 != null || positional < 5 ? x4 : dflt(4, first);
+        x5 = x5 != null || positional < 6 ? x5 : dflt(5, first);
+        if (positional > 0 && x0 == null || positional > 1 && x1 == null || positional > 2 && x2 == null
+                || positional > 3 && x3 == null || positional > 4 && x4 == null || positional > 5 && x5 == null) {
+            return UNBOUND;
+        }
+        switch (positional) {
+            case 0:
+                return body0 != null ? body0.run() : UNBOUND;
+            case 1:
+                return body1 != null ? body1.run(x0) : UNBOUND;
+            case 2:
+                return body2 != null ? body2.run(x0, x1) : UNBOUND;
+            case 3:
+                return body3 != null ? body3.run(x0, x1, x2) : UNBOUND;
+            case 4:
+                return body4 != null ? body4.run(x0, x1, x2, x3) : UNBOUND;
+            case 5:
+                return body5 != null ? body5.run(x0, x1, x2, x3, x4) : UNBOUND;
+            default:
+                return body6 != null ? body6.run(x0, x1, x2, x3, x4, x5) : UNBOUND;
+        }
+    }
+
+    /// The default of positional parameter `i`, or null when it has none.
+    private Object dflt(int i, int first) {
+        return i >= first ? defaults[i - first] : null;
+    }
+
+    /// The positional parameter named `k`, or -1.
+    private int slotOf(String k) {
+        for (int p = 0; p < positional; p++) {
+            if (params[p].equals(k)) {
+                return p;
+            }
+        }
+        return -1;
     }
 
     private static List<String> add(List<String> l, String n) {

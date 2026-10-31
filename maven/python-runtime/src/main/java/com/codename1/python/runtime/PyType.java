@@ -43,6 +43,13 @@ public final class PyType extends PyObject {
         Object create(PyType type, Object[] args, String[] kwNames);
     }
 
+    /// A builtin type's one-positional-argument constructor (`str(x)`,
+    /// `int(x)`): what its [Factory] answers for that call, without the
+    /// argument array the factory takes.
+    interface Unary {
+        Object create(Object x);
+    }
+
     public String name;
     public final PyType[] bases;
     final PyType[] mro;
@@ -69,6 +76,9 @@ public final class PyType extends PyObject {
     private Map<String, Object> lookupCache;
     private int lookupVersion = -1;
     Factory factory;
+    /// Set only on the builtin type itself, never inherited: a subclass of
+    /// `str` constructs through `__new__`/`__init__` as usual.
+    Unary unary;
     /// The builtin type whose storage instances of this class extend, or `null`.
     final PyType solidBase;
     /// The class's metaclass: `type`, or a subclass of it (null while `type`
@@ -883,6 +893,9 @@ public final class PyType extends PyObject {
 
     @Override
     public Object call1(Object a) {
+        if (unary != null) {
+            return unary.create(a);
+        }
         Object init = plainInit();
         if (init == null) {
             return super.call1(a);

@@ -550,6 +550,24 @@ public final class Emitter {
                         + exprOrNone(ss.lower) + ", " + exprOrNone(ss.upper) + ", " + exprOrNone(ss.step) + ")", out, ind);
                 return;
             }
+            if (a.targets.size() == 1 && parallel(a.targets.get(0), a.value)) {
+                // `a, b = b, a + b`: the values go to locals left to right,
+                // then the targets are stored left to right, as CPython
+                // does. No tuple is built only to be unpacked again.
+                List<Expr> ts = elts(a.targets.get(0));
+                List<Expr> vs = ((TupleExpr) a.value).elts;
+                String[] tmps = new String[vs.size()];
+                for (int i = 0; i < vs.size(); i++) {
+                    tmps[i] = fresh("s");
+                    String e = expr(vs.get(i));
+                    indent(out, ind);
+                    out.append("final Object ").append(tmps[i]).append(" = ").append(e).append(";\n");
+                }
+                for (int i = 0; i < ts.size(); i++) {
+                    store(ts.get(i), tmps[i], out, ind);
+                }
+                return;
+            }
             String v = expr(a.value);
             if (a.targets.size() == 1 && a.targets.get(0) instanceof Name) {
                 storeName(((Name) a.targets.get(0)).id, v, out, ind);
@@ -935,6 +953,30 @@ public final class Emitter {
 
     private static boolean isSlice(Expr e) {
         return e instanceof Subscript && ((Subscript) e).index instanceof Slice;
+    }
+
+    private static List<Expr> elts(Expr t) {
+        return t instanceof TupleExpr ? ((TupleExpr) t).elts : t instanceof ListExpr ? ((ListExpr) t).elts : null;
+    }
+
+    /// Whether `t = v` pairs a tuple or list target with a tuple display of
+    /// the same length, neither side starred.
+    private static boolean parallel(Expr t, Expr v) {
+        List<Expr> ts = elts(t);
+        if (ts == null || !(v instanceof TupleExpr) || ((TupleExpr) v).elts.size() != ts.size()) {
+            return false;
+        }
+        for (Expr e : ts) {
+            if (e instanceof Starred) {
+                return false;
+            }
+        }
+        for (Expr e : ((TupleExpr) v).elts) {
+            if (e instanceof Starred) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /// Whether an unpacking target is made of plain names only, so storing
@@ -1699,7 +1741,7 @@ public final class Emitter {
         Set<String> savedRecycled = recycled;
         recycled = body != null ? ListRecycling.find(body, names, fs) : java.util.Collections.<String>emptySet();
         List<String> pnames = args.names();
-        boolean directParams = args.vararg == null && args.kwarg == null && args.kwonly.isEmpty() && pnames.size() <= 4;
+        boolean directParams = args.vararg == null && args.kwarg == null && args.kwonly.isEmpty() && pnames.size() <= 6;
         if (asStatic != null && asClass != null && directParams && !pnames.isEmpty()
                 && !fs.assigned.contains(pnames.get(0)) && !fs.cells.contains(pnames.get(0))) {
             selfLocal = localVar(fs, pnames.get(0));
@@ -1753,10 +1795,10 @@ public final class Emitter {
             }
         }
         String a = "a" + frame.id;
-        // Only positional parameters, at most four: the body takes them as
-        // Java parameters (PyFunction.Body0..Body4), so a call allocates no
+        // Only positional parameters, at most six: the body takes them as
+        // Java parameters (PyFunction.Body0..Body6), so a call allocates no
         // argument array.
-        boolean direct = args.vararg == null && args.kwarg == null && args.kwonly.isEmpty() && names.size() <= 4;
+        boolean direct = args.vararg == null && args.kwarg == null && args.kwonly.isEmpty() && names.size() <= 6;
         StringBuilder pro = new StringBuilder();
         Set<String> declared = new LinkedHashSet<String>();
         for (int i = 0; i < names.size(); i++) {
@@ -2481,10 +2523,10 @@ public final class Emitter {
                 String direct = directCall(a.attr, n, recv, args.toString(), helper, site(a.attr));
                 return direct != null ? direct : helper + recv + args + ", " + site(a.attr) + ")";
             }
-            if (n <= 3) {
+            if (n <= 6) {
                 return site(a.attr) + ".call" + n + "(" + recv + args + ")";
             }
-            return site(a.attr) + ".callN(" + recv + ", new Object[] {" + args.substring(2) + "})";
+            return site(a.attr) + ".callN(" + recv + ", new Object[] {null, " + args.substring(2) + "})";
         }
         return "Py.call(" + expr(c.func) + args + ")";
     }
@@ -3443,7 +3485,7 @@ public final class Emitter {
 
     /// The single returned expression a pure twin is made from, or null.
     private Expr pureReturn(Arguments args, List<String> names, List<Stmt> body, Expr exprBody) {
-        boolean direct = args.vararg == null && args.kwarg == null && args.kwonly.isEmpty() && names.size() <= 4;
+        boolean direct = args.vararg == null && args.kwarg == null && args.kwonly.isEmpty() && names.size() <= 6;
         if (!direct || !args.defaults.isEmpty()) {
             return null;
         }

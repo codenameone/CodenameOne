@@ -3682,14 +3682,14 @@ final class TypedEmit {
         for (E x : args) {
             a.append(", ").append(box(x));
         }
-        if (args.size() <= 3) {
+        if (args.size() <= 6) {
             return new E(site + ".call" + args.size() + "(" + a + ")", Ty.DYN);
         }
         StringBuilder arr = new StringBuilder();
         for (E x : args) {
             arr.append(arr.length() == 0 ? "" : ", ").append(box(x));
         }
-        return new E(site + ".callN(" + box(r) + ", new Object[] {" + arr + "})", Ty.DYN);
+        return new E(site + ".callN(" + box(r) + ", new Object[] {null, " + arr + "})", Ty.DYN);
     }
 
     /// The field `f` returns when its body is only `return self.<field>`

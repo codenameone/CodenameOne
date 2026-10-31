@@ -127,6 +127,14 @@ public abstract class PyObject {
         return call(new Object[] {a, b, c, d}, Py.NO_KW);
     }
 
+    public Object call5(Object a, Object b, Object c, Object d, Object e) {
+        return call(new Object[] {a, b, c, d, e}, Py.NO_KW);
+    }
+
+    public Object call6(Object a, Object b, Object c, Object d, Object e, Object f) {
+        return call(new Object[] {a, b, c, d, e, f}, Py.NO_KW);
+    }
+
     // ---- numbers ---------------------------------------------------------
 
     public Object add(Object o) {

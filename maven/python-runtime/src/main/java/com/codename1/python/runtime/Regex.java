@@ -142,21 +142,7 @@ final class Regex {
             p.anchored = Py.isTrue(a[4]);
             return p;
         }));
-        m.setAttr("run", PyBuiltin.positional("run", a -> {
-            if (!(a[0] instanceof Prog)) {
-                throw Py.typeError("_cn1re.run() needs a compiled program");
-            }
-            int[] regs = run((Prog) a[0], Py.toStr(a[1]), (int) Py.index(a[2]), (int) Py.index(a[3]),
-                    (int) Py.index(a[4]), (int) Py.index(a[5]));
-            if (regs.length == 0) {
-                return Py.NONE;
-            }
-            Object[] out = new Object[regs.length];
-            for (int i = 0; i < regs.length; i++) {
-                out[i] = Long.valueOf(regs[i]);
-            }
-            return new PyList(out);
-        }));
+        m.setAttr("run", new RunFn());
         return m;
     }
 
@@ -427,6 +413,46 @@ final class Regex {
         }
         boolean b = word(t, pos - 1, endpos, unicode) != word(t, pos, endpos, unicode);
         return kind == AT_BOUNDARY ? b : !b;
+    }
+
+    /// `_cn1re.run(prog, text, pos, endpos, mode, forbid)`. Called once per
+    /// match attempt with all six arguments, so it takes them directly
+    /// rather than as the argument array a [PyBuiltin] would build.
+    private static final class RunFn extends PyObject {
+        @Override
+        public PyType type() {
+            return Py.BUILTIN_TYPE;
+        }
+
+        @Override
+        public Object call6(Object prog, Object text, Object pos, Object endpos, Object mode, Object forbid) {
+            if (!(prog instanceof Prog)) {
+                throw Py.typeError("_cn1re.run() needs a compiled program");
+            }
+            int[] regs = run((Prog) prog, Py.toStr(text), (int) Py.index(pos), (int) Py.index(endpos),
+                    (int) Py.index(mode), (int) Py.index(forbid));
+            if (regs.length == 0) {
+                return Py.NONE;
+            }
+            Object[] out = new Object[regs.length];
+            for (int i = 0; i < regs.length; i++) {
+                out[i] = Long.valueOf(regs[i]);
+            }
+            return new PyList(out);
+        }
+
+        @Override
+        public Object call(Object[] args, String[] kwNames) {
+            if (args.length != 6 || kwNames.length != 0) {
+                throw Py.typeError("_cn1re.run() takes exactly 6 positional arguments");
+            }
+            return call6(args[0], args[1], args[2], args[3], args[4], args[5]);
+        }
+
+        @Override
+        public String repr() {
+            return "<built-in function run>";
+        }
     }
 
     // ---- the machine -----------------------------------------------------
