@@ -215,26 +215,6 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private int[] lastTitleBarRegions;
     private int[] nativeTitleBarInsets;
 
-    private int backdropBlurs;
-
-    /// How many backdrop blurs (plain or glass) have been asked for.
-    public int getBackdropBlurCount() {
-        return backdropBlurs;
-    }
-
-    @Override
-    public boolean blurRegion(Object graphics, int x, int y, int width, int height, float radius) {
-        backdropBlurs++;
-        return false;
-    }
-
-    @Override
-    public boolean glassRegion(Object graphics, int x, int y, int width, int height, float radius, float cornerRadius,
-            float sat, float scale, float offset, float refract, float specular, float curve, float curveMid, float outline) {
-        backdropBlurs++;
-        return false;
-    }
-
     public void setNativeTitleBarInsets(int... values) {
         nativeTitleBarInsets = values;
     }

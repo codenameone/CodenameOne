@@ -15213,26 +15213,11 @@ public class JavaSEPort extends CodenameOneImplementation {
         return stringWidth(nativeFont, new String(ch, offset, length));
     }
 
-    /**
-     * The context text is measured in: the screen's hints without its zoom.
-     * Codename One lays text out in device pixels, and the screen buffer is
-     * scaled by the simulator's zoom; measured through that transform, every
-     * glyph advance was rounded at the zoomed size, so a string came out up
-     * to a pixel per glyph narrower than it draws anywhere unzoomed -- in a
-     * mutable image, a screenshot, a device. Wrapped text then ran past the
-     * edge it was wrapped for, and a word drawn after another overlapped
-     * the space between them.
-     */
-    private FontRenderContext measureFRC() {
-        FontRenderContext screen = canvas.getFRC();
-        return new FontRenderContext(null, screen.getAntiAliasingHint(), screen.getFractionalMetricsHint());
-    }
-
     private Rectangle2D getStringBoundsWithEmojis(java.awt.Font font, String str) {
         if (hasUnsupportedChars(font, str)) {
-            return mixedFontBounds(createAttributedString(font, str).getIterator(), measureFRC());
+            return mixedFontBounds(createAttributedString(font, str).getIterator(), canvas.getFRC());
         } else {
-            return font.getStringBounds(str, measureFRC());
+            return font.getStringBounds(str, canvas.getFRC());
         }
     }
 
@@ -15413,7 +15398,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (isEmojiFontLoaded() && !Character.isHighSurrogate(ch) && !fnt.canDisplay(ch)) {
             fnt = deriveEmojiFont(fnt.getSize2D());
         }
-        int w = (int) Math.ceil(fnt.getStringBounds(strch, measureFRC()).getWidth());
+        int w = (int) Math.ceil(fnt.getStringBounds(strch, canvas.getFRC()).getWidth());
         return w;
     }
 
@@ -16739,13 +16724,6 @@ public class JavaSEPort extends CodenameOneImplementation {
             String user = p.get("user", null);
             Display d = Display.getInstance();
             if (user == null) {
-                // The prompt is modal. Asked for from the Codename One EDT (log
-                // sending after a network error reaches here) it froze the
-                // application until answered, and headless nobody can answer
-                // it. Answer the default instead, as an unregistered user does.
-                if (d.isEdt() || java.awt.GraphicsEnvironment.isHeadless()) {
-                    return defaultValue;
-                }
                 JPanel pnl = new JPanel();
                 JTextField tf = new JTextField(20);
                 pnl.add(new JLabel("E-Mail For Push"));

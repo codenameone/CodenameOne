@@ -1428,6 +1428,14 @@ public class HeadlessImplementation extends CodenameOneImplementation {
     /// Storage held in memory for the life of the test JVM, so code that
     /// persists through com.codename1.io.Storage (the AndroidKeyStore) can be
     /// read back by a fresh instance.
+    /// The size of a stored entry, read off the map. The inherited answer
+    /// counts with skip(), which never ends on these in-memory streams.
+    @Override
+    public int getStorageEntrySize(java.lang.String a0) {
+        byte[] b = STORAGE.get(a0);
+        return b == null ? -1 : b.length;
+    }
+
     public static final java.util.Map<String, byte[]> STORAGE =
             java.util.Collections.synchronizedMap(new java.util.TreeMap<String, byte[]>());
 
@@ -1454,12 +1462,6 @@ public class HeadlessImplementation extends CodenameOneImplementation {
             throw new java.io.IOException("No storage entry " + a0);
         }
         return new java.io.ByteArrayInputStream(b);
-    }
-
-    @Override
-    public int getStorageEntrySize(java.lang.String a0) {
-        byte[] b = STORAGE.get(a0);
-        return b == null ? -1 : b.length;
     }
 
     @Override

@@ -716,11 +716,6 @@ public final class RasterDisplay extends CodenameOneImplementation {
     }
 
     @Override
-    public int getStorageEntrySize(String name) {
-        return -1;
-    }
-
-    @Override
     public boolean storageFileExists(String name) {
         return false;
     }

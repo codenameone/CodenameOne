@@ -3481,15 +3481,6 @@ public class LinuxImplementation extends CodenameOneImplementation {
     }
 
     @Override
-    public int getStorageEntrySize(String name) {
-        String path = storagePath(name);
-        if (!LinuxNative.fileExists(path)) {
-            return -1;
-        }
-        return (int) LinuxNative.fileLength(path);
-    }
-
-    @Override
     public boolean storageFileExists(String name) {
         return LinuxNative.fileExists(storagePath(name));
     }

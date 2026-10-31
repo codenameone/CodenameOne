@@ -325,7 +325,6 @@ public final class HeadlessCssCompilerImplementation extends CodenameOneImplemen
     @Override public OutputStream createStorageOutputStream(String name) throws IOException { return null; }
     @Override public InputStream createStorageInputStream(String name) throws IOException { return null; }
     @Override public boolean storageFileExists(String name) { return false; }
-    @Override public int getStorageEntrySize(String name) { return -1; }
     @Override public String[] listStorageEntries() { return new String[0]; }
     @Override public String[] listFilesystemRoots() { return new String[0]; }
     @Override public String[] listFiles(String directory) throws IOException { return new String[0]; }
