@@ -118,6 +118,9 @@ public class GeneratorModel {
     /// The card-battle template's accent, used for its icon: it has no `--brand`.
     public static final int SKIRMISH_BRAND = 0xc8862f;
 
+    /// The runner template's accent, used for its icon: it has no `--brand`.
+    public static final int DASH_BRAND = 0xff4d5e;
+
     /// The messaging template's `--brand`, held to its theme.css the same way.
     public static final int PARLEY_BRAND = 0x0a7d6b;
 
@@ -137,7 +140,8 @@ public class GeneratorModel {
             return BASTION_BRAND;
         }
         return template == Template.SAVOR ? SAVOR_BRAND
-                : template == Template.SKIRMISH ? SKIRMISH_BRAND : FULL_STACK_BRAND;
+                : template == Template.SKIRMISH ? SKIRMISH_BRAND
+                : template == Template.DASH ? DASH_BRAND : FULL_STACK_BRAND;
     }
 
     /// Whether `template` can be generated at [CN1_PLUGIN_VERSION]: the UI offers
@@ -1125,7 +1129,7 @@ public class GeneratorModel {
                 "dependency on the shared module");
         requirePomFragment("backend/pom.xml", normalizedPom(entries, "backend/pom.xml"), dependency,
                 "dependency on the shared module");
-        if (template == Template.SKIRMISH) {
+        if (template == Template.SKIRMISH || template == Template.DASH) {
             // The rules pom takes its group and version from the parent, so its
             // coordinates are the parent's and its artifact id.
             requirePomFragment("rules/pom.xml", normalizedPom(entries, "rules/pom.xml"),
@@ -1611,7 +1615,7 @@ public class GeneratorModel {
             content = replaceTagValue(content, "cn1.plugin.version", pluginVersion);
             content = replaceTagValue(content, "cn1.version", pluginVersion);
             if (template.isFullStack() && !options.isGradle() && !isMavenBackendOnly()) {
-                content = addSharedModule(content, template == Template.SKIRMISH);
+                content = addSharedModule(content, template == Template.SKIRMISH || template == Template.DASH);
             }
             if (mavenLayoutsEnabled() && !isMavenBackendOnly()) {
                 content = guardModuleProfiles(content, !includesPlatformModules());
@@ -2043,7 +2047,23 @@ public class GeneratorModel {
                     .append("Package it as a native binary with ")
                     .append("`./mvnw -pl backend -am -Dcodename1.platform=backend package cn1:backend-package`.\n\n");
         }
-        if (template == Template.SKIRMISH) {
+        if (template == Template.DASH) {
+            out.append("## The game and its server\n\n")
+                    .append("This project is a working endless runner: a 2D-to-3D camera swing, a track editor, ")
+                    .append("leaderboards the server re-simulates, live races with voice, crews and an admin console, ")
+                    .append("and the server they talk to.\n\n")
+                    .append("- `rules/` is the game: a deterministic simulation with no dependencies, which the app ")
+                    .append("runs, the server re-simulates to verify scores and the replay viewer re-runs.\n")
+                    .append("- `shared/` is the contract: the REST interfaces and the objects they carry.\n")
+                    .append("- `backend/` is the server.\n")
+                    .append("- `common/` is the app.\n\n")
+                    .append("Start the server, then, in a second terminal, the app:\n\n```\n")
+                    .append("./run-server.sh\n")
+                    .append("./run.sh\n```\n\n")
+                    .append("On Windows: `run-server.bat`, then `run.bat`. Your IDE's run menu has both: ")
+                    .append("\"Run Server\" and the simulator.\n\n")
+                    .append("`./mvnw -pl backend -am -Dcodename1.platform=backend test` runs the server's tests.\n\n");
+        } else if (template == Template.SKIRMISH) {
             out.append("## The game and its server\n\n")
                     .append("This project is a working real-time card battler: a 3D arena, matchmaking, replays, ")
                     .append("progression and an admin console, and the server they talk to.\n\n")

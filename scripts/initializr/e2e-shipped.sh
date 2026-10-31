@@ -12,7 +12,7 @@
 #
 #   e2e-shipped.sh [--require-latest] [--no-ui] [TEMPLATE ...]
 #
-# TEMPLATE is BAREBONES, KOTLIN, WAYLINE, SAVOR, SKIRMISH, PARLEY, BASTION or REEL; all of them
+# TEMPLATE is BAREBONES, KOTLIN, WAYLINE, SAVOR, SKIRMISH, DASH, PARLEY, BASTION or REEL; all of them
 # by default. Every other check of the templates builds them against this
 # checkout's 8.0-SNAPSHOT, which no developer has: the generated pom names the
 # release the Initializr pins, and that is the only thing this script builds
@@ -63,7 +63,7 @@ for arg in "$@"; do
     *) TEMPLATES+=("$arg") ;;
   esac
 done
-[ ${#TEMPLATES[@]} -gt 0 ] || TEMPLATES=(BAREBONES KOTLIN WAYLINE SAVOR SKIRMISH PARLEY BASTION REEL)
+[ ${#TEMPLATES[@]} -gt 0 ] || TEMPLATES=(BAREBONES KOTLIN WAYLINE SAVOR SKIRMISH DASH PARLEY BASTION REEL)
 
 log() { echo "[e2e-shipped] $*" >&2; }
 fail() { echo "[e2e-shipped] FAIL: $*" >&2; exit 1; }

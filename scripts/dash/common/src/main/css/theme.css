@@ -1,0 +1,1815 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
+/*
+ * The whole look of Dash.
+ *
+ * Every screen is built from ordinary Codename One widgets -- Button,
+ * TextField, Label, Tabs, Switch -- and this file is what makes them look like
+ * a game instead of a form: a night-blue backdrop, glass panels with a hairline
+ * edge, bright pill-shaped calls to action and a volt-green GO. Change the
+ * palette below to re-skin the game; change a rule to re-shape one widget
+ * everywhere it appears.
+ *
+ * The track itself is not styled here: run/RunView.java draws it with
+ * com.codename1.gaming, in the colours of run/Theme.java.
+ */
+#Constants {
+    includeNativeBool: true;
+    defaultSourceDPIInt: "0";
+    endsWith3PointsBool: true;
+    transitionSpeedInt: "250";
+    /* Alerts fade in on the game's own dialog, with carved buttons, instead
+       of the native theme's pop-in white card. */
+    dialogTransitionIn: "fade";
+    dialogTransitionOut: "fade";
+    dlgCommandGridBool: false;
+    dlgButtonCommandUIID: "DialogAction";
+    /* Modals dim the game to a deep navy, not the default grey. */
+    tintColor: "d0060818";
+    /* Lists scroll by touch; the bar is noise on a phone. */
+    scrollVisibleBool: false;
+    /* tag::dash-palette[] */
+    --bg: #0b0e1d;
+    --surface: #151a33;
+    --surface-light: #1f2647;
+    --edge: #2c3563;
+    --edge-light: #4a5594;
+    --coral: #ff4d5e;
+    --coral-light: #ff8a4c;
+    --coral-dark: #c22745;
+    --volt: #d4ff3a;
+    --volt-dark: #8fb800;
+    --cyan: #2ee6ff;
+    --violet: #8a5cff;
+    --violet-glow: #c3b0ff;
+    --ice: #eaf6ff;
+    --ink: #0b0e1d;
+    --text: #ffffff;
+    --text-muted: #93a0c8;
+    --danger: #ff3b5c;
+    /* end::dash-palette[] */
+}
+
+Form, GameForm, RunScreen {
+    background: linear-gradient(to bottom, #1a1f45, var(--bg));
+    color: var(--text);
+}
+
+RunScreen {
+    padding: 0;
+}
+
+GameToolbar {
+    background-color: var(--bg);
+    border-bottom: 0.2mm solid var(--edge);
+    padding: 1mm;
+}
+
+GameTitle {
+    color: var(--volt);
+    font-family: "native:MainBold";
+    font-size: 4mm;
+    text-align: center;
+}
+
+Container {
+    background-color: transparent;
+}
+
+Label {
+    color: var(--text);
+    font-family: "native:MainRegular";
+    font-size: 3mm;
+}
+
+Logo {
+    color: var(--volt);
+    font-family: "native:MainBlack";
+    font-size: 9mm;
+    text-align: center;
+    margin: 4mm 0 0 0;
+}
+
+/* A dark pill, so the line reads over the skyline and the sun. */
+Tagline {
+    background-color: rgba(11, 14, 29, 0.78);
+    color: var(--ice);
+    font-family: "native:MainBold";
+    font-size: 2.8mm;
+    text-align: center;
+    border-radius: 3mm;
+    padding: 0.8mm 3mm;
+    margin: 0 0 4mm 0;
+}
+
+SectionTitle {
+    color: var(--cyan);
+    font-family: "native:MainBold";
+    font-size: 2.8mm;
+    margin: 3.5mm 2mm 1mm 2.5mm;
+}
+
+/* tag::dash-primary-button[] */
+/* The call to action: a glossy coral pill, sunset orange at the top, that
+   darkens when touched. */
+PrimaryButton {
+    background: linear-gradient(to bottom, var(--coral-light), var(--coral));
+    border: 0.3mm solid var(--coral-dark);
+    border-radius: 5mm;
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 3.8mm;
+    text-align: center;
+    padding: 2.6mm;
+    /* The same 2mm inset as the section titles and panels above it. */
+    margin: 1.2mm 2mm;
+}
+
+PrimaryButton.pressed {
+    background: linear-gradient(to bottom, var(--coral), var(--coral-dark));
+    color: var(--ice);
+}
+
+PrimaryButton.disabled {
+    background-color: var(--surface-light);
+    color: var(--text-muted);
+}
+/* end::dash-primary-button[] */
+
+GhostButton, PriceButton, GemButton, ReplayButton {
+    background-color: var(--surface);
+    border: 0.35mm solid var(--edge-light);
+    border-radius: 5mm;
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 3mm;
+    text-align: center;
+    padding: 1.9mm;
+    margin: 1mm 2mm;
+}
+
+GhostButton.pressed, PriceButton.pressed, GemButton.pressed, ReplayButton.pressed {
+    background-color: var(--edge);
+}
+
+GemButton {
+    background: linear-gradient(to bottom, #7cf2ff, #12b4d6);
+    border: 0.3mm solid #0b7c96;
+    color: var(--ink);
+}
+
+DangerButton {
+    background-color: transparent;
+    border: 0.35mm solid var(--danger);
+    border-radius: 5mm;
+    color: var(--danger);
+    font-family: "native:MainBold";
+    text-align: center;
+    padding: 1.8mm;
+    margin: 1mm 2mm;
+}
+
+AdminButton {
+    background-color: var(--surface);
+    border: 0.4mm solid var(--volt);
+    border-radius: 1.5mm;
+    color: var(--volt);
+    font-family: "native:MainBold";
+    text-align: center;
+    padding: 1.8mm;
+    margin: 2mm;
+}
+
+LinkButton {
+    background-color: transparent;
+    color: var(--text-muted);
+    text-align: center;
+    font-size: 2.5mm;
+    padding: 1mm;
+}
+
+/* A glass card that groups fields and buttons. */
+Panel {
+    background-color: var(--surface);
+    border: 0.25mm solid var(--edge);
+    border-radius: 4mm;
+    padding: 2.5mm;
+    margin: 1.5mm 2mm;
+}
+
+GameField {
+    background-color: var(--bg);
+    border: 0.3mm solid var(--edge-light);
+    border-radius: 3mm;
+    color: var(--text);
+    font-size: 3.2mm;
+    padding: 2.2mm;
+    margin: 1mm 0;
+}
+
+TextHint {
+    color: #5f6a95;
+}
+
+/* tag::dash-name-field-css[] */
+/* The runner-name entry is a volt-green plate: the name is the one thing a
+   player types that everyone else sees. */
+NameField {
+    background: linear-gradient(to bottom, #ecff9a, var(--volt));
+    border: 0.4mm solid var(--volt-dark);
+    border-radius: 4mm;
+    color: var(--ink);
+    font-family: "native:MainBold";
+    font-size: 5mm;
+    /* Left, like every other field: a centred native editor put the caret
+       at one edge and the text at the other while typing. */
+    text-align: left;
+    padding: 2.5mm 3mm;
+    margin: 1mm 0;
+}
+
+/* end::dash-name-field-css[] */
+
+WalletBar {
+    background-color: var(--surface);
+    padding: 1.5mm;
+}
+
+Trophies, Coins, Gems {
+    font-family: "native:MainBold";
+    font-size: 3.2mm;
+    text-align: center;
+}
+
+Trophies {
+    color: var(--volt);
+}
+
+Coins {
+    color: #ffc93a;
+}
+
+Gems {
+    color: var(--cyan);
+}
+
+/* tag::dash-card-slot[] */
+CardSlot, CardSlotSelected {
+    background-color: var(--surface);
+    border: 0.3mm solid var(--edge);
+    border-radius: 4mm;
+    color: var(--violet-glow);
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+    text-align: center;
+    padding: 1.2mm;
+    margin: 0.8mm;
+}
+
+CardSlotSelected {
+    border: 0.6mm solid var(--volt);
+    background-color: var(--surface-light);
+}
+
+CardSlot.disabled {
+    background-color: var(--bg);
+    color: #4a5280;
+}
+/* end::dash-card-slot[] */
+
+ReplayBar {
+    background-color: var(--surface);
+    padding: 0.8mm;
+}
+
+PlayerName {
+    color: var(--cyan);
+}
+
+PlayerName {
+    color: #8db8ff;
+}
+
+RunClock {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 4mm;
+    text-align: center;
+}
+
+/* tag::dash-elixir-css[] */
+
+/* end::dash-elixir-css[] */
+
+/* Quick chat in a race: glassy chips with a cyan rim, inset from the edges. */
+EmoteButton {
+    background-color: rgba(21, 26, 51, 0.85);
+    border: 0.3mm solid var(--cyan);
+    border-radius: 3mm;
+    color: var(--ice);
+    font-family: "native:MainBold";
+    font-size: 2.4mm;
+    text-align: center;
+    padding: 0.9mm 0.5mm;
+    margin: 0.5mm 0.8mm 1.5mm 0.8mm;
+}
+
+ChallengeCode {
+    background-color: var(--ice);
+    border-radius: 2mm;
+    color: var(--ink);
+    font-family: "native:MainBold";
+    font-size: 7mm;
+    padding: 2mm 4mm;
+}
+
+ChallengeUrl, Empty {
+    color: var(--text-muted);
+    font-size: 2.6mm;
+    text-align: center;
+    padding: 1mm 2mm;
+    margin: 0;
+}
+
+Spotlight {
+    background-color: var(--surface);
+    border: 0.4mm solid var(--volt);
+    border-radius: 3mm;
+    color: var(--volt);
+    font-family: "native:MainBold";
+    font-size: 2.4mm;
+    text-align: left;
+    padding: 1mm 2mm;
+    margin: 0 4mm 1.5mm 4mm;
+}
+
+Spotlight.pressed {
+    background-color: var(--bg);
+}
+
+SpotlightIcon {
+    color: var(--volt);
+    padding: 0 1.5mm 0 0;
+}
+
+SpotlightText {
+    color: var(--volt);
+    font-family: "native:MainBold";
+    font-size: 2.4mm;
+    text-align: left;
+}
+
+InviteCode {
+    color: var(--volt);
+    font-family: "native:MainBold";
+    font-size: 5mm;
+    text-align: center;
+    margin: 2mm;
+}
+
+Warning {
+    color: #ffb74d;
+    font-size: 2.8mm;
+    margin: 1mm 2mm;
+}
+
+ShopItem, LeaderRow, LeaderTop, SettingRow {
+    background-color: var(--surface);
+    border-radius: 2mm;
+    padding: 2mm;
+    margin: 1mm 2mm;
+}
+
+LeaderTop {
+    border: 0.4mm solid var(--volt);
+}
+
+ShopItemName, LeaderName, SettingLabel {
+    color: var(--text);
+    font-size: 3mm;
+}
+
+LeaderRank {
+    color: var(--text-muted);
+    font-family: "native:MainBold";
+    padding: 0 2mm 0 0;
+}
+
+Owned {
+    color: #7be38a;
+    font-family: "native:MainBold";
+}
+
+HistoryRow, AdminRow, FlagReport, FlagAuto {
+    background-color: var(--surface);
+    border-radius: 2mm;
+    padding: 1.5mm;
+    margin: 0.8mm 2mm;
+}
+
+FlagReport {
+    border: 0.4mm solid #ffb74d;
+}
+
+FlagAuto {
+    border: 0.4mm solid var(--coral);
+}
+
+HistoryWin {
+    color: var(--volt);
+    font-family: "native:MainBold";
+}
+
+HistoryLoss {
+    color: #ff9a92;
+    font-family: "native:MainBold";
+}
+
+HistoryDraw {
+    color: var(--text-muted);
+    font-family: "native:MainBold";
+}
+
+MultiLine1 {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 3mm;
+}
+
+MultiLine2, MultiLine3 {
+    color: var(--text-muted);
+    font-size: 2.5mm;
+}
+
+AdminStat {
+    background-color: var(--surface);
+    border: 0.4mm solid var(--edge);
+    border-radius: 2mm;
+    color: var(--volt);
+    font-family: "native:MainBold";
+    font-size: 3.2mm;
+    padding: 2.5mm;
+    margin: 1mm;
+}
+
+AdminDetail {
+    color: var(--text);
+    font-size: 2.8mm;
+}
+
+AdminTabs {
+    background-color: var(--bg);
+}
+
+Tab {
+    background-color: var(--surface);
+    color: var(--text-muted);
+    font-size: 2.6mm;
+    padding: 1.5mm;
+}
+
+Tab.selected {
+    color: var(--volt);
+    border-bottom: 0.6mm solid var(--volt);
+}
+
+Dialog {
+    background-color: var(--surface);
+    border: 0.5mm solid var(--coral);
+    border-radius: 3mm;
+    padding: 2mm;
+}
+
+DialogBody, DialogTitle {
+    color: var(--text);
+}
+
+DialogTitle {
+    color: var(--volt);
+    font-family: "native:MainBold";
+}
+
+AdDialog {
+    background-color: #000000;
+    color: #ffffff;
+}
+
+Slider {
+    background-color: var(--edge);
+    border-radius: 1mm;
+    padding: 0.8mm;
+}
+
+SliderFull {
+    background-color: var(--volt);
+    border-radius: 1mm;
+}
+
+/* Text sits on the panel or backdrop under it: the native theme gives a
+   label an opaque ground, which a game screen must not have. */
+Label, SpanLabel, SpanLabelText, Logo, Tagline, SectionTitle, Trophies, Coins, Gems, PlayerName, RunClock, ChallengeUrl, Empty, Warning, ShopItemName, LeaderName, SettingLabel, LeaderRank, Owned, HistoryWin, HistoryLoss, HistoryDraw, MultiLine1, MultiLine2, MultiLine3, AdminDetail, GameTitle, Title, TextHint, ForgeLabel, ForgeHelp, ForgeHelpText, ForgeByline, ForgeValue, InviteCode, SpotlightText, SpotlightIcon, Container {
+    background-color: transparent;
+}
+
+StatusBar, StatusBarSideMenu {
+    background-color: var(--surface);
+}
+
+TabsContainer {
+    background-color: var(--surface);
+    border: none;
+    padding: 0;
+    margin: 0;
+}
+
+Tab, Tab.selected, Tab.pressed {
+    background-color: var(--surface);
+    border: none;
+    border-radius: 0;
+    margin: 0;
+}
+
+Tab.selected {
+    border-bottom: 0.6mm solid var(--volt);
+}
+
+ContentPane, Toolbar, TitleArea {
+    background-color: transparent;
+}
+
+FlagReport, FlagAuto {
+    color: var(--text);
+}
+
+/* tag::dash-progress-css[] */
+/* Home, progress and celebrations. Every piece of chrome around the art is
+   one of these; the art itself (cards, heroes) comes from ui/CardArt.java. */
+HomeHeader {
+    background-color: var(--surface);
+    border-bottom: 0.25mm solid var(--edge);
+}
+
+PlayerNameBig {
+    background-color: transparent;
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 3.6mm;
+    padding: 0 1.5mm;
+}
+
+LevelBadge, LevelBadgeBig {
+    background-color: var(--violet);
+    border: 0.3mm solid var(--violet-glow);
+    border-radius: 3mm;
+    color: #ffffff;
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+    text-align: center;
+    padding: 0.4mm 1.8mm;
+    margin: 0 1.5mm;
+}
+
+LevelBadgeBig {
+    background: linear-gradient(to bottom, #ecff9a, var(--volt));
+    color: var(--ink);
+    border: 0.4mm solid var(--volt-dark);
+}
+
+XpText, Muted {
+    background-color: transparent;
+    color: var(--text-muted);
+    font-size: 2.4mm;
+    padding: 0 1.5mm;
+}
+
+Muted {
+    background-color: transparent;
+    text-align: center;
+}
+
+HeroStage {
+    background-color: transparent;
+    padding: 1mm 0 0 0;
+}
+
+LeagueName {
+    background-color: transparent;
+    color: var(--volt);
+    font-family: "native:MainBold";
+    font-size: 3.4mm;
+    margin: 1.6mm 0 0 0;
+    text-align: center;
+}
+
+GoButton {
+    background: linear-gradient(to bottom, #ecff9a, var(--volt));
+    border: 0.4mm solid var(--volt-dark);
+    border-radius: 7mm;
+    color: var(--ink);
+    font-family: "native:MainBlack";
+    font-size: 7mm;
+    text-align: center;
+    padding: 3.5mm;
+    margin: 2mm 4mm;
+}
+
+GoButton.pressed {
+    background: linear-gradient(to bottom, var(--volt), var(--volt-dark));
+    color: var(--ink);
+}
+
+CrateSlot, CrateSlotEmpty {
+    background-color: var(--surface);
+    border: 0.35mm solid var(--cyan);
+    border-radius: 3.5mm;
+    color: var(--cyan);
+    font-family: "native:MainBold";
+    font-size: 2.2mm;
+    text-align: center;
+    padding: 0.8mm 0.3mm;
+    margin: 0 1.2mm 1.5mm 1.2mm;
+}
+
+CrateSlot.pressed {
+    background-color: var(--edge);
+}
+
+CrateSlotEmpty {
+    background-color: var(--bg);
+    border: 0.3mm solid var(--edge);
+    color: var(--edge-light);
+}
+
+QuestCard {
+    background-color: var(--surface);
+    border: 0.4mm solid var(--edge);
+    border-radius: 2mm;
+    padding: 1.5mm 2mm;
+    margin: 0.8mm 0;
+}
+
+QuestTitle {
+    background-color: transparent;
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 3mm;
+}
+
+QuestReward {
+    color: #ffc93a;
+}
+
+ClaimButton {
+    background: linear-gradient(to bottom, #ecff9a, var(--volt));
+    border: 0.3mm solid var(--volt-dark);
+    border-radius: 4mm;
+    color: var(--ink);
+    font-family: "native:MainBold";
+    font-size: 2.8mm;
+    text-align: center;
+    padding: 1.2mm 2.8mm;
+    margin: 0 0 0 1.5mm;
+}
+
+ClaimButton.pressed {
+    background-color: var(--volt-dark);
+}
+
+Claimed {
+    color: var(--volt);
+}
+
+/* The runner in play: CardAction's box, so its card ends level with the
+   others' buttons. */
+RunnerChip {
+    background-color: rgba(212, 255, 58, 0.12);
+    border: 0.3mm solid var(--volt);
+    border-radius: 3mm;
+    color: var(--volt);
+    font-family: "native:MainBold";
+    font-size: 2.5mm;
+    text-align: center;
+    padding: 1.4mm 0.5mm;
+    margin: 2mm 0.8mm 0 0.8mm;
+}
+
+RunnerStageName {
+    background-color: transparent;
+    color: var(--text);
+    font-family: "native:MainBlack";
+    font-size: 5mm;
+    text-align: center;
+    padding: 0 0 3mm 0;
+    margin: 0;
+}
+
+NavTile {
+    background: linear-gradient(to bottom, var(--edge-light), var(--edge));
+    border: 0.4mm solid var(--edge);
+    border-radius: 2mm;
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+    text-align: center;
+    padding: 1.5mm 0.5mm;
+    margin: 0.8mm;
+}
+
+NavTile.pressed {
+    background-color: var(--edge);
+}
+
+RewardDialog {
+    background: linear-gradient(to bottom, #222a5a, var(--bg));
+    border: 0.8mm solid var(--volt);
+    border-radius: 4mm;
+    padding: 2mm 3mm;
+}
+
+RewardCard {
+    background: linear-gradient(to bottom, #222a5a, var(--bg));
+    border: 0.8mm solid var(--volt);
+    border-radius: 4mm;
+    padding: 2mm 3mm;
+    margin: 2mm;
+}
+
+RewardBody {
+    background-color: transparent;
+    padding: 0;
+}
+
+RewardTitle, LevelUpTitle {
+    background-color: transparent;
+    color: var(--volt);
+    font-family: "native:MainBold";
+    font-size: 4mm;
+    text-align: center;
+}
+
+LevelUpTitle {
+    background-color: transparent;
+    color: #ffffff;
+    font-size: 4.4mm;
+}
+
+RewardHero {
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+}
+
+RewardCoins, RewardGems, RewardXp, RewardChest {
+    background-color: #0e1224;
+    border-radius: 2mm;
+    font-family: "native:MainBold";
+    font-size: 2.8mm;
+    padding: 0.8mm 1.6mm;
+    margin: 0.6mm;
+}
+
+RewardCoins { color: #ffc93a; }
+RewardGems { color: var(--cyan); }
+RewardXp { color: var(--volt); }
+RewardChest { color: var(--volt); }
+
+RewardAchievement {
+    background-color: transparent;
+    color: var(--volt);
+    font-family: "native:MainBold";
+    font-size: 3mm;
+}
+
+AchievementRow, AchievementLocked {
+    background-color: var(--surface);
+    border: 0.4mm solid var(--volt);
+    border-radius: 2mm;
+    padding: 1.5mm;
+    margin: 0.8mm 0;
+}
+
+AchievementLocked {
+    border: 0.4mm solid var(--edge);
+}
+
+CoachBubble {
+    background-color: var(--surface-light);
+    border: 0.35mm solid var(--cyan);
+    border-radius: 4mm;
+    padding: 2mm;
+    margin: 2mm;
+}
+
+CoachName {
+    background-color: transparent;
+    color: var(--cyan);
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+}
+
+CoachText {
+    background-color: transparent;
+    color: var(--text);
+    font-size: 3.2mm;
+}
+
+CoachHint {
+    background-color: transparent;
+    color: var(--text-muted);
+    font-size: 2.4mm;
+}
+
+TutorialSkip {
+    background-color: transparent;
+    color: #ffffff;
+    font-size: 2.6mm;
+    padding: 1mm 2mm;
+}
+
+SignInHero {
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+    text-align: center;
+}
+
+/* end::dash-progress-css[] */
+
+/* The toolbar's back arrow: a bare gold glyph, no native button chrome. */
+BackCommand, BackCommand.pressed, TitleCommand, TitleCommand.pressed {
+    background-color: transparent;
+    border: none;
+    color: var(--volt);
+    padding: 1mm;
+    margin: 0;
+}
+
+BackCommand.pressed, TitleCommand.pressed {
+    color: var(--coral-light);
+}
+
+DialogCommandArea {
+    background-color: transparent;
+    padding: 1.5mm 0 0 0;
+}
+
+DialogAction {
+    background: linear-gradient(to bottom, var(--coral-light), var(--coral));
+    border: 0.5mm solid var(--coral-dark);
+    border-radius: 1.5mm;
+    color: var(--ink);
+    font-family: "native:MainBold";
+    font-size: 3mm;
+    text-align: center;
+    padding: 1.5mm 4mm;
+    margin: 0 1mm;
+}
+
+DialogAction.pressed {
+    background-color: var(--coral-dark);
+    color: var(--ice);
+}
+
+/* The Forge: the pack browser and the editors. Rows are stone panels, labels
+   sit left and values right, and the small steppers are carved like the big
+   buttons so the editor feels like part of the game. */
+ForgeRow {
+    background-color: var(--edge);
+    border-radius: 1.5mm;
+    padding: 1.5mm 2mm;
+    margin: 0.8mm 2mm;
+}
+
+ForgeLabel {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 3mm;
+    text-align: left;
+    padding: 0.5mm 2mm 0.5mm 0.5mm;
+    margin: 0;
+}
+
+ForgeValue {
+    color: var(--volt);
+    font-family: "native:MainBold";
+    font-size: 3mm;
+    text-align: center;
+    padding: 0.5mm 1.5mm;
+    margin: 0;
+}
+
+ForgeField {
+    background-color: var(--bg);
+    border: 0.3mm solid var(--edge-light);
+    border-radius: 2.5mm;
+    color: var(--text);
+    font-size: 3mm;
+    text-align: left;
+    padding: 1.2mm;
+    margin: 0.5mm 0;
+}
+
+ForgeStep {
+    background-color: rgba(46, 230, 255, 0.12);
+    border: 0.35mm solid var(--cyan);
+    border-radius: 3mm;
+    color: var(--cyan);
+    font-family: "native:MainBold";
+    font-size: 3mm;
+    text-align: center;
+    padding: 1mm 2mm;
+    margin: 0 0.5mm;
+}
+
+ForgeStep.pressed {
+    background-color: var(--cyan);
+    color: var(--ink);
+}
+
+ForgeCheck {
+    color: var(--text);
+    font-size: 3mm;
+    text-align: left;
+    padding: 1mm;
+    margin: 0.5mm 2mm;
+}
+
+ForgeHelp, ForgeHelpText, ForgeByline {
+    color: var(--text-muted);
+    font-size: 2.6mm;
+    text-align: left;
+    padding: 0.5mm 2mm;
+    margin: 0;
+}
+
+ForgeProblem {
+    color: var(--coral);
+    font-size: 2.8mm;
+    text-align: left;
+    padding: 0.5mm 2mm;
+    margin: 0;
+}
+
+ForgeOfficial {
+    background-color: transparent;
+    color: var(--volt);
+    font-family: "native:MainBold";
+    font-size: 3.4mm;
+    padding: 0.3mm 0;
+    margin: 0;
+}
+
+ForgeTab, ForgeTabOn {
+    background-color: var(--edge);
+    border-radius: 1.5mm;
+    color: var(--edge-light);
+    font-family: "native:MainBold";
+    font-size: 3mm;
+    text-align: center;
+    padding: 1.5mm;
+    margin: 0.5mm;
+}
+
+ForgeTabOn {
+    background: linear-gradient(to bottom, var(--coral-light), var(--coral));
+    color: var(--ink);
+}
+
+/* The arena editor's tools: an icon over a short word, small enough that
+   five of them share a phone's width without "To...". */
+ForgeTool, ForgeToolOn {
+    background-color: var(--edge);
+    border-radius: 1.5mm;
+    color: var(--edge-light);
+    font-family: "native:MainBold";
+    font-size: 2.4mm;
+    text-align: center;
+    padding: 1mm 0.5mm;
+    margin: 0.5mm;
+}
+
+ForgeToolOn {
+    background: linear-gradient(to bottom, var(--coral-light), var(--coral));
+    color: var(--ink);
+}
+
+/* tag::dash-desk-css[] */
+/* The admin console. It is a tool for the people running the game, not part
+   of the game, so it looks like a desktop application: a light page, a side
+   bar, plain fields in one aligned column, flat buttons and charts. Nothing
+   here is wood or stone. admin/Desk.java builds every widget with these. */
+DeskForm, DeskPage, DeskTabs {
+    background-color: #f4f5f7;
+    padding: 0;
+    margin: 0;
+}
+
+DeskPage {
+    padding: 2mm 3mm;
+}
+
+DeskToolbar {
+    background-color: #1f2633;
+    padding: 1mm 2mm;
+}
+
+DeskTitle {
+    background-color: transparent;
+    color: #ffffff;
+    font-family: "native:MainBold";
+    font-size: 3.2mm;
+    text-align: left;
+}
+
+DeskSide {
+    background-color: #e8eaee;
+    border-right: 0.2mm solid #d3d7de;
+    padding: 1mm 0;
+}
+
+DeskTab, DeskTab.selected, DeskTab.pressed {
+    background-color: transparent;
+    color: #3c4454;
+    font-family: "native:MainRegular";
+    font-size: 2.7mm;
+    text-align: left;
+    border: none;
+    border-radius: 1mm;
+    padding: 1.4mm 2.5mm;
+    margin: 0.3mm 1mm;
+}
+
+DeskTab.selected {
+    background-color: #ffffff;
+    color: #1d4ed8;
+    font-family: "native:MainBold";
+}
+
+DeskSection {
+    background-color: transparent;
+    color: #1d2330;
+    font-family: "native:MainBold";
+    font-size: 3.2mm;
+    padding: 0;
+    margin: 3mm 0 1.2mm 0;
+}
+
+DeskPanel, DeskCard, DeskChartBox {
+    background-color: #ffffff;
+    border: 0.2mm solid #d9dde3;
+    border-radius: 1.2mm;
+    padding: 2mm 2.5mm;
+    margin: 0.8mm;
+}
+
+DeskPanelTitle {
+    background-color: transparent;
+    color: #1d2330;
+    font-family: "native:MainBold";
+    font-size: 2.9mm;
+    padding: 0 0 0.6mm 0;
+    margin: 0;
+}
+
+DeskCardValue {
+    background-color: transparent;
+    color: #1d2330;
+    font-family: "native:MainBold";
+    font-size: 5mm;
+    padding: 0;
+    margin: 0;
+}
+
+DeskCardName {
+    background-color: transparent;
+    color: #4a5263;
+    font-size: 2.6mm;
+    padding: 0;
+    margin: 0;
+}
+
+DeskCardDetail, DeskHelp {
+    background-color: transparent;
+    color: #6b7280;
+    font-size: 2.4mm;
+    padding: 0;
+    margin: 0;
+}
+
+DeskHelpBox {
+    background-color: transparent;
+    padding: 0.8mm 0;
+    margin: 0;
+}
+
+DeskFieldRow {
+    background-color: transparent;
+    padding: 0.6mm 0;
+    margin: 0;
+}
+
+DeskLabel {
+    background-color: transparent;
+    color: #4a5263;
+    font-size: 2.7mm;
+    text-align: right;
+    padding: 1.2mm 2.5mm 1.2mm 0;
+    margin: 0;
+}
+
+DeskValue, DeskValueAlert {
+    background-color: transparent;
+    color: #1d2330;
+    font-size: 2.7mm;
+    padding: 1.2mm 0;
+    margin: 0;
+}
+
+DeskValueAlert {
+    color: #b42318;
+}
+
+DeskInput {
+    background-color: #ffffff;
+    border: 0.2mm solid #c4c9d2;
+    border-radius: 0.8mm;
+    color: #1d2330;
+    font-size: 2.7mm;
+    text-align: left;
+    padding: 1mm 1.4mm;
+    margin: 0 0.6mm 0 0;
+}
+
+DeskConditionRow {
+    background-color: transparent;
+    padding: 0.4mm 0;
+    margin: 0;
+}
+
+DeskActions {
+    background-color: transparent;
+    padding: 1mm 0 0 0;
+    margin: 0;
+}
+
+DeskButton, DeskPrimary, DeskDanger {
+    background-color: #ffffff;
+    border: 0.2mm solid #c4c9d2;
+    border-radius: 0.8mm;
+    color: #1d2330;
+    font-family: "native:MainRegular";
+    font-size: 2.7mm;
+    text-align: center;
+    padding: 1mm 2.5mm;
+    margin: 0 0 0 1mm;
+}
+
+DeskButton.pressed {
+    background-color: #e8eaee;
+}
+
+DeskPrimary {
+    background-color: #2563eb;
+    border: 0.2mm solid #1d4ed8;
+    color: #ffffff;
+    font-family: "native:MainBold";
+}
+
+DeskPrimary.pressed {
+    background-color: #1d4ed8;
+}
+
+DeskDanger {
+    color: #b42318;
+    border: 0.2mm solid #e4a39c;
+}
+
+DeskDanger.pressed {
+    background-color: #fdecea;
+}
+
+DeskLink {
+    background-color: transparent;
+    color: #1d4ed8;
+    font-size: 2.6mm;
+    text-align: left;
+    padding: 1mm;
+    margin: 0;
+}
+
+DeskRow, DeskRowWarn, DeskRowAlert {
+    background-color: #ffffff;
+    border: 0.2mm solid #d9dde3;
+    border-radius: 1mm;
+    padding: 1.4mm 2mm;
+    margin: 0.5mm 0;
+}
+
+DeskRowWarn {
+    border-left: 1mm solid #f59e0b;
+}
+
+DeskRowAlert {
+    border-left: 1mm solid #dc2626;
+}
+
+DeskRowTitle {
+    background-color: transparent;
+    color: #1d2330;
+    font-family: "native:MainBold";
+    font-size: 2.8mm;
+}
+
+DeskRowDetail {
+    background-color: transparent;
+    color: #6b7280;
+    font-size: 2.5mm;
+}
+
+DeskTableHeader, DeskTableRow {
+    background-color: #ffffff;
+    border-bottom: 0.2mm solid #e5e7eb;
+    padding: 0 1mm;
+    margin: 0;
+}
+
+DeskTableHeader {
+    background-color: #eef0f3;
+}
+
+DeskTableHead, DeskCell {
+    background-color: transparent;
+    color: #1d2330;
+    font-size: 2.6mm;
+    text-align: left;
+    padding: 1mm;
+    margin: 0;
+}
+
+DeskTableHead {
+    color: #4a5263;
+    font-family: "native:MainBold";
+}
+
+DeskEmpty {
+    background-color: transparent;
+    color: #6b7280;
+    font-size: 2.7mm;
+    padding: 2mm 0;
+}
+
+DeskBadge, DeskBadgeOn {
+    background-color: #e5e7eb;
+    border-radius: 1mm;
+    color: #4a5263;
+    font-family: "native:MainBold";
+    font-size: 2.3mm;
+    padding: 0.4mm 1.5mm;
+    margin: 0;
+}
+
+DeskBadgeOn {
+    background-color: #dcfce7;
+    color: #166534;
+}
+
+/* The charts read their colours from these: the page, the grid lines and
+   the three series. */
+DeskChart {
+    background-color: #ffffff;
+    color: #4a5263;
+    padding: 0;
+    margin: 0;
+}
+
+DeskChartGrid {
+    color: #e2e5ea;
+}
+
+DeskChartA {
+    color: #2563eb;
+}
+
+DeskChartB {
+    color: #16a34a;
+}
+
+DeskChartC {
+    color: #f59e0b;
+}
+/* end::dash-desk-css[] */
+
+/* ---- Run HUD: drawn over the 3D view, so every piece keeps its own
+   translucent backing and stays readable against bright scenery. ---- */
+EmoteBar {
+    background-color: transparent;
+    padding: 0 2mm 3mm 2mm;
+    margin: 0;
+}
+HudBar {
+    background: linear-gradient(to bottom, rgba(5, 7, 18, 0.75), rgba(5, 7, 18, 0));
+    padding: 1.5mm 2mm 4mm 2mm;
+}
+HudDistance, HudScore, HudCoins, HudPlace, HudPower {
+    background-color: transparent;
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 3.2mm;
+    padding: 0.3mm 1.5mm;
+    margin: 0;
+}
+HudDistance {
+    font-family: "native:MainBlack";
+    font-size: 8mm;
+    text-align: center;
+}
+HudScore {
+    background-color: rgba(10, 14, 32, 0.72);
+    border: 0.25mm solid #3a4380;
+    border-radius: 3mm;
+    color: var(--ice);
+    text-align: center;
+    padding: 0.4mm 2.2mm;
+}
+HudStreet {
+    background-color: #0f6b45;
+    border: 0.25mm solid #ffffff;
+    border-radius: 1.2mm;
+    color: #ffffff;
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+    text-align: center;
+    padding: 0.4mm 1.8mm;
+    margin-top: 0.8mm;
+}
+HudCoins {
+    background-color: rgba(10, 14, 32, 0.8);
+    border: 0.3mm solid #ffc93a;
+    border-radius: 3.5mm;
+    color: #ffc93a;
+    font-size: 3.6mm;
+    padding: 0.8mm 2.2mm;
+    margin: 0.5mm 0;
+}
+HudPower {
+    color: var(--violet-glow);
+    text-align: right;
+}
+HudPlace {
+    color: var(--cyan);
+    font-family: "native:MainBlack";
+    font-size: 4.6mm;
+    text-align: right;
+}
+HudCountdown {
+    background-color: transparent;
+    color: var(--volt);
+    font-family: "native:MainBlack";
+    font-size: 24mm;
+    text-align: center;
+}
+HudButton {
+    background-color: rgba(10, 14, 32, 0.8);
+    border: 0.3mm solid var(--edge-light);
+    color: var(--text);
+    font-size: 3mm;
+    border-radius: 5mm;
+    padding: 1.6mm;
+    margin: 1mm;
+}
+HudButton.pressed {
+    background-color: var(--edge);
+}
+ChatLog {
+    background-color: rgba(10, 14, 28, 0.45);
+    padding: 1mm;
+    margin: 1mm;
+}
+ChatLine {
+    background-color: transparent;
+    color: var(--text);
+    font-size: 2.8mm;
+    padding: 0;
+    margin: 0;
+}
+
+ChatFrom {
+    background-color: transparent;
+    color: var(--cyan);
+    font-family: "native:MainBold";
+    font-size: 2.2mm;
+    padding: 0;
+    margin: 0;
+}
+
+ChatBubble {
+    background-color: #1e2350;
+    border: 1px solid #3a4290;
+    border-radius: 2mm;
+    padding: 1mm 2mm;
+    margin: 0.6mm 2mm;
+}
+
+/* ---- Results, score boards and the track editor ---- */
+ResultLine {
+    color: var(--text);
+    font-size: 3.2mm;
+    padding: 0.8mm 2mm;
+    margin: 0;
+}
+DialogButton {
+    background: linear-gradient(to bottom, var(--coral-light), var(--coral));
+    border: 0.3mm solid var(--coral-dark);
+    color: #ffffff;
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+    text-align: center;
+    border-radius: 4mm;
+    padding: 1.5mm 1mm;
+    margin: 1mm;
+}
+BoardTab {
+    background-color: var(--surface);
+    color: var(--edge-light);
+    font-size: 2.9mm;
+    border-radius: 4mm;
+    padding: 1.2mm 2.2mm;
+    margin: 0.6mm;
+}
+BoardTab.selected, BoardTab.pressed {
+    background-color: var(--cyan);
+    color: var(--ink);
+}
+Timeline {
+    background-color: var(--bg);
+    padding: 0;
+    margin: 1mm 0;
+}
+
+/* ---- Home lobby ---- */
+
+TopBar {
+    background: linear-gradient(to bottom, rgba(5, 7, 18, 0.85), rgba(5, 7, 18, 0));
+    padding: 2mm 2.5mm 3mm 2.5mm;
+}
+
+CurrencyPill {
+    background-color: rgba(10, 14, 32, 0.78);
+    border: 0.3mm solid var(--edge-light);
+    border-radius: 4mm;
+    padding: 0.4mm 0.6mm 0.4mm 1.4mm;
+    margin: 0 0.8mm;
+}
+
+Trophies, Coins, Gems {
+    font-size: 2.8mm;
+    padding: 0.4mm 0.8mm;
+    margin: 0;
+    background-color: transparent;
+}
+
+PillPlus {
+    background-color: var(--volt);
+    border-radius: 2.5mm;
+    color: var(--ink);
+    padding: 0.2mm;
+    margin: 0 0.2mm 0 0.6mm;
+}
+
+IconButton {
+    background-color: rgba(10, 14, 32, 0.78);
+    border: 0.3mm solid var(--edge-light);
+    border-radius: 4mm;
+    color: var(--text);
+    padding: 1mm;
+    margin: 0 0 0 0.8mm;
+}
+
+Rail {
+    background-color: transparent;
+    padding: 1mm 1.5mm;
+}
+
+RailTile {
+    background: linear-gradient(to bottom, rgba(46, 54, 104, 0.9), rgba(16, 20, 44, 0.9));
+    border: 0.35mm solid var(--edge-light);
+    border-radius: 3.5mm;
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 1.8mm;
+    text-align: center;
+    padding: 0.8mm 1.1mm 0.6mm 1.1mm;
+    margin: 0.5mm 0;
+}
+
+RailTile.pressed {
+    background-color: var(--violet);
+    border-color: var(--cyan);
+}
+
+HomeBottom {
+    background: linear-gradient(to bottom, rgba(5, 7, 18, 0), rgba(5, 7, 18, 0.92));
+    padding: 0;
+}
+
+RaceChip {
+    background-color: rgba(18, 22, 50, 0.9);
+    border: 0.35mm solid var(--cyan);
+    border-radius: 5mm;
+    color: var(--cyan);
+    font-family: "native:MainBold";
+    font-size: 3mm;
+    text-align: center;
+    padding: 2mm;
+    margin: 0 4mm 2mm 4mm;
+}
+
+RaceChip.pressed {
+    background-color: var(--cyan);
+    color: var(--ink);
+}
+
+NavBar {
+    background-color: rgba(6, 8, 20, 0.96);
+    border-top: 0.3mm solid var(--edge);
+    padding: 1mm 0 0.6mm 0;
+}
+
+NavItem, NavItemOn {
+    background-color: transparent;
+    color: var(--text-muted);
+    font-family: "native:MainBold";
+    font-size: 2.2mm;
+    text-align: center;
+    padding: 1mm 0.5mm;
+    margin: 0;
+}
+
+NavItemOn {
+    color: var(--volt);
+}
+
+/* ---- End of a run ---- */
+
+/* The veil a result or reward card sits on, over the scene where the run
+   ended. opacity sets the background's transparency only. */
+RunDim {
+    background-color: rgba(6, 8, 24, 0.6);
+    padding: 6mm 3mm;
+    margin: 0;
+}
+
+ResultCard {
+    background: linear-gradient(to bottom, #1d2350, #0b0e1d);
+    border: 0.4mm solid var(--violet-glow);
+    border-radius: 5mm;
+    padding: 4mm 3mm 3mm 3mm;
+    margin: 2mm;
+}
+
+ResultTitle {
+    color: var(--volt);
+    font-family: "native:MainBlack";
+    font-size: 5.5mm;
+    text-align: center;
+    background-color: transparent;
+}
+
+ResultScore {
+    color: #ffffff;
+    font-family: "native:MainBlack";
+    font-size: 9mm;
+    text-align: center;
+    background-color: transparent;
+    padding: 1mm 0 0 0;
+}
+
+ResultCaption {
+    color: var(--text-muted);
+    font-family: "native:MainBold";
+    font-size: 2.4mm;
+    text-align: center;
+    background-color: transparent;
+}
+
+StatChip {
+    background-color: rgba(46, 230, 255, 0.12);
+    border: 0.3mm solid var(--cyan);
+    border-radius: 3.5mm;
+    color: var(--cyan);
+    font-family: "native:MainBold";
+    font-size: 2.2mm;
+    padding: 0.8mm 1.6mm;
+    margin: 1.5mm 0.8mm;
+}
+
+/* ---- Level cards ---- */
+
+LevelCard {
+    background: linear-gradient(to bottom, #1d2350, #121633);
+    border: 0.3mm solid var(--edge-light);
+    border-radius: 4mm;
+    padding: 2mm;
+    margin: 1.5mm 3mm;
+}
+
+LevelThumb {
+    background-color: transparent;
+    padding: 0 2.5mm 0 0;
+    margin: 0;
+}
+
+CityIcon {
+    background-color: #1f2a5e;
+    border-radius: 3mm;
+    color: var(--volt);
+    text-align: center;
+    padding: 2mm;
+    margin: 0 2mm 0 0;
+}
+
+CityCard {
+    background: linear-gradient(to bottom, #1d2350, #0b0e1d);
+    border: 0.4mm solid var(--violet-glow);
+    border-radius: 5mm;
+    padding: 3mm;
+    margin: 2mm;
+}
+
+CityStatus {
+    background-color: transparent;
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 3mm;
+    text-align: center;
+    padding: 0 0 2mm 0;
+    margin: 0;
+}
+
+MapCredit {
+    background-color: rgba(255, 255, 255, 0.8);
+    color: #333333;
+    font-family: "native:MainRegular";
+    font-size: 1.7mm;
+    padding: 0.3mm 1mm;
+    margin: 0;
+}
+
+CityMinimap {
+    background-color: rgba(10, 14, 32, 0.72);
+    border: 0.25mm solid #3a4380;
+    border-radius: 3mm;
+    padding: 0;
+    margin: 1mm 0 0 0;
+}
+
+LevelLength {
+    background-color: transparent;
+    color: var(--text-muted);
+    font-family: "native:MainRegular";
+    font-size: 2.4mm;
+    padding: 0.4mm 0 0 0.6mm;
+    margin: 0;
+}
+
+LevelName {
+    background-color: transparent;
+    color: var(--text);
+    font-family: "native:MainBlack";
+    font-size: 3.2mm;
+    padding: 0.5mm 0;
+}
+
+TagChip {
+    background-color: rgba(181, 108, 255, 0.2);
+    border: 0.3mm solid var(--violet-glow);
+    border-radius: 2.5mm;
+    color: var(--violet-glow);
+    font-family: "native:MainBold";
+    font-size: 2.2mm;
+    padding: 0.4mm 1.6mm;
+    margin: 0.5mm 1mm 0.5mm 0;
+}
+
+PlayRound {
+    background: linear-gradient(to bottom, #ecff9a, var(--volt));
+    border: 0.4mm solid var(--volt-dark);
+    border-radius: 7mm;
+    color: var(--ink);
+    padding: 2.4mm;
+    margin: 0 0 0 1mm;
+}
+
+PlayRound.pressed {
+    background-color: var(--volt-dark);
+}
+
+CardAction {
+    background-color: rgba(46, 230, 255, 0.08);
+    border: 0.3mm solid var(--edge-light);
+    border-radius: 3mm;
+    color: var(--cyan);
+    font-family: "native:MainBold";
+    font-size: 2.5mm;
+    text-align: center;
+    padding: 1.4mm 0.5mm;
+    margin: 2mm 0.8mm 0 0.8mm;
+}
+
+CardAction.pressed {
+    background-color: var(--edge);
+}
+
+CardGo {
+    background: linear-gradient(to bottom, #ecff9a, var(--volt));
+    border: 0.4mm solid var(--volt-dark);
+    border-radius: 6mm;
+    color: var(--ink);
+    font-family: "native:MainBlack";
+    font-size: 4.6mm;
+    text-align: center;
+    padding: 2.6mm;
+    margin: 2mm 1mm 1.5mm 1mm;
+}
+
+CardGo.pressed {
+    background-color: var(--volt-dark);
+}
+
+/* Text that sits on a card or a dialog shows what is under it. */
+Claimed, DialogBody, DialogTitle, ForgeCheck, ForgeProblem, QuestReward, ResultLine {
+    background-color: transparent;
+}
+
+/* ---- Shop cards ---- */
+
+ShopArt {
+    background-color: transparent;
+    padding: 0 2.5mm 0 0;
+    margin: 0;
+}
+
+ShopItemKind {
+    background-color: transparent;
+    color: var(--violet-glow);
+    font-family: "native:MainBold";
+    font-size: 2.1mm;
+    padding: 0.3mm 0;
+}
+
+/* The name on the home screen's top bar. */
+PlayerName {
+    background-color: transparent;
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 3mm;
+    padding: 0.4mm 1mm 0.4mm 1.5mm;
+}
+
+LevelBadge {
+    font-size: 2.2mm;
+    padding: 0.3mm 1.4mm;
+    margin: 0.4mm 0;
+}
+
+/* The sign-in's server switch: a developer setting, kept small and quiet. */
+/* The invite code, on a card of its own with a caption over it. */
+InviteCard {
+    background: linear-gradient(to bottom, var(--surface-light), var(--surface));
+    border: 0.3mm solid var(--edge-light);
+    border-radius: 3mm;
+    padding: 2mm;
+    margin: 1.5mm 0;
+}
+
+InviteCaption {
+    background-color: transparent;
+    color: var(--text-muted);
+    font-family: "native:MainBold";
+    font-size: 2mm;
+    padding: 0;
+    margin: 0;
+}
+
+/* A MultiButton's emblem (the stars on a score row): no plate behind it. */
+Emblem {
+    background-color: transparent;
+    padding: 0 0 0 1mm;
+    margin: 0;
+}

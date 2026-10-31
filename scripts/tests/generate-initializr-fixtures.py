@@ -86,6 +86,7 @@ FULL_STACK = {
     'WAYLINE': ('api/RiderApi.java', 'rider/RiderForm.java'),
     'SAVOR': ('api/OrderApi.java', 'customer/CustomerForm.java'),
     'SKIRMISH': ('api/AccountApi.java', 'ui/HomeForm.java'),
+    'DASH': ('api/AccountApi.java', 'ui/HomeForm.java'),
     'PARLEY': ('api/ConversationApi.java', 'ui/CallScreen.java'),
     'REEL': ('api/CatalogApi.java', 'ui/WelcomeForm.java'),
     'BASTION': ('api/BankingApi.java', 'ui/HomeForm.java'),
@@ -97,6 +98,7 @@ TEMPLATE_HINT = {
     'WAYLINE': 'codename1.arg.ios.NSLocationWhenInUseUsageDescription=',
     'SAVOR': 'codename1.arg.ios.NSLocationWhenInUseUsageDescription=',
     'SKIRMISH': None,
+    'DASH': None,
     'PARLEY': 'codename1.arg.ios.NSLocationWhenInUseUsageDescription=',
     'BASTION': 'codename1.arg.ios.detectJailbreak=true',
     'REEL': None,
@@ -127,8 +129,8 @@ def check_full_stack_fixture(archive, z, template):
     full = archive.name.split('-')[1] == 'FULL'
     root_pom = ''.join(z.read('pom.xml').decode().split())
     assert '<module>shared</module><module>common</module>' in root_pom, archive.name
-    # SKIRMISH also has the game's rules as a module of its own, ahead of the contract.
-    rules = template == 'SKIRMISH'
+    # SKIRMISH and DASH also have the game's rules as a module of its own, ahead of the contract.
+    rules = template in ('SKIRMISH', 'DASH')
     assert (not rules) or '<module>rules</module><module>shared</module>' in root_pom, archive.name
     for module in ('shared', 'common', 'backend') + (('rules',) if rules else ()):
         assert module + '/pom.xml' in names, (archive.name, module)

@@ -1,0 +1,114 @@
+= Dash
+
+An endless runner and its server, in one Maven project and one language. A runner
+races down a track of lanes, jumping hurdles, sliding under barriers and changing
+lanes around traffic, while the camera can start side on, like a 2D platformer,
+and swing behind the runner into full 3D halfway through a level. Around the run
+is what a live game needs: accounts, levels with stars, leaderboards for every
+level (all time, this week, today, friends and crews), live races between friends
+on the same track with voice chat, ghosts and replays, a track editor with
+publishing and moderation, crews, a shop with in-app purchases and rewarded ads,
+push notifications, and a console for running the game.
+
+The rules are one module, `rules`, that the app, the server and the tests all
+compile. It uses no floating point and no clock, so a run plays out identically
+on a phone, on the server and in a replay. That's what makes the leaderboards
+honest: the app sends its input log, and the server plays it again.
+
+It's a sample of what Codename One does for games, and the project the
+Initializr generates when you start from the endless-runner template.
+
+== Start here
+
+One chapter of the developer guide covers this project:
+
+* https://www.codenameone.com/developer-guide/#dash-implementors-guide[The Dash chapter]
+  (link:../../docs/developer-guide/Dash-Implementors-Guide.asciidoc[source])
+  tours what the game does, with the demo accounts, then explains how it's
+  built and what to change to make it yours: levels and their camera, new
+  obstacles and pickups, runners, the look, store products, ads, push and
+  moderation.
+
+== The modules
+
+[cols="1,3"]
+|===
+| Module | What it holds
+
+| `rules` | The deterministic simulation: tracks, runners, obstacles, pickups,
+  camera cues, the bot, replays and level packs.
+| `shared` | The data transfer objects and `@RestClient` interfaces.
+| `common` | The app: the 3D track, the menus, the track editor, the race lobby and
+  voice, the store, the admin console.
+| `backend` | The server: accounts, re-simulated scores and leaderboards, the
+  lockstep race rooms, level packs and moderation, progression, receipts, push.
+| `ios` | The iOS build, for generating the Xcode project.
+|===
+
+== Running it
+
+Start the server on the development profile. It needs nothing installed: the
+database is in memory, purchases and push notifications are simulated, and the
+demo accounts `player@`, `rival@`, `trouble@` and `admin@dash.example` exist,
+each with the password `dash-demo`.
+
+[source,bash]
+----
+CN1_PROFILE=dev backend/server.sh run
+----
+
+Then run the app in the simulator:
+
+[source,bash]
+----
+mvn verify -Psimulator -DskipTests -Dcodename1.platform=javase
+----
+
+The app looks for the server at `http://localhost:8080/`; *Settings* changes it.
+`backend/server.sh run --port N` serves on another port.
+
+For the native iOS app, generate the Xcode project on a Mac, open it and run it
+from Xcode:
+
+[source,bash]
+----
+mvn package -DskipTests -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-source -Dopen=false
+----
+
+== Tests
+
+[source,bash]
+----
+mvn -pl rules test   # <1>
+mvn -pl rules,shared,backend -Dcodename1.platform=backend test   # <2>
+./run-e2e.sh   # <3>
+./check-template.sh   # <4>
+----
+<1> Determinism: the same seed and inputs give the same run, the golden
+    replays still end the way they were recorded, and the bot can finish every
+    official level.
+<2> The server's tests: whole races over its rooms and sockets, re-simulated
+    scores, level packs, receipts, progression and moderation.
+<3> Starts the server on the `test` profile and runs the app's tests against it
+    in the simulator. The screenshots the developer guide shows land in
+    `target/e2e-shots`.
+<4> Generates a project from the Initializr template, under another name and
+    package, and builds it.
+
+`.github/workflows/dash.yml` runs them, and builds the app for Android and
+iOS.
+
+== The Initializr template
+
+`scripts/sync-initializr-template.py dash --write` copies this project into the
+Initializr's resources; without `--write` it fails when they differ, which is what
+CI runs. Change the project here, never the copies.
+
+== Licence
+
+Dash is released under MIT No Attribution (see `LICENSE`), not under the
+GPLv2 with Classpath Exception that covers Codename One itself. Take any of it
+into your own application, under any licence, with no notice to keep.
+
+The game ships no art files. The runners, the track, the skyline and the
+portraits are all drawn in code, so there is nothing else to license.
