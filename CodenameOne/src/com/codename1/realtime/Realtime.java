@@ -32,8 +32,12 @@ package com.codename1.realtime;
 /// rt.setMemoryLimit(64L * 1024 * 1024);     // fail fast instead of thrashing
 /// RealtimeThread motor = rt.start("motor",
 ///         new RealtimeParameters().setPeriodNanos(1000000L).setPriority(80).setCpu(3),
-///         new MotorLoop());
-/// ...
+///         new RealtimeTask() {
+///             public void cycle() {
+///                 // every period; must not allocate (see RealtimeTask)
+///             }
+///         });
+/// // the application runs; the motor keeps its period meanwhile
 /// Log.p(motor.getStatistics().toString());
 /// ```
 ///

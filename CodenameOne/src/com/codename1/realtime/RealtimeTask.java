@@ -26,19 +26,34 @@ package com.codename1.realtime;
 ///
 /// ```java
 /// class MotorLoop extends RealtimeTask {
+///     private final double[] samples = new double[64];
+///     private final double[] gains = new double[64];
 ///     private PwmChannel pwm;
-///     private final byte[] reading = new byte[2];
-///     private I2cDevice encoder;
+///     private boolean failed;
 ///
 ///     public void setup() {
 ///         // runs once on the real-time thread; may allocate
-///         ...
+///         try {
+///             pwm = Hardware.getInstance().openPwm(0, 0);
+///         } catch (HardwareException e) {
+///             failed = true;
+///         }
 ///     }
 ///
 ///     public void cycle() {
 ///         // every period; must not allocate
-///         encoder.read(reading, 0, 2);
-///         pwm.setDutyCycle(controlLaw(reading));
+///         if (failed) {
+///             return;
+///         }
+///         double out = 0;
+///         for (int i = 0; i < samples.length; i++) {
+///             out += samples[i] * gains[i];
+///         }
+///         try {
+///             pwm.setDutyCycle(out);
+///         } catch (HardwareException e) {
+///             failed = true;
+///         }
 ///     }
 /// }
 /// ```
