@@ -227,7 +227,7 @@ image::img/pulse-watch-agenda.png["The watch's list of the classes booked in the
 === The trainer
 
 The trainer's home leads with the class on now, or the next one, with a button for
-its roster. Under it is the trainer's month: the classes taught, the check-ins,
+its roster. The trainer's month follows: the classes taught, the check-ins,
 how full the classes were and how many of those booked came, the regulars who came
 three times or more, and the kudos received. A chart shows the check-ins of
 each of the last eight weeks, and under it the kinds of class that drew the most
@@ -289,7 +289,7 @@ image::img/pulse-owner.png["The owner's dashboard with revenue, how full the cla
 
 ==== Insights
 
-Insights is where the owner looks further back. It opens with four numbers: the
+The Insights screen is where the owner looks further back. It opens with four numbers: the
 share of members who joined 90 days ago or more and are still members, the visits
 of a member in a week, the share of bookings nobody came to, and the monthly
 recurring revenue of a member.
@@ -330,9 +330,9 @@ image::img/pulse-member-detail.png["A member's page with visits, streak and life
 
 ==== Billing
 
-Billing totals what was collected in the last 30 days, what is outstanding and how
-many charges failed, and lists the invoices, filtered to paid, failed or open. A
-failed invoice shows the attempt it is on and when the next one runs; the owner can
+Billing totals what was collected in the last 30 days, what's outstanding and how
+many charges failed, and lists the invoices, filtered to paid, failed, or open. A
+failed invoice shows which attempt it's on and when the next one runs; the owner can
 void a failed or open invoice, with a reason.
 
 image::img/pulse-billing.png["Billing with the money collected, outstanding and failed, and the list of invoices",scaledwidth=40%]
