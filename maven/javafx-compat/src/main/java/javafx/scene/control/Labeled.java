@@ -68,8 +68,12 @@ import javafx.scene.text.TextAlignment;
 /// `graphicTextGap` away from it; the label's padding makes the room, so
 /// the preferred size covers both. A text too long for the control is cut
 /// short and ends in three points, and the minimum width is the width of
-/// those. `wrapText`, `ellipsisString`, `textOverrun`, `lineSpacing` are
-/// recorded or absent and have no effect on a single line native label.
+/// those. With `wrapText` on, a `Label` breaks its text into lines at
+/// the width it is given instead (`com.codename1.fxcompat.runtime.WrappingLabel`),
+/// its content bias is horizontal and its preferred height is that of the
+/// wrapped lines at a width; other labeled controls stay on one line.
+/// `ellipsisString`, `textOverrun` and `lineSpacing` are recorded or
+/// absent and have no effect.
 ///
 /// With `mnemonicParsing` on, as it is for every button and off for a
 /// label, the underscore that marks a mnemonic is taken out of the text
@@ -152,7 +156,11 @@ public abstract class Labeled extends Control {
         String t = isMnemonicParsing() ? Mnemonics.strip(getText()) : getText();
         label.setText(t == null || getContentDisplay() == ContentDisplay.GRAPHIC_ONLY ? "" : t);
         Style style = com.codename1.fxcompat.runtime.PeerPaint.allStyles(label);
-        if (c.getClass() == com.codename1.ui.Label.class) {
+        if (c instanceof com.codename1.fxcompat.runtime.WrappingLabel) {
+            ((com.codename1.fxcompat.runtime.WrappingLabel) c).setWrap(isWrapText());
+        }
+        if (c.getClass() == com.codename1.ui.Label.class
+                || c.getClass() == com.codename1.fxcompat.runtime.WrappingLabel.class) {
             style.setBgTransparency(0);
             style.setBorder(com.codename1.ui.plaf.Border.createEmpty());
         }
@@ -426,6 +434,56 @@ public abstract class Labeled extends Control {
             g.resize(w, height);
         }
         positionInArea(g, Units.toLogical(gx), Units.toLogical(gy), w, height, 0, HPos.CENTER, VPos.CENTER);
+    }
+
+    /// A label that wraps its text is as tall as its lines at a width.
+    @Override
+    public javafx.geometry.Orientation getContentBias() {
+        return wraps() ? javafx.geometry.Orientation.HORIZONTAL : super.getContentBias();
+    }
+
+    private boolean wraps() {
+        return isWrapText() && cn1CreatesWrappingNative();
+    }
+
+    /// Whether the native label breaks its text into lines when
+    /// `wrapText` is on. True of a label.
+    boolean cn1CreatesWrappingNative() {
+        return false;
+    }
+
+    /// The height of the wrapped text at a width, when the label wraps;
+    /// the native label's own height otherwise.
+    @Override
+    protected double computePrefHeight(double width) {
+        double single = super.computePrefHeight(width);
+        if (width < 0 || !wraps()) {
+            return single;
+        }
+        Component c = cn1NativeIfCreated();
+        String t = isMnemonicParsing() ? Mnemonics.strip(getText()) : getText();
+        if (t == null || t.length() == 0 || getContentDisplay() == ContentDisplay.GRAPHIC_ONLY) {
+            return single;
+        }
+        com.codename1.ui.Font f = null;
+        int padLeft = 0;
+        int padRight = 0;
+        if (c != null) {
+            Style s = c.getUnselectedStyle();
+            f = s.getFont();
+            padLeft = s.getPaddingLeftNoRTL();
+            padRight = s.getPaddingRightNoRTL();
+        }
+        if (f == null) {
+            f = Fonts.of(getFont());
+        }
+        Insets in = getInsets();
+        int area = Units.toPixels(width - in.getLeft() - in.getRight()) - padLeft - padRight;
+        int lines = com.codename1.fxcompat.runtime.WrappingLabel.lines(f, t, area).size();
+        if (lines <= 1) {
+            return single;
+        }
+        return single + snapSizeY(Units.toLogical((lines - 1) * f.getHeight()));
     }
 
     /// A labeled control can be as narrow as its ellipsis: the native

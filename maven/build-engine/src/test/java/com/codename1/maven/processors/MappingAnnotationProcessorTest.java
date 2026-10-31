@@ -112,6 +112,126 @@ public class MappingAnnotationProcessorTest {
         }
     }
 
+    /// A field typed as a nested class, a list of one, or a nested enum: the
+    /// generated mapper must name them canonically (`Download.DownloadFile`),
+    /// since javac does not resolve the binary `Download$DownloadFile` in source.
+    @Test
+    public void nestedClassAndEnumFieldsCompileAndRoundTrip() throws Exception {
+        File classes = tmp.newFolder("classes");
+        Map<String, String> sources = new LinkedHashMap<String, String>();
+        sources.put("com.example.Download",
+                "package com.example;\n"
+                        + "import com.codename1.annotations.Mapped;\n"
+                        + "import java.util.List;\n"
+                        + "@Mapped public class Download {\n"
+                        + "    public DownloadFile main;\n"
+                        + "    public List<DownloadFile> files;\n"
+                        + "    public DownloadType type;\n"
+                        + "    public List<DownloadType> types;\n"
+                        + "    public Download() {}\n"
+                        + "    @Mapped public static class DownloadFile {\n"
+                        + "        public String name;\n"
+                        + "        public DownloadFile() {}\n"
+                        + "    }\n"
+                        + "    public enum DownloadType { FULL, DELTA }\n"
+                        + "}\n");
+        JavaSourceCompiler.compile(sources, classes, Arrays.asList(testClassesDir()));
+        runProcessorOrFail(classes);
+
+        try (URLClassLoader cl = childLoader(classes)) {
+            Class<?> dlCls = cl.loadClass("com.example.Download");
+            Class<?> fileCls = cl.loadClass("com.example.Download$DownloadFile");
+            Class<?> typeCls = cl.loadClass("com.example.Download$DownloadType");
+            Class<?> mapperCls = cl.loadClass("com.example.DownloadCn1Mapper");
+            Object mapper = mapperCls.newInstance();
+
+            Map<String, Object> f1 = new LinkedHashMap<String, Object>();
+            f1.put("name", "a.bin");
+            Map<String, Object> f2 = new LinkedHashMap<String, Object>();
+            f2.put("name", "b.bin");
+            Map<String, Object> in = new LinkedHashMap<String, Object>();
+            in.put("main", f1);
+            in.put("files", Arrays.asList(f1, f2));
+            in.put("type", "DELTA");
+            in.put("types", Arrays.asList("FULL"));
+            // Nested mappers resolve through the registry, so install them.
+            Class.forName("com.example.Download$DownloadFileCn1Mapper", true, cl)
+                    .getMethod("register").invoke(null);
+            mapperCls.getMethod("register").invoke(null);
+            Object d = mapperCls.getMethod("fromMap", Map.class).invoke(mapper, in);
+            Object main = dlCls.getField("main").get(d);
+            assertEquals("a.bin", fileCls.getField("name").get(main));
+            List<?> files = (List<?>) dlCls.getField("files").get(d);
+            assertEquals(2, files.size());
+            assertEquals("b.bin", fileCls.getField("name").get(files.get(1)));
+            Object delta = typeCls.getMethod("valueOf", String.class).invoke(null, "DELTA");
+            assertEquals(delta, dlCls.getField("type").get(d));
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> out = (Map<String, Object>) mapperCls
+                    .getMethod("toMap", dlCls).invoke(mapper, d);
+            assertEquals("DELTA", out.get("type"));
+            assertEquals(Arrays.asList("FULL"), out.get("types"));
+        }
+    }
+
+    /// Properties inherited from an abstract, non-@Mapped base class are
+    /// mapped too, both ways, alongside the subclass's own.
+    @Test
+    public void inheritedPropertiesFromPlainBaseRoundTrip() throws Exception {
+        File classes = tmp.newFolder("classes");
+        Map<String, String> sources = new LinkedHashMap<String, String>();
+        sources.put("com.example.ModelObject",
+                "package com.example;\n"
+                        + "import java.util.List;\n"
+                        + "public abstract class ModelObject {\n"
+                        + "    private String id;\n"
+                        + "    private boolean active;\n"
+                        + "    private List<String> personIds;\n"
+                        + "    public String getId() { return id; }\n"
+                        + "    public void setId(String v) { id = v; }\n"
+                        + "    public boolean isActive() { return active; }\n"
+                        + "    public void setActive(boolean v) { active = v; }\n"
+                        + "    public List<String> getPersonIds() { return personIds; }\n"
+                        + "    public void setPersonIds(List<String> v) { personIds = v; }\n"
+                        + "}\n");
+        sources.put("com.example.RealWorldApp",
+                "package com.example;\n"
+                        + "import com.codename1.annotations.Mapped;\n"
+                        + "@Mapped public class RealWorldApp extends ModelObject {\n"
+                        + "    private String url;\n"
+                        + "    public RealWorldApp() {}\n"
+                        + "    public String getUrl() { return url; }\n"
+                        + "    public void setUrl(String v) { url = v; }\n"
+                        + "}\n");
+        JavaSourceCompiler.compile(sources, classes, Arrays.asList(testClassesDir()));
+        runProcessorOrFail(classes);
+
+        try (URLClassLoader cl = childLoader(classes)) {
+            Class<?> appCls = cl.loadClass("com.example.RealWorldApp");
+            Class<?> mapperCls = cl.loadClass("com.example.RealWorldAppCn1Mapper");
+            Object mapper = mapperCls.newInstance();
+            Map<String, Object> in = new LinkedHashMap<String, Object>();
+            in.put("id", "a1");
+            in.put("active", Boolean.TRUE);
+            in.put("personIds", Arrays.asList("p1", "p2"));
+            in.put("url", "https://example.com");
+            Object app = mapperCls.getMethod("fromMap", Map.class).invoke(mapper, in);
+            assertEquals("a1", appCls.getMethod("getId").invoke(app));
+            assertEquals(Boolean.TRUE, appCls.getMethod("isActive").invoke(app));
+            assertEquals(Arrays.asList("p1", "p2"), appCls.getMethod("getPersonIds").invoke(app));
+            assertEquals("https://example.com", appCls.getMethod("getUrl").invoke(app));
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> out = (Map<String, Object>) mapperCls
+                    .getMethod("toMap", appCls).invoke(mapper, app);
+            assertEquals("a1", out.get("id"));
+            assertEquals(Boolean.TRUE, out.get("active"));
+            assertEquals(Arrays.asList("p1", "p2"), out.get("personIds"));
+            assertEquals("https://example.com", out.get("url"));
+        }
+    }
+
     @Test
     public void enumFieldsRoundTripThroughJson() throws Exception {
         File classes = tmp.newFolder("classes");

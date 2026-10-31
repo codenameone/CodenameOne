@@ -16724,6 +16724,13 @@ public class JavaSEPort extends CodenameOneImplementation {
             String user = p.get("user", null);
             Display d = Display.getInstance();
             if (user == null) {
+                // The prompt is modal. Asked for from the Codename One EDT (log
+                // sending after a network error reaches here) it froze the
+                // application until answered, and headless nobody can answer
+                // it. Answer the default instead, as an unregistered user does.
+                if (d.isEdt() || java.awt.GraphicsEnvironment.isHeadless()) {
+                    return defaultValue;
+                }
                 JPanel pnl = new JPanel();
                 JTextField tf = new JTextField(20);
                 pnl.add(new JLabel("E-Mail For Push"));

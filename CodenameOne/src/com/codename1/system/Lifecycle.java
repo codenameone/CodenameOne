@@ -108,10 +108,15 @@ public class Lifecycle {
     protected void handleNetworkError(NetworkEvent err) {
         // prevent the event from propagating
         err.consume();
+        // Only a thrown exception is an application failure worth a crash log.
+        // An HTTP error code (404, 500...) is the server's answer, not a bug in
+        // the app, so it must not send the log: sending registers the device,
+        // which in the simulator asks for the build account with a modal
+        // prompt and used to block the EDT on a plain 404.
         if (err.getError() != null) {
             Log.e(err.getError());
+            Log.sendLogAsync();
         }
-        Log.sendLogAsync();
         Dialog.show("Connection Error", "There was a networking error in the connection to " + err.getConnectionRequest().getUrl(), "OK", null);
     }
 

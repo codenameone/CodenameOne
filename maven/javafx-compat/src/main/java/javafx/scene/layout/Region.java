@@ -33,11 +33,15 @@ import com.codename1.fxcompat.runtime.Renderer;
 import com.codename1.fxcompat.runtime.StyleList;
 import com.codename1.fxcompat.runtime.Units;
 
+import javafx.beans.InvalidationListener;
+import javafx.beans.Observable;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.ReadOnlyDoubleProperty;
 import javafx.beans.property.ReadOnlyDoubleWrapper;
+import javafx.beans.property.ReadOnlyObjectProperty;
+import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.geometry.BoundingBox;
 import javafx.geometry.Bounds;
 import javafx.geometry.HPos;
@@ -130,6 +134,7 @@ public class Region extends Parent {
     private Object styleEdgeRepeat;
     private Object styleEdgeInsets;
     private Insets insetsCache;
+    private ReadOnlyObjectWrapper<Insets> insets;
 
     /// Creates an empty region.
     public Region() {
@@ -470,6 +475,23 @@ public class Region extends Parent {
     /// The space kept free inside the border.
     public final ObjectProperty<Insets> paddingProperty() {
         return padding;
+    }
+
+    /// The space between the edges and the content, as [#getInsets()]
+    /// reports it; follows the padding and the border.
+    public final ReadOnlyObjectProperty<Insets> insetsProperty() {
+        if (insets == null) {
+            insets = new ReadOnlyObjectWrapper<Insets>(this, "insets", getInsets());
+            InvalidationListener sync = new InvalidationListener() {
+                @Override
+                public void invalidated(Observable o) {
+                    insets.set(getInsets());
+                }
+            };
+            padding.addListener(sync);
+            border.addListener(sync);
+        }
+        return insets.getReadOnlyProperty();
     }
 
     /// Returns the space between the edges and the content: the border's
