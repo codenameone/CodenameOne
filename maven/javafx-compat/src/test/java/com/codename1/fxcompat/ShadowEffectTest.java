@@ -165,6 +165,9 @@ public class ShadowEffectTest {
         f.revalidate();
         f.paintComponent(Image.createImage(HeadlessImplementation.WIDTH, HeadlessImplementation.HEIGHT).getGraphics());
         HeadlessImplementation.recordDraws = false;
+        // A changed picture is made after the frame, outside the paint;
+        // what the event loop would run next.
+        Effects.rebuildPending();
         return images();
     }
 

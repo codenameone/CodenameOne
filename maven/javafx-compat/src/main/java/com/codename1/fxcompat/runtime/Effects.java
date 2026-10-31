@@ -81,6 +81,15 @@ public final class Effects {
         int behindX;
         int behindY;
         Image over;
+        /// What the pictures show has changed; they are drawn until new
+        /// ones are made after the frame.
+        boolean stale;
+        /// A rebuild after the frame is queued.
+        boolean scheduled;
+
+        boolean drawn() {
+            return behind != null || over != null;
+        }
     }
 
     /// How many pictures were made since the start; for tests, which
@@ -123,8 +132,14 @@ public final class Effects {
                 if (n != node && contained && within != null && coversItsBox(n) && inside(within, n)) {
                     continue;
                 }
-                n.cn1SetEffectCache(null);
-                live--;
+                Object kept = n.cn1EffectCache();
+                if (kept instanceof Kept && ((Kept) kept).drawn() && has(n)) {
+                    // Drawn on until the new picture is made; see kept().
+                    ((Kept) kept).stale = true;
+                } else {
+                    n.cn1SetEffectCache(null);
+                    live--;
+                }
             }
             // What a node with its own effect draws reaches past its box.
             if (n.getEffect() != null) {
@@ -342,8 +357,18 @@ public final class Effects {
         Object cached = node.cn1EffectCache();
         if (cached instanceof Kept) {
             Kept k = (Kept) cached;
-            if (k.effect == effect && k.width == peer.getWidth() && k.height == peer.getHeight()
-                    && same(k.values, values)) {
+            boolean current = k.effect == effect && same(k.values, values);
+            if (current && !k.stale && k.width == peer.getWidth() && k.height == peer.getHeight()) {
+                return k;
+            }
+            if (current && k.drawn()) {
+                // A picture is made by painting the node into an image.
+                // Done in the middle of the screen's paint, that took the
+                // node itself out of the frame on iOS: the shadowed bottom
+                // bar of a phone app went blank on every page change. The
+                // old picture is drawn for this frame and the new one is
+                // made after it, outside any paint.
+                rebuildLater(k, node, peer);
                 return k;
             }
         }
@@ -360,6 +385,50 @@ public final class Effects {
         node.cn1SetEffectCache(k);
         build(k, node, peer);
         return k;
+    }
+
+    /// Rebuilds waiting for the end of the frame, in the order asked for.
+    private static final java.util.ArrayList<Object[]> PENDING = new java.util.ArrayList<Object[]>();
+    private static final Runnable REBUILD = new Runnable() {
+        @Override
+        public void run() {
+            rebuildPending();
+        }
+    };
+
+    private static void rebuildLater(Kept old, Node node, Component peer) {
+        if (old.scheduled) {
+            return;
+        }
+        old.scheduled = true;
+        if (PENDING.isEmpty()) {
+            com.codename1.ui.Display.getInstance().callSerially(REBUILD);
+        }
+        PENDING.add(new Object[] {old, node, peer});
+    }
+
+    /// Makes the pictures that changed since the last frame; what the call
+    /// queued after a paint runs, and what a test runs in its place.
+    public static void rebuildPending() {
+        Object[][] all = PENDING.toArray(new Object[PENDING.size()][]);
+        PENDING.clear();
+        for (int i = 0; i < all.length; i++) {
+            Kept old = (Kept) all[i][0];
+            Node node = (Node) all[i][1];
+            Component peer = (Component) all[i][2];
+            old.scheduled = false;
+            if (node.cn1EffectCache() != old || node.getEffect() != old.effect) {
+                continue;
+            }
+            Kept k = new Kept();
+            k.effect = old.effect;
+            k.values = old.values;
+            k.width = peer.getWidth();
+            k.height = peer.getHeight();
+            node.cn1SetEffectCache(k);
+            build(k, node, peer);
+            peer.repaint();
+        }
     }
 
     private static void build(Kept k, Node node, Component peer) {
