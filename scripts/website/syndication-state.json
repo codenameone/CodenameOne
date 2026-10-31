@@ -3108,6 +3108,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-10-31T01:01:14+00:00"
+      },
+      "devto": {
+        "id": 4954240,
+        "url": "https://dev.to/codenameone/skirmish-a-multiplayer-strategy-game-template-in-java-c5d",
+        "syndicated_at": "2026-10-31T18:31:24+00:00"
       }
     }
   }
