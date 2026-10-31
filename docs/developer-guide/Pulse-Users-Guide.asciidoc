@@ -208,6 +208,8 @@ down to the next one, and the member's points, level and week streak. The code i
 the same one the phone's pass shows, so the watch opens the door with the phone
 left in the locker.
 
+image::img/pulse-watch.png["The watch face with the next class, the door code counting down, and the points, level and streak",scaledwidth=25%]
+
 === The trainer
 
 The trainer's home leads with the class on now, or the next one, with a button for
