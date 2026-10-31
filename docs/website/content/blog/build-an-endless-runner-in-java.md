@@ -12,7 +12,7 @@ Skirmish showed that most of a mobile game is app: the sign-in, the menus, the s
 
 ## A level that turns into 3D
 
-The trick I like most in Dash is that a level can start as a side-scroller and become a 3D runner halfway through. The first stretch of *Neon Causeway* looks like a flat platformer: one row of hurdles and barriers, seen from the side. At 300 metres the camera swings behind the runner, the lanes open up, and the rest is a chase-camera runner.
+The trick I like most in Dash is that a level can start as a side-scroller and become a 3D runner halfway through. The first stretch of *Neon Causeway* looks like a flat platformer: one row of hurdles and barriers, seen from the side. At 300 meters the camera swings behind the runner, the lanes open up, and the rest is a chase-camera runner.
 
 There is no second game behind that. The simulation always has lanes, heights and distances, and a hurdle is cleared the same way from either angle. A level only carries *camera cues*, and the renderer blends between the two framings when the runner reaches one. Because the rules never see the camera, a level can change its view anywhere without changing who wins.
 

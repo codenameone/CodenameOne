@@ -55,6 +55,8 @@ around the hauler. Swipes, taps and the keyboard (arrows, WASD and space) all dr
 the same four inputs.
 
 image::img/dash-tutorial-coach.png["First Steps: the coach calls out the next move above the track",scaledwidth=30%]
+image::img/dash-tutorial-first-visit.png["The first visit: First Steps opens before anything else",scaledwidth=30%]
+image::img/dash-tutorial-result.png["First Steps finished: the coach's last word and the first reward",scaledwidth=30%]
 
 The home screen leads to the *Levels*. Each official level shows its stars and has
 three buttons: *Run* plays this week's track for it, *Race the best* runs it against
@@ -66,6 +68,9 @@ image::img/dash-home.png["The home screen: level and currencies, missions, daily
 image::img/dash-run-side.png["The Neon Causeway side on: the runner jumps a hurdle on the 2D opening",scaledwidth=30%]
 image::img/dash-run-chase.png["The same level after the camera swing: the chase view over three lanes, coins and a barrier ahead",scaledwidth=30%]
 image::img/dash-run-reward.png["The reward card after a run: experience, a chest and an achievement",scaledwidth=30%]
+image::img/dash-levels.png["The levels: stars per level and its Run, Race the best and Scores buttons",scaledwidth=30%]
+image::img/dash-run-result.png["The result of a run: distance, points, coins and stars",scaledwidth=30%]
+image::img/dash-reward-levelup.png["A level up on the reward cards",scaledwidth=30%]
 image::img/dash-scores.png["A level board: the top three framed, each row with points, distance, coins and stars",scaledwidth=30%]
 
 *Quick race* drops the player into a race with whoever is waiting for that level, and
@@ -78,6 +83,7 @@ out trophies and coins. The *Daily dash* is one endless track a day, the same fo
 everyone, with its own board.
 
 image::img/dash-party-chat.png["A party lobby: the code and link to share, the runners in it, and chat bubbles between them",scaledwidth=30%]
+image::img/dash-race.png["A quick race against the waiting runners and bots",scaledwidth=30%]
 image::img/dash-party-race.png["A race in progress: the friend in the next lane, live standings and emotes on screen",scaledwidth=30%]
 
 *Track editor* is where players make levels. A pack holds levels and the pieces they
@@ -85,12 +91,21 @@ use, and is published for others to play, rate, race and remix. Every level in a
 has its own board.
 
 image::img/dash-forge-home.png["The track editor's home: your packs and the official one to remix",scaledwidth=30%]
+image::img/dash-forge-pack.png["The official pack: each level with its play, Race friends and Scores buttons",scaledwidth=30%]
+image::img/dash-forge-editor.png["Editing a pack: its levels, its own obstacles and pickups, save and publish",scaledwidth=30%]
 image::img/dash-forge-level-editor.png["The level editor: a strip of lanes over distance with obstacles placed, and the palette of pieces and camera cues",scaledwidth=30%]
 image::img/dash-forge-playtest.png["A playtest of the draft, run on the same rules as a published level",scaledwidth=30%]
 
 The rest -- crews, friends and invitations, the shop, trophies, the runner choice and
 the settings -- is the same kind of screen as the rest of the app, styled by one CSS
 file.
+
+image::img/dash-signin.png["Signing in",scaledwidth=30%]
+image::img/dash-register-name.png["Choosing the name other runners see",scaledwidth=30%]
+image::img/dash-friends.png["Friends, requests and invitations",scaledwidth=30%]
+image::img/dash-shop.png["The shop: gem packs, the season pass, runners and trails",scaledwidth=30%]
+image::img/dash-runner.png["Choosing and dressing the runner",scaledwidth=30%]
+image::img/dash-settings.png["The settings",scaledwidth=30%]
 
 [[dash-modules]]
 === The modules
@@ -117,7 +132,7 @@ obstacles and pickups placed along it, a procedural tail built from chunks that 
 harder with distance, the coach's lines, and *camera cues*. Here is the official level
 that starts as a side-scroller and becomes a 3D runner:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/dash/rules/src/main/java/com/codenameone/examples/dash/rules/Content.java[tag=dash-causeway,indent=0]
 ----
@@ -128,7 +143,7 @@ side or from behind. The camera is the renderer's business: `RunView` reads the 
 under the runner, eases between the two framings, and leaves the rules alone. Because
 of that, a level can change its view anywhere without changing who wins.
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/dash/common/src/main/java/com/codenameone/examples/dash/run/RunView.java[tag=dash-camera-blend,indent=0]
 ----
@@ -137,7 +152,7 @@ The view runs the rules on a fixed tick of 60 per second, whatever the frame rat
 and draws between ticks by interpolating. A slow phone drops frames, never ticks, so
 the run stays the same run:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/dash/common/src/main/java/com/codenameone/examples/dash/run/RunView.java[tag=dash-fixed-tick,indent=0]
 ----
@@ -145,7 +160,7 @@ include::../../scripts/dash/common/src/main/java/com/codenameone/examples/dash/r
 Gestures and keys become the four input bits in one place, and the same bits reach
 every kind of run -- solo, race, replay and playtest -- through a `Driver`:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/dash/common/src/main/java/com/codenameone/examples/dash/run/RunView.java[tag=dash-controls,indent=0]
 ----
@@ -159,7 +174,7 @@ level, plays the log through the same rules, and reads the score off its own
 simulation. A score that was typed in, or a log edited to dodge an obstacle the
 player hit, simply doesn't reproduce:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/dash/backend/src/main/java/com/codenameone/examples/dash/forge/Forge.java[tag=dash-forge-result,indent=0]
 ----
@@ -169,7 +184,7 @@ stretch of a level is built from the seed, so no board takes a seed the app pick
 for itself: `all` takes only the seeds the server hands out, and `week` and `day`
 count only the board's own seed, so everyone is running the same track there:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/dash/backend/src/main/java/com/codenameone/examples/dash/forge/Scores.java[tag=dash-scores,indent=0]
 ----
@@ -177,7 +192,7 @@ include::../../scripts/dash/backend/src/main/java/com/codenameone/examples/dash/
 A better score on the `all` board tells the friends whose best it just passed, and
 only them, with a push that opens that level's board:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/dash/backend/src/main/java/com/codenameone/examples/dash/forge/Scores.java[tag=dash-beaten-push,indent=0]
 ----
@@ -191,7 +206,7 @@ tick's inputs to every seat. A phone only advances when it has the server's tick
 they all see the same race, and the server's copy is the one that decides the
 places:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/dash/backend/src/main/java/com/codenameone/examples/dash/game/RaceRoom.java[tag=dash-race-room,indent=0]
 ----
@@ -201,7 +216,7 @@ second. A phone whose hash disagrees with the server's is sent the race's log to
 up, and one that keeps disagreeing is flagged for a moderator -- a modified client
 can't stay in a race unnoticed:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/dash/common/src/main/java/com/codenameone/examples/dash/run/RaceDriver.java[tag=dash-lockstep,indent=0]
 ----
@@ -210,7 +225,7 @@ Voice is peer to peer. The game's own socket carries the offers, answers and ICE
 candidates, and Codename One's WebRTC API connects each pair of players in the party
 directly; the server never carries audio:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/dash/common/src/main/java/com/codenameone/examples/dash/run/Voice.java[tag=dash-voice,indent=0]
 ----
@@ -225,7 +240,7 @@ The editor draws the level as a strip: distance runs left to right, one row per 
 an all-lanes row on top, and the camera cues as flags along the bottom. Tapping a cell
 puts the selected piece there:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/dash/common/src/main/java/com/codenameone/examples/dash/forge/TrackTimeline.java[tag=dash-timeline,indent=0]
 ----
@@ -233,7 +248,7 @@ include::../../scripts/dash/common/src/main/java/com/codenameone/examples/dash/f
 The palette is every piece the pack can place -- the game's own and the pack's custom
 obstacles and pickups -- plus one tool per camera mode and an eraser:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/dash/common/src/main/java/com/codenameone/examples/dash/forge/LevelEditor.java[tag=dash-level-palette,indent=0]
 ----
@@ -257,7 +272,7 @@ platform, and the route comes from `Routing`. `CityForm` reduces the route to
 streets and turns (`CityForm.toRoute`), reading each turn off the geometry where
 two streets meet, and hands the result to the rules as a `CityRoute`:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 CityRoute route = new CityRoute("Old Harbour")
         .leg(420, CityRoute.STRAIGHT, "Quay Street")
@@ -289,7 +304,7 @@ most twelve, and adds them to the `CityRoute`. They are part of the route the se
 receives, so they are part of the level and its hash, and the server places the
 same boards:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 CityRoute route = new CityRoute("Old Harbour")
         .leg(420, CityRoute.STRAIGHT, "Quay Street")
@@ -302,6 +317,7 @@ places: the interface is one method that takes the route's path.
 
 image::img/dash-city-route.png["A route picked on the street map, with the landmarks along it pinned",scaledwidth=30%]
 image::img/dash-city-run.png["The run down Cannon Street: the street name under the score and the route minimap",scaledwidth=30%]
+image::img/dash-city-result.png["The result of a city run, with the route it followed",scaledwidth=30%]
 image::img/dash-city-landmark.png["A landmark's board beside the track as the runner passes it",scaledwidth=30%]
 
 Before you ship this, point `Routing` at a routing server of your own:
@@ -337,7 +353,7 @@ The operator's side is in the admin console:
   player's home screen (*spotlight*), which can open a level, the shop or the
   editor.
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/dash/backend/src/main/java/com/codenameone/examples/dash/social/Pipelines.java[tag=dash-pipelines-schedule,indent=0]
 ----
@@ -346,12 +362,17 @@ On a phone the console is a list of pages; on a desktop or a tablet it is a side
 and a page, and the *Promote* tab is shown:
 
 image::img/dash-admin-overview.png["The admin console on a phone: the live numbers and the pages it leads to",scaledwidth=30%]
+image::img/dash-admin-player.png["A flagged player: account, record, wallet, the flag raised automatically and the actions an admin can take",scaledwidth=30%]
+image::img/dash-admin-flags.png["Flagged runs waiting for a decision",scaledwidth=30%]
+image::img/dash-admin-promote.png["Promote on a phone: a broadcast push to a segment and the home spotlight",scaledwidth=30%]
 image::img/dash-desktop-admin-overview.png["The admin console on a desktop: the side bar and the overview page",scaledwidth=70%]
 image::img/dash-desktop-admin-reports.png["Reports: players, runs and purchases over time",scaledwidth=70%]
 image::img/dash-desktop-admin-query.png["The player query: conditions over what the game knows about each player",scaledwidth=70%]
 image::img/dash-desktop-admin-pipelines.png["Engagement pipelines with their audiences, actions and cool-downs",scaledwidth=70%]
 image::img/dash-desktop-admin-pipeline-edit.png["Editing a pipeline: the query, the push or gift, and the cool-down",scaledwidth=70%]
 image::img/dash-desktop-admin-broadcast.png["A broadcast push to a segment of players",scaledwidth=70%]
+image::img/dash-desktop-admin-promote.png["Promote on a desktop: broadcast, spotlight, a campaign link and how many invited players went on to race",scaledwidth=70%]
+image::img/dash-desktop-admin-broadcast-confirm.png["Confirming a broadcast before it is sent",scaledwidth=70%]
 image::img/dash-desktop-admin-spotlight.png["Setting the home screen's spotlight banner",scaledwidth=70%]
 image::img/dash-desktop-home-spotlight.png["The banner as players see it on the home screen",scaledwidth=70%]
 
@@ -362,7 +383,7 @@ Published packs, reports and automatic flags -- a run that doesn't re-simulate, 
 race hash that disagrees -- land in the admin console. A moderator can hide, restore
 or promote a pack, look at its files, and act on a player:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/dash/backend/src/main/java/com/codenameone/examples/dash/admin/Moderation.java[tag=dash-moderation,indent=0]
 ----
@@ -385,7 +406,7 @@ from the same lobby a player uses to spectate.
   for the menus. Both take their colours from an `Outfit`, so a new runner is one
   line:
 +
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/dash/common/src/main/java/com/codenameone/examples/dash/run/Outfit.java[tag=dash-outfits,indent=0]
 ----
@@ -401,12 +422,12 @@ include::../../scripts/dash/common/src/main/css/theme.css[tag=dash-palette,inden
   `AppConfig`, the receipt validator is chosen in `Services`, and the push key is
   read the same way:
 +
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/dash/common/src/main/java/com/codenameone/examples/dash/AppConfig.java[tag=dash-monetization-ids,indent=0]
 ----
 +
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/dash/backend/src/main/java/com/codenameone/examples/dash/Services.java[tag=dash-receipt-choice,indent=0]
 ----
