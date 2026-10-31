@@ -58,7 +58,7 @@ public final class Levels {
     }
 
     /// Keeps `pack` for later references to it; returns it.
-    public static synchronized ContentPack remember(ContentPack pack) {
+    public static ContentPack remember(ContentPack pack) {
         PACKS.put(pack.id + "@" + pack.hash(), pack);
         PACKS.put(pack.id, pack);
         return pack;
@@ -93,8 +93,13 @@ public final class Levels {
     /// A city route's level, kept so a run of it can be submitted with its
     /// route, run again and replayed. `path` is the street map's line for the
     /// minimap, or null.
-    public static synchronized Playable city(CityRoute route, CityPath path) {
+    public static Playable city(CityRoute route, CityPath path) {
         LevelDef l = route.level();
+        // Only the routes of this session's last few runs are kept.
+        if (CITIES.size() >= 16 && !CITIES.containsKey(l.id)) {
+            CITIES.clear();
+            PATHS.clear();
+        }
         CITIES.put(l.id, route);
         if (path != null) {
             PATHS.put(l.id, path);
@@ -104,19 +109,19 @@ public final class Levels {
 
     /// The encoded route of the city level `levelId`, or null when it is not
     /// one.
-    public static synchronized String citySpec(String levelId) {
+    public static String citySpec(String levelId) {
         CityRoute r = levelId == null ? null : CITIES.get(levelId);
         return r == null ? null : r.encode();
     }
 
     /// The minimap line of the city level `levelId`, or null.
-    public static synchronized CityPath cityPath(String levelId) {
+    public static CityPath cityPath(String levelId) {
         return levelId == null ? null : PATHS.get(levelId);
     }
 
     /// The level a replay or race calls `ref`, or null when its pack is not
     /// here yet (see [#packOf]).
-    public static synchronized Playable resolve(String ref) {
+    public static Playable resolve(String ref) {
         if (ref == null) {
             return null;
         }

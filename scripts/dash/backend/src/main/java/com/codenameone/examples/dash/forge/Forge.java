@@ -470,8 +470,9 @@ public class Forge {
     /// A city run. The result carries the route, and the server builds the
     /// level from it ([CityRoute#level]) rather than trusting anything about
     /// it: the level's id is a hash of the route, so a route edited to an
-    /// easier one names another level, with a board of its own. Rewards are
-    /// a community level's, from the same daily allowance.
+    /// easier one names another level, with a board of its own. Coins and XP
+    /// both come out of the community levels' daily allowance, since a new
+    /// route is always a new level.
     private LevelOutcomeDto cityResult(String username, Replay replay, String spec) throws IOException {
         CityRoute route;
         try {
@@ -495,7 +496,9 @@ public class Forge {
         LevelStars row = record(username, CITY_PACK, level.id, won, score);
         int newStars = row.getPaidStars() - paidBefore;
         int coins = spendDailyAllowance(username, COMMUNITY_LEVEL_COINS * newStars / 3);
-        int xp = COMMUNITY_LEVEL_XP * newStars / 3;
+        // XP follows the coins the allowance granted: any edit of a route is a
+        // new level with unpaid stars, so an uncapped XP would farm forever.
+        int xp = COMMUNITY_LEVEL_XP * coins / COMMUNITY_LEVEL_COINS;
         int rank = scores.submit(username, level.id, replay, played);
         RewardDto reward = progression.levelReward(username, level.name, coins, xp);
         return new LevelOutcomeDto(CITY_PACK, level.id, won, score, row.getBest(), rank, reward);

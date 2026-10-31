@@ -254,8 +254,9 @@ LevelDef level = route.level();
 carries the encoded route next to its replay; the server builds the same level
 from it and plays the replay on it as it would any other. The level's id is a hash
 of the route, so each route has a board of its own, and editing a route into an
-easier one names a different level. City runs pay what a community level pays,
-from the same daily allowance.
+easier one names a different level with a different board. Since any edit makes a
+new level, a city run's coins and experience both come out of the community
+levels' daily allowance; a new route never pays beyond it.
 
 image::img/dash-city-route.png[A route picked on the street map,scaledwidth=30%]
 image::img/dash-city-run.png[The run down it with the route minimap,scaledwidth=30%]
@@ -263,7 +264,8 @@ image::img/dash-city-run.png[The run down it with the route minimap,scaledwidth=
 Before you ship this, point `Routing` at a routing server of your own:
 `Routing.setService(new OsrmRouteService("https://osrm.example.com"))`. The
 default is OSRM's public demo server, which is rate limited, has no service
-guarantee and routes for cars. The map data is OpenStreetMap's, whose licence
+guarantee and serves only its car profile, whatever travel mode the request
+asks for. The map data is OpenStreetMap's, whose licence
 asks for credit wherever it is shown; the city screen carries that line, and a
 reskin has to keep it.
 

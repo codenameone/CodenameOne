@@ -174,7 +174,8 @@ public final class CityRoute {
             } else if (l.turn != STRAIGHT) {
                 // A street too short to run down between two turns is passed
                 // rather than cornered twice in a few metres.
-                if (start - lastCorner >= 2 * CORNER + 20) {
+                // One right at the line would sit on the finish coins.
+                if (start - lastCorner >= 2 * CORNER + 20 && start <= total - CORNER) {
                     corner(d, start, l.turn, street);
                     lastCorner = start;
                 }

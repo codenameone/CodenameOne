@@ -102,7 +102,8 @@ public final class RunForm implements RunView.Hud, RaceDriver.Listener {
         Button quit = Ui.button("", "HudButton", "quit", e -> quit());
         quit.setMaterialIcon(FontImage.MATERIAL_PAUSE, 4.4f);
         // In a box, so a taller right column never stretches the button.
-        Container left = BoxLayout.encloseY(quit);
+        // The pause pill keeps its own width over the wider minimap.
+        Container left = BoxLayout.encloseY(FlowLayout.encloseIn(quit));
         // A city run shows where on its streets the runner is, under the
         // pause button and clear of the distance.
         CityPath path = Levels.cityPath(driver.run().level().id);
@@ -238,7 +239,7 @@ public final class RunForm implements RunView.Hud, RaceDriver.Listener {
         Runner me = run.runner(driver.me());
         distance.setText(me.z / Track.UNIT + " m");
         if (minimap != null && run.level().length > 0) {
-            minimap.setProgress(me.z / (float) run.level().length);
+            minimap.setProgress(me.z / (float) Track.UNIT / run.level().length);
         }
         score.setText(String.valueOf(me.score()));
         coins.setText(String.valueOf(me.coins));

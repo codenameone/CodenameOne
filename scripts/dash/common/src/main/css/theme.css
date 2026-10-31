@@ -1542,8 +1542,7 @@ NavItemOn {
 /* The veil a result or reward card sits on, over the scene where the run
    ended. opacity sets the background's transparency only. */
 RunDim {
-    background-color: #060818;
-    opacity: 0.6;
+    background-color: rgba(6, 8, 24, 0.6);
     padding: 6mm 3mm;
     margin: 0;
 }

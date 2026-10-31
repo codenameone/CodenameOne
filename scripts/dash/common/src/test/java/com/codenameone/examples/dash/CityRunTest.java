@@ -93,16 +93,18 @@ public class CityRunTest extends E2e {
         @Override
         public void findRoutes(RouteRequest request, final RouteCallback callback) {
             LatLng a = request.getOrigin();
-            double east = 1 / (111320.0 * Math.cos(Math.toRadians(a.getLatitude())));
-            double north = 1 / 110540.0;
-            LatLng b = new LatLng(a.getLatitude(), a.getLongitude() + 520 * east);
-            LatLng c = new LatLng(b.getLatitude() + 380 * north, b.getLongitude());
-            LatLng d = new LatLng(c.getLatitude(), c.getLongitude() + 460 * east);
+            // East, north, east again, ending where the finish was tapped so
+            // the line on the map meets both pins.
+            LatLng d = request.getDestination();
+            double share = 520.0 / (520 + 460);
+            double midLon = a.getLongitude() + (d.getLongitude() - a.getLongitude()) * share;
+            LatLng b = new LatLng(a.getLatitude(), midLon);
+            LatLng c = new LatLng(d.getLatitude(), midLon);
             List<RouteStep> steps = new ArrayList<RouteStep>();
-            steps.add(new RouteStep("Head east", "Long Street", 520, 400, a, Arrays.asList(a, b)));
-            steps.add(new RouteStep("Turn left", "Mill Lane", 380, 300, b, Arrays.asList(b, c)));
-            steps.add(new RouteStep("Turn right", "Bridge Road", 460, 350, c, Arrays.asList(c, d)));
-            steps.add(new RouteStep("Arrive", "Bridge Road", 0, 0, d, Arrays.asList(d)));
+            steps.add(new RouteStep("Head east", "Cannon Street", 520, 400, a, Arrays.asList(a, b)));
+            steps.add(new RouteStep("Turn left", "Moorgate", 380, 300, b, Arrays.asList(b, c)));
+            steps.add(new RouteStep("Turn right", "London Wall", 460, 350, c, Arrays.asList(c, d)));
+            steps.add(new RouteStep("Arrive", "London Wall", 0, 0, d, Arrays.asList(d)));
             final Route r = new Route(Arrays.asList(a, b, c, d),
                     Arrays.asList(new RouteLeg("", 1360, 1050, steps)), 1360, 1050, "");
             CN.callSerially(() -> callback.routesFound(Arrays.asList(r)));
