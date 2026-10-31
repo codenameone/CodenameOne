@@ -36,6 +36,7 @@ import com.codenameone.examples.dash.rules.Bot;
 import com.codenameone.examples.dash.api.GameProtocol;
 import com.codenameone.examples.dash.run.RaceDriver;
 import com.codenameone.examples.dash.rules.Run;
+import com.codenameone.examples.dash.rules.Track;
 import com.codenameone.examples.dash.run.Driver;
 import com.codenameone.examples.dash.run.RunView;
 import com.codenameone.examples.dash.run.Sfx;
@@ -95,7 +96,27 @@ public abstract class E2e extends AbstractTest {
             log("Not a test for " + (desktopRun() ? "the desktop" : "the phone") + "; skipped");
             return true;
         }
+        if (desktopRun()) {
+            desktopWindow(1440, 900);
+        }
         return run();
+    }
+
+    /// The desktop pass shoots a laptop-sized window. The simulator opens a
+    /// desktop at whatever size the content asks for, which for a phone app
+    /// is small; the window is sized here, and the form lays itself out again
+    /// at the new size as it would after a user resized it.
+    private void desktopWindow(int width, int height) throws Exception {
+        javax.swing.SwingUtilities.invokeAndWait(() -> {
+            for (java.awt.Frame f : java.awt.Frame.getFrames()) {
+                if (f.isShowing()) {
+                    f.setExtendedState(java.awt.Frame.NORMAL);
+                    f.setSize(width, height);
+                    f.validate();
+                }
+            }
+        });
+        waitFor(1200);
     }
 
     @Override
@@ -289,6 +310,31 @@ public abstract class E2e extends AbstractTest {
         }
         waitFor(1200);
         capture(dir, name);
+    }
+
+    /// Whether the stretch the camera shows next -- 10 to 70 m ahead --
+    /// holds at least `items` coins, power-ups and obstacles, so a shot of
+    /// the track has something on it.
+    protected static boolean busyAhead(RunView view, int items) {
+        Run run = view.driver().run();
+        int z = run.runner(view.driver().me()).z;
+        Track t = run.track();
+        int n = 0;
+        for (int i = 0; i < t.size(); i++) {
+            Track.Entry e = t.get(i);
+            if (e.z > z + 10 * Track.UNIT && e.z < z + 70 * Track.UNIT) {
+                n++;
+            }
+        }
+        return n >= items;
+    }
+
+    /// Lets the bot run, for at most `millis`, until the track ahead is busy.
+    protected void driveToBusy(RunView view, int items, int millis) {
+        long give = System.currentTimeMillis() + millis;
+        while (System.currentTimeMillis() < give && !busyAhead(view, items) && !driveFor(view, 100)) {
+            // the bot steers
+        }
     }
 
     /// A shot of a run in progress: the bot keeps steering while the frame

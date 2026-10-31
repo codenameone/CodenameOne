@@ -65,7 +65,7 @@ public class PartyTest extends E2e {
             guest.emote("wow");
             guest.say("Catch me if you can!");
             click("emote-wave");
-            driveFor(view, 1200);
+            driveToBusy(view, 8, 15000);
             shot("party-race", view);
             onEdt(() -> {
                 ((RaceDriver) view.driver()).leave();

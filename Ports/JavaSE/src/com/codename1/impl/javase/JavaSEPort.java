@@ -4356,10 +4356,6 @@ public class JavaSEPort extends CodenameOneImplementation {
          */
         int blitCounter;
         
-        /**
-         * Snapshot of what this canvas last painted, used by the windowed screenshot
-         * tests: the ordinary screenshot path can only see the primary surface.
-         */
         /// The last complete frame, kept only while the simulator recorder runs.
         private BufferedImage presented;
 
@@ -4406,6 +4402,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         }
 
+        /**
+         * Snapshot of what this canvas last painted, used by the windowed screenshot
+         * tests: the ordinary screenshot path can only see the primary surface.
+         */
         BufferedImage captureBuffer() {
             synchronized (bufferLock) {
                 BufferedImage src = buffer != null ? buffer : edtBuffer;

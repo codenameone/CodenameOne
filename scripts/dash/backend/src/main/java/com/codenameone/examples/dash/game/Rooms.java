@@ -417,11 +417,13 @@ public class Rooms {
 
     /// Emotes, chat and voice signaling go to whoever shares a race or a party
     /// with the sender.
-    synchronized void emote(String username, String emote) {
+    /// Both carry the sender's display name, never the account name: that is
+    /// an email address, and other runners see it.
+    synchronized void emote(String username, String name, String emote) {
         if (emote == null || emote.length() > 32) {
             return;
         }
-        relay(username, Messages.emote(username, emote), false);
+        relay(username, Messages.emote(name, emote), false);
     }
 
     synchronized void chat(String username, String name, String text) {

@@ -85,7 +85,7 @@ public class GameSocket implements WebSocket {
                 return;
             }
             if (GameProtocol.EMOTE.equals(type)) {
-                rooms.emote(username, string(m, "id"));
+                rooms.emote(username, p.getDisplayName(), string(m, "id"));
             } else {
                 rooms.chat(username, p.getDisplayName(), string(m, "text"));
             }

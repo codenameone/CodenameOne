@@ -57,11 +57,13 @@ public class DemoAccounts {
     private final Promotion promotion;
     private final Pipelines pipelines;
     private final Scores scores;
+    private final DemoHistory history;
     private final String adminEmail;
     private final String adminPassword;
 
     public DemoAccounts(Accounts accounts, Flags flags, Progression progression, Config config,
-            Promotion promotion, Pipelines pipelines, Scores scores, @Value("${dash.admin.email:}") String adminEmail,
+            Promotion promotion, Pipelines pipelines, Scores scores, DemoHistory history,
+            @Value("${dash.admin.email:}") String adminEmail,
             @Value("${dash.admin.password:}") String adminPassword) {
         this.accounts = accounts;
         this.flags = flags;
@@ -70,6 +72,7 @@ public class DemoAccounts {
         this.promotion = promotion;
         this.pipelines = pipelines;
         this.scores = scores;
+        this.history = history;
         this.adminEmail = adminEmail;
         this.adminPassword = adminPassword;
     }
@@ -117,26 +120,29 @@ public class DemoAccounts {
     /// leaderboard has a field to climb from the first run. Each one's names
     /// and skill are fixed; their runs are the rules' own bot, played on this
     /// week's seed and submitted like anyone's, so every score is a real,
-    /// verified run. The skills are spread wide: above 80 the bot never
-    /// lapses, so a field of strong bots would post one score eight times.
-    private static final String[][] FIELD = {
+    /// verified run. Most of the field sits between 16 and 46, where a run
+    /// ends somewhere along the track: above about 55 the bot finishes the
+    /// causeway, and a field of finishers posts one distance eight times.
+    static final String[][] FIELD = {
         {"nova@dash.example", "Nova", "97"},
-        {"kai@dash.example", "Kai", "82"},
-        {"juno@dash.example", "Juno", "70"},
-        {"ezra@dash.example", "Ezra", "58"},
-        {"sasha@dash.example", "Sasha", "46"},
-        {"dev@dash.example", "Dev", "34"},
+        {"kai@dash.example", "Kai", "90"},
+        {"juno@dash.example", "Juno", "46"},
+        {"ezra@dash.example", "Ezra", "40"},
+        {"sasha@dash.example", "Sasha", "34"},
+        {"dev@dash.example", "Dev", "28"},
         {"ivy@dash.example", "Ivy", "22"},
-        {"theo@dash.example", "Theo", "10"},
+        {"theo@dash.example", "Theo", "16"},
     };
 
     private void field() throws IOException {
         int week = Scores.today() / 7;
+        boolean fresh = false;
         for (int i = 0; i < FIELD.length; i++) {
             String who = FIELD[i][0];
             if (accounts.exists(who)) {
                 continue;
             }
+            fresh = true;
             add(who, FIELD[i][1], false);
             int skill = Integer.parseInt(FIELD[i][2]);
             for (LevelDef level : Content.levels()) {
@@ -146,6 +152,9 @@ public class DemoAccounts {
                     post(who, level, Content.dailySeed(Scores.today()), skill, i);
                 }
             }
+        }
+        if (fresh) {
+            history.seed(FIELD);
         }
     }
 

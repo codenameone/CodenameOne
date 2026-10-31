@@ -64,6 +64,7 @@ public final class RaceLobby implements GameLink.Listener, Voice.Listener {
     private ShareButton share;
     private final Container members = new Container(BoxLayout.y());
     private final Container chat = new Container(BoxLayout.y());
+    private Container page;
     private final Label code = new Label("", "ChallengeCode");
     private final Label url = new Label("", "ChallengeUrl");
     private boolean host;
@@ -154,19 +155,27 @@ public final class RaceLobby implements GameLink.Listener, Voice.Listener {
         share.setUIID("PrimaryButton");
         share.setName("shareParty");
         share.addActionListener(e -> Telemetry.challengeShared());
-        top.add(share);
-        top.add(Ui.secondary("Copy the link", "copyParty", e -> {
+        // A material icon takes the button's own colour; the stock share
+        // image is a picture and sits on a light square on a dark button.
+        share.setMaterialIcon(FontImage.MATERIAL_SHARE);
+        Button copy = Ui.secondary("Copy the link", "copyParty", e -> {
             Display.getInstance().copyToClipboard(url.getText());
             Ui.toast("Copied");
-        }));
-        top.add(Ui.label("Runners", "SectionTitle"));
+        });
+        top.add(share);
+        top.add(copy);
+        // The code and the invite stay put; the runners and the chat scroll
+        // under them, so the conversation is never squeezed into what the
+        // code card leaves and scrolling to a new line never hides the code.
+        Container below = Ui.column();
+        below.add(Ui.label("Runners", "SectionTitle"));
         members.setName("members");
-        top.add(members);
-        // The code, the runners and the chat scroll as one page, so the
-        // conversation is never squeezed into what the code card leaves.
+        below.add(members);
         chat.setName("chat");
-        Container page = BoxLayout.encloseY(Ui.centeredColumn(top), chat);
+        below.add(chat);
+        page = BoxLayout.encloseY(Ui.centeredColumn(below));
         page.setScrollableY(true);
+        form.add(BorderLayout.NORTH, Ui.centeredColumn(top));
         form.add(BorderLayout.CENTER, page);
 
         final TextField say = new TextField("", "Say something", 40, TextField.ANY);
@@ -243,7 +252,7 @@ public final class RaceLobby implements GameLink.Listener, Voice.Listener {
             bubble.setUIID("ChatBubble");
             chat.add(bubble);
             form.revalidate();
-            form.scrollComponentToVisible(bubble);
+            page.scrollComponentToVisible(bubble);
         } else if (GameProtocol.ERROR.equals(type) || GameProtocol.KICKED.equals(type)) {
             String why = GameProtocol.KICKED.equals(type) ? "You were removed from the race."
                     : GameLink.text(m, "message");

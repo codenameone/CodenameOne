@@ -43,7 +43,7 @@ public class PracticeTest extends E2e {
         shot("run-side");
         new Thread(() -> drive(view, 60000)).start();
         until(() -> view.driver().run().runner(view.driver().me()).z / 1000 > 340
-                || view.driver().run().over(), 60000, "the swing to the chase view");
+                && busyAhead(view, 8) || view.driver().run().over(), 60000, "the swing to the chase view");
         shot("run-chase");
         finish(view, 60 * 600);
         awaitResult("the result");

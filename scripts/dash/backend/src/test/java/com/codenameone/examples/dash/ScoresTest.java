@@ -71,7 +71,10 @@ class ScoresTest {
         String id = (String) mine.get("replayId");
         String watcher = Api.player(accounts, "daily-watcher");
         assertEquals(today, Api.json(mvc, Api.as(get("/api/races/" + id), watcher)).get("replay"));
-        assertEquals(today, Api.json(mvc, Api.as(get("/api/ghost?level=endless&board=day"), watcher)).get("replay"));
+        // The ghost is the closest run above the watcher's (none): whichever
+        // of the day's runners that is, it was run on the day's seed.
+        String ghost = (String) Api.json(mvc, Api.as(get("/api/ghost?level=endless&board=day"), watcher)).get("replay");
+        assertTrue(ghost.contains("|" + seed + "|"), ghost);
     }
 
     @Test
