@@ -2304,6 +2304,17 @@ public class CSSTheme {
      * @return 
      */
     public boolean isModified(String id) {
+        return isModified(id, new java.util.HashSet<String>());
+    }
+
+    // A style can derive from itself through one of its states
+    // (`X.pressed { cn1-derive: X; }`), or from a style that derives back
+    // from it; following derives without remembering the path then never
+    // ends. A selector already on the path adds nothing new.
+    private boolean isModified(String id, java.util.Set<String> visiting) {
+        if (!visiting.add(id)) {
+            return false;
+        }
         if (selectorCacheStatus != null) {
             CacheStatus status = selectorCacheStatus.get(id);
             if (status == null) {
@@ -2320,21 +2331,21 @@ public class CSSTheme {
             String selectedDerive = el.getThemeDerive(el.getFlattenedSelectedStyle(), "");
             String pressedDerive = el.getThemeDerive(el.getFlattenedPressedStyle(), "");
             String disabledDerive = el.getThemeDerive(el.getFlattenedDisabledStyle(), "");
-            if (derive != null && selectorCacheStatus.containsKey(derive) &&  isModified(derive)) {
+            if (derive != null && selectorCacheStatus.containsKey(derive) &&  isModified(derive, visiting)) {
                 
                 return true;
             }
-            if (unselectedDerive != null && selectorCacheStatus.containsKey(unselectedDerive) && isModified(unselectedDerive)) {
+            if (unselectedDerive != null && selectorCacheStatus.containsKey(unselectedDerive) && isModified(unselectedDerive, visiting)) {
                 
                 return true;
             }
-            if (selectedDerive != null && selectorCacheStatus.containsKey(selectedDerive) && isModified(selectedDerive)) {
+            if (selectedDerive != null && selectorCacheStatus.containsKey(selectedDerive) && isModified(selectedDerive, visiting)) {
                 return true;
             }
-            if (pressedDerive != null && selectorCacheStatus.containsKey(pressedDerive) && isModified(pressedDerive)) {
+            if (pressedDerive != null && selectorCacheStatus.containsKey(pressedDerive) && isModified(pressedDerive, visiting)) {
                 return true;
             }
-            if (disabledDerive != null && selectorCacheStatus.containsKey(disabledDerive) && isModified(disabledDerive)) {
+            if (disabledDerive != null && selectorCacheStatus.containsKey(disabledDerive) && isModified(disabledDerive, visiting)) {
                 return true;
             }
             
