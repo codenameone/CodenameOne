@@ -40,13 +40,44 @@ public class PyDict extends PyObject {
     int used;
     /// Number of live entries.
     int size;
+    /// Open-addressed entry indices by hash; null while the entries fit in
+    /// `LINEAR` slots, where a scan of `hashes` finds a key as fast and the
+    /// table would be one more allocation for every small dict.
     private int[] index;
 
+    /// The most entry slots a dict keeps without an index table.
+    private static final int LINEAR = 8;
+    private static final Object[] NO_OBJECTS = new Object[0];
+    private static final long[] NO_HASHES = new long[0];
+
+    /// An empty dict allocates no arrays until its first entry: keyword
+    /// dicts, per-call dicts and the like are often never filled.
     public PyDict() {
-        keys = new Object[8];
-        values = new Object[8];
-        hashes = new long[8];
-        index = newIndex(16);
+        keys = NO_OBJECTS;
+        values = NO_OBJECTS;
+        hashes = NO_HASHES;
+    }
+
+    /// The entry a slot from `find` names: without an index table the
+    /// finders answer the entry itself.
+    private int entry(int s) {
+        return index == null ? s : index[s];
+    }
+
+    /// The entry holding `key` by a scan of the entries (no index table),
+    /// or -1.
+    private int scan(Object key, long h) {
+        final long[] hs = hashes;
+        final Object[] ks = keys;
+        for (int e = 0; e < used; e++) {
+            if (hs[e] == h) {
+                Object k = ks[e];
+                if (k != null && keyEq(k, h, key, h)) {
+                    return e;
+                }
+            }
+        }
+        return -1;
     }
 
     private static int[] newIndex(int n) {
@@ -90,6 +121,19 @@ public class PyDict extends PyObject {
     /// directly, and only a key of another type with the same hash goes
     /// through the general comparison.
     private int findStr(String key, long h) {
+        if (index == null) {
+            final long[] hs = hashes;
+            final Object[] ks = keys;
+            for (int e = 0; e < used; e++) {
+                if (hs[e] == h) {
+                    Object k = ks[e];
+                    if (k instanceof String ? key.equals(k) : k != null && keyEq(k, h, key, h)) {
+                        return e;
+                    }
+                }
+            }
+            return -1;
+        }
         int mask = index.length - 1;
         int i = (int) (h & mask);
         long perturb = h & Long.MAX_VALUE;
@@ -118,6 +162,9 @@ public class PyDict extends PyObject {
 
     /// The index slot holding `key`, or the negative of (1 + the first free slot).
     private int find(Object key, long h) {
+        if (index == null) {
+            return scan(key, h);
+        }
         int mask = index.length - 1;
         int i = (int) (h & mask);
         long perturb = h & Long.MAX_VALUE;
@@ -146,15 +193,17 @@ public class PyDict extends PyObject {
         long h = Py.keyHash(key, "a dict key");
         int s = key instanceof String ? findStr((String) key, h) : find(key, h);
         if (s >= 0) {
-            int e = index[s];
-            Object stored = keys[e];
+            final int[] ix = index;
+            final Object[] ks = keys;
+            int e = entry(s);
+            Object stored = ks[e];
             Object r = Py.add(values[e], inc);
-            if (index[s] != e || keys[e] != stored) { //NOPMD CompareObjectsWithEquals - identity is meant
+            if (index != ix || keys != ks || ix != null && ix[s] != e || ks[e] != stored) { //NOPMD CompareObjectsWithEquals - identity is meant
                 // The addition ran Python code that changed the dict.
                 s = find(key, h);
             }
             if (s >= 0) {
-                values[index[s]] = r;
+                values[entry(s)] = r;
                 return r;
             }
             setItem(key, r);
@@ -168,6 +217,19 @@ public class PyDict extends PyObject {
     /// The slot of int key `k` (hash `h`), as `find` answers; the key is
     /// compared without being boxed.
     private int findLong(long k, long h) {
+        if (index == null) {
+            final long[] hs = hashes;
+            final Object[] ks = keys;
+            for (int e = 0; e < used; e++) {
+                if (hs[e] == h) {
+                    Object x = ks[e];
+                    if (x instanceof Long ? ((Long) x).longValue() == k : x != null && keyEq(x, h, Long.valueOf(k), h)) {
+                        return e;
+                    }
+                }
+            }
+            return -1;
+        }
         int mask = index.length - 1;
         int i = (int) (h & mask);
         long perturb = h & Long.MAX_VALUE;
@@ -195,7 +257,7 @@ public class PyDict extends PyObject {
     /// `self.get(k)` for an int key, or `null` when absent.
     Object getLong(long k) {
         int s = findLong(k, Hashing.ofLong(k));
-        return s >= 0 ? values[index[s]] : null;
+        return s >= 0 ? values[entry(s)] : null;
     }
 
     /// `self[k] = value` for an int key; the key is boxed only when it is new.
@@ -203,20 +265,22 @@ public class PyDict extends PyObject {
         long h = Hashing.ofLong(k);
         int s = findLong(k, h);
         if (s >= 0) {
-            values[index[s]] = value;
+            values[entry(s)] = value;
             return;
         }
         if (used == keys.length) {
             grow();
             s = findLong(k, h);
         }
-        index[-1 - s] = used;
+        if (index != null) {
+            index[-1 - s] = used;
+        }
         keys[used] = Long.valueOf(k);
         values[used] = value;
         hashes[used] = h;
         used++;
         size++;
-        if (used * 3 >= index.length * 2) {
+        if (index != null && used * 3 >= index.length * 2) {
             rebuild(index.length * 2);
         }
     }
@@ -225,7 +289,7 @@ public class PyDict extends PyObject {
     public Object getOrNull(Object key) {
         sync();
         int s = find(key, Py.keyHash(key, "a dict key"));
-        return s >= 0 ? values[index[s]] : null;
+        return s >= 0 ? values[entry(s)] : null;
     }
 
     public Object get(String key) {
@@ -250,20 +314,22 @@ public class PyDict extends PyObject {
         long h = Py.keyHash(key, "a dict key");
         int s = find(key, h);
         if (s >= 0) {
-            values[index[s]] = value;
+            values[entry(s)] = value;
             return;
         }
         if (used == keys.length) {
             grow();
             s = find(key, h);
         }
-        index[-1 - s] = used;
+        if (index != null) {
+            index[-1 - s] = used;
+        }
         keys[used] = key;
         values[used] = value;
         hashes[used] = h;
         used++;
         size++;
-        if (used * 3 >= index.length * 2) {
+        if (index != null && used * 3 >= index.length * 2) {
             rebuild(index.length * 2);
         }
     }
@@ -289,7 +355,11 @@ public class PyDict extends PyObject {
         values = nv;
         hashes = nh;
         used = w;
-        int n = index.length;
+        if (cap <= LINEAR) {
+            index = null;
+            return;
+        }
+        int n = index == null ? 16 : index.length;
         while (cap * 3 >= n * 2) {
             n *= 2;
         }
@@ -320,9 +390,11 @@ public class PyDict extends PyObject {
         if (s < 0) {
             return null;
         }
-        int e = index[s];
+        int e = entry(s);
         Object v = values[e];
-        index[s] = DUMMY;
+        if (index != null) {
+            index[s] = DUMMY;
+        }
         keys[e] = null;
         values[e] = null;
         size--;
@@ -368,14 +440,16 @@ public class PyDict extends PyObject {
             nullOut(keys, used);
             nullOut(values, used);
             int[] ix = index;
-            for (int i = 0; i < ix.length; i++) {
-                ix[i] = EMPTY;
+            if (ix != null) {
+                for (int i = 0; i < ix.length; i++) {
+                    ix[i] = EMPTY;
+                }
             }
         } else {
-            keys = new Object[8];
-            values = new Object[8];
-            hashes = new long[8];
-            index = newIndex(16);
+            keys = NO_OBJECTS;
+            values = NO_OBJECTS;
+            hashes = NO_HASHES;
+            index = null;
         }
         used = 0;
         size = 0;

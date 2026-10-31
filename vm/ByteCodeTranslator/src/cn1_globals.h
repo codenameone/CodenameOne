@@ -2077,6 +2077,11 @@ struct ThreadLocalData {
        back a page-aligned block, unmaps memory the allocator still believes it
        owns. */
     int threadObjectStackMapped;
+    /* A VIRTUAL thread's call-stack, pending-allocation and try-block buffers, carved
+       out of one lazily faulted mapping (cn1MapThreadBuffers); null when they were
+       calloc'd one by one, as an OS thread's are. */
+    char* threadBuffersMap;
+    size_t threadBuffersMapBytes;
     int threadObjectStackOffset;
     
     // allocations are stored here and then copied to the big memory pool during

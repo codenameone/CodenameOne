@@ -164,12 +164,17 @@ final class TypeMethods {
 
         @Override
         public Object next() {
-            int n = v.length();
+            // The string and each character in locals, and no assignment inside
+            // a loop condition: ParparVM keeps a condition's DUP/ISTORE on its
+            // operand stack in memory, while plain locals stay in registers.
+            final String s = v;
+            final int n = s.length();
             int a = pos;
-            // The range test first: isSpace is a call, and words are mostly
-            // printable ASCII.
-            char c;
-            while (a < n && ((c = v.charAt(a)) == ' ' || (c < ' ' || c >= '\u0085') && isSpace(c))) {
+            while (a < n) {
+                char c = s.charAt(a);
+                if (c > ' ' && c < '\u0085' || !isSpace(c)) {
+                    break;
+                }
                 a++;
             }
             if (a >= n) {
@@ -177,11 +182,15 @@ final class TypeMethods {
                 return null;
             }
             int b = a + 1;
-            while (b < n && ((c = v.charAt(b)) > ' ' && c < '\u0085' || c != ' ' && !isSpace(c))) {
+            while (b < n) {
+                char c = s.charAt(b);
+                if (c <= ' ' && isSpace(c) || c >= '\u0085' && isSpace(c)) {
+                    break;
+                }
                 b++;
             }
             pos = b;
-            return v.substring(a, b);
+            return s.substring(a, b);
         }
     }
 

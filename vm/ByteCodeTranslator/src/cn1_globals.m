@@ -16316,7 +16316,12 @@ cn1GcMallocRetry:
                 memset(tmp, 0, threadStateData->threadHeapTotalSize * 2 * sizeof(void *));
                 memcpy(tmp, threadStateData->pendingHeapAllocations, threadStateData->threadHeapTotalSize * sizeof(void *));
                 threadStateData->threadHeapTotalSize *= 2;
-                free(threadStateData->pendingHeapAllocations);
+                // A virtual thread's first table is part of its buffer mapping
+                // (cn1MapThreadBuffers), released with the state, not by free.
+                { extern int cn1InThreadBuffersMap(struct ThreadLocalData* i, void* p);
+                  if(!cn1InThreadBuffersMap(threadStateData, threadStateData->pendingHeapAllocations)) {
+                      free(threadStateData->pendingHeapAllocations);
+                  } }
                 threadStateData->pendingHeapAllocations = tmp;
                 unlockThreadHeapMutex();
             }
