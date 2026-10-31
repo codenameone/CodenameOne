@@ -132,7 +132,7 @@ image::img/pulse-timetable.png["The timetable for one day, each class a card wit
 An account holder books for up to eight people: themselves and their children.
 Each child has their own membership, their own place in a class and their own door
 pass, but only the account holder signs in. A child's age is worked out from their
-birth date on the day of each class, so a child grows into the next age band
+date of birth on the day of each class, so a child grows into the next age band
 without anyone changing anything.
 
 ==== The door pass
@@ -176,7 +176,7 @@ image::img/pulse-workouts.png["The workouts list with the duration, average hear
 
 Coming to a class, recording a workout and keeping a weekly streak earn points,
 and points raise the member's level. A workout recorded with a heart-rate strap or
-a watch earns extra points, since it shows how hard the member really worked.
+a watch earns extra points, since it shows how hard the member worked.
 Badges mark milestones: the first class, ten and fifty classes, a four- and a
 twelve-week streak, a first workout with heart rate, a class worn with a strap or a
 watch, a minute in zone 5, and ten hours of workouts. Tapping a badge says how it
@@ -218,8 +218,8 @@ its roster.
 
 image::img/pulse-trainer-home.png["The trainer's home with the class on now featured above the week's classes",scaledwidth=40%]
 
-The trainer sees the classes they teach in the coming week. Each class's roster
-lists who is booked, who is waiting and who came, with what the trainer needs to
+The trainer sees the classes they teach in the coming week. The roster of each class
+shows the members booked, the ones waiting and the ones who came, with what the trainer needs to
 know about each person. Attendance can be marked by hand for someone the door
 didn't see, and corrected for 30 minutes after the class ends.
 

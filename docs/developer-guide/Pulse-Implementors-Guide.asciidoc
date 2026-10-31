@@ -244,7 +244,7 @@ physical systems begin. A product needs at least:
   HealthKit and Health Connect.
 * *Marketing consent.* Nudges and campaigns respect the promotion switch and quiet
   hours. Check your market's rules on marketing messages, such as opt-in
-  requirements and an unsubscribe in every message.
+  requirements and an unsubscribe link in every message.
 * *Reviewed translations.* The non-English bundles are machine translations; have
   them reviewed before release.
 * *Operations.* Monitoring, backups that have been restored in a test, a support
