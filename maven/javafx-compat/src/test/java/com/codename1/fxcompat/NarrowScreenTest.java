@@ -111,6 +111,22 @@ public class NarrowScreenTest {
     }
 
     @Test
+    public void aSafeAreaTopInsetMovesTheSceneDownAndIsFilledWithTheRootsBackground() {
+        Pane root = new Pane();
+        root.setStyle("-fx-background-color: #102030;");
+        Container content = shown(root);
+        // A safe area is padding on the content pane, the status bar's
+        // height at the top; the bottom is left to the scene.
+        content.getUnselectedStyle().setPadding(40, 30, 0, 0);
+        content.revalidate();
+        assertEquals(content.getHeight() - 40, root.getHeight(), 0.01);
+        assertEquals(content.getWidth(), root.getWidth(), 0.01);
+        assertEquals(40, content.getComponentAt(0).getY());
+        assertEquals(0x102030, content.getUnselectedStyle().getBgColor());
+        assertEquals((byte) 0xff, content.getUnselectedStyle().getBgTransparency());
+    }
+
+    @Test
     public void aRootWiderThanTheFormAtItsLeastIsLaidOutThatWideAndScrolls() {
         Pane root = new Pane();
         int wide = Display.getInstance().getDisplayWidth() + 500;

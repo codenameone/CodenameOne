@@ -38,6 +38,8 @@ import javafx.scene.Node;
 import javafx.scene.Parent;
 
 import javafx.scene.Scene;
+import javafx.scene.paint.Color;
+import javafx.scene.paint.Paint;
 import javafx.scene.layout.Region;
 import javafx.stage.Window;
 
@@ -101,8 +103,17 @@ final class HostCore {
             if (rootPeer == null) {
                 return;
             }
-            int w = parent.getWidth();
-            int h = parent.getHeight();
+            // Inside the pane's padding, which is where a safe area puts
+            // the status bar and the notch.
+            com.codename1.ui.plaf.Style ps = parent.getStyle();
+            int left = ps.getPaddingLeftNoRTL();
+            int top = ps.getPaddingTop();
+            int w = parent.getWidth() - left - ps.getPaddingRightNoRTL();
+            // The bottom inset is left to the scene, as it always was: a
+            // phone app's bottom bar runs to the edge and pads itself, and
+            // cut short above the home indicator it left a band of form.
+            int h = parent.getHeight() - top;
+            fillInsets(parent);
             if (w <= 0 || h <= 0) {
                 return;
             }
@@ -153,10 +164,41 @@ final class HostCore {
                 }
                 parent.setScrollableY(overY);
             }
-            rootPeer.setX(0);
-            rootPeer.setY(0);
+            rootPeer.setX(left);
+            rootPeer.setY(top);
             rootPeer.setWidth(overX ? least.getWidth() : w);
             rootPeer.setHeight(overY ? least.getHeight() : h);
+        }
+
+        /// Paints the pane, which the safe area's padding uncovers above
+        /// the scene, in the scene's fill, so that the strip under the
+        /// status bar continues the scene instead of showing the form.
+        private void fillInsets(Container parent) {
+            // What shows at the top of the scene is its root's background,
+            // when it has one, and the scene's fill under that.
+            Paint fill = null;
+            if (scene != null && scene.getRoot() instanceof Region) {
+                javafx.scene.layout.Background bg = ((Region) scene.getRoot()).getBackground();
+                if (bg != null && !bg.getFills().isEmpty()) {
+                    fill = bg.getFills().get(bg.getFills().size() - 1).getFill();
+                }
+            }
+            if (!(fill instanceof Color) || !((Color) fill).isOpaque()) {
+                fill = scene == null ? null : scene.getFill();
+            }
+            com.codename1.ui.plaf.Style st = parent.getUnselectedStyle();
+            if (fill instanceof Color && ((Color) fill).isOpaque()) {
+                Color c = (Color) fill;
+                int rgb = ((int) Math.round(c.getRed() * 255) << 16)
+                        | ((int) Math.round(c.getGreen() * 255) << 8)
+                        | (int) Math.round(c.getBlue() * 255);
+                if (st.getBgColor() != rgb || st.getBgTransparency() != (byte) 0xff) {
+                    st.setBgColor(rgb, true);
+                    st.setBgTransparency(0xff, true);
+                }
+            } else if (st.getBgTransparency() != 0) {
+                st.setBgTransparency(0, true);
+            }
         }
 
         @Override

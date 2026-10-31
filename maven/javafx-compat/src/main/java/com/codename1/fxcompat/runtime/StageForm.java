@@ -79,6 +79,11 @@ public final class StageForm extends Form implements StageHost {
             if (titleArea != null) {
                 titleArea.setHidden(true);
             }
+            // With the title area hidden nothing kept the scene out of the
+            // status bar and the notch: on a phone its top row was drawn
+            // under the clock. A JavaFX scene knows nothing of either, so
+            // the window's content stays inside the safe area.
+            getContentPane().setSafeArea(true);
         } else {
             setBackCommand(new Command("Back") {
                 @Override
