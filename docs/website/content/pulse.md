@@ -18,9 +18,10 @@ In the Initializr, choose the **Pulse** fitness studio template, set your applic
 | Part | Included workflows |
 | --- | --- |
 | Member | Book classes or join the waitlist, book for children in the household, show a rotating QR door pass, join, change, freeze and cancel plans, declare away periods, see visits and workouts, add friends, give kudos and invite friends to a class |
-| Trainer | See the week's classes and rosters, mark attendance, follow members' heart rate zones live in class, offer and take shifts |
+| Trainer | See the week's classes and rosters, mark attendance, follow members' heart rate zones live in class, see their month (classes, check-ins, fill, attendance, regulars, kudos), offer and take shifts |
 | Front desk and kiosk | Check people in by QR pass, NFC fob or name with a reason for every refusal, record guests, day passes and trials, run a door kiosk on a tablet |
-| Owner | Monthly recurring revenue, utilisation, members at risk and under-filled classes; plans, timetable, staff and campaigns |
+| Owner | Monthly recurring revenue, utilisation, members at risk and under-filled classes; insights with busy hours, retention, membership growth, class fill and no-shows, plan mix and coach rankings; a searchable member list with each member's history; billing with failed charges and voids; plans, timetable, staff and campaigns |
+| Watch | Next class with a countdown, the door code, points, level and streak, and the classes coming up |
 | Java backend | Accounts and roles, households, bookings that never oversell, door passes, subscription billing with proration, freezes and a dunning ladder, automatic class-filling and we-miss-you nudges with quiet hours, live updates over WebSocket |
 | Shared code | API contracts and data classes shared between the client and server |
 
@@ -30,6 +31,13 @@ The account's roles decide which screens a person sees. The same client project 
 ![Pulse class timetable](/developer-guide/img/pulse-timetable.png)
 ![Pulse live class with heart rate zones](/developer-guide/img/pulse-live.png)
 ![Pulse owner dashboard](/developer-guide/img/pulse-owner.png)
+![Pulse insights with busy hours and membership](/developer-guide/img/pulse-insights.png)
+![Pulse coaches ranked with fill, attendance and kudos](/developer-guide/img/pulse-insights-coaches.png)
+![Pulse member page with visits a week and favourite classes](/developer-guide/img/pulse-member-detail.png)
+![Pulse billing with collected, outstanding and failed](/developer-guide/img/pulse-billing.png)
+![Pulse trainer home with the trainer's month](/developer-guide/img/pulse-trainer-home.png)
+![Pulse watch next class](/developer-guide/img/pulse-watch.png)
+![Pulse watch week with level ring and streak](/developer-guide/img/pulse-watch-week.png)
 
 ## From first run to customization
 

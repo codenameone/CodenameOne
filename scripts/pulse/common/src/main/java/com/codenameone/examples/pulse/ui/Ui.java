@@ -670,10 +670,14 @@ public final class Ui {
 
     /// Makes the whole of `row` one button. The name is the button's, for a
     /// test to click.
+    ///
+    /// The lead is an empty, unpadded button rather than a hidden one: a
+    /// hidden component is left out of the accessibility tree, and a screen
+    /// reader then had no way to activate the row. It reads what the row says.
     public static Container tap(Container row, String name, ActionListener<ActionEvent> onClick) {
-        Button lead = new Button();
+        Button lead = new Button("", "SvLead");
         lead.setName(name);
-        lead.setHidden(true);
+        lead.setAccessibilityText(spoken(row, new StringBuilder()).toString());
         lead.addActionListener(onClick);
         if (!(row.getLayout() instanceof BorderLayout)) {
             // The lead goes in a border's south; any other layout is wrapped.
@@ -682,6 +686,28 @@ public final class Ui {
         row.add(BorderLayout.SOUTH, lead);
         row.setLeadComponent(lead);
         return row;
+    }
+
+    /// The text of every label in `parent`, in order, comma separated.
+    private static StringBuilder spoken(Container parent, StringBuilder out) {
+        for (int iter = 0; iter < parent.getComponentCount(); iter++) {
+            Component child = parent.getComponentAt(iter);
+            String text = null;
+            if (child instanceof Label) {
+                text = ((Label) child).getText();
+            } else if (child instanceof SpanLabel) {
+                text = ((SpanLabel) child).getText();
+            } else if (child instanceof Container) {
+                spoken((Container) child, out);
+            }
+            if (text != null && text.length() > 0) {
+                if (out.length() > 0) {
+                    out.append(", ");
+                }
+                out.append(text);
+            }
+        }
+        return out;
     }
 
     /// A day, without the time.

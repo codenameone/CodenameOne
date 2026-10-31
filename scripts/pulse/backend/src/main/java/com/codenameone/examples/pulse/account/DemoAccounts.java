@@ -58,6 +58,12 @@ public class DemoAccounts {
     public static final String LAPSED_MEMBER = "member4@pulse.example";
     public static final String TRAINER = "trainer@pulse.example";
     public static final String SECOND_TRAINER = "trainer2@pulse.example";
+    /// Pilates and barre at Downtown.
+    public static final String PILATES_TRAINER = "trainer3@pulse.example";
+    /// The ride and HIIT coach at Downtown.
+    public static final String RIDE_TRAINER = "trainer4@pulse.example";
+    /// Yoga and climbing at Riverside.
+    public static final String RIVERSIDE_TRAINER = "trainer5@pulse.example";
     public static final String DESK = "desk@pulse.example";
     public static final String OWNER = "owner@pulse.example";
     /// The password of every demo account. Not a secret: these accounts exist
@@ -120,6 +126,12 @@ public class DemoAccounts {
                 false, false, 400);
         add(SECOND_TRAINER, PASSWORD, "Theo Brooks", "+15550111", LocalDate.of(1985, 7, 19),
                 true, false, false, 300);
+        add(PILATES_TRAINER, PASSWORD, "Maya Lindqvist", "+15550114", LocalDate.of(1989, 6, 11),
+                true, false, false, 380);
+        add(RIDE_TRAINER, PASSWORD, "Andre Okoye", "+15550115", LocalDate.of(1993, 1, 25), true,
+                false, false, 340);
+        add(RIVERSIDE_TRAINER, PASSWORD, "Sofia Marin", "+15550116", LocalDate.of(1988, 10, 3),
+                true, false, false, 270);
         add(DESK, PASSWORD, "Dee Patel", "+15550112", LocalDate.of(1998, 12, 1), false, true,
                 false, 250);
         add(OWNER, PASSWORD, "Olive Hart", "+15550113", LocalDate.of(1976, 4, 4), false,

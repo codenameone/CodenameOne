@@ -27,11 +27,15 @@ import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codenameone.examples.pulse.api.SessionDto;
+import com.codenameone.examples.pulse.api.TrainerStatsDto;
 import com.codenameone.examples.pulse.live.LiveChannel;
 import com.codenameone.examples.pulse.member.Classes;
 import com.codenameone.examples.pulse.net.Api;
 import com.codenameone.examples.pulse.net.Net;
+import com.codenameone.examples.pulse.owner.OwnerForm;
 import com.codenameone.examples.pulse.ui.Beat;
+import com.codenameone.examples.pulse.ui.Chart;
+import com.codenameone.examples.pulse.ui.StatRow;
 import com.codenameone.examples.pulse.ui.Lang;
 import com.codenameone.examples.pulse.ui.Menu;
 import com.codenameone.examples.pulse.ui.Nav;
@@ -45,6 +49,7 @@ public class TrainerForm extends LiveChannel.Adapter implements Nav.Home {
     private final Menu menu = new Menu(form, Nav.TRAINER);
     private final Container list = Ui.list("trainer");
     private List<SessionDto> classes;
+    private TrainerStatsDto stats;
 
     @Override
     public Form form() {
@@ -77,6 +82,13 @@ public class TrainerForm extends LiveChannel.Adapter implements Nav.Home {
             classes = found;
             fill();
         }, Ui.failed(list, this::load)));
+        // The month is extra: when it does not come, the classes still do.
+        Api.trainer().stats(Net.to(found -> {
+            stats = found;
+            if (classes != null) {
+                fill();
+            }
+        }, (status, message) -> { }));
     }
 
     private void fill() {
@@ -85,6 +97,10 @@ public class TrainerForm extends LiveChannel.Adapter implements Nav.Home {
         SessionDto featured = current(classes, at);
         if (featured != null) {
             list.add(featured(featured, featured.startsAt() <= at));
+        }
+        // Above the week rather than under it: below twenty class cards nobody found it.
+        if (stats != null) {
+            month(stats);
         }
         // The rest of the week as the members see it, a day at a time, with
         // the room's fill instead of a booking button.
@@ -111,6 +127,33 @@ public class TrainerForm extends LiveChannel.Adapter implements Nav.Home {
                     Lang.tr("Classes the studio gives you appear here.")));
         }
         Ui.refresh(form);
+    }
+
+    /// The trainer's last four weeks: how many they taught and coached, how
+    /// full and how faithfully attended their classes were, and what for.
+    private void month(TrainerStatsDto month) {
+        Ui.section(list, "Your month");
+        StatRow tiles = Ui.stats(3);
+        tiles.stat(String.valueOf(month.classes()), "Classes", "monthClasses")
+                .stat(String.valueOf(month.attendees()), "Check-ins", "monthAttendees")
+                .stat(month.fillPercent() + "%", "Places filled", "monthFill")
+                .stat(month.showPercent() + "%", "Showed up", "monthShow")
+                .stat(String.valueOf(month.regulars()), "Regulars", "monthRegulars")
+                .stat(String.valueOf(month.kudos()), "Kudos", "monthKudos");
+        list.add(tiles);
+        List<Integer> weeks = month.attendeesByWeek();
+        double[] values = new double[weeks == null ? 0 : weeks.size()];
+        for (int iter = 0; iter < values.length; iter++) {
+            Integer value = weeks.get(iter);
+            values[iter] = value == null ? 0 : value.intValue();
+        }
+        list.add(Ui.label("People a week", "SvChartTitle"));
+        list.add(Chart.of("trainerAttendance", values, Lang.tr("7 weeks ago"),
+                Lang.tr("This week")));
+        if (month.topClasses() != null && !month.topClasses().isEmpty()) {
+            list.add(Ui.label("Top classes", "SvChartTitle"));
+            list.add(OwnerForm.popular(month.topClasses()));
+        }
     }
 
     // The class on now, or the next one: the one thing a coach opens the app

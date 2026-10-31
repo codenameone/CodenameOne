@@ -26,6 +26,7 @@ import com.codenameone.examples.pulse.api.AttendanceDto;
 import com.codenameone.examples.pulse.api.RosterEntryDto;
 import com.codenameone.examples.pulse.api.SessionDto;
 import com.codenameone.examples.pulse.api.ShiftDto;
+import com.codenameone.examples.pulse.api.TrainerStatsDto;
 import com.codenameone.examples.pulse.api.TrainerApiServer;
 
 import java.util.List;
@@ -54,6 +55,11 @@ public class TrainerEndpoint implements TrainerApiServer {
     @Override
     public RosterEntryDto attendance(String id, AttendanceDto mark) throws Exception {
         return trainers.attendance(Caller.name(), Caller.hasRole(Roles.OWNER), id, mark);
+    }
+
+    @Override
+    public TrainerStatsDto stats() throws Exception {
+        return trainers.stats(Caller.name());
     }
 
     @Override

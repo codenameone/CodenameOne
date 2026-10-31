@@ -31,6 +31,7 @@ import java.util.List;
 @Repository(entity = Invoice.class, key = String.class)
 public interface InvoiceRepository extends CrudRepository<Invoice, String> {
     List<Invoice> findByAccountOrderByCreatedAtDesc(String account);
+    List<Invoice> findByMemberIdOrderByCreatedAtDesc(String memberId);
 
     Invoice findFirstByIdAndAccount(String id, String account);
 

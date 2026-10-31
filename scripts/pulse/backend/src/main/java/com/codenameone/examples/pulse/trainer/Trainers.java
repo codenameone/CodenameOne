@@ -24,29 +24,41 @@ import com.codename1.backend.annotations.Transactional;
 import com.codenameone.examples.pulse.Ids;
 import com.codenameone.examples.pulse.account.Accounts;
 import com.codenameone.examples.pulse.api.AttendanceDto;
+import com.codenameone.examples.pulse.api.CoachStatDto;
+import com.codenameone.examples.pulse.api.NameCountDto;
 import com.codenameone.examples.pulse.api.RosterEntryDto;
 import com.codenameone.examples.pulse.api.SessionDto;
 import com.codenameone.examples.pulse.api.ShiftDto;
+import com.codenameone.examples.pulse.api.TrainerStatsDto;
 import com.codenameone.examples.pulse.domain.Booking;
 import com.codenameone.examples.pulse.domain.CheckIn;
 import com.codenameone.examples.pulse.domain.ClassSession;
+import com.codenameone.examples.pulse.domain.ClassType;
+import com.codenameone.examples.pulse.domain.Kudos;
 import com.codenameone.examples.pulse.domain.Member;
 import com.codenameone.examples.pulse.domain.Profile;
 import com.codenameone.examples.pulse.domain.Shift;
+import com.codenameone.examples.pulse.domain.Workout;
 import com.codenameone.examples.pulse.repository.BookingRepository;
 import com.codenameone.examples.pulse.repository.CheckInRepository;
 import com.codenameone.examples.pulse.repository.ClassSessionRepository;
+import com.codenameone.examples.pulse.repository.ClassTypeRepository;
+import com.codenameone.examples.pulse.repository.KudosRepository;
 import com.codenameone.examples.pulse.repository.MemberRepository;
 import com.codenameone.examples.pulse.repository.ProfileRepository;
 import com.codenameone.examples.pulse.repository.ShiftRepository;
+import com.codenameone.examples.pulse.repository.WorkoutRepository;
 import com.codenameone.examples.pulse.studio.Bookings;
 import com.codenameone.examples.pulse.studio.Studio;
 
 import java.io.IOException;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /// A trainer's day: the classes they teach, who is coming, who came, and
 /// the shifts they work.
@@ -67,10 +79,17 @@ public class Trainers {
     private final ProfileRepository profiles;
     private final Studio studio;
     private final HeartRates rates;
+    private final ClassTypeRepository types;
+    private final WorkoutRepository workouts;
+    private final KudosRepository kudos;
 
     public Trainers(ClassSessionRepository sessions, BookingRepository bookings,
             MemberRepository members, CheckInRepository checkIns, ShiftRepository shifts,
-            ProfileRepository profiles, Studio studio, HeartRates rates) {
+            ProfileRepository profiles, Studio studio, HeartRates rates, ClassTypeRepository types,
+            WorkoutRepository workouts, KudosRepository kudos) {
+        this.types = types;
+        this.workouts = workouts;
+        this.kudos = kudos;
         this.sessions = sessions;
         this.bookings = bookings;
         this.members = members;
@@ -245,5 +264,146 @@ public class Trainers {
         return new ShiftDto(row.getId(), row.getLocationId(), row.getStaff(),
                 who == null ? "" : who.getDisplayName(), row.getDuty(),
                 row.getStartsAt().toEpochMilli(), row.getEndsAt().toEpochMilli(), row.getState());
+    }
+
+    // ----------------------------------------------------------------- stats
+
+    /// What a trainer's classes added up to: the last four weeks, and the
+    /// eight weeks of attendance behind them.
+    private static final class Tally {
+        int classes;
+        int attendees;
+        long booked;
+        long offered;
+        int missed;
+        int kudos;
+        int regulars;
+        int[] byWeek = new int[8];
+        Map<String, int[]> byType = new HashMap<String, int[]>();
+
+        int fillPercent() {
+            return offered == 0 ? 0 : (int) Math.min(100L, booked * 100 / offered);
+        }
+
+        int showPercent() {
+            return attendees + missed == 0 ? 0 : attendees * 100 / (attendees + missed);
+        }
+    }
+
+    /// The signed-in trainer's last four weeks.
+    @Transactional(readOnly = true)
+    public TrainerStatsDto stats(String trainer) {
+        Tally tally = tally(trainer);
+        List<Integer> weeks = new ArrayList<Integer>();
+        for (int iter = 0; iter < tally.byWeek.length; iter++) {
+            weeks.add(Integer.valueOf(tally.byWeek[iter]));
+        }
+        List<NameCountDto> top = new ArrayList<NameCountDto>();
+        for (Map.Entry<String, int[]> entry : tally.byType.entrySet()) {
+            ClassType type = types.findById(entry.getKey());
+            top.add(new NameCountDto(type == null ? entry.getKey() : type.getName(),
+                    entry.getValue()[0]));
+        }
+        top.sort((a, b) -> b.count() - a.count());
+        return new TrainerStatsDto(tally.classes, tally.attendees, tally.fillPercent(),
+                tally.showPercent(), tally.regulars, tally.kudos, weeks, top);
+    }
+
+    /// The same four weeks as the owner's insights show them.
+    @Transactional(readOnly = true)
+    public CoachStatDto coach(String trainer) {
+        Tally tally = tally(trainer);
+        Profile who = profiles.findById(trainer);
+        return new CoachStatDto(trainer, who == null ? trainer : who.getDisplayName(),
+                tally.classes, tally.attendees, tally.fillPercent(), tally.showPercent(),
+                tally.kudos);
+    }
+
+    /// Classes that are over and were not cancelled, from the Monday eight
+    /// weeks back in the studio's zone. The four-week figures count from four
+    /// weeks before now, as the owner's dashboard does.
+    private Tally tally(String trainer) {
+        Tally tally = new Tally();
+        Instant now = Instant.now();
+        ZoneId zone = studio.zone();
+        LocalDate thisWeek = Studio.monday(LocalDate.now(zone));
+        LocalDate firstWeek = thisWeek.minusWeeks(tally.byWeek.length - 1);
+        Instant from = firstWeek.atStartOfDay(zone).toInstant();
+        Instant month = now.minusMillis(28L * 86400000L);
+        List<ClassSession> taught = sessions.findByTrainerAndStartsAtGreaterThanEqualAndStartsAtLessThanOrderByStartsAtAsc(
+                trainer, from, now);
+        Map<String, ClassSession> recent = new HashMap<String, ClassSession>();
+        List<String> ids = new ArrayList<String>();
+        for (int iter = 0; iter < taught.size(); iter++) {
+            ClassSession row = taught.get(iter);
+            if (Studio.CANCELLED.equals(row.getState()) || row.getEndsAt().isAfter(now)) {
+                continue;
+            }
+            ids.add(row.getId());
+            if (!row.getStartsAt().isBefore(month)) {
+                recent.put(row.getId(), row);
+                tally.classes++;
+                tally.booked += row.getBooked();
+                tally.offered += row.getCapacity();
+            }
+        }
+        if (ids.isEmpty()) {
+            return tally;
+        }
+        Map<String, ClassSession> byId = new HashMap<String, ClassSession>();
+        for (int iter = 0; iter < taught.size(); iter++) {
+            byId.put(taught.get(iter).getId(), taught.get(iter));
+        }
+        Map<String, int[]> visits = new HashMap<String, int[]>();
+        List<Booking> rows = bookings.findBySessionIdIn(ids);
+        for (int iter = 0; iter < rows.size(); iter++) {
+            Booking row = rows.get(iter);
+            ClassSession session = byId.get(row.getSessionId());
+            boolean came = Bookings.CHECKED_IN.equals(row.getState());
+            if (came && session != null) {
+                LocalDate day = session.getStartsAt().atZone(zone).toLocalDate();
+                int week = (int) ((day.toEpochDay() - firstWeek.toEpochDay()) / 7);
+                if (week >= 0 && week < tally.byWeek.length) {
+                    tally.byWeek[week]++;
+                }
+            }
+            if (!recent.containsKey(row.getSessionId())) {
+                continue;
+            }
+            if (came) {
+                tally.attendees++;
+                count(visits, row.getMemberId());
+                count(tally.byType, session.getClassTypeId());
+            } else if (Bookings.NO_SHOW.equals(row.getState())) {
+                tally.missed++;
+            }
+        }
+        for (int[] count : visits.values()) {
+            if (count[0] >= 3) {
+                tally.regulars++;
+            }
+        }
+        if (!recent.isEmpty()) {
+            List<Workout> recorded = workouts.findBySessionIdIn(
+                    new ArrayList<String>(recent.keySet()));
+            List<String> workoutIds = new ArrayList<String>();
+            for (int iter = 0; iter < recorded.size(); iter++) {
+                workoutIds.add(recorded.get(iter).getId());
+            }
+            if (!workoutIds.isEmpty()) {
+                List<Kudos> given = kudos.findByWorkoutIdIn(workoutIds);
+                tally.kudos = given.size();
+            }
+        }
+        return tally;
+    }
+
+    private static void count(Map<String, int[]> counts, String key) {
+        int[] count = counts.get(key);
+        if (count == null) {
+            count = new int[1];
+            counts.put(key, count);
+        }
+        count[0]++;
     }
 }

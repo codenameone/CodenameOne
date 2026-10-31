@@ -761,7 +761,7 @@ public class Billing {
         return out;
     }
 
-    private InvoiceDto toDto(Invoice row) {
+    public InvoiceDto toDto(Invoice row) {
         Member member = members.findById(row.getMemberId());
         String label = Payments.CASH.equals(row.getMethodId()) ? "Cash"
                 : row.getMethodId().length() == 0 ? "" : "Card";

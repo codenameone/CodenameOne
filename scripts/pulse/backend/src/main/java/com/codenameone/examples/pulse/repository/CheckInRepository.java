@@ -38,6 +38,12 @@ public interface CheckInRepository extends CrudRepository<CheckIn, String> {
     long countByLocationIdAndAtGreaterThanEqual(String locationId, Instant since);
 
     long countByAtGreaterThanEqual(Instant since);
+    List<CheckIn> findByAtGreaterThanEqual(Instant since);
+    List<CheckIn> findByMemberIdAndAtGreaterThanEqualOrderByAtAsc(String memberId, Instant since);
+    /// When each member, not account, last came in: a child and their parent
+    /// share an account.
+    @Query("select c.memberId, max(c.at) from CheckIn c group by c.memberId")
+    List<Object[]> lastVisitsByMember();
 
     List<CheckIn> findByAccountAndAtGreaterThanEqualOrderByAtAsc(String account, Instant since);
 

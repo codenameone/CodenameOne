@@ -204,24 +204,45 @@ image::img/pulse-settings.png["The settings with the theme, the language, notifi
 
 ==== The watch
 
-On a paired watch, Pulse shows the next class, the door code with a bar counting
-down to the next one, and the member's points, level and week streak. The code is
+On a paired watch, Pulse is four pages, swiped sideways. The first is the next class:
+its name, a countdown, the room and the trainer, and a bar of how full it is.
+
+image::img/pulse-watch.png["The watch's first page with the next class, the time until it starts, the room, the trainer and how full the class is",scaledwidth=25%]
+
+The second is the door code, with a bar counting down to the next one. The code is
 the same one the phone's pass shows, so the watch opens the door with the phone
 left in the locker.
 
-image::img/pulse-watch.png["The watch face with the next class, the door code counting down, and the points, level and streak",scaledwidth=25%]
+image::img/pulse-watch-door.png["The watch's door code with the member's name and a bar counting down to the next code",scaledwidth=25%]
+
+The third is the week: a ring of the points toward the next level, the points still
+needed, the week streak and the visits of the last eight weeks as bars.
+
+image::img/pulse-watch-week.png["The watch's week page with a ring of points toward the next level, the streak and eight weeks of visits",scaledwidth=25%]
+
+The last lists the classes booked after the next one.
+
+image::img/pulse-watch-agenda.png["The watch's list of the classes booked in the coming days",scaledwidth=25%]
 
 === The trainer
 
 The trainer's home leads with the class on now, or the next one, with a button for
-its roster.
+its roster. Under it is the trainer's month: the classes taught, the check-ins,
+how full the classes were and how many of those booked came, the regulars who came
+three times or more, and the kudos received. A chart shows the check-ins of
+each of the last eight weeks, and under it the kinds of class that drew the most
+people.
+The week's classes follow, each with how many places are taken, and a full class
+says so.
 
-image::img/pulse-trainer-home.png["The trainer's home with the class on now featured above the week's classes",scaledwidth=40%]
+image::img/pulse-trainer-home.png["The trainer's home with the class on now and the trainer's month: classes, check-ins, places filled, attendance, regulars and kudos",scaledwidth=40%]
 
 The trainer sees the classes they teach in the coming week. The roster of each class
 shows the members booked, the ones waiting and the ones who came, with what the trainer needs to
 know about each person. Attendance can be marked by hand for someone the door
 didn't see, and corrected for 30 minutes after the class ends.
+
+image::img/pulse-roster.png["The roster of a class with each member's age and heart rate and a switch for attendance",scaledwidth=40%]
 
 During a class, members who share their heart rate appear with their current zone,
 one to five, worked out from their age.
@@ -265,6 +286,56 @@ classes in the next two days that are under half full, each with a button to fil
 it.
 
 image::img/pulse-owner.png["The owner's dashboard with revenue, how full the classes were, members at risk and the quiet classes ahead",scaledwidth=40%]
+
+==== Insights
+
+Insights is where the owner looks further back. It opens with four numbers: the
+share of members who joined 90 days ago or more and are still members, the visits
+of a member in a week, the share of bookings nobody came to, and the monthly
+recurring revenue of a member.
+
+The busy hours are a grid of the days of the week by the hours the studio is open,
+each cell as dark as the check-ins in that hour over the last eight weeks. Under it,
+the membership: how many members there are against twelve weeks ago, a line of the
+active members of each week, and bars of who joined and who left.
+
+image::img/pulse-insights.png["Insights with retention, visits, no-shows and revenue a member, the busy hours grid and the membership over twelve weeks",scaledwidth=40%]
+
+The classes are ranked by how full they ran, each with its share of no-shows. The
+plan mix is a ring of the members on each plan, with what each plan brings in a
+month; a class pack is paid by the pack, so it says that instead.
+
+image::img/pulse-insights-classes.png["The classes ranked by how full they ran, with the share of no-shows of each",scaledwidth=40%]
+
+The coaches are ranked by their check-ins, each with their classes, how
+full those were, how many booked came, and their kudos.
+
+image::img/pulse-insights-coaches.png["The plans with their members and monthly revenue, and the coaches ranked with their classes, fill, attendance and kudos",scaledwidth=40%]
+
+==== Members
+
+The members list searches by name and filters to the members at risk, past due or
+frozen. Each row shows the plan, the last visit and the visits in 30 days, and a pill
+that says where the member stands.
+
+image::img/pulse-members.png["The members list with the plan, the last visit, the visits in 30 days and the state of each member",scaledwidth=40%]
+
+image::img/pulse-members-at-risk.png["The members list filtered to the members at risk",scaledwidth=40%]
+
+A member's page has the visits in 30 days, the week streak and what the member has
+paid in all, a chart of the visits of each of the last twelve weeks, the classes
+they come to most, and their invoices.
+
+image::img/pulse-member-detail.png["A member's page with visits, streak and lifetime value, visits a week and favourite classes",scaledwidth=40%]
+
+==== Billing
+
+Billing totals what was collected in the last 30 days, what is outstanding and how
+many charges failed, and lists the invoices, filtered to paid, failed or open. A
+failed invoice shows the attempt it is on and when the next one runs; the owner can
+void a failed or open invoice, with a reason.
+
+image::img/pulse-billing.png["Billing with the money collected, outstanding and failed, and the list of invoices",scaledwidth=40%]
 
 The owner adds and changes plans (a change reaches members at their next renewal),
 puts classes on the timetable for a number of weeks, manages the staff and their

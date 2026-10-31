@@ -23,10 +23,13 @@ import com.codename1.backend.annotations.PreAuthorize;
 import com.codenameone.examples.pulse.Caller;
 import com.codenameone.examples.pulse.api.CampaignDto;
 import com.codenameone.examples.pulse.api.ClassTypeDto;
+import com.codenameone.examples.pulse.api.InsightsDto;
 import com.codenameone.examples.pulse.api.InvoiceDto;
+import com.codenameone.examples.pulse.api.MemberDetailDto;
 import com.codenameone.examples.pulse.api.NewSessionDto;
 import com.codenameone.examples.pulse.api.OwnerApiServer;
 import com.codenameone.examples.pulse.api.OwnerDashboardDto;
+import com.codenameone.examples.pulse.api.OwnerMemberDto;
 import com.codenameone.examples.pulse.api.PlanDto;
 import com.codenameone.examples.pulse.api.ReasonDto;
 import com.codenameone.examples.pulse.api.RoomDto;
@@ -43,15 +46,32 @@ import java.util.List;
 public class OwnerEndpoint implements OwnerApiServer {
     private final Owner owner;
     private final Billing billing;
+    private final Insights insights;
 
-    public OwnerEndpoint(Owner owner, Billing billing) {
+    public OwnerEndpoint(Owner owner, Billing billing, Insights insights) {
         this.owner = owner;
         this.billing = billing;
+        this.insights = insights;
     }
 
     @Override
     public OwnerDashboardDto dashboard() throws Exception {
         return owner.dashboard();
+    }
+
+    @Override
+    public InsightsDto insights() throws Exception {
+        return insights.insights();
+    }
+
+    @Override
+    public List<OwnerMemberDto> members(String filter) throws Exception {
+        return insights.members(filter);
+    }
+
+    @Override
+    public MemberDetailDto member(String id) throws Exception {
+        return insights.member(id);
     }
 
     @Override

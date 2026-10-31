@@ -44,6 +44,11 @@ public interface TrainerApi {
             OnComplete<Response<RosterEntryDto>> callback);
 
     /// The trainer's own shifts, and open ones at their site anyone may take.
+    /// The signed-in trainer's last four weeks: classes, attendance, regulars
+    /// and kudos.
+    @GET("/api/trainer/stats")
+    void stats(OnComplete<Response<TrainerStatsDto>> callback);
+
     @GET("/api/trainer/shifts")
     void shifts(OnComplete<Response<List<ShiftDto>>> callback);
 

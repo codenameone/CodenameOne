@@ -212,6 +212,12 @@ public class DemoStudio {
                 "Strength and conditioning coach; ten years on the floor.");
         staffRow(DemoAccounts.SECOND_TRAINER, RIVERSIDE, "Yoga and kids lead",
                 "Yoga teacher, climbing instructor and parent of two.");
+        staffRow(DemoAccounts.PILATES_TRAINER, DOWNTOWN, "Pilates and barre",
+                "Former dancer; teaches Pilates and the gentler strength classes.");
+        staffRow(DemoAccounts.RIDE_TRAINER, DOWNTOWN, "Ride and HIIT coach",
+                "Track cyclist turned coach; runs the evening rides.");
+        staffRow(DemoAccounts.RIVERSIDE_TRAINER, RIVERSIDE, "Yoga and climbing",
+                "Yoga teacher and route setter at the Riverside wall.");
         plan(UNLIMITED, "Unlimited", "Every class, every location.", "MONTHLY", 8900L, 1, 0, 16,
                 0, false);
         plan(ANNUAL, "Unlimited Annual", "Twelve months for the price of ten.", "ANNUAL",
@@ -230,6 +236,50 @@ public class DemoStudio {
         walkIns();
         shifts();
         campaigns();
+        // The tests assert exact counts against the studio above -- members,
+        // bookings, invoices -- and both the JVM and the compiled ParparVM run
+        // of them seed a fresh database for every suite, so the crowd and its
+        // twelve weeks of history are for the servers people look at.
+        if (!"test".equals(config.getProfile())) {
+            crowd();
+            rileysWeek();
+        }
+    }
+
+    /// Riley's next few days: a class tomorrow and two more after it, so the
+    /// watch's "coming up" page and the phone's bookings have a week in them.
+    /// Kept out of the tests' studio with the crowd, since it books places
+    /// the tests count.
+    private void rileysWeek() throws IOException {
+        Member riley = self(DemoAccounts.MEMBER);
+        if (riley == null) {
+            return;
+        }
+        Instant now = Instant.now();
+        List<ClassSession> ahead = sessions.findByStartsAtGreaterThanEqualAndStartsAtLessThanOrderByStartsAtAsc(
+                now.plusMillis(12L * 3600000L), now.plusMillis(6L * Days.MILLIS));
+        int booked = 0;
+        long last = 0;
+        // A different kind of class each time: three lunchtime yogas read as a seed.
+        StringBuilder kinds = new StringBuilder();
+        for (int iter = 0; iter < ahead.size() && booked < 3; iter++) {
+            ClassSession session = ahead.get(iter);
+            String type = session.getClassTypeId();
+            boolean likes = HIIT.equals(type) || "type-yoga".equals(type)
+                    || "type-pilates".equals(type);
+            // One a day at most, and only where there is room.
+            if (likes && kinds.indexOf(type + ";") < 0
+                    && DOWNTOWN.equals(session.getLocationId())
+                    && session.getBooked() < session.getCapacity()
+                    && session.getStartsAt().toEpochMilli() - last > 20L * 3600000L
+                    && bookings.findFirstBySessionIdAndMemberId(session.getId(),
+                            riley.getId()) == null) {
+                book(riley, session);
+                last = session.getStartsAt().toEpochMilli();
+                kinds.append(type).append(';');
+                booked++;
+            }
+        }
     }
 
     /// A HIIT of Tess's that started a quarter of an hour ago, whatever the
@@ -279,7 +329,7 @@ public class DemoStudio {
                 ClassSession session = past.get(each);
                 if (session.getEndsAt().isBefore(now) && DOWNTOWN.equals(session.getLocationId())
                         && !LITTLE_MOVERS.equals(session.getClassTypeId())
-                        && !TEEN.equals(session.getClassTypeId()) && next(2) == 0) {
+                        && !TEEN.equals(session.getClassTypeId()) && next(9) == 0) {
                     attended(row, session, next(10) != 0);
                 }
             }
@@ -413,41 +463,44 @@ public class DemoStudio {
 
     private void timetable() throws IOException {
         LocalDate today = LocalDate.now(ZoneId.of(zone));
-        // The compiled backend's LocalDate has no with(TemporalAdjuster), so the
-        // Monday is reached by counting back from the day of the week.
-        LocalDate back = today.minusWeeks(WEEKS_BACK);
-        LocalDate first = back.minusDays(back.getDayOfWeek().getValue() - 1);
-        LocalDate last = today.plusWeeks(WEEKS_AHEAD);
+        timetable(Studio.monday(today.minusWeeks(WEEKS_BACK)), today.plusWeeks(WEEKS_AHEAD));
+    }
+
+    /// The weekly timetable on every day from `first` to `last`, both included.
+    private void timetable(LocalDate first, LocalDate last) throws IOException {
         String tess = DemoAccounts.TRAINER;
         String theo = DemoAccounts.SECOND_TRAINER;
+        String maya = DemoAccounts.PILATES_TRAINER;
+        String andre = DemoAccounts.RIDE_TRAINER;
+        String sofia = DemoAccounts.RIVERSIDE_TRAINER;
         for (LocalDate day = first; !day.isAfter(last); day = day.plusDays(1)) {
             DayOfWeek dow = day.getDayOfWeek();
             boolean weekday = dow != DayOfWeek.SATURDAY && dow != DayOfWeek.SUNDAY;
             if (weekday) {
                 session(day, 6, 30, HIIT, DOWNTOWN, "room-studio-a", tess);
-                session(day, 7, 30, "type-ride", DOWNTOWN, "room-ride", tess);
+                session(day, 7, 30, "type-ride", DOWNTOWN, "room-ride", andre);
                 session(day, 12, 15, "type-yoga", DOWNTOWN, "room-studio-a", theo);
                 session(day, 17, 30, "type-barbell", DOWNTOWN, "room-floor", tess);
-                session(day, 18, 30, "type-ride", DOWNTOWN, "room-ride", tess);
-                session(day, 19, 30, "type-pilates", DOWNTOWN, "room-studio-a", theo);
-                session(day, 7, 0, "type-yoga", RIVERSIDE, "room-river", theo);
-                session(day, 18, 0, HIIT, RIVERSIDE, "room-river", tess);
+                session(day, 18, 30, "type-ride", DOWNTOWN, "room-ride", andre);
+                session(day, 19, 30, "type-pilates", DOWNTOWN, "room-studio-a", maya);
+                session(day, 7, 0, "type-yoga", RIVERSIDE, "room-river", sofia);
+                session(day, 18, 0, HIIT, RIVERSIDE, "room-river", andre);
             }
             if (dow == DayOfWeek.TUESDAY || dow == DayOfWeek.THURSDAY) {
                 session(day, 16, 0, LITTLE_MOVERS, DOWNTOWN, "room-kids", theo);
                 session(day, 16, 30, TEEN, DOWNTOWN, "room-floor", tess);
             }
             if (dow == DayOfWeek.WEDNESDAY) {
-                session(day, 10, 0, "type-steady", DOWNTOWN, "room-studio-a", theo);
+                session(day, 10, 0, "type-steady", DOWNTOWN, "room-studio-a", maya);
             }
             if (dow == DayOfWeek.SATURDAY) {
                 session(day, 9, 0, LITTLE_MOVERS, DOWNTOWN, "room-kids", theo);
-                session(day, 10, 0, "type-kidsclimb", RIVERSIDE, "room-wall", theo);
+                session(day, 10, 0, "type-kidsclimb", RIVERSIDE, "room-wall", sofia);
                 session(day, 11, 0, TEEN, DOWNTOWN, "room-floor", tess);
-                session(day, 9, 30, "type-yoga", RIVERSIDE, "room-river", theo);
+                session(day, 9, 30, "type-yoga", RIVERSIDE, "room-river", sofia);
             }
             if (dow == DayOfWeek.SUNDAY) {
-                session(day, 10, 0, "type-ride", DOWNTOWN, "room-ride", tess);
+                session(day, 10, 0, "type-ride", DOWNTOWN, "room-ride", andre);
             }
         }
     }
@@ -656,6 +709,13 @@ public class DemoStudio {
     /// since.
     private Membership membership(Member member, String planId, String state, int daysAgo,
             int creditsLeft, Instant now) throws IOException {
+        return membership(member, planId, state, daysAgo, creditsLeft, now, now);
+    }
+
+    /// A membership whose bills stop with the period running at `stop`: the
+    /// day a cancelled one was cancelled, or now.
+    private Membership membership(Member member, String planId, String state, int daysAgo,
+            int creditsLeft, Instant now, Instant stop) throws IOException {
         if (member == null) {
             return null;
         }
@@ -678,7 +738,7 @@ public class DemoStudio {
             if (!"PAST_DUE".equals(state) || periodEnd.isBefore(now)) {
                 paid(row, member, plan, periodStart, periodEnd);
             }
-            if (!recurring || periodEnd.isAfter(now)) {
+            if (!recurring || periodEnd.isAfter(stop)) {
                 break;
             }
             periodStart = periodEnd;
@@ -732,6 +792,13 @@ public class DemoStudio {
 
     /// A past class, attended -- or booked and missed, for `came` false.
     private void attended(Member member, ClassSession session, boolean came) throws IOException {
+        attended(member, session, came, true);
+    }
+
+    /// The same, with the workout an adult recorded left out for `record`
+    /// false.
+    private void attended(Member member, ClassSession session, boolean came, boolean record)
+            throws IOException {
         if (member == null) {
             return;
         }
@@ -750,7 +817,7 @@ public class DemoStudio {
             visit.setAt(at);
             visit.setStaff(DemoAccounts.DESK);
             checkIns.insert(visit);
-            if ("SELF".equals(member.getRelation())
+            if (record && "SELF".equals(member.getRelation())
                     && session.getEndsAt().isBefore(Instant.now())) {
                 worked(member, session);
             }
@@ -856,6 +923,277 @@ public class DemoStudio {
         row.setCreatedAt(made);
         row.setUpdatedAt(made);
         return row;
+    }
+
+    // ----------------------------------------------------------------- crowd
+
+    // Sixty of each, so a first name comes round at most twice in the crowd
+    // and an alphabetical list does not read as one name over and over.
+    private static final String[] FIRST = {"Alex", "Bea", "Carlos", "Dana", "Eli", "Fatima",
+        "Gabe", "Hana", "Ivan", "Jade", "Kofi", "Lena", "Mateo", "Nora", "Omar", "Paula",
+        "Quinn", "Rosa", "Sven", "Tara", "Umar", "Vera", "Wes", "Yusuf", "Zoe", "Amara",
+        "Ben", "Chloe", "Diego", "Emma", "Farid", "Greta", "Hugo", "Ines", "Jonas", "Kira",
+        "Luca", "Maya", "Nikhil", "Olivia", "Pablo", "Rina", "Sara", "Tomas", "Uma", "Victor",
+        "Wendy", "Yara", "Zain", "Anya", "Bruno", "Celine", "Dev", "Esme", "Felix", "Gia",
+        "Hiro", "Isla", "Jamal", "Keira"};
+    private static final String[] LAST = {"Abbott", "Baker", "Castillo", "Dubois", "Evans",
+        "Ferreira", "Gupta", "Holm", "Ibrahim", "Jensen", "Kowalski", "Larsen", "Mendez",
+        "Nakamura", "Olsen", "Petrov", "Quigley", "Ruiz", "Sato", "Tanaka", "Ueda", "Varga",
+        "Walsh", "Young", "Zhang", "Adeyemi", "Bauer", "Costa", "Novak", "Duarte", "Eriksen",
+        "Fontaine", "Garcia", "Hughes", "Iyer", "Jovanovic", "Khan", "Lindgren", "Moreau",
+        "Nguyen", "O'Brien", "Pham", "Quinlan", "Rossi", "Silva", "Torres", "Vogel", "Weber",
+        "Yilmaz", "Ziegler", "Alvarado", "Brennan", "Chowdhury", "Dalton", "Esposito",
+        "Fischer", "Greene", "Haddad", "Ito", "Keller"};
+    private static final String[] KIDS_NAMES = {"Leo", "Ava", "Max", "Ivy", "Noah", "Lily",
+        "Finn", "Ruby", "Theo", "Nina", "Otto", "Mila"};
+    /// The kinds of class each sort of regular comes for. The evening crowd
+    /// rides and does HIIT, which is why those classes fill.
+    private static final String[][] TASTES = {
+        {"type-ride", HIIT, "type-ride"},
+        {HIIT, "type-barbell", "type-ride"},
+        {"type-yoga", "type-pilates"},
+        {"type-yoga", "type-yoga", "type-steady"},
+        {"type-yoga", "type-ride"},
+    };
+    static final int EARLY = 0;
+    static final int LUNCH = 1;
+    static final int EVENING = 2;
+    static final int WEEKEND = 3;
+    static final int CROWD = 110;
+    static final int HISTORY_WEEKS = 12;
+
+    /// One synthetic member's habit: what they come to, when, how often, and
+    /// the days between which they came.
+    private static final class Regular {
+        Member member;
+        String[] tastes;
+        int band;
+        int perWeekTenths;
+        Instant from;
+        Instant until;
+        int matches;
+    }
+
+    /// About a hundred and ten more members with a year of joining, a few
+    /// months of leaving and twelve weeks of classes, so the owner's
+    /// insights have a studio to describe. Every number comes from the fixed
+    /// sequence, so every demo database tells the same story.
+    private void crowd() throws IOException {
+        Instant now = Instant.now();
+        ZoneId here = ZoneId.of(zone);
+        LocalDate today = LocalDate.now(here);
+        // Nine older weeks of the same timetable, before the three every
+        // database has.
+        LocalDate oldest = Studio.monday(today.minusWeeks(HISTORY_WEEKS - 1));
+        LocalDate base = Studio.monday(today.minusWeeks(WEEKS_BACK));
+        timetable(oldest, base.minusDays(1));
+        List<Regular> regulars = new ArrayList<Regular>();
+        int cancelled = 0;
+        int frozen = 0;
+        int pastDue = 0;
+        int kids = 0;
+        for (int iter = 0; iter < CROWD; iter++) {
+            String first = FIRST[iter % FIRST.length];
+            String last = LAST[(iter * 37 + iter / FIRST.length * 7 + 11) % LAST.length];
+            String name = first + " " + last;
+            String account = "crowd-" + (iter + 1) + "@pulse.example";
+            // More joined lately than a year ago: the square root bunches
+            // the days towards now.
+            double spread = Math.sqrt(next(10000) / 10000.0);
+            int daysAgo = 2 + (int) (360 * (1.0 - spread));
+            Member self = new Member();
+            self.setId("member-crowd-" + (iter + 1));
+            self.setAccount(account);
+            self.setName(name);
+            self.setBirthDate(today.minusYears(19 + next(45)).minusDays(next(365)));
+            self.setRelation("SELF");
+            self.setCreatedAt(now.minusMillis(daysAgo * Days.MILLIS));
+            sign(self);
+            members.insert(self);
+            Profile profile = new Profile();
+            profile.setUsername(account);
+            profile.setDisplayName(name);
+            profile.setCreatedAt(self.getCreatedAt());
+            profiles.insert(profile);
+
+            Regular habit = new Regular();
+            habit.member = self;
+            int taste = next(20);
+            habit.tastes = TASTES[taste < 9 ? 0 : taste < 13 ? 1 : taste < 17 ? 2 : taste < 19
+                    ? 3 : 4];
+            habit.band = habit.tastes == TASTES[3] ? LUNCH : habit.tastes == TASTES[4] ? WEEKEND
+                    : next(10) < (habit.tastes == TASTES[2] ? 4 : 2) ? EARLY : EVENING;
+            // The evening crowd comes most, two to four times a week.
+            habit.perWeekTenths = habit.band == EVENING ? 20 + next(21) : 5 + next(36);
+            habit.from = self.getCreatedAt();
+            habit.until = now;
+
+            // The plan: mostly Unlimited, then Off-Peak for the daytime
+            // crowd, Annual, and a few packs; one in eight is a parent who
+            // signed a child up instead.
+            int pick = next(100);
+            if (pick < 14 && kids < KIDS_NAMES.length) {
+                // Made here rather than by child(), which looks the parent up
+                // and would not find one inserted in this transaction yet.
+                Member child = new Member();
+                child.setId("member-crowd-kid-" + (kids + 1));
+                child.setAccount(account);
+                child.setName(KIDS_NAMES[kids] + " " + last);
+                child.setBirthDate(today.minusYears(5 + next(10)));
+                child.setRelation("CHILD");
+                child.setCreatedAt(self.getCreatedAt());
+                sign(child);
+                members.insert(child);
+                kids++;
+                membership(child, KIDS, "ACTIVE", daysAgo, 0, now);
+                Regular young = new Regular();
+                young.member = child;
+                young.tastes = new String[] {LITTLE_MOVERS, "type-kidsclimb", TEEN};
+                young.band = WEEKEND;
+                young.perWeekTenths = 10 + next(11);
+                young.from = habit.from;
+                young.until = now;
+                regulars.add(young);
+                continue;
+            }
+            String plan = pick < 55 ? UNLIMITED : pick < 75 ? OFF_PEAK : pick < 88 ? ANNUAL
+                    : PACK;
+            if (OFF_PEAK.equals(plan) && habit.band != LUNCH && habit.band != WEEKEND) {
+                // Off-Peak is weekday middays and weekends: its members come
+                // then, for what is on then.
+                boolean lunch = next(2) == 0;
+                habit.band = lunch ? LUNCH : WEEKEND;
+                habit.tastes = lunch ? TASTES[3] : TASTES[4];
+                habit.perWeekTenths = 5 + next(21);
+            }
+            String state = "ACTIVE";
+            Instant stop = now;
+            if (cancelled < 15 && daysAgo > 40 && iter % 5 == 1) {
+                // Left at some point in the last ninety days.
+                cancelled++;
+                state = "CANCELLED";
+                stop = now.minusMillis((3L + next(Math.min(87, daysAgo - 30))) * Days.MILLIS);
+                habit.until = stop;
+            } else if (frozen < 4 && daysAgo > 45 && iter % 7 == 4) {
+                frozen++;
+                state = "FROZEN";
+                habit.until = now.minusMillis((5L + next(10)) * Days.MILLIS);
+            } else if (pastDue < 3 && OFF_PEAK.equals(plan) && daysAgo > 35 && iter % 5 == 3) {
+                pastDue++;
+                state = "PAST_DUE";
+            } else if (iter % 13 == 5 && daysAgo > 30) {
+                // At risk: has not been in for two weeks or more.
+                habit.until = now.minusMillis((15L + next(15)) * Days.MILLIS);
+            }
+            Membership row = membership(self, plan, state, daysAgo,
+                    PACK.equals(plan) ? 2 + next(7) : 0, now, stop);
+            if ("CANCELLED".equals(state)) {
+                row.setUpdatedAt(stop);
+            } else if ("FROZEN".equals(state)) {
+                row.setFrozenFrom(habit.until);
+                row.setFrozenUntil(habit.until.plusMillis(30L * Days.MILLIS));
+                row.setUpdatedAt(habit.until);
+            } else if ("PAST_DUE".equals(state)) {
+                overdue(row, 5900L, now);
+                row.setUpdatedAt(now.minusMillis(4L * Days.MILLIS));
+            }
+            regulars.add(habit);
+        }
+
+        // The desk's guests from liveClass() kept their habit in the older
+        // weeks too: half the adult classes Downtown, up to where their
+        // history there begins.
+        List<ClassSession> older = sessions.findByStartsAtGreaterThanEqualAndStartsAtLessThanOrderByStartsAtAsc(
+                oldest.atStartOfDay(here).toInstant(),
+                now.minusMillis(WEEKS_BACK * 7L * Days.MILLIS));
+        for (int iter = 0; iter < 10; iter++) {
+            Member guest = members.findById("member-guest-" + (iter + 1));
+            for (int each = 0; guest != null && each < older.size(); each++) {
+                ClassSession session = older.get(each);
+                if (session.getStartsAt().isAfter(guest.getCreatedAt())
+                        && DOWNTOWN.equals(session.getLocationId())
+                        && !LITTLE_MOVERS.equals(session.getClassTypeId())
+                        && !TEEN.equals(session.getClassTypeId()) && next(9) == 0) {
+                    attended(guest, session, next(10) != 0, next(5) == 0);
+                }
+            }
+        }
+
+        // The classes: each regular comes to about as many a week as their
+        // habit says, spread over the classes that suit them, while there
+        // is a place.
+        List<ClassSession> all = sessions.findByStartsAtGreaterThanEqualAndStartsAtLessThanOrderByStartsAtAsc(
+                oldest.atStartOfDay(here).toInstant(), now.plusMillis(8L * Days.MILLIS));
+        for (int each = 0; each < all.size(); each++) {
+            ClassSession session = all.get(each);
+            int band = band(session, here);
+            for (int iter = 0; iter < regulars.size(); iter++) {
+                Regular habit = regulars.get(iter);
+                if (suits(habit, session, band) && session.getStartsAt().isAfter(habit.from)
+                        && session.getStartsAt().isBefore(habit.until)) {
+                    habit.matches++;
+                }
+            }
+        }
+        for (int each = 0; each < all.size(); each++) {
+            ClassSession session = all.get(each);
+            boolean over = session.getEndsAt().isBefore(now);
+            boolean ahead = session.getStartsAt().isAfter(now);
+            if (!over && !ahead || !Studio.DONE.equals(session.getState()) && !ahead) {
+                continue;
+            }
+            int band = band(session, here);
+            for (int iter = 0; iter < regulars.size(); iter++) {
+                Regular habit = regulars.get(iter);
+                if (session.getBooked() >= session.getCapacity()) {
+                    break;
+                }
+                if (!suits(habit, session, band) || habit.matches == 0) {
+                    continue;
+                }
+                Instant start = session.getStartsAt();
+                if (!start.isAfter(habit.from) || over && !start.isBefore(habit.until)
+                        || ahead && habit.until.isBefore(now)) {
+                    continue;
+                }
+                long weeks = Math.max(1L, (habit.until.toEpochMilli()
+                        - habit.from.toEpochMilli()) / (7L * Days.MILLIS));
+                long active = Math.min(weeks, HISTORY_WEEKS + 1);
+                // Visits wanted over the classes that suit, in thousandths.
+                long chance = habit.perWeekTenths * active * 100L / habit.matches;
+                if (next(1000) >= chance) {
+                    continue;
+                }
+                if (ahead) {
+                    book(habit.member, session);
+                } else {
+                    attended(habit.member, session, next(12) != 0, next(5) == 0);
+                }
+            }
+        }
+    }
+
+    /// Early, lunch, evening, or the weekend, on the studio's clock.
+    private static int band(ClassSession session, ZoneId here) {
+        ZonedDateTime local = session.getStartsAt().atZone(here);
+        DayOfWeek dow = local.getDayOfWeek();
+        if (dow == DayOfWeek.SATURDAY || dow == DayOfWeek.SUNDAY) {
+            return WEEKEND;
+        }
+        int hour = local.getHour();
+        return hour < 9 ? EARLY : hour < 15 ? LUNCH : EVENING;
+    }
+
+    private static boolean suits(Regular habit, ClassSession session, int band) {
+        if (habit.band != band) {
+            return false;
+        }
+        for (int iter = 0; iter < habit.tastes.length; iter++) {
+            if (habit.tastes[iter].equals(session.getClassTypeId())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /// The next number in `[0, bound)` of the fixed sequence.

@@ -232,7 +232,9 @@ public final class Classes {
             fill.add(BorderLayout.CENTER, meter);
             fill.add(BorderLayout.EAST, new Label(left > 0
                     ? Lang.tr("{0} left", Integer.valueOf(left))
-                    : Lang.tr("{0} waiting", Integer.valueOf(session.waitlisted())),
+                    : session.waitlisted() > 0
+                    ? Lang.tr("{0} waiting", Integer.valueOf(session.waitlisted()))
+                    : Lang.tr("Full"),
                     left > 0 && left <= 3 ? "SvClassScarce" : left > 0 ? "SvClassLeft"
                             : "SvClassFull"));
             body.add(fill);

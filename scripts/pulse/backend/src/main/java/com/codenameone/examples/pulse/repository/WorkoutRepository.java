@@ -28,6 +28,7 @@ import java.util.List;
 @Repository(entity = Workout.class, key = String.class)
 public interface WorkoutRepository extends CrudRepository<Workout, String> {
     List<Workout> findByAccountOrderByStartedAtDesc(String account);
+    List<Workout> findBySessionIdIn(List<String> sessionIds);
 
     List<Workout> findByAccountAndStartedAtGreaterThanEqual(String account, Instant since);
 

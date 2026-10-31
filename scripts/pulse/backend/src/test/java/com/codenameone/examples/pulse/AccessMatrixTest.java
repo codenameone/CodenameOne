@@ -79,6 +79,7 @@ class AccessMatrixTest {
     private static final String[] TRAINERS = {
         "GET /api/trainer/classes",
         "GET /api/trainer/shifts",
+        "GET /api/trainer/stats",
         "GET /api/trainer/classes/none/roster",
         "POST /api/trainer/classes/none/attendance",
         "POST /api/trainer/shifts/none/swap",
@@ -92,6 +93,9 @@ class AccessMatrixTest {
     };
     private static final String[] OWNERS = {
         "GET /api/owner/dashboard",
+        "GET /api/owner/insights",
+        "GET /api/owner/members?filter=AT_RISK",
+        "GET /api/owner/members/none",
         "GET /api/owner/plans",
         "GET /api/owner/rooms",
         "GET /api/owner/staff",

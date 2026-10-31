@@ -36,6 +36,21 @@ public interface OwnerApi {
     @GET("/api/owner/dashboard")
     void dashboard(OnComplete<Response<OwnerDashboardDto>> callback);
 
+    /// Twelve weeks of the studio: busy hours, membership growth and churn,
+    /// how each kind of class fills, the plan mix and each trainer's month.
+    @GET("/api/owner/insights")
+    void insights(OnComplete<Response<InsightsDto>> callback);
+
+    /// Members with a membership, by name. `filter` narrows the list: AT_RISK,
+    /// PAST_DUE, FROZEN, NEW (joined in the last 30 days) or CANCELLED; empty
+    /// for every running membership.
+    @GET("/api/owner/members")
+    void members(@Query("filter") String filter, OnComplete<Response<List<OwnerMemberDto>>> callback);
+
+    /// One member's visits, favourite classes and bills.
+    @GET("/api/owner/members/{id}")
+    void member(@Path("id") String id, OnComplete<Response<MemberDetailDto>> callback);
+
     @GET("/api/owner/plans")
     void plans(OnComplete<Response<List<PlanDto>>> callback);
 

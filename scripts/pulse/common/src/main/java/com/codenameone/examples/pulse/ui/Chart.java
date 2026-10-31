@@ -97,7 +97,7 @@ public final class Chart extends Component {
         double most = 0;
         int peak = -1;
         for (int iter = 0; iter < count; iter++) {
-            if (values[iter] > most) {
+            if (values[iter] >= most && values[iter] > 0) {
                 most = values[iter];
                 peak = iter;
             }

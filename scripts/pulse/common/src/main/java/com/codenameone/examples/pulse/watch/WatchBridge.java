@@ -27,12 +27,13 @@ import com.codenameone.examples.pulse.api.SessionDto;
 import com.codenameone.examples.pulse.api.StatsDto;
 import com.codenameone.examples.pulse.net.Api;
 import com.codenameone.examples.pulse.net.Net;
+import java.util.ArrayList;
 import java.util.List;
 
 /// The phone's side of the watch app: what the watch shows, kept current.
 ///
-/// The watch shows the next class and the door pass, and neither needs an
-/// answer now, so both are replicated data rather than messages: each is
+/// The watch shows the next class, the door pass, the member's week and the
+/// classes coming up, and none of it needs an answer now, so both are replicated data rather than messages: each is
 /// pinned at a path with [WearableConnection#putData(WearableMessage)] and the
 /// watch reads it whenever it wakes, even with the phone out of reach. The
 /// pass carries its secret rather than a code, because a code is good for
@@ -40,12 +41,20 @@ import java.util.List;
 /// channel between a phone and its own paired watch is the platform's
 /// encrypted one.
 public final class WatchBridge {
-    /// The next class: `name`, `startsAt`, `room`, `trainer`; empty when none.
+    /// The next class: `name`, `startsAt`, `room`, `trainer`, `booked`,
+    /// `capacity` and `color` (`#RRGGBB`); empty when none.
     public static final String NEXT = "/pulse/next";
     /// The pass: `memberId`, `name`, `secret` (hex), `period`, `digits`.
     public static final String PASS = "/pulse/pass";
-    /// How the member is doing: `points`, `level`, `streak` (weeks).
+    /// How the member is doing: `points`, `level`, `floor` and `next` (the
+    /// points this level starts at and the next one does), `streak` (weeks)
+    /// and `weeks`, visits a week as comma separated numbers, oldest first.
     public static final String STATS = "/pulse/stats";
+    /// The classes booked next, soonest first: `count`, then `name<i>`,
+    /// `at<i>` and `room<i>` for each.
+    public static final String AGENDA = "/pulse/agenda";
+    /// How many classes [#AGENDA] carries: what fits on a watch page.
+    static final int AGENDA_SIZE = 3;
 
     private WatchBridge() {
     }
@@ -73,7 +82,7 @@ public final class WatchBridge {
     }
 
     static void next(List<BookingDto> upcoming) {
-        SessionDto next = null;
+        List<SessionDto> booked = new ArrayList<SessionDto>();
         long now = System.currentTimeMillis();
         for (int iter = 0; upcoming != null && iter < upcoming.size(); iter++) {
             BookingDto booking = upcoming.get(iter);
@@ -81,25 +90,50 @@ public final class WatchBridge {
             if (session == null || !"BOOKED".equals(booking.state()) || session.endsAt() < now) {
                 continue;
             }
-            if (next == null || session.startsAt() < next.startsAt()) {
-                next = session;
+            int at = booked.size();
+            while (at > 0 && booked.get(at - 1).startsAt() > session.startsAt()) {
+                at--;
             }
+            booked.add(at, session);
         }
         WearableMessage data = new WearableMessage(NEXT);
-        if (next != null) {
+        if (!booked.isEmpty()) {
+            SessionDto next = booked.get(0);
             data.put("name", next.name()).put("startsAt", next.startsAt())
                     .put("room", next.locationName() + ", " + next.roomName())
-                    .put("trainer", next.trainerName());
+                    .put("trainer", next.trainerName()).put("booked", next.booked())
+                    .put("capacity", next.capacity())
+                    .put("color", next.color() == null ? "" : next.color());
         }
         WearableConnection.putData(data);
+        // The agenda starts after the class the first page already shows.
+        WearableMessage agenda = new WearableMessage(AGENDA);
+        int count = 0;
+        for (int iter = 1; iter < booked.size() && count < AGENDA_SIZE; iter++) {
+            SessionDto session = booked.get(iter);
+            agenda.put("name" + count, session.name()).put("at" + count, session.startsAt())
+                    .put("room" + count, session.locationName() + ", " + session.roomName());
+            count++;
+        }
+        WearableConnection.putData(agenda.put("count", count));
     }
 
     static void stats(StatsDto stats) {
         if (stats == null) {
             return;
         }
+        StringBuilder weeks = new StringBuilder();
+        List<Integer> visits = stats.weeklyVisits();
+        for (int iter = 0; visits != null && iter < visits.size(); iter++) {
+            if (iter > 0) {
+                weeks.append(',');
+            }
+            weeks.append(visits.get(iter).intValue());
+        }
         WearableConnection.putData(new WearableMessage(STATS).put("points", stats.points())
-                .put("level", stats.level()).put("streak", stats.weekStreak()));
+                .put("level", stats.level()).put("floor", stats.levelFloor())
+                .put("next", stats.nextLevel()).put("streak", stats.weekStreak())
+                .put("weeks", weeks.toString()));
     }
 
     static void pass(PassDto pass) {

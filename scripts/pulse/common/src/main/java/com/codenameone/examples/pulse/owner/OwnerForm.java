@@ -68,6 +68,11 @@ public class OwnerForm implements Nav.Home {
     @Override
     public void start() {
         menu.item(FontImage.MATERIAL_INSIGHTS, "Dashboard", "dashboard", () -> form.showBack());
+        menu.item(FontImage.MATERIAL_QUERY_STATS, "Insights", "insights",
+                () -> InsightsForm.show(form));
+        menu.item(FontImage.MATERIAL_GROUP, "Members", "members", () -> MembersForm.show(form));
+        menu.item(FontImage.MATERIAL_RECEIPT_LONG, "Billing", "billing",
+                () -> BillingForm.show(form));
         menu.item(FontImage.MATERIAL_CARD_MEMBERSHIP, "Plans and pricing", "ownerPlans",
                 () -> PlansForm.show(form));
         menu.item(FontImage.MATERIAL_CATEGORY, "Class templates", "templates",
@@ -113,6 +118,17 @@ public class OwnerForm implements Nav.Home {
                 .stat(String.valueOf(board.checkIns7()), "Visits this week", "checkIns7")
                 .stat(String.valueOf(board.pastDue()), "Invoices past due", "pastDue");
         page.add(month);
+        // The deeper screens, each from the figure that sends an owner there.
+        page.add(Ui.tap(Ui.row(FontImage.MATERIAL_QUERY_STATS, Lang.tr("Insights"),
+                Lang.tr("Busy hours, growth, classes and coaches"), null), "insightsButton",
+                e -> InsightsForm.show(form)));
+        page.add(Ui.tap(Ui.row(FontImage.MATERIAL_GROUP, Lang.tr("Members"),
+                Lang.tr("{0} at risk", Integer.valueOf(board.atRisk())), null), "membersButton",
+                e -> MembersForm.show(form)));
+        page.add(Ui.tap(Ui.row(FontImage.MATERIAL_RECEIPT_LONG, Lang.tr("Billing"),
+                Lang.tr("{0} invoices past due", Integer.valueOf(board.pastDue())),
+                board.pastDue() > 0 ? Ui.badge(String.valueOf(board.pastDue()), "SvBadgeBad")
+                : null), "billingButton", e -> BillingForm.show(form)));
 
         // Takings: everything paid, packs and drop-ins too, which is why it
         // is not the recurring figure above.
@@ -219,7 +235,7 @@ public class OwnerForm implements Nav.Home {
     /// The most booked kinds of class, ranked, each with a bar for its share
     /// of the most booked one: easier to read on a phone than a pie, and no
     /// label falls off the edge.
-    static Component popular(List<NameCountDto> classes) {
+    public static Component popular(List<NameCountDto> classes) {
         Container list = new Container(BoxLayout.y());
         list.setName("popularChart");
         int most = 1;

@@ -45,6 +45,7 @@ import com.codenameone.examples.pulse.repository.StaffRepository;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -285,6 +286,26 @@ public class Studio {
 
     private static String text(String value) {
         return value == null ? "" : value;
+    }
+
+    /// The time zone the studio as a whole keeps its weeks in, for figures
+    /// that add up every location: the zone of the location first by id.
+    public ZoneId zone() {
+        List<Location> all = locations.findAll();
+        String first = null;
+        for (int iter = 0; iter < all.size(); iter++) {
+            String id = all.get(iter).getId();
+            if (first == null || id.compareTo(first) < 0) {
+                first = id;
+            }
+        }
+        return zone(first);
+    }
+
+    /// The Monday that starts the week `day` is in. The compiled backend's
+    /// LocalDate has no with(TemporalAdjuster), so it counts back.
+    public static LocalDate monday(LocalDate day) {
+        return day.minusDays(day.getDayOfWeek().getValue() - 1);
     }
 
     /// The time zone a location keeps its days in: UTC for a location that
