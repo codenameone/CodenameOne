@@ -413,7 +413,10 @@ public class DemoStudio {
 
     private void timetable() throws IOException {
         LocalDate today = LocalDate.now(ZoneId.of(zone));
-        LocalDate first = today.minusWeeks(WEEKS_BACK).with(DayOfWeek.MONDAY);
+        // The compiled backend's LocalDate has no with(TemporalAdjuster), so the
+        // Monday is reached by counting back from the day of the week.
+        LocalDate back = today.minusWeeks(WEEKS_BACK);
+        LocalDate first = back.minusDays(back.getDayOfWeek().getValue() - 1);
         LocalDate last = today.plusWeeks(WEEKS_AHEAD);
         String tess = DemoAccounts.TRAINER;
         String theo = DemoAccounts.SECOND_TRAINER;
