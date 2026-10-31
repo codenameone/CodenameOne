@@ -1,0 +1,31 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
+package com.codenameone.examples.pulse.pay;
+
+import java.io.IOException;
+
+/// A card was refused, or a setup was not finished: the processor was asked
+/// and said no. The message is written for the person paying and is safe to
+/// show them -- unlike that of a plain `IOException` from a provider, which
+/// describes a fault and goes to the log.
+public class PaymentDeclinedException extends IOException {
+    public PaymentDeclinedException(String message) {
+        super(message);
+    }
+}

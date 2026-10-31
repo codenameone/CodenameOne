@@ -1,0 +1,1823 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
+/*
+ * The whole look of the app.
+ *
+ * COLOURS AND SHAPE -- change these and nothing else to re-skin the app. Every
+ * rule below takes its colours from here; none names a colour of its own. Each
+ * colour has a second value for dark mode, used by the block at the end of the
+ * file.
+ */
+#Constants {
+    includeNativeBool: true;
+    defaultSourceDPIInt: "0";
+    /* ONE TYPE SCALE, in millimetres as a phone draws them: 2.1 caption,
+       2.5 secondary, 2.75 body, 2.9 control, 3.5 heading, 4.4 title, 7 display.
+       A desktop draws a millimetre in far fewer pixels and is read from
+       further away, so every size is a quarter larger there. */
+    device-desktop-font-scale: "1.25";
+    /* A line too long for its place ends in an ellipsis, not mid-word. */
+    endsWith3PointsBool: true;
+    /* Screens change quickly: nothing waits for an animation. */
+    transitionSpeedInt: "200";
+    /* The switch, sized from the Switch style's font. */
+    switchThumbScaleY: "1.5";
+    switchTrackScaleY: "1.8";
+    switchTrackScaleX: "3.1";
+    switchThumbInsetMM: "0.35";
+    switchTrackOffOutlineWidthMM: "0";
+    switchTrackOnOutlineWidthMM: "0";
+    switchThumbWidthScale: "1.0";
+    /* A deep orange-red that white lettering reads on at 4.6:1. */
+    --brand: #db3416;
+    --brand-pressed: #f0532f;
+    --brand-contrast: #ffffff;
+    /* The studio at night: the hero cards, and the accents only they use --
+       lime for points and effort, violet for levels and badges. */
+    --ink: #17111f;
+    --ink-raised: #261d33;
+    --ink-text: #ffffff;
+    --ink-muted: #b9aecb;
+    --lime: #c6f432;
+    --violet: #7b4dff;
+    --violet-tint: #efe9ff;
+    --locked: #d9d3e0;
+    --surface: #ffffff;
+    --surface-alt: #f3f1f5;
+    --surface-press: #e6e2ea;
+    --text: #16121c;
+    /* A violet grey, dark enough to read on white. */
+    --text-muted: #675f72;
+    --line: #e1dce6;
+    --line-strong: #c8c0d1;
+    --success: #12805c;
+    --warning: #b25e09;
+    --danger: #c5292a;
+    /* The pale ground a selected card and a badge sit on. */
+    --brand-tint: #fff0ea;
+    --success-tint: #e4f4ed;
+    --warning-tint: #fcf0df;
+    --danger-tint: #fcebeb;
+
+    --brand-dark: #ff5f3d;
+    --brand-pressed-dark: #ff7c5f;
+    --brand-contrast-dark: #1c0800;
+    --ink-dark: #221a2e;
+    --ink-raised-dark: #30263f;
+    --violet-dark: #a487ff;
+    --violet-tint-dark: #2a2142;
+    --locked-dark: #3a3147;
+    --surface-dark: #120f17;
+    --surface-alt-dark: #1f1a27;
+    --surface-press-dark: #352d40;
+    --text-dark: #efeaf5;
+    --text-muted-dark: #b6aec2;
+    --line-dark: #352d40;
+    --line-strong-dark: #4b4159;
+    --success-dark: #47c79a;
+    --warning-dark: #f0a24b;
+    --danger-dark: #ff7a7a;
+    --brand-tint-dark: #3a1a0e;
+    --success-tint-dark: #15302a;
+    --warning-tint-dark: #33270f;
+    --danger-tint-dark: #3a1f22;
+
+    /* ONE RADIUS for anything card- or button-shaped, a smaller one for what
+       sits inside a card, and the sheet's. */
+    --radius: 2mm;
+    --radius-small: 1.5mm;
+
+    /* What floats over the map: the shadow under it, the dimming behind an
+       open menu, and the corners of the sheet. */
+    --shadow: #101828;
+    /* Under a card with square-ish corners. Black, and without a blur where it
+       is used: that is the one shadow a rounded rectangle draws for itself.
+       Any other is rendered to pictures of the card when the theme is
+       compiled, and a build that cannot render them has no card at all. */
+    --shadow-card: rgba(0, 0, 0, 0.14);
+    --scrim: #000000;
+    --radius-sheet: 4mm;
+}
+
+/* ---------------------------------------------------------------- surfaces */
+
+SvForm {
+    background-color: var(--surface);
+    padding: 0;
+    margin: 0;
+}
+
+SvDock {
+    background-color: var(--surface);
+    border-top: 1px solid var(--line);
+    padding: 2.4mm 3.6mm 3mm 3.6mm;
+    margin: 0;
+}
+
+SvPage {
+    background-color: var(--surface);
+    padding: 3mm 3.6mm 4mm 3.6mm;
+    margin: 0;
+}
+
+/* The coloured top of the welcome screen. */
+SvHero {
+    background-color: var(--brand);
+    padding: 14mm 4.4mm 8mm 4.4mm;
+    margin: 0;
+}
+
+SvHeroTitle {
+    color: var(--brand-contrast);
+    font-family: "native:MainBold";
+    font-size: 7mm;
+    padding: 2.4mm 0 0.8mm 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+SvHeroText {
+    color: var(--brand-contrast);
+    font-family: "native:MainRegular";
+    font-size: 2.9mm;
+    padding: 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+SvHeroIcon {
+    color: var(--brand-contrast);
+    padding: 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+/* The panel that rises over the map. */
+SvCard {
+    background-color: var(--surface);
+    border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+    padding: 3.6mm 3.6mm 4mm 3.6mm;
+    margin: 0;
+}
+
+/* A panel that floats over the map with a gap around it. */
+SvFloat {
+    background-color: var(--surface);
+    border-radius: var(--radius);
+    padding: 2.4mm 3.2mm 2.4mm 3.2mm;
+    margin: 2.4mm;
+}
+
+SvPanel {
+    background-color: var(--surface-alt);
+    border-radius: var(--radius);
+    padding: 2.8mm 3mm 2.8mm 3mm;
+    margin: 1.2mm 0 1.2mm 0;
+}
+
+SvDivider {
+    background-color: var(--line);
+    padding: 0;
+    margin: 2mm 0 2mm 0;
+}
+
+/* -------------------------------------------------------------------- text */
+
+SvTitle {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 4.4mm;
+    padding: 0.6mm 0 1mm 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+SvHeading {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 3.5mm;
+    padding: 0.4mm 0 0.4mm 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+SvText {
+    color: var(--text);
+    font-family: "native:MainRegular";
+    font-size: 2.75mm;
+    padding: 0.4mm 0 0.4mm 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+SvMuted {
+    color: var(--text-muted);
+    font-family: "native:MainRegular";
+    font-size: 2.5mm;
+    padding: 0.4mm 0 0.4mm 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+SvLabel {
+    color: var(--text-muted);
+    font-family: "native:MainBold";
+    font-size: 2.1mm;
+    padding: 2.6mm 0 1mm 0.3mm;
+    margin: 0;
+    background-color: transparent;
+}
+
+SvPrice {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 4.4mm;
+    padding: 0;
+    margin: 0;
+    text-align: right;
+    background-color: transparent;
+}
+
+/* The same, where it is the headline of a sheet: it starts where the
+   sheet's words start. */
+
+SvError {
+    color: var(--danger);
+    font-family: "native:MainRegular";
+    font-size: 2.5mm;
+    padding: 1mm 0 1mm 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+SvNotice {
+    color: var(--text);
+    background-color: var(--surface-alt);
+    border-radius: var(--radius);
+    font-family: "native:MainRegular";
+    font-size: 2.5mm;
+    padding: 2.4mm 3mm 2.4mm 3mm;
+    margin: 2mm 0 1mm 0;
+}
+
+/* ----------------------------------------------------------------- buttons */
+
+SvPrimary {
+    color: var(--brand-contrast);
+    background-color: var(--brand);
+    border-radius: var(--radius);
+    font-family: "native:MainBold";
+    font-size: 2.9mm;
+    text-align: center;
+    padding: 2.75mm 4mm 2.75mm 4mm;
+    margin: 1.6mm 0 0.8mm 0;
+}
+
+SvPrimary.pressed {
+    background-color: var(--brand-pressed);
+}
+
+SvPrimary.disabled {
+    color: var(--text-muted);
+    background-color: var(--surface-press);
+}
+
+SvSecondary {
+    color: var(--text);
+    background-color: var(--surface-alt);
+    border-radius: var(--radius);
+    font-family: "native:MainBold";
+    font-size: 2.9mm;
+    text-align: center;
+    padding: 2.75mm 4mm 2.75mm 4mm;
+    margin: 1.6mm 0 0.8mm 0;
+}
+
+SvSecondary.pressed {
+    background-color: var(--surface-press);
+}
+
+SvDanger {
+    color: var(--danger);
+    background-color: var(--danger-tint);
+    border-radius: var(--radius);
+    font-family: "native:MainBold";
+    font-size: 2.9mm;
+    text-align: center;
+    padding: 2.75mm 4mm 2.75mm 4mm;
+    margin: 1.6mm 0 0.8mm 0;
+}
+
+SvDanger.pressed {
+    background-color: var(--surface-press);
+}
+
+SvLink {
+    color: var(--brand);
+    background-color: transparent;
+    border-radius: var(--radius);
+    font-family: "native:MainBold";
+    font-size: 2.75mm;
+    text-align: center;
+    padding: 2.4mm 2mm 2.4mm 2mm;
+    margin: 0;
+}
+
+SvSecondary.disabled, SvDanger.disabled, SvLink.disabled {
+    color: var(--line-strong);
+}
+
+SvLink.pressed {
+    color: var(--brand-pressed);
+    background-color: var(--brand-tint);
+}
+
+/* The round buttons that sit on the map. */
+SvMapButton {
+    color: var(--text);
+    background: cn1-round-border;
+    background-color: var(--surface);
+    cn1-box-shadow-spread: 0.5mm;
+    cn1-box-shadow-blur: 1.6mm;
+    cn1-box-shadow-h: 0.5;
+    cn1-box-shadow-v: 0.7;
+    cn1-box-shadow-color: var(--shadow);
+    padding: 2.4mm;
+    margin: 1.2mm 2.4mm 1.2mm 2.4mm;
+}
+
+SvMapButton.pressed {
+    background-color: var(--surface-alt);
+}
+
+/* The same button on a bar: flat, because nothing on a bar floats. */
+SvBarButton {
+    color: var(--text);
+    background: cn1-round-border;
+    background-color: var(--surface);
+    padding: 2.4mm;
+    margin: 0.6mm 0.6mm 0.6mm 1.2mm;
+}
+
+SvBarButton.pressed {
+    background-color: var(--surface-alt);
+}
+
+/* "Where to?" -- looks like a field, behaves like a button. */
+
+/* ------------------------------------------------------------------ fields */
+
+SvField {
+    color: var(--text);
+    background-color: var(--surface-alt);
+    border-radius: var(--radius);
+    font-family: "native:MainRegular";
+    font-size: 2.9mm;
+    padding: 2.7mm 3mm 2.7mm 3mm;
+    margin: 0;
+}
+
+/* The field being typed in says so. */
+SvField.selected {
+    background-color: var(--brand-tint);
+}
+
+SvField.disabled {
+    color: var(--text-muted);
+}
+
+SvFieldHint {
+    color: var(--text-muted);
+    font-family: "native:MainRegular";
+    font-size: 2.9mm;
+    padding: 2.7mm 3mm 2.7mm 3mm;
+    margin: 0;
+    background-color: transparent;
+}
+
+/* ------------------------------------------------------------------- lists */
+
+SvRow {
+    background-color: var(--surface);
+    border-bottom: 1px solid var(--line);
+    padding: 2.6mm 0 2.6mm 0;
+    margin: 0;
+}
+
+SvRow.pressed {
+    background-color: var(--surface-alt);
+}
+
+SvRowIcon {
+    color: var(--text-muted);
+    padding: 0 3mm 0 0.4mm;
+    margin: 0;
+    background-color: transparent;
+}
+
+SvRowTitle {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 2.75mm;
+    padding: 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+SvRowDetail {
+    color: var(--text-muted);
+    font-family: "native:MainRegular";
+    font-size: 2.4mm;
+    padding: 0.3mm 0 0 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+SvRowValue {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 2.75mm;
+    text-align: right;
+    padding: 0 0 0 2mm;
+    margin: 0;
+    background-color: transparent;
+}
+
+/* ------------------------------------------------------------------ badges */
+
+SvBadge {
+    color: var(--text-muted);
+    background: cn1-pill-border;
+    background-color: var(--surface-alt);
+    font-family: "native:MainBold";
+    font-size: 2.05mm;
+    padding: 0.7mm 2mm 0.7mm 2mm;
+    margin: 0 0 0 2mm;
+}
+
+SvBadgeGood {
+    cn1-derive: SvBadge;
+    color: var(--success);
+    background-color: var(--success-tint);
+}
+
+SvBadgeWarn {
+    cn1-derive: SvBadge;
+    color: var(--warning);
+    background-color: var(--warning-tint);
+}
+
+SvBadgeBad {
+    cn1-derive: SvBadge;
+    color: var(--danger);
+    background-color: var(--danger-tint);
+}
+
+/* ------------------------------------------------------------------- admin */
+
+SvStat {
+    background-color: var(--surface-alt);
+    border-radius: var(--radius);
+    padding: 2.6mm 2.6mm 2.6mm 2.6mm;
+    margin: 0.8mm;
+}
+
+SvStatValue {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 3.9mm;
+    padding: 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+SvStatLabel {
+    color: var(--text-muted);
+    font-family: "native:MainRegular";
+    font-size: 2.3mm;
+    padding: 0.3mm 0 0 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+/* --------------------------------------------------------------- title bar */
+
+/* The strip the clock and the battery are drawn over. */
+StatusBar {
+    background-color: var(--surface);
+    padding: 0;
+    margin: 0;
+}
+
+Toolbar {
+    background-color: var(--surface);
+    border-bottom: 1px solid var(--line);
+    padding: 0.6mm 0 0.6mm 0;
+    margin: 0;
+}
+
+Title {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 3.05mm;
+    background-color: transparent;
+}
+
+TitleCommand {
+    color: var(--text);
+    background-color: transparent;
+}
+
+BackCommand {
+    color: var(--text);
+    background-color: transparent;
+}
+
+/* The switch: the thumb is the colour, the track the background. */
+Switch {
+    color: #ffffff;
+    background-color: var(--line-strong);
+    font-family: "native:MainRegular";
+    font-size: 2.5mm;
+    padding: 0.6mm 0 0.6mm 2mm;
+    margin: 0;
+}
+
+Switch.selected {
+    color: #ffffff;
+    background-color: var(--brand);
+}
+
+Switch.disabled {
+    color: var(--surface-alt);
+    background-color: var(--line);
+}
+
+/* ---------------------------------------------------------------------------
+ * OVER THE MAP. The clear strip the status bar is drawn in, which the map
+ * runs under, the bar of floating controls,
+ * the sheet at the bottom and what goes in each.
+ */
+
+/* "Where to?" -- a card that floats over the map and behaves like a button. */
+
+/* From where to where, once there is somewhere to go. */
+
+/* One short fact, in a pill under the bar. */
+SvChip {
+    color: var(--text);
+    background: cn1-pill-border;
+    background-color: var(--surface);
+    cn1-box-shadow-spread: 0.4mm;
+    cn1-box-shadow-blur: 1.4mm;
+    cn1-box-shadow-h: 0.5;
+    cn1-box-shadow-v: 0.7;
+    cn1-box-shadow-color: var(--shadow);
+    font-family: "native:MainBold";
+    font-size: 2.4mm;
+    padding: 1.4mm 3mm 1.4mm 2.6mm;
+    margin: 1.2mm 2mm 1mm 2mm;
+}
+
+SvSheet {
+    background-color: var(--surface);
+    border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+    padding: 0.4mm 3.6mm 3.2mm 3.6mm;
+    margin: 0;
+}
+
+/* The handle of the sheet: the colour is the bar's. */
+SvGrip {
+    color: var(--line-strong);
+    background-color: transparent;
+    padding: 1.6mm 0 1.8mm 0;
+    margin: 0;
+}
+
+/* The countdown on the pass card: lime for the time left, as on the watch,
+   since red would read as an error. */
+SvRingTrack {
+    color: var(--ink-raised);
+    background-color: transparent;
+}
+
+SvRing {
+    color: var(--lime);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 3.3mm;
+    padding: 0.8mm;
+    margin: 0 0 0 2.4mm;
+}
+
+SvPulse {
+    color: var(--brand);
+    background-color: transparent;
+    padding: 0.8mm;
+    margin: 0.8mm 0 0.8mm 0;
+}
+
+/* Home and Work, side by side on the idle sheet. */
+SvShortcut {
+    color: var(--text);
+    background-color: var(--surface-alt);
+    border-radius: var(--radius);
+    font-family: "native:MainBold";
+    font-size: 2.75mm;
+    text-align: left;
+    padding: 2.6mm 3mm 2.6mm 3mm;
+    margin: 2mm 0.8mm 0.8mm 0.8mm;
+}
+
+SvShortcut.pressed {
+    background-color: var(--surface-press);
+}
+
+SvAvatar {
+    color: var(--brand-contrast);
+    background: cn1-round-border;
+    background-color: var(--brand);
+    font-family: "native:MainBold";
+    font-size: 2.9mm;
+    text-align: center;
+    padding: 2.3mm;
+    margin: 0 3mm 0 0;
+}
+
+/* A number plate reads as one, so it is boxed like one. */
+
+SvActions {
+    background-color: transparent;
+    padding: 0;
+    margin: 0.8mm 0 0 0;
+}
+
+/* Call, message, share: an icon with a word under it. */
+SvAction {
+    color: var(--text);
+    background-color: transparent;
+    border-radius: var(--radius);
+    font-family: "native:MainRegular";
+    font-size: 2.2mm;
+    text-align: center;
+    padding: 1.8mm 0 1.8mm 0;
+    margin: 0;
+}
+
+SvAction.pressed {
+    color: var(--brand);
+    background-color: var(--surface-alt);
+}
+
+/* The desk's two ways to let someone in: big tiles, scanning filled. */
+SvFrontScan, SvFrontScan.pressed {
+    color: var(--brand-contrast);
+    background-color: var(--brand);
+    border-radius: var(--radius);
+    font-family: "native:MainBold";
+    font-size: 3mm;
+    text-align: center;
+    padding: 5mm 1mm 4.2mm 1mm;
+    margin: 0 1.2mm 0 0;
+}
+
+SvFrontScan.pressed {
+    background-color: var(--brand-pressed);
+}
+
+SvFrontFob, SvFrontFob.pressed {
+    color: var(--text);
+    background-color: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    font-family: "native:MainBold";
+    font-size: 3mm;
+    text-align: center;
+    padding: 5mm 1mm 4.2mm 1mm;
+    margin: 0 0 0 1.2mm;
+}
+
+SvFrontFob.pressed {
+    background-color: var(--surface-alt);
+}
+
+SvActionDanger {
+    cn1-derive: SvAction;
+    color: var(--danger);
+}
+
+SvActionDanger.pressed {
+    color: var(--danger);
+    background-color: var(--danger-tint);
+}
+
+/* ------------------------------------------------------ records and charts */
+
+/* A list that fills a screen: rows from edge to edge, each with the page's
+   margin inside it. */
+SvList {
+    background-color: var(--surface);
+    padding: 0 3.6mm 3.2mm 3.6mm;
+    margin: 0;
+}
+/* One line of a receipt: what, and how much. */
+SvFact {
+    background-color: transparent;
+    padding: 1.1mm 0 1.1mm 0;
+    margin: 0;
+}
+SvFactLabel {
+    color: var(--text-muted);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2.6mm;
+    text-align: left;
+    padding: 0;
+    margin: 0;
+}
+SvFactValue {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2.6mm;
+    text-align: right;
+    padding: 0 0 0 3mm;
+    margin: 0;
+}
+/* The line the others add up to. */
+SvFactTotal {
+    cn1-derive: SvFactValue;
+    font-family: "native:MainBold";
+    font-size: 3.3mm;
+}
+/* The one thing a screen is about, said large at its top. */
+/* A note to read in the flow of a page: see Ui.callout. */
+SvCallout {
+    background-color: var(--warning-tint);
+    border-radius: var(--radius);
+    padding: 2.4mm 3mm 2.4mm 2.4mm;
+    margin: 2.4mm 0 1mm 0;
+}
+SvCalloutIcon {
+    color: var(--warning);
+    background-color: transparent;
+    padding: 0.3mm 2.2mm 0 0;
+    margin: 0;
+}
+SvCalloutTitle {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 2.5mm;
+    padding: 0;
+    margin: 0;
+}
+SvCalloutText { background-color: transparent;
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2.6mm;
+    padding: 0.4mm 0 0 0;
+    margin: 0;
+}
+
+SvBanner {
+    background-color: transparent;
+    padding: 5mm 3mm 3mm 3mm;
+    margin: 0;
+}
+SvBannerIcon {
+    color: var(--brand);
+    background: cn1-round-border;
+    background-color: var(--brand-tint);
+    padding: 3.4mm;
+    margin: 0 0 2.4mm 0;
+}
+SvBannerIconGood {
+    cn1-derive: SvBannerIcon;
+    color: var(--success);
+    background-color: var(--success-tint);
+}
+SvBannerIconWarn {
+    cn1-derive: SvBannerIcon;
+    color: var(--warning);
+    background-color: var(--warning-tint);
+}
+SvBannerIconBad {
+    cn1-derive: SvBannerIcon;
+    color: var(--danger);
+    background-color: var(--danger-tint);
+}
+SvBannerTitle {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 3.5mm;
+    text-align: center;
+    padding: 0.4mm 0 0.4mm 0;
+    margin: 0;
+}
+SvBannerText {
+    color: var(--text-muted);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2.6mm;
+    text-align: center;
+    padding: 0.4mm 2mm 0.4mm 2mm;
+    margin: 0;
+}
+/* The amount a receipt is for. */
+SvAmount {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 7mm;
+    text-align: center;
+    padding: 1mm 0 0.4mm 0;
+    margin: 0;
+}
+/* A group of rows under one heading. */
+SvGroup {
+    background-color: transparent;
+    padding: 0;
+    margin: 0 0 0.8mm 0;
+}
+/* A chart or a breakdown, boxed with its title. */
+SvInkBpm { background-color: transparent; font-family: "native:MainBold"; font-size: 9mm; color: var(--lime); padding: 1mm 0 1mm 0; margin: 0; }
+SvZoneBar { background-color: transparent; padding: 0; margin: 1.2mm 0 0 0; }
+SvWorkoutWorn { background-color: transparent; color: var(--violet); padding: 0 3mm 0 0.4mm; margin: 0; }
+SvPoints { font-family: "native:MainBold"; font-size: 2.9mm; color: var(--ink); background-color: var(--lime); border-radius: 3mm; padding: 1mm 2.4mm 1mm 2.4mm; margin: 0; }
+SvAvatarLines { background-color: transparent; padding: 0 0 0 2.6mm; margin: 0; }
+SvKudos { font-family: "native:MainBold"; font-size: 2.8mm; color: var(--brand); background-color: var(--surface-alt); border-radius: 4mm; padding: 1.2mm 2.6mm 1.2mm 2.4mm; margin: 0; }
+SvKudos.pressed { background-color: var(--surface-press); }
+SvKudos.disabled { color: var(--text-muted); background-color: var(--surface-alt); }
+SvKudosGiven, SvKudosGiven.disabled { font-family: "native:MainBold"; font-size: 2.8mm; color: #ffffff; background-color: var(--brand); border-radius: 4mm; padding: 1.2mm 2.6mm 1.2mm 2.4mm; margin: 0; }
+SvKudosMine, SvKudosMine.disabled { font-family: "native:MainBold"; font-size: 2.8mm; color: var(--text-muted); background-color: transparent; padding: 1.2mm 2.6mm 1.2mm 2.4mm; margin: 0; }
+SvPassQr { background-color: transparent; padding: 0; margin: 0; }
+SvPassPanel { background-color: #ffffff; border-radius: 3mm; padding: 3mm; margin: 3mm 0 2mm 0; }
+SvPassCode { background-color: transparent; font-family: "native:MainBold"; font-size: 7mm; color: var(--lime); padding: 0; margin: 0; }
+SvTile {
+    background-color: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 3mm 3mm 3mm 3mm;
+    margin: 0.8mm 0.8mm 1.6mm 0.8mm;
+}
+/* A bar chart: the colour is the bars'. */
+SvChart {
+    color: var(--brand);
+    background-color: transparent;
+    padding: 1.6mm 0 0 0;
+    margin: 0;
+}
+SvChartPeak {
+    color: var(--brand-pressed);
+    background-color: transparent;
+}
+SvChartGrid {
+    color: var(--line);
+    background-color: transparent;
+}
+/* The owner's popular classes: a name and count, a bar under it. */
+SvRankRow {
+    background-color: transparent;
+    padding: 2mm 0 0.8mm 0;
+    margin: 0;
+}
+
+SvRankBar {
+    color: var(--surface-alt);
+    background-color: transparent;
+    padding: 0;
+    margin: 0 0 1.2mm 0;
+}
+
+SvChartTitle {
+    color: var(--text-muted);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 2.3mm;
+    padding: 2.4mm 0 1mm 0;
+    margin: 0;
+}
+
+SvChartAxis {
+    color: var(--text-muted);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2mm;
+    padding: 0.8mm 0 0 0;
+    margin: 0;
+}
+/* The number a chart adds up to, over the chart. */
+SvChartValue {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 4.2mm;
+    text-align: left;
+    padding: 0;
+    margin: 0;
+}
+/* A share along a track: the colour is the share, the background the track. */
+SvMeter {
+    color: var(--brand);
+    background-color: transparent;
+    padding: 0.8mm 0 1.6mm 0;
+    margin: 0;
+}
+/* Something waiting for the admin, at the top of the dashboard. */
+SvAlert {
+    color: var(--warning);
+    background-color: var(--warning-tint);
+    border-radius: var(--radius);
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+    text-align: left;
+    padding: 2.6mm 3mm 2.6mm 3mm;
+    margin: 0.8mm;
+}
+SvAlert.pressed {
+    background-color: var(--surface-press);
+}
+
+/* ----------------------------------------------------------------- choosing */
+
+/* One of several things to pick from, of which one is picked: a kind of car,
+   a way to pay. */
+SvOption {
+    background-color: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 2.4mm 3mm 2.4mm 3mm;
+    margin: 0.8mm 0 0.8mm 0;
+}
+SvOption.pressed {
+    background-color: var(--surface-alt);
+}
+SvOptionPicked {
+    cn1-derive: SvOption;
+    background-color: var(--brand-tint);
+    border: 2px solid var(--brand);
+}
+SvOptionIcon {
+    color: var(--text);
+    background-color: transparent;
+    padding: 0 2.4mm 0 0;
+    margin: 0;
+}
+/* A payment card, drawn as one. */
+SvCardFace {
+    background-color: var(--brand);
+    border-radius: var(--radius);
+    padding: 4mm 4mm 3.4mm 4mm;
+    margin: 1mm 0 2.4mm 0;
+}
+SvCardBrand {
+    color: var(--brand-contrast);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 2.9mm;
+    text-align: right;
+    padding: 0;
+    margin: 0;
+}
+SvCardNumber {
+    color: var(--brand-contrast);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 3.7mm;
+    text-align: left;
+    padding: 4.8mm 0 2.4mm 0;
+    margin: 0;
+}
+SvCardSmall {
+    color: var(--brand-contrast);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2.3mm;
+    padding: 0;
+    margin: 0;
+}
+/* Two fields side by side: the space between them is theirs. */
+SvPairLeft {
+    background-color: transparent;
+    padding: 0 1.2mm 0 0;
+    margin: 0;
+}
+SvPairRight {
+    background-color: transparent;
+    padding: 0 0 0 1.2mm;
+    margin: 0;
+}
+/* A picture of a document, small, beside what it is. */
+SvThumb {
+    color: var(--text-muted);
+    background-color: var(--surface-alt);
+    border-radius: var(--radius-small);
+    padding: 2mm;
+    margin: 0 3mm 0 0;
+}
+/* The same picture, filling the screen. */
+SvPicture {
+    background-color: var(--scrim);
+    padding: 0;
+    margin: 0;
+}
+/* How far through the steps of a form: "Step 2 of 5". */
+/* What is fixed to the foot of a form of several steps. */
+SvFooter {
+    background-color: var(--surface);
+    border-top: 1px solid var(--line);
+    padding: 1mm 3.6mm 1.6mm 3.6mm;
+    margin: 0;
+}
+
+/* ---------------------------------------------------------------- the menu */
+
+/* Dimmed by the colour's own alpha. `opacity` would not do it: a style's
+   opacity fades what a component draws over its background, and the
+   background itself is filled at the background's transparency -- so an opaque
+   black with an opacity is still a black screen. */
+SvScrim {
+    background-color: rgba(0, 0, 0, 0.45);
+    padding: 0;
+    margin: 0;
+}
+
+SvMenu {
+    background-color: var(--surface);
+    padding: 0;
+    margin: 0;
+}
+
+SvMenuTop {
+    background-color: var(--surface);
+    border-bottom: 1px solid var(--line);
+    padding: 5mm 4mm 3.6mm 4mm;
+    margin: 0;
+}
+
+SvMenuName {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 3.5mm;
+    text-align: left;
+    padding: 0;
+    margin: 0;
+}
+
+SvMenuDetail {
+    color: var(--text-muted);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2.4mm;
+    text-align: left;
+    padding: 0.2mm 0 0 0;
+    margin: 0;
+}
+
+/* Which of the three apps this is. */
+SvModeBadge {
+    color: var(--brand);
+    background: cn1-pill-border;
+    background-color: var(--brand-tint);
+    font-family: "native:MainBold";
+    font-size: 2.1mm;
+    text-align: center;
+    padding: 0.8mm 2.4mm 0.8mm 2.4mm;
+    margin: 2.4mm 0 0 0;
+}
+
+SvMenuLabel {
+    color: var(--text-muted);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 2.1mm;
+    text-align: left;
+    padding: 3.6mm 4mm 1mm 4mm;
+    margin: 0;
+}
+
+SvMenuItem {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2.9mm;
+    text-align: left;
+    padding: 2.6mm 4mm 2.6mm 4mm;
+    margin: 0;
+}
+
+SvMenuItem.pressed {
+    background-color: var(--surface-alt);
+}
+
+SvMenuBottom {
+    background-color: transparent;
+    border-top: 1px solid var(--line);
+    padding: 0.8mm 0 1.6mm 0;
+    margin: 0;
+}
+
+/* The top of a home screen that has no map: the menu, and what this is. */
+SvHomeBar {
+    background-color: var(--surface);
+    border-bottom: 1px solid var(--line);
+    padding: 0.6mm 3.6mm 0.6mm 0;
+    margin: 0;
+}
+
+/* ---------------------------------------------------------------- settings */
+
+SvSection {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 3.1mm;
+    text-align: left;
+    padding: 5mm 0 0.8mm 0;
+    margin: 0;
+}
+
+/* A few options side by side, one of them chosen. */
+SvSegments {
+    background-color: var(--surface-alt);
+    border-radius: var(--radius);
+    padding: 0.5mm;
+    margin: 0.8mm 0 1.6mm 0;
+}
+
+SvSegment {
+    color: var(--text-muted);
+    background-color: transparent;
+    border-radius: 1.9mm;
+    font-family: "native:MainBold";
+    font-size: 2.3mm;
+    text-align: center;
+    padding: 2mm 1.2mm 2mm 1.2mm;
+    margin: 0.3mm;
+}
+
+/* ".selected" is the FOCUSED state in a Codename One theme, not the chosen
+   one: a chosen toggle wears ".pressed". Styled like the chosen option, the
+   focused one looked chosen too, so two options of one row seemed picked. */
+SvSegment.selected {
+    color: var(--text-muted);
+    background-color: transparent;
+}
+
+/* A toggle that is on wears the pressed style, so the two say the same. */
+SvSegment.pressed {
+    color: var(--text);
+    background-color: var(--surface);
+}
+
+SvSegment.disabled {
+    color: var(--line-strong);
+}
+
+/* The outline of rows that are on their way: the colour is the bars'. */
+SvSkeleton {
+    color: var(--surface-alt);
+    background-color: transparent;
+    padding: 1mm 0 0 0;
+    margin: 0;
+}
+
+/* "Pull to refresh", over a list being pulled. */
+PullToRefresh {
+    color: var(--text-muted);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2.3mm;
+    text-align: center;
+    padding: 1.6mm;
+    margin: 0;
+}
+
+/* What the app says in passing, over the foot of the screen. */
+ToastBar {
+    background-color: var(--text);
+    border-radius: var(--radius);
+    padding: 2.4mm 3mm 2.4mm 3mm;
+    margin: 2.4mm 3.6mm 3.2mm 3.6mm;
+}
+
+ToastBarMessage {
+    color: var(--surface);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2.5mm;
+    padding: 0;
+    margin: 0;
+}
+
+/* ------------------------------------------------- the admin console, wide */
+
+/* On a tablet on its side, a desktop or a browser the console is three
+   columns: where to go, a list, and what was picked from it. */
+SvSide {
+    background-color: var(--surface-alt);
+    border-right: 1px solid var(--line);
+    padding: 2.4mm 1.6mm 2.4mm 1.6mm;
+    margin: 0;
+}
+
+SvSideName {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 3.05mm;
+    padding: 0.8mm 2.4mm 0 2.4mm;
+    margin: 0;
+}
+
+SvSideDetail {
+    color: var(--text-muted);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2.3mm;
+    padding: 0 2.4mm 2.4mm 2.4mm;
+    margin: 0;
+}
+
+SvSideLabel {
+    color: var(--text-muted);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 2.15mm;
+    padding: 3.2mm 2.4mm 0.8mm 2.4mm;
+    margin: 0;
+}
+
+SvSideItem {
+    color: var(--text);
+    background-color: transparent;
+    border-radius: var(--radius-small);
+    font-family: "native:MainRegular";
+    font-size: 2.8mm;
+    text-align: left;
+    padding: 1.9mm 2.4mm 1.9mm 2.4mm;
+    margin: 0.2mm 0 0.2mm 0;
+}
+
+SvSideItem.pressed {
+    background-color: var(--line);
+}
+
+SvSidePicked {
+    cn1-derive: SvSideItem;
+    color: var(--brand-contrast);
+    background-color: var(--brand);
+    font-family: "native:MainBold";
+}
+
+SvMaster {
+    background-color: var(--surface);
+    border-right: 1px solid var(--line);
+    padding: 0;
+    margin: 0;
+}
+
+SvPaneBar {
+    background-color: var(--surface);
+    border-bottom: 1px solid var(--line);
+    padding: 1.2mm 4mm 1.2mm 4mm;
+    margin: 0;
+}
+
+SvPaneTitle {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 3.5mm;
+    padding: 1.6mm 0 1.6mm 0;
+    margin: 0;
+}
+
+/* The row of a list whose detail is open beside it. */
+SvRowPicked {
+    cn1-derive: SvRow;
+    background-color: var(--surface-alt);
+}
+
+/*
+ * THE DESKTOP'S OWN LOOK. On macOS, Windows and Linux, and in a desktop
+ * browser, the platform's theme is under this one (the nativeTheme=native build
+ * hint), and the admin console wears it: Layouts.dress() gives each component
+ * the SvDesk twin of its style. A twin derives from the platform's control
+ * where there is one -- a button, a field, a segmented control, a group box --
+ * and takes its colours from the palette every desktop theme declares, so the
+ * same rules are Aqua on a Mac, Fluent on Windows and Adwaita on Linux. Nothing
+ * here names the brand; the accent is the platform's.
+ *
+ * The values in SvDeskPalette are only what the compiler needs to resolve
+ * var(): each use is bound to the name, and the installed theme's own value
+ * replaces it when the app runs. They are declared outside #Constants so that
+ * they are not exported over the theme's.
+ */
+SvDeskPalette {
+    --window-bg-color: #ececec;
+    --window-bg-color-dark: #1e1e1e;
+    --view-bg-color: #ffffff;
+    --view-bg-color-dark: #1e1e1e;
+    --control-bg-color: #ffffff;
+    --control-bg-color-dark: #2c2c2c;
+    --headerbar-bg-color: #e8e8e8;
+    --headerbar-bg-color-dark: #2a2a2a;
+    --text-color: #1a1a1a;
+    --text-color-dark: #ffffff;
+    --text-secondary-color: #5d5d5d;
+    --text-secondary-color-dark: #c0c0c0;
+    --separator-color: #d8d8d8;
+    --separator-color-dark: #3a3a3a;
+    --accent-color: #007aff;
+    --accent-color-dark: #0a84ff;
+    --accent-fg-color: #ffffff;
+    --accent-fg-color-dark: #ffffff;
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+}
+
+SvDeskForm { background-color: var(--window-bg-color); padding: 0; margin: 0; }
+SvDeskPage { background-color: var(--window-bg-color); padding: 3mm 5mm 4mm 5mm; margin: 0; }
+SvDeskList { background-color: var(--view-bg-color); padding: 0 3mm 2mm 3mm; margin: 0; }
+SvDeskMaster { background-color: var(--view-bg-color); border-right: 1px solid #c6c6c8; padding: 0; margin: 0; }
+SvDeskHomeBar { background-color: var(--headerbar-bg-color); border-bottom: 1px solid #c6c6c8; padding: 1mm 4mm 1mm 0; margin: 0; }
+SvDeskPaneBar { background-color: var(--window-bg-color); border-bottom: 1px solid #c6c6c8; padding: 1mm 5mm 1mm 5mm; margin: 0; }
+SvDeskPaneTitle { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 3.2mm; padding: 1.6mm 0 1.6mm 0; margin: 0; }
+SvDeskBarButton { cn1-derive: Button; padding: 1.2mm; margin: 0 2mm 0 0; }
+
+SvDeskSide { background-color: var(--headerbar-bg-color); border-right: 1px solid #c6c6c8; padding: 2.5mm 2mm 2.5mm 2mm; margin: 0; }
+SvDeskSideName { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 2.7mm; padding: 1mm 2.6mm 0 2.6mm; margin: 0; }
+SvDeskSideDetail { color: var(--text-secondary-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.25mm; padding: 0 2.6mm 2mm 2.6mm; margin: 0; }
+SvDeskSideLabel { color: var(--text-secondary-color); background-color: transparent; font-family: "native:MainBold"; font-size: 2.15mm; padding: 3mm 2.6mm 1mm 2.6mm; margin: 0; }
+SvDeskSideItem { color: var(--text-color); background-color: transparent; border-radius: 1.4mm; font-family: "native:MainRegular"; font-size: 2.65mm; text-align: left; padding: 1.6mm 2.6mm 1.6mm 2.6mm; margin: 0.2mm 0 0.2mm 0; }
+SvDeskSideItem.pressed { background-color: var(--separator-color); }
+SvDeskSidePicked { cn1-derive: SvDeskSideItem; color: var(--accent-fg-color); background-color: var(--accent-color); }
+
+SvDeskPrimary { cn1-derive: RaisedButton; text-align: center; margin: 2mm 0 1mm 0; }
+SvDeskSecondary { cn1-derive: Button; text-align: center; margin: 1.5mm 0 1mm 0; }
+SvDeskDanger { cn1-derive: Button; color: var(--danger); text-align: center; margin: 1.5mm 0 1mm 0; }
+SvDeskLink { cn1-derive: Link; padding: 1.6mm 0 1.6mm 0; }
+SvDeskField { cn1-derive: TextField; margin: 0; }
+SvDeskFieldHint { cn1-derive: TextHint; }
+SvDeskSegments { cn1-derive: TabsContainer; border-radius: 1.6mm; padding: 0.4mm; margin: 1mm 0 2mm 0; }
+/* Four of these share the master pane of the console, which is narrow: the
+   platform's own tab padding leaves "Cancelled" no room and it was drawn cut
+   off at both ends. */
+SvDeskSegment { cn1-derive: Tab; text-align: center; padding: 1.4mm 0.4mm 1.4mm 0.4mm; margin: 0; }
+/* Something waiting is the one thing on the console that is not the
+   platform's grey: it wears the warning tint the phone's does. */
+SvDeskAlert { color: var(--warning); background-color: var(--warning-tint); border-radius: 1.6mm; font-family: "native:MainBold"; font-size: 2.6mm; text-align: left; padding: 2mm 3mm 2mm 3mm; margin: 1mm 0 1mm 0; }
+SvDeskAlert.pressed { color: var(--warning); background-color: var(--warning-tint); border-radius: 1.6mm; font-family: "native:MainBold"; font-size: 2.6mm; text-align: left; padding: 2mm 3mm 2mm 3mm; margin: 1mm 0 1mm 0; }
+
+SvDeskRow { background-color: transparent; border-bottom: 1px solid #d8d8d8; padding: 2mm 1mm 2mm 1mm; margin: 0; }
+SvDeskRow.pressed { background-color: var(--separator-color); }
+SvDeskRowPicked { background-color: var(--separator-color); border-bottom: 1px solid #d8d8d8; border-radius: 1.4mm; padding: 2mm 1mm 2mm 1mm; margin: 0; }
+SvDeskRowIcon { color: var(--text-secondary-color); background-color: transparent; padding: 0 2.6mm 0 0; margin: 0; }
+SvDeskRowTitle { color: var(--text-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.7mm; padding: 0; margin: 0; }
+SvDeskRowDetail { color: var(--text-secondary-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.3mm; padding: 0.4mm 0 0 0; margin: 0; }
+SvDeskRowValue { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 2.65mm; text-align: right; padding: 0; margin: 0; }
+
+SvDeskSection { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 2.8mm; text-align: left; padding: 4mm 0 1.2mm 0; margin: 0; }
+SvDeskTitle { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 4.4mm; padding: 0 0 2mm 0; margin: 0; }
+SvDeskHeading { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 3.2mm; padding: 0; margin: 0; }
+SvDeskText { color: var(--text-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.65mm; padding: 1mm 0 1mm 0; margin: 0; }
+SvDeskMuted { color: var(--text-secondary-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.4mm; padding: 0.5mm 0 0.5mm 0; margin: 0; }
+SvDeskLabel { color: var(--text-secondary-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.4mm; padding: 2.4mm 0 0.8mm 0; margin: 0; }
+SvDeskError { color: var(--danger); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.5mm; padding: 1mm 0 1mm 0; margin: 0; }
+SvDeskNotice { cn1-derive: GroupBox; color: var(--text-color); font-family: "native:MainRegular"; font-size: 2.55mm; padding: 2.4mm; margin: 2mm 0 1mm 0; }
+SvDeskPanel { cn1-derive: GroupBox; padding: 2.6mm 3mm 2.6mm 3mm; margin: 1mm 0 1mm 0; }
+SvDeskFact { background-color: transparent; padding: 1.2mm 0 1.2mm 0; margin: 0; }
+SvDeskFactLabel { color: var(--text-secondary-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.55mm; padding: 0; margin: 0; }
+SvDeskFactValue { color: var(--text-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.55mm; text-align: right; padding: 0; margin: 0; }
+SvDeskFactTotal { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 2.7mm; text-align: right; padding: 0; margin: 0; }
+SvDeskAmount { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 6.4mm; text-align: center; padding: 2mm 0 1mm 0; margin: 0; }
+SvDeskBannerIcon { color: var(--text-secondary-color); background-color: transparent; padding: 6mm 0 2mm 0; margin: 0; }
+SvDeskBannerTitle { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 3.05mm; text-align: center; padding: 0; margin: 0; }
+SvDeskBannerText { color: var(--text-secondary-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; padding: 1mm 0 0 0; margin: 0; }
+
+/* The numbers and the charts have no control on any desktop: they keep their
+   shape, in a group box, in the platform's colours. */
+SvDeskTile { cn1-derive: GroupBox; padding: 3mm 3.4mm 3mm 3.4mm; margin: 1.2mm; }
+SvDeskStat { cn1-derive: GroupBox; padding: 2.6mm 3mm 2.6mm 3mm; margin: 1.2mm; }
+SvDeskStatValue { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 4.3mm; padding: 0; margin: 0; }
+SvDeskStatLabel { color: var(--text-secondary-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.3mm; padding: 0.6mm 0 0 0; margin: 0; }
+SvDeskChartValue { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 4.3mm; padding: 0.6mm 0 0 0; margin: 0; }
+SvDeskChartAxis { color: var(--text-secondary-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.1mm; padding: 0.6mm 0 0 0; margin: 0; }
+
+/*
+ * DARK MODE. The same rules, with the second value of each colour. A rule added
+ * above that names a colour needs its line here.
+ */
+/* THE CUSTOMER'S SCREENS -- Grub's look: photos on cards, the green for what
+   can be tapped, grey for everything that is only read. */
+SvHomeHeader { background-color: var(--surface); padding: 1mm 3mm 1.5mm 1mm; margin: 0; }
+SvGreeting { color: var(--text); font-family: "native:MainBold"; font-size: 4.4mm; padding: 1mm 0 0 0; margin: 0; background-color: transparent; }
+SvMutedSmall { color: var(--text-muted); font-family: "native:MainRegular"; font-size: 2.1mm; padding: 0.3mm 0 0.3mm 0; margin: 0; background-color: transparent; }
+SvMetaLine { color: var(--text); font-family: "native:MainRegular"; font-size: 2.1mm; padding: 0.3mm 0 0 0; margin: 0; background-color: transparent; }
+SvTabBar { background-color: var(--surface); border-top: 1px solid var(--line); padding: 0.6mm 0 0.6mm 0; margin: 0; }
+SvTab { color: var(--text-muted); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.05mm; text-align: center; padding: 1mm 0 1mm 0; margin: 0; }
+SvTab.pressed { color: var(--text); }
+SvTabSelected { color: var(--brand-pressed); background-color: transparent; font-family: "native:MainBold"; font-size: 2.05mm; text-align: center; padding: 1mm 0 1mm 0; margin: 0; }
+SvSheetTitle { color: var(--text); font-family: "native:MainBold"; font-size: 3.5mm; padding: 0; margin: 0; background-color: transparent; }
+SvTotal { color: var(--text); font-family: "native:MainBold"; font-size: 3.5mm; padding: 0; margin: 0; background-color: transparent; }
+
+/* THE KITCHEN'S QUEUE -- down the left on a wide screen, the order beside it. */
+SvQueuePane { background-color: var(--surface); border-right: 1px solid var(--line); padding: 0; margin: 0; }
+SvDetailPane { background-color: var(--surface-alt); padding: 0; margin: 0; }
+SvQueueRow { background-color: var(--surface); border-bottom: 1px solid var(--line); padding: 2.6mm 3mm 2.6mm 3mm; margin: 0; }
+SvQueueRow.pressed { background-color: var(--surface-alt); }
+SvQueueRowPicked { background-color: var(--brand-tint); border-bottom: 1px solid var(--line); padding: 2.6mm 3mm 2.6mm 3mm; margin: 0; }
+
+/* The trainer's live view: a tile per member, coloured by heart rate zone,
+   from easy (1) to flat out (5); 0 is no reading yet. */
+SvZone0 { color: #ffffff; background-color: #5f6b76; border-radius: var(--radius); padding: 2mm; margin: 1mm; }
+SvZone1 { color: #ffffff; background-color: #8e9aa6; border-radius: var(--radius); padding: 2mm; margin: 1mm; }
+SvZone2 { color: #ffffff; background-color: #3a86ff; border-radius: var(--radius); padding: 2mm; margin: 1mm; }
+SvZone3 { color: #ffffff; background-color: #2a9d55; border-radius: var(--radius); padding: 2mm; margin: 1mm; }
+SvZone4 { color: #ffffff; background-color: #e09f00; border-radius: var(--radius); padding: 2mm; margin: 1mm; }
+SvZone5 { color: #ffffff; background-color: #e4572e; border-radius: var(--radius); padding: 2mm; margin: 1mm; }
+SvZoneName { color: #ffffff; font-family: "native:MainRegular"; font-size: 2.4mm; padding: 0; margin: 0; background-color: transparent; }
+SvZoneRate { color: #ffffff; font-family: "native:MainBold"; font-size: 5mm; padding: 0.5mm 0 0 0; margin: 0; background-color: transparent; }
+
+/* The watch app: large type on black. */
+SvLead { background-color: transparent; padding: 0; margin: 0; border: none; font-size: 0.1mm; }
+SvWatchForm { background-color: #000000; padding: 0.5mm 0.5mm 2mm 0.5mm; }
+SvWatchEyebrow { color: #c6f432; background-color: transparent; font-family: "native:MainBold"; font-size: 1.8mm; padding: 1mm 1mm 0 1mm; margin: 0; }
+SvWatchTitle { color: #ffffff; background-color: transparent; font-family: "native:MainBold"; font-size: 3mm; padding: 0.3mm 1mm; margin: 0; }
+SvWatchText { color: #b0b3b8; background-color: transparent; font-family: "native:MainRegular"; font-size: 2.4mm; padding: 0.2mm 1mm; margin: 0; }
+SvWatchCard { background-color: #1a1a1f; border-radius: 2.5mm; padding: 0.8mm 0.5mm; margin: 1.2mm 1mm 0.8mm 1mm; }
+SvWatchCode { color: #ffffff; background-color: transparent; font-family: "native:MainBold"; font-size: 3.4mm; text-align: center; padding: 0.5mm 0; margin: 0; }
+SvWatchBar { background-color: transparent; padding: 0.5mm 1mm; margin: 0; }
+SvWatchStat { color: #c6f432; background-color: transparent; font-family: "native:MainBold"; font-size: 2.2mm; text-align: center; padding: 1mm 1mm 0 1mm; margin: 0; }
+SvWatchStreak { color: #b0b3b8; background-color: transparent; font-family: "native:MainRegular"; font-size: 2mm; text-align: center; padding: 0 1mm; margin: 0; }
+SvWatchPage { background-color: #000000; padding: 0; margin: 0; }
+SvWatchBig { color: #c6f432; background-color: transparent; font-family: "native:MainBold"; font-size: 4.2mm; padding: 0.3mm 1mm; margin: 0; }
+SvWatchSmall { color: #8a8d93; background-color: transparent; font-family: "native:MainRegular"; font-size: 1.9mm; padding: 0.2mm 1mm; margin: 0; }
+SvWatchSmallCenter { color: #8a8d93; background-color: transparent; font-family: "native:MainRegular"; font-size: 1.9mm; text-align: center; padding: 0.3mm 1mm; margin: 0; }
+SvWatchEyebrowMuted { color: #c6f432; background-color: transparent; font-family: "native:MainBold"; font-size: 1.7mm; padding: 0; margin: 0; }
+SvWatchRow { background-color: #1a1a1f; border-radius: 2mm; padding: 0.8mm 1.2mm; margin: 0.6mm 0 0 0; }
+SvWatchRowTitle { color: #ffffff; background-color: transparent; font-family: "native:MainBold"; font-size: 2.5mm; padding: 0.2mm 0; margin: 0; }
+SvWatchRing { background-color: transparent; padding: 0.8mm 0 0.4mm 0; margin: 0; }
+SvWatchBars { background-color: transparent; padding: 0.8mm 2mm 0.2mm 2mm; margin: 0; }
+SvWatchDots { background-color: #000000; padding: 0; margin: 0; }
+
+/* ----------------------------------------------------------- class cards */
+
+SvClass {
+    background-color: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 3mm;
+    padding: 2.4mm 2.4mm 2.4mm 0;
+    margin: 1.2mm 0 1.2mm 0;
+}
+SvClassTime { background-color: transparent; padding: 0 2mm 0 2.6mm; margin: 0; }
+SvClassClock { background-color: transparent; font-family: "native:MainBold"; font-size: 3.6mm; color: var(--text); padding: 0; margin: 0; }
+SvClassLength { background-color: transparent; font-size: 2.6mm; color: var(--text-muted); padding: 0; margin: 0; }
+SvClassStripe { background-color: var(--brand); padding: 0 0.5mm 0 0.5mm; margin: 0.5mm 0 0.5mm 0; border-radius: 1mm; }
+SvClassBody { background-color: transparent; padding: 0 1.6mm 0 2.4mm; margin: 0; }
+SvClassName { background-color: transparent; font-family: "native:MainBold"; font-size: 3.2mm; color: var(--text); padding: 0; margin: 0; }
+SvClassGlyph { background-color: transparent; padding: 0 1.2mm 0 0; margin: 0; }
+SvClassWho { background-color: transparent; font-size: 2.7mm; color: var(--text-muted); padding: 0.6mm 0 0.8mm 0; margin: 0; }
+SvClassFill { background-color: transparent; padding: 0.4mm 0 0 0; margin: 0; }
+SvClassLeft { background-color: transparent; font-size: 2.5mm; color: var(--text-muted); padding: 0 0 0 1.6mm; margin: 0; }
+SvClassScarce { background-color: transparent; font-family: "native:MainBold"; font-size: 2.5mm; color: var(--brand); padding: 0 0 0 1.6mm; margin: 0; }
+SvClassFull { background-color: transparent; font-family: "native:MainBold"; font-size: 2.5mm; color: var(--danger); padding: 0 0 0 1.6mm; margin: 0; }
+SvClassFriends { background-color: transparent; font-size: 2.6mm; color: var(--violet); padding: 0.8mm 0 0 0; margin: 0; }
+/* Tinted, not filled: a page of classes is a page of Book buttons, and a
+   column of solid red shouted. */
+SvPillBook { font-family: "native:MainBold"; font-size: 2.9mm; color: var(--brand); background-color: var(--brand-tint); border-radius: 4mm; padding: 1.4mm 2.8mm 1.4mm 2.8mm; margin: 0; text-align: center; }
+SvPillBook.pressed { color: var(--brand-contrast); background-color: var(--brand); }
+SvPillQueue { font-family: "native:MainBold"; font-size: 2.9mm; color: var(--violet); background-color: var(--violet-tint); border-radius: 4mm; padding: 1.4mm 2.8mm 1.4mm 2.8mm; margin: 0; text-align: center; }
+SvPillBooked { font-family: "native:MainBold"; font-size: 2.9mm; color: var(--success); background-color: var(--success-tint); border-radius: 4mm; padding: 1.4mm 2.8mm 1.4mm 2.8mm; margin: 0; text-align: center; }
+
+/* Days of the week and people in a household: pills in a row that scrolls.
+   A chosen toggle wears ".pressed" (see SvSegment). */
+SvPills { background-color: transparent; padding: 0 0 2mm 0; margin: 0; }
+SvPill { font-family: "native:MainBold"; font-size: 2.6mm; color: var(--text-muted); background-color: var(--surface-alt); border-radius: 4mm; padding: 1.8mm 3.2mm 1.8mm 3.2mm; margin: 0 1.6mm 0 0; text-align: center; }
+SvPill.selected { color: var(--text-muted); background-color: var(--surface-alt); }
+SvPill.pressed { color: var(--ink-text); background-color: var(--ink); }
+
+/* --------------------------------------------------------- gamification */
+
+SvLevel { background-color: transparent; font-family: "native:MainBold"; font-size: 5mm; color: var(--lime); padding: 0; margin: 0; }
+SvLevelTrack { color: var(--ink-raised); }
+SvShelf { background-color: transparent; padding: 1mm 0 1mm 0; margin: 0; }
+SvMedalCell { background-color: transparent; padding: 0 1.4mm 0 1.4mm; margin: 0; }
+SvMedal { color: #ffffff; background-color: var(--violet); border-radius: 50%; padding: 2.6mm; margin: 0; }
+SvMedalLocked { color: var(--text-muted); background-color: var(--locked); border-radius: 50%; padding: 2.6mm; margin: 0; }
+SvMedalName { background-color: transparent; font-size: 2.4mm; color: var(--text); padding: 0.8mm 0 0 0; margin: 0; }
+SvMedalNameLocked { background-color: transparent; font-size: 2.4mm; color: var(--text-muted); padding: 0.8mm 0 0 0; margin: 0; }
+SvInk { background-color: var(--ink); border-radius: 3.4mm; padding: 3.4mm; margin: 1.4mm 0 1.4mm 0; }
+SvInkEyebrow { background-color: transparent; font-family: "native:MainBold"; font-size: 2.4mm; color: var(--lime); padding: 0; margin: 0; }
+SvInkTitle { background-color: transparent; font-family: "native:MainBold"; font-size: 5mm; color: var(--ink-text); padding: 0.6mm 0 0.6mm 0; margin: 0; }
+SvInkText { background-color: transparent; font-size: 2.9mm; color: var(--ink-muted); padding: 0; margin: 0; }
+SvInkChip { font-family: "native:MainBold"; font-size: 2.6mm; color: var(--ink); background-color: var(--lime); border-radius: 3mm; padding: 1mm 2.8mm 1mm 2.8mm; margin: 0 1.4mm 0 0; }
+SvInkButton { font-family: "native:MainBold"; font-size: 3mm; color: var(--ink); background-color: var(--lime); border-radius: 4mm; padding: 1.8mm 3.6mm 1.8mm 3.6mm; margin: 2mm 0 0 0; text-align: center; }
+SvInkButton.pressed { background-color: #ffffff; }
+SvBeat { background-color: transparent; color: var(--lime); padding: 0; margin: 0; }
+SvTile { background-color: var(--surface-alt); border-radius: 3mm; padding: 2mm 0.6mm 2mm 0.6mm; margin: 0.8mm; }
+SvInkRow { background-color: transparent; padding: 0; margin: 1.6mm 0 0 0; }
+SvLevelBox { background-color: transparent; padding: 0 0 0 3mm; margin: 0; }
+SvTileValue { background-color: transparent; font-family: "native:MainBold"; font-size: 4.4mm; color: var(--text); padding: 0; margin: 0; }
+SvTileLabel { background-color: transparent; font-size: 2.3mm; color: var(--text-muted); padding: 0; margin: 0; }
+SvCallout { background-color: var(--violet-tint); border-radius: 3mm; padding: 2.6mm; margin: 1.4mm 0 1.4mm 0; }
+SvCalloutText { font-size: 2.9mm; color: var(--violet); padding: 0; margin: 0; }
+
+SvWelcome { background-color: var(--ink); padding: 10mm 5mm 4mm 5mm; margin: 0; }
+SvWelcomeActions { background-color: transparent; padding: 2mm 5mm 4mm 5mm; margin: 0; }
+SvWelcomeIcon { background-color: transparent; color: var(--lime); padding: 0 2mm 0 0; margin: 0; }
+SvWelcomeTitle { background-color: transparent; font-family: "native:MainBold"; font-size: 11mm; color: var(--ink-text); padding: 4mm 0 0 0; margin: 0; }
+SvWelcomeTag { background-color: transparent; font-size: 4.2mm; color: var(--ink-muted); padding: 0 0 6mm 0; margin: 0; }
+SvWelcomeFeature { background-color: var(--ink-raised); border-radius: 3mm; padding: 2.6mm; margin: 1.2mm 0 1.2mm 0; }
+SvWelcomeFeatureIcon { background-color: transparent; color: var(--lime); padding: 0 2.6mm 0 0; margin: 0; }
+SvWelcomeFeatureText { background-color: transparent; font-size: 3.1mm; color: var(--ink-text); padding: 0; margin: 0; }
+
+@media (prefers-color-scheme: dark) {
+    SvDock { background-color: var(--surface-dark); border-top: 1px solid var(--surface-press-dark); }
+    SvWelcome { background-color: var(--ink-dark); }
+    SvWelcomeFeature { background-color: var(--ink-raised-dark); }
+    SvClass { background-color: var(--surface-alt-dark); border: 1px solid var(--surface-press-dark); }
+    SvClassStripe { background-color: var(--brand-dark); }
+    SvClassScarce { color: var(--brand-dark); }
+    SvClassFriends { color: var(--violet-dark); }
+    SvPillBook { color: var(--brand-dark); background-color: var(--brand-tint-dark); }
+    SvPillQueue { color: var(--violet-dark); background-color: var(--violet-tint-dark); }
+    SvInk { background-color: var(--ink-dark); }
+    SvLevelTrack { color: var(--ink-raised-dark); }
+    SvMedal { background-color: var(--violet-dark); }
+    SvMedalLocked { background-color: var(--locked-dark); }
+    SvTile { background-color: var(--surface-alt-dark); }
+    SvCallout { background-color: var(--violet-tint-dark); }
+    SvCalloutText { color: var(--violet-dark); }
+    SvForm { background-color: var(--surface-dark); }
+    SvPage { background-color: var(--surface-dark); }
+    SvHero { background-color: var(--brand-dark); }
+    SvHeroTitle { color: var(--brand-contrast-dark); }
+    SvHeroText { color: var(--brand-contrast-dark); }
+    SvHeroIcon { color: var(--brand-contrast-dark); }
+    SvCard { background-color: var(--surface-dark); }
+    SvFloat { background-color: var(--surface-dark); }
+    SvPanel { background-color: var(--surface-alt-dark); }
+    SvDivider { background-color: var(--line-dark); }
+    SvTitle { color: var(--text-dark); }
+    SvHeading { color: var(--text-dark); }
+    SvText { color: var(--text-dark); }
+    SvMuted { color: var(--text-muted-dark); }
+    SvPill { color: var(--text-muted-dark); background-color: var(--surface-alt-dark); }
+    SvPill.selected { color: var(--text-muted-dark); background-color: var(--surface-alt-dark); }
+    SvPill.pressed { color: var(--ink-dark); background-color: var(--lime); }
+    SvChartTitle { color: var(--text-muted-dark); }
+    SvRankBar { color: var(--surface-alt-dark); }
+    SvFrontScan { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
+    SvFrontScan.pressed { background-color: var(--brand-pressed-dark); }
+    SvFrontFob { color: var(--text-dark); background-color: var(--surface-alt-dark); border: 1px solid var(--line-dark); }
+    SvFrontFob.pressed { background-color: var(--surface-press-dark); }
+    SvLabel { color: var(--text-muted-dark); }
+    SvPrice { color: var(--text-dark); }
+    SvError { color: var(--danger-dark); }
+    SvNotice { color: var(--text-dark); background-color: var(--surface-alt-dark); }
+    SvPrimary { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
+    SvPrimary.pressed { background-color: var(--brand-pressed-dark); }
+    SvPrimary.disabled { color: var(--text-muted-dark); background-color: var(--surface-press-dark); }
+    SvSecondary { color: var(--text-dark); background-color: var(--surface-alt-dark); }
+    SvSecondary.pressed { background-color: var(--surface-press-dark); }
+    SvDanger { color: var(--danger-dark); background-color: var(--danger-tint-dark); }
+    SvDanger.pressed { background-color: var(--surface-press-dark); }
+    SvLink { color: var(--brand-dark); }
+    SvLink.pressed { color: var(--brand-pressed-dark); background-color: var(--brand-tint-dark); }
+    SvMapButton { background: cn1-round-border; color: var(--text-dark); background-color: var(--surface-dark); }
+    SvMapButton.pressed { background: cn1-round-border; background-color: var(--surface-alt-dark); }
+    SvBarButton { background: cn1-round-border; color: var(--text-dark); background-color: var(--surface-dark); }
+    SvBarButton.pressed { background: cn1-round-border; background-color: var(--surface-alt-dark); }
+    SvField { color: var(--text-dark); background-color: var(--surface-alt-dark); }
+    SvFieldHint { color: var(--text-muted-dark); }
+    SvRow { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
+    SvRow.pressed { background-color: var(--surface-alt-dark); }
+    SvRowIcon { color: var(--text-muted-dark); }
+    SvRowTitle { color: var(--text-dark); }
+    SvRowDetail { color: var(--text-muted-dark); }
+    SvRowValue { color: var(--text-dark); }
+    SvBadge { background: cn1-pill-border; color: var(--text-muted-dark); background-color: var(--surface-alt-dark); }
+    SvBadgeGood { background: cn1-pill-border; color: var(--success-dark); background-color: var(--success-tint-dark); }
+    SvBadgeWarn { background: cn1-pill-border; color: var(--warning-dark); background-color: var(--warning-tint-dark); }
+    SvBadgeBad { background: cn1-pill-border; color: var(--danger-dark); background-color: var(--danger-tint-dark); }
+    SvStat { background-color: var(--surface-alt-dark); }
+    SvStatValue { color: var(--text-dark); }
+    SvStatLabel { color: var(--text-muted-dark); }
+    StatusBar { background-color: var(--surface-dark); }
+    Toolbar { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
+    Title { color: var(--text-dark); }
+    TitleCommand { color: var(--text-dark); }
+    BackCommand { color: var(--text-dark); }
+    SvChip { background: cn1-pill-border; color: var(--text-dark); background-color: var(--surface-alt-dark); }
+    SvSheet { background-color: var(--surface-dark); }
+    SvGrip { color: var(--line-strong-dark); }
+    SvPulse { color: var(--brand-dark); }
+    SvShortcut { color: var(--text-dark); background-color: var(--surface-alt-dark); }
+    SvShortcut.pressed { background-color: var(--surface-press-dark); }
+    SvAvatar { background: cn1-round-border; color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
+    SvAction { color: var(--text-dark); }
+    SvAction.pressed { color: var(--brand-dark); background-color: var(--surface-alt-dark); }
+    SvActionDanger { color: var(--danger-dark); }
+    SvActionDanger.pressed { color: var(--danger-dark); background-color: var(--danger-tint-dark); }
+    SvMenu { background-color: var(--surface-dark); }
+    SvMenuTop { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
+    SvMenuName { color: var(--text-dark); }
+    SvMenuDetail { color: var(--text-muted-dark); }
+    SvModeBadge { background: cn1-pill-border; color: var(--brand-dark); background-color: var(--brand-tint-dark); }
+    SvMenuLabel { color: var(--text-muted-dark); }
+    SvMenuItem { color: var(--text-dark); }
+    SvMenuItem.pressed { background-color: var(--surface-alt-dark); }
+    SvMenuBottom { border-top: 1px solid var(--line-dark); }
+    SvHomeBar { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
+    SvSection { color: var(--text-dark); }
+    SvSegments { background-color: var(--surface-alt-dark); }
+    SvSegment { color: var(--text-muted-dark); }
+    SvSegment.selected { color: var(--text-muted-dark); background-color: transparent; }
+    SvSegment.pressed { color: var(--text-dark); background-color: var(--surface-press-dark); }
+    SvList { background-color: var(--surface-dark); }
+    SvFactLabel { color: var(--text-muted-dark); }
+    SvFactValue { color: var(--text-dark); }
+    SvFactTotal { color: var(--text-dark); }
+    SvCallout { background-color: var(--warning-tint-dark); }
+    SvCalloutIcon { color: var(--warning-dark); }
+    SvCalloutTitle { color: var(--text-dark); }
+    SvCalloutText { color: var(--text-dark); }
+    SvBannerIcon { background: cn1-round-border; color: var(--brand-dark); background-color: var(--brand-tint-dark); }
+    SvBannerIconGood { background: cn1-round-border; color: var(--success-dark); background-color: var(--success-tint-dark); }
+    SvBannerIconWarn { background: cn1-round-border; color: var(--warning-dark); background-color: var(--warning-tint-dark); }
+    SvBannerIconBad { background: cn1-round-border; color: var(--danger-dark); background-color: var(--danger-tint-dark); }
+    SvBannerTitle { color: var(--text-dark); }
+    SvBannerText { color: var(--text-muted-dark); }
+    SvAmount { color: var(--text-dark); }
+    SvChart { color: var(--brand-dark); }
+    SvChartPeak { color: var(--brand-pressed-dark); }
+    SvChartGrid { color: var(--line-dark); }
+    SvChartAxis { color: var(--text-muted-dark); }
+    SvChartValue { color: var(--text-dark); }
+    SvMeter { color: var(--brand-dark); }
+    SvAlert { color: var(--warning-dark); background-color: var(--warning-tint-dark); }
+    SvAlert.pressed { background-color: var(--surface-press-dark); }
+    SvOption { background-color: var(--surface-dark); border: 1px solid var(--line-dark); }
+    SvOption.pressed { background-color: var(--surface-alt-dark); }
+    SvOptionPicked { background-color: var(--brand-tint-dark); border: 2px solid var(--brand-dark); }
+    SvOptionIcon { color: var(--text-dark); }
+    SvCardFace { background-color: var(--brand-dark); }
+    SvCardBrand { color: var(--brand-contrast-dark); }
+    SvCardNumber { color: var(--brand-contrast-dark); }
+    SvCardSmall { color: var(--brand-contrast-dark); }
+    SvThumb { color: var(--text-muted-dark); background-color: var(--surface-alt-dark); }
+    SvFooter { background-color: var(--surface-dark); border-top: 1px solid var(--line-dark); }
+    SvSide { background-color: var(--surface-alt-dark); border-right: 1px solid var(--line-dark); }
+    SvSideName { color: var(--text-dark); }
+    SvSideDetail { color: var(--text-muted-dark); }
+    SvSideLabel { color: var(--text-muted-dark); }
+    SvSideItem { color: var(--text-dark); }
+    SvSideItem.pressed { background-color: var(--line-dark); }
+    SvSidePicked { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
+    SvMaster { background-color: var(--surface-dark); border-right: 1px solid var(--line-dark); }
+    SvPaneBar { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
+    SvPaneTitle { color: var(--text-dark); }
+    SvRowPicked { background-color: var(--surface-alt-dark); }
+    SvSecondary.disabled, SvDanger.disabled, SvLink.disabled { color: var(--line-strong-dark); }
+    SvField.selected { background-color: var(--brand-tint-dark); }
+    SvField.disabled { color: var(--text-muted-dark); }
+    Switch { color: #ffffff; background-color: var(--line-strong-dark); }
+    Switch.selected { color: #ffffff; background-color: var(--brand-dark); }
+    Switch.disabled { color: var(--text-muted-dark); background-color: var(--line-dark); }
+    SvSegment.disabled { color: var(--line-strong-dark); }
+    SvSkeleton { color: var(--surface-alt-dark); }
+    PullToRefresh { color: var(--text-muted-dark); }
+    ToastBar { background-color: var(--text-dark); }
+    ToastBarMessage { color: var(--surface-dark); }
+    SvDeskForm { background-color: var(--window-bg-color-dark); }
+    SvDeskPage { background-color: var(--window-bg-color-dark); }
+    SvDeskList { background-color: var(--view-bg-color-dark); }
+    SvDeskMaster { background-color: var(--view-bg-color-dark); border-right: 1px solid #3a3a3a; }
+    SvDeskHomeBar { background-color: var(--headerbar-bg-color-dark); border-bottom: 1px solid #3a3a3a; }
+    SvDeskPaneBar { background-color: var(--window-bg-color-dark); border-bottom: 1px solid #3a3a3a; }
+    SvDeskPaneTitle { color: var(--text-color-dark); }
+    SvDeskSide { background-color: var(--headerbar-bg-color-dark); border-right: 1px solid #3a3a3a; }
+    SvDeskSideName { color: var(--text-color-dark); }
+    SvDeskSideDetail { color: var(--text-secondary-color-dark); }
+    SvDeskSideLabel { color: var(--text-secondary-color-dark); }
+    SvDeskSideItem { color: var(--text-color-dark); }
+    SvDeskSideItem.pressed { background-color: var(--separator-color-dark); }
+    SvDeskSidePicked { color: var(--accent-fg-color-dark); background-color: var(--accent-color-dark); }
+    SvDeskDanger { color: var(--danger-dark); }
+    SvDeskRow { border-bottom: 1px solid #3a3a3a; }
+    SvDeskRow.pressed { background-color: var(--separator-color-dark); }
+    SvDeskRowPicked { background-color: var(--separator-color-dark); border-bottom: 1px solid #3a3a3a; }
+    SvDeskAlert { color: var(--warning-dark); background-color: var(--warning-tint-dark); }
+    SvDeskAlert.pressed { color: var(--warning-dark); background-color: var(--warning-tint-dark); }
+    SvDeskRowIcon { color: var(--text-secondary-color-dark); }
+    SvDeskRowTitle { color: var(--text-color-dark); }
+    SvDeskRowDetail { color: var(--text-secondary-color-dark); }
+    SvDeskRowValue { color: var(--text-color-dark); }
+    SvDeskSection { color: var(--text-color-dark); }
+    SvDeskTitle { color: var(--text-color-dark); }
+    SvDeskHeading { color: var(--text-color-dark); }
+    SvDeskText { color: var(--text-color-dark); }
+    SvDeskMuted { color: var(--text-secondary-color-dark); }
+    SvDeskLabel { color: var(--text-secondary-color-dark); }
+    SvDeskError { color: var(--danger-dark); }
+    SvDeskNotice { color: var(--text-color-dark); }
+    SvDeskFactLabel { color: var(--text-secondary-color-dark); }
+    SvDeskFactValue { color: var(--text-color-dark); }
+    SvDeskFactTotal { color: var(--text-color-dark); }
+    SvDeskAmount { color: var(--text-color-dark); }
+    SvDeskBannerIcon { color: var(--text-secondary-color-dark); }
+    SvDeskBannerTitle { color: var(--text-color-dark); }
+    SvDeskBannerText { color: var(--text-secondary-color-dark); }
+    SvDeskStatValue { color: var(--text-color-dark); }
+    SvDeskStatLabel { color: var(--text-secondary-color-dark); }
+    SvDeskChartValue { color: var(--text-color-dark); }
+    SvDeskChartAxis { color: var(--text-secondary-color-dark); }
+    SvHomeHeader { background-color: var(--surface-dark); }
+    SvGreeting { color: var(--text-dark); }
+    SvMutedSmall { color: var(--text-muted-dark); }
+    SvMetaLine { color: var(--text-dark); }
+    SvTabBar { background-color: var(--surface-dark); border-top: 1px solid var(--line-dark); }
+    SvTab { color: var(--text-muted-dark); }
+    SvTab.pressed { color: var(--text-dark); }
+    SvTabSelected { color: var(--brand-dark); }
+    SvSheetTitle { color: var(--text-dark); }
+    SvTotal { color: var(--text-dark); }
+    SvQueuePane { background-color: var(--surface-dark); border-right: 1px solid var(--line-dark); }
+    SvDetailPane { background-color: var(--surface-alt-dark); }
+    SvQueueRow { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
+    SvQueueRow.pressed { background-color: var(--surface-alt-dark); }
+    SvQueueRowPicked { background-color: var(--brand-tint-dark); border-bottom: 1px solid var(--line-dark); }
+
+    /* Class cards, medals, kudos and tiles. */
+    SvWorkoutWorn { color: var(--violet-dark); }
+    SvPoints { color: var(--ink-dark); }
+    SvKudos { color: var(--brand-dark); background-color: var(--surface-alt-dark); }
+    SvKudos.pressed { background-color: var(--surface-press-dark); }
+    SvKudos.disabled { color: var(--text-muted-dark); background-color: var(--surface-alt-dark); }
+    SvKudosGiven { background-color: var(--brand-dark); }
+    SvKudosGiven.disabled { background-color: var(--brand-dark); }
+    SvKudosMine { color: var(--text-muted-dark); }
+    SvKudosMine.disabled { color: var(--text-muted-dark); }
+    SvClassClock { color: var(--text-dark); }
+    SvClassLength { color: var(--text-muted-dark); }
+    SvClassName { color: var(--text-dark); }
+    SvClassWho { color: var(--text-muted-dark); }
+    SvClassLeft { color: var(--text-muted-dark); }
+    SvClassFull { color: var(--danger-dark); }
+    SvPillBook.pressed { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
+    SvPillBooked { color: var(--success-dark); background-color: var(--success-tint-dark); }
+    SvMedalLocked { color: var(--text-muted-dark); }
+    SvMedalName { color: var(--text-dark); }
+    SvMedalNameLocked { color: var(--text-muted-dark); }
+    SvInkChip { color: var(--ink-dark); }
+    SvInkButton { color: var(--ink-dark); }
+    SvTileValue { color: var(--text-dark); }
+    SvTileLabel { color: var(--text-muted-dark); }
+    SvRowAmount { color: var(--text-dark); }
+
+    /* The owner's insights, members and billing. */
+    SvHeatmap { color: var(--brand-dark); }
+    SvDonut { color: var(--text-dark); }
+    SvLegendActive { color: var(--brand-dark); }
+    SvLegendJoined { color: var(--success-dark); }
+    SvLegendLeft { color: var(--danger-dark); }
+    SvLegendRow { border-bottom: 1px solid var(--line-dark); }
+    SvSearchBar { background-color: var(--surface-dark); }
+}
+SvRowAmount { background-color: transparent; font-family: "native:MainBold"; font-size: 3.6mm; color: var(--text); padding: 0 0 0 2mm; margin: 0; }
+SvClassTile { background-color: transparent; padding: 2mm; margin: 0 3mm 0 0; }
+
+/* The owner's insights: the busy-hours heatmap (its colour is the cells',
+   its font the labels'), the plan donut (the total in the middle) and the
+   membership chart's legend, whose colours the chart draws its series in. */
+SvHeatmap { color: var(--brand); background-color: transparent; font-family: "native:MainRegular"; font-size: 2mm; padding: 1.6mm 0 1mm 0; margin: 0; }
+SvDonut { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 5mm; padding: 2mm; margin: 0; }
+SvLegendActive { color: var(--brand); background-color: transparent; font-family: "native:MainBold"; font-size: 2.3mm; padding: 1mm 3mm 0 0; margin: 0; }
+SvLegendJoined { cn1-derive: SvLegendActive; color: var(--success); }
+SvLegendLeft { cn1-derive: SvLegendActive; color: var(--danger); }
+SvLegendRow { background-color: transparent; border-bottom: 1px solid var(--line); padding: 2mm 0 2mm 0; margin: 0; }
+/* The search field and chips over the member list and the billing summary. */
+SvSearchBar { background-color: var(--surface); padding: 2mm 3mm 0 3mm; margin: 0; }
