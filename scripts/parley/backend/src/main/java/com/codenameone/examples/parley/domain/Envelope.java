@@ -21,6 +21,7 @@ package com.codenameone.examples.parley.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
+import java.time.Instant;
 
 /// One encrypted copy of a message, waiting for one device to fetch it. It is
 /// deleted when the device acknowledges it, or when its disappearing timer runs
@@ -59,10 +60,10 @@ public class Envelope {
     private byte[] payload = new byte[0];
 
     @Column(nullable = false)
-    private long sentAt;
+    private Instant sentAt = Instant.EPOCH;
 
     @Column(nullable = false)
-    private long expiresAt;
+    private Instant expiresAt = Instant.EPOCH;
 
     public Envelope() {
     }
@@ -147,19 +148,19 @@ public class Envelope {
         this.payload = payload;
     }
 
-    public long getSentAt() {
+    public Instant getSentAt() {
         return sentAt;
     }
 
-    public void setSentAt(long sentAt) {
+    public void setSentAt(Instant sentAt) {
         this.sentAt = sentAt;
     }
 
-    public long getExpiresAt() {
+    public Instant getExpiresAt() {
         return expiresAt;
     }
 
-    public void setExpiresAt(long expiresAt) {
+    public void setExpiresAt(Instant expiresAt) {
         this.expiresAt = expiresAt;
     }
 }

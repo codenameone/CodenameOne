@@ -3091,6 +3091,23 @@
         "status": "submitted",
         "published": false,
         "syndicated_at": "2026-10-30T01:01:52+00:00"
+      },
+      "devto": {
+        "id": 4949758,
+        "url": "https://dev.to/codenameone/rewrite-everything-in-java-not-rust-5co8",
+        "syndicated_at": "2026-10-30T22:46:41+00:00"
+      }
+    },
+    "build-a-multiplayer-strategy-game-in-java": {
+      "hashnode": {
+        "url": "https://debugagent.com/skirmish-a-multiplayer-strategy-game-template-in-java",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6ae53da2e6bf8b25f54d7f93",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-10-31T01:01:14+00:00"
       }
     }
   }

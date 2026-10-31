@@ -70,7 +70,8 @@ public class StackRenderElement extends RenderElement {
 
     private Alignment alignment() {
         Alignment a = stack().getAlignment();
-        return a == null ? Alignment.topLeft : a;
+        // Flutter's default is AlignmentDirectional.topStart: top-right under RTL.
+        return a == null ? com.codename1.flutter.AlignmentDirectional.topStart : a;
     }
 
     @Override
@@ -130,7 +131,7 @@ public class StackRenderElement extends RenderElement {
             } else {
                 Size cs = kid.size();
                 setChildOffset(kid,
-                        Alignment.along(a.x(), self.width(), cs.width()),
+                        Alignment.along(com.codename1.flutter.AlignmentDirectional.xFor(a, isRtl()), self.width(), cs.width()),
                         Alignment.along(a.y(), self.height(), cs.height()));
             }
         }
@@ -189,7 +190,7 @@ public class StackRenderElement extends RenderElement {
         } else if (right != null) {
             x = self.width() - right - cs.width();
         } else {
-            x = Alignment.along(a.x(), self.width(), cs.width());
+            x = Alignment.along(com.codename1.flutter.AlignmentDirectional.xFor(a, isRtl()), self.width(), cs.width());
         }
         double y;
         if (top != null) {

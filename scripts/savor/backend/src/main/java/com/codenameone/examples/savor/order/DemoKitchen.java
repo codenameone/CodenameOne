@@ -28,6 +28,7 @@ import com.codenameone.examples.savor.domain.CustomerOrder;
 import com.codenameone.examples.savor.repository.CustomerOrderRepository;
 import com.codenameone.examples.savor.repository.RestaurantStaffRepository;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.List;
 
 /// The kitchens of the demo restaurants nobody runs, on a development server:
@@ -62,7 +63,7 @@ public class DemoKitchen {
             return;
         }
         long now = System.currentTimeMillis();
-        List<CustomerOrder> waiting = unattended(OrderState.PLACED, now - ACCEPT_AFTER_MILLIS);
+        List<CustomerOrder> waiting = unattended(OrderState.PLACED, Instant.ofEpochMilli(now - ACCEPT_AFTER_MILLIS));
         for (int iter = 0; iter < waiting.size(); iter++) {
             CustomerOrder order = waiting.get(iter);
             try {
@@ -72,7 +73,7 @@ public class DemoKitchen {
                 // Cancelled or turned down in the meantime.
             }
         }
-        List<CustomerOrder> cooking = unattended(OrderState.ACCEPTED, now - READY_AFTER_MILLIS);
+        List<CustomerOrder> cooking = unattended(OrderState.ACCEPTED, Instant.ofEpochMilli(now - READY_AFTER_MILLIS));
         for (int iter = 0; iter < cooking.size(); iter++) {
             CustomerOrder order = cooking.get(iter);
             try {
@@ -85,7 +86,7 @@ public class DemoKitchen {
 
     /// Orders in `state` since before `before` at restaurants with no staff.
     @Transactional(readOnly = true)
-    private List<CustomerOrder> unattended(OrderState state, long before) {
+    private List<CustomerOrder> unattended(OrderState state, Instant before) {
         List<CustomerOrder> rows = OrderState.PLACED == state
                 ? orders.findByStateAndPlacedAtLessThan(state, before)
                 : orders.findByStateAndAcceptedAtLessThan(state, before);

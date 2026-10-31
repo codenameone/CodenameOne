@@ -4,7 +4,7 @@ Pets 1.2.3+45
 offline true
 a.txt text/plain hello 5
 details true
-platform impl true
+platform impl false
 before init: no-app
 apps 1 p
 headless: network-request-failed

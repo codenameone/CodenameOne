@@ -18,6 +18,7 @@ public class DemoApp extends StatelessWidget {
 
     @Override
     public Widget build(BuildContext context) {
+        //@dart:12 main.dart
         var $t0 = new MaterialApp();
         $t0.title("M2 Demo");
         var $t1 = new ThemeData();
@@ -28,4 +29,5 @@ public class DemoApp extends StatelessWidget {
         return $t0;
     }
 
+    static final String $cn1DartLines = "main.dart\n22:12";
 }

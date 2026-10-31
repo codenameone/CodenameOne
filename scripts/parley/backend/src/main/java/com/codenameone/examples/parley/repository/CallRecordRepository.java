@@ -25,6 +25,7 @@ import com.codename1.orm.repository.Query;
 import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.parley.domain.CallRecord;
 
+import java.time.Instant;
 import java.util.List;
 
 /// Calls, live and past.
@@ -42,16 +43,16 @@ public interface CallRecordRepository extends CrudRepository<CallRecord, String>
     @Query("select c from CallRecord c where c.caller = :username or c.callee = :username order by c.startedAt desc")
     List<CallRecord> historyOf(@Param("username") String username);
 
-    @Query("select c from CallRecord c where (c.caller = :username or c.callee = :username) and c.endedAt = 0")
-    List<CallRecord> liveOf(@Param("username") String username);
+    @Query("select c from CallRecord c where (c.caller = :username or c.callee = :username) and c.endedAt = :none")
+    List<CallRecord> liveOf(@Param("username") String username, @Param("none") Instant none);
 
-    @Query("select c from CallRecord c where c.endedAt = 0 and c.startedAt < :before")
-    List<CallRecord> openSince(@Param("before") long before);
+    @Query("select c from CallRecord c where c.endedAt = :none and c.startedAt < :before")
+    List<CallRecord> openSince(@Param("before") Instant before, @Param("none") Instant none);
 
-    long countByStartedAtGreaterThanEqual(long since);
+    long countByStartedAtGreaterThanEqual(Instant since);
 
     @Query("select c.startedAt from CallRecord c where c.startedAt >= :since")
-    List<Long> startedSince(@Param("since") long since);
+    List<Instant> startedSince(@Param("since") Instant since);
 
     @Modifying
     @Query("delete from CallRecord c where c.caller = :username or c.callee = :username")

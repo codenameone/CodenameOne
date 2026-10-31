@@ -38,6 +38,7 @@ public final class AppleSignInResult {
     String userId;
     String email;
     String fullName;
+    String rawNonce;
 
     AppleSignInResult() {}
 
@@ -73,5 +74,14 @@ public final class AppleSignInResult {
     /// share it.
     public String getFullName() {
         return fullName;
+    }
+
+    /// The nonce this sign-in sent, before hashing: the native sheet sends Apple its
+    /// SHA-256, so the identity token's `nonce` claim is that hash, and a service that
+    /// checks the token against the request -- Firebase Authentication's
+    /// `signInWithIdp` -- needs this value to recompute it. `null` for the web flow,
+    /// whose request carries an unhashed nonce of its own.
+    public String getRawNonce() {
+        return rawNonce;
     }
 }

@@ -208,6 +208,7 @@ public final class AppleSignIn extends Login {
                         return;
                     }
                     AppleSignInResult result = parsePackedResult(packed);
+                    result.rawNonce = plainNonce;
                     if (result.getIdentityToken() == null) {
                         callback.onError("Apple Sign-In returned no identity token");
                         return;

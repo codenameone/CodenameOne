@@ -194,6 +194,13 @@ public class ListTileRenderElement extends RenderElement {
             setChildOffset(trailing, width - hpad - trailingSize.width(),
                     (height - trailingSize.height()) / 2);
         }
+        if (isRtl()) {
+            // Leading at the right edge, trailing at the left, text right of the middle.
+            mirrorChildX(leading, width);
+            mirrorChildX(title, width);
+            mirrorChildX(subtitle, width);
+            mirrorChildX(trailing, width);
+        }
         if (overlay != null) {
             overlay.layout(BoxConstraints.tight(width, height));
             setChildOffset(overlay, 0, 0);

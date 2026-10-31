@@ -1,0 +1,227 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.maven;
+
+import com.codename1.build.SystemStreamLog;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
+
+import java.io.File;
+import java.nio.file.Files;
+import java.util.HashSet;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
+/**
+ * Flattened Flutter assets follow the source tree across incremental builds:
+ * what disappears from src/main/flutter disappears from the output, and nothing
+ * the plugin did not write is ever removed.
+ */
+public class FlutterProjectAssetsTest {
+
+    @Rule
+    public TemporaryFolder tmp = new TemporaryFolder();
+
+    private FlutterProjectBuilder mojo;
+    private File flutter;
+    private File classes;
+
+    @Before
+    public void setUp() throws Exception {
+        File target = tmp.newFolder("target");
+        classes = new File(target, "classes");
+        flutter = tmp.newFolder("flutter");
+        mojo = new FlutterProjectBuilder(flutter, new File(target, "generated-sources/flutter"), classes,
+                new File(target, "cn1-flutter-assets.lst"), new File(target, "dart2java-state.txt"), null,
+                new SystemStreamLog());
+    }
+
+    @Test
+    public void aRenamedAssetLeavesNoStaleCopy() throws Exception {
+        File old = asset("assets/icons/old_name.png");
+        asset("assets/kept.png");
+        mojo.copyAssets();
+        File oldFlat = flat("assets/icons/old_name.png");
+        assertTrue(oldFlat.isFile());
+
+        assertTrue(old.delete());
+        asset("assets/icons/new_name.png");
+        mojo.copyAssets();
+
+        assertFalse("the renamed-away asset must not be packaged again", oldFlat.exists());
+        assertTrue(flat("assets/icons/new_name.png").isFile());
+        assertTrue(flat("assets/kept.png").isFile());
+    }
+
+    @Test
+    public void theManifestListsEveryBundledAssetKey() throws Exception {
+        asset("assets/a.png");
+        asset("assets/2.5x/a.png");
+        asset("packages/lib/assets/3x/b.png");
+        mojo.copyAssets();
+        File manifest = new File(classes, FlutterProjectBuilder.ASSET_MANIFEST);
+        assertTrue(manifest.isFile());
+        assertEquals(java.util.Arrays.asList("assets/2.5x/a.png", "assets/a.png", "packages/lib/assets/3x/b.png"),
+                Files.readAllLines(manifest.toPath(), java.nio.charset.StandardCharsets.UTF_8));
+
+        // Recorded like the assets: gone with them when the Flutter tree is.
+        mojo.removeStaleAssets(new HashSet<String>());
+        assertFalse(manifest.exists());
+    }
+
+    @Test
+    public void removingFlutterRemovesItsAssets() throws Exception {
+        asset("assets/a.png");
+        asset("packages/lib/assets/b.png");
+        mojo.copyAssets();
+        assertTrue(flat("assets/a.png").isFile());
+
+        // What executeImpl does when src/main/flutter is gone.
+        mojo.removeStaleAssets(new HashSet<String>());
+
+        assertFalse(flat("assets/a.png").exists());
+        assertFalse(flat("packages/lib/assets/b.png").exists());
+    }
+
+    @Test
+    public void filesThePluginDidNotWriteAreNeverRemoved() throws Exception {
+        asset("assets/a.png");
+        mojo.copyAssets();
+        // The application's own resource, sharing the output directory and even
+        // the prefix: it is not in the plugin's record, so it is not the plugin's.
+        File own = new File(classes, "cn1f_app_owned.bin");
+        Files.write(own.toPath(), new byte[] {1});
+
+        mojo.removeStaleAssets(new HashSet<String>());
+
+        assertTrue(own.isFile());
+    }
+
+    /**
+     * Flutter allows an asset or font declared anywhere project-relative, not
+     * only under {@code assets/} or {@code packages/} -- {@code fonts/MyFont.ttf}
+     * is exactly the shape a font-only pubspec entry takes. Only
+     * {@code cn1:import-flutter-project} ever writes
+     * {@code FlutterProjectImporter.ASSET_KEYS_RECORD}: a hand-wired tree with no
+     * such record must keep relying on the two legacy roots alone, unchanged.
+     */
+    @Test
+    public void declaredAssetKeysOutsideTheLegacyRootsAreFlattenedToo() throws Exception {
+        File fontFile = new File(flutter, "fonts/MyFont.ttf");
+        fontFile.getParentFile().mkdirs();
+        Files.write(fontFile.toPath(), new byte[] {9});
+        declareAssetKeys("fonts/MyFont.ttf");
+
+        mojo.copyAssets();
+
+        assertTrue("a declared key outside assets/+packages must still be flattened",
+                flat("fonts/MyFont.ttf").isFile());
+    }
+
+    @Test
+    public void aDeclaredDirectoryKeyIsFlattenedRecursively() throws Exception {
+        asset("images/logo.png");
+        asset("images/2x/logo.png");
+        declareAssetKeys("images");
+
+        mojo.copyAssets();
+
+        assertTrue(flat("images/logo.png").isFile());
+        assertTrue(flat("images/2x/logo.png").isFile());
+    }
+
+    @Test
+    public void handWiredProjectsWithNoDeclaredAssetKeysRecordAreUnaffected() throws Exception {
+        // No ASSET_KEYS_RECORD file at all -- never imported -- so a file outside
+        // assets/+packages must stay invisible to the mojo, exactly as before.
+        asset("fonts/MyFont.ttf");
+
+        mojo.copyAssets();
+
+        assertFalse(flat("fonts/MyFont.ttf").exists());
+    }
+
+    private void declareAssetKeys(String... keys) throws Exception {
+        File record = new File(flutter, FlutterProjectImporter.ASSET_KEYS_RECORD);
+        StringBuilder b = new StringBuilder();
+        for (String k : keys) {
+            b.append(k).append('\n');
+        }
+        Files.write(record.toPath(), b.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+
+    /**
+     * A root-declared asset (outside {@code assets/}/{@code packages/}) named exactly
+     * {@code AssetManifest.txt} used to flatten onto the generated manifest's name, and
+     * {@code writeAssetManifest} then overwrote it, so {@code Image.asset("AssetManifest.txt")}
+     * loaded the key list. The manifest's name is now outside the flattening namespace:
+     * both files are written, each with its own content.
+     */
+    @Test
+    public void aRootAssetNamedLikeTheManifestIsKeptBesideTheManifest() throws Exception {
+        File colliding = new File(flutter, "AssetManifest.txt");
+        Files.write(colliding.toPath(), "this is the developer's own asset".getBytes(
+                java.nio.charset.StandardCharsets.UTF_8));
+        declareAssetKeys("AssetManifest.txt");
+
+        mojo.copyAssets();
+
+        File asset = new File(classes, FlutterProjectBuilder.flatAssetName("AssetManifest.txt"));
+        assertEquals("this is the developer's own asset", new String(Files.readAllBytes(asset.toPath()),
+                java.nio.charset.StandardCharsets.UTF_8));
+        File manifestFile = new File(classes, FlutterProjectBuilder.ASSET_MANIFEST);
+        assertTrue("the generated manifest is written under its own name", manifestFile.isFile());
+        assertFalse(asset.getName().equals(manifestFile.getName()));
+    }
+
+    /**
+     * The same vectors as the runtime's FlutterAssetsTest and the benchmark's
+     * stage_assets.py: the three encoders must agree name for name, or an asset
+     * the build writes is one the runtime never finds.
+     */
+    @Test
+    public void encodingMatchesTheRuntimeAndIsPrefixFree() {
+        assertEquals("cn1f_assets_sstudies_sreply__card.png",
+                FlutterProjectBuilder.flatAssetName("assets/studies/reply_card.png"));
+        assertEquals("cn1f_a___sb.png", FlutterProjectBuilder.flatAssetName("a_/b.png"));
+        assertEquals("cn1f_a_s__b.png", FlutterProjectBuilder.flatAssetName("a/_b.png"));
+        assertFalse(FlutterProjectBuilder.flatAssetName("a_/b.png")
+                .equals(FlutterProjectBuilder.flatAssetName("a/_b.png")));
+    }
+
+    private File asset(String key) throws Exception {
+        File f = new File(flutter, key);
+        f.getParentFile().mkdirs();
+        Files.write(f.toPath(), new byte[] {0});
+        return f;
+    }
+
+    private File flat(String key) {
+        return new File(classes, FlutterProjectBuilder.flatAssetName(key));
+    }
+}

@@ -33,7 +33,14 @@ import dart.typed_data.Uint8List;
 /**
  * Dart's {@code WebSocket} over {@link com.codename1.io.WebSocket}: a stream of the
  * messages received (a String per text frame, a Uint8List per binary frame) that the
- * app writes to with {@link #add}. Events reach listeners on the EDT.
+ * app writes to with {@link #add}. Events reach listeners on the EDT. The
+ * {@code headers} of {@code connect} go on the opening handshake. {@code pingInterval}
+ * is kept and read back but sends no ping frames, deliberately: {@code
+ * com.codename1.io.WebSocket} offers only text and binary {@code send}, and each port's
+ * socket answers a server's ping with a pong on its own but has no entry point for
+ * sending a ping. A text or binary message on the interval would not be a ping -- the
+ * server would deliver it to the application -- so nothing is sent; keep-alive is the
+ * server's pings, answered by the port.
  */
 public class WebSocket extends Stream<Object> {
     public static final long connecting = 0;
@@ -231,6 +238,14 @@ public class WebSocket extends Stream<Object> {
         return "";
     }
 
-    public void pingInterval(Object interval) {
+    private Object pingInterval;
+
+    public Object pingInterval() {
+        return pingInterval;
+    }
+
+    public Object pingInterval(Object interval) {
+        pingInterval = interval;
+        return interval;
     }
 }

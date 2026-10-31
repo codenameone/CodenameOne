@@ -49,6 +49,7 @@ import com.codenameone.examples.savor.repository.PayoutAccountRepository;
 import com.codenameone.examples.savor.repository.PayoutRepository;
 import com.codenameone.examples.savor.repository.RestaurantRepository;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -226,12 +227,12 @@ public class DemoOrders {
                 order.setPaymentStatus(delivered ? Payments.PAID
                         : cash ? Payments.PENDING : Payments.RELEASED);
                 order.setPrepMinutes(kitchen.getPrepMinutes());
-                order.setPlacedAt(at);
-                order.setUpdatedAt(ended);
+                order.setPlacedAt(Instant.ofEpochMilli(at));
+                order.setUpdatedAt(Instant.ofEpochMilli(ended));
                 order.setAcceptedAt(OrderState.REJECTED == state
-                        || OrderState.CANCELLED_BY_CUSTOMER == state ? 0L : accepted);
-                order.setReadyAt(delivered ? ready : 0L);
-                order.setDeliveredAt(delivered ? ended : 0L);
+                        || OrderState.CANCELLED_BY_CUSTOMER == state ? Instant.EPOCH : Instant.ofEpochMilli(accepted));
+                order.setReadyAt(delivered ? Instant.ofEpochMilli(ready) : Instant.EPOCH);
+                order.setDeliveredAt(delivered ? Instant.ofEpochMilli(ended) : Instant.EPOCH);
                 order.setReason(OrderState.REJECTED == state ? "Out of ingredients"
                         : OrderState.NO_COURIERS == state ? "No courier was free to bring it"
                         : OrderState.CANCELLED_BY_CUSTOMER == state ? "Cancelled by the customer"
@@ -270,9 +271,9 @@ public class DemoOrders {
                 delivery.setCurrency(pricing.currency());
                 delivery.setDistanceMeters(meters);
                 delivery.setDurationSeconds(meters / Quotes.METERS_PER_SECOND);
-                delivery.setRequestedAt(accepted);
-                delivery.setUpdatedAt(ended);
-                delivery.setSearchUntil(accepted + 900000L);
+                delivery.setRequestedAt(Instant.ofEpochMilli(accepted));
+                delivery.setUpdatedAt(Instant.ofEpochMilli(ended));
+                delivery.setSearchUntil(Instant.ofEpochMilli(accepted + 900000L));
                 delivery.setStars(given);
                 delivery.setPaymentStatus(delivered ? Payments.PAID : Payments.PENDING);
                 delivery.setMethodId(method[0]);
@@ -300,7 +301,7 @@ public class DemoOrders {
                 payment.setStatus(Payments.PAID);
                 payment.setProviderRef(cash ? Payments.CASH : "sim_ch_order-" + id);
                 payment.setTipRef("");
-                payment.setCreatedAt(ended);
+                payment.setCreatedAt(Instant.ofEpochMilli(ended));
                 paid.insert(payment);
                 lastSeen[courierIndex] = Math.max(lastSeen[courierIndex], ended);
                 if (ended < now - 7L * Days.MILLIS) {
@@ -324,7 +325,7 @@ public class DemoOrders {
             }
             state.setLat(real(iter % DOORS.length, 1));
             state.setLng(real(iter % DOORS.length, 2));
-            state.setLastSeen(lastSeen[iter]);
+            state.setLastSeen(Instant.ofEpochMilli(lastSeen[iter]));
             state.setRatingSum(stars[iter]);
             state.setRatingCount(rated[iter]);
             if (first) {
@@ -343,7 +344,7 @@ public class DemoOrders {
                 payout.setCourier(couriers[iter]);
                 payout.setAmountCents(earnedEarlier[iter]);
                 payout.setStatus("paid");
-                payout.setCreatedAt(now - 7L * Days.MILLIS);
+                payout.setCreatedAt(Instant.ofEpochMilli(now - 7L * Days.MILLIS));
                 payout.setDestination("Bay Credit Union ****67" + (10 + iter));
                 payouts.insert(payout);
             }
@@ -357,7 +358,7 @@ public class DemoOrders {
         event.setOrderId(order);
         event.setState(state);
         event.setActor(actor);
-        event.setCreatedAt(at);
+        event.setCreatedAt(Instant.ofEpochMilli(at));
         orderEvents.insert(event);
     }
 
@@ -368,7 +369,7 @@ public class DemoOrders {
         event.setDeliveryId(delivery);
         event.setState(state);
         event.setActor(actor);
-        event.setCreatedAt(at);
+        event.setCreatedAt(Instant.ofEpochMilli(at));
         deliveryEvents.insert(event);
     }
 

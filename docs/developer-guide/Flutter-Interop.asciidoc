@@ -108,10 +108,51 @@ by hand would take:
 * Carries the application name and version over from `pubspec.yaml`.
 
 It then lists the application's pub dependencies and says which of them
-Codename One provides. The transpiler doesn't compile a package's Dart; a
-package works when the Flutter runtime implements its API, as it does for
-`provider`, `intl`, `animations` and other common ones. A dependency listed as
-not covered is the first thing to look at if a screen misbehaves.
+Codename One provides. A package is provided one of two ways. A pure Dart
+package is copied and transpiled with the application, file by file, as far as
+the application's imports reach into it. A plugin, or a package the runtime
+implements natively (`provider`, `intl`, `go_router`, `firebase_auth` and the
+others in <<flutter-plugin-coverage>>), is provided by a stub pack: Dart
+declarations of the package's API backed by Java. A dependency listed as not
+covered is the first thing to look at if a screen misbehaves.
+
+[[flutter-import-report]]
+==== The import report
+
+The same report is written as JSON to `common/target/flutter-import-report.json`,
+for a script or a CI step to read. Each package has a status (`covered` or
+`unsupported`), the note or the reason, and the application's own files that
+reach it. An unsupported package that's only unsupported because of something
+it depends on carries the chain that verdict came through, ending with the
+package that's unsupported itself:
+
+[source,json]
+----
+include::../demos/common/src/main/snippets/developer-guide/flutter-import-report.json[tag=flutter-import-report-json-001,indent=0]
+----
+
+The report also lists, under `googleFonts`, every Google Fonts family the
+application names. The `google_fonts` stub draws only fonts bundled with the
+application, so those are the families to add as assets.
+
+A few kinds of imports are resolved rather than reported:
+
+* A conditional import (`if (dart.library.html) ...`) takes the branch for a
+  library the runtime has, so a web-only branch and everything it imports are
+  never read.
+* A plugin that implements only desktop or web platforms is transpiled as Dart.
+  Its calls into the platform answer `MissingPluginException`, as they would on
+  a mobile device in Flutter.
+
+==== Parameters that are accepted and not applied
+
+Some stub parameters are accepted so the application compiles, and then have no
+effect: an HTTP header a media player can't send, a fit mode an image renderer
+lacks. A call that passes one gets a build warning at that argument:
+
+----
+[WARNING] src/main/flutter/feed/post.dart:[41,6] 'httpHeaders' of networkUrl is accepted but not applied on Codename One (dart2java:W0002)
+----
 
 Re-running the command later picks up changes made on the Flutter side. A file
 you edited after the earlier import is left as you edited it, and a file the
@@ -344,6 +385,198 @@ The generated package and the paths are configurable:
 |The package the generated classes are emitted into. Defaults to
 `com.codename1.generated.flutter`.
 |===
+
+==== Localization and right-to-left layout
+
+`GlobalMaterialLocalizations.delegate` and `GlobalCupertinoLocalizations.delegate`
+supply English, Spanish and Hebrew strings for the built-in widgets, picked by the
+locale's language code; any other language falls back to English. Your own
+delegates and ARB-generated localizations work as they do in Flutter.
+
+Under a right-to-left `Directionality`, rows,
+wraps, `AlignmentDirectional`, stacks, text alignment, list tiles and app bars are
+mirrored, and the directional arrow and chevron icons swap. A plain `Alignment`
+never mirrors, as in Flutter.
+
+[[flutter-plugin-coverage]]
+=== Plugin coverage
+
+These are the pub packages the runtime provides, and how. A package that's not
+listed and is pure Dart is transpiled from its own sources.
+
+[cols="2,4,3", options="header"]
+|===
+|Package |Backed by |Accepted and not applied
+
+|`firebase_core`, `firebase_auth`
+|The Identity Toolkit REST API: email and password, anonymous accounts, and
+Google, Apple and OAuth credentials exchanged through `signInWithIdp`.
+`signInWithProvider` runs Google's and Apple's sign-in.
+|Phone sign-in, multi-factor, account linking
+
+|`google_sign_in`
+|`GoogleConnect`, Google's OIDC sign-in with PKCE in the system browser
+|`signInSilently` answers the current run's account only; `hostedDomain`
+
+|`firebase_ui_auth`, `firebase_ui_oauth_google`, `firebase_ui_oauth_apple`
+|`SignInScreen` and `ProfileScreen` built from the runtime's Material widgets,
+over `firebase_auth`; the Google and Apple buttons sign in as `signInWithProvider` does
+|`styles`, `sideBuilder`, `breakpoint`, `headerMaxExtent`; reported as W0002 warnings
+
+|`firebase_analytics`, `firebase_messaging`
+|Logged events and `AnalyticsService`; Codename One push, including
+`onBackgroundMessage` and provisional permission
+|
+
+|`firebase_ai`
+|The Firebase AI Logic REST API, Gemini through Google AI or Vertex AI, with the
+App Check token and the signed-in user's ID token
+|Function calling, `responseSchema`, `toolConfig`; `generateContentStream`
+delivers the whole reply as one event; Live and Imagen models
+
+|`firebase_app_check`
+|The debug provider's token, from the `firebase.appCheck.debugToken` Display property
+|Play Integrity, DeviceCheck and App Attest: there is no attestation, so they yield no token
+
+|`dio`
+|`ConnectionRequest`: interceptors, `DioException` types, `CancelToken`,
+`FormData`, downloads
+|
+
+|`go_router`
+|The runtime's navigator: routes, redirects, `extra`, transitions
+|
+
+|`cached_network_image`
+|`ConnectionRequest` with an in-memory cache: `placeholder`,
+`progressIndicatorBuilder` and `errorWidget` are built
+|`fadeInDuration`
+
+|`google_maps_flutter`
+|`MapView`: markers with hued or byte icons, polylines, circles, camera, taps
+|
+
+|`image_picker`, `camera`
+|`Capture` and `com.codename1.camera`; `maxWidth`, `maxHeight` and `imageQuality`
+re-encode the picked image
+|The `child` overlay of `CameraPreview`
+
+|`video_player`
+|`MediaManager`
+|`httpHeaders`, captions, playback speed
+
+|`video_thumbnail`, `video_compress`
+|No frame extraction or transcoding in the core: every thumbnail call fails,
+and `compressVideo` answers the original file with a warning
+|
+
+|`webview_flutter`
+|`BrowserComponent`, JavaScript channels through `addJSCallback`
+|A POST body, `JavaScriptMode.disabled`, `clearCache`
+
+|`flutter_svg`
+|`Image.createSVG` where the port renders SVG, otherwise an empty box of the
+requested size
+|`colorFilter`, `fit`, `alignment`, `placeholderBuilder`
+
+|`file_picker`
+|The native open and save dialogs
+|
+
+|`audioplayers`
+|`MediaManager`
+|
+
+|`flutter_image_compress`
+|`Image` and `ImageIO`, JPEG and PNG
+|HEIC and WebP where the platform can't encode them
+
+|`geocoding`
+|The Google Geocoding REST API, keyed by the `google.geocoding.key` Display
+property
+|
+
+|`mixpanel_flutter`
+|Mixpanel's HTTP ingestion API, with `setServerURL` for EU residency
+|
+
+|`flutter_web_auth_2`
+|An in-app browser that watches for the callback URL
+|
+
+|`emoji_picker_flutter`
+|A Codename One emoji grid with recents and search
+|`Config`, except `height`
+
+|`app_settings`, `flutter_timezone`
+|`Display.execute` with the platform's settings URL; `java.util.TimeZone`
+|
+
+|`android_play_install_referrer`
+|Nothing: `installReferrer` always fails with `UnsupportedError`
+|
+
+|`shared_preferences`, `path_provider`, `package_info_plus`,
+`device_info_plus`, `connectivity_plus`, `geolocator`, `share_plus`,
+`url_launcher`, `app_links`, `flutter_local_notifications`
+|`Preferences`, `FileSystemStorage`, the build and Display properties,
+`NetworkManager`, `LocationManager`, `Display.share`, `Display.execute` (an in-app
+`BrowserComponent` for `LaunchMode.inAppWebView`), `LocalNotification` with
+Android channels, raw sounds and a background tap callback
+|
+|===
+
+[[flutter-stub-packs]]
+=== Writing a stub pack
+
+A package the runtime doesn't provide can be provided by a stub pack of your
+own, in the application or in a library jar. A pack has two parts.
+
+The Dart half is a file under `META-INF/dart/` on the compile class path --
+in an application, `common/src/main/resources/META-INF/dart/`. It declares the
+package's API with `external` members, and names the Java class behind each type
+with `@JavaName`. The `cn1:covers` line tells the import report that the pack
+stands in for the package:
+
+[source,dart]
+----
+include::../demos/common/src/main/snippets/developer-guide/flutter-stub-pack.dart[tag=flutter-stub-pack-dart-001,indent=0]
+----
+
+Stub types share one namespace. When two packages export the same name -- the
+`AppleProvider` of `firebase_app_check` and of `firebase_ui_oauth_apple` -- give
+each file a `// cn1:package <package>` line: a library then sees the declaration
+of the package it imports, and a class of the application's own with the same
+name is never shadowed by a stub of a package it doesn't import.
+
+The Java half is an ordinary class with the members the declarations map to:
+
+[source,java,role=cn1-no-try]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/flutter/Lottie.java[tag=flutter-stub-pack-java-001,indent=0]
+----
+
+The mapping rules:
+
+* Named parameters become positional Java parameters, in the order they're
+  declared. A parameter the call leaves out is passed as `null`.
+* `int` is `Long` (or `long` when it can't be null), `double` is `Double`,
+  `bool` is `Boolean`, `List` and `Map` are `dart.core.DartList` and
+  `dart.core.DartMap`, `Future` and `Stream` are `dart.async.Future` and
+  `dart.async.Stream`, and a function is a `dart.runtime.Funcs` interface.
+* A constructor whose parameters are all named is a public no-argument
+  constructor plus one method per parameter, named after it, which the
+  generated code calls for each argument passed.
+* An instance getter is a method with no arguments. A static getter is a
+  public static field.
+* `@Unapplied('a, b')` on a constructor or method names the parameters that
+  are accepted and not applied, so that the build warns where one is passed.
+
+Every stub on the class path shares one namespace, so a type that another stub
+already declares mustn't be declared again. The transpiler ignores the import
+of the package itself. For a pack outside the application, pass its jar to the
+import with `-Dcn1.flutter.stubPacks=path/to/pack.jar` so that the report counts
+it.
 
 [[flutter-benchmark]]
 === How the numbers are measured
