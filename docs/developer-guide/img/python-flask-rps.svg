@@ -11,17 +11,19 @@
 <text x="168" y="69" font-size="12" fill="#202124">Codename One Python</text>
 <line x1="150.0" y1="80" x2="150.0" y2="134" stroke="#e8eaed"/>
 <text x="150.0" y="150" font-size="11" fill="#5f6368" text-anchor="middle">0 </text>
-<line x1="415.0" y1="80" x2="415.0" y2="134" stroke="#e8eaed"/>
-<text x="415.0" y="150" font-size="11" fill="#5f6368" text-anchor="middle">10k </text>
+<line x1="326.7" y1="80" x2="326.7" y2="134" stroke="#e8eaed"/>
+<text x="326.7" y="150" font-size="11" fill="#5f6368" text-anchor="middle">10k </text>
+<line x1="503.3" y1="80" x2="503.3" y2="134" stroke="#e8eaed"/>
+<text x="503.3" y="150" font-size="11" fill="#5f6368" text-anchor="middle">20k </text>
 <line x1="680.0" y1="80" x2="680.0" y2="134" stroke="#e8eaed"/>
-<text x="680.0" y="150" font-size="11" fill="#5f6368" text-anchor="middle">20k </text>
+<text x="680.0" y="150" font-size="11" fill="#5f6368" text-anchor="middle">30k </text>
 <text x="142" y="106" font-size="12" fill="#202124" text-anchor="end">requests/s</text>
-<rect x="150" y="84" width="16.2" height="8" fill="#9aa0a6"/>
-<text x="170.2" y="91" font-size="9" fill="#5f6368">611</text>
-<rect x="150" y="93" width="16.2" height="8" fill="#f9ab00"/>
-<text x="170.2" y="100" font-size="9" fill="#5f6368">610</text>
-<rect x="150" y="102" width="12.4" height="8" fill="#a142f4"/>
-<text x="166.4" y="109" font-size="9" fill="#5f6368">468</text>
-<rect x="150" y="111" width="443.8" height="8" fill="#1a73e8"/>
-<text x="597.8" y="118" font-size="9" fill="#5f6368">16749</text>
+<rect x="150" y="84" width="10.8" height="8" fill="#9aa0a6"/>
+<text x="164.8" y="91" font-size="9" fill="#5f6368">611</text>
+<rect x="150" y="93" width="10.8" height="8" fill="#f9ab00"/>
+<text x="164.8" y="100" font-size="9" fill="#5f6368">610</text>
+<rect x="150" y="102" width="8.3" height="8" fill="#a142f4"/>
+<text x="162.3" y="109" font-size="9" fill="#5f6368">468</text>
+<rect x="150" y="111" width="450.3" height="8" fill="#1a73e8"/>
+<text x="604.3" y="118" font-size="9" fill="#5f6368">25490</text>
 </svg>

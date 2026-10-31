@@ -22,8 +22,8 @@
 <text x="171.2" y="100" font-size="9" fill="#5f6368">65</text>
 <rect x="150" y="102" width="85.5" height="8" fill="#a142f4"/>
 <text x="239.5" y="109" font-size="9" fill="#5f6368">323</text>
-<rect x="150" y="111" width="7.0" height="8" fill="#1a73e8"/>
-<text x="161.0" y="118" font-size="9" fill="#5f6368">27</text>
+<rect x="150" y="111" width="9.2" height="8" fill="#1a73e8"/>
+<text x="163.2" y="118" font-size="9" fill="#5f6368">35</text>
 <text x="142" y="156" font-size="12" fill="#202124" text-anchor="end">after load</text>
 <rect x="150" y="134" width="10.6" height="8" fill="#9aa0a6"/>
 <text x="164.6" y="141" font-size="9" fill="#5f6368">40</text>
@@ -31,8 +31,8 @@
 <text x="181.1" y="150" font-size="9" fill="#5f6368">102</text>
 <rect x="150" y="152" width="336.6" height="8" fill="#a142f4"/>
 <text x="490.6" y="159" font-size="9" fill="#5f6368">1270</text>
-<rect x="150" y="161" width="99.4" height="8" fill="#1a73e8"/>
-<text x="253.4" y="168" font-size="9" fill="#5f6368">375</text>
+<rect x="150" y="161" width="50.4" height="8" fill="#1a73e8"/>
+<text x="204.4" y="168" font-size="9" fill="#5f6368">190</text>
 <text x="142" y="206" font-size="12" fill="#202124" text-anchor="end">deployed size</text>
 <rect x="150" y="184" width="21.7" height="8" fill="#9aa0a6"/>
 <text x="175.7" y="191" font-size="9" fill="#5f6368">82</text>

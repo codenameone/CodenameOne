@@ -438,7 +438,7 @@ image::img/python-flask-memory.svg["Memory and deployed size of the Flask sample
 | CPython 3.14 | 81 | 611 | 39.1 | 39.9 | 82.0
 | PyPy 3.11 | 184 | 610 | 64.8 | 102.3 | 110.5
 | GraalPy 3.13 | 438 | 468 | 322.8 | 1270.4 | 305.8
-| Codename One | 33 | 16,749 | 26.6 | 375.2 | 22.8
+| Codename One | 45 | 25,490 | 34.9 | 190.2 | 22.8
 |===
 
 The deployed size is the interpreter's installation plus Flask and its

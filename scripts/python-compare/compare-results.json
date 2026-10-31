@@ -138,10 +138,10 @@
    "p99_ms": 59
   },
   "Codename One Python": {
-   "first_ms": 32.780792000266956,
-   "idle_mb": 26.59375,
-   "loaded_mb": 375.1875,
-   "rps": 16748.68,
+   "first_ms": 44.97,
+   "idle_mb": 34.86,
+   "loaded_mb": 190.23,
+   "rps": 25490.18,
    "p99_ms": 1
   }
  },

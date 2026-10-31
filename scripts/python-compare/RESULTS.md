@@ -34,7 +34,7 @@ Measured on Darwin arm64, 2026-10-28. Codename One rows are native binaries (Pyt
 | CPython | 81 | 39.1 | 39.9 | 611 | 16 |
 | PyPy | 184 | 64.8 | 102.3 | 610 | 24 |
 | GraalPy | 438 | 322.8 | 1270.4 | 468 | 59 |
-| Codename One Python | 33 | 26.6 | 375.2 | 16749 | 1 |
+| Codename One Python | 45 | 34.9 | 190.2 | 25490 | 1 |
 
 ## What you deploy
 
