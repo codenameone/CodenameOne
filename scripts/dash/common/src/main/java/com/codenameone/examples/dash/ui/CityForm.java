@@ -43,6 +43,7 @@ import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.LayeredLayout;
 import com.codenameone.examples.dash.rules.CityRoute;
 import com.codenameone.examples.dash.run.CityPath;
+import com.codenameone.examples.dash.run.Landmarks;
 import com.codenameone.examples.dash.run.Levels;
 import java.util.ArrayList;
 import java.util.List;
@@ -69,6 +70,7 @@ public final class CityForm {
     private Marker fromMarker;
     private Marker toMarker;
     private Polyline line;
+    private final List<Marker> landmarkMarkers = new ArrayList<Marker>();
     private CityRoute route;
     private CityPath path;
     private final MapView map = new MapView();
@@ -149,6 +151,10 @@ public final class CityForm {
         if (line != null) {
             map.removePolyline(line);
         }
+        for (Marker m : landmarkMarkers) {
+            map.removeMarker(m);
+        }
+        landmarkMarkers.clear();
         from = null;
         to = null;
         fromMarker = null;
@@ -207,6 +213,44 @@ public final class CityForm {
                 + turns + (turns == 1 ? " turn" : " turns"));
         run.setEnabled(true);
         run.getComponentForm().revalidate();
+        final String summary = status.getText();
+        final CityRoute asked = c;
+        Landmarks.addTo(c, points(r), () -> {
+            if (route != asked) {
+                return;
+            }
+            for (CityRoute.Landmark m : asked.landmarks()) {
+                landmarkMarkers.add(map.addMarker(new MarkerOptions(near(r, m.metres, asked.metres()))
+                        .title(m.name).label(m.name)));
+            }
+            int n = asked.landmarks().size();
+            if (n > 0) {
+                say(summary + "\n" + n + (n == 1 ? " landmark" : " landmarks") + " on the way");
+            }
+        });
+    }
+
+    /// The point `metres` along the route's line, for a landmark's pin.
+    private static LatLng near(Route r, int metres, int total) {
+        List<LatLng> pts = points(r);
+        double len = 0;
+        for (int i = 1; i < pts.size(); i++) {
+            len += Landmarks.metres(pts.get(i - 1), pts.get(i));
+        }
+        double want = total <= 0 ? 0 : len * metres / total;
+        double at = 0;
+        for (int i = 1; i < pts.size(); i++) {
+            double seg = Landmarks.metres(pts.get(i - 1), pts.get(i));
+            if (at + seg >= want && seg > 0) {
+                double t = (want - at) / seg;
+                LatLng a = pts.get(i - 1);
+                LatLng b = pts.get(i);
+                return new LatLng(a.getLatitude() + (b.getLatitude() - a.getLatitude()) * t,
+                        a.getLongitude() + (b.getLongitude() - a.getLongitude()) * t);
+            }
+            at += seg;
+        }
+        return pts.get(pts.size() - 1);
     }
 
     private void start() {

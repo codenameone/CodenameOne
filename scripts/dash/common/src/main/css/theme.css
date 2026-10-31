@@ -1347,6 +1347,17 @@ HudScore {
     text-align: center;
     padding: 0.4mm 2.2mm;
 }
+HudStreet {
+    background-color: #0f6b45;
+    border: 0.25mm solid #ffffff;
+    border-radius: 1.2mm;
+    color: #ffffff;
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+    text-align: center;
+    padding: 0.4mm 1.8mm;
+    margin-top: 0.8mm;
+}
 HudCoins {
     background-color: rgba(10, 14, 32, 0.8);
     border: 0.3mm solid #ffc93a;
@@ -1394,8 +1405,25 @@ ChatLine {
     background-color: transparent;
     color: var(--text);
     font-size: 2.8mm;
-    padding: 0.3mm 1mm;
+    padding: 0;
     margin: 0;
+}
+
+ChatFrom {
+    background-color: transparent;
+    color: var(--cyan);
+    font-family: "native:MainBold";
+    font-size: 2.2mm;
+    padding: 0;
+    margin: 0;
+}
+
+ChatBubble {
+    background-color: #1e2350;
+    border: 1px solid #3a4290;
+    border-radius: 2mm;
+    padding: 1mm 2mm;
+    margin: 0.6mm 2mm;
 }
 
 /* ---- Results, score boards and the track editor ---- */

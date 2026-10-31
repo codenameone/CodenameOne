@@ -7,7 +7,10 @@
 # simulator tests in common/src/test against it. The screenshots they take --
 # the ones the developer guide shows -- land in target/e2e-shots.
 #
-#   run-e2e.sh [--prebuilt]
+#   run-e2e.sh [--prebuilt] [--video]
+#
+# --video also films the promotional tour (PromoVideoTest) with the
+# simulator's recorder into target/dash-promo.mp4; it needs ffmpeg.
 #
 # On Linux it wraps the simulator in xvfb-run when that is installed.
 set -euo pipefail
@@ -18,9 +21,11 @@ PORT="${DASH_PORT:-18090}"
 LOG="${DASH_SERVER_LOG:-$HERE/target/e2e-server.log}"
 SHOTS="$HERE/target/e2e-shots"
 BUILD=1
+VIDEO=
 for arg in "$@"; do
   case "$arg" in
     --prebuilt) BUILD=0 ;;
+    --video) VIDEO="-Ddash.e2e.video=$HERE/target/dash-promo.mp4" ;;
     *) echo "[dash-e2e] unknown option: $arg" >&2; exit 2 ;;
   esac
 done
@@ -66,7 +71,7 @@ fi
 
 # Every test runs in one simulator, and the Forge's turntable previews and
 # 3D battles hold enough textures that 768m ran out in the test after them.
-export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-} -Xmx1536m -Ddash.server.url=http://localhost:$PORT -Ddash.shots.dir=$SHOTS"
+export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-} -Xmx1536m -Ddash.server.url=http://localhost:$PORT -Ddash.shots.dir=$SHOTS $VIDEO"
 
 set +e
 ${RUNNER[@]+"${RUNNER[@]}"} "$MVN" -B -f "$HERE/pom.xml" -Dcodename1.platform=javase -Ptest verify

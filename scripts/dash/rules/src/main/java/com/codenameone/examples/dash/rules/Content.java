@@ -60,30 +60,45 @@ public final class Content {
     }
 
     /// The chunk pool every official endless section draws from, easiest first.
+    /// Chunks are short and full: a coin trail runs through nearly every one,
+    /// so the line a player takes always has something to pick up, and a
+    /// hazard is never more than a couple of seconds away.
     public static List<Chunk> chunks() {
+        // Spacing rule: a jump carries the runner about 14 m at top speed, and
+        // a lane change takes a quarter second. So two obstacles a runner has
+        // to answer one after the other stand at least 16 m apart, nothing
+        // stands in a chunk's first 6 m or within 12 m of its end (the next
+        // chunk may open with anything), and a hauler always leaves a lane
+        // open with room to reach it. ChunkFairnessTest holds every chunk to
+        // this by sending the bot down hundreds of seeds.
         List<Chunk> c = new ArrayList<Chunk>();
-        c.add(coinLine(new Chunk("warmup", 30 * Track.UNIT, 0).add(14 * Track.UNIT, HURDLE, 1), 0, 2));
-        c.add(new Chunk("side-step", 30 * Track.UNIT, 0).add(10 * Track.UNIT, HAULER, 0).add(10 * Track.UNIT, COIN, 1)
-                .add(12 * Track.UNIT, COIN, 1).add(14 * Track.UNIT, COIN, 1));
-        c.add(new Chunk("duck", 30 * Track.UNIT, 1).add(12 * Track.UNIT, BARRIER, Placement.ALL_LANES)
-                .add(20 * Track.UNIT, GEM, 1));
-        c.add(new Chunk("leap", 32 * Track.UNIT, 1).add(12 * Track.UNIT, GAP, Placement.ALL_LANES)
-                .add(13 * Track.UNIT, COIN, 1));
-        c.add(new Chunk("corridor", 40 * Track.UNIT, 2).add(10 * Track.UNIT, HAULER, 0).add(10 * Track.UNIT, HAULER, 2)
-                .add(15 * Track.UNIT, HURDLE, 1).add(25 * Track.UNIT, MAGNET, 1));
-        c.add(new Chunk("weave", 44 * Track.UNIT, 3).add(8 * Track.UNIT, HAULER, 0).add(8 * Track.UNIT, HAULER, 1)
-                .add(26 * Track.UNIT, HAULER, 1).add(26 * Track.UNIT, HAULER, 2).add(36 * Track.UNIT, SHIELD, 0));
-        c.add(new Chunk("combo", 40 * Track.UNIT, 4).add(10 * Track.UNIT, HURDLE, Placement.ALL_LANES)
-                .add(24 * Track.UNIT, BARRIER, Placement.ALL_LANES).add(34 * Track.UNIT, BOOST, 1));
-        c.add(new Chunk("gauntlet", 48 * Track.UNIT, 6).add(8 * Track.UNIT, HAULER, 1).add(10 * Track.UNIT, BARRIER, 0)
-                .add(10 * Track.UNIT, HURDLE, 2).add(28 * Track.UNIT, GAP, Placement.ALL_LANES)
-                .add(40 * Track.UNIT, GEM, 1));
+        int u = Track.UNIT;
+        c.add(trail(new Chunk("warmup", 22 * u, 0).add(10 * u, HURDLE, 1), 2, 14, 1));
+        c.add(trail(new Chunk("side-step", 34 * u, 0).add(6 * u, HAULER, 0).add(22 * u, HURDLE, 2), 2, 26, 1));
+        c.add(trail(new Chunk("duck", 22 * u, 1).add(10 * u, BARRIER, Placement.ALL_LANES), 4, 18, 1)
+                .add(16 * u, GEM, 0));
+        c.add(trail(new Chunk("leap", 24 * u, 1).add(10 * u, GAP, Placement.ALL_LANES), 6, 16, 1));
+        c.add(trail(new Chunk("hop-skip", 36 * u, 1).add(6 * u, HURDLE, 0).add(6 * u, HURDLE, 2)
+                .add(24 * u, BARRIER, 1), 2, 30, 0));
+        c.add(trail(new Chunk("corridor", 34 * u, 2).add(6 * u, HAULER, 0).add(6 * u, HAULER, 2)
+                .add(22 * u, HURDLE, 1), 2, 28, 1).add(28 * u, MAGNET, 0));
+        c.add(trail(new Chunk("slalom", 42 * u, 2).add(6 * u, HURDLE, 0).add(18 * u, HURDLE, 1)
+                .add(30 * u, HURDLE, 2), 2, 36, 2).add(36 * u, GEM, 0));
+        c.add(trail(new Chunk("weave", 52 * u, 3).add(6 * u, HAULER, 0).add(6 * u, HAULER, 1)
+                .add(30 * u, HAULER, 1).add(30 * u, HAULER, 2), 2, 46, 2).add(46 * u, SHIELD, 0));
+        c.add(trail(new Chunk("combo", 38 * u, 4).add(6 * u, HURDLE, Placement.ALL_LANES)
+                .add(26 * u, BARRIER, Placement.ALL_LANES), 2, 32, 1).add(32 * u, BOOST, 2));
+        c.add(trail(new Chunk("traffic", 56 * u, 5).add(6 * u, HAULER, 1).add(26 * u, HAULER, 0)
+                .add(26 * u, HAULER, 2).add(44 * u, BARRIER, Placement.ALL_LANES), 2, 50, 1).add(50 * u, GEM, 2));
+        c.add(trail(new Chunk("gauntlet", 42 * u, 6).add(6 * u, HAULER, 1).add(8 * u, BARRIER, 0)
+                .add(8 * u, HURDLE, 2).add(30 * u, GAP, Placement.ALL_LANES), 18, 38, 1).add(38 * u, GEM, 0));
         return c;
     }
 
-    private static Chunk coinLine(Chunk c, int lane, int count) {
-        for (int i = 0; i < count; i++) {
-            c.add((20 + 2 * i) * Track.UNIT, COIN, lane);
+    /// Coins every 2 m in `lane` from `from` to `to` metres into the chunk.
+    private static Chunk trail(Chunk c, int from, int to, int lane) {
+        for (int m = from; m <= to; m += 2) {
+            c.add(m * Track.UNIT, COIN, lane);
         }
         return c;
     }

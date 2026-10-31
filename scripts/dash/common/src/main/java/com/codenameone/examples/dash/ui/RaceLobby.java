@@ -27,6 +27,7 @@ import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.TextField;
+import com.codename1.components.SpanLabel;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codenameone.examples.dash.api.GameProtocol;
@@ -161,10 +162,12 @@ public final class RaceLobby implements GameLink.Listener, Voice.Listener {
         top.add(Ui.label("Runners", "SectionTitle"));
         members.setName("members");
         top.add(members);
-        form.add(BorderLayout.NORTH, Ui.centeredColumn(top));
-        chat.setScrollableY(true);
+        // The code, the runners and the chat scroll as one page, so the
+        // conversation is never squeezed into what the code card leaves.
         chat.setName("chat");
-        form.add(BorderLayout.CENTER, chat);
+        Container page = BoxLayout.encloseY(Ui.centeredColumn(top), chat);
+        page.setScrollableY(true);
+        form.add(BorderLayout.CENTER, page);
 
         final TextField say = new TextField("", "Say something", 40, TextField.ANY);
         say.setName("chatField");
@@ -234,8 +237,13 @@ public final class RaceLobby implements GameLink.Listener, Voice.Listener {
                 v.mutedBy(GameLink.text(m, "from"), Boolean.TRUE.equals(m.get("on")));
             }
         } else if (GameProtocol.CHAT.equals(type) && driver == null) {
-            chat.add(new Label(GameLink.text(m, "from") + ": " + GameLink.text(m, "text"), "ChatLine"));
-            form.revalidateLater();
+            // A bubble per message, the newest scrolled into view.
+            Container bubble = BoxLayout.encloseY(new Label(GameLink.text(m, "from"), "ChatFrom"),
+                    new SpanLabel(GameLink.text(m, "text"), "ChatLine"));
+            bubble.setUIID("ChatBubble");
+            chat.add(bubble);
+            form.revalidate();
+            form.scrollComponentToVisible(bubble);
         } else if (GameProtocol.ERROR.equals(type) || GameProtocol.KICKED.equals(type)) {
             String why = GameProtocol.KICKED.equals(type) ? "You were removed from the race."
                     : GameLink.text(m, "message");

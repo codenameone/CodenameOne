@@ -114,6 +114,12 @@ public final class Levels {
         return r == null ? null : r.encode();
     }
 
+    /// The route of the city level `levelId`, or null when it is not one
+    /// this app built.
+    public static CityRoute cityRoute(String levelId) {
+        return levelId == null ? null : CITIES.get(levelId);
+    }
+
     /// The minimap line of the city level `levelId`, or null.
     public static CityPath cityPath(String levelId) {
         return levelId == null ? null : PATHS.get(levelId);

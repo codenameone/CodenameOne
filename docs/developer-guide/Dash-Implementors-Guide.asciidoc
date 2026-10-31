@@ -54,11 +54,19 @@ introduces one move at a time: jump the hurdle, slide under the barrier, change 
 around the hauler. Swipes, taps and the keyboard (arrows, WASD and space) all drive
 the same four inputs.
 
+image::img/dash-tutorial-coach.png["First Steps: the coach calls out the next move above the track",scaledwidth=30%]
+
 The home screen leads to the *Levels*. Each official level shows its stars and has
 three buttons: *Run* plays this week's track for it, *Race the best* runs it against
 the ghost of the week's best run, and *Scores* opens its boards -- all time, this
 week, today, friends, and one per crew. Any row on a board opens that run's replay,
 with a scrubber, a pause, speeds, and a choice of whom the camera follows.
+
+image::img/dash-home.png["The home screen: level and currencies, missions, daily run, trophies and replays, the runner on stage, the spotlight banner, chest slots and the PLAY button",scaledwidth=30%]
+image::img/dash-run-side.png["The Neon Causeway side on: the runner jumps a hurdle on the 2D opening",scaledwidth=30%]
+image::img/dash-run-chase.png["The same level after the camera swing: the chase view over three lanes, coins and a barrier ahead",scaledwidth=30%]
+image::img/dash-run-reward.png["The reward card after a run: experience, a chest and an achievement",scaledwidth=30%]
+image::img/dash-scores.png["A level board: the top three framed, each row with points, distance, coins and stars",scaledwidth=30%]
 
 *Quick race* drops the player into a race with whoever is waiting for that level, and
 fills the empty lanes with bots after a few seconds. *Race friends* opens a party with
@@ -69,9 +77,16 @@ runners appear in their own lanes, and the result screen ranks the places and pa
 out trophies and coins. The *Daily dash* is one endless track a day, the same for
 everyone, with its own board.
 
+image::img/dash-party-chat.png["A party lobby: the code and link to share, the runners in it, and chat bubbles between them",scaledwidth=30%]
+image::img/dash-party-race.png["A race in progress: the friend in the next lane, live standings and emotes on screen",scaledwidth=30%]
+
 *Track editor* is where players make levels. A pack holds levels and the pieces they
 use, and is published for others to play, rate, race and remix. Every level in a pack
 has its own board.
+
+image::img/dash-forge-home.png["The track editor's home: your packs and the official one to remix",scaledwidth=30%]
+image::img/dash-forge-level-editor.png["The level editor: a strip of lanes over distance with obstacles placed, and the palette of pieces and camera cues",scaledwidth=30%]
+image::img/dash-forge-playtest.png["A playtest of the draft, run on the same rules as a published level",scaledwidth=30%]
 
 The rest -- crews, friends and invitations, the shop, trophies, the runner choice and
 the settings -- is the same kind of screen as the rest of the app, styled by one CSS
@@ -258,8 +273,36 @@ easier one names a different level with a different board. Since any edit makes 
 new level, a city run's coins and experience both come out of the community
 levels' daily allowance; a new route never pays beyond it.
 
-image::img/dash-city-route.png[A route picked on the street map,scaledwidth=30%]
-image::img/dash-city-run.png[The run down it with the route minimap,scaledwidth=30%]
+==== Street names and landmarks
+
+The run follows the map, not just its turns. The street the runner is on sits under
+the score and changes at every corner, a green street sign spans the track where a
+new street begins, and the places along the way -- churches, museums, stations,
+parks, monuments -- stand beside the track with their names on a board as the
+runner passes, and the coach calls them out ("Passing Guildhall."). The minimap in
+the corner shows how far along the route the runner is.
+
+The places come from OpenStreetMap through the Overpass API: `Landmarks` asks for
+named tourist, historic, religious, station and park features within 70 metres of
+the route, projects each onto the line, keeps them at least 60 metres apart and at
+most twelve, and adds them to the `CityRoute`. They are part of the route the server
+receives, so they are part of the level and its hash, and the server places the
+same boards:
+
+[source,java]
+----
+CityRoute route = new CityRoute("Old Harbour")
+        .leg(420, CityRoute.STRAIGHT, "Quay Street")
+        .landmark(180, CityRoute.MUSEUM, "Maritime Museum");
+----
+
+The public Overpass server is shared and rate limited. A game with players points
+`Landmarks.setSource` at an Overpass instance of its own, or at any other source of
+places: the interface is one method that takes the route's path.
+
+image::img/dash-city-route.png["A route picked on the street map, with the landmarks along it pinned",scaledwidth=30%]
+image::img/dash-city-run.png["The run down Cannon Street: the street name under the score and the route minimap",scaledwidth=30%]
+image::img/dash-city-landmark.png["A landmark's board beside the track as the runner passes it",scaledwidth=30%]
 
 Before you ship this, point `Routing` at a routing server of your own:
 `Routing.setService(new OsrmRouteService("https://osrm.example.com"))`. The
@@ -268,6 +311,49 @@ guarantee and serves only its car profile, whatever travel mode the request
 asks for. The map data is OpenStreetMap's, whose licence
 asks for credit wherever it is shown; the city screen carries that line, and a
 reskin has to keep it.
+
+[[dash-engagement]]
+=== Engagement and live operations
+
+Players come back for what changes: three quests a day, picked per player from
+`Goals` (run 500 metres, collect 100 coins, win a race...), a daily dash with one
+track for everyone and its own board, chests that open over time, a level and
+trophies to climb, achievements, and boards that reset every week. Rivals already
+on the boards from the first run keep a new player company: on a development server
+`DemoAccounts` seeds a field of runners whose scores are the rules' bot playing each
+week's track, submitted and verified like anyone's.
+
+The operator's side is in the admin console:
+
+* *Reports* chart players, runs, races, purchases and invitations over time.
+* *Query* finds players by what the game knows about them -- days away, races,
+  purchases, invitations, trophies -- with conditions such as `daysAway >= 7`.
+* *Pipelines* turn a query into an action that runs every hour: a push to players
+  away for a week that opens the shop, 20 gems to a player who reached 300 trophies
+  and never bought anything. Each player is acted on once per cool-down, and a push
+  carries the campaign `pipeline-<name>`, so its opens show in Codename One
+  analytics.
+* *Promote* sends a push to a segment (*broadcast*) and sets the banner on every
+  player's home screen (*spotlight*), which can open a level, the shop or the
+  editor.
+
+[source,java]
+----
+include::../../scripts/dash/backend/src/main/java/com/codenameone/examples/dash/social/Pipelines.java[tag=dash-pipelines-schedule,indent=0]
+----
+
+On a phone the console is a list of pages; on a desktop or a tablet it is a side bar
+and a page, and the *Promote* tab is shown:
+
+image::img/dash-admin-overview.png["The admin console on a phone: the live numbers and the pages it leads to",scaledwidth=30%]
+image::img/dash-desktop-admin-overview.png["The admin console on a desktop: the side bar and the overview page",scaledwidth=70%]
+image::img/dash-desktop-admin-reports.png["Reports: players, runs and purchases over time",scaledwidth=70%]
+image::img/dash-desktop-admin-query.png["The player query: conditions over what the game knows about each player",scaledwidth=70%]
+image::img/dash-desktop-admin-pipelines.png["Engagement pipelines with their audiences, actions and cool-downs",scaledwidth=70%]
+image::img/dash-desktop-admin-pipeline-edit.png["Editing a pipeline: the query, the push or gift, and the cool-down",scaledwidth=70%]
+image::img/dash-desktop-admin-broadcast.png["A broadcast push to a segment of players",scaledwidth=70%]
+image::img/dash-desktop-admin-spotlight.png["Setting the home screen's spotlight banner",scaledwidth=70%]
+image::img/dash-desktop-home-spotlight.png["The banner as players see it on the home screen",scaledwidth=70%]
 
 [[dash-moderation]]
 === Moderation
@@ -294,8 +380,8 @@ from the same lobby a player uses to spectate.
   when you change the rules themselves, so old replays aren't judged by new rules.
 * *Obstacles and pickups*: add a definition in `Content.catalog()`, a colour or a
   model in `RunView`, and the editor offers it at once.
-* *Runners*: there are no model files. `Rig` builds every runner from boxes and a
-  sphere and poses each joint in code, and `Portraits` paints the same figure flat
+* *Runners*: there are no model files. `Rig` builds every runner from capsules,
+  rounded boxes and glowing trim and poses each joint in code, and `Portraits` paints the same figure flat
   for the menus. Both take their colours from an `Outfit`, so a new runner is one
   line:
 +

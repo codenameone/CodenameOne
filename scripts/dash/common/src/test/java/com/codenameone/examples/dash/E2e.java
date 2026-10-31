@@ -33,6 +33,8 @@ import com.codename1.ui.util.ImageIO;
 import com.codename1.util.AsyncResource;
 import com.codenameone.examples.dash.engage.Telemetry;
 import com.codenameone.examples.dash.rules.Bot;
+import com.codenameone.examples.dash.api.GameProtocol;
+import com.codenameone.examples.dash.run.RaceDriver;
 import com.codenameone.examples.dash.rules.Run;
 import com.codenameone.examples.dash.run.Driver;
 import com.codenameone.examples.dash.run.RunView;
@@ -186,8 +188,19 @@ public abstract class E2e extends AbstractTest {
     /// decides a frame early now and then, so a test asserts that the run
     /// ended, never that it was won.
     protected void drive(final RunView view, int timeoutMillis) {
-        final Bot bot = new Bot(7, 90);
-        long end = System.currentTimeMillis() + timeoutMillis;
+        if (!driveFor(view, timeoutMillis)) {
+            assertTrue(false, "the run did not end in " + timeoutMillis + " ms");
+        }
+    }
+
+    /// Steers with the bot for `millis` of real time, or until the run ends,
+    /// so a test waiting on the screen does not leave the runner to crash.
+    /// Answers whether the run ended.
+    protected boolean driveFor(final RunView view, int millis) {
+        // A race applies an input when the server has stamped it, at least
+        // INPUT_DELAY ticks on, so the bot looks that much further ahead.
+        final Bot bot = new Bot(7, 90, view.driver() instanceof RaceDriver ? GameProtocol.INPUT_DELAY + 4 : 0);
+        long end = System.currentTimeMillis() + millis;
         while (System.currentTimeMillis() < end) {
             final boolean[] over = new boolean[1];
             onEdt(() -> {
@@ -198,11 +211,11 @@ public abstract class E2e extends AbstractTest {
                 }
             });
             if (over[0]) {
-                return;
+                return true;
             }
             waitFor(16);
         }
-        assertTrue(false, "the run did not end in " + timeoutMillis + " ms");
+        return false;
     }
 
     /// Plays the rest of the run at once, the bot choosing every tick, so a
@@ -226,10 +239,19 @@ public abstract class E2e extends AbstractTest {
     /// earned something shows first.
     protected void awaitResult(String what) {
         until(() -> has("result") || has("collectReward"), 20000, what);
-        if (!has("result")) {
-            shot("run-reward");
-            click("collectReward");
-            until(() -> has("result"), 20000, what);
+        // A run can earn more than one card -- the level's reward, then a
+        // level up -- and each is collected in turn.
+        boolean first = true;
+        while (!has("result")) {
+            if (has("collectReward")) {
+                if (first) {
+                    shot("run-reward");
+                    first = false;
+                }
+                click("collectReward");
+                waitFor(600);
+            }
+            until(() -> has("result") || has("collectReward"), 20000, what);
         }
     }
 
@@ -265,8 +287,23 @@ public abstract class E2e extends AbstractTest {
         if (dir == null || dir.length() == 0) {
             return;
         }
-        String out = dir.startsWith("file:") ? dir : "file://" + dir;
         waitFor(1200);
+        capture(dir, name);
+    }
+
+    /// A shot of a run in progress: the bot keeps steering while the frame
+    /// settles, or the runner would be on the floor by the time it is taken.
+    protected void shot(String name, RunView view) {
+        String dir = System.getProperty("dash.shots.dir");
+        if (dir == null || dir.length() == 0) {
+            return;
+        }
+        driveFor(view, 1200);
+        capture(dir, name);
+    }
+
+    private void capture(String dir, String name) {
+        String out = dir.startsWith("file:") ? dir : "file://" + dir;
         final Image[] captured = new Image[1];
         onEdt(() -> captured[0] = Display.getInstance().captureScreen());
         FileSystemStorage files = FileSystemStorage.getInstance();

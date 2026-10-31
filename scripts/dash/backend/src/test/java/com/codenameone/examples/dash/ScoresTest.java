@@ -59,12 +59,16 @@ class ScoresTest {
         String today = Runs.bot(Content.endless(), Content.catalog(), seed, 10).encode();
         String other = Runs.bot(Content.endless(), Content.catalog(), seed + 1, 10).encode();
         Api.json(mvc, Api.as(Api.body(post("/api/forge/results"), result(other)), who));
-        assertTrue(Api.list(mvc, Api.as(get("/api/scores?level=endless&board=day&limit=10"), who)).isEmpty());
+        // The development server's seeded field is on the board too, so the
+        // test looks for its own runner rather than counting rows.
+        assertTrue(row(Api.list(mvc, Api.as(get("/api/scores?level=endless&board=day&limit=50"), who)),
+                "daily-runner") == null);
         Api.json(mvc, Api.as(Api.body(post("/api/forge/results"), result(today)), who));
-        List board = Api.list(mvc, Api.as(get("/api/scores?level=endless&board=day&limit=10"), who));
-        assertEquals(1, board.size());
+        Map mine = row(Api.list(mvc, Api.as(get("/api/scores?level=endless&board=day&limit=50"), who)),
+                "daily-runner");
+        assertTrue(mine != null);
         // Anyone can watch the run behind a score.
-        String id = (String) ((Map) board.get(0)).get("replayId");
+        String id = (String) mine.get("replayId");
         String watcher = Api.player(accounts, "daily-watcher");
         assertEquals(today, Api.json(mvc, Api.as(get("/api/races/" + id), watcher)).get("replay"));
         assertEquals(today, Api.json(mvc, Api.as(get("/api/ghost?level=endless&board=day"), watcher)).get("replay"));
@@ -127,5 +131,14 @@ class ScoresTest {
         Api.json(mvc, Api.as(post("/api/crews/" + code + "/leave"), mate));
         assertEquals(0, Api.list(mvc, Api.as(get("/api/crews"), mate)).size());
         assertEquals(404, Api.statusOf(mvc, Api.as(post("/api/crews/NOPE/join"), stranger)));
+    }
+
+    private static Map row(List board, String name) {
+        for (Object o : board) {
+            if (name.equals(((Map) o).get("displayName"))) {
+                return (Map) o;
+            }
+        }
+        return null;
     }
 }

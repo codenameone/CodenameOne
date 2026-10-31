@@ -23,7 +23,7 @@ package com.codenameone.examples.dash.rules;
 /// the server refuses a score whose replay names another version, and the replay
 /// viewer warns when it re-runs one under newer rules.
 public final class RulesVersion {
-    public static final String ID = "1";
+    public static final String ID = "2";
 
     private RulesVersion() {
     }

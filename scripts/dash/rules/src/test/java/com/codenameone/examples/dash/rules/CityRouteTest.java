@@ -105,4 +105,42 @@ class CityRouteTest {
         assertThrows(IllegalArgumentException.class, () -> CityRoute.decode("1~x~10,7,a"));
         assertThrows(IllegalArgumentException.class, () -> CityRoute.decode(null));
     }
+
+    @Test
+    void landmarksRoundTripAndShowWhereTheyStand() {
+        CityRoute r = new CityRoute("City of London").leg(500, CityRoute.STRAIGHT, "Cannon Street")
+                .leg(400, CityRoute.LEFT, "Moorgate").leg(300, CityRoute.RIGHT, "London Wall")
+                .landmark(250, CityRoute.WORSHIP, "St Paul's Cathedral")
+                .landmark(700, CityRoute.MUSEUM, "Bank of England Museum");
+        CityRoute back = CityRoute.decode(r.encode());
+        assertEquals(r.encode(), back.encode());
+        assertEquals(2, back.landmarks().size());
+        assertEquals("Moorgate", back.streetAt(600));
+        assertEquals("Cannon Street", back.streetAt(10));
+        int streets = 0;
+        int marks = 0;
+        int last = -1;
+        for (CityRoute.Sign s : back.signs()) {
+            assertTrue(s.metres >= last, "signs in order");
+            last = s.metres;
+            if (s.kind < 0) {
+                streets++;
+            } else {
+                marks++;
+            }
+        }
+        assertEquals(3, streets);
+        assertEquals(2, marks);
+        boolean called = false;
+        for (DialogLine l : back.level().dialog) {
+            called |= l.text.indexOf("St Paul's Cathedral") >= 0;
+        }
+        assertTrue(called, "the coach names a landmark");
+        // A landmark changes the route, so it names another level.
+        assertTrue(!r.id().equals(new CityRoute("City of London").leg(500, CityRoute.STRAIGHT, "Cannon Street")
+                .leg(400, CityRoute.LEFT, "Moorgate").leg(300, CityRoute.RIGHT, "London Wall").id()));
+        assertThrows(IllegalArgumentException.class,
+                () -> CityRoute.decode("1~x~@10,0,Tower~100,0,Street"));
+        assertThrows(IllegalArgumentException.class, () -> CityRoute.decode("1~x~100,0,Street~@10,9,Tower"));
+    }
 }

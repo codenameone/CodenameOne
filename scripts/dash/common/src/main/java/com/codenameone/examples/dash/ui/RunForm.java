@@ -42,6 +42,7 @@ import com.codenameone.examples.dash.net.Api;
 import com.codenameone.examples.dash.net.Net;
 import com.codenameone.examples.dash.net.Session;
 import com.codenameone.examples.dash.rules.Content;
+import com.codenameone.examples.dash.rules.CityRoute;
 import com.codenameone.examples.dash.rules.DialogLine;
 import com.codenameone.examples.dash.rules.Input;
 import com.codenameone.examples.dash.rules.Replay;
@@ -74,6 +75,8 @@ public final class RunForm implements RunView.Hud, RaceDriver.Listener {
     private final Label place = new Label("", "HudPlace");
     private final Label countdown = new Label("", "HudCountdown");
     private final Label power = new Label("", "HudPower");
+    private final Label street = new Label("", "HudStreet");
+    private CityRoute cityRoute;
     private final SpanLabel coach = new SpanLabel("");
     /// Everything drawn over the track; hidden under the result card.
     private Container hud;
@@ -118,6 +121,13 @@ public final class RunForm implements RunView.Hud, RaceDriver.Listener {
         Container mid = new Container(BoxLayout.y());
         mid.add(distance);
         mid.add(FlowLayout.encloseCenter(score));
+        // The street the runner is on, on a city run, under the score.
+        cityRoute = Levels.cityRoute(driver.run().level().id);
+        if (cityRoute != null) {
+            street.setName("street");
+            Ui.glyph(street, FontImage.MATERIAL_SIGNPOST, 2.8f);
+            mid.add(FlowLayout.encloseCenter(street));
+        }
         top.add(BorderLayout.CENTER, mid);
         Ui.glyph(coins, FontImage.MATERIAL_MONETIZATION_ON, 3.6f);
         Ui.glyph(power, FontImage.MATERIAL_BOLT, 3.2f);
@@ -242,6 +252,14 @@ public final class RunForm implements RunView.Hud, RaceDriver.Listener {
             minimap.setProgress(me.z / (float) Track.UNIT / run.level().length);
         }
         score.setText(String.valueOf(me.score()));
+        if (cityRoute != null) {
+            String on = cityRoute.streetAt(me.z / Track.UNIT);
+            if (!on.equals(street.getText())) {
+                street.setText(on);
+                street.setVisible(on.length() > 0);
+                form.revalidateLater();
+            }
+        }
         coins.setText(String.valueOf(me.coins));
         power.setText(me.shield > 0 ? "Shield" : me.magnet > 0 ? "Magnet" : me.boost > 0 ? "Boost" : "");
         int wait = driver.countdownTicks();

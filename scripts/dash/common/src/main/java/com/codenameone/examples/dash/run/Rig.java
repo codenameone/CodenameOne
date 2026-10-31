@@ -30,10 +30,11 @@ import com.codename1.gpu.Primitives;
 /// air, sliding, down, or celebrating -- and the body eases towards it every
 /// frame, so one move flows into the next.
 ///
-/// The proportions are a stylized runner's, not a person's: a big glossy
-/// helmet with a visor that wraps round it, chunky gloves and shoes, pads on
-/// the shoulders and a backpack with a light strip, all in smooth PHONG
-/// shading over a soft round shadow.
+/// The proportions are an athlete's: long legs, a chest that tapers to a
+/// narrow waist, a small streamlined helmet with a visor that wraps round it,
+/// trainers and a slim pack with a light strip. The suit is matte and the
+/// trim glows -- a stripe down each leg and arm -- so the body reads as one
+/// sleek shape at speed rather than a stack of glossy balls.
 ///
 /// Angles are in degrees in the runner's side plane: 0 hangs straight down
 /// (a limb) or stands straight up (the torso), and a positive angle swings
@@ -51,29 +52,31 @@ final class Rig {
     private static final int FORE_R = 9;
     private static final int JOINTS = 10;
 
-    private static final float THIGH = 0.44f;
-    private static final float SHIN = 0.42f;
-    private static final float TORSO = 0.52f;
-    private static final float UPPER_ARM = 0.3f;
-    private static final float FOREARM = 0.28f;
-    private static final float STAND = 0.94f;
-    private static final float HEAD = 0.25f;
+    private static final float THIGH = 0.5f;
+    private static final float SHIN = 0.48f;
+    private static final float TORSO = 0.54f;
+    private static final float UPPER_ARM = 0.31f;
+    private static final float FOREARM = 0.29f;
+    private static final float STAND = 1.02f;
+    private static final float HEAD = 0.17f;
 
     /// The meshes every runner shares, built once per run.
     static final class Kit {
-        final Mesh thigh = Meshes.capsule(0.09f, THIGH - 0.09f, 4, 12);
-        final Mesh shin = Meshes.capsule(0.075f, SHIN - 0.075f, 4, 12);
-        final Mesh arm = Meshes.capsule(0.065f, UPPER_ARM - 0.065f, 4, 10);
-        final Mesh fore = Meshes.capsule(0.07f, FOREARM - 0.07f, 4, 10);
-        final Mesh torso = Meshes.capsule(0.2f, 0.2f, 6, 16);
-        final Mesh pelvis = Meshes.roundedBox(0.36f, 0.2f, 0.26f, 0.09f, 3);
-        final Mesh band = Meshes.torus(0.2f, 0.028f, 8, 20);
+        final Mesh thigh = Meshes.capsule(0.075f, THIGH - 0.075f, 4, 12);
+        final Mesh shin = Meshes.capsule(0.058f, SHIN - 0.058f, 4, 12);
+        final Mesh arm = Meshes.capsule(0.05f, UPPER_ARM - 0.05f, 4, 10);
+        final Mesh fore = Meshes.capsule(0.045f, FOREARM - 0.045f, 4, 10);
+        final Mesh chest = Meshes.roundedBox(0.42f, 0.3f, 0.24f, 0.1f, 4);
+        final Mesh torso = Meshes.capsule(0.13f, 0.14f, 6, 16);
+        final Mesh pelvis = Meshes.roundedBox(0.3f, 0.16f, 0.2f, 0.07f, 3);
+        final Mesh band = Meshes.torus(0.135f, 0.018f, 8, 20);
         final Mesh ball = Primitives.sphere(0.5f, 14, 20, false);
-        final Mesh visor = Meshes.band(0.232f, 0.1f, 160f, 16);
-        final Mesh pack = Meshes.roundedBox(0.28f, 0.32f, 0.13f, 0.055f, 3);
-        final Mesh strip = Meshes.capsule(0.022f, 0.2f, 3, 8);
-        final Mesh shoe = Meshes.roundedBox(0.18f, 0.12f, 0.33f, 0.055f, 3);
-        final Mesh sole = Meshes.roundedBox(0.19f, 0.04f, 0.34f, 0.018f, 2);
+        final Mesh visor = Meshes.band(HEAD + 0.012f, 0.07f, 170f, 16);
+        final Mesh pack = Meshes.roundedBox(0.24f, 0.28f, 0.08f, 0.035f, 3);
+        final Mesh strip = Meshes.capsule(0.016f, 0.2f, 3, 8);
+        final Mesh stripe = Meshes.capsule(0.012f, 0.3f, 3, 6);
+        final Mesh shoe = Meshes.roundedBox(0.12f, 0.085f, 0.3f, 0.04f, 3);
+        final Mesh sole = Meshes.roundedBox(0.13f, 0.03f, 0.31f, 0.014f, 2);
         final Mesh quad;
         final Material shadow;
 
@@ -85,6 +88,7 @@ final class Rig {
 
     private final Model pelvis;
     private final Model torso;
+    private final Model chest;
     private final Model band;
     private final Model head;
     private final Model visor;
@@ -97,7 +101,8 @@ final class Rig {
     private final Model[] arm = new Model[2];
     private final Model[] fore = new Model[2];
     private final Model[] hand = new Model[2];
-    private final Model[] pad = new Model[2];
+    private final Model[] legStripe = new Model[2];
+    private final Model[] armStripe = new Model[2];
     private final Model shadow;
     private final Model[] all;
     private final float[] pose = new float[JOINTS];
@@ -106,17 +111,20 @@ final class Rig {
     private float phase;
 
     Rig(Kit k, Outfit o) {
-        Material suit = new Material(Material.Type.PHONG).setColor(o.suit).setShininess(36f);
-        Material shell = new Material(Material.Type.PHONG).setColor(o.shell).setShininess(90f);
-        Material helmet = new Material(Material.Type.PHONG).setColor(Outfit.mix(o.suit, 0xffffffff, 0.12f))
-                .setShininess(140f);
+        // A matte suit, so the light does not pool into highlights that make
+        // every rounded part read as a balloon; the gloss is kept for the
+        // helmet alone.
+        Material suit = new Material(Material.Type.PHONG).setColor(o.suit).setShininess(8f);
+        Material shell = new Material(Material.Type.PHONG).setColor(o.shell).setShininess(20f);
+        Material helmet = new Material(Material.Type.PHONG).setColor(o.shell).setShininess(120f);
         Material kicks = new Material(Material.Type.PHONG).setColor(Outfit.mix(o.shell, 0xffffffff, 0.78f))
                 .setShininess(70f);
         Material glow = new Material(Material.Type.UNLIT).setColor(o.trim);
         pelvis = part(k.pelvis, shell, 1f, 1f, 1f);
-        torso = part(k.torso, suit, 1f, 1f, 0.78f);
+        torso = part(k.torso, suit, 1f, 1f, 0.8f);
+        chest = part(k.chest, suit, 1f, 1f, 1f);
         band = part(k.band, glow, 1f, 1f, 0.8f);
-        head = part(k.ball, helmet, HEAD * 2f, HEAD * 2f * 0.96f, HEAD * 2f);
+        head = part(k.ball, helmet, HEAD * 2f, HEAD * 2f * 1.08f, HEAD * 2f * 1.12f);
         visor = part(k.visor, glow, 1f, 1f, 1f);
         pack = part(k.pack, shell, 1f, 1f, 1f);
         strip = part(k.strip, glow, 1f, 1f, 1f);
@@ -127,14 +135,15 @@ final class Rig {
             sole[s] = part(k.sole, glow, 1f, 1f, 1f);
             arm[s] = part(k.arm, suit, 1f, 1f, 1f);
             fore[s] = part(k.fore, shell, 1f, 1f, 1f);
-            hand[s] = part(k.ball, shell, 0.17f, 0.17f, 0.17f);
-            pad[s] = part(k.ball, shell, 0.2f, 0.14f, 0.2f);
+            hand[s] = part(k.ball, shell, 0.1f, 0.11f, 0.1f);
+            legStripe[s] = part(k.stripe, glow, 1f, 1f, 1f);
+            armStripe[s] = part(k.stripe, glow, 1f, 0.8f, 1f);
         }
         shadow = new Model(k.quad, k.shadow);
         shadow.setRotation(-90f, 0f, 0f);
-        all = new Model[] {shadow, pelvis, torso, band, pack, strip, head, visor, thigh[0], thigh[1],
+        all = new Model[] {shadow, pelvis, torso, chest, band, pack, strip, head, visor, thigh[0], thigh[1],
             shin[0], shin[1], shoe[0], shoe[1], sole[0], sole[1], arm[0], arm[1], fore[0], fore[1],
-            hand[0], hand[1], pad[0], pad[1]};
+            hand[0], hand[1], legStripe[0], legStripe[1], armStripe[0], armStripe[1]};
         running(0f);
         System.arraycopy(want, 0, pose, 0, JOINTS);
     }
@@ -248,12 +257,17 @@ final class Rig {
         // Torso: from the hip, up and leaning forward.
         float midY = hipY + cosL * TORSO / 2f;
         float midF = sinL * TORSO / 2f;
-        put(torso, x, midY, z - midF, -lean);
-        put(band, x, hipY + cosL * TORSO * 0.62f, z - sinL * TORSO * 0.62f, -lean);
-        // The backpack sits on the back, square to the torso.
-        float back = 0.19f;
+        put(torso, x, midY - cosL * 0.06f, z - (midF - sinL * 0.06f), -lean);
+        // The chest, broader than the waist under it.
+        float chestUp = TORSO * 0.72f;
+        put(chest, x, hipY + cosL * chestUp, z - sinL * chestUp, -lean);
+        put(band, x, hipY + cosL * TORSO * 0.3f, z - sinL * TORSO * 0.3f, -lean);
+        // The pack sits on the back, square to the torso.
+        float back = 0.15f;
+        midY = hipY + cosL * chestUp;
+        midF = sinL * chestUp;
         put(pack, x, midY + sinL * back, z - (midF - cosL * back), -lean);
-        float glowBack = back + 0.075f;
+        float glowBack = back + 0.045f;
         put(strip, x, midY + sinL * glowBack, z - (midF - cosL * glowBack), -lean);
         float topY = hipY + cosL * TORSO;
         float topF = sinL * TORSO;
@@ -261,21 +275,25 @@ final class Rig {
         float headF = topF + sinL * (HEAD - 0.02f);
         put(head, x, headY, z - headF, -lean);
         put(visor, x, headY + cosL * 0.02f, z - (headF + sinL * 0.02f), -lean);
-        float shY = topY - cosL * 0.08f;
-        float shF = topF - sinL * 0.08f;
+        float shY = topY - cosL * 0.06f;
+        float shF = topF - sinL * 0.06f;
         for (int s = 0; s < 2; s++) {
             float side = s == 0 ? -1f : 1f;
-            float lx = x + side * 0.11f;
-            limb(thigh[s], lx, hipY, z, 0f, pose[s == 0 ? THIGH_L : THIGH_R], THIGH);
+            float lx = x + side * 0.1f;
+            float ta = pose[s == 0 ? THIGH_L : THIGH_R];
+            limb(thigh[s], lx, hipY, z, 0f, ta, THIGH);
+            // The stripe down the outside of the thigh.
+            put(legStripe[s], lx + side * 0.07f, (hipY + end[0]) / 2f, z - end[1] / 2f, ta);
             float kneeY = end[0];
             float kneeF = end[1];
             limb(shin[s], lx, kneeY, z, kneeF, pose[s == 0 ? SHIN_L : SHIN_R], SHIN);
             float sa = pose[s == 0 ? SHIN_L : SHIN_R];
-            put(shoe[s], lx, end[0] - 0.01f, z - (end[1] + 0.07f), sa * 0.3f);
-            put(sole[s], lx, end[0] - 0.075f, z - (end[1] + 0.07f), sa * 0.3f);
-            float ax = x + side * 0.27f;
-            put(pad[s], ax - side * 0.01f, shY + cosL * 0.03f, z - (shF + sinL * 0.03f), -lean);
-            limb(arm[s], ax, shY, z, shF, pose[s == 0 ? ARM_L : ARM_R] + lean * 0.3f, UPPER_ARM);
+            put(shoe[s], lx, end[0] - 0.02f, z - (end[1] + 0.06f), sa * 0.3f);
+            put(sole[s], lx, end[0] - 0.07f, z - (end[1] + 0.06f), sa * 0.3f);
+            float ax = x + side * 0.25f;
+            float aa = pose[s == 0 ? ARM_L : ARM_R] + lean * 0.3f;
+            limb(arm[s], ax, shY, z, shF, aa, UPPER_ARM);
+            put(armStripe[s], ax + side * 0.048f, (shY + end[0]) / 2f, z - (shF + end[1]) / 2f, aa);
             limb(fore[s], ax, end[0], z, end[1], pose[s == 0 ? FORE_L : FORE_R] + lean * 0.3f, FOREARM);
             hand[s].setPosition(ax, end[0], z - end[1]);
         }

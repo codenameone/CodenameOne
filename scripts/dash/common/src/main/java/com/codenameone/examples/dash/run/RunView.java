@@ -31,6 +31,7 @@ import com.codename1.gpu.RenderState;
 import com.codename1.gpu.Texture;
 import com.codename1.ui.CN;
 import com.codename1.ui.Display;
+import com.codenameone.examples.dash.rules.CityRoute;
 import com.codenameone.examples.dash.rules.Clearance;
 import com.codenameone.examples.dash.rules.Input;
 import com.codenameone.examples.dash.rules.PickupKind;
@@ -161,6 +162,7 @@ public class RunView extends GameView {
     private int pressX = -1;
     private int pressY = -1;
     private final boolean[] keyWas = new boolean[4];
+    private Signage signage;
 
     public RunView(Driver driver) {
         this.driver = driver;
@@ -327,6 +329,13 @@ public class RunView extends GameView {
         pitDepth = Glow.additive(glow.soft, 0x70ff5a1a);
         coinMaterial = new Material(Material.Type.PHONG).setColor(0xffffc93a).setShininess(128f);
         coinGlint = Glow.additive(glow.glint, 0xd0fff0b0);
+        CityRoute city = Levels.cityRoute(driver.run().level().id);
+        if (city != null) {
+            signage = new Signage(d, city, cube, quad, legMesh, half);
+            for (Model m : signage.models()) {
+                addModel(m);
+            }
+        }
 
         Run run = driver.run();
         runners = new Rig[run.runnerCount()];
@@ -525,6 +534,9 @@ public class RunView extends GameView {
     /// other as the runner passes them; the sky and the sun travel with the
     /// camera so they stay at the horizon.
     private void scenery(Run run, float meX, float meZ, float dt) {
+        if (signage != null) {
+            signage.update(meZ);
+        }
         int lanes = Math.max(1, run.level().lanes);
         float half = lanes * LANE_W / 2f + 0.3f;
         int first = (int) Math.floor((meZ - BEHIND) / SEGMENT);

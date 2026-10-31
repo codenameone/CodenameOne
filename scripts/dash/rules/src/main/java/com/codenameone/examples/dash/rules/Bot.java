@@ -27,11 +27,20 @@ public final class Bot {
     private final Rng rng;
     /// 0 to 100: how often it reacts in time, and how greedily it chases coins.
     private final int skill;
+    /// Ticks between deciding and the input taking effect: 0 when the bot
+    /// steps the run itself, the race's input delay when its inputs go
+    /// through a server first. It sees everything that much earlier.
+    private final int lead;
     private int cooldown;
 
     public Bot(long seed, int skill) {
+        this(seed, skill, 0);
+    }
+
+    public Bot(long seed, int skill, int lead) {
         this.rng = new Rng(seed * 31 + 7);
         this.skill = FixedMath.clamp(skill, 0, 100);
+        this.lead = Math.max(0, lead);
     }
 
     public int decide(Run run, int who) {
@@ -44,7 +53,7 @@ public final class Bot {
             return Input.NONE;
         }
         int perTick = Math.max(1, r.speed / Run.TICKS_PER_SECOND);
-        int look = perTick * 40;
+        int look = perTick * (40 + lead);
         Track t = run.track();
         Track.Entry threat = nearestObstacle(t, r, r.lane, look);
         if (threat != null) {
@@ -68,7 +77,7 @@ public final class Bot {
 
     private int respond(Run run, Runner r, Track.Entry e, int dist, int perTick, int look) {
         Clearance c = e.obstacle.clearance;
-        if (c == Clearance.DODGE || (e.obstacle.lethal && !e.spansAllLanes() && dist > perTick * 12)) {
+        if (c == Clearance.DODGE || (e.obstacle.lethal && !e.spansAllLanes() && dist > perTick * (12 + lead))) {
             int lanes = run.level().lanes;
             int best = -1;
             for (int d = 1; d < lanes && best < 0; d++) {
@@ -87,10 +96,10 @@ public final class Bot {
                 return Input.NONE;
             }
         }
-        if (c == Clearance.JUMP && dist <= perTick * 14 && r.y == 0) {
+        if (c == Clearance.JUMP && dist <= perTick * (14 + lead) && r.y == 0) {
             return Input.JUMP;
         }
-        if (c == Clearance.SLIDE && dist <= perTick * 10 && !r.sliding()) {
+        if (c == Clearance.SLIDE && dist <= perTick * (10 + lead) && !r.sliding()) {
             return Input.SLIDE;
         }
         return Input.NONE;

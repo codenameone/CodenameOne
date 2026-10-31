@@ -26,7 +26,13 @@ import com.codenameone.examples.dash.admin.Flags;
 import com.codenameone.examples.dash.api.ConditionDto;
 import com.codenameone.examples.dash.api.PipelineDto;
 import com.codenameone.examples.dash.api.SpotlightDto;
+import com.codenameone.examples.dash.forge.Scores;
 import com.codenameone.examples.dash.progress.Progression;
+import com.codenameone.examples.dash.rules.Bot;
+import com.codenameone.examples.dash.rules.Content;
+import com.codenameone.examples.dash.rules.LevelDef;
+import com.codenameone.examples.dash.rules.Recorder;
+import com.codenameone.examples.dash.rules.Run;
 import com.codenameone.examples.dash.social.Pipelines;
 import com.codenameone.examples.dash.social.Promotion;
 import java.io.IOException;
@@ -50,11 +56,12 @@ public class DemoAccounts {
     private final Config config;
     private final Promotion promotion;
     private final Pipelines pipelines;
+    private final Scores scores;
     private final String adminEmail;
     private final String adminPassword;
 
     public DemoAccounts(Accounts accounts, Flags flags, Progression progression, Config config,
-            Promotion promotion, Pipelines pipelines, @Value("${dash.admin.email:}") String adminEmail,
+            Promotion promotion, Pipelines pipelines, Scores scores, @Value("${dash.admin.email:}") String adminEmail,
             @Value("${dash.admin.password:}") String adminPassword) {
         this.accounts = accounts;
         this.flags = flags;
@@ -62,6 +69,7 @@ public class DemoAccounts {
         this.config = config;
         this.promotion = promotion;
         this.pipelines = pipelines;
+        this.scores = scores;
         this.adminEmail = adminEmail;
         this.adminPassword = adminPassword;
     }
@@ -78,6 +86,7 @@ public class DemoAccounts {
         add(PLAYER, "Riley", false);
         add(RIVAL, "Morgan", false);
         add(ADMIN, "Game Master", true);
+        field();
         if (!accounts.exists(TROUBLE)) {
             add(TROUBLE, "Sore Loser", false);
             flags.auto(TROUBLE, "Left three races in a row", null);
@@ -102,6 +111,51 @@ public class DemoAccounts {
                     Pipelines.GEMS, "A gift for you", "20 gems for your next crate. Thanks for playing!",
                     "shop", 20, 30, 0, 0L));
         }
+    }
+
+    /// Runners already on the boards when a development server starts, so a
+    /// leaderboard has a field to climb from the first run. Each one's names
+    /// and skill are fixed; their runs are the rules' own bot, played on this
+    /// week's seed and submitted like anyone's, so every score is a real,
+    /// verified run. The skills are spread wide: above 80 the bot never
+    /// lapses, so a field of strong bots would post one score eight times.
+    private static final String[][] FIELD = {
+        {"nova@dash.example", "Nova", "97"},
+        {"kai@dash.example", "Kai", "82"},
+        {"juno@dash.example", "Juno", "70"},
+        {"ezra@dash.example", "Ezra", "58"},
+        {"sasha@dash.example", "Sasha", "46"},
+        {"dev@dash.example", "Dev", "34"},
+        {"ivy@dash.example", "Ivy", "22"},
+        {"theo@dash.example", "Theo", "10"},
+    };
+
+    private void field() throws IOException {
+        int week = Scores.today() / 7;
+        for (int i = 0; i < FIELD.length; i++) {
+            String who = FIELD[i][0];
+            if (accounts.exists(who)) {
+                continue;
+            }
+            add(who, FIELD[i][1], false);
+            int skill = Integer.parseInt(FIELD[i][2]);
+            for (LevelDef level : Content.levels()) {
+                long seed = Content.weeklySeed(week, level.id);
+                post(who, level, seed, skill, i);
+                if (Scores.DAILY_LEVEL.equals(level.id)) {
+                    post(who, level, Content.dailySeed(Scores.today()), skill, i);
+                }
+            }
+        }
+    }
+
+    private void post(String who, LevelDef level, long seed, int skill, int salt) throws IOException {
+        Recorder rec = new Recorder(new Run(level, Content.catalog(), seed, 1));
+        Bot bot = new Bot(seed * 31 + salt, skill);
+        while (!rec.run().over()) {
+            rec.step(new int[] {bot.decide(rec.run(), 0)});
+        }
+        scores.submit(who, level.id, rec.replay(), rec.run());
     }
 
     private void add(String username, String name, boolean admin) throws IOException {

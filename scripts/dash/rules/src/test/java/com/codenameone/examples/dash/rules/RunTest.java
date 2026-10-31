@@ -165,6 +165,26 @@ class RunTest {
         }
     }
 
+    /// The chunks are fair: a sharp bot finishes the causeway on every one of
+    /// 200 weekly seeds. One obstacle placed inside another's jump or lane
+    /// change shows up here as a run that ends early on some seeds.
+    @Test
+    void aSharpBotFinishesTheCausewayOnEveryWeeklySeed() {
+        LevelDef level = Content.causeway();
+        for (int week = 2900; week < 3100; week++) {
+            long seed = Content.weeklySeed(week, level.id);
+            Run run = new Run(level, Content.catalog(), seed, 1);
+            Bot bot = new Bot(seed * 31, 97);
+            int[] in = new int[1];
+            while (!run.over() && run.tick() < 60 * 600) {
+                in[0] = bot.decide(run, 0);
+                run.step(in);
+            }
+            assertTrue(run.runner(0).finished, "week " + week + " ended at "
+                    + run.runner(0).z / Track.UNIT + " m");
+        }
+    }
+
     @Test
     void theValidatorCatchesBrokenLevels() {
         LevelDef d = new LevelDef("bad", "bad");

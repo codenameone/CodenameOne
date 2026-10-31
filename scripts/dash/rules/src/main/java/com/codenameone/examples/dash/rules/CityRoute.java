@@ -25,7 +25,10 @@ import java.util.List;
 /// points, turned into a level. Each leg is a stretch of one street; a turn
 /// into the next is a corner the runner has to take on the side it turns to,
 /// with the street's name called out before it, and what lies between the
-/// corners comes from the game's own chunks.
+/// corners comes from the game's own chunks. Landmarks the route passes --
+/// named places from the map -- are kept with how far along the route they
+/// stand, so the run can show them by the track where they really are and
+/// the coach can call them out.
 ///
 /// Nothing here knows about maps. The app reduces a route to this spec, and
 /// the spec is all the server needs: [#level()] is deterministic, so the
@@ -44,6 +47,15 @@ public final class CityRoute {
     public static final int MAX_METRES = 2500;
     public static final int MAX_LEGS = 60;
     public static final int MAX_NAME = 32;
+    public static final int MAX_LANDMARKS = 24;
+    /// What kind of place a landmark is; the renderer picks its marker by it.
+    public static final int LANDMARK = 0;
+    public static final int WORSHIP = 1;
+    public static final int MUSEUM = 2;
+    public static final int PARK = 3;
+    public static final int STATION = 4;
+    public static final int MONUMENT = 5;
+    private static final int KINDS = 6;
     private static final int VERSION = 1;
     private static final String[] THEMES = {"daybreak", "neon", "ember"};
     /// Clear track before the first obstacle, and around every corner.
@@ -64,8 +76,37 @@ public final class CityRoute {
         }
     }
 
+    /// A named place beside the route, `metres` from its start.
+    public static final class Landmark {
+        public final int metres;
+        public final int kind;
+        public final String name;
+
+        Landmark(int metres, int kind, String name) {
+            this.metres = metres;
+            this.kind = kind;
+            this.name = name;
+        }
+    }
+
+    /// Something the run shows by the track, `metres` into the level (scaled
+    /// as the level is): a street's name where the runner enters it, or a
+    /// landmark. `kind` is -1 for a street sign, else the landmark's kind.
+    public static final class Sign {
+        public final int metres;
+        public final int kind;
+        public final String text;
+
+        Sign(int metres, int kind, String text) {
+            this.metres = metres;
+            this.kind = kind;
+            this.text = text;
+        }
+    }
+
     public final String place;
     private final List<Leg> legs = new ArrayList<Leg>();
+    private final List<Landmark> landmarks = new ArrayList<Landmark>();
 
     /// A route through `place`, a name for the area shown on the level.
     public CityRoute(String place) {
@@ -92,6 +133,80 @@ public final class CityRoute {
         return legs;
     }
 
+    /// Adds a landmark `metres` along the route. Ones past the end, past
+    /// [#MAX_LANDMARKS] or with no name are refused.
+    public CityRoute landmark(int metres, int kind, String name) {
+        if (landmarks.size() >= MAX_LANDMARKS) {
+            throw new IllegalArgumentException("a route has at most " + MAX_LANDMARKS + " landmarks");
+        }
+        if (metres < 0 || metres > 100000 || kind < 0 || kind >= KINDS) {
+            throw new IllegalArgumentException("not a landmark");
+        }
+        String n = clean(name);
+        if (n.length() == 0) {
+            throw new IllegalArgumentException("a landmark has a name");
+        }
+        landmarks.add(new Landmark(metres, kind, n));
+        return this;
+    }
+
+    public List<Landmark> landmarks() {
+        return landmarks;
+    }
+
+    /// Where a point `metres` along the real route falls in the level.
+    private int scaled(int metres, int total, int real) {
+        return (int) ((long) Math.min(metres, real) * total / real);
+    }
+
+    /// The signs along the run, in order: each street's name where it
+    /// starts, and every landmark.
+    public List<Sign> signs() {
+        int real = Math.max(1, metres());
+        int total = Math.max(MIN_METRES, Math.min(MAX_METRES, real));
+        List<Sign> out = new ArrayList<Sign>();
+        int at = 0;
+        for (int i = 0; i < legs.size(); i++) {
+            Leg l = legs.get(i);
+            if (l.street.length() > 0) {
+                out.add(new Sign(Math.max(12, scaled(at, total, real)), -1, l.street));
+            }
+            at += l.metres;
+        }
+        for (int i = 0; i < landmarks.size(); i++) {
+            Landmark m = landmarks.get(i);
+            out.add(new Sign(scaled(m.metres, total, real), m.kind, m.name));
+        }
+        // Insertion sort: a route has a few dozen signs at most.
+        for (int i = 1; i < out.size(); i++) {
+            Sign x = out.get(i);
+            int j = i - 1;
+            while (j >= 0 && out.get(j).metres > x.metres) {
+                out.set(j + 1, out.get(j));
+                j--;
+            }
+            out.set(j + 1, x);
+        }
+        return out;
+    }
+
+    /// The street a runner `metres` into the level is on, or "" where the
+    /// map had no name.
+    public String streetAt(int metres) {
+        int real = Math.max(1, metres());
+        int total = Math.max(MIN_METRES, Math.min(MAX_METRES, real));
+        int at = 0;
+        String street = "";
+        for (int i = 0; i < legs.size(); i++) {
+            if (scaled(at, total, real) > metres) {
+                break;
+            }
+            street = legs.get(i).street;
+            at += legs.get(i).metres;
+        }
+        return street;
+    }
+
     /// The real length of the route, in metres.
     public int metres() {
         int m = 0;
@@ -110,6 +225,10 @@ public final class CityRoute {
             Leg l = legs.get(i);
             sb.append('~').append(l.metres).append(',').append(l.turn).append(',').append(l.street);
         }
+        for (int i = 0; i < landmarks.size(); i++) {
+            Landmark m = landmarks.get(i);
+            sb.append("~@").append(m.metres).append(',').append(m.kind).append(',').append(m.name);
+        }
         return sb.toString();
     }
 
@@ -125,11 +244,20 @@ public final class CityRoute {
         }
         CityRoute r = new CityRoute(parts.get(1));
         for (int i = 2; i < parts.size(); i++) {
-            List<String> f = Text.split(parts.get(i), ',');
+            String part = parts.get(i);
+            boolean mark = part.length() > 0 && part.charAt(0) == '@';
+            List<String> f = Text.split(mark ? part.substring(1) : part, ',');
             if (f.size() != 3) {
                 throw new IllegalArgumentException("not a city route");
             }
             try {
+                if (mark) {
+                    r.landmark(Integer.parseInt(f.get(0)), Integer.parseInt(f.get(1)), f.get(2));
+                    continue;
+                }
+                if (!r.landmarks.isEmpty()) {
+                    throw new IllegalArgumentException("not a city route");
+                }
                 r.leg(Integer.parseInt(f.get(0)), Integer.parseInt(f.get(1)), f.get(2));
             } catch (NumberFormatException e) {
                 throw new IllegalArgumentException("not a city route");
@@ -189,7 +317,41 @@ public final class CityRoute {
         for (int m = total - 12; m < total - 2; m += 3) {
             d.place(m, Content.COIN, Placement.ALL_LANES);
         }
+        // The coach names each landmark as it comes up, unless it would talk
+        // over a corner's call.
+        for (int i = 0; i < landmarks.size(); i++) {
+            Landmark m = landmarks.get(i);
+            int at = Math.max(LEAD_IN, scaled(m.metres, total, real) - 25);
+            if (at < total - 10 && !talking(d, at * Track.UNIT)) {
+                d.dialog.add(new DialogLine(at * Track.UNIT, "Vee", "Passing " + m.name + ".", 0));
+            }
+        }
+        sortLines(d.dialog);
         return d;
+    }
+
+    /// Whether a line is already said within 6 seconds' running of `at`.
+    private static boolean talking(LevelDef d, int at) {
+        for (int i = 0; i < d.dialog.size(); i++) {
+            int gap = d.dialog.get(i).at - at;
+            if (gap > -40 * Track.UNIT && gap < 40 * Track.UNIT) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Orders lines by where they are said; the run reads them in order.
+    private static void sortLines(List<DialogLine> lines) {
+        for (int i = 1; i < lines.size(); i++) {
+            DialogLine x = lines.get(i);
+            int j = i - 1;
+            while (j >= 0 && lines.get(j).at > x.at) {
+                lines.set(j + 1, lines.get(j));
+                j--;
+            }
+            lines.set(j + 1, x);
+        }
     }
 
     private int runUpTo(int legCount) {
@@ -241,7 +403,7 @@ public final class CityRoute {
                 Placement p = c.placements().get(j);
                 d.placements.add(new Placement(m * Track.UNIT + p.z, p.defId, p.lane));
             }
-            m += c.length / Track.UNIT + 8;
+            m += c.length / Track.UNIT + 4;
         }
     }
 

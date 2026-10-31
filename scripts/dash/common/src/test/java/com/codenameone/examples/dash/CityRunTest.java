@@ -19,6 +19,10 @@
 package com.codenameone.examples.dash;
 
 import com.codename1.maps.LatLng;
+import com.codenameone.examples.dash.rules.Track;
+import com.codenameone.examples.dash.rules.CityRoute;
+import com.codenameone.examples.dash.run.Levels;
+import com.codenameone.examples.dash.run.Landmarks;
 import com.codename1.maps.routing.Route;
 import com.codename1.maps.routing.RouteCallback;
 import com.codename1.maps.routing.RouteLeg;
@@ -42,6 +46,7 @@ public class CityRunTest extends E2e {
     protected boolean run() throws Exception {
         final RouteService real = Routing.getService();
         Routing.setService(new Canned());
+        Landmarks.setSource(new CannedPlaces());
         try {
             signIn(PLAYER);
             waitForForm("home");
@@ -64,9 +69,30 @@ public class CityRunTest extends E2e {
             click("runCity");
             waitForForm("run");
             final RunView view = track();
-            until(() -> view.driver().run().tick() > 60 * 12, 30000, "the run");
+            while (view.driver().run().tick() < 60 * 12 && !driveFor(view, 200)) {
+                // the bot steers for the first stretch
+            }
             assertTrue(has("minimap"), "the route's minimap");
-            shot("city-run");
+            assertTrue(has("street"), "the street the runner is on");
+            shot("city-run", view);
+            // Just short of the first landmark, with its board in view.
+            CityRoute route = Levels.cityRoute(view.driver().run().level().id);
+            assertTrue(route != null && route.landmarks().size() >= 3, "landmarks along the route");
+            int mark = -1;
+            for (CityRoute.Sign sign : route.signs()) {
+                if (sign.kind >= 0 && sign.metres > 120) {
+                    mark = sign.metres;
+                    break;
+                }
+            }
+            final int ahead = mark - 45;
+            long give = System.currentTimeMillis() + 60000;
+            while (view.driver().run().runner(view.driver().me()).z / Track.UNIT < ahead
+                    && System.currentTimeMillis() < give && !driveFor(view, 100)) {
+                // the bot steers up to the landmark
+            }
+            assertTrue(!view.driver().run().over(), "still running at the landmark");
+            shot("city-landmark", view);
             finish(view, 60 * 900);
             awaitResult("the result");
             shot("city-result");
@@ -74,6 +100,7 @@ public class CityRunTest extends E2e {
             return true;
         } finally {
             Routing.setService(real);
+            Landmarks.setSource(new Landmarks.Overpass("https://overpass-api.de/api/interpreter"));
         }
     }
 
@@ -108,6 +135,33 @@ public class CityRunTest extends E2e {
             final Route r = new Route(Arrays.asList(a, b, c, d),
                     Arrays.asList(new RouteLeg("", 1360, 1050, steps)), 1360, 1050, "");
             CN.callSerially(() -> callback.routesFound(Arrays.asList(r)));
+        }
+    }
+
+    /// Real places of the City of London, set along the canned route.
+    static final class CannedPlaces implements Landmarks.Source {
+        private static final Object[][] PLACES = {
+            {0.12, CityRoute.WORSHIP, "St Mary-le-Bow"},
+            {0.3, CityRoute.MUSEUM, "Bank of England Museum"},
+            {0.48, CityRoute.MONUMENT, "Guildhall"},
+            {0.62, CityRoute.STATION, "Moorgate Station"},
+            {0.8, CityRoute.PARK, "Finsbury Circus Gardens"},
+        };
+
+        @Override
+        public void find(List<LatLng> path, Landmarks.Callback done) {
+            List<Landmarks.Place> out = new ArrayList<Landmarks.Place>();
+            for (Object[] p : PLACES) {
+                double t = (Double) p[0] * (path.size() - 1);
+                int i = Math.min(path.size() - 2, (int) t);
+                double f = t - i;
+                LatLng a = path.get(i);
+                LatLng b = path.get(i + 1);
+                LatLng at = new LatLng(a.getLatitude() + (b.getLatitude() - a.getLatitude()) * f,
+                        a.getLongitude() + (b.getLongitude() - a.getLongitude()) * f);
+                out.add(new Landmarks.Place(at, (Integer) p[1], (String) p[2]));
+            }
+            CN.callSerially(() -> done.found(out));
         }
     }
 }
