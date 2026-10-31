@@ -62,7 +62,7 @@ import java.util.List;
 /// from `/api/admin`, which only an account with the admin role may call --
 /// the server enforces that, not this screen.
 ///
-/// - **Overview**: what is happening now, and charts of players, battles,
+/// - **Overview**: what is happening now, and charts of players, races,
 ///   sales, the funnel, retention and the trophy ladder ([ReportsTab]).
 /// - **Flags**: reports from players and the server's own suspicions (a
 ///   desynced client, impossible play rates), newest first. New ones raise a

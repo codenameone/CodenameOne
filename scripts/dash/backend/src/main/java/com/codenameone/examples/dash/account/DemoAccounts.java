@@ -125,7 +125,7 @@ public class DemoAccounts {
     /// causeway, and a field of finishers posts one distance eight times.
     static final String[][] FIELD = {
         {"nova@dash.example", "Nova", "97"},
-        {"kai@dash.example", "Kai", "90"},
+        {"kai@dash.example", "Kai", "64"},
         {"juno@dash.example", "Juno", "46"},
         {"ezra@dash.example", "Ezra", "40"},
         {"sasha@dash.example", "Sasha", "34"},
@@ -136,13 +136,11 @@ public class DemoAccounts {
 
     private void field() throws IOException {
         int week = Scores.today() / 7;
-        boolean fresh = false;
         for (int i = 0; i < FIELD.length; i++) {
             String who = FIELD[i][0];
             if (accounts.exists(who)) {
                 continue;
             }
-            fresh = true;
             add(who, FIELD[i][1], false);
             int skill = Integer.parseInt(FIELD[i][2]);
             for (LevelDef level : Content.levels()) {
@@ -153,9 +151,7 @@ public class DemoAccounts {
                 }
             }
         }
-        if (fresh) {
-            history.seed(FIELD);
-        }
+        history.seed(FIELD);
     }
 
     private void post(String who, LevelDef level, long seed, int skill, int salt) throws IOException {

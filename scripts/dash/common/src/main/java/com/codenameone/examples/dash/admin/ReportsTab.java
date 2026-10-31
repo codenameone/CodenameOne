@@ -133,7 +133,7 @@ final class ReportsTab {
         }
         charts.add(back);
         trends.add(charts);
-        trends.add(Desk.help("Read from the game's own records: accounts, battles and purchases. What players "
+        trends.add(Desk.help("Read from the game's own records: accounts, races and purchases. What players "
                 + "do inside the app (screens, sessions, shared invites, opened pushes) is reported to Codename "
                 + "One analytics."));
         trends.add(Desk.actions(Desk.button("Open Codename One analytics", "openAnalytics",

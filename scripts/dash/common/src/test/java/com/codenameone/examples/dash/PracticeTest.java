@@ -22,6 +22,7 @@ import com.codenameone.examples.dash.rules.Content;
 import com.codenameone.examples.dash.rules.ViewMode;
 import com.codenameone.examples.dash.run.RunView;
 import com.codenameone.examples.dash.run.SoloDriver;
+import com.codenameone.examples.dash.ui.ScoresForm;
 
 /// A solo run of the causeway from the level list: it starts side on, the
 /// camera swings behind the runner at 300 m, and the server's re-simulation
@@ -50,6 +51,13 @@ public class PracticeTest extends E2e {
         shot("run-result");
         click("scores");
         waitForForm("scores");
+        // The board for the guide is the day's endless run: a track with no
+        // finish line, where every run ends somewhere different. A finite
+        // level's all-time board is a row of finishers at its length.
+        onEdt(() -> ScoresForm.show(Content.ENDLESS, null));
+        until(() -> has("board-day"), 20000, "the endless board");
+        touch("board-day");
+        until(() -> has("score-3"), 20000, "the day's board");
         shot("scores");
         return true;
     }

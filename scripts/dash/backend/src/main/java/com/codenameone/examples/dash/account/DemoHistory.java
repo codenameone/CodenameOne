@@ -57,6 +57,11 @@ public class DemoHistory {
     /// rules' bots, replays included -- and now and then bought gems.
     @Transactional
     public void seed(String[][] field) throws IOException {
+        // Once per database: a first start that died half way through seeds
+        // the field again on the next one, but never a second month.
+        if (races.count() > 0) {
+            return;
+        }
         long today = Clock.dayOf(Clock.now());
         int days = 28;
         for (int i = 0; i < field.length; i++) {

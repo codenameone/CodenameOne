@@ -35,12 +35,12 @@ import java.util.List;
 /// (`social.Audience`), which refuses anything else.
 // tag::dash-conditions[]
 final class Conditions {
-    static final String[] FIELDS = {"daysAway", "daysSinceJoin", "trophies", "battles", "wins", "gems", "coins",
+    static final String[] FIELDS = {"daysAway", "daysSinceJoin", "trophies", "races", "wins", "gems", "coins",
         "purchases", "friends"};
-    static final String[] FIELD_NAMES = {"Days away", "Days since joining", "Trophies", "Battles", "Wins", "Gems",
+    static final String[] FIELD_NAMES = {"Days away", "Days since joining", "Trophies", "Races", "Wins", "Gems",
         "Coins", "Purchases", "Friends invited"};
     /// The same names as they read inside a sentence.
-    static final String[] FIELD_WORDS = {"days away", "days since joining", "trophies", "battles", "wins", "gems",
+    static final String[] FIELD_WORDS = {"days away", "days since joining", "trophies", "races", "wins", "gems",
         "coins", "purchases", "friends invited"};
     static final String[] OPS = {">=", "<=", "=", ">", "<", "!="};
     static final String[] OP_NAMES = {"at least", "at most", "equals", "more than", "less than", "is not"};
