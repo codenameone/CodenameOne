@@ -3750,7 +3750,9 @@ public final class Emitter {
             l = asDouble(l, lt);
             r = asDouble(r, rt);
             if ("**".equals(b.op)) {
-                m.append("            double ").append(t).append(" = Math.pow(").append(l).append(", ").append(r)
+                // MathUtil, not Math: CLDC has no Math.pow, and the
+                // compliance check rejects the generated call.
+                m.append("            double ").append(t).append(" = com.codename1.util.MathUtil.pow(").append(l).append(", ").append(r)
                         .append(");\n");
                 bail(m, "Double.isNaN(" + t + ") || Double.isInfinite(" + t + ")", label);
                 return t;
@@ -4882,7 +4884,7 @@ public final class Emitter {
             indent(r, ind);
         }
         if ("**".equals(b.op)) {
-            r.append("final double ").append(t).append(" = Math.pow(").append(lv).append(", ").append(rv)
+            r.append("final double ").append(t).append(" = com.codename1.util.MathUtil.pow(").append(lv).append(", ").append(rv)
                     .append(");\n");
             indent(r, ind);
             r.append("if (Double.isNaN(").append(t).append(") || Double.isInfinite(").append(t).append(")) {\n");
