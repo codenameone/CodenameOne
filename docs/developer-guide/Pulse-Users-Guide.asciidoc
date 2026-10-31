@@ -225,17 +225,17 @@ The last lists the classes booked after the next one.
 image::img/pulse-watch-agenda.png["The watch's list of the classes booked in the coming days",scaledwidth=25%]
 
 A trainer's watch adds a coaching page: the class they teach now or next, the
-minutes until it starts or until it ends, the room and how full it is, and the
+minutes until it starts or until it ends, the room and its places taken, and the
 trainer's level and place among the studio's coaches.
 
-image::img/pulse-watch-coach.png["The watch's coaching page with the class on now, the minutes left, how full it is and the coach's level and rank",scaledwidth=25%]
+image::img/pulse-watch-coach.png["The watch's coaching page with the class on now, the minutes left, the places taken and the coach's level and rank",scaledwidth=25%]
 
 === The trainer
 
 The trainer's home leads with the class on now, or the next one, on a dark card with
 a button for the live view and one for the roster.
 
-Under it is the trainer's own game. Members earn points for coming; a trainer earns
+Under the card is the trainer's own game. Members earn points for coming; a trainer earns
 them for the people they coach: 10 for each check-in to their classes, 5 for each
 kudos on a workout from them, and 25 for a class with every place booked. The points
 count over the last eight weeks, so a level reflects how the trainer is coaching now
