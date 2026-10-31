@@ -132,7 +132,7 @@ public final class WorkoutsForm {
             list.add(live);
         }
         if (Workouts.storeAvailable()) {
-            list.add(Ui.secondary("Bring in recent workouts", "importHealth",
+            list.add(Ui.secondary("Import from Health", "importHealth",
                     e -> Workouts.importRecent(share, count -> {
                         int posted = count.intValue();
                         Ui.say(posted < 0 ? Lang.tr("Health data could not be read")
@@ -141,6 +141,8 @@ public final class WorkoutsForm {
                     })));
         }
         Ui.section(list, "Recent");
+        list.add(Ui.text("Wear a watch or a strap to earn bonus points.",
+                "SvMuted"));
         for (int iter = 0; workouts != null && iter < workouts.size(); iter++) {
             list.add(row(workouts.get(iter), iter));
         }
@@ -163,15 +165,21 @@ public final class WorkoutsForm {
         row.add(BorderLayout.WEST, icon);
         Container lines = new Container(BoxLayout.y());
         lines.add(Ui.label(title(workout.activity()), "SvRowTitle"));
-        StringBuilder detail = new StringBuilder(Ui.when(workout.startedAt()));
-        detail.append(Ui.DOT).append(Lang.tr("{0} min", Integer.valueOf(workout.minutes())));
+        // When and how long on one line, the effort on the next: one line of
+        // all four wrapped mid-unit on a phone.
+        lines.add(Ui.plain(Ui.when(workout.startedAt()) + Ui.DOT
+                + Lang.tr("{0} min", Integer.valueOf(workout.minutes())), "SvRowDetail"));
+        StringBuilder effort = new StringBuilder();
         if (workout.avgHr() > 0) {
-            detail.append(Ui.DOT).append(Lang.tr("{0} bpm", Integer.valueOf(workout.avgHr())));
+            effort.append(Lang.tr("{0} bpm avg", Integer.valueOf(workout.avgHr())));
         }
         if (workout.calories() > 0) {
-            detail.append(Ui.DOT).append(workout.calories()).append(" kcal");
+            effort.append(effort.length() > 0 ? Ui.DOT : "").append(workout.calories())
+                    .append(" kcal");
         }
-        lines.add(Ui.text(detail.toString(), "SvRowDetail"));
+        if (effort.length() > 0) {
+            lines.add(Ui.plain(effort.toString(), "SvRowDetail"));
+        }
         ZoneBar zones = new ZoneBar(workout.zones());
         if (zones.hasData()) {
             lines.add(zones);

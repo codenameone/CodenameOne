@@ -23,12 +23,15 @@ import com.codename1.codescan.ScanResult;
 import com.codename1.nfc.Nfc;
 import com.codename1.nfc.NfcReadOptions;
 import com.codename1.nfc.Tag;
+import com.codename1.ui.Button;
 import com.codename1.ui.CN;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.TextField;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.GridLayout;
@@ -88,15 +91,19 @@ public class DeskForm extends LiveChannel.Adapter implements Nav.Home {
 
         Container page = Ui.page();
         page.setName("desk");
+        // Letting people in is the desk's whole job, so the two ways to do it
+        // are the biggest things on the screen; scanning, the common one, is
+        // the filled one.
         Container buttons = new Container(new GridLayout(1, 2));
-        buttons.add(Ui.action(FontImage.MATERIAL_QR_CODE_SCANNER, "Scan pass", "scan",
-                e -> scan()));
-        buttons.add(Ui.action(FontImage.MATERIAL_NFC, "Tap fob", "nfc", e -> readFob()));
+        buttons.add(deskAction(FontImage.MATERIAL_QR_CODE_SCANNER, "Scan pass", "scan",
+                "SvFrontScan", e -> scan()));
+        buttons.add(deskAction(FontImage.MATERIAL_NFC, "Tap fob", "nfc", "SvFrontFob",
+                e -> readFob()));
         page.add(buttons);
 
         // For a kiosk with no camera, and for the simulator: the code typed
         // in, as the scanner would have read it.
-        final TextField typed = Ui.field(page, "Or type the pass", "code", "pulse:...");
+        final TextField typed = Ui.field(page, "Or type the pass", "code", "Pass number");
         typed.addActionListener(e -> {
             String text = typed.getText().trim();
             typed.setText("");
@@ -219,6 +226,15 @@ public class DeskForm extends LiveChannel.Adapter implements Nav.Home {
         Ui.refresh(form);
     }
 
+    private static Button deskAction(char icon, String text, String name, String uiid,
+            ActionListener<ActionEvent> onClick) {
+        Button button = Ui.action(icon, text, name, onClick);
+        button.setUIID(uiid);
+        Ui.icon(button, icon, 7f);
+        button.setGap(CN.convertToPixels(1.4f));
+        return button;
+    }
+
     private void loadToday() {
         Api.desk().today(locationId, Net.to(this::showToday, (status, message) -> { }));
     }
@@ -230,9 +246,9 @@ public class DeskForm extends LiveChannel.Adapter implements Nav.Home {
         today.removeAll();
         Ui.section(today, "Today");
         StatRow stats = Ui.stats(3);
-        stats.stat(String.valueOf(day.checkIns()), Lang.tr("check-ins"), "checkIns");
-        stats.stat(String.valueOf(day.walkIns()), Lang.tr("walk-ins"), "walkIns");
-        stats.stat(Ui.money(day.walkInCents(), null), Lang.tr("taken"), "takings");
+        stats.stat(String.valueOf(day.checkIns()), Lang.tr("Check-ins"), "checkIns");
+        stats.stat(String.valueOf(day.walkIns()), Lang.tr("Walk-ins"), "walkIns");
+        stats.stat(Ui.moneyShort(day.walkInCents(), null), Lang.tr("Takings"), "takings");
         today.add(stats);
         if (day.upcoming() != null && !day.upcoming().isEmpty()) {
             Ui.section(today, "Coming up");
@@ -240,8 +256,8 @@ public class DeskForm extends LiveChannel.Adapter implements Nav.Home {
         for (int iter = 0; day.upcoming() != null && iter < day.upcoming().size()
                 && iter < 4; iter++) {
             SessionDto session = day.upcoming().get(iter);
-            today.add(Classes.card(session, Ui.badge(session.booked() + "/"
-                    + session.capacity(), "SvBadge"), null));
+            // The card already says how many places are left.
+            today.add(Classes.card(session, null, null));
         }
         if (day.recent() != null && !day.recent().isEmpty()) {
             Ui.section(today, "Just in");

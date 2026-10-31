@@ -19,21 +19,20 @@
 package com.codenameone.examples.pulse.owner;
 
 import com.codename1.charts.ChartComponent;
-import com.codename1.charts.models.CategorySeries;
 import com.codename1.charts.models.XYMultipleSeriesDataset;
 import com.codename1.charts.models.XYSeries;
-import com.codename1.charts.renderers.DefaultRenderer;
-import com.codename1.charts.renderers.SimpleSeriesRenderer;
 import com.codename1.charts.renderers.XYMultipleSeriesRenderer;
 import com.codename1.charts.renderers.XYSeriesRenderer;
 import com.codename1.charts.views.BarChart;
-import com.codename1.charts.views.PieChart;
 import com.codename1.ui.CN;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
 import com.codenameone.examples.pulse.api.DayAmountDto;
 import com.codenameone.examples.pulse.api.NameCountDto;
 import com.codenameone.examples.pulse.api.OwnerDashboardDto;
@@ -102,18 +101,23 @@ public class OwnerForm implements Nav.Home {
     private void fill(OwnerDashboardDto board) {
         page.removeAll();
         stats.clear();
-        stats.stat(Ui.money(board.mrrCents(), null), "Monthly revenue", "mrr")
+        stats.stat(Ui.moneyShort(board.mrrCents(), null), "Monthly recurring", "mrr")
                 .stat(String.valueOf(board.activeMembers()), "Members", "members")
                 .stat(board.utilisation() + "%", "Places taken", "utilisation")
                 .stat(String.valueOf(board.atRisk()), "At risk", "atRisk");
         page.add(stats);
-        page.add(Ui.text(Lang.tr("{0} joined and {1} left in 30 days; {2} check-ins this week, "
-                + "{3} invoices past due.", Integer.valueOf(board.newMembers30()),
-                Integer.valueOf(board.churned30()), Integer.valueOf(board.checkIns7()),
-                Integer.valueOf(board.pastDue())), "SvMuted"));
+        // The rest of the month at a glance, as tiles rather than a sentence.
+        StatRow month = Ui.stats(2);
+        month.stat(String.valueOf(board.newMembers30()), "Joined in 30 days", "joined")
+                .stat(String.valueOf(board.churned30()), "Left in 30 days", "left")
+                .stat(String.valueOf(board.checkIns7()), "Visits this week", "checkIns7")
+                .stat(String.valueOf(board.pastDue()), "Invoices past due", "pastDue");
+        page.add(month);
 
-        Ui.section(page, "Revenue per day");
-        page.add(Ui.text(Lang.tr("{0} in the last 30 days", Ui.money(board.revenue30Cents(), null)),
+        // Takings: everything paid, packs and drop-ins too, which is why it
+        // is not the recurring figure above.
+        Ui.section(page, "Takings");
+        page.add(Ui.text(Lang.tr("{0} in the last 30 days", Ui.moneyShort(board.revenue30Cents(), null)),
                 "SvMuted"));
         page.add(sized(revenue(board.revenueByDay()), "revenueChart"));
 
@@ -121,7 +125,7 @@ public class OwnerForm implements Nav.Home {
         if (board.popularClasses() == null || board.popularClasses().isEmpty()) {
             page.add(Ui.text("No bookings in the last month.", "SvMuted"));
         } else {
-            page.add(sized(popular(board.popularClasses()), "popularChart"));
+            page.add(popular(board.popularClasses()));
         }
 
         Ui.section(page, "Under-filled this week");
@@ -137,7 +141,8 @@ public class OwnerForm implements Nav.Home {
             page.add(Ui.text("Every class is filling up.", "SvMuted"));
         }
         if (board.atRisk() > 0) {
-            page.add(Ui.secondary(Lang.tr("Win back {0} lapsing members",
+            page.add(Ui.secondary(board.atRisk() == 1 ? Lang.tr("Win back a lapsing member")
+                    : Lang.tr("Win back {0} lapsing members",
                     Integer.valueOf(board.atRisk())), "winBack",
                     e -> CampaignsForm.compose(form, null)));
         }
@@ -161,8 +166,7 @@ public class OwnerForm implements Nav.Home {
             most = Math.max(most, amount);
             if (iter % 7 == 0) {
                 String date = days.get(iter).date();
-                renderer.addXTextLabel(iter + 1, date != null && date.length() >= 10
-                        ? date.substring(5) : date);
+                renderer.addXTextLabel(iter + 1, shortDate(date));
             }
         }
         XYMultipleSeriesDataset data = new XYMultipleSeriesDataset();
@@ -199,22 +203,70 @@ public class OwnerForm implements Nav.Home {
         return renderer;
     }
 
-    /// The share of bookings of the most booked kinds of class.
-    static Component popular(List<NameCountDto> classes) {
-        CategorySeries series = new CategorySeries(Lang.tr("Bookings"));
-        DefaultRenderer renderer = new DefaultRenderer();
-        for (int iter = 0; iter < classes.size(); iter++) {
-            series.add(classes.get(iter).name(), classes.get(iter).count());
-            SimpleSeriesRenderer slice = new SimpleSeriesRenderer();
-            slice.setColor(PALETTE[iter % PALETTE.length] | 0xff000000);
-            renderer.addSeriesRenderer(slice);
+    private static final String[] MONTHS = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul",
+        "Aug", "Sep", "Oct", "Nov", "Dec"};
+
+    /// `2026-10-01` as "Oct 1".
+    static String shortDate(String date) {
+        if (date == null || date.length() < 10) {
+            return date == null ? "" : date;
         }
-        renderer.setShowLegend(true);
-        renderer.setLabelsTextSize(CN.convertToPixels(2.2f));
-        renderer.setLegendTextSize(CN.convertToPixels(2.2f));
-        renderer.setLabelsColor(0xff7a7a7a);
-        renderer.setPanEnabled(false);
-        renderer.setZoomEnabled(false);
-        return new ChartComponent(new PieChart(series, renderer));
+        int month = (date.charAt(5) - '0') * 10 + date.charAt(6) - '0';
+        int day = (date.charAt(8) - '0') * 10 + date.charAt(9) - '0';
+        return month < 1 || month > 12 ? date : Lang.tr(MONTHS[month - 1]) + " " + day;
+    }
+
+    /// The most booked kinds of class, ranked, each with a bar for its share
+    /// of the most booked one: easier to read on a phone than a pie, and no
+    /// label falls off the edge.
+    static Component popular(List<NameCountDto> classes) {
+        Container list = new Container(BoxLayout.y());
+        list.setName("popularChart");
+        int most = 1;
+        for (int iter = 0; iter < classes.size(); iter++) {
+            most = Math.max(most, classes.get(iter).count());
+        }
+        for (int iter = 0; iter < classes.size(); iter++) {
+            NameCountDto row = classes.get(iter);
+            Container line = new Container(new BorderLayout(), "SvRankRow");
+            line.add(BorderLayout.CENTER, Ui.plain(row.name(), "SvRowTitle"));
+            line.add(BorderLayout.EAST, Ui.plain(Lang.tr("{0} booked",
+                    Integer.valueOf(row.count())), "SvRowDetail"));
+            list.add(line);
+            list.add(new Share(row.count() / (double) most,
+                    PALETTE[iter % PALETTE.length]));
+        }
+        return list;
+    }
+
+    /// A rounded bar filled to `share` of the width.
+    private static final class Share extends Component {
+        private final double share;
+        private final int color;
+
+        Share(double share, int color) {
+            this.share = share;
+            this.color = color;
+            setUIID("SvRankBar");
+        }
+
+        @Override
+        protected Dimension calcPreferredSize() {
+            return new Dimension(CN.convertToPixels(30),
+                    CN.convertToPixels(1.6f) + getStyle().getVerticalPadding());
+        }
+
+        @Override
+        public void paint(Graphics g) {
+            int x = getX() + getStyle().getPaddingLeftNoRTL();
+            int y = getY() + getStyle().getPaddingTop();
+            int w = getWidth() - getStyle().getHorizontalPadding();
+            int h = getHeight() - getStyle().getVerticalPadding();
+            g.setAntiAliased(true);
+            g.setColor(getStyle().getFgColor());
+            g.fillRoundRect(x, y, w, h, h, h);
+            g.setColor(color);
+            g.fillRoundRect(x, y, Math.max(h, (int) (w * share)), h, h, h);
+        }
     }
 }

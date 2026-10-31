@@ -54,7 +54,15 @@ public final class TimetableForm {
         Ui.back(form, previous);
         final Container list = Ui.list("timetable");
         final Runnable[] load = new Runnable[1];
-        load[0] = () -> Api.studio().classes("", System.currentTimeMillis() - DAY / 2, 8,
+        // From the start of today, so the morning's classes are still there to
+        // check and nothing from yesterday leads the list.
+        Calendar today = Calendar.getInstance();
+        today.set(Calendar.HOUR_OF_DAY, 0);
+        today.set(Calendar.MINUTE, 0);
+        today.set(Calendar.SECOND, 0);
+        today.set(Calendar.MILLISECOND, 0);
+        final long from = today.getTime().getTime();
+        load[0] = () -> Api.studio().classes("", from, 8,
                 Net.to(classes -> fill(form, list, classes, load[0]), Ui.failed(list, load[0])));
         Ui.pull(list, load[0]);
         form.add(BorderLayout.CENTER, list);

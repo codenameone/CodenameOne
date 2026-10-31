@@ -492,7 +492,9 @@ public class Bookings {
     /// is noticed here -- and classes that ended are settled.
     @Scheduled(fixedDelay = 60000, initialDelay = 30000, lock = "pulse-bookings")
     // The two lookups below read through the injected session, which needs a
-    // transaction open; promote and settle join it.
+    // transaction open; promote and settle join it. One sweep is one
+    // transaction: a failure rolls the whole sweep back and the next run, a
+    // minute later, does it again, which every step here is safe to repeat.
     @Transactional(rollbackFor = IOException.class)
     public void sweep() throws IOException {
         Instant now = Instant.now();

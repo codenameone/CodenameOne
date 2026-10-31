@@ -218,16 +218,20 @@ public class MemberForm extends LiveChannel.Adapter implements Nav.Home {
                 (found.points() - found.levelFloor()) / (double) span));
         ring.setName("level");
         Container about = new Container(BoxLayout.y(), "SvLevelBox");
-        about.add(Ui.label(Lang.tr("Level {0}", Integer.valueOf(found.level())), "SvHeading"));
-        about.add(Ui.label(Lang.tr("{0} points", Integer.valueOf(found.points())), "SvRowTitle"));
+        // The ring already shows the level, so the words beside it lead with
+        // the points and say what the next level takes.
+        about.add(Ui.label(Lang.tr("{0} points", Integer.valueOf(found.points())), "SvHeading"));
         about.add(Ui.label(found.nextLevel() > found.points()
-                ? Lang.tr("{0} to the next level",
-                        Integer.valueOf(found.nextLevel() - found.points()))
+                ? Lang.tr("{0} more to level {1}",
+                        Integer.valueOf(found.nextLevel() - found.points()),
+                        Integer.valueOf(found.level() + 1))
                 : Lang.tr("Top level"), "SvMuted"));
         if (found.weekStreak() > 0) {
             Label streak = Ui.label(Lang.tr("{0} week streak",
                     Integer.valueOf(found.weekStreak())), "SvBadgeGood");
             Ui.icon(streak, FontImage.MATERIAL_LOCAL_FIRE_DEPARTMENT, 2.6f);
+            // Flush with the words above it, not indented by the badge margin.
+            streak.getAllStyles().setMarginLeft(0);
             about.add(FlowLayout.encloseIn(streak));
         }
         Container levelRow = new Container(new BorderLayout());
@@ -247,6 +251,7 @@ public class MemberForm extends LiveChannel.Adapter implements Nav.Home {
                 Integer value = weekly.get(iter);
                 values[iter] = value == null ? 0 : value.intValue();
             }
+            stats.add(Ui.label(Lang.tr("Visits each week"), "SvChartTitle"));
             stats.add(Chart.of("weekly", values, Lang.tr("{0} weeks ago",
                     Integer.valueOf(values.length)), Lang.tr("This week")));
         }

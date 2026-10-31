@@ -55,6 +55,7 @@ import com.codenameone.examples.pulse.studio.Studio;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -307,7 +308,10 @@ public class Desk {
             throw new ResponseStatusException(400, "Say which location");
         }
         Instant now = Instant.now();
-        Instant dayStart = Instant.ofEpochMilli(Days.start(now.toEpochMilli()));
+        // The location's day, not UTC's: a studio in New York would otherwise
+        // start a new day at seven or eight in the evening.
+        ZoneId zone = studio.zone(locationId);
+        Instant dayStart = LocalDate.now(zone).atStartOfDay(zone).toInstant();
         List<WalkIn> walked = walkIns.findByLocationIdAndAtGreaterThanEqualOrderByAtDesc(
                 locationId, dayStart);
         long cents = 0L;
@@ -320,7 +324,7 @@ public class Desk {
         List<CheckIn> came = checkIns.findByLocationIdAndAtGreaterThanEqualOrderByAtDesc(
                 locationId, dayStart);
         List<CheckInResultDto> recent = new ArrayList<CheckInResultDto>();
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(zone);
         for (int iter = 0; iter < came.size() && recent.size() < 12; iter++) {
             CheckIn row = came.get(iter);
             Member member = members.findById(row.getMemberId());

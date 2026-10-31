@@ -44,10 +44,10 @@ import java.util.List;
 
 /// The week's timetable, a day at a time.
 ///
-/// Two filters narrow it: the age band of the class, and who in the household
-/// it is for. Choosing a child shows only the classes the child is old enough
-/// for, and books, queues and cancels for the child; choosing yourself does
-/// the same for you. The server still has the last word on every booking.
+/// One filter narrows it: who in the household it is for. Choosing a child
+/// shows only the classes the child is old enough for, and books, queues and
+/// cancels for the child; choosing an adult shows the adult classes. The
+/// server still has the last word on every booking.
 ///
 /// Places left are kept up to date over the live channel while the screen is
 /// open: a class that fills up changes its row without being asked for.
@@ -62,7 +62,6 @@ public final class ScheduleForm extends LiveChannel.Adapter {
     private List<MemberDto> household = new ArrayList<MemberDto>();
     private long weekStart;
     private int day;
-    private String band = Classes.BAND_ALL;
     private String memberId;
 
     private ScheduleForm() {
@@ -117,33 +116,25 @@ public final class ScheduleForm extends LiveChannel.Adapter {
                     : name.format(new Date(weekStart + iter * DAY));
             values[iter] = String.valueOf(iter);
         }
-        Container row = Ui.choice("day", labels, values, "0", value -> {
+        return Ui.pills("day", labels, values, "0", value -> {
             day = Integer.parseInt(value);
             fill();
-        }, 7);
-        row.setScrollableX(true);
-        return row;
+        });
     }
 
     private void buildFilters() {
         filters.removeAll();
-        filters.add(Ui.choice("band", new String[] {Lang.tr("All ages"), Lang.tr("Kids"),
-            Lang.tr("Teens"), Lang.tr("Adults")}, new String[] {Classes.BAND_ALL,
-                Classes.BAND_KIDS, Classes.BAND_TEENS, Classes.BAND_ADULTS}, band, value -> {
-                    band = value;
-                    fill();
-                }));
         if (household.size() > 1) {
             String[] labels = new String[household.size()];
             String[] values = new String[household.size()];
             for (int iter = 0; iter < labels.length; iter++) {
-                labels[iter] = household.get(iter).name();
+                labels[iter] = firstName(household.get(iter).name());
                 values[iter] = household.get(iter).id();
             }
-            filters.add(Ui.choice("for", labels, values, memberId, value -> {
+            filters.add(Ui.pills("for", labels, values, memberId, value -> {
                 memberId = value;
                 fill();
-            }, Math.min(labels.length, 3)));
+            }));
         }
     }
 
@@ -172,6 +163,11 @@ public final class ScheduleForm extends LiveChannel.Adapter {
         load();
     }
 
+    private static String firstName(String name) {
+        int space = name == null ? -1 : name.indexOf(' ');
+        return space > 0 ? name.substring(0, space) : name == null ? "" : name;
+    }
+
     private MemberDto member() {
         for (MemberDto member : household) {
             if (member.id().equals(memberId)) {
@@ -190,7 +186,8 @@ public final class ScheduleForm extends LiveChannel.Adapter {
         for (final SessionDto session : sessions) {
             if (session.startsAt() < from || session.startsAt() >= to
                     || session.endsAt() < System.currentTimeMillis()
-                    || !Classes.inBand(session, band)
+                    || member != null && member.age() >= 18
+                    && !Classes.inBand(session, Classes.BAND_ADULTS)
                     || member != null && !Classes.fits(session, member.age())) {
                 continue;
             }

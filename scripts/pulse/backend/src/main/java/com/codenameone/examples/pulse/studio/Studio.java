@@ -45,6 +45,7 @@ import com.codenameone.examples.pulse.repository.StaffRepository;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -144,8 +145,11 @@ public class Studio {
         if (days < 1 || days > MOST_DAYS) {
             throw new ResponseStatusException(400, "Ask for 1 to " + MOST_DAYS + " days");
         }
-        Instant start = Instant.ofEpochMilli(Days.start(from <= 0L ? System.currentTimeMillis()
-                : from));
+        // The caller's own start, as given: the app sends its local midnight,
+        // and rounding it to a UTC day would pull in yesterday's classes for
+        // a studio east of Greenwich.
+        Instant start = Instant.ofEpochMilli(from <= 0L
+                ? Days.start(System.currentTimeMillis()) : from);
         Instant end = start.plusMillis(days * Days.MILLIS);
         List<ClassSession> rows = locationId == null || locationId.length() == 0
                 ? sessions.findByStartsAtGreaterThanEqualAndStartsAtLessThanOrderByStartsAtAsc(
@@ -281,5 +285,17 @@ public class Studio {
 
     private static String text(String value) {
         return value == null ? "" : value;
+    }
+
+    /// The time zone a location keeps its days in: UTC for a location that
+    /// names none, or one this runtime does not know.
+    public ZoneId zone(String locationId) {
+        Location location = locationId == null ? null : locations.findById(locationId);
+        String id = location == null ? "" : location.getTimeZone();
+        try {
+            return ZoneId.of(id == null || id.length() == 0 ? "UTC" : id);
+        } catch (RuntimeException unknown) {
+            return ZoneId.of("UTC");
+        }
     }
 }

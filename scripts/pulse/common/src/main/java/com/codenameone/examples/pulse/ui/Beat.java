@@ -82,8 +82,10 @@ public final class Beat extends Component {
         // Where the beat is, as a share of the width: one sweep every three
         // seconds when running, a third of the way along when still.
         double at = running ? ((System.currentTimeMillis() - started) % 3000L) / 3000d : 0.32d;
-        int x0 = left + (int) (width * at);
         int unit = Math.max(2, height / 6);
+        // The spike travels over the width less its own, so it is never cut
+        // off by the right edge into a flat line with a tick.
+        int x0 = left + (int) (Math.max(0, width - 6 * unit) * at);
         int[] xs = {left, x0, x0 + unit, x0 + 2 * unit, x0 + 3 * unit, x0 + 4 * unit,
             x0 + 5 * unit, x0 + 6 * unit, left + width};
         int[] ys = {mid, mid, mid - height / 6, mid + height / 5, mid - height / 2 + 1,
@@ -96,13 +98,12 @@ public final class Beat extends Component {
             GeneralPath path = new GeneralPath();
             path.moveTo(xs[0], ys[0]);
             for (int iter = 1; iter < xs.length; iter++) {
-                path.lineTo(Math.min(xs[iter], left + width), ys[iter]);
+                path.lineTo(xs[iter], ys[iter]);
             }
             g.drawShape(path, new Stroke(thickness, Stroke.CAP_ROUND, Stroke.JOIN_ROUND, 1f));
         } else {
             for (int iter = 1; iter < xs.length; iter++) {
-                g.drawLine(xs[iter - 1], ys[iter - 1], Math.min(xs[iter], left + width),
-                        ys[iter]);
+                g.drawLine(xs[iter - 1], ys[iter - 1], xs[iter], ys[iter]);
             }
         }
     }

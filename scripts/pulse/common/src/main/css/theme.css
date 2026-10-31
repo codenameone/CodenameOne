@@ -610,14 +610,15 @@ SvGrip {
     margin: 0;
 }
 
-/* The countdown: the colour is the time left, the background the time gone. */
+/* The countdown on the pass card: lime for the time left, as on the watch,
+   since red would read as an error. */
 SvRingTrack {
-    color: var(--line);
+    color: var(--ink-raised);
     background-color: transparent;
 }
 
 SvRing {
-    color: var(--brand);
+    color: var(--lime);
     background-color: transparent;
     font-family: "native:MainBold";
     font-size: 3.3mm;
@@ -681,6 +682,38 @@ SvAction {
 
 SvAction.pressed {
     color: var(--brand);
+    background-color: var(--surface-alt);
+}
+
+/* The desk's two ways to let someone in: big tiles, scanning filled. */
+SvFrontScan, SvFrontScan.pressed {
+    color: var(--brand-contrast);
+    background-color: var(--brand);
+    border-radius: var(--radius);
+    font-family: "native:MainBold";
+    font-size: 3mm;
+    text-align: center;
+    padding: 5mm 1mm 4.2mm 1mm;
+    margin: 0 1.2mm 0 0;
+}
+
+SvFrontScan.pressed {
+    background-color: var(--brand-pressed);
+}
+
+SvFrontFob, SvFrontFob.pressed {
+    color: var(--text);
+    background-color: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    font-family: "native:MainBold";
+    font-size: 3mm;
+    text-align: center;
+    padding: 5mm 1mm 4.2mm 1mm;
+    margin: 0 0 0 1.2mm;
+}
+
+SvFrontFob.pressed {
     background-color: var(--surface-alt);
 }
 
@@ -861,6 +894,29 @@ SvChartGrid {
     color: var(--line);
     background-color: transparent;
 }
+/* The owner's popular classes: a name and count, a bar under it. */
+SvRankRow {
+    background-color: transparent;
+    padding: 2mm 0 0.8mm 0;
+    margin: 0;
+}
+
+SvRankBar {
+    color: var(--surface-alt);
+    background-color: transparent;
+    padding: 0;
+    margin: 0 0 1.2mm 0;
+}
+
+SvChartTitle {
+    color: var(--text-muted);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 2.3mm;
+    padding: 2.4mm 0 1mm 0;
+    margin: 0;
+}
+
 SvChartAxis {
     color: var(--text-muted);
     background-color: transparent;
@@ -1438,10 +1494,19 @@ SvClassLeft { background-color: transparent; font-size: 2.5mm; color: var(--text
 SvClassScarce { background-color: transparent; font-family: "native:MainBold"; font-size: 2.5mm; color: var(--brand); padding: 0 0 0 1.6mm; margin: 0; }
 SvClassFull { background-color: transparent; font-family: "native:MainBold"; font-size: 2.5mm; color: var(--danger); padding: 0 0 0 1.6mm; margin: 0; }
 SvClassFriends { background-color: transparent; font-size: 2.6mm; color: var(--violet); padding: 0.8mm 0 0 0; margin: 0; }
-SvPillBook { font-family: "native:MainBold"; font-size: 2.9mm; color: var(--brand-contrast); background-color: var(--brand); border-radius: 4mm; padding: 1.4mm 2.8mm 1.4mm 2.8mm; margin: 0; text-align: center; }
-SvPillBook.pressed { background-color: var(--brand-pressed); }
+/* Tinted, not filled: a page of classes is a page of Book buttons, and a
+   column of solid red shouted. */
+SvPillBook { font-family: "native:MainBold"; font-size: 2.9mm; color: var(--brand); background-color: var(--brand-tint); border-radius: 4mm; padding: 1.4mm 2.8mm 1.4mm 2.8mm; margin: 0; text-align: center; }
+SvPillBook.pressed { color: var(--brand-contrast); background-color: var(--brand); }
 SvPillQueue { font-family: "native:MainBold"; font-size: 2.9mm; color: var(--violet); background-color: var(--violet-tint); border-radius: 4mm; padding: 1.4mm 2.8mm 1.4mm 2.8mm; margin: 0; text-align: center; }
 SvPillBooked { font-family: "native:MainBold"; font-size: 2.9mm; color: var(--success); background-color: var(--success-tint); border-radius: 4mm; padding: 1.4mm 2.8mm 1.4mm 2.8mm; margin: 0; text-align: center; }
+
+/* Days of the week and people in a household: pills in a row that scrolls.
+   A chosen toggle wears ".pressed" (see SvSegment). */
+SvPills { background-color: transparent; padding: 0 0 2mm 0; margin: 0; }
+SvPill { font-family: "native:MainBold"; font-size: 2.6mm; color: var(--text-muted); background-color: var(--surface-alt); border-radius: 4mm; padding: 1.8mm 3.2mm 1.8mm 3.2mm; margin: 0 1.6mm 0 0; text-align: center; }
+SvPill.selected { color: var(--text-muted); background-color: var(--surface-alt); }
+SvPill.pressed { color: var(--ink-text); background-color: var(--ink); }
 
 /* --------------------------------------------------------- gamification */
 
@@ -1486,7 +1551,7 @@ SvWelcomeFeatureText { background-color: transparent; font-size: 3.1mm; color: v
     SvClassStripe { background-color: var(--brand-dark); }
     SvClassScarce { color: var(--brand-dark); }
     SvClassFriends { color: var(--violet-dark); }
-    SvPillBook { background-color: var(--brand-dark); }
+    SvPillBook { color: var(--brand-dark); background-color: var(--brand-tint-dark); }
     SvPillQueue { color: var(--violet-dark); background-color: var(--violet-tint-dark); }
     SvInk { background-color: var(--ink-dark); }
     SvLevelTrack { color: var(--ink-raised-dark); }
@@ -1509,6 +1574,15 @@ SvWelcomeFeatureText { background-color: transparent; font-size: 3.1mm; color: v
     SvHeading { color: var(--text-dark); }
     SvText { color: var(--text-dark); }
     SvMuted { color: var(--text-muted-dark); }
+    SvPill { color: var(--text-muted-dark); background-color: var(--surface-alt-dark); }
+    SvPill.selected { color: var(--text-muted-dark); background-color: var(--surface-alt-dark); }
+    SvPill.pressed { color: var(--ink-dark); background-color: var(--lime); }
+    SvChartTitle { color: var(--text-muted-dark); }
+    SvRankBar { color: var(--surface-alt-dark); }
+    SvFrontScan { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
+    SvFrontScan.pressed { background-color: var(--brand-pressed-dark); }
+    SvFrontFob { color: var(--text-dark); background-color: var(--surface-alt-dark); border: 1px solid var(--line-dark); }
+    SvFrontFob.pressed { background-color: var(--surface-press-dark); }
     SvLabel { color: var(--text-muted-dark); }
     SvPrice { color: var(--text-dark); }
     SvError { color: var(--danger-dark); }
@@ -1549,8 +1623,6 @@ SvWelcomeFeatureText { background-color: transparent; font-size: 3.1mm; color: v
     SvChip { background: cn1-pill-border; color: var(--text-dark); background-color: var(--surface-alt-dark); }
     SvSheet { background-color: var(--surface-dark); }
     SvGrip { color: var(--line-strong-dark); }
-    SvRing { color: var(--brand-dark); }
-    SvRingTrack { color: var(--line-dark); }
     SvPulse { color: var(--brand-dark); }
     SvShortcut { color: var(--text-dark); background-color: var(--surface-alt-dark); }
     SvShortcut.pressed { background-color: var(--surface-press-dark); }
@@ -1704,8 +1776,7 @@ SvWelcomeFeatureText { background-color: transparent; font-size: 3.1mm; color: v
     SvClassWho { color: var(--text-muted-dark); }
     SvClassLeft { color: var(--text-muted-dark); }
     SvClassFull { color: var(--danger-dark); }
-    SvPillBook { color: var(--brand-contrast-dark); }
-    SvPillBook.pressed { background-color: var(--brand-pressed-dark); }
+    SvPillBook.pressed { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
     SvPillBooked { color: var(--success-dark); background-color: var(--success-tint-dark); }
     SvMedalLocked { color: var(--text-muted-dark); }
     SvMedalName { color: var(--text-dark); }

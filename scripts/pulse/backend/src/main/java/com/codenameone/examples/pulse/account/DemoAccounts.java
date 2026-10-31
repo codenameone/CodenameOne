@@ -102,27 +102,27 @@ public class DemoAccounts {
         // new account is: no card saved. Under the `test` profile only the
         // others get one.
         boolean card = !"test".equals(config.getProfile());
-        if (add(MEMBER, PASSWORD, "Riley Member", "+15550100", LocalDate.of(1987, 5, 14),
+        if (add(MEMBER, PASSWORD, "Riley Park", "+15550100", LocalDate.of(1987, 5, 14),
                 false, false, false, 120) && card) {
-            card(MEMBER, "Riley Member");
+            card(MEMBER, "Riley Park");
         }
-        add(SECOND_MEMBER, PASSWORD, "Robin Member", "+15550101", LocalDate.of(1995, 9, 2),
+        add(SECOND_MEMBER, PASSWORD, "Robin Chen", "+15550101", LocalDate.of(1995, 9, 2),
                 false, false, false, 3);
-        if (add(FLAGGED_MEMBER, PASSWORD, "Rae Member", "+15550102", LocalDate.of(1990, 2, 20),
+        if (add(FLAGGED_MEMBER, PASSWORD, "Rae Okafor", "+15550102", LocalDate.of(1990, 2, 20),
                 false, false, false, 60)) {
             flag(FLAGGED_MEMBER, "Three no-shows to full classes in one week", 4);
         }
-        if (add(LAPSED_MEMBER, PASSWORD, "Lee Member", "+15550103", LocalDate.of(1979, 11, 8),
+        if (add(LAPSED_MEMBER, PASSWORD, "Lee Moreno", "+15550103", LocalDate.of(1979, 11, 8),
                 false, false, false, 200)) {
-            card(LAPSED_MEMBER, "Lee Member");
+            card(LAPSED_MEMBER, "Lee Moreno");
         }
-        add(TRAINER, PASSWORD, "Tess Trainer", "+15550110", LocalDate.of(1991, 3, 30), true,
+        add(TRAINER, PASSWORD, "Tess Alvarez", "+15550110", LocalDate.of(1991, 3, 30), true,
                 false, false, 400);
-        add(SECOND_TRAINER, PASSWORD, "Theo Trainer", "+15550111", LocalDate.of(1985, 7, 19),
+        add(SECOND_TRAINER, PASSWORD, "Theo Brooks", "+15550111", LocalDate.of(1985, 7, 19),
                 true, false, false, 300);
-        add(DESK, PASSWORD, "Dee Desk", "+15550112", LocalDate.of(1998, 12, 1), false, true,
+        add(DESK, PASSWORD, "Dee Patel", "+15550112", LocalDate.of(1998, 12, 1), false, true,
                 false, 250);
-        add(OWNER, PASSWORD, "Olive Owner", "+15550113", LocalDate.of(1976, 4, 4), false,
+        add(OWNER, PASSWORD, "Olive Hart", "+15550113", LocalDate.of(1976, 4, 4), false,
                 false, true, 500);
     }
 

@@ -112,7 +112,8 @@ image::img/pulse-member-home.png["The member's home with the next class, the mon
 ==== The timetable and booking
 
 The timetable lists the classes at each location by day, with the places left,
-which update live as other members book. Booking takes a place if one is free and
+which update live as other members book. Pills at the top pick the day and the
+person in the household, and picking a person shows only the classes open to them. Booking takes a place if one is free and
 joins the waitlist if not. When someone gives a place back, the first person
 waiting is moved into the class and told so at once.
 
@@ -246,17 +247,22 @@ The desk's day shows who came, what was taken and what starts soon. Signed in on
 tablet by the door, the desk account runs as the kiosk: a member holds up their
 pass and the screen turns green or red.
 
-The desk's home has three parts: today's numbers, the classes coming up with how
-many are booked, and the people who just came in, admitted or turned away.
+The desk's home opens with two large buttons, one to scan a pass and one to read a
+fob, and a field to type a pass number. Under them are today's check-ins, walk-ins
+and takings, the classes coming up, and the people who just came in, admitted or
+turned away.
 
 image::img/pulse-desk.png["The front desk's home with today's numbers, the classes coming up and the latest check-ins",scaledwidth=40%]
 
 === The owner
 
-The dashboard shows monthly recurring revenue, the share of places taken in the
-last week's classes, the members who haven't been in for two weeks and didn't say
-they'd be away, the most booked kinds of class, and the classes in the next two
-days that are under half full.
+The dashboard opens with the recurring revenue a month, the members, the share of
+places taken in the last week's classes, and the members who haven't been in for
+two weeks and didn't say they'd be away. Under them are who joined and who left in
+the last 30 days, the visits this week and the invoices past due; the takings of
+each day for the last 30 days; the kinds of class booked most, ranked; and the
+classes in the next two days that are under half full, each with a button to fill
+it.
 
 image::img/pulse-owner.png["The owner's dashboard with revenue, how full the classes were, members at risk and the quiet classes ahead",scaledwidth=40%]
 

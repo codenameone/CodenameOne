@@ -164,16 +164,19 @@ public final class SocialForm {
         if (item.minutes() > 0) {
             detail.append(Ui.DOT).append(Lang.tr("{0} min", Integer.valueOf(item.minutes())));
         }
-        if (item.avgHr() > 0) {
-            detail.append(Ui.DOT).append(item.avgHr()).append(" bpm");
-        }
         Container row = new Container(new BorderLayout(), "SvRow");
         row.setName("feed-" + iter);
         row.add(BorderLayout.WEST, Ui.avatar(item.name()));
         Container lines = new Container(BoxLayout.y(), "SvAvatarLines");
         lines.add(Ui.text(Lang.tr(mine ? "You did {1}" : "{0} did {1}",
                 first(item.name()), WorkoutsForm.title(item.title())), "SvRowTitle"));
-        lines.add(Ui.label(detail.toString(), "SvRowDetail"));
+        // When on one line and the effort on the next, as on the workouts
+        // screen: a single line wrapped mid-way on a phone.
+        lines.add(Ui.plain(detail.toString(), "SvRowDetail"));
+        if (item.avgHr() > 0) {
+            lines.add(Ui.plain(Lang.tr("{0} bpm avg", Integer.valueOf(item.avgHr())),
+                    "SvRowDetail"));
+        }
         row.add(BorderLayout.CENTER, lines);
         final Button kudos = new Button(String.valueOf(item.kudos()),
                 mine ? "SvKudosMine" : item.kudoed() ? "SvKudosGiven" : "SvKudos");

@@ -104,6 +104,16 @@ public final class Ui {
         }
     }
 
+    private static void clearOfTheNotch(Form form) {
+        Rectangle safe = Display.getInstance().getDisplaySafeArea(new Rectangle());
+        int covered = Math.max(0, safe.getY());
+        Style style = form.getContentPane().getAllStyles();
+        if (form.getContentPane().getUnselectedStyle().getPaddingTop() != covered) {
+            style.setPaddingUnitTop(Style.UNIT_TYPE_PIXELS);
+            style.setPaddingTop(covered);
+        }
+    }
+
     /// Gives `label` a material icon `size` millimetres tall, and the space
     /// between it and the label's words: without one the two touch.
     public static void icon(Label label, char icon, float size) {
@@ -139,6 +149,11 @@ public final class Ui {
         form.setName(name);
         watch(form);
         form.getToolbar().hideToolbar();
+        // With no title bar, nothing keeps the home bar out from under the
+        // clock and the notch: the content pane does, by the same inset a
+        // pushed screen's title bar is kept clear by, so the two line up.
+        clearOfTheNotch(form);
+        form.addSizeChangedListener(e -> clearOfTheNotch(form));
         // What is on the screen scrolls, where it needs to. The screen itself
         // does not, or it would offer to scroll the map away.
         form.setScrollable(false);
@@ -355,6 +370,28 @@ public final class Ui {
             final String value = values[iter];
             RadioButton option = RadioButton.createToggle(labels[iter], group);
             option.setUIID("SvSegment");
+            option.setName(name + "-" + value);
+            option.setSelected(value.equals(current));
+            option.addActionListener(e -> chosen.chosen(value));
+            row.add(option);
+        }
+        return row;
+    }
+
+    /// Options as a row of pills that scrolls sideways, one chosen: days of a
+    /// week, people in a household. Unlike [#choice] no option is squeezed,
+    /// however many there are.
+    public static Container pills(String name, String[] labels, final String[] values,
+            String current, final Chosen chosen) {
+        Container row = new Container(BoxLayout.x());
+        row.setUIID("SvPills");
+        row.setScrollableX(true);
+        row.setScrollVisible(false);
+        ButtonGroup group = new ButtonGroup();
+        for (int iter = 0; iter < values.length; iter++) {
+            final String value = values[iter];
+            RadioButton option = RadioButton.createToggle(labels[iter], group);
+            option.setUIID("SvPill");
             option.setName(name + "-" + value);
             option.setSelected(value.equals(current));
             option.addActionListener(e -> chosen.chosen(value));
@@ -722,13 +759,35 @@ public final class Ui {
             // in the one the server is configured for (pulse.currency).
             currency = Ui.currency;
         }
-        long whole = cents / 100;
+        long whole = Math.abs(cents / 100);
         long part = Math.abs(cents % 100);
-        String amount = whole + "." + (part < 10 ? "0" : "") + part;
+        String sign = cents < 0 ? "-" : "";
+        String amount = grouped(whole) + "." + (part < 10 ? "0" : "") + part;
         if (currency == null || currency.length() == 0 || "USD".equals(currency)) {
-            return "$" + amount;
+            return sign + "$" + amount;
         }
-        return amount + " " + currency;
+        return sign + amount + " " + currency;
+    }
+
+    // Thousands grouped with commas, "1,187": a dashboard's figures are read
+    // at a glance.
+    private static String grouped(long whole) {
+        String digits = String.valueOf(whole);
+        StringBuilder out = new StringBuilder();
+        for (int iter = 0; iter < digits.length(); iter++) {
+            if (iter > 0 && (digits.length() - iter) % 3 == 0) {
+                out.append(',');
+            }
+            out.append(digits.charAt(iter));
+        }
+        return out.toString();
+    }
+
+    /// An amount for a stat tile: whole units when there are no cents, so
+    /// "$25" fits where "$25.00" was cut off.
+    public static String moneyShort(long cents, String currency) {
+        String full = money(cents, currency);
+        return cents % 100 == 0 ? full.replace(".00", "") : full;
     }
 
     /// A distance, in the units chosen in Settings.

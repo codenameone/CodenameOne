@@ -132,10 +132,9 @@ public final class PassForm {
         code.add(BorderLayout.EAST, ring);
         card.add(code);
         body.add(card);
-        body.add(Ui.text(Lang.tr("Show this at the front desk. It changes every {0} seconds, "
-                + "so a screenshot of it is no use to anyone.",
+        body.add(Ui.text(Lang.tr("Show this at the front desk. It refreshes every {0} seconds.",
                 Integer.valueOf(found.periodSeconds())), "SvMuted"));
-        body.add(Ui.text(Lang.tr("Key fob {0}", fob(found.nfcId())), "SvMuted"));
+        body.add(Ui.row(FontImage.MATERIAL_NFC, Lang.tr("Key fob"), fob(found.nfcId()), null));
         body.add(Ui.link("Lost your phone or fob? Replace the pass", "rotate",
                 e -> Api.household().rotatePass(found.memberId(), Net.to(rotated -> {
                     Ui.say("Your old pass and fob no longer open the door");
@@ -177,10 +176,18 @@ public final class PassForm {
     // The fob's id is long; its first eight characters are what the desk
     // reads off a fob's label to match it.
     private static String fob(String id) {
-        if (id == null || id.length() <= 8) {
-            return id == null ? "" : id;
+        String label = id == null ? "" : id.length() > 8 ? id.substring(0, 8) : id;
+        // Upper case by hand: the id is hex, and String.toUpperCase is
+        // locale sensitive.
+        StringBuilder out = new StringBuilder();
+        for (int iter = 0; iter < label.length(); iter++) {
+            char c = label.charAt(iter);
+            if (iter == 4) {
+                out.append(' ');
+            }
+            out.append(c >= 'a' && c <= 'z' ? (char) (c - 'a' + 'A') : c);
         }
-        return id.substring(0, 4) + " " + id.substring(4, 8) + "...";
+        return out.toString();
     }
 
     /// The code a pass shows for `counter`, exactly as the server works it out.

@@ -20,6 +20,7 @@ package com.codenameone.examples.pulse.studio;
 
 import com.codename1.backend.Config;
 import com.codename1.backend.annotations.Component;
+import com.codename1.backend.annotations.Value;
 import com.codename1.backend.annotations.PostConstruct;
 import com.codename1.backend.annotations.Transactional;
 import com.codenameone.examples.pulse.Days;
@@ -35,7 +36,9 @@ import com.codenameone.examples.pulse.domain.Friend;
 import com.codenameone.examples.pulse.domain.Invoice;
 import com.codenameone.examples.pulse.domain.Location;
 import com.codenameone.examples.pulse.domain.Member;
+import com.codenameone.examples.pulse.domain.WalkIn;
 import com.codenameone.examples.pulse.domain.Kudos;
+import com.codenameone.examples.pulse.domain.Profile;
 import com.codenameone.examples.pulse.domain.Workout;
 import com.codenameone.examples.pulse.domain.Membership;
 import com.codenameone.examples.pulse.domain.MembershipPlan;
@@ -49,6 +52,7 @@ import com.codenameone.examples.pulse.repository.ClassSessionRepository;
 import com.codenameone.examples.pulse.repository.ClassTypeRepository;
 import com.codenameone.examples.pulse.repository.FriendRepository;
 import com.codenameone.examples.pulse.repository.KudosRepository;
+import com.codenameone.examples.pulse.repository.ProfileRepository;
 import com.codenameone.examples.pulse.repository.InvoiceRepository;
 import com.codenameone.examples.pulse.repository.LocationRepository;
 import com.codenameone.examples.pulse.repository.MemberRepository;
@@ -56,6 +60,7 @@ import com.codenameone.examples.pulse.repository.MembershipPlanRepository;
 import com.codenameone.examples.pulse.repository.MembershipRepository;
 import com.codenameone.examples.pulse.repository.RoomRepository;
 import com.codenameone.examples.pulse.repository.ShiftRepository;
+import com.codenameone.examples.pulse.repository.WalkInRepository;
 import com.codenameone.examples.pulse.repository.StaffRepository;
 import com.codenameone.examples.pulse.repository.WorkoutRepository;
 
@@ -83,7 +88,11 @@ import java.util.List;
 public class DemoStudio {
     public static final String DOWNTOWN = "loc-downtown";
     public static final String RIVERSIDE = "loc-riverside";
-    public static final String ZONE = "America/New_York";
+    /// The studio's time zone when `pulse.demo.zone` names none. The timetable
+    /// is laid out in studio hours, so a screenshot run sets the zone to one
+    /// where it is morning, and the device to the same zone, rather than
+    /// showing an evening of late classes.
+    public static final String DEFAULT_ZONE = "America/New_York";
     /// The plan ids the tests name.
     public static final String UNLIMITED = "plan-unlimited";
     public static final String OFF_PEAK = "plan-offpeak";
@@ -121,6 +130,9 @@ public class DemoStudio {
     private final CampaignRepository campaigns;
     /// A fixed sequence, so that every demo database has the same history.
     private long seed = 20261030L;
+    private final String zone;
+    private final WalkInRepository walkIns;
+    private final ProfileRepository profiles;
 
     public DemoStudio(DemoAccounts accounts, Config config, LocationRepository locations,
             RoomRepository rooms, ClassTypeRepository types, ClassSessionRepository sessions,
@@ -128,7 +140,12 @@ public class DemoStudio {
             MembershipRepository memberships, MemberRepository members,
             BookingRepository bookings, CheckInRepository checkIns, InvoiceRepository invoices,
             WorkoutRepository workouts, FriendRepository friends, KudosRepository kudos,
-            ShiftRepository shifts, CampaignRepository campaigns) {
+            ShiftRepository shifts, CampaignRepository campaigns, WalkInRepository walkIns,
+            ProfileRepository profiles,
+            @Value("${pulse.demo.zone:" + DEFAULT_ZONE + "}") String zone) {
+        this.zone = zone;
+        this.walkIns = walkIns;
+        this.profiles = profiles;
         this.accounts = accounts;
         this.config = config;
         this.locations = locations;
@@ -210,6 +227,7 @@ public class DemoStudio {
         timetable();
         households();
         liveClass();
+        walkIns();
         shifts();
         campaigns();
     }
@@ -221,14 +239,15 @@ public class DemoStudio {
         Instant now = Instant.now();
         ClassSession live = session(now.minusMillis(15L * 60000L), HIIT, DOWNTOWN,
                 "room-studio-a", DemoAccounts.TRAINER);
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(ZoneId.of(zone));
         attended(self(DemoAccounts.SECOND_MEMBER), live, true);
         String[] names = {"Jordan Reyes", "Priya Natarajan", "Marcus Bell", "Hannah Okafor",
-            "Sam Whitfield"};
-        int[] ages = {27, 34, 45, 22, 58};
+            "Sam Whitfield", "Elena Rossi", "Daniel Kim", "Grace Mensah", "Tom Fischer",
+            "Aisha Rahman"};
+        int[] ages = {27, 34, 45, 22, 58, 31, 39, 26, 49, 36};
         // Start days that fall on different days of the billing month, so the
         // owner's revenue chart is not one bar.
-        int[] joined = {37, 52, 98, 143, 176};
+        int[] joined = {37, 52, 98, 143, 176, 12, 64, 121, 158, 201};
         List<ClassSession> past = sessions.findByStartsAtGreaterThanEqualAndStartsAtLessThanOrderByStartsAtAsc(
                 now.minusMillis(WEEKS_BACK * 7L * Days.MILLIS), now);
         for (int iter = 0; iter < names.length; iter++) {
@@ -243,6 +262,13 @@ public class DemoStudio {
             row.setCreatedAt(now.minusMillis((200L + 40L * iter) * Days.MILLIS));
             sign(row);
             members.insert(row);
+            // A profile, as signing up would have made: the friends list, the
+            // feed and kudos name a person by it.
+            Profile profile = new Profile();
+            profile.setUsername(row.getAccount());
+            profile.setDisplayName(names[iter]);
+            profile.setCreatedAt(row.getCreatedAt());
+            profiles.insert(profile);
             Membership plan = membership(row, iter == 3 ? OFF_PEAK : UNLIMITED, "ACTIVE",
                     joined[iter], 0, now);
             // The odd drop-in for a friend and a class pack on top, on days
@@ -253,18 +279,55 @@ public class DemoStudio {
                 ClassSession session = past.get(each);
                 if (session.getEndsAt().isBefore(now) && DOWNTOWN.equals(session.getLocationId())
                         && !LITTLE_MOVERS.equals(session.getClassTypeId())
-                        && !TEEN.equals(session.getClassTypeId()) && next(7) == 0) {
+                        && !TEEN.equals(session.getClassTypeId()) && next(2) == 0) {
                     attended(row, session, next(10) != 0);
                 }
             }
             attended(row, live, true);
+            // Three of them train with Riley too, so the friends' feed is a
+            // handful of people and classes rather than one friend's week.
+            if (iter == 0 || iter == 1 || iter == 3) {
+                befriend(DemoAccounts.MEMBER, row.getAccount(), now);
+                befriend(row.getAccount(), DemoAccounts.MEMBER, now);
+            }
+        }
+    }
+
+    /// This morning's walk-ins at the downtown desk, so the desk's day has
+    /// people and takings in it: a day pass, a guest of a member and a free
+    /// trial, the latest a few minutes ago.
+    private void walkIns() throws IOException {
+        Instant now = Instant.now();
+        Instant midnight = LocalDate.now(ZoneId.of(zone)).atStartOfDay(ZoneId.of(zone)).toInstant();
+        String[] names = {"Alex Romero", "Noor Haddad", "Ben Kowalski"};
+        String[] kinds = {"DAY_PASS", "GUEST", "TRIAL"};
+        String[] paidBy = {"CARD", "NONE", "NONE"};
+        long[] cents = {2500L, 0L, 0L};
+        long[] minutesAgo = {95L, 40L, 6L};
+        for (int iter = 0; iter < names.length; iter++) {
+            Instant at = now.minusMillis(minutesAgo[iter] * 60000L);
+            if (at.isBefore(midnight)) {
+                continue;
+            }
+            WalkIn row = new WalkIn();
+            row.setId(Ids.next());
+            row.setLocationId(DOWNTOWN);
+            row.setName(names[iter]);
+            row.setEmail("");
+            row.setPhone("");
+            row.setKind(kinds[iter]);
+            row.setAmountCents(cents[iter]);
+            row.setPaidBy(paidBy[iter]);
+            row.setStaff(DemoAccounts.DESK);
+            row.setAt(at);
+            walkIns.insert(row);
         }
     }
 
     /// A week of shifts for both trainers, one of Theo's offered for swap so
     /// Tess has something under "Offered by others".
     private void shifts() throws IOException {
-        LocalDate today = LocalDate.now(ZoneId.of(ZONE));
+        LocalDate today = LocalDate.now(ZoneId.of(zone));
         for (int day = 1; day <= 7; day++) {
             LocalDate on = today.plusDays(day);
             if (on.getDayOfWeek() != DayOfWeek.SUNDAY) {
@@ -336,7 +399,7 @@ public class DemoStudio {
 
     private void shift(String trainer, LocalDate day, int hour, int hours, String duty,
             String state) throws IOException {
-        Instant start = ZonedDateTime.of(day, LocalTime.of(hour, 0), ZoneId.of(ZONE)).toInstant();
+        Instant start = ZonedDateTime.of(day, LocalTime.of(hour, 0), ZoneId.of(zone)).toInstant();
         Shift row = new Shift();
         row.setId(Ids.next());
         row.setLocationId(DOWNTOWN);
@@ -349,7 +412,7 @@ public class DemoStudio {
     }
 
     private void timetable() throws IOException {
-        LocalDate today = LocalDate.now(ZoneId.of(ZONE));
+        LocalDate today = LocalDate.now(ZoneId.of(zone));
         LocalDate first = today.minusWeeks(WEEKS_BACK).with(DayOfWeek.MONDAY);
         LocalDate last = today.plusWeeks(WEEKS_AHEAD);
         String tess = DemoAccounts.TRAINER;
@@ -390,10 +453,10 @@ public class DemoStudio {
     private void households() throws IOException {
         Instant now = Instant.now();
         String riley = DemoAccounts.MEMBER;
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(ZoneId.of(zone));
         Member rileySelf = self(riley);
-        Member kai = child(KAI, riley, "Kai Member", today.minusYears(6).minusDays(40));
-        Member mia = child(MIA, riley, "Mia Member", today.minusYears(13).minusDays(100));
+        Member kai = child(KAI, riley, "Kai Park", today.minusYears(6).minusDays(40));
+        Member mia = child(MIA, riley, "Mia Park", today.minusYears(13).minusDays(100));
         sign(rileySelf);
         sign(kai);
         sign(mia);
@@ -475,7 +538,7 @@ public class DemoStudio {
         row.setId(id);
         row.setName(name);
         row.setAddress(address);
-        row.setTimeZone(ZONE);
+        row.setTimeZone(zone);
         row.setOpensMinute(opens);
         row.setClosesMinute(closes);
         locations.insert(row);
@@ -538,7 +601,7 @@ public class DemoStudio {
 
     private void session(LocalDate day, int hour, int minute, String typeId, String location,
             String room, String trainer) throws IOException {
-        session(ZonedDateTime.of(day, LocalTime.of(hour, minute), ZoneId.of(ZONE)).toInstant(),
+        session(ZonedDateTime.of(day, LocalTime.of(hour, minute), ZoneId.of(zone)).toInstant(),
                 typeId, location, room, trainer);
     }
 
@@ -733,7 +796,14 @@ public class DemoStudio {
         for (int iter = 0; iter < cheers; iter++) {
             Kudos one = new Kudos();
             one.setId(Ids.next());
-            one.setFromAccount("demo-guest-" + (iter + 1) + "@pulse.example");
+            // The guests seeded in liveClass(): members with an account of
+            // their own, so a feed that names the sender finds them.
+            String from = "demo-guest-" + (iter + 1) + "@pulse.example";
+            if (from.equals(member.getAccount())) {
+                // Nobody cheers their own workout.
+                from = "demo-guest-" + (iter + 6) + "@pulse.example";
+            }
+            one.setFromAccount(from);
             one.setToAccount(member.getAccount());
             one.setWorkoutId(row.getId());
             one.setCreatedAt(session.getEndsAt().plusSeconds(600L * (iter + 1)));
