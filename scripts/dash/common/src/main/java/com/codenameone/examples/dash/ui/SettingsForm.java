@@ -68,6 +68,7 @@ public final class SettingsForm {
                 toggle("Share anonymous usage", "analytics", Telemetry.allowed(), Telemetry::allow),
                 toggle("Notifications", "push", Notifications.enabled(), Notifications::setEnabled)));
         if (AppConfig.serverSwitchable()) {
+            f.add(Ui.label("Server", "SectionTitle"));
             f.add(Ui.secondary("Server: " + AppConfig.serverUrl(), "serverButton", e -> chooseServer()));
         }
         f.add(Ui.button("Sign out", "DangerButton", "signOut", e -> Nav.signOut()));

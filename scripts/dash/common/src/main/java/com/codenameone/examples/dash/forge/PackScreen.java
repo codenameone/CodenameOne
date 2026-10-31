@@ -18,7 +18,6 @@
  */
 package com.codenameone.examples.dash.forge;
 
-import com.codename1.components.MultiButton;
 import com.codename1.components.ShareButton;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
@@ -112,23 +111,16 @@ public final class PackScreen {
         f.show();
     }
 
-    /// A level's row. A community run is on a seed of the level's own, the
-    /// same every time, so its all-time board compares like with like.
+    /// A level's card, the same as the official ones on the level list. A
+    /// community run is on a seed of the level's own, the same every time,
+    /// so its all-time board compares like with like.
     private static com.codename1.ui.Container level(final ContentPack pack, final LevelDef l, int stars) {
-        MultiButton b = new MultiButton(l.name);
-        b.setUIID("HistoryRow");
-        b.setUIIDLine1("HistoryWin");
-        b.setTextLine2(LevelsForm.describe(l));
-        b.setEmblem(com.codenameone.examples.dash.ui.Kit.starsImage(stars,
-                com.codename1.ui.CN.convertToPixels(3.4f)));
-        b.setName("level-" + l.id);
         final Levels.Playable p = Levels.of(pack, l.id);
         final String ref = pack.id + "/" + l.id;
-        b.addActionListener(e -> RunForm.solo(p, l.contentHash(), "solo", null, () -> show(pack.id)));
-        return com.codename1.ui.layouts.BoxLayout.encloseY(b, Ui.row(
-                Ui.button("Race friends", "DialogButton", "race-" + l.id, e -> RaceLobby.host(ref)),
-                Ui.button("Scores", "DialogButton", "scores-" + l.id,
-                        e -> ScoresForm.show(ref, () -> show(pack.id)))));
+        return LevelsForm.card(l, stars,
+                e -> RunForm.solo(p, l.contentHash(), "solo", null, () -> show(pack.id)),
+                "Race friends", com.codename1.ui.FontImage.MATERIAL_GROUPS, e -> RaceLobby.host(ref),
+                e -> ScoresForm.show(ref, () -> show(pack.id)));
     }
 
     private static void remix(final PackSummaryDto s) {

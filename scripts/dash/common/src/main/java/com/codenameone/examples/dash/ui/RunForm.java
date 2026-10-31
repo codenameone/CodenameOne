@@ -48,6 +48,7 @@ import com.codenameone.examples.dash.rules.Replay;
 import com.codenameone.examples.dash.rules.Run;
 import com.codenameone.examples.dash.rules.Runner;
 import com.codenameone.examples.dash.rules.Track;
+import com.codenameone.examples.dash.run.CityPath;
 import com.codenameone.examples.dash.run.Driver;
 import com.codenameone.examples.dash.run.Levels;
 import com.codenameone.examples.dash.run.RaceDriver;
@@ -65,6 +66,8 @@ public final class RunForm implements RunView.Hud, RaceDriver.Listener {
     private final Runnable back;
     private final RunView view;
     private final Form form;
+    private Container layers;
+    private CityPath.Minimap minimap;
     private final Label distance = new Label("0 m", "HudDistance");
     private final Label score = new Label("0", "HudScore");
     private final Label coins = new Label("0", "HudCoins");
@@ -72,6 +75,8 @@ public final class RunForm implements RunView.Hud, RaceDriver.Listener {
     private final Label countdown = new Label("", "HudCountdown");
     private final Label power = new Label("", "HudPower");
     private final SpanLabel coach = new SpanLabel("");
+    /// Everything drawn over the track; hidden under the result card.
+    private Container hud;
     private final Container chatLog = new Container(BoxLayout.y());
     private int nextLine;
 
@@ -88,25 +93,39 @@ public final class RunForm implements RunView.Hud, RaceDriver.Listener {
         form.setUIID("RunScreen");
         form.getToolbar().hideToolbar();
 
-        Container hud = new Container(new BorderLayout());
+        hud = new Container(new BorderLayout());
         hud.setSafeArea(true);
-        Container top = new Container(new BorderLayout());
+        // Centred on the screen, not between the columns: the race's right
+        // column is wider than the pause button and pulled the distance left.
+        Container top = new Container(new BorderLayout(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE));
         top.setUIID("HudBar");
         Button quit = Ui.button("", "HudButton", "quit", e -> quit());
         quit.setMaterialIcon(FontImage.MATERIAL_PAUSE, 4.4f);
-        top.add(BorderLayout.WEST, quit);
+        // In a box, so a taller right column never stretches the button.
+        Container left = BoxLayout.encloseY(quit);
+        // A city run shows where on its streets the runner is, under the
+        // pause button and clear of the distance.
+        CityPath path = Levels.cityPath(driver.run().level().id);
+        if (path != null) {
+            minimap = new CityPath.Minimap(path);
+            minimap.setName("minimap");
+            left.add(minimap);
+        }
+        top.add(BorderLayout.WEST, left);
         // Distance big in the middle, score under it; coins and place to the
         // right, where the eye checks them between obstacles.
         Container mid = new Container(BoxLayout.y());
         mid.add(distance);
-        mid.add(score);
+        mid.add(FlowLayout.encloseCenter(score));
         top.add(BorderLayout.CENTER, mid);
         Ui.glyph(coins, FontImage.MATERIAL_MONETIZATION_ON, 3.6f);
         Ui.glyph(power, FontImage.MATERIAL_BOLT, 3.2f);
+        // Each on the right edge at its own width: a wide place line in a
+        // race must not stretch the coin pill.
         Container right = new Container(BoxLayout.y());
-        right.add(coins);
-        right.add(place);
-        right.add(power);
+        right.add(FlowLayout.encloseRight(coins));
+        right.add(FlowLayout.encloseRight(place));
+        right.add(FlowLayout.encloseRight(power));
         top.add(BorderLayout.EAST, right);
         distance.setName("distance");
         score.setName("score");
@@ -126,6 +145,9 @@ public final class RunForm implements RunView.Hud, RaceDriver.Listener {
             chatLog.setUIID("ChatLog");
             bottom.add(BorderLayout.CENTER, chatLog);
             Container emotes = new Container(new GridLayout(1, 4));
+            // Clear of the home indicator, with room under the chips.
+            emotes.setUIID("EmoteBar");
+            emotes.setSafeArea(true);
             String[] ids = {"wave", "gg", "wow", "oops"};
             for (final String id : ids) {
                 emotes.add(Ui.button(emoteText(id), "EmoteButton", "emote-" + id,
@@ -134,7 +156,7 @@ public final class RunForm implements RunView.Hud, RaceDriver.Listener {
             bottom.add(BorderLayout.SOUTH, emotes);
             hud.add(BorderLayout.SOUTH, bottom);
         }
-        Container layers = new Container(new LayeredLayout());
+        layers = new Container(new LayeredLayout());
         layers.add(view);
         layers.add(hud);
         form.add(BorderLayout.CENTER, layers);
@@ -215,6 +237,9 @@ public final class RunForm implements RunView.Hud, RaceDriver.Listener {
     public void ticked(Run run) {
         Runner me = run.runner(driver.me());
         distance.setText(me.z / Track.UNIT + " m");
+        if (minimap != null && run.level().length > 0) {
+            minimap.setProgress(me.z / (float) run.level().length);
+        }
         score.setText(String.valueOf(me.score()));
         coins.setText(String.valueOf(me.coins));
         power.setText(me.shield > 0 ? "Shield" : me.magnet > 0 ? "Magnet" : me.boost > 0 ? "Boost" : "");
@@ -230,11 +255,13 @@ public final class RunForm implements RunView.Hud, RaceDriver.Listener {
         form.revalidateLater();
     }
 
-    /// The run is over: the coach stops talking, so its bubble never shows
-    /// over the result card or the rewards.
+    /// The run is over: the coach stops talking and the HUD steps aside, so
+    /// neither shows through the dim behind the result card or the rewards.
     private void quiet() {
         nextLine = Integer.MAX_VALUE;
         coach.setVisible(false);
+        // The result card says it all; the HUD under the dim is just noise.
+        hud.setVisible(false);
         form.revalidateLater();
     }
 
@@ -303,7 +330,8 @@ public final class RunForm implements RunView.Hud, RaceDriver.Listener {
             result("RUN OVER", me.score(), null, null);
             return;
         }
-        Api.forge().result(new LevelResultDto(d.replay().encode()), Net.to(o -> Ui.later(() -> {
+        // A city run carries its route: the server builds the level from it.
+        Api.forge().result(new LevelResultDto(d.replay().encode(), Levels.citySpec(d.replay().levelId())), Net.to(o -> Ui.later(() -> {
             if ("tutorial".equals(mode)) {
                 Api.progress().tutorialDone(Net.to(r -> { }, (s, m) -> { }));
             }
@@ -330,10 +358,7 @@ public final class RunForm implements RunView.Hud, RaceDriver.Listener {
     /// button on the card.
     private void result(String title, int score, String note, final LevelOutcomeDto o) {
         view.stop();
-        Dialog d = new Dialog("", BoxLayout.y());
-        d.setDialogUIID("ResultDialog");
-        d.setTitleComponent(new Label());
-        d.getTitleComponent().setVisible(false);
+        final Runnable[] close = new Runnable[1];
         Container card = new Container(BoxLayout.y());
         card.setUIID("ResultCard");
         card.setName("result");
@@ -359,7 +384,7 @@ public final class RunForm implements RunView.Hud, RaceDriver.Listener {
         }
         card.add(FlowLayout.encloseCenter(chips));
         Button again = Ui.button("RUN AGAIN", "CardGo", "again", e -> {
-            d.dispose();
+            close[0].run();
             again();
         });
         again.setMaterialIcon(FontImage.MATERIAL_REPLAY, 4.4f);
@@ -367,7 +392,7 @@ public final class RunForm implements RunView.Hud, RaceDriver.Listener {
         Container buttons = new Container(new GridLayout(1, "playtest".equals(mode) ? 1 : 2));
         if (!"playtest".equals(mode)) {
             Button scores = Ui.button("Scores", "CardAction", "scores", e -> {
-                d.dispose();
+                close[0].run();
                 driver.dispose();
                 ScoresForm.show(driver.run().level().id, null);
             });
@@ -375,29 +400,40 @@ public final class RunForm implements RunView.Hud, RaceDriver.Listener {
             buttons.add(scores);
         }
         Button done = Ui.button("Home", "CardAction", "done", e -> {
-            d.dispose();
+            close[0].run();
             close();
         });
         Ui.glyph(done, FontImage.MATERIAL_HOME, 3.4f);
         buttons.add(done);
         card.add(buttons);
-        d.add(card);
-        // A short phone scrolls the card rather than cutting its buttons off.
-        d.getContentPane().setScrollableY(true);
-        d.getContentPane().setScrollVisible(false);
         final Runnable after = () -> {
-            // Inset from every edge rather than packed, so the card is as
-            // wide as the phone allows and nothing on it is cut short.
-            int dw = CN.getDisplayWidth();
-            int dh = CN.getDisplayHeight();
-            d.show(dh / 9, dh / 9, dw / 16, dw / 16);
+            close[0] = overlay(card);
             Ads.betweenRuns(Ui.adFree());
         };
         if (o != null && o.reward() != null && (o.reward().coins() > 0 || o.reward().xp() > 0)) {
-            Rewards.show(o.reward(), () -> Rewards.afterRun(after));
+            Rewards.show(o.reward(), () -> Rewards.afterRun(after, this::overlay), this::overlay);
         } else {
-            Rewards.afterRun(after);
+            Rewards.afterRun(after, this::overlay);
         }
+    }
+
+    /// Lays `card` over the scene, which stays where the run ended, and
+    /// answers what takes it away. Not a dialog: a dialog shows a capture of
+    /// the form behind it, and the GPU scene is not in that capture.
+    private Runnable overlay(Component card) {
+        final Container dim = new Container(new BorderLayout(BorderLayout.CENTER_BEHAVIOR_CENTER));
+        dim.setUIID("RunDim");
+        // A short phone scrolls the card rather than cutting its buttons off.
+        Container scroll = BoxLayout.encloseY(card);
+        scroll.setScrollableY(true);
+        scroll.setScrollVisible(false);
+        dim.add(BorderLayout.CENTER, scroll);
+        layers.add(dim);
+        form.revalidate();
+        return () -> {
+            layers.removeComponent(dim);
+            form.revalidate();
+        };
     }
 
     private void again() {
@@ -445,21 +481,28 @@ public final class RunForm implements RunView.Hud, RaceDriver.Listener {
         }
         sb.append('\n').append(trophies >= 0 ? "+" : "").append(trophies).append(" trophies   +")
                 .append(coinsWon).append(" coins");
-        Dialog d = new Dialog(HistoryForm.place(mine) + " place", new BorderLayout());
+        final Runnable[] close = new Runnable[1];
+        final Container d = new Container(BoxLayout.y());
+        d.setUIID("ResultCard");
         d.setName("raceResult");
-        d.add(BorderLayout.CENTER, Ui.text(sb.toString(), "ResultLine"));
+        d.add(new Label(HistoryForm.place(mine) + " place", "ResultTitle"));
+        d.add(Ui.text(sb.toString(), "ResultLine"));
         Container buttons = new Container(new GridLayout(1, 2));
-        buttons.add(Ui.button("Replay", "DialogButton", "replayRace", e -> {
-            d.dispose();
+        Button replay = Ui.button("Replay", "CardAction", "replayRace", e -> {
+            close[0].run();
             driver.dispose();
             ReplayForm.load(raceId);
-        }));
-        buttons.add(Ui.button("Done", "DialogButton", "done", e -> {
-            d.dispose();
+        });
+        Ui.glyph(replay, FontImage.MATERIAL_REPLAY, 3.4f);
+        buttons.add(replay);
+        Button done = Ui.button("Home", "CardAction", "done", e -> {
+            close[0].run();
             close();
-        }));
-        d.add(BorderLayout.SOUTH, buttons);
-        Rewards.afterRun(() -> d.showPacked(BorderLayout.CENTER, true));
+        });
+        Ui.glyph(done, FontImage.MATERIAL_HOME, 3.4f);
+        buttons.add(done);
+        d.add(buttons);
+        Rewards.afterRun(() -> close[0] = overlay(d), this::overlay);
     }
 
     @Override

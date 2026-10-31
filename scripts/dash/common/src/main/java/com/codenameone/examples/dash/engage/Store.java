@@ -19,6 +19,7 @@
 package com.codenameone.examples.dash.engage;
 
 import com.codename1.io.Log;
+import com.codename1.payment.Product;
 import com.codename1.payment.Purchase;
 import com.codename1.payment.Receipt;
 import com.codename1.ui.CN;
@@ -61,6 +62,20 @@ public final class Store {
     public static boolean available() {
         Purchase p = Purchase.getInAppPurchase();
         return !CN.isSimulator() && p != null && p.isManagedPaymentSupported();
+    }
+
+    /// The store's own price for `sku`, in the player's currency, or null
+    /// where there is no store to ask (the simulator) or it has not said.
+    public static String price(String sku) {
+        if (!available()) {
+            return null;
+        }
+        Product[] products = Purchase.getInAppPurchase().getProducts(new String[] {sku});
+        if (products == null || products.length == 0 || products[0] == null) {
+            return null;
+        }
+        String p = products[0].getLocalizedPrice();
+        return p == null || p.length() == 0 ? null : p;
     }
 
     /// Starts buying `sku` from the platform's store. In the simulator the

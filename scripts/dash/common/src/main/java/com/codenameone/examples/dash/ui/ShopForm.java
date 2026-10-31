@@ -55,7 +55,9 @@ public final class ShopForm {
                 // Signed out while the shop was loading.
                 return;
             }
-            f.add(Ui.wallet(Session.user()));
+            // The wallet just fetched, not the player cached at sign-in:
+            // the shop is where the balance has to be right.
+            f.add(Ui.wallet(Session.user().trophies(), wallet.coins(), wallet.gems()));
             fill(f, items, wallet);
             f.revalidate();
         }), Ui::failed)), Ui::failed));
@@ -76,7 +78,9 @@ public final class ShopForm {
                 if (owned) {
                     row.add(BorderLayout.EAST, FlowLayout.encloseMiddle(new Label("Owned", "Owned")));
                 } else {
-                    row.add(BorderLayout.EAST, FlowLayout.encloseMiddle(Ui.button("Buy", "GemButton", "buy-" + item.id(),
+                    String price = Store.price(item.sku());
+                    row.add(BorderLayout.EAST, FlowLayout.encloseMiddle(Ui.button(price == null ? "Buy" : price,
+                            "GemButton", "buy-" + item.id(),
                             e -> Store.buy(item.sku()))));
                 }
             } else if (owned) {
@@ -100,7 +104,14 @@ public final class ShopForm {
         if (item.id().startsWith("trail-")) {
             return "TRAIL";
         }
-        return item.sku() != null && item.sku().length() > 0 ? "BEST VALUE" : "ITEM";
+        if ("gems-500".equals(item.id())) {
+            // The biggest pack is the one that is cheapest per gem.
+            return "BEST VALUE";
+        }
+        if (item.id().startsWith("gems-")) {
+            return "GEM PACK";
+        }
+        return item.sku() != null && item.sku().length() > 0 ? "SEASON PASS" : "ITEM";
     }
 
     private static void buy(ShopItemDto item) {

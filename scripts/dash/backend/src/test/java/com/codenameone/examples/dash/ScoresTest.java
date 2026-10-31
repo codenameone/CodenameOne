@@ -71,6 +71,42 @@ class ScoresTest {
     }
 
     @Test
+    void theAllTimeBoardRefusesASeedTheAppWasNotHanded() throws Exception {
+        String who = Api.player(accounts, "seed-picker");
+        // Any seed but the ones the server hands out: searched for offline.
+        long picked = 987654321L;
+        String run = Runs.bot(Content.endless(), Content.catalog(), picked, 10).encode();
+        Api.json(mvc, Api.as(Api.body(post("/api/forge/results"), result(run)), who));
+        for (Object row : Api.list(mvc, Api.as(get("/api/scores?level=endless&board=all&limit=50"), who))) {
+            assertTrue(!"seed-picker".equals(((Map) row).get("displayName")), "picked seed reached the board");
+        }
+        String fixed = Runs.bot(Content.endless(), Content.catalog(), 1L, 10).encode();
+        Api.json(mvc, Api.as(Api.body(post("/api/forge/results"), result(fixed)), who));
+        boolean listed = false;
+        for (Object row : Api.list(mvc, Api.as(get("/api/scores?level=endless&board=all&limit=50"), who))) {
+            listed |= "seed-picker".equals(((Map) row).get("displayName"));
+        }
+        assertTrue(listed, "the fixed seed is fair");
+    }
+
+    @Test
+    void theWeeksSeedTheAppDerivesCountsOnTheWeekAndAllTime() throws Exception {
+        String who = Api.player(accounts, "week-runner");
+        // The way LevelsForm.week derives it: days since the epoch, over 7.
+        int week = (int) (System.currentTimeMillis() / 86400000L) / 7;
+        long seed = Content.weeklySeed(week, Content.ENDLESS);
+        String run = Runs.bot(Content.endless(), Content.catalog(), seed, 10).encode();
+        Api.json(mvc, Api.as(Api.body(post("/api/forge/results"), result(run)), who));
+        for (String board : new String[] {"week", "all"}) {
+            boolean listed = false;
+            for (Object row : Api.list(mvc, Api.as(get("/api/scores?level=endless&board=" + board + "&limit=50"), who))) {
+                listed |= "week-runner".equals(((Map) row).get("displayName"));
+            }
+            assertTrue(listed, "the week's seed missed the " + board + " board");
+        }
+    }
+
+    @Test
     void aCrewBoardListsItsMembersOnly() throws Exception {
         String owner = Api.player(accounts, "crew-owner");
         String mate = Api.player(accounts, "crew-mate");
@@ -80,7 +116,7 @@ class ScoresTest {
         Map joined = Api.json(mvc, Api.as(post("/api/crews/" + code + "/join"), mate));
         assertEquals(2, ((List) joined.get("members")).size());
         for (String who : new String[] {owner, mate, stranger}) {
-            String run = Runs.bot(Content.tutorial(), Content.catalog(), who.length(), 80).encode();
+            String run = Runs.bot(Content.tutorial(), Content.catalog(), 1L, 80).encode();
             Api.json(mvc, Api.as(Api.body(post("/api/forge/results"), result(run)), who));
         }
         List board = Api.list(mvc, Api.as(get("/api/scores?level=first-steps&board=crew%3A" + code + "&limit=50"), owner));

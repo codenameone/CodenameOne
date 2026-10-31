@@ -19,6 +19,7 @@
 package com.codenameone.examples.dash.run;
 
 import com.codenameone.examples.dash.rules.Catalog;
+import com.codenameone.examples.dash.rules.CityRoute;
 import com.codenameone.examples.dash.rules.Content;
 import com.codenameone.examples.dash.rules.LevelDef;
 import com.codenameone.examples.dash.rules.forge.ContentPack;
@@ -50,6 +51,8 @@ public final class Levels {
     }
 
     private static final Map<String, ContentPack> PACKS = new HashMap<String, ContentPack>();
+    private static final Map<String, CityRoute> CITIES = new HashMap<String, CityRoute>();
+    private static final Map<String, CityPath> PATHS = new HashMap<String, CityPath>();
 
     private Levels() {
     }
@@ -87,11 +90,39 @@ public final class Levels {
         return new Playable(pack.id + "@" + pack.hash() + "#" + level.id, level, pack.catalog());
     }
 
+    /// A city route's level, kept so a run of it can be submitted with its
+    /// route, run again and replayed. `path` is the street map's line for the
+    /// minimap, or null.
+    public static synchronized Playable city(CityRoute route, CityPath path) {
+        LevelDef l = route.level();
+        CITIES.put(l.id, route);
+        if (path != null) {
+            PATHS.put(l.id, path);
+        }
+        return new Playable(l.id, l, Content.catalog());
+    }
+
+    /// The encoded route of the city level `levelId`, or null when it is not
+    /// one.
+    public static synchronized String citySpec(String levelId) {
+        CityRoute r = levelId == null ? null : CITIES.get(levelId);
+        return r == null ? null : r.encode();
+    }
+
+    /// The minimap line of the city level `levelId`, or null.
+    public static synchronized CityPath cityPath(String levelId) {
+        return levelId == null ? null : PATHS.get(levelId);
+    }
+
     /// The level a replay or race calls `ref`, or null when its pack is not
     /// here yet (see [#packOf]).
     public static synchronized Playable resolve(String ref) {
         if (ref == null) {
             return null;
+        }
+        if (ref.startsWith(CityRoute.ID_PREFIX)) {
+            CityRoute r = CITIES.get(ref);
+            return r == null ? null : city(r, null);
         }
         if (ref.indexOf('@') < 0) {
             return official(ref);

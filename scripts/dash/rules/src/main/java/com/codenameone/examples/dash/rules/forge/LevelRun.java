@@ -53,13 +53,24 @@ public final class LevelRun {
         if (level == null) {
             throw new IllegalArgumentException("no level " + levelId);
         }
+        Catalog catalog = Samples.OFFICIAL_ID.equals(pack.id) ? Content.catalog() : pack.catalog();
+        return verify(level, catalog, claimed);
+    }
+
+    /// Plays `claimed` on `level`, a level the caller built itself -- a city
+    /// route, rebuilt from its spec. The same checks as for a pack's level;
+    /// that the replay names this level is the caller's to check, since a
+    /// pack's level is named by a [ContentRef].
+    public static Run verify(LevelDef level, Catalog catalog, Replay claimed) {
+        if (!RulesVersion.ID.equals(claimed.rulesVersion())) {
+            throw new IllegalArgumentException("recorded under other rules");
+        }
         if (level.contentHash() != claimed.levelHash()) {
             throw new IllegalArgumentException("the level changed since this run");
         }
         if (claimed.runners() != 1) {
             throw new IllegalArgumentException("a submitted run has one runner");
         }
-        Catalog catalog = Samples.OFFICIAL_ID.equals(pack.id) ? Content.catalog() : pack.catalog();
         Run run = claimed.play(level, catalog);
         if (!run.over()) {
             throw new IllegalArgumentException("the run did not end");

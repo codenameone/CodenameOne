@@ -20,6 +20,7 @@ package com.codenameone.examples.dash.forge;
 
 import com.codename1.backend.annotations.Component;
 import com.codenameone.examples.dash.rules.Catalog;
+import com.codenameone.examples.dash.rules.CityRoute;
 import com.codenameone.examples.dash.rules.Content;
 import com.codenameone.examples.dash.rules.LevelDef;
 import com.codenameone.examples.dash.rules.forge.ContentPack;
@@ -61,7 +62,7 @@ public class Levels {
         }
         int slash = ref.indexOf('/');
         if (slash < 0) {
-            return Content.level(ref) == null ? null : ref;
+            return Content.level(ref) != null || isCity(ref) ? ref : null;
         }
         if (slash == 0 || slash == ref.length() - 1 || ref.indexOf('/', slash + 1) >= 0) {
             return null;
@@ -69,9 +70,28 @@ public class Levels {
         return ref;
     }
 
+    /// Whether `ref` is the id of a city route's level: [CityRoute#id]'s
+    /// shape. The route itself is only ever in a result, so the server has
+    /// boards for a route but cannot build its level from the id alone.
+    static boolean isCity(String ref) {
+        if (!ref.startsWith(CityRoute.ID_PREFIX) || ref.length() == CityRoute.ID_PREFIX.length()
+                || ref.length() > CityRoute.ID_PREFIX.length() + 16) {
+            return false;
+        }
+        for (int i = CityRoute.ID_PREFIX.length(); i < ref.length(); i++) {
+            char c = ref.charAt(i);
+            if (!(c >= '0' && c <= '9' || c >= 'a' && c <= 'f')) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// The level `ref` names, or null -- for a city route too, whose level is
+    /// built from a route the server does not keep.
     public Resolved resolve(String ref) throws IOException {
         String r = normalize(ref);
-        if (r == null) {
+        if (r == null || isCity(r)) {
             return null;
         }
         int slash = r.indexOf('/');

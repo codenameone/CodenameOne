@@ -161,7 +161,7 @@ class ForgeTest {
     @Test
     void aRunPaysForStarsTheServerSawOnceAndEntersTheBoard() throws Exception {
         String who = Api.player(accounts, "forge-hero");
-        Replay run = Runs.bot(Content.tutorial(), Content.catalog(), 21, 99);
+        Replay run = Runs.bot(Content.tutorial(), Content.catalog(), 1L, 99);
         String replay = run.encode();
         String body = replayBody(replay);
         Map first = Api.json(mvc, Api.as(Api.body(post("/api/forge/results"), body), who));

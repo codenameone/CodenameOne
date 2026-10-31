@@ -149,9 +149,10 @@ player hit, simply doesn't reproduce:
 include::../../scripts/dash/backend/src/main/java/com/codenameone/examples/dash/forge/Forge.java[tag=dash-forge-result,indent=0]
 ----
 
-The verified run is then entered on every board it qualifies for. The `all` board
-takes any seed; `week` and `day` count only the board's own seed, so everyone is
-running the same track there:
+The verified run is then entered on every board it qualifies for. The endless
+stretch of a level is built from the seed, so no board takes a seed the app picked
+for itself: `all` takes only the seeds the server hands out, and `week` and `day`
+count only the board's own seed, so everyone is running the same track there:
 
 [source,java]
 ----
@@ -226,6 +227,45 @@ include::../../scripts/dash/common/src/main/java/com/codenameone/examples/dash/f
 submitted. Publishing runs the validator the server runs too, and that includes
 sending the bot down the level: a level that the bot can't finish can't be
 published, so every published level can be beaten.
+
+[[dash-city-runs]]
+=== City runs
+
+*Run your city* on the levels screen opens a street map. The player taps a start
+and a finish, a routing service finds the way between them, and the route becomes
+a level: every street a stretch of track, every turn a corner taken on the side it
+turns to, with the next street's name called out before it. What lies between the
+corners is drawn from the game's own chunks, harder as the run goes on.
+
+The map is Codename One's `MapView`, which draws OpenStreetMap data itself on every
+platform, and the route comes from `Routing`. `CityForm` reduces the route to
+streets and turns (`CityForm.toRoute`), reading each turn off the geometry where
+two streets meet, and hands the result to the rules as a `CityRoute`:
+
+[source,java]
+----
+CityRoute route = new CityRoute("Old Harbour")
+        .leg(420, CityRoute.STRAIGHT, "Quay Street")
+        .leg(310, CityRoute.LEFT, "Rope Walk");
+LevelDef level = route.level();
+----
+
+`level()` is deterministic, so the server needs no map. A city run's result
+carries the encoded route next to its replay; the server builds the same level
+from it and plays the replay on it as it would any other. The level's id is a hash
+of the route, so each route has a board of its own, and editing a route into an
+easier one names a different level. City runs pay what a community level pays,
+from the same daily allowance.
+
+image::img/dash-city-route.png[A route picked on the street map,scaledwidth=30%]
+image::img/dash-city-run.png[The run down it with the route minimap,scaledwidth=30%]
+
+Before you ship this, point `Routing` at a routing server of your own:
+`Routing.setService(new OsrmRouteService("https://osrm.example.com"))`. The
+default is OSRM's public demo server, which is rate limited, has no service
+guarantee and routes for cars. The map data is OpenStreetMap's, whose licence
+asks for credit wherever it is shown; the city screen carries that line, and a
+reskin has to keep it.
 
 [[dash-moderation]]
 === Moderation

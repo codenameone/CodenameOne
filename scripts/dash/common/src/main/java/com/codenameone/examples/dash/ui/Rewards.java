@@ -73,6 +73,11 @@ public final class Rewards {
     /// Fetches the progress and celebrates what changed since the last fetch:
     /// levels gained and achievements unlocked by the run just played.
     public static void afterRun(final Runnable done) {
+        afterRun(done, null);
+    }
+
+    /// [#afterRun(Runnable)], celebrating on `host` when it is not null.
+    public static void afterRun(final Runnable done, final Host host) {
         final ProgressDto before = last;
         refresh(() -> {
             ProgressDto now = last;
@@ -90,27 +95,33 @@ public final class Rewards {
             int chests = Math.max(0, now.chests() - before.chests());
             if (now.level() > before.level() || !unlocked.isEmpty() || chests > 0) {
                 show(new RewardDto(now.level() > before.level() ? "Level up!" : "Run rewards", 0, 0,
-                        gainedXp, chests, now.level(), now.level() > before.level(), unlocked), done);
+                        gainedXp, chests, now.level(), now.level() > before.level(), unlocked), done, host);
             } else {
                 done.run();
             }
         });
     }
 
+    /// Somewhere other than a dialog to show a card: the run screen lays it
+    /// over its own scene, because a dialog over the GPU view captures the
+    /// form behind it and the 3D scene is not in that capture -- the card
+    /// sat on flat grey.
+    public interface Host {
+        /// Shows `card` and answers what takes it away again.
+        Runnable open(Component card);
+    }
+
     /// A reward the server just granted, shown with the hero cheering.
     public static void show(RewardDto r, final Runnable done) {
+        show(r, done, null);
+    }
+
+    /// [#show(RewardDto, Runnable)] on `host`, or in a dialog when it is null.
+    public static void show(RewardDto r, final Runnable done, Host host) {
         Telemetry.screen(r.levelUp() ? "levelUp" : "reward");
-        final Dialog d = new Dialog(BoxLayout.y());
+        final Container d = new Container(BoxLayout.y());
         d.setName("rewardDialog");
-        d.setDialogUIID("RewardDialog");
-        d.getContentPane().setUIID("RewardBody");
-        d.getTitleComponent().setUIID("Container");
-        // A fade, not the pulsate transition: pulsate scales a snapshot of the
-        // dialog whose rounded corners were captured opaque, so it spun in on
-        // a white box.
-        d.setTransitionInAnimator(CommonTransitions.createFade(250));
-        d.setTransitionOutAnimator(CommonTransitions.createFade(200));
-        d.setDisposeWhenPointerOutOfBounds(false);
+        d.setUIID(host == null ? "RewardBody" : "RewardCard");
         // Wraps rather than truncating "Training co...".
         SpanLabel title = Ui.text(r.title(), r.levelUp() ? "LevelUpTitle" : "RewardTitle");
         title.setTextBlockAlign(Component.CENTER);
@@ -151,21 +162,38 @@ public final class Rewards {
                 d.add(FlowLayout.encloseCenter(l));
             }
         }
+        final Runnable[] close = new Runnable[1];
         Button collect = Ui.primary("Collect", "collectReward", e -> {
-            d.dispose();
+            close[0].run();
             Session.refreshUser(() -> Ui.later(done), (s, m) -> Ui.later(done));
         });
         d.add(collect);
-        // A scrolling body: showPacked clamped the height
-        // first, and the last child -- the button -- absorbed the shortfall.
-        d.getContentPane().setScrollableY(true);
         // A wrapping title packs to its narrowest, so an empty strut gives the
         // card its width.
         Label strut = new Label("", "Container");
         strut.setPreferredW(Math.min(CN.convertToPixels(70), CN.getDisplayWidth() - CN.convertToPixels(16)));
         strut.setPreferredH(1);
         d.add(strut);
-        d.showPacked(BorderLayout.CENTER, true);
+        if (host != null) {
+            close[0] = host.open(d);
+            return;
+        }
+        final Dialog dlg = new Dialog(new BorderLayout());
+        dlg.setDialogUIID("RewardDialog");
+        dlg.getContentPane().setUIID("Container");
+        dlg.getTitleComponent().setUIID("Container");
+        // A fade, not the pulsate transition: pulsate scales a snapshot of the
+        // dialog whose rounded corners were captured opaque, so it spun in on
+        // a white box.
+        dlg.setTransitionInAnimator(CommonTransitions.createFade(250));
+        dlg.setTransitionOutAnimator(CommonTransitions.createFade(200));
+        dlg.setDisposeWhenPointerOutOfBounds(false);
+        // A scrolling body: showPacked clamped the height first, and the last
+        // child -- the button -- absorbed the shortfall.
+        dlg.getContentPane().setScrollableY(true);
+        dlg.add(BorderLayout.CENTER, d);
+        close[0] = dlg::dispose;
+        dlg.showPacked(BorderLayout.CENTER, true);
     }
 
     /// A short line under a celebration: how far the player is from the next

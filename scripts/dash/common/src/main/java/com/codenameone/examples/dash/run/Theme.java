@@ -188,7 +188,7 @@ public final class Theme {
     }
 
     /// The face of the causeway the track stands on in the side view: dark
-    /// panels with a lit rail along the top and a lamp at each joint.
+    /// panels with a lit rail along the top and a strip light on each.
     static int[] deckTexture(Theme t) {
         int n = 64;
         int[] px = new int[n * n];
@@ -203,7 +203,10 @@ public final class Theme {
                     c = mix(t.rail, body, 0.55f);
                 } else if (x % 16 == 0) {
                     c = shade(body, 0.6f);
-                } else if (x % 16 > 6 && x % 16 < 10 && y > 9 && y < 13) {
+                } else if (y == 10 && x % 16 > 3 && x % 16 < 13) {
+                    // A strip light per panel: a thin line stays crisp when
+                    // the texture stretches over a tall deck, a square lamp
+                    // blurred into a blob.
                     c = mix(t.window, 0xffffffff, 0.3f);
                 }
                 px[y * n + x] = c;

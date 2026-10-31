@@ -195,11 +195,16 @@ public final class Ui {
 
     /// The trophies, coins and gems strip at the top of the menus.
     public static Container wallet(PlayerDto p) {
+        return wallet(p.trophies(), p.coins(), p.gems());
+    }
+
+    /// The same bar for balances fresher than the signed-in player's.
+    public static Container wallet(int trophies, int coins, int gems) {
         Container c = new Container(new GridLayout(1, 3));
         c.setUIID("WalletBar");
-        c.add(stat(FontImage.MATERIAL_EMOJI_EVENTS, p.trophies(), "Trophies"));
-        c.add(stat(FontImage.MATERIAL_MONETIZATION_ON, p.coins(), "Coins"));
-        c.add(stat(FontImage.MATERIAL_DIAMOND, p.gems(), "Gems"));
+        c.add(stat(FontImage.MATERIAL_EMOJI_EVENTS, trophies, "Trophies"));
+        c.add(stat(FontImage.MATERIAL_MONETIZATION_ON, coins, "Coins"));
+        c.add(stat(FontImage.MATERIAL_DIAMOND, gems, "Gems"));
         return c;
     }
 

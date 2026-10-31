@@ -64,6 +64,10 @@ public final class ForgeHome {
             for (final PackSummaryDto p : list) {
                 f.add(row(p, "mine".equals(scope)));
             }
+            if ("official".equals(scope)) {
+                f.add(Ui.text("Levels players make show up under Popular and New. "
+                        + "Make your own with Create a pack.", "Empty"));
+            }
             f.revalidate();
         }), Ui::failed));
         f.show();
@@ -83,6 +87,12 @@ public final class ForgeHome {
             b.setTextLine3(p.version() == 0 ? "Draft, not published" : "Version " + p.version() + ", "
                     + p.status() + (p.pendingAssets() ? ", files waiting for review" : ""));
         }
+        // A lit view of a track as the pack's cover, its theme picked by the
+        // pack's id so a pack keeps its cover.
+        String[] themes = {"neon", "ember", "daybreak"};
+        int pick = (p.id().hashCode() & 0x7fffffff) % themes.length;
+        int th = com.codename1.ui.CN.convertToPixels(12);
+        b.setIcon(com.codenameone.examples.dash.ui.Kit.thumb(themes[pick], th * 3 / 5, th));
         b.setName("pack-" + p.id());
         b.addActionListener(e -> {
             if (mine && p.version() == 0) {

@@ -20,10 +20,12 @@ package com.codenameone.examples.dash.ui;
 
 import com.codename1.ui.CN;
 import com.codename1.ui.Container;
+import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.GridLayout;
 import com.codenameone.examples.dash.api.PlayerDto;
 import com.codenameone.examples.dash.api.RunnerDto;
@@ -46,15 +48,27 @@ public final class RunnerForm {
         final Form f = Ui.form("Runner", "runner");
         Ui.back(f, Nav::home);
         final Container grid = new Container(new GridLayout(1, RUNNERS.length));
-        f.add(Ui.centeredColumn(Ui.column(grid)));
-        fill(f, grid);
+        final Container stage = new Container(BoxLayout.y());
+        Container col = Ui.column(stage, grid);
+        col.add(Ui.secondary("More runners and trails in the shop", "runnerShop", e -> ShopForm.show()));
+        f.add(Ui.centeredColumn(col));
+        fill(f, grid, stage);
         f.show();
     }
 
-    private static void fill(final Form f, final Container grid) {
+    private static void fill(final Form f, final Container grid, final Container stage) {
         grid.removeAll();
+        stage.removeAll();
         PlayerDto p = Session.user();
         String current = p == null || p.runner() == null ? RUNNERS[0] : p.runner();
+        // The runner in play, large and lit, over the line-up to choose from.
+        for (int i = 0; i < RUNNERS.length; i++) {
+            if (RUNNERS[i].equals(current)) {
+                stage.add(Kit.burst(Portraits.figure(Portraits.of(current), CN.convertToPixels(30)), 0x29e0ff));
+                Label name = new Label(NAMES[i], "RunnerStageName");
+                stage.add(FlowLayout.encloseCenter(name));
+            }
+        }
         for (int i = 0; i < RUNNERS.length; i++) {
             final String id = RUNNERS[i];
             boolean owned = i == 0 || p != null && p.owned() != null && p.owned().contains(id);
@@ -64,11 +78,15 @@ public final class RunnerForm {
             card.add(BorderLayout.CENTER, new Label(Portraits.figure(Portraits.of(id), CN.convertToPixels(22)),
                     "Container"));
             Container under = new Container(BoxLayout.y());
-            under.add(new Label(NAMES[i], "QuestTitle"));
+            under.add(FlowLayout.encloseCenter(new Label(NAMES[i], "QuestTitle")));
+            // Every card ends in the same place: a chip the size of a button
+            // on the one in play, so the three line up.
             if (id.equals(current)) {
-                under.add(new Label("Running", "Claimed"));
+                Label on = new Label("In play", "RunnerChip");
+                on.setMaterialIcon(FontImage.MATERIAL_CHECK_CIRCLE, 3f);
+                under.add(on);
             } else if (owned) {
-                under.add(Ui.button("Choose", "ClaimButton", "choose-" + id, e -> choose(f, grid, id)));
+                under.add(Ui.button("Choose", "CardAction", "choose-" + id, e -> choose(f, grid, stage, id)));
             } else {
                 under.add(Ui.button("Shop", "CardAction", "shop-" + id, e -> ShopForm.show()));
             }
@@ -78,10 +96,10 @@ public final class RunnerForm {
         f.revalidate();
     }
 
-    private static void choose(final Form f, final Container grid, final String id) {
+    private static void choose(final Form f, final Container grid, final Container stage, final String id) {
         Api.game().saveRunner(new RunnerDto(id), Net.to(r -> Session.refreshUser(() -> Ui.later(() -> {
             Telemetry.runnerChosen(id);
-            fill(f, grid);
+            fill(f, grid, stage);
         }), Ui::failed), Ui::failed));
     }
 }

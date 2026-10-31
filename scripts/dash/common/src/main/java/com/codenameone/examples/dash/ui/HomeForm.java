@@ -235,9 +235,9 @@ public final class HomeForm {
                 });
                 c.add(b);
             } else {
-                Label l = new Label("Empty", "CrateSlotEmpty");
+                Label l = new Label("Win one", "CrateSlotEmpty");
                 l.setTextPosition(Component.BOTTOM);
-                l.setIcon(FontImage.createMaterial(FontImage.MATERIAL_LOCK, "CrateSlotEmpty", 3.6f));
+                l.setIcon(FontImage.createMaterial(FontImage.MATERIAL_ADD_CIRCLE_OUTLINE, "CrateSlotEmpty", 3.6f));
                 c.add(l);
             }
         }

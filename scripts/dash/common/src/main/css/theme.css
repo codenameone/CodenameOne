@@ -40,6 +40,10 @@
     dialogTransitionOut: "fade";
     dlgCommandGridBool: false;
     dlgButtonCommandUIID: "DialogAction";
+    /* Modals dim the game to a deep navy, not the default grey. */
+    tintColor: "d0060818";
+    /* Lists scroll by touch; the bar is noise on a phone. */
+    scrollVisibleBool: false;
     /* tag::dash-palette[] */
     --bg: #0b0e1d;
     --surface: #151a33;
@@ -102,10 +106,15 @@ Logo {
     margin: 4mm 0 0 0;
 }
 
+/* A dark pill, so the line reads over the skyline and the sun. */
 Tagline {
-    color: var(--text-muted);
-    font-size: 3mm;
+    background-color: rgba(11, 14, 29, 0.78);
+    color: var(--ice);
+    font-family: "native:MainBold";
+    font-size: 2.8mm;
     text-align: center;
+    border-radius: 3mm;
+    padding: 0.8mm 3mm;
     margin: 0 0 4mm 0;
 }
 
@@ -228,22 +237,13 @@ NameField {
     color: var(--ink);
     font-family: "native:MainBold";
     font-size: 5mm;
-    text-align: center;
-    padding: 2.5mm;
+    /* Left, like every other field: a centred native editor put the caret
+       at one edge and the text at the other while typing. */
+    text-align: left;
+    padding: 2.5mm 3mm;
     margin: 1mm 0;
 }
 
-NamePreview {
-    background-color: var(--violet);
-    border: 0.4mm solid var(--violet-glow);
-    border-radius: 3mm;
-    color: var(--text);
-    font-family: "native:MainBold";
-    font-size: 4.5mm;
-    text-align: center;
-    padding: 1.5mm 5mm;
-    margin: 2mm;
-}
 /* end::dash-name-field-css[] */
 
 WalletBar {
@@ -317,14 +317,17 @@ RunClock {
 
 /* end::dash-elixir-css[] */
 
+/* Quick chat in a race: glassy chips with a cyan rim, inset from the edges. */
 EmoteButton {
-    background-color: var(--bg);
+    background-color: rgba(21, 26, 51, 0.85);
+    border: 0.3mm solid var(--cyan);
     border-radius: 3mm;
-    color: var(--text);
-    font-size: 2.6mm;
+    color: var(--ice);
+    font-family: "native:MainBold";
+    font-size: 2.4mm;
     text-align: center;
-    padding: 1mm;
-    margin: 0.5mm;
+    padding: 0.9mm 0.5mm;
+    margin: 0.5mm 0.8mm 1.5mm 0.8mm;
 }
 
 ChallengeCode {
@@ -610,6 +613,7 @@ LeagueName {
     color: var(--volt);
     font-family: "native:MainBold";
     font-size: 3.4mm;
+    margin: 1.6mm 0 0 0;
     text-align: center;
 }
 
@@ -691,6 +695,30 @@ Claimed {
     color: var(--volt);
 }
 
+/* The runner in play: CardAction's box, so its card ends level with the
+   others' buttons. */
+RunnerChip {
+    background-color: rgba(212, 255, 58, 0.12);
+    border: 0.3mm solid var(--volt);
+    border-radius: 3mm;
+    color: var(--volt);
+    font-family: "native:MainBold";
+    font-size: 2.5mm;
+    text-align: center;
+    padding: 1.4mm 0.5mm;
+    margin: 2mm 0.8mm 0 0.8mm;
+}
+
+RunnerStageName {
+    background-color: transparent;
+    color: var(--text);
+    font-family: "native:MainBlack";
+    font-size: 5mm;
+    text-align: center;
+    padding: 0 0 3mm 0;
+    margin: 0;
+}
+
 NavTile {
     background: linear-gradient(to bottom, var(--edge-light), var(--edge));
     border: 0.4mm solid var(--edge);
@@ -712,6 +740,14 @@ RewardDialog {
     border: 0.8mm solid var(--volt);
     border-radius: 4mm;
     padding: 2mm 3mm;
+}
+
+RewardCard {
+    background: linear-gradient(to bottom, #222a5a, var(--bg));
+    border: 0.8mm solid var(--volt);
+    border-radius: 4mm;
+    padding: 2mm 3mm;
+    margin: 2mm;
 }
 
 RewardBody {
@@ -915,7 +951,7 @@ ForgeCheck {
 }
 
 ForgeHelp, ForgeHelpText, ForgeByline {
-    color: var(--edge-light);
+    color: var(--text-muted);
     font-size: 2.6mm;
     text-align: left;
     padding: 0.5mm 2mm;
@@ -1281,6 +1317,11 @@ DeskChartC {
 
 /* ---- Run HUD: drawn over the 3D view, so every piece keeps its own
    translucent backing and stays readable against bright scenery. ---- */
+EmoteBar {
+    background-color: transparent;
+    padding: 0 2mm 3mm 2mm;
+    margin: 0;
+}
 HudBar {
     background: linear-gradient(to bottom, rgba(5, 7, 18, 0.75), rgba(5, 7, 18, 0));
     padding: 1.5mm 2mm 4mm 2mm;
@@ -1299,8 +1340,12 @@ HudDistance {
     text-align: center;
 }
 HudScore {
-    color: var(--text-muted);
+    background-color: rgba(10, 14, 32, 0.72);
+    border: 0.25mm solid #3a4380;
+    border-radius: 3mm;
+    color: var(--ice);
     text-align: center;
+    padding: 0.4mm 2.2mm;
 }
 HudCoins {
     background-color: rgba(10, 14, 32, 0.8);
@@ -1439,9 +1484,9 @@ RailTile {
     border-radius: 3.5mm;
     color: var(--text);
     font-family: "native:MainBold";
-    font-size: 1.9mm;
+    font-size: 1.8mm;
     text-align: center;
-    padding: 0.8mm 0.4mm 0.6mm 0.4mm;
+    padding: 0.8mm 1.1mm 0.6mm 1.1mm;
     margin: 0.5mm 0;
 }
 
@@ -1494,9 +1539,13 @@ NavItemOn {
 
 /* ---- End of a run ---- */
 
-ResultDialog {
-    background-color: transparent;
-    padding: 0;
+/* The veil a result or reward card sits on, over the scene where the run
+   ended. opacity sets the background's transparency only. */
+RunDim {
+    background-color: #060818;
+    opacity: 0.6;
+    padding: 6mm 3mm;
+    margin: 0;
 }
 
 ResultCard {
@@ -1559,6 +1608,59 @@ LevelThumb {
     margin: 0;
 }
 
+CityIcon {
+    background-color: #1f2a5e;
+    border-radius: 3mm;
+    color: var(--volt);
+    text-align: center;
+    padding: 2mm;
+    margin: 0 2mm 0 0;
+}
+
+CityCard {
+    background: linear-gradient(to bottom, #1d2350, #0b0e1d);
+    border: 0.4mm solid var(--violet-glow);
+    border-radius: 5mm;
+    padding: 3mm;
+    margin: 2mm;
+}
+
+CityStatus {
+    background-color: transparent;
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 3mm;
+    text-align: center;
+    padding: 0 0 2mm 0;
+    margin: 0;
+}
+
+MapCredit {
+    background-color: rgba(255, 255, 255, 0.8);
+    color: #333333;
+    font-family: "native:MainRegular";
+    font-size: 1.7mm;
+    padding: 0.3mm 1mm;
+    margin: 0;
+}
+
+CityMinimap {
+    background-color: rgba(10, 14, 32, 0.72);
+    border: 0.25mm solid #3a4380;
+    border-radius: 3mm;
+    padding: 0;
+    margin: 1mm 0 0 0;
+}
+
+LevelLength {
+    background-color: transparent;
+    color: var(--text-muted);
+    font-family: "native:MainRegular";
+    font-size: 2.4mm;
+    padding: 0.4mm 0 0 0.6mm;
+    margin: 0;
+}
+
 LevelName {
     background-color: transparent;
     color: var(--text);
@@ -1575,7 +1677,7 @@ TagChip {
     font-family: "native:MainBold";
     font-size: 2.2mm;
     padding: 0.4mm 1.6mm;
-    margin: 0.5mm 0;
+    margin: 0.5mm 1mm 0.5mm 0;
 }
 
 PlayRound {
@@ -1657,4 +1759,30 @@ LevelBadge {
     font-size: 2.2mm;
     padding: 0.3mm 1.4mm;
     margin: 0.4mm 0;
+}
+
+/* The sign-in's server switch: a developer setting, kept small and quiet. */
+/* The invite code, on a card of its own with a caption over it. */
+InviteCard {
+    background: linear-gradient(to bottom, var(--surface-light), var(--surface));
+    border: 0.3mm solid var(--edge-light);
+    border-radius: 3mm;
+    padding: 2mm;
+    margin: 1.5mm 0;
+}
+
+InviteCaption {
+    background-color: transparent;
+    color: var(--text-muted);
+    font-family: "native:MainBold";
+    font-size: 2mm;
+    padding: 0;
+    margin: 0;
+}
+
+/* A MultiButton's emblem (the stars on a score row): no plate behind it. */
+Emblem {
+    background-color: transparent;
+    padding: 0 0 0 1mm;
+    margin: 0;
 }

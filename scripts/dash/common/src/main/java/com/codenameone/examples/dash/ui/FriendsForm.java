@@ -60,13 +60,19 @@ public final class FriendsForm {
     }
 
     private static void fillInvite(Container col, final InviteDto mine) {
+        // The crew they could race, in front: who an invite brings in.
+        col.add(SignInForm.heroes());
         col.add(Ui.label("Invite a friend", "SectionTitle"));
         col.add(Ui.text("Your friend starts with " + mine.friendCoins() + " coins. When they have played "
                 + "their first race, you get " + mine.inviterCoins() + " coins, for up to "
                 + mine.maxRewarded() + " friends.", "ForgeHelpText"));
         Label code = Ui.label(mine.code(), "InviteCode");
         code.setName("inviteCode");
-        col.add(Ui.centered(code));
+        Container codeCard = new Container(BoxLayout.y());
+        codeCard.setUIID("InviteCard");
+        codeCard.add(Ui.centered(Ui.label("YOUR INVITE CODE", "InviteCaption")));
+        codeCard.add(Ui.centered(code));
+        col.add(codeCard);
         col.add(Ui.primary("Invite friends", "inviteButton", e -> Friends.share(mine)));
         Label count = Ui.label(mine.joined() + " joined, " + mine.rewarded() + " rewarded", "LeagueName");
         count.setName("inviteCount");

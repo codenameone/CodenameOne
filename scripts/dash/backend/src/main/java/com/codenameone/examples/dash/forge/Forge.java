@@ -57,6 +57,8 @@ import com.codenameone.examples.dash.rules.Run;
 import com.codenameone.examples.dash.rules.Replay;
 import com.codenameone.examples.dash.rules.forge.AssetRef;
 import com.codenameone.examples.dash.rules.forge.ContentPack;
+import com.codenameone.examples.dash.rules.CityRoute;
+import com.codenameone.examples.dash.rules.Content;
 import com.codenameone.examples.dash.rules.forge.ContentRef;
 import com.codenameone.examples.dash.rules.forge.GlbInspector;
 import com.codenameone.examples.dash.rules.Json;
@@ -411,14 +413,18 @@ public class Forge {
     ///
     /// The seed is the app's choice, so a determined player could search for
     /// a lucky one offline. Stars are capped by what the level can pay, and
-    /// community levels by a daily total, which is what keeps that harmless.
+    /// community levels by a daily total, which is what keeps that harmless;
+    /// the boards take only the seeds the app was handed ([Scores#fairSeed]).
     @Transactional(rollbackFor = IOException.class)
-    public LevelOutcomeDto result(String username, String encoded) throws IOException {
+    public LevelOutcomeDto result(String username, String encoded, String city) throws IOException {
         Replay replay;
         try {
             replay = Replay.decode(encoded);
         } catch (RuntimeException e) {
             throw new ResponseStatusException(400, "That is not a run replay");
+        }
+        if (replay.levelId().startsWith(CityRoute.ID_PREFIX)) {
+            return cityResult(username, replay, city);
         }
         ContentRef ref = replay.levelId().indexOf('@') < 0 ? null : ContentRef.parse(replay.levelId());
         String packId = ref == null ? Samples.OFFICIAL_ID : ref.pack;
@@ -438,24 +444,9 @@ public class Forge {
         }
         int won = played.stars(0);
         int score = played.runner(0).score();
-
-        String key = Ids.sha256(username + "|" + p.getId() + "|" + levelId);
-        LevelStars row = stars.findById(key);
-        if (row == null) {
-            row = new LevelStars();
-            row.setId(key);
-            row.setUsername(username);
-            row.setPackId(p.getId());
-            row.setLevelId(levelId);
-            stars.insert(row);
-        }
-        row.setPlays(row.getPlays() + 1);
-        row.setStars(Math.max(row.getStars(), won));
-        row.setBest(Math.max(row.getBest(), score));
-        int newStars = Math.max(0, won - row.getPaidStars());
-        row.setPaidStars(row.getPaidStars() + newStars);
-        row.setUpdatedAt(Instant.now());
-        stars.save(row);
+        int paidBefore = paidStars(username, p.getId(), levelId);
+        LevelStars row = record(username, p.getId(), levelId, won, score);
+        int newStars = row.getPaidStars() - paidBefore;
         p.setPlays(p.getPlays() + 1);
         packs.save(p);
 
@@ -474,6 +465,71 @@ public class Forge {
         int rank = scores.submit(username, ref == null ? levelId : packId + "/" + levelId, replay, played);
         RewardDto reward = progression.levelReward(username, level.name, coins, xp);
         return new LevelOutcomeDto(p.getId(), levelId, won, score, row.getBest(), rank, reward);
+    }
+
+    /// A city run. The result carries the route, and the server builds the
+    /// level from it ([CityRoute#level]) rather than trusting anything about
+    /// it: the level's id is a hash of the route, so a route edited to an
+    /// easier one names another level, with a board of its own. Rewards are
+    /// a community level's, from the same daily allowance.
+    private LevelOutcomeDto cityResult(String username, Replay replay, String spec) throws IOException {
+        CityRoute route;
+        try {
+            route = CityRoute.decode(spec);
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(400, "That is not a city route");
+        }
+        LevelDef level = route.level();
+        if (!level.id.equals(replay.levelId())) {
+            throw new ResponseStatusException(400, "That run is of another route");
+        }
+        Run played;
+        try {
+            played = LevelRun.verify(level, Content.catalog(), replay);
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(400, e.getMessage());
+        }
+        int won = played.stars(0);
+        int score = played.runner(0).score();
+        int paidBefore = paidStars(username, CITY_PACK, level.id);
+        LevelStars row = record(username, CITY_PACK, level.id, won, score);
+        int newStars = row.getPaidStars() - paidBefore;
+        int coins = spendDailyAllowance(username, COMMUNITY_LEVEL_COINS * newStars / 3);
+        int xp = COMMUNITY_LEVEL_XP * newStars / 3;
+        int rank = scores.submit(username, level.id, replay, played);
+        RewardDto reward = progression.levelReward(username, level.name, coins, xp);
+        return new LevelOutcomeDto(CITY_PACK, level.id, won, score, row.getBest(), rank, reward);
+    }
+
+    /// The pack id the stars of city runs are kept under; no pack has it.
+    static final String CITY_PACK = "city";
+
+    private int paidStars(String username, String packId, String levelId) throws IOException {
+        LevelStars row = stars.findById(Ids.sha256(username + "|" + packId + "|" + levelId));
+        return row == null ? 0 : row.getPaidStars();
+    }
+
+    /// Counts a play of a level and keeps the best stars and score; the
+    /// stars not paid for before are marked paid.
+    private LevelStars record(String username, String packId, String levelId, int won, int score)
+            throws IOException {
+        String key = Ids.sha256(username + "|" + packId + "|" + levelId);
+        LevelStars row = stars.findById(key);
+        if (row == null) {
+            row = new LevelStars();
+            row.setId(key);
+            row.setUsername(username);
+            row.setPackId(packId);
+            row.setLevelId(levelId);
+            stars.insert(row);
+        }
+        row.setPlays(row.getPlays() + 1);
+        row.setStars(Math.max(row.getStars(), won));
+        row.setBest(Math.max(row.getBest(), score));
+        row.setPaidStars(Math.max(row.getPaidStars(), won));
+        row.setUpdatedAt(Instant.now());
+        stars.save(row);
+        return row;
     }
 
     @Transactional(readOnly = true)

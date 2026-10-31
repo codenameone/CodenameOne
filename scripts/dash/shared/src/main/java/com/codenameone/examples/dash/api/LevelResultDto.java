@@ -21,7 +21,9 @@ package com.codenameone.examples.dash.api;
 import com.codename1.annotations.Mapped;
 
 /// A finished solo run: the replay the app recorded. The server plays it again
-/// before it believes the score.
+/// before it believes the score. `city` is the encoded route of a city run
+/// (`CityRoute.encode`), from which the server builds the level itself; null
+/// for any other level.
 @Mapped
-public record LevelResultDto(String replay) {
+public record LevelResultDto(String replay, String city) {
 }

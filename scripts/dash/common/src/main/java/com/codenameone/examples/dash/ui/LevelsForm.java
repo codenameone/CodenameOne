@@ -22,6 +22,8 @@ import com.codename1.ui.Button;
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.FontImage;
@@ -57,7 +59,6 @@ public final class LevelsForm {
         final Container list = Ui.column();
         f.add(Ui.centeredColumn(list));
         fill(list, new HashMap<String, Integer>());
-        f.add(Ui.primary("Community levels", "communityButton", e -> ForgeHome.show()));
         f.show();
         Api.forge().stars(Samples.OFFICIAL_ID, Net.to(stars -> Ui.later(() -> {
             fill(list, byLevel(stars));
@@ -76,34 +77,67 @@ public final class LevelsForm {
     private static void fill(Container list, Map<String, Integer> stars) {
         list.removeAll();
         for (final LevelDef l : Content.levels()) {
-            // A card per level: a lit view of its track, its name, what kind
-            // of run it is and the stars won, a round play button, and the
-            // two ways to compete underneath.
-            Container card = new Container(new BorderLayout());
-            card.setUIID("LevelCard");
-            card.setName("level-" + l.id);
-            int th = CN.convertToPixels(17);
-            card.add(BorderLayout.WEST, new Label(Kit.thumb(l.theme, th * 3 / 5, th), "LevelThumb"));
-            Container text = new Container(BoxLayout.y());
-            text.add(new Label(l.name, "LevelName"));
-            Label kind = new Label(describe(l), "TagChip");
-            text.add(FlowLayout.encloseIn(kind));
-            Integer s = stars.get(l.id);
-            text.add(Kit.stars(s == null ? 0 : s.intValue(), 3, 4.5f));
-            card.add(BorderLayout.CENTER, text);
             final Levels.Playable p = Levels.official(l.id);
-            Button play = Ui.button("", "PlayRound", "play-" + l.id,
-                    e -> RunForm.solo(p, week(l.id), "solo", null, LevelsForm::show));
-            play.setMaterialIcon(FontImage.MATERIAL_PLAY_ARROW, 4.6f);
-            card.add(BorderLayout.EAST, FlowLayout.encloseCenterMiddle(play));
-            Button ghost = Ui.button("Race the best", "CardAction", "ghost-" + l.id, e -> ghost(p));
-            Ui.glyph(ghost, FontImage.MATERIAL_DIRECTIONS_RUN, 3.2f);
-            Button scores = Ui.button("Scores", "CardAction", "scores-" + l.id,
+            Integer s = stars.get(l.id);
+            Container card = card(l, s == null ? 0 : s.intValue(),
+                    e -> RunForm.solo(p, week(l.id), "solo", null, LevelsForm::show),
+                    "Race the best", FontImage.MATERIAL_DIRECTIONS_RUN, e -> ghost(p),
                     e -> ScoresForm.show(l.id, LevelsForm::show));
-            Ui.glyph(scores, FontImage.MATERIAL_LEADERBOARD, 3.2f);
-            card.add(BorderLayout.SOUTH, GridLayout.encloseIn(2, ghost, scores));
             list.add(card);
         }
+        list.add(cityCard());
+        // In the list, so it scrolls up with the cards instead of sitting
+        // under the last one half off the screen.
+        list.add(Ui.primary("Community levels", "communityButton", e -> ForgeHome.show()));
+    }
+
+    /// A card per level: a lit view of its track, its name, what kind of run
+    /// it is and the stars won, a round play button, and the two ways to
+    /// compete underneath. The community levels of a pack use it too.
+    public static Container card(LevelDef l, int stars, ActionListener<ActionEvent> play, String compete,
+            char competeIcon, ActionListener<ActionEvent> onCompete, ActionListener<ActionEvent> onScores) {
+        Container card = new Container(new BorderLayout());
+        card.setUIID("LevelCard");
+        card.setName("level-" + l.id);
+        int th = CN.convertToPixels(17);
+        card.add(BorderLayout.WEST, new Label(Kit.thumb(l.theme, th * 3 / 5, th), "LevelThumb"));
+        Container text = new Container(BoxLayout.y());
+        // The name wraps rather than truncates; the kind of run is a chip
+        // and the length a line of its own, since "2D into 3D" and a
+        // length side by side are wider than a narrow phone's card.
+        text.add(Ui.text(l.name, "LevelName"));
+        text.add(FlowLayout.encloseIn(new Label(view(l), "TagChip")));
+        text.add(new Label(l.length <= 0 ? "Endless" : l.length / 1000 + " m", "LevelLength"));
+        text.add(Kit.stars(stars, 3, 4.5f));
+        card.add(BorderLayout.CENTER, text);
+        Button go = Ui.button("", "PlayRound", "play-" + l.id, play);
+        go.setMaterialIcon(FontImage.MATERIAL_PLAY_ARROW, 3.8f);
+        card.add(BorderLayout.EAST, FlowLayout.encloseCenterMiddle(go));
+        Button versus = Ui.button(compete, "CardAction", "race-" + l.id, onCompete);
+        Ui.glyph(versus, competeIcon, 3.2f);
+        Button scores = Ui.button("Scores", "CardAction", "scores-" + l.id, onScores);
+        Ui.glyph(scores, FontImage.MATERIAL_LEADERBOARD, 3.2f);
+        card.add(BorderLayout.SOUTH, GridLayout.encloseIn(2, versus, scores));
+        return card;
+    }
+
+    /// The way into city runs: any two points on a real street map.
+    private static Container cityCard() {
+        Container card = new Container(new BorderLayout());
+        card.setUIID("LevelCard");
+        card.setName("cityCard");
+        Label icon = new Label("", "CityIcon");
+        icon.setMaterialIcon(FontImage.MATERIAL_MAP, 9f);
+        card.add(BorderLayout.WEST, icon);
+        Container text = new Container(BoxLayout.y());
+        text.add(Ui.text("Run your city", "LevelName"));
+        text.add(Ui.text("Pick a start and a finish on a street map. The streets become the track, "
+                + "every turn a corner.", "LevelLength"));
+        card.add(BorderLayout.CENTER, text);
+        Button go = Ui.button("", "PlayRound", "cityButton", e -> CityForm.show());
+        go.setMaterialIcon(FontImage.MATERIAL_PLAY_ARROW, 3.8f);
+        card.add(BorderLayout.EAST, FlowLayout.encloseCenterMiddle(go));
+        return card;
     }
 
     /// The week's leader on `p`, as a ghost on the same seed.
@@ -121,6 +155,11 @@ public final class LevelsForm {
 
     /// One line on what kind of level it is.
     public static String describe(LevelDef l) {
+        return view(l) + (l.length <= 0 ? " - endless" : " - " + l.length / 1000 + " m");
+    }
+
+    /// How the level is seen: "2D", "3D", or "2D into 3D".
+    static String view(LevelDef l) {
         boolean side = l.startView() == ViewMode.SIDE_2D;
         boolean turns = false;
         for (int i = 0; i < l.cues.size(); i++) {
@@ -128,7 +167,6 @@ public final class LevelsForm {
                 turns = true;
             }
         }
-        String view = side && turns ? "2D into 3D" : side ? "2D" : "3D";
-        return view + (l.length <= 0 ? ", endless" : ", " + l.length / 1000 + " m");
+        return side && turns ? "2D into 3D" : side ? "2D" : "3D";
     }
 }

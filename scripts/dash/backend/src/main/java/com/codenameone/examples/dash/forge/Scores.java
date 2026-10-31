@@ -76,8 +76,11 @@ public class Scores {
         this.pushes = pushes;
     }
 
+    /// Days since the epoch, UTC: the day number the app counts in too
+    /// (`LevelsForm.week`), so both derive the same weekly seed. Not
+    /// [Clock#dayOf], which answers the day's first millisecond.
     public static int today() {
-        return (int) Clock.dayOf(Clock.now());
+        return (int) (Clock.now() / Clock.DAY);
     }
 
     public static String weekBoard() {
@@ -103,9 +106,11 @@ public class Scores {
             return 0;
         }
         Runner r = played.runner(0);
-        int before = enter(ALL, level, p, replay, played);
-        if (before != NOT_BETTER) {
-            tellFriendsBeaten(p, level, before, r.score());
+        if (fairSeed(level, replay.seed(), played.level().contentHash())) {
+            int before = enter(ALL, level, p, replay, played);
+            if (before != NOT_BETTER) {
+                tellFriendsBeaten(p, level, before, r.score());
+            }
         }
         if (replay.seed() == Content.weeklySeed(today() / 7, level)) {
             enter(weekBoard(), level, p, replay, played);
@@ -116,6 +121,23 @@ public class Scores {
         Long above = scores.above(ALL, level, r.score());
         return above == null ? 1 : above.intValue() + 1;
     }
+
+    /// Whether `seed` is one the app was handed rather than one it picked.
+    /// The endless stretch of a level is built from the seed, so a board
+    /// that took any seed would let a player search offline for an easy
+    /// track. The app plays this or last week's seed (a run can straddle the
+    /// change), today's or yesterday's daily seed, a pack level's content
+    /// hash, or the fixed seed of the tutorial and the guest run.
+    static boolean fairSeed(String level, long seed, long contentHash) {
+        int week = today() / 7;
+        return seed == FIXED_SEED || seed == contentHash
+                || seed == Content.weeklySeed(week, level) || seed == Content.weeklySeed(week - 1, level)
+                || DAILY_LEVEL.equals(level)
+                        && (seed == Content.dailySeed(today()) || seed == Content.dailySeed(today() - 1));
+    }
+
+    /// The seed the tutorial and the guest run always play.
+    static final long FIXED_SEED = 1L;
 
     /// What [#enter] answers when the run is no better than the player's
     /// best on that board.

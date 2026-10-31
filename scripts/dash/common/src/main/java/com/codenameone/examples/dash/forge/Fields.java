@@ -107,6 +107,14 @@ public final class Fields {
         final int[] v = {Math.max(min, Math.min(max, value))};
         final Label shown = new Label(show(v[0], scale, unit), "ForgeValue");
         shown.setName(name);
+        // One width on every stepper, or the widest value this one can show
+        // if that is wider, so the + button stays put as the value grows and
+        // the steppers on a form line up.
+        String wide = show(max, scale, unit).length() >= show(min, scale, unit).length()
+                ? show(max, scale, unit) : show(min, scale, unit);
+        shown.setText(wide);
+        shown.setPreferredW(Math.max(shown.getPreferredW(), com.codename1.ui.CN.convertToPixels(19)));
+        shown.setText(show(v[0], scale, unit));
         Button less = new Button("-", "ForgeStep");
         Button more = new Button("+", "ForgeStep");
         less.setName(name + "-less");
@@ -133,6 +141,10 @@ public final class Fields {
         p.setSelectedString(options[Math.max(0, Math.min(options.length - 1, selected))]);
         p.setName(name);
         p.setUIID("ForgeField");
+        // A drop-down arrow at the end, so it reads as a choice, not as a
+        // field to type into.
+        p.setMaterialIcon(com.codename1.ui.FontImage.MATERIAL_ARROW_DROP_DOWN, 3.6f);
+        p.setTextPosition(com.codename1.ui.Component.LEFT);
         p.addActionListener(e -> {
             String s = p.getSelectedString();
             for (int i = 0; i < options.length; i++) {

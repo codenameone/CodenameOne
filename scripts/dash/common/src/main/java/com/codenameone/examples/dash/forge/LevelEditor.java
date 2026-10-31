@@ -93,7 +93,7 @@ public final class LevelEditor {
         f.add(Fields.stepper("Endless from", "levelProcedural", l.proceduralFrom / Track.UNIT, 0, 5000, 50, "m",
                 v -> l.proceduralFrom = v * Track.UNIT));
         f.add(Fields.help("Past \"endless from\" the track builds itself out of the game's chunks, harder "
-                + "every stretch. 0 keeps the whole level hand built."));
+                + "every stretch. At 0 m the whole level is hand built."));
         for (int s = 0; s < 3; s++) {
             final int star = s;
             f.add(Fields.stepper("Star " + (s + 1), "levelStar" + s, l.stars[s], 0, 100000, 25, "points",

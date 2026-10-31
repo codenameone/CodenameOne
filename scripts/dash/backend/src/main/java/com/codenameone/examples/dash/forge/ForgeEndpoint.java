@@ -110,7 +110,7 @@ public class ForgeEndpoint implements ForgeApiServer {
 
     @Override
     public LevelOutcomeDto result(LevelResultDto body) throws Exception {
-        return forge.result(Caller.name(), body == null ? null : body.replay());
+        return forge.result(Caller.name(), body == null ? null : body.replay(), body == null ? null : body.city());
     }
 
     @Override

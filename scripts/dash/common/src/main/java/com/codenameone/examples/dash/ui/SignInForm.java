@@ -20,13 +20,13 @@ package com.codenameone.examples.dash.ui;
 
 import com.codename1.ui.CN;
 import com.codename1.ui.Component;
+import com.codename1.ui.Button;
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
-import com.codenameone.examples.dash.AppConfig;
 import com.codenameone.examples.dash.net.Session;
 
 /// Signing in, and the way to the practice arena without an account.
@@ -43,23 +43,24 @@ public final class SignInForm {
         Container col = Ui.column();
         col.add(heroes());
         col.add(Ui.label("DASH", "Logo"));
-        col.add(Ui.label("Run. Race. Build.", "Tagline"));
+        col.add(FlowLayout.encloseCenter(Ui.label("Run. Race. Build.", "Tagline")));
         final TextField email = field("Email", TextField.EMAILADDR, "email");
         final TextField password = field("Password", TextField.PASSWORD, "password");
         // Fields and both buttons share one panel, so they share one width.
-        col.add(Ui.panel(email, password,
+        // The guest run and the server switch sit inside the panel too, so
+        // nothing reads over the backdrop's track.
+        Button guest = Ui.button("Try a level without an account", "LinkButton", "practiceButton",
+                e -> RunForm.solo(com.codenameone.examples.dash.run.Levels.official(
+                        com.codenameone.examples.dash.rules.Content.CAUSEWAY), 1L, "guest", null, SignInForm::show));
+        Container panel = Ui.panel(email, password,
                 Ui.primary("Sign in", "signInButton", e -> {
                     Session.signIn(email.getText().trim(), password.getText(),
                             () -> Ui.later(Nav::signedIn), Ui::failed);
                 }),
-                Ui.secondary("Create an account", "registerButton", e -> RegisterForm.show())));
-        col.add(Ui.button("Try a level without an account", "LinkButton", "practiceButton",
-                e -> RunForm.solo(com.codenameone.examples.dash.run.Levels.official(
-                        com.codenameone.examples.dash.rules.Content.CAUSEWAY), 1L, "guest", null, SignInForm::show)));
-        if (AppConfig.serverSwitchable()) {
-            col.add(Ui.button("Server: " + AppConfig.serverUrl(), "LinkButton", "serverButton",
-                    e -> SettingsForm.chooseServer()));
-        }
+                Ui.secondary("Create an account", "registerButton", e -> RegisterForm.show()), guest);
+        // Which server the app talks to is a setting, not something every
+        // player meets before signing in: it is under Settings, signed in.
+        col.add(panel);
         Container safe = Ui.centeredColumn(col);
         safe.setSafeArea(true);
         Container front = new Container(BoxLayout.yCenter());

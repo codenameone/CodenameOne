@@ -534,7 +534,7 @@ public class RunView extends GameView {
         // The city sinks as the camera swings out to the side, and rises
         // back as it swings in behind the runner; the chase camera never
         // strays more than a few metres off centre, so it sees none of it.
-        float sink = Math.max(0f, Math.min(1f, (cam.getEyeX() - 6f) / 24f));
+        float sink = Math.max(0f, Math.min(1f, (cam.getEyeX() - 6f) / 12f));
         float drop = DROP * sink;
         ground.setPosition(0f, -0.05f - drop, 0f);
         for (int i = 0; i < SEGMENTS; i++) {
@@ -548,7 +548,9 @@ public class RunView extends GameView {
             curbs[i * 2 + 1].setPosition(half + 0.12f, 0.12f, cz);
             for (int t = 0; t < TOWERS; t++) {
                 int k = i * TOWERS + t;
-                float h = 6f + jitter(seg, 31 + t) * 22f;
+                // Lower from the side, so the skyline stops short of the top
+                // of a portrait frame and leaves it sky.
+                float h = (6f + jitter(seg, 31 + t) * 22f) * (1f - 0.5f * sink);
                 float w = 3.5f + jitter(seg, 41 + t) * 4f;
                 float tx = -half - 7f - t * 9f - jitter(seg, 3 + t) * 5f;
                 float tz = -(seg * SEGMENT + jitter(seg, 5 + t) * SEGMENT);
@@ -566,7 +568,7 @@ public class RunView extends GameView {
                 beacons[k].setPosition(tx + (crowned ? (w - cw) * 0.25f : 0f), top + 0.5f - drop, tz);
                 Glow.face(beacons[k], cam);
             }
-            float mh = 14f + jitter(seg, 91) * 32f;
+            float mh = (14f + jitter(seg, 91) * 32f) * (1f - 0.4f * sink);
             float mw = 6f + jitter(seg, 92) * 8f;
             midTowers[i].setScale(mw, mh, mw);
             midTowers[i].setPosition(-half - 32f - jitter(seg, 93) * 12f, mh / 2f - drop,
@@ -809,18 +811,18 @@ public class RunView extends GameView {
     /// field of view, then the up vector's z (0 for upright, -1 looking down).
     private static void framing(ViewMode mode, float x, float y, float z, float[] out) {
         if (mode == ViewMode.SIDE_2D) {
-            // Off to the right, low, and tilted up: the runner a quarter in
-            // from the left with the track ahead in view, the track near the
-            // bottom edge over a strip of ground, and the skyline above.
-            // Close enough that several towers and the sky share the frame;
-            // from far out a portrait lens sees one facade and nothing else.
-            out[0] = 30f;
-            out[1] = 1.2f + y * 0.3f;
-            out[2] = -z - 3f;
+            // Off to the right, at the deck's height and tilted up: the runner
+            // a third in from the left with the track ahead in view, the deck
+            // in the lower third, and open sky over the skyline. A portrait
+            // frame is narrow along the track, so the camera stands well back
+            // to see enough of it ahead.
+            out[0] = 24f;
+            out[1] = 0.9f + y * 0.3f;
+            out[2] = -z - 1.3f;
             out[3] = 0f;
-            out[4] = 7.4f + y * 0.3f;
-            out[5] = -z - 3f;
-            out[6] = 40f;
+            out[4] = 4.6f + y * 0.3f;
+            out[5] = -z - 1.3f;
+            out[6] = 42f;
             out[7] = 0f;
         } else if (mode == ViewMode.TOP_DOWN) {
             out[0] = x * 0.4f;
