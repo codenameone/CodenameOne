@@ -14,6 +14,13 @@ def _u4(n):
 
 
 def _quote(s, ensure_ascii):
+    # Most keys and values need no escape: one scan, and the only string
+    # built is the quoted result.
+    for ch in s:
+        if ch < " " or ch == '"' or ch == "\\" or (ensure_ascii and ch > "~"):
+            break
+    else:
+        return '"' + s + '"'
     out = ['"']
     for ch in s:
         e = _ESC.get(ch)
@@ -77,7 +84,7 @@ class JSONEncoder:
 
     def iterencode(self, o, _one_shot=False):
         out = []
-        self._enc(o, out, 0, {} if self.check_circular else None)
+        self._enc(o, out, 0, [] if self.check_circular else None)
         return out
 
     def _float(self, f):
@@ -149,9 +156,9 @@ class JSONEncoder:
                 out.append("{}")
             else:
                 out.append("{")
-                items = list(o.items())
-                if self.sort_keys:
-                    items.sort(key=lambda kv: kv[0])
+                # Two keys of one dict never compare equal, so sorting the
+                # pairs sorts by key without a key function.
+                items = sorted(o.items()) if self.sort_keys else o.items()
                 first = True
                 for k, v in items:
                     k = self._key(k)
@@ -172,15 +179,19 @@ class JSONEncoder:
             self._enc(self.default(o), out, level, markers)
             self._unmark(o, markers)
 
+    # markers is the stack of containers being encoded, innermost last:
+    # marks nest, so an identity scan of the stack finds a cycle without the
+    # id() integers and the dict a table of them costs.
     def _mark(self, o, markers):
         if markers is not None:
-            if id(o) in markers:
-                raise ValueError("Circular reference detected")
-            markers[id(o)] = o
+            for m in markers:
+                if m is o:
+                    raise ValueError("Circular reference detected")
+            markers.append(o)
 
     def _unmark(self, o, markers):
         if markers is not None:
-            del markers[id(o)]
+            markers.pop()
 
 
 _WS = " \t\n\r"

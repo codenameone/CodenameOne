@@ -345,15 +345,19 @@ public final class PyStr extends PyObject {
         if (i < 0 || i >= n) {
             throw Py.indexError("string index out of range");
         }
-        return Py.str(substr((int) i, (int) i + 1));
+        return n == value.length() ? Typed.ch(value.charAt((int) i)) : Py.str(substr((int) i, (int) i + 1));
     }
 
     @Override
     public Object iter() {
-        return new PyIter(codePoints()) {
+        final int n = codePoints();
+        // Without surrogates a code point is a char, and Latin-1 ones are
+        // shared strings: a loop over ASCII text allocates nothing per step.
+        final boolean bmp = n == value.length();
+        return new PyIter(n) {
             @Override
             Object at(int i) {
-                return Py.str(substr(i, i + 1));
+                return bmp ? Typed.ch(value.charAt(i)) : Py.str(substr(i, i + 1));
             }
         };
     }

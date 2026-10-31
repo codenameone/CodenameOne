@@ -377,16 +377,29 @@ final class TypeMethods {
     }
 
     private static boolean affix(String self, Object[] a, boolean start) {
-        int[] r = range(self, a, 2);
-        String v = self.substring(r[0], r[1]);
-        Object[] cands = a[1] instanceof PyTuple ? ((PyTuple) a[1]).items : new Object[] {a[1]};
-        for (Object cand : cands) {
-            String c = strArg(cand, start ? "startswith" : "endswith");
-            if (start ? v.startsWith(c) : v.endsWith(c)) {
+        // Compared in place: no substring, and no offsets resolved unless
+        // a start or end was given.
+        int lo = 0;
+        int hi = self.length();
+        if (a.length > 2) {
+            int[] r = range(self, a, 2);
+            lo = r[0];
+            hi = r[1];
+        }
+        if (!(a[1] instanceof PyTuple)) {
+            return affixAt(self, lo, hi, strArg(a[1], start ? "startswith" : "endswith"), start);
+        }
+        for (Object cand : ((PyTuple) a[1]).items) {
+            if (affixAt(self, lo, hi, strArg(cand, start ? "startswith" : "endswith"), start)) {
                 return true;
             }
         }
         return false;
+    }
+
+    private static boolean affixAt(String self, int lo, int hi, String c, boolean start) {
+        int n = c.length();
+        return hi - lo >= n && self.regionMatches(start ? lo : hi - n, c, 0, n);
     }
 
     private static Object pad(Object[] a, int mode) {

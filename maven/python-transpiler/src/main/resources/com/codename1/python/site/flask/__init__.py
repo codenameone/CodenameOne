@@ -46,11 +46,34 @@ def _b(x):
     return str(x).encode("utf-8")
 
 
+# The usual header names, folded once: an application sets and tests the
+# same few on every response. Read-only after import, since requests run on
+# several threads; any other name is folded where it is used.
+_FOLDED = {}
+for _n in ("Content-Type", "Content-Length", "Content-Encoding", "Content-Disposition", "Location",
+           "Set-Cookie", "Cache-Control", "ETag", "Last-Modified", "Allow", "Vary", "Expires",
+           "Access-Control-Allow-Origin", "Access-Control-Allow-Methods", "Access-Control-Allow-Headers",
+           "WWW-Authenticate", "X-Content-Type-Options", "Accept", "Authorization", "Cookie", "Host",
+           "User-Agent", "If-None-Match", "If-Modified-Since", "Origin", "Referer", "Accept-Encoding"):
+    _FOLDED[_n] = _n.lower()
+    _FOLDED[_n.lower()] = _n.lower()
+
+
+def _fold(key):
+    lk = _FOLDED.get(key)
+    return lk if lk is not None else key.lower()
+
+
 class Headers:
     """Case-insensitive, ordered, multi-valued header collection."""
 
+    # _l holds the (name, value) pairs as given and _k each name folded, so a
+    # lookup folds only the name it is asked for: folding every stored name
+    # on every lookup was a string per header per question, per request.
+
     def __init__(self, items=None):
         self._l = []
+        self._k = []
         if items is not None:
             self.extend(items)
 
@@ -58,43 +81,51 @@ class Headers:
         if isinstance(items, Headers):
             items = items._l
         elif isinstance(items, dict):
-            items = list(items.items())
+            items = items.items()
         for k, v in items:
             self.add(k, v)
 
     def add(self, key, value):
-        self._l.append((key, str(value)))
+        self._l.append((key, value if isinstance(value, str) else str(value)))
+        self._k.append(_fold(key))
 
     def set(self, key, value):
         self.__setitem__(key, value)
 
+    def _find(self, lk):
+        ks = self._k
+        for i in range(len(ks)):
+            if ks[i] == lk:
+                return i
+        return -1
+
     def __setitem__(self, key, value):
-        lk = key.lower()
-        out = []
-        done = False
-        for k, v in self._l:
-            if k.lower() == lk:
-                if not done:
-                    out.append((key, str(value)))
-                    done = True
-            else:
-                out.append((k, v))
-        if not done:
-            out.append((key, str(value)))
-        self._l = out
+        lk = _fold(key)
+        pair = (key, value if isinstance(value, str) else str(value))
+        i = self._find(lk)
+        if i < 0:
+            self._l.append(pair)
+            self._k.append(lk)
+            return
+        self._l[i] = pair
+        j = len(self._k) - 1
+        while j > i:
+            if self._k[j] == lk:
+                del self._l[j]
+                del self._k[j]
+            j -= 1
 
     def __getitem__(self, key):
-        lk = key.lower()
-        for k, v in self._l:
-            if k.lower() == lk:
-                return v
-        raise KeyError(key)
+        i = self._find(_fold(key))
+        if i < 0:
+            raise KeyError(key)
+        return self._l[i][1]
 
     def get(self, key, default=None, type=None):
-        try:
-            v = self[key]
-        except KeyError:
+        i = self._find(_fold(key)) if isinstance(key, str) else -1
+        if i < 0:
             return default
+        v = self._l[i][1]
         if type is not None:
             try:
                 return type(v)
@@ -103,15 +134,21 @@ class Headers:
         return v
 
     def getlist(self, key):
-        lk = key.lower()
-        return [v for k, v in self._l if k.lower() == lk]
+        lk = _fold(key)
+        ks = self._k
+        return [self._l[i][1] for i in range(len(ks)) if ks[i] == lk]
 
     def __contains__(self, key):
-        return isinstance(key, str) and key.lower() in [k.lower() for k, v in self._l]
+        return isinstance(key, str) and self._find(_fold(key)) >= 0
 
     def __delitem__(self, key):
-        lk = key.lower()
-        self._l = [(k, v) for k, v in self._l if k.lower() != lk]
+        lk = _fold(key)
+        j = len(self._k) - 1
+        while j >= 0:
+            if self._k[j] == lk:
+                del self._l[j]
+                del self._k[j]
+            j -= 1
 
     def remove(self, key):
         del self[key]
@@ -387,8 +424,15 @@ class _Ctx:
     def __init__(self, app, req):
         self.app = app
         self.request = req
-        self.g = _AppGlobals()
+        self._g = None
         self._session = None
+
+    @property
+    def g(self):
+        # Made on first use: most requests never touch flask.g.
+        if self._g is None:
+            self._g = _AppGlobals()
+        return self._g
 
     @property
     def session(self):
@@ -479,7 +523,7 @@ class Request:
         self.path = path
         self.query_string = _b(query or "")
         self.headers = Headers(headers)
-        self._body = bytes(body or b"")
+        self._body = body if type(body) is bytes else bytes(body or b"")
         self.view_args = None
         self.endpoint = None
         self.url_rule = None
@@ -624,20 +668,35 @@ current_app = _Proxy("app")
 session = _Proxy("session")
 
 
+# The blueprint chain of a request outside any blueprint; never mutated.
+_NO_CHAIN = ()
+
+
+def _json_default(o):
+    if hasattr(o, "isoformat"):
+        return o.isoformat()
+    if isinstance(o, _uuid.UUID):
+        return str(o)
+    if hasattr(o, "__html__"):
+        return str(o.__html__())
+    if hasattr(o, "model_dump"):
+        return o.model_dump(mode="json")
+    raise TypeError("Object of type %s is not JSON serializable" % type(o).__name__)
+
+
+# An encoder keeps no state between calls, so one per style serves every
+# response instead of a new encoder (and its keyword binding) each time.
+# Built at import: the table is only read while requests run.
+_ENCODERS = [
+    _json.JSONEncoder(default=_json_default, sort_keys=False, indent=2),
+    _json.JSONEncoder(default=_json_default, sort_keys=True, indent=2),
+    _json.JSONEncoder(default=_json_default, sort_keys=False, separators=(",", ":")),
+    _json.JSONEncoder(default=_json_default, sort_keys=True, separators=(",", ":")),
+]
+
+
 def _to_json(obj, compact=True, sort=True):
-    def default(o):
-        if hasattr(o, "isoformat"):
-            return o.isoformat()
-        if isinstance(o, _uuid.UUID):
-            return str(o)
-        if hasattr(o, "__html__"):
-            return str(o.__html__())
-        if hasattr(o, "model_dump"):
-            return o.model_dump(mode="json")
-        raise TypeError("Object of type %s is not JSON serializable" % type(o).__name__)
-    if compact:
-        return _json.dumps(obj, default=default, sort_keys=sort, separators=(",", ":"))
-    return _json.dumps(obj, default=default, sort_keys=sort, indent=2)
+    return _ENCODERS[(2 if compact else 0) + (1 if sort else 0)].encode(obj)
 
 
 def jsonify(*args, **kwargs):
@@ -765,8 +824,14 @@ class Rule:
         self.convs = [p[1] for p in self.parts if p[0] == "var"]
         self.nvars = len(self.names)
         self.weight = weight
+        # The literal text before the first variable: a path that does not
+        # start with it cannot match, and most rules are ruled out by it
+        # without running their pattern.
+        self.prefix = self.parts[0][1] if self.parts and self.parts[0][0] == "lit" else ""
 
     def match(self, path):
+        if not path.startswith(self.prefix):
+            return None
         m = self.regex.match(path)
         if m is None:
             return None
@@ -1018,20 +1083,20 @@ class Flask(_Routes):
 
     def _route(self, req):
         path = req.path
-        allowed = set()
+        allowed = None
         redirect_rule = None
         for r in self._rules_sorted():
             vals = r.match(path)
             if vals is not None:
                 if req.method in r.methods:
                     return r, vals, None
-                allowed |= r.methods
+                allowed = set(r.methods) if allowed is None else allowed | r.methods
             elif r.slash and not path.endswith("/"):
                 if r.match(path + "/") is not None and redirect_rule is None:
                     if req.method in r.methods:
                         redirect_rule = r
                     else:
-                        allowed |= r.methods
+                        allowed = set(r.methods) if allowed is None else allowed | r.methods
         if redirect_rule is not None:
             return None, None, ("redirect", redirect_rule)
         if allowed:
@@ -1085,13 +1150,14 @@ class Flask(_Routes):
         try:
             rule, vals, fail = self._route(req)
             rv = None
-            chain = []
+            chain = _NO_CHAIN
             if fail is None:
                 req.url_rule = rule
                 req.endpoint = rule.endpoint
                 req.view_args = vals
                 bp = req.blueprint
                 if bp:
+                    chain = []
                     parts = bp.split(".")
                     for i in range(1, len(parts) + 1):
                         chain.append(".".join(parts[:i]))
@@ -1129,7 +1195,7 @@ class Flask(_Routes):
         except Exception as e:
             resp = self._handle_exception(e, bp)
             chain = []
-        return self._finish(resp, bp, chain if bp else [])
+        return self._finish(resp, bp, chain if bp else _NO_CHAIN)
 
     def _allowed_for(self, path):
         out = set()
@@ -1182,7 +1248,8 @@ class Flask(_Routes):
             return resp.status_code, resp.headers.items(), _in_context(ctx, stream)
         if "Content-Length" not in resp.headers and resp.status_code not in (204, 304):
             resp.headers["Content-Length"] = str(len(resp._data))
-        return resp.status_code, resp.headers.items(), resp._data
+        # The server only reads the pairs, and the response is done with.
+        return resp.status_code, resp.headers._l, resp._data
 
 
 class _TestContext:

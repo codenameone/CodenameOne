@@ -124,11 +124,25 @@ final class Regex {
         int marks;
         String prefix;
         boolean anchored;
+        /// The text view, registers and backtracking stacks of the last run,
+        /// handed back for the next one: a route table or a tokenizer runs
+        /// one pattern per request, and these were most of what a run
+        /// allocated. Taken with `getAndSet(null)`, so two threads running
+        /// one pattern at once never share them; the loser builds its own.
+        final java.util.concurrent.atomic.AtomicReference<Scratch> scratch =
+                new java.util.concurrent.atomic.AtomicReference<Scratch>();
 
         @Override
         public PyType type() {
             return TYPE;
         }
+    }
+
+    private static final class Scratch {
+        final Text text = new Text();
+        final Ints stack = new Ints();
+        final Ints trail = new Ints();
+        int[] regs = NO_INTS;
     }
 
     static PyModule module() {
@@ -284,10 +298,17 @@ final class Regex {
 
     /// The text, by code point.
     private static final class Text {
-        final String s;
-        final int[] cps;
+        String s;
+        int[] cps;
+
+        Text() {
+        }
 
         Text(String s) {
+            reset(s);
+        }
+
+        void reset(String s) {
             this.s = s;
             int n = s.codePointCount(0, s.length());
             if (n == s.length()) {
@@ -790,13 +811,32 @@ final class Regex {
     /// `_engine.run`: mode 0 matches, 1 fully matches, 2 searches. The
     /// group registers then `lastindex`, or `NO_MATCH`.
     static int[] run(Prog p, String text, int pos, int endpos, int mode, int forbid) {
-        Text t = new Text(text);
+        Scratch sc = p.scratch.getAndSet(null);
+        if (sc == null) {
+            sc = new Scratch();
+        }
+        try {
+            return run(p, sc, text, pos, endpos, mode, forbid);
+        } finally {
+            sc.text.s = null;
+            sc.text.cps = null;
+            p.scratch.set(sc);
+        }
+    }
+
+    private static int[] run(Prog p, Scratch sc, String text, int pos, int endpos, int mode, int forbid) {
+        Text t = sc.text;
+        t.reset(text);
         int size = 2 * (p.groups + 1);
         boolean full = mode == 1;
         int start = pos;
-        int[] regs = new int[size + 1 + p.marks];
-        Ints stack = new Ints();
-        Ints trail = new Ints();
+        int need = size + 1 + p.marks;
+        if (sc.regs.length != need) {
+            sc.regs = new int[need];
+        }
+        int[] regs = sc.regs;
+        Ints stack = sc.stack;
+        Ints trail = sc.trail;
         while (start <= endpos) {
             if (mode == 2 && p.prefix != null) {
                 int found = find(t, p.prefix, start, endpos);

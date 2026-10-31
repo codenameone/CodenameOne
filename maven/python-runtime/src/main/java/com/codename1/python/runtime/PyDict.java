@@ -58,6 +58,22 @@ public class PyDict extends PyObject {
         hashes = NO_HASHES;
     }
 
+    /// A dict sized for `n` entries, as a literal of that many pairs builds:
+    /// its arrays are allocated once at that size rather than at the first
+    /// growth's.
+    public PyDict(int n) {
+        if (n > 0 && n <= LINEAR) {
+            keys = new Object[n];
+            values = new Object[n];
+            hashes = new long[n];
+        } else {
+            // A larger literal grows as it is filled, index table included.
+            keys = NO_OBJECTS;
+            values = NO_OBJECTS;
+            hashes = NO_HASHES;
+        }
+    }
+
     /// The entry a slot from `find` names: without an index table the
     /// finders answer the entry itself.
     private int entry(int s) {
@@ -335,7 +351,9 @@ public class PyDict extends PyObject {
     }
 
     private void grow() {
-        int cap = Math.max(8, size * 2);
+        // A dict's first entry gets room for four: most dicts filled one at
+        // a time (keyword arguments, a route's values) stay that small.
+        int cap = keys.length == 0 ? 4 : Math.max(8, size * 2);
         if (cap < keys.length && size < used) {
             cap = keys.length;
         }

@@ -5657,7 +5657,11 @@ public final class HttpServer {
         boolean drained;
 
         /// Memoised request targets for this connection. See internTarget.
-        private final String[] targetCache = new String[TARGET_CACHE_SLOTS];
+        /// Null until the connection's second distinct target: a connection
+        /// that serves one request (no keep-alive) never memoises anything,
+        /// and that one target is held in soleTarget instead of a table.
+        private String[] targetCache;
+        private String soleTarget;
         /// The Host value of the previous request on this connection.
         private String lastHost;
 
@@ -5698,11 +5702,23 @@ public final class HttpServer {
             // Capped rather than cleared when idle: clearing would throw the
             // memoisation away on every keep-alive request, which is the case it
             // was measured to help.
-            if (targetCache.length == 0 || length > MAX_CACHED_TARGET_BYTES) {
+            if (TARGET_CACHE_SLOTS == 0 || length > MAX_CACHED_TARGET_BYTES) {
                 // Cache disabled (CN1_HTTP_TARGET_CACHE=0), for A/B measurement.
                 // Guarded because the slot arithmetic below is a modulo, and a zero
                 // size would divide by it rather than politely doing nothing.
                 return asciiString(data, start, length);
+            }
+            if (targetCache == null) {
+                if (sameTarget(soleTarget, data, start, length)) {
+                    return soleTarget;
+                }
+                if (soleTarget == null) {
+                    soleTarget = asciiString(data, start, length);
+                    return soleTarget;
+                }
+                targetCache = new String[TARGET_CACHE_SLOTS];
+                targetCache[targetSlot(soleTarget)] = soleTarget;
+                soleTarget = null;
             }
             int hash = 0;
             for (int iter = 0 ; iter < length ; iter++) {
@@ -5726,6 +5742,28 @@ public final class HttpServer {
             // overwriting lets whichever is currently hot keep the slot.
             targetCache[slot] = fresh;
             return fresh;
+        }
+
+        private static boolean sameTarget(String cached, byte[] data, int start, int length) {
+            if (cached == null || cached.length() != length) {
+                return false;
+            }
+            for (int iter = 0 ; iter < length ; iter++) {
+                if (cached.charAt(iter) != (char) (data[start + iter] & 0xff)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        /// The slot internTarget's hash gives a target already held as a
+        /// String: the same sum over its chars, which are its bytes.
+        private static int targetSlot(String target) {
+            int hash = 0;
+            for (int iter = 0 ; iter < target.length() ; iter++) {
+                hash = hash * 31 + (byte) target.charAt(iter);
+            }
+            return (hash & 0x7fffffff) % TARGET_CACHE_SLOTS;
         }
 
         /// Where a response is assembled, reused for the life of the connection.
@@ -5807,7 +5845,16 @@ public final class HttpServer {
         // Not final: an oversized one is REPLACED rather than carried, see
         // releaseIdleMemory. reset() only rewinds the length, which is the right
         // thing per request and the wrong thing across an idle wait.
-        ByteSink bodySink = new ByteSink(512);
+        // Made on first use: only a deferred JSON response needs it, and a
+        // connection that never sends one should not pay for it.
+        ByteSink bodySink;
+
+        ByteSink bodySink() {
+            if (bodySink == null) {
+                bodySink = new ByteSink(512);
+            }
+            return bodySink;
+        }
 
         void reset() {
             outLength = 0;
@@ -5847,7 +5894,9 @@ public final class HttpServer {
         private byte[] ctBytes;
 
         void putContentType(String ct) {
-            if (ct == ctKey) { //NOPMD CompareObjectsWithEquals - identity on purpose, see above
+            // ctBytes is tested for SpotBugs: ct is never null, so a match
+            // implies the cache was filled, which it cannot prove.
+            if (ct == ctKey && ctBytes != null) { //NOPMD CompareObjectsWithEquals - identity on purpose, see above
                 System.arraycopy(ctBytes, 0, out, ensureAt(ctBytes.length), ctBytes.length);
                 outLength += ctBytes.length;
                 return;
@@ -6389,8 +6438,8 @@ public final class HttpServer {
                 out = new byte[1024];
                 outLength = 0;
             }
-            if (bodySink.bytes().length > MAX_IDLE_BUFFER_BYTES) {
-                bodySink = new ByteSink(512);
+            if (bodySink != null && bodySink.bytes().length > MAX_IDLE_BUFFER_BYTES) {
+                bodySink = null;
             }
             if (pooledResponse != null) {
                 pooledResponse.releaseRetained();
@@ -6658,8 +6707,8 @@ public final class HttpServer {
                 // the write it dropped the connection with nothing sent.
                 if (response.hasDeferredJson) {
                     try {
-                        conn.bodySink.reset();
-                        response.writeDeferredJson(conn.bodySink);
+                        conn.bodySink().reset();
+                        response.writeDeferredJson(conn.bodySink());
                     } catch (Throwable err) {
                         rethrowIfFatal(err);
                         System.err.println("handler failed: " + err);
@@ -8142,8 +8191,8 @@ public final class HttpServer {
         }
         try {
             if (refused.hasDeferredJson) {
-                conn.bodySink.reset();
-                refused.writeDeferredJson(conn.bodySink);
+                conn.bodySink().reset();
+                refused.writeDeferredJson(conn.bodySink());
             }
             writeResponse(conn, fd, session, refused, false, false, true);
             conn.writtenStatus = status;
@@ -9317,8 +9366,8 @@ public final class HttpServer {
         byte[] deferred = null;
         int deferredLength = 0;
         if (response.hasDeferredJson) {
-            deferred = conn.bodySink.bytes();
-            deferredLength = conn.bodySink.length();
+            deferred = conn.bodySink().bytes();
+            deferredLength = conn.bodySink().length();
         }
         long bodyLength = response.fileFd >= 0 ? response.fileLength
                 : (deferred != null ? deferredLength : response.body.length);

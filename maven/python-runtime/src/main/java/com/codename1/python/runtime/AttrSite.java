@@ -64,6 +64,8 @@ public final class AttrSite {
     private static final int I_SPLIT = 5;
     private static final int I_JOIN = 6;
     private static final int I_CLEAR = 7;
+    private static final int I_STARTSWITH = 8;
+    private static final int I_ENDSWITH = 9;
 
     // Reads and calls. An entry with a null shape is a non-instance receiver
     // type (BUILTIN or NONE). All entries are valid only while getVersion is
@@ -150,6 +152,10 @@ public final class AttrSite {
                 return I_JOIN;
             case "clear":
                 return I_CLEAR;
+            case "startswith":
+                return I_STARTSWITH;
+            case "endswith":
+                return I_ENDSWITH;
             default:
                 return I_NONE;
         }
@@ -413,6 +419,12 @@ public final class AttrSite {
                 }
                 if (intrinsic == I_JOIN) {
                     return TypeMethods.join(((String) o), a);
+                }
+                if (intrinsic == I_STARTSWITH && a instanceof String) {
+                    return Py.bool(((String) o).startsWith((String) a));
+                }
+                if (intrinsic == I_ENDSWITH && a instanceof String) {
+                    return Py.bool(((String) o).endsWith((String) a));
                 }
             }
             if (intrinsic == I_GET && o instanceof PyDict && o.getClass() == PyDict.class) {

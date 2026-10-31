@@ -646,6 +646,10 @@ public final class Py {
                 }
             }
         }
+        if (a instanceof String && b instanceof String) {
+            // Two str compare by code point without wrapping either one.
+            return bool(PyStr.compare((String) a, (String) b) < 0);
+        }
         Object r = Py.obj(a).lt(b);
         if (r == null) {
             r = Py.obj(b).gt(a);
@@ -679,6 +683,9 @@ public final class Py {
                     return bool(x <= y);
                 }
             }
+        }
+        if (a instanceof String && b instanceof String) {
+            return bool(PyStr.compare((String) a, (String) b) <= 0);
         }
         Object r = Py.obj(a).le(b);
         if (r == null) {
@@ -714,6 +721,9 @@ public final class Py {
                 }
             }
         }
+        if (a instanceof String && b instanceof String) {
+            return bool(PyStr.compare((String) a, (String) b) > 0);
+        }
         Object r = Py.obj(a).gt(b);
         if (r == null) {
             r = Py.obj(b).lt(a);
@@ -747,6 +757,9 @@ public final class Py {
                     return bool(x >= y);
                 }
             }
+        }
+        if (a instanceof String && b instanceof String) {
+            return bool(PyStr.compare((String) a, (String) b) >= 0);
         }
         Object r = Py.obj(a).ge(b);
         if (r == null) {
@@ -1882,7 +1895,7 @@ public final class Py {
 
     /// `{k0: v0, k1: v1, ...}` from alternating keys and values.
     public static PyDict dict(Object... kv) {
-        PyDict d = new PyDict();
+        PyDict d = new PyDict(kv.length / 2);
         for (int i = 0; i < kv.length; i += 2) {
             d.setItem(kv[i], kv[i + 1]);
         }
