@@ -251,6 +251,7 @@ static JAVA_INT cn1RtImpl_rtEnter(CODENAME_ONE_THREAD_STATE, JAVA_INT priority, 
         p.sched_priority = priority;
         if (pthread_setschedparam(pthread_self(), SCHED_FIFO, &p) == 0) {
             applied |= CN1_RT_APPLIED_SCHEDULING;
+            threadStateData->rtPriority = priority;
         }
     }
     if (cpu >= 0) {

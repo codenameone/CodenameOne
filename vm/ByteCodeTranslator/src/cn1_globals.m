@@ -754,6 +754,46 @@ static JAVA_BOOLEAN cn1RtThreadsPresent(void) {
     return __atomic_load_n(&cn1RtThreadCount, __ATOMIC_SEQ_CST) > 0 ? JAVA_TRUE : JAVA_FALSE;
 }
 
+// PRIORITY INHERITANCE FOR THE HOLD. A real-time thread that wakes while the collector is
+// scanning its stack waits for that scan (CN1_RT_UNPARK), and the collector is an ordinary
+// thread: on a busy machine the threads the real-time one exists to outrank preempt it
+// inside that window, and the wait becomes theirs. Measured on a 2-vCPU CI runner as a
+// single 125ms stall of a 1kHz loop whose own cycle never ran past 4us. So the collector
+// takes SCHED_FIFO just under the held thread for exactly the window it holds it -- from
+// raising threadBlockedByGC to the release after its stacks -- and drops back after.
+// Failure (no privilege) leaves it as it was, which is the old behaviour.
+#if defined(__linux__)
+static int cn1RtCollectorBoosted = 0;
+static int cn1RtCollectorPolicy;
+static struct sched_param cn1RtCollectorParam;
+static void cn1RtBoostCollector(struct ThreadLocalData* held) {
+    struct sched_param p;
+    if(!held->realtimeThread || held->rtPriority <= 0 || cn1RtCollectorBoosted) {
+        return;
+    }
+    if(pthread_getschedparam(pthread_self(), &cn1RtCollectorPolicy, &cn1RtCollectorParam) != 0) {
+        return;
+    }
+    memset(&p, 0, sizeof(p));
+    // One below the held thread: above every ordinary thread, which is what the hold needs,
+    // and never equal to the thread itself, which on a shared CPU would let the collector's
+    // wait for it to park (a spin, while it runs its period) delay the period instead.
+    p.sched_priority = held->rtPriority > 1 ? held->rtPriority - 1 : 1;
+    if(pthread_setschedparam(pthread_self(), SCHED_FIFO, &p) == 0) {
+        cn1RtCollectorBoosted = 1;
+    }
+}
+static void cn1RtUnboostCollector(void) {
+    if(cn1RtCollectorBoosted) {
+        pthread_setschedparam(pthread_self(), cn1RtCollectorPolicy, &cn1RtCollectorParam);
+        cn1RtCollectorBoosted = 0;
+    }
+}
+#else
+#define cn1RtBoostCollector(held) do { (void)(held); } while(0)
+#define cn1RtUnboostCollector() do {} while(0)
+#endif
+
 // Monotonic nanoseconds, for the collector's own short waits and policy timing. Same
 // split as cn1MonotonicMillis: clock_gettime / CLOCK_MONOTONIC do not exist on the
 // clang-cl Windows target, so it reads the QueryPerformanceCounter-backed clock there
@@ -6053,6 +6093,7 @@ void codenameOneGCMark() {
                 // wait for the thread to pause so we can traverse its stack but not for native threads where
                 // we don't have much control and who barely call into Java anyway
                 if(t->lightweightThread) {
+                    cn1RtBoostCollector(t);
                     t->threadBlockedByGC = JAVA_TRUE;
                     // Full fence before the threadActive reads below: with the one in
                     // cn1GcTryResumeActive, a thread going active either sees this block
@@ -6598,6 +6639,9 @@ void codenameOneGCMark() {
                     cn1GcWakeUnblocked();
                 }
 #endif
+                // Past the hold either way: released above, or held to the sweep with
+                // every other thread, where no period is promised.
+                cn1RtUnboostCollector();
 #ifdef CN1_GC_CAN_FORCE_STOP
                 // Released as soon as this thread's roots are captured, which is HERE and
                 // not at the threadBlockedByGC clear below. A cooperatively parked thread
