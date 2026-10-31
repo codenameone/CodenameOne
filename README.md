@@ -26,6 +26,10 @@ Generate a complete application from Initializr, then make it your own. These te
 | --- | --- |
 | <a href="https://www.codenameone.com/wayline/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=wayline"><img src="docs/developer-guide/img/wayline-rider-home.png" alt="Wayline rider map and destination screen" width="200"></a><br><br>Rider, driver and admin screens, with a Java backend for matching, live trips, earnings and payments. | <a href="https://www.codenameone.com/skirmish/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=skirmish"><img src="docs/developer-guide/img/skirmish-battle.png" alt="Skirmish live battle screen" width="200"></a><br><br>Online battles, replays and progression, with a Java game server and a moderation console. |
 
+| [Bastion — Virtual banking](https://www.codenameone.com/bastion/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=bastion) | [Reel — Streaming and courses](https://www.codenameone.com/developer-guide/reel-users-guide/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=reel) |
+| --- | --- |
+| <a href="https://www.codenameone.com/bastion/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=bastion"><img src="docs/developer-guide/img/bastion-dashboard.png" alt="Bastion account balances and dashboard" width="200"></a><br><br>Customer accounts, transfers and a staff console, with a Java backend and double-entry ledger. Money and markets are simulated. | <a href="https://www.codenameone.com/developer-guide/reel-users-guide/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=reel"><img src="docs/developer-guide/img/reel-viewer-home.png" alt="Reel streaming catalog and continue-watching screen" width="200"></a><br><br>A viewer app, creator studio, moderation and admin screens, with a Java backend for subscriptions, rentals and courses. |
+
 [Generate your application](https://www.codenameone.com/initializr/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=template-start) · [Explore the complete templates](https://www.codenameone.com/demos/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=fullstack-samples)
 
 | What do you want to build? | Start here |
@@ -35,7 +39,7 @@ Generate a complete application from Initializr, then make it your own. These te
 | An app and its backend | [Share models and generated REST clients](https://www.codenameone.com/blog/java-backend-shared-models/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=shared-models) |
 | An existing Android app on more platforms | [Import classic Android application code](https://www.codenameone.com/developer-guide/android-interop/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=android-import), including activities, XML layouts and resources |
 | Existing Flutter screens | [Compile supported Dart and Flutter code to Java](https://www.codenameone.com/developer-guide/flutter-interop/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=flutter-import); experimental compatibility, with interaction limits documented in the guide |
-| A complete full-stack application | [Choose a template](#start-with-a-complete-full-stack-application): food delivery, messaging, ride hailing or multiplayer strategy |
+| A complete full-stack application | [Choose a template](#start-with-a-complete-full-stack-application): food delivery, messaging, ride hailing, multiplayer strategy, virtual banking or streaming and courses |
 | Evidence before adopting | [Compare performance](#measured-performance) and [inspect platform support](https://www.codenameone.com/port-status/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=platforms) |
 
 ### A backend that compiles the wiring into your application
