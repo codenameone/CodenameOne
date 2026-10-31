@@ -54,7 +54,9 @@
 #include <windows.devices.geolocation.h>
 #include <windows.applicationmodel.contacts.h>
 #include <windows.applicationmodel.datatransfer.h>
+#if !defined(CN1_WINDOWS_UWP)
 #include <shobjidl_core.h>   /* IDataTransferManagerInterop */
+#endif
 
 using namespace ABI::Windows::Foundation;
 using namespace ABI::Windows::Foundation::Collections;
@@ -382,6 +384,9 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_contactsGetAll___R_java_lan
     }
 }
 
+#if !defined(CN1_WINDOWS_UWP) /* uwp: desktop only */
+/* Share goes through the HWND interop bridge, which a UWP app has no use for;
+ * scripts/gen-windows-uwp-stubs.py stubs shareText there. */
 /* ----------------------------------------------------------------- share
  *
  * System share via the WinRT DataTransferManager. ShowShareUIForWindow needs the
@@ -460,6 +465,7 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_shareText___java_lang_Stri
     return JAVA_TRUE;
 }
 
+#endif /* uwp: end desktop only */
 
 /* UISettings provides the user's actual accent palette. Keep initialization balanced:
    this query runs repeatedly on the long-lived EDT, unlike short-lived worker bridges. */
@@ -468,6 +474,7 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_nativeThemeSettings___R_jav
     using namespace ABI::Windows::UI::ViewManagement;
     CN1Buf buffer;
     cn1BufInit(&buffer);
+#if !defined(CN1_WINDOWS_UWP) /* no system metrics or classic palette in the app container */
     NONCLIENTMETRICSW metrics = {};
     metrics.cbSize = sizeof(metrics);
     if (SystemParametersInfoW(SPI_GETNONCLIENTMETRICS, sizeof(metrics), &metrics, 0)) {
@@ -484,6 +491,7 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_nativeThemeSettings___R_jav
             cn1BufAppendBytes(&buffer, line, strlen(line));
         }
     }
+#endif
     HRESULT initialized = RoInitialize(RO_INIT_MULTITHREADED);
     {
         ComPtr<IInspectable> instance;
@@ -505,6 +513,7 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_nativeThemeSettings___R_jav
     if (SUCCEEDED(initialized)) RoUninitialize();
     /* GetSysColor describes the classic/high-contrast palette, not Fluent dark surfaces.
        Use these semantic colors only for high contrast; normal Fluent keeps its surfaces. */
+#if !defined(CN1_WINDOWS_UWP)
     HIGHCONTRASTW contrast = {};
     contrast.cbSize = sizeof(contrast);
     if (SystemParametersInfoW(SPI_GETHIGHCONTRAST, sizeof(contrast), &contrast, 0)
@@ -523,6 +532,7 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_nativeThemeSettings___R_jav
             }
         }
     }
+#endif
     JAVA_OBJECT result = newStringFromCString(threadStateData, buffer.data ? buffer.data : "");
     free(buffer.data);
     return result;

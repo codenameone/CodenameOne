@@ -70,7 +70,7 @@
  * Deliberately no MSVC STL here -- the xwin cross-compile CI's clang-cl
  * predates the Clang version the MSVC STL demands (STL1000), so this file
  * sticks to plain C containers (see g_widgetEvents / CN1Widget.hitRects). */
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(CN1_WINDOWS_UWP) /* desktop only: stubbed for UWP in cn1_windows_uwp_stubs.c */
 #include <windows.h>
 #include <windowsx.h>
 #include <stdio.h>
@@ -82,7 +82,7 @@
 
 #include "cn1_windows.h"
 
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(CN1_WINDOWS_UWP) /* desktop only: stubbed for UWP in cn1_windows_uwp_stubs.c */
 
 /* --------------------------------------------------------------- op codes */
 

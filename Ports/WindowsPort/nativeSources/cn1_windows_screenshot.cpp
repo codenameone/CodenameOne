@@ -267,6 +267,8 @@ static JAVA_OBJECT cn1WinWicSourceToPngBytes(CODENAME_ONE_THREAD_STATE, IWICBitm
  * window from one whose raster and hierarchy disagree, and it never contains a
  * peer or a native editor at all.
  */
+#if !defined(CN1_WINDOWS_UWP) /* uwp: desktop only */
+/* GDI PrintWindow of a secondary HWND. */
 #ifndef PW_RENDERFULLCONTENT
 /* Windows 8.1 and later. Defined here rather than assumed, because an older SDK
  * header omits it and the flag is the difference between a captured Direct2D
@@ -343,6 +345,7 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_captureDesktopWindowToPngBy
     }
     return result;
 }
+#endif /* uwp: end desktop only */
 
 /*
  * Encodes the current window's render target to PNG bytes. In headless /

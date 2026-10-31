@@ -59,6 +59,60 @@
 #include <wincodec.h>
 #include <stdint.h>
 
+#if defined(CN1_WINDOWS_UWP)
+/*
+ * UWP (Xbox Developer Mode) build: the app container's API partition drops a
+ * few Win32 calls that have a direct app-partition equivalent. They are mapped
+ * here once, so the shared file code reads the same in both builds.
+ * CreateFileW -> CreateFile2 (same handle, same flags, split differently);
+ * CharUpperW -> an invariant-locale LCMapStringEx in place. A template file is
+ * never used by this port, so CreateFile2 ignores that argument.
+ */
+static __inline HANDLE cn1UwpCreateFileW(LPCWSTR name, DWORD access, DWORD share,
+        LPSECURITY_ATTRIBUTES sa, DWORD disposition, DWORD flagsAndAttributes, HANDLE templateFile) {
+    CREATEFILE2_EXTENDED_PARAMETERS ext;
+    (void) templateFile;
+    ZeroMemory(&ext, sizeof(ext));
+    ext.dwSize = sizeof(ext);
+    ext.dwFileAttributes = flagsAndAttributes & 0x0000FFFF;
+    ext.dwFileFlags = flagsAndAttributes & 0xFFF00000;
+    ext.dwSecurityQosFlags = flagsAndAttributes & 0x000F0000;
+    ext.lpSecurityAttributes = sa;
+    return CreateFile2(name, access, share, disposition, &ext);
+}
+#undef CreateFileW
+#define CreateFileW cn1UwpCreateFileW
+
+static __inline HANDLE cn1UwpCreateFileA(LPCSTR name, DWORD access, DWORD share,
+        LPSECURITY_ATTRIBUTES sa, DWORD disposition, DWORD flagsAndAttributes, HANDLE templateFile) {
+    WCHAR wide[MAX_PATH];
+    if (MultiByteToWideChar(CP_UTF8, 0, name, -1, wide, MAX_PATH) <= 0) {
+        SetLastError(ERROR_FILENAME_EXCED_RANGE);
+        return INVALID_HANDLE_VALUE;
+    }
+    return cn1UwpCreateFileW(wide, access, share, sa, disposition, flagsAndAttributes, templateFile);
+}
+#undef CreateFileA
+#define CreateFileA cn1UwpCreateFileA
+
+static __inline LPWSTR cn1UwpCharUpperW(LPWSTR s) {
+    int len = (int) wcslen(s);
+    LCMapStringEx(LOCALE_NAME_INVARIANT, LCMAP_UPPERCASE, s, len, s, len, NULL, NULL, 0);
+    return s;
+}
+#undef CharUpperW
+#define CharUpperW cn1UwpCharUpperW
+
+/* Declared by the SDK for the desktop partition only, but exported by kernel32
+ * on every Windows, the Xbox included. It is how a null dereference becomes a
+ * NullPointerException (cn1WinFaultToException), so the UWP build keeps it.
+ * Developer Mode sideloading does not run the Store's API certification. */
+#ifdef __cplusplus
+extern "C"
+#endif
+WINBASEAPI PVOID WINAPI AddVectoredExceptionHandler(ULONG First, PVECTORED_EXCEPTION_HANDLER Handler);
+#endif /* CN1_WINDOWS_UWP */
+
 #ifdef __cplusplus
 /* C++ method-call macros for the COBJMACROS-style call sites. */
 #include "cn1_windows_comc.h"
@@ -70,6 +124,16 @@ extern "C" {
 
 /* The ParparVM runtime is C; keep its declarations C-linked under C++. */
 #include "cn1_globals.h"
+
+#if defined(CN1_WINDOWS_UWP)
+/* The app's local data folder (ApplicationData.Current.LocalFolder) into buf,
+ * NUL terminated. Returns 0 when it cannot be read. cn1_windows_corewindow.cpp. */
+int cn1UwpLocalFolder(WCHAR* buf, int capacity);
+#endif
+
+/* COM, the fault handlers and the input ring, shared by every host's
+ * initDisplay. 0 when already initialised. cn1_windows_window.cpp. */
+int cn1WinInitRuntime(void);
 
 /* ------------------------------------------------------------------ events */
 

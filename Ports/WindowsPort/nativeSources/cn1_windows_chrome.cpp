@@ -25,7 +25,7 @@
 /* Integrated main-window title bar. The window keeps WS_OVERLAPPEDWINDOW:
  * DWM owns the real caption buttons and DefWindowProc owns system commands,
  * resize tracking, caption double-click and the window system menu. */
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(CN1_WINDOWS_UWP) /* desktop only: stubbed for UWP in cn1_windows_uwp_stubs.c */
 #include "cn1_windows.h"
 #include <dwmapi.h>
 #include <windowsx.h>

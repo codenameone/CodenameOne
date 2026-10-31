@@ -1,11 +1,22 @@
 /*
  * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 only, as
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
@@ -100,6 +111,11 @@ static unsigned __stdcall cn1_cp_log_reader_thread(void *arg) {
 }
 
 static void cn1_cp_log_install(void) {
+#if defined(CN1_WINDOWS_UWP)
+    /* The UWP CRT has no _pipe, and an app container has no stderr anyone
+     * reads; the crash record still works, only the log tail is empty. */
+    return;
+#else
     int pipefds[2];
     if (_pipe(pipefds, 4096, _O_BINARY) != 0) return;
     cn1_cp_stderr_dup_fd = _dup(_fileno(stderr));
@@ -115,6 +131,7 @@ static void cn1_cp_log_install(void) {
     HANDLE h = (HANDLE)_beginthreadex(NULL, 0, cn1_cp_log_reader_thread,
                                        (void *)(intptr_t)pipefds[0], 0, NULL);
     if (h != NULL) CloseHandle(h);
+#endif /* CN1_WINDOWS_UWP */
 }
 
 char * cn1_crash_protection_log_snapshot(void) {
@@ -139,7 +156,19 @@ char * cn1_crash_protection_log_snapshot(void) {
 
 static void cn1_cp_resolve_pending_path(void) {
     wchar_t *wlocal = NULL;
+#if defined(CN1_WINDOWS_UWP)
+    /* The package's own local folder: the only place the container may write. */
+    static wchar_t uwpLocal[MAX_PATH];
+    if (cn1UwpLocalFolder(uwpLocal, MAX_PATH)) {
+        wlocal = (wchar_t *)CoTaskMemAlloc(sizeof(uwpLocal));
+        if (wlocal != NULL) {
+            memcpy(wlocal, uwpLocal, sizeof(uwpLocal));
+        }
+    }
+    if (wlocal == NULL) {
+#else
     if (SHGetKnownFolderPath(&FOLDERID_LocalAppData, 0, NULL, &wlocal) != S_OK) {
+#endif
         snprintf(cn1_cp_pending_path, sizeof(cn1_cp_pending_path),
                  "C:\\Temp\\.cn1_pending_native_crash");
         cn1_cp_pending_path_set = 1;

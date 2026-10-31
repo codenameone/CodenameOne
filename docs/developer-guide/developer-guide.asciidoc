@@ -332,6 +332,8 @@ include::Maven-Appendix-Control-Center.adoc[]
 
 include::Maven-Appendix-Rich-Properties.adoc[]
 
+include::Gaming-Consoles.asciidoc[]
+
 = Historical reference
 
 include::Working-with-UWP.asciidoc[]

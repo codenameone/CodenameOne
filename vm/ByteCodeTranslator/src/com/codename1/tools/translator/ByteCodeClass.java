@@ -1808,6 +1808,13 @@ public class ByteCodeClass {
                     clInitMethod = clsName + "_" + m.getMethodName() + "__";
                 }
                 if(m.isMain()) {
+                    // A UWP build (the Xbox Developer Mode target) cannot start in
+                    // main: the process has to hand its first thread to
+                    // CoreApplication::Run, which calls back on that same thread once
+                    // the window exists. cn1_windows_corewindow.cpp owns the real main
+                    // and calls this one, renamed, from there. Every other target leaves
+                    // CN1_WINDOWS_UWP undefined and gets main unchanged.
+                    b.append("\n#if defined(CN1_WINDOWS_UWP)\n#define main cn1JavaMain\n#endif\n");
                     b.append("\nint main(int argc, char *argv[]) {\n");
                     // Line-buffer stdout/stderr. C streams block-buffer when they are
                     // not a tty, so everything an app logs into a pipe -- which is

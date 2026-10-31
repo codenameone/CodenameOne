@@ -1447,7 +1447,31 @@ public class ByteCodeTranslator {
                 //   saw it because the cross-compile leg sets WEBVIEW2_SDK_DIR and got the
                 //   library by accident, which is the same way the iOS port once lost
                 //   UniformTypeIdentifiers.
+                // CN1_WINDOWS_UWP (WindowsNativeBuilder passes it for windows.xbox=true)
+                // builds for the UWP app container that Xbox Developer Mode runs:
+                // the app API partition, CoreWindow host (cn1_windows_corewindow.cpp),
+                // desktop-only natives stubbed (cn1_windows_uwp_stubs.cpp). It links
+                // WindowsApp.lib and nothing else that imports a DLL, so the link
+                // itself is the proof that every import exists in the container -- a
+                // desktop-only call fails here, not on the console's loader. The CRT
+                // is static (/MT): the app-CRT import libs are not part of the SDK
+                // layout we build against, and a static CRT needs no VCLibs framework
+                // package next to the app. SQLite has no switch for this partition any more;
+                // cn1_sqlite3.c supplies the few file calls it lacks.
+                writer.append("    option(CN1_WINDOWS_UWP \"Build for the UWP app container (Xbox Developer Mode)\" OFF)\n");
+                writer.append("    if(CN1_WINDOWS_UWP)\n");
+                writer.append("        target_compile_definitions(${PROJECT_NAME} PRIVATE CN1_WINDOWS_UWP=1 WINAPI_FAMILY=WINAPI_FAMILY_APP)\n");
+                writer.append("        target_link_libraries(${PROJECT_NAME} WindowsApp uuid mfuuid dxguid)\n");
+                writer.append("        target_link_options(${PROJECT_NAME} PRIVATE /APPCONTAINER /NODEFAULTLIB:kernel32.lib)\n");
+                writer.append("        foreach(CN1_FLAG_VAR CMAKE_C_FLAGS_RELEASE CMAKE_CXX_FLAGS_RELEASE CMAKE_C_FLAGS_RELWITHDEBINFO CMAKE_CXX_FLAGS_RELWITHDEBINFO CMAKE_C_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_MINSIZEREL)\n");
+                writer.append("            string(REPLACE \"/MD\" \"/MT\" ${CN1_FLAG_VAR} \"${${CN1_FLAG_VAR}}\")\n");
+                writer.append("        endforeach()\n");
+                writer.append("        foreach(CN1_FLAG_VAR CMAKE_C_FLAGS_DEBUG CMAKE_CXX_FLAGS_DEBUG)\n");
+                writer.append("            string(REPLACE \"/MDd\" \"/MTd\" ${CN1_FLAG_VAR} \"${${CN1_FLAG_VAR}}\")\n");
+                writer.append("        endforeach()\n");
+                writer.append("    else()\n");
                 writer.append("    target_link_libraries(${PROJECT_NAME} d2d1 dwrite dxgi windowscodecs winhttp ws2_32 user32 gdi32 ole32 oleaut32 uuid mf mfplat mfreadwrite mfuuid shell32 comdlg32 crypt32 bcrypt ncrypt winmm runtimeobject dbghelp advapi32 dwmapi)\n");
+                writer.append("    endif()\n");
                 // BrowserComponent is backed by WebView2 (cn1_windows_browser.cpp),
                 // gated on the SDK being present: when WEBVIEW2_SDK_DIR points at a
                 // Microsoft.Web.WebView2 build/native folder we link the static
@@ -1455,7 +1479,8 @@ public class ByteCodeTranslator {
                 // browser natives compile as stubs and the port reports the browser
                 // as unsupported. version/shell32/advapi32/shlwapi back the loader; advapi32
                 // is in the unconditional list above as well, because the port itself needs it.
-                writer.append("    if(DEFINED ENV{WEBVIEW2_SDK_DIR} AND EXISTS \"$ENV{WEBVIEW2_SDK_DIR}/include/WebView2.h\")\n");
+                // WebView2 hosts in an HWND, which a UWP build has none of.
+                writer.append("    if(NOT CN1_WINDOWS_UWP AND DEFINED ENV{WEBVIEW2_SDK_DIR} AND EXISTS \"$ENV{WEBVIEW2_SDK_DIR}/include/WebView2.h\")\n");
                 writer.append("        target_include_directories(${PROJECT_NAME} PRIVATE \"$ENV{WEBVIEW2_SDK_DIR}/include\")\n");
                 writer.append("        target_compile_definitions(${PROJECT_NAME} PRIVATE CN1_HAVE_WEBVIEW2=1)\n");
                 // VsDevCmd sets VSCMD_ARG_TGT_ARCH to the *target* arch (arm64/x64),

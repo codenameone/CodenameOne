@@ -439,6 +439,17 @@ public class WindowsNativeBuilder extends Executor {
         boolean msix = "true".equalsIgnoreCase(request.getArg("windows.msix", "false"));
         File winAppSdk = msix ? resolveWinAppSdkDir() : null;
         String widgetBoardCompileFlags = msix ? widgetBoardCompileFlags(winAppSdk) : "";
+        // windows.xbox=true builds the UWP flavour instead (Xbox Developer Mode
+        // sideloads UWP packages only): the CoreWindow host, compiled against the
+        // app partition and linked to WindowsApp.lib, then packed into an MSIX
+        // with no full-trust entry point -- see buildXboxPackage. The Widgets
+        // Board provider is a full-trust COM server, so the two cannot combine.
+        boolean xbox = "true".equalsIgnoreCase(request.getArg("windows.xbox", "false"));
+        if (xbox && msix) {
+            throw new BuildException("windows.xbox=true and windows.msix=true cannot be combined: "
+                    + "the Xbox package is a UWP app container, the windows.msix one a full-trust "
+                    + "desktop package with a Widgets Board provider. Build them separately.");
+        }
 
         List<String> configure = new ArrayList<String>();
         configure.add("cmake");
@@ -451,6 +462,7 @@ public class WindowsNativeBuilder extends Executor {
         configure.add("Ninja");
         configure.add("-DCMAKE_C_COMPILER=" + clangClExecutable());
         configure.add("-DCMAKE_CXX_COMPILER=" + clangClExecutable());
+        configure.add("-DCN1_WINDOWS_UWP=" + (xbox ? "ON" : "OFF"));
         if (cross) {
             addCrossCompileConfigure(configure, triple, arch, xwinSysroot,
                     widgetBoardCompileFlags, msix ? widgetBoardLinkFlags(winAppSdk, arch) : "");
@@ -522,6 +534,9 @@ public class WindowsNativeBuilder extends Executor {
         // windows.msix=true: wrap the signed exe in an MSIX package that also
         // declares the Windows 11 Widgets Board provider (surfaces.json kinds).
         buildMsixPackage(request, resDir, arch);
+        if (xbox) {
+            buildXboxPackage(request, arch);
+        }
         log("Native Windows executable: " + windowsExecutable.getAbsolutePath() + " (" + arch + ")");
         return true;
     }
@@ -1036,6 +1051,10 @@ public class WindowsNativeBuilder extends Executor {
         }
         String password = request.getArg("windows.msix.password",
                 request.getArg("windows.signing.password", request.getCertificatePassword()));
+        signMsixWith(msix, pkcs12, password, request.getArg("windows.signing.digest", "sha256"));
+    }
+
+    private void signMsixWith(File msix, File pkcs12, String password, String digest) {
         if (password == null) {
             password = "";
         }
@@ -1052,7 +1071,7 @@ public class WindowsNativeBuilder extends Executor {
         cmd.add("-pass");
         cmd.add(password);
         cmd.add("-h");
-        cmd.add(request.getArg("windows.signing.digest", "sha256"));
+        cmd.add(digest);
         cmd.add("-in");
         cmd.add(msix.getAbsolutePath());
         cmd.add("-out");
@@ -1074,6 +1093,190 @@ public class WindowsNativeBuilder extends Executor {
         } catch (Exception ex) {
             throw new BuildException("MSIX signing failed (osslsigncode)", ex);
         }
+    }
+
+    /**
+     * windows.xbox=true: packs the UWP exe into an MSIX that Xbox Developer
+     * Mode can sideload through Device Portal (or a desktop through
+     * Add-AppxPackage). The package is an app-container UWP app -- no
+     * runFullTrust, a Windows.Universal target -- because that is the only kind
+     * the console runs outside the GDK.
+     *
+     * Signing follows windows.msix.pfx / the exe signing configuration. With
+     * no certificate at all a self-signed development certificate is created
+     * whose subject is the manifest Publisher, the package is signed with it
+     * and its public half is written beside the package as
+     * {@code <main class>-dev.cer}: Device Portal asks for exactly that file
+     * when installing, and a desktop must trust it before Add-AppxPackage.
+     */
+    private void buildXboxPackage(BuildRequest request, String arch) {
+        log("Packaging UWP MSIX for Xbox Developer Mode (windows.xbox=true)");
+        // A package installs only when its manifest Publisher equals the signing
+        // certificate's subject. The generated dev certificate is made to match;
+        // a supplied one (often the exe's Authenticode certificate) is not, and
+        // guessing would ship a package every install refuses.
+        boolean hasCert = request.getArg("windows.msix.pfx",
+                request.getArg("windows.signing.pkcs12", null)) != null
+                || (request.getCertificate() != null && request.getCertificate().length > 0);
+        String publisherHint = request.getArg("windows.msix.publisher", null);
+        if (hasCert && (publisherHint == null || publisherHint.trim().length() == 0)) {
+            throw new BuildException("windows.xbox=true is signing with your certificate, so set "
+                    + "windows.msix.publisher to that certificate's subject exactly as Windows shows "
+                    + "it (for example CN=Example, O=Example Ltd); the console refuses a package whose "
+                    + "Publisher differs. Leave out the certificate to have a development one created.");
+        }
+        try {
+            File layout = new File(getBuildDirectory(), "uwp-layout");
+            File assets = new File(layout, "Assets");
+            assets.mkdirs();
+            copy(windowsExecutable, new File(layout, "app.exe"));
+            byte[] icon = request.getIcon();
+            if (icon == null || icon.length == 0) {
+                throw new BuildException("windows.xbox=true needs the app icon to generate the "
+                        + "package logos, but the build request carries no icon.");
+            }
+            createFile(new File(assets, "StoreLogo.png"), icon);
+            createFile(new File(assets, "Square150x150Logo.png"), icon);
+            createFile(new File(assets, "Square44x44Logo.png"), icon);
+            createFile(new File(assets, "SplashScreen.png"), icon);
+            String publisher = xboxPublisher(request);
+            createFile(new File(layout, "AppxManifest.xml"),
+                    buildXboxAppxManifest(request, arch, publisher).getBytes(StandardCharsets.UTF_8));
+
+            File msix = new File(resultDir, request.getMainClass() + ".msix");
+            String makemsix = System.getenv("CN1_MAKEMSIX");
+            if (makemsix == null || makemsix.isEmpty()) {
+                makemsix = "makemsix";
+            }
+            if (!exec(getBuildDirectory(), 600000, makemsix, "pack",
+                    "-d", layout.getAbsolutePath(), "-p", msix.getAbsolutePath()) || !msix.isFile()) {
+                throw new BuildException("MSIX packaging failed. Ensure the `makemsix` tool "
+                        + "(from the msix-packaging project) is on PATH, or point CN1_MAKEMSIX at it.");
+            }
+            if (hasCert) {
+                signMsixPackage(msix, request);
+            } else {
+                File pfx = createXboxDevCertificate(new File(getBuildDirectory(), "uwp-devcert"), publisher,
+                        new File(resultDir, request.getMainClass() + "-dev.cer"));
+                signMsixWith(msix, pfx, "", "sha256");
+            }
+            log("Xbox package: " + msix.getAbsolutePath());
+        } catch (BuildException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new BuildException("Failed to build the Xbox MSIX package", ex);
+        }
+    }
+
+    /**
+     * The manifest Publisher: windows.msix.publisher, else a CN made of the
+     * display name reduced to characters that need no escaping in a
+     * distinguished name (a comma or quote there would make it a different
+     * name from the certificate subject, and the install would be refused).
+     */
+    static String xboxPublisher(BuildRequest request) {
+        String hint = request.getArg("windows.msix.publisher", null);
+        if (hint != null && hint.trim().length() > 0) {
+            return hint.trim();
+        }
+        String cn = request.getDisplayName() == null ? "" : request.getDisplayName().replaceAll("[^A-Za-z0-9 ._-]", "").trim();
+        return "CN=" + (cn.length() == 0 ? "CodenameOneDev" : cn);
+    }
+
+    /**
+     * A self-signed code-signing certificate for sideloading, made with
+     * openssl, in {@code dir}. Returns the PKCS#12 (empty password) and writes
+     * the DER certificate to {@code cerOut}. Package visible because CI creates
+     * one through this method and installs a package signed with it on Windows.
+     */
+    File createXboxDevCertificate(File dir, String publisher, File cerOut) throws Exception {
+        dir.mkdirs();
+        File key = new File(dir, "key.pem");
+        File cert = new File(dir, "cert.pem");
+        File pfx = new File(dir, "dev.pfx");
+        // "CN=a, O=b" -> "/O=b/CN=a": openssl -subj encodes in the order given,
+        // while Windows writes a subject most specific first (the reverse of the
+        // encoding) when it compares it with the manifest Publisher.
+        StringBuilder subj = new StringBuilder();
+        String[] rdns = publisher.split(",");
+        for (int i = rdns.length - 1; i >= 0; i--) {
+            subj.append('/').append(rdns[i].trim());
+        }
+        String openssl = System.getenv("CN1_OPENSSL");
+        if (openssl == null || openssl.isEmpty()) {
+            openssl = "openssl";
+        }
+        boolean ok = exec(dir, 120000, openssl, "req", "-x509", "-newkey", "rsa:2048", "-nodes",
+                "-keyout", key.getAbsolutePath(), "-out", cert.getAbsolutePath(), "-days", "365",
+                "-subj", subj.toString(),
+                "-addext", "basicConstraints=critical,CA:FALSE",
+                "-addext", "keyUsage=critical,digitalSignature",
+                "-addext", "extendedKeyUsage=codeSigning")
+                && exec(dir, 120000, openssl, "pkcs12", "-export", "-inkey", key.getAbsolutePath(),
+                "-in", cert.getAbsolutePath(), "-out", pfx.getAbsolutePath(), "-passout", "pass:")
+                && exec(dir, 120000, openssl, "x509", "-in", cert.getAbsolutePath(),
+                "-outform", "DER", "-out", cerOut.getAbsolutePath());
+        if (!ok || !pfx.isFile() || !cerOut.isFile()) {
+            throw new BuildException("Could not create the Xbox development certificate with openssl "
+                    + "(1.1.1 or newer; CN1_OPENSSL overrides). Alternatively supply windows.msix.pfx "
+                    + "and windows.msix.password with a certificate whose subject is " + publisher + ".");
+        }
+        log("Created a self-signed development certificate " + cerOut.getName()
+                + "; install it with the package (Device Portal asks for it).");
+        return pfx;
+    }
+
+    /**
+     * The UWP AppxManifest for windows.xbox=true. Windows.Universal covers the
+     * console and a desktop alike (Windows.Xbox alone would refuse to install
+     * on the desktop the package is tested on); 10.0.17763 is the oldest
+     * console OS Developer Mode still runs. The entry point is the exe itself:
+     * a CoreApplication app needs no activatable class.
+     */
+    static String buildXboxAppxManifest(BuildRequest request, String arch, String publisher) {
+        String identityName = request.getArg("windows.msix.identityName", request.getPackageName());
+        String version = normalizeMsixVersion(request.getArg("windows.msix.version",
+                request.getVersion() != null ? request.getVersion() : "1.0.0.0"));
+        String displayName = escapeXml(request.getDisplayName());
+        String procArch = ARCH_ARM64.equals(normalizeArch(arch)) ? "arm64" : "x64";
+        StringBuilder sb = new StringBuilder();
+        sb.append("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n")
+          .append("<Package xmlns=\"http://schemas.microsoft.com/appx/manifest/foundation/windows10\"\n")
+          .append("         xmlns:uap=\"http://schemas.microsoft.com/appx/manifest/uap/windows10\"\n")
+          .append("         IgnorableNamespaces=\"uap\">\n")
+          .append("  <Identity Name=\"").append(escapeXml(identityName))
+          .append("\" Publisher=\"").append(escapeXml(publisher))
+          .append("\" Version=\"").append(version)
+          .append("\" ProcessorArchitecture=\"").append(procArch).append("\"/>\n")
+          .append("  <Properties>\n")
+          .append("    <DisplayName>").append(displayName).append("</DisplayName>\n")
+          .append("    <PublisherDisplayName>").append(escapeXml(request.getVendor() != null
+                  ? request.getVendor() : request.getDisplayName())).append("</PublisherDisplayName>\n")
+          .append("    <Logo>Assets\\StoreLogo.png</Logo>\n")
+          .append("  </Properties>\n")
+          .append("  <Dependencies>\n")
+          .append("    <TargetDeviceFamily Name=\"Windows.Universal\" MinVersion=\"10.0.17763.0\" "
+                  + "MaxVersionTested=\"10.0.26100.0\"/>\n")
+          .append("  </Dependencies>\n")
+          .append("  <Resources>\n")
+          .append("    <Resource Language=\"en-us\"/>\n")
+          .append("  </Resources>\n")
+          .append("  <Applications>\n")
+          .append("    <Application Id=\"App\" Executable=\"app.exe\" EntryPoint=\"App\">\n")
+          .append("      <uap:VisualElements DisplayName=\"").append(displayName)
+          .append("\" Description=\"").append(displayName)
+          .append("\" BackgroundColor=\"transparent\" "
+                  + "Square150x150Logo=\"Assets\\Square150x150Logo.png\" "
+                  + "Square44x44Logo=\"Assets\\Square44x44Logo.png\">\n")
+          .append("        <uap:SplashScreen Image=\"Assets\\SplashScreen.png\"/>\n")
+          .append("      </uap:VisualElements>\n")
+          .append("    </Application>\n")
+          .append("  </Applications>\n")
+          .append("  <Capabilities>\n")
+          .append("    <Capability Name=\"internetClient\"/>\n")
+          .append("  </Capabilities>\n")
+          .append("</Package>\n");
+        return sb.toString();
     }
 
     /** Pads/truncates a version string to the four numeric parts MSIX requires. */
