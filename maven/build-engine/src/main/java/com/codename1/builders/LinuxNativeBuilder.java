@@ -612,6 +612,16 @@ public class LinuxNativeBuilder extends Executor {
         if (zigAvailable() || "zig".equalsIgnoreCase(request.getArg("linux.toolchain", ""))) {
             return writeZigCcWrapper(arch, false).getAbsolutePath();
         }
+        // The host cc only builds for the host. A board of another architecture with
+        // no cross compiler used to "succeed" here and fail far later, or hand the
+        // board a binary it cannot run; say what is needed instead.
+        if (!arch.equals(detectHostArch())
+                && request.getArg("linux.sysroot", "").trim().isEmpty()) {
+            throw new BuildException("Building for " + arch + " on a " + detectHostArch()
+                    + " machine needs a cross compiler, and zig was not found. Install zig "
+                    + "(https://ziglang.org/download/) and put it on the PATH or set CN1_ZIG, "
+                    + "or point linux.cc at a cross compiler, or set linux.sysroot to a board SDK.");
+        }
         log("zig not found (set CN1_ZIG or install zig); building with the host 'cc'. "
                 + "The binary will require the build host's glibc version -- install zig for a "
                 + "portable old-glibc binary.");

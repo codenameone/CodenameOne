@@ -298,6 +298,8 @@ include::Working-With-Linux.asciidoc[]
 
 include::Embedded-Linux.asciidoc[]
 
+include::Realtime.asciidoc[]
+
 include::Desktop-Integration.asciidoc[]
 
 include::Desktop-Windows.asciidoc[]

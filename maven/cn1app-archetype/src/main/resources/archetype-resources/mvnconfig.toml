@@ -58,6 +58,21 @@ command=["$MVNW", "package", "-DskipTests", "-Dcodename1.platform=linux", "-Dcod
 label="Linux Device Build"
 group="Cloud"
 
+[linux_local]
+command=["$MVNW", "cn1:buildLinuxLocal", "-U", "-e"]
+label="Linux Local Build"
+group="Local"
+
+[device]
+command=["$MVNW", "cn1:runOnDevice", "-Dcn1.board=rpi5", "-Dcn1.device.host=raspberrypi.local", "-U", "-e"]
+label="Run on Device"
+run=true
+
+[device_logs]
+command=["$MVNW", "cn1:device-logs", "-Dcn1.device.host=raspberrypi.local", "-e"]
+label="Device Logs"
+run=true
+
 
 [xcode]
 command=["$MVNW", "package", "-DskipTests", "-Dcodename1.platform=ios", "-Dcodename1.buildTarget=ios-source", "-U", "-e"]

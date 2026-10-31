@@ -26,6 +26,7 @@ on:
       - 'vm/JavaAPI/src/**'
       - 'maven/linux/**'
       - 'scripts/embedded/**'
+      - 'vm/backend/**'
       - '.github/workflows/embedded-linux.yml'
   pull_request:
     paths:
@@ -35,6 +36,7 @@ on:
       - 'vm/JavaAPI/src/**'
       - 'maven/linux/**'
       - 'scripts/embedded/**'
+      - 'vm/backend/**'
       - '.github/workflows/embedded-linux.yml'
 
 concurrency:
@@ -70,7 +72,7 @@ jobs:
           RETRY_DELAY_SECONDS: '60'
         run: |
           cd maven
-          bash ../scripts/ci/retry.sh mvn -B -pl core,linux -am install \
+          bash ../scripts/ci/retry.sh mvn -B -pl core,linux,backend,codenameone-maven-plugin -am install \
             -DskipTests -Dmaven.javadoc.skip=true -Plocal-dev-javase \
             -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
             -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
@@ -118,6 +120,24 @@ jobs:
           python3 scripts/embedded/check-demo-run.py --max-rss-mb 160 \
             --reference "$B/result/frame60.png" "$B/result/gpu/demo.log" "$B/result/gpu/frame60.png" \
             "$GITHUB_STEP_SUMMARY"
+
+      # The real-time check (vm/backend/demo/rtcheck): a 1 kHz loop beside a thread
+      # that keeps the collector busy, a cycle that allocates where the build cannot
+      # see it, and the memory limit. Run as root so SCHED_FIFO and mlockall apply.
+      # The runner's kernel is not PREEMPT_RT and its cores are shared, so the
+      # latency is reported and bounded loosely (20ms): what this gates is that the
+      # collector never stops the loop, which shows up as a missed run of periods,
+      # not as tens of microseconds.
+      - name: Real-time threads under collector load
+        run: |
+          bash scripts/ci/apt-get-update.sh
+          sudo apt-get install -y clang libssl-dev libnghttp2-dev libcurl4-openssl-dev
+          export JDK_8_HOME="$JAVA_HOME"
+          (cd vm/backend && CN1_BACKEND_DEMO=demo/rtcheck \
+            ./build.sh RtCheck com.demo "$RUNNER_TEMP/rtcheck")
+          sudo timeout 120 "$RUNNER_TEMP/rtcheck" 10 20000 | tee "$RUNNER_TEMP/rtcheck.log"
+          grep '^RTCHECK' "$RUNNER_TEMP/rtcheck.log" >> "$GITHUB_STEP_SUMMARY"
+          grep -q '^RTCHECK OK' "$RUNNER_TEMP/rtcheck.log"
 
       - name: Upload the run
         if: always()
