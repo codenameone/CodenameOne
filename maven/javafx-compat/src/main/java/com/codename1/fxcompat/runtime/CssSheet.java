@@ -110,6 +110,41 @@ final class CssSheet {
     final HashSet<String> ancestorClasses = new HashSet<String>();
     final HashSet<String> ancestorTypes = new HashSet<String>();
     PseudoClass[] ancestorPseudos = new PseudoClass[0];
+    /// For each of [#ancestorPseudos], the compounds that require it:
+    /// a node's state of that pseudo-class can only change how a
+    /// descendant is styled when the node also has everything else one of
+    /// them asks for. Without this, a single `.button:pressed .text` made
+    /// pressing anything restyle the whole scene below it, on every tap.
+    PseudoGuard[][] pseudoGuards = new PseudoGuard[0][];
+
+    /// The id, type and classes an ancestor compound requires besides a
+    /// pseudo-class; `null` and empty mean any.
+    static final class PseudoGuard {
+        final String id;
+        final String type;
+        final String[] classes;
+
+        PseudoGuard(String id, String type, String[] classes) {
+            this.id = id;
+            this.type = type;
+            this.classes = classes;
+        }
+
+        boolean matches(String nodeId, String nodeType, java.util.List<String> nodeClasses) {
+            if (id != null && !id.equals(nodeId)) {
+                return false;
+            }
+            if (type != null && !type.equals(nodeType)) {
+                return false;
+            }
+            for (int i = 0; i < classes.length; i++) {
+                if (!nodeClasses.contains(classes[i])) {
+                    return false;
+                }
+            }
+            return true;
+        }
+    }
     private int ruleCount;
 
     private CssSheet() {
@@ -199,6 +234,7 @@ final class CssSheet {
         HashMap<String, ArrayList<Rule>> types = new HashMap<String, ArrayList<Rule>>();
         ArrayList<Rule> any = new ArrayList<Rule>();
         ArrayList<PseudoClass> pseudos = new ArrayList<PseudoClass>();
+        ArrayList<ArrayList<PseudoGuard>> guards = new ArrayList<ArrayList<PseudoGuard>>();
         for (int r = 0; r < rules.size(); r++) {
             Rule rule = rules.get(r);
             CssSelector s = rule.selector;
@@ -221,10 +257,18 @@ final class CssSheet {
                 for (int j = 0; j < s.classCount(c); j++) {
                     ancestorClasses.add(s.styleClass(c, j));
                 }
+                String[] required = new String[s.classCount(c)];
+                for (int j = 0; j < required.length; j++) {
+                    required[j] = s.styleClass(c, j);
+                }
                 for (int j = 0; j < rule.pseudo[c].length; j++) {
-                    if (!pseudos.contains(rule.pseudo[c][j])) {
+                    int at = pseudos.indexOf(rule.pseudo[c][j]);
+                    if (at < 0) {
+                        at = pseudos.size();
                         pseudos.add(rule.pseudo[c][j]);
+                        guards.add(new ArrayList<PseudoGuard>());
                     }
+                    guards.get(at).add(new PseudoGuard(s.id(c), s.type(c), required));
                 }
             }
         }
@@ -233,6 +277,10 @@ final class CssSheet {
         freeze(types, byType);
         universal = any.toArray(NO_RULES);
         ancestorPseudos = pseudos.toArray(new PseudoClass[pseudos.size()]);
+        pseudoGuards = new PseudoGuard[guards.size()][];
+        for (int i = 0; i < pseudoGuards.length; i++) {
+            pseudoGuards[i] = guards.get(i).toArray(new PseudoGuard[guards.get(i).size()]);
+        }
     }
 
     private static void file(HashMap<String, ArrayList<Rule>> into, String key, Rule rule) {

@@ -404,7 +404,8 @@ public final class CssEngine extends StyleEngine {
             consider(sheet.byType.get(type), node, s);
             consider(sheet.universal, node, s);
             for (int p = 0; p < sheet.ancestorPseudos.length; p++) {
-                if (node.cn1HasPseudoClass(sheet.ancestorPseudos[p])) {
+                if (node.cn1HasPseudoClass(sheet.ancestorPseudos[p])
+                        && guarded(sheet.pseudoGuards[p], id, type, classes)) {
                     signature = signature * 31 + (p + 1) * 7919L + s;
                 }
             }
@@ -459,6 +460,16 @@ public final class CssEngine extends StyleEngine {
         want(FONT_STYLE, state.posture);
         apply(node, state);
         return changed && !fresh;
+    }
+
+    private static boolean guarded(CssSheet.PseudoGuard[] guards, String id, String type,
+            java.util.List<String> classes) {
+        for (int i = 0; i < guards.length; i++) {
+            if (guards[i].matches(id, type, classes)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void want(int property, Object value) {
