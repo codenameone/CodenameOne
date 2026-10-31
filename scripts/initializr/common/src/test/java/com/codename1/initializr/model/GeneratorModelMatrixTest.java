@@ -423,11 +423,11 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 "package " + packageName + ".api;", label + "the contract moves to the project's package");
         assertContains(getText(entries, "backend/src/main/java/" + packagePath + "/SecurityConfig.java"),
                 "package " + packageName + ";", label + "the server moves to the project's package");
-        assertNotNull(entries.get("backend/src/main/resources/db/migration/" + (game ? "V1__game.sql" : bank ? "V4__accounts.sql" : "V1__accounts.sql")),
+        assertNotNull(entries.get("backend/src/main/resources/db/migration/" + (game ? "V1__game.sql" : bank ? "V4__accounts.sql" : studio ? "V2__accounts.sql" : "V1__accounts.sql")),
                 label + "the server keeps its migrations");
-        assertNotNull(entries.get("backend/src/test/java/" + packagePath + (game ? "/GameSocketTest.java" : rides ? "/RideFlowTest.java" : chat ? "/MessagingTest.java" : bank ? "/LedgerTest.java" : video ? "/PlaybackTest.java" : "/OrderFlowTest.java")),
+        assertNotNull(entries.get("backend/src/test/java/" + packagePath + (game ? "/GameSocketTest.java" : rides ? "/RideFlowTest.java" : chat ? "/MessagingTest.java" : bank ? "/LedgerTest.java" : video ? "/PlaybackTest.java" : studio ? "/StudioTest.java" : "/OrderFlowTest.java")),
                 label + "the server keeps its tests");
-        assertNotNull(entries.get("common/src/main/java/" + packagePath + (game ? "/ui/HomeForm.java" : rides ? "/rider/RiderForm.java" : chat ? "/ui/ChatForm.java" : bank ? "/ui/HomeForm.java" : video ? "/ui/WelcomeForm.java" : "/customer/CustomerForm.java")),
+        assertNotNull(entries.get("common/src/main/java/" + packagePath + (game ? "/ui/HomeForm.java" : rides ? "/rider/RiderForm.java" : chat ? "/ui/ChatForm.java" : bank ? "/ui/HomeForm.java" : video ? "/ui/WelcomeForm.java" : studio ? "/member/MemberForm.java" : "/customer/CustomerForm.java")),
                 label + "the app's screens move to the project's package");
         if (!game) {
             assertNotNull(entries.get("common/src/main/l10n/Bundle.properties"), label + "the app keeps its bundle");
@@ -452,6 +452,11 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 // from the library.
                 assertContains(settings, "codename1.arg.ios.NSPhotoLibraryUsageDescription=",
                         label + "the template's iOS photo library prompt");
+            } else if (studio) {
+                // The studio asks for no location; it reads workouts from Health
+                // and scans the door pass with the camera.
+                assertContains(settings, "codename1.arg.ios.NSHealthShareUsageDescription=",
+                        label + "the template's iOS Health prompt");
             } else if (!game) {
                 assertContains(settings, "codename1.arg.ios.NSLocationWhenInUseUsageDescription=",
                         label + "the template's iOS location prompt");

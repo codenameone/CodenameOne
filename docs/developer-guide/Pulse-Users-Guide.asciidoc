@@ -240,7 +240,7 @@ them for the people they coach: 10 for each check-in to their classes, 5 for eac
 kudos on a workout from them, and 25 for a class with every place booked. The points
 count over the last eight weeks, so a level reflects how the trainer is coaching now
 rather than how they once did, and every 400 points is a level. The ring shows the
-level and the way to the next one, and beside it are the weeks running in which the
+level and the way to the next one, and next to it are the weeks running in which the
 trainer taught, and their place among the studio's coaches.
 
 image::img/pulse-trainer-home.png["The trainer's home with the class on now, the coach's level ring with points, streak and rank, and the coach badges",scaledwidth=40%]
