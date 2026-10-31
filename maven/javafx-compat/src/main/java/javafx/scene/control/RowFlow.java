@@ -28,6 +28,7 @@ import javafx.event.EventHandler;
 import javafx.geometry.Insets;
 import javafx.geometry.Point2D;
 import javafx.scene.Node;
+import javafx.scene.Scene;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.Background;
@@ -205,7 +206,16 @@ final class RowFlow extends Region {
         double v = value < 0 || Double.isNaN(value) ? 0 : (value > max ? max : value);
         if (Double.compare(v, offset) != 0) {
             offset = v;
-            requestLayout();
+            // A new offset moves rows and fills the ones that came into
+            // view; it changes no size, so the ancestors are not asked to
+            // lay out again (requestLayout would clear every size cache up
+            // to the scene on each frame of a drag). The pulse's layout
+            // pass walks the whole tree and finds this flow marked.
+            cn1MarkNeedsLayout();
+            Scene s = getScene();
+            if (s != null) {
+                s.cn1RequestPulse();
+            }
         }
     }
 
