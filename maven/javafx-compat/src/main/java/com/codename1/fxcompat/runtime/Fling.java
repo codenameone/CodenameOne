@@ -41,6 +41,11 @@ public final class Fling implements FrameClock.Pulse {
         /// Scrolls by a distance; answers false when the view could not
         /// move the whole way, which ends the glide.
         boolean flingBy(double delta);
+
+        /// The glide reached an end still moving at `speed` pixels a
+        /// millisecond; a view that stretches past its ends carries it on.
+        default void reachedEnd(double speed) {
+        }
     }
 
     /// The fraction of its speed a glide keeps per millisecond, the
@@ -147,7 +152,11 @@ public final class Fling implements FrameClock.Pulse {
         double kept = MathUtil.pow(DECAY, ms);
         double delta = speed * (kept - 1) / k;
         speed *= kept;
-        if (!target.flingBy(delta) || Math.abs(speed) < MIN_SPEED) {
+        if (!target.flingBy(delta)) {
+            double left = speed;
+            stop();
+            target.reachedEnd(left);
+        } else if (Math.abs(speed) < MIN_SPEED) {
             stop();
         }
     }

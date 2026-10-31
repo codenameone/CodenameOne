@@ -171,7 +171,25 @@ public class ScrollPane extends Control {
                     double after = offset(getVvalue(), getVmin(), getVmax(), extentY);
                     return Math.abs(after - before - delta) < 0.5;
                 }
+
+                @Override
+                public void reachedEnd(double speed) {
+                    overscroll.bounce(speed, viewport.getHeight());
+                }
             });
+    /// The stretch past the top or the bottom while a finger drags beyond
+    /// it, and the spring back after.
+    private final com.codename1.fxcompat.runtime.Overscroll overscroll = new com.codename1.fxcompat.runtime.Overscroll(
+            new com.codename1.fxcompat.runtime.Overscroll.Target() {
+                @Override
+                public void overscrollChanged() {
+                    placeContent();
+                }
+            });
+    /// How far past an end the press began, so a press on a stretched
+    /// view holds it where it is.
+    private double pressBeyond;
+    private boolean pressCancelled;
 
     private void init() {
         getStyleClass().add("scroll-pane");
@@ -180,6 +198,7 @@ public class ScrollPane extends Control {
         addEventHandler(ScrollEvent.SCROLL, new EventHandler<ScrollEvent>() {
             @Override
             public void handle(ScrollEvent event) {
+                overscroll.reset();
                 if (scrollBy(-event.getDeltaX(), -event.getDeltaY())) {
                     event.consume();
                 }
@@ -190,12 +209,21 @@ public class ScrollPane extends Control {
             public void handle(MouseEvent event) {
                 fling.stop();
                 rememberPress(event);
+                pressBeyond = overscroll.grab();
+                pressCancelled = false;
                 panning = isPannable() || (Display.isInitialized() && !Display.getInstance().isDesktop());
             }
         });
         addEventHandler(MouseEvent.MOUSE_DRAGGED, new EventHandler<MouseEvent>() {
             @Override
             public void handle(MouseEvent event) {
+                if (panning && !pressCancelled && getScene() != null
+                        && Math.max(Math.abs(pressX - event.getSceneX()), Math.abs(pressY - event.getSceneY())) > 4) {
+                    // A drag is a scroll: what it began on is not being
+                    // pressed, and must not stay shaded as if it were.
+                    pressCancelled = true;
+                    getScene().cn1CancelPress();
+                }
                 if (panning && panTo(pressX - event.getSceneX(), pressY - event.getSceneY())) {
                     fling.track(offset(getVvalue(), getVmin(), getVmax(), contentHeight - viewport.getHeight()));
                     event.consume();
@@ -206,7 +234,11 @@ public class ScrollPane extends Control {
             @Override
             public void handle(MouseEvent event) {
                 if (panning) {
-                    fling.release();
+                    if (overscroll.value() != 0) {
+                        overscroll.release();
+                    } else {
+                        fling.release();
+                    }
                 }
                 panning = false;
             }
@@ -314,7 +346,9 @@ public class ScrollPane extends Control {
             setHvalue(valueAt(offset(pressH, getHmin(), getHmax(), extentX) + dx, getHmin(), getHmax(), extentX));
         }
         if (extentY > 0 && !vvalue.isBound()) {
-            setVvalue(valueAt(offset(pressV, getVmin(), getVmax(), extentY) + dy, getVmin(), getVmax(), extentY));
+            double to = offset(pressV, getVmin(), getVmax(), extentY) + pressBeyond + dy;
+            setVvalue(valueAt(to, getVmin(), getVmax(), extentY));
+            overscroll.drag(to < 0 ? to : (to > extentY ? to - extentY : 0), viewport.getHeight());
         }
         return extentX > 0 || extentY > 0;
     }
@@ -330,7 +364,8 @@ public class ScrollPane extends Control {
         if (c != null && c.getParent() == viewport) {
             Bounds lb = c.getLayoutBounds();
             c.setLayoutX(-ox - lb.getMinX());
-            c.setLayoutY(-oy - lb.getMinY());
+            // A stretch past an end moves the content and nothing else.
+            c.setLayoutY(-oy - snapPositionY(overscroll.value()) - lb.getMinY());
         }
         Bounds old = viewportBounds.get();
         if (old == null || old.getMinX() != -ox || old.getMinY() != -oy || old.getWidth() != vw

@@ -698,6 +698,13 @@ public class Scene implements EventTarget {
         }
     }
 
+    /// Takes the pressed look off the nodes under a press, for a scroller
+    /// that has taken a drag: on a touch screen that drag is a scroll, not
+    /// a press of the row it began on.
+    public final void cn1CancelPress() {
+        clearPressed();
+    }
+
     private void clearPressed() {
         for (int i = 0; i < pressedNodes.size(); i++) {
             pressedNodes.get(i).cn1SetPressed(false);

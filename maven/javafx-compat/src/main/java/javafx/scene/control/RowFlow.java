@@ -98,6 +98,20 @@ final class RowFlow extends Region {
                     scrollTo(offset + delta);
                     return Math.abs(offset - before - delta) < 0.5;
                 }
+
+                @Override
+                public void reachedEnd(double speed) {
+                    overscroll.bounce(speed, getHeight());
+                }
+            });
+    /// The stretch past either end while a finger drags beyond it, and the
+    /// spring back after.
+    private final com.codename1.fxcompat.runtime.Overscroll overscroll = new com.codename1.fxcompat.runtime.Overscroll(
+            new com.codename1.fxcompat.runtime.Overscroll.Target() {
+                @Override
+                public void overscrollChanged() {
+                    requestLayout();
+                }
             });
 
     RowFlow(Rows rows) {
@@ -113,6 +127,7 @@ final class RowFlow extends Region {
             @Override
             public void handle(ScrollEvent event) {
                 double before = offset;
+                overscroll.reset();
                 scrollTo(offset - event.getDeltaY());
                 if (Double.compare(before, offset) != 0) {
                     event.consume();
@@ -124,7 +139,7 @@ final class RowFlow extends Region {
             public void handle(MouseEvent event) {
                 fling.stop();
                 pressY = event.getSceneY();
-                pressOffset = offset;
+                pressOffset = offset + overscroll.grab();
                 dragging = false;
             }
         });
@@ -134,10 +149,18 @@ final class RowFlow extends Region {
                 double moved = event.getSceneY() - pressY;
                 if (!dragging && Math.abs(moved) > DRAG_SLOP) {
                     dragging = true;
+                    // A drag is a scroll: the row under the finger is not
+                    // being pressed, and must not stay shaded as if it were.
+                    if (getScene() != null) {
+                        getScene().cn1CancelPress();
+                    }
                 }
                 if (dragging) {
-                    scrollTo(pressOffset - moved);
-                    fling.track(offset);
+                    double to = pressOffset - moved;
+                    scrollTo(to);
+                    double max = maxOffset();
+                    overscroll.drag(to < 0 ? to : (to > max ? to - max : 0), getHeight());
+                    fling.track(to < 0 ? 0 : Math.min(to, max));
                 }
             }
         });
@@ -145,7 +168,11 @@ final class RowFlow extends Region {
             @Override
             public void handle(MouseEvent event) {
                 if (dragging) {
-                    fling.release();
+                    if (overscroll.value() != 0) {
+                        overscroll.release();
+                    } else {
+                        fling.release();
+                    }
                 }
                 dragging = false;
             }
@@ -168,8 +195,9 @@ final class RowFlow extends Region {
         }
         // From the first row in view: a row is shaded to the edge of the
         // view, past its last cell, and so is the room below the rows.
-        int first = (int) Math.floor(offset / rh);
-        double y = first * rh - offset;
+        double shown = offset + overscroll.value();
+        int first = (int) Math.floor(shown / rh);
+        double y = first * rh - shown;
         Color alt = com.codename1.fxcompat.runtime.CssEngine.themeColor(this, "-fx-control-inner-background-alt");
         if (alt == null) {
             return;
@@ -354,7 +382,7 @@ final class RowFlow extends Region {
                 IndexedCell<?> cell = slot[c];
                 rows.updateCell(cell, c, row < count ? row : -1, force);
                 cell.setVisible(ws[c] > 0);
-                cell.resizeRelocate(xs[c], row * rh - offset, ws[c], rh);
+                cell.resizeRelocate(xs[c], row * rh - offset - overscroll.value(), ws[c], rh);
             }
         }
         force = false;
