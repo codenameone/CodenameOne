@@ -268,11 +268,31 @@ public class BackendPackager {
 
         prepareSources(work, runtimeVersion);
         compile(jdk, javaApi, runtimeSources, classes);
+        // Backend libraries are wired as the module's own classes, exactly as
+        // process-annotations does on the JVM; see BackendLibraries.
+        try {
+            BackendLibraries.merge(compileClasspathWithoutRuntime(), classes);
+        } catch (IOException ex) {
+            throw new BuildExecutionException("Could not merge the backend libraries: "
+                    + ex.getMessage(), ex);
+        }
         // Generated code stays at Java 8, but its compiler must be able to read
         // the application's newer class files (including when Maven runs on 8).
+        boolean generated = false;
         try (JavaSourceCompiler.CompilerScope ignored = JavaSourceCompiler.useJdk(jdk)) {
             generateControllers(classes, work);
             afterGenerate(jdk, javaApi, classes, work);
+            generated = true;
+        } finally {
+            // After the rewrites above, failed or not; see AnnotationProcessing.run.
+            try {
+                BackendLibraries.restamp(classes);
+            } catch (IOException ex) {
+                if (generated) {
+                    throw new BuildExecutionException("Could not record the merged backend "
+                            + "libraries: " + ex.getMessage(), ex);
+                }
+            }
         }
         requireMainClass(classes);
         translate(jdk, compilerJar, javaApi, classes, nativeSources, translated,
@@ -843,7 +863,22 @@ public class BackendPackager {
         boolean any = false;
         for (int i = 0; i < classpath.size(); i++) {
             File element = new File(classpath.get(i));
-            if (element.isDirectory()) {
+            if (BackendLibraries.isLibrary(element)) {
+                // Its classes were merged into the module's own; only its
+                // natives are taken from here, so no class is translated twice.
+                // Tested before the directory branch: a sibling reactor module's
+                // target/classes is a library too.
+                if (element.isDirectory()) {
+                    File natives = new File(element, "cn1-native");
+                    if (natives.isDirectory()) {
+                        mkdirs(nativeSources);
+                        copyDirectoryFirstWins(natives, nativeSources);
+                    }
+                } else {
+                    File scratch = new File(staged.getParentFile(), "backend-library-" + i);
+                    unzip(element, scratch, nativeSources, true);
+                }
+            } else if (element.isDirectory()) {
                 copyDirectoryFirstWins(element, staged, nativeSources);
                 any = true;
             } else if (element.isFile()) {

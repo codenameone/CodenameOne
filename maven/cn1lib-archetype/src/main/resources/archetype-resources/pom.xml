@@ -63,6 +63,8 @@
         <kotlin.compiler.jvmTarget>1.8</kotlin.compiler.jvmTarget>
     </properties>
     <modules>
+        <!-- Before common: the cn1lib that common packs includes its classes. -->
+        <module>backend</module>
         <module>common</module>
         <module>android</module>
         <module>ios</module>
@@ -87,6 +89,11 @@
             <dependency>
                 <groupId>com.codenameone</groupId>
                 <artifactId>codenameone-javase</artifactId>
+                <version>${cn1.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-backend</artifactId>
                 <version>${cn1.version}</version>
             </dependency>
             <dependency>

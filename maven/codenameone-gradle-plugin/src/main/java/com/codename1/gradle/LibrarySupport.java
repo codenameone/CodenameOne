@@ -58,6 +58,7 @@ import java.util.Set;
 /// | `G:N-common` | the compiled library, with `codenameone_library_appended.properties` and `codenameone_library_required.properties` under `META-INF/codenameone/G/N-common/` |
 /// | `G:N-common:cn1css@zip` | `src/main/css`, merged into an application's theme |
 /// | `G:N-<platform>` | `src/<platform>/<lang>` (compiled, for `javase`), one per platform |
+/// | `G:N-backend` | `src/backend/java`, compiled against the backend runtime and marked as a backend library; only when it or `src/backend/resources` has files |
 /// | `G:N-lib@pom` | what applications depend on: the common jar and CSS, plus one `codename1.platform` profile per platform |
 ///
 /// `./gradlew publishToMavenLocal` installs it; any `publishing { repositories }`
@@ -442,6 +443,7 @@ final class LibrarySupport {
                         });
                     });
         }
+        registerBackend(project, layout, ext, publishing, name);
         publishing.getPublications().create("cn1libLib", MavenPublication.class, pub -> {
             pub.setArtifactId(name + "-lib");
             pub.getPom().setPackaging("pom");
@@ -451,5 +453,72 @@ final class LibrarySupport {
                 sb.append(Cn1libPom.render(group.get(), name, version.get(), platforms, hasCss));
             });
         });
+    }
+
+    /// The server half of the library, from `src/backend/java` and
+    /// `src/backend/resources`: compiled against the backend runtime, published
+    /// as `N-backend` and marked as a backend library, so a server that depends
+    /// on it wires its controllers, beans and entities as its own (see
+    /// `BackendLibraries`). The Maven archetype's `backend` module and the
+    /// `.cn1lib`'s `backend.zip` carry the same classes.
+    ///
+    /// Not annotation processed here: the server does that, and a library's
+    /// generated wiring would collide with the server's.
+    private static void registerBackend(final Project project, final ProjectLayout layout,
+                                        final CodenameOneExtension ext, PublishingExtension publishing,
+                                        final String name) {
+        final File sources = new File(layout.projectDir(), "src" + File.separator + "backend"
+                + File.separator + "java");
+        // A server half with only resources -- migrations, say -- is one too.
+        if (!hasFiles(sources) && !hasFiles(new File(layout.projectDir(), "src" + File.separator
+                + "backend" + File.separator + "resources"))) {
+            return;
+        }
+        SourceSetContainer sourceSets = project.getExtensions().getByType(JavaPluginExtension.class).getSourceSets();
+        final SourceSet backend = sourceSets.create("backend", ss -> {
+            ss.getJava().setSrcDirs(Collections.singletonList(sources));
+            ss.getResources().setSrcDirs(Collections.singletonList(new File(layout.projectDir(),
+                    "src" + File.separator + "backend" + File.separator + "resources")));
+        });
+        // The server that uses the library brings its own runtime.
+        AppSupport.addFramework(project, backend.getCompileOnlyConfigurationName(), ext.getVersion(),
+                "codenameone-backend");
+        final File markerDir = new File(project.getLayout().getBuildDirectory().getAsFile().get(),
+                "cn1-backend-marker");
+        final TaskProvider<org.gradle.api.Task> marker = project.getTasks().register("cn1libBackendMarker", t -> {
+            t.getOutputs().dir(markerDir);
+            t.doLast("cn1BackendMarker", x -> {
+                File file = new File(markerDir, "META-INF" + File.separator + "codenameone"
+                        + File.separator + "backend-library");
+                if (!file.getParentFile().isDirectory() && !file.getParentFile().mkdirs()) {
+                    throw new org.gradle.api.GradleException("Could not create " + file.getParentFile());
+                }
+                try {
+                    java.nio.file.Files.write(file.toPath(), new byte[0]);
+                } catch (java.io.IOException e) {
+                    throw new org.gradle.api.GradleException("Could not write " + file, e);
+                }
+            });
+        });
+        final TaskProvider<Jar> jar = project.getTasks().register("cn1libBackendJar", Jar.class, j -> {
+            j.setGroup(AppSupport.GROUP);
+            j.setDescription("Packages the library's server half");
+            j.getArchiveBaseName().set(name + "-backend");
+            j.from(backend.getOutput());
+            j.from(marker);
+        });
+        // The same jar for a server in this build that declares
+        // implementation(project(path = ":lib", configuration = "cn1libBackendElements")).
+        Configuration elements = project.getConfigurations().create("cn1libBackendElements", c -> {
+            c.setCanBeConsumed(true);
+            c.setCanBeResolved(false);
+            c.setDescription("The library's server half, for servers in this build");
+        });
+        project.getArtifacts().add(elements.getName(), jar);
+        publishing.getPublications().create("cn1libBackend", MavenPublication.class,
+                pub -> {
+                    pub.setArtifactId(name + "-backend");
+                    pub.artifact(jar);
+                });
     }
 }

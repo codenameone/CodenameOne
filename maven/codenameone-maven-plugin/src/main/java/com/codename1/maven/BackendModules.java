@@ -58,7 +58,11 @@ final class BackendModules {
         return true;
     }
 
-    private static boolean dependsOnBackend(MavenProject project) {
+    static boolean dependsOnBackend(MavenProject project) {
+        if (project == null) {
+            // A mojo run outside a build, as the plugin's tests do.
+            return false;
+        }
         Set<Artifact> artifacts = project.getArtifacts();
         if (artifacts == null) {
             return false;

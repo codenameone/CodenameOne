@@ -27,6 +27,7 @@ on:
       - 'maven/integration-tests/cn1app-archetype-test.sh'
       - 'maven/integration-tests/cn1app-staged-jar-test.sh'
       - 'maven/integration-tests/cn1app-minimal-layout-test.sh'
+      - 'maven/integration-tests/backend-cn1lib-test.sh'
       - 'scripts/initializr/common/src/main/resources/common-hosted-platform-profiles.xml'
       - 'scripts/initializr/common/src/main/resources/backend-only-pom.xml'
       # What a generated project stages for upload also depends on the
@@ -54,6 +55,7 @@ on:
       - 'maven/integration-tests/cn1app-archetype-test.sh'
       - 'maven/integration-tests/cn1app-staged-jar-test.sh'
       - 'maven/integration-tests/cn1app-minimal-layout-test.sh'
+      - 'maven/integration-tests/backend-cn1lib-test.sh'
       - 'scripts/initializr/common/src/main/resources/common-hosted-platform-profiles.xml'
       - 'scripts/initializr/common/src/main/resources/backend-only-pom.xml'
       # What a generated project stages for upload also depends on the
@@ -140,6 +142,15 @@ jobs:
         run: |
           cd maven/integration-tests
           xvfb-run -a bash cn1app-archetype-test.sh
+      # A cn1lib with a server half, used by a generated server: the library's
+      # controller, bean, entity, repository and migration are wired by the
+      # server's build, on the JVM and natively.
+      - name: Check a cn1lib's backend part in a generated server
+        env:
+          CN1_BACKEND_PACKAGE_REQUIRED: '1'
+        run: |
+          cd maven/integration-tests
+          env -u DISPLAY -u WAYLAND_DISPLAY bash backend-cn1lib-test.sh
       # The jar cn1:build would upload, for every target the generated build.sh
       # offers. #5380 put ~300 MB of ffmpeg natives into every desktop upload and
       # the build client refused them; nothing looked at this jar for two months.

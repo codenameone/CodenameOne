@@ -73,7 +73,30 @@ public final class ClassScanner {
         Map<String, AnnotatedClass> out = new LinkedHashMap<String, AnnotatedClass>();
         if (root == null || !root.isDirectory()) return out;
         scan(root, out);
+        markLibraryClasses(root, out);
         return out;
+    }
+
+    /// Marks what a backend library contributed to `root` (see
+    /// `com.codename1.maven.BackendLibraries`): those classes have no source
+    /// in the module, and the checks that drop a class whose source was
+    /// deleted must not read them as stale.
+    private static void markLibraryClasses(File root, Map<String, AnnotatedClass> out)
+            throws ProcessingException {
+        java.util.Set<String> merged;
+        try {
+            merged = com.codename1.maven.BackendLibraries.mergedPaths(root);
+        } catch (IOException e) {
+            throw new ProcessingException("Could not read the backend library record under " + root, e);
+        }
+        for (String path : merged) {
+            if (path.endsWith(".class")) {
+                AnnotatedClass cls = out.get(path.substring(0, path.length() - ".class".length()));
+                if (cls != null) {
+                    cls.setFromBackendLibrary(true);
+                }
+            }
+        }
     }
 
     private static void scan(File dir, Map<String, AnnotatedClass> out) throws ProcessingException {

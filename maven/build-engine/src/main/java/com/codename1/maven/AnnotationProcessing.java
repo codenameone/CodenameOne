@@ -109,6 +109,19 @@ public final class AnnotationProcessing {
         return this;
     }
 
+    /// Whether backend libraries on the classpath are merged into the output
+    /// first; see [BackendLibraries].
+    private boolean mergeBackendLibraries;
+
+    /// Merges the backend libraries on the compile classpath into the output
+    /// directory before anything scans it, so their controllers, beans and
+    /// entities are wired as the module's own. For a module's main classes
+    /// only: its tests see the merged classes through the main output.
+    public AnnotationProcessing withBackendLibraries(boolean merge) {
+        this.mergeBackendLibraries = merge;
+        return this;
+    }
+
     /// The compile classpath without [#ownClassDirectories].
     private List<String> dependencyClasspath() {
         if (ownClassDirectories.isEmpty()) {
@@ -142,10 +155,28 @@ public final class AnnotationProcessing {
             classpath.add(new File(element));
         }
         com.codename1.maven.annotations.JavaSourceCompiler.setProjectClasspath(classpath);
+        boolean processed = false;
         try {
             runProcessors();
+            processed = true;
         } finally {
             com.codename1.maven.annotations.JavaSourceCompiler.clearProjectClasspath();
+            // The processors rewrite merged classes in place; the record must
+            // describe what this build left -- a failed build too, since a
+            // processor may have woven some classes before another one threw --
+            // or the next build reads every rewritten library class as the
+            // module's own and never refreshes it.
+            if (mergeBackendLibraries) {
+                try {
+                    BackendLibraries.restamp(outputDirectory);
+                } catch (IOException e) {
+                    if (processed) {
+                        throw new BuildExecutionException("Could not record the merged backend "
+                                + "libraries in " + outputDirectory + ": " + e.getMessage(), e);
+                    }
+                    // Otherwise the processors' own failure is the one to report.
+                }
+            }
         }
     }
 
@@ -153,6 +184,27 @@ public final class AnnotationProcessing {
         if (!outputDirectory.isDirectory()) {
             log.debug("cn1: nothing compiled at " + outputDirectory + " -- skipping annotation processing");
             return;
+        }
+        if (new File(outputDirectory, BackendLibraries.MARKER).isFile()) {
+            // A backend library is wired by the server that uses it, as that
+            // server's own classes. Processed here as well, it would ship
+            // generated classes with fixed names -- cn1app.DaoBootstrap, the
+            // wiring record -- that collide with the server's.
+            log.info("cn1: " + outputDirectory + " is a backend library; it is processed "
+                    + "by the server that depends on it");
+            return;
+        }
+        if (mergeBackendLibraries) {
+            try {
+                int merged = BackendLibraries.merge(compileClasspath, outputDirectory);
+                if (merged > 0) {
+                    log.info("cn1: merged " + merged + " backend librar"
+                            + (merged == 1 ? "y" : "ies") + " into " + outputDirectory);
+                }
+            } catch (IOException e) {
+                throw new BuildExecutionException("Could not merge the backend libraries into "
+                        + outputDirectory + ": " + e.getMessage(), e);
+            }
         }
         List<AnnotationProcessor> processors = loadProcessors();
         if (processors.isEmpty()) {

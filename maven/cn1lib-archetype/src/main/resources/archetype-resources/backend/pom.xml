@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+      <groupId>${groupId}</groupId>
+      <artifactId>${rootArtifactId}</artifactId>
+      <version>${version}</version>
+  </parent>
+  <groupId>${groupId}</groupId>
+  <artifactId>${artifactId}</artifactId>
+  <version>${version}</version>
+
+  <name>${artifactId}</name>
+
+  <!--
+       The server half of the library. Classes here are compiled against the
+       Codename One backend runtime and shipped in the cn1lib as backend.zip.
+       A server that depends on the library wires its @RestController, @Service,
+       @Configuration and @Entity classes as its own: routes, beans and tables
+       appear in the application without any registration code.
+
+       The library is not annotation processed here: the server does that, so
+       generated wiring is never duplicated. The marker resource
+       META-INF/codenameone/backend-library is what says so; keep it.
+
+       Leave src/main/java empty for a library with no server half.
+  -->
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
+
+  <dependencies>
+      <!-- Provided: the server that uses the library brings its own runtime. -->
+      <dependency>
+          <groupId>com.codenameone</groupId>
+          <artifactId>codenameone-backend</artifactId>
+          <scope>provided</scope>
+      </dependency>
+  </dependencies>
+</project>
