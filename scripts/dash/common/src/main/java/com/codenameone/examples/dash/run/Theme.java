@@ -150,15 +150,18 @@ public final class Theme {
     /// whole of it pulled `haze` of the way to the horizon colour so far
     /// towers fade into the sky.
     static int[] towerTexture(Theme t, float haze) {
-        int n = 64;
-        int[] px = new int[n * n];
-        for (int y = 0; y < n; y++) {
-            for (int x = 0; x < n; x++) {
+        int w = TOWER_TEX_W;
+        int h = TOWER_TEX_H;
+        int[] px = new int[w * h];
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
                 // A soft vertical gradient: lighter up top, where the sky is.
-                int c = shade(t.tower, 0.8f + 0.35f * (1f - y / (float) n));
-                boolean win = x % 6 > 1 && y % 6 > 2;
+                int c = shade(t.tower, 0.8f + 0.35f * (1f - y / (float) h));
+                // Window bays of 8 by 8 texels, with a mullion and a floor
+                // slab between them, so the facade stays crisp up close.
+                boolean win = x % 8 > 1 && y % 8 > 2;
                 if (win) {
-                    int cell = (x / 6) * 7 + (y / 6) * 13;
+                    int cell = (x / 8) * 7 + (y / 8) * 13;
                     int r = (int) ((cell * 2654435761L) >>> 7 & 7);
                     if (r < 2) {
                         c = mix(t.window, 0xffffffff, 0.35f);
@@ -167,16 +170,51 @@ public final class Theme {
                     } else {
                         c = shade(t.tower, 0.6f);
                     }
+                    // A lighter top edge on every pane reads as glass.
+                    if (y % 8 == 3) {
+                        c = mix(c, 0xffffffff, 0.18f);
+                    }
+                } else if (y % 8 == 2) {
+                    c = shade(c, 0.82f);
                 }
                 // A vertical accent stripe on the corner.
-                if (x < 2) {
+                if (x < 3) {
                     c = mix(c, t.rail, 0.5f);
                 }
-                px[y * n + x] = mix(c, t.skyHorizon, haze);
+                px[y * w + x] = mix(c, t.skyHorizon, haze);
             }
         }
         return px;
     }
+
+    /// The face of the causeway the track stands on in the side view: dark
+    /// panels with a lit rail along the top and a lamp at each joint.
+    static int[] deckTexture(Theme t) {
+        int n = 64;
+        int[] px = new int[n * n];
+        int body = shade(t.tower, 0.45f);
+        for (int y = 0; y < n; y++) {
+            for (int x = 0; x < n; x++) {
+                // Darker toward the bottom, where the light does not reach.
+                int c = shade(body, 1.1f - 0.5f * (y / (float) n));
+                if (y < 3) {
+                    c = mix(t.rail, 0xffffffff, 0.25f);
+                } else if (y < 6) {
+                    c = mix(t.rail, body, 0.55f);
+                } else if (x % 16 == 0) {
+                    c = shade(body, 0.6f);
+                } else if (x % 16 > 6 && x % 16 < 10 && y > 9 && y < 13) {
+                    c = mix(t.window, 0xffffffff, 0.3f);
+                }
+                px[y * n + x] = c;
+            }
+        }
+        return px;
+    }
+
+    /// The facade texture's size: tall, because towers are.
+    static final int TOWER_TEX_W = 64;
+    static final int TOWER_TEX_H = 256;
 
     /// A vertical ramp of the horizon colour, opaque at the bottom and clear
     /// at the top: the haze that sits over the far city.

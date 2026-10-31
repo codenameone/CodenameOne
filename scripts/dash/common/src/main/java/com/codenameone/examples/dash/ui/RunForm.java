@@ -230,6 +230,14 @@ public final class RunForm implements RunView.Hud, RaceDriver.Listener {
         form.revalidateLater();
     }
 
+    /// The run is over: the coach stops talking, so its bubble never shows
+    /// over the result card or the rewards.
+    private void quiet() {
+        nextLine = Integer.MAX_VALUE;
+        coach.setVisible(false);
+        form.revalidateLater();
+    }
+
     /// The coach's line for the stretch the runner is on.
     private void lines(Run run, Runner me) {
         java.util.List<DialogLine> d = run.level().dialog;
@@ -276,6 +284,7 @@ public final class RunForm implements RunView.Hud, RaceDriver.Listener {
     @Override
     public void ended(Run run) {
         Runner me = run.runner(driver.me());
+        quiet();
         Telemetry.runEnded(mode, run.level().id, placeOf(run, driver.me()), me.z / Track.UNIT, !me.alive);
         if ("playtest".equals(mode)) {
             result(me.alive ? "FINISHED" : "CRASHED AT " + me.z / Track.UNIT + " M", me.score(),
@@ -422,6 +431,7 @@ public final class RunForm implements RunView.Hud, RaceDriver.Listener {
     @Override
     public void ended(int[] places, int[] scores, int trophies, int coinsWon, String raceId) {
         view.stop();
+        quiet();
         int mine = driver.me() < places.length ? places[driver.me()] : 0;
         Friends.raceFinished(mine == 0);
         StringBuilder sb = new StringBuilder();

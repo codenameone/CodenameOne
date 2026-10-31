@@ -45,9 +45,9 @@ import java.util.Map;
 /// Draws a run in 3D, and -- for a stretch a level cues as `SIDE_2D` -- as a
 /// flat side-scroller.
 ///
-/// There is one scene and one simulation. "Faux 2D" is a camera: far off to
-/// the side, with a field of view so narrow the perspective all but vanishes,
-/// so the lanes stack behind each other and the track reads as a platformer.
+/// There is one scene and one simulation. "Faux 2D" is a camera: off to the
+/// side, low and looking across the track, so the runner moves left to right
+/// against the skyline and the track reads as a platformer.
 /// When the runner reaches a cue, the camera's position, target and field of
 /// view are interpolated, over the cue's blend distance, to the chase view
 /// behind the runner. Nothing the player does means anything different
@@ -96,11 +96,18 @@ public class RunView extends GameView {
     private final Model[] neon = new Model[6];
     /// Towers of the skyline in three layers. The near ones, TOWERS per
     /// segment with a setback crown and a beacon on top, and the middle ones
-    /// stand on the left only, so the side-on camera, which sits far out on
-    /// the right, looks across the track at them; each layer is hazier than
+    /// stand on the left only, so the side-on camera, which sits out on the
+    /// right, looks across the track at them; each layer is hazier than
     /// the one before it. The far layer has a row on the right too, past the
     /// side camera, where it is only ever seen from behind the runner.
     private final Model[] towers = new Model[SEGMENTS * TOWERS];
+    /// The side of the causeway the track runs on. In the side view the
+    /// city drops away below the track and this face fills the bottom of
+    /// the frame, where a bare field of ground would otherwise be.
+    private final Model[] decks = new Model[SEGMENTS];
+    private Model ground;
+    /// How far the city sinks below the track when seen from the side.
+    private static final float DROP = 9f;
     private final Model[] crowns = new Model[SEGMENTS * TOWERS];
     private final Model[] beacons = new Model[SEGMENTS * TOWERS];
     private final Model[] midTowers = new Model[SEGMENTS];
@@ -245,7 +252,15 @@ public class RunView extends GameView {
         for (int i = 0; i < neon.length; i++) {
             addModel(neon[i]);
         }
-        Model ground = new Model(quad, new Material(Material.Type.LAMBERT).setColor(theme.ground));
+        Texture deckTex = d.createTexture(64, 64, Theme.deckTexture(theme));
+        deckTex.setFilter(Texture.Filter.LINEAR);
+        Material deckMaterial = new Material(Material.Type.LAMBERT).setTexture(deckTex);
+        for (int i = 0; i < decks.length; i++) {
+            decks[i] = new Model(cube, deckMaterial);
+            decks[i].setVisible(false);
+            addModel(decks[i]);
+        }
+        ground = new Model(quad, new Material(Material.Type.LAMBERT).setColor(theme.ground));
         ground.setRotation(-90f, 0f, 0f);
         ground.setScale(800f, 800f, 1f);
         ground.setPosition(0f, -0.05f, 0f);
@@ -356,7 +371,7 @@ public class RunView extends GameView {
     }
 
     private Material towerMaterial(GraphicsDevice d, float hazeK) {
-        Texture t = d.createTexture(64, 64, Theme.towerTexture(theme, hazeK));
+        Texture t = d.createTexture(Theme.TOWER_TEX_W, Theme.TOWER_TEX_H, Theme.towerTexture(theme, hazeK));
         t.setFilter(Texture.Filter.LINEAR);
         return new Material(hazeK > 0.5f ? Material.Type.UNLIT : Material.Type.LAMBERT).setTexture(t);
     }
@@ -516,9 +531,18 @@ public class RunView extends GameView {
         boolean side = run.track().viewAt(run.runner(driver.me()).z) == ViewMode.SIDE_2D
                 && run.track().blendAt(run.runner(driver.me()).z) > 500;
         GameCamera cam = getCamera();
+        // The city sinks as the camera swings out to the side, and rises
+        // back as it swings in behind the runner; the chase camera never
+        // strays more than a few metres off centre, so it sees none of it.
+        float sink = Math.max(0f, Math.min(1f, (cam.getEyeX() - 6f) / 24f));
+        float drop = DROP * sink;
+        ground.setPosition(0f, -0.05f - drop, 0f);
         for (int i = 0; i < SEGMENTS; i++) {
             int seg = first + i;
             float cz = -(seg * SEGMENT + SEGMENT / 2f);
+            decks[i].setVisible(sink > 0.02f);
+            decks[i].setScale(0.4f, drop + 0.1f, SEGMENT);
+            decks[i].setPosition(half + 0.5f, (0.1f - drop) / 2f, cz);
             floor[i].setPosition(0f, 0f, cz);
             curbs[i * 2].setPosition(-half - 0.12f, 0.12f, cz);
             curbs[i * 2 + 1].setPosition(half + 0.12f, 0.12f, cz);
@@ -529,35 +553,32 @@ public class RunView extends GameView {
                 float tx = -half - 7f - t * 9f - jitter(seg, 3 + t) * 5f;
                 float tz = -(seg * SEGMENT + jitter(seg, 5 + t) * SEGMENT);
                 towers[k].setScale(w, h, w);
-                towers[k].setPosition(tx, h / 2f, tz);
+                towers[k].setPosition(tx, h / 2f - drop, tz);
                 // A setback crown on most towers, narrower and offset.
                 float ch = h * (0.2f + jitter(seg, 51 + t) * 0.3f);
                 float cw = w * (0.45f + jitter(seg, 61 + t) * 0.25f);
                 boolean crowned = jitter(seg, 71 + t) > 0.25f;
-                crowns[k].setVisible(crowned && !side);
+                crowns[k].setVisible(crowned);
                 crowns[k].setScale(cw, ch, cw);
-                crowns[k].setPosition(tx + (w - cw) * 0.25f, h + ch / 2f, tz);
+                crowns[k].setPosition(tx + (w - cw) * 0.25f, h + ch / 2f - drop, tz);
                 float top = crowned ? h + ch : h;
-                beacons[k].setVisible(!side && jitter(seg, 81 + t) > 0.35f);
-                // From the side the near row would stand close in front of
-                // the lens and fill the frame; the farther rows make the skyline.
-                towers[k].setVisible(!side);
-                beacons[k].setPosition(tx + (crowned ? (w - cw) * 0.25f : 0f), top + 0.5f, tz);
+                beacons[k].setVisible(jitter(seg, 81 + t) > 0.35f);
+                beacons[k].setPosition(tx + (crowned ? (w - cw) * 0.25f : 0f), top + 0.5f - drop, tz);
                 Glow.face(beacons[k], cam);
             }
             float mh = 14f + jitter(seg, 91) * 32f;
             float mw = 6f + jitter(seg, 92) * 8f;
             midTowers[i].setScale(mw, mh, mw);
-            midTowers[i].setPosition(-half - 32f - jitter(seg, 93) * 12f, mh / 2f,
+            midTowers[i].setPosition(-half - 32f - jitter(seg, 93) * 12f, mh / 2f - drop,
                     -(seg * SEGMENT + jitter(seg, 94) * SEGMENT));
             for (int f = 0; f < 2; f++) {
                 float fh = 24f + jitter(seg, 101 + f) * 50f;
                 float fw = 9f + jitter(seg, 103 + f) * 12f;
-                // The right-hand row stands past x = 70, behind the side
+                // The right-hand row stands past x = 88, behind the side
                 // camera, so it never blocks the side-scroller view.
                 float fx = f == 0 ? -half - 62f - jitter(seg, 105) * 25f : 88f + jitter(seg, 106) * 25f;
                 farTowers[i * 2 + f].setScale(fw, fh, fw);
-                farTowers[i * 2 + f].setPosition(fx, fh / 2f, -(seg * SEGMENT + jitter(seg, 107 + f) * SEGMENT));
+                farTowers[i * 2 + f].setPosition(fx, fh / 2f - drop, -(seg * SEGMENT + jitter(seg, 107 + f) * SEGMENT));
             }
         }
         float mid = -meZ - (AHEAD - BEHIND) / 2f;
@@ -788,17 +809,18 @@ public class RunView extends GameView {
     /// field of view, then the up vector's z (0 for upright, -1 looking down).
     private static void framing(ViewMode mode, float x, float y, float z, float[] out) {
         if (mode == ViewMode.SIDE_2D) {
-            // Far to the right with a narrow lens: the lanes line up behind
-            // each other and the run reads as a side-scroller.
-            // The runner sits left of centre with the track ahead in view,
-            // and the track in the lower third under the skyline.
-            out[0] = 70f;
-            out[1] = 3.4f + y * 0.3f;
-            out[2] = -z - 2.2f;
+            // Off to the right, low, and tilted up: the runner a quarter in
+            // from the left with the track ahead in view, the track near the
+            // bottom edge over a strip of ground, and the skyline above.
+            // Close enough that several towers and the sky share the frame;
+            // from far out a portrait lens sees one facade and nothing else.
+            out[0] = 30f;
+            out[1] = 1.2f + y * 0.3f;
+            out[2] = -z - 3f;
             out[3] = 0f;
-            out[4] = 3.2f + y * 0.3f;
-            out[5] = -z - 2.2f;
-            out[6] = 14f;
+            out[4] = 7.4f + y * 0.3f;
+            out[5] = -z - 3f;
+            out[6] = 40f;
             out[7] = 0f;
         } else if (mode == ViewMode.TOP_DOWN) {
             out[0] = x * 0.4f;
