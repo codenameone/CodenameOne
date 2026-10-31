@@ -67,8 +67,8 @@ public final class FriendsForm {
         Label code = Ui.label(mine.code(), "InviteCode");
         code.setName("inviteCode");
         col.add(Ui.centered(code));
-        col.add(Ui.wood("Invite friends", "inviteButton", e -> Friends.share(mine)));
-        Label count = Ui.label(mine.joined() + " joined, " + mine.rewarded() + " rewarded", "ArenaName");
+        col.add(Ui.primary("Invite friends", "inviteButton", e -> Friends.share(mine)));
+        Label count = Ui.label(mine.joined() + " joined, " + mine.rewarded() + " rewarded", "LeagueName");
         count.setName("inviteCount");
         col.add(count);
     }

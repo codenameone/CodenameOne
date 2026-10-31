@@ -49,14 +49,14 @@ public final class CrewsForm {
         final TextField code = new TextField("", "Crew code", 12, TextField.ANY);
         code.setName("crewCode");
         Container make = Ui.column(Ui.label("Start a crew", "SectionTitle"), name,
-                Ui.wood("Create", "createCrew", e -> {
+                Ui.primary("Create", "createCrew", e -> {
                     if (name.getText().trim().length() > 0) {
                         Api.game().createCrew(new CrewCreateDto(name.getText().trim()),
                                 Net.to(c -> Ui.later(CrewsForm::show), Ui::failed));
                     }
                 }),
                 Ui.label("Join a crew", "SectionTitle"), code,
-                Ui.stone("Join", "joinCrew", e -> {
+                Ui.secondary("Join", "joinCrew", e -> {
                     if (code.getText().trim().length() > 0) {
                         Api.game().joinCrew(code.getText().trim().toUpperCase(),
                                 Net.to(c -> Ui.later(CrewsForm::show), Ui::failed));

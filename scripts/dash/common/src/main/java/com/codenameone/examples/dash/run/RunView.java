@@ -18,7 +18,6 @@
  */
 package com.codenameone.examples.dash.run;
 
-import com.codename1.gaming.AnimatedModel;
 import com.codename1.gaming.GameCamera;
 import com.codename1.gaming.GameInput;
 import com.codename1.gaming.GameView;
@@ -28,6 +27,7 @@ import com.codename1.gpu.GraphicsDevice;
 import com.codename1.gpu.Material;
 import com.codename1.gpu.Mesh;
 import com.codename1.gpu.Primitives;
+import com.codename1.gpu.RenderState;
 import com.codename1.gpu.Texture;
 import com.codename1.ui.CN;
 import com.codename1.ui.Display;
@@ -74,6 +74,7 @@ public class RunView extends GameView {
     private static final float BEHIND = 12f;
     private static final float RUNNER_HEIGHT = 1.7f;
     private static final int SWIPE = 24;
+    private static final int TOWERS = 2;
 
     private final Driver driver;
     private Hud hud;
@@ -81,11 +82,61 @@ public class RunView extends GameView {
     private Mesh cube;
     private Mesh quad;
     private Mesh sphere;
+    private Mesh gemMesh;
+    private Mesh coinMesh;
+    private Glow glow;
+    private Rig.Kit kit;
+    private final Map<String, Mesh> shapes = new HashMap<String, Mesh>();
     private final Model[] floor = new Model[SEGMENTS];
-    private final AnimatedModel[] props = new AnimatedModel[SEGMENTS * 2];
-    private AnimatedModel[] runners = new AnimatedModel[0];
-    private AnimatedModel[] ghostModels = new AnimatedModel[0];
-    private final Map<Integer, Model> entries = new HashMap<Integer, Model>();
+    /// Raised, rounded curbs along both edges, one pair per segment with a
+    /// gap between, so they tick past.
+    private final Model[] curbs = new Model[SEGMENTS * 2];
+    /// What does not change along the track travels with the runner: the
+    /// neon tube on each curb, its halo, and its reflection on the floor.
+    private final Model[] neon = new Model[6];
+    /// Towers of the skyline in three layers. The near ones, TOWERS per
+    /// segment with a setback crown and a beacon on top, and the middle ones
+    /// stand on the left only, so the side-on camera, which sits far out on
+    /// the right, looks across the track at them; each layer is hazier than
+    /// the one before it. The far layer has a row on the right too, past the
+    /// side camera, where it is only ever seen from behind the runner.
+    private final Model[] towers = new Model[SEGMENTS * TOWERS];
+    private final Model[] crowns = new Model[SEGMENTS * TOWERS];
+    private final Model[] beacons = new Model[SEGMENTS * TOWERS];
+    private final Model[] midTowers = new Model[SEGMENTS];
+    private final Model[] farTowers = new Model[SEGMENTS * 2];
+    private final Model[] haze = new Model[3];
+    /// Light gantries over the track, one every other segment: two legs, a
+    /// rounded beam, the light tube under it, its halo and its pool of light
+    /// on the floor.
+    private static final int GANTRY_PARTS = 6;
+    private final Model[] gantries = new Model[SEGMENTS / 2 * GANTRY_PARTS];
+    private Model sky;
+    private Model sun;
+    private Model sunHalo;
+    private Model sunCorona;
+    private Theme theme;
+    private Rig[] runners = new Rig[0];
+    private Rig[] ghostModels = new Rig[0];
+    private final Map<Integer, Model[]> entries = new HashMap<Integer, Model[]>();
+    private ParticleEmitter streaks;
+    private ParticleEmitter trail;
+    private Material hurdleFrame;
+    private Material hurdleBar;
+    private Material hurdleHalo;
+    private Material holo;
+    private Material warning;
+    private Material warningHalo;
+    private Material pod;
+    private Material podGlow;
+    private Material podHalo;
+    private Material pit;
+    private Material pitRim;
+    private Material pitHalo;
+    private Material pitDepth;
+    private Material coinMaterial;
+    private Material coinGlint;
+    private final Map<PickupKind, Material[]> gemMaterials = new HashMap<PickupKind, Material[]>();
     private int firstEntry;
     private ParticleEmitter sparks;
     private ParticleEmitter dust;
@@ -125,79 +176,217 @@ public class RunView extends GameView {
     @Override
     protected void onSetup(GraphicsDevice d) {
         device = d;
-        Theme theme = Theme.of(driver.run().level().theme);
-        setClearColor(theme.sky);
-        getLight().setDirection(-0.4f, -1f, -0.3f).setColor(0xfffff4e0).setAmbientColor(theme.ambient);
+        theme = Theme.of(driver.run().level().theme);
+        setClearColor(theme.skyHorizon);
+        getLight().setDirection(-0.5f, -1f, -0.35f).setColor(theme.light).setAmbientColor(theme.ambient);
         getCamera().setPerspective(60f, 0.5f, 400f);
         cube = Primitives.cube(d, 1f);
         quad = Primitives.quad(d, 1f);
-        sphere = Primitives.sphere(d, 0.5f, 10, 14, false);
+        sphere = Primitives.sphere(d, 0.5f, 12, 18, false);
+        gemMesh = Meshes.gem(0.5f, 1f);
+        coinMesh = Meshes.coin(0.34f, 0.1f, 24);
+        glow = new Glow(d);
+        kit = new Rig.Kit(quad, glow);
+
+        Texture skyTex = d.createTexture(4, 128, Theme.skyTexture(theme, 128));
+        skyTex.setFilter(Texture.Filter.LINEAR);
+        sky = new Model(Primitives.sphere(d, 0.5f, 16, 16, true), new Material(Material.Type.UNLIT).setTexture(skyTex));
+        sky.setScale(700f);
+        addModel(sky);
+        Texture hazeTex = d.createTexture(4, 64, Theme.hazeTexture(theme));
+        hazeTex.setFilter(Texture.Filter.LINEAR);
+        Material hazeMaterial = Glow.blended(hazeTex, 0xffffffff);
+        for (int i = 0; i < haze.length; i++) {
+            haze[i] = Glow.sprite(quad, hazeMaterial, 0f, 28f, 0f, 900f, 66f);
+            // Ahead, to the left, and to the right past the side camera.
+            haze[i].setRotation(0f, i == 0 ? 0f : i == 1 ? 90f : -90f, 0f);
+            addModel(haze[i]);
+        }
+        sun = new Model(sphere, new Material(Material.Type.UNLIT).setColor(theme.sun));
+        sun.setScale(46f, 46f, 1f);
+        addModel(sun);
+        sunCorona = Glow.sprite(quad, Glow.additive(glow.soft, (theme.sun & 0x00ffffff) | 0xc0000000),
+                0f, 0f, 0f, 120f, 120f);
+        sunHalo = Glow.sprite(quad, Glow.additive(glow.soft, (theme.sun & 0x00ffffff) | 0x60000000),
+                0f, 0f, 0f, 320f, 220f);
+        addModel(sunHalo);
+        addModel(sunCorona);
 
         int lanes = Math.max(1, driver.run().level().lanes);
-        Texture lane = d.createTexture(64, 64, Theme.laneTexture(theme, lanes));
+        float half = lanes * LANE_W / 2f + 0.3f;
+        Texture lane = d.createTexture(128, 128, Theme.laneTexture(theme, lanes));
         lane.setFilter(Texture.Filter.LINEAR);
-        Material floorMaterial = new Material(Material.Type.LAMBERT).setTexture(lane);
+        Material floorMaterial = new Material(Material.Type.PHONG).setTexture(lane).setShininess(70f);
+        Mesh curb = Meshes.roundedBox(0.38f, 0.26f, SEGMENT - 0.25f, 0.1f, 3);
+        Material curbMaterial = new Material(Material.Type.PHONG).setColor(Theme.shade(theme.tower, 0.55f))
+                .setShininess(90f);
         for (int i = 0; i < SEGMENTS; i++) {
             Model m = new Model(quad, floorMaterial);
             m.setRotation(-90f, 0f, 0f);
             m.setScale(lanes * LANE_W + 0.6f, SEGMENT, 1f);
             floor[i] = m;
             addModel(m);
+            for (int s = 0; s < 2; s++) {
+                Model r = new Model(curb, curbMaterial);
+                curbs[i * 2 + s] = r;
+                addModel(r);
+            }
+        }
+        Material tube = new Material(Material.Type.UNLIT).setColor(Theme.mix(theme.rail, 0xffffffff, 0.3f));
+        Material tubeHalo = Glow.additive(glow.streak, (theme.rail & 0x00ffffff) | 0x90000000);
+        Material tubeShine = Glow.additive(glow.streak, (theme.rail & 0x00ffffff) | 0x58000000);
+        for (int s = 0; s < 2; s++) {
+            neon[s] = box(cube, tube, 0f, 0f, 0f, 0.07f, 0.07f, AHEAD + BEHIND);
+            neon[2 + s] = Glow.sprite(quad, tubeHalo, 0f, 0f, 0f, AHEAD + BEHIND, 0.7f);
+            neon[2 + s].setRotation(0f, 90f, 0f);
+            neon[4 + s] = Glow.sprite(quad, tubeShine, 0f, 0f, 0f, AHEAD + BEHIND, 1.5f);
+            neon[4 + s].setRotation(-90f, 90f, 0f);
+        }
+        for (int i = 0; i < neon.length; i++) {
+            addModel(neon[i]);
         }
         Model ground = new Model(quad, new Material(Material.Type.LAMBERT).setColor(theme.ground));
         ground.setRotation(-90f, 0f, 0f);
-        ground.setScale(400f, 400f, 1f);
+        ground.setScale(800f, 800f, 1f);
         ground.setPosition(0f, -0.05f, 0f);
         ground.setUserData("ground");
         addModel(ground);
-        for (int i = 0; i < props.length; i++) {
-            String kind = theme.props[i % theme.props.length];
-            props[i] = new AnimatedModel(d, Models.scene(kind));
-            float[] b = Models.bounds(props[i]);
-            float s = (i % 3 == 0 ? 3.2f : 2.2f) / Math.max(0.01f, Math.max(b[3] - b[0], b[5] - b[2]));
-            props[i].setScale(s);
-            props[i].addTo(this);
+        Material nearTower = towerMaterial(d, 0.08f);
+        Material midTower = towerMaterial(d, 0.42f);
+        Material farTower = towerMaterial(d, 0.7f);
+        Material beacon = Glow.additive(glow.soft, (theme.rail & 0x00ffffff) | 0xe0000000);
+        for (int i = 0; i < towers.length; i++) {
+            towers[i] = new Model(cube, nearTower);
+            crowns[i] = new Model(cube, nearTower);
+            beacons[i] = Glow.sprite(quad, beacon, 0f, 0f, 0f, 1.6f, 1.6f);
+            addModel(towers[i]);
+            addModel(crowns[i]);
+            addModel(beacons[i]);
+        }
+        for (int i = 0; i < midTowers.length; i++) {
+            midTowers[i] = new Model(cube, midTower);
+            addModel(midTowers[i]);
+        }
+        for (int i = 0; i < farTowers.length; i++) {
+            farTowers[i] = new Model(cube, farTower);
+            addModel(farTowers[i]);
+        }
+        float span = half * 2f + 0.8f;
+        Mesh legMesh = Meshes.roundedBox(0.3f, 4.6f, 0.3f, 0.1f, 3);
+        Mesh beamMesh = Meshes.capsule(0.14f, span, 4, 12);
+        Material leg = new Material(Material.Type.PHONG).setColor(Theme.shade(theme.tower, 0.6f)).setShininess(80f);
+        Material beamLight = new Material(Material.Type.UNLIT).setColor(Theme.mix(theme.line, 0xffffffff, 0.3f));
+        Material beamHalo = Glow.additive(glow.streak, (theme.line & 0x00ffffff) | 0xa0000000);
+        Material pool = Glow.additive(glow.soft, (theme.line & 0x00ffffff) | 0x48000000);
+        for (int g = 0; g < SEGMENTS / 2; g++) {
+            int o = g * GANTRY_PARTS;
+            gantries[o] = new Model(legMesh, leg);
+            gantries[o + 1] = new Model(legMesh, leg);
+            gantries[o + 2] = new Model(beamMesh, leg);
+            gantries[o + 2].setRotation(0f, 0f, 90f);
+            gantries[o + 3] = box(cube, beamLight, 0f, 0f, 0f, span - 0.4f, 0.06f, 0.08f);
+            gantries[o + 4] = Glow.sprite(quad, beamHalo, 0f, 0f, 0f, span + 2.5f, 1.8f);
+            gantries[o + 5] = Glow.sprite(quad, pool, 0f, 0f, 0f, span, 4f);
+            gantries[o + 5].setRotation(-90f, 0f, 0f);
+            for (int p = 0; p < GANTRY_PARTS; p++) {
+                addModel(gantries[o + p]);
+            }
         }
 
+        hurdleFrame = new Material(Material.Type.PHONG).setColor(0xff2a2f3d).setShininess(80f);
+        hurdleBar = new Material(Material.Type.UNLIT).setColor(0xffff6d88);
+        hurdleHalo = Glow.additive(glow.streak, 0xc0ff3d6d);
+        Texture holoTex = d.createTexture(64, 64, Theme.holoTexture(0xe0ffd23a, 0x5014141c));
+        holoTex.setFilter(Texture.Filter.LINEAR);
+        holo = Glow.blended(holoTex, 0xffffffff);
+        warning = new Material(Material.Type.UNLIT).setColor(0xffff5a5a);
+        warningHalo = Glow.additive(glow.streak, 0xc0ff3b3b);
+        Texture podTex = d.createTexture(64, 64, Theme.podTexture(0xff9aa3c0, 0xff35e8ff));
+        podTex.setFilter(Texture.Filter.LINEAR);
+        pod = new Material(Material.Type.PHONG).setTexture(podTex).setShininess(110f);
+        podGlow = new Material(Material.Type.UNLIT).setColor(0xff5af0ff);
+        podHalo = Glow.additive(glow.soft, 0x9035e8ff);
+        pit = new Material(Material.Type.UNLIT).setColor(0xff05050a);
+        pitRim = new Material(Material.Type.UNLIT).setColor(0xffffb44a);
+        pitHalo = Glow.additive(glow.streak, 0xd0ff8a2a);
+        pitDepth = Glow.additive(glow.soft, 0x70ff5a1a);
+        coinMaterial = new Material(Material.Type.PHONG).setColor(0xffffc93a).setShininess(128f);
+        coinGlint = Glow.additive(glow.glint, 0xd0fff0b0);
+
         Run run = driver.run();
-        runners = new AnimatedModel[run.runnerCount()];
+        runners = new Rig[run.runnerCount()];
         for (int i = 0; i < runners.length; i++) {
             String id = i < runnerIds.length ? runnerIds[i] : null;
-            runners[i] = runnerModel(Models.modelFor(id, i + 1), i == driver.me() ? 0xffffffff : 0xffb0c8ff);
+            runners[i] = rig(Outfit.of(id, i == driver.me() ? 0 : i + 1));
         }
         Run[] ghosts = driver.ghosts();
-        ghostModels = new AnimatedModel[ghosts.length];
+        ghostModels = new Rig[ghosts.length];
         for (int i = 0; i < ghosts.length; i++) {
-            ghostModels[i] = runnerModel(Models.modelFor(null, i + 2), 0xff8890a0);
+            ghostModels[i] = rig(Outfit.of(null, i + 2).ghost());
         }
         prevX = new float[runners.length + ghostModels.length];
         prevY = new float[prevX.length];
         prevZ = new float[prevX.length];
         remember();
 
-        sparks = new ParticleEmitter(d, 160).setColor(0xffffe27a).setAdditive(true)
+        sparks = new ParticleEmitter(d, 160).setColor(0xffffd65a).setAdditive(true)
                 .setSpeed(1.5f, 4f).setLifetime(0.15f, 0.4f).setSize(0.25f, 0.05f)
                 .setGravity(-6f).setDrag(1f);
-        dust = new ParticleEmitter(d, 120).setColor(0x90c2a77a).setAdditive(false)
+        dust = new ParticleEmitter(d, 120).setColor((Theme.mix(theme.ground, 0xffffffff, 0.6f) & 0x00ffffff) | 0x80000000).setAdditive(false)
                 .setSpeed(0.6f, 1.8f).setLifetime(0.3f, 0.7f).setSize(0.3f, 0.8f)
                 .setGravity(0.4f).setDrag(3f).setDirection(0f, 0.3f, 0f, 85f);
+        streaks = new ParticleEmitter(d, 200).setColor((Theme.mix(theme.line, 0xffffffff, 0.5f) & 0x00ffffff) | 0x70000000).setAdditive(true)
+                .setSpeed(26f, 40f).setLifetime(0.18f, 0.32f).setSize(0.07f, 0.02f)
+                .setGravity(0f).setDrag(0f).setDirection(0f, 0f, 1f, 4f);
+        trail = new ParticleEmitter(d, 160).setColor(runnerTrim()).setAdditive(true)
+                .setSpeed(0.4f, 1.2f).setLifetime(0.2f, 0.45f).setSize(0.14f, 0.02f)
+                .setGravity(0.5f).setDrag(2f).setDirection(0f, 0.2f, 1f, 50f);
         dust.addTo(this);
         sparks.addTo(this);
+        streaks.addTo(this);
+        trail.addTo(this);
         Sfx.load();
     }
     // end::dash-run-view[]
 
-    private AnimatedModel runnerModel(String name, int tint) {
-        AnimatedModel m = new AnimatedModel(device, Models.scene(name));
-        float[] b = Models.bounds(m);
-        m.setScale(RUNNER_HEIGHT / Math.max(0.01f, b[4] - b[1]));
-        m.setTint(tint);
-        String clip = Models.clip(m, "Running_A");
-        if (clip != null) {
-            m.play(clip, true);
+    private Rig rig(Outfit o) {
+        Rig r = new Rig(kit, o);
+        r.addTo(this);
+        return r;
+    }
+
+    private Material towerMaterial(GraphicsDevice d, float hazeK) {
+        Texture t = d.createTexture(64, 64, Theme.towerTexture(theme, hazeK));
+        t.setFilter(Texture.Filter.LINEAR);
+        return new Material(hazeK > 0.5f ? Material.Type.UNLIT : Material.Type.LAMBERT).setTexture(t);
+    }
+
+    /// A rounded box or a capsule of the given size, built the first time an
+    /// obstacle needs it and shared after that.
+    private Mesh rounded(float w, float h, float d, float r) {
+        String key = "b" + (int) (w * 100) + "," + (int) (h * 100) + "," + (int) (d * 100) + "," + (int) (r * 100);
+        Mesh m = shapes.get(key);
+        if (m == null) {
+            m = Meshes.roundedBox(w, h, d, r, 3);
+            shapes.put(key, m);
         }
-        m.addTo(this);
         return m;
+    }
+
+    private Mesh capsule(float r, float len) {
+        String key = "c" + (int) (r * 100) + "," + (int) (len * 100);
+        Mesh m = shapes.get(key);
+        if (m == null) {
+            m = Meshes.capsule(r, Math.max(0.01f, len), 4, 12);
+            shapes.put(key, m);
+        }
+        return m;
+    }
+
+    private int runnerTrim() {
+        int me = driver.me();
+        String id = me < runnerIds.length ? runnerIds[me] : null;
+        return (Outfit.of(id, 0).trim & 0x00ffffff) | 0xb0000000;
     }
 
     // tag::dash-fixed-tick[]
@@ -304,34 +493,116 @@ public class RunView extends GameView {
                     lerp(prevZ[k], r.z / (float) Track.UNIT), dt);
         }
 
-        // The floor: segments leapfrog each other as the runner passes them.
-        int first = (int) Math.floor((meZ - BEHIND) / SEGMENT);
-        for (int i = 0; i < SEGMENTS; i++) {
-            int seg = first + i;
-            floor[i].setPosition(0f, 0f, -(seg * SEGMENT + SEGMENT / 2f));
-            AnimatedModel left = props[i * 2];
-            AnimatedModel right = props[i * 2 + 1];
-            float side = Math.max(1, run.level().lanes) * LANE_W / 2f + 3f;
-            left.setPosition(-side - jitter(seg, 3) * 4f, 0f, -(seg * SEGMENT + jitter(seg, 5) * SEGMENT));
-            right.setPosition(side + jitter(seg, 7) * 4f, 0f, -(seg * SEGMENT + jitter(seg, 11) * SEGMENT));
-            left.setRotation(0f, jitter(seg, 13) * 360f, 0f);
-            right.setRotation(0f, jitter(seg, 17) * 360f, 0f);
-        }
+        scenery(run, meX, meZ, dt);
         entries(run, me, meZ);
         camera(run, me, meX, meY, meZ);
         sparks.update(dt, getCamera());
+        streaks.update(dt, getCamera());
+        trail.update(dt, getCamera());
         dust.update(dt, getCamera());
     }
 
-    private void pose(AnimatedModel m, Runner r, float x, float y, float z, float dt) {
-        m.setPosition(x, y, -z);
-        m.setRotation(r.sliding() ? -55f : 0f, 180f, 0f);
-        String want = !r.alive ? "Death_A" : r.finished ? "Cheer" : "Running_A";
-        if (!want.equals(m.getClipName()) && Models.clip(m, want) != null) {
-            m.crossFade(want, 0.2f, r.alive);
+    private void pose(Rig m, Runner r, float x, float y, float z, float dt) {
+        m.pose(x, y, -z, r.alive, r.finished, r.airborne(), r.sliding(), r.speed / 12000f, dt);
+    }
+
+    /// The floor, the rails, the skyline and the gantries leapfrog each
+    /// other as the runner passes them; the sky and the sun travel with the
+    /// camera so they stay at the horizon.
+    private void scenery(Run run, float meX, float meZ, float dt) {
+        int lanes = Math.max(1, run.level().lanes);
+        float half = lanes * LANE_W / 2f + 0.3f;
+        int first = (int) Math.floor((meZ - BEHIND) / SEGMENT);
+        boolean side = run.track().viewAt(run.runner(driver.me()).z) == ViewMode.SIDE_2D
+                && run.track().blendAt(run.runner(driver.me()).z) > 500;
+        GameCamera cam = getCamera();
+        for (int i = 0; i < SEGMENTS; i++) {
+            int seg = first + i;
+            float cz = -(seg * SEGMENT + SEGMENT / 2f);
+            floor[i].setPosition(0f, 0f, cz);
+            curbs[i * 2].setPosition(-half - 0.12f, 0.12f, cz);
+            curbs[i * 2 + 1].setPosition(half + 0.12f, 0.12f, cz);
+            for (int t = 0; t < TOWERS; t++) {
+                int k = i * TOWERS + t;
+                float h = 6f + jitter(seg, 31 + t) * 22f;
+                float w = 3.5f + jitter(seg, 41 + t) * 4f;
+                float tx = -half - 7f - t * 9f - jitter(seg, 3 + t) * 5f;
+                float tz = -(seg * SEGMENT + jitter(seg, 5 + t) * SEGMENT);
+                towers[k].setScale(w, h, w);
+                towers[k].setPosition(tx, h / 2f, tz);
+                // A setback crown on most towers, narrower and offset.
+                float ch = h * (0.2f + jitter(seg, 51 + t) * 0.3f);
+                float cw = w * (0.45f + jitter(seg, 61 + t) * 0.25f);
+                boolean crowned = jitter(seg, 71 + t) > 0.25f;
+                crowns[k].setVisible(crowned && !side);
+                crowns[k].setScale(cw, ch, cw);
+                crowns[k].setPosition(tx + (w - cw) * 0.25f, h + ch / 2f, tz);
+                float top = crowned ? h + ch : h;
+                beacons[k].setVisible(!side && jitter(seg, 81 + t) > 0.35f);
+                // From the side the near row would stand close in front of
+                // the lens and fill the frame; the farther rows make the skyline.
+                towers[k].setVisible(!side);
+                beacons[k].setPosition(tx + (crowned ? (w - cw) * 0.25f : 0f), top + 0.5f, tz);
+                Glow.face(beacons[k], cam);
+            }
+            float mh = 14f + jitter(seg, 91) * 32f;
+            float mw = 6f + jitter(seg, 92) * 8f;
+            midTowers[i].setScale(mw, mh, mw);
+            midTowers[i].setPosition(-half - 32f - jitter(seg, 93) * 12f, mh / 2f,
+                    -(seg * SEGMENT + jitter(seg, 94) * SEGMENT));
+            for (int f = 0; f < 2; f++) {
+                float fh = 24f + jitter(seg, 101 + f) * 50f;
+                float fw = 9f + jitter(seg, 103 + f) * 12f;
+                // The right-hand row stands past x = 70, behind the side
+                // camera, so it never blocks the side-scroller view.
+                float fx = f == 0 ? -half - 62f - jitter(seg, 105) * 25f : 88f + jitter(seg, 106) * 25f;
+                farTowers[i * 2 + f].setScale(fw, fh, fw);
+                farTowers[i * 2 + f].setPosition(fx, fh / 2f, -(seg * SEGMENT + jitter(seg, 107 + f) * SEGMENT));
+            }
         }
-        m.setSpeed(r.alive && !r.finished ? Math.max(0.6f, r.speed / 12000f) : 1f);
-        m.update(dt);
+        float mid = -meZ - (AHEAD - BEHIND) / 2f;
+        for (int s = 0; s < 2; s++) {
+            float sx = s == 0 ? -1f : 1f;
+            neon[s].setPosition(sx * (half + 0.12f), 0.27f, mid);
+            neon[2 + s].setPosition(sx * (half + 0.12f), 0.3f, mid);
+            neon[4 + s].setPosition(sx * (half - 0.45f), 0.012f, mid);
+        }
+        for (int g = 0; g < SEGMENTS / 2; g++) {
+            int seg = first + g * 2 + (first & 1);
+            float gz = -(seg * SEGMENT);
+            int o = g * GANTRY_PARTS;
+            gantries[o].setPosition(-half - 0.45f, 2.3f, gz);
+            gantries[o + 1].setPosition(half + 0.45f, 2.3f, gz);
+            gantries[o + 2].setPosition(0f, 4.6f, gz);
+            gantries[o + 3].setPosition(0f, 4.43f, gz);
+            gantries[o + 4].setPosition(0f, 4.45f, gz + 0.1f);
+            gantries[o + 5].setPosition(0f, 0.015f, gz);
+            // Seen from the side, the near leg would sweep across the runner.
+            for (int p = 0; p < GANTRY_PARTS; p++) {
+                gantries[o + p].setVisible(!side);
+            }
+        }
+        sky.setPosition(cam.getEyeX(), 0f, cam.getEyeZ());
+        float sunZ = -meZ - 300f;
+        sun.setPosition(0f, 22f, sunZ);
+        sunCorona.setPosition(0f, 22f, sunZ + 2f);
+        sunHalo.setPosition(0f, 20f, sunZ + 4f);
+        haze[0].setPosition(0f, 26f, -meZ - 250f);
+        haze[1].setPosition(-150f, 26f, -meZ - 60f);
+        haze[2].setPosition(150f, 26f, -meZ - 60f);
+        Runner me = run.runner(driver.me());
+        if (me.alive && !me.finished && me.speed > 0) {
+            float fast = Math.min(1f, me.speed / 16000f);
+            int n = (int) (fast * 3f + (Math.random() < fast ? 1 : 0));
+            for (int i = 0; i < n; i++) {
+                float a = (float) (Math.random() * Math.PI * 2);
+                float rr = 2f + (float) Math.random() * 3f;
+                streaks.burst(meX + (float) Math.cos(a) * rr, 1.6f + (float) Math.sin(a) * rr * 0.6f,
+                        -meZ - 14f - (float) Math.random() * 10f, 1);
+            }
+            float y = me.y / (float) Track.UNIT;
+            trail.burst(meX, 0.15f + y, -meZ + 0.25f, me.airborne() ? 1 : 2);
+        }
     }
 
     /// Obstacles and pickups from just behind the camera to the horizon:
@@ -341,9 +612,9 @@ public class RunView extends GameView {
         while (firstEntry < track.size()) {
             Track.Entry e = track.get(firstEntry);
             if ((e.z + e.depth) / (float) Track.UNIT < meZ - BEHIND) {
-                Model gone = entries.remove(Integer.valueOf(firstEntry));
+                Model[] gone = entries.remove(Integer.valueOf(firstEntry));
                 if (gone != null) {
-                    removeModel(gone);
+                    remove(gone);
                 }
                 firstEntry++;
             } else {
@@ -356,68 +627,144 @@ public class RunView extends GameView {
                 break;
             }
             Integer key = Integer.valueOf(i);
-            Model m = entries.get(key);
+            Model[] m = entries.get(key);
             if (m == null) {
                 m = model(run, e);
                 entries.put(key, m);
-                addModel(m);
+                for (int p = 0; p < m.length; p++) {
+                    addModel(m[p]);
+                }
             }
             if (e.pickup != null) {
                 boolean taken = me.took(e.index);
-                m.setVisible(!taken);
+                for (int p = 0; p < m.length; p++) {
+                    m[p].setVisible(!taken);
+                }
                 if (!taken) {
                     float bob = (float) Math.sin(time * 3f + i) * 0.12f;
-                    m.setPosition(m.getX(), 1.0f + bob, m.getZ());
-                    m.setRotation(0f, time * 120f + i * 20f, 0f);
+                    for (int p = 0; p < m.length; p++) {
+                        m[p].setPosition(m[p].getX(), 1.0f + bob, m[p].getZ());
+                    }
+                    boolean coin = e.pickup.kind == PickupKind.COIN;
+                    m[0].setRotation(coin ? 90f : 0f, time * 140f + i * 20f, 0f);
+                    // The halo faces the camera and, on a coin, twinkles.
+                    Glow.face(m[1], getCamera());
+                    float pulse = coin ? 0.75f + 0.35f * (float) Math.sin(time * 9f + i * 1.7f) : 1f;
+                    m[1].setScale(coin ? pulse : 1.7f, coin ? pulse : 1.7f, 1f);
                 }
             }
         }
         // Defensive: anything left over from before a restart.
-        Iterator<Map.Entry<Integer, Model>> it = entries.entrySet().iterator();
+        Iterator<Map.Entry<Integer, Model[]>> it = entries.entrySet().iterator();
         while (it.hasNext()) {
-            Map.Entry<Integer, Model> en = it.next();
+            Map.Entry<Integer, Model[]> en = it.next();
             if (en.getKey().intValue() < firstEntry) {
-                removeModel(en.getValue());
+                remove(en.getValue());
                 it.remove();
             }
         }
     }
 
-    private Model model(Run run, Track.Entry e) {
+    private void remove(Model[] parts) {
+        for (int i = 0; i < parts.length; i++) {
+            removeModel(parts[i]);
+        }
+    }
+
+    /// The models for one obstacle or pickup. Each kind has a shape a
+    /// player learns at a glance from any camera: a low bar with a glowing
+    /// top to jump, striped boards hanging overhead to slide under, a cargo
+    /// pod to steer around, and a black pit with hot edges.
+    private Model[] model(Run run, Track.Entry e) {
         int lanes = Math.max(1, run.level().lanes);
         float width = e.spansAllLanes() ? lanes * LANE_W : LANE_W * 0.85f;
         float x = e.spansAllLanes() ? 0f : (e.lane * 1000 - (lanes - 1) * 500) / (float) Track.UNIT * LANE_W;
         float depth = Math.max(0.2f, e.depth / (float) Track.UNIT);
         float z = -(e.z / (float) Track.UNIT + depth / 2f);
         if (e.pickup != null) {
-            Model m = new Model(sphere, new Material(Material.Type.PHONG).setColor(pickupColor(e.pickup.kind)));
-            float s = e.pickup.kind == PickupKind.COIN ? 0.45f : 0.7f;
-            m.setScale(s, s, e.pickup.kind == PickupKind.COIN ? 0.12f : s);
-            m.setPosition(x, 1.0f, -(e.z / (float) Track.UNIT));
-            return m;
+            float pz = -(e.z / (float) Track.UNIT);
+            if (e.pickup.kind == PickupKind.COIN) {
+                Model m = new Model(coinMesh, coinMaterial);
+                m.setPosition(x, 1.0f, pz);
+                return new Model[] {m, Glow.sprite(quad, coinGlint, x, 1.0f, pz + 0.05f, 1f, 1f)};
+            }
+            Material[] mats = gemMaterials.get(e.pickup.kind);
+            if (mats == null) {
+                int c = pickupColor(e.pickup.kind);
+                mats = new Material[] {
+                    new Material(Material.Type.PHONG).setColor(Theme.mix(c, 0xffffffff, 0.15f)).setShininess(110f),
+                    Glow.additive(glow.soft, (c & 0x00ffffff) | 0xa0000000),
+                };
+                gemMaterials.put(e.pickup.kind, mats);
+            }
+            Model m = new Model(gemMesh, mats[0]);
+            m.setScale(0.55f, 0.8f, 0.55f);
+            m.setPosition(x, 1.0f, pz);
+            return new Model[] {m, Glow.sprite(quad, mats[1], x, 1.0f, pz, 1f, 1f)};
         }
         Clearance c = e.obstacle.clearance;
-        Model m;
         if (c == Clearance.JUMP && e.obstacle.height == 0) {
-            // A gap: a dark pit lying just above the track.
-            m = new Model(quad, new Material(Material.Type.UNLIT).setColor(0xff101018));
-            m.setRotation(-90f, 0f, 0f);
-            m.setScale(width + 0.1f, depth, 1f);
-            m.setPosition(x, 0.02f, z);
-        } else if (c == Clearance.JUMP) {
-            float h = e.obstacle.height / (float) Track.UNIT;
-            m = new Model(cube, new Material(Material.Type.PHONG).setColor(0xffff9a3c));
-            m.setScale(width, h, depth);
-            m.setPosition(x, h / 2f, z);
-        } else if (c == Clearance.SLIDE) {
-            m = new Model(cube, new Material(Material.Type.PHONG).setColor(0xffe0405a));
-            m.setScale(width, 0.9f, depth);
-            m.setPosition(x, 1.55f, z);
-        } else {
-            m = new Model(cube, new Material(Material.Type.LAMBERT).setColor(0xff4a78c8));
-            m.setScale(width, 2.6f, depth);
-            m.setPosition(x, 1.3f, z);
+            float w = width + 0.1f;
+            Model hole = box(quad, pit, x, 0.02f, z, w, depth, 1f);
+            hole.setRotation(-90f, 0f, 0f);
+            Model heat = box(quad, pitDepth, x, 0.03f, z, w * 0.9f, depth * 0.8f, 1f);
+            heat.setRotation(-90f, 0f, 0f);
+            Model near = box(capsule(0.06f, w - 0.12f), pitRim, x, 0.06f, z + depth / 2f, 1f, 1f, 1f);
+            Model far = box(capsule(0.06f, w - 0.12f), pitRim, x, 0.06f, z - depth / 2f, 1f, 1f, 1f);
+            near.setRotation(0f, 0f, 90f);
+            far.setRotation(0f, 0f, 90f);
+            Model nearHalo = box(quad, pitHalo, x, 0.04f, z + depth / 2f, w + 0.8f, 0.9f, 1f);
+            Model farHalo = box(quad, pitHalo, x, 0.04f, z - depth / 2f, w + 0.8f, 0.9f, 1f);
+            nearHalo.setRotation(-90f, 0f, 0f);
+            farHalo.setRotation(-90f, 0f, 0f);
+            return new Model[] {hole, heat, near, far, nearHalo, farHalo};
         }
+        if (c == Clearance.JUMP) {
+            float h = e.obstacle.height / (float) Track.UNIT;
+            float post = 0.12f;
+            Mesh postMesh = rounded(post, h, post, 0.05f);
+            Model bar = box(capsule(0.075f, width - 0.15f), hurdleBar, x, h - 0.075f, z, 1f, 1f, 1f);
+            bar.setRotation(0f, 0f, 90f);
+            return new Model[] {
+                box(postMesh, hurdleFrame, x - width / 2f + post, h / 2f, z, 1f, 1f, 1f),
+                box(postMesh, hurdleFrame, x + width / 2f - post, h / 2f, z, 1f, 1f, 1f),
+                box(rounded(width - post * 2f, h * 0.45f, 0.06f, 0.03f), hurdleFrame, x, h * 0.42f, z, 1f, 1f, 1f),
+                bar,
+                Glow.sprite(quad, hurdleHalo, x, h - 0.075f, z + 0.1f, width + 1f, 0.9f),
+            };
+        }
+        if (c == Clearance.SLIDE) {
+            float d = Math.min(depth, 0.3f);
+            Model edge = box(capsule(0.05f, width - 0.1f), warning, x, 1.25f, z, 1f, 1f, 1f);
+            edge.setRotation(0f, 0f, 90f);
+            Model top = box(capsule(0.07f, width), hurdleFrame, x, 2.0f, z, 1f, 1f, 1f);
+            top.setRotation(0f, 0f, 90f);
+            Mesh postMesh = rounded(0.12f, 2.2f, 0.12f, 0.05f);
+            return new Model[] {
+                box(rounded(width, 0.7f, d, 0.06f), holo, x, 1.63f, z, 1f, 1f, 1f),
+                edge,
+                top,
+                box(postMesh, hurdleFrame, x - width / 2f, 1.1f, z, 1f, 1f, 1f),
+                box(postMesh, hurdleFrame, x + width / 2f, 1.1f, z, 1f, 1f, 1f),
+                Glow.sprite(quad, warningHalo, x, 1.25f, z + d / 2f + 0.05f, width + 1f, 0.8f),
+            };
+        }
+        float pw = width * 0.92f;
+        Model under = box(quad, podHalo, x, 0.02f, z, pw * 1.5f, depth * 1.3f, 1f);
+        under.setRotation(-90f, 0f, 0f);
+        return new Model[] {
+            box(rounded(pw, 2.1f, depth, 0.36f), pod, x, 1.4f, z, 1f, 1f, 1f),
+            box(rounded(width * 0.8f, 0.32f, depth * 0.9f, 0.1f), hurdleFrame, x, 0.2f, z, 1f, 1f, 1f),
+            box(rounded(pw + 0.04f, 0.08f, depth + 0.04f, 0.04f), podGlow, x, 0.62f, z, 1f, 1f, 1f),
+            under,
+            Glow.sprite(quad, podHalo, x, 1.9f, z + depth / 2f + 0.08f, pw * 1.1f, 0.9f),
+        };
+    }
+
+    private static Model box(Mesh mesh, Material mat, float x, float y, float z, float sx, float sy, float sz) {
+        Model m = new Model(mesh, mat);
+        m.setScale(sx, sy, sz);
+        m.setPosition(x, y, z);
         return m;
     }
 
@@ -428,11 +775,11 @@ public class RunView extends GameView {
             case GEM:
                 return 0xff3ce0ff;
             case MAGNET:
-                return 0xffff4a4a;
+                return 0xffff3d9a;
             case SHIELD:
-                return 0xff6a8cff;
+                return 0xff8a7bff;
             default:
-                return 0xff5cff7a;
+                return 0xffc8ff3d;
         }
     }
 
@@ -443,13 +790,15 @@ public class RunView extends GameView {
         if (mode == ViewMode.SIDE_2D) {
             // Far to the right with a narrow lens: the lanes line up behind
             // each other and the run reads as a side-scroller.
+            // The runner sits left of centre with the track ahead in view,
+            // and the track in the lower third under the skyline.
             out[0] = 70f;
-            out[1] = 1.6f + y * 0.3f;
-            out[2] = -z - 5f;
+            out[1] = 3.4f + y * 0.3f;
+            out[2] = -z - 2.2f;
             out[3] = 0f;
-            out[4] = 1.4f + y * 0.3f;
-            out[5] = -z - 5f;
-            out[6] = 9f;
+            out[4] = 3.2f + y * 0.3f;
+            out[5] = -z - 2.2f;
+            out[6] = 14f;
             out[7] = 0f;
         } else if (mode == ViewMode.TOP_DOWN) {
             out[0] = x * 0.4f;

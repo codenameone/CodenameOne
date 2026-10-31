@@ -17,8 +17,3 @@ mvn -pl rules test
 mvn -pl rules,shared,backend -Dcodename1.platform=backend test
 ./run-e2e.sh
 // end::dash-sh-tests[]
-
-// tag::dash-sh-portraits[]
-mvn -pl common test-compile surefire:test -Dtest=PortraitStudio \
-    -Ddash.portraits="$PWD/common/src/main/resources"
-// end::dash-sh-portraits[]

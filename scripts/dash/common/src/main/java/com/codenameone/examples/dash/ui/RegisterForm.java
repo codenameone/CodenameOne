@@ -57,7 +57,7 @@ public final class RegisterForm {
         col.add(SignInForm.heroes());
         col.add(Ui.label("Choose your runner name", "SectionTitle"));
         col.add(Ui.panel(name, Ui.centered(preview)));
-        col.add(Ui.panel(email, password, Ui.wood("Enter the arena", "createButton", e -> {
+        col.add(Ui.panel(email, password, Ui.primary("Start running", "createButton", e -> {
             final String mail = email.getText().trim();
             final String pass = password.getText();
             Api.account().register(new RegisterDto(mail, pass, name.getText().trim()),

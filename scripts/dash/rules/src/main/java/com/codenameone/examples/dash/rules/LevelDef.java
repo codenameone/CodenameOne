@@ -29,7 +29,7 @@ import java.util.List;
 public final class LevelDef {
     public String id;
     public String name;
-    public String theme = "dusk";
+    public String theme = "ember";
     public int lanes = 3;
     public int startSpeed = 9000;
     public int maxSpeed = 22000;

@@ -34,6 +34,7 @@ import com.codename1.util.AsyncResource;
 import com.codenameone.examples.dash.engage.Telemetry;
 import com.codenameone.examples.dash.rules.Bot;
 import com.codenameone.examples.dash.rules.Run;
+import com.codenameone.examples.dash.run.Driver;
 import com.codenameone.examples.dash.run.RunView;
 import com.codenameone.examples.dash.run.Sfx;
 import com.codenameone.examples.dash.net.Session;
@@ -202,6 +203,34 @@ public abstract class E2e extends AbstractTest {
             waitFor(16);
         }
         assertTrue(false, "the run did not end in " + timeoutMillis + " ms");
+    }
+
+    /// Plays the rest of the run at once, the bot choosing every tick, so a
+    /// long level costs a test a moment instead of minutes of real time. The
+    /// view then sees a finished run on its next frame, the way it would at
+    /// the end of a real one. `maxTicks` stops an endless level.
+    protected void finish(final RunView view, final int maxTicks) {
+        onEdt(() -> {
+            Bot bot = new Bot(7, 90);
+            Driver d = view.driver();
+            Run run = d.run();
+            int limit = run.tick() + maxTicks;
+            while (!run.over() && d.canStep() && run.tick() < limit) {
+                d.input(bot.decide(run, d.me()));
+                d.step();
+            }
+        });
+    }
+
+    /// Waits for the result screen, collecting the reward that a run which
+    /// earned something shows first.
+    protected void awaitResult(String what) {
+        until(() -> has("result") || has("collectReward"), 20000, what);
+        if (!has("result")) {
+            shot("run-reward");
+            click("collectReward");
+            until(() -> has("result"), 20000, what);
+        }
     }
 
     /// A real touch: press and release at a point on the screen, the way a

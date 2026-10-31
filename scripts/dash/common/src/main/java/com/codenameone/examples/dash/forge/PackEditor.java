@@ -98,7 +98,7 @@ public final class PackEditor {
             LevelDef l = p.levels.get(i);
             f.add(item(l.name, LevelsForm.describe(l), "level-" + l.id, () -> LevelEditor.edit(at)));
         }
-        f.add(Ui.stone("Add a level", "addLevel", e -> LevelEditor.create()));
+        f.add(Ui.secondary("Add a level", "addLevel", e -> LevelEditor.create()));
 
         f.add(Ui.label("Obstacles and pickups", "SectionTitle"));
         f.add(Fields.help("Your own pieces, on top of the game's hurdles, barriers, haulers, gaps, coins "
@@ -115,8 +115,8 @@ public final class PackEditor {
                 f.add(item(k.id, "Pickup, " + DefEditor.kindName(k.kind), "def-" + k.id, () -> DefEditor.edit(at)));
             }
         }
-        f.add(Ui.row(Ui.stone("Add an obstacle", "addObstacle", e -> DefEditor.create(true)),
-                Ui.stone("Add a pickup", "addPickup", e -> DefEditor.create(false))));
+        f.add(Ui.row(Ui.secondary("Add an obstacle", "addObstacle", e -> DefEditor.create(true)),
+                Ui.secondary("Add a pickup", "addPickup", e -> DefEditor.create(false))));
 
         List<String> problems = Validator.check(p);
         if (!problems.isEmpty()) {
@@ -125,9 +125,9 @@ public final class PackEditor {
                 f.add(Ui.text(problems.get(i), "ForgeProblem"));
             }
         }
-        f.add(Ui.row(Ui.stone("Save", "savePack", e -> save(() -> Ui.toast("Saved"))),
-                Ui.wood("Publish", "publishPack", e -> publish())));
-        f.add(Ui.stone("Delete pack", "deletePack", e -> {
+        f.add(Ui.row(Ui.secondary("Save", "savePack", e -> save(() -> Ui.toast("Saved"))),
+                Ui.primary("Publish", "publishPack", e -> publish())));
+        f.add(Ui.secondary("Delete pack", "deletePack", e -> {
             if (Dialog.show("Delete?", "Players who have the link can no longer open it.", "Delete", "Keep")) {
                 Api.forge().delete(p.id, Net.to(s -> Ui.later(() -> ForgeHome.show("mine")), Ui::failed));
             }

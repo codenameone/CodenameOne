@@ -118,16 +118,16 @@ public final class LevelEditor {
         for (int i = 0; i < l.dialog.size(); i++) {
             final DialogLine d = l.dialog.get(i);
             f.add(Ui.row(Ui.text(d.at / Track.UNIT + " m: " + d.text, "QuestReward"),
-                    Ui.stone("Remove", "removeLine" + i, e -> {
+                    Ui.secondary("Remove", "removeLine" + i, e -> {
                         l.dialog.remove(d);
                         edit(index);
                     })));
         }
-        f.add(Ui.stone("Add a line", "addLine", e -> addLine(l, index)));
+        f.add(Ui.secondary("Add a line", "addLine", e -> addLine(l, index)));
 
-        f.add(Ui.row(Ui.wood("Playtest", "playtest", e -> RunForm.playtest(
+        f.add(Ui.row(Ui.primary("Playtest", "playtest", e -> RunForm.playtest(
                 Levels.draft(PackEditor.pack, l), () -> edit(index))),
-                Ui.stone("Delete level", "deleteLevel", e -> {
+                Ui.secondary("Delete level", "deleteLevel", e -> {
                     if (Dialog.show("Delete?", "Delete " + l.name + "?", "Delete", "Keep")) {
                         PackEditor.pack.levels.remove(index);
                         PackEditor.show();

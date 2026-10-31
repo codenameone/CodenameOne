@@ -44,7 +44,7 @@ import com.codenameone.examples.dash.run.RunView;
 public final class ReplayForm implements RunView.Hud {
     private final ReplayDriver driver;
     private final Slider scrub = new Slider();
-    private final Label clock = new Label("0:00", "BattleClock");
+    private final Label clock = new Label("0:00", "RunClock");
     private final Runnable back;
     private boolean dragging;
 
@@ -101,7 +101,7 @@ public final class ReplayForm implements RunView.Hud {
         view.setHud(this);
         Form f = new Form(driver.run().level().name, new BorderLayout());
         f.setName("replay");
-        f.setUIID("BattleForm");
+        f.setUIID("RunScreen");
         Ui.back(f, () -> {
             view.stop();
             if (back != null) {

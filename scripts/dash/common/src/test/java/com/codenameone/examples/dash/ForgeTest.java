@@ -63,8 +63,8 @@ public class ForgeTest extends E2e {
         final RunView view = track();
         until(() -> view.driver().run().tick() > 240, 20000, "the playtest");
         shot("forge-playtest");
-        drive(view, 120000);
-        until(() -> has("result"), 20000, "the playtest result");
+        finish(view, 60 * 600);
+        awaitResult("the playtest result");
         click("done");
         waitForForm("levelEditor");
         return true;

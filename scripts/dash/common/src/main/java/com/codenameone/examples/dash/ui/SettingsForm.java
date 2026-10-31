@@ -54,7 +54,7 @@ public final class SettingsForm {
         name.setUIID("NameField");
         name.setName("displayName");
         f.add(Ui.label("Runner name", "SectionTitle"));
-        f.add(Ui.panel(name, Ui.stone("Rename", "rename", e -> Api.account().saveProfile(
+        f.add(Ui.panel(name, Ui.secondary("Rename", "rename", e -> Api.account().saveProfile(
                 new ProfileDto(name.getText().trim()), Net.to(p -> {
                     Session.setUser(p);
                     Ui.toast("Renamed");
@@ -68,7 +68,7 @@ public final class SettingsForm {
                 toggle("Share anonymous usage", "analytics", Telemetry.allowed(), Telemetry::allow),
                 toggle("Notifications", "push", Notifications.enabled(), Notifications::setEnabled)));
         if (AppConfig.serverSwitchable()) {
-            f.add(Ui.stone("Server: " + AppConfig.serverUrl(), "serverButton", e -> chooseServer()));
+            f.add(Ui.secondary("Server: " + AppConfig.serverUrl(), "serverButton", e -> chooseServer()));
         }
         f.add(Ui.button("Sign out", "DangerButton", "signOut", e -> Nav.signOut()));
         f.show();

@@ -43,7 +43,7 @@ import com.codenameone.examples.dash.net.Session;
 
 /// The few building blocks every screen is made of. None of them draws
 /// anything itself: each one only names a UIID, and `theme.css` decides what a
-/// `WoodButton`, a `Panel` or a `Banner` looks like. Re-skinning the game is
+/// `PrimaryButton`, a `Panel` or a `Banner` looks like. Re-skinning the game is
 /// editing that file, not this one.
 // tag::dash-ui[]
 public final class Ui {
@@ -83,6 +83,7 @@ public final class Ui {
 
     public static SpanLabel text(String text, String uiid) {
         SpanLabel l = new SpanLabel(text);
+        l.setUIID("Container");
         l.setTextUIID(uiid);
         return l;
     }
@@ -96,14 +97,23 @@ public final class Ui {
         return b;
     }
 
-    /// The big carved button of a menu.
-    public static Button wood(String text, String name, ActionListener<ActionEvent> onClick) {
-        return button(text, "WoodButton", name, onClick);
+    /// The bright, rounded call to action of a screen.
+    public static Button primary(String text, String name, ActionListener<ActionEvent> onClick) {
+        return button(text, "PrimaryButton", name, onClick);
     }
 
-    /// The smaller grey button for everything secondary.
-    public static Button stone(String text, String name, ActionListener<ActionEvent> onClick) {
-        return button(text, "StoneButton", name, onClick);
+    /// The outlined button for everything secondary.
+    public static Button secondary(String text, String name, ActionListener<ActionEvent> onClick) {
+        return button(text, "GhostButton", name, onClick);
+    }
+
+    /// Sets a material icon drawn on nothing, so a label with a translucent
+    /// background doesn't get a darker square behind its icon.
+    public static void glyph(com.codename1.ui.Label l, char icon, float mm) {
+        com.codename1.ui.plaf.Style st = new com.codename1.ui.plaf.Style(l.getUnselectedStyle());
+        st.setBgTransparency(0);
+        st.setBorder(null);
+        l.setIcon(com.codename1.ui.FontImage.createMaterial(icon, st, mm));
     }
 
     public static Container panel(Component... children) {

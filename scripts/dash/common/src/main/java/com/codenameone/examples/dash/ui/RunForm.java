@@ -85,7 +85,7 @@ public final class RunForm implements RunView.Hud, RaceDriver.Listener {
         view.setHud(this);
         form = new Form(driver.run().level().name, new BorderLayout());
         form.setName("run");
-        form.setUIID("BattleForm");
+        form.setUIID("RunScreen");
         form.getToolbar().hideToolbar();
 
         Container hud = new Container(new BorderLayout());
@@ -93,11 +93,21 @@ public final class RunForm implements RunView.Hud, RaceDriver.Listener {
         Container top = new Container(new BorderLayout());
         top.setUIID("HudBar");
         Button quit = Ui.button("", "HudButton", "quit", e -> quit());
-        quit.setMaterialIcon(FontImage.MATERIAL_CLOSE);
+        quit.setMaterialIcon(FontImage.MATERIAL_PAUSE, 4.4f);
         top.add(BorderLayout.WEST, quit);
-        coins.setMaterialIcon(FontImage.MATERIAL_MONETIZATION_ON);
-        top.add(BorderLayout.CENTER, BoxLayout.encloseX(distance, score, coins, power));
-        top.add(BorderLayout.EAST, place);
+        // Distance big in the middle, score under it; coins and place to the
+        // right, where the eye checks them between obstacles.
+        Container mid = new Container(BoxLayout.y());
+        mid.add(distance);
+        mid.add(score);
+        top.add(BorderLayout.CENTER, mid);
+        Ui.glyph(coins, FontImage.MATERIAL_MONETIZATION_ON, 3.6f);
+        Ui.glyph(power, FontImage.MATERIAL_BOLT, 3.2f);
+        Container right = new Container(BoxLayout.y());
+        right.add(coins);
+        right.add(place);
+        right.add(power);
+        top.add(BorderLayout.EAST, right);
         distance.setName("distance");
         score.setName("score");
         place.setName("place");
@@ -268,8 +278,8 @@ public final class RunForm implements RunView.Hud, RaceDriver.Listener {
         Runner me = run.runner(driver.me());
         Telemetry.runEnded(mode, run.level().id, placeOf(run, driver.me()), me.z / Track.UNIT, !me.alive);
         if ("playtest".equals(mode)) {
-            result(me.alive ? "Finished" : "Crashed at " + me.z / Track.UNIT + " m",
-                    me.score() + " points. A playtest is not submitted.", null);
+            result(me.alive ? "FINISHED" : "CRASHED AT " + me.z / Track.UNIT + " M", me.score(),
+                    "Playtests are not submitted", null);
         } else if (driver instanceof SoloDriver) {
             submit((SoloDriver) driver);
         }
@@ -281,46 +291,97 @@ public final class RunForm implements RunView.Hud, RaceDriver.Listener {
     private void submit(SoloDriver d) {
         final Runner me = d.run().runner(0);
         if (Session.user() == null) {
-            result("Run over", me.score() + " points", null);
+            result("RUN OVER", me.score(), null, null);
             return;
         }
         Api.forge().result(new LevelResultDto(d.replay().encode()), Net.to(o -> Ui.later(() -> {
             if ("tutorial".equals(mode)) {
                 Api.progress().tutorialDone(Net.to(r -> { }, (s, m) -> { }));
             }
-            result(stars(o), o.score() + " points   best " + o.best()
-                    + (o.rank() > 0 ? "   rank #" + o.rank() : ""), o);
-        }), (s, m) -> Ui.later(() -> result("Run over", me.score() + " points (not saved: " + m + ")", null))));
+            result(o.score() >= o.best() && o.score() > 0 ? "NEW BEST!" : headline(o.stars()), o.score(),
+                    null, o);
+        }), (s, m) -> Ui.later(() -> result("RUN OVER", me.score(), "Not saved: " + m, null))));
     }
 
-    private static String stars(LevelOutcomeDto o) {
-        return LevelsForm.starText(o.stars());
+    private static String headline(int stars) {
+        switch (stars) {
+            case 3:
+                return "PERFECT RUN";
+            case 2:
+                return "GREAT RUN";
+            case 1:
+                return "NICE RUN";
+            default:
+                return "RUN OVER";
+        }
     }
 
-    private void result(String title, String line, final LevelOutcomeDto o) {
+    /// The end of a run: the stars popping in one by one, the score counting
+    /// up, the best and the rank beside it, and the next run the biggest
+    /// button on the card.
+    private void result(String title, int score, String note, final LevelOutcomeDto o) {
         view.stop();
-        Dialog d = new Dialog(title, new BorderLayout());
-        d.setName("result");
-        d.add(BorderLayout.CENTER, Ui.text(line, "ResultLine"));
-        Container buttons = new Container(new GridLayout(1, 3));
-        buttons.add(Ui.button("Again", "DialogButton", "again", e -> {
+        Dialog d = new Dialog("", BoxLayout.y());
+        d.setDialogUIID("ResultDialog");
+        d.setTitleComponent(new Label());
+        d.getTitleComponent().setVisible(false);
+        Container card = new Container(BoxLayout.y());
+        card.setUIID("ResultCard");
+        card.setName("result");
+        card.add(new Label(title, "ResultTitle"));
+        if (o != null) {
+            card.add(Kit.stars(o.stars(), 3, 9f));
+        }
+        card.add(Kit.countUp("", score, "ResultScore"));
+        card.add(new Label("POINTS", "ResultCaption"));
+        Container chips = new Container(BoxLayout.x());
+        if (o != null) {
+            Label best = new Label("BEST " + o.best(), "StatChip");
+            Ui.glyph(best, FontImage.MATERIAL_EMOJI_EVENTS, 3f);
+            chips.add(best);
+            if (o.rank() > 0) {
+                Label rank = new Label("RANK #" + o.rank(), "StatChip");
+                Ui.glyph(rank, FontImage.MATERIAL_LEADERBOARD, 3f);
+                chips.add(rank);
+            }
+        }
+        if (note != null) {
+            chips.add(new Label(note, "ResultCaption"));
+        }
+        card.add(FlowLayout.encloseCenter(chips));
+        Button again = Ui.button("RUN AGAIN", "CardGo", "again", e -> {
             d.dispose();
             again();
-        }));
+        });
+        again.setMaterialIcon(FontImage.MATERIAL_REPLAY, 4.4f);
+        card.add(again);
+        Container buttons = new Container(new GridLayout(1, "playtest".equals(mode) ? 1 : 2));
         if (!"playtest".equals(mode)) {
-            buttons.add(Ui.button("Scores", "DialogButton", "scores", e -> {
+            Button scores = Ui.button("Scores", "CardAction", "scores", e -> {
                 d.dispose();
                 driver.dispose();
                 ScoresForm.show(driver.run().level().id, null);
-            }));
+            });
+            Ui.glyph(scores, FontImage.MATERIAL_LEADERBOARD, 3.4f);
+            buttons.add(scores);
         }
-        buttons.add(Ui.button("Done", "DialogButton", "done", e -> {
+        Button done = Ui.button("Home", "CardAction", "done", e -> {
             d.dispose();
             close();
-        }));
-        d.add(BorderLayout.SOUTH, buttons);
+        });
+        Ui.glyph(done, FontImage.MATERIAL_HOME, 3.4f);
+        buttons.add(done);
+        card.add(buttons);
+        d.add(card);
+        // A short phone scrolls the card rather than cutting its buttons off.
+        d.getContentPane().setScrollableY(true);
+        d.getContentPane().setScrollVisible(false);
         final Runnable after = () -> {
-            d.showPacked(BorderLayout.CENTER, true);
+            // Inset from every edge rather than packed, so the card is as
+            // wide as the phone allows and nothing on it is cut short.
+            int dw = CN.getDisplayWidth();
+            int dh = CN.getDisplayHeight();
+            d.show(dh / 9, dh / 9, dw / 16, dw / 16);
             Ads.betweenRuns(Ui.adFree());
         };
         if (o != null && o.reward() != null && (o.reward().coins() > 0 || o.reward().xp() > 0)) {

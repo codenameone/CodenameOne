@@ -21,6 +21,9 @@ package com.codenameone.examples.dash.ui;
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
+import com.codename1.ui.layouts.FlowLayout;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.CN;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codenameone.examples.dash.api.BuyDto;
 import com.codenameone.examples.dash.api.EquipDto;
@@ -64,24 +67,40 @@ public final class ShopForm {
             boolean owned = wallet.owned() != null && wallet.owned().contains(item.id());
             Container row = new Container(new BorderLayout());
             row.setUIID("ShopItem");
-            row.add(BorderLayout.CENTER, new Label(item.name(), "ShopItemName"));
+            row.add(BorderLayout.WEST, new Label(Kit.shopArt(item.id(), CN.convertToPixels(13)), "ShopArt"));
+            Container text = new Container(BoxLayout.y());
+            text.add(Ui.text(item.name(), "ShopItemName"));
+            text.add(new Label(kindOf(item), "ShopItemKind"));
+            row.add(BorderLayout.CENTER, text);
             if (item.sku() != null && item.sku().length() > 0) {
                 if (owned) {
-                    row.add(BorderLayout.EAST, new Label("Owned", "Owned"));
+                    row.add(BorderLayout.EAST, FlowLayout.encloseMiddle(new Label("Owned", "Owned")));
                 } else {
-                    row.add(BorderLayout.EAST, Ui.button("Buy", "GemButton", "buy-" + item.id(), e -> Store.buy(item.sku())));
+                    row.add(BorderLayout.EAST, FlowLayout.encloseMiddle(Ui.button("Buy", "GemButton", "buy-" + item.id(),
+                            e -> Store.buy(item.sku()))));
                 }
             } else if (owned) {
                 boolean on = item.id().equals(wallet.outfit());
-                row.add(BorderLayout.EAST, item.id().startsWith("trail-") && !on
-                        ? Ui.button("Use", "StoneButton", "equip-" + item.id(), e -> equip(item.id()))
-                        : new Label(on ? "In use" : "Owned", "Owned"));
+                row.add(BorderLayout.EAST, FlowLayout.encloseMiddle(item.id().startsWith("trail-") && !on
+                        ? Ui.button("Use", "GhostButton", "equip-" + item.id(), e -> equip(item.id()))
+                        : new Label(on ? "In use" : "Owned", "Owned")));
             } else {
                 String price = item.priceGems() > 0 ? item.priceGems() + " gems" : item.priceCoins() + " coins";
-                row.add(BorderLayout.EAST, Ui.button(price, "PriceButton", "buy-" + item.id(), e -> buy(item)));
+                row.add(BorderLayout.EAST, FlowLayout.encloseMiddle(Ui.button(price, "PriceButton", "buy-" + item.id(),
+                        e -> buy(item))));
             }
             f.add(row);
         }
+    }
+
+    private static String kindOf(ShopItemDto item) {
+        if (item.id().startsWith("runner-")) {
+            return "RUNNER";
+        }
+        if (item.id().startsWith("trail-")) {
+            return "TRAIL";
+        }
+        return item.sku() != null && item.sku().length() > 0 ? "BEST VALUE" : "ITEM";
     }
 
     private static void buy(ShopItemDto item) {

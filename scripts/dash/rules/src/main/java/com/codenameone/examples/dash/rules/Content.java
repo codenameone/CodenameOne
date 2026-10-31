@@ -110,7 +110,7 @@ public final class Content {
     /// The how-to-play level: side-on, one move at a time, nothing lethal.
     public static LevelDef tutorial() {
         LevelDef d = new LevelDef(TUTORIAL, "First Steps");
-        d.theme = "meadow";
+        d.theme = "daybreak";
         d.length = 400 * Track.UNIT;
         d.accel = 0;
         d.stars = new int[] {400, 450, 500};
@@ -155,7 +155,7 @@ public final class Content {
     /// The chase-view endless run every leaderboard and the daily challenge use.
     public static LevelDef endless() {
         LevelDef d = new LevelDef(ENDLESS, "Endless");
-        d.theme = "dusk";
+        d.theme = "ember";
         d.goal = Goal.ENDLESS;
         d.stars = new int[] {500, 1500, 3000};
         d.cue(0, ViewMode.CHASE_3D, 0);

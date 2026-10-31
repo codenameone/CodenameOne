@@ -91,23 +91,23 @@ public final class PackScreen {
         f.add(Ui.label("Share", "SectionTitle"));
         ShareButton share = new ShareButton();
         share.setText("Send to a friend");
-        share.setUIID("WoodButton");
+        share.setUIID("PrimaryButton");
         // The share icon ShareButton brings is drawn on white; a material
         // icon takes the button's own colours.
         share.setMaterialIcon(com.codename1.ui.FontImage.MATERIAL_SHARE);
         share.setName("sharePack");
         share.setTextToShare("Play \"" + s.name() + "\" in Dash: " + AppConfig.packLink(s.id()));
         f.add(share);
-        f.add(Ui.row(Ui.stone("Copy the link", "copyPack", e -> {
+        f.add(Ui.row(Ui.secondary("Copy the link", "copyPack", e -> {
             Display.getInstance().copyToClipboard(AppConfig.packLink(s.id()));
             Ui.toast("Copied");
-        }), Ui.stone("Remix", "remixPack", e -> remix(s))));
+        }), Ui.secondary("Remix", "remixPack", e -> remix(s))));
         String me = Session.user() == null ? "" : Session.user().username();
         if (me.equals(s.owner())) {
-            f.add(Ui.stone("Edit", "editPack", e -> PackEditor.open(s.id())));
+            f.add(Ui.secondary("Edit", "editPack", e -> PackEditor.open(s.id())));
         } else {
-            f.add(Ui.row(Ui.stone("Rate", "ratePack", e -> rate(s)),
-                    Ui.stone("Report", "reportPack", e -> report(s))));
+            f.add(Ui.row(Ui.secondary("Rate", "ratePack", e -> rate(s)),
+                    Ui.secondary("Report", "reportPack", e -> report(s))));
         }
         f.show();
     }
@@ -118,7 +118,9 @@ public final class PackScreen {
         MultiButton b = new MultiButton(l.name);
         b.setUIID("HistoryRow");
         b.setUIIDLine1("HistoryWin");
-        b.setTextLine2(LevelsForm.starText(stars) + "   " + LevelsForm.describe(l));
+        b.setTextLine2(LevelsForm.describe(l));
+        b.setEmblem(com.codenameone.examples.dash.ui.Kit.starsImage(stars,
+                com.codename1.ui.CN.convertToPixels(3.4f)));
         b.setName("level-" + l.id);
         final Levels.Playable p = Levels.of(pack, l.id);
         final String ref = pack.id + "/" + l.id;
@@ -145,7 +147,7 @@ public final class PackScreen {
         final int[] picked = {0};
         d.add(Fields.choice("Rating", "rating", choices, 4, v -> picked[0] = v + 1));
         picked[0] = 5;
-        d.add(Ui.wood("Rate", "rateSend", e -> {
+        d.add(Ui.primary("Rate", "rateSend", e -> {
             d.dispose();
             Api.forge().rate(new RateDto(s.id(), picked[0]), Net.to(r -> Ui.toast("Thanks for rating"),
                     Ui::failed));

@@ -22,6 +22,10 @@ import com.codename1.ui.Button;
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
+import com.codename1.ui.layouts.GridLayout;
+import com.codename1.ui.layouts.FlowLayout;
+import com.codename1.ui.FontImage;
+import com.codename1.ui.CN;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codenameone.examples.dash.api.LevelStarsDto;
@@ -53,7 +57,7 @@ public final class LevelsForm {
         final Container list = Ui.column();
         f.add(Ui.centeredColumn(list));
         fill(list, new HashMap<String, Integer>());
-        f.add(Ui.wood("Community levels", "communityButton", e -> ForgeHome.show()));
+        f.add(Ui.primary("Community levels", "communityButton", e -> ForgeHome.show()));
         f.show();
         Api.forge().stars(Samples.OFFICIAL_ID, Net.to(stars -> Ui.later(() -> {
             fill(list, byLevel(stars));
@@ -72,21 +76,32 @@ public final class LevelsForm {
     private static void fill(Container list, Map<String, Integer> stars) {
         list.removeAll();
         for (final LevelDef l : Content.levels()) {
+            // A card per level: a lit view of its track, its name, what kind
+            // of run it is and the stars won, a round play button, and the
+            // two ways to compete underneath.
             Container card = new Container(new BorderLayout());
-            card.setUIID("QuestCard");
+            card.setUIID("LevelCard");
             card.setName("level-" + l.id);
+            int th = CN.convertToPixels(17);
+            card.add(BorderLayout.WEST, new Label(Kit.thumb(l.theme, th * 3 / 5, th), "LevelThumb"));
             Container text = new Container(BoxLayout.y());
-            text.add(new Label(l.name, "QuestTitle"));
+            text.add(new Label(l.name, "LevelName"));
+            Label kind = new Label(describe(l), "TagChip");
+            text.add(FlowLayout.encloseIn(kind));
             Integer s = stars.get(l.id);
-            text.add(new Label(starText(s == null ? 0 : s.intValue()) + "   " + describe(l), "QuestReward"));
+            text.add(Kit.stars(s == null ? 0 : s.intValue(), 3, 4.5f));
             card.add(BorderLayout.CENTER, text);
             final Levels.Playable p = Levels.official(l.id);
-            Button play = Ui.button("Run", "ClaimButton", "play-" + l.id,
+            Button play = Ui.button("", "PlayRound", "play-" + l.id,
                     e -> RunForm.solo(p, week(l.id), "solo", null, LevelsForm::show));
-            Button ghost = Ui.button("Race the best", "DialogButton", "ghost-" + l.id, e -> ghost(p));
-            Button scores = Ui.button("Scores", "DialogButton", "scores-" + l.id,
+            play.setMaterialIcon(FontImage.MATERIAL_PLAY_ARROW, 4.6f);
+            card.add(BorderLayout.EAST, FlowLayout.encloseCenterMiddle(play));
+            Button ghost = Ui.button("Race the best", "CardAction", "ghost-" + l.id, e -> ghost(p));
+            Ui.glyph(ghost, FontImage.MATERIAL_DIRECTIONS_RUN, 3.2f);
+            Button scores = Ui.button("Scores", "CardAction", "scores-" + l.id,
                     e -> ScoresForm.show(l.id, LevelsForm::show));
-            card.add(BorderLayout.SOUTH, Ui.row(play, ghost, scores));
+            Ui.glyph(scores, FontImage.MATERIAL_LEADERBOARD, 3.2f);
+            card.add(BorderLayout.SOUTH, GridLayout.encloseIn(2, ghost, scores));
             list.add(card);
         }
     }
@@ -102,14 +117,6 @@ public final class LevelsForm {
     static long week(String levelId) {
         int day = (int) (System.currentTimeMillis() / 86400000L);
         return Content.weeklySeed(day / 7, levelId);
-    }
-
-    public static String starText(int n) {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < 3; i++) {
-            sb.append(i < n ? '*' : '.');
-        }
-        return sb.toString();
     }
 
     /// One line on what kind of level it is.

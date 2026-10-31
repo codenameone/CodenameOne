@@ -46,7 +46,7 @@ public final class AchievementsForm {
                 for (AchievementDto a : p.achievements()) {
                     done += a.unlocked() ? 1 : 0;
                 }
-                col.add(Ui.label(done + " of " + p.achievements().size() + " unlocked", "ArenaName"));
+                col.add(Ui.label(done + " of " + p.achievements().size() + " unlocked", "LeagueName"));
                 for (AchievementDto a : p.achievements()) {
                     col.add(row(a));
                 }

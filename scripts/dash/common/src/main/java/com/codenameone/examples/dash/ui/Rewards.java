@@ -116,15 +116,23 @@ public final class Rewards {
         title.setTextBlockAlign(Component.CENTER);
         d.add(title);
         String hero = Portraits.mine();
-        Image art = Portraits.hero(hero, CN.convertToPixels(r.levelUp() ? 17 : 16));
-        Label heroLabel = new Label(art, "RewardHero");
-        d.add(FlowLayout.encloseCenter(heroLabel));
+        Image art = Portraits.figure(hero, CN.convertToPixels(r.levelUp() ? 17 : 16));
+        // The prize turns in a burst of light, the way a win should feel.
+        Image prize = r.chests() > 0 && !r.levelUp() ? Portraits.crate(CN.convertToPixels(16), true) : art;
+        d.add(Kit.burst(prize, r.levelUp() ? 0xd4ff3a : 0xffd23a));
         if (r.levelUp()) {
             d.add(FlowLayout.encloseCenter(new Label("Level " + r.level(), "LevelBadgeBig")));
         }
         Container items = new Container(new FlowLayout(Component.CENTER));
         if (r.coins() > 0) {
-            items.add(chip(FontImage.MATERIAL_MONETIZATION_ON, "+" + r.coins(), "RewardCoins"));
+            Label coinsWon = Kit.countUp("+", r.coins(), "RewardCoins");
+            coinsWon.setMaterialIcon(FontImage.MATERIAL_MONETIZATION_ON);
+            // The icon widens the label: size it again for the final amount.
+            coinsWon.setText("+" + r.coins());
+            coinsWon.setPreferredSize(null);
+            coinsWon.setPreferredSize(coinsWon.getPreferredSize());
+            coinsWon.setText("+0");
+            items.add(coinsWon);
         }
         if (r.gems() > 0) {
             items.add(chip(FontImage.MATERIAL_DIAMOND, "+" + r.gems(), "RewardGems"));
@@ -143,7 +151,7 @@ public final class Rewards {
                 d.add(FlowLayout.encloseCenter(l));
             }
         }
-        Button collect = Ui.wood("Collect", "collectReward", e -> {
+        Button collect = Ui.primary("Collect", "collectReward", e -> {
             d.dispose();
             Session.refreshUser(() -> Ui.later(done), (s, m) -> Ui.later(done));
         });

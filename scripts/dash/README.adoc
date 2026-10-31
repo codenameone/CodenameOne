@@ -110,5 +110,5 @@ Dash is released under MIT No Attribution (see `LICENSE`), not under the
 GPLv2 with Classpath Exception that covers Codename One itself. Take any of it
 into your own application, under any licence, with no notice to keep.
 
-The runners in `common/src/main/resources/model_*.glb` are KayKit
-models by Kay Lousberg (https://kaylousberg.com), released under CC0.
+The game ships no art files. The runners, the track, the skyline and the
+portraits are all drawn in code, so there is nothing else to license.

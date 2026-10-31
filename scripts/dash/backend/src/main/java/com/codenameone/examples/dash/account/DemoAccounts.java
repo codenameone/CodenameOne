@@ -99,7 +99,7 @@ public class DemoAccounts {
                     "race", 0, 14, 0, 0L));
             pipelines.save(ADMIN, new PipelineDto(null, "Keen, never paid", false,
                     Arrays.asList(new ConditionDto("races", ">=", 10), new ConditionDto("purchases", "=", 0)),
-                    Pipelines.GEMS, "A gift for you", "20 gems for your next chest. Thanks for playing!",
+                    Pipelines.GEMS, "A gift for you", "20 gems for your next crate. Thanks for playing!",
                     "shop", 20, 30, 0, 0L));
         }
     }

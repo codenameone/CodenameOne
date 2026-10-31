@@ -61,7 +61,7 @@ public final class RunnerForm {
             Container card = new Container(new BorderLayout());
             card.setUIID(id.equals(current) ? "CardSlotSelected" : "CardSlot");
             card.setName(id);
-            card.add(BorderLayout.CENTER, new Label(Portraits.hero(Portraits.of(id), CN.convertToPixels(22)),
+            card.add(BorderLayout.CENTER, new Label(Portraits.figure(Portraits.of(id), CN.convertToPixels(22)),
                     "Container"));
             Container under = new Container(BoxLayout.y());
             under.add(new Label(NAMES[i], "QuestTitle"));
@@ -70,7 +70,7 @@ public final class RunnerForm {
             } else if (owned) {
                 under.add(Ui.button("Choose", "ClaimButton", "choose-" + id, e -> choose(f, grid, id)));
             } else {
-                under.add(Ui.button("In the shop", "DialogButton", "shop-" + id, e -> ShopForm.show()));
+                under.add(Ui.button("Shop", "CardAction", "shop-" + id, e -> ShopForm.show()));
             }
             card.add(BorderLayout.SOUTH, under);
             grid.add(card);

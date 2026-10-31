@@ -119,7 +119,7 @@ public class GeneratorModel {
     public static final int SKIRMISH_BRAND = 0xc8862f;
 
     /// The runner template's accent, used for its icon: it has no `--brand`.
-    public static final int DASH_BRAND = 0xe8572a;
+    public static final int DASH_BRAND = 0xff4d5e;
 
     /// The messaging template's `--brand`, held to its theme.css the same way.
     public static final int PARLEY_BRAND = 0x0a7d6b;

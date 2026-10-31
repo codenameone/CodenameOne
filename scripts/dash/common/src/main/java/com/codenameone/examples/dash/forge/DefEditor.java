@@ -115,7 +115,7 @@ public final class DefEditor {
                 PackEditor.pack.defs.set(index, p[0]);
             }));
         }
-        f.add(Ui.stone("Delete piece", "deleteDef", e -> {
+        f.add(Ui.secondary("Delete piece", "deleteDef", e -> {
             if (Dialog.show("Delete?", "Levels that place it will stop validating.", "Delete", "Keep")) {
                 PackEditor.pack.defs.remove(index);
                 PackEditor.show();

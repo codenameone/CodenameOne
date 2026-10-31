@@ -45,7 +45,7 @@ import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.spinner.Picker;
 import java.util.List;
 
-/// The console's own widgets. The game is painted wood and stone; the
+/// The console's own widgets. The game is all night track and neon; the
 /// console is a tool, so it looks like a desktop application: a light page,
 /// a side bar, plain fields in one aligned column and charts. Every look is
 /// a `Desk*` style in `theme.css`.

@@ -53,7 +53,7 @@ public final class ForgeHome {
             tabs.add(b);
         }
         f.add(tabs);
-        f.add(Ui.wood("Create a pack", "forgeCreate", e -> PackEditor.create()));
+        f.add(Ui.primary("Create a pack", "forgeCreate", e -> PackEditor.create()));
         Api.forge().packs(scope, Net.to(list -> Ui.later(() -> {
             if (list.isEmpty()) {
                 f.add(Ui.text("mine".equals(scope)

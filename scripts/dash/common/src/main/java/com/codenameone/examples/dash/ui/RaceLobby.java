@@ -121,7 +121,7 @@ public final class RaceLobby implements GameLink.Listener, Voice.Listener {
         final TextField field = new TextField("", "Party code", 12, TextField.ANY);
         field.setName("partyCode");
         f.add(field);
-        f.add(Ui.wood("Join", "joinButton", e -> {
+        f.add(Ui.primary("Join", "joinButton", e -> {
             if (field.getText().trim().length() > 0) {
                 join(field.getText().trim().toUpperCase());
             }
@@ -134,7 +134,7 @@ public final class RaceLobby implements GameLink.Listener, Voice.Listener {
         Ui.back(form, this::cancel);
         form.setLayout(BoxLayout.yCenter());
         form.add(Ui.centered(new InfiniteProgress()));
-        form.add(Ui.stone("Cancel", "cancel", e -> cancel()));
+        form.add(Ui.secondary("Cancel", "cancel", e -> cancel()));
         form.show();
         link = GameLink.open(this);
     }
@@ -150,11 +150,11 @@ public final class RaceLobby implements GameLink.Listener, Voice.Listener {
         top.add(url);
         share = new ShareButton();
         share.setText("Invite friends");
-        share.setUIID("WoodButton");
+        share.setUIID("PrimaryButton");
         share.setName("shareParty");
         share.addActionListener(e -> Telemetry.challengeShared());
         top.add(share);
-        top.add(Ui.stone("Copy the link", "copyParty", e -> {
+        top.add(Ui.secondary("Copy the link", "copyParty", e -> {
             Display.getInstance().copyToClipboard(url.getText());
             Ui.toast("Copied");
         }));
@@ -189,9 +189,9 @@ public final class RaceLobby implements GameLink.Listener, Voice.Listener {
         bottom.setSafeArea(true);
         bottom.add(BorderLayout.CENTER, say);
         bottom.add(BorderLayout.EAST, mic);
-        Container actions = Ui.row(Ui.stone("Leave", "cancel", e -> cancel()));
+        Container actions = Ui.row(Ui.secondary("Leave", "cancel", e -> cancel()));
         if (host) {
-            actions.add(Ui.wood("Start the race", "goButton", e -> link.send("{\"type\":\"" + GameProtocol.GO
+            actions.add(Ui.primary("Start the race", "goButton", e -> link.send("{\"type\":\"" + GameProtocol.GO
                     + "\",\"level\":" + Json.write(level) + "}")));
         }
         bottom.add(BorderLayout.SOUTH, actions);

@@ -26,7 +26,9 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
+import com.codename1.ui.Dialog;
 import com.codename1.ui.Label;
+import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
@@ -38,7 +40,6 @@ import com.codenameone.examples.dash.api.QuestDto;
 import com.codenameone.examples.dash.api.SpotlightDto;
 import com.codenameone.examples.dash.engage.Ads;
 import com.codenameone.examples.dash.engage.Telemetry;
-import com.codenameone.examples.dash.forge.ForgeHome;
 import com.codenameone.examples.dash.forge.PackScreen;
 import com.codenameone.examples.dash.net.Api;
 import com.codenameone.examples.dash.net.Net;
@@ -60,29 +61,19 @@ public final class HomeForm {
     public static void show() {
         final PlayerDto p = Session.user();
         Form f = Ui.form("", "home");
-        f.setLayout(new BorderLayout());
+        f.setLayout(new LayeredLayout());
         f.getToolbar().hideToolbar();
-        final Container header = new Container(new BorderLayout());
-        header.setUIID("HomeHeader");
-        // The toolbar is hidden here, so nothing else keeps the header out
-        // from under the notch.
-        header.setSafeArea(true);
-        f.add(BorderLayout.NORTH, header);
-        final Container col = Ui.column();
-        Container scroll = new Container(BoxLayout.y());
-        scroll.setScrollableY(true);
-        scroll.add(Ui.centeredColumn(col));
-        f.add(BorderLayout.CENTER, scroll);
-        Component banner = Ads.banner(Ui.adFree());
-        if (banner != null) {
-            f.add(BorderLayout.SOUTH, banner);
-        }
-        fill(f, header, col, p, Rewards.progress());
+        f.setScrollable(false);
+        f.add(Kit.backdrop());
+        final Container front = new Container(new BorderLayout());
+        front.setSafeArea(true);
+        f.add(front);
+        fill(f, front, p, Rewards.progress());
         f.show();
         Api.social().spotlight(Net.to(found -> {
             spotlight = found;
             if (Session.user() != null && CN.getCurrentForm() == f) {
-                fill(f, header, col, Session.user(), Rewards.progress());
+                fill(f, front, Session.user(), Rewards.progress());
                 f.revalidate();
             }
         }, (s, m) -> { }));
@@ -94,7 +85,7 @@ public final class HomeForm {
             if (now != null) {
                 Telemetry.describe(now.level(), Session.user().trophies());
             }
-            fill(f, header, col, Session.user(), now);
+            fill(f, front, Session.user(), now);
             f.revalidate();
             offerTutorial(now);
         });
@@ -115,80 +106,115 @@ public final class HomeForm {
         RunForm.tutorial();
     }
 
-    private static void fill(Form f, Container header, Container col, PlayerDto p, ProgressDto g) {
-        header.removeAll();
-        col.removeAll();
-        header.add(BorderLayout.WEST, new Label(Portraits.face(Portraits.of(p.runner()), CN.convertToPixels(11)),
-                "Container"));
-        Container who = new Container(BoxLayout.y());
-        Container nameRow = BoxLayout.encloseX(new Label(p.displayName(), "PlayerNameBig"));
+    private static void fill(Form f, Container front, PlayerDto p, ProgressDto g) {
+        front.removeAll();
+        String runner = Portraits.of(p.runner());
+
+        // Top bar: the avatar ringed by level progress, the name and level
+        // over what the player holds, and the settings gear.
+        Container top = new Container(new BorderLayout());
+        top.setUIID("TopBar");
+        int into = g == null ? 0 : g.xp() - g.levelStart();
+        int span = g == null ? 1 : g.levelEnd() - g.levelStart();
+        top.add(BorderLayout.WEST, Kit.xpRing(Portraits.face(runner, CN.convertToPixels(9)), into, span));
+        Container nameRow = new Container(BoxLayout.x());
+        nameRow.add(new Label(p.displayName(), "PlayerName"));
         if (g != null) {
-            Label lvl = new Label("Lv " + g.level(), "LevelBadge");
+            Label lvl = new Label("LV " + g.level(), "LevelBadge");
             lvl.setName("level");
             nameRow.add(lvl);
-            who.add(nameRow);
-            Container xp = new Container(new BorderLayout());
-            xp.add(BorderLayout.CENTER, Ui.bar(g.xp() - g.levelStart(), g.levelEnd() - g.levelStart(), 0x7be07b));
-            Container pad = BoxLayout.encloseY(xp);
-            pad.getAllStyles().setPaddingUnit(com.codename1.ui.plaf.Style.UNIT_TYPE_DIPS);
-            pad.getAllStyles().setPadding(0.6f, 0.6f, 1.5f, 1.5f);
-            who.add(pad);
-            who.add(new Label((g.xp() - g.levelStart()) + " / " + (g.levelEnd() - g.levelStart()) + " XP", "XpText"));
-        } else {
-            who.add(nameRow);
         }
-        header.add(BorderLayout.CENTER, who);
-        Container wallet = new Container(BoxLayout.y());
-        wallet.add(stat(FontImage.MATERIAL_EMOJI_EVENTS, p.trophies(), "Trophies"));
-        wallet.add(stat(FontImage.MATERIAL_MONETIZATION_ON, p.coins(), "Coins"));
-        wallet.add(stat(FontImage.MATERIAL_DIAMOND, p.gems(), "Gems"));
-        header.add(BorderLayout.EAST, wallet);
+        Container wallet = new Container(BoxLayout.x());
+        wallet.add(Kit.pill(FontImage.MATERIAL_MONETIZATION_ON, p.coins(), "Coins", "Coins", e -> ShopForm.show()));
+        wallet.add(Kit.pill(FontImage.MATERIAL_DIAMOND, p.gems(), "Gems", "Gems", e -> ShopForm.show()));
+        top.add(BorderLayout.CENTER, BoxLayout.encloseY(nameRow, wallet));
+        Button gear = Ui.button("", "IconButton", "settingsButton", e -> SettingsForm.show());
+        gear.setMaterialIcon(FontImage.MATERIAL_SETTINGS, 4.2f);
+        top.add(BorderLayout.EAST, FlowLayout.encloseMiddle(gear));
+        front.add(BorderLayout.NORTH, top);
 
-        if (p.suspended()) {
-            col.add(Ui.text("Your account is suspended. Races and leaderboards are closed to you until it is lifted.",
-                    "Warning"));
-        }
-        Container stage = new Container(new BorderLayout());
-        stage.setUIID("HeroStage");
-        Label hero = new Label(Portraits.hero(Portraits.of(p.runner()), CN.convertToPixels(30)), "Container");
-        hero.setName("hero");
-        stage.add(BorderLayout.CENTER, FlowLayout.encloseCenter(hero));
-        Label arena = new Label(leagueName(p.trophies()), "ArenaName");
-        stage.add(BorderLayout.SOUTH, arena);
-        col.add(stage);
-        Component banner = spotlightBanner();
-        if (banner != null) {
-            col.add(banner);
-        }
-        Button run = Ui.button("RUN", "BattleButton", "runButton", e -> LevelsForm.show());
-        run.setMaterialIcon(FontImage.MATERIAL_DIRECTIONS_RUN);
-        col.add(run);
-        col.add(Ui.row(Ui.stone("Quick race", "quickRaceButton", e -> RaceLobby.quick(null)),
-                Ui.stone("Race friends", "partyButton", e -> RaceLobby.host(null))));
-        col.add(Ui.wood("Daily dash", "dailyButton", e -> RunForm.daily()));
+        // The middle: rails down both sides, the runner on its stage between.
+        Container mid = new Container(new BorderLayout());
+        int ready = 0;
         if (g != null) {
-            col.add(Ui.label("Chests", "SectionTitle"));
-            col.add(chests(g));
-            col.add(Ui.label("Daily quests", "SectionTitle"));
             for (QuestDto q : g.quests()) {
-                col.add(quest(q));
+                if (!q.claimed() && q.progress() >= q.goal()) {
+                    ready++;
+                }
             }
         }
-        col.add(Ui.wood("Track editor", "forgeButton", e -> ForgeHome.show()));
-        Container nav = new Container(new GridLayout(2, 4));
-        nav.add(tile("Friends", FontImage.MATERIAL_GROUP_ADD, "friendsButton", e -> FriendsForm.show()));
-        nav.add(tile("Crews", FontImage.MATERIAL_GROUPS, "crewsButton", e -> CrewsForm.show()));
-        nav.add(tile("Shop", FontImage.MATERIAL_STOREFRONT, "shopButton", e -> ShopForm.show()));
-        nav.add(tile("Trophies", FontImage.MATERIAL_MILITARY_TECH, "achievementsButton",
-                e -> AchievementsForm.show()));
-        nav.add(tile("Replays", FontImage.MATERIAL_REPLAY, "replaysButton", e -> HistoryForm.show()));
-        nav.add(tile("Leaders", FontImage.MATERIAL_LEADERBOARD, "leadersButton", e -> LeaderboardForm.show()));
-        nav.add(tile("Runner", FontImage.MATERIAL_CHECKROOM, "runnerButton", e -> RunnerForm.show()));
-        nav.add(tile("Settings", FontImage.MATERIAL_SETTINGS, "settingsButton", e -> SettingsForm.show()));
-        col.add(nav);
-        if (p.admin()) {
-            col.add(Ui.button("Admin console", "AdminButton", "adminButton", e -> Nav.adminConsole()));
+        final ProgressDto prog = g;
+        mid.add(BorderLayout.WEST, Kit.rail(
+                Kit.tile("Missions", FontImage.MATERIAL_TASK_ALT, "missionsButton", ready,
+                        e -> missions(prog)),
+                Kit.tile("Daily", FontImage.MATERIAL_TODAY, "dailyButton", 0, e -> RunForm.daily()),
+                Kit.tile("Trophies", FontImage.MATERIAL_MILITARY_TECH, "achievementsButton", 0,
+                        e -> AchievementsForm.show()),
+                Kit.tile("Replays", FontImage.MATERIAL_REPLAY, "replaysButton", 0, e -> HistoryForm.show())));
+        mid.add(BorderLayout.EAST, Kit.rail(
+                Kit.tile("Runner", FontImage.MATERIAL_CHECKROOM, "runnerButton", 0, e -> RunnerForm.show()),
+                Kit.tile("Friends", FontImage.MATERIAL_GROUP_ADD, "friendsButton", 0, e -> FriendsForm.show()),
+                Kit.tile("Crews", FontImage.MATERIAL_GROUPS, "crewsButton", 0, e -> CrewsForm.show()),
+                Kit.tile("Leaders", FontImage.MATERIAL_LEADERBOARD, "leadersButton", 0,
+                        e -> LeaderboardForm.show())));
+        Container center = new Container(new BorderLayout());
+        Component spot = spotlightBanner();
+        if (p.suspended()) {
+            center.add(BorderLayout.NORTH, Ui.text("Your account is suspended. Races and leaderboards are "
+                    + "closed to you until it is lifted.", "Warning"));
         }
+        Component hero = Kit.stage(Portraits.figure(runner, CN.convertToPixels(26)));
+        hero.setName("hero");
+        center.add(BorderLayout.CENTER, hero);
+        Label league = new Label(leagueName(p.trophies()), "LeagueName");
+        league.setMaterialIcon(FontImage.MATERIAL_SHIELD, 3.4f);
+        Label trophies = new Label(String.valueOf(p.trophies()), "Trophies");
+        trophies.setName("Trophies");
+        trophies.setMaterialIcon(FontImage.MATERIAL_EMOJI_EVENTS, 3.4f);
+        center.add(BorderLayout.SOUTH, FlowLayout.encloseCenter(league, trophies));
+        mid.add(BorderLayout.CENTER, center);
+        front.add(BorderLayout.CENTER, mid);
+
+        // The bottom: crates, the big button, races, then the bar.
+        Container bottom = new Container(BoxLayout.y());
+        bottom.setUIID("HomeBottom");
+        if (spot != null) {
+            bottom.add(spot);
+        }
+        if (g != null) {
+            bottom.add(chests(g));
+        }
+        Button run = Ui.button("PLAY", "GoButton", "runButton", e -> LevelsForm.show());
+        run.setMaterialIcon(FontImage.MATERIAL_PLAY_ARROW, 6f);
+        bottom.add(run);
+        Button quick = Ui.button("Quick race", "RaceChip", "quickRaceButton", e -> RaceLobby.quick(null));
+        quick.setMaterialIcon(FontImage.MATERIAL_BOLT, 3.6f);
+        Button party = Ui.button("Party", "RaceChip", "partyButton", e -> RaceLobby.host(null));
+        party.setMaterialIcon(FontImage.MATERIAL_HEADSET_MIC, 3.6f);
+        bottom.add(GridLayout.encloseIn(2, quick, party));
+        bottom.add(Kit.navBar("homeNav", p.admin()));
+        Component banner = Ads.banner(Ui.adFree());
+        if (banner != null) {
+            bottom.add(banner);
+        }
+        front.add(BorderLayout.SOUTH, bottom);
+    }
+
+    /// Today's quests in a sheet over home, each claimable the moment it is done.
+    private static void missions(ProgressDto g) {
+        Dialog d = new Dialog("Missions", BoxLayout.y());
+        d.setName("missions");
+        d.getContentPane().setScrollableY(true);
+        if (g == null || g.quests().isEmpty()) {
+            d.add(new Label("No missions right now.", "Muted"));
+        } else {
+            for (QuestDto q : g.quests()) {
+                d.add(quest(q));
+            }
+        }
+        Button close = Ui.button("Close", "DialogAction", "closeMissions", e -> d.dispose());
+        d.add(close);
+        d.showPacked(BorderLayout.CENTER, true);
     }
 
     /// The four chest slots. A full one opens on a tap; an empty one says how
@@ -196,10 +222,10 @@ public final class HomeForm {
     private static Container chests(ProgressDto g) {
         Container c = new Container(new GridLayout(1, 4));
         c.setName("chests");
-        int size = CN.convertToPixels(9);
+        int size = CN.convertToPixels(5.5f);
         for (int i = 0; i < 4; i++) {
             if (i < g.chests()) {
-                Button b = new Button("Open", Portraits.chest(size, false), "ChestSlot");
+                Button b = new Button("Open", Portraits.crate(size, false), "CrateSlot");
                 b.setName("chest" + i);
                 b.setTextPosition(Component.BOTTOM);
                 b.addActionListener(e -> {
@@ -209,9 +235,9 @@ public final class HomeForm {
                 });
                 c.add(b);
             } else {
-                Label l = new Label("Empty", "ChestSlotEmpty");
+                Label l = new Label("Empty", "CrateSlotEmpty");
                 l.setTextPosition(Component.BOTTOM);
-                l.setIcon(FontImage.createMaterial(FontImage.MATERIAL_LOCK, "ChestSlotEmpty", 5));
+                l.setIcon(FontImage.createMaterial(FontImage.MATERIAL_LOCK, "CrateSlotEmpty", 3.6f));
                 c.add(l);
             }
         }
@@ -271,21 +297,6 @@ public final class HomeForm {
         return b;
     }
     // end::dash-spotlight[]
-
-    private static Button tile(String text, char icon, String name,
-            com.codename1.ui.events.ActionListener<com.codename1.ui.events.ActionEvent> go) {
-        Button b = Ui.button(text, "NavTile", name, go);
-        b.setMaterialIcon(icon, 4.5f);
-        b.setTextPosition(Component.BOTTOM);
-        return b;
-    }
-
-    private static Label stat(char icon, int value, String uiid) {
-        Label l = new Label(String.valueOf(value), uiid);
-        l.setName(uiid);
-        l.setMaterialIcon(icon);
-        return l;
-    }
 
     /// The league a trophy count has reached. Cosmetic only: a quick race
     /// fills with whoever is waiting, not by league.

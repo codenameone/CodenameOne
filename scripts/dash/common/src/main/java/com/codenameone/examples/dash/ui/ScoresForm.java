@@ -90,8 +90,8 @@ public final class ScoresForm {
             for (final ScoreDto s : list) {
                 MultiButton b = new MultiButton("#" + s.rank() + "  " + s.displayName());
                 b.setUIID(s.rank() <= 3 ? "LeaderTop" : "LeaderRow");
-                b.setTextLine2(s.score() + " pts   " + s.distance() + " m   " + s.coins() + " coins   "
-                        + LevelsForm.starText(s.stars()));
+                b.setTextLine2(s.score() + " pts   " + s.distance() + " m   " + s.coins() + " coins");
+                b.setEmblem(Kit.starsImage(s.stars(), com.codename1.ui.CN.convertToPixels(3.4f)));
                 b.setName("score-" + s.rank());
                 if (s.replayId() != null && s.replayId().length() > 0) {
                     b.addActionListener(e -> Api.game().replay(s.replayId(), Net.to(

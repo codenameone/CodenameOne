@@ -39,13 +39,11 @@ public class TutorialTest extends E2e {
         onEdt(RunForm::tutorial);
         waitForForm("run");
         final RunView view = track();
-        until(() -> has("countdown") && view.driver().run().tick() == 0, 10000, "the countdown");
-        shot("tutorial-countdown");
         until(() -> view.driver().run().tick() > 120, 20000, "the run to start");
         until(() -> has("coach"), 20000, "the coach");
         shot("tutorial-coach");
-        drive(view, 120000);
-        until(() -> has("result"), 20000, "the result");
+        finish(view, 60 * 600);
+        awaitResult("the result");
         shot("tutorial-result");
         click("done");
         // Not through onEdt: the popup is modal and would hold it forever.

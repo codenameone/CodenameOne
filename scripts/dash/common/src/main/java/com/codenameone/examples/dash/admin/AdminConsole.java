@@ -119,7 +119,7 @@ public final class AdminConsole {
         form.getToolbar().getTitleComponent().setUIID("DeskTitle");
         form.setScrollableY(false);
         Telemetry.screen("admin");
-        form.getToolbar().addMaterialCommandToRightBar("Back to the game", FontImage.MATERIAL_SPORTS_ESPORTS,
+        form.getToolbar().addMaterialCommandToRightBar("", FontImage.MATERIAL_SPORTS_ESPORTS,
                 e -> Nav.home());
         tabs = new Tabs();
         tabs.setUIID("DeskTabs");

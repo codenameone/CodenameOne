@@ -17,7 +17,7 @@ In the Initializr, choose the **Dash** endless-runner template, set your applica
 
 | Part | Included workflows |
 | --- | --- |
-| The run | A 3D track drawn with `com.codename1.gaming` and glTF runners, swipe, tap and keyboard controls, power-ups, particles, and camera cues that blend between a side view, a chase view and a top-down view |
+| The run | A 3D track drawn with `com.codename1.gaming` and runners built and animated in code, swipe, tap and keyboard controls, power-ups, particles, and camera cues that blend between a side view, a chase view and a top-down view |
 | Shared rules | One deterministic Java module, with no floating point, that the app, the server, the replays and the tests all run |
 | Leaderboards | All-time, weekly, daily, friends and crew boards for every level, holding only runs the server played again from their input logs |
 | Races | Quick races and parties with share links, in lockstep over WebSocket, peer-to-peer voice chat through WebRTC, text chat, emotes, spectating and replays |

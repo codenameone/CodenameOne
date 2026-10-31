@@ -36,21 +36,23 @@ public final class SignInForm {
 
     public static void show() {
         Form f = Ui.form("", "signin");
-        f.setLayout(BoxLayout.yCenter());
+        f.setLayout(new com.codename1.ui.layouts.LayeredLayout());
+        f.setScrollable(false);
+        f.add(Kit.backdrop());
         f.getToolbar().hideToolbar();
         Container col = Ui.column();
         col.add(heroes());
         col.add(Ui.label("DASH", "Logo"));
-        col.add(Ui.label("Deploy. Defend. Destroy.", "Tagline"));
+        col.add(Ui.label("Run. Race. Build.", "Tagline"));
         final TextField email = field("Email", TextField.EMAILADDR, "email");
         final TextField password = field("Password", TextField.PASSWORD, "password");
         // Fields and both buttons share one panel, so they share one width.
         col.add(Ui.panel(email, password,
-                Ui.wood("Sign in", "signInButton", e -> {
+                Ui.primary("Sign in", "signInButton", e -> {
                     Session.signIn(email.getText().trim(), password.getText(),
                             () -> Ui.later(Nav::signedIn), Ui::failed);
                 }),
-                Ui.stone("Create an account", "registerButton", e -> RegisterForm.show())));
+                Ui.secondary("Create an account", "registerButton", e -> RegisterForm.show())));
         col.add(Ui.button("Try a level without an account", "LinkButton", "practiceButton",
                 e -> RunForm.solo(com.codenameone.examples.dash.run.Levels.official(
                         com.codenameone.examples.dash.rules.Content.CAUSEWAY), 1L, "guest", null, SignInForm::show)));
@@ -60,17 +62,20 @@ public final class SignInForm {
         }
         Container safe = Ui.centeredColumn(col);
         safe.setSafeArea(true);
-        f.add(safe);
+        Container front = new Container(BoxLayout.yCenter());
+        front.setScrollableY(true);
+        front.add(safe);
+        f.add(front);
         f.show();
     }
 
-    /// Three of the game's heroes, the middle one in front: the first thing a
-    /// new player sees is who they will fight with.
+    /// Three runners mid-stride, the middle one in front: the first thing a
+    /// new player sees is who they will race.
     static Container heroes() {
         int h = CN.convertToPixels(26);
-        Label left = new Label(Portraits.hero("barbarian", h * 4 / 5), "SignInHero");
-        Label mid = new Label(Portraits.hero("knight", h), "SignInHero");
-        Label right = new Label(Portraits.hero("mage", h * 4 / 5), "SignInHero");
+        Label left = new Label(Portraits.figure("runner-nova", h * 4 / 5), "SignInHero");
+        Label mid = new Label(Portraits.figure("runner-dash", h), "SignInHero");
+        Label right = new Label(Portraits.figure("runner-kite", h * 4 / 5), "SignInHero");
         Container c = new Container(new FlowLayout(Component.CENTER, Component.BOTTOM));
         c.add(left).add(mid).add(right);
         c.setName("heroes");

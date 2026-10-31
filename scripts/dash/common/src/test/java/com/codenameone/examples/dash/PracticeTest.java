@@ -41,14 +41,12 @@ public class PracticeTest extends E2e {
         assertEqual(ViewMode.SIDE_2D, view.driver().run().level().startView(), "the causeway starts side on");
         until(() -> view.driver().run().tick() > 240, 20000, "the run");
         shot("run-side");
-        final int[] metres = new int[1];
-        new Thread(() -> drive(view, 180000)).start();
-        until(() -> {
-            metres[0] = view.driver().run().runner(view.driver().me()).z / 1000;
-            return metres[0] > 340 || view.driver().run().over();
-        }, 120000, "the swing to the chase view");
+        new Thread(() -> drive(view, 60000)).start();
+        until(() -> view.driver().run().runner(view.driver().me()).z / 1000 > 340
+                || view.driver().run().over(), 60000, "the swing to the chase view");
         shot("run-chase");
-        until(() -> has("result"), 200000, "the result");
+        finish(view, 60 * 600);
+        awaitResult("the result");
         shot("run-result");
         click("scores");
         waitForForm("scores");

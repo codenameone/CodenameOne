@@ -252,13 +252,17 @@ from the same lobby a player uses to spectate.
   when you change the rules themselves, so old replays aren't judged by new rules.
 * *Obstacles and pickups*: add a definition in `Content.catalog()`, a colour or a
   model in `RunView`, and the editor offers it at once.
-* *Runners*: `Models` maps a runner id to a glTF model; the portraits the menus show
-  are rendered from the same models by a test:
+* *Runners*: there are no model files. `Rig` builds every runner from boxes and a
+  sphere and poses each joint in code, and `Portraits` paints the same figure flat
+  for the menus. Both take their colours from an `Outfit`, so a new runner is one
+  line:
 +
-[source,bash]
+[source,java]
 ----
-include::../demos/common/src/main/snippets/developer-guide/dash.sh[tag=dash-sh-portraits,indent=0]
+include::../../scripts/dash/common/src/main/java/com/codenameone/examples/dash/run/Outfit.java[tag=dash-outfits,indent=0]
 ----
+* *The track*: `Theme` holds each level theme's sky, light, surface, rails and
+  skyline, and paints the textures it needs at startup.
 * *The look*: every colour is a variable at the top of `theme.css`:
 +
 [source,css]
