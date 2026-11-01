@@ -1820,7 +1820,11 @@ public final class JavaEmitter {
     }
 
     private static boolean bridgeable(MethodDecl m) {
-        if (m.isStatic || m.isSetter || m.name.startsWith("$") || !m.typeParams.isEmpty()
+        return bridgeable(m, false);
+    }
+
+    private static boolean bridgeable(MethodDecl m, boolean allowTypeParams) {
+        if (m.isStatic || m.isSetter || m.name.startsWith("$") || (!allowTypeParams && !m.typeParams.isEmpty())
                 || "hashCode".equals(m.name) || "compareTo".equals(m.name) || "toString".equals(m.name)) {
             return false;
         }
@@ -1862,7 +1866,7 @@ public final class JavaEmitter {
         }
         for (MethodDecl sm : im.methods) {
             if (sm.isStatic || sm.isSetter || sm.isGetter != m.isGetter || !sm.name.equals(m.name)
-                    || sm.params.size() != m.params.size() || !sm.typeParams.isEmpty()) {
+                    || sm.params.size() != m.params.size() || sm.typeParams.size() != m.typeParams.size()) {
                 continue;
             }
             IfaceSig sig = new IfaceSig();
@@ -1904,7 +1908,8 @@ public final class JavaEmitter {
      * declared type serves.
      */
     private String interfacePinnedReturn(ClassDecl c, MethodDecl m, Ctx ctx) {
-        if (!bridgeable(m)) {
+        // A generic method is never bridged, but its return can still be pinned.
+        if (!bridgeable(m, true)) {
             return null;
         }
         TypeRef rt = m.returnType == null || m.returnType.is("var") ? TypeRef.DYNAMIC : m.returnType;
