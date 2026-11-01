@@ -216,7 +216,7 @@ def main():
 
     hello = os.path.join(HERE, "hello.py")
     w("## Startup: `print('hello')`\n")
-    w("| | wall ms (best of 10) | peak RSS MB |")
+    w("| | wall ms (best of 10) | peak footprint MB |")
     w("|---|---:|---:|")
     startup = [(n, [exe, hello]) for n, exe in arms]
     if a.cn1_hello:

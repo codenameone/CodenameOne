@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="760" height="364" viewBox="0 0 760 364" font-family="Helvetica, Arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="409" viewBox="0 0 760 409" font-family="Helvetica, Arial, sans-serif">
 <rect width="100%" height="100%" fill="#ffffff"/>
-<text x="150" y="24" font-size="16" font-weight="bold" fill="#202124">Kernel peak memory (lower is better)</text>
+<text x="150" y="24" font-size="16" font-weight="bold" fill="#202124">Kernel peak physical footprint (lower is better)</text>
 <rect x="150" y="36" width="12" height="12" fill="#9aa0a6"/>
 <text x="168" y="47" font-size="12" fill="#202124">CPython</text>
 <rect x="350" y="36" width="12" height="12" fill="#f9ab00"/>
@@ -9,61 +9,69 @@
 <text x="568" y="47" font-size="12" fill="#202124">GraalPy</text>
 <rect x="150" y="58" width="12" height="12" fill="#1a73e8"/>
 <text x="168" y="69" font-size="12" fill="#202124">Codename One Python</text>
-<line x1="150.0" y1="80" x2="150.0" y2="334" stroke="#e8eaed"/>
-<text x="150.0" y="350" font-size="11" fill="#5f6368" text-anchor="middle">0 MB</text>
-<line x1="256.0" y1="80" x2="256.0" y2="334" stroke="#e8eaed"/>
-<text x="256.0" y="350" font-size="11" fill="#5f6368" text-anchor="middle">100 MB</text>
-<line x1="362.0" y1="80" x2="362.0" y2="334" stroke="#e8eaed"/>
-<text x="362.0" y="350" font-size="11" fill="#5f6368" text-anchor="middle">200 MB</text>
-<line x1="468.0" y1="80" x2="468.0" y2="334" stroke="#e8eaed"/>
-<text x="468.0" y="350" font-size="11" fill="#5f6368" text-anchor="middle">300 MB</text>
-<line x1="574.0" y1="80" x2="574.0" y2="334" stroke="#e8eaed"/>
-<text x="574.0" y="350" font-size="11" fill="#5f6368" text-anchor="middle">400 MB</text>
-<line x1="680.0" y1="80" x2="680.0" y2="334" stroke="#e8eaed"/>
-<text x="680.0" y="350" font-size="11" fill="#5f6368" text-anchor="middle">500 MB</text>
-<text x="142" y="106" font-size="12" fill="#202124" text-anchor="end">nbody</text>
-<rect x="150" y="84" width="15.8" height="8" fill="#9aa0a6"/>
-<text x="169.8" y="91" font-size="9" fill="#5f6368">15</text>
-<rect x="150" y="93" width="34.3" height="8" fill="#f9ab00"/>
-<text x="188.3" y="100" font-size="9" fill="#5f6368">32</text>
-<rect x="150" y="102" width="250.4" height="8" fill="#a142f4"/>
-<text x="404.4" y="109" font-size="9" fill="#5f6368">236</text>
-<rect x="150" y="111" width="10.9" height="8" fill="#1a73e8"/>
-<text x="164.9" y="118" font-size="9" fill="#5f6368">10</text>
-<text x="142" y="156" font-size="12" fill="#202124" text-anchor="end">richards</text>
-<rect x="150" y="134" width="16.1" height="8" fill="#9aa0a6"/>
-<text x="170.1" y="141" font-size="9" fill="#5f6368">15</text>
-<rect x="150" y="143" width="35.8" height="8" fill="#f9ab00"/>
-<text x="189.8" y="150" font-size="9" fill="#5f6368">34</text>
-<rect x="150" y="152" width="287.9" height="8" fill="#a142f4"/>
-<text x="441.9" y="159" font-size="9" fill="#5f6368">272</text>
-<rect x="150" y="161" width="11.3" height="8" fill="#1a73e8"/>
-<text x="165.3" y="168" font-size="9" fill="#5f6368">11</text>
-<text x="142" y="206" font-size="12" fill="#202124" text-anchor="end">fannkuch</text>
-<rect x="150" y="184" width="15.4" height="8" fill="#9aa0a6"/>
-<text x="169.4" y="191" font-size="9" fill="#5f6368">15</text>
-<rect x="150" y="193" width="34.8" height="8" fill="#f9ab00"/>
-<text x="188.8" y="200" font-size="9" fill="#5f6368">33</text>
-<rect x="150" y="202" width="262.7" height="8" fill="#a142f4"/>
-<text x="416.7" y="209" font-size="9" fill="#5f6368">248</text>
-<rect x="150" y="211" width="10.6" height="8" fill="#1a73e8"/>
-<text x="164.6" y="218" font-size="9" fill="#5f6368">10</text>
-<text x="142" y="256" font-size="12" fill="#202124" text-anchor="end">spectral_norm</text>
-<rect x="150" y="234" width="15.5" height="8" fill="#9aa0a6"/>
-<text x="169.5" y="241" font-size="9" fill="#5f6368">15</text>
-<rect x="150" y="243" width="34.1" height="8" fill="#f9ab00"/>
-<text x="188.1" y="250" font-size="9" fill="#5f6368">32</text>
-<rect x="150" y="252" width="268.0" height="8" fill="#a142f4"/>
-<text x="422.0" y="259" font-size="9" fill="#5f6368">253</text>
-<rect x="150" y="261" width="10.8" height="8" fill="#1a73e8"/>
-<text x="164.8" y="268" font-size="9" fill="#5f6368">10</text>
-<text x="142" y="306" font-size="12" fill="#202124" text-anchor="end">dicts_strings</text>
-<rect x="150" y="284" width="66.3" height="8" fill="#9aa0a6"/>
-<text x="220.3" y="291" font-size="9" fill="#5f6368">63</text>
-<rect x="150" y="293" width="85.2" height="8" fill="#f9ab00"/>
-<text x="239.2" y="300" font-size="9" fill="#5f6368">80</text>
-<rect x="150" y="302" width="460.0" height="8" fill="#a142f4"/>
-<text x="614.0" y="309" font-size="9" fill="#5f6368">434</text>
-<rect x="150" y="311" width="132.6" height="8" fill="#1a73e8"/>
-<text x="286.6" y="318" font-size="9" fill="#5f6368">125</text>
+<rect x="350" y="58" width="12" height="12" fill="#8ab4f8"/>
+<text x="368" y="69" font-size="12" fill="#202124">Codename One Python, 128 MB budget</text>
+<line x1="150.0" y1="80" x2="150.0" y2="379" stroke="#e8eaed"/>
+<text x="150.0" y="395" font-size="11" fill="#5f6368" text-anchor="middle">0 MB</text>
+<line x1="326.7" y1="80" x2="326.7" y2="379" stroke="#e8eaed"/>
+<text x="326.7" y="395" font-size="11" fill="#5f6368" text-anchor="middle">100 MB</text>
+<line x1="503.3" y1="80" x2="503.3" y2="379" stroke="#e8eaed"/>
+<text x="503.3" y="395" font-size="11" fill="#5f6368" text-anchor="middle">200 MB</text>
+<line x1="680.0" y1="80" x2="680.0" y2="379" stroke="#e8eaed"/>
+<text x="680.0" y="395" font-size="11" fill="#5f6368" text-anchor="middle">300 MB</text>
+<text x="142" y="110" font-size="12" fill="#202124" text-anchor="end">nbody</text>
+<rect x="150" y="84" width="12.9" height="8" fill="#9aa0a6"/>
+<text x="166.9" y="91" font-size="9" fill="#5f6368">7.3</text>
+<rect x="150" y="93" width="40.4" height="8" fill="#f9ab00"/>
+<text x="194.4" y="100" font-size="9" fill="#5f6368">23</text>
+<rect x="150" y="102" width="212.5" height="8" fill="#a142f4"/>
+<text x="366.5" y="109" font-size="9" fill="#5f6368">120</text>
+<rect x="150" y="111" width="9.2" height="8" fill="#1a73e8"/>
+<text x="163.2" y="118" font-size="9" fill="#5f6368">5.2</text>
+<rect x="150" y="120" width="9.1" height="8" fill="#8ab4f8"/>
+<text x="163.1" y="127" font-size="9" fill="#5f6368">5.2</text>
+<text x="142" y="169" font-size="12" fill="#202124" text-anchor="end">richards</text>
+<rect x="150" y="143" width="13.5" height="8" fill="#9aa0a6"/>
+<text x="167.5" y="150" font-size="9" fill="#5f6368">7.6</text>
+<rect x="150" y="152" width="42.7" height="8" fill="#f9ab00"/>
+<text x="196.7" y="159" font-size="9" fill="#5f6368">24</text>
+<rect x="150" y="161" width="263.8" height="8" fill="#a142f4"/>
+<text x="417.8" y="168" font-size="9" fill="#5f6368">149</text>
+<rect x="150" y="170" width="9.4" height="8" fill="#1a73e8"/>
+<text x="163.4" y="177" font-size="9" fill="#5f6368">5.3</text>
+<rect x="150" y="179" width="9.5" height="8" fill="#8ab4f8"/>
+<text x="163.5" y="186" font-size="9" fill="#5f6368">5.4</text>
+<text x="142" y="228" font-size="12" fill="#202124" text-anchor="end">fannkuch</text>
+<rect x="150" y="202" width="12.1" height="8" fill="#9aa0a6"/>
+<text x="166.1" y="209" font-size="9" fill="#5f6368">6.9</text>
+<rect x="150" y="211" width="41.3" height="8" fill="#f9ab00"/>
+<text x="195.3" y="218" font-size="9" fill="#5f6368">23</text>
+<rect x="150" y="220" width="213.9" height="8" fill="#a142f4"/>
+<text x="367.9" y="227" font-size="9" fill="#5f6368">121</text>
+<rect x="150" y="229" width="9.4" height="8" fill="#1a73e8"/>
+<text x="163.4" y="236" font-size="9" fill="#5f6368">5.3</text>
+<rect x="150" y="238" width="9.1" height="8" fill="#8ab4f8"/>
+<text x="163.1" y="245" font-size="9" fill="#5f6368">5.2</text>
+<text x="142" y="287" font-size="12" fill="#202124" text-anchor="end">spectral_norm</text>
+<rect x="150" y="261" width="12.3" height="8" fill="#9aa0a6"/>
+<text x="166.3" y="268" font-size="9" fill="#5f6368">7.0</text>
+<rect x="150" y="270" width="40.1" height="8" fill="#f9ab00"/>
+<text x="194.1" y="277" font-size="9" fill="#5f6368">23</text>
+<rect x="150" y="279" width="220.4" height="8" fill="#a142f4"/>
+<text x="374.4" y="286" font-size="9" fill="#5f6368">125</text>
+<rect x="150" y="288" width="9.2" height="8" fill="#1a73e8"/>
+<text x="163.2" y="295" font-size="9" fill="#5f6368">5.2</text>
+<rect x="150" y="297" width="9.3" height="8" fill="#8ab4f8"/>
+<text x="163.3" y="304" font-size="9" fill="#5f6368">5.3</text>
+<text x="142" y="346" font-size="12" fill="#202124" text-anchor="end">dicts_strings</text>
+<rect x="150" y="320" width="94.1" height="8" fill="#9aa0a6"/>
+<text x="248.1" y="327" font-size="9" fill="#5f6368">53</text>
+<rect x="150" y="329" width="148.6" height="8" fill="#f9ab00"/>
+<text x="302.6" y="336" font-size="9" fill="#5f6368">84</text>
+<rect x="150" y="338" width="451.6" height="8" fill="#a142f4"/>
+<text x="605.6" y="345" font-size="9" fill="#5f6368">256</text>
+<rect x="150" y="347" width="219.6" height="8" fill="#1a73e8"/>
+<text x="373.6" y="354" font-size="9" fill="#5f6368">124</text>
+<rect x="150" y="356" width="173.7" height="8" fill="#8ab4f8"/>
+<text x="327.7" y="363" font-size="9" fill="#5f6368">98</text>
 </svg>

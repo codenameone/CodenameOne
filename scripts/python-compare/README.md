@@ -29,6 +29,11 @@ python3 scripts/python-compare/compare.py \
 GraalPy is an optional arm (`--graalpy`); `RESULTS.md` includes it. Install
 Flask into it with `graalpy -m ensurepip` and `graalpy -m pip install flask`.
 
+Every Codename One binary also runs a second time under a memory budget
+(`--budget-mb`, 128 by default), so the report shows both sides of
+the collector's trade: memory spent for throughput when it is free, and given
+back when the process has a limit.
+
 ## CommonWorkloads
 
 `common_compare.py` runs `com.bench.CommonWorkloads`, the benchmark every

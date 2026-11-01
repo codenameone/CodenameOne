@@ -388,66 +388,118 @@ The same programs, run on one Apple Silicon Mac with
 `scripts/python-compare/common_compare.py`. Codename One rows are native
 executables. The interpreters are CPython 3.14, PyPy 3.11 (7.3.20) and GraalPy
 3.13 (Community edition 25.4, on its own JVM). Every program runs in a process
-of its own, so each memory figure is that program's peak resident memory.
+of its own. Memory is the process's physical footprint, the figure the
+operating system meters a process by and the one a memory limit is measured
+in, read the same way for every runtime.
+
+==== One binary, two trade-offs
+
+Every Codename One figure below appears twice, from the same executable.
+
+*Codename One* is the program on a machine with memory to spare. Its
+collector adapts to the load. While collecting costs the program little CPU it
+keeps the heap close to what the program really uses. When the program is busy
+enough that collecting more often would take throughput away, it lets the heap
+grow instead: memory the machine isn't using earns nothing, and the speed it
+buys is real. That's a choice the runtime makes because the memory is there,
+not a size it needs.
+
+*Codename One, 128 MB budget* is the same executable given a memory limit of
+128 MB, the way a container or a small cloud instance would give it one. With
+a budget, the collector stops spending memory for speed: it keeps the heap
+tight, and paces allocation so the process stays inside the limit. The trade
+flips, and the program gives back some speed to use less memory.
+
+Both still come out ahead.
 
 ==== Startup
 
 A program that prints one line, best of ten runs:
 
-image::img/python-startup.svg["Startup wall time and peak memory on CPython, PyPy, GraalPy and Codename One"]
+image::img/python-startup.svg["Startup wall time and peak footprint on CPython, PyPy, GraalPy and Codename One"]
 
 [cols="1,1,1",options="header"]
 |===
-| | Wall time (ms) | Peak memory (MB)
-| CPython 3.14 | 15.1 | 14.4
-| PyPy 3.11 | 13.9 | 29.1
-| GraalPy 3.13 | 28.2 | 118.6
-| Codename One | 4.7 | 8.6
+| | Wall time (ms) | Peak footprint (MB)
+| CPython 3.14 | 25.2 | 6.6
+| PyPy 3.11 | 22.0 | 22.0
+| GraalPy 3.13 | 41.6 | 28.2
+| Codename One | 7.8 | 4.5
 |===
 
 ==== Python kernels
 
 Classic benchmark programs written for Python (`scripts/python-bench/kernels`),
-fastest round in milliseconds, then peak memory in MB:
+fastest round in milliseconds, then peak footprint in MB:
 
 image::img/python-kernels-time.svg["Run time of the Python kernels on CPython, PyPy, GraalPy and Codename One"]
 
-image::img/python-kernels-rss.svg["Peak memory of the Python kernels on CPython, PyPy, GraalPy and Codename One"]
+image::img/python-kernels-rss.svg["Peak footprint of the Python kernels on CPython, PyPy, GraalPy and Codename One"]
 
-[cols="2,1,1,1,1,1,1,1,1",options="header"]
+[cols="2,1,1,1,1,1,1,1,1,1,1",options="header"]
 |===
-| Kernel 2+| CPython 3.14 2+| PyPy 3.11 2+| GraalPy 3.13 2+| Codename One
-| nbody | 764 | 15 | 62 | 32 | 180 | 236 | 88 | 10
-| richards | 632 | 15 | 39 | 34 | 104 | 272 | 36 | 11
-| fannkuch | 2606 | 15 | 582 | 33 | 519 | 248 | 568 | 10
-| spectral_norm | 711 | 15 | 12 | 32 | 7.2 | 253 | 32 | 10
-| dicts_strings | 387 | 63 | 134 | 80 | 213 | 434 | 189 | 125
+| Kernel 2+| CPython 3.14 2+| PyPy 3.11 2+| GraalPy 3.13 2+| Codename One 2+| Codename One, 128 MB budget
+| nbody | 1091 | 7.3 | 89 | 22.9 | 345 | 120 | 125 | 5.2 | 127 | 5.2
+| richards | 907 | 7.6 | 55 | 24.2 | 195 | 149 | 51 | 5.3 | 60 | 5.4
+| fannkuch | 3656 | 6.9 | 1376 | 23.4 | 1119 | 121 | 941 | 5.3 | 880 | 5.2
+| spectral_norm | 1173 | 7.0 | 23 | 22.7 | 17 | 125 | 23 | 5.2 | 22 | 5.3
+| dicts_strings | 727 | 53.3 | 247 | 84.1 | 539 | 256 | 277 | 124 | 345 | 98
 |===
+
+The numeric kernels allocate almost nothing, so the budget changes nothing
+there. `dicts_strings` builds large dictionaries and strings, and shows the
+trade in miniature: under the budget it gives up about a fifth of its speed
+for a fifth less memory.
 
 ==== A Flask server
 
-The Flask sample above, measured with `ab -n 20000 -c 8` after a warm-up:
+The Flask sample above, under thirty seconds of `ab -c 8` after a warm-up. Every
+server gets the same length of load rather than the same number of requests, so
+a fast server isn't measured before its collector has settled. Footprint is read
+when the load ends, again five seconds later, and at its peak.
 
 image::img/python-flask-rps.svg["Requests per second of the Flask sample on CPython, PyPy, GraalPy and Codename One"]
 
-image::img/python-flask-memory.svg["Memory and deployed size of the Flask sample on CPython, PyPy, GraalPy and Codename One"]
+image::img/python-flask-memory.svg["Footprint of the Flask sample on CPython, PyPy, GraalPy and Codename One"]
 
-[cols="1,1,1,1,1,1",options="header"]
+[cols="2,1,1,1,1,1,1,1",options="header"]
 |===
-| | First response (ms) | Requests per second | Idle memory (MB) | Memory after load (MB) | Deployed size (MB)
-| CPython 3.14 | 81 | 611 | 39.1 | 39.9 | 82.0
-| PyPy 3.11 | 184 | 610 | 64.8 | 102.3 | 110.5
-| GraalPy 3.13 | 438 | 468 | 322.8 | 1270.4 | 305.8
-| Codename One | 45 | 25,490 | 34.9 | 190.2 | 22.8
+| | First response (ms) | Requests per second | p99 (ms) | Idle (MB) | After load (MB) | 5 s later (MB) | Peak (MB)
+| CPython 3.14 | 346 | 670 | 21 | 28.3 | 27.7 | 27.7 | 29.5
+| PyPy 3.11 | 392 | 673 | 22 | 59.5 | 70.5 | 70.5 | 81.2
+| GraalPy 3.13 | 1298 | 520 | 53 | 243.8 | 854.0 | 868.9 | 863.8
+| Codename One | 90 | 22,876 | 2 | 14.0 | 110.5 | 101.8 | 427.4
+| Codename One, 128 MB budget | 29 | 19,504 | 2 | 14.0 | 67.7 | 66.0 | 103.9
+|===
+
+Unconstrained, the server spends memory for speed: 110 MB after load, at about
+23,000 requests a second. That's the collector seeing a busy program and spare
+memory, and choosing throughput; it briefly reaches its peak while the load is
+heaviest. Under the 128 MB budget the same binary keeps the heap tight instead:
+68 MB, never past 104 MB, at 19,500 requests a second. It keeps 85% of its
+unconstrained throughput, uses less memory than PyPy, and still serves 29 times
+as many requests as CPython, which answers 670 a second in 28 MB.
+
+The chart below puts each server at its throughput and its footprint, with the
+two Codename One points joined: the line is the trade the collector makes, and
+both ends of it are far to the right of every interpreter.
+
+image::img/python-flask-tradeoff.svg["Requests per second against footprint for the Flask sample, with the two Codename One configurations joined"]
+
+[cols="1,1",options="header"]
+|===
+| | Deployed size (MB)
+| CPython 3.14 | 82.2
+| PyPy 3.11 | 110.5
+| GraalPy 3.13 | 305.8
+| Codename One | 35.0
 |===
 
 The deployed size is the interpreter's installation plus Flask and its
 dependencies, against the one executable. CPython, PyPy and GraalPy serve with
 Werkzeug's threaded server, which is what `app.run()` starts; a production
 CPython deployment behind a WSGI server with several worker processes serves
-more, using a full interpreter's memory per worker. The Codename One server's
-heap grows under load and stays at that size, which is the memory after load
-column; it doesn't grow further on longer runs.
+more, using a full interpreter's memory per worker.
 
 Where an application needs CPython instead: code that builds source text and
 runs it with `exec`, and packages whose C code is the bulk of the package

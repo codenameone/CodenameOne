@@ -1080,6 +1080,16 @@ public final class Py {
         return r;
     }
 
+    /// `x ** y` for two floats the transpiler typed as `double`, before the generated code
+    /// checks the result for the cases Python raises on. Generated code calls this rather
+    /// than `java.lang.Math.pow`, which CLDC does not declare and the compliance check
+    /// therefore rejects in application classes; the runtime may name it, as `pow` below
+    /// does, because ParparVM implements it natively (libm). `MathUtil.pow`, the portable
+    /// alternative, is a pure-Java series and made `nbody` four times slower.
+    public static double powd(double x, double y) {
+        return Math.pow(x, y);
+    }
+
     public static Object pow(Object a, Object b) {
         if (a instanceof Double) {
             double x = ((Double) a).doubleValue();
