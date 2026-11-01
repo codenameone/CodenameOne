@@ -165,7 +165,7 @@ enum Thumb { start, end }
 @JavaName('com.codename1.flutter.material.ToggleButtons')
 class ToggleButtons extends Widget {
   external ToggleButtons(
-      {Key? key, List<Widget> children, List<bool> isSelected, Object? onPressed,
+      {Key? key, List<Widget> children, List<bool> isSelected, void Function(int)? onPressed,
        TextStyle? textStyle, Object? constraints, Color? color, Color? selectedColor,
        Color? disabledColor, Color? fillColor, Color? focusColor, Color? highlightColor,
        Color? hoverColor, Color? splashColor, bool? renderBorder, Color? borderColor,
@@ -193,7 +193,7 @@ class SimpleDialog extends Widget {
 @JavaName('com.codename1.flutter.material.SimpleDialogOption')
 class SimpleDialogOption extends Widget {
   external SimpleDialogOption(
-      {Key? key, Object? onPressed, EdgeInsets? padding, Widget? child});
+      {Key? key, VoidCallback? onPressed, EdgeInsets? padding, Widget? child});
 }
 
 // ======================================================================
@@ -227,7 +227,7 @@ class Typography {
 @JavaName('com.codename1.flutter.navigation.PageRouteBuilder')
 class PageRouteBuilder<T> extends Route<T> {
   external PageRouteBuilder(
-      {RouteSettings? settings, Object pageBuilder, Object? transitionsBuilder,
+      {RouteSettings? settings, Widget Function(BuildContext, Animation<double>, Animation<double>) pageBuilder, Widget Function(BuildContext, Animation<double>, Animation<double>, Widget)? transitionsBuilder,
        Duration? transitionDuration, Duration? reverseTransitionDuration,
        bool? opaque, bool? barrierDismissible, Color? barrierColor,
        String? barrierLabel, bool? maintainState, bool? fullscreenDialog});
@@ -295,7 +295,7 @@ class Matrix4 {
 @JavaName('com.codename1.flutter.scheduler.SchedulerBinding')
 class SchedulerBinding {
   external static SchedulerBinding get instance;
-  external void addPostFrameCallback(Object callback);
+  external void addPostFrameCallback(void Function(dynamic) callback);
   external int scheduleFrameCallback(Object callback, {bool rescheduling});
   external void scheduleFrame();
 }

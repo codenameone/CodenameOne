@@ -122,19 +122,30 @@ public final class DoubleListMixinView extends DartDoubleList implements MixinVi
         return add((Double) value);
     }
 
+    /** The program class's sublist, which it may override, copied into a double list. */
     @Override
     public DartDoubleList sublist(long start, long end) {
-        RangeError.checkValueInInterval(start, 0, size(), "start");
-        RangeError.checkValueInInterval(end, start, size(), "end");
+        return copyOf(src.sublist(start, end));
+    }
+
+    private static DartDoubleList copyOf(DartList<Double> picked) {
         DartDoubleList out = new DartDoubleList();
-        for (long i = start; i < end; i++) {
-            out.addDouble(src.$index(i));
+        for (int i = 0; i < picked.size(); i++) {
+            out.addDouble(picked.get(i));
         }
         return out;
     }
 
+    /** Dart's addAll, run by the program class: it may override it. */
+    @Override
+    public void addAllIterable(Iterable<? extends Double> elements) {
+        modCount++;
+        // a view added to its own source is a snapshot: iterating it while appending never ends
+        src.addAll(elements == this ? new java.util.ArrayList<>(this) : elements);
+    }
+
     @Override
     public DartDoubleList sublist(long start) {
-        return sublist(start, size());
+        return copyOf(src.sublist(start));
     }
 }

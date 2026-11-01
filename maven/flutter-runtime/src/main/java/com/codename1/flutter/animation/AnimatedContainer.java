@@ -48,7 +48,7 @@ public class AnimatedContainer extends StatefulWidget {
     private Widget child;
     private Duration duration;
     private Curve curve;
-    private Object onEnd;
+    private dart.runtime.Funcs.VoidFunc0 onEnd;
     public void width(double v) { this.width = Double.valueOf(v); }
     public void height(double v) { this.height = Double.valueOf(v); }
     public void color(Color v) { this.color = v; }
@@ -64,7 +64,7 @@ public class AnimatedContainer extends StatefulWidget {
     public void child(Widget v) { this.child = v; }
     public void duration(Duration v) { this.duration = v; }
     public void curve(Curve v) { this.curve = v; }
-    public void onEnd(Object v) { this.onEnd = v; }
+    public void onEnd(dart.runtime.Funcs.VoidFunc0 v) { this.onEnd = v; }
 
     @Override
     public State<? extends StatefulWidget> createState() {

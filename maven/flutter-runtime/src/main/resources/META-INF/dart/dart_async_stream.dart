@@ -69,14 +69,14 @@ abstract class Stream<T> {
   external static Stream<T> error(Object error);
   external static Stream<T> fromFuture(Future<T> future);
   external static Stream<T> fromFutures(Iterable<Future<T>> futures);
-  external static Stream<T> periodic(Duration period, [Object? computation]);
-  external Stream<R> expand<R>(Object convert);
-  external Stream<R> asyncMap<R>(Object convert);
+  external static Stream<T> periodic(Duration period, [T Function(int)? computation]);
+  external Stream<R> expand<R>(Iterable<R> Function(T) convert);
+  external Stream<R> asyncMap<R>(dynamic Function(T) convert);
   external Stream<T> take(int count);
   external Stream<T> skip(int count);
   external Stream<T> takeWhile(bool Function(T element) test);
   external Stream<T> skipWhile(bool Function(T element) test);
-  external Stream<T> distinct([Object? equals]);
+  external Stream<T> distinct([bool Function(T, T)? equals]);
   external Stream<T> handleError(Function onError, {Object? test});
   external Stream<R> transform<R>(Object streamTransformer);
   external Stream<R> cast<R>();
@@ -92,11 +92,11 @@ abstract class Stream<T> {
   external Future<T> get last;
   external Future<T> firstWhere(bool Function(T element) test, {Object? orElse});
   external Future<bool> any(bool Function(T element) test);
-  external Future<bool> every(Object test);
+  external Future<bool> every(bool Function(T) test);
   external Future<bool> contains(Object? needle);
   external Future<String> join([String separator = ""]);
-  external Future<S> fold<S>(S initialValue, Object combine);
-  external Future<T> reduce(Object combine);
+  external Future<S> fold<S>(S initialValue, S Function(S, T) combine);
+  external Future<T> reduce(dynamic Function(T, T) combine);
   external Future<T> elementAt(int index);
 }
 

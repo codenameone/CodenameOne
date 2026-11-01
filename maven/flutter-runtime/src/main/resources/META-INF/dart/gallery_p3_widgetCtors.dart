@@ -115,7 +115,9 @@ class CheckedPopupMenuItem<T> extends PopupMenuItem<T> {
 
 @JavaName('com.codename1.flutter.widgets.ValueListenableBuilder')
 class ValueListenableBuilder<T> extends Widget {
-  external ValueListenableBuilder({Key? key, Object valueListenable, Object builder, Widget? child});
+  // The builder is typed so an untyped `(context, value, _) {...}` takes the
+  // runtime setter's Func3<BuildContext, T, Widget, Widget> instead of Object params.
+  external ValueListenableBuilder({Key? key, ValueListenable<T> valueListenable, ValueWidgetBuilder<T> builder, Widget? child});
 }
 
 // ======================================================================
@@ -257,7 +259,7 @@ class SizeTransition extends Widget {
 
 @JavaName('com.codename1.flutter.animation.PageTransitionSwitcher')
 class PageTransitionSwitcher extends Widget {
-  external PageTransitionSwitcher({Key? key, Duration? duration, bool? reverse, Object transitionBuilder, Widget? child});
+  external PageTransitionSwitcher({Key? key, Duration? duration, bool? reverse, Widget Function(Widget, Animation<double>, Animation<double>) transitionBuilder, Widget? child});
 }
 
 // ======================================================================
@@ -266,7 +268,7 @@ class PageTransitionSwitcher extends Widget {
 
 @JavaName('com.codename1.flutter.animations.OpenContainer')
 class OpenContainer extends Widget {
-  external OpenContainer({Key? key, Object? onClosed, Object closedBuilder, Object openBuilder, bool? tappable, Duration? transitionDuration, Object? transitionType, Color? closedColor, Color? openColor, Color? middleColor, double? closedElevation, double? openElevation, Object? closedShape, Object? openShape, String? routeSettings, bool? useRootNavigator});
+  external OpenContainer({Key? key, Object? onClosed, CloseContainerBuilder closedBuilder, CloseContainerBuilder openBuilder, bool? tappable, Duration? transitionDuration, Object? transitionType, Color? closedColor, Color? openColor, Color? middleColor, double? closedElevation, double? openElevation, Object? closedShape, Object? openShape, String? routeSettings, bool? useRootNavigator});
 }
 
 // The `closedBuilder` signature of an OpenContainer — the animations package's

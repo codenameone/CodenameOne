@@ -39,14 +39,14 @@ public class AnimatedAlign extends StatefulWidget {
     private Widget child;
     private Duration duration;
     private Curve curve;
-    private Object onEnd;
+    private dart.runtime.Funcs.VoidFunc0 onEnd;
     public void alignment(Object v) { this.alignment = v; }
     public void widthFactor(double v) { this.widthFactor = Double.valueOf(v); }
     public void heightFactor(double v) { this.heightFactor = Double.valueOf(v); }
     public void child(Widget v) { this.child = v; }
     public void duration(Duration v) { this.duration = v; }
     public void curve(Curve v) { this.curve = v; }
-    public void onEnd(Object v) { this.onEnd = v; }
+    public void onEnd(dart.runtime.Funcs.VoidFunc0 v) { this.onEnd = v; }
 
     @Override
     public State<? extends StatefulWidget> createState() {

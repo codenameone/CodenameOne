@@ -38,13 +38,13 @@ public class AnimatedRotation extends StatefulWidget {
     private Widget child;
     private Duration duration;
     private Curve curve;
-    private Object onEnd;
+    private dart.runtime.Funcs.VoidFunc0 onEnd;
     public void turns(double v) { this.turns = Double.valueOf(v); }
     public void alignment(Object v) { this.alignment = v; }
     public void child(Widget v) { this.child = v; }
     public void duration(Duration v) { this.duration = v; }
     public void curve(Curve v) { this.curve = v; }
-    public void onEnd(Object v) { this.onEnd = v; }
+    public void onEnd(dart.runtime.Funcs.VoidFunc0 v) { this.onEnd = v; }
     public void filterQuality(Object v) { }
 
     @Override

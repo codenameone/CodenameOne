@@ -28,7 +28,7 @@ class DropdownButton<T> extends Widget {
 class DropdownButtonFormField<T> extends Widget {
   external DropdownButtonFormField({Key? key, List<DropdownMenuItem<T>>? items, T? value, T? initialValue,
       DynamicCallback? onChanged, Widget? hint, Widget? disabledHint, Widget? icon, bool? isExpanded,
-      TextStyle? style, Color? dropdownColor, InputDecoration? decoration, Object? validator, Object? onSaved,
+      TextStyle? style, Color? dropdownColor, InputDecoration? decoration, dynamic Function(dynamic)? validator, Object? onSaved,
       Object? autovalidateMode, bool? isDense, int? elevation, double? iconSize, Object? borderRadius,
       double? menuMaxHeight, Object? alignment, Object? padding, Object? focusNode, bool? autofocus,
       Object? selectedItemBuilder});
@@ -53,7 +53,7 @@ class InputDecorationTheme extends InputDecorationThemeData {
        TextStyle? hintStyle, TextStyle? errorStyle, TextStyle? prefixStyle,
        TextStyle? suffixStyle, TextStyle? counterStyle, bool? filled, Color? fillColor,
        Object? border, Object? enabledBorder, Object? focusedBorder, Object? errorBorder,
-       Object? contentPadding, bool? isDense});
+       EdgeInsetsGeometry? contentPadding, bool? isDense});
 }
 
 @JavaName('com.codename1.flutter.material.NavigationDestination')
@@ -111,7 +111,7 @@ class ListBody extends Widget {
 @JavaName('com.codename1.flutter.widgets.AnimatedScale')
 class AnimatedScale extends Widget {
   external AnimatedScale({Key? key, required double scale, required Duration duration, Widget? child,
-      Object? alignment, Curve? curve, Object? onEnd, Object? filterQuality});
+      Object? alignment, Curve? curve, VoidCallback? onEnd, Object? filterQuality});
 }
 
 @JavaName('com.codename1.flutter.widgets.CrossFadeState')

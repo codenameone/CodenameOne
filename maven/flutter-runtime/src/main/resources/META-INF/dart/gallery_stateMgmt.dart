@@ -69,7 +69,7 @@ class MultiProvider extends Widget {
 
 @JavaName('com.codename1.flutter.provider.Consumer')
 class Consumer<T> extends StatelessWidget {
-  external Consumer({Key? key, dynamic builder, Widget? child});
+  external Consumer({Key? key, Widget Function(BuildContext, T, Widget)? builder, Widget? child});
 }
 
 // --- scoped_model package ---------------------------------------------
@@ -90,7 +90,7 @@ class ScopedModel extends Widget {
 
 @JavaName('com.codename1.flutter.scopedmodel.ScopedModelDescendant')
 class ScopedModelDescendant<T> extends StatelessWidget {
-  external ScopedModelDescendant({Key? key, dynamic builder, bool? rebuildOnChange, Widget? child});
+  external ScopedModelDescendant({Key? key, Widget Function(BuildContext, Widget, T)? builder, bool? rebuildOnChange, Widget? child});
 }
 
 // --- Locale -----------------------------------------------------------

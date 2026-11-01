@@ -2554,9 +2554,9 @@ class ThemeData {
       ChipThemeData? chipTheme, CheckboxThemeData? checkboxTheme, CardTheme? cardTheme,
       BottomAppBarThemeData? bottomAppBarTheme, DividerThemeData? dividerTheme,
       dynamic snackBarTheme, dynamic inputDecorationTheme, dynamic radioTheme, dynamic switchTheme,
-      dynamic tooltipTheme, dynamic bottomSheetTheme, dynamic floatingActionButtonTheme,
+      dynamic tooltipTheme, BottomSheetThemeData? bottomSheetTheme, dynamic floatingActionButtonTheme,
       dynamic elevatedButtonTheme, dynamic textButtonTheme, dynamic outlinedButtonTheme,
-      dynamic pageTransitionsTheme, dynamic visualDensity, dynamic typography, dynamic platform,
+      PageTransitionsTheme? pageTransitionsTheme, dynamic visualDensity, dynamic typography, dynamic platform,
       NavigationRailThemeData? navigationRailTheme, NavigationBarThemeData? navigationBarTheme,
       dynamic bottomNavigationBarTheme,
       bool? applyElevationOverlayColor, String? fontFamily});

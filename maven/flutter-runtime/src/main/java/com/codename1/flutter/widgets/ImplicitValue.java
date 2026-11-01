@@ -69,8 +69,8 @@ public final class ImplicitValue {
         });
     }
 
-    public void onEnd(Object callback) {
-        this.onEnd = callback instanceof Funcs.VoidFunc0 ? (Funcs.VoidFunc0) callback : null;
+    public void onEnd(dart.runtime.Funcs.VoidFunc0 callback) {
+        this.onEnd = callback;
     }
 
     /** Starts a run to {@code target} unless that is already where the value is headed. */

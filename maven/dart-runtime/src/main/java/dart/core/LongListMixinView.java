@@ -122,19 +122,30 @@ public final class LongListMixinView extends DartLongList implements MixinView {
         return add((Long) value);
     }
 
+    /** The program class's sublist, which it may override, copied into a long list. */
     @Override
     public DartLongList sublist(long start, long end) {
-        RangeError.checkValueInInterval(start, 0, size(), "start");
-        RangeError.checkValueInInterval(end, start, size(), "end");
+        return copyOf(src.sublist(start, end));
+    }
+
+    private static DartLongList copyOf(DartList<Long> picked) {
         DartLongList out = new DartLongList();
-        for (long i = start; i < end; i++) {
-            out.addLong(src.$index(i));
+        for (int i = 0; i < picked.size(); i++) {
+            out.addLong(picked.get(i));
         }
         return out;
     }
 
+    /** Dart's addAll, run by the program class: it may override it. */
+    @Override
+    public void addAllIterable(Iterable<? extends Long> elements) {
+        modCount++;
+        // a view added to its own source is a snapshot: iterating it while appending never ends
+        src.addAll(elements == this ? new java.util.ArrayList<>(this) : elements);
+    }
+
     @Override
     public DartLongList sublist(long start) {
-        return sublist(start, size());
+        return copyOf(src.sublist(start));
     }
 }

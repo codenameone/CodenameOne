@@ -73,6 +73,6 @@ void main() {
   final shelf = Shelf({'a': 7});
   final api.Shelf asApi = shelf;
   print(asApi is Shelf);
-  print(shelf.open<int>('a').item);
-  print(shelf.open<String>('b', maker: (n, sh) => Crate<String>('made ' + n)).item);
+  print(asApi.open<int>('a').item);
+  print(asApi.open<String>('b', maker: (n, sh) => Crate<String>('made ' + n)).item);
 }

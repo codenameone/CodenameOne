@@ -41,14 +41,14 @@ public class TweenAnimationBuilder extends StatefulWidget {
     private Tween<?> tween;
     private Duration duration;
     private Curve curve;
-    private Object onEnd;
+    private dart.runtime.Funcs.VoidFunc0 onEnd;
     private Widget child;
     private Funcs.Func3<BuildContext, Object, Widget, Widget> builder;
 
     public void tween(Tween<?> v) { this.tween = v; }
     public void duration(Duration v) { this.duration = v; }
     public void curve(Curve v) { this.curve = v; }
-    public void onEnd(Object v) { this.onEnd = v; }
+    public void onEnd(dart.runtime.Funcs.VoidFunc0 v) { this.onEnd = v; }
     public void child(Widget v) { this.child = v; }
     @SuppressWarnings("unchecked")
     public void builder(Funcs.Func3<?, ?, ?, ?> v) {

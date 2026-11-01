@@ -137,7 +137,7 @@ class DateTime {
 
 @JavaName('dart.core.DateTimeRange')
 class DateTimeRange {
-  external DateTimeRange({DateTime start, DateTime end});
+  external DateTimeRange({required DateTime start, required DateTime end});
   external DateTime get start;
   external DateTime get end;
   external Duration get duration;

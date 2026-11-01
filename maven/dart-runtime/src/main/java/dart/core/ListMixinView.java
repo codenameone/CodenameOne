@@ -103,4 +103,24 @@ public final class ListMixinView<E> extends DartList<E> implements MixinView {
         modCount++;
         src.length(n);
     }
+
+    /** Dart's addAll, run by the program class: it may override it. */
+    @Override
+    public void addAllIterable(Iterable<? extends E> elements) {
+        modCount++;
+        // a view added to its own source is a snapshot: iterating it while appending never ends
+        src.addAll(elements == this ? new java.util.ArrayList<>(this) : elements);
+    }
+
+    /** The program class's sublist, which it may override. */
+    @Override
+    public DartList<E> sublist(long start, long end) {
+        return src.sublist(start, end);
+    }
+
+    /** The program class's one-argument sublist, which it may override. */
+    @Override
+    public DartList<E> sublist(long start) {
+        return src.sublist(start);
+    }
 }

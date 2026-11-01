@@ -209,9 +209,9 @@ public class PageViewRenderElement extends ScrollRenderElement {
             return;
         }
         reportedPage = page;
-        dart.runtime.Funcs.VoidFunc1<dart.runtime.RefLong> cb = pageView().getOnPageChanged();
+        dart.runtime.Funcs.VoidFunc1<Long> cb = pageView().getOnPageChanged();
         if (cb != null) {
-            cb.call(new dart.runtime.RefLong(page));
+            cb.call(Long.valueOf(page));
         }
     }
 

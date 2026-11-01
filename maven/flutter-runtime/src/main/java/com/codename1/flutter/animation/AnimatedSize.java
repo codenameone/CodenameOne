@@ -46,7 +46,7 @@ public class AnimatedSize extends Widget {
     private Duration reverseDuration;
     private Curve curve;
     private Alignment alignment = Alignment.center;
-    private Object onEnd;
+    private dart.runtime.Funcs.VoidFunc0 onEnd;
 
     public void child(Widget v) {
         this.child = v;
@@ -75,7 +75,7 @@ public class AnimatedSize extends Widget {
     public void clipBehavior(Object v) {
     }
 
-    public void onEnd(Object v) {
+    public void onEnd(dart.runtime.Funcs.VoidFunc0 v) {
         this.onEnd = v;
     }
 

@@ -282,6 +282,19 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
     /// different from Dart only for a list of unknown argument whose elements all happen
     /// to be X.
     public static boolean isListOf(Object value, Class<?> type, boolean nullable) {
+        if (value instanceof dart.collection.ListMixin) {
+            // A program class applying ListMixin, or `implements List<E>` alone (emitted as
+            // one): a List in Dart, tested by its elements as an untyped DartList is.
+            dart.collection.ListMixin<?> m = (dart.collection.ListMixin<?>) value;
+            long n = m.length();
+            for (long i = 0; i < n; i++) {
+                Object e = m.$index(i);
+                if (e == null ? !nullable : !type.isInstance(e)) {
+                    return false;
+                }
+            }
+            return true;
+        }
         if (!(value instanceof DartList)) {
             return false;
         }
@@ -770,6 +783,15 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
 
     public DartList<E> sublist(long start) {
         return sublist(start, size());
+    }
+
+    /**
+     * Dart's {@code sublist(start, end)} with a nullable {@code end}, as a program forwards
+     * its own {@code [int? end]}: null is the one-argument form. Overload resolution picks
+     * this only for a boxed argument, so a long still reaches sublist(long, long).
+     */
+    public DartList<E> sublist(long start, Long end) {
+        return end == null ? sublist(start) : sublist(start, end.longValue());
     }
 
     /**

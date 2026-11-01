@@ -31,7 +31,7 @@ public class ShaderMask extends Widget implements HasChild {
     Object shaderCallback;
     com.codename1.flutter.BlendMode blendMode;
     private Widget child;
-    public void shaderCallback(Object v) { this.shaderCallback = v; }
+    public void shaderCallback(dart.runtime.Funcs.Func1<com.codename1.flutter.Rect, ?> v) { this.shaderCallback = v; }
     public void blendMode(com.codename1.flutter.BlendMode v) { this.blendMode = v; }
     public void child(Widget v) { this.child = v; }
     @Override

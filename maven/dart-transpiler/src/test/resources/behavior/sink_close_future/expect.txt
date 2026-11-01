@@ -1,0 +1,7 @@
+[1, 2, 3, 0]
+done
+closed 2
+then closed 3
+[a, closing, closing, via sink, closing]
+closed 2
+[loud, closing, via sink, loud, closing]

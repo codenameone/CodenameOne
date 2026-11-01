@@ -290,6 +290,12 @@ public class DartLongList extends DartList<Long> {
         return new DartLongList(backing, n, true);
     }
 
+    /** {@link DartList#sublist(long, Long)}, keeping the primitive-backed list type. */
+    @Override
+    public DartLongList sublist(long start, Long end) {
+        return end == null ? sublist(start) : sublist(start, end.longValue());
+    }
+
     /** Dart's {@code sublist(start)}; see {@link #sublist(long, long)}. */
     @Override
     public DartLongList sublist(long start) {

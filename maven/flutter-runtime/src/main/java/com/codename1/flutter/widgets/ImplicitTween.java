@@ -60,7 +60,7 @@ public final class ImplicitTween {
         this.tween = (Tween<Object>) t;
     }
 
-    public void onEnd(Object callback) {
+    public void onEnd(dart.runtime.Funcs.VoidFunc0 callback) {
         progress.onEnd(callback);
     }
 
