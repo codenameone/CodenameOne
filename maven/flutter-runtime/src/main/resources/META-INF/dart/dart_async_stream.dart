@@ -131,7 +131,7 @@ abstract class EventSink<T> {
   external void close();
 }
 
-@JavaName('dart.async.StreamSink')
+@JavaName('dart.async.Sink')
 abstract class Sink<T> {
   external void add(T data);
   external void close();
@@ -189,7 +189,7 @@ class StreamController<T> {
   external bool get isClosed;
   external bool get hasListener;
   external void add(T event);
-  external void addError(Object error);
+  external void addError(Object error, [StackTrace? stackTrace]);
   external Future<void> close();
   external StreamSink<T> get sink;
   external bool get isPaused;

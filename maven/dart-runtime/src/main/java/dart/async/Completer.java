@@ -47,6 +47,12 @@ public class Completer<T> {
         future.completeError(error);
     }
 
+    /// Dart's {@code completeError(error, stackTrace)}: the trace travels with the error
+    /// to whoever handles it.
+    public void completeError(Object error, Object stackTrace) {
+        future.completeError(dart.core.StackTrace.carry(error, stackTrace));
+    }
+
     /**
      * Dart's {@code isCompleted}: true once complete or completeError has been
      * called -- including complete(aFuture) while that future is still pending.

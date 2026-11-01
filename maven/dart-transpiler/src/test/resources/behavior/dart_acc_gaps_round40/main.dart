@@ -22,13 +22,13 @@ class Owner {
 // An extension method torn off as a callback.
 class Gate {
   bool open = false;
-  final List<String> notes = [];
+  final List<String> log = [];
 }
 
 extension on Gate {
   void note(Object error, Object st) {
     if (open) return;
-    notes.add('noted $error');
+    log.add('noted $error');
   }
 }
 
@@ -89,7 +89,7 @@ void main() async {
 
   final gate = Gate();
   Watcher(gate).watch('boom');
-  print(gate.notes);
+  print(gate.log);
 
   final w = Wrapped<int>([4, 5, 6]);
   print('${w.label} ${w.size} ${w.at(1)}');

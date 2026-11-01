@@ -748,8 +748,11 @@ public final class AstBuilder {
                     cd.ctors.add(ctor);
                     return;
                 }
+                // Only `Vec.unit(...)` is a named constructor: `Pipe<T> mapEach(...);` and
+                // `Vec unit();` are abstract methods that merely return the class.
                 if (!m.isStatic && tmp.returnType != null && tmp.returnType.is(cd.name)
-                        && d.EXTERNAL_() == null) {
+                        && d.EXTERNAL_() == null
+                        && d.functionSignature().getText().startsWith(cd.name + "." + tmp.name)) {
                     CtorDecl ctor = new CtorDecl();
                     pos(ctor, d);
                     ctor.name = tmp.name;

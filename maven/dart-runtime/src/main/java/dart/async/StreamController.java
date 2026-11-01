@@ -194,6 +194,11 @@ public final class StreamController<T> implements StreamSink<T> {
         theStream.emit(event);
     }
 
+    /// Dart's {@code addError(error, stackTrace)}: the trace travels with the error.
+    public void addError(Object error, Object stackTrace) {
+        addError(stackTrace == null ? error : dart.core.StackTrace.carry(error, stackTrace));
+    }
+
     public void addError(Object error) {
         if (closed) {
             throw new dart.core.StateError("Cannot add event after closing");

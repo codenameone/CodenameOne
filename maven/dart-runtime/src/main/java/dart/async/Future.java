@@ -108,6 +108,13 @@ public class Future<T> {
         return f;
     }
 
+    /** Dart's {@code Future.error(error, stackTrace)}: the trace travels with the error. */
+    public static <T> Future<T> error(Object err, Object stackTrace) {
+        Future<T> f = new Future<T>();
+        f.completeError(dart.core.StackTrace.carry(err, stackTrace));
+        return f;
+    }
+
     /** An already-failed future. */
     public static <T> Future<T> error(Object err) {
         Future<T> f = new Future<T>();
@@ -414,10 +421,10 @@ public class Future<T> {
             return null;
         }
         if (handler instanceof Funcs.Func2) {
-            return ((Funcs.Func2) handler).call(err, null);
+            return ((Funcs.Func2) handler).call(err, dart.core.StackTrace.forError(thrown));
         }
         if (handler instanceof Funcs.VoidFunc2) {
-            ((Funcs.VoidFunc2) handler).call(err, null);
+            ((Funcs.VoidFunc2) handler).call(err, dart.core.StackTrace.forError(thrown));
             return null;
         }
         throw new dart.core.ArgumentError("onError is not a function");
@@ -519,6 +526,37 @@ public class Future<T> {
             }
         });
         return next;
+    }
+
+    /// {@code catchError((e, st) => ...)}: a handler that also takes the trace, which is
+    /// the frameless {@link dart.core.StackTrace#empty} here.
+    public Future<Object> catchError(final Funcs.Func2<Object, ? super dart.core.StackTrace, ?> onError,
+            final Object test) {
+        return catchError(new Funcs.Func1<Object, Object>() {
+            @Override
+            public Object call(Object e) {
+                return onError.call(e, dart.core.StackTrace.empty);
+            }
+        }, test);
+    }
+
+    public Future<Object> catchError(final Funcs.Func2<Object, ? super dart.core.StackTrace, ?> onError) {
+        return catchError(onError, null);
+    }
+
+    /// {@code catchError((e, st) { ... })} with a void handler.
+    public Future<T> catchError(final Funcs.VoidFunc2<Object, ? super dart.core.StackTrace> onError,
+            final Object test) {
+        return catchError(new Funcs.VoidFunc1<Object>() {
+            @Override
+            public void call(Object e) {
+                onError.call(e, dart.core.StackTrace.empty);
+            }
+        }, test);
+    }
+
+    public Future<T> catchError(final Funcs.VoidFunc2<Object, ? super dart.core.StackTrace> onError) {
+        return catchError(onError, null);
     }
 
     /** {@code catchError(onError, test: ...)} -- value-handler form. */

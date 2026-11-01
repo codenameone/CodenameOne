@@ -31,5 +31,10 @@ public interface StreamSink<S> extends StreamConsumer<S> {
 
     void addError(Object error);
 
+    /// Dart's {@code addError(error, stackTrace)}: the trace travels with the error.
+    default void addError(Object error, Object stackTrace) {
+        addError(stackTrace == null ? error : dart.core.StackTrace.carry(error, stackTrace));
+    }
+
     Future<Object> done();
 }

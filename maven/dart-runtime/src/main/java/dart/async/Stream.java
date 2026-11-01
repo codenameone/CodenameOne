@@ -593,9 +593,9 @@ public class Stream<T> {
             } else if (onError instanceof Funcs.Func1) {
                 ((Funcs.Func1<Object, Object>) onError).call(err);
             } else if (onError instanceof Funcs.VoidFunc2) {
-                ((Funcs.VoidFunc2<Object, Object>) onError).call(err, null);
+                ((Funcs.VoidFunc2<Object, Object>) onError).call(err, dart.core.StackTrace.forError(error));
             } else if (onError instanceof Funcs.Func2) {
-                ((Funcs.Func2<Object, Object, Object>) onError).call(err, null);
+                ((Funcs.Func2<Object, Object, Object>) onError).call(err, dart.core.StackTrace.forError(error));
             } else if (onError == null) {
                 // No handler installed: Dart's default behaviour is to forward the
                 // error to the subscription's zone, which for a headless runtime

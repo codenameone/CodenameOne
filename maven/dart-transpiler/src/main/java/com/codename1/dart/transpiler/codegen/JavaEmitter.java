@@ -1022,18 +1022,52 @@ public final class JavaEmitter {
             // An abstract member the applying class implements -- possibly with a field,
             // through the bridge implementerBridges writes -- throws if nothing does.
             boolean abstractMember = m.body == null && m.exprBody == null;
-            body.append("    default ").append(m.isSetter ? "void" : javaType(rt, false, ctx))
-                    .append(' ').append(m.isGetter ? m.name : m.name).append('(');
+            // A generic member keeps its own type parameters and witnesses here as it does
+            // in a class: `whereType<T>() => inner.whereType<T>()` in a class used as a
+            // mixin takes the runtime's (Class, boolean) pair and filters by T.
+            java.util.Set<String> savedTps = ctx.methodTypeParams;
+            java.util.Set<String> savedWl = ctx.witnessLocals;
+            java.util.Map<String, TypeRef> savedBounds = ctx.methodTypeParamBounds;
+            List<String> mws = m.typeParams == null || m.typeParams.isEmpty()
+                    ? java.util.Collections.<String>emptyList() : methodWitnesses(m);
+            boolean wtOverride = isWhereTypeOverride(m) && mws.isEmpty();
+            StringBuilder lead = new StringBuilder();
+            if (m.typeParams != null && !m.typeParams.isEmpty()) {
+                ctx.methodTypeParams = new HashSet<String>(m.typeParams);
+                ctx.methodTypeParamBounds = m.typeParamBounds;
+                ctx.witnessLocals = mws.isEmpty() ? null : new HashSet<String>(mws);
+                if (wtOverride) {
+                    String tw = m.typeParams.get(0);
+                    ctx.witnessLocals = new HashSet<String>(m.typeParams);
+                    lead.append("java.lang.Class<").append(tw).append("> $twc$").append(tw)
+                            .append(", boolean $twn$").append(tw);
+                }
+                for (String tw : mws) {
+                    lead.append(lead.length() == 0 ? "" : ", ").append("dart.runtime.TypeWitness $tw$").append(tw);
+                }
+            }
+            body.append("    default ");
+            if (m.typeParams != null && !m.typeParams.isEmpty()) {
+                body.append('<').append(String.join(", ", m.typeParams)).append("> ");
+            }
+            body.append(m.isSetter ? "void" : javaType(rt, false, ctx))
+                    .append(' ').append(m.isGetter ? m.name : m.name).append('(').append(lead);
             for (int i = 0; i < m.params.size(); i++) {
                 Param pm = m.params.get(i);
                 TypeRef pt = pm.type == null || pm.type.is("var") ? TypeRef.DYNAMIC : pm.type;
-                if (i > 0) {
+                if (i > 0 || lead.length() > 0) {
                     body.append(", ");
                 }
                 body.append(javaType(pt, false, ctx)).append(' ')
                         .append(ctx.declareShadowSafe(pm.name, pt));
             }
             body.append(") {\n");
+            if (wtOverride) {
+                String tw = m.typeParams.get(0);
+                body.append("        dart.runtime.TypeWitness $tw$").append(tw)
+                        .append(" = dart.runtime.TypeWitness.of($twc$").append(tw).append(", $twn$")
+                        .append(tw).append(");\n");
+            }
             ctx.pushWriter(2);
             ctx.methodReturnType = rt;
             ctx.inAsyncBody = m.isAsync;
@@ -1055,6 +1089,9 @@ public final class JavaEmitter {
             body.append(ctx.popWriter());
             ctx.methodReturnType = null;
             ctx.inAsyncBody = false;
+            ctx.methodTypeParams = savedTps;
+            ctx.witnessLocals = savedWl;
+            ctx.methodTypeParamBounds = savedBounds;
             ctx.popScope();
             body.append("    }\n\n");
         }
@@ -1406,10 +1443,26 @@ public final class JavaEmitter {
                 }
                 continue;
             }
+            String itfJava = javaType(itf, false, ctx);
+            String itfRaw = itfJava.indexOf('<') < 0 ? itfJava : itfJava.substring(0, itfJava.indexOf('<'));
+            String itfSimple = itfRaw.substring(itfRaw.lastIndexOf('.') + 1);
+            // The element-specialised forms too: List<int> is DartLongList, Map<int, V> DartLongMap.
+            if (itfSimple.matches("Dart(Long|Double)?(List|Set|Map|Iterable)")) {
+                // dart:core's List/Set/Map/Iterable are runtime *classes* here, which a Java
+                // `implements` cannot name. A class applying the family's mixin
+                // (ListMixin, ...) already has the protocol from it; one with no
+                // superclass of its own extends the runtime class instead, which is the
+                // type every List-typed parameter and field is declared with.
+                if (!appliesCollectionMixin(c) && c.superclass == null && implementedAsSuper == null
+                        && mixinClassAsSuper == null) {
+                    implementedAsSuper = itf;
+                }
+                continue;
+            }
             if (impls.length() > 0) {
                 impls.append(", ");
             }
-            impls.append(javaType(itf, false, ctx));
+            impls.append(itfJava);
             emitChangeNotifierState(itf, body);
         }
         // `class C with M` where `mixin class M implements I` and C's field implements I's
@@ -1681,6 +1734,26 @@ public final class JavaEmitter {
         }
         return finishClassFile(jname + "$I", "public interface " + jname + "$I" + typeParams,
                 ext.length() == 0 ? null : ext.toString(), null, body, ctx, c.file);
+    }
+
+    /** True when c (or a superclass in the program) applies a dart:collection mixin or base. */
+    private boolean appliesCollectionMixin(ClassDecl c) {
+        for (ClassDecl k = c; k != null;
+             k = k.superclass != null ? program.classes.get(k.superclass.name) : null) {
+            java.util.List<TypeRef> refs = new java.util.ArrayList<TypeRef>(k.mixins);
+            if (k.superclass != null) {
+                refs.add(k.superclass);
+            }
+            for (TypeRef r : refs) {
+                String n = r.name;
+                if (n != null && (n.endsWith("Mixin") || n.endsWith("Base"))
+                        && (n.startsWith("List") || n.startsWith("Set") || n.startsWith("Map")
+                        || n.startsWith("Iterable")) && !program.classes.containsKey(n)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /**
@@ -7655,14 +7728,14 @@ public final class JavaEmitter {
                     eg.returnType == null || eg.returnType.is("var") ? TypeRef.DYNAMIC : eg.returnType);
         }
         // Inside `extension on List<E>`, a bare `length` is `this.length` on the extended value.
-        if (ctx.extensionSelfType != null && resolveTopLevel(n, ctx) == null
+        if (ctx.extensionSelfType != null && !lexicalTopLevel(n, ctx)
                 && (hasMember(ctx.extensionSelfType.name, n, true, ctx)
                 || EXTENDED_CORE_GETTERS.contains(ctx.extensionSelfType.name + "." + n))) {
             return emitMemberGet(new Out("$self", ctx.extensionSelfType), n, id, ctx);
         }
         // `extension on FileSpan` reading `length`, which only an interface FileSpan
         // implements (SourceSpan) declares: still a member of the extended value.
-        if (ctx.extensionSelfType != null && resolveTopLevel(n, ctx) == null) {
+        if (ctx.extensionSelfType != null && !lexicalTopLevel(n, ctx)) {
             ClassDecl onCls = program.resolveClass(ctx.extensionSelfType.name, ctx.library());
             if (onCls != null && interfaceDeclaring(onCls, n, ctx, new java.util.HashSet<String>()) != null) {
                 return emitMemberGet(new Out("$self", ctx.extensionSelfType), n, id, ctx);
@@ -7700,6 +7773,24 @@ public final class JavaEmitter {
      * a stub function torn off there keeps every parameter, as its Dart type does.
      */
     private boolean tearOffKeepAll;
+
+    /**
+     * Whether a bare name in an extension body is in the library's lexical scope, which
+     * Dart searches before the extended type's members: a program top-level declaration,
+     * a runtime class, or a dart: library function this library imports. A runtime
+     * library function that is NOT imported (dart:math's `log` with no import) is not in
+     * scope, so `log.add(..)` reaches the extended class's `log` field, as in Dart.
+     */
+    private boolean lexicalTopLevel(String n, Ctx ctx) {
+        if (resolveTopLevel(n, ctx) == null) {
+            return false;
+        }
+        return program.classes.containsKey(n) || program.enums.containsKey(n)
+                || program.topLevelVars.containsKey(n) || program.functions.containsKey(n)
+                || stubs.isStubClass(n) || stubs.isStubEnum(n) || CORE_STATIC_RECEIVERS.contains(n)
+                || n.equals("Future") || n.equals("Duration") || n.equals("Iterable")
+                || stubs.topLevelVars.containsKey(n) || libraryStubFunction(n, ctx) != null;
+    }
 
     private Out resolveTopLevel(String n, Ctx ctx) {
         return resolveTopLevel(n, null, ctx);
@@ -8257,9 +8348,11 @@ public final class JavaEmitter {
                 Ast.MethodDecl g = stubs.findMethod(cls, name, true);
                 if (g != null && g.isStatic) {
                     // Icons are methods in the runtime (see Icons.java: a field per icon
-                    // kept all 2,176 alive), so an icon read is a call.
+                    // kept all 2,176 alive), so an icon read is a call. So is
+                    // StackTrace.current: it captures the reader's frames, which a field cannot.
+                    boolean call = cls.equals("Icons") || (cls.equals("StackTrace") && name.equals("current"));
                     return new Out(stubSimpleName(cls, ctx) + "." + name
-                            + (cls.equals("Icons") ? "()" : ""), g.returnType);
+                            + (call ? "()" : ""), g.returnType);
                 }
                 // Material's style variants (`Icons.home_outlined`, `_rounded`, `_sharp`) are
                 // separate glyphs in Flutter's font; the icon font here has one glyph per
@@ -10352,9 +10445,10 @@ public final class JavaEmitter {
             String var = ctx.declareShadowSafe(cc.exceptionVar != null ? cc.exceptionVar : "$e", varType);
             w.line(bindType + " " + var + " = " + bindValue + ";");
             if (cc.stackVar != null) {
-                // stack traces are not modeled; bind the name for compilation
-                String stackJn = ctx.declareShadowSafe(cc.stackVar, TypeRef.DYNAMIC);
-                w.line("Object " + stackJn + " = null;");
+                // The caught exception's own trace: the one an async error carried
+                // (completeError/addError), else the Java frames of the throwable.
+                String stackJn = ctx.declareShadowSafe(cc.stackVar, new TypeRef("StackTrace"));
+                w.line("dart.core.StackTrace " + stackJn + " = dart.core.StackTrace.ofThrown(" + caught + ");");
             }
             String outerRethrow = ctx.rethrowTarget;
             ctx.rethrowTarget = caught;
@@ -10833,14 +10927,23 @@ public final class JavaEmitter {
 
     private Out emitLambda(Lambda l, TypeRef expected, Ctx ctx) {
         if (expected != null && expected.funcParams == null && expected.funcReturn == null
-                && (expected.is("Object") || isDynamicType(expected))) {
+                && (expected.is("Object") || expected.is("Function") || isDynamicType(expected))) {
+            // A bare `Function` slot (a tear-off adapter's optional parameter) erases to
+            // Object too.
             // A closure handed to an Object/dynamic slot (a named argument through a
             // full-arity tear-off local, `dec(s, reviver: (k, v) => ..)`): Object is not a
             // functional interface, so bind it to its own Funcs SAM first.
-            Out o = emitLambda(l, null, ctx);
-            if (o.type != null && (o.type.funcParams != null || o.type.funcReturn != null)
-                    && !o.code.startsWith("((")) {
-                return new Out("((" + javaType(o.type, false, ctx) + ") " + o.code + ")", o.type);
+            // A lambda's own Out type is a bare Function, so its SAM is built from its
+            // parameters (declared or dynamic) and a dynamic result.
+            TypeRef own = new TypeRef("Function");
+            own.funcParams = new ArrayList<TypeRef>();
+            for (Param p : l.params) {
+                own.funcParams.add(p.type == null || p.type.is("var") ? TypeRef.DYNAMIC : p.type);
+            }
+            own.funcReturn = TypeRef.DYNAMIC;
+            Out o = emitLambda(l, own, ctx);
+            if (!o.code.startsWith("((")) {
+                return new Out("((" + javaType(own, false, ctx) + ") " + o.code + ")", own);
             }
             return o;
         }
@@ -11789,7 +11892,10 @@ public final class JavaEmitter {
                     return new Out("CoreStatics.futureSync(" + f.code + ")", TypeRef.of("Future", TypeRef.DYNAMIC));
                 }
                 if (n.equals("error")) {
-                    return new Out("Future.error(" + emitExpr(c.args.positional.get(0), null, ctx).code + ")",
+                    // Future.error(e, stackTrace): the trace travels with the error.
+                    return new Out("Future.error(" + emitExpr(c.args.positional.get(0), null, ctx).code
+                            + (c.args.positional.size() > 1
+                                    ? ", " + emitExpr(c.args.positional.get(1), null, ctx).code : "") + ")",
                             TypeRef.of("Future", TypeRef.DYNAMIC));
                 }
                 if (n.equals("delayed")) {
@@ -12725,8 +12831,13 @@ public final class JavaEmitter {
                 // skipped it and the chain stayed failed.
                 for (NamedArg na : c.args.named) {
                     if (na.name.equals("onError")) {
+                        // (error, stackTrace) handlers take the two-argument shapes.
+                        boolean two = na.value instanceof Lambda && ((Lambda) na.value).params.size() == 2;
                         String handler = pinnedHandler(na.value, emitExpr(na.value, null, ctx), true,
-                                "dart.runtime.Funcs.Func1<Object, Object>", "dart.runtime.Funcs.VoidFunc1<Object>");
+                                two ? "dart.runtime.Funcs.Func2<Object, Object, Object>"
+                                        : "dart.runtime.Funcs.Func1<Object, Object>",
+                                two ? "dart.runtime.Funcs.VoidFunc2<Object, Object>"
+                                        : "dart.runtime.Funcs.VoidFunc1<Object>");
                         return new Out(target.code + ".then(" + cbCode + ", (Object) " + paren(handler) + ")",
                                 TypeRef.of("Future", TypeRef.DYNAMIC));
                     }
@@ -12908,7 +13019,8 @@ public final class JavaEmitter {
                     TypeRef.of("Future", v.type));
         }
         if (ctor.equals("error")) {
-            return new Out("Future.error(" + emitExpr(pos.get(0), null, ctx).code + ")",
+            return new Out("Future.error(" + emitExpr(pos.get(0), null, ctx).code
+                    + (pos.size() > 1 ? ", " + emitExpr(pos.get(1), null, ctx).code : "") + ")",
                     TypeRef.of("Future", TypeRef.DYNAMIC));
         }
         return null;
@@ -16640,6 +16752,13 @@ public final class JavaEmitter {
         // Dart has it implement List: every implementation is a typed list, so it casts.
         if (o.type != null && o.type.is("TypedDataList") && (target.is("List") || target.is("Iterable"))) {
             return "((" + javaType(target, false, ctx) + ") (Object) " + paren(o.code) + ")";
+        }
+        // Dart's StreamSink and EventSink are Sinks; in Java their close() answers a Future
+        // where Sink's is void, so the interfaces cannot be related and Sink.of adapts.
+        if (o.type != null && target.is("Sink") && (o.type.is("StreamSink") || o.type.is("EventSink")
+                || o.type.is("IOSink") || o.type.is("StreamController"))) {
+            ctx.importClass("dart.async.Sink");
+            return "Sink.of(" + o.code + ")";
         }
         // A Dart `double` value reaching a Dart `int` target only happens through stub
         // imprecision (e.g. math.max/min typed to return double): Dart itself forbids the

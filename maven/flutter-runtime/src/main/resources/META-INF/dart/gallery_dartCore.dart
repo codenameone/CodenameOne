@@ -235,8 +235,17 @@ class Completer<T> {
   external static Completer sync();
   external Future<T> get future;
   external void complete([T? value]);
-  external void completeError(Object error);
+  external void completeError(Object error, [StackTrace? stackTrace]);
   external bool get isCompleted;
+}
+
+// dart:core's StackTrace: current captures the Java frames; traces travel with async errors.
+@JavaName('dart.core.StackTrace')
+class StackTrace {
+  external static StackTrace get current;
+  external static StackTrace get empty;
+  external static StackTrace fromString(String stackTraceString);
+  external String toString();
 }
 
 // The eventual-value type — dart:async's `Future<T>`. `await`, the named
