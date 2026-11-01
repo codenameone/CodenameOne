@@ -2519,7 +2519,8 @@ class MaterialApp extends Widget {
 
 @JavaName('com.codename1.flutter.material.Scaffold')
 class Scaffold extends Widget {
-  external Scaffold({Key? key, Widget? appBar, Widget? body, Widget? floatingActionButton, Widget? drawer, Widget? bottomNavigationBar});
+  external Scaffold({Key? key, Widget? appBar, Widget? body, Widget? floatingActionButton, Widget? drawer, Widget? bottomNavigationBar,
+      List<Widget>? persistentFooterButtons});
   external static ScaffoldState of(BuildContext context);
 }
 
@@ -2737,7 +2738,7 @@ class Image extends Widget {
 
 @JavaName('com.codename1.flutter.widgets.Stack')
 class Stack extends Widget {
-  external Stack({Key? key, Alignment? alignment, List<Widget> children});
+  external Stack({Key? key, AlignmentGeometry? alignment, List<Widget> children});
 }
 
 @JavaName('com.codename1.flutter.widgets.Positioned')

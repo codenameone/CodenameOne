@@ -215,7 +215,7 @@ class FadeTransition extends Widget {
 
 @JavaName('com.codename1.flutter.animation.ScaleTransition')
 class ScaleTransition extends Widget {
-  external ScaleTransition({Key? key, Animation<double> scale, Alignment? alignment, Widget? child});
+  external ScaleTransition({Key? key, Animation<double> scale, AlignmentGeometry? alignment, Widget? child});
 }
 
 @JavaName('com.codename1.flutter.animation.SlideTransition')
@@ -225,7 +225,7 @@ class SlideTransition extends Widget {
 
 @JavaName('com.codename1.flutter.animation.RotationTransition')
 class RotationTransition extends Widget {
-  external RotationTransition({Key? key, Animation<double> turns, Alignment? alignment, Widget? child});
+  external RotationTransition({Key? key, Animation<double> turns, AlignmentGeometry? alignment, Widget? child});
 }
 
 @JavaName('com.codename1.flutter.animation.PositionedTransition')

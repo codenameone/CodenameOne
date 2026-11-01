@@ -799,7 +799,14 @@ public class Stream<T> {
 
     /// {@code Stream.eventTransformed(source, mapSink)}: every event of {@code source}
     /// goes to the sink {@code mapSink} builds over the output stream's sink.
-    public static <T> Stream<T> eventTransformed(final Stream<?> source, final Funcs.Func1<Object, Object> mapSink) {
+    ///
+    /// The sink is {@code ? super StreamSink<T>}, not {@code Object}: a typed
+    /// {@code (EventSink<T>) -> EventSink<S>} closure and a static method over raw sinks
+    /// ({@code static EventSink make(EventSink sink)}) must both bind, as they do in Dart.
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public static <T> Stream<T> eventTransformed(final Stream<?> source,
+            final Funcs.Func1<? super StreamSink<T>, ?> typedMapSink) {
+        final Funcs.Func1 mapSink = typedMapSink;
         final StreamController<T> out = new StreamController<T>();
         out.onListen(new Funcs.VoidFunc0() {
             @Override

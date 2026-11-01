@@ -32,10 +32,14 @@ public interface StreamTransformer<S, T> {
     Stream<T> bind(Stream<S> stream);
 
     /// {@code StreamTransformer.fromHandlers(handleData:, handleError:, handleDone:)}.
+    /// The handlers take {@code ? super} sinks: Dart's {@code void f(EventSink sink)} -- a
+    /// raw sink -- is a valid {@code handleDone} for any {@code T}, as it is in Dart.
+    @SuppressWarnings("unchecked")
     static <S, T> StreamTransformer<S, T> fromHandlers(
-            dart.runtime.Funcs.VoidFunc2<S, StreamSink<T>> handleData, Object handleError,
-            dart.runtime.Funcs.VoidFunc1<StreamSink<T>> handleDone) {
-        return new SinkTransformer<S, T>(handleData, handleError, handleDone);
+            dart.runtime.Funcs.VoidFunc2<S, ? super StreamSink<T>> handleData, Object handleError,
+            dart.runtime.Funcs.VoidFunc1<? super StreamSink<T>> handleDone) {
+        return new SinkTransformer<S, T>((dart.runtime.Funcs.VoidFunc2<S, StreamSink<T>>) (Object) handleData,
+                handleError, (dart.runtime.Funcs.VoidFunc1<StreamSink<T>>) (Object) handleDone);
     }
 
     /// The unnamed factory {@code StreamTransformer(onListen)}: each listen on a bound stream

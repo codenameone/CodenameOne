@@ -11,12 +11,12 @@ Iterable<T> expandAll<E, T>(List<E> xs, Iterable<T> Function(E) f) =>
 
 extension Pairs<T> on Stream<T> {
   Stream<List<T>> pairs() {
-    final slice = <T>[];
+    var slice = <T>[];
     return transform(StreamTransformer.fromHandlers(handleData: (data, sink) {
       slice.add(data);
       if (slice.length == 2) {
         sink.add(List<T>.of(slice));
-        slice.clear();
+        slice = [];
       }
     }, handleDone: (sink) {
       if (slice.isNotEmpty) sink.add(slice);

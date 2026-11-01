@@ -1053,6 +1053,7 @@ public final class JavaEmitter {
             ctx.syncStarElem = elem;
         }
         ctx.methodReturnType = TypeRef.VOID;
+        ctx.beginBodyCaptures(m.body, null);
         ctx.indent(1);
         ctx.pushScope();
         emitStatements(m.body, ctx);
@@ -3353,6 +3354,7 @@ public final class JavaEmitter {
             w.line(superNamedInit);
         }
         if (ct.body != null) {
+            ctx.beginBodyCaptures(ct.body, null);
             emitStatements(ct.body, ctx);
         }
         ctx.witnessLocals = savedWitnessLocals;
@@ -3404,6 +3406,7 @@ public final class JavaEmitter {
         ctx.witnessLocals = new HashSet<String>(witnessParams(c));
         ctx.staticMember = true;
         if (ct.body != null) {
+            ctx.beginBodyCaptures(ct.body, null);
             emitStatements(ct.body, ctx);
         }
         ctx.witnessLocals = savedWitnessLocals;
@@ -3574,6 +3577,7 @@ public final class JavaEmitter {
             }
         }
         if (ct.body != null) {
+            ctx.beginBodyCaptures(ct.body, null);
             emitStatements(ct.body, ctx);
         }
     }
@@ -5072,10 +5076,7 @@ public final class JavaEmitter {
         ctx.pushWriter(2);
         ctx.methodReturnType = rt;
         ctx.inAsyncBody = m.isAsync;
-        ctx.boxedLocals.clear();
-        ctx.clearBoxed();
-        ctx.boxedLocals.addAll(m.body != null
-                ? CaptureScan.boxedLocals(m.body) : CaptureScan.boxedLocals(m.exprBody));
+        ctx.beginBodyCaptures(m.body, m.exprBody);
         ctx.valueCalledLocals.clear();
         ctx.valueCalledLocals.addAll(CaptureScan.valueCalledNames(m.body, m.exprBody));
         if (m.isAsyncStar && !m.isSetter) {
@@ -5287,6 +5288,9 @@ public final class JavaEmitter {
      * extension method was a Java {@code return;} in a method returning Future.
      */
     private void emitMemberBody(MethodDecl m, TypeRef rt, Ctx ctx) {
+        // Extension and mixin members reach here without the class-member path, so the
+        // locals a closure reassigns are boxed here too (javac: "effectively final").
+        ctx.beginBodyCaptures(m.body, m.exprBody);
         boolean savedAsync = ctx.inAsyncBody;
         ctx.inAsyncBody = m.isAsync;
         boolean asyncFuture = m.isAsync && (rt.is("Future") || rt.is("FutureOr"));
@@ -20005,6 +20009,30 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 return found;
             }
         }
+        // Named arguments bind too (`fromHandlers(handleData: typedField)`); a closure
+        // literal is still left to the call's expected type, as above.
+        for (Ast.Param prm : params) {
+            if (!prm.named || prm.type == null
+                    || !mentionsAnyTypeParam(prm.type, java.util.Collections.singletonList(p))) {
+                continue;
+            }
+            for (NamedArg na : args.named) {
+                if (!prm.name.equals(na.name) || na.value instanceof Lambda) {
+                    continue;
+                }
+                Expr bare = na.value;
+                while (bare instanceof ParenExpr) {
+                    bare = ((ParenExpr) bare).inner;
+                }
+                if (bare instanceof Lambda || bare instanceof ListLit || bare instanceof SetLit) {
+                    continue;
+                }
+                TypeRef found = unifyTypeParam(p, prm.type, inferExprTypeQuiet(bare, ctx));
+                if (found != null && !isDynamicType(found) && !found.is("var")) {
+                    return found;
+                }
+            }
+        }
         return null;
     }
 
@@ -20065,7 +20093,8 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 factoryWitnessPartial = true;
             }
         }
-        if (fromExpected && m.typeParams.isEmpty() && mentionsAnyTypeParam(m.returnType, sc.typeParams)) {
+        if (fromExpected && m.typeParams.isEmpty()
+                && mentionsAnyTypeParam(m.returnType, sc.typeParams)) {
             // Bound only by the context, javac cannot do the same: an untyped closure
             // argument is not pertinent to its inference, and the target is itself a
             // generic call's parameter. The runtime static declares the class's
@@ -20159,6 +20188,18 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         }
         if (formal.args.isEmpty() && formal.funcParams == null && formal.name.equals(p)) {
             return actual;
+        }
+        if (formal.funcParams != null && actual.funcParams != null
+                && formal.funcParams.size() == actual.funcParams.size()) {
+            // A function-typed argument binds through its signature (`handleData:` of a
+            // `void Function(T, EventSink<T>)` field binds fromHandlers' T), as Dart's does.
+            for (int i = 0; i < formal.funcParams.size(); i++) {
+                TypeRef r = unifyTypeParam(p, formal.funcParams.get(i), actual.funcParams.get(i));
+                if (r != null) {
+                    return r;
+                }
+            }
+            return unifyTypeParam(p, formal.funcReturn, actual.funcReturn);
         }
         boolean sameHead = formal.name.equals(actual.name)
                 || (formal.is("Iterable") && ITERABLE_LIKE.contains(actual.name));
@@ -20864,9 +20905,13 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         Call call = new Call();
         call.target = recv;
         call.name = name;
-        if (recv != null && !(recv instanceof ThisExpr)) {
+        boolean classRecv = recv instanceof Ident && ((Ident) recv).typeArgs == null
+                && ctx.lookup(((Ident) recv).name) == null
+                && program.resolveClass(((Ident) recv).name, ctx.library()) != null;
+        if (recv != null && !(recv instanceof ThisExpr) && !classRecv) {
             // Dart reads the receiver once, at the tear-off: bind it rather than re-read
-            // the chain on each call (see emitBoundTearOff).
+            // the chain on each call (see emitBoundTearOff). A class name
+            // (`onError: Failure.new`, a static) is not a value and is never bound.
             l.boundRecv = recv;
             l.boundName = "$tear" + (tearOffSeq++);
             Ident bound = new Ident();
@@ -22888,7 +22933,22 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         }
         tearOffReturn = null;
         if (!simple || ft.funcParams.size() > 5 || (!tps.isEmpty() && typeArgs.isEmpty())) {
-            // an uninstantiated generic constructor is left for the call site to target-type
+            // an uninstantiated generic constructor is left for the call site to target-type.
+            // Its body is a block that returns, so it is not also void-compatible: as a bare
+            // `new C<>(p)` expression it matched both Future.then(Func1) and then(VoidFunc1)
+            // and the call was ambiguous (`f.then(Success.new)`).
+            if (body instanceof CtorCall) {
+                ReturnStmt rs = new ReturnStmt();
+                rs.line = posNode.line;
+                rs.col = posNode.col;
+                rs.value = body;
+                Block b = new Block();
+                b.line = posNode.line;
+                b.col = posNode.col;
+                b.statements.add(rs);
+                l.exprBody = null;
+                l.body = b;
+            }
             return emitExpr(l, null, ctx);
         }
         Out lo = emitExpr(l, ft, ctx);
@@ -23264,6 +23324,18 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                     + quote(target.toString()) + ")";
             return jt.equals(erased) ? as : "((" + jt + ") " + as + ")";
         }
+        // A Future whose element we inferred less precisely than Dart (`a.then((_) => task())
+        // .whenComplete(c.complete)` is a Future<T> in Dart, a Future<Object> here) into a
+        // Future<T> slot. Dart allows no implicit Future<dynamic> to Future<T> narrowing, so
+        // a valid program reaching here only lost the element to our inference; the Java
+        // object is the same erased Future, retyped through Object.
+        if (o.type != null && o.type.is("Future") && target.is("Future") && o.type.args.size() == 1
+                && target.args.size() == 1 && o.code.endsWith(")")
+                && (isDynamicType(o.type.args.get(0)) || o.type.args.get(0).is("Object"))
+                && !isDynamicType(target.args.get(0)) && !target.args.get(0).is("Object")
+                && !target.args.get(0).is("void")) {
+            return "(" + javaType(copyNonNull(target), false, ctx) + ") (Object) " + paren(o.code);
+        }
         // The same implicit downcast for a dynamic local or parameter (a closure's untyped
         // `(error, stackTrace)` handed on to `completeError(Object, StackTrace)`): its Java
         // type is Object, which javac will not narrow by itself. Only a bare name of an
@@ -23316,14 +23388,29 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 voidSlot.funcReturn = sig[sig.length - 1];
             }
         }
-        if (o.type != null && o.type.funcParams != null && voidSlot != null && voidSlot.funcParams != null
-                && o.type.funcParams.size() == voidSlot.funcParams.size()
-                && o.type.funcReturn != null && !o.type.funcReturn.is("void")
+        // The value's own type can be a typedef too (a `ZoneCallback` field, raw: its R is
+        // dynamic), which has no signature until it is expanded the same way.
+        TypeRef valueFn = o.type;
+        if (valueFn != null && valueFn.funcParams == null && valueFn.funcReturn == null
+                && !valueFn.is("Function")) {
+            TypeRef[] vsig = typedefSig(valueFn.name);
+            valueFn = null;
+            if (vsig != null && vsig.length > 0) {
+                valueFn = new TypeRef("Function");
+                valueFn.funcParams = new ArrayList<TypeRef>(java.util.Arrays.asList(vsig).subList(0, vsig.length - 1));
+                TypeRef vr = vsig[vsig.length - 1];
+                valueFn.funcReturn = vr == null || (vr.args.isEmpty() && vr.funcParams == null
+                        && typedefDecl(o.type.name) != null && typedefDecl(o.type.name).typeParams.contains(vr.name)) ? TypeRef.DYNAMIC : vr;
+            }
+        }
+        if (valueFn != null && valueFn.funcParams != null && voidSlot != null && voidSlot.funcParams != null
+                && valueFn.funcParams.size() == voidSlot.funcParams.size()
+                && valueFn.funcReturn != null && !valueFn.funcReturn.is("void")
                 && voidSlot.funcReturn != null && voidSlot.funcReturn.is("void")
                 && !o.code.contains("::") && !o.code.contains("->")
                 && o.code.matches("(this\\.)?[A-Za-z_$][A-Za-z0-9_$.]*(\\(\\))?")) {
             String ts = funcSamTypeFromRefs(voidSlot.funcParams, TypeRef.VOID, ctx);
-            String os = funcSamTypeFromRefs(o.type.funcParams, o.type.funcReturn, ctx);
+            String os = funcSamTypeFromRefs(valueFn.funcParams, valueFn.funcReturn, ctx);
             if (!ts.equals(os) && ts.contains("VoidFunc")) {
                 return "(" + o.code + " == null ? null : (" + ts + ") " + paren(o.code) + "::call)";
             }
@@ -24238,6 +24325,17 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
 
         void clearBoxed() {
             boxedActive.clear();
+        }
+
+        /// Starts a function body: every local that a closure in it reads and that is
+        /// assigned anywhere in it is lowered to a box, since a Java lambda can capture
+        /// only effectively-final locals. Each emitter of a body calls this, so none
+        /// (constructor, extension member, generator) is left with a stale or empty set.
+        void beginBodyCaptures(Block body, Expr exprBody) {
+            boxedLocals.clear();
+            clearBoxed();
+            boxedLocals.addAll(body != null
+                    ? CaptureScan.boxedLocals(body) : CaptureScan.boxedLocals(exprBody));
         }
 
         private final List<Out> cascadeTargets = new ArrayList<Out>();
