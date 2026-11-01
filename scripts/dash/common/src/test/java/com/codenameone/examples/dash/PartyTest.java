@@ -59,9 +59,17 @@ public class PartyTest extends E2e {
             final RunView view = track();
             // The bot steers while the race warms up, so the shot is of the
             // race and not of a runner who hit the first barrier.
-            while (view.driver().run().tick() < 60 * 6 && !driveFor(view, 200)) {
+            // A race only moves as the server stamps ticks, so a stalled one
+            // would spin here until the suite's timeout killed the test with
+            // no word of why; give it half a minute and say where it stood.
+            long give = System.currentTimeMillis() + 30000;
+            while (view.driver().run().tick() < 60 * 6 && System.currentTimeMillis() < give
+                    && !driveFor(view, 200)) {
                 // keep running
             }
+            int tick = view.driver().run().tick();
+            assertTrue(tick >= 60 * 6 || view.driver().run().over(),
+                    "the race reached tick " + tick + " of " + 60 * 6 + " in 30 s");
             guest.emote("wow");
             guest.say("Catch me if you can!");
             click("emote-wave");
