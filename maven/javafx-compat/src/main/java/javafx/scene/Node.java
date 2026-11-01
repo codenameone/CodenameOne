@@ -1775,6 +1775,13 @@ public abstract class Node implements EventTarget, Styleable, StyleTarget, Dirty
 
     // ------------------------------------------------------------ events
 
+    /// Returns whether a handler or filter on this node listens for a press,
+    /// release or click, so that its peer offers an accessibility action
+    /// that taps it.
+    public final boolean cn1HandlesClicks() {
+        return events != null && events.handlesClicks();
+    }
+
     /// Returns the filters and handlers of this node.
     protected final EventHandlerManager cn1Events() {
         if (events == null) {

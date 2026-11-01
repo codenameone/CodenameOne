@@ -27,6 +27,7 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.Transform;
+import com.codename1.ui.accessibility.AccessibilityNode;
 import com.codename1.ui.events.WheelEvent;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.Layout;
@@ -61,6 +62,11 @@ public class ParentPeer extends Container implements FxPeer {
         PeerPaint.strip(this);
         setScrollable(false);
         setFocusable(false);
+    }
+
+    @Override
+    public AccessibilityNode getSemantics() {
+        return Activation.sync(this, node, super.getSemantics());
     }
 
     @Override

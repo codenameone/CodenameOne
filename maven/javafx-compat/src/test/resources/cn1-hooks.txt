@@ -17,6 +17,7 @@ javafx.scene.Node#cn1SetEffectCache
 javafx.scene.Node#cn1Events
 javafx.scene.Node#cn1FocusRequested
 javafx.scene.Node#cn1GeometryChanged
+javafx.scene.Node#cn1HandlesClicks
 javafx.scene.Node#cn1HasPeer
 javafx.scene.Node#cn1HasPseudoClass
 javafx.scene.Node#cn1Matches

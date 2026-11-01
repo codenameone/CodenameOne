@@ -133,6 +133,24 @@ public final class EventHandlerManager implements EventDispatcher {
         remove(filters, type, filter);
     }
 
+    /// Returns whether anything here listens for a mouse press, release or
+    /// click.
+    public boolean handlesClicks() {
+        EventType<?>[] types = {MouseEvent.ANY, MouseEvent.MOUSE_PRESSED, MouseEvent.MOUSE_RELEASED,
+            MouseEvent.MOUSE_CLICKED};
+        for (EventType<?> t : types) {
+            if (listens(handlers, t) || listens(filters, t) || (slots != null && getSlot(t) != null)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean listens(HashMap<EventType<?>, ArrayList<EventHandler<?>>> map, EventType<?> type) {
+        ArrayList<EventHandler<?>> list = map == null ? null : map.get(type);
+        return list != null && !list.isEmpty();
+    }
+
     /// Returns the property behind a convenience handler such as
     /// `onAction`, creating it the first time.
     @SuppressWarnings("unchecked")
