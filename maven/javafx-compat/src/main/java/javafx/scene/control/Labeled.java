@@ -197,6 +197,7 @@ public abstract class Labeled extends Control {
             // preferred size of the label covers both.
             Style base = UIManager.getInstance().getComponentStyle(label.getUIID());
             int[] room = g == null ? new int[GRAPHIC_BOX] : graphicBox(label, g);
+            System.arraycopy(room, 0, paddedRoom, 0, paddedRoom.length);
             style.setPaddingUnit(Style.UNIT_TYPE_PIXELS);
             if (bare) {
                 style.setPadding(room[0], room[1], room[2], room[3]);
@@ -215,6 +216,9 @@ public abstract class Labeled extends Control {
     }
 
     private static final int GRAPHIC_BOX = 9;
+    /// The room around the text the native label's padding was last set
+    /// to hold for the graphic, `{top, bottom, left, right}`.
+    private final int[] paddedRoom = new int[4];
 
     /// Whether a subclass places the graphic itself, as a cell does; this
     /// class then leaves the graphic and the padding of the label alone.
@@ -409,6 +413,15 @@ public abstract class Labeled extends Control {
         }
         com.codename1.ui.Label label = (com.codename1.ui.Label) c;
         int[] box = graphicBox(label, g);
+        if (box[0] != paddedRoom[0] || box[1] != paddedRoom[1] || box[2] != paddedRoom[2]
+                || box[3] != paddedRoom[3]) {
+            // The graphic changed size since the padding was set -- an icon
+            // whose font arrives in a style after the label was styled is
+            // the usual case. Placed by its new size beside text padded for
+            // the old one, a wider icon was drawn over the first letters.
+            cn1SyncNative();
+            requestLayout();
+        }
         Style base = UIManager.getInstance().getComponentStyle(label.getUIID());
         Insets in = getInsets();
         // The area the label lays its content out in, less the room made
