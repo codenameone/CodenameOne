@@ -749,7 +749,17 @@ public final class DartRuntime {
             return own.equals(e.name()) ? e.getDeclaringClass().getSimpleName() + "." + own : own;
         }
         if (v instanceof Class<?> c) {
-            // A Dart Type (`runtimeType`) is a Class here; Dart prints the bare type name.
+            // A Dart Type (`runtimeType`, a type witness) is a Class here; Dart prints the
+            // bare Dart type name, which for the boxed core types is not the Java one.
+            if (c == Long.class || c == Integer.class) {
+                return "int";
+            }
+            if (c == Double.class) {
+                return "double";
+            }
+            if (c == Boolean.class) {
+                return "bool";
+            }
             return c.getSimpleName();
         }
         return v.toString();

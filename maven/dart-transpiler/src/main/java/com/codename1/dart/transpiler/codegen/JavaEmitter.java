@@ -831,6 +831,7 @@ public final class JavaEmitter {
             m.typeParamBounds = f.typeParamBounds;
             m.body = f.body;
             m.exprBody = f.exprBody;
+            m.witnesses = methodWitnesses(f);
             body.append(emitMethodLike(m, ctx, false));
         }
         return finishClassFile(cls, "public final class " + cls, null, null,
@@ -1174,6 +1175,7 @@ public final class JavaEmitter {
             mm.typeParamBounds = m.typeParamBounds;
             mm.body = m.body;
             mm.exprBody = m.exprBody;
+            mm.witnesses = methodWitnesses(m);
             if (!c.isMixin) {
                 mm.javaReturn = interfacePinnedReturn(c, m, ctx);
             }
@@ -1309,6 +1311,7 @@ public final class JavaEmitter {
             mm.typeParamBounds = m.typeParamBounds;
                     mm.body = m.body;
                     mm.exprBody = m.exprBody;
+                    mm.witnesses = methodWitnesses(m);
                     body.append(emitMethodLike(mm, ctx, false));
                 }
             }
@@ -2717,6 +2720,8 @@ public final class JavaEmitter {
         List<Param> params = new ArrayList<Param>();
         Block body;
         Expr exprBody;
+        /** The type parameters this method takes a hidden leading TypeWitness for. */
+        List<String> witnesses = java.util.Collections.emptyList();
     }
 
     /**
@@ -3070,9 +3075,12 @@ public final class JavaEmitter {
         boolean savedStatic = ctx.staticMember;
         ctx.methodTypeParams = m.typeParams == null ? null : new HashSet<String>(m.typeParams);
         ctx.staticMember = m.isStatic;
+        java.util.Set<String> savedWl = ctx.witnessLocals;
+        ctx.witnessLocals = m.witnesses.isEmpty() ? null : new HashSet<String>(m.witnesses);
         try {
             return emitMethodLikeBody(m, ctx, classIsAbstract);
         } finally {
+            ctx.witnessLocals = savedWl;
             ctx.methodTypeParamBounds = savedBounds;
             ctx.methodTypeParams = savedTps;
             ctx.staticMember = savedStatic;
@@ -3126,6 +3134,11 @@ public final class JavaEmitter {
         // The Java parameter list and names, kept for a sync* body's helper method.
         StringBuilder paramDecls = new StringBuilder();
         StringBuilder paramNames = new StringBuilder();
+        for (String tw : m.witnesses) {
+            sb.append("dart.runtime.TypeWitness $tw$").append(tw).append(m.params.isEmpty() ? "" : ", ");
+            paramDecls.append(", dart.runtime.TypeWitness $tw$").append(tw);
+            paramNames.append(", $tw$").append(tw);
+        }
         for (int i = 0; i < m.params.size(); i++) {
             Param p = m.params.get(i);
             TypeRef pt = p.type == null || p.type.is("var") ? TypeRef.DYNAMIC : p.type;
@@ -5382,7 +5395,21 @@ public final class JavaEmitter {
             return new Out("DartRuntime.throwValue(" + v.code + ")", TypeRef.DYNAMIC);
         }
         if (e instanceof AwaitExpr) {
-            Out o = emitExpr(((AwaitExpr) e).operand, null, ctx);
+            Expr operand = ((AwaitExpr) e).operand;
+            Call savedFor = ctx.callExpectedFor;
+            TypeRef savedExp = ctx.callExpected;
+            if (operand instanceof Call && expected != null) {
+                // Only for a generic call's witness inference: `Box<int> b = await open(..)`.
+                ctx.callExpectedFor = (Call) operand;
+                ctx.callExpected = TypeRef.of("Future", expected);
+            }
+            Out o;
+            try {
+                o = emitExpr(operand, null, ctx);
+            } finally {
+                ctx.callExpectedFor = savedFor;
+                ctx.callExpected = savedExp;
+            }
             // Awaiting a void-typed operand (e.g. a `void` stub call) yields nothing; wrapping it
             // in Await.await$(...) is a "void not allowed here" error, so emit the bare call.
             if (o.type != null && o.type.is("void")) {
@@ -5818,11 +5845,18 @@ public final class JavaEmitter {
                 || c.enumOf != null || !isProgramClassDecl(c)) {
             return java.util.Collections.emptyList();
         }
+        indexMethods();
         List<String> cached = witnessCache.get(c);
         if (cached != null) {
             return cached;
         }
         witnessCache.put(c, java.util.Collections.<String>emptyList());
+        List<String> out = computeClassWitnesses(c);
+        witnessCache.put(c, out);
+        return out;
+    }
+
+    private List<String> computeClassWitnesses(ClassDecl c) {
         java.util.Set<String> used = new HashSet<String>();
         java.util.Set<String> tps = new HashSet<String>(c.typeParams);
         java.util.Set<Object> seen = java.util.Collections.newSetFromMap(
@@ -5857,7 +5891,6 @@ public final class JavaEmitter {
                 out.add(n);
             }
         }
-        witnessCache.put(c, out);
         return out;
     }
 
@@ -5897,6 +5930,31 @@ public final class JavaEmitter {
         if (o instanceof Ident && tps.contains(((Ident) o).name)) {
             used.add(((Ident) o).name);
         }
+        if (o instanceof Call && !((Call) o).typeArgs.isEmpty()) {
+            Call call = (Call) o;
+            for (int i = 0; i < call.typeArgs.size(); i++) {
+                TypeRef a = call.typeArgs.get(i);
+                if (a != null && a.args.isEmpty() && tps.contains(a.name) && callNeedsWitness(call, i)) {
+                    used.add(a.name);
+                }
+            }
+        }
+        if (o instanceof Call && ((Call) o).typeArgs.isEmpty() && ((Call) o).name != null
+                && calleeTakesWitness((Call) o)) {
+            // `registerAdapter(Adapter<T>(...))`: the callee infers its witness from T.
+            collectTypeNames(((Call) o).args, tps, used, 0);
+            implicitWitnessCalls++;
+        }
+        if (o instanceof CtorCall && ((CtorCall) o).type != null) {
+            TypeRef ct = ((CtorCall) o).type;
+            ClassDecl pc = program.classes.get(ct.name);
+            for (int i = 0; pc != null && i < ct.args.size() && i < pc.typeParams.size(); i++) {
+                TypeRef a = ct.args.get(i);
+                if (a.args.isEmpty() && tps.contains(a.name) && witnessParams(pc).contains(pc.typeParams.get(i))) {
+                    used.add(a.name);
+                }
+            }
+        }
         if (o instanceof IsTest) {
             TypeRef t = ((IsTest) o).type;
             if (t != null && t.args.isEmpty() && tps.contains(t.name)) {
@@ -5926,17 +5984,487 @@ public final class JavaEmitter {
         }
     }
 
+    // ---- generic METHOD witnesses ------------------------------------------------------
+    //
+    // A generic method, function or static whose body uses one of its OWN type parameters as
+    // a value -- or hands it on to something that does (a witnessed class, another witnessed
+    // generic, whereType<T>) -- takes a hidden leading dart.runtime.TypeWitness per such
+    // parameter. Instance methods are decided per name and type-parameter count across every
+    // program class, so an override always has its overridden method's Java signature; a
+    // group with a member that overrides a RUNTIME method (List.cast, Iterable.whereType)
+    // takes none, because the runtime's signature cannot change, and its uses stay E0142.
+    // A call passes the written type arguments, else the ones inferred from the expected
+    // type and the argument types; with neither it is E0142, never a guessed witness.
+
+    private final java.util.Map<Object, List<String>> methodWitnessCache =
+            new java.util.IdentityHashMap<Object, List<String>>();
+    private java.util.Map<String, List<MethodDecl>> methodsByName;
+    /** Counts calls to a witnessed generic that write no type arguments (see the scan). */
+    private int implicitWitnessCalls;
+    private java.util.Map<MethodDecl, ClassDecl> methodOwners;
+
+    private void indexMethods() {
+        if (methodsByName != null) {
+            return;
+        }
+        methodsByName = new java.util.HashMap<String, List<MethodDecl>>();
+        methodOwners = new java.util.IdentityHashMap<MethodDecl, ClassDecl>();
+        java.util.Set<ClassDecl> all = java.util.Collections.newSetFromMap(
+                new java.util.IdentityHashMap<ClassDecl, Boolean>());
+        all.addAll(program.classes.values());
+        for (List<ClassDecl> l : program.classesByName.values()) {
+            all.addAll(l);
+        }
+        for (ClassDecl c : all) {
+            for (MethodDecl m : c.methods) {
+                methodOwners.put(m, c);
+                List<MethodDecl> l = methodsByName.get(m.name);
+                if (l == null) {
+                    l = new ArrayList<MethodDecl>();
+                    methodsByName.put(m.name, l);
+                }
+                l.add(m);
+            }
+        }
+        // Witness needs propagate along calls and super chains, which can be cyclic: start
+        // every class and generic method at "none" and recompute until nothing grows.
+        List<Object> decls = new ArrayList<Object>();
+        for (ClassDecl c : all) {
+            if (!c.typeParams.isEmpty()) {
+                witnessCache.remove(c);
+            }
+            for (MethodDecl m : c.methods) {
+                if (!m.typeParams.isEmpty()) {
+                    decls.add(m);
+                }
+            }
+        }
+        for (FunctionDecl f : program.functions.values()) {
+            if (!f.typeParams.isEmpty()) {
+                decls.add(f);
+            }
+        }
+        List<ClassDecl> generic = new ArrayList<ClassDecl>();
+        for (ClassDecl c : all) {
+            if (!c.typeParams.isEmpty()) {
+                witnessCache.put(c, java.util.Collections.<String>emptyList());
+                generic.add(c);
+            }
+        }
+        for (Object d : decls) {
+            methodWitnessCache.put(d, java.util.Collections.<String>emptyList());
+        }
+        boolean changed = true;
+        for (int round = 0; changed && round < 50; round++) {
+            changed = false;
+            for (ClassDecl c : generic) {
+                List<String> out = witnessParams(c).isEmpty() && (c.isMixin || c.extensionOn != null
+                        || c.enumOf != null || !isProgramClassDecl(c))
+                        ? java.util.Collections.<String>emptyList() : computeClassWitnesses(c);
+                if (!out.equals(witnessCache.put(c, out))) {
+                    changed = true;
+                }
+            }
+            for (Object d : decls) {
+                changed |= computeMethodWitnesses(d);
+            }
+        }
+    }
+
+    /** The type parameters of a MethodDecl or FunctionDecl that take a hidden witness. */
+    List<String> methodWitnesses(Object decl) {
+        List<String> tps = decl instanceof MethodDecl ? ((MethodDecl) decl).typeParams
+                : decl instanceof FunctionDecl ? ((FunctionDecl) decl).typeParams : null;
+        if (tps == null || tps.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        indexMethods();
+        List<String> cached = methodWitnessCache.get(decl);
+        if (cached != null) {
+            return cached;
+        }
+        computeMethodWitnesses(decl);
+        return methodWitnessCache.get(decl);
+    }
+
+    /** Computes (and caches) the witnesses of decl's override group; true when any grew. */
+    private boolean computeMethodWitnesses(Object decl) {
+        List<String> tps = decl instanceof MethodDecl ? ((MethodDecl) decl).typeParams
+                : ((FunctionDecl) decl).typeParams;
+        List<Object> group = new ArrayList<Object>();
+        boolean runtimeOverride = false;
+        if (decl instanceof MethodDecl && !((MethodDecl) decl).isStatic && methodOwners.containsKey(decl)) {
+            MethodDecl md = (MethodDecl) decl;
+            // The override group: same-named methods of classes related to a member by
+            // subtyping, closed transitively -- never an unrelated class's same name.
+            List<MethodDecl> cands = new ArrayList<MethodDecl>();
+            for (MethodDecl o : methodsByName.get(md.name)) {
+                if (!o.isStatic && o.typeParams.size() == tps.size() && o != md) {
+                    cands.add(o);
+                }
+            }
+            group.add(md);
+            boolean grew = true;
+            while (grew) {
+                grew = false;
+                for (java.util.Iterator<MethodDecl> it = cands.iterator(); it.hasNext();) {
+                    MethodDecl o = it.next();
+                    for (Object g : group) {
+                        ClassDecl a = methodOwners.get(g);
+                        ClassDecl b = methodOwners.get(o);
+                        if (isProgramSubtype(a, b) || isProgramSubtype(b, a)) {
+                            group.add(o);
+                            it.remove();
+                            grew = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            for (Object g : group) {
+                MethodDecl o = (MethodDecl) g;
+                runtimeOverride |= o.isOverride && !declaredInProgramSuper(methodOwners.get(o), o.name);
+            }
+        } else {
+            group.add(decl);
+        }
+        for (Object g : group) {
+            if (!methodWitnessCache.containsKey(g)) {
+                methodWitnessCache.put(g, java.util.Collections.<String>emptyList());
+            }
+        }
+        if (runtimeOverride) {
+            return false;
+        }
+        boolean changed = false;
+        boolean[] need = new boolean[tps.size()];
+        for (Object g : group) {
+            List<String> gt = g instanceof MethodDecl ? ((MethodDecl) g).typeParams : ((FunctionDecl) g).typeParams;
+            java.util.Set<String> used = new HashSet<String>();
+            java.util.Set<Object> seen = java.util.Collections.newSetFromMap(
+                    new java.util.IdentityHashMap<Object, Boolean>());
+            java.util.Set<String> set = new HashSet<String>(gt);
+            int implicitBefore = implicitWitnessCalls;
+            TypeRef gret = g instanceof MethodDecl ? ((MethodDecl) g).returnType : ((FunctionDecl) g).returnType;
+            if (g instanceof MethodDecl) {
+                MethodDecl m = (MethodDecl) g;
+                scanTypeValueUses(m.params, set, used, seen);
+                scanTypeValueUses(m.body, set, used, seen);
+                scanTypeValueUses(m.exprBody, set, used, seen);
+            } else {
+                FunctionDecl f = (FunctionDecl) g;
+                scanTypeValueUses(f.params, set, used, seen);
+                scanTypeValueUses(f.body, set, used, seen);
+                scanTypeValueUses(f.exprBody, set, used, seen);
+            }
+            if (implicitWitnessCalls != implicitBefore) {
+                // `return box(name);`: the callee infers its witness from this method's
+                // return type, so the type parameters that type names are needed too.
+                collectTypeNames(gret, set, used, 0);
+            }
+            for (int i = 0; i < gt.size(); i++) {
+                need[i] |= used.contains(gt.get(i));
+            }
+        }
+        for (Object g : group) {
+            List<String> gt = g instanceof MethodDecl ? ((MethodDecl) g).typeParams : ((FunctionDecl) g).typeParams;
+            List<String> out = new ArrayList<String>();
+            for (int i = 0; i < gt.size(); i++) {
+                if (need[i]) {
+                    out.add(gt.get(i));
+                }
+            }
+            List<String> old = methodWitnessCache.put(g, out);
+            changed |= old == null || !old.equals(out);
+        }
+        return changed;
+    }
+
+    /** Whether program class {@code sub} is {@code sup} or reaches it through program supertypes. */
+    private boolean isProgramSubtype(ClassDecl sub, ClassDecl sup) {
+        if (sub == null || sup == null) {
+            return false;
+        }
+        java.util.Set<ClassDecl> seen = java.util.Collections.newSetFromMap(
+                new java.util.IdentityHashMap<ClassDecl, Boolean>());
+        java.util.ArrayDeque<ClassDecl> work = new java.util.ArrayDeque<ClassDecl>();
+        work.add(sub);
+        while (!work.isEmpty()) {
+            ClassDecl k = work.poll();
+            if (k == sup) {
+                return true;
+            }
+            if (!seen.add(k)) {
+                continue;
+            }
+            List<TypeRef> sups = new ArrayList<TypeRef>(k.interfaces);
+            sups.addAll(k.mixins);
+            if (k.superclass != null) {
+                sups.add(k.superclass);
+            }
+            for (TypeRef t : sups) {
+                ClassDecl sc = program.classes.get(t.name);
+                if (sc != null) {
+                    work.add(sc);
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean declaredInProgramSuper(ClassDecl c, String name) {
+        java.util.Set<ClassDecl> seen = java.util.Collections.newSetFromMap(
+                new java.util.IdentityHashMap<ClassDecl, Boolean>());
+        java.util.ArrayDeque<ClassDecl> work = new java.util.ArrayDeque<ClassDecl>();
+        if (c != null) {
+            work.add(c);
+        }
+        boolean first = true;
+        while (!work.isEmpty()) {
+            ClassDecl k = work.poll();
+            if (!seen.add(k)) {
+                continue;
+            }
+            if (!first && k.method(name) != null) {
+                return true;
+            }
+            first = false;
+            List<TypeRef> sups = new ArrayList<TypeRef>(k.interfaces);
+            sups.addAll(k.mixins);
+            if (k.superclass != null) {
+                sups.add(k.superclass);
+            }
+            for (TypeRef t : sups) {
+                ClassDecl sc = program.classes.get(t.name);
+                if (sc != null) {
+                    work.add(sc);
+                }
+            }
+        }
+        return false;
+    }
+
+    /** Whether a call written with {@code <..., tp, ...>} at {@code idx} needs tp's witness. */
+    private boolean callNeedsWitness(Call c, int idx) {
+        if ("whereType".equals(c.name) && c.target != null) {
+            return true;
+        }
+        if (c.name == null) {
+            return false;
+        }
+        ClassDecl pc = c.target == null ? program.classes.get(c.name) : null;
+        if (pc != null) {
+            return idx < pc.typeParams.size() && witnessParams(pc).contains(pc.typeParams.get(idx));
+        }
+        FunctionDecl f = c.target == null ? program.functions.get(c.name) : null;
+        if (f != null && idx < f.typeParams.size() && methodWitnesses(f).contains(f.typeParams.get(idx))) {
+            return true;
+        }
+        indexMethods();
+        List<MethodDecl> ms = methodsByName.get(c.name);
+        if (ms != null) {
+            for (MethodDecl m : ms) {
+                if (idx < m.typeParams.size() && m.typeParams.size() == c.typeArgs.size()
+                        && methodWitnesses(m).contains(m.typeParams.get(idx))) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean calleeTakesWitness(Call c) {
+        FunctionDecl f = c.target == null ? program.functions.get(c.name) : null;
+        if (f != null) {
+            return !methodWitnesses(f).isEmpty();
+        }
+        List<MethodDecl> ms = methodsByName.get(c.name);
+        if (ms != null) {
+            for (MethodDecl m : ms) {
+                if (!methodWitnesses(m).isEmpty()) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** Adds every type-parameter name in tps written as a type argument inside o. */
+    private void collectTypeNames(Object o, java.util.Set<String> tps, java.util.Set<String> used, int depth) {
+        if (o == null || depth > 40) {
+            return;
+        }
+        if (o instanceof Ast.Args) {
+            Ast.Args a = (Ast.Args) o;
+            for (Expr e : a.positional) {
+                collectTypeNames(e, tps, used, depth + 1);
+            }
+            for (Ast.NamedArg na : a.named) {
+                collectTypeNames(na.value, tps, used, depth + 1);
+            }
+            return;
+        }
+        if (o instanceof TypeRef) {
+            TypeRef t = (TypeRef) o;
+            if (t.args.isEmpty() && tps.contains(t.name)) {
+                used.add(t.name);
+            }
+            for (TypeRef x : t.args) {
+                collectTypeNames(x, tps, used, depth + 1);
+            }
+            return;
+        }
+        if (o instanceof Call) {
+            for (TypeRef t : ((Call) o).typeArgs) {
+                collectTypeNames(t, tps, used, depth + 1);
+            }
+            collectTypeNames(((Call) o).args, tps, used, depth + 1);
+        } else if (o instanceof CtorCall) {
+            collectTypeNames(((CtorCall) o).type, tps, used, depth + 1);
+            collectTypeNames(((CtorCall) o).args, tps, used, depth + 1);
+        }
+    }
+
+    private static String withWitnesses(String w, String args) {
+        return args.isEmpty() ? stripTrailingComma(w) : w + args;
+    }
+
+    /**
+     * The leading witness arguments (each followed by ", ") of a call to the generic
+     * MethodDecl/FunctionDecl {@code decl}, or "" when it takes none.
+     */
+    private String methodWitnessCall(Object decl, Call c, TypeRef expected, Ctx ctx) {
+        List<String> ws = methodWitnesses(decl);
+        if (ws.isEmpty()) {
+            return "";
+        }
+        List<String> tps = decl instanceof MethodDecl ? ((MethodDecl) decl).typeParams : ((FunctionDecl) decl).typeParams;
+        List<Param> params = decl instanceof MethodDecl ? ((MethodDecl) decl).params : ((FunctionDecl) decl).params;
+        TypeRef ret = decl instanceof MethodDecl ? ((MethodDecl) decl).returnType : ((FunctionDecl) decl).returnType;
+        String name = decl instanceof MethodDecl ? ((MethodDecl) decl).name : ((FunctionDecl) decl).name;
+        Map<String, TypeRef> m = new LinkedHashMap<String, TypeRef>();
+        if (c.typeArgs.size() == tps.size()) {
+            for (int i = 0; i < tps.size(); i++) {
+                m.put(tps.get(i), c.typeArgs.get(i));
+            }
+        } else {
+            int pos = 0;
+            for (Param p : params) {
+                Expr a = null;
+                if (p.named) {
+                    for (Ast.NamedArg na : c.args.named) {
+                        if (na.name.equals(p.name)) {
+                            a = na.value;
+                        }
+                    }
+                } else if (pos < c.args.positional.size()) {
+                    a = c.args.positional.get(pos++);
+                }
+                if (a != null && !(a instanceof Lambda)) {
+                    TypeRef at = inferExprTypeQuiet(a, ctx);
+                    if ((at == null || at.is("dynamic")) && a instanceof Call && ((Call) a).target == null
+                            && ((Call) a).name != null && program.classes.containsKey(((Call) a).name)) {
+                        // An unannotated construction: its class, with what was written.
+                        at = new TypeRef(((Call) a).name);
+                        at.args.addAll(((Call) a).typeArgs);
+                    }
+                    unifyThroughSupers(p.type, at, tps, m, 0);
+                }
+            }
+            if (expected != null && ret != null) {
+                TypeRef r = ret;
+                TypeRef e = expected;
+                if (r.is("Future") && r.args.size() == 1 && !e.is("Future")) {
+                    r = r.args.get(0);
+                } else if (e.is("Future") && e.args.size() == 1 && !r.is("Future")) {
+                    e = e.args.get(0);
+                }
+                unifyTypeVars(asSuper(r, e.name, 0), e, tps, m);
+            }
+        }
+        StringBuilder sb = new StringBuilder();
+        for (String n : ws) {
+            TypeRef t = m.get(n);
+            String w = t == null ? null : witnessOf(t, ctx);
+            if (w == null) {
+                diags.error(c, "E0142", "Calling " + name + " needs its type argument '" + n
+                        + "' at run time (its body uses " + n + " as a value), and none is "
+                        + (t == null ? "written or inferable here" : "available for '" + t.name + "'")
+                        + ". Write the type argument explicitly at this call.");
+                w = "null";
+            }
+            sb.append(w).append(", ");
+        }
+        return sb.toString();
+    }
+
+    /** {@code t} as its program supertype named {@code name}, or t itself. */
+    private TypeRef asSuper(TypeRef t, String name, int depth) {
+        if (t == null || name == null || name.equals(t.name) || depth > 8) {
+            return t;
+        }
+        ClassDecl tc = program.classes.get(t.name);
+        if (tc == null) {
+            return t;
+        }
+        List<TypeRef> sups = new ArrayList<TypeRef>(tc.interfaces);
+        sups.addAll(tc.mixins);
+        if (tc.superclass != null) {
+            sups.add(tc.superclass);
+        }
+        List<TypeRef> args = new ArrayList<TypeRef>();
+        for (int i = 0; i < tc.typeParams.size(); i++) {
+            args.add(i < t.args.size() ? t.args.get(i) : TypeRef.DYNAMIC);
+        }
+        for (TypeRef s : sups) {
+            TypeRef r = asSuper(substTypeParams(s, tc.typeParams, args), name, depth + 1);
+            if (r != null && name.equals(r.name)) {
+                return r;
+            }
+        }
+        return t;
+    }
+
+    /** unifyTypeVars that also reads a program class argument as each of its supertypes. */
+    private void unifyThroughSupers(TypeRef p, TypeRef a, List<String> tps, Map<String, TypeRef> m, int depth) {
+        if (p == null || a == null || depth > 8) {
+            return;
+        }
+        if (p.name != null && !p.name.equals(a.name) && !tps.contains(p.name) && a.funcReturn == null) {
+            ClassDecl ac = program.classes.get(a.name);
+            if (ac != null) {
+                List<TypeRef> sups = new ArrayList<TypeRef>(ac.interfaces);
+                sups.addAll(ac.mixins);
+                if (ac.superclass != null) {
+                    sups.add(ac.superclass);
+                }
+                List<TypeRef> args = new ArrayList<TypeRef>();
+                for (int i = 0; i < ac.typeParams.size(); i++) {
+                    args.add(i < a.args.size() ? a.args.get(i) : TypeRef.DYNAMIC);
+                }
+                for (TypeRef s : sups) {
+                    unifyThroughSupers(p, substTypeParams(s, ac.typeParams, args), tps, m, depth + 1);
+                }
+                return;
+            }
+        }
+        unifyTypeVars(p, a, tps, m);
+    }
+
     private static String witnessField(ClassDecl owner, String tp) {
         return "$tw$" + owner.name.replace('.', '_') + "$" + tp;
     }
 
     /** The Java expression of the witness of type parameter {@code n} here, or null. */
     private String witnessFor(String n, Ctx ctx) {
-        if (n == null || (ctx.methodTypeParams != null && ctx.methodTypeParams.contains(n))) {
+        if (n == null) {
             return null;
         }
         if (ctx.witnessLocals != null && ctx.witnessLocals.contains(n)) {
             return "$tw$" + n;
+        }
+        if (ctx.methodTypeParams != null && ctx.methodTypeParams.contains(n)) {
+            return null;
         }
         ClassDecl c = ctx.currentClass;
         if (c == null || ctx.staticMember || !witnessParams(c).contains(n)) {
@@ -10181,6 +10709,24 @@ public final class JavaEmitter {
     // ==================================================================
 
     private Out emitCall(Call c, TypeRef expected, Ctx ctx) {
+        Call savedFor = ctx.callExpectedFor;
+        TypeRef savedExp = ctx.callExpected;
+        TypeRef awaited = savedFor == c ? savedExp : null;
+        ctx.callExpectedFor = c;
+        ctx.callExpected = expected != null ? expected : awaited;
+        try {
+            return emitCallWithExpected(c, expected, ctx);
+        } finally {
+            ctx.callExpectedFor = savedFor;
+            ctx.callExpected = savedExp;
+        }
+    }
+
+    private TypeRef callExpected(Call c, Ctx ctx) {
+        return ctx.callExpectedFor == c ? ctx.callExpected : null;
+    }
+
+    private Out emitCallWithExpected(Call c, TypeRef expected, Ctx ctx) {
         // closure value invocation: f(...) where f is a local of Function type
         if (c.name == null && c.target != null) {
             Out target = emitExpr(c.target, null, ctx);
@@ -10442,8 +10988,8 @@ public final class JavaEmitter {
             }
             if (m != null) {
                 String recv = m.isStatic ? cc.name : "this";
-                return new Out(recv + "." + n + "("
-                        + methodArgs(m.params, c.args, ctx) + ")",
+                return new Out(recv + "." + n + "(" + withWitnesses(methodWitnessCall(m, c, callExpected(c, ctx), ctx),
+                        methodArgs(m.params, c.args, ctx)) + ")",
                         m.returnType == null || m.returnType.is("var") ? TypeRef.DYNAMIC : m.returnType);
             }
             String stubSuper = nearestStubSuper(cc);
@@ -10511,7 +11057,8 @@ public final class JavaEmitter {
                     rt = substTypeParams(rt, fn.typeParams, bound);
                 }
             }
-            return new Out(cls + "." + jn + "(" + methodArgs(ps, c.args, ctx) + ")", rt);
+            return new Out(cls + "." + jn + "(" + withWitnesses(methodWitnessCall(fn, c, callExpected(c, ctx), ctx),
+                    methodArgs(ps, c.args, ctx)) + ")", rt);
         }
         // dart:core identical(a, b): unresolved before, so any use failed the build.
         if (n.equals("identical") && c.args.positional.size() == 2 && !program.functions.containsKey(n)) {
@@ -10758,13 +11305,15 @@ public final class JavaEmitter {
                 String jcls = javaClassName(pc);
                 MethodDecl m = pc.method(n);
                 if (m != null && m.isStatic) {
-                    return new Out(jcls + "." + n + "(" + methodArgs(m.params, c.args, ctx) + ")",
+                    return new Out(jcls + "." + n + "(" + withWitnesses(methodWitnessCall(m, c,
+                            callExpected(c, ctx), ctx), methodArgs(m.params, c.args, ctx)) + ")",
                             m.returnType == null ? TypeRef.DYNAMIC : m.returnType);
                 }
                 CtorDecl named = pc.namedCtor(n);
                 if (named != null) {
                     // named (or named factory) constructor -> static factory
-                    String tw = witnessArgs(pc, null, c, ctx);
+                    String tw = witnessArgs(pc, inferredWitnessTypeArgs(pc, c.typeArgs, callExpected(c, ctx)),
+                            c, ctx);
                     String na = canonicalArgs(named, c.args, ctx);
                     return new Out(jcls + "." + javaIdent(n) + "(" + (na.isEmpty() ? stripTrailingComma(tw)
                             : tw + na) + ")", new TypeRef(cls));
@@ -10811,14 +11360,19 @@ public final class JavaEmitter {
                 }
             }
             if (m != null) {
-                String callCode = target.code + "." + n + "(" + methodArgs(m.params, c.args, ctx) + ")";
+                String callCode = target.code + "." + n + "(" + withWitnesses(methodWitnessCall(m, c,
+                        callExpected(c, ctx), ctx), methodArgs(m.params, c.args, ctx)) + ")";
                 String pinned = pinnedCallBox(pc, m, ctx);
                 if (pinned != null) {
                     callCode = "((" + pinned + ") (Object) " + callCode + ")";
                 }
-                return new Out(callCode,
-                        m.returnType == null || m.returnType.is("var") ? TypeRef.DYNAMIC
-                                : asSeenFrom(m.returnType, m, m.typeParams, pc, tt));
+                TypeRef seen = m.returnType == null || m.returnType.is("var") ? TypeRef.DYNAMIC
+                        : asSeenFrom(m.returnType, m, m.typeParams, pc, tt);
+                if (!m.typeParams.isEmpty() && c.typeArgs.size() == m.typeParams.size()) {
+                    // `open<int>(..)`: the method's own type arguments, as written.
+                    seen = substTypeParams(seen, m.typeParams, c.typeArgs);
+                }
+                return new Out(callCode, seen);
             }
             // method inherited from the program class's stub superclass or a stub mixin
             // (e.g. a RestorableProperty subclass calling the inherited `dispose()`).
@@ -11318,6 +11872,13 @@ public final class JavaEmitter {
                 // null-witness branch above and silently filter nothing instead of only T.
                 // Diagnosed instead of lowered: see reportTypeVariableWitness.
                 TypeRef sub = c.typeArgs.isEmpty() ? null : c.typeArgs.get(0);
+                String subW = sub != null && sub.args.isEmpty() ? witnessFor(sub.name, ctx) : null;
+                if (subW != null) {
+                    // A type parameter with a reified witness: filter by its class.
+                    return new Out(target.code + ".whereType((java.lang.Class) " + subW + ".type(), "
+                            + (sub.nullable ? "true" : subW + ".test(null)") + ")",
+                            TypeRef.of("Iterable", sub));
+                }
                 if (sub != null && reportTypeVariableWitness(c, sub, ctx, "'whereType<" + sub.name + ">()'")) {
                     return new Out(target.code + ".whereType(null)",
                             TypeRef.of("Iterable", TypeRef.DYNAMIC), true);
@@ -15972,6 +16533,9 @@ public final class JavaEmitter {
         java.util.Set<String> witnessLocals;
         /// True in a static member, where the class's witness fields are out of reach.
         boolean staticMember;
+        /// The call being emitted and the type its context expects (see callExpected).
+        Call callExpectedFor;
+        TypeRef callExpected;
         /** The library whose top-level (lib-class) body is being emitted; set only when currentClass is null. */
         Library currentLibrary;
         final Map<String, String> imports = new TreeMap<String, String>();
