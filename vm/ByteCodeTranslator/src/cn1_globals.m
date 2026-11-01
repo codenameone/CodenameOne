@@ -9356,7 +9356,19 @@ static void cn1GcRsetScan(struct ThreadLocalData* d, JAVA_BOOLEAN trace) {
 }
 
 
+// When the current and the previous cycle began, for cn1BibopGrowSurvivalPercent. GC
+// thread only: the cycle begins and the sweep that adapts the trigger both run there.
+static long long cn1GcCycleStartNs = 0;
+static long long cn1GcPrevCycleStartNs = 0;
+static long long cn1GcDutyClockNs(void) {
+    struct timespec t;
+    clock_gettime(CLOCK_MONOTONIC, &t);
+    return (long long)t.tv_sec * 1000000000LL + (long long)t.tv_nsec;
+}
+
 void cn1BibopBeginGcCycle(void) {
+    cn1GcPrevCycleStartNs = cn1GcCycleStartNs;
+    cn1GcCycleStartNs = cn1GcDutyClockNs();
     // The epoch is published by codenameOneGCMark, which every cycle passes through
     // whether or not the page heap is compiled in. It used to be published here, which
     // left the mirror frozen under -DCN1_DISABLE_BIBOP; see the note at that store.
@@ -12411,6 +12423,62 @@ void cn1BibopNoteMonitorAttached(JAVA_OBJECT obj) {
 void cn1BibopNoteNativePeer(JAVA_OBJECT obj) { (void)obj; }
 #endif
 
+// THE SURVIVAL AT WHICH THE TRIGGER GROWS FOLLOWS HOW HARD THE COLLECTOR IS WORKING.
+//
+// The trigger doubles after two sweeps at or above this survival, so the value sets
+// the heap the policy settles at relative to the live set: 25% lets it grow to about
+// four times what is live, 66% to about one and a half. A fixed value has to pick one
+// end of the memory-for-CPU trade for every program. Measured on a Flask server, 66%
+// halved the footprint after load (137-191MB -> 75-98MB) and cost 9% of its
+// throughput, which is the wrong trade for a program that allocates hard enough for
+// collection to be its bottleneck -- and the right one for the many that do not.
+//
+// So the threshold is chosen from the collector's DUTY CYCLE: the share of wall time,
+// from the previous cycle's start to the end of this sweep, that this cycle took. A
+// collector that is mostly idle has CPU to spare and the heap is held near the live
+// set (CN1_BIBOP_TIGHT_SURVIVAL_PERCENT); one that is busy for more than
+// CN1_GC_BUSY_DUTY_PERCENT of the time is costing the program throughput, and the
+// heap may grow exactly as it always could (CN1_BIBOP_TRIGGER_SURVIVAL_PERCENT).
+// Between the two it is interpolated, so a program near the boundary moves gradually
+// rather than flipping between the two heap sizes on every other cycle.
+//
+// The default build keeps the tight value equal to the classic one, so nothing changes
+// for an application that does not opt in; the server build opts in.
+#ifndef CN1_BIBOP_TIGHT_SURVIVAL_PERCENT
+#define CN1_BIBOP_TIGHT_SURVIVAL_PERCENT CN1_BIBOP_TRIGGER_SURVIVAL_PERCENT
+#endif
+#ifndef CN1_GC_IDLE_DUTY_PERCENT
+#define CN1_GC_IDLE_DUTY_PERCENT 10
+#endif
+#ifndef CN1_GC_BUSY_DUTY_PERCENT
+#define CN1_GC_BUSY_DUTY_PERCENT 40
+#endif
+static int cn1GcLastDutyPercent = 0;   // GC thread only; reported by the instrument line
+
+static int cn1BibopGrowSurvivalPercent(void) {
+    int tight = CN1_BIBOP_TIGHT_SURVIVAL_PERCENT;
+    int loose = CN1_BIBOP_TRIGGER_SURVIVAL_PERCENT;
+    if(tight <= loose || cn1GcPrevCycleStartNs == 0) {
+        return loose;
+    }
+    long long now = cn1GcDutyClockNs();
+    long long period = now - cn1GcPrevCycleStartNs;
+    long long busy = now - cn1GcCycleStartNs;
+    if(period <= 0 || busy < 0) {
+        return loose;
+    }
+    int duty = (int)((busy * 100) / period);
+    cn1GcLastDutyPercent = duty;
+    if(duty <= CN1_GC_IDLE_DUTY_PERCENT) {
+        return tight;
+    }
+    if(duty >= CN1_GC_BUSY_DUTY_PERCENT) {
+        return loose;
+    }
+    return tight - (tight - loose) * (duty - CN1_GC_IDLE_DUTY_PERCENT)
+                   / (CN1_GC_BUSY_DUTY_PERCENT - CN1_GC_IDLE_DUTY_PERCENT);
+}
+
 static void cn1BibopAdaptAfterSweep(long occupiedBytes, long liveBytes,
                                     long reclaimedBytes) {
     bibopLastCycleOccupiedBytes = occupiedBytes;
@@ -12474,7 +12542,7 @@ static void cn1BibopAdaptAfterSweep(long occupiedBytes, long liveBytes,
         // 98MB-to-38MB result, and it needs no live-set measurement to be correct.
         // So the shrink target is that minimum rather than the fixed 24MB constant
         // master uses, and nothing else about this policy differs from master.
-        if(survival >= CN1_BIBOP_TRIGGER_SURVIVAL_PERCENT) {
+        if(survival >= cn1BibopGrowSurvivalPercent()) {
             bibopTriggerHighSurvivalStreak++;
             if(bibopTriggerHighSurvivalStreak >= 2) {
                 // The host's free memory BOUNDS this growth; it does not size it.
@@ -12509,10 +12577,10 @@ static void cn1BibopAdaptAfterSweep(long occupiedBytes, long liveBytes,
 
 #ifdef CN1_GC_INSTRUMENT
     fprintf(stderr,
-            "[BIBOP-ADAPT] epoch=%d allocatedMB=%.1f triggerMB=%.1f occupiedMB=%.1f "
+            "[BIBOP-ADAPT] duty=%d epoch=%d allocatedMB=%.1f triggerMB=%.1f occupiedMB=%.1f "
             "liveMB=%.1f reclaimedMB=%.1f promotions=%ld bypass=%ld bypassAllocs=%ld freshPages=%ld "
             "beltRuns=%ld adoptedSkips=%ld\n",
-            currentGcMarkValue,
+            cn1GcLastDutyPercent, currentGcMarkValue,
             bibopCycleAllocatedBytes / (1024.0 * 1024.0),
             atomic_load_explicit(&bibopGcTriggerBytes, memory_order_relaxed) /
                 (1024.0 * 1024.0),

@@ -53,19 +53,18 @@ CN1_BACKEND_CFLAGS="${CN1_BACKEND_CFLAGS:-} -DCN1_VIRTUAL_THREADS=1"
 # time, which is what this is.
 CN1_BACKEND_CFLAGS="$CN1_BACKEND_CFLAGS -DCN1_BIBOP_GC_MIN_TRIGGER_BYTES=$((4*1024*1024))"
 
-# Grow the trigger only while two thirds of the swept heap survives, not a quarter.
+# Hold the heap near the live set while the collector has time to spare.
 #
-# The collector doubles its trigger after two sweeps at or above this survival, so
-# the value sets the heap it settles at relative to the live set: 25% lets the heap
-# grow to about four times what is live, 66% to about one and a half. That is the
-# classic memory-for-CPU trade, and a device app and a server want different ends
-# of it -- this is the server choosing its end, the same way it chooses its own
-# minimum above, not a pinned size: the trigger still follows the live set.
-# Measured on the Flask sample, 100k requests at 8 connections, three interleaved
-# runs per arm: physical footprint after load 137-191MB -> 75-98MB, RSS 166-223MB
-# -> 128-146MB, footprint five seconds later 101-139MB -> 68-70MB, for 27.7-29.2k
-# -> 25.7-25.9k requests per second.
-CN1_BACKEND_CFLAGS="$CN1_BACKEND_CFLAGS -DCN1_BIBOP_TRIGGER_SURVIVAL_PERCENT=66"
+# The trigger grows after two sweeps at or above a survival threshold, and that
+# threshold sets the heap relative to the live set: the VM's 25% lets it reach
+# about four times what is live, 66% about one and a half. A fixed 66% halved the
+# Flask sample's footprint after load and cost 9% of its throughput, so it is not
+# fixed: cn1BibopGrowSurvivalPercent moves between this value and the VM's from the
+# collector's duty cycle. A collector that is mostly idle keeps the heap tight; one
+# busy enough to cost throughput gets the classic growth back. Measured on the same
+# sample at full speed, three interleaved runs: 29.1-29.7k req/s against 29.6-30.1k
+# for the VM default, where the fixed value measured 26.0-26.9k.
+CN1_BACKEND_CFLAGS="$CN1_BACKEND_CFLAGS -DCN1_BIBOP_TIGHT_SURVIVAL_PERCENT=66"
 J8="${JDK_8_HOME:?set JDK_8_HOME to a JDK 8 home}"
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/cn1backend.XXXXXX")"
 
