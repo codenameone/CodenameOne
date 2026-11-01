@@ -8,9 +8,12 @@
 // transpiler makes every class that declares a zero-argument toJson()
 // implement dart.convert.JsonEncodable so that needs no reflection.
 //
-// The text and byte codecs share one Java class, dart.convert.ByteCodec, so
-// their encode/decode are typed dynamic here: utf8.encode takes a String and
-// returns a Uint8List, base64.encode the reverse.
+// The text and byte codecs share one Java base class, dart.convert.ByteCodec,
+// whose encode/decode are typed dynamic (an Encoding value may be either kind).
+// utf8, ascii and latin1 are dart.convert.TextCodec and base64/base64Url
+// dart.convert.Base64Codec, which narrow encode/decode/encoder/decoder to the
+// types Dart gives them, so a caller handing the result to a List<int> or a
+// String compiles without a cast.
 
 @JavaName('dart.convert.JsonCodec')
 class JsonCodec extends Codec<Object?, String> {
@@ -120,12 +123,38 @@ class HtmlEscapeMode {
 @JavaName('dart.convert.Convert.htmlEscape')
 HtmlEscape htmlEscape = HtmlEscape();
 
-@JavaName('dart.convert.ByteCodec')
-abstract class Utf8Codec extends Encoding {
+@JavaName('dart.convert.BytesConverter')
+abstract class CodecBytesConverter extends Encoding {
+  external Uint8List convert(dynamic input);
 }
 
-@JavaName('dart.convert.ByteCodec')
+@JavaName('dart.convert.TextConverter')
+abstract class CodecTextConverter extends Encoding {
+  external String convert(dynamic input);
+}
+
+@JavaName('dart.convert.TextCodec')
+abstract class Utf8Codec extends Encoding {
+  external Uint8List encode(String input);
+  external String decode(List<int> encoded, {bool? allowMalformed});
+  external CodecBytesConverter get encoder;
+  external CodecTextConverter get decoder;
+}
+
+@JavaName('dart.convert.TextCodec')
+abstract class AsciiCodec extends Utf8Codec {
+}
+
+@JavaName('dart.convert.TextCodec')
+abstract class Latin1Codec extends Utf8Codec {
+}
+
+@JavaName('dart.convert.Base64Codec')
 abstract class Base64Codec extends Encoding {
+  external String encode(List<int> input);
+  external Uint8List decode(String encoded);
+  external CodecTextConverter get encoder;
+  external CodecBytesConverter get decoder;
 }
 
 @JavaName('dart.convert.LineSplitter')
@@ -140,9 +169,9 @@ JsonCodec json = JsonCodec();
 @JavaName('dart.convert.Convert.utf8')
 Utf8Codec utf8 = Utf8Codec();
 @JavaName('dart.convert.Convert.ascii')
-Encoding ascii = Encoding();
+AsciiCodec ascii = AsciiCodec();
 @JavaName('dart.convert.Convert.latin1')
-Encoding latin1 = Encoding();
+Latin1Codec latin1 = Latin1Codec();
 @JavaName('dart.convert.Convert.base64')
 Base64Codec base64 = Base64Codec();
 @JavaName('dart.convert.Convert.base64Url')
