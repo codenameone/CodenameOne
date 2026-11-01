@@ -168,10 +168,11 @@ public final class CoreExt {
         return e;
     }
 
-    /// Dart's `iterator`: `moveNext()` then `current`, over Java's iterator.
-    @SuppressWarnings("unchecked")
-    public static <E> dart.collection.Iterator<E> iterator(final Iterable<?> it) {
-        final java.util.Iterator<E> j = (java.util.Iterator<E>) it.iterator();
+    /// Dart's `iterator`: `moveNext()` then `current`, over Java's iterator. The element
+    /// type comes from the receiver, so `var it = xs.iterator` in an extension on
+    /// `Iterable<double>` reads `it.current` as a double rather than an Object.
+    public static <E> dart.collection.Iterator<E> iterator(final Iterable<? extends E> it) {
+        final java.util.Iterator<? extends E> j = it.iterator();
         return new dart.collection.Iterator<E>() {
             private E cur;
 

@@ -34,7 +34,7 @@ extension DartCoreListExt<E> on List<E> {
   external void replaceRange(int start, int end, Iterable<E> replacements);
   external void setAll(int index, Iterable<E> iterable);
   external E get single;
-  external Iterator<dynamic> get iterator;
+  external Iterator<E> get iterator;
   external void shuffle([Object? random]);
   external Iterable<E> get nonNulls;
 }
@@ -42,7 +42,7 @@ extension DartCoreListExt<E> on List<E> {
 @JavaName('dart.core.CoreExt')
 extension DartCoreIterableExt<E> on Iterable<E> {
   external Iterable<dynamic> cast();
-  external Iterator<dynamic> get iterator;
+  external Iterator<E> get iterator;
   external Iterable<E> get nonNulls;
   external E get single;
 }
@@ -52,7 +52,7 @@ extension DartCoreSetExt<E> on Set<E> {
   external Set<dynamic> cast();
   external E? lookup(Object? object);
   external E get single;
-  external Iterator<dynamic> get iterator;
+  external Iterator<E> get iterator;
 }
 
 @JavaName('dart.core.CoreExt')

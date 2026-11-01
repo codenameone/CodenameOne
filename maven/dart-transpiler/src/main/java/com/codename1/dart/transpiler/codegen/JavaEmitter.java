@@ -1326,6 +1326,15 @@ public final class JavaEmitter {
             if (overriddenReturnsVoid(c, m)) {
                 mm.returnType = TypeRef.VOID;
             }
+            // `Never add(E v) => throw ...` implementing `Future<int> add(E v)`: Never is a
+            // subtype of every return type, so Dart allows it, while Java's Object return is
+            // no override of Future<Long>. The override takes the member's declared type.
+            if (!m.isStatic && !m.isSetter && isCoreNever(m.returnType)) {
+                TypeRef over = overriddenProgramReturn(c, m, new HashSet<String>());
+                if (over != null) {
+                    mm.returnType = over;
+                }
+            }
             mm.params = m.params;
             mm.typeParams = m.typeParams;
             mm.typeParamBounds = m.typeParamBounds;
@@ -1979,7 +1988,19 @@ public final class JavaEmitter {
     private String ifaceJava(TypeRef t, ClassDecl im, List<TypeRef> args, Ctx ctx) {
         TypeRef tt = t == null ? TypeRef.DYNAMIC : t;
         boolean bareVar = im.typeParams.contains(tt.name) && tt.args.isEmpty();
-        return javaType(substTypeParams(tt, im.typeParams, args), bareVar, ctx);
+        TypeRef st = substTypeParams(tt, im.typeParams, args);
+        // The member's types are named in the INTERFACE's library: markdown's
+        // `visitText(Text text)` is its own Text node even when the implementer's file
+        // also imports the Text widget. Pinned only where a stub shares the name.
+        if (st != null && st.resolved == null && st.name != null && im.ownerLibrary != null
+                && !im.typeParams.contains(st.name)
+                && (stubs.isStubClass(st.name) || stubs.isStubEnum(st.name))) {
+            ClassDecl wc = program.resolveClass(st.name, im.ownerLibrary);
+            if (wc != null && st.name.equals(wc.name) && classVisibleFrom(wc, im.ownerLibrary)) {
+                st.resolved = wc;
+            }
+        }
+        return javaType(st, bareVar, ctx);
     }
 
     private List<String> implJavaParams(MethodDecl m, Ctx ctx) {
@@ -3039,6 +3060,44 @@ public final class JavaEmitter {
     }
 
     /**
+     * The return type, in {@code c}'s own type variables, of the program member that
+     * {@code m} overrides through a superclass, interface or mixin of {@code c}; null when
+     * none declares it or it is itself Never.
+     */
+    private TypeRef overriddenProgramReturn(ClassDecl c, MethodDecl m, java.util.Set<String> seen) {
+        if (c == null || !seen.add(c.name)) {
+            return null;
+        }
+        List<TypeRef> supers = new ArrayList<TypeRef>();
+        if (c.superclass != null) {
+            supers.add(c.superclass);
+        }
+        supers.addAll(c.interfaces);
+        supers.addAll(c.mixins);
+        for (TypeRef st : supers) {
+            ClassDecl sp = superDeclOf(c, st);
+            if (sp == null) {
+                continue;
+            }
+            MethodDecl sm = m.isGetter ? sp.getter(m.name) : sp.method(m.name);
+            TypeRef found = null;
+            if (sm != null && sm.isGetter == m.isGetter && !sm.isSetter && sm.returnType != null
+                    && !sm.returnType.is("var") && !isCoreNever(sm.returnType)) {
+                found = sm.returnType;
+            } else if (m.isGetter && sp.field(m.name) != null && sp.field(m.name).type != null) {
+                found = sp.field(m.name).type;
+            } else {
+                found = overriddenProgramReturn(sp, m, seen);
+            }
+            if (found != null) {
+                return st.args.size() == sp.typeParams.size() && !st.args.isEmpty()
+                        ? substTypeParams(found, sp.typeParams, st.args) : found;
+            }
+        }
+        return null;
+    }
+
+    /**
      * Bridges a program class's field or getter onto the method name a stub
      * interface declares for it.
      *
@@ -3642,13 +3701,24 @@ public final class JavaEmitter {
             sb.append("abstract ");
         }
         ctx.pushScope();
-        if (m.typeParams != null && !m.typeParams.isEmpty()) {
+        // A static function declared to return dart:core Never always throws. Emitted
+        // returning Object, a call to it (`=> _fail('x')`, `return Box._throw();`) did not
+        // fit a position typed bool, E or Future<T>, though Never is a subtype of all of
+        // them. A Java type variable of its own -- not a Dart one, so no witness is passed
+        // -- lets javac infer whatever type the call site needs.
+        boolean neverGeneric = m.isStatic && !m.isSetter && m.javaReturn == null && isCoreNever(rt)
+                && (m.body != null || m.exprBody != null) && !m.isAsync && !m.isSyncStar && !m.isAsyncStar;
+        if ((m.typeParams != null && !m.typeParams.isEmpty()) || neverGeneric) {
             sb.append('<');
-            for (int i = 0; i < m.typeParams.size(); i++) {
+            int n = m.typeParams == null ? 0 : m.typeParams.size();
+            for (int i = 0; i < n; i++) {
                 if (i > 0) {
                     sb.append(", ");
                 }
                 sb.append(m.typeParams.get(i));
+            }
+            if (neverGeneric) {
+                sb.append(n > 0 ? ", " : "").append("$Never");
             }
             sb.append("> ");
         }
@@ -3674,6 +3744,9 @@ public final class JavaEmitter {
         String rjt = m.isSetter ? "void" : m.javaReturn != null ? m.javaReturn
                 : (forceIntReturn ? "int" : javaType(rt, (boxListMixinOp && "$index".equals(m.name)) || boxCollReturn
                         || (!m.isStatic && overridesTypeVarReturn(ctx.currentClass, m.name, m.isGetter, ctx)), ctx));
+        if (neverGeneric) {
+            rjt = "$Never";
+        }
         sb.append(rjt).append(' ').append(m.name).append('(');
         // The Java parameter list and names, kept for a sync* body's helper method.
         StringBuilder paramDecls = new StringBuilder();
@@ -6014,8 +6087,10 @@ public final class JavaEmitter {
             // context expects (Dart's Never), so it fits a ternary arm, `??` or an arrow body.
             ctx.importClass("dart.runtime.DartRuntime");
             Out v = emitExpr(((ThrowExpr) e).value, null, ctx);
+            // Never (a static Never function's arrow body, typed by its own type variable)
+            // is left to javac's inference from the return position.
             if (expected != null && !expected.is("void") && !expected.is("dynamic")
-                    && !expected.is("var")) {
+                    && !expected.is("var") && !isCoreNever(expected)) {
                 return new Out("DartRuntime.<" + javaType(expected, true, ctx) + ">throwValue("
                         + v.code + ")", expected);
             }
@@ -9261,6 +9336,13 @@ public final class JavaEmitter {
                 return new Out("dart.core.CoreStatics.isNegative(" + target.code + ")", TypeRef.BOOL);
             }
         }
+        // The same classification getters on a num, a Java Number: through its double
+        // value, which an int widens to exactly as above (`Iterable<num>`'s elements).
+        if (tt.is("num") && !program.classes.containsKey("num")
+                && (name.equals("isNaN") || name.equals("isInfinite") || name.equals("isFinite"))) {
+            return new Out("Double." + name + "(((Number) " + paren(target.code) + ").doubleValue())",
+                    TypeRef.BOOL);
+        }
         // The same implicit members on a stub enum, which is a plain Java enum.
         if (!program.enums.containsKey(tt.name) && stubs.isStubEnum(tt.name)
                 && (name.equals("index") || name.equals("name"))) {
@@ -9464,6 +9546,10 @@ public final class JavaEmitter {
             String extSimple = stubExtensionSimpleName(stubExt, ctx);
             TypeRef rt = eg == null || eg.returnType == null || eg.returnType.is("var")
                     ? TypeRef.DYNAMIC : eg.returnType;
+            // The extension's own type parameters read as the receiver's arguments: the
+            // `iterator` of `extension<E> on Iterable<E>` is an Iterator<double> on an
+            // Iterable<double>, so `it.current.isNaN` resolves statically.
+            rt = stubExtensionSubst(stubExt, tt, rt);
             return new Out(extSimple + "." + name + "(" + target.code + ")", rt);
         }
         // `e.message` on dart:core's errors that declare one. Each maps to a Java exception
@@ -11117,6 +11203,14 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             }
             String eq = "DartRuntime.eq(" + l.code + ", " + boxIfPrimitive(r, ctx) + ")";
             return new Out(b.op.equals("==") ? eq : "!" + eq, TypeRef.BOOL);
+        }
+        // `v < result` where both are a type variable bounded by num (`<T extends num>`): a
+        // Java T is a reference with no operators, so it compares on the values.
+        if ((b.op.equals("<") || b.op.equals(">") || b.op.equals("<=") || b.op.equals(">="))
+                && (numBoundedTypeVar(l.type, ctx) || numBoundedTypeVar(r.type, ctx))) {
+            ctx.importClass("dart.runtime.DartRuntime");
+            return new Out("DartRuntime.dynCompare(\"" + b.op + "\", " + boxIfPrimitive(l, ctx) + ", "
+                    + boxIfPrimitive(r, ctx) + ")", TypeRef.BOOL);
         }
         // A dynamic operand: Dart chooses the operator from the run-time value, and none
         // of the typed lowerings below apply -- the fallback emitted `Object + long`, which
@@ -17829,6 +17923,26 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         return TypeRef.DYNAMIC;
     }
 
+    /** True when t is a method or class type variable whose bound is num, int or double. */
+    private boolean numBoundedTypeVar(TypeRef t, Ctx ctx) {
+        if (t == null || !t.args.isEmpty() || t.name == null) {
+            return false;
+        }
+        TypeRef bound = ctx.methodTypeParamBounds == null ? null : ctx.methodTypeParamBounds.get(t.name);
+        if (bound == null && ctx.currentClass != null && ctx.currentClass.typeParams.contains(t.name)) {
+            bound = ctx.currentClass.typeParamBounds.get(t.name);
+        }
+        if (bound == null && ctx.currentExtension != null && ctx.currentExtension.typeParams.contains(t.name)) {
+            bound = ctx.currentExtension.typeParamBounds.get(t.name);
+        }
+        return bound != null && (bound.is("num") || bound.is("int") || bound.is("double"));
+    }
+
+    /** True for dart:core's Never (not a program class of that name). */
+    private boolean isCoreNever(TypeRef t) {
+        return t != null && t.is("Never") && !program.classes.containsKey("Never");
+    }
+
     /** Maps a Dart type to Java source. boxed=true forces reference types. */
     /** True when a type argument of {@code t}, at any depth, is dart:core's Never. */
     private boolean argsMentionNever(TypeRef t) {
@@ -18166,6 +18280,29 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
     }
 
     /** Simple Java class name hosting a stub extension's static members; imports its @JavaName. */
+    /**
+     * {@code t} with a stub extension's type parameters replaced by the receiver's type
+     * arguments, matched position by position against the extension's {@code on} type.
+     * Unchanged when the receiver carries no arguments to match.
+     */
+    private static TypeRef stubExtensionSubst(Ast.ClassDecl ext, TypeRef recv, TypeRef t) {
+        TypeRef on = ext.extensionOn;
+        if (t == null || on == null || recv == null || ext.typeParams.isEmpty()
+                || on.args.size() != recv.args.size()) {
+            return t;
+        }
+        List<String> names = new ArrayList<String>();
+        List<TypeRef> args = new ArrayList<TypeRef>();
+        for (int i = 0; i < on.args.size(); i++) {
+            TypeRef a = on.args.get(i);
+            if (a.args.isEmpty() && ext.typeParams.contains(a.name)) {
+                names.add(a.name);
+                args.add(recv.args.get(i));
+            }
+        }
+        return names.isEmpty() ? t : substTypeParams(t, names, args);
+    }
+
     private String stubExtensionSimpleName(Ast.ClassDecl ext, Ctx ctx) {
         if (ext.javaName != null) {
             ctx.importClass(ext.javaName);

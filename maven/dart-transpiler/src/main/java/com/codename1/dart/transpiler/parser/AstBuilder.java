@@ -239,6 +239,10 @@ public final class AstBuilder {
             if (ext.typeParameters() != null) {
                 for (Dart2Parser.TypeParameterContext tp : ext.typeParameters().typeParameter()) {
                     cd.typeParams.add(tp.identifier().getText());
+                    // `extension S<T extends num> on Iterable<T>`: `a < b` on two T needs it.
+                    if (tp.typeNotVoid() != null) {
+                        cd.typeParamBounds.put(tp.identifier().getText(), buildTypeNotVoid(tp.typeNotVoid()));
+                    }
                 }
             }
             java.util.List<Dart2Parser.ClassMemberDeclarationContext> members = ext.classMemberDeclaration();
