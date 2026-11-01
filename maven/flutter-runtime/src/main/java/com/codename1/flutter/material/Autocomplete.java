@@ -63,7 +63,41 @@ public class Autocomplete<T> extends com.codename1.flutter.widgets.RawAutocomple
     }
 
     public static final class AutocompleteState<T> extends State<com.codename1.flutter.widgets.RawAutocomplete<T>> {
-        private final TextEditingController controller = new TextEditingController();
+        private final TextEditingController ownController = new TextEditingController();
+        private final com.codename1.flutter.FocusNode ownFocus = new com.codename1.flutter.FocusNode();
+        /// The controller the options follow: the widget's textEditingController, or one
+        /// of the state's own, listened to so a field from fieldViewBuilder works too.
+        private TextEditingController controller;
+        private String lastText = "";
+        private final dart.runtime.Funcs.VoidFunc0 textListener = () -> {
+            String t = controller.text();
+            if (!t.equals(lastText)) {
+                lastText = t;
+                textChanged(t);
+            }
+        };
+
+        private void follow(TextEditingController c) {
+            if (c == controller) {
+                return;
+            }
+            if (controller != null) {
+                controller.removeListener(textListener);
+            }
+            controller = c;
+            lastText = c.text();
+            c.addListener(textListener);
+        }
+
+        private TextEditingController wanted() {
+            com.codename1.flutter.widgets.RawAutocomplete<T> w = widget();
+            return w != null && w.getTextEditingController() != null ? w.getTextEditingController() : ownController;
+        }
+
+        private com.codename1.flutter.FocusNode focus() {
+            com.codename1.flutter.widgets.RawAutocomplete<T> w = widget();
+            return w != null && w.getFocusNode() != null ? w.getFocusNode() : ownFocus;
+        }
         private boolean picked;
         private int highlighted;
         private DartList<T> options = DartList.of();
@@ -79,6 +113,7 @@ public class Autocomplete<T> extends com.codename1.flutter.widgets.RawAutocomple
         }
 
         public TextEditingController textController() {
+            follow(wanted());
             return controller;
         }
 
@@ -103,6 +138,24 @@ public class Autocomplete<T> extends com.codename1.flutter.widgets.RawAutocomple
             }
         }
 
+        /// RawAutocomplete's arrow-up, arrow-down and enter intents: what a Codename One
+        /// game key does while options show. Answers whether the key was taken.
+        public boolean handleKey(int gameKey) {
+            if (options.isEmpty()) {
+                return false;
+            }
+            if (gameKey == com.codename1.ui.Display.GAME_UP) {
+                highlightPrevious();
+            } else if (gameKey == com.codename1.ui.Display.GAME_DOWN) {
+                highlightNext();
+            } else if (gameKey == com.codename1.ui.Display.GAME_FIRE) {
+                submit();
+            } else {
+                return false;
+            }
+            return true;
+        }
+
         public void textChanged(String text) {
             setState(() -> {
                 picked = false;
@@ -112,8 +165,10 @@ public class Autocomplete<T> extends com.codename1.flutter.widgets.RawAutocomple
 
         public void select(T o) {
             final com.codename1.flutter.widgets.RawAutocomplete<T> w = widget();
+            final String shown = w.display(o);
             setState(() -> {
-                controller.text(w.display(o));
+                lastText = shown;
+                controller.text(shown);
                 picked = true;
             });
             w.selected(o);
@@ -123,14 +178,15 @@ public class Autocomplete<T> extends com.codename1.flutter.widgets.RawAutocomple
         /// show: RawAutocomplete's arrow-up/down and enter intents.
         private com.codename1.ui.Form keysOn;
         private final com.codename1.ui.events.ActionListener<com.codename1.ui.events.ActionEvent> upKey =
-                evt -> { if (!options.isEmpty()) { evt.consume(); highlightPrevious(); } };
+                evt -> { if (handleKey(com.codename1.ui.Display.GAME_UP)) { evt.consume(); } };
         private final com.codename1.ui.events.ActionListener<com.codename1.ui.events.ActionEvent> downKey =
-                evt -> { if (!options.isEmpty()) { evt.consume(); highlightNext(); } };
+                evt -> { if (handleKey(com.codename1.ui.Display.GAME_DOWN)) { evt.consume(); } };
         private final com.codename1.ui.events.ActionListener<com.codename1.ui.events.ActionEvent> fireKey =
-                evt -> { if (!options.isEmpty()) { evt.consume(); submit(); } };
+                evt -> { if (handleKey(com.codename1.ui.Display.GAME_FIRE)) { evt.consume(); } };
 
         void listenToKeys(boolean on) {
-            com.codename1.ui.Form f = on ? com.codename1.ui.CN.getCurrentForm() : null;
+            com.codename1.ui.Form f = on && com.codename1.ui.Display.isInitialized()
+                    ? com.codename1.ui.CN.getCurrentForm() : null;
             if (f == keysOn) {
                 return;
             }
@@ -167,6 +223,9 @@ public class Autocomplete<T> extends com.codename1.flutter.widgets.RawAutocomple
         public void dispose() {
             listenToKeys(false);
             removeEntry();
+            if (controller != null) {
+                controller.removeListener(textListener);
+            }
         }
 
         private static double absX(RenderElement r) {
@@ -178,7 +237,16 @@ public class Autocomplete<T> extends com.codename1.flutter.widgets.RawAutocomple
         }
 
         /// The options list, positioned under the field in the overlay's coordinates.
-        Widget optionsView(BuildContext overlayContext) {
+        /// The options as optionsViewBuilder shows them, or the default Material list.
+        private Widget optionsContent(BuildContext ctx) {
+            final com.codename1.flutter.widgets.RawAutocomplete<T> w = widget();
+            if (w.getOptionsViewBuilder() != null) {
+                return w.getOptionsViewBuilder().call(ctx, this::select, options);
+            }
+            return defaultOptions();
+        }
+
+        private Widget defaultOptions() {
             final com.codename1.flutter.widgets.RawAutocomplete<T> w = widget();
             DartList<Widget> rows = DartList.of();
             for (int i = 0; i < options.size(); i++) {
@@ -198,6 +266,11 @@ public class Autocomplete<T> extends com.codename1.flutter.widgets.RawAutocomple
             Material m = new Material();
             m.elevation(4.0);
             m.child(box);
+            return m;
+        }
+
+        Widget optionsView(BuildContext overlayContext) {
+            Widget m = optionsContent(overlayContext);
             RenderElement field = context() instanceof Element
                     ? RenderElement.findRenderElement((Element) context()) : null;
             RenderElement host = null;
@@ -221,10 +294,17 @@ public class Autocomplete<T> extends com.codename1.flutter.widgets.RawAutocomple
         @Override
         public Widget build(BuildContext context) {
             final com.codename1.flutter.widgets.RawAutocomplete<T> w = widget();
-            TextField field = new TextField();
-            field.controller(controller);
-            field.onChanged(this::textChanged);
-            field.onSubmitted(s -> submit());
+            follow(wanted());
+            Widget field;
+            if (w.getFieldViewBuilder() != null) {
+                field = w.getFieldViewBuilder().call(context, controller, focus(), this::submit);
+            } else {
+                TextField tf = new TextField();
+                tf.controller(controller);
+                tf.focusNode(focus());
+                tf.onSubmitted(s -> submit());
+                field = tf;
+            }
             options = !picked && controller.text().length() > 0 ? w.optionsFor(controller.text()) : DartList.<T>of();
             if (highlighted >= options.size()) {
                 highlighted = 0;
@@ -252,13 +332,8 @@ public class Autocomplete<T> extends com.codename1.flutter.widgets.RawAutocomple
             }
             DartList<Widget> rows = DartList.of();
             rows.add(field);
-            for (int i = 0; i < options.size(); i++) {
-                final T o = options.get(i);
-                ListTile tile = new ListTile();
-                tile.title(new Text(w.display(o)));
-                tile.selected(i == highlighted);
-                tile.onTap(() -> select(o));
-                rows.add(tile);
+            if (!options.isEmpty()) {
+                rows.add(optionsContent(context));
             }
             Column col = new Column();
             col.children(rows);

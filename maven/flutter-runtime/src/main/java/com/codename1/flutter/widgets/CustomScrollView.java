@@ -254,8 +254,119 @@ public class CustomScrollView extends StatefulWidget {
             return -1;
         }
 
+        /// The headers, lead count and geometry the last build used, so a layout pass
+        /// can tell whether the slot positions it just computed disagree with them.
+        private java.util.List<Header> lastHeaders = new java.util.ArrayList<Header>();
+        private int lastLead;
+        private double[][] lastGeometry;
+
+        /// Per header: {extent, shrinkOffset, paint y, stuck (1/0)}. A header that
+        /// follows ordinary slivers has its top read from its slot: from the render
+        /// tree's layout when {@code fromLayout} (the pass that just ran), otherwise
+        /// from the components.
+        private double[][] geometry(java.util.List<Header> headers, int lead, boolean fromLayout) {
+            double off = offset();
+            int n = headers.size();
+            double[] extent = new double[n];
+            double[] shrink = new double[n];
+            double[] paintY = new double[n];
+            double[] stuck = new double[n];
+            double pinnedAbove = 0;
+            double leadTop = 0;
+            for (int i = 0; i < n; i++) {
+                Header h = headers.get(i);
+                double max = h.delegate.maxExtent();
+                double top;
+                if (i < lead) {
+                    top = leadTop;
+                    leadTop += max;
+                } else {
+                    top = fromLayout ? renderTop(slots[i]) : contentTop(slots[i]);
+                }
+                if (top < 0 || top - off >= pinnedAbove) {
+                    extent[i] = max;
+                    continue;
+                }
+                double[] g = headerGeometry(h.delegate.minExtent(), max, top - pinnedAbove, off,
+                        h.pinned, h.floating, floatShown[i]);
+                extent[i] = g[0];
+                shrink[i] = g[1];
+                paintY[i] = pinnedAbove;
+                stuck[i] = 1;
+                if (h.pinned || h.floating) {
+                    pinnedAbove += g[0];
+                }
+            }
+            return new double[][] {extent, shrink, paintY, stuck};
+        }
+
+        /// Whether the layout that just ran puts a header that follows ordinary slivers
+        /// somewhere other than the last build assumed -- on the first frame the build
+        /// could not know any such slot's position.
+        boolean layoutDisagrees() {
+            if (lastGeometry == null || lastLead >= lastHeaders.size()
+                    || slots.length != lastHeaders.size()) {
+                return false;
+            }
+            double[][] now = geometry(lastHeaders, lastLead, true);
+            for (int k = 0; k < now.length; k++) {
+                if (!java.util.Arrays.equals(now[k], lastGeometry[k])) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// The top of {@code slot} in the list's content from the render tree alone,
+        /// valid as soon as the list has been laid out, or -1.
+        static double renderTop(BuildContext slot) {
+            if (!(slot instanceof com.codename1.flutter.Element)) {
+                return -1;
+            }
+            com.codename1.flutter.RenderElement r =
+                    com.codename1.flutter.RenderElement.findRenderElement((com.codename1.flutter.Element) slot);
+            if (r == null) {
+                return -1;
+            }
+            double y = r.relY();
+            for (com.codename1.flutter.Element e = r.parent(); e != null; e = e.parent()) {
+                if (e instanceof ListViewRenderElement) {
+                    return y;
+                }
+                if (e instanceof com.codename1.flutter.RenderElement) {
+                    y += ((com.codename1.flutter.RenderElement) e).relY();
+                }
+            }
+            return -1;
+        }
+
         @Override
         public Widget build(final BuildContext context) {
+            final CustomScrollView w = widget();
+            final Widget body = buildBody(context);
+            boolean trailing = false;
+            if (w.slivers != null && w.scrollDirection != com.codename1.flutter.Axis.horizontal && !w.reverse) {
+                boolean ordinary = false;
+                for (int i = 0; i < w.slivers.size(); i++) {
+                    if (headerOf(w.slivers.get(i)) == null) {
+                        ordinary = true;
+                    } else if (ordinary) {
+                        trailing = true;
+                    }
+                }
+            }
+            if (!trailing) {
+                return body;
+            }
+            return new SlotPass(body, new Funcs.Func0<Widget>() {
+                @Override
+                public Widget call() {
+                    return layoutDisagrees() ? buildBody(context) : null;
+                }
+            });
+        }
+
+        Widget buildBody(final BuildContext context) {
             CustomScrollView w = widget();
             DartList<Widget> all = w.slivers != null ? w.slivers : new DartList<Widget>();
             boolean vertical = w.scrollDirection != com.codename1.flutter.Axis.horizontal;
@@ -291,37 +402,17 @@ public class CustomScrollView extends StatefulWidget {
             // to (or past) the bottom of the pinned headers above it, so it is painted over
             // the list with the extent and shrinkOffset that give it, as Flutter's sliver
             // protocol does wherever in the list the header sits.
-            double off = offset();
-            final double[] extent = new double[headers.size()];
-            final double[] shrink = new double[headers.size()];
-            final double[] paintY = new double[headers.size()];
+            double[][] geo = geometry(headers, lead, false);
+            final double[] extent = geo[0];
+            final double[] shrink = geo[1];
+            final double[] paintY = geo[2];
             final boolean[] stuck = new boolean[headers.size()];
-            double pinnedAbove = 0;
-            double leadTop = 0;
-            for (int i = 0; i < headers.size(); i++) {
-                Header h = headers.get(i);
-                double max = h.delegate.maxExtent();
-                double top;
-                if (i < lead) {
-                    top = leadTop;
-                    leadTop += max;
-                } else {
-                    top = contentTop(slots[i]);
-                }
-                if (top < 0 || top - off >= pinnedAbove) {
-                    extent[i] = max;
-                    continue;
-                }
-                double[] g = headerGeometry(h.delegate.minExtent(), max, top - pinnedAbove, off,
-                        h.pinned, h.floating, floatShown[i]);
-                extent[i] = g[0];
-                shrink[i] = g[1];
-                paintY[i] = pinnedAbove;
-                stuck[i] = true;
-                if (h.pinned || h.floating) {
-                    pinnedAbove += g[0];
-                }
+            for (int i = 0; i < stuck.length; i++) {
+                stuck[i] = geo[3][i] != 0;
             }
+            lastHeaders = headers;
+            lastLead = lead;
+            lastGeometry = geo;
             DartList<Widget> content = new DartList<Widget>();
             for (int i = 0; i < all.size(); i++) {
                 final int hi = headerAt[i];
@@ -383,6 +474,69 @@ public class CustomScrollView extends StatefulWidget {
             Stack stack = new Stack();
             stack.children(layers);
             return stack;
+        }
+    }
+
+    /// Lays out the scroll view's body and, when that layout puts a header that follows
+    /// ordinary slivers somewhere the body's build did not assume, rebuilds the body
+    /// once and lays it out again -- in the same pass, so such a header is right on the
+    /// first frame instead of after the next rebuild.
+    static final class SlotPass extends Widget {
+        final Widget body;
+        final Funcs.Func0<Widget> rebuildIfStale;
+
+        SlotPass(Widget body, Funcs.Func0<Widget> rebuildIfStale) {
+            this.body = body;
+            this.rebuildIfStale = rebuildIfStale;
+        }
+
+        @Override
+        public com.codename1.flutter.Element createElement() {
+            return new SlotPassElement(this);
+        }
+    }
+
+    static final class SlotPassElement extends com.codename1.flutter.SingleChildRenderElement {
+        /// The body rebuilt by the last layout, until the next configuration arrives.
+        private Widget relaidOut;
+
+        SlotPassElement(SlotPass w) {
+            super(w);
+        }
+
+        @Override
+        public void update(Widget newWidget) {
+            relaidOut = null;
+            super.update(newWidget);
+        }
+
+        @Override
+        protected Widget childWidget() {
+            return relaidOut != null ? relaidOut : ((SlotPass) widget()).body;
+        }
+
+        @Override
+        protected com.codename1.flutter.rendering.Size performLayout(
+                com.codename1.flutter.rendering.BoxConstraints constraints) {
+            com.codename1.flutter.RenderElement child = renderChild();
+            if (child == null) {
+                return constraints.smallest();
+            }
+            com.codename1.flutter.rendering.Size cs = child.layout(constraints);
+            if (!isDryPass()) {
+                Widget next = ((SlotPass) widget()).rebuildIfStale.call();
+                if (next != null) {
+                    relaidOut = next;
+                    syncChildren();
+                    child = renderChild();
+                    if (child == null) {
+                        return constraints.smallest();
+                    }
+                    cs = child.layout(constraints);
+                }
+            }
+            setChildOffset(child, 0, 0);
+            return constraints.constrain(cs);
         }
     }
 }

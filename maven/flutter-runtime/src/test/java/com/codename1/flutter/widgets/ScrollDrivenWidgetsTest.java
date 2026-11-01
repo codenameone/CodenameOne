@@ -149,6 +149,27 @@ class ScrollDrivenWidgetsTest {
     }
 
     @Test
+    void headerAfterOrdinarySliversIsStuckOnTheFirstFrame() {
+        Recording d = new Recording();
+        SliverPersistentHeader h = new SliverPersistentHeader();
+        h.delegate(d);
+        h.pinned(true);
+        ScrollController c = new ScrollController();
+        c.initialScrollOffset(350);
+        CustomScrollView v = new CustomScrollView();
+        v.controller(c);
+        v.slivers(DartList.of((Widget) new ProbeBox(100, 300), h, new ProbeBox(100, 2000)));
+        RenderHost host = new RenderHost();
+        BuildOwner owner = new BuildOwner();
+        FlutterUI.mount(v, host, owner);
+        // One layout pass, no rebuild in between: the slot's top (300) is known only
+        // once the list is laid out, and the header must already be stuck at it.
+        host.rootRenderElement().layout(BoxConstraints.tight(300, 400));
+        assertEquals(350.0, c.offset(), 1e-9);
+        assertEquals(50.0, d.shrinks.get(d.shrinks.size() - 1), 1e-9, "300 of content above it");
+    }
+
+    @Test
     void draggingDownOnContentAtItsTopShrinksTheSheet() {
         DraggableScrollableController c = new DraggableScrollableController();
         DraggableScrollableSheet s = new DraggableScrollableSheet();

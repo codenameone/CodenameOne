@@ -23,7 +23,10 @@
  */
 package com.codename1.flutter.widgets;
 
+import com.codename1.flutter.BuildContext;
+import com.codename1.flutter.FocusNode;
 import com.codename1.flutter.State;
+import com.codename1.flutter.Widget;
 import com.codename1.flutter.StatefulWidget;
 import com.codename1.flutter.TextEditingValue;
 import com.codename1.flutter.material.Autocomplete;
@@ -44,6 +47,44 @@ public class RawAutocomplete<T> extends StatefulWidget {
     public void optionsBuilder(Funcs.Func1<TextEditingValue, Iterable<T>> v) { this.optionsBuilder = v; }
     public void onSelected(Funcs.VoidFunc1<T> v) { this.onSelected = v; }
     public void displayStringForOption(Funcs.Func1<T, String> v) { this.displayStringForOption = v; }
+
+    private Funcs.Func4<BuildContext, com.codename1.flutter.material.TextEditingController, FocusNode,
+            Funcs.VoidFunc0, Widget> fieldViewBuilder;
+    private Funcs.Func3<BuildContext, Funcs.VoidFunc1<T>, Iterable<T>, Widget> optionsViewBuilder;
+    private com.codename1.flutter.material.TextEditingController textEditingController;
+    private FocusNode focusNode;
+
+    /// Flutter's {@code fieldViewBuilder(context, textEditingController, focusNode,
+    /// onFieldSubmitted)}: the field the options answer. Its controller is the one the
+    /// options follow, and calling onFieldSubmitted selects the highlighted option.
+    public void fieldViewBuilder(Funcs.Func4<BuildContext, com.codename1.flutter.material.TextEditingController,
+            FocusNode, Funcs.VoidFunc0, Widget> v) { this.fieldViewBuilder = v; }
+
+    /// Flutter's {@code optionsViewBuilder(context, onSelected, options)}: the view of
+    /// the options, shown under the field while there are any. Calling onSelected
+    /// selects an option as a tap on the default list does.
+    public void optionsViewBuilder(Funcs.Func3<BuildContext, Funcs.VoidFunc1<T>, Iterable<T>, Widget> v) {
+        this.optionsViewBuilder = v;
+    }
+
+    public void textEditingController(com.codename1.flutter.material.TextEditingController v) {
+        this.textEditingController = v;
+    }
+
+    public void focusNode(FocusNode v) { this.focusNode = v; }
+
+    public Funcs.Func4<BuildContext, com.codename1.flutter.material.TextEditingController, FocusNode,
+            Funcs.VoidFunc0, Widget> getFieldViewBuilder() { return fieldViewBuilder; }
+
+    public Funcs.Func3<BuildContext, Funcs.VoidFunc1<T>, Iterable<T>, Widget> getOptionsViewBuilder() {
+        return optionsViewBuilder;
+    }
+
+    public com.codename1.flutter.material.TextEditingController getTextEditingController() {
+        return textEditingController;
+    }
+
+    public FocusNode getFocusNode() { return focusNode; }
 
     /// Flutter's {@code RawAutocomplete.defaultStringForOption}: the option's toString.
     public static String defaultStringForOption(Object option) {
