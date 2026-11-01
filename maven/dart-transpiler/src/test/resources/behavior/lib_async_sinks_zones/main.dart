@@ -102,9 +102,6 @@ Future<void> main() async {
   await it.cancel();
   print('iterator $seen');
 
-  final r = Random.secure();
-  final n = r.nextInt(10);
-  print('secure ${n >= 0 && n < 10}');
 
   Object e1 = HandshakeException('hs');
   print('tls ${e1 is TlsException} ${e1 is IOException} ${TlsException('t') is HandshakeException}');

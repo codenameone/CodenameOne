@@ -52,6 +52,34 @@ abstract class Encoding {
   external Stream bind(Stream stream);
 }
 
+@JavaName('dart.convert.Converter')
+abstract class Converter<S, T> {
+  external Converter();
+  external T convert(S input);
+  external dynamic startChunkedConversion(dynamic sink);
+  external Stream<T> bind(Stream<S> stream);
+  external Converter<S, R> fuse<R>(Converter<T, R> other);
+}
+
+@JavaName('dart.convert.ByteConversionSink')
+abstract class ByteConversionSink {
+  external ByteConversionSink();
+  external static ByteConversionSink withCallback(void Function(List<int>) callback);
+  external void add(List<int> chunk);
+  external void addSlice(List<int> chunk, int start, int end, bool isLast);
+  external void close();
+}
+
+@JavaName('dart.convert.Utf8Encoder')
+class Utf8Encoder extends Converter<String, List<int>> {
+  external Utf8Encoder();
+}
+
+@JavaName('dart.convert.Utf8Decoder')
+class Utf8Decoder extends Converter<List<int>, String> {
+  external Utf8Decoder({bool allowMalformed});
+}
+
 @JavaName('dart.convert.HtmlEscape')
 class HtmlEscape {
   external HtmlEscape();

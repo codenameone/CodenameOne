@@ -33,6 +33,8 @@ import java.util.List;
 public final class Uint8List {
 
     private final byte[] bytes;
+    private final int off;
+    private final int len;
 
     public Uint8List(long length) {
         // Checked on the long, before narrowing, as ByteData and the lists are:
@@ -40,10 +42,21 @@ public final class Uint8List {
         dart.core.RangeError.checkNotNegative(length, "length");
         dart.core.RangeError.checkAllocatable(length);
         this.bytes = new byte[(int) length];
+        this.off = 0;
+        this.len = bytes.length;
     }
 
     private Uint8List(byte[] bytes) {
+        this(bytes, 0, bytes.length);
+    }
+
+    /// A window of {@code len} bytes of {@code bytes} at {@code off}, shared, not
+    /// copied: writes through it reach the buffer and the buffer's reach it, as Dart's
+    /// views do.
+    private Uint8List(byte[] bytes, int off, int len) {
         this.bytes = bytes;
+        this.off = off;
+        this.len = len;
     }
 
     /// A Uint8List over {@code bytes} itself, not a copy: a ByteBuffer's view.
@@ -61,7 +74,7 @@ public final class Uint8List {
     public static Uint8List fromList(Object source) {
         if (source instanceof Uint8List) {
             // a Uint8List IS a List<int> in Dart (utf8.encode returns one), but not a java.util.List here
-            return fromBytes(((Uint8List) source).bytes);
+            return new Uint8List(((Uint8List) source).copyBytes());
         }
         if (!(source instanceof List)) {
             throw new dart.core.TypeError("type '" + (source == null ? "Null" : source.getClass().getName())
@@ -86,14 +99,20 @@ public final class Uint8List {
         return new Uint8List(b);
     }
 
+    private byte[] copyBytes() {
+        byte[] c = new byte[len];
+        System.arraycopy(bytes, off, c, 0, len);
+        return c;
+    }
+
     public long length() {
-        return bytes.length;
+        return len;
     }
 
     /** {@code bytes[i]}: the unsigned byte, as Dart reads a Uint8List. */
     public long $index(long index) {
-        dart.core.RangeError.checkValidIndex(index, bytes.length);
-        return bytes[(int) index] & 0xff;
+        dart.core.RangeError.checkValidIndex(index, len);
+        return bytes[off + (int) index] & 0xff;
     }
 
     /// The index operator as the transpiler spells it on a receiver it types as a list.
@@ -101,15 +120,20 @@ public final class Uint8List {
         return $index(index);
     }
 
+    /// The index assignment as the transpiler spells it on a receiver it types as a list.
+    public void idxSet(long index, long value) {
+        $indexSet(index, value);
+    }
+
     public void $indexSet(long index, long value) {
-        dart.core.RangeError.checkValidIndex(index, bytes.length);
-        bytes[(int) index] = (byte) value;
+        dart.core.RangeError.checkValidIndex(index, len);
+        bytes[off + (int) index] = (byte) value;
     }
 
     public dart.core.DartList<Long> toList() {
         dart.core.DartList<Long> out = new dart.core.DartList<Long>();
-        for (byte b : bytes) {
-            out.add(Long.valueOf(b & 0xff));
+        for (int i = 0; i < len; i++) {
+            out.add(Long.valueOf(bytes[off + i] & 0xff));
         }
         return out;
     }
@@ -119,25 +143,45 @@ public final class Uint8List {
     }
 
     public Uint8List sublist(long start, Long end) {
-        int e = end == null ? bytes.length : (int) end.longValue();
-        if (start < 0 || start > e || e > bytes.length) {
+        int e = end == null ? len : (int) end.longValue();
+        if (start < 0 || start > e || e > len) {
             throw new dart.core.RangeError("Invalid range " + start + ".." + e);
         }
         byte[] out = new byte[e - (int) start];
-        System.arraycopy(bytes, (int) start, out, 0, out.length);
+        System.arraycopy(bytes, off + (int) start, out, 0, out.length);
         return new Uint8List(out);
     }
 
+    /// {@code Uint8List.sublistView(data, start, end)}: a view sharing the storage of
+    /// any typed list or ByteData, element offsets counted in bytes of {@code data}.
+    public static Uint8List sublistView(Object data) {
+        return sublistView(data, 0, null);
+    }
+
+    public static Uint8List sublistView(Object data, long start) {
+        return sublistView(data, start, null);
+    }
+
+    public static Uint8List sublistView(Object data, long start, Long end) {
+        long[] w = Bytes.sublistWindow(data, start, end);
+        return new Uint8List(Bytes.storage(data), (int) w[0], (int) w[1]);
+    }
+
     public boolean isEmpty() {
-        return bytes.length == 0;
+        return len == 0;
     }
 
     public boolean isNotEmpty() {
-        return bytes.length != 0;
+        return len != 0;
     }
 
-    /** The raw backing array (used by image decoders). */
+    /// The bytes as a Java array (used by image decoders and platform channels): the
+    /// backing array itself when this list covers all of it, else a copy of the window.
     public byte[] toBytes() {
+        return off == 0 && len == bytes.length ? bytes : copyBytes();
+    }
+
+    byte[] storage() {
         return bytes;
     }
 
@@ -145,11 +189,11 @@ public final class Uint8List {
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder("[");
-        for (int i = 0; i < bytes.length; i++) {
+        for (int i = 0; i < len; i++) {
             if (i > 0) {
                 sb.append(", ");
             }
-            sb.append(bytes[i] & 0xff);
+            sb.append(bytes[off + i] & 0xff);
         }
         return sb.append(']').toString();
     }
@@ -159,11 +203,11 @@ public final class Uint8List {
     }
 
     public long lengthInBytes() {
-        return bytes.length;
+        return len;
     }
 
     public long offsetInBytes() {
-        return 0;
+        return off;
     }
 
     public long elementSizeInBytes() {
@@ -178,18 +222,10 @@ public final class Uint8List {
         return view(buffer, offsetInBytes, null);
     }
 
-    /// A view over the whole buffer shares its bytes. This class keeps no offset, so a
-    /// view of part of the buffer is a copy of that part: writes through it do not reach
-    /// the buffer. Use ByteData.view or another typed list for a shared partial view.
+    /// A view of part of the buffer shares its bytes, as Dart's does.
     public static Uint8List view(ByteBuffer buffer, long offsetInBytes, Long length) {
         int n = Bytes.viewLength(buffer, offsetInBytes, length, 1);
-        byte[] b = buffer.bytes();
-        if (offsetInBytes == 0 && n == b.length) {
-            return new Uint8List(b);
-        }
-        byte[] c = new byte[n];
-        System.arraycopy(b, (int) offsetInBytes, c, 0, n);
-        return new Uint8List(c);
+        return new Uint8List(buffer.bytes(), (int) offsetInBytes, n);
     }
 
     public void setRange(long start, long end, Object from) {
@@ -197,14 +233,15 @@ public final class Uint8List {
     }
 
     public void setRange(long start, long end, Object from, long skipCount) {
-        dart.core.RangeError.checkValueInInterval(start, 0, bytes.length, "start");
-        dart.core.RangeError.checkValueInInterval(end, start, bytes.length, "end");
+        dart.core.RangeError.checkValueInInterval(start, 0, len, "start");
+        dart.core.RangeError.checkValueInInterval(end, start, len, "end");
         if (from instanceof Uint8List) {
-            byte[] src = ((Uint8List) from).bytes;
-            if (skipCount + (end - start) > src.length) {
+            Uint8List f = (Uint8List) from;
+            if (skipCount + (end - start) > f.len) {
                 throw new dart.core.StateError("Too few elements");
             }
-            System.arraycopy(src, (int) skipCount, bytes, (int) start, (int) (end - start));
+            // arraycopy handles an overlapping source as memmove, which is what Dart does
+            System.arraycopy(f.bytes, f.off + (int) skipCount, bytes, off + (int) start, (int) (end - start));
             return;
         }
         java.util.Iterator<?> it = ((Iterable<?>) from).iterator();
@@ -215,7 +252,7 @@ public final class Uint8List {
             if (!it.hasNext()) {
                 throw new dart.core.StateError("Too few elements");
             }
-            bytes[(int) i] = (byte) ((Number) it.next()).longValue();
+            bytes[off + (int) i] = (byte) ((Number) it.next()).longValue();
         }
     }
 
@@ -231,8 +268,8 @@ public final class Uint8List {
     }
 
     public void fillRange(long start, long end, Long value) {
-        dart.core.RangeError.checkValueInInterval(start, 0, bytes.length, "start");
-        dart.core.RangeError.checkValueInInterval(end, start, bytes.length, "end");
-        java.util.Arrays.fill(bytes, (int) start, (int) end, (byte) (value == null ? 0 : value.longValue()));
+        dart.core.RangeError.checkValueInInterval(start, 0, len, "start");
+        dart.core.RangeError.checkValueInInterval(end, start, len, "end");
+        java.util.Arrays.fill(bytes, off + (int) start, off + (int) end, (byte) (value == null ? 0 : value.longValue()));
     }
 }

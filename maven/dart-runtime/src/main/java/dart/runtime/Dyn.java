@@ -94,6 +94,10 @@ public final class Dyn {
                 return Boolean.valueOf(b.isNotEmpty());
             }
         }
+        Object core = coreTypeGet(o, name);
+        if (core != NO_MEMBER) {
+            return core;
+        }
         if (name.equals("hashCode")) {
             return Long.valueOf(o == null ? 0 : o.hashCode());
         }
@@ -101,6 +105,60 @@ public final class Dyn {
             return o == null ? null : o.getClass();
         }
         throw noSuch(o, name);
+    }
+
+    /**
+     * Getters of the dart:core value classes the runtime implements as plain Java classes
+     * (no DynamicObject table): DateTime, Duration and Uri. Reached when such a value's
+     * static type is dynamic, e.g. {@code (clock ?? DateTime.now)().year}.
+     */
+    private static Object coreTypeGet(Object o, String name) {
+        if (o instanceof dart.core.DateTime) {
+            dart.core.DateTime d = (dart.core.DateTime) o;
+            switch (name) {
+                case "year": return Long.valueOf(d.year());
+                case "month": return Long.valueOf(d.month());
+                case "day": return Long.valueOf(d.day());
+                case "hour": return Long.valueOf(d.hour());
+                case "minute": return Long.valueOf(d.minute());
+                case "second": return Long.valueOf(d.second());
+                case "millisecond": return Long.valueOf(d.millisecond());
+                case "microsecond": return Long.valueOf(d.microsecond());
+                case "weekday": return Long.valueOf(d.weekday());
+                case "millisecondsSinceEpoch": return Long.valueOf(d.millisecondsSinceEpoch());
+                case "microsecondsSinceEpoch": return Long.valueOf(d.microsecondsSinceEpoch());
+                case "isUtc": return Boolean.valueOf(d.isUtc());
+                default: return NO_MEMBER;
+            }
+        }
+        if (o instanceof dart.core.Duration) {
+            dart.core.Duration d = (dart.core.Duration) o;
+            switch (name) {
+                case "inMicroseconds": return Long.valueOf(d.inMicroseconds());
+                case "inMilliseconds": return Long.valueOf(d.inMilliseconds());
+                case "inSeconds": return Long.valueOf(d.inSeconds());
+                case "inMinutes": return Long.valueOf(d.inMinutes());
+                case "inHours": return Long.valueOf(d.inHours());
+                case "inDays": return Long.valueOf(d.inDays());
+                case "isNegative": return Boolean.valueOf(d.isNegative());
+                default: return NO_MEMBER;
+            }
+        }
+        if (o instanceof dart.core.DartUri) {
+            dart.core.DartUri u = (dart.core.DartUri) o;
+            switch (name) {
+                case "scheme": return u.scheme();
+                case "host": return u.host();
+                case "port": return Long.valueOf(u.port());
+                case "path": return u.path();
+                case "query": return u.query();
+                case "fragment": return u.fragment();
+                case "pathSegments": return u.pathSegments();
+                case "hasScheme": return Boolean.valueOf(u.hasScheme());
+                default: return NO_MEMBER;
+            }
+        }
+        return NO_MEMBER;
     }
 
     private static Object mapGet(Map<?, ?> m, String name) {

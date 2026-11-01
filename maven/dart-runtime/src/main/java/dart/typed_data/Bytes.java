@@ -70,4 +70,57 @@ final class Bytes {
         }
         return (int) n;
     }
+
+    /// The backing array of any typed list or ByteData.
+    static byte[] storage(Object data) {
+        if (data instanceof Uint8List) {
+            return ((Uint8List) data).storage();
+        }
+        if (data instanceof TypedIntList) {
+            return ((TypedIntList) data).buf;
+        }
+        if (data instanceof TypedFloatList) {
+            return ((TypedFloatList) data).buf;
+        }
+        if (data instanceof ByteData) {
+            return ((ByteData) data).buffer().bytes();
+        }
+        throw new dart.core.ArgumentError("Not a TypedData: " + data);
+    }
+
+    /// {@code X.sublistView(data, start, end)} for a 1-byte target: the byte offset
+    /// into the storage and the byte length, {@code start}/{@code end} counted in
+    /// elements of {@code data} and checked as Dart checks them.
+    static long[] sublistWindow(Object data, long start, Long end) {
+        long es;
+        long count;
+        long base;
+        if (data instanceof Uint8List) {
+            Uint8List u = (Uint8List) data;
+            es = 1;
+            count = u.length();
+            base = u.offsetInBytes();
+        } else if (data instanceof TypedIntList) {
+            TypedIntList t = (TypedIntList) data;
+            es = t.elementSize();
+            count = t.len;
+            base = t.off;
+        } else if (data instanceof TypedFloatList) {
+            TypedFloatList t = (TypedFloatList) data;
+            es = t.elementSizeInBytes();
+            count = t.len;
+            base = t.off;
+        } else if (data instanceof ByteData) {
+            ByteData d = (ByteData) data;
+            es = 1;
+            count = d.lengthInBytes();
+            base = d.offsetInBytes();
+        } else {
+            throw new dart.core.ArgumentError("Not a TypedData: " + data);
+        }
+        long e = end == null ? count : end.longValue();
+        dart.core.RangeError.checkValueInInterval(start, 0, count, "start");
+        dart.core.RangeError.checkValueInInterval(e, start, count, "end");
+        return new long[] {base + start * es, (e - start) * es};
+    }
 }

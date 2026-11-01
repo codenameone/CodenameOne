@@ -757,6 +757,42 @@ public class Stream<T> {
         };
     }
 
+    /// {@code Stream.eventTransformed(source, mapSink)}: every event of {@code source}
+    /// goes to the sink {@code mapSink} builds over the output stream's sink.
+    public static <T> Stream<T> eventTransformed(final Stream<?> source, final Funcs.Func1<Object, Object> mapSink) {
+        final StreamController<T> out = new StreamController<T>();
+        out.onListen(new Funcs.VoidFunc0() {
+            @Override
+            @SuppressWarnings("unchecked")
+            public void call() {
+                Object made = mapSink.call(out);
+                if (!(made instanceof StreamSink)) {
+                    out.addError(new dart.core.ArgumentError("eventTransformed: mapSink must return an EventSink"));
+                    out.close();
+                    return;
+                }
+                final StreamSink<Object> in = (StreamSink<Object>) made;
+                ((Stream<Object>) source).listen(new Funcs.VoidFunc1<Object>() {
+                    @Override
+                    public void call(Object v) {
+                        in.add(v);
+                    }
+                }, new Funcs.VoidFunc1<Object>() {
+                    @Override
+                    public void call(Object e) {
+                        in.addError(e);
+                    }
+                }, new Funcs.VoidFunc0() {
+                    @Override
+                    public void call() {
+                        in.close();
+                    }
+                });
+            }
+        });
+        return out.stream();
+    }
+
     /** Dart's {@code Stream.value}. */
     public static <T> Stream<T> value(T v) {
         return fromIterable(java.util.Collections.singletonList(v));

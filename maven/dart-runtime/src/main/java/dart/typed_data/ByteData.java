@@ -67,6 +67,20 @@ public final class ByteData {
         return new ByteData(buffer.bytes(), (int) offsetInBytes, n);
     }
 
+    /// {@code ByteData.sublistView(data, start, end)}: shares {@code data}'s storage.
+    public static ByteData sublistView(Object data) {
+        return sublistView(data, 0, null);
+    }
+
+    public static ByteData sublistView(Object data, long start) {
+        return sublistView(data, start, null);
+    }
+
+    public static ByteData sublistView(Object data, long start, Long end) {
+        long[] w = Bytes.sublistWindow(data, start, end);
+        return new ByteData(Bytes.storage(data), (int) w[0], (int) w[1]);
+    }
+
     public long offsetInBytes() {
         return off;
     }

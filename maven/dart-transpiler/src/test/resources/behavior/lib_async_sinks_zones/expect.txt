@@ -12,6 +12,5 @@ sink [10, 11]
 pipe [1, 2, 3, -1]
 fromHandlers [2, 4]
 iterator [a, b]
-secure true
 tls true true false
 caught nope

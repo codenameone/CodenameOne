@@ -56,6 +56,14 @@ public final class ByteBuffer {
         return ByteData.fromBytes(bytes);
     }
 
+    public ByteData asByteData(long offsetInBytes) {
+        return ByteData.view(this, offsetInBytes);
+    }
+
+    public ByteData asByteData(long offsetInBytes, Long length) {
+        return ByteData.view(this, offsetInBytes, length);
+    }
+
     byte[] bytes() {
         return bytes;
     }

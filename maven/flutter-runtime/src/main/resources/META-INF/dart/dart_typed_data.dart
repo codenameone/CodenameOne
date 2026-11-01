@@ -17,6 +17,7 @@ class Uint8List implements List<int> {
   external Uint8List(int length);
   external static Uint8List fromList(List<int> elements);
   external static Uint8List view(ByteBuffer buffer, [int offsetInBytes, int? length]);
+  external static Uint8List sublistView(Object data, [int start, int? end]);
   external int get length;
   external int operator [](int index);
   external void operator []=(int index, int value);
@@ -397,6 +398,7 @@ class Float64List implements List<double> {
 class ByteData {
   external ByteData(int length);
   external static ByteData view(ByteBuffer buffer, [int offsetInBytes, int? length]);
+  external static ByteData sublistView(Object data, [int start, int? end]);
   external int get lengthInBytes;
   external int get offsetInBytes;
   external int get elementSizeInBytes;
@@ -427,7 +429,7 @@ class ByteData {
 class ByteBuffer {
   external int get lengthInBytes;
   external Uint8List asUint8List([int offsetInBytes, int? length]);
-  external ByteData asByteData();
+  external ByteData asByteData([int offsetInBytes, int? length]);
   external Int8List asInt8List([int offsetInBytes, int? length]);
   external Uint8ClampedList asUint8ClampedList([int offsetInBytes, int? length]);
   external Int16List asInt16List([int offsetInBytes, int? length]);

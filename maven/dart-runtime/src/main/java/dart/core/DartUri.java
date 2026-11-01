@@ -80,7 +80,7 @@ public final class DartUri {
         StringBuilder out = new StringBuilder(t.length() + 8);
         int pos = 0;
         int colon = t.indexOf(':');
-        if (colon > 0 && colon < end && isScheme(t.substring(0, colon))) {
+        if (colon > 0 && colon < end && isSchemeText(t.substring(0, colon))) {
             out.append(t.substring(0, colon + 1));
             pos = colon + 1;
         }
@@ -293,7 +293,7 @@ public final class DartUri {
         if (colon >= 0 && colon < end) {
             // A colon before the first '/', '?' or '#' ends a scheme, so what precedes
             // it has to be one.
-            if (colon == 0 || !isScheme(text.substring(0, colon))) {
+            if (colon == 0 || !isSchemeText(text.substring(0, colon))) {
                 return "Invalid scheme";
             }
             rest = colon + 1;
@@ -444,7 +444,7 @@ public final class DartUri {
             s = s.substring(0, q);
         }
         int colon = s.indexOf(':');
-        if (colon > 0 && isScheme(s.substring(0, colon))) {
+        if (colon > 0 && isSchemeText(s.substring(0, colon))) {
             scheme = asciiLower(s.substring(0, colon));
             s = s.substring(colon + 1);
         }
@@ -738,7 +738,7 @@ public final class DartUri {
     /// answer true for any Unicode letter, so an accented Latin letter
     /// (a letter, but not ASCII) would otherwise be accepted as part of
     /// a scheme -- check the ASCII ranges by hand instead.
-    private static boolean isScheme(String s) {
+    private static boolean isSchemeText(String s) {
         if (s.isEmpty() || !isAsciiAlpha(s.charAt(0))) {
             return false;
         }
@@ -995,6 +995,163 @@ public final class DartUri {
 
     private String canonical;
 
+    /// {@code uri.hasScheme}.
+    public boolean hasScheme() {
+        return scheme.length() > 0;
+    }
+
+    /// {@code uri.isScheme(name)}: case-insensitive, as Dart compares schemes.
+    public boolean isScheme(String name) {
+        return name == null || name.length() == 0 ? scheme.length() == 0 : scheme.equalsIgnoreCase(name);
+    }
+
+    /// {@code uri.data}: only a {@code data:} URI has one, and this runtime has no
+    /// UriData, so it answers null for every other URI and throws for a data URI.
+    public Object data() {
+        if (isScheme("data")) {
+            throw new UnsupportedError("UriData is not supported");
+        }
+        return null;
+    }
+
+    /// {@code uri.toFilePath()}: the decoded path of a {@code file:} (or scheme-less) URI,
+    /// POSIX style.
+    public String toFilePath() {
+        if (scheme.length() > 0 && !isScheme("file")) {
+            throw new UnsupportedError("Cannot extract a file path from a " + scheme + " URI");
+        }
+        if (query.length() > 0) {
+            throw new UnsupportedError("Cannot extract a file path from a URI with a query component");
+        }
+        if (fragment.length() > 0) {
+            throw new UnsupportedError("Cannot extract a file path from a URI with a fragment component");
+        }
+        return decodeComponent(path);
+    }
+
+    /// {@code uri.resolve(reference)}: RFC 3986 section 5.2 reference resolution.
+    public DartUri resolve(String reference) {
+        return resolveUri(parse(reference));
+    }
+
+    public DartUri resolveUri(DartUri reference) {
+        String[] r = split(reference.text);
+        String[] b = split(text);
+        String sch;
+        String auth;
+        String pth;
+        String qry;
+        if (r[0] != null) {
+            sch = r[0];
+            auth = r[1];
+            pth = removeDots(r[2]);
+            qry = r[3];
+        } else {
+            sch = b[0];
+            if (r[1] != null) {
+                auth = r[1];
+                pth = removeDots(r[2]);
+                qry = r[3];
+            } else {
+                auth = b[1];
+                if (r[2].length() == 0) {
+                    pth = b[2];
+                    qry = r[3] != null ? r[3] : b[3];
+                } else {
+                    if (r[2].startsWith("/")) {
+                        pth = removeDots(r[2]);
+                    } else {
+                        String merged;
+                        if (b[1] != null && b[2].length() == 0) {
+                            merged = "/" + r[2];
+                        } else {
+                            int slash = b[2].lastIndexOf('/');
+                            merged = (slash < 0 ? "" : b[2].substring(0, slash + 1)) + r[2];
+                        }
+                        pth = removeDots(merged);
+                    }
+                    qry = r[3];
+                }
+            }
+        }
+        StringBuilder sb = new StringBuilder();
+        if (sch != null) {
+            sb.append(sch).append(':');
+        }
+        if (auth != null) {
+            sb.append("//").append(auth);
+        }
+        sb.append(pth);
+        if (qry != null) {
+            sb.append('?').append(qry);
+        }
+        if (r[4] != null) {
+            sb.append('#').append(r[4]);
+        }
+        return parse(sb.toString());
+    }
+
+    /// scheme, authority, path, query, fragment; null for an absent component.
+    private static String[] split(String u) {
+        String[] out = new String[5];
+        int hash = u.indexOf('#');
+        if (hash >= 0) {
+            out[4] = u.substring(hash + 1);
+            u = u.substring(0, hash);
+        }
+        int q = u.indexOf('?');
+        if (q >= 0) {
+            out[3] = u.substring(q + 1);
+            u = u.substring(0, q);
+        }
+        int colon = u.indexOf(':');
+        int firstSlash = u.indexOf('/');
+        if (colon > 0 && (firstSlash < 0 || colon < firstSlash)) {
+            out[0] = u.substring(0, colon);
+            u = u.substring(colon + 1);
+        }
+        if (u.startsWith("//")) {
+            int end = u.indexOf('/', 2);
+            if (end < 0) {
+                end = u.length();
+            }
+            out[1] = u.substring(2, end);
+            u = u.substring(end);
+        }
+        out[2] = u;
+        return out;
+    }
+
+    /// RFC 3986 section 5.2.4.
+    private static String removeDots(String in) {
+        StringBuilder out = new StringBuilder();
+        while (in.length() > 0) {
+            if (in.startsWith("../")) {
+                in = in.substring(3);
+            } else if (in.startsWith("./")) {
+                in = in.substring(2);
+            } else if (in.startsWith("/./")) {
+                in = in.substring(2);
+            } else if (in.equals("/.")) {
+                in = "/";
+            } else if (in.startsWith("/../") || in.equals("/..")) {
+                in = in.length() == 3 ? "/" : in.substring(3);
+                int last = out.lastIndexOf("/");
+                out.setLength(last < 0 ? 0 : last);
+            } else if (in.equals(".") || in.equals("..")) {
+                in = "";
+            } else {
+                int next = in.indexOf('/', in.startsWith("/") ? 1 : 0);
+                if (next < 0) {
+                    next = in.length();
+                }
+                out.append(in, 0, next);
+                in = in.substring(next);
+            }
+        }
+        return out.toString();
+    }
+
     /**
      * Value equality over the canonical text, as Dart's Uri has: two separate parses
      * of one URL are equal, and https://EXAMPLE.com/a equals https://example.com/a.
@@ -1024,7 +1181,7 @@ public final class DartUri {
         int rest = 0;
         String scheme = "";
         int colon = t.indexOf(':');
-        if (colon > 0 && colon < end && isScheme(t.substring(0, colon))) {
+        if (colon > 0 && colon < end && isSchemeText(t.substring(0, colon))) {
             out = foldRange(t, out, 0, colon);
             rest = colon + 1;
             scheme = asciiLower(t.substring(0, colon));

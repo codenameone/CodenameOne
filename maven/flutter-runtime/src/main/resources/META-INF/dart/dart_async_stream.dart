@@ -53,6 +53,7 @@ abstract class StreamSubscription<T> {
 
 @JavaName('dart.async.Stream')
 abstract class Stream<T> {
+  external static Stream<T> eventTransformed<T>(Stream source, dynamic Function(dynamic) mapSink);
   external Future pipe(StreamConsumer<T> streamConsumer);
   external StreamSubscription<T> listen(void Function(T event)? onData,
       {Object? onError, void Function()? onDone, bool? cancelOnError});

@@ -62,6 +62,12 @@ public final class RegExp {
     private boolean unicode;
     private boolean dotAll;
     private RE compiled;
+    /// Names of {@code (?<name>...)} groups, by group number (index 0 unused); null
+    /// when the pattern has none.
+    private String[] groupNameByIndex;
+    /// The source as the engine reads it: named groups made plain groups and
+    /// {@code \k<name>} made a numbered back reference, as the engine has neither.
+    private String engineSource;
 
     public RegExp(String source) {
         this.source = source == null ? "" : source;
@@ -183,13 +189,99 @@ public final class RegExp {
                 flags |= RE.MATCH_SINGLELINE;   // '.' also matches line terminators
             }
             try {
-                compiled = new RE(source, flags);
+                compiled = new RE(engineSource(), flags);
             } catch (RESyntaxException e) {
                 throw new FormatException("Invalid regular expression: /" + source + "/: "
                         + e.getMessage());
             }
         }
         return compiled;
+    }
+
+    private String engineSource() {
+        if (engineSource == null) {
+            engineSource = stripNamedGroups();
+        }
+        return engineSource;
+    }
+
+    /// Rewrites {@code (?<name>} to {@code (} and {@code \k<name>} to the group's
+    /// number, recording each name against its group number. Groups are counted by
+    /// the same rules as countCapturingGroups: escapes and character classes skipped.
+    private String stripNamedGroups() {
+        String src = source;
+        if (src.indexOf("(?<") < 0) {
+            return src;
+        }
+        java.util.List<String> names = new java.util.ArrayList<String>();
+        names.add(null);
+        StringBuilder out = new StringBuilder(src.length());
+        boolean inClass = false;
+        int n = src.length();
+        for (int i = 0; i < n; i++) {
+            char c = src.charAt(i);
+            if (c == '\\' && i + 1 < n) {
+                char d = src.charAt(i + 1);
+                if (d == 'k' && !inClass && i + 2 < n && src.charAt(i + 2) == '<') {
+                    int close = src.indexOf('>', i + 3);
+                    if (close > 0) {
+                        int g = names.indexOf(src.substring(i + 3, close));
+                        if (g > 0) {
+                            out.append('\\').append(g);
+                            i = close;
+                            continue;
+                        }
+                    }
+                }
+                out.append(c).append(d);
+                i++;
+                continue;
+            }
+            if (inClass) {
+                if (c == ']') {
+                    inClass = false;
+                }
+                out.append(c);
+                continue;
+            }
+            if (c == '[') {
+                inClass = true;
+                out.append(c);
+                continue;
+            }
+            if (c == '(') {
+                if (i + 1 < n && src.charAt(i + 1) == '?') {
+                    if (i + 2 < n && src.charAt(i + 2) == '<' && i + 3 < n
+                            && src.charAt(i + 3) != '=' && src.charAt(i + 3) != '!') {
+                        int close = src.indexOf('>', i + 3);
+                        if (close < 0) {
+                            throw new FormatException("Invalid regular expression: /" + source
+                                    + "/: unterminated group name");
+                        }
+                        String name = src.substring(i + 3, close);
+                        if (names.contains(name)) {
+                            throw new FormatException("Invalid regular expression: /" + source
+                                    + "/: Duplicate capture group name");
+                        }
+                        names.add(name);
+                        out.append('(');
+                        i = close;
+                        continue;
+                    }
+                } else {
+                    names.add(null);
+                }
+            }
+            out.append(c);
+        }
+        groupNameByIndex = names.toArray(new String[names.size()]);
+        return out.toString();
+    }
+
+    /// The group names, by group number, or null; for RegExpMatch.namedGroup.
+    String[] groupNames() {
+        engineSource();
+        return groupNameByIndex;
     }
 
     /** Dart's {@code RegExp.pattern} getter — the original source string. */
@@ -213,7 +305,7 @@ public final class RegExp {
             return null;
         }
         RE re = engine();
-        return re.match(input) ? snapshot(re, input, declaredGroupCount) : null;
+        return re.match(input) ? snapshot(re, input, declaredGroupCount, groupNames()) : null;
     }
 
     /** Dart's {@code RegExp.stringMatch(input)} — the matched substring or null. */
@@ -312,7 +404,7 @@ public final class RegExp {
             hook.run();
         }
         RE re = engine();
-        return re.match(input, from) ? snapshot(re, input, declaredGroupCount) : null;
+        return re.match(input, from) ? snapshot(re, input, declaredGroupCount, groupNames()) : null;
     }
 
     /**
@@ -327,7 +419,7 @@ public final class RegExp {
      * counts correctly comes back as an unmatched group rather than stale
      * data from an earlier match.</p>
      */
-    private static RegExpMatch snapshot(RE re, String input, int declaredGroupCount) {
+    private static RegExpMatch snapshot(RE re, String input, int declaredGroupCount, String[] names) {
         int count = Math.max(declaredGroupCount + 1, re.getParenCount());
         String[] groups = new String[count];
         int[] starts = new int[count];
@@ -337,7 +429,7 @@ public final class RegExp {
             starts[i] = re.getParenStart(i);
             ends[i] = re.getParenEnd(i);
         }
-        return new RegExpMatch(groups, starts, ends, input);
+        return new RegExpMatch(groups, starts, ends, input, names);
     }
 
     @Override

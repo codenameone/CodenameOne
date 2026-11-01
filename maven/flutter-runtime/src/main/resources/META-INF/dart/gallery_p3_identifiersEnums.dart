@@ -82,6 +82,12 @@ class Uri {
   external String get fragment;
   external List<String> get pathSegments;
   external Map<String, String> get queryParameters;
+  external bool get hasScheme;
+  external bool isScheme(String scheme);
+  external dynamic get data;
+  external String toFilePath();
+  external Uri resolve(String reference);
+  external Uri resolveUri(Uri reference);
   external String toString();
 }
 

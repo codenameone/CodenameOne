@@ -114,6 +114,13 @@ class RegExpMatch {
   external int get start;
   external int get end;
   external String get input;
+  external String? namedGroup(String name);
+  external Iterable<String> get groupNames;
+}
+
+@JavaName('dart.core.Symbol')
+class Symbol {
+  external Symbol(String name);
 }
 
 // --- dart:core : StringBuffer ----------------------------------------------
