@@ -123,6 +123,59 @@ class ScrollDrivenWidgetsTest {
     }
 
     @Test
+    void headerAfterOrdinarySliversSticksWhenTheContentReachesIt() {
+        Recording d = new Recording();
+        SliverPersistentHeader h = new SliverPersistentHeader();
+        h.delegate(d);
+        h.pinned(true);
+        ScrollController c = new ScrollController();
+        CustomScrollView v = new CustomScrollView();
+        v.controller(c);
+        v.slivers(DartList.of((Widget) new ProbeBox(100, 300), h, new ProbeBox(100, 2000)));
+        RenderHost host = new RenderHost();
+        BuildOwner owner = new BuildOwner();
+        FlutterUI.mount(v, host, owner);
+        host.rootRenderElement().layout(BoxConstraints.tight(300, 400));
+        c.userScrolled(200, 2000, 400);
+        owner.flushSync();
+        host.rootRenderElement().layout(BoxConstraints.tight(300, 400));
+        assertEquals(0.0, d.shrinks.get(d.shrinks.size() - 1), 1e-9, "still below the top");
+        c.userScrolled(350, 2000, 400);
+        owner.flushSync();
+        assertEquals(50.0, d.shrinks.get(d.shrinks.size() - 1), 1e-9, "300 of content above it");
+        c.userScrolled(1000, 2000, 400);
+        owner.flushSync();
+        assertEquals(80.0, d.shrinks.get(d.shrinks.size() - 1), 1e-9, "pinned at minExtent");
+    }
+
+    @Test
+    void draggingDownOnContentAtItsTopShrinksTheSheet() {
+        DraggableScrollableController c = new DraggableScrollableController();
+        DraggableScrollableSheet s = new DraggableScrollableSheet();
+        s.controller(c);
+        s.minChildSize(0.2);
+        final ScrollController[] content = new ScrollController[1];
+        s.builder(new Funcs.Func2<BuildContext, ScrollController, Widget>() {
+            @Override
+            public Widget call(BuildContext ctx, ScrollController sc) {
+                content[0] = sc;
+                return new ProbeBox(10, 10);
+            }
+        });
+        RenderHost host = new RenderHost();
+        BuildOwner owner = new BuildOwner();
+        FlutterUI.mount(s, host, owner);
+        host.rootRenderElement().layout(BoxConstraints.tight(300, 400));
+        assertEquals(0.5, c.size(), 1e-9);
+        // The list pulled 40px past its top: the sheet takes the drag.
+        content[0].userScrolled(-40, 1000, 200);
+        assertEquals(0.4, c.size(), 1e-9);
+        assertEquals(0.0, content[0].offset(), 1e-9, "the content stays at its top");
+        content[0].userScrolled(-400, 1000, 200);
+        assertEquals(0.2, c.size(), 1e-9, "down to minChildSize");
+    }
+
+    @Test
     void sheetSnapsToTheNearestStopOrTheNextOneAFlingReaches() {
         double[] stops = {0.25, 0.5, 1.0};
         assertEquals(0.5, DraggableScrollableSheet.snapTarget(0.6, 0, stops), 1e-9);

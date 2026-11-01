@@ -65,10 +65,15 @@ class DraggableScrollableSheet extends Widget {
   external DraggableScrollableSheet({Key? key, double? initialChildSize, double? minChildSize, double? maxChildSize, bool? expand, bool? snap, List<double>? snapSizes, DraggableScrollableController? controller, bool? shouldCloseOnMinExtent, required Widget Function(BuildContext, ScrollController) builder});
 }
 
+@JavaName('com.codename1.flutter.widgets.RawAutocomplete')
+class RawAutocomplete<T extends Object> extends Widget {
+  external RawAutocomplete({Key? key, required Iterable<T> Function(TextEditingValue) optionsBuilder, void Function(T)? onSelected, String Function(T)? displayStringForOption});
+  external static String defaultStringForOption(Object option);
+}
+
 @JavaName('com.codename1.flutter.material.Autocomplete')
 class Autocomplete<T extends Object> extends Widget {
   external Autocomplete({Key? key, required Iterable<T> Function(TextEditingValue) optionsBuilder, void Function(T)? onSelected, String Function(T)? displayStringForOption, double? optionsMaxHeight});
-  external static String defaultStringForOption(Object option);
 }
 
 @JavaName('com.codename1.flutter.material.ElevatedButtonThemeData')

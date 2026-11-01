@@ -45,9 +45,9 @@ import dart.runtime.Funcs;
 /// one in the fling's direction). The ScrollController handed to the builder is the
 /// sheet's own: while the sheet is below maxChildSize, scrolling the content grows
 /// the sheet instead and the content stays at its top; at maxChildSize the content
-/// scrolls. A drag down on content scrolled to its top does not shrink the sheet,
-/// since the list here reports no overscroll; a drag on any non-scrolling part of
-/// the sheet does. A {@link DraggableScrollableController} reads and moves the size.
+/// scrolls. A drag down on content scrolled to its top shrinks the sheet: the
+/// list's overscroll past its top (a negative offset) is handed to the sheet, down to
+/// minChildSize. A drag on any non-scrolling part of the sheet moves it as well. A {@link DraggableScrollableController} reads and moves the size.
 public class DraggableScrollableSheet extends StatefulWidget {
 
     private double initialChildSize = 0.5;
@@ -199,6 +199,21 @@ public class DraggableScrollableSheet extends StatefulWidget {
                 return;
             }
             double max = widget().maxChildSize;
+            if (off < 0 && size > widget().minChildSize) {
+                // The overscroll handoff, the other way: a drag down on content already at
+                // its top pulls the list past it (Codename One's tensile drag reports that
+                // as a negative offset), and Flutter hands such a drag to the sheet, which
+                // shrinks while the content stays at its top.
+                double shrink = Math.min(-off / available, size - widget().minChildSize);
+                moveTo(size - shrink);
+                handing = true;
+                try {
+                    scroll.jumpTo(Math.min(0, off + shrink * available));
+                } finally {
+                    handing = false;
+                }
+                return;
+            }
             if (off > 0 && size < max) {
                 double grow = Math.min(off / available, max - size);
                 moveTo(size + grow);

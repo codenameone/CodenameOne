@@ -41,10 +41,10 @@ import dart.runtime.Funcs;
 /// header's maxExtent in the scrolling content, and paints the headers over it with the
 /// shrinkOffset that offset gives them. A pinned header shrinks from maxExtent to
 /// minExtent and stays; a floating one scrolls away and comes back as soon as the user
-/// scrolls in reverse; a plain one scrolls away with a growing shrinkOffset. A
-/// persistent header that follows an ordinary sliver is built at its full extent and
-/// scrolls with the content: its position would need the extents of the box slivers
-/// before it, which this layout does not report.
+/// scrolls in reverse; a plain one scrolls away with a growing shrinkOffset. A header
+/// that follows ordinary slivers does the same once the content scrolls it up to the
+/// pinned headers above it: its top is read from the laid-out slot it reserves, so it
+/// scrolls with the content until then and sticks at the offset Flutter sticks it.
 public class CustomScrollView extends StatefulWidget {
 
     private DartList<Widget> slivers;
@@ -213,20 +213,71 @@ public class CustomScrollView extends StatefulWidget {
             });
         }
 
+        /// Per header: the context of its slot in the scrolling content, from which the
+        /// header's top in the content is read once it has been laid out.
+        private BuildContext[] slots = new BuildContext[0];
+
+        /// The top of {@code slot} in the scrolling content, or -1 while it has not been
+        /// laid out: its y summed up to the component that scrolls.
+        static double contentTop(BuildContext slot) {
+            if (!(slot instanceof com.codename1.flutter.Element)) {
+                return -1;
+            }
+            com.codename1.flutter.RenderElement r =
+                    com.codename1.flutter.RenderElement.findRenderElement((com.codename1.flutter.Element) slot);
+            if (r == null) {
+                return -1;
+            }
+            com.codename1.ui.Component c = r.component();
+            if (c == null || c.getParent() == null) {
+                // Not on a Codename One component (yet): the render tree's own layout,
+                // the slot's offset summed up to the list.
+                double y = r.relY();
+                for (com.codename1.flutter.Element e = r.parent(); e != null; e = e.parent()) {
+                    if (e instanceof ListViewRenderElement) {
+                        return y;
+                    }
+                    if (e instanceof com.codename1.flutter.RenderElement) {
+                        y += ((com.codename1.flutter.RenderElement) e).relY();
+                    }
+                }
+                return -1;
+            }
+            double y = 0;
+            while (c != null && c.getParent() != null) {
+                y += c.getY();
+                if (c.getParent().isScrollableY()) {
+                    return y;
+                }
+                c = c.getParent();
+            }
+            return -1;
+        }
+
         @Override
-        public Widget build(BuildContext context) {
+        public Widget build(final BuildContext context) {
             CustomScrollView w = widget();
             DartList<Widget> all = w.slivers != null ? w.slivers : new DartList<Widget>();
-            java.util.List<Header> headers = new java.util.ArrayList<Header>();
-            int lead = 0;
             boolean vertical = w.scrollDirection != com.codename1.flutter.Axis.horizontal;
-            while (vertical && !w.reverse && lead < all.size()) {
-                Header h = headerOf(all.get(lead));
+            final java.util.List<Header> headers = new java.util.ArrayList<Header>();
+            // index into all -> header index, -1 for an ordinary sliver
+            int[] headerAt = new int[all.size()];
+            // How many headers lead the list: their tops are known without layout.
+            int lead = -1;
+            for (int i = 0; i < all.size(); i++) {
+                Header h = vertical && !w.reverse ? headerOf(all.get(i)) : null;
                 if (h == null) {
-                    break;
+                    headerAt[i] = -1;
+                    if (lead < 0) {
+                        lead = headers.size();
+                    }
+                } else {
+                    headerAt[i] = headers.size();
+                    headers.add(h);
                 }
-                headers.add(h);
-                lead++;
+            }
+            if (lead < 0) {
+                lead = headers.size();
             }
             if (floatShown.length != headers.size()) {
                 double[] next = new double[headers.size()];
@@ -234,19 +285,67 @@ public class CustomScrollView extends StatefulWidget {
                     next[i] = headers.get(i).delegate.maxExtent();
                 }
                 floatShown = next;
+                slots = new BuildContext[headers.size()];
+            }
+            // Where each header's top is in the content, and whether it is stuck: scrolled
+            // to (or past) the bottom of the pinned headers above it, so it is painted over
+            // the list with the extent and shrinkOffset that give it, as Flutter's sliver
+            // protocol does wherever in the list the header sits.
+            double off = offset();
+            final double[] extent = new double[headers.size()];
+            final double[] shrink = new double[headers.size()];
+            final double[] paintY = new double[headers.size()];
+            final boolean[] stuck = new boolean[headers.size()];
+            double pinnedAbove = 0;
+            double leadTop = 0;
+            for (int i = 0; i < headers.size(); i++) {
+                Header h = headers.get(i);
+                double max = h.delegate.maxExtent();
+                double top;
+                if (i < lead) {
+                    top = leadTop;
+                    leadTop += max;
+                } else {
+                    top = contentTop(slots[i]);
+                }
+                if (top < 0 || top - off >= pinnedAbove) {
+                    extent[i] = max;
+                    continue;
+                }
+                double[] g = headerGeometry(h.delegate.minExtent(), max, top - pinnedAbove, off,
+                        h.pinned, h.floating, floatShown[i]);
+                extent[i] = g[0];
+                shrink[i] = g[1];
+                paintY[i] = pinnedAbove;
+                stuck[i] = true;
+                if (h.pinned || h.floating) {
+                    pinnedAbove += g[0];
+                }
             }
             DartList<Widget> content = new DartList<Widget>();
-            double reserved = 0;
-            for (Header h : headers) {
-                reserved += h.delegate.maxExtent();
-            }
-            if (reserved > 0) {
-                SizedBox spacer = new SizedBox();
-                spacer.height(reserved);
-                content.add(spacer);
-            }
-            for (int i = lead; i < all.size(); i++) {
-                content.add(all.get(i));
+            for (int i = 0; i < all.size(); i++) {
+                final int hi = headerAt[i];
+                if (hi < 0) {
+                    content.add(all.get(i));
+                    continue;
+                }
+                final Header h = headers.get(hi);
+                // The header's slot reserves maxExtent in the content; it holds the header
+                // itself until the header sticks, and is left empty after.
+                Builder slot = new Builder();
+                slot.builder(new Funcs.Func1<BuildContext, Widget>() {
+                    @Override
+                    public Widget call(BuildContext ctx) {
+                        slots[hi] = ctx;
+                        SizedBox box = new SizedBox();
+                        box.height(h.delegate.maxExtent());
+                        if (!stuck[hi]) {
+                            box.child(h.delegate.build(ctx, 0.0, false));
+                        }
+                        return box;
+                    }
+                });
+                content.add(slot);
             }
             ListView list = new ListView();
             list.children(content);
@@ -260,38 +359,29 @@ public class CustomScrollView extends StatefulWidget {
             if (w.shrinkWrap) {
                 list.shrinkWrap(true);
             }
-            if (headers.isEmpty()) {
-                return list;
-            }
-            double off = offset();
-            DartList<Widget> painted = new DartList<Widget>();
-            double top = 0;
+            DartList<Widget> layers = new DartList<Widget>();
+            layers.add(list);
             for (int i = 0; i < headers.size(); i++) {
-                Header h = headers.get(i);
-                double max = h.delegate.maxExtent();
-                double[] g = headerGeometry(h.delegate.minExtent(), max, top, off,
-                        h.pinned, h.floating, floatShown[i]);
-                top += max;
-                if (g[0] <= 0) {
+                if (!stuck[i] || extent[i] <= 0) {
                     continue;
                 }
                 SizedBox box = new SizedBox();
-                box.height(g[0]);
+                box.height(extent[i]);
                 ClipRect clip = new ClipRect();
-                clip.child(h.delegate.build(context, g[1], g[1] > 0));
+                clip.child(headers.get(i).delegate.build(context, shrink[i], shrink[i] > 0));
                 box.child(clip);
-                painted.add(box);
+                Positioned pos = new Positioned();
+                pos.left(0);
+                pos.top(paintY[i]);
+                pos.right(0);
+                pos.child(box);
+                layers.add(pos);
             }
-            Column column = new Column();
-            column.mainAxisSize(MainAxisSize.min);
-            column.children(painted);
-            Positioned pos = new Positioned();
-            pos.left(0);
-            pos.top(0);
-            pos.right(0);
-            pos.child(column);
+            if (headers.isEmpty()) {
+                return list;
+            }
             Stack stack = new Stack();
-            stack.children(DartList.of((Widget) list, pos));
+            stack.children(layers);
             return stack;
         }
     }
