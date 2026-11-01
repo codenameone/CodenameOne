@@ -382,7 +382,13 @@ public final class Program {
      */
     public Ast.ClassDecl resolveClass(String name, Ast.Library fromLibrary, String prefix) {
         if (prefix != null && fromLibrary != null) {
-            Ast.Library target = resolveImportedLibrary(fromLibrary, fromLibrary.prefixImports.get(prefix));
+            String uri = fromLibrary.prefixImports.get(prefix);
+            if (uri != null && uri.startsWith("dart:")) {
+                // `io.WebSocket`: a dart: library declares no program class, so the name is
+                // the runtime type even beside a program class of the same simple name.
+                return null;
+            }
+            Ast.Library target = resolveImportedLibrary(fromLibrary, uri);
             List<Ast.ClassDecl> byName = classesByName.get(name);
             if (target != null && byName != null) {
                 for (Ast.ClassDecl c : byName) {

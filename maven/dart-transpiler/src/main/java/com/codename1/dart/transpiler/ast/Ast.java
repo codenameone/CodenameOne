@@ -69,6 +69,10 @@ public final class Ast {
         /// prefix is stripped from {@link #name}: a bare name may mean a different
         /// type (a stub of the same name) in the library that reads it.
         public ClassDecl resolved;
+        /// A prefixed name (`io.WebSocket`) whose prefix's library declares no program class
+        /// of that name: it is the runtime type, even where a program class of the same
+        /// simple name is in scope.
+        public boolean runtimeOnly;
         // For an inline function type (name == "Function", e.g. `void Function(int)`):
         // the parsed signature so codegen can render a real Funcs.* SAM instead of Object.
         public List<TypeRef> funcParams;          // non-null iff this is an inline function type
@@ -736,6 +740,12 @@ public final class Ast {
         public List<Param> params = new ArrayList<Param>();
         public Block body;                        // nullable
         public Expr exprBody;                     // for `=> expr`
+        /**
+         * A tear-off closure's receiver, evaluated ONCE where the closure is built and
+         * bound to {@link #boundName} inside it; null for an ordinary function literal.
+         */
+        public Expr boundRecv;
+        public String boundName;
     }
 
     public static class ParenExpr extends Expr {

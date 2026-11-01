@@ -2710,7 +2710,7 @@ abstract class Alignment extends AlignmentGeometry {
 @JavaName('com.codename1.flutter.widgets.ListView')
 class ListView extends Widget {
   external ListView({Key? key, List<Widget> children, EdgeInsets? padding, bool? shrinkWrap, Axis? scrollDirection});
-  external static ListView builder({Key? key, int? itemCount, IndexedWidgetBuilder itemBuilder, EdgeInsets? padding, bool? shrinkWrap, Object? physics, Object? scrollDirection, Object? controller, String? restorationId, bool? primary, double? itemExtent, bool? reverse});
+  external static ListView builder({Key? key, int? itemCount, IndexedWidgetBuilder itemBuilder, EdgeInsets? padding, bool? shrinkWrap, Object? physics, Axis? scrollDirection, Object? controller, String? restorationId, bool? primary, double? itemExtent, bool? reverse});
   external static ListView separated({Key? key, bool? primary, int? itemCount, IndexedWidgetBuilder itemBuilder, IndexedWidgetBuilder separatorBuilder, EdgeInsets? padding, bool? shrinkWrap, Axis? scrollDirection});
 }
 

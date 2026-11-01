@@ -271,7 +271,7 @@ class PageView extends Widget {
        bool? allowImplicitScrolling, String? restorationId, Object? clipBehavior});
   external static PageView builder(
       {Key? key, PageController? controller, Object? scrollDirection, bool? reverse,
-       Object? physics, bool? pageSnapping, Object? onPageChanged,
+       Object? physics, bool? pageSnapping, void Function(int)? onPageChanged,
        IndexedWidgetBuilder itemBuilder, int? itemCount, bool? allowImplicitScrolling,
        String? restorationId, Object? clipBehavior});
 }
@@ -965,7 +965,7 @@ external int compareAsciiUpperCase(String a, String b);
 class SynchronousFuture<T> {
   external SynchronousFuture(T value);
   external Object then(Object onValue, {Object? onError});
-  external Object whenComplete(Object action);
+  external Object whenComplete(dynamic Function() action);
   external Object catchError(Object onError, {Object? test});
 }
 

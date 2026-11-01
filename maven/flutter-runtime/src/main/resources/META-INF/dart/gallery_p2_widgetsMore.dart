@@ -196,7 +196,7 @@ class Dismissible extends Widget {
 @JavaName('com.codename1.flutter.widgets.ReorderableListView')
 class ReorderableListView extends Widget {
   external ReorderableListView({Key? key, List<Widget> children, required void Function(int, int) onReorder, Object? padding, Widget? header, Object? scrollDirection, bool? shrinkWrap, Object? physics, bool? buildDefaultDragHandles});
-  external static ReorderableListView builder({Key? key, required IndexedWidgetBuilder itemBuilder, required int itemCount, required Object onReorder, Object? padding, Object? scrollDirection, bool? shrinkWrap});
+  external static ReorderableListView builder({Key? key, required IndexedWidgetBuilder itemBuilder, required int itemCount, required void Function(int, int) onReorder, Object? padding, Object? scrollDirection, bool? shrinkWrap});
 }
 
 // ======================================================================

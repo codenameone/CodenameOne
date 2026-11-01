@@ -137,6 +137,18 @@
                     <version>${project.version}</version>
                     <scope>test</scope>
                 </dependency>
+                <!--
+                  Both runtimes declare core `provided`, so it does not arrive with
+                  them. Without it a runtime class whose signatures name a core type
+                  (Future, Navigator, WebSocket, RegExp) cannot be reflected on, and
+                  StubJavaParameterTypeTest had to skip exactly those classes.
+                -->
+                <dependency>
+                    <groupId>com.codenameone</groupId>
+                    <artifactId>codenameone-core</artifactId>
+                    <version>${project.version}</version>
+                    <scope>test</scope>
+                </dependency>
             </dependencies>
         </profile>
 

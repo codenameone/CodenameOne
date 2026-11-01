@@ -51,6 +51,7 @@ public final class AstBuilder {
     private String file;
     /** The `import ... as p` prefixes of the library being built (imports come first). */
     private List<String> importPrefixes = new ArrayList<String>();
+    private java.util.Map<String, String> prefixImports = new java.util.HashMap<String, String>();
 
     public AstBuilder(Diagnostics diags) {
         this.diags = diags;
@@ -79,6 +80,7 @@ public final class AstBuilder {
         Library lib = new Library();
         lib.fileName = fileName;
         importPrefixes = lib.importPrefixes;
+        prefixImports = lib.prefixImports;
         pos(lib, unit);
         if (unit.libraryDeclaration() != null) {
             buildLibrary(unit.libraryDeclaration(), lib);
@@ -2460,6 +2462,14 @@ public final class AstBuilder {
             CtorCall cc = new CtorCall();
             pos(cc, ctx);
             cc.type = new TypeRef(ci.typeName().getText());
+            int pdot = cc.type.name.indexOf('.');
+            String puri = pdot > 0 ? prefixImports.get(cc.type.name.substring(0, pdot)) : null;
+            if (puri != null && puri.startsWith("dart:")) {
+                // `col.Queue<int>.from(..)`: the runtime type, as markRuntimePrefix says
+                String written = cc.type.name;
+                cc.type.name = withoutImportPrefix(written);
+                markRuntimePrefix(cc.type, written);
+            }
             for (Dart2Parser.TypeContext t : ci.typeArguments().typeList().type()) {
                 cc.type.args.add(buildType(t));
             }
@@ -2521,8 +2531,10 @@ public final class AstBuilder {
                 cc.type = new TypeRef(text.substring(0, dot));
                 cc.ctorName = text.substring(dot + 1);
             }
+            markRuntimePrefix(cc.type, d.qualifiedName().getText());
         } else {
             cc.type = new TypeRef(withoutImportPrefix(d.typeName().getText()));
+            markRuntimePrefix(cc.type, d.typeName().getText());
             if (d.typeArguments() != null) {
                 for (Dart2Parser.TypeContext t : d.typeArguments().typeList().type()) {
                     cc.type.args.add(buildType(t));
@@ -2537,6 +2549,20 @@ public final class AstBuilder {
             markConstArgs(cc.args);
         }
         return cc;
+    }
+
+    /**
+     * A constructor's type written through the prefix of a {@code dart:} import
+     * ({@code col.Queue<int>.from(..)}): a dart: library declares no program class, so the
+     * type is the runtime one even beside a program class of the same name.
+     */
+    private void markRuntimePrefix(TypeRef t, String written) {
+        int dot = written.indexOf('.');
+        String uri = dot > 0 ? prefixImports.get(written.substring(0, dot)) : null;
+        if (uri != null && uri.startsWith("dart:")) {
+            t.runtimeOnly = true;
+            t.name = collectionAlias(t.name);
+        }
     }
 
     /** {@code p.X...} with a leading import prefix {@code p.} removed. */

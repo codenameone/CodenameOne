@@ -225,7 +225,7 @@ class StreamController<T> {
   // `StreamController<int>.broadcast()` as `StreamController.broadcast()`
   // with the target's declared type carrying the type argument instead.
   external static StreamController broadcast(
-      {Object? onListen, Object? onCancel, bool? sync});
+      {void Function()? onListen, void Function()? onCancel, bool? sync});
   external Stream<T> get stream;
   external bool get isClosed;
   external bool get hasListener;

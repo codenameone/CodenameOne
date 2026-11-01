@@ -7594,7 +7594,7 @@ public final class JavaEmitter {
                         return future;
                     }
                 }
-                ClassDecl pc = program.classes.get(cc.type.name);
+                ClassDecl pc = cc.type.runtimeOnly ? null : program.classes.get(cc.type.name);
                 if (pc != null && pc.namedCtor(cc.ctorName) != null) {
                     String tw = witnessArgs(pc, cc.type.args, cc, ctx);
                     String na = canonicalArgs(pc.namedCtor(cc.ctorName), cc.args, ctx);
@@ -11040,7 +11040,7 @@ public final class JavaEmitter {
         // A field/param typed with an import prefix (`intl.DateFormat`, `ui.Size`) keeps the
         // prefix in its type name; strip it so member resolution sees the real stub type.
         if (tt != null && tt.name != null && tt.name.indexOf('.') > 0) {
-            tt.name = stripImportPrefix(tt.name);
+            stripPrefixedType(tt, ctx);
         }
         // A receiver typed by a bounded type parameter (`B extends Base<T>`) has the
         // bound's members; Java erases B to Object, so view it as the bound.
@@ -11332,7 +11332,8 @@ public final class JavaEmitter {
         // Crate even where a local class of the same name is in scope.
         ClassDecl pc = tt.resolved != null && tt.name.equals(tt.resolved.name)
                 && program.classesByName.get(tt.name) != null
-                && program.classesByName.get(tt.name).contains(tt.resolved) ? tt.resolved : programClass(tt.name, ctx);
+                && program.classesByName.get(tt.name).contains(tt.resolved) ? tt.resolved
+                : tt.runtimeOnly ? null : programClass(tt.name, ctx);
         if (pc != null) {
             FieldDecl f = pc.field(name);
             if (f != null) {
@@ -12545,6 +12546,15 @@ public final class JavaEmitter {
                 String name = ((Ident) t.operand).name;
                 TypeRef prev = ctx.pushPromotion(name, t.type);
                 undo.add(new Object[] {name, prev});
+            } else if (!t.negated && t.operand instanceof Ident && t.type != null && t.type.is("Future")) {
+                // `x is Future<X>` false, x a FutureOr<X>: x is an X there (Dart's
+                // FutureOr factoring), so `else { stream = x; }` assigns without a cast.
+                String name = ((Ident) t.operand).name;
+                TypeRef declared = ctx.lookup(name);
+                if (declared != null && declared.is("FutureOr") && declared.args.size() == 1) {
+                    TypeRef prev = ctx.pushPromotion(name, declared.args.get(0));
+                    undo.add(new Object[] {name, prev});
+                }
             }
         }
     }
@@ -14622,12 +14632,62 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
     private boolean programFnSlot;
 
     private Out emitLambda(Lambda l, TypeRef expected, Ctx ctx) {
+        if (l.boundRecv != null) {
+            return emitBoundTearOff(l, expected, ctx);
+        }
         // the next argument of the same program-function call still sees the flag
         boolean slot = programFnSlot;
         try {
             return emitLambdaIn(l, expected, ctx);
         } finally {
             programFnSlot = slot;
+        }
+    }
+
+    /**
+     * A tear-off closure over a receiver chain ({@code a.b.c.method}): Dart evaluates the
+     * receiver once, at the tear-off, so it is evaluated here and handed to an in-place
+     * closure, {@code ((Func1<R, J>) (R $tear) -> (J) (closure)).call(receiver)}, whose
+     * parameter the closure reads on each call. The SAM {@code J} is the one the context
+     * expects, or the closure's own (void or value, by its body) -- the same choice
+     * {@link #pinnedHandler} makes from {@code lastLambdaVoid}, which the inner emission
+     * leaves set.
+     */
+    private Out emitBoundTearOff(Lambda l, TypeRef expected, Ctx ctx) {
+        Expr recv = l.boundRecv;
+        l.boundRecv = null;
+        try {
+            Out r = emitExpr(recv, null, ctx);
+            TypeRef rt = r.type == null || r.type.is("var") ? TypeRef.DYNAMIC : r.type;
+            String rj = isDynamicType(rt) ? "Object" : javaType(boxType(rt), true, ctx);
+            ctx.pushScope();
+            Out inner;
+            try {
+                ctx.declare(l.boundName, rt);
+                inner = emitLambda(l, expected, ctx);
+            } finally {
+                ctx.popScope();
+            }
+            boolean voidBody = l.exprBody != null && lastLambdaVoid;
+            String sam;
+            if (expected != null && expected.funcParams != null
+                    && expected.funcParams.size() == l.params.size()) {
+                TypeRef fe = expected;
+                if (voidBody) {
+                    // the closure emitted void-bodied: its SAM is the void one
+                    fe = new TypeRef("Function");
+                    fe.funcParams = expected.funcParams;
+                    fe.funcReturn = new TypeRef("void");
+                }
+                sam = javaType(fe, false, ctx);
+            } else {
+                sam = "dart.runtime.Funcs." + (voidBody ? "VoidFunc" : "Func") + l.params.size();
+            }
+            String code = "((dart.runtime.Funcs.Func1<" + rj + ", " + sam + ">) (" + rj + " "
+                    + l.boundName + ") -> (" + sam + ") " + paren(inner.code) + ").call(" + r.code + ")";
+            return new Out(code, inner.type);
+        } finally {
+            l.boundRecv = recv;
         }
     }
 
@@ -15170,8 +15230,17 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             bare.line = c.line;
             bare.col = c.col;
             bare.name = c.name;
+            String puri = ctx.library() == null ? null
+                    : ctx.library().prefixImports.get(((Ident) c.target).name);
             bare.args = c.args;
             bare.typeArgs = c.typeArgs;
+            if (puri != null && puri.startsWith("dart:")) {
+                // `col.Queue<int>()` beside a program Queue: the runtime collection
+                Out coll = emitCollectionClassCtor(bare, c.name, true, ctx);
+                if (coll != null) {
+                    return coll;
+                }
+            }
             // The prefix picks the library: a.Foo() and b.Foo() are different classes
             // when both libraries declare Foo. Dropping it let import order decide both.
             String outer = ctx.callPrefix;
@@ -15672,7 +15741,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         // A receiver typed with an import prefix (`intl.DateFormat`, `ui.Size`) keeps the
         // prefix in its type name; strip it so method resolution sees the real stub type.
         if (tt != null && tt.name != null && tt.name.indexOf('.') > 0) {
-            tt.name = stripImportPrefix(tt.name);
+            stripPrefixedType(tt, ctx);
         }
         // A receiver typed by a bounded type parameter (`B extends Base<T>`) has the
         // bound's members; Java erases B to Object, so view it as the bound.
@@ -15905,7 +15974,8 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         // property-get path does).
         ClassDecl pc = tt.resolved != null && tt.name.equals(tt.resolved.name)
                 && program.classesByName.get(tt.name) != null
-                && program.classesByName.get(tt.name).contains(tt.resolved) ? tt.resolved : programClass(tt.name, ctx);
+                && program.classesByName.get(tt.name).contains(tt.resolved) ? tt.resolved
+                : tt.runtimeOnly ? null : programClass(tt.name, ctx);
         if (pc != null) {
             MethodDecl m = pc.method(n);
             if (m == null) {
@@ -16334,7 +16404,14 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             TypeRef sub = c.typeArgs.get(0);
             // Generic code (a library's cast<T>()) is common, so a type variable is not
             // diagnosed as whereType's is: it keeps the old unchecked behaviour.
-            boolean dyn = sub.is("dynamic") || sub.is("var") || sub.is("Object") || isTypeVariable(sub, ctx);
+            boolean dyn = sub.is("dynamic") || sub.is("var") || sub.is("Object");
+            if (!dyn && isTypeVariable(sub, ctx)) {
+                // Unchecked, but still a witness: a bare `.cast()` infers R from nothing
+                // in a receiver position, and `s.cast<T>().pipe(sink)` then hands a
+                // Stream<Object> to a StreamConsumer<T>.
+                return new Out(target.code + ".<" + javaType(sub, true, ctx) + ">cast()",
+                        TypeRef.of("Stream", sub));
+            }
             String jt = dyn ? null : javaType(sub, true, ctx);
             if (jt == null) {
                 return new Out(target.code + ".cast()", TypeRef.of("Stream", sub));
@@ -17263,8 +17340,14 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
      * class of the program.
      */
     private Out emitCollectionClassCtor(Call c, String n, Ctx ctx) {
+        return emitCollectionClassCtor(c, n, false, ctx);
+    }
+
+    /// @param runtime the name came through a {@code dart:} import prefix, so a program
+    ///                class of the same name is not the one meant
+    private Out emitCollectionClassCtor(Call c, String n, boolean runtime, Ctx ctx) {
         String alias = com.codename1.dart.transpiler.parser.AstBuilder.collectionAlias(n);
-        if (alias.equals(n) || program.classes.containsKey(n) || stubs.isStubClass(n)) {
+        if (alias.equals(n) || (!runtime && program.classes.containsKey(n)) || stubs.isStubClass(n)) {
             return null;
         }
         List<TypeRef> ta = c.typeArgs;
@@ -20139,6 +20222,8 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         }
     }
 
+    private int tearOffSeq;
+
     private Expr tearOffAsErrorLambda(Expr e, Ctx ctx) {
         return tearOffAsLambda(e, -1, ctx);
     }
@@ -20200,6 +20285,15 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         Call call = new Call();
         call.target = recv;
         call.name = name;
+        if (recv != null && !(recv instanceof ThisExpr)) {
+            // Dart reads the receiver once, at the tear-off: bind it rather than re-read
+            // the chain on each call (see emitBoundTearOff).
+            l.boundRecv = recv;
+            l.boundName = "$tear" + (tearOffSeq++);
+            Ident bound = new Ident();
+            bound.name = l.boundName;
+            call.target = bound;
+        }
         String[] names = {"$onErrE", "$onErrS"};
         for (int i = 0; i < arity; i++) {
             Param p = new Param();
@@ -21318,6 +21412,11 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                         : program.resolveImportedLibrary(from, from.prefixImports.get(pfx));
                 List<ClassDecl> same = program.classesByName.get(stripped);
                 t.name = stripped;
+                if (same != null && !providesProgramClass(target, from, pfx, stripped)) {
+                    // `io.WebSocket` beside a program WebSocket: the runtime type.
+                    t.runtimeOnly = true;
+                    t.name = com.codename1.dart.transpiler.parser.AstBuilder.collectionAlias(stripped);
+                }
                 // Also when the only other `stripped` is a stub type: `md.Text` is the
                 // markdown package's Text even in a file whose bare `Text` is the widget.
                 if (target != null && same != null
@@ -21479,7 +21578,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         // another app class or a stub type of the same simple name. A type that came from a
         // prefixed name keeps the class the prefix chose.
         String appName = t.resolved != null && t.name.equals(t.resolved.name)
-                ? javaClassName(t.resolved) : resolveAppClassName(t.name, ctx.library(), ctx);
+                ? javaClassName(t.resolved) : t.runtimeOnly ? null : resolveAppClassName(t.name, ctx.library(), ctx);
         if (appName != null) {
             if (!classRefMode) {
                 // A name pinned to another library's class (pinToLibrary) is that class's
@@ -21775,6 +21874,42 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
      * the type is resolved, so the base name resolves against {@code program}/{@link StubRegistry}.
      * Returns the name unchanged when there is no such prefix.
      */
+    /// Whether the library a prefix imports provides a program class {@code base}. A
+    /// prefix on a {@code dart:} library, or on one outside the program, never does.
+    private boolean providesProgramClass(Library target, Library from, String pfx, String base) {
+        if (from != null && !from.prefixImports.containsKey(pfx)) {
+            // a prefix of another library: the program-wide strip, as before
+            return true;
+        }
+        List<ClassDecl> same = program.classesByName.get(base);
+        if (target == null || same == null) {
+            return false;
+        }
+        for (ClassDecl pc : same) {
+            if (program.provides(target, base, pc.ownerLibrary)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// {@link #stripImportPrefix} on a type in place, marking it {@code runtimeOnly} when the
+    /// prefix's library provides no program class of the name (see {@link #javaType}).
+    private void stripPrefixedType(TypeRef t, Ctx ctx) {
+        String stripped = stripImportPrefix(t.name);
+        if (stripped.equals(t.name)) {
+            return;
+        }
+        String pfx = t.name.substring(0, t.name.indexOf('.'));
+        Library from = ctx == null ? null : ctx.library();
+        Library target = from == null ? null : program.resolveImportedLibrary(from, from.prefixImports.get(pfx));
+        t.name = stripped;
+        if (program.classesByName.get(stripped) != null && !providesProgramClass(target, from, pfx, stripped)) {
+            t.runtimeOnly = true;
+            t.name = com.codename1.dart.transpiler.parser.AstBuilder.collectionAlias(stripped);
+        }
+    }
+
     private String stripImportPrefix(String name) {
         if (name != null) {
             int dot = name.indexOf('.');

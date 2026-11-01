@@ -197,13 +197,18 @@ public final class StreamController<T> implements StreamSink<T> {
      * say -- is flattened to all three positionally, nulls filling in whichever were
      * not given. The no-argument {@link #broadcast()} above answers only the
      * zero-argument call and would fail to compile every other one.
+     *
+     * The handlers are typed as callbacks, not {@code Object}: a method tear-off
+     * ({@code broadcast(onListen: this._onListen)}) becomes a Java method reference,
+     * which has no target type in an {@code Object} slot and does not compile there.
      */
-    public static <T> StreamController<T> broadcast(Object onListen, Object onCancel, Boolean sync) {
+    public static <T> StreamController<T> broadcast(dart.runtime.Funcs.VoidFunc0 onListen,
+            dart.runtime.Funcs.VoidFunc0 onCancel, Boolean sync) {
         StreamController<T> c = new StreamController<T>();
         c.broadcast = true;
         c.sync = sync != null && sync.booleanValue();
-        c.onListen(onListen);
-        c.onCancel(onCancel);
+        c.onListen((Object) onListen);
+        c.onCancel((Object) onCancel);
         return c;
     }
 

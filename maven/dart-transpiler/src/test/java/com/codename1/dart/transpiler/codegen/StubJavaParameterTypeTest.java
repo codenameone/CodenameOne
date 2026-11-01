@@ -79,7 +79,21 @@ public class StubJavaParameterTypeTest {
         Diagnostics diags = new Diagnostics();
         StubRegistry reg = StubRegistry.loadFromClasspath(Collections.singletonList(RUNTIME_RESOURCES), diags);
         assertFalse(diags.hasErrors(), "runtime stubs failed to parse: " + diags.asList());
+        checkAll(reg, "runtime", 100);
+    }
 
+    /// The transpiler's own built-in stubs (`com/codename1/dart/stubs`: the
+    /// dart:collection mixins and the embedded Flutter fallback set) map onto the same
+    /// runtime classes and are held to them the same way.
+    @Test
+    public void builtInStubParameterKindsMatchTheJavaMembersTheyMapTo() throws Exception {
+        Diagnostics diags = new Diagnostics();
+        StubRegistry reg = StubRegistry.loadEmbedded(diags);
+        assertFalse(diags.hasErrors(), "built-in stubs failed to parse: " + diags.asList());
+        checkAll(reg, "built-in", 50);
+    }
+
+    private void checkAll(StubRegistry reg, String which, int minimum) {
         List<String> bad = new ArrayList<String>();
         int checked = 0;
         List<String> skipped = new ArrayList<String>();
@@ -98,7 +112,7 @@ public class StubJavaParameterTypeTest {
                 java.getMethods();
                 java.getConstructors();
             } catch (LinkageError e) {
-                skipped.add(cls.javaName);
+                skipped.add(cls.javaName + " (" + e + ")");
                 continue;  // its signatures name a class absent from this test class path
             }
             for (Ast.CtorDecl ctor : cls.ctors) {
@@ -135,11 +149,17 @@ public class StubJavaParameterTypeTest {
                     continue;
                 }
                 boolean anyNamed = false;
+                boolean allNamed = !m.params.isEmpty();
                 for (Ast.Param p : m.params) {
                     anyNamed |= p.named;
+                    allNamed &= p.named;
                 }
-                if (anyNamed) {
-                    continue;  // named method arguments are lowered differently; not this test's mapping
+                // A static whose parameters are all named -- how a stub spells a named
+                // constructor, `StreamController.broadcast({onListen, ...})` -- is called
+                // with every one of them positionally, in declaration order, nulls filling
+                // the ones not given. Any other mix is lowered differently.
+                if (anyNamed && !(m.isStatic && allNamed)) {
+                    continue;
                 }
                 for (int i = 0; i < m.params.size(); i++) {
                     List<Type> cands = new ArrayList<Type>();
@@ -153,9 +173,9 @@ public class StubJavaParameterTypeTest {
                 }
             }
         }
-        System.out.println("StubJavaParameterTypeTest: compared " + checked + " parameters; skipped "
+        System.out.println("StubJavaParameterTypeTest (" + which + "): compared " + checked + " parameters; skipped "
                 + skipped.size() + " classes with unresolvable signatures: " + skipped);
-        assertTrue(checked > 100, "only " + checked + " stub parameters were compared -- the mapping broke");
+        assertTrue(checked > minimum, "only " + checked + " stub parameters were compared -- the mapping broke");
         assertTrue(bad.isEmpty(), bad.size() + " stub parameter(s) disagree with the Java member they map to "
                 + "(give the stub the Dart equivalent of the Java type):\n  " + String.join("\n  ", bad));
     }
