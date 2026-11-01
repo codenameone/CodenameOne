@@ -421,7 +421,7 @@ public final class Dyn {
                 return 0;
             case "containsKey": case "containsValue": case "remove": case "addAll": case "forEach": case "add":
             case "removeAt": case "sort": case "map": case "where": case "any": case "every":
-            case "join": case "elementAt": case "skip": case "take": case "endsWith":
+            case "reduce": case "join": case "elementAt": case "skip": case "take": case "endsWith":
             case "split": case "codeUnitAt": case "compareTo": case "toStringAsFixed":
                 return 1;
             case "putIfAbsent": case "insert": case "indexOf": case "sublist": case "firstWhere": case "fold":
@@ -558,6 +558,19 @@ public final class Dyn {
                 Object acc = arg(a, 0);
                 for (Object e : it) {
                     acc = invoke(arg(a, 1), new Object[] {acc, e});
+                }
+                return acc;
+            }
+            case "reduce": {
+                // Missing, a dynamic list's reduce -- a top-level `final xs = ws.map(...)
+                // .toList()` is one -- threw NoSuchMethodError though fold worked.
+                java.util.Iterator<?> i = it.iterator();
+                if (!i.hasNext()) {
+                    throw new dart.core.StateError("No element");
+                }
+                Object acc = i.next();
+                while (i.hasNext()) {
+                    acc = invoke(arg(a, 0), new Object[] {acc, i.next()});
                 }
                 return acc;
             }

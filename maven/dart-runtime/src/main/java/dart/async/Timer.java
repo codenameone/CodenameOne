@@ -72,15 +72,25 @@ public class Timer {
             handle = Timers.schedule(ms, r);
         } else {
             final long delay = ms;
+            // The thread only waits out the delay: the callback is posted to the
+            // isolate's thread (see Microtasks), so it never runs beside the frame
+            // that awaits, and the program does not end while the timer is pending.
+            Microtasks.timerStarted();
+            headlessPending = true;
             worker = new Thread(new Runnable() {
                 @Override
                 public void run() {
                     try {
                         Thread.sleep(delay);
                     } catch (InterruptedException ignore) {
-                        // cancel() interrupts the sleep; r checks the flag and does nothing
+                        // cancel() interrupts the sleep and has already ended the
+                        // pending count; nothing is posted
+                        return;
                     }
-                    r.run();
+                    if (!claimPending()) {
+                        return;
+                    }
+                    Microtasks.postTimerEvent(r);
                 }
             }, "dart-timer");
             worker.start();
@@ -89,6 +99,15 @@ public class Timer {
 
     /** The headless sleeping thread, so cancel() can end it early. */
     private Thread worker;
+    /** Headless: counted in Microtasks' pending timers and not yet posted or cancelled. */
+    private boolean headlessPending;
+
+    /// Takes the pending mark exactly once, for whichever of fire and cancel comes first.
+    private synchronized boolean claimPending() {
+        boolean was = headlessPending;
+        headlessPending = false;
+        return was;
+    }
 
     public void cancel() {
         cancelled = true;
@@ -108,6 +127,9 @@ public class Timer {
         // its callback reachable until then; interrupting ends the thread now.
         Thread w = worker;
         worker = null;
+        if (claimPending()) {
+            Microtasks.timerEnded();
+        }
         if (w != null) {
             w.interrupt();
         }

@@ -74,20 +74,24 @@ public final class Await {
     }
 
     private static void parkUntilDone(Future<?> f) {
-        while (!f.isDone()) {
-            // Headless, a parked frame is where Dart's event loop runs: microtasks other
-            // threads queued (an I/O callback adding to a controller) run here, outside
-            // the monitor. Under a Display this is a no-op off the EDT.
-            Microtasks.drain();
-            synchronized (f.monitor()) {
-                if (!f.isDone()) {
-                    try {
-                        f.monitor().wait(20);
-                    } catch (InterruptedException ignore) {
-                        // spurious wakeup handling via the loop condition
+        if (com.codename1.ui.Display.isInitialized()) {
+            // Off the EDT of a live Display (or inside invokeAndBlock) the EDT runs the
+            // loop; this frame only waits for the result.
+            while (!f.isDone()) {
+                synchronized (f.monitor()) {
+                    if (!f.isDone()) {
+                        try {
+                            f.monitor().wait(20);
+                        } catch (InterruptedException ignore) {
+                            // spurious wakeup handling via the loop condition
+                        }
                     }
                 }
             }
+            return;
         }
+        // Headless, a parked frame is where Dart's event loop runs: microtasks and fired
+        // timers run here (see Microtasks).
+        Microtasks.parkUntil(f);
     }
 }

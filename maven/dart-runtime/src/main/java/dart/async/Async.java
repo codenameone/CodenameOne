@@ -41,19 +41,23 @@ public final class Async {
         if (callback == null) {
             throw new dart.core.ArgumentError("scheduleMicrotask: callback must not be null");
         }
-        Microtasks.schedule(new Runnable() {
+        // Runs in the zone that scheduled it, as Dart's does. Uncaptured, it ran in
+        // whatever zone the draining frame was in: a microtask scheduled inside
+        // runZoned read the root zone's values once timer callbacks stopped draining
+        // from their own (zoned) threads.
+        Microtasks.schedule(Zone.capture(new Runnable() {
             @Override
             public void run() {
                 callback.call();
             }
-        });
+        }));
     }
 
     /// Runs every queued microtask now, on the calling thread: what the end of main()
     /// is to Dart. FlutterRegistry calls it after main, and so do the headless runners
     /// and tests. Off the EDT of a live Display it does nothing (the EDT drains).
     public static void runMicrotasks() {
-        Microtasks.drain();
+        Microtasks.runUntilIdle();
     }
 
     /// {@code runZoned(body)}: runs the body in a child of the current zone that holds

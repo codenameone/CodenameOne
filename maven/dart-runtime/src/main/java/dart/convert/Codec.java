@@ -27,23 +27,32 @@ package dart.convert;
  * Dart's {@code Codec<S, T>}, as far as the byte codecs need it: a variable typed
  * {@code Codec<String, List<int>>} holding {@code utf8} reaches {@code encode},
  * {@code decode}, {@code encoder} and {@code decoder} through this interface.
- * The type parameters are carried for the declaration only; the members are
- * typed by {@link ByteCodec}, which decides direction by the input's type.
+ * A codec declared in Dart implements it too, with its own Converter subclasses as
+ * encoder and decoder; {@code encode}/{@code decode} default to converting through
+ * them, as Dart's do. {@link ByteCodec} is its own encoder and decoder and decides
+ * direction by the input's type.
  *
  * @param <S> the decoded type
  * @param <T> the encoded type
  */
 public interface Codec<S, T> {
 
-    /** Dart's {@code Codec.encode}. */
-    Object encode(Object input);
+    /** Dart's {@code Codec.encode}: {@code encoder.convert(input)} unless overridden. */
+    @SuppressWarnings("unchecked")
+    default Object encode(Object input) {
+        return ((Converter<Object, Object>) (Converter<?, ?>) encoder()).convert(input);
+    }
 
-    /** Dart's {@code Codec.decode}. */
-    Object decode(Object encoded);
+    /** Dart's {@code Codec.decode}: {@code decoder.convert(encoded)} unless overridden. */
+    @SuppressWarnings("unchecked")
+    default Object decode(Object encoded) {
+        return ((Converter<Object, Object>) (Converter<?, ?>) decoder()).convert(encoded);
+    }
 
-    /** Dart's {@code Codec.encoder}. */
-    CodecConverter encoder();
+    /// Dart's {@code Codec.encoder}. A Converter, as in Dart, so a codec written in Dart
+    /// returns its own {@code Converter} subclass and the override is a covariant one.
+    Converter<S, T> encoder();
 
-    /** Dart's {@code Codec.decoder}. */
-    CodecConverter decoder();
+    /// Dart's {@code Codec.decoder}, the reverse conversion.
+    Converter<T, S> decoder();
 }

@@ -258,10 +258,12 @@ public final class CoreExt {
 
     // ---------------------------------------------------------------- String
 
-    public static DartList<Long> codeUnits(String s) {
-        DartList<Long> out = new DartList<Long>();
+    /// {@code String.codeUnits}: a List<int>, so the primitive DartLongList every other
+    /// List<int> is (a local typed by it is declared as one).
+    public static DartLongList codeUnits(String s) {
+        DartLongList out = new DartLongList();
         for (int i = 0; i < s.length(); i++) {
-            out.add(Long.valueOf(s.charAt(i)));
+            out.addLong(s.charAt(i));
         }
         return out;
     }

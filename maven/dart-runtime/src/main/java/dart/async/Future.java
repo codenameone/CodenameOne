@@ -205,6 +205,10 @@ public class Future<T> {
             Timers.schedule(ms, complete);
         } else {
             final long sleepMs = ms;
+            // The thread only waits out the delay; completion is posted to the isolate's
+            // thread like any timer event (see Microtasks), and the program cannot end
+            // while it is pending.
+            Microtasks.timerStarted();
             new Thread(new Runnable() {
                 @Override
                 public void run() {
@@ -213,7 +217,7 @@ public class Future<T> {
                     } catch (InterruptedException ignore) {
                         // fall through and complete anyway
                     }
-                    complete.run();
+                    Microtasks.postTimerEvent(complete);
                 }
             }, "dart-future-delayed").start();
         }

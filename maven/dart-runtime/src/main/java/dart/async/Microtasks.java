@@ -77,8 +77,55 @@ final class Microtasks {
         }
     }
 
-    /// Runs queued tasks, in order, until none is left (tasks may queue more). Off the
-    /// EDT of a live Display this does nothing: the posted turn drains on the EDT.
+    /// Headless only: timer callbacks whose deadline passed, waiting for the isolate's
+    /// thread. A timer used to run its callback on its own sleeping thread, so it raced
+    /// the thread parked in an await: a zero-delay Future.delayed completed and drained
+    /// microtasks there while the awaiting frame woke and ran on, and an event a
+    /// controller had queued was delivered after the code that followed the await, or
+    /// not at all (the drainer check let one thread abandon a task the other had just
+    /// stopped looking for). Now the timer thread only posts here, and the event runs
+    /// where the microtasks run, one at a time, after the microtask queue is empty --
+    /// Dart's event loop order.
+    private static final ArrayDeque<Runnable> EVENTS = new ArrayDeque<Runnable>();
+    /// Headless timers that have neither fired nor been cancelled. Dart's VM does not
+    /// exit while one is pending, so neither does {@link #runUntilIdle()}.
+    private static int pendingTimers;
+
+    static void timerStarted() {
+        synchronized (LOCK) {
+            pendingTimers++;
+        }
+    }
+
+    /// A pending timer was cancelled before its event ran.
+    static void timerEnded() {
+        synchronized (LOCK) {
+            pendingTimers--;
+            LOCK.notifyAll();
+        }
+    }
+
+    /// Posts a fired headless timer's callback to the isolate's thread. The pending
+    /// count drops when the event has run, not now, so exit cannot slip between.
+    static void postTimerEvent(final Runnable r) {
+        synchronized (LOCK) {
+            EVENTS.addLast(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        r.run();
+                    } finally {
+                        timerEnded();
+                    }
+                }
+            });
+            LOCK.notifyAll();
+        }
+    }
+
+    /// Runs queued tasks, in order, until none is left (tasks may queue more), then
+    /// one fired timer event at a time, each followed by the microtasks it queued. Off
+    /// the EDT of a live Display this does nothing: the posted turn drains on the EDT.
     static void drain() {
         if (com.codename1.ui.Display.isInitialized()
                 && !com.codename1.ui.Display.getInstance().isEdt()) {
@@ -93,20 +140,80 @@ final class Microtasks {
             outer = drainer;
             drainer = self;
         }
+        boolean released = false;
         try {
             while (true) {
                 Runnable next;
                 synchronized (LOCK) {
                     next = QUEUE.pollFirst();
-                }
-                if (next == null) {
-                    return;
+                    if (next == null) {
+                        next = EVENTS.pollFirst();
+                    }
+                    if (next == null) {
+                        // Released under the same lock that found the queues empty: a
+                        // task another thread queues after this either is seen above or
+                        // finds no drainer and is drained by that thread's own caller.
+                        // Releasing in a finally after the lock was dropped lost it.
+                        drainer = outer;
+                        released = true;
+                        return;
+                    }
                 }
                 next.run();
             }
         } finally {
+            if (!released) {
+                synchronized (LOCK) {
+                    drainer = outer;
+                }
+            }
+        }
+    }
+
+    /// Headless: whether anything is queued for the isolate's thread.
+    private static boolean idleLocked() {
+        return QUEUE.isEmpty() && EVENTS.isEmpty();
+    }
+
+    /// Headless park of an awaiting frame: runs the event loop until f completes.
+    static void parkUntil(Future<?> f) {
+        while (!f.isDone()) {
+            drain();
             synchronized (LOCK) {
-                drainer = outer;
+                if (idleLocked() && !f.isDone()) {
+                    try {
+                        // Woken by a posted event; the timeout covers a future some
+                        // other thread completes directly (an I/O callback).
+                        LOCK.wait(20);
+                    } catch (InterruptedException ignore) {
+                        // the loop condition decides
+                    }
+                }
+            }
+        }
+    }
+
+    /// The end of main(): runs microtasks and timer events until none is queued and no
+    /// timer is pending, as Dart's VM does before it exits. Off the EDT of a live
+    /// Display only the (empty) drain happens; the EDT is the loop there.
+    static void runUntilIdle() {
+        if (com.codename1.ui.Display.isInitialized()) {
+            drain();
+            return;
+        }
+        while (true) {
+            drain();
+            synchronized (LOCK) {
+                if (idleLocked()) {
+                    if (pendingTimers <= 0) {
+                        return;
+                    }
+                    try {
+                        LOCK.wait(20);
+                    } catch (InterruptedException ignore) {
+                        // the loop condition decides
+                    }
+                }
             }
         }
     }

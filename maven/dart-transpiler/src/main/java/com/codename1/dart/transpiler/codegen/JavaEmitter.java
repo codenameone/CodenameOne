@@ -979,16 +979,8 @@ public final class JavaEmitter {
             ctx.methodReturnType = rt;
             if (emitInlineGeneratorBody(m, rt, ctx)) {
                 // generator: emitted as a lambda
-            } else if (m.body != null) {
-                emitStatements(m.body, ctx);
-            } else if (m.exprBody != null) {
-                if (rt.is("void")) {
-                    // `void f() => expr;` runs expr for its effects, whatever its shape.
-                    emitDiscardedValue(m.exprBody, ctx);
-                } else {
-                    Out o = emitExpr(m.exprBody, rt, ctx);
-                    ctx.writer().line("return " + coerce(o, rt, ctx) + ";");
-                }
+            } else {
+                emitMemberBody(m, rt, ctx);
             }
             body.append(ctx.popWriter());
             ctx.methodReturnType = null;
@@ -1146,16 +1138,8 @@ public final class JavaEmitter {
                 ctx.writer().line("throw new UnsupportedOperationException(\"" + mx.name + "." + m.name + "\");");
             } else if (emitInlineGeneratorBody(m, rt, ctx)) {
                 // generator: emitted as a lambda
-            } else if (m.body != null) {
-                emitStatements(m.body, ctx);
-            } else if (m.exprBody != null) {
-                if (rt.is("void")) {
-                    // `void f() => expr;` runs expr for its effects, whatever its shape.
-                    emitDiscardedValue(m.exprBody, ctx);
-                } else {
-                    Out o = emitExpr(m.exprBody, rt, ctx);
-                    ctx.writer().line("return " + coerce(o, rt, ctx) + ";");
-                }
+            } else {
+                emitMemberBody(m, rt, ctx);
             }
             body.append(ctx.popWriter());
             ctx.methodReturnType = null;
@@ -2018,7 +2002,7 @@ public final class JavaEmitter {
             "dart.async.Sink", "dart.async.StreamConsumer", "dart.async.StreamSubscription",
             "dart.async.StreamTransformer", "dart.async.StreamSink", "dart.collection.IterableMixin",
             "dart.collection.ListMixin", "dart.collection.MapMixin", "dart.collection.SetMixin",
-            "dart.collection.Iterator", "dart.collection.UnmodifiableMapBase", "dart.convert.CodecConverter",
+            "dart.collection.Iterator", "dart.collection.UnmodifiableMapBase",
             "dart.convert.Codec", "dart.convert.JsonEncodable", "dart.core.MixinView",
             "dart.runtime.DynamicObject", "dart.typed_data.TypedData", "dart.typed_data.TypedDataList"));
 
@@ -4588,6 +4572,54 @@ public final class JavaEmitter {
         return sb.toString();
     }
 
+    /**
+     * The body of an extension's static method or a mixin's default method. An async one
+     * is lowered as a class method's is: {@code return;} and falling off the end answer
+     * {@code Future.value(null)}, a returned value is wrapped, and a throw becomes
+     * {@code Future.error}. Emitted bare, `if (c) return;` in a {@code Future<void>}
+     * extension method was a Java {@code return;} in a method returning Future.
+     */
+    private void emitMemberBody(MethodDecl m, TypeRef rt, Ctx ctx) {
+        boolean savedAsync = ctx.inAsyncBody;
+        ctx.inAsyncBody = m.isAsync;
+        boolean asyncFuture = m.isAsync && (rt.is("Future") || rt.is("FutureOr"));
+        String asyncErr = null;
+        if (asyncFuture && (m.body != null || m.exprBody != null)) {
+            ctx.importClass("dart.async.Future");
+            asyncErr = ctx.newTemp();
+            ctx.writer().line("try {");
+            ctx.indent(1);
+        }
+        if (m.body != null) {
+            emitStatements(m.body, ctx);
+            if (asyncFuture && !endsWithJump(m.body)) {
+                ctx.writer().line("return Future.value(null);");
+            }
+        } else if (m.exprBody != null) {
+            if (asyncFuture) {
+                lineMark(m.exprBody, ctx);
+                Out o = emitExpr(m.exprBody, null, ctx);
+                ctx.writer().line("return " + (o.type.is("Future") ? o.code
+                        : "Future.value(" + boxIfPrimitive(o, ctx) + ")") + ";");
+            } else if (rt.is("void")) {
+                // `void f() => expr;` runs expr for its effects, whatever its shape.
+                emitDiscardedValue(m.exprBody, ctx);
+            } else {
+                Out o = emitExpr(m.exprBody, rt, ctx);
+                ctx.writer().line("return " + coerce(o, rt, ctx) + ";");
+            }
+        }
+        if (asyncErr != null) {
+            ctx.indent(-1);
+            ctx.writer().line("} catch (RuntimeException " + asyncErr + ") {");
+            ctx.indent(1);
+            ctx.writer().line("return Future.error(" + asyncErr + ");");
+            ctx.indent(-1);
+            ctx.writer().line("}");
+        }
+        ctx.inAsyncBody = savedAsync;
+    }
+
     /** Does the block's last statement definitely leave the method? */
     private boolean endsWithJump(Block b) {
         if (b.statements.isEmpty()) {
@@ -6880,7 +6912,7 @@ public final class JavaEmitter {
                 if (cc.type.name.equals("List")
                         && (cc.ctorName.equals("generate") || cc.ctorName.equals("filled")
                             || cc.ctorName.equals("from") || cc.ctorName.equals("unmodifiable"))) {
-                    return emitListFactory(cc, ctx);
+                    return emitListFactory(cc, expected, ctx);
                 }
                 // Map/Set/Iterable named factory constructors -- dart:core intrinsics
                 // routed to the existing statics on Dart{Map,Set,Iterable}.
@@ -15401,7 +15433,11 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                         tt.is("Set") ? TypeRef.BOOL : TypeRef.VOID);
             }
             if (n.equals("addAll")) {
-                return new Out(target.code + ".addAllIterable(" + mixinIterableCode(emitExpr(pos.get(0), null, ctx)) + ")", TypeRef.VOID);
+                // `Iterable<E>`: a list literal argument takes the receiver's element
+                // type, as Dart's downward inference gives it (`syntaxes.addAll([A(), B()])`
+                // on a List<Syntax> is a List<Syntax>, not a List<Object>).
+                TypeRef argType = elem != null && !isDynamicType(elem) ? TypeRef.of("Iterable", elem) : null;
+                return new Out(target.code + ".addAllIterable(" + mixinIterableCode(emitExpr(pos.get(0), argType, ctx)) + ")", TypeRef.VOID);
             }
             // dart:collection's Queue is a List here (AstBuilder.collectionAlias); its own
             // end operations are the List ones at index 0 / the end.
@@ -15951,8 +15987,36 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
      * result stays index/add consistent with how {@code List<int>}/{@code List<double>}
      * variables are typed elsewhere; everything else uses the boxed {@link dart.core.DartList}.
      */
-    private Out emitListFactory(CtorCall cc, Ctx ctx) {
+    private Out emitListFactory(CtorCall cc, TypeRef expected, Ctx ctx) {
         TypeRef listType = cc.type;
+        boolean implicitDynamic = listType.args.size() == 1 && isDynamicType(listType.arg(0));
+        if (listType.args.isEmpty() || implicitDynamic) {
+            // No type argument (an analysis pass may already have written `dynamic` for
+            // it, and an explicit List<dynamic> in a List<int> context does not compile in
+            // Dart, so the context decides either way): Dart infers E downwards from the context (`Map<K, List<int>>
+            // .putIfAbsent(k, () => List.filled(3, 0))`), and failing that `filled` takes
+            // its fill value's static type. Untyped, the list was a List<dynamic> where a
+            // List<int> -- a DartLongList -- was promised.
+            TypeRef inferredElem = null;
+            if (expected != null && expected.is("List") && expected.args.size() == 1
+                    && !isDynamicType(expected.arg(0)) && typeVarsInScope(expected.arg(0), ctx)) {
+                inferredElem = expected.arg(0);
+            } else if (listType.args.isEmpty() && cc.ctorName.equals("filled") && cc.args.positional.size() > 1) {
+                Expr fe = cc.args.positional.get(1);
+                // inferExprTypeQuiet resolves names, not literals; `List.filled(3, 0)` is the
+                // common shape.
+                TypeRef ft = fe instanceof IntLit ? TypeRef.INT : fe instanceof DoubleLit ? TypeRef.DOUBLE
+                        : fe instanceof BoolLit ? TypeRef.BOOL : fe instanceof StringLit ? TypeRef.STRING
+                        : inferExprTypeQuiet(fe, ctx);
+                if (ft != null && !isDynamicType(ft) && !ft.is("Null") && ft.funcParams == null
+                        && typeVarsInScope(ft, ctx)) {
+                    inferredElem = ft;
+                }
+            }
+            if (inferredElem != null) {
+                listType = TypeRef.of("List", inferredElem);
+            }
+        }
         TypeRef elem = listType.args.isEmpty() ? TypeRef.DYNAMIC : listType.arg(0);
         String pk = primitiveListKind(listType);
         String cls;
@@ -19362,8 +19426,113 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             if (constructed != null) {
                 return constructed;
             }
+            TypeRef emitted = staticInitializerType(f);
+            if (emitted != null) {
+                return emitted;
+            }
         }
         return TypeRef.DYNAMIC;
+    }
+
+    /** Inferred types of untyped top-level and static variables, by declaration. */
+    private final java.util.Map<FieldDecl, TypeRef> inferredStaticTypes =
+            new java.util.IdentityHashMap<FieldDecl, TypeRef>();
+    /** Declarations whose initializer is being typed now: a cycle answers dynamic. */
+    private final java.util.Set<FieldDecl> inferringStatic =
+            java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<FieldDecl, Boolean>());
+    /** Each top-level variable and static field, mapped to the class declaring it (or to
+     * a null-class marker holding its library). Built on first use. */
+    private java.util.Map<FieldDecl, Object> staticOwners;
+
+    /**
+     * The type of an untyped top-level or static variable's initializer, found the way a
+     * local's is: by emitting the initializer and reading the type the emission reports.
+     * {@code final _done = Uint8List.fromList([0])} was declared Object, so every member
+     * read on it -- {@code _done.length} -- failed to compile, though the same line as a
+     * local was typed. The emission is thrown away (and its diagnostics with it); the
+     * real one, at the declaration, reports any problem once. It runs in a context of
+     * the declaring library or class, never the caller's, whose locals could shadow a
+     * name the initializer means. Closures keep the old answer: their SAM typing is the
+     * local path's alone.
+     */
+    private TypeRef staticInitializerType(FieldDecl f) {
+        if (f.initializer == null || f.initializer instanceof Lambda || f.isLate) {
+            return null;
+        }
+        if (inferredStaticTypes.containsKey(f)) {
+            return inferredStaticTypes.get(f);
+        }
+        Object owner = staticOwner(f);
+        if (owner == null || inferringStatic.contains(f)) {
+            return null;
+        }
+        inferringStatic.add(f);
+        TypeRef t = null;
+        int mark = diags.mark();
+        try {
+            Ctx c;
+            if (owner instanceof ClassDecl) {
+                c = new Ctx((ClassDecl) owner);
+                c.staticMember = true;
+            } else {
+                c = new Ctx(null);
+                c.currentLibrary = (Library) owner;
+            }
+            c.pushWriter(2);
+            try {
+                Out o = emitExpr(f.initializer, null, c);
+                t = o == null ? null : o.type;
+            } finally {
+                c.popWriter();
+            }
+        } catch (RuntimeException ex) {
+            t = null;
+        } finally {
+            diags.rollback(mark);
+            inferringStatic.remove(f);
+        }
+        if (t != null && (t.is("dynamic") || t.is("Object") || t.is("Null") || t.is("void")
+                || t.name == null || t.name.isEmpty() || hasLooseArgument(t))) {
+            t = null;
+        }
+        inferredStaticTypes.put(f, t);
+        return t;
+    }
+
+    /// Whether a type argument, at any depth, is dynamic or Object. The type an emission
+    /// reports can be looser than the Java it produced -- {@code words.map((w) =>
+    /// w.length).toList()} reports List of dynamic and emits a DartList of Long -- which a
+    /// local's {@code var} absorbs and a declared field cannot; such a field stays
+    /// dynamic, as before.
+    private static boolean hasLooseArgument(TypeRef t) {
+        if (t.args == null) {
+            return false;
+        }
+        for (TypeRef a : t.args) {
+            if (a == null || a.is("dynamic") || a.is("Object") || hasLooseArgument(a)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private Object staticOwner(FieldDecl f) {
+        if (staticOwners == null) {
+            staticOwners = new java.util.IdentityHashMap<FieldDecl, Object>();
+            for (Library lib : program.libraries) {
+                for (FieldDecl v : lib.topLevelVars) {
+                    staticOwners.put(v, lib);
+                }
+            }
+            for (ClassDecl cd : program.classes.values()) {
+                for (FieldDecl v : cd.fields) {
+                    if (v.isStatic) {
+                        staticOwners.put(v, cd);
+                    }
+                }
+            }
+        }
+        return staticOwners.get(f);
     }
 
     /**
@@ -20842,6 +21011,34 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 return "(" + ts + ") (Object) " + paren(o.code);
             }
         }
+        // A value-returning function value into a void function slot of the same arity
+        // (a `dynamic Function()` field handed to `Timer(d, void Function() callback)`):
+        // Dart allows it, since any return type is a subtype of void, but Func0 and
+        // VoidFunc0 are unrelated Java interfaces. A method reference to the value's own
+        // call adapts it, its result discarded; a null value stays null.
+        TypeRef voidSlot = target;
+        if (target.funcParams == null && target.funcReturn == null && !target.is("Function")) {
+            // A typedef slot (`VoidCallback`, `ZoneCallback<void>`): its signature.
+            TypeRef[] sig = target.args.isEmpty() ? typedefSig(target.name) : null;
+            voidSlot = null;
+            if (sig != null && sig.length > 0) {
+                voidSlot = new TypeRef("Function");
+                voidSlot.funcParams = new ArrayList<TypeRef>(java.util.Arrays.asList(sig).subList(0, sig.length - 1));
+                voidSlot.funcReturn = sig[sig.length - 1];
+            }
+        }
+        if (o.type != null && o.type.funcParams != null && voidSlot != null && voidSlot.funcParams != null
+                && o.type.funcParams.size() == voidSlot.funcParams.size()
+                && o.type.funcReturn != null && !o.type.funcReturn.is("void")
+                && voidSlot.funcReturn != null && voidSlot.funcReturn.is("void")
+                && !o.code.contains("::") && !o.code.contains("->")
+                && o.code.matches("(this\\.)?[A-Za-z_$][A-Za-z0-9_$.]*(\\(\\))?")) {
+            String ts = funcSamTypeFromRefs(voidSlot.funcParams, TypeRef.VOID, ctx);
+            String os = funcSamTypeFromRefs(o.type.funcParams, o.type.funcReturn, ctx);
+            if (!ts.equals(os) && ts.contains("VoidFunc")) {
+                return "(" + o.code + " == null ? null : (" + ts + ") " + paren(o.code) + "::call)";
+            }
+        }
         // A FutureOr<T> promoted to Future (`if (toReturn is Future) toReturn` into a
         // `<Future<Object?>>[...]` element): the Java value is an Object, cast to the slot.
         if (o.type != null && o.type.is("FutureOr") && target.is("Future") && isFullyConcrete(target)) {
@@ -21837,6 +22034,20 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         /** Applies a promotion, returning the prior value (possibly null) for later restore. */
         TypeRef pushPromotion(String name, TypeRef type) {
             TypeRef prev = promotions.get(name);
+            // `source is List` on an Iterable<E>: Dart promotes to List<E>, the raw type
+            // instantiated from what is already known (a List<dynamic> lost E, and a later
+            // `table.setRange(0, n, source)` no longer matched a List<E>).
+            if (type != null && type.args.isEmpty() && type.funcParams == null
+                    && (type.is("List") || type.is("Set") || type.is("Iterable"))) {
+                TypeRef known = prev != null ? prev : lookup(name);
+                if (known != null && known.args.size() == 1 && known.funcParams == null
+                        && (known.is("Iterable") || known.is("List") || known.is("Set"))
+                        && !(type.is("Iterable") && !known.is("Iterable"))) {
+                    TypeRef inst = TypeRef.of(type.name, known.arg(0));
+                    inst.nullable = type.nullable;
+                    type = inst;
+                }
+            }
             promotions.put(name, type);
             return prev;
         }

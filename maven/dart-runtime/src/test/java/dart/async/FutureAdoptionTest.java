@@ -159,7 +159,10 @@ public class FutureAdoptionTest {
                     }
                 });
         long deadline = System.currentTimeMillis() + 2000;
+        // Headless, a fired timer runs on the isolate's thread (the event loop), not on
+        // the thread that waited out the delay: this thread runs that loop.
         while (!f.isDone() && System.currentTimeMillis() < deadline) {
+            Async.runMicrotasks();
             Thread.sleep(5);
         }
         assertTrue(f.isDone(), "a negative delay must not leave the future pending forever");
@@ -284,6 +287,9 @@ public class FutureAdoptionTest {
                 fired.countDown();
             }
         });
+        // The end of main(): the loop runs until no timer is pending, so the callback
+        // has run when it returns.
+        Async.runMicrotasks();
         assertTrue(fired.await(5, java.util.concurrent.TimeUnit.SECONDS),
                 "a negative delay fires as soon as possible, as though it were zero");
     }

@@ -58,6 +58,19 @@ public final class Diagnostics {
         return false;
     }
 
+    /// The number of diagnostics so far, for {@link #rollback(int)}.
+    public int mark() {
+        return all.size();
+    }
+
+    /// Drops what was reported since {@code mark}: an expression emitted only to learn its
+    /// type is emitted again for real, and reports its problems then.
+    public void rollback(int mark) {
+        while (all.size() > mark) {
+            all.remove(all.size() - 1);
+        }
+    }
+
     public List<Diagnostic> asList() {
         return all;
     }

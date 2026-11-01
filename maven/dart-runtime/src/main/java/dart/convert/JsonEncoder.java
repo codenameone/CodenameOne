@@ -24,7 +24,7 @@
 package dart.convert;
 
 /** {@code JsonEncoder} and {@code JsonEncoder.withIndent}. */
-public final class JsonEncoder implements CodecConverter {
+public final class JsonEncoder extends Converter<Object, String> {
     private final Object toEncodable;
     private final String indent;
 

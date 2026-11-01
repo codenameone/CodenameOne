@@ -42,20 +42,15 @@ class JsonUnsupportedObjectError {
   external Object? get unsupportedObject;
 }
 
-// Dart's Codec<S, T>. Only the byte codecs implement it (dart.convert.Codec); its
-// converters are the codec itself, which picks the direction by input type.
+// Dart's Codec<S, T> (dart.convert.Codec). Its encoder and decoder are Converters, so
+// a codec written in Dart overrides them with its own Converter subclasses; the byte
+// codecs are their own converters and pick the direction by input type.
 @JavaName('dart.convert.Codec')
 abstract class Codec<S, T> {
   external dynamic encode(dynamic input);
   external dynamic decode(dynamic encoded);
-  external CodecConverter get encoder;
-  external CodecConverter get decoder;
-}
-
-// What a Codec's encoder and decoder answer (the Java side's common type).
-@JavaName('dart.convert.CodecConverter')
-abstract class CodecConverter {
-  external dynamic convert(dynamic input);
+  external Converter<S, T> get encoder;
+  external Converter<T, S> get decoder;
 }
 
 @JavaName('dart.convert.ByteCodec')
