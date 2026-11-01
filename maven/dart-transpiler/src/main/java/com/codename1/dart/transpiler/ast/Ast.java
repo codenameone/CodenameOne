@@ -194,6 +194,8 @@ public final class Ast {
         public TypeRef superclass;                // null if none/Object
         public List<TypeRef> interfaces = new ArrayList<TypeRef>();
         public List<String> typeParams = new ArrayList<String>();
+        /** Declared bound of each bounded type parameter ({@code B extends Base<T>}). */
+        public java.util.Map<String, TypeRef> typeParamBounds = new java.util.HashMap<String, TypeRef>();
         public List<FieldDecl> fields = new ArrayList<FieldDecl>();
         public List<CtorDecl> ctors = new ArrayList<CtorDecl>();
         public List<MethodDecl> methods = new ArrayList<MethodDecl>();

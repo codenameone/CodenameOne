@@ -67,13 +67,13 @@ class DraggableScrollableSheet extends Widget {
 
 @JavaName('com.codename1.flutter.widgets.RawAutocomplete')
 class RawAutocomplete<T extends Object> extends Widget {
-  external RawAutocomplete({Key? key, required Iterable<T> Function(TextEditingValue) optionsBuilder, void Function(T)? onSelected, String Function(T)? displayStringForOption});
+  external RawAutocomplete({Key? key, required Iterable<T> Function(TextEditingValue) optionsBuilder, void Function(T)? onSelected, String Function(T)? displayStringForOption, Widget Function(BuildContext context, TextEditingController textEditingController, FocusNode focusNode, void Function() onFieldSubmitted)? fieldViewBuilder, Widget Function(BuildContext context, void Function(T) onSelected, Iterable<T> options)? optionsViewBuilder, TextEditingController? textEditingController, FocusNode? focusNode});
   external static String defaultStringForOption(Object option);
 }
 
 @JavaName('com.codename1.flutter.material.Autocomplete')
 class Autocomplete<T extends Object> extends Widget {
-  external Autocomplete({Key? key, required Iterable<T> Function(TextEditingValue) optionsBuilder, void Function(T)? onSelected, String Function(T)? displayStringForOption, double? optionsMaxHeight});
+  external Autocomplete({Key? key, required Iterable<T> Function(TextEditingValue) optionsBuilder, void Function(T)? onSelected, String Function(T)? displayStringForOption, double? optionsMaxHeight, Widget Function(BuildContext context, TextEditingController textEditingController, FocusNode focusNode, void Function() onFieldSubmitted)? fieldViewBuilder, Widget Function(BuildContext context, void Function(T) onSelected, Iterable<T> options)? optionsViewBuilder});
 }
 
 @JavaName('com.codename1.flutter.material.ElevatedButtonThemeData')

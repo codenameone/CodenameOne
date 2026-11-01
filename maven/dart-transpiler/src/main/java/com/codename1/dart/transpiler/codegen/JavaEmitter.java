@@ -2996,6 +2996,20 @@ public final class JavaEmitter {
         return true;
     }
 
+    /** Whether {@code c} or a program superclass applies the stub {@code ListMixin}. */
+    private boolean appliesListMixin(ClassDecl c) {
+        java.util.Set<String> seen = new java.util.HashSet<String>();
+        for (ClassDecl mc = c; mc != null && seen.add(mc.name);
+                mc = mc.superclass != null ? program.classes.get(mc.superclass.name) : null) {
+            for (TypeRef mix : mc.mixins) {
+                if ("ListMixin".equals(mix.name)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     private String paramTypeName(Param p) {
         return p.type == null || p.type.is("var") ? "dynamic" : p.type.name;
     }
@@ -3036,8 +3050,13 @@ public final class JavaEmitter {
             }
             sb.append("> ");
         }
+        // A class `with ListMixin<E>` implements dart.collection.ListMixin's generic
+        // `E $index(long)` / `$indexSet(long, E)`: a primitive element type there would
+        // not implement them, so the element side of both operators is emitted boxed.
+        boolean boxListMixinOp = ("$index".equals(m.name) || "$indexSet".equals(m.name))
+                && !m.isStatic && appliesListMixin(ctx.currentClass);
         String rjt = m.isSetter ? "void" : m.javaReturn != null ? m.javaReturn
-                : (forceIntReturn ? "int" : javaType(rt, false, ctx));
+                : (forceIntReturn ? "int" : javaType(rt, boxListMixinOp && "$index".equals(m.name), ctx));
         sb.append(rjt).append(' ').append(m.name).append('(');
         // The Java parameter list and names, kept for a sync* body's helper method.
         StringBuilder paramDecls = new StringBuilder();
@@ -3049,7 +3068,7 @@ public final class JavaEmitter {
                 sb.append(", ");
             }
             String jn = ctx.declareShadowSafe(p.name, pt);
-            String decl = javaType(pt, false, ctx) + ' ' + jn;
+            String decl = javaType(pt, boxListMixinOp && i == 1, ctx) + ' ' + jn;
             sb.append(decl);
             paramDecls.append(", ").append(decl);
             paramNames.append(", ").append(jn);
@@ -4545,6 +4564,15 @@ public final class JavaEmitter {
             for (String b : binds) {
                 w.line(b);
             }
+            // `switch (w) { T1() => w.span }`: an object pattern promotes a local subject
+            // to the pattern's type in the guard and the arm, as `w is T1` would.
+            String promoName = null;
+            TypeRef promoPrev = null;
+            if (c.pattern instanceof ObjectPattern && ((ObjectPattern) c.pattern).type != null
+                    && sw.subject instanceof Ident && ctx.lookup(((Ident) sw.subject).name) != null) {
+                promoName = ((Ident) sw.subject).name;
+                promoPrev = ctx.pushPromotion(promoName, ((ObjectPattern) c.pattern).type);
+            }
             boolean guarded = c.guard != null;
             if (guarded) {
                 Out g = emitExpr(c.guard, TypeRef.BOOL, ctx);
@@ -4552,6 +4580,9 @@ public final class JavaEmitter {
                 ctx.indent(1);
             }
             Out v = emitExpr(c.value, resultType, ctx);
+            if (promoName != null) {
+                ctx.restorePromotion(promoName, promoPrev);
+            }
             w.line(res + " = " + coerce(v, resultType, ctx) + ";");
             w.line("break " + label + ";");
             if (guarded) {
@@ -6767,6 +6798,30 @@ public final class JavaEmitter {
             }
             s = s.superclass != null ? program.classes.get(s.superclass.name) : null;
         }
+        // declared (usually abstract) by an interface the class or a superclass implements:
+        // `abstract class M implements Span` reads `start` before any subclass defines it
+        return interfaceGetter(c, name, new java.util.HashSet<ClassDecl>());
+    }
+
+    private MethodDecl interfaceGetter(ClassDecl c, String name, java.util.Set<ClassDecl> seen) {
+        for (ClassDecl k = c; k != null && seen.add(k);
+                k = k.superclass != null ? program.classes.get(k.superclass.name) : null) {
+            java.util.List<TypeRef> sups = new java.util.ArrayList<TypeRef>(k.interfaces);
+            sups.addAll(k.mixins);
+            for (TypeRef i : sups) {
+                ClassDecl ic = program.classes.get(i.name);
+                if (ic == null) {
+                    continue;
+                }
+                MethodDecl g = ic.getter(name);
+                if (g == null) {
+                    g = interfaceGetter(ic, name, seen);
+                }
+                if (g != null) {
+                    return g;
+                }
+            }
+        }
         return null;
     }
 
@@ -6953,6 +7008,13 @@ public final class JavaEmitter {
         if (tt != null && tt.name != null && tt.name.indexOf('.') > 0) {
             tt.name = stripImportPrefix(tt.name);
         }
+        // A receiver typed by a bounded type parameter (`B extends Base<T>`) has the
+        // bound's members; Java erases B to Object, so view it as the bound.
+        Out boundView = typeParamBoundView(target, ctx);
+        if (boundView != null) {
+            target = boundView;
+            tt = boundView.type;
+        }
         // Cascade suppression: the receiver already fell to `dynamic` from a reported
         // diagnostic upstream; a member read on a dynamic receiver is legal Dart, so
         // don't re-diagnose the same root cause on every link of the chain.
@@ -7110,6 +7172,11 @@ public final class JavaEmitter {
             if (name.equals("last")) {
                 return new Out(target.code + ".last()", elem);
             }
+            if (name.equals("single")) {
+                // Dart's `single`: the one element, StateError on none or several --
+                // exactly singleWhere with an always-true test and no orElse.
+                return new Out(target.code + ".singleWhere(e$ -> Boolean.TRUE, null)", elem);
+            }
             if (name.equals("reversed")) {
                 return new Out(target.code + ".reversedIterable()", TypeRef.of("Iterable", elem));
             }
@@ -7141,6 +7208,21 @@ public final class JavaEmitter {
             }
             if (name.equals("isOdd")) {
                 return new Out("(" + target.code + " % 2 != 0)", TypeRef.BOOL);
+            }
+            // num's classification getters. Each evaluates the receiver once; an int
+            // widens to double, which answers false/false/true for NaN/infinite/finite.
+            if (name.equals("isNaN")) {
+                return new Out("Double.isNaN(" + target.code + ")", TypeRef.BOOL);
+            }
+            if (name.equals("isInfinite")) {
+                return new Out("Double.isInfinite(" + target.code + ")", TypeRef.BOOL);
+            }
+            if (name.equals("isFinite")) {
+                return new Out("Double.isFinite(" + target.code + ")", TypeRef.BOOL);
+            }
+            if (name.equals("isNegative")) {
+                // Dart: -0.0 is negative, NaN is not.
+                return new Out("dart.core.CoreStatics.isNegative(" + target.code + ")", TypeRef.BOOL);
             }
         }
         // The same implicit members on a stub enum, which is a plain Java enum.
@@ -9901,6 +9983,18 @@ public final class JavaEmitter {
             if (sm != null) {
                 return new Out("$self." + n + "(" + stubMethodArgs(sm, c.args, ctx) + ")", sm.returnType);
             }
+            // an instance method of a program class (or interface) the extension is on
+            ClassDecl onCls = programClass(ctx.extensionSelfType.name, ctx);
+            if (onCls != null && resolveTopLevel(n, ctx) == null
+                    && (ctx.currentExtension == null || ctx.currentExtension.method(n) == null)) {
+                MethodDecl om = onCls.method(n);
+                if (om == null) {
+                    om = findMethodInHierarchy(onCls, n);
+                }
+                if (om != null && !om.isStatic && !om.isGetter) {
+                    return emitMethodCallOn(self, c, ctx);
+                }
+            }
             ClassDecl extCls = ctx.currentExtension != null && ctx.currentExtension.method(n) != null
                     ? ctx.currentExtension : findUserExtension(ctx.extensionSelfType.name, n, false, ctx);
             if (extCls != null) {
@@ -10128,6 +10222,13 @@ public final class JavaEmitter {
         // prefix in its type name; strip it so method resolution sees the real stub type.
         if (tt != null && tt.name != null && tt.name.indexOf('.') > 0) {
             tt.name = stripImportPrefix(tt.name);
+        }
+        // A receiver typed by a bounded type parameter (`B extends Base<T>`) has the
+        // bound's members; Java erases B to Object, so view it as the bound.
+        Out boundView = typeParamBoundView(target, ctx);
+        if (boundView != null) {
+            target = boundView;
+            tt = boundView.type;
         }
         String n = c.name;
         // Cascade suppression: the receiver's type already fell to `dynamic` because a
@@ -10440,7 +10541,35 @@ public final class JavaEmitter {
             Ast.MethodDecl em = extensionMember(stubExtM, n, false);
             if (em != null) {
                 String callee = stubExtensionSimpleName(stubExtM, ctx) + "." + n;
-                Out o = stubCallOut(em, c, callee, ctx);
+                // `extension X<K, V> on Map<K, V>`: the receiver's type arguments stand in
+                // for the extension's type parameters while the arguments are emitted, so
+                // `m.map((k, v) => ...)` types v as the map's value type, not a bare V.
+                java.util.Map<String, TypeRef> extSubst = new java.util.HashMap<String, TypeRef>();
+                TypeRef on = stubExtM.extensionOn;
+                if (on != null && on.args.size() == tt.args.size()) {
+                    for (int i = 0; i < on.args.size(); i++) {
+                        TypeRef a = on.args.get(i);
+                        if (a.args.isEmpty() && stubExtM.typeParams.contains(a.name)
+                                && !em.typeParams.contains(a.name)) {
+                            extSubst.put(a.name, tt.args.get(i));
+                        }
+                    }
+                }
+                List<TypeRef> savedParamTypes = new ArrayList<TypeRef>();
+                for (Param ep : em.params) {
+                    savedParamTypes.add(ep.type);
+                    if (!extSubst.isEmpty()) {
+                        ep.type = substFunctionType(ep.type, extSubst);
+                    }
+                }
+                Out o;
+                try {
+                    o = stubCallOut(em, c, callee, ctx);
+                } finally {
+                    for (int i = 0; i < em.params.size(); i++) {
+                        em.params.get(i).type = savedParamTypes.get(i);
+                    }
+                }
                 String prefix = callee + "(";
                 if (o.code.startsWith(prefix)) {
                     String rest = o.code.substring(prefix.length());
@@ -14989,13 +15118,55 @@ public final class JavaEmitter {
     }
 
     /** Finds a method walking the program-class superclass chain. */
+    /**
+     * The receiver viewed as its type parameter's declared bound, or null when its type
+     * is not a bounded type parameter of the enclosing class (or the bound is not a class
+     * this emitter can resolve members on).
+     */
+    private Out typeParamBoundView(Out target, Ctx ctx) {
+        TypeRef tt = target.type;
+        ClassDecl cc = ctx.currentClass;
+        if (tt == null || tt.name == null || !tt.args.isEmpty() || tt.funcReturn != null || cc == null
+                || cc.typeParamBounds == null || !cc.typeParams.contains(tt.name)) {
+            return null;
+        }
+        TypeRef bound = cc.typeParamBounds.get(tt.name);
+        if (bound == null || bound.name == null || bound.name.equals(tt.name)
+                || cc.typeParams.contains(bound.name)) {
+            return null;
+        }
+        if (programClass(bound.name, ctx) == null && !stubs.isStubClass(bound.name)) {
+            return null;
+        }
+        return new Out("((" + javaType(bound, true, ctx) + ") " + target.code + ")", bound);
+    }
+
     private MethodDecl findMethodInHierarchy(ClassDecl c, String name) {
-        while (c != null) {
+        return findMethodInHierarchy(c, name, new java.util.HashSet<ClassDecl>());
+    }
+
+    /**
+     * Superclasses first (the concrete chain wins), then the interfaces each class
+     * implements: an abstract `Sub<E> implements Base<E>` has Base's members too.
+     */
+    private MethodDecl findMethodInHierarchy(ClassDecl c, String name, java.util.Set<ClassDecl> seen) {
+        java.util.List<ClassDecl> chain = new java.util.ArrayList<ClassDecl>();
+        while (c != null && seen.add(c)) {
             MethodDecl m = c.method(name);
             if (m != null) {
                 return m;
             }
+            chain.add(c);
             c = c.superclass != null ? program.classes.get(c.superclass.name) : null;
+        }
+        for (ClassDecl k : chain) {
+            for (TypeRef i : k.interfaces) {
+                ClassDecl ic = program.classes.get(i.name);
+                MethodDecl m = ic == null ? null : findMethodInHierarchy(ic, name, seen);
+                if (m != null) {
+                    return m;
+                }
+            }
         }
         return null;
     }

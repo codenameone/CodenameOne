@@ -520,6 +520,9 @@ public final class AstBuilder {
         if (ctx.typeParameters() != null) {
             for (Dart2Parser.TypeParameterContext tp : ctx.typeParameters().typeParameter()) {
                 cd.typeParams.add(tp.identifier().getText());
+                if (tp.typeNotVoid() != null) {
+                    cd.typeParamBounds.put(tp.identifier().getText(), buildTypeNotVoid(tp.typeNotVoid()));
+                }
             }
         }
         if (ctx.superclass() != null) {
@@ -564,6 +567,9 @@ public final class AstBuilder {
         if (ctx.typeParameters() != null) {
             for (Dart2Parser.TypeParameterContext tp : ctx.typeParameters().typeParameter()) {
                 cd.typeParams.add(tp.identifier().getText());
+                if (tp.typeNotVoid() != null) {
+                    cd.typeParamBounds.put(tp.identifier().getText(), buildTypeNotVoid(tp.typeNotVoid()));
+                }
             }
         }
         Dart2Parser.MixinApplicationContext app = ctx.mixinApplication();
@@ -2817,6 +2823,30 @@ public final class AstBuilder {
         return null;
     }
 
+    /**
+     * Whether an element is a `k: v` entry, looking through collection-if and
+     * collection-for: `{for (var x in xs) x.id: x}` is a map, not a set.
+     */
+    private static boolean isMapElement(Dart2Parser.ElementContext e) {
+        if (e == null) {
+            return false;
+        }
+        if (e.mapElement() != null) {
+            return true;
+        }
+        if (e.forElement() != null) {
+            return isMapElement(e.forElement().element());
+        }
+        if (e.ifElement() != null) {
+            for (Dart2Parser.ElementContext b : e.ifElement().element()) {
+                if (isMapElement(b)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     private Expr buildSetOrMapLiteral(Dart2Parser.SetOrMapLiteralContext ctx) {
         // Set vs map disambiguation (matching Dart): explicit <T>{...} or <K,V>{...} decides;
         // otherwise a top-level `k: v` entry means a map, and any other non-empty body is a set.
@@ -2826,7 +2856,7 @@ public final class AstBuilder {
         boolean hasAnyElement = ctx.elements() != null && !ctx.elements().element().isEmpty();
         if (ctx.elements() != null) {
             for (Dart2Parser.ElementContext e : ctx.elements().element()) {
-                if (e.mapElement() != null) {
+                if (isMapElement(e)) {
                     hasMapEntry = true;
                     break;
                 }
