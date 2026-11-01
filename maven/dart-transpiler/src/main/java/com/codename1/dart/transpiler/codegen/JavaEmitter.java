@@ -1186,6 +1186,15 @@ public final class JavaEmitter {
             if (im != null && interfacedClasses().contains(im)) {
                 // `mixin M implements Shape`: M's values are Shapes
                 mext.append(mext.length() > 0 ? ", " : "").append(javaType(itf, false, ctx));
+                continue;
+            }
+            Ast.ClassDecl ss = itf.name == null || program.classes.containsKey(itf.name)
+                    ? null : stubs.classes.get(itf.name);
+            if (ss != null && "dart.collection.SetMixin".equals(ss.javaName) && itf.args.size() == 1) {
+                // `mixin class ReadOnly<E> implements Set<E>` (Program.addSetProtocol adds the
+                // SetBase): the mixin is a SetMixin, so the class applying it is one too.
+                mext.append(mext.length() > 0 ? ", " : "").append("dart.collection.SetMixin<")
+                        .append(javaType(itf.arg(0), true, ctx)).append('>');
             }
         }
         return finishClassFile(mx.name, "public interface " + mx.name + typeParams,
@@ -4636,6 +4645,15 @@ public final class JavaEmitter {
             java.util.List<TypeRef> applied = new java.util.ArrayList<TypeRef>(mc.mixins);
             if (mc.superclass != null) {
                 applied.add(mc.superclass);
+            }
+            // `implements Set<E>` beside a superclass gains a SetBase interface (see
+            // Program.addSetProtocol), on the class itself or on a program mixin it applies.
+            applied.addAll(mc.interfaces);
+            for (TypeRef mix : mc.mixins) {
+                ClassDecl pm = mix.name == null ? null : program.classes.get(mix.name);
+                if (pm != null && pm != mc) {
+                    applied.addAll(pm.interfaces);
+                }
             }
             for (TypeRef mix : applied) {
                 Ast.ClassDecl sc = mix.name == null || program.classes.containsKey(mix.name)
@@ -9795,7 +9813,15 @@ public final class JavaEmitter {
             SpreadElement s = (SpreadElement) e;
             // `...[Text(' '), anchor(i)]` into a List<Node>: Dart types the inner literal
             // from the outer element (an Iterable<Node> context), so it is no List<Object>.
-            TypeRef spreadCtx = s.expr instanceof ListLit && ((ListLit) s.expr).elementType == null
+            // `...List.generate(n, (i) => Text(..))` likewise: an untyped List factory infers
+            // its element type from that context, not List<dynamic>.
+            boolean untypedListFactory = s.expr instanceof CtorCall && ((CtorCall) s.expr).type != null
+                    && ((CtorCall) s.expr).type.is("List") && ((CtorCall) s.expr).type.args.isEmpty()
+                    || s.expr instanceof Call && ((Call) s.expr).typeArgs.isEmpty()
+                    && ((Call) s.expr).target instanceof Ident && "List".equals(((Ident) ((Call) s.expr).target).name)
+                    && ctx.lookup("List") == null;
+            TypeRef spreadCtx = (s.expr instanceof ListLit && ((ListLit) s.expr).elementType == null
+                    || untypedListFactory)
                     && elem != null && !isDynamicType(elem) ? TypeRef.of("List", elem) : null;
             Out src = emitExpr(s.expr, spreadCtx, ctx);
             if (s.nullAware) {
@@ -17564,6 +17590,11 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             // its fill value's static type. Untyped, the list was a List<dynamic> where a
             // List<int> -- a DartLongList -- was promised.
             TypeRef inferredElem = null;
+            // `completer.complete(List.from(xs))` / `Future.value(List.from(xs))`: the
+            // parameter is a FutureOr<List<E>>, and Dart infers E through the FutureOr.
+            if (expected != null && expected.is("FutureOr") && expected.args.size() == 1) {
+                expected = expected.arg(0);
+            }
             if (expected != null && (expected.is("List") || expected.is("Iterable")) && expected.args.size() == 1
                     && !isDynamicType(expected.arg(0)) && typeVarsInScope(expected.arg(0), ctx)) {
                 inferredElem = expected.arg(0);
@@ -17863,6 +17894,11 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             // (`List<String> f = List.from(src)`, `Map<String, String> m = Map.of({})`),
             // so the factory goes through the typed path when the context names one.
             TypeRef ctxType = callExpected(c, ctx);
+            if (ctxType != null && ctxType.is("FutureOr") && ctxType.args.size() == 1) {
+                // `completer.complete(List.from(xs))`, `Future.value(List.from(xs))`: the
+                // parameter is a FutureOr<List<E>>, and Dart infers E through it.
+                ctxType = ctxType.arg(0);
+            }
             if (c.typeArgs.isEmpty() && ctxType != null && ctxType.is(cls)
                     && ctxType.args.size() == (cls.equals("Map") ? 2 : 1)
                     && typeVarsInScope(ctxType, ctx)) {
@@ -23136,6 +23172,15 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                         : "dart.core.ListMixinView<>";
                 return "new " + view + "(" + o.code + ")";
             }
+            if ("dart.collection.SetMixin".equals(fam) && target.is("Iterable") && target.args.size() == 1) {
+                // A Set in an Iterable slot travels as the wrap of a DartSet, which `is Set`,
+                // `as Set` and a narrowed call (`Set<T> cast<T>()` overriding Iterable's)
+                // look through; ofMixin's view is no Set to them.
+                String el = javaType(target.arg(0), true, ctx);
+                return "dart.core.DartIterable.<" + el + ">wrap(new dart.core.SetMixinView<" + el
+                        + ">((dart.collection.SetMixin<" + el + ">) (dart.collection.SetMixin<?>) ("
+                        + o.code + ")))";
+            }
             if (fam != null && target.is("Iterable") && !"dart.collection.MapMixin".equals(fam)) {
                 return "dart.core.DartIterable.ofMixin(" + o.code + ")";
             }
@@ -23146,6 +23191,15 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 && (target.is("Set") || target.is("Map"))) {
             String fam = appliedCollectionMixin(o.type.name);
             if ("dart.collection.SetMixin".equals(fam) && target.is("Set")) {
+                ClassDecl oc = program.classes.get(o.type.name);
+                if (target.args.size() == 1 && oc != null && interfacedClasses().contains(oc)) {
+                    // A value typed by the class's X$I interface: X itself is a SetMixin (it
+                    // `implements Set<E>`, Program.addSetProtocol), X$I is not -- extending
+                    // SetMixin would clash with X$I's own defaults -- so the view takes a cast.
+                    String el = javaType(target.arg(0), true, ctx);
+                    return "new dart.core.SetMixinView<" + el + ">((dart.collection.SetMixin<" + el
+                            + ">) (dart.collection.SetMixin<?>) (" + o.code + "))";
+                }
                 return "new dart.core.SetMixinView<>(" + o.code + ")";
             }
             if ("dart.collection.MapMixin".equals(fam) && target.is("Map")) {

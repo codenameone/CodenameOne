@@ -1,0 +1,10 @@
+wrap 3 true [1, 2, 3]
+copy 4 true [1, 2, 3, 9]
+[1, 3]
+ro 2 true [2, 4]
+ro add: read-only set
+keys 2 true [1, 2]
+{1, 2}
+2
+[1, 2, 7]
+[2]

@@ -199,6 +199,7 @@ public final class Program {
                         }
                     }
                 }
+                addSetProtocol(c);
             }
         }
         Set<Ast.ClassDecl> done = new HashSet<Ast.ClassDecl>();
@@ -224,6 +225,46 @@ public final class Program {
                 }
             }
         }
+    }
+
+    /**
+     * `class Wrapper<E> extends Base<E> implements Set<E>` (or a mixin declared
+     * `implements Set<E>`): dart:core's Set is a runtime class here, which a Java class that
+     * already extends something cannot extend, so the class was neither a DartSet nor a
+     * SetMixin and could be handed to no Set-typed slot. SetBase is added beside Set -- Set
+     * stays, so the analyzer still reads the class as a Set -- and the emitter implements
+     * its runtime interface, dart.collection.SetMixin, and bridges it through SetMixinView.
+     * A class with no superclass and no mixin keeps extending the runtime class instead.
+     */
+    private void addSetProtocol(Ast.ClassDecl c) {
+        if (c.superclass == null && c.mixins.isEmpty() && !c.isMixin) {
+            return;
+        }
+        Ast.TypeRef set = null;
+        for (Ast.TypeRef i : c.interfaces) {
+            if ("SetBase".equals(i.name) || "SetMixin".equals(i.name)) {
+                return;
+            }
+            if ("Set".equals(i.name) && i.resolved == null && i.args.size() == 1
+                    && resolveClass("Set", c.ownerLibrary) == null) {
+                set = i;
+            }
+        }
+        if (set == null || set.arg(0).is("int") || set.arg(0).is("double")) {
+            return;
+        }
+        for (Ast.TypeRef m : c.mixins) {
+            if ("SetBase".equals(m.name) || "SetMixin".equals(m.name)) {
+                return;
+            }
+        }
+        if (c.superclass != null && ("SetBase".equals(c.superclass.name)
+                || "SetMixin".equals(c.superclass.name))) {
+            return;
+        }
+        Ast.TypeRef base = new Ast.TypeRef("SetBase");
+        base.args.add(set.arg(0));
+        c.interfaces.add(base);
     }
 
     /**
