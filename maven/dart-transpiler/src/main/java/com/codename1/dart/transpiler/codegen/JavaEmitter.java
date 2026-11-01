@@ -889,11 +889,17 @@ public final class JavaEmitter {
                 sig.append('<').append(String.join(", ", tvs)).append("> ");
             }
             sig.append(m.isSetter ? "void" : javaType(rt, false, ctx))
-                    .append(' ').append(m.name).append('(')
-                    .append(javaType(ext.extensionOn, false, ctx)).append(" $self");
+                    .append(' ').append(m.name).append('(');
+            if (!m.isStatic) {
+                // A static extension member has no receiver: `Ext.helper(a)`.
+                sig.append(javaType(ext.extensionOn, false, ctx)).append(" $self");
+            }
+            boolean firstParam = m.isStatic;
             for (Param pm : m.params) {
                 TypeRef pt = pm.type == null || pm.type.is("var") ? TypeRef.DYNAMIC : pm.type;
-                sig.append(", ").append(javaType(pt, false, ctx)).append(' ')
+                sig.append(firstParam ? "" : ", ");
+                firstParam = false;
+                sig.append(javaType(pt, false, ctx)).append(' ')
                         .append(ctx.declareShadowSafe(pm.name, pt));
             }
             sig.append(") {\n");
@@ -4797,6 +4803,23 @@ public final class JavaEmitter {
      * (own, or inherited from a program superclass) referenced by a bare identifier. Returns
      * null for anything it can't resolve cheaply.
      */
+    /** Whether an untyped set literal is only spreads of maps, which makes it a map. */
+    private boolean spreadsOnlyMaps(SetLit sl, TypeRef expected, Ctx ctx) {
+        if (sl.elementType != null || sl.elements.isEmpty()) {
+            return false;
+        }
+        for (Expr el : sl.elements) {
+            if (!(el instanceof SpreadElement)) {
+                return false;
+            }
+        }
+        if (expected != null && expected.is("Map")) {
+            return true;
+        }
+        TypeRef t = inferExprTypeQuiet(((SpreadElement) sl.elements.get(0)).expr, ctx);
+        return t != null && t.is("Map");
+    }
+
     private TypeRef inferExprTypeQuiet(Expr e, Ctx ctx) {
         if (e instanceof Ident) {
             String nm = ((Ident) e).name;
@@ -5399,6 +5422,20 @@ public final class JavaEmitter {
             }
             Out o = emitMapLit(ml, expected, ctx);
             return ((MapLit) e).isConst ? constCollection(o, ctx) : o;
+        }
+        if (e instanceof SetLit && spreadsOnlyMaps((SetLit) e, expected, ctx)) {
+            // `{...?headers}`: a body of spreads alone is a map when what it spreads is one
+            // (Dart decides by the spread's static type); the parser, seeing no `k: v`, made
+            // it a set, and `.containsKey` on the result was then E0137.
+            SetLit sl = (SetLit) e;
+            MapLit ml = new MapLit();
+            ml.line = sl.line;
+            ml.col = sl.col;
+            ml.isConst = sl.isConst;
+            ml.structured = true;
+            ml.elements.addAll(sl.elements);
+            Out o = emitMapLit(ml, expected, ctx);
+            return ml.isConst ? constCollection(o, ctx) : o;
         }
         if (e instanceof SetLit) {
             Out o = emitSetLit((SetLit) e, expected, ctx);
@@ -6004,6 +6041,15 @@ public final class JavaEmitter {
             }
             return;
         }
+        if (o instanceof Args) {
+            // Args and NamedArg are not Nodes, so the reflective walk below never reached a
+            // call's arguments: `print('${xs.whereType<T>()}')` left T unwitnessed (E0142).
+            scanTypeValueUses(((Args) o).positional, tps, used, seen);
+            for (NamedArg na : ((Args) o).named) {
+                scanTypeValueUses(na.value, tps, used, seen);
+            }
+            return;
+        }
         if (!(o instanceof Node) || o instanceof ClassDecl || o instanceof Library) {
             return;
         }
@@ -6054,7 +6100,7 @@ public final class JavaEmitter {
                 continue;
             }
             Class<?> ft = f.getType();
-            if (Node.class.isAssignableFrom(ft) || List.class.isAssignableFrom(ft)) {
+            if (Node.class.isAssignableFrom(ft) || List.class.isAssignableFrom(ft) || ft == Args.class) {
                 try {
                     scanTypeValueUses(f.get(o), inner, used, seen);
                 } catch (IllegalAccessException e) {
@@ -8077,6 +8123,32 @@ public final class JavaEmitter {
         return false;
     }
 
+    /** The first non-program (core or stub) supertype of program class {@code c}, or null. */
+    private TypeRef coreAncestor(ClassDecl c, java.util.Set<ClassDecl> seen) {
+        if (c == null || !seen.add(c)) {
+            return null;
+        }
+        List<TypeRef> sups = new ArrayList<TypeRef>();
+        if (c.superclass != null) {
+            sups.add(c.superclass);
+        }
+        sups.addAll(c.interfaces);
+        for (TypeRef t : sups) {
+            ClassDecl pc = program.classes.get(t.name);
+            if (pc == null) {
+                if (t.is("List") || t.is("Iterable") || t.is("Set") || t.is("Map")) {
+                    return t;
+                }
+                continue;
+            }
+            TypeRef up = coreAncestor(pc, seen);
+            if (up != null) {
+                return up;
+            }
+        }
+        return null;
+    }
+
     private Out emitMemberGet(Out target, String name, Node posNode, Ctx ctx) {
         TypeRef tt = target.type;
         // A field/param typed with an import prefix (`intl.DateFormat`, `ui.Size`) keeps the
@@ -8488,6 +8560,14 @@ public final class JavaEmitter {
                 || tt.is("Map") && (name.equals("containsKey") || name.equals("containsValue")
                         || name.equals("remove"))) {
             return new Out("(" + target.code + ")::" + name, new TypeRef("Function"));
+        }
+        TypeRef coreUp = programClass(tt.name, ctx) != null
+                ? coreAncestor(programClass(tt.name, ctx), new HashSet<ClassDecl>()) : null;
+        if (coreUp != null) {
+            // `abstract class B implements A` with `abstract class A implements List<E>`: a
+            // member only the core type declares (`length`) is reached through the
+            // interface chain, however many program levels sit between.
+            return emitMemberGet(new Out(target.code, coreUp), name, posNode, ctx);
         }
         diags.error(posNode, "E0132", "Cannot resolve member '" + name + "' on type " + tt
                 + ". Confirm the file passes `dart analyze`, or the API is not yet implemented in the Codename One runtime.");
@@ -10658,6 +10738,18 @@ public final class JavaEmitter {
     private boolean lastLambdaExprIsStatementShaped;
 
     private Out emitLambda(Lambda l, TypeRef expected, Ctx ctx) {
+        if (expected != null && expected.funcParams == null && expected.funcReturn == null
+                && (expected.is("Object") || isDynamicType(expected))) {
+            // A closure handed to an Object/dynamic slot (a named argument through a
+            // full-arity tear-off local, `dec(s, reviver: (k, v) => ..)`): Object is not a
+            // functional interface, so bind it to its own Funcs SAM first.
+            Out o = emitLambda(l, null, ctx);
+            if (o.type != null && (o.type.funcParams != null || o.type.funcReturn != null)
+                    && !o.code.startsWith("((")) {
+                return new Out("((" + javaType(o.type, false, ctx) + ") " + o.code + ")", o.type);
+            }
+            return o;
+        }
         Out adapted = optionalParamLambda(l, expected, ctx);
         if (adapted != null) {
             return adapted;
@@ -11004,6 +11096,65 @@ public final class JavaEmitter {
         return ctx.callExpectedFor == c ? ctx.callExpected : null;
     }
 
+    /** The program extension named {@code n}, preferring the current library's, or null. */
+    private ClassDecl extensionNamed(String n, Ctx ctx) {
+        if (n == null || ctx.lookup(n) != null || program.classes.containsKey(n)) {
+            return null;
+        }
+        ClassDecl any = null;
+        for (ClassDecl e : program.extensions) {
+            if (n.equals(e.name)) {
+                if (e.ownerLibrary == ctx.library()) {
+                    return e;
+                }
+                if (any == null && !n.startsWith("_")) {
+                    any = e;
+                }
+            }
+        }
+        return any;
+    }
+
+    /**
+     * {@code Ext.staticMember(..)} and an explicit extension application
+     * {@code Ext(receiver).member(..)}. An extension is not a class in the program tables, so
+     * both fell through to "cannot resolve" (E0129/E0135). The application calls the
+     * extension's static method directly, with the receiver as its {@code $self}, which is
+     * also how Dart resolves it: the named extension wins even over a member of the receiver.
+     */
+    private Out emitExplicitExtensionCall(Call c, Ctx ctx) {
+        if (c.name == null) {
+            return null;
+        }
+        if (c.target instanceof Ident) {
+            ClassDecl ext = extensionNamed(((Ident) c.target).name, ctx);
+            MethodDecl m = ext == null ? null : ext.method(c.name);
+            if (m != null && m.isStatic) {
+                TypeRef rt = m.returnType == null || m.returnType.is("var") ? TypeRef.DYNAMIC : m.returnType;
+                return new Out(ext.name + "." + c.name + "(" + methodArgs(m.params, c.args, ctx) + ")", rt);
+            }
+            return null;
+        }
+        if (!(c.target instanceof Call)) {
+            return null;
+        }
+        Call app = (Call) c.target;
+        if (app.target != null || app.args.positional.size() != 1 || !app.args.named.isEmpty()) {
+            return null;
+        }
+        ClassDecl ext = extensionNamed(app.name, ctx);
+        MethodDecl em = ext == null ? null : ext.method(c.name);
+        if (em == null || em.isStatic || em.isGetter || em.isSetter) {
+            return null;
+        }
+        Out recv = emitExpr(app.args.positional.get(0), null, ctx);
+        TypeRef rtype = recv.type == null ? ext.extensionOn : recv.type;
+        String rest = methodArgs(extensionCallbackParams(ext, em.params, rtype), c.args, ctx);
+        String self = extensionSelf(recv, rtype, ext, ctx);
+        return new Out(ext.name + "." + c.name + "(" + self + (rest.isEmpty() ? "" : ", " + rest) + ")",
+                em.returnType == null || em.returnType.is("var") ? TypeRef.DYNAMIC : em.returnType);
+    }
+
     private Out emitCallWithExpected(Call c, TypeRef expected, Ctx ctx) {
         // closure value invocation: f(...) where f is a local of Function type
         if (c.name == null && c.target != null) {
@@ -11016,6 +11167,10 @@ public final class JavaEmitter {
                         TypeRef.DYNAMIC);
             }
             return new Out(fnCall(target.code, target.type, c.args, ctx), TypeRef.DYNAMIC);
+        }
+        Out explicitExt = emitExplicitExtensionCall(c, ctx);
+        if (explicitExt != null) {
+            return explicitExt;
         }
         if (c.target == null) {
             return emitBareCall(c, expected, ctx);
@@ -15266,6 +15421,12 @@ public final class JavaEmitter {
      * no functional interface to land in. Null for any other argument.
      */
     private String slotArg(Expr arg, TypeRef slot, Ctx ctx) {
+        if (arg instanceof Lambda && slot != null && slot.funcParams == null && slot.funcReturn == null
+                && (slot.is("Object") || isDynamicType(slot))) {
+            // An Object slot (a stub's untyped callback parameter seen through a tear-off
+            // value) is no functional interface: bind the closure to its own SAM.
+            slot = null;
+        }
         String code = emitExpr(arg, slot, ctx).code;
         if (slot == null || code.startsWith("((")) {
             return code;
