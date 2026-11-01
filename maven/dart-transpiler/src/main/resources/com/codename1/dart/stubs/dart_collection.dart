@@ -72,7 +72,10 @@ mixin MapMixin<K, V> {
   bool get isEmpty;
   bool get isNotEmpty;
   bool containsKey(Object? key);
+  bool containsValue(Object? value);
   void forEach(void Function(K key, V value) action);
+  void addAll(Map<K, V> other);
+  V putIfAbsent(K key, V Function() ifAbsent);
   V? remove(Object? key);
   void clear();
 }
@@ -84,10 +87,25 @@ mixin SetMixin<E> {
   int get length;
   bool get isEmpty;
   bool get isNotEmpty;
+  E get first;
+  E get last;
+  E get single;
   bool contains(Object? element);
+  E? lookup(Object? element);
   bool add(E value);
   bool remove(Object? value);
+  Set<E> toSet();
+  void clear();
+  void addAll(Iterable<E> elements);
+  void removeAll(Iterable<Object?> elements);
+  bool containsAll(Iterable<Object?> other);
+  void removeWhere(bool Function(E element) test);
+  void retainWhere(bool Function(E element) test);
   void forEach(void Function(E element) action);
+  E elementAt(int index);
+  bool any(bool Function(E element) test);
+  bool every(bool Function(E element) test);
+  String join([String separator = '']);
 }
 
 // dart:collection's *Base classes, declared as mixins so a class extending one takes the
@@ -157,7 +175,10 @@ mixin MapBase<K, V> {
   bool get isEmpty;
   bool get isNotEmpty;
   bool containsKey(Object? key);
+  bool containsValue(Object? value);
   void forEach(void Function(K key, V value) action);
+  void addAll(Map<K, V> other);
+  V putIfAbsent(K key, V Function() ifAbsent);
   V? remove(Object? key);
   void clear();
 }
@@ -169,8 +190,23 @@ mixin SetBase<E> {
   int get length;
   bool get isEmpty;
   bool get isNotEmpty;
+  E get first;
+  E get last;
+  E get single;
   bool contains(Object? element);
+  E? lookup(Object? element);
   bool add(E value);
   bool remove(Object? value);
+  Set<E> toSet();
+  void clear();
+  void addAll(Iterable<E> elements);
+  void removeAll(Iterable<Object?> elements);
+  bool containsAll(Iterable<Object?> other);
+  void removeWhere(bool Function(E element) test);
+  void retainWhere(bool Function(E element) test);
   void forEach(void Function(E element) action);
+  E elementAt(int index);
+  bool any(bool Function(E element) test);
+  bool every(bool Function(E element) test);
+  String join([String separator = '']);
 }

@@ -23,9 +23,90 @@
  */
 package dart.collection;
 
-/// The runtime side of dart:collection's {@code MapMixin}/{@code MapBase}: the
-/// static helpers a map implementation calls from its {@code toString}.
+/// The runtime side of dart:collection's {@code MapMixin}/{@code MapBase}. A program class
+/// applying either supplies the five members Dart's {@code MapMixin} leaves abstract
+/// ({@code operator []}, {@code operator []=}, {@code keys}, {@code remove}, {@code clear});
+/// the rest of the Map protocol is the defaults below, written as Dart's MapMixin writes
+/// them, on top of those. Where the object is passed as a {@code Map},
+/// {@code dart.core.MapMixinView} bridges it. {@link #mapToString} is the static helper a
+/// map implementation calls from its {@code toString}.
 public interface MapMixin<K, V> {
+
+    /// Dart's {@code operator [](key)}.
+    V $index(Object key);
+
+    /// Dart's {@code operator []=(key, value)}.
+    void $indexSet(K key, V value);
+
+    /// Dart's {@code keys}.
+    Iterable<K> keys();
+
+    /// Dart's {@code remove(key)}: the removed value, or null.
+    V remove(Object key);
+
+    /// Dart's {@code clear}.
+    void clear();
+
+    /// Dart's {@code length}: counts {@link #keys}.
+    default long length() {
+        long n = 0;
+        for (K ignored : keys()) {
+            n++;
+        }
+        return n;
+    }
+
+    default boolean isEmpty() {
+        return !keys().iterator().hasNext();
+    }
+
+    default boolean isNotEmpty() {
+        return !isEmpty();
+    }
+
+    /// Dart's {@code containsKey}: searches {@link #keys} with Dart's {@code ==}.
+    default boolean containsKey(Object key) {
+        for (K k : keys()) {
+            if (dart.runtime.DartRuntime.eq(k, key)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Dart's {@code containsValue}.
+    default boolean containsValue(Object value) {
+        for (K k : keys()) {
+            if (dart.runtime.DartRuntime.eq($index(k), value)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Dart's {@code forEach}.
+    default void forEach(dart.runtime.Funcs.VoidFunc2<K, V> action) {
+        for (K k : keys()) {
+            action.call(k, $index(k));
+        }
+    }
+
+    /// Dart's {@code addAll}.
+    default void addAll(java.util.Map<? extends K, ? extends V> other) {
+        for (java.util.Map.Entry<? extends K, ? extends V> e : other.entrySet()) {
+            $indexSet(e.getKey(), e.getValue());
+        }
+    }
+
+    /// Dart's {@code putIfAbsent}.
+    default V putIfAbsent(K key, dart.runtime.Funcs.Func0<V> ifAbsent) {
+        if (containsKey(key)) {
+            return $index(key);
+        }
+        V v = ifAbsent.call();
+        $indexSet(key, v);
+        return v;
+    }
 
     /// {@code MapBase.mapToString(map)}: {@code {k: v, k2: v2}}.
     static String mapToString(java.util.Map<?, ?> m) {

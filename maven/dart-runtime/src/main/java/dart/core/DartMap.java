@@ -307,8 +307,8 @@ public class DartMap<K, V> extends LinkedHashMap<K, V> {
         return new DartIdentityMap<K, V>();
     }
 
-    /** Dart's map[key]. */
-    public V idx(K key) {
+    /** Dart's map[key]: Dart's operator [] takes any Object?, as get does. */
+    public V idx(Object key) {
         return get(key);
     }
 

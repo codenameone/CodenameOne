@@ -130,6 +130,12 @@ public final class DartRuntime {
      * explicit isInstance, never a cast whose failure is caught. {@code nullable} is
      * {@code as T?}, which lets null through; {@code dartType} names T in the message.
      */
+    /// The program object behind a dart:collection mixin view ({@link dart.core.MixinView}),
+    /// or {@code value} itself: what an {@code is} test of a program class tests.
+    public static Object unview(Object value) {
+        return value instanceof dart.core.MixinView ? ((dart.core.MixinView) value).source() : value;
+    }
+
     @SuppressWarnings("unchecked")
     public static <T> T as(Object value, Class<T> type, boolean nullable, String dartType) {
         if (value == null) {
@@ -138,6 +144,12 @@ public final class DartRuntime {
             }
         } else if (type.isInstance(value)) {
             return (T) value;
+        } else if (value instanceof dart.core.MixinView
+                && type.isInstance(((dart.core.MixinView) value).source())) {
+            // A List/Set/Map/Iterable view of a program object applying a dart:collection
+            // mixin is that object in Dart: casting it back to the program's class answers
+            // the object itself, so its own fields and members are reached, not the view.
+            return (T) ((dart.core.MixinView) value).source();
         }
         throw new TypeError("type '" + typeName(value) + "' is not a subtype of type '"
                 + dartType + "' in type cast");

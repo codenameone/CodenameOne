@@ -168,6 +168,9 @@ public final class JavaEmitter {
         List<GeneratedFile> mapped = new ArrayList<GeneratedFile>(pruned.size());
         for (GeneratedFile g : pruned) {
             String dart = g == null ? null : dartFileOf.get(g.relativePath);
+            if (g != null && g.relativePath.endsWith(".java")) {
+                g = new GeneratedFile(g.relativePath, JavaKeywordEscaper.apply(g.content));
+            }
             mapped.add(dart == null ? g : new GeneratedFile(g.relativePath, DartLineTable.apply(g.content, dart)));
         }
         return mapped;
@@ -545,6 +548,17 @@ public final class JavaEmitter {
         sb.append("    public static final dart.core.DartList<").append(enumJava)
                 .append("> values = dart.core.DartList.<").append(enumJava).append(">of(")
                 .append(names).append(");\n\n");
+        // The Dart names, which a value whose name is a Java keyword (`native`)
+        // does not keep as its Java constant (JavaKeywordEscaper renames it).
+        StringBuilder dartNames = new StringBuilder();
+        for (String nm : names.toString().split(", ")) {
+            if (dartNames.length() > 0) {
+                dartNames.append(", ");
+            }
+            dartNames.append('"').append(nm).append('"');
+        }
+        sb.append("    private static final String[] $dartNames = {").append(dartNames).append("};\n\n");
+        sb.append("    public String name$() {\n        return $dartNames[ordinal()];\n    }\n\n");
         sb.append(body);
         // Dart's Enum.toString is "Mode.only" -- what print and string interpolation
         // show -- where Java's is the bare constant name; .name is still name().
@@ -556,7 +570,7 @@ public final class JavaEmitter {
         }
         if (!ownToString) {
             sb.append("\n    @Override\n    public String toString() {\n        return \"")
-                    .append(e.name).append(".\" + name();\n    }\n");
+                    .append(e.name).append(".\" + name$();\n    }\n");
         }
         sb.append("}\n");
         return new GeneratedFile(enumJava + ".java", sb.toString());
@@ -3212,7 +3226,8 @@ public final class JavaEmitter {
                 Ast.ClassDecl sc = mix.name == null || program.classes.containsKey(mix.name)
                         ? null : stubs.classes.get(mix.name);
                 String jn = sc != null ? sc.javaName : null;
-                if ("dart.collection.ListMixin".equals(jn)) {
+                if ("dart.collection.ListMixin".equals(jn) || "dart.collection.SetMixin".equals(jn)
+                        || "dart.collection.MapMixin".equals(jn)) {
                     return jn;
                 }
                 if ("dart.collection.IterableMixin".equals(jn)) {
@@ -3320,8 +3335,19 @@ public final class JavaEmitter {
         boolean boxListMixinOp = ("$index".equals(m.name) || "$indexSet".equals(m.name)
                 || ("add".equals(m.name) && m.params.size() == 1))
                 && !m.isStatic && appliesListMixin(ctx.currentClass);
+        // The same for SetMixin/SetBase and MapMixin/MapBase: their abstract members are
+        // generic in E or K/V, so an element, key or value side typed `int` is emitted boxed
+        // or the class would only overload them (SetMixin.add(E), MapMixin.$indexSet(K, V)).
+        String collFam = m.isStatic || ctx.currentClass == null ? null
+                : appliedCollectionMixin(ctx.currentClass.name);
+        boolean setFam = "dart.collection.SetMixin".equals(collFam);
+        boolean mapFam = "dart.collection.MapMixin".equals(collFam);
+        boolean boxCollReturn = (mapFam && ("$index".equals(m.name) || "remove".equals(m.name)))
+                || (setFam && "lookup".equals(m.name));
+        boolean boxCollAllParams = mapFam && "$indexSet".equals(m.name);
+        boolean boxCollFirstParam = setFam && "add".equals(m.name) && m.params.size() == 1;
         String rjt = m.isSetter ? "void" : m.javaReturn != null ? m.javaReturn
-                : (forceIntReturn ? "int" : javaType(rt, boxListMixinOp && "$index".equals(m.name), ctx));
+                : (forceIntReturn ? "int" : javaType(rt, (boxListMixinOp && "$index".equals(m.name)) || boxCollReturn, ctx));
         sb.append(rjt).append(' ').append(m.name).append('(');
         // The Java parameter list and names, kept for a sync* body's helper method.
         StringBuilder paramDecls = new StringBuilder();
@@ -3348,7 +3374,8 @@ public final class JavaEmitter {
                 sb.append(", ");
             }
             String jn = ctx.declareShadowSafe(p.name, pt);
-            String decl = javaType(pt, boxListMixinOp && i == ("add".equals(m.name) ? 0 : 1), ctx) + ' ' + jn;
+            String decl = javaType(pt, (boxListMixinOp && i == ("add".equals(m.name) ? 0 : 1))
+                    || boxCollAllParams || (boxCollFirstParam && i == 0), ctx) + ' ' + jn;
             sb.append(decl);
             paramDecls.append(", ").append(decl);
             paramNames.append(", ").append(jn);
@@ -5594,6 +5621,12 @@ public final class JavaEmitter {
             return new Out("this", ctx.currentClass != null ? new TypeRef(ctx.currentClass.name) : TypeRef.DYNAMIC);
         }
         if (e instanceof SuperExpr) {
+            String member = ctx.superMember;
+            ctx.superMember = null;
+            Out viaMixin = superThroughMixin(member, ctx);
+            if (viaMixin != null) {
+                return viaMixin;
+            }
             TypeRef sup = ctx.currentClass != null && ctx.currentClass.superclass != null
                     ? ctx.currentClass.superclass : TypeRef.DYNAMIC;
             return new Out("super", sup);
@@ -5706,9 +5739,15 @@ public final class JavaEmitter {
             return emitRecordLit((RecordLit) e, ctx);
         }
         if (e instanceof PropertyGet) {
+            if (((PropertyGet) e).target instanceof SuperExpr) {
+                ctx.superMember = ((PropertyGet) e).name;
+            }
             return emitPropertyGet((PropertyGet) e, ctx);
         }
         if (e instanceof Call) {
+            if (((Call) e).target instanceof SuperExpr) {
+                ctx.superMember = ((Call) e).name;
+            }
             return emitCall((Call) e, expected, ctx);
         }
         if (e instanceof CtorCall) {
@@ -5791,6 +5830,9 @@ public final class JavaEmitter {
                     program.classes.get(cc.type.name), cc.type.args, expected), cc.args, e, ctx);
         }
         if (e instanceof IndexGet) {
+            if (((IndexGet) e).target instanceof SuperExpr) {
+                ctx.superMember = "$index";
+            }
             return emitIndexGet((IndexGet) e, ctx);
         }
         if (e instanceof Assign) {
@@ -5984,6 +6026,14 @@ public final class JavaEmitter {
                         && !isProgramSubtype(from, to) && !isProgramSubtype(to, from)) {
                     subject = "((Object) " + paren(o.code) + ")";
                 }
+            }
+            if (t.type.name != null && program.classes.containsKey(t.type.name)
+                    && appliedCollectionMixin(t.type.name) != null
+                    && (o.type == null || !program.classes.containsKey(o.type.name))) {
+                // `s is Bag` where Bag applies a dart:collection mixin and s is typed as a
+                // runtime collection: s may be the live view the coercion made of a Bag, which
+                // is that Bag in Dart. The test looks through the view (DartRuntime.unview).
+                subject = "dart.runtime.DartRuntime.unview(" + o.code + ")";
             }
             String check;
             String tw = t.type.args.isEmpty() && t.type.funcReturn == null
@@ -8500,6 +8550,12 @@ public final class JavaEmitter {
                     return new Out(cls + (isLazyStatic(f) || isLateChecked(f, pc) ? ".get$" + name + "()" : "." + name),
                             fieldType(f, ctx));
                 }
+                // A static getter (`static String get mode => ...`) is a static no-arg method.
+                MethodDecl sg = pc.getter(name);
+                if (sg != null && sg.isStatic) {
+                    return new Out(javaClassName(pc) + "." + javaMethodName(name) + "()",
+                            sg.returnType == null ? TypeRef.DYNAMIC : sg.returnType);
+                }
             }
             if (cls.equals("DateTime") && pc == null) {
                 int dc = java.util.Arrays.asList("monday", "tuesday", "wednesday", "thursday", "friday",
@@ -8621,7 +8677,7 @@ public final class JavaEmitter {
                 return new Out(target.code + ".ordinal()", TypeRef.INT);
             }
             if (name.equals("name")) {
-                return new Out(target.code + ".name()", TypeRef.STRING);
+                return new Out(target.code + ".name$()", TypeRef.STRING);
             }
             // enhanced-enum getter declared in the enum body
             Ast.EnumDecl ed = programEnum(tt.name, ctx);
@@ -10953,6 +11009,42 @@ public final class JavaEmitter {
         return TypeRef.DYNAMIC;
     }
 
+    /**
+     * `super.m` in a class with no superclass but mixins (`class C with A, B`):
+     * Dart's linearization sends it to the last mixin that declares `m`, which
+     * Java reaches as that interface's default method, `B.super.m()`. A first
+     * `with` entry that is a plain class is the Java superclass, so plain
+     * `super` names it. Null when the class has a superclass or no mixin
+     * declares the member.
+     */
+    private Out superThroughMixin(String member, Ctx ctx) {
+        ClassDecl c = ctx.currentClass;
+        if (member == null || c == null || c.superclass != null || c.mixins.isEmpty() || c.isMixin) {
+            return null;
+        }
+        for (int i = c.mixins.size() - 1; i >= 0; i--) {
+            TypeRef mixRef = c.mixins.get(i);
+            ClassDecl mx = program.classes.get(mixRef.name);
+            if (mx == null) {
+                // A runtime mixin (ListMixin, MapMixin...) is a Java interface too.
+                if (stubs.findMethod(mixRef.name, member, false) != null
+                        || stubs.findMethod(mixRef.name, member, true) != null) {
+                    return new Out(stubSimpleName(mixRef.name, ctx) + ".super", mixRef);
+                }
+                continue;
+            }
+            boolean declares = mx.method(member) != null || mx.getter(member) != null || mx.field(member) != null;
+            if (!declares) {
+                continue;
+            }
+            if (i == 0 && !mx.isMixin && mx.superclass == null && mx.mixins.isEmpty()) {
+                return new Out("super", mixRef);
+            }
+            return new Out(javaClassName(mx) + ".super", mixRef);
+        }
+        return null;
+    }
+
     /** Dart identifiers that are Java reserved words; escaped with a trailing underscore. */
     private static final java.util.Set<String> JAVA_KEYWORDS = new java.util.HashSet<String>(java.util.Arrays.asList(
             "abstract", "assert", "boolean", "break", "byte", "case", "catch", "char", "class", "const",
@@ -10969,8 +11061,37 @@ public final class JavaEmitter {
      * use the same escaped name.
      */
     static String javaMethodName(String dartName) {
-        return JAVA_KEYWORDS.contains(dartName) ? dartName + "_" : dartName;
+        if (dartName == null) {
+            return null;
+        }
+        if (JAVA_KEYWORDS.contains(dartName)) {
+            return dartName + "_";
+        }
+        // A Java keyword that is NOT reserved in Dart (public, native, char, ...)
+        // can be a Dart identifier both bare and with trailing underscores
+        // (Flutter's Icons has public and public_). Bare maps to one underscore,
+        // so each existing trailing underscore gains one more: the mapping is
+        // injective and public/public_ never meet. Dart-reserved words (class,
+        // try, ...) cannot appear bare, so their `_` forms keep their own name.
+        int end = dartName.length();
+        while (end > 0 && dartName.charAt(end - 1) == '_') {
+            end--;
+        }
+        if (end > 0 && end < dartName.length()) {
+            String base = dartName.substring(0, end);
+            if (JAVA_KEYWORDS.contains(base) && !DART_RESERVED.contains(base)) {
+                return dartName + "_";
+            }
+        }
+        return dartName;
     }
+
+    /** Dart reserved words: never a bare Dart identifier. */
+    private static final java.util.Set<String> DART_RESERVED = new java.util.HashSet<String>(java.util.Arrays.asList(
+            "assert", "break", "case", "catch", "class", "const", "continue", "default", "do", "else",
+            "enum", "extends", "false", "final", "finally", "for", "if", "in", "is", "new", "null",
+            "rethrow", "return", "super", "switch", "this", "throw", "true", "try", "var", "void",
+            "while", "with"));
 
     /** True when the identifier is one or more underscores and nothing else. */
     private static boolean isAllUnderscores(String s) {
@@ -16928,8 +17049,20 @@ public final class JavaEmitter {
                         : "dart.core.ListMixinView<>";
                 return "new " + view + "(" + o.code + ")";
             }
-            if (fam != null && target.is("Iterable")) {
+            if (fam != null && target.is("Iterable") && !"dart.collection.MapMixin".equals(fam)) {
                 return "dart.core.DartIterable.ofMixin(" + o.code + ")";
+            }
+        }
+        // The same live bridge for SetMixin/SetBase (a Dart Set) and MapMixin/MapBase (a
+        // Dart Map): dart.core.SetMixinView / MapMixinView read and write through the object.
+        if (o.type != null && o.type.name != null && program.classes.containsKey(o.type.name)
+                && (target.is("Set") || target.is("Map"))) {
+            String fam = appliedCollectionMixin(o.type.name);
+            if ("dart.collection.SetMixin".equals(fam) && target.is("Set")) {
+                return "new dart.core.SetMixinView<>(" + o.code + ")";
+            }
+            if ("dart.collection.MapMixin".equals(fam) && target.is("Map")) {
+                return "new dart.core.MapMixinView<>(" + o.code + ")";
             }
         }
         // Dart's StreamSink and EventSink are Sinks; in Java their close() answers a Future
@@ -17580,6 +17713,8 @@ public final class JavaEmitter {
     // ==================================================================
 
     private final class Ctx {
+        /// The member a `super.x` about to be emitted names, for [#superThroughMixin].
+        String superMember;
         /// Declared bounds of the type parameters of the method being emitted (`m<T extends B>`).
         java.util.Map<String, TypeRef> methodTypeParamBounds;
         /**
