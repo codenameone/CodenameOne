@@ -90,7 +90,7 @@ public final class JavaEmitter {
                 if (c.superclass == null || c.isMixin || c.extensionOn != null) {
                     continue;
                 }
-                Ast.ClassDecl sup = program.classes.get(c.superclass.name);
+                Ast.ClassDecl sup = superDeclOf(c, c.superclass);
                 if (sup == null) {
                     sup = stubs.classes.get(c.superclass.name);
                 }
@@ -1100,7 +1100,7 @@ public final class JavaEmitter {
         List<TypeRef> mxSupers = new ArrayList<TypeRef>(mx.interfaces);
         mxSupers.addAll(mx.mixinOn);
         for (TypeRef itf : mxSupers) {
-            ClassDecl im = program.classes.get(itf.name);
+            ClassDecl im = superDeclOf(mx, itf);
             if (im != null && interfacedClasses().contains(im)) {
                 // `mixin M implements Shape`: M's values are Shapes
                 mext.append(mext.length() > 0 ? ", " : "").append(javaType(itf, false, ctx));
@@ -1182,7 +1182,7 @@ public final class JavaEmitter {
         for (String tw : witnessParams(c)) {
             body.append("    public dart.runtime.TypeWitness ").append(witnessField(c, tw)).append(";\n");
         }
-        ClassDecl twSuper = c.superclass != null ? program.classes.get(c.superclass.name) : null;
+        ClassDecl twSuper = c.superclass != null ? superDeclOf(c, c.superclass) : null;
         boolean implicitWitnessCtor = c.ctors.isEmpty()
                 && (!witnessParams(c).isEmpty() || (twSuper != null && !witnessParams(twSuper).isEmpty()));
         // constructors
@@ -1193,7 +1193,7 @@ public final class JavaEmitter {
             // A subclass's named constructor builds through this chain and then runs the
             // superclass constructor it names as an $init$ method, so the chain must not
             // run any constructor body itself.
-            ClassDecl markerSuper = c.superclass != null ? program.classes.get(c.superclass.name) : null;
+            ClassDecl markerSuper = c.superclass != null ? superDeclOf(c, c.superclass) : null;
             body.append("    ").append(javaClassName(c)).append("($NamedCtor $marker) {\n");
             if (markerSuper != null) {
                 body.append("        super((").append(javaClassName(markerSuper)).append(".$NamedCtor) null);\n");
@@ -1484,7 +1484,7 @@ public final class JavaEmitter {
                 }
                 ancestors.addAll(anc.mixins);
                 for (TypeRef aitf : anc.interfaces) {
-                    ClassDecl ai2 = program.classes.get(aitf.name);
+                    ClassDecl ai2 = superDeclOf(anc, aitf);
                     if (ai2 == null || ai2.isMixin) {
                         continue;
                     }
@@ -1531,7 +1531,7 @@ public final class JavaEmitter {
                 supers.add(c.superclass);
             }
             for (TypeRef sr : supers) {
-                ClassDecl sup = program.classes.get(sr.name);
+                ClassDecl sup = superDeclOf(c, sr);
                 if (sup != null && sup.isSealed && !directSubtypes(sup.name).isEmpty()) {
                     modifier = "non-sealed ";
                     break;
@@ -1648,7 +1648,7 @@ public final class JavaEmitter {
                 if (!out.add(im)) {
                     continue;
                 }
-                ClassDecl sup = im.superclass != null ? program.classes.get(im.superclass.name) : null;
+                ClassDecl sup = im.superclass != null ? superDeclOf(im, im.superclass) : null;
                 if (sup != null && !sup.isMixin && sup.extensionOn == null) {
                     work.add(sup);
                 }
@@ -1722,12 +1722,12 @@ public final class JavaEmitter {
         }
         StringBuilder ext = new StringBuilder();
         java.util.Set<ClassDecl> mine = interfacedClasses();
-        ClassDecl sup = c.superclass != null ? program.classes.get(c.superclass.name) : null;
+        ClassDecl sup = c.superclass != null ? superDeclOf(c, c.superclass) : null;
         if (sup != null && mine.contains(sup)) {
             ext.append(javaType(c.superclass, false, ctx));
         }
         for (TypeRef itf : c.interfaces) {
-            ClassDecl im = program.classes.get(itf.name);
+            ClassDecl im = superDeclOf(c, itf);
             if (im != null && mine.contains(im)) {
                 ext.append(ext.length() > 0 ? ", " : "").append(javaType(itf, false, ctx));
             }
@@ -1739,7 +1739,7 @@ public final class JavaEmitter {
     /** True when c (or a superclass in the program) applies a dart:collection mixin or base. */
     private boolean appliesCollectionMixin(ClassDecl c) {
         for (ClassDecl k = c; k != null;
-             k = k.superclass != null ? program.classes.get(k.superclass.name) : null) {
+             k = k.superclass != null ? superDeclOf(k, k.superclass) : null) {
             java.util.List<TypeRef> refs = new java.util.ArrayList<TypeRef>(k.mixins);
             if (k.superclass != null) {
                 refs.add(k.superclass);
@@ -1765,7 +1765,7 @@ public final class JavaEmitter {
         StringBuilder sb = new StringBuilder();
         java.util.Set<String> done = new java.util.HashSet<String>();
         for (ClassDecl im = implemented; im != null;
-             im = im.superclass != null ? program.classes.get(im.superclass.name) : null) {
+             im = im.superclass != null ? superDeclOf(im, im.superclass) : null) {
             for (FieldDecl f : im.fields) {
                 if (f.isStatic || !done.add(f.name) || hasFieldInChain(c, f.name)) {
                     continue;
@@ -1848,15 +1848,16 @@ public final class JavaEmitter {
         }
         java.util.Set<ClassDecl> seen = new java.util.HashSet<ClassDecl>();
         for (TypeRef itf : c.interfaces) {
-            collectIfaceSigs(itf, java.util.Collections.<String>emptyList(),
+            collectIfaceSigs(c, itf, java.util.Collections.<String>emptyList(),
                     java.util.Collections.<TypeRef>emptyList(), m, ctx, out, seen);
         }
         return out;
     }
 
-    private void collectIfaceSigs(TypeRef itf, List<String> outerNames, List<TypeRef> outerArgs, MethodDecl m,
-                                  Ctx ctx, List<IfaceSig> out, java.util.Set<ClassDecl> seen) {
-        ClassDecl im = program.classes.get(itf.name);
+    private void collectIfaceSigs(ClassDecl owner, TypeRef itf, List<String> outerNames, List<TypeRef> outerArgs,
+                                  MethodDecl m, Ctx ctx, List<IfaceSig> out, java.util.Set<ClassDecl> seen) {
+        // `implements impl.ShelfBase`: the reference may still carry its import prefix.
+        ClassDecl im = superDeclOf(owner, itf);
         if (im == null || !interfacedClasses().contains(im) || !seen.add(im)) {
             return;
         }
@@ -1879,10 +1880,10 @@ public final class JavaEmitter {
             out.add(sig);
         }
         if (im.superclass != null) {
-            collectIfaceSigs(im.superclass, im.typeParams, args, m, ctx, out, seen);
+            collectIfaceSigs(im, im.superclass, im.typeParams, args, m, ctx, out, seen);
         }
         for (TypeRef sup : im.interfaces) {
-            collectIfaceSigs(sup, im.typeParams, args, m, ctx, out, seen);
+            collectIfaceSigs(im, sup, im.typeParams, args, m, ctx, out, seen);
         }
     }
 
@@ -1939,7 +1940,7 @@ public final class JavaEmitter {
      * casts the result back to; null otherwise.
      */
     private String pinnedCallBox(ClassDecl pc, MethodDecl m, Ctx ctx) {
-        for (ClassDecl k = pc; k != null; k = k.superclass != null ? program.classes.get(k.superclass.name) : null) {
+        for (ClassDecl k = pc; k != null; k = k.superclass != null ? superDeclOf(k, k.superclass) : null) {
             if (k.methods.contains(m)) {
                 if (k.isMixin || interfacePinnedReturn(k, m, ctx) == null) {
                     return null;
@@ -2011,8 +2012,8 @@ public final class JavaEmitter {
             return;
         }
         java.util.Set<String> have = new java.util.HashSet<String>();
-        for (ClassDecl k = c; k != null; k = k.superclass != null ? program.classes.get(k.superclass.name) : null) {
-            if (k.superclass != null && program.classes.get(k.superclass.name) == null) {
+        for (ClassDecl k = c; k != null; k = k.superclass != null ? superDeclOf(k, k.superclass) : null) {
+            if (k.superclass != null && superDeclOf(k, k.superclass) == null) {
                 return;
             }
             List<ClassDecl> parts = new ArrayList<ClassDecl>();
@@ -2039,7 +2040,7 @@ public final class JavaEmitter {
         java.util.Set<ClassDecl> seen = new java.util.HashSet<ClassDecl>();
         List<ClassDecl> work = new ArrayList<ClassDecl>();
         for (TypeRef itf : c.interfaces) {
-            ClassDecl im = program.classes.get(itf.name);
+            ClassDecl im = superDeclOf(c, itf);
             if (im != null && interfacedClasses().contains(im)) {
                 work.add(im);
             }
@@ -2075,7 +2076,7 @@ public final class JavaEmitter {
     }
 
     private FieldDecl findFieldInChain(ClassDecl c, String name) {
-        for (ClassDecl k = c; k != null; k = k.superclass != null ? program.classes.get(k.superclass.name) : null) {
+        for (ClassDecl k = c; k != null; k = k.superclass != null ? superDeclOf(k, k.superclass) : null) {
             FieldDecl f = k.field(name);
             if (f != null && !f.isStatic) {
                 return f;
@@ -2089,7 +2090,7 @@ public final class JavaEmitter {
     }
 
     private MethodDecl findGetterInChain(ClassDecl c, String name) {
-        for (ClassDecl k = c; k != null; k = k.superclass != null ? program.classes.get(k.superclass.name) : null) {
+        for (ClassDecl k = c; k != null; k = k.superclass != null ? superDeclOf(k, k.superclass) : null) {
             MethodDecl g = k.getter(name);
             if (g != null && !g.isStatic) {
                 return g;
@@ -2099,7 +2100,7 @@ public final class JavaEmitter {
     }
 
     private MethodDecl findSetterInChain(ClassDecl c, String name) {
-        for (ClassDecl k = c; k != null; k = k.superclass != null ? program.classes.get(k.superclass.name) : null) {
+        for (ClassDecl k = c; k != null; k = k.superclass != null ? superDeclOf(k, k.superclass) : null) {
             for (MethodDecl m : k.methods) {
                 if (m.isSetter && !m.isStatic && m.name.equals(name)) {
                     return m;
@@ -2119,8 +2120,8 @@ public final class JavaEmitter {
      * @return whether this class declares the interface itself (no program superclass)
      */
     private boolean emitDynamicMembers(ClassDecl c, StringBuilder body, Ctx ctx) {
-        boolean inherits = c.superclass != null && program.classes.containsKey(c.superclass.name)
-                && !program.classes.get(c.superclass.name).isMixin;
+        boolean inherits = c.superclass != null && superDeclOf(c, c.superclass) != null
+                && !superDeclOf(c, c.superclass).isMixin;
         // A class extending a framework or runtime class (a widget, a State, a
         // BoxPainter, a RestorableProperty) is not the model data dynamic code reaches
         // into, and its overrides of stub methods have no return type of their own to
@@ -2129,7 +2130,7 @@ public final class JavaEmitter {
         if (c.superclass != null && !inherits && !MODEL_BASES.contains(c.superclass.name)) {
             return false;
         }
-        if (inherits && !hasDynamicMembers(program.classes.get(c.superclass.name))) {
+        if (inherits && !hasDynamicMembers(superDeclOf(c, c.superclass))) {
             return false;
         }
         TypeRef self = new TypeRef(c.name);
@@ -2297,7 +2298,7 @@ public final class JavaEmitter {
             if (c.superclass == null) {
                 return true;
             }
-            c = program.classes.get(c.superclass.name);
+            c = superDeclOf(c, c.superclass);
         }
         return false;
     }
@@ -2338,13 +2339,13 @@ public final class JavaEmitter {
     /** Whether a program superclass declares {@code name} void, which a Java override keeps. */
     private boolean overridesVoid(ClassDecl c, String name) {
         java.util.Set<String> guard = new java.util.HashSet<String>();
-        ClassDecl k = c.superclass == null ? null : program.classes.get(c.superclass.name);
+        ClassDecl k = c.superclass == null ? null : superDeclOf(c, c.superclass);
         while (k != null && guard.add(k.name)) {
             MethodDecl sm = k.method(name);
             if (sm != null && sm.returnType != null && sm.returnType.is("void")) {
                 return true;
             }
-            k = k.superclass == null ? null : program.classes.get(k.superclass.name);
+            k = k.superclass == null ? null : superDeclOf(k, k.superclass);
         }
         return false;
     }
@@ -2359,7 +2360,7 @@ public final class JavaEmitter {
             return false;
         }
         for (TypeRef itf : c.interfaces) {
-            ClassDecl ip = program.classes.get(itf.name);
+            ClassDecl ip = superDeclOf(c, itf);
             if (ip != null && !ip.isMixin) {
                 return false;
             }
@@ -2483,7 +2484,7 @@ public final class JavaEmitter {
         String superNamedInit = null;
 
         // super(...) initializer for program superclasses
-        ClassDecl progSuper = c.superclass != null ? program.classes.get(c.superclass.name) : null;
+        ClassDecl progSuper = c.superclass != null ? superDeclOf(c, c.superclass) : null;
         if (progSuper != null) {
             Args superArgs = superArgsOf(ct);
             CtorDecl superNamed = ct.superInit != null && ct.superInit.namedCtor != null
@@ -2725,7 +2726,7 @@ public final class JavaEmitter {
                     + canonicalArgs(targetCtor, ct.redirect.args, ctx) + ");");
             return;
         }
-        ClassDecl progSuper = c.superclass != null ? program.classes.get(c.superclass.name) : null;
+        ClassDecl progSuper = c.superclass != null ? superDeclOf(c, c.superclass) : null;
         for (Param p : ct.params) {
             if (p.isThis) {
                 w.line(fieldStore(c, p.name, javaIdent(p.name)));
@@ -2801,7 +2802,7 @@ public final class JavaEmitter {
     /** Whether some program class with a marker chain extends {@code c} directly. */
     private boolean isSuperOfMarker(ClassDecl c) {
         for (ClassDecl m : markerClasses()) {
-            if (m.superclass != null && program.classes.get(m.superclass.name) == c) {
+            if (m.superclass != null && superDeclOf(m, m.superclass) == c) {
                 return true;
             }
         }
@@ -2820,7 +2821,7 @@ public final class JavaEmitter {
                     }
                     ClassDecl a = c;
                     while (a != null && out.add(a)) {
-                        a = a.superclass != null ? program.classes.get(a.superclass.name) : null;
+                        a = a.superclass != null ? superDeclOf(a, a.superclass) : null;
                     }
                 }
             }
@@ -2899,7 +2900,7 @@ public final class JavaEmitter {
             if (p.superclass == null) {
                 break;
             }
-            ClassDecl sp = program.classes.get(p.superclass.name);
+            ClassDecl sp = superDeclOf(p, p.superclass);
             if (sp != null) {
                 MethodDecl sm = sp.method(m.name);
                 if (sm != null && sameParamTypes(sm.params, m.params)) {
@@ -2928,7 +2929,7 @@ public final class JavaEmitter {
             if (p.superclass == null) {
                 break;
             }
-            ClassDecl sp = program.classes.get(p.superclass.name);
+            ClassDecl sp = superDeclOf(p, p.superclass);
             if (sp != null) {
                 MethodDecl sm = sp.method(m.name);
                 // Match by name+arity: a base param typed with the class's type variable won't
@@ -3116,7 +3117,7 @@ public final class JavaEmitter {
     private Object[] widerBaseMethod(ClassDecl c, MethodDecl m) {
         ClassDecl p = c;
         while (p != null && p.superclass != null) {
-            ClassDecl sp = program.classes.get(p.superclass.name);
+            ClassDecl sp = superDeclOf(p, p.superclass);
             if (sp == null) {
                 Object[] s = widerStubMethod(p.superclass.name, m);
                 if (s != null) {
@@ -3133,7 +3134,7 @@ public final class JavaEmitter {
             }
             p = sp;
         }
-        for (ClassDecl q = c; q != null; q = q.superclass == null ? null : program.classes.get(q.superclass.name)) {
+        for (ClassDecl q = c; q != null; q = q.superclass == null ? null : superDeclOf(q, q.superclass)) {
             for (TypeRef t : q.mixins) {
                 Object[] s = widerStubMethod(t.name, m);
                 if (s != null) {
@@ -3192,11 +3193,54 @@ public final class JavaEmitter {
         return true;
     }
 
+    /**
+     * The runtime interface ({@code dart.collection.ListMixin} or {@code IterableMixin})
+     * that the program class {@code name} or a program superclass applies, as a mixin or as
+     * a mixin-declared superclass ({@code extends ListBase<E>}); null when none. ListMixin
+     * wins over IterableMixin, since it is the more specific protocol.
+     */
+    private String appliedCollectionMixin(String name) {
+        String found = null;
+        java.util.Set<String> seen = new java.util.HashSet<String>();
+        for (ClassDecl mc = program.classes.get(name); mc != null && seen.add(mc.name);
+                mc = mc.superclass != null ? superDeclOf(mc, mc.superclass) : null) {
+            java.util.List<TypeRef> applied = new java.util.ArrayList<TypeRef>(mc.mixins);
+            if (mc.superclass != null) {
+                applied.add(mc.superclass);
+            }
+            for (TypeRef mix : applied) {
+                Ast.ClassDecl sc = mix.name == null || program.classes.containsKey(mix.name)
+                        ? null : stubs.classes.get(mix.name);
+                String jn = sc != null ? sc.javaName : null;
+                if ("dart.collection.ListMixin".equals(jn)) {
+                    return jn;
+                }
+                if ("dart.collection.IterableMixin".equals(jn)) {
+                    found = jn;
+                }
+            }
+        }
+        return found;
+    }
+
+    /**
+     * {@code o}'s code, bridged to a live {@code DartIterable} when it is a program object
+     * applying a dart:collection mixin: a Java {@code Iterable} slot (addAll, a spread,
+     * {@code yield*}) cannot take the object itself, which is no Java Iterable.
+     */
+    private String mixinIterableCode(Out o) {
+        if (o.type != null && o.type.name != null && program.classes.containsKey(o.type.name)
+                && appliedCollectionMixin(o.type.name) != null) {
+            return "dart.core.DartIterable.ofMixin(" + o.code + ")";
+        }
+        return o.code;
+    }
+
     /** Whether {@code c} or a program superclass applies the stub {@code ListMixin}. */
     private boolean appliesListMixin(ClassDecl c) {
         java.util.Set<String> seen = new java.util.HashSet<String>();
         for (ClassDecl mc = c; mc != null && seen.add(mc.name);
-                mc = mc.superclass != null ? program.classes.get(mc.superclass.name) : null) {
+                mc = mc.superclass != null ? superDeclOf(mc, mc.superclass) : null) {
             for (TypeRef mix : mc.mixins) {
                 if ("ListMixin".equals(mix.name)) {
                     return true;
@@ -3271,7 +3315,10 @@ public final class JavaEmitter {
         // A class `with ListMixin<E>` implements dart.collection.ListMixin's generic
         // `E $index(long)` / `$indexSet(long, E)`: a primitive element type there would
         // not implement them, so the element side of both operators is emitted boxed.
-        boolean boxListMixinOp = ("$index".equals(m.name) || "$indexSet".equals(m.name))
+        // `add(E)` too: an override typed `void add(int v)` emitted as add(long) was only an
+        // overload, so a call through the List view (ListMixin.add) ran the mixin default.
+        boolean boxListMixinOp = ("$index".equals(m.name) || "$indexSet".equals(m.name)
+                || ("add".equals(m.name) && m.params.size() == 1))
                 && !m.isStatic && appliesListMixin(ctx.currentClass);
         String rjt = m.isSetter ? "void" : m.javaReturn != null ? m.javaReturn
                 : (forceIntReturn ? "int" : javaType(rt, boxListMixinOp && "$index".equals(m.name), ctx));
@@ -3301,7 +3348,7 @@ public final class JavaEmitter {
                 sb.append(", ");
             }
             String jn = ctx.declareShadowSafe(p.name, pt);
-            String decl = javaType(pt, boxListMixinOp && i == 1, ctx) + ' ' + jn;
+            String decl = javaType(pt, boxListMixinOp && i == ("add".equals(m.name) ? 0 : 1), ctx) + ' ' + jn;
             sb.append(decl);
             paramDecls.append(", ").append(decl);
             paramNames.append(", ").append(jn);
@@ -3877,7 +3924,7 @@ public final class JavaEmitter {
                 diags.error(y, "E0304", "yield outside a generator body");
             } else if (y.star) {
                 Out o = emitExpr(y.value, null, ctx);
-                w.line(ctx.syncStarList + ".addAllIterable(" + o.code + ");");
+                w.line(ctx.syncStarList + ".addAllIterable(" + mixinIterableCode(o) + ");");
             } else {
                 Out o = emitExpr(y.value, ctx.syncStarElem, ctx);
                 w.line(ctx.syncStarList + ".add(" + coerce(o, ctx.syncStarElem, ctx) + ");");
@@ -5918,6 +5965,16 @@ public final class JavaEmitter {
                 // A primitive operand cannot be tested with instanceof; the cast boxes it,
                 // so `min(1, 2) is int` tests the Long it is.
                 subject = "((Object) " + paren(o.code) + ")";
+            } else if (o.type != null && o.type.name != null && t.type.name != null) {
+                // `bin is LazyBin` where Bin is a class LazyBin is unrelated to: Dart allows the
+                // test (a subclass of Bin may implement LazyBin), javac refuses an instanceof
+                // between two unrelated classes. Testing the value as an Object is the same test.
+                ClassDecl from = program.resolveClass(o.type.name, ctx.library());
+                ClassDecl to = program.resolveClass(t.type.name, ctx.library());
+                if (from != null && to != null && from != to && isProgramClassDecl(from) && isProgramClassDecl(to)
+                        && !isProgramSubtype(from, to) && !isProgramSubtype(to, from)) {
+                    subject = "((Object) " + paren(o.code) + ")";
+                }
             }
             String check;
             String tw = t.type.args.isEmpty() && t.type.funcReturn == null
@@ -6078,7 +6135,7 @@ public final class JavaEmitter {
                 scanTypeValueUses(m, tps, used, seen);
             }
         }
-        ClassDecl sup = c.superclass != null ? program.classes.get(c.superclass.name) : null;
+        ClassDecl sup = c.superclass != null ? superDeclOf(c, c.superclass) : null;
         if (sup != null) {
             List<String> sw = witnessParams(sup);
             for (String n : sw) {
@@ -6842,7 +6899,7 @@ public final class JavaEmitter {
             w.line(self + "." + witnessField(c, n) + " = $tw$" + n + ";");
         }
         if (parentToo) {
-            ClassDecl sup = c.superclass != null ? program.classes.get(c.superclass.name) : null;
+            ClassDecl sup = c.superclass != null ? superDeclOf(c, c.superclass) : null;
             if (sup != null && !witnessParams(sup).isEmpty()) {
                 List<String> parts = witnessArgList(sup, c.superclass.args, c, ctx);
                 List<String> sw = witnessParams(sup);
@@ -7206,7 +7263,7 @@ public final class JavaEmitter {
                 ctx.indent(-1);
                 w.line("}");
             } else {
-                w.line(list + ".addAllIterable(" + src.code + ");");
+                w.line(list + ".addAllIterable(" + mixinIterableCode(src) + ");");
             }
             return;
         }
@@ -7355,7 +7412,7 @@ public final class JavaEmitter {
                 ctx.indent(-1);
                 w.line("}");
             } else {
-                w.line(set + ".addAllIterable(" + src.code + ");");
+                w.line(set + ".addAllIterable(" + mixinIterableCode(src) + ");");
             }
             return;
         }
@@ -8009,13 +8066,13 @@ public final class JavaEmitter {
     }
 
     private FieldDecl findInheritedField(ClassDecl c, String name) {
-        ClassDecl s = c.superclass != null ? program.classes.get(c.superclass.name) : null;
+        ClassDecl s = c.superclass != null ? superDeclOf(c, c.superclass) : null;
         while (s != null) {
             FieldDecl f = s.field(name);
             if (f != null) {
                 return f;
             }
-            s = s.superclass != null ? program.classes.get(s.superclass.name) : null;
+            s = s.superclass != null ? superDeclOf(s, s.superclass) : null;
         }
         return null;
     }
@@ -8030,12 +8087,12 @@ public final class JavaEmitter {
         if (!name.startsWith("_")) {
             return true;
         }
-        ClassDecl s = c.superclass != null ? program.classes.get(c.superclass.name) : null;
+        ClassDecl s = c.superclass != null ? superDeclOf(c, c.superclass) : null;
         while (s != null) {
             if (s.field(name) != null) {
                 return sameLibrary(s, c);
             }
-            s = s.superclass != null ? program.classes.get(s.superclass.name) : null;
+            s = s.superclass != null ? superDeclOf(s, s.superclass) : null;
         }
         return false;
     }
@@ -8050,13 +8107,13 @@ public final class JavaEmitter {
     }
 
     private MethodDecl findInheritedGetter(ClassDecl c, String name) {
-        ClassDecl s = c.superclass != null ? program.classes.get(c.superclass.name) : null;
+        ClassDecl s = c.superclass != null ? superDeclOf(c, c.superclass) : null;
         while (s != null) {
             MethodDecl g = s.getter(name);
             if (g != null) {
                 return g;
             }
-            s = s.superclass != null ? program.classes.get(s.superclass.name) : null;
+            s = s.superclass != null ? superDeclOf(s, s.superclass) : null;
         }
         // declared (usually abstract) by an interface the class or a superclass implements:
         // `abstract class M implements Span` reads `start` before any subclass defines it
@@ -8065,7 +8122,7 @@ public final class JavaEmitter {
 
     private MethodDecl interfaceGetter(ClassDecl c, String name, java.util.Set<ClassDecl> seen) {
         for (ClassDecl k = c; k != null && seen.add(k);
-                k = k.superclass != null ? program.classes.get(k.superclass.name) : null) {
+                k = k.superclass != null ? superDeclOf(k, k.superclass) : null) {
             java.util.List<TypeRef> sups = new java.util.ArrayList<TypeRef>(k.interfaces);
             sups.addAll(k.mixins);
             for (TypeRef i : sups) {
@@ -12041,15 +12098,25 @@ public final class JavaEmitter {
             if (m != null) {
                 String callCode = target.code + "." + n + "(" + withWitnesses(methodWitnessCall(m, c,
                         callExpected(c, ctx), ctx), methodArgs(m.params, c.args, ctx)) + ")";
-                String pinned = pinnedCallBox(pc, m, ctx);
-                if (pinned != null) {
-                    callCode = "((" + pinned + ") (Object) " + callCode + ")";
-                }
                 TypeRef seen = m.returnType == null || m.returnType.is("var") ? TypeRef.DYNAMIC
                         : asSeenFrom(m.returnType, m, m.typeParams, pc, tt);
                 if (!m.typeParams.isEmpty() && c.typeArgs.size() == m.typeParams.size()) {
                     // `open<int>(..)`: the method's own type arguments, as written.
                     seen = substTypeParams(seen, m.typeParams, c.typeArgs);
+                }
+                if (pinnedCallBox(pc, m, ctx) != null) {
+                    // The implementer's return as this call sees it: `shelf.open<int>()` is a
+                    // Future<Crate2<Long>>, never the declaration's Future<Crate2<V>>, whose V
+                    // is not in scope here. A type argument left to inference reads as dynamic.
+                    TypeRef castTo = seen;
+                    if (!m.typeParams.isEmpty() && c.typeArgs.size() != m.typeParams.size()) {
+                        List<TypeRef> dyn = new ArrayList<TypeRef>();
+                        for (int i = 0; i < m.typeParams.size(); i++) {
+                            dyn.add(TypeRef.DYNAMIC);
+                        }
+                        castTo = substTypeParams(seen, m.typeParams, dyn);
+                    }
+                    callCode = "((" + javaType(castTo, true, ctx) + ") (Object) " + callCode + ")";
                 }
                 return new Out(callCode, seen);
             }
@@ -12069,7 +12136,7 @@ public final class JavaEmitter {
             // (`class B extends A` where `A with ListMixin<bool>` reaching `toList()`)
             java.util.Set<String> mixSeen = new java.util.HashSet<String>();
             for (ClassDecl mc = pc; mc != null && mixSeen.add(mc.name);
-                    mc = mc.superclass != null ? program.classes.get(mc.superclass.name) : null) {
+                    mc = mc.superclass != null ? superDeclOf(mc, mc.superclass) : null) {
                 for (TypeRef mixRef : mc.mixins) {
                     if (stubs.isStubClass(mixRef.name)) {
                         Ast.MethodDecl sm = stubs.findMethod(mixRef.name, n, false);
@@ -12471,7 +12538,7 @@ public final class JavaEmitter {
                         tt.is("Set") ? TypeRef.BOOL : TypeRef.VOID);
             }
             if (n.equals("addAll")) {
-                return new Out(target.code + ".addAllIterable(" + emitExpr(pos.get(0), null, ctx).code + ")", TypeRef.VOID);
+                return new Out(target.code + ".addAllIterable(" + mixinIterableCode(emitExpr(pos.get(0), null, ctx)) + ")", TypeRef.VOID);
             }
             // dart:collection's Queue is a List here (AstBuilder.collectionAlias); its own
             // end operations are the List ones at index 0 / the end.
@@ -13172,7 +13239,7 @@ public final class JavaEmitter {
                 String rt = cls.equals("List") ? "DartList" : "DartSet";
                 ctx.importClass("dart.core." + rt);
                 Out src = emitExpr(pos.get(0), null, ctx);
-                String code = paren(src.code);
+                String code = paren(mixinIterableCode(src));
                 return new Out(rt + ".<Object>from((Iterable<Object>) (Iterable<?>) " + code + ")",
                         TypeRef.of(cls, TypeRef.DYNAMIC));
             }
@@ -13702,7 +13769,7 @@ public final class JavaEmitter {
                     return m;
                 }
             }
-            c = c.superclass != null ? program.classes.get(c.superclass.name) : null;
+            c = c.superclass != null ? superDeclOf(c, c.superclass) : null;
         }
         return null;
     }
@@ -15979,7 +16046,7 @@ public final class JavaEmitter {
         if (p.isSuper && c != null && c.superclass != null) {
             // super.x forwards to the super constructor's parameter named x; resolve its
             // type against the program (app) super chain first, then the stub super chain.
-            ClassDecl progCur = program.classes.get(c.superclass.name);
+            ClassDecl progCur = superDeclOf(c, c.superclass);
             // A positional super parameter forwards by POSITION, not by name:
             // `B(super.count)` against `A(this._count)` is A's first positional.
             int superPos = positionalSuperIndex(c, p);
@@ -16011,7 +16078,7 @@ public final class JavaEmitter {
                 if (sf != null) {
                     return fieldType(sf, ctx);
                 }
-                progCur = progCur.superclass != null ? program.classes.get(progCur.superclass.name) : null;
+                progCur = progCur.superclass != null ? superDeclOf(progCur, progCur.superclass) : null;
             }
             // look up the named param type on the stub super chain
             Ast.ClassDecl cur = stubs.classes.get(c.superclass.name);
@@ -16797,6 +16864,24 @@ public final class JavaEmitter {
         if (o.type != null && o.type.is("TypedDataList") && (target.is("List") || target.is("Iterable"))) {
             return "((" + javaType(target, false, ctx) + ") (Object) " + paren(o.code) + ")";
         }
+        // A program class applying ListMixin/ListBase (or IterableMixin/IterableBase) is a
+        // Dart List/Iterable, but the runtime list classes keep private storage, so the Java
+        // class cannot be one: a live view that reads and writes through the object bridges
+        // it at the boundary (dart.core.*ListMixinView, DartIterable.ofMixin).
+        if (o.type != null && o.type.name != null && program.classes.containsKey(o.type.name)
+                && (target.is("List") || target.is("Iterable"))) {
+            String fam = appliedCollectionMixin(o.type.name);
+            if ("dart.collection.ListMixin".equals(fam) && target.is("List")) {
+                String jt = javaType(copyNonNull(target), false, ctx);
+                String view = jt.startsWith("DartLongList") ? "dart.core.LongListMixinView"
+                        : jt.startsWith("DartDoubleList") ? "dart.core.DoubleListMixinView"
+                        : "dart.core.ListMixinView<>";
+                return "new " + view + "(" + o.code + ")";
+            }
+            if (fam != null && target.is("Iterable")) {
+                return "dart.core.DartIterable.ofMixin(" + o.code + ")";
+            }
+        }
         // Dart's StreamSink and EventSink are Sinks; in Java their close() answers a Future
         // where Sink's is void, so the interfaces cannot be related and Sink.of adapts.
         if (o.type != null && target.is("Sink") && (o.type.is("StreamSink") || o.type.is("EventSink")
@@ -17029,7 +17114,7 @@ public final class JavaEmitter {
                     }
                 }
             }
-            c = c.superclass != null ? program.classes.get(c.superclass.name) : null;
+            c = c.superclass != null ? superDeclOf(c, c.superclass) : null;
         }
         return null;
     }
@@ -17092,7 +17177,7 @@ public final class JavaEmitter {
                 return m;
             }
             chain.add(c);
-            c = c.superclass != null ? program.classes.get(c.superclass.name) : null;
+            c = c.superclass != null ? superDeclOf(c, c.superclass) : null;
         }
         for (ClassDecl k : chain) {
             for (TypeRef i : k.interfaces) {

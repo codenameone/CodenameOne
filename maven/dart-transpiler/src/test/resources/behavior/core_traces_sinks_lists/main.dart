@@ -40,6 +40,13 @@ int total(List<int> xs) {
   return s;
 }
 
+void bump(List<int> xs) {
+  xs[0] = 10;
+  xs.add(4);
+}
+
+List<int> echo(List<int> xs) => xs;
+
 String joined(Iterable<String> it) => it.join('+');
 
 void pour(Sink<int> s) {
@@ -55,6 +62,14 @@ Future<void> main() async {
   r.add(2);
   r.add(3);
   print('join ${r.join("-")} ${r.length} ${Letters().join("+")}');
+  print('total ${total(r)} joined ${joined(Letters())}');
+  final grown = <int>[0];
+  grown.addAll(r);
+  final copy = List.of(r);
+  print('addAll $grown of $copy');
+  bump(r);
+  print('bumped ${r[0]} ${r.length} ${r.join(",")}');
+  print('same ${identical(echo(r), r)}');
   final f = Fixed();
   print('fixed ${f.length} ${f[0]} ${f[1]}');
 

@@ -54,6 +54,50 @@ public class DartIterable<E> implements Iterable<E> {
         this.membershipTest = membershipTest;
     }
 
+    /// A live Iterable over a program object applying dart:collection's
+    /// {@code IterableMixin} (or {@code ListMixin}), made where it is passed to an
+    /// {@code Iterable} parameter: each iteration asks the object for a fresh iterator,
+    /// so it sees the object's state at that moment. {@code identical} looks through it.
+    public static <E> DartIterable<E> ofMixin(dart.collection.IterableMixin<E> source) {
+        return new MixinIterable<E>(source);
+    }
+
+    private static final class MixinIterable<E> extends DartIterable<E> implements MixinView {
+        private final dart.collection.IterableMixin<E> src;
+
+        MixinIterable(dart.collection.IterableMixin<E> src) {
+            super(() -> new java.util.Iterator<E>() {
+                private final dart.collection.Iterator<E> it = src.iterator();
+                private boolean ready;
+                private boolean has;
+
+                @Override
+                public boolean hasNext() {
+                    if (!ready) {
+                        has = it.moveNext();
+                        ready = true;
+                    }
+                    return has;
+                }
+
+                @Override
+                public E next() {
+                    if (!hasNext()) {
+                        throw new java.util.NoSuchElementException();
+                    }
+                    ready = false;
+                    return it.current();
+                }
+            });
+            this.src = src;
+        }
+
+        @Override
+        public Object source() {
+            return src;
+        }
+    }
+
     public static <E> DartIterable<E> wrap(Iterable<E> source) {
         return source instanceof DartIterable<E> di ? di : new DartIterable<>(source);
     }

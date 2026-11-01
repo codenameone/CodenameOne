@@ -263,6 +263,12 @@ public final class DartRuntime {
         if (a == b) {
             return true;
         }
+        // A mixin-backed List/Iterable view stands for the object it was made from.
+        if (a instanceof dart.core.MixinView || b instanceof dart.core.MixinView) {
+            Object ua = a instanceof dart.core.MixinView ? ((dart.core.MixinView) a).source() : a;
+            Object ub = b instanceof dart.core.MixinView ? ((dart.core.MixinView) b).source() : b;
+            return ua == ub;
+        }
         if (a instanceof Long && b instanceof Long) {
             return ((Long) a).longValue() == ((Long) b).longValue();
         }
