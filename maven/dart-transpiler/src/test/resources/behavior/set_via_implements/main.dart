@@ -231,6 +231,28 @@ class Fwd<E> extends Iterable<E> implements Set<E> {
   Set<E> union(Set<E> o) => _inner.union(o);
   @override
   Set<E> toSet() => _inner.toSet();
+  // Iterable members the wrapper forwards explicitly. NoneSet below implements Fwd
+  // but extends IterableBase, so it takes IterableBase's versions of these.
+  @override
+  Iterable<E> where(bool Function(E) t) => _inner.where(t);
+  @override
+  bool any(bool Function(E) t) => _inner.any(t);
+  @override
+  bool every(bool Function(E) t) => _inner.every(t);
+  @override
+  Iterable<T> map<T>(T Function(E) f) => _inner.map(f);
+  @override
+  Iterable<E> skip(int n) => _inner.skip(n);
+  @override
+  Iterable<E> take(int n) => _inner.take(n);
+  @override
+  String join([String separator = '']) => _inner.join(separator);
+  @override
+  T fold<T>(T initial, T Function(T, E) combine) => _inner.fold(initial, combine);
+  @override
+  void forEach(void Function(E) f) => _inner.forEach(f);
+  @override
+  List<E> toList({bool growable = true}) => _inner.toList(growable: growable);
 }
 
 mixin NoWrites<E> implements Set<E> {
@@ -299,6 +321,22 @@ void noneMain() {
     print('none add: ${e.message}');
   }
   print(n.union({4, 5}).toList());
+  print('none iter ${n.where((x) => x > 0).length} ${n.any((x) => true)} '
+      '${n.every((x) => false)} ${n.map((x) => x * 2).toList()} '
+      '${n.skip(1).isEmpty} ${n.take(2).length} [${n.join(',')}] '
+      '${n.fold<int>(7, (a, b) => a + b)} ${n.toList()}');
+  try {
+    n.single;
+  } on StateError catch (e) {
+    print('none single: ${e.message}');
+  }
+  var seen = 0;
+  n.forEach((x) => seen++);
+  final FwdView<int> w = FwdView<int>({3, 4, 5});
+  print('view iter $seen ${w.where((x) => x > 3).toList()} ${w.any((x) => x == 4)} '
+      '${w.every((x) => x > 2)} ${w.map((x) => x + 1).toList()} '
+      '${w.skip(1).toList()} ${w.take(1).toList()} ${w.join('-')} '
+      '${w.fold<int>(0, (a, b) => a + b)} ${w.toList()} ${FwdView<int>({9}).single}');
   final FwdView<int> v = FwdView<int>({1, 2});
   print('view ${v.length} ${v.cast<num>().length}');
   try {

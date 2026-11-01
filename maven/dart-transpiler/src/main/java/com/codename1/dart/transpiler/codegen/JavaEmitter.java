@@ -314,6 +314,7 @@ public final class JavaEmitter {
             }
             String cls = out.get(ci).content;
             List<String> heads = new ArrayList<String>();
+            java.util.Set<String> imports = new java.util.LinkedHashSet<String>();
             java.util.Set<String> visited = new HashSet<String>();
             List<String> work = new ArrayList<String>(mi.interfaceTypes);
             while (!work.isEmpty()) {
@@ -324,6 +325,10 @@ public final class JavaEmitter {
                 }
                 String src = out.get(ii).content;
                 for (String line : src.split("\n")) {
+                    if (line.startsWith("import ") && !cls.contains("\n" + line + "\n")) {
+                        // A forwarder head is copied as written there (`DartList<E> toList`).
+                        imports.add(line);
+                    }
                     java.util.regex.Matcher dm = defaultHead.matcher(line);
                     if (dm.matches()) {
                         heads.add(dm.group(1).trim());
@@ -379,15 +384,42 @@ public final class JavaEmitter {
                 String ret = before.substring(0, before.lastIndexOf(' ')).trim();
                 boolean isVoid = ret.equals("void") || ret.endsWith(" void");
                 add.append("\n    @Override\n    public ").append(head).append(" {\n        ")
-                        .append(isVoid ? "" : "return ").append(mixin).append(".super.").append(name)
+                        .append(isVoid ? "" : "return ").append(superCallPrefix(mixin)).append(name)
                         .append('(').append(args).append(");\n    }\n");
             }
             if (add.length() > 0) {
                 int end = cls.lastIndexOf('}');
-                out.set(ci, new GeneratedFile(out.get(ci).relativePath,
-                        cls.substring(0, end) + add + cls.substring(end)));
+                String body = cls.substring(0, end) + add + cls.substring(end);
+                int nl = body.indexOf('\n', body.indexOf("package "));
+                StringBuilder imp = new StringBuilder();
+                for (String line : imports) {
+                    String simple = line.substring(line.lastIndexOf('.') + 1, line.length() - 1);
+                    // Only what a forwarder names, and never a simple name the class already
+                    // imports from another package.
+                    if (add.indexOf(simple) >= 0 && !cls.contains("." + simple + ";")) {
+                        imp.append(line).append('\n');
+                    }
+                }
+                if (imp.length() > 0 && nl > 0) {
+                    body = body.substring(0, nl + 1) + "\n" + imp + body.substring(nl + 1);
+                }
+                out.set(ci, new GeneratedFile(out.get(ci).relativePath, body));
             }
         }
+    }
+
+    /**
+     * The receiver a forwarder calls {@code mixin}'s member on. {@code M.super.m()} is
+     * refused when another direct superinterface also extends M, which the runtime
+     * IterableMixin (an `extends IterableBase` applied as a mixin) usually is -- the
+     * interfaced class C implements reaches it too. Its defaults are the iterator-driven
+     * members DartIterable.ofMixin(this) gives, so that wrapper is called instead.
+     */
+    private static String superCallPrefix(String mixin) {
+        if (mixin.equals("IterableMixin") || mixin.equals("dart.collection.IterableMixin")) {
+            return "dart.core.DartIterable.ofMixin(this).";
+        }
+        return mixin + ".super.";
     }
 
     /** Whether class text {@code cls} declares a method {@code name} with these Java parameter types. */
@@ -1987,12 +2019,19 @@ public final class JavaEmitter {
         }
         for (TypeRef mx : c.mixins) {
             ClassDecl md = superDeclOf(c, mx);
+            if (md == null) {
+                md = stubs.classes.get(mx.name);
+            }
             if (md == null || !md.isMixin) {
                 continue;
             }
+            // A runtime mixin (`extends IterableBase<E>`, moved to the front of the mixins)
+            // is declared in the stubs without bodies, but every member it lists is a Java
+            // default of the interface it maps to (IterableMixin), so all of them count.
+            boolean runtime = stubs.classes.get(md.name) == md;
             java.util.Set<String> names = new HashSet<String>();
             for (MethodDecl m : md.methods) {
-                if (!m.isStatic && !m.isAbstract && !m.isGetter && !m.isSetter) {
+                if (!m.isStatic && (runtime || !m.isAbstract) && (runtime || !m.isGetter) && !m.isSetter) {
                     names.add(m.name);
                 }
             }
@@ -2779,6 +2818,13 @@ public final class JavaEmitter {
             return null;
         }
         List<IfaceSig> sigs = interfaceSigs(c, m, ctx);
+        if (c.superclass != null) {
+            // An override of a superclass member erases to the same clash as one of an
+            // interface member: `extends Writer<T>` overriding `write(T)` as `write(Stamp)`.
+            sigs = new ArrayList<IfaceSig>(sigs);
+            collectSuperclassParamSigs(c, c.superclass, java.util.Collections.<String>emptyList(),
+                    java.util.Collections.<TypeRef>emptyList(), m, ctx, sigs, 0);
+        }
         if (sigs.isEmpty()) {
             return null;
         }
@@ -2794,7 +2840,12 @@ public final class JavaEmitter {
                 if (a.equals(b) || (out != null && out.get(i) != null)) {
                     continue;
                 }
-                if (javaErasure(a, c, m).equals(javaErasure(b, c, m))) {
+                // `class A<T extends DateTime> extends Adapter<T>` overriding `write(T obj)`
+                // with `write(DateTime obj)` widens T to its own bound. Whether or not the Java
+                // class declares that bound, the parameter takes T: then it is the inherited
+                // signature exactly, and the body still sees a DateTime.
+                if (javaErasure(a, c, m).equals(javaErasure(b, c, m))
+                        || widensTypeVarToBound(a, b.trim(), c, m, ctx)) {
                     if (out == null) {
                         out = new ArrayList<String>();
                         for (int k = 0; k < impl.size(); k++) {
@@ -2806,6 +2857,56 @@ public final class JavaEmitter {
             }
         }
         return out;
+    }
+
+    /**
+     * The parameter types of the program superclass members {@code m} overrides, as the
+     * superclass chain declares them with this class's type arguments substituted. Unlike
+     * {@link #collectIfaceSigs} it does not need the superclass to have an X$I: a Java
+     * subclass overrides the class's own method.
+     */
+    private void collectSuperclassParamSigs(ClassDecl owner, TypeRef sup, List<String> outerNames,
+            List<TypeRef> outerArgs, MethodDecl m, Ctx ctx, List<IfaceSig> out, int depth) {
+        ClassDecl sc = superDeclOf(owner, sup);
+        if (sc == null || depth > 16 || !sup.args.isEmpty() && sup.args.size() != sc.typeParams.size()) {
+            return;
+        }
+        List<TypeRef> args = new ArrayList<TypeRef>();
+        for (TypeRef a : sup.args) {
+            args.add(substTypeParams(a, outerNames, outerArgs));
+        }
+        for (MethodDecl sm : sc.methods) {
+            if (sm.isStatic || sm.isSetter || sm.isGetter || !sm.name.equals(m.name)
+                    || sm.params.size() != m.params.size() || !sm.typeParams.isEmpty()
+                    || !m.typeParams.isEmpty()) {
+                continue;
+            }
+            IfaceSig sig = new IfaceSig();
+            sig.owner = sc.name;
+            boolean namesMatch = true;
+            for (int pi = 0; pi < sm.params.size(); pi++) {
+                Param p = sm.params.get(pi);
+                Param mp = m.params.get(pi);
+                if (p.named != mp.named || (p.named && !p.name.equals(mp.name))) {
+                    namesMatch = false;
+                }
+                sig.params.add(args.isEmpty() && !sc.typeParams.isEmpty()
+                        ? erase(ifaceJava(p.type, sc, args, ctx)) : ifaceJava(p.type, sc, args, ctx));
+            }
+            if (namesMatch) {
+                out.add(sig);
+            }
+        }
+        if (sc.superclass != null) {
+            collectSuperclassParamSigs(sc, sc.superclass, sc.typeParams, args, m, ctx, out, depth + 1);
+        }
+    }
+
+    /** Whether Java type {@code a} is the Dart bound of {@code tv}, a type variable of c or m. */
+    private boolean widensTypeVarToBound(String a, String tv, ClassDecl c, MethodDecl m, Ctx ctx) {
+        TypeRef bound = c.typeParams.contains(tv) ? c.typeParamBounds.get(tv)
+                : m.typeParams.contains(tv) ? m.typeParamBounds.get(tv) : null;
+        return bound != null && erase(javaType(bound, false, ctx)).trim().equals(erase(a).trim());
     }
 
     /** {@link #erase}, with an unbounded type variable of the class or method as Object. */
@@ -3445,6 +3546,23 @@ public final class JavaEmitter {
         }
         sb.append(") {\n");
         Ctx.Writer w = ctx.pushWriter(2);
+        CtorDecl redirectTarget = ct.redirect != null && ct.redirect.namedCtor != null
+                ? c.namedCtor(ct.redirect.namedCtor) : null;
+        if (redirectTarget != null && !redirectTarget.isFactory) {
+            // `C(x) : this.named(x, 0);` runs only the named constructor: the marker
+            // constructor builds the object as a named constructor's static method does, and
+            // its $init$ stores the fields and calls the superclass. Falling through to the
+            // super call below would hand the superclass its declared defaults instead.
+            w.line("this(($NamedCtor) null);");
+            storeWitnesses(c, "this", true, false, w, ctx);
+            w.line("this.$init$" + redirectTarget.name + "("
+                    + canonicalArgs(redirectTarget, ct.redirect.args, ctx) + ");");
+            ctx.witnessLocals = savedWitnessLocals;
+            sb.append(ctx.popWriter());
+            ctx.popScope();
+            sb.append("    }\n\n");
+            return sb.toString();
+        }
         String superNamedInit = null;
 
         // super(...) initializer for program superclasses
@@ -10751,7 +10869,13 @@ public final class JavaEmitter {
                 return emitMemberGet(new Out("$self", ctx.extensionSelfType), n, id, ctx);
             }
         }
-        Out top = resolveTopLevel(n, ctx);
+        tearOffExpected = expected;
+        Out top;
+        try {
+            top = resolveTopLevel(n, ctx);
+        } finally {
+            tearOffExpected = null;
+        }
         tearOffKeepAll = false;
         if (top != null) {
             return retargetTearOff(top, expected, ctx);
@@ -10844,6 +10968,12 @@ public final class JavaEmitter {
         if (resolveTopLevel(n, ctx) == null) {
             return false;
         }
+        if ((program.topLevelVars.containsKey(n) || program.functions.containsKey(n))
+                && !program.classes.containsKey(n) && !program.enums.containsKey(n)
+                && !program.topLevelMemberVisibleUnprefixed(n, ctx.library())) {
+            // Declared only in libraries this one does not import: not in lexical scope.
+            return false;
+        }
         return program.classes.containsKey(n) || program.enums.containsKey(n)
                 || program.topLevelVars.containsKey(n) || program.functions.containsKey(n)
                 || stubs.isStubClass(n) || stubs.isStubEnum(n) || CORE_STATIC_RECEIVERS.contains(n)
@@ -10929,7 +11059,7 @@ public final class JavaEmitter {
             if (simple) {
                 ft.funcReturn = fn.typeParams.isEmpty() ? fn.returnType
                         : substTypeParams(fn.returnType, fn.typeParams, java.util.Collections.<TypeRef>emptyList());
-                String sam = javaType(ft, false, ctx);
+                String sam = javaType(samAtBoundsRaw(ft, tearOffExpected), false, ctx);
                 if (ft.funcRequired >= 0 && ft.funcRequired < ordered.size()) {
                     // Optional parameters: an adapter restores defaults (see tearOffAdapter).
                     final String lib = Program.libClassName(owner.fileName) + "." + n;
@@ -16651,7 +16781,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 // and a listen callback's parameter as Object); rawReceiver reads it at bounds.
                 String recvCode = m.isStatic ? target.code : rawReceiver(target.code, pc, tt, m.returnType, ctx);
                 String callCode = recvCode + "." + programCallName(pc, m, n) + "(" + withWitnesses(methodWitnessCall(m, c,
-                        callExpected(c, ctx), ctx), methodArgs(paramsSeenFrom(m, pc, tt, false, ctx),
+                        callExpected(c, ctx), ctx), methodArgs(paramsSeenFrom(m, pc, tt, false, ctx, c.typeArgs),
                         c.args, ctx)) + ")";
                 TypeRef seen = m.returnType == null || m.returnType.is("var") ? TypeRef.DYNAMIC
                         : asSeenFrom(m.returnType, m, m.typeParams, pc, tt);
@@ -16692,6 +16822,9 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                     // `class C extends Iterable<int>`: the inherited `where` hands its
                     // callback an int, not the stub's unbound E, so `(x) => x.isEven` types.
                     sm = withReceiverCallbackTypes(sm, stubSuperAsSeen(pc, stubSuper, tt));
+                    // ... and `p.fold<List<int>>(<int>[], (a, e) => a..add(e))` hands `a`
+                    // the List<int> written at the call, not the stub's unbound T.
+                    sm = withCallCallbackTypes(sm, c);
                     // `class V extends StreamView<int>`: the inherited `toList()` returns a
                     // Future<List<int>>, not the stub's bare Future<List<T>>.
                     return stubCallOut(sm, c, target.code + "." + n, ctx,
@@ -16717,7 +16850,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                             // `where`'s callback takes an int, not the stub's unbound E.
                             TypeRef seenMix = mc == pc && tt != null && tt.args.size() == pc.typeParams.size()
                                     ? substTypeVars(mixRef, paramMap(pc.typeParams, tt.args)) : mixRef;
-                            sm = withReceiverCallbackTypes(sm, seenMix);
+                            sm = withCallCallbackTypes(withReceiverCallbackTypes(sm, seenMix), c);
                             // QueueList<Result<T>> mixing ListMixin<E>: elementAt answers Result<T>
                             return stubCallOut(sm, c, target.code + "." + n, ctx,
                                     substMixinMember(sm.returnType, mixRef, mc, mc == pc ? tt : null));
@@ -16737,7 +16870,8 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 if (stubCls != null && stubCls.typeParams.size() == stubItf.args.size()) {
                     ret = substTypeVars(ret, paramMap(stubCls.typeParams, stubItf.args));
                 }
-                return stubCallOut(withReceiverCallbackTypes(sm, stubItf), c, target.code + "." + n, ctx, ret);
+                return stubCallOut(withCallCallbackTypes(withReceiverCallbackTypes(sm, stubItf), c), c,
+                        target.code + "." + n, ctx, ret);
             }
             // invocation of a function-typed field: `obj.onTap(args)` where onTap is a
             // `void Function(...)`/callback field — read the field then invoke its SAM.
@@ -17398,6 +17532,26 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                     return new Out(target.code + ".whereType(null)",
                             TypeRef.of("Iterable", TypeRef.DYNAMIC), true);
                 }
+                if (sub != null && !sub.args.isEmpty()) {
+                    // `whereType<Relay<int>>()`: a class literal cannot name type arguments
+                    // (`Relay<Long>.class` does not parse). The elements are filtered by the
+                    // erased class, and then by the same check `x is Relay<int>` makes (see
+                    // the IsTest branch of emitExpr): the element test for List<int>,
+                    // List<double> and the scalar lists, the erased instanceof otherwise.
+                    String erased = erasedJavaType(sub, ctx);
+                    String pk = sub.is("List") ? primitiveListKind(sub) : null;
+                    TypeRef el = pk == null && sub.is("List") ? scalarListElement(sub) : null;
+                    String elemCheck = pk != null ? "dart.core.Dart" + pk + "List.is" + pk + "s($wt)"
+                            : el != null ? "dart.core.DartList.isListOf($wt, " + erasedJavaType(el, ctx)
+                                    + ".class, " + el.nullable + ")" : null;
+                    String code = target.code + ".whereType((java.lang.Class) " + erased + ".class"
+                            + (sub.nullable ? ", true" : "") + ")";
+                    if (elemCheck != null) {
+                        code = "((dart.core.DartIterable<Object>) " + code
+                                + ").where(($wt) -> $wt == null || " + elemCheck + ")";
+                    }
+                    return new Out("((dart.core.DartIterable) " + code + ")", TypeRef.of("Iterable", sub));
+                }
                 String token = sub != null ? javaType(sub, true, ctx) + ".class" : "null";
                 boolean admitsNull = sub == null || sub.nullable || sub.is("dynamic") || sub.is("var");
                 return new Out(target.code + ".whereType(" + token + (admitsNull ? ", true" : "") + ")",
@@ -17706,6 +17860,30 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 return new Out(target.code + ".clear()", TypeRef.VOID);
             }
         }
+        if (tt.is("StreamSubscription") && n.equals("onData") && tt.args.size() == 1 && pos.size() == 1
+                && pos.get(0) instanceof Lambda && ((Lambda) pos.get(0)).params.size() == 1
+                && ((Lambda) pos.get(0)).typeParams.isEmpty()
+                && (((Lambda) pos.get(0)).params.get(0).type == null
+                        || ((Lambda) pos.get(0)).params.get(0).type.is("var"))) {
+            // `subscription.onData((event) { completer.complete(event); })`: Dart types the
+            // handler's parameter from the subscription's T. The runtime slot is an untyped
+            // Function, so without this the parameter was Object and `complete(event)` on a
+            // Completer<T> did not compile.
+            TypeRef dataType = tt.arg(0);
+            // typeVarsInScope also answers for an extension's own T (`extension on Stream<T>`),
+            // which the static Java method declares; nameableHere does not see it.
+            if (!isDynamicType(dataType) && (nameableHere(dataType, ctx) || typeVarsInScope(dataType, ctx))
+                    && !dataType.is("int")
+                    && !dataType.is("double") && !dataType.is("bool") && !dataType.is("num")
+                    && !dataType.is("void") && !dataType.is("Null")) {
+                Lambda src = (Lambda) pos.get(0);
+                Out cb = emitExpr(src, inlineFuncType(dataType, TypeRef.DYNAMIC), ctx);
+                String dj = javaType(boxType(dataType), true, ctx);
+                String code = pinnedHandler(src, cb, true, "dart.runtime.Funcs.Func1<" + dj + ", Object>",
+                        "dart.runtime.Funcs.VoidFunc1<" + dj + ">");
+                return new Out(target.code + ".onData(" + code + ")", TypeRef.VOID);
+            }
+        }
         if (tt.is("Future")) {
             ctx.importClass("dart.async.Future");
             if (n.equals("then")) {
@@ -17716,6 +17894,14 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 // A tear-off onValue (`then(completer.complete)`) is a Java method reference
                 // both then overloads accept, which javac reports as ambiguous.
                 Expr cbExpr = tearOffAsLambda(pos.get(0), 1, ctx);
+                if (cbExpr != pos.get(0) && cbExpr instanceof Lambda && ((Lambda) cbExpr).params.size() == 1
+                        && ((Lambda) cbExpr).params.get(0).type == TypeRef.DYNAMIC) {
+                    // `then(completer.complete)` on a Runtime receiver: the closure built for
+                    // the tear-off has no declared parameter type to copy, so it takes the
+                    // future's value type, as Dart's tear-off does (Object reached a
+                    // Completer<T>.complete(T) otherwise).
+                    ((Lambda) cbExpr).params.get(0).type = null;
+                }
                 boolean typedCb = valueType != null && !isDynamicType(valueType)
                         && nameableHere(valueType, ctx)
                         && !valueType.is("int") && !valueType.is("double") && !valueType.is("bool")
@@ -18637,6 +18823,33 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             }
             String twArgs = witnessArgs(pc, typeArgs, posNode, ctx);
             if (ct != null && ct.isFactory) {
+                List<TypeRef> contextArgs = ctx.ctorContextArgs;
+                ctx.ctorContextArgs = null;
+                if (constructed.args.isEmpty() && contextArgs != null && contextArgs.size() == pc.typeParams.size()) {
+                    // `Chan<S> cast<S>() => Chan(s.cast(), StreamController(sync: true)..)` with
+                    // an unnamed factory: Dart takes the type arguments from the return
+                    // context. javac inferred the static $create's T from the arguments alone
+                    // (an Object from `cast()`, an R from the cascade), so it is instantiated
+                    // explicitly, and the arguments are emitted against the bound parameters.
+                    ClassDecl savedOwner = ctx.ctorTypeOwner;
+                    java.util.Map<String, TypeRef> savedSubst = ctx.ctorTypeSubst;
+                    ctx.ctorTypeOwner = pc;
+                    ctx.ctorTypeSubst = new java.util.HashMap<String, TypeRef>();
+                    StringBuilder ta = new StringBuilder("<");
+                    for (int i = 0; i < pc.typeParams.size(); i++) {
+                        ctx.ctorTypeSubst.put(pc.typeParams.get(i), contextArgs.get(i));
+                        ta.append(i > 0 ? ", " : "").append(javaType(boxType(contextArgs.get(i)), true, ctx));
+                    }
+                    try {
+                        String fa = canonicalArgs(ct, pc, args, ctx);
+                        return new Out(jn + "." + ta.append('>') + "$create("
+                                + (fa.isEmpty() ? stripTrailingComma(twArgs) : twArgs + fa) + ")",
+                                TypeRef.of(className, contextArgs.toArray(new TypeRef[0])));
+                    } finally {
+                        ctx.ctorTypeOwner = savedOwner;
+                        ctx.ctorTypeSubst = savedSubst;
+                    }
+                }
                 String fa = canonicalArgs(ct, pc, args, ctx);
                 return new Out(jn + ".$create(" + (fa.isEmpty() ? stripTrailingComma(twArgs) : twArgs + fa) + ")",
                         constructed);
@@ -19863,6 +20076,19 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
      */
     private List<Param> paramsSeenFrom(MethodDecl m, ClassDecl pc, TypeRef tt, boolean collectionsOnly,
                                        Ctx ctx) {
+        return paramsSeenFrom(m, pc, tt, collectionsOnly, ctx, null);
+    }
+
+    /**
+     * As above, with the call's explicit type arguments: `w.fold<int>(0, (a, b) => a + b)`
+     * types the combiner's untyped parameters from the written T = int, where reading the
+     * method's own T as dynamic made `a + b` a dynamic operation javac could not return as
+     * the Long the call infers.
+     */
+    private List<Param> paramsSeenFrom(MethodDecl m, ClassDecl pc, TypeRef tt, boolean collectionsOnly,
+                                       Ctx ctx, List<TypeRef> callTypeArgs) {
+        boolean explicit = callTypeArgs != null && !m.typeParams.isEmpty()
+                && callTypeArgs.size() == m.typeParams.size();
         List<Param> out = null;
         for (int i = 0; i < m.params.size(); i++) {
             Param p = m.params.get(i);
@@ -19871,6 +20097,9 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 continue;
             }
             TypeRef seen = asSeenFrom(p.type, m, m.typeParams, pc, tt);
+            if (seen != null && explicit) {
+                seen = substTypeParams(seen, m.typeParams, callTypeArgs);
+            }
             if (seen != null && !m.typeParams.isEmpty() && !typeVarsInScope(seen, ctx)
                     // only when the receiver bound something: `T Function(String)` of
                     // `each<T>` keeps its T, which a void arrow body is matched against
@@ -21151,6 +21380,8 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
     }
 
     private int tearOffSeq;
+    /** The expected type of the identifier being resolved as a top-level tear-off. */
+    private TypeRef tearOffExpected;
 
     private Expr tearOffAsErrorLambda(Expr e, Ctx ctx) {
         return tearOffAsLambda(e, -1, ctx);
@@ -23349,6 +23580,57 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         return true;
     }
 
+    /**
+     * The function type of a top-level tear-off's SAM cast, with every parameter that is a
+     * program generic class instantiated to its bounds (`Relay` or `Relay<Object?>` for a
+     * `class Relay<T>`) rendered raw. Java has no covariance: `Func1<Relay<Object>, ..>` is
+     * no argument to `List<Relay>.map`, whose element is the raw Relay, so a parameter is
+     * rendered raw only where the expected slot names the class raw. Only this cast changes; the Out's
+     * type and every other type keep their arguments, since instantiating raw types to
+     * their bounds everywhere broke Dart's covariance elsewhere.
+     */
+    private TypeRef samAtBoundsRaw(TypeRef ft, TypeRef expected) {
+        if (ft == null || ft.funcParams == null || expected == null || expected.funcParams == null
+                || expected.funcParams.size() != ft.funcParams.size()) {
+            return ft;
+        }
+        List<TypeRef> ps = null;
+        for (int i = 0; i < ft.funcParams.size(); i++) {
+            TypeRef p = ft.funcParams.get(i);
+            ClassDecl pc = p == null || p.name == null || p.args.isEmpty() || p.funcParams != null
+                    ? null : program.classes.get(p.name);
+            // Only where the slot names the class raw (`List<Relay>.map`): a slot typed
+            // `Relay<Object?>` takes the parameterized SAM as it is.
+            TypeRef slot = expected.funcParams.get(i);
+            boolean atBounds = pc != null && isProgramClassDecl(pc) && pc.typeParams.size() == p.args.size()
+                    && slot != null && p.name.equals(slot.name) && slot.args.isEmpty();
+            for (int k = 0; atBounds && k < p.args.size(); k++) {
+                TypeRef a = p.args.get(k);
+                TypeRef b = pc.typeParamBounds.get(pc.typeParams.get(k));
+                atBounds = b == null ? isDynamicType(a) || a.is("Object")
+                        : a.name != null && a.name.equals(b.name) && a.args.isEmpty() && b.args.isEmpty();
+            }
+            if (atBounds) {
+                if (ps == null) {
+                    ps = new ArrayList<TypeRef>(ft.funcParams);
+                }
+                TypeRef raw = new TypeRef(p.name);
+                raw.nullable = p.nullable;
+                ps.set(i, raw);
+            }
+        }
+        if (ps == null) {
+            return ft;
+        }
+        TypeRef copy = TypeRef.of(ft.name, ft.args.toArray(new TypeRef[0]));
+        copy.nullable = ft.nullable;
+        copy.funcParams = ps;
+        copy.funcReturn = ft.funcReturn;
+        copy.funcRequired = ft.funcRequired;
+        copy.funcNamed = ft.funcNamed;
+        return copy;
+    }
+
     private String funcCast(Out o, TypeRef target, Ctx ctx) {
         if (target != null && isFunctionValued(target)) {
             return "(" + javaType(target, true, ctx) + ") " + paren(o.code);
@@ -24386,6 +24668,60 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             } else {
                 params.add(p);
             }
+        }
+        if (!changed) {
+            return m;
+        }
+        Ast.MethodDecl copy = new Ast.MethodDecl();
+        copy.returnType = m.returnType;
+        copy.name = m.name;
+        copy.typeParams = m.typeParams;
+        copy.params = params;
+        copy.isStatic = m.isStatic;
+        copy.isGetter = m.isGetter;
+        copy.isSetter = m.isSetter;
+        copy.isAbstract = m.isAbstract;
+        copy.isAsync = m.isAsync;
+        return copy;
+    }
+
+    /**
+     * Stub method {@code m} with the call's explicit type arguments substituted into its
+     * function-typed parameters, so an untyped closure's parameters take them. The
+     * method keeps its type parameters and return type: the return-witness path reads
+     * those from the declaration.
+     */
+    private Ast.MethodDecl withCallCallbackTypes(Ast.MethodDecl m, Call c) {
+        if (m.typeParams.isEmpty() || c.typeArgs.size() != m.typeParams.size()) {
+            return m;
+        }
+        java.util.Map<String, TypeRef> subst = new java.util.HashMap<String, TypeRef>();
+        for (int i = 0; i < m.typeParams.size(); i++) {
+            TypeRef a = c.typeArgs.get(i);
+            if (a == null || !isConcreteType(a)) {
+                return m;
+            }
+            subst.put(m.typeParams.get(i), a);
+        }
+        List<Param> params = new ArrayList<Param>();
+        boolean changed = false;
+        for (Param p : m.params) {
+            TypeRef nt = p.type != null && p.type.funcParams != null ? substFunctionType(p.type, subst) : p.type;
+            if (nt == p.type) {
+                params.add(p);
+                continue;
+            }
+            Param q = new Param();
+            q.type = nt;
+            q.name = p.name;
+            q.named = p.named;
+            q.required = p.required;
+            q.optional = p.optional;
+            q.isThis = p.isThis;
+            q.isSuper = p.isSuper;
+            q.defaultValue = p.defaultValue;
+            params.add(q);
+            changed = true;
         }
         if (!changed) {
             return m;

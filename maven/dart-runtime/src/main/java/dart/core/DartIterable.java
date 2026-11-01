@@ -319,6 +319,19 @@ public class DartIterable<E> implements Iterable<E> {
         return iterator().hasNext();
     }
 
+    /** Dart's {@code Iterable.single}. */
+    public E single() {
+        Iterator<E> it = iterator();
+        if (!it.hasNext()) {
+            throw new StateError("No element");
+        }
+        E result = it.next();
+        if (it.hasNext()) {
+            throw new StateError("Too many elements");
+        }
+        return result;
+    }
+
     public E first() {
         Iterator<E> it = iterator();
         if (!it.hasNext()) {

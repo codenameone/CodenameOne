@@ -540,6 +540,37 @@ public final class Program {
         return resolveOwner(name, topLevelVarOwnersByName.get(name), topLevelVarOwners.get(name), from, prefix);
     }
 
+    /**
+     * Whether a bare {@code name} in {@code from} can mean a top-level variable or function of
+     * the program: one declared in {@code from} itself or provided by an unprefixed import.
+     * The owner tables are whole-program, so without this a library that never imports
+     * {@code package:path} would see its {@code context} getter.
+     */
+    public boolean topLevelMemberVisibleUnprefixed(String name, Ast.Library from) {
+        List<Ast.Library> owners = new ArrayList<Ast.Library>();
+        if (topLevelVarOwnersByName.get(name) != null) {
+            owners.addAll(topLevelVarOwnersByName.get(name));
+        }
+        if (functionOwnersByName.get(name) != null) {
+            owners.addAll(functionOwnersByName.get(name));
+        }
+        if (from == null || owners.isEmpty() || owners.contains(from)) {
+            return true;
+        }
+        for (Ast.Directive d : from.importDirectives) {
+            if (d.prefix != null || !d.admits(name)) {
+                continue;
+            }
+            Ast.Library target = resolveImportedLibrary(from, d.uri);
+            for (Ast.Library o : owners) {
+                if (target != null && provides(target, name, o)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     /** Same as {@link #resolveTopLevelVarOwner} for top-level functions / getters. */
     public Ast.Library resolveFunctionOwner(String name, Ast.Library from, String prefix) {
         return resolveOwner(name, functionOwnersByName.get(name), functionOwners.get(name), from, prefix);

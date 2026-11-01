@@ -17,6 +17,9 @@ mixin IterableMixin<E> {
   E get first;
   E get last;
   E get single;
+  E firstWhere(bool Function(E element) test, {E Function()? orElse});
+  E lastWhere(bool Function(E element) test, {E Function()? orElse});
+  E singleWhere(bool Function(E element) test, {E Function()? orElse});
   bool contains(Object? element);
   void forEach(void Function(E element) action);
   E elementAt(int index);
@@ -45,6 +48,9 @@ mixin ListMixin<E> implements IterableMixin<E> {
   E get first;
   E get last;
   E get single;
+  E firstWhere(bool Function(E element) test, {E Function()? orElse});
+  E lastWhere(bool Function(E element) test, {E Function()? orElse});
+  E singleWhere(bool Function(E element) test, {E Function()? orElse});
   void add(E element);
   void addAll(Iterable<E> iterable);
   E removeLast();
@@ -97,6 +103,9 @@ mixin SetMixin<E> {
   E get first;
   E get last;
   E get single;
+  E firstWhere(bool Function(E element) test, {E Function()? orElse});
+  E lastWhere(bool Function(E element) test, {E Function()? orElse});
+  E singleWhere(bool Function(E element) test, {E Function()? orElse});
   bool contains(Object? element);
   E? lookup(Object? element);
   bool add(E value);
@@ -134,6 +143,9 @@ mixin IterableBase<E> {
   E get first;
   E get last;
   E get single;
+  E firstWhere(bool Function(E element) test, {E Function()? orElse});
+  E lastWhere(bool Function(E element) test, {E Function()? orElse});
+  E singleWhere(bool Function(E element) test, {E Function()? orElse});
   bool contains(Object? element);
   void forEach(void Function(E element) action);
   E elementAt(int index);
@@ -161,6 +173,9 @@ mixin ListBase<E> {
   E get first;
   E get last;
   E get single;
+  E firstWhere(bool Function(E element) test, {E Function()? orElse});
+  E lastWhere(bool Function(E element) test, {E Function()? orElse});
+  E singleWhere(bool Function(E element) test, {E Function()? orElse});
   void add(E element);
   void addAll(Iterable<E> iterable);
   E removeLast();
@@ -230,6 +245,9 @@ mixin SetBase<E> {
   E get first;
   E get last;
   E get single;
+  E firstWhere(bool Function(E element) test, {E Function()? orElse});
+  E lastWhere(bool Function(E element) test, {E Function()? orElse});
+  E singleWhere(bool Function(E element) test, {E Function()? orElse});
   bool contains(Object? element);
   E? lookup(Object? element);
   bool add(E value);

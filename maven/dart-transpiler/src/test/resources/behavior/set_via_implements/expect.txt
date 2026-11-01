@@ -13,5 +13,8 @@ none cast 0 true
 none removeAll: read-only
 none add: read-only
 [4, 5]
+none iter 0 false true [] true 0 [] 7 []
+none single: No element
+view iter 0 [4, 5] true true [4, 5, 6] [4, 5] [3] 3-4-5 12 [3, 4, 5] 9
 view 2 2
 view clear: read-only

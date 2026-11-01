@@ -268,6 +268,21 @@ public final class CoreExt {
         return out;
     }
 
+    /// {@code String.runes}: the Unicode code points, a surrogate pair read as one.
+    public static DartLongList runes(String s) {
+        DartLongList out = new DartLongList();
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (Character.isHighSurrogate(c) && i + 1 < s.length() && Character.isLowSurrogate(s.charAt(i + 1))) {
+                out.addLong(Character.toCodePoint(c, s.charAt(i + 1)));
+                i++;
+            } else {
+                out.addLong(c);
+            }
+        }
+        return out;
+    }
+
     public static String trimLeft(String s) {
         int start = 0;
         while (start < s.length() && DString.isDartWhitespace(s.charAt(start))) {

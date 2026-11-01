@@ -265,4 +265,31 @@ public interface IterableMixin<E> {
     default <R> R fold(R initialValue, Funcs.Func2<R, E, R> combine) {
         return dart.core.DartIterable.ofMixin(this).fold(initialValue, combine);
     }
+
+    /**
+     * {@code fold<T>(..)} with its type argument written: the stub's {@code fold} returns
+     * its own type parameter, so the call passes T's class as a trailing witness. The
+     * result is the combiner's, which already has that type.
+     */
+    default <R> R fold(R initialValue, Funcs.Func2<R, E, R> combine, Class<?> type) {
+        return fold(initialValue, combine);
+    }
+    // The element lookups by test. `single` on a class applying this mixin is emitted
+    // as singleWhere with an always-true test, so a class that only implements
+    // Iterable (taking the rest from here) must answer all three.
+
+    /** Dart's {@code firstWhere(test, {orElse})}. */
+    default E firstWhere(Funcs.Func1<E, Boolean> test, Funcs.Func0<E> orElse) {
+        return dart.core.DartIterable.ofMixin(this).firstWhere(test, orElse);
+    }
+
+    /** Dart's {@code lastWhere(test, {orElse})}. */
+    default E lastWhere(Funcs.Func1<E, Boolean> test, Funcs.Func0<E> orElse) {
+        return dart.core.DartIterable.ofMixin(this).lastWhere(test, orElse);
+    }
+
+    /** Dart's {@code singleWhere(test, {orElse})}. */
+    default E singleWhere(Funcs.Func1<E, Boolean> test, Funcs.Func0<E> orElse) {
+        return dart.core.DartIterable.ofMixin(this).singleWhere(test, orElse);
+    }
 }
