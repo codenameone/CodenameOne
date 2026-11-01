@@ -35,7 +35,9 @@ public abstract class Converter<S, T> implements dart.async.StreamTransformer<S,
 
     /// {@code startChunkedConversion(sink)}: Dart's default refuses, and a converter
     /// that supports chunking overrides it.
-    public Sink<S> startChunkedConversion(Object sink) {
+    /// The result is Object: a subclass answers its own sink type (a ByteConversionSink, a
+    /// StringConversionSink), which Java accepts as an override only of an Object return.
+    public Object startChunkedConversion(Object sink) {
         throw new dart.core.UnsupportedError("This converter does not support chunked conversions: "
                 + "Instance of '" + getClass().getSimpleName() + "'");
     }
@@ -61,12 +63,5 @@ public abstract class Converter<S, T> implements dart.async.StreamTransformer<S,
                 return other.convert(self.convert(input));
             }
         };
-    }
-
-    /// Dart's {@code Sink<T>}: add and close.
-    public interface Sink<T> {
-        void add(T chunk);
-
-        void close();
     }
 }

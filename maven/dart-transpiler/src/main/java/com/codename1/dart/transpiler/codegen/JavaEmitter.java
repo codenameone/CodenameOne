@@ -1791,6 +1791,11 @@ public final class JavaEmitter {
                                                 CharSequence classBody, Ctx ctx) {
         StringBuilder body = new StringBuilder();
         java.util.Set<String> seen = new java.util.HashSet<String>();
+        // A library-private member is not part of the interface outside its library:
+        // typed_data's `_TypedQueue<E, L> implements QueueList<E>` declares a `L _table` of
+        // its own, unrelated to QueueList's `List<E?> _table`. With a foreign implementer
+        // the private accessors stay out of X$I, or the two clash in Java.
+        boolean dropPrivate = hasForeignImplementer(c);
         for (String line : classBody.toString().split("\n")) {
             java.util.regex.Matcher m = PUBLIC_MEMBER.matcher(line);
             if (!m.matches()) {
@@ -1811,6 +1816,9 @@ public final class JavaEmitter {
             if (name.equals(jname) || name.startsWith("$") && !name.startsWith("$op")
                     || "equals".equals(name) || "hashCode".equals(name) || "toString".equals(name)) {
                 // A default method may not override a member of Object.
+                continue;
+            }
+            if (dropPrivate && (name.startsWith("_") || name.startsWith("get$_") || name.startsWith("set$_"))) {
                 continue;
             }
             if (!seen.add(head.replaceAll("\\s+", " "))) {
@@ -1875,6 +1883,41 @@ public final class JavaEmitter {
         }
         return finishClassFile(jname + "$I", "public interface " + jname + "$I" + typeParams,
                 ext.length() == 0 ? null : ext.toString(), null, body, ctx, c.file);
+    }
+
+    /** Whether a class of another library implements c, directly or through a subinterface. */
+    private boolean hasForeignImplementer(ClassDecl c) {
+        Boolean known = foreignImplemented.get(c);
+        if (known == null) {
+            known = computeForeignImplementer(c);
+            foreignImplemented.put(c, known);
+        }
+        return known;
+    }
+
+    private final java.util.Map<ClassDecl, Boolean> foreignImplemented =
+            new java.util.IdentityHashMap<ClassDecl, Boolean>();
+
+    private boolean computeForeignImplementer(ClassDecl c) {
+        List<List<ClassDecl>> groups = new ArrayList<List<ClassDecl>>(program.classesByName.values());
+        groups.add(new ArrayList<ClassDecl>(program.classes.values()));
+        for (List<ClassDecl> same : groups) {
+            for (ClassDecl k : same) {
+                if (k == c || sameLibrary(k, c)) {
+                    continue;
+                }
+                for (TypeRef itf : k.interfaces) {
+                    java.util.Set<ClassDecl> seen = new java.util.HashSet<ClassDecl>();
+                    for (ClassDecl im = superDeclOf(k, itf); im != null && seen.add(im);
+                            im = im.superclass != null ? superDeclOf(im, im.superclass) : null) {
+                        if (im == c) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     /** True when c (or a superclass in the program) applies a dart:collection mixin or base. */
@@ -3673,6 +3716,27 @@ public final class JavaEmitter {
             return "dart.core.DartIterable.ofMixin(" + o.code + ")";
         }
         return o.code;
+    }
+
+    /**
+     * Whether program type t reaches the stub ListMixin/ListBase (applied as a mixin or
+     * extended), so its Java type is dart.collection.ListMixin and not DartList.
+     */
+    private boolean listMixinTyped(TypeRef t) {
+        java.util.Set<String> seen = new java.util.HashSet<String>();
+        for (ClassDecl mc = program.classes.get(t.name); mc != null && seen.add(mc.name);
+                mc = mc.superclass != null ? superDeclOf(mc, mc.superclass) : null) {
+            if (mc.superclass != null && program.classes.get(mc.superclass.name) == null
+                    && (mc.superclass.is("ListBase") || mc.superclass.is("ListMixin"))) {
+                return true;
+            }
+            for (TypeRef mix : mc.mixins) {
+                if ("ListMixin".equals(mix.name) || "ListBase".equals(mix.name)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /** Whether {@code c} or a program superclass applies the stub {@code ListMixin}. */
@@ -6538,7 +6602,7 @@ public final class JavaEmitter {
                 }
                 // Map/Set/Iterable named factory constructors -- dart:core intrinsics
                 // routed to the existing statics on Dart{Map,Set,Iterable}.
-                Out coreFactory = emitCoreCollectionFactory(cc, ctx);
+                Out coreFactory = emitCoreCollectionFactory(cc, expected, ctx);
                 if (coreFactory != null) {
                     return coreFactory;
                 }
@@ -7067,6 +7131,83 @@ public final class JavaEmitter {
             return written;
         }
         return expected.args;
+    }
+
+    /**
+     * The type arguments Dart infers for an unparameterised construction of generic
+     * program class {@code pc} from its context: {@code Iterable<K> get keys =>
+     * Dedup(Joined(..))} where {@code Dedup<T> extends Iterable<T>} makes a
+     * {@code Dedup<K>}, and that in turn types {@code Joined}'s argument. Java's diamond
+     * cannot see through the nested construction, and fails to infer either. Null unless
+     * a supertype of {@code pc} has the context's name and binds every type parameter to
+     * a type that is in scope here.
+     */
+    private static final java.util.Set<String> ITERABLE_BASES = new java.util.HashSet<String>(
+            java.util.Arrays.asList("IterableBase", "IterableMixin", "ListBase", "ListMixin", "SetBase",
+                    "SetMixin", "UnmodifiableListBase"));
+
+    private List<TypeRef> typeArgsFromSupertypeContext(ClassDecl pc, TypeRef expected, Ctx ctx) {
+        if (expected == null || expected.args.isEmpty() || expected.name == null
+                || pc.name.equals(expected.name) || !typeVarsInScope(expected, ctx)) {
+            return null;
+        }
+        for (TypeRef a : expected.args) {
+            if (a == null || isDynamicType(a) || a.is("var") || a.is("Object")) {
+                return null;
+            }
+        }
+        TypeRef self = new TypeRef(pc.name);
+        for (String tp : pc.typeParams) {
+            self.args.add(new TypeRef(tp));
+        }
+        TypeRef sup = asSuper(self, expected.name, 0);
+        if (sup == null || !expected.name.equals(sup.name) || sup.args.size() != expected.args.size()) {
+            sup = null;
+            ClassDecl cur = pc;
+            TypeRef curRef = self;
+            for (int d = 0; d < 8 && cur != null && sup == null; d++) {
+                List<TypeRef> sups = new ArrayList<TypeRef>(cur.interfaces);
+                sups.addAll(cur.mixins);
+                if (cur.superclass != null) {
+                    sups.add(cur.superclass);
+                }
+                List<TypeRef> args = new ArrayList<TypeRef>();
+                for (int i = 0; i < cur.typeParams.size(); i++) {
+                    args.add(i < curRef.args.size() ? curRef.args.get(i) : TypeRef.DYNAMIC);
+                }
+                TypeRef next = null;
+                for (TypeRef st : sups) {
+                    TypeRef bound = substTypeParams(st, cur.typeParams, args);
+                    if (expected.is("Iterable") && bound.args.size() == 1 && ITERABLE_BASES.contains(bound.name)) {
+                        // `extends Iterable<T>` is lowered to the IterableBase mixin.
+                        bound = TypeRef.of("Iterable", bound.arg(0));
+                    }
+                    if (expected.name.equals(bound.name)) {
+                        sup = bound;
+                        break;
+                    }
+                    if (next == null && stubs.classes.containsKey(bound.name)) {
+                        next = bound;
+                    }
+                }
+                curRef = next;
+                cur = next == null ? null : stubs.classes.get(next.name);
+            }
+        }
+        if (sup == null || sup.args.size() != expected.args.size()) {
+            return null;
+        }
+        Map<String, TypeRef> m = new LinkedHashMap<String, TypeRef>();
+        unifyTypeVars(sup, expected, pc.typeParams, m);
+        List<TypeRef> out = new ArrayList<TypeRef>();
+        for (String tp : pc.typeParams) {
+            TypeRef b = m.get(tp);
+            if (b == null) {
+                return null;
+            }
+            out.add(b);
+        }
+        return out;
     }
 
     private boolean isProgramClassDecl(ClassDecl c) {
@@ -8031,6 +8172,12 @@ public final class JavaEmitter {
     private Out emitListLit(ListLit l, TypeRef expected, Ctx ctx) {
         ctx.importClass("dart.core.DartList");
         TypeRef elem = l.elementType;
+        if (expected != null && expected.args.isEmpty() && isTypeVariable(expected, ctx)
+                && !typeVarsInScope(expected, ctx)) {
+            // A stub parameter's own type variable left unbound (`Sink<T>.add(T)`): no
+            // context, so the literal is typed from its elements.
+            expected = null;
+        }
         // An Iterable context types the literal too (`addEntries([MapEntry('n', 1)])` into
         // an Iterable<MapEntry<String, Object>> is a List<MapEntry<String, Object>>).
         if (elem == null && expected != null && expected.is("List") && !expected.args.isEmpty()) {
@@ -8198,6 +8345,59 @@ public final class JavaEmitter {
         }
         if (e instanceof Ident) {
             return inferExprTypeQuiet(e, ctx);
+        }
+        if (e instanceof ParenExpr) {
+            return elementTypeQuiet(((ParenExpr) e).inner, ctx);
+        }
+        if (e instanceof Binary) {
+            // Arithmetic over operands typed here (`b * 2`, `i + 0.5`): int with int stays
+            // int (but `/` is a double), and a double operand makes a double.
+            Binary b = (Binary) e;
+            String op = b.op;
+            if (!("+".equals(op) || "-".equals(op) || "*".equals(op) || "/".equals(op)
+                    || "~/".equals(op) || "%".equals(op))) {
+                return null;
+            }
+            TypeRef l = elementTypeQuiet(b.left, ctx);
+            TypeRef r = elementTypeQuiet(b.right, ctx);
+            if (l == null || r == null || l.nullable || r.nullable) {
+                return null;
+            }
+            if ("+".equals(op) && l.is("String") && r.is("String")) {
+                return TypeRef.STRING;
+            }
+            boolean li = l.is("int");
+            boolean ri = r.is("int");
+            boolean ld = l.is("double");
+            boolean rd = r.is("double");
+            if (!(li || ld) || !(ri || rd)) {
+                return null;
+            }
+            if ("~/".equals(op)) {
+                return TypeRef.INT;
+            }
+            return "/".equals(op) || ld || rd ? TypeRef.DOUBLE : TypeRef.INT;
+        }
+        if (e instanceof ForElement && ((ForElement) e).varName != null && ((ForElement) e).pattern == null) {
+            // `[for (final b in bytes) b * 2]` with no context: the element is what the
+            // body yields with the loop variable bound to the iterable's element. Left
+            // unknown, the list was a List<dynamic> where a List<int> was required.
+            ForElement f = (ForElement) e;
+            TypeRef it = inferExprTypeQuiet(f.iterable, ctx);
+            TypeRef et = f.varType != null && !f.varType.is("var") ? f.varType
+                    : it != null && (it.is("List") || it.is("Iterable") || it.is("Set")) && it.args.size() == 1
+                    ? it.arg(0) : null;
+            if (et == null || isDynamicType(et)) {
+                return null;
+            }
+            ctx.pushScope();
+            try {
+                ctx.declare(f.varName, et);
+                Expr b = f.body;
+                return elementTypeQuiet(b, ctx);
+            } finally {
+                ctx.popScope();
+            }
         }
         return null;
     }
@@ -9747,6 +9947,15 @@ public final class JavaEmitter {
                 return new Out(target.code + ".reversedIterable()", TypeRef.of("Iterable", elem));
             }
         }
+        if (name.equals("reversed") && program.classes.get(tt.name) != null
+                && listMixinTyped(tt)) {
+            // A program ListBase/ListMixin subclass: the runtime mixin spells Dart's
+            // `reversed` reversedIterable(), as DartList does, because java.util.List's own
+            // reversed() (JDK 21) returns a List and the two cannot share one name.
+            TypeRef coll = coreCollectionVia(tt, new java.util.HashSet<ClassDecl>());
+            TypeRef elem = coll != null && !coll.args.isEmpty() ? coll.arg(0) : TypeRef.DYNAMIC;
+            return new Out(target.code + ".reversedIterable()", TypeRef.of("Iterable", elem));
+        }
         if (name.equals("values") && program.classes.get(tt.name) != null
                 && extendsRuntimeMap(program.classes.get(tt.name))) {
             // A program Map subclass declares `values` as valuesIterable() (see emitMethodLikeBody).
@@ -9843,6 +10052,17 @@ public final class JavaEmitter {
                     return new Out("this." + name, fieldType(f, ctx));
                 }
                 TypeRef fSeen = asSeenFrom(fieldType(f, ctx), f, null, pc, tt);
+                if (name.startsWith("_") && !target.code.equals("this") && !target.code.equals("super")
+                        && interfacedClasses().contains(pc) && hasForeignImplementer(pc)) {
+                    // X$I leaves the private accessor out (emitImplicitInterface): read it
+                    // from the class, after checking the receiver really is one.
+                    ctx.importClass("dart.runtime.DartRuntime");
+                    String cls = javaClassName(pc);
+                    String recv = "((" + javaClassType(tt, ctx) + ") DartRuntime.privateReceiver("
+                            + target.code + ", " + cls + ".class, \"" + name + "\"))";
+                    return new Out(primitiveListSeen(recv + ".get$" + name + "()", fieldType(f, ctx), fSeen, ctx),
+                            fSeen);
+                }
                 return new Out(primitiveListSeen(rawReceiver(target.code, pc, tt, fieldType(f, ctx), ctx)
                         + ".get$" + name + "()", fieldType(f, ctx), fSeen, ctx), fSeen);
             }
@@ -13685,7 +13905,14 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         // constructor of program class
         ClassDecl pc = program.classes.get(n);
         if (pc != null) {
-            return emitCtorCall(n, inferredWitnessTypeArgs(pc, c.typeArgs, expected), c.args, c, ctx);
+            List<TypeRef> ta = inferredWitnessTypeArgs(pc, c.typeArgs, expected); 
+            if ((ta == null || ta.isEmpty()) && !pc.typeParams.isEmpty()) {
+                List<TypeRef> fromCtx = typeArgsFromSupertypeContext(pc, expected, ctx);
+                if (fromCtx != null) {
+                    ta = fromCtx;
+                }
+            }
+            return emitCtorCall(n, ta, c.args, c, ctx);
         }
         // constructor of stub class
         if (stubs.isStubClass(n)) {
@@ -15653,7 +15880,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         return null;
     }
 
-    private Out emitCoreCollectionFactory(CtorCall cc, Ctx ctx) {
+    private Out emitCoreCollectionFactory(CtorCall cc, TypeRef expected, Ctx ctx) {
         String name = cc.type.name;
         String ctor = cc.ctorName;
         List<Expr> pos = cc.args.positional;
@@ -15668,7 +15895,30 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 return new Out("DartMap" + witness + "unmodifiable(" + src + ")", cc.type);
             }
             if (ctor.equals("of") || ctor.equals("from") || ctor.equals("unmodifiable")) {
-                String src = emitExpr(pos.get(0), null, ctx).code;
+                Out srcO = emitExpr(pos.get(0), null, ctx);
+                String src = srcO.code;
+                if (cc.type.args.isEmpty()) {
+                    // `Map.of(m)` / `Map.from(m)` with no type arguments: Dart infers K and V
+                    // from the context type first, and (for `of`, whose parameter is
+                    // Map<K, V>) from the argument otherwise. Typing the copy <Object, Object>
+                    // made it unassignable to a Map<Object, E> field and left an inferred
+                    // field dynamic.
+                    TypeRef from = expected != null && expected.is("Map") && expected.args.size() == 2
+                            ? expected
+                            : ctor.equals("of") && srcO.type != null && srcO.type.is("Map")
+                                    && srcO.type.args.size() == 2 ? srcO.type : null;
+                    if (from != null) {
+                        TypeRef typed = new TypeRef("Map");
+                        typed.nullable = cc.type.nullable;
+                        typed.args.add(from.arg(0));
+                        typed.args.add(from.arg(1));
+                        if (!isPrimitiveLongMap(typed)) {
+                            String w = ".<" + javaType(from.arg(0), true, ctx) + ", "
+                                    + javaType(from.arg(1), true, ctx) + ">";
+                            return new Out("DartMap" + w + "from(" + src + ")", typed);
+                        }
+                    }
+                }
                 if (isPrimitiveLongMap(cc.type)) {
                     ctx.importClass("dart.core.DartLongMap");
                     return new Out("DartLongMap.from(" + src + ")", cc.type);
@@ -16363,7 +16613,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                         sb.append(handler);
                     } else {
                         Out o = emitExpr(arg, runtimeFnSlot ? null : pt, ctx);
-                        sb.append(coerce(o, pt, ctx));
+                        sb.append(ct.file == STUB_ARGS ? rawStreamSubclassArg(o, pt, ctx) : coerce(o, pt, ctx));
                     }
                 } else if (p.defaultValue != null) {
                     sb.append(coerce(emitDefaultValue(p, pt, owner, ctx), pt, ctx));
@@ -16409,6 +16659,47 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         }
         reportUnknownNamedArgs(ct, owner, args);
         return sb.toString();
+    }
+
+    /**
+     * A program class extending Stream ({@code class Bytes extends StreamView<List<int>>})
+     * handed to a runtime stub's Stream parameter ({@code decoder.bind(this)}): the runtime
+     * often declares that parameter {@code Stream<Object>}, which Java's invariant generics
+     * refuse a {@code Stream<DartLongList>} for, though Dart's covariant ones accept it.
+     * Passed raw, the call is an unchecked conversion and the elements are what they are.
+     */
+    private String rawStreamSubclassArg(Out o, TypeRef pt, Ctx ctx) {
+        String code = coerce(o, pt, ctx);
+        if (pt != null && pt.is("Stream") && o.type != null && o.type.name != null && !o.type.is("Stream")
+                && code.equals(o.code) && program.classes.containsKey(o.type.name)
+                && asSuperNamed(o.type, "Stream")) {
+            return "(dart.async.Stream) " + code;
+        }
+        return code;
+    }
+
+    /** Whether program class type {@code t} has {@code name} among its supertypes. */
+    private boolean asSuperNamed(TypeRef t, String name) {
+        TypeRef cur = t;
+        for (int depth = 0; cur != null && depth < 10; depth++) {
+            if (name.equals(cur.name)) {
+                return true;
+            }
+            ClassDecl c = program.classes.get(cur.name);
+            if (c == null) {
+                c = stubs.classes.get(cur.name);
+            }
+            if (c == null) {
+                return false;
+            }
+            for (TypeRef i : c.interfaces) {
+                if (name.equals(i.name)) {
+                    return true;
+                }
+            }
+            cur = c.superclass;
+        }
+        return false;
     }
 
     /**
@@ -17244,6 +17535,12 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 bound = inferTypeParamFromArgs(typeParams.get(i), params, c.args, ctx);
             }
             if (bound == null) {
+                bound = inferTypeParamFromLambdaParams(typeParams.get(i), params, c.args);
+            }
+            if (bound == null && returnsTypeParamOnly(typeParams.get(i), params)) {
+                bound = TypeRef.DYNAMIC;
+            }
+            if (bound == null) {
                 if (!triedClosure) {
                     fromClosure = inferClosureArgReturnType(c);
                     triedClosure = true;
@@ -17253,6 +17550,61 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             subst.put(typeParams.get(i), bound);
         }
         return substTypeVars(t, subst);
+    }
+
+    /**
+     * {@code p} read off a closure literal's annotated parameter where the callee's
+     * parameter is a function type taking {@code p} at that position
+     * ({@code bindUnaryCallback<R, T>(R Function(T))} called with {@code (int x) => ..}).
+     */
+    private static TypeRef inferTypeParamFromLambdaParams(String p, List<Param> params, Args args) {
+        int pi = 0;
+        for (Ast.Param prm : params) {
+            if (prm.named) {
+                continue;
+            }
+            if (pi >= args.positional.size()) {
+                break;
+            }
+            Expr arg = args.positional.get(pi++);
+            if (!(arg instanceof Lambda) || prm.type == null || prm.type.funcParams == null) {
+                continue;
+            }
+            Lambda l = (Lambda) arg;
+            for (int j = 0; j < prm.type.funcParams.size() && j < l.params.size(); j++) {
+                TypeRef fp = prm.type.funcParams.get(j);
+                TypeRef lt = l.params.get(j).type;
+                if (fp != null && fp.args.isEmpty() && fp.funcParams == null && p.equals(fp.name)
+                        && lt != null && !lt.is("var") && !lt.is("dynamic")) {
+                    return lt;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Whether {@code p} appears in a function-typed parameter only as one of that
+     * function's parameters, never as its result: the closure's return type is then
+     * not what binds it, and dynamic is the honest answer when nothing else does.
+     */
+    private static boolean returnsTypeParamOnly(String p, List<Param> params) {
+        boolean asParam = false;
+        for (Ast.Param prm : params) {
+            TypeRef t = prm.type;
+            if (t == null || t.funcParams == null) {
+                continue;
+            }
+            if (t.funcReturn != null && t.funcReturn.args.isEmpty() && p.equals(t.funcReturn.name)) {
+                return false;
+            }
+            for (TypeRef fp : t.funcParams) {
+                if (fp != null && p.equals(fp.name)) {
+                    asParam = true;
+                }
+            }
+        }
+        return asParam;
     }
 
     /**
@@ -17361,6 +17713,18 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
     private boolean mentionsAnyTypeParam(TypeRef t, List<String> params) {
         if (t == null) {
             return false;
+        }
+        if (t.funcParams != null || t.funcReturn != null) {
+            if (mentionsAnyTypeParam(t.funcReturn, params)) {
+                return true;
+            }
+            if (t.funcParams != null) {
+                for (TypeRef a : t.funcParams) {
+                    if (mentionsAnyTypeParam(a, params)) {
+                        return true;
+                    }
+                }
+            }
         }
         if (t.args.isEmpty()) {
             return params.contains(t.name);
@@ -18599,6 +18963,34 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             }
             cls = cc.type.name;
             typeArgs = cc.type.args;
+            // dart:async's controllers, `final _events = StreamController<E>.broadcast()`:
+            // a factory, not a declared constructor, but the type is the one written.
+            if (cc.ctorName != null && cc.type.args.size() == 1
+                    && (cls.equals("StreamController") && cc.ctorName.equals("broadcast")
+                        || cls.equals("StreamController") && cc.ctorName.equals("sync"))
+                    && !program.classes.containsKey(cls)) {
+                return TypeRef.of(cls, cc.type.args.get(0));
+            }
+            // `final m = Map.of(<String, int>{...})` / `Map<K, V>.from(src)`: the copy is
+            // typed by the written arguments, else (`of` only, whose parameter is
+            // Map<K, V>) by a literal argument's own type.
+            if (cc.ctorName != null && cls.equals("Map") && !program.classes.containsKey(cls)
+                    && (cc.ctorName.equals("of") || cc.ctorName.equals("from"))) {
+                if (cc.type.args.size() == 2) {
+                    return TypeRef.of("Map", cc.type.args.get(0), cc.type.args.get(1));
+                }
+                if (cc.ctorName.equals("of") && cc.args.positional.size() == 1) {
+                    Expr a = cc.args.positional.get(0);
+                    if (a instanceof MapLit && ((MapLit) a).keyType != null && ((MapLit) a).valueType != null) {
+                        return TypeRef.of("Map", ((MapLit) a).keyType, ((MapLit) a).valueType);
+                    }
+                    TypeRef lit = untypedLiteralType(a, ctx);
+                    if (lit != null && lit.is("Map")) {
+                        return lit;
+                    }
+                }
+                return null;
+            }
             if (cc.ctorName != null && !hasNamedCtor(cls, cc.ctorName)) {
                 return null;
             }
@@ -18614,6 +19006,17 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 }
                 cls = c.name;
                 typeArgs = c.typeArgs;
+            } else if (c.target instanceof Ident && "Map".equals(((Ident) c.target).name)
+                    && "of".equals(c.name) && c.typeArgs.isEmpty() && c.args.positional.size() == 1
+                    && c.args.named.isEmpty() && !program.classes.containsKey("Map")) {
+                // `final m = Map.of(<String, int>{...})`: Map.of's parameter is Map<K, V>,
+                // so a literal argument types the copy.
+                Expr a = c.args.positional.get(0);
+                if (a instanceof MapLit && ((MapLit) a).keyType != null && ((MapLit) a).valueType != null) {
+                    return TypeRef.of("Map", ((MapLit) a).keyType, ((MapLit) a).valueType);
+                }
+                TypeRef lit = untypedLiteralType(a, ctx);
+                return lit != null && lit.is("Map") ? lit : null;
             } else if (c.target instanceof Ident && c.typeArgs.isEmpty()
                     && hasNamedCtor(((Ident) c.target).name, c.name)) {
                 cls = ((Ident) c.target).name;
@@ -20229,6 +20632,27 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
     private TypeRef substTypeVars(TypeRef t, java.util.Map<String, TypeRef> subst) {
         if (t == null || subst.isEmpty()) {
             return t;
+        }
+        if (t.funcParams != null || t.funcReturn != null) {
+            // An inline function type (`R Function(T)` of Zone.bindUnaryCallback): its
+            // signature carries the variables, not its (empty) type arguments.
+            TypeRef f = new TypeRef(t.name);
+            f.nullable = t.nullable;
+            f.line = t.line;
+            f.col = t.col;
+            for (TypeRef a : t.args) {
+                f.args.add(substTypeVars(a, subst));
+            }
+            if (t.funcParams != null) {
+                f.funcParams = new java.util.ArrayList<TypeRef>();
+                for (TypeRef a : t.funcParams) {
+                    f.funcParams.add(substTypeVars(a, subst));
+                }
+            }
+            f.funcReturn = substTypeVars(t.funcReturn, subst);
+            f.funcRequired = t.funcRequired;
+            f.funcNamed = t.funcNamed;
+            return f;
         }
         if (t.args.isEmpty()) {
             TypeRef mapped = subst.get(t.name);

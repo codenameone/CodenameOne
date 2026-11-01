@@ -62,11 +62,11 @@ Future<void> main() async {
   print(text);
   print((codec.decode(text) as Map)['a']);
 
-  final String Function() f = Zone.current.bindCallback(() => 'bound');
+  final f = Zone.current.bindCallback(() => 'bound');
   print(f());
-  final int Function(int) g = Zone.current.bindUnaryCallback((int x) => x + 1);
+  final g = Zone.current.bindUnaryCallback((int x) => x + 1);
   print(g(41));
-  final int Function(int, int) h = Zone.current.bindBinaryCallback((int a, int b) => a * b);
+  final h = Zone.current.bindBinaryCallback((int a, int b) => a * b);
   print(h(6, 7));
 
   Doubled(Stream.fromIterable([1, 2, 3])).listen((int v) => print('view $v'));

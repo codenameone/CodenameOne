@@ -59,7 +59,7 @@ Future<void> main() async {
   var runs = 0;
   var registered = 0;
   final r = runZoned(() {
-    final String Function() cb = Zone.current.bindCallback(() => 'bound ${tag()}');
+    final cb = Zone.current.bindCallback(() => 'bound ${tag()}');
     return cb();
   }, zoneValues: {#tag: 'R'}, zoneSpecification: ZoneSpecification(
       run: <R>(Zone self, ZoneDelegate parent, Zone zone, R Function() f) {
