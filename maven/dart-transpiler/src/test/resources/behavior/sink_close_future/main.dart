@@ -68,4 +68,14 @@ Future<void> main() async {
   print(await lg.close());
   feed(lg);
   print(lg.log);
+  await dynamicClose();
+}
+
+// A dynamic receiver still reaches the future, not the void bridge.
+Future<void> dynamicClose() async {
+  dynamic d = Group();
+  d.add('dyn');
+  print(await d.close());
+  final Object o = LoudGroup();
+  print(await (o as dynamic).close());
 }

@@ -2931,7 +2931,10 @@ public final class JavaEmitter {
                 args.append(cast);
             }
             TypeRef rt = m.returnType == null ? TypeRef.DYNAMIC : m.returnType;
-            String invoke = "this." + javaMethodName(m.name) + "(" + args + ")";
+            // A `Future close()` renamed to close$future: its void close() bridge would answer
+            // null, while `(s as dynamic).close()` must still answer the Future.
+            boolean futureClose = isFutureSinkClose(c, m);
+            String invoke = "this." + (futureClose ? FUTURE_SINK_CLOSE : javaMethodName(m.name)) + "(" + args + ")";
             call.append("            ").append(DYN_CASE).append("case \"").append(m.name).append("\": ");
             // Dart checks a dynamic call's shape before running the method: a missing
             // required argument, an extra positional one or an unknown name is a
@@ -2953,7 +2956,7 @@ public final class JavaEmitter {
                     .append(positional).append(", ")
                     .append(named.length() == 0 ? "null" : "new String[] {" + named + "}").append(", ")
                     .append(requiredNamed.length() == 0 ? "null" : "new String[] {" + requiredNamed + "}").append("); ");
-            if (rt.is("void") || overridesVoid(c, m.name)) {
+            if (!futureClose && (rt.is("void") || overridesVoid(c, m.name))) {
                 call.append(invoke).append("; return null;\n");
             } else {
                 call.append("return ").append(invoke).append(";\n");
@@ -4152,6 +4155,29 @@ public final class JavaEmitter {
      * {@code (Object, StackTrace)} is an overload of neither, so a caller holding the
      * interface would never reach it.
      */
+    /**
+     * The function type of a tear-off of instance method m seen through receiver type tt,
+     * so a slot with no functional interface (Object, as in Function.apply) can cast the
+     * method reference to one. A generic method, or one with an untyped parameter or
+     * return, stays a plain Function as before.
+     */
+    private TypeRef tearOffType(MethodDecl m, ClassDecl pc, TypeRef tt) {
+        TypeRef f = new TypeRef("Function");
+        if (!m.typeParams.isEmpty() || m.returnType == null || m.params.size() > 5) {
+            return f;
+        }
+        java.util.List<TypeRef> ps = new ArrayList<TypeRef>();
+        for (Param p : m.params) {
+            if (p.named || p.optional || p.type == null || p.type.is("var")) {
+                return f;
+            }
+            ps.add(asSeenFrom(p.type, m, null, pc, tt));
+        }
+        f.funcParams = ps;
+        f.funcReturn = asSeenFrom(m.returnType, m, null, pc, tt);
+        return f;
+    }
+
     /** The Java name of a program {@code Future close()} that implements Dart's void Sink.close. */
     static final String FUTURE_SINK_CLOSE = "close$future";
 
@@ -9465,6 +9491,19 @@ public final class JavaEmitter {
             if (st == null) {
                 st = fieldOfTypedReceiverQuiet(((SpreadElement) e).expr, ctx);
             }
+            if (st == null && se instanceof PropertyGet) {
+                // `[...map.entries]` / keys / values: the view's element type comes from the map's.
+                PropertyGet pg = (PropertyGet) se;
+                TypeRef mt = inferExprTypeQuiet(pg.target, ctx);
+                if (mt != null && mt.is("Map") && mt.args.size() == 2) {
+                    if (pg.name.equals("entries")) {
+                        return TypeRef.of("MapEntry", mt.arg(0), mt.arg(1));
+                    }
+                    if (pg.name.equals("keys") || pg.name.equals("values")) {
+                        return mt.arg(pg.name.equals("keys") ? 0 : 1);
+                    }
+                }
+            }
             if (st != null && (st.is("List") || st.is("Set") || st.is("Iterable")) && st.args.size() == 1) {
                 return st.arg(0);
             }
@@ -10331,6 +10370,7 @@ public final class JavaEmitter {
         if (program.classes.containsKey(n) || program.enums.containsKey(n)
                 || stubs.isStubClass(n) || stubs.isStubEnum(n)
                 || n.equals("Future") || n.equals("Duration") || n.equals("Iterable")
+                || (n.equals("Function") && ctx.lookup(n) == null)
                 || CORE_STATIC_RECEIVERS.contains(n)) {
             TypeRef ref = classRef(n);
             if (prefix != null && program.classes.containsKey(n)) {
@@ -11360,7 +11400,7 @@ public final class JavaEmitter {
                     }
                     return new Out(rt + "::" + name, new TypeRef("Function"));
                 }
-                return new Out(target.code + "::" + name, new TypeRef("Function"));
+                return new Out(target.code + "::" + name, tearOffType(tm, pc, tt));
             }
         }
         // stub class member (walk supers)
@@ -15075,6 +15115,26 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
     private Out emitCallWithExpected(Call c, TypeRef expected, Ctx ctx) {
         // closure value invocation: f(...) where f is a local of Function type
         if (c.name == null && c.target != null) {
+            Expr callee = c.target;
+            while (callee instanceof ParenExpr) {
+                callee = ((ParenExpr) callee).inner;
+            }
+            if (callee instanceof Lambda) {
+                // A closure invoked in place, `(() { ... })()`: Java accepts a lambda only
+                // where a functional interface is expected, so it is bound to its own SAM,
+                // whose result is the type the call site expects (a dynamic one otherwise).
+                Lambda l = (Lambda) callee;
+                TypeRef own = new TypeRef("Function");
+                own.funcParams = new ArrayList<TypeRef>();
+                for (Param p : l.params) {
+                    own.funcParams.add(p.type == null || p.type.is("var") ? TypeRef.DYNAMIC : p.type);
+                }
+                own.funcReturn = expected == null || expected.is("void") ? TypeRef.DYNAMIC : expected;
+                Out lam = emitLambda(l, own, ctx);
+                String code = lam.code.startsWith("((") ? lam.code
+                        : "((" + javaType(own, false, ctx) + ") " + lam.code + ")";
+                return new Out(fnCall(code, own, c.args, ctx), own.funcReturn);
+            }
             Out target = emitExpr(c.target, null, ctx);
             if (target.type == null || target.type.is("dynamic") || target.type.is("Object")) {
                 // `(f)()` on a dynamic value: no functional interface to call through.
@@ -15686,6 +15746,25 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                         ? ", " + emitExpr(c.args.positional.get(1), new TypeRef("IndexedGenerator"), ctx).code : "";
                 return new Out("DartIterable.<Object>generate(" + count + gen + ")",
                         TypeRef.of("Iterable", TypeRef.DYNAMIC));
+            }
+            // Function.apply(f, positional, [named]): the function value is held as a
+            // Function, so a tear-off or closure takes its canonical Funcs shape, and the
+            // runtime spreads the list over it as a dynamic call would.
+            if (cls.equals("Function") && n.equals("apply") && !program.classes.containsKey("Function")
+                    && c.args.positional.size() >= 1 && c.args.positional.size() <= 3) {
+                Out f = emitExpr(c.args.positional.get(0), new TypeRef("Function"), ctx);
+                if (f.type != null && f.type.funcParams != null && f.code.contains("::")
+                        && leadingFuncsCast(f.code) == null) {
+                    // A bare method reference (`c.bump`, `print`) has no target type in an
+                    // Object slot; it takes the functional interface of its own signature.
+                    f = new Out("((" + javaType(f.type, true, ctx) + ") " + f.code + ")", f.type);
+                }
+                String argList = c.args.positional.size() > 1
+                        ? boxIfPrimitive(emitExpr(c.args.positional.get(1), null, ctx), ctx) : "null";
+                String namedMap = c.args.positional.size() > 2
+                        ? boxIfPrimitive(emitExpr(c.args.positional.get(2), null, ctx), ctx) : "null";
+                return new Out("dart.runtime.Dyn.apply(" + boxIfPrimitive(f, ctx) + ", " + argList + ", "
+                        + namedMap + ")", TypeRef.DYNAMIC);
             }
             Out coreStatic = emitCoreStaticCall(cls, c, ctx);
             if (coreStatic != null) {
@@ -20035,6 +20114,31 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
      * reads it per call where the tear-off read it once. Any other expression is returned
      * as it is.
      */
+    /**
+     * A name, {@code this}, or a chain of property reads over one, with any {@code !} on
+     * the way ({@code _controller.local.sink}): a receiver the closure built for a tear-off
+     * may read again on each call. Dart reads it once, at the tear-off; reading it per
+     * call differs only for a property that changes between the two, and a tear-off's
+     * receiver chain (a controller's sink, a completer field) is not one that does. A call
+     * or an index is never re-run: its tear-off keeps the method reference.
+     */
+    private static boolean isPropertyPath(Expr e) {
+        while (true) {
+            if (e instanceof Ident || e instanceof ThisExpr) {
+                return true;
+            }
+            if (e instanceof PropertyGet && !((PropertyGet) e).nullAware) {
+                e = ((PropertyGet) e).target;
+            } else if (e instanceof NotNullAssert) {
+                e = ((NotNullAssert) e).operand;
+            } else if (e instanceof ParenExpr) {
+                e = ((ParenExpr) e).inner;
+            } else {
+                return false;
+            }
+        }
+    }
+
     private Expr tearOffAsErrorLambda(Expr e, Ctx ctx) {
         return tearOffAsLambda(e, -1, ctx);
     }
@@ -20046,7 +20150,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         if (e instanceof PropertyGet && !((PropertyGet) e).nullAware) {
             recv = ((PropertyGet) e).target;
             name = ((PropertyGet) e).name;
-            if (!(recv instanceof Ident || recv instanceof ThisExpr)) {
+            if (!isPropertyPath(recv)) {
                 return e;
             }
         } else if (e instanceof Ident && ((Ident) e).typeArgs == null) {
@@ -22350,6 +22454,13 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         if (o.type != null && o.type.is("FutureOr") && !isDynamicType(target) && !target.is("void")
                 && !target.is("Future") && target.funcReturn == null
                 && (isFullyConcrete(target) || classTypeVarInScope(target, ctx))) {
+            return "(" + javaType(boxType(copyNonNull(target)), true, ctx) + ") (Object) " + paren(o.code);
+        }
+        // A Future reaching a bare type-variable slot: the slot is Dart's FutureOr<T>, erased
+        // to T in Java (`completer.complete(Future.sync(computation))`), and the runtime
+        // adopts a Future it is completed with. Dart admits nothing else there.
+        if (o.type != null && o.type.is("Future") && target.args.isEmpty() && target.funcReturn == null
+                && !isFullyConcrete(target) && classTypeVarInScope(target, ctx)) {
             return "(" + javaType(boxType(copyNonNull(target)), true, ctx) + ") (Object) " + paren(o.code);
         }
         return o.code;

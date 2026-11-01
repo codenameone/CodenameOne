@@ -5,3 +5,5 @@ then closed 3
 [a, closing, closing, via sink, closing]
 closed 2
 [loud, closing, via sink, loud, closing]
+closed 2
+closed 2

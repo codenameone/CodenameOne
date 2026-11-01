@@ -688,6 +688,33 @@ public final class Dyn {
                 || f instanceof Funcs.VoidFunc3 || f instanceof Funcs.VoidFunc4 || f instanceof Funcs.VoidFunc5;
     }
 
+    /// Dart's {@code Function.apply(f, positional, named)}. The positional list is spread
+    /// over the function as {@link #invoke} does. Function values are held in their
+    /// canonical positional shape, which keeps no parameter names, so named arguments
+    /// cannot be matched to anything: a non-empty map is refused rather than dropped.
+    @SuppressWarnings("unchecked")
+    public static Object apply(Object f, Object positional, Object named) {
+        if (named instanceof Map && !((Map<Object, Object>) named).isEmpty()) {
+            throw new dart.core.UnsupportedError(
+                    "Function.apply with named arguments is not supported: function values keep no parameter names");
+        }
+        Object[] a = NONE;
+        if (positional instanceof java.util.Collection) {
+            a = ((java.util.Collection<Object>) positional).toArray();
+        } else if (positional instanceof Iterable) {
+            java.util.ArrayList<Object> l = new java.util.ArrayList<Object>();
+            for (Object o : (Iterable<Object>) positional) {
+                l.add(o);
+            }
+            a = l.toArray();
+        }
+        if (f instanceof DynamicObject) {
+            // A callable object: Function.apply reaches its call method.
+            return call(f, "call", a, null);
+        }
+        return invoke(f, a);
+    }
+
     /** Calls a function value whose static type is dynamic or Function. */
     @SuppressWarnings({"unchecked", "rawtypes"})
     public static Object invoke(Object f, Object... a) {

@@ -279,7 +279,7 @@ abstract class HttpHeaders {
   external void remove(String name, Object value);
   external void removeAll(String name);
   external void clear();
-  external void forEach(Object action);
+  external void forEach(void Function(String name, List<String> values) action);
   external ContentType? get contentType;
   external set contentType(ContentType? type);
   external int get contentLength;
