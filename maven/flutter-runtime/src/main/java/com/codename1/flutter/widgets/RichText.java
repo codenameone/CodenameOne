@@ -37,6 +37,26 @@ public class RichText extends Widget {
 
     private TextSpan text;
     private TextAlign textAlign;
+    private com.codename1.flutter.TextOverflow overflow;
+    private com.codename1.flutter.TextDirection textDirection;
+
+    /** How overflowing text is shown; Flutter's default is {@code TextOverflow.clip}. */
+    public void overflow(com.codename1.flutter.TextOverflow v) {
+        this.overflow = v;
+    }
+
+    public com.codename1.flutter.TextOverflow overflow() {
+        return overflow == null ? com.codename1.flutter.TextOverflow.clip : overflow;
+    }
+
+    /** The direction the text runs in, or null to follow the ambient Directionality. */
+    public void textDirection(com.codename1.flutter.TextDirection v) {
+        this.textDirection = v;
+    }
+
+    public com.codename1.flutter.TextDirection textDirection() {
+        return textDirection;
+    }
 
     public void text(TextSpan v) {
         this.text = v;

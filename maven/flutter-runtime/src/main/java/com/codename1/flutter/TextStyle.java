@@ -36,6 +36,52 @@ public class TextStyle {
     private FontWeight fontWeight;
     private Color color;
     private String fontFamily;
+    private Boolean inherit;
+    private FontStyle fontStyle;
+
+    /** Upright or italic glyphs. */
+    public void fontStyle(FontStyle v) {
+        this.fontStyle = v;
+    }
+
+    public FontStyle fontStyle() {
+        return fontStyle;
+    }
+    private String fontPackage;
+    private Paint foreground;
+
+    /**
+     * Whether null properties are taken from the ambient style. Flutter's default is
+     * true; a style with false (an icon's glyph style) stands on its own.
+     */
+    public void inherit(boolean v) {
+        this.inherit = v;
+    }
+
+    public boolean inherit() {
+        return inherit == null || inherit.booleanValue();
+    }
+
+    /** Dart's {@code package}: the package whose bundled font {@code fontFamily} names. */
+    public void package_(String v) {
+        this.fontPackage = v;
+    }
+
+    public String package_() {
+        return fontPackage;
+    }
+
+    /**
+     * The paint the glyphs are drawn with. Flutter forbids both it and {@code color};
+     * when only the paint is given, its color is the text color the renderers read.
+     */
+    public void foreground(Paint v) {
+        this.foreground = v;
+    }
+
+    public Paint foreground() {
+        return foreground;
+    }
     private Double letterSpacing;
     private Double height;
     private TextDecoration decoration;
@@ -216,6 +262,9 @@ public class TextStyle {
     }
 
     public Color getColor() {
+        if (color == null && foreground != null) {
+            return foreground.color();
+        }
         return color;
     }
 
@@ -229,6 +278,10 @@ public class TextStyle {
         t.fontWeight = fontWeight;
         t.color = color;
         t.fontFamily = fontFamily;
+        t.inherit = inherit;
+        t.fontStyle = fontStyle;
+        t.fontPackage = fontPackage;
+        t.foreground = foreground;
         t.letterSpacing = letterSpacing;
         t.height = height;
         t.decoration = decoration;

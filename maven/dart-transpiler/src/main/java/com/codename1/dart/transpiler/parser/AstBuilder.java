@@ -609,11 +609,16 @@ public final class AstBuilder {
             // constant's own name. The first identifier is the constant.
             ed.entries.add(e.identifier(0).getText());
             Args entryArgs = null;
-            if (e.arguments() != null && e.identifier().size() == 1) {
+            String entryCtor = null;
+            if (e.arguments() != null) {
                 entryArgs = new Args();
                 buildArgs(e.arguments(), entryArgs);
+                if (e.identifier().size() == 2) {
+                    entryCtor = e.identifier(1).getText();
+                }
             }
             ed.entryArgs.add(entryArgs);
+            ed.entryCtors.add(entryCtor);
         }
         // Enhanced-enum body: methods / getters, fields and constructors declared after the
         // trailing `;`. These share the class-member grammar, so build them into a throwaway

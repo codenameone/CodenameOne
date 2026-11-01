@@ -93,7 +93,9 @@ public class RichTextRenderElement extends RenderElement {
     private int cn1Align() {
         TextAlign a = richText().getTextAlign();
         boolean rtl = isRtl();
-        if (a == null) {
+        if (a == null || a == TextAlign.justify) {
+            // A label cannot stretch its words; justified text is laid out from the start,
+            // which is where Flutter places a justified paragraph's last line too.
             a = TextAlign.start;
         }
         switch (a) {

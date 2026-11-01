@@ -91,6 +91,12 @@ public class FlexRenderElement extends RenderElement {
         boolean vertical = flex().isVertical();
         MainAxisAlignment mainAlign = flex().getMainAxisAlignment();
         CrossAxisAlignment crossAlign = flex().getCrossAxisAlignment();
+        if (crossAlign == CrossAxisAlignment.baseline) {
+            // Baseline alignment lines children up on their first text baseline. The
+            // peers expose no baseline, so children are placed at the start, which is the
+            // same line for the common case of one font size in the row.
+            crossAlign = CrossAxisAlignment.start;
+        }
         MainAxisSize mainSizeMode = flex().getMainAxisSize();
 
         double maxMain = vertical ? constraints.maxHeight() : constraints.maxWidth();

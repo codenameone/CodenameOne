@@ -220,7 +220,8 @@ public class TextRenderElement extends RenderElement {
         TextAlign a = text().getTextAlign();
         // Flutter's default is TextAlign.start, the right edge under right-to-left text.
         boolean rtl = isRtl();
-        if (a == null && rtl) {
+        if ((a == null && rtl) || a == TextAlign.justify) {
+            // A label cannot stretch its words; justified text is laid out from the start.
             a = TextAlign.start;
         }
         if (a != null) {

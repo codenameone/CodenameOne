@@ -34,7 +34,7 @@ import com.codename1.flutter.Widget;
  */
 public class Icon extends Widget {
 
-    private final IconData icon;
+    private IconData icon;
     private Double size;
     private Color color;
     private String semanticLabel;
@@ -50,6 +50,18 @@ public class Icon extends Widget {
 
     public Icon(IconData icon) {
         this.icon = icon;
+    }
+
+    /**
+     * For a program subclass (`class MyIcon extends Icon { MyIcon(super.icon) }`), whose
+     * super-parameters arrive through the setters rather than this class's constructor.
+     */
+    protected Icon() {
+    }
+
+    /** The glyph, assigned by a subclass's {@code super.icon} parameter. */
+    public void icon(IconData v) {
+        this.icon = v;
     }
 
     public void semanticLabel(String v) {

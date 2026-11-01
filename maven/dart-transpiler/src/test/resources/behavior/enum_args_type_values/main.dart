@@ -25,6 +25,24 @@ enum Named {
   final int rank;
 }
 
+enum Shade {
+  plain('plain'),
+  dark.tinted('dark', 40),
+  light.tinted('light', 10),
+  none.empty();
+
+  const Shade(this.label) : percent = 0;
+  const Shade.tinted(this.label, this.percent);
+  const Shade.empty()
+      : label = '-',
+        percent = -1;
+
+  final String label;
+  final int percent;
+
+  String describe() => '$name:$label:$percent';
+}
+
 class Box<V> {
   String kind() {
     if (V is String) return 'type is a String value';
@@ -33,6 +51,14 @@ class Box<V> {
   }
 
   bool objectTest() => V is Object;
+}
+
+String literalTests() {
+  final parts = <String>[];
+  if (String is Type) parts.add('String is Type');
+  if (int is! String) parts.add('int is! String');
+  parts.add('${List is Object}');
+  return parts.join(', ');
 }
 
 abstract class HasPosition {
@@ -78,6 +104,10 @@ void main() {
   for (final n in Named.values) {
     print('${n.name} ${n.code} ${n.rank}');
   }
+  for (final s in Shade.values) {
+    print('${s.index} ${s.describe()}');
+  }
+  print(literalTests());
   print(Box<String>().kind());
   print(Box<int>().objectTest());
   final t = Tracker();

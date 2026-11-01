@@ -264,6 +264,9 @@ public final class Ast {
         // Per entry, the arguments an enhanced enum passes its unnamed constructor
         // (`boundary('boundary')`), or null when the entry has none.
         public List<Args> entryArgs = new ArrayList<Args>();
+        // Per entry, the named constructor it invokes (`x.named(...)`), or null for the
+        // unnamed one.
+        public List<String> entryCtors = new ArrayList<String>();
         // Dart 2.17 enhanced-enum body members (methods / getters, fields, constructors).
         public List<FieldDecl> fields = new ArrayList<FieldDecl>();
         public List<MethodDecl> methods = new ArrayList<MethodDecl>();

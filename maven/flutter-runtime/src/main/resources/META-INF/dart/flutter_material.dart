@@ -189,13 +189,13 @@ class EdgeInsets extends EdgeInsetsGeometry {
 enum MainAxisAlignment { start, end, center, spaceBetween, spaceAround, spaceEvenly }
 
 @JavaName('com.codename1.flutter.CrossAxisAlignment')
-enum CrossAxisAlignment { start, end, center, stretch }
+enum CrossAxisAlignment { start, end, center, stretch, baseline }
 
 @JavaName('com.codename1.flutter.MainAxisSize')
 enum MainAxisSize { min, max }
 
 @JavaName('com.codename1.flutter.TextAlign')
-enum TextAlign { left, right, center, start, end }
+enum TextAlign { left, right, center, start, end, justify }
 
 @JavaName('com.codename1.flutter.FontWeight')
 abstract class FontWeight {
@@ -217,7 +217,12 @@ class TextStyle {
   external TextStyle({double? fontSize, FontWeight? fontWeight, Color? color, String? fontFamily, double? letterSpacing, double? height,
       TextDecoration? decoration, Color? decorationColor, TextDecorationStyle? decorationStyle, double? decorationThickness,
       List<Shadow>? shadows, Color? backgroundColor, List<FontVariation>? fontVariations, List<Object>? fontFeatures,
-      List<String>? fontFamilyFallback, TextLeadingDistribution? leadingDistribution});
+      List<String>? fontFamilyFallback, TextLeadingDistribution? leadingDistribution,
+      bool inherit = true, String? package, Paint? foreground, FontStyle? fontStyle});
+  external FontStyle? get fontStyle;
+  external bool get inherit;
+  external String? get package;
+  external Paint? get foreground;
   external List<FontVariation>? get fontVariations;
   external List<String>? get fontFamilyFallback;
   external TextLeadingDistribution? get leadingDistribution;
@@ -2468,12 +2473,14 @@ class Icon extends Widget {
 
 @JavaName('com.codename1.flutter.widgets.Column')
 class Column extends Widget {
-  external Column({Key? key, MainAxisAlignment? mainAxisAlignment, CrossAxisAlignment? crossAxisAlignment, MainAxisSize? mainAxisSize, List<Widget> children});
+  external Column({Key? key, MainAxisAlignment? mainAxisAlignment, CrossAxisAlignment? crossAxisAlignment, MainAxisSize? mainAxisSize, TextBaseline? textBaseline, List<Widget> children});
+  external TextBaseline? get textBaseline;
 }
 
 @JavaName('com.codename1.flutter.widgets.Row')
 class Row extends Widget {
-  external Row({Key? key, MainAxisAlignment? mainAxisAlignment, CrossAxisAlignment? crossAxisAlignment, MainAxisSize? mainAxisSize, List<Widget> children});
+  external Row({Key? key, MainAxisAlignment? mainAxisAlignment, CrossAxisAlignment? crossAxisAlignment, MainAxisSize? mainAxisSize, TextBaseline? textBaseline, List<Widget> children});
+  external TextBaseline? get textBaseline;
 }
 
 @JavaName('com.codename1.flutter.widgets.Center')
@@ -2715,7 +2722,8 @@ class GridView extends Widget {
 
 @JavaName('com.codename1.flutter.widgets.SingleChildScrollView')
 class SingleChildScrollView extends Widget {
-  external SingleChildScrollView({Key? key, EdgeInsets? padding, Axis? scrollDirection, Widget? child});
+  external SingleChildScrollView({Key? key, EdgeInsets? padding, Axis? scrollDirection, ScrollController? controller, Widget? child});
+  external ScrollController? get controller;
 }
 
 @JavaName('com.codename1.flutter.widgets.Image')
@@ -3058,7 +3066,10 @@ class Size {
 
 @JavaName('com.codename1.flutter.widgets.RichText')
 class RichText extends Widget {
-  external RichText({Key? key, TextSpan text, TextAlign? textAlign, TextScaler? textScaler});
+  external RichText({Key? key, TextSpan text, TextAlign? textAlign, TextScaler? textScaler,
+      TextOverflow overflow = TextOverflow.clip, TextDirection? textDirection});
+  external TextOverflow get overflow;
+  external TextDirection? get textDirection;
   external InlineSpan get text;
 }
 

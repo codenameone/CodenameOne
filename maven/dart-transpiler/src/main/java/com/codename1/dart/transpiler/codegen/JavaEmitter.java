@@ -500,12 +500,34 @@ public final class JavaEmitter {
             }
         }
         CtorDecl entryCtor = null;
+        java.util.Map<String, CtorDecl> namedEntryCtors = new java.util.HashMap<String, CtorDecl>();
         for (CtorDecl ct : e.ctors) {
-            String ctor = emitCtor(syn, ct, ctx);
+            // A named generative constructor (`const E.named(...)`, used by an entry as
+            // `x.named(...)`) cannot be the marker-constructor-plus-$init$ pair a class gets:
+            // an enum's final fields must be assigned in a Java constructor. It is emitted as
+            // an unnamed one instead, told apart from the others by a leading parameter of a
+            // marker type of its own, which the entry passes as a typed null.
+            String named = ct.isFactory ? null : ct.name;
+            String ctor;
+            if (named != null) {
+                ct.name = null;
+                try {
+                    ctor = emitCtor(syn, ct, ctx);
+                } finally {
+                    ct.name = named;
+                }
+                namedEntryCtors.put(named, ct);
+                body.append("    private static final class $Ctor_").append(named).append(" {\n    }\n");
+            } else {
+                ctor = emitCtor(syn, ct, ctx);
+            }
             // A Java enum constructor may not be public; the constants are its only callers.
             String pub = "    public " + enumJava + "(";
             if (ctor.startsWith(pub)) {
-                ctor = "    private " + enumJava + "(" + ctor.substring(pub.length());
+                String rest = ctor.substring(pub.length());
+                String marker = named == null ? ""
+                        : "$Ctor_" + named + " $named" + (rest.startsWith(")") ? "" : ", ");
+                ctor = "    private " + enumJava + "(" + marker + rest;
             }
             body.append(ctor);
             if (ct.name == null && !ct.isFactory) {
@@ -539,7 +561,15 @@ public final class JavaEmitter {
         String[] entryArgCode = new String[e.entries.size()];
         for (int i = 0; i < entryArgCode.length; i++) {
             Args entryArgs = i < e.entryArgs.size() ? e.entryArgs.get(i) : null;
-            if (entryArgs != null && entryCtor != null) {
+            String entryNamed = i < e.entryCtors.size() ? e.entryCtors.get(i) : null;
+            CtorDecl namedCtor = entryNamed != null ? namedEntryCtors.get(entryNamed) : null;
+            if (entryArgs != null && namedCtor != null) {
+                String canon = canonicalArgs(namedCtor, syn, entryArgs, ctx);
+                entryArgCode[i] = "(($Ctor_" + entryNamed + ") null"
+                        + (canon.isEmpty() ? "" : ", " + canon) + ")";
+            } else if (entryNamed != null) {
+                diags.error(e, "E0406", "Enum entry uses an unknown constructor: " + entryNamed);
+            } else if (entryArgs != null && entryCtor != null) {
                 entryArgCode[i] = "(" + canonicalArgs(entryCtor, syn, entryArgs, ctx) + ")";
             }
         }
@@ -4577,8 +4607,10 @@ public final class JavaEmitter {
         l.body = lf.body;
         l.exprBody = lf.exprBody;
         // Declare the local first so a recursive body can reference the name.
-        String jn = ctx.declareShadowSafe(lf.name, new TypeRef("Function"));
+        // Declared with its real signature, so a call of it is typed by its return type
+        // (`stopAll().whenComplete(...)` binds statically instead of through Dyn).
         TypeRef expected = funcTypeRef(lf.returnType, lf.params);
+        String jn = ctx.declareShadowSafe(lf.name, funcTypeRef(lf.returnType, lf.params));
         if (lf.isSyncStar || lf.isAsyncStar) {
             // A generator's element type comes from its declared Iterable<T>/Stream<T>,
             // which the generator lowering reads from the target's return type.
@@ -6308,7 +6340,33 @@ public final class JavaEmitter {
                 return new Out("(" + cond.code + " ? (Number) " + paren(a.code) + " : (Number) "
                         + paren(b.code) + ")", t);
             }
-            return new Out("(" + cond.code + " ? " + a.code + " : " + b.code + ")", t);
+            // `f == null ? sink.completeError : (Object e, StackTrace s) async {...}` handed
+            // to an Object-erased Function slot: the tear-off arm carries its Funcs cast, the
+            // lambda arm has no target type at all ("lambda expression not expected here").
+            // The lambda takes the tear-off's functional interface.
+            String aCode = a.code;
+            String bCode = b.code;
+            if (c.elseExpr instanceof Lambda && !(c.thenExpr instanceof Lambda)) {
+                String sam = leadingFuncsCast(aCode);
+                if (sam != null) {
+                    bCode = "(" + sam + ") " + bCode;
+                }
+            } else if (c.thenExpr instanceof Lambda && !(c.elseExpr instanceof Lambda)) {
+                String sam = leadingFuncsCast(bCode);
+                if (sam != null) {
+                    aCode = "(" + sam + ") " + aCode;
+                }
+            }
+            // An arm Java types as Object (a dynamic read, an imprecise stub return, a
+            // FutureOr) in a conditional whose slot is a concrete reference type: javac types
+            // the ternary by its arms ("bad type in conditional expression"), so the arm takes
+            // Dart's implicit downcast to the slot here.
+            // With no slot (`final n = last ? chunk.length : 0`) the local is declared with
+            // the conditional's own type, which is then the slot.
+            TypeRef slot = expected != null ? expected : t;
+            aCode = downcastArm(a, aCode, slot, ctx);
+            bCode = downcastArm(b, bCode, slot, ctx);
+            return new Out("(" + cond.code + " ? " + aCode + " : " + bCode + ")", t);
         }
         if (e instanceof NotNullAssert) {
             Out o = emitExpr(((NotNullAssert) e).operand, null, ctx);
@@ -6319,6 +6377,11 @@ public final class JavaEmitter {
         if (e instanceof IsTest) {
             IsTest t = (IsTest) e;
             Out o = emitExpr(t.operand, null, ctx);
+            if (o.type != null && isClassRef(o.type)) {
+                // `String is Type`: a type literal operand is the Type object, its class
+                // literal; emitted bare it was the class name, which javac cannot test.
+                o = new Out(classLiteral(o, ctx), new TypeRef("Type"));
+            }
             String subject = o.code;
             if (o.type != null && !o.type.nullable
                     && (o.type.is("int") || o.type.is("double") || o.type.is("bool"))) {
@@ -10905,8 +10968,14 @@ public final class JavaEmitter {
                 }
                 ctx.writer().raw(rl.lifted);
                 right = rl.out;
-                return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code + ")",
-                        ifNullType(left.type, right.type));
+                // `_court = v ?? _court` with v an untyped closure parameter: its arm takes
+                // the implicit downcast to the slot (see downcastArm).
+                TypeRef nt = ifNullType(left.type, right.type);
+                // Dart types `dynamic ?? Court` as dynamic; javac types the ternary by its arms,
+                // so the dynamic arm is narrowed to the default's type (where it is assigned).
+                TypeRef slot = nt != null && isDynamicType(nt) && right.type != null ? right.type : nt;
+                return new Out("(" + left.code + " != null ? " + downcastArm(left, left.code, slot, ctx) + " : "
+                        + downcastArm(right, right.code, slot, ctx) + ")", nt);
             }
             String tmp = ctx.newTemp();
             if (jt == null) {
@@ -12405,6 +12474,8 @@ public final class JavaEmitter {
             boolean nullTail = sigTypes != null && sigTypes.length > 0
                     && sigTypes[sigTypes.length - 1] != null
                     && (sigTypes[sigTypes.length - 1].is("dynamic")
+                    || sigTypes[sigTypes.length - 1].is("FutureOr")
+                    || sigTypes[sigTypes.length - 1].is("Object")
                     || isTypeVariable(sigTypes[sigTypes.length - 1], ctx))
                     && !returnsValue(l.body);
             boolean outerNullReturn = ctx.bareReturnIsNull;
@@ -12955,7 +13026,20 @@ public final class JavaEmitter {
             }
             if (m != null) {
                 String recv = m.isStatic ? cc.name : "this";
-                String code = recv + "." + n + "(" + withWitnesses(methodWitnessCall(m, c, callExpected(c, ctx), ctx),
+                // An explicit `thenJob<R>(...)` keeps its type arguments: Java cannot infer
+                // R from a lambda argument whose parameters name it.
+                String targs = "";
+                if (c.typeArgs != null && !c.typeArgs.isEmpty() && c.typeArgs.size() == m.typeParams.size()) {
+                    StringBuilder tb = new StringBuilder("<");
+                    for (int i = 0; i < c.typeArgs.size(); i++) {
+                        if (i > 0) {
+                            tb.append(", ");
+                        }
+                        tb.append(javaType(c.typeArgs.get(i), true, ctx));
+                    }
+                    targs = tb.append('>').toString();
+                }
+                String code = recv + "." + targs + n + "(" + withWitnesses(methodWitnessCall(m, c, callExpected(c, ctx), ctx),
                         methodArgs(m.params, c.args, ctx)) + ")";
                 // `T run<T>(T Function() f)`: the result is the method's own T, bound from
                 // the call (explicit type argument, an argument, or the closure's return),
@@ -18606,6 +18690,29 @@ public final class JavaEmitter {
                 && !classTypeVarInScope(target, ctx)) {
             return "(" + javaType(copyNonNull(target), false, ctx) + ") " + o.code;
         }
+        // A function value whose SAM differs from an Object-returning function slot of the
+        // same arity (`Func0<Future<Object>>` into a `FutureOr Function()` slot, `Func0<Object>`):
+        // Dart's function subtyping is covariant in the return, Java generics are not. The
+        // Funcs interfaces erase identically, so the value is retyped through Object.
+        if (o.type != null && o.type.funcParams != null && target.funcParams != null
+                && o.type.funcParams.size() == target.funcParams.size()
+                && o.type.funcReturn != null && !o.type.funcReturn.is("void")
+                && !isTypeVariable(o.type.funcReturn, ctx) && isFullyConcrete(o.type.funcReturn)
+                && target.funcReturn != null && !target.funcReturn.is("void")
+                && (isDynamicType(target.funcReturn) || target.funcReturn.is("Object")
+                        || target.funcReturn.is("FutureOr"))) {
+            String ts = funcSamTypeFromRefs(target.funcParams, target.funcReturn, ctx);
+            String os = funcSamTypeFromRefs(o.type.funcParams, o.type.funcReturn, ctx);
+            // A method reference or lambda is not a value yet: Java types it by the slot.
+            if (!ts.equals(os) && ts.indexOf('<') >= 0 && !o.code.contains("::") && !o.code.contains("->")) {
+                return "(" + ts + ") (Object) " + paren(o.code);
+            }
+        }
+        // A FutureOr<T> promoted to Future (`if (toReturn is Future) toReturn` into a
+        // `<Future<Object?>>[...]` element): the Java value is an Object, cast to the slot.
+        if (o.type != null && o.type.is("FutureOr") && target.is("Future") && isFullyConcrete(target)) {
+            return "(" + javaType(copyNonNull(target), false, ctx) + ") (Object) " + paren(o.code);
+        }
         // A FutureOr<T> is an Object in Java; reaching a T slot (after an `is! Future` test
         // returned early, or a value Dart already knows is not a Future) it is Dart's implicit
         // downcast. A class type variable is in scope only in an instance member.
@@ -18615,6 +18722,46 @@ public final class JavaEmitter {
             return "(" + javaType(boxType(copyNonNull(target)), true, ctx) + ") (Object) " + paren(o.code);
         }
         return o.code;
+    }
+
+    private String downcastArm(Out arm, String code, TypeRef slot, Ctx ctx) {
+        if (slot == null || arm.type == null || isDynamicType(slot) || slot.is("void") || slot.is("Object")
+                || slot.is("FutureOr") || slot.is("Null") || slot.is("Function") || slot.is("num")
+                || slot.funcReturn != null || slot.funcParams != null
+                || "null".equals(code) || code.contains("->") || code.contains("::")
+                || !(isFullyConcrete(slot) || classTypeVarInScope(slot, ctx))) {
+            return code;
+        }
+        boolean erased = isDynamicType(arm.type) || arm.type.is("Object") || arm.type.is("FutureOr");
+        if (!erased) {
+            return code;
+        }
+        return "(" + javaType(boxType(copyNonNull(slot)), true, ctx) + ") (Object) " + paren(code);
+    }
+
+    /**
+     * The functional interface of a leading {@code ((Funcs.X<...>) ...)} cast, or null. Only a
+     * cast whose operand is itself a lambda counts: that is how a tear-off is emitted.
+     */
+    private static String leadingFuncsCast(String code) {
+        if (!code.startsWith("((Funcs.")) {
+            return null;
+        }
+        int depth = 0;
+        for (int i = 2; i < code.length(); i++) {
+            char ch = code.charAt(i);
+            if (ch == '<') {
+                depth++;
+            } else if (ch == '>') {
+                depth--;
+            } else if (ch == ')' && depth == 0) {
+                String sam = code.substring(2, i);
+                return sam.matches("Funcs\\.[A-Za-z0-9]+(<.*>)?") ? sam : null;
+            } else if (ch == '(' || ch == ' ' && depth == 0) {
+                return null;
+            }
+        }
+        return null;
     }
 
     /** {@code T} of the enclosing class, which Java has in scope only in an instance member. */
