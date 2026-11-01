@@ -102,10 +102,14 @@ abstract class Stream<T> {
 
 @JavaName('dart.async.StreamTransformer')
 abstract class StreamTransformer<S, T> {
+  external factory StreamTransformer(
+      StreamSubscription<T> Function(Stream<S> stream, bool cancelOnError) onListen);
   external Stream<T> bind(Stream<S> stream);
-  external static StreamTransformer fromHandlers(
-      {void Function(dynamic, EventSink<dynamic>)? handleData, Function? handleError,
-      void Function(EventSink<dynamic>)? handleDone});
+  // Typed with the class's S and T, which the call's expected type binds
+  // (`stream.transform(StreamTransformer.fromHandlers(handleData: (data, sink) ..))`).
+  external static StreamTransformer<S, T> fromHandlers(
+      {void Function(S, EventSink<T>)? handleData, Function? handleError,
+      void Function(EventSink<T>)? handleDone});
 }
 
 

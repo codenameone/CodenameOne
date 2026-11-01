@@ -5720,6 +5720,13 @@ public final class JavaEmitter {
             } else if (ctx.narrowReturnToInt) {
                 Out o = emitExpr(r.value, null, ctx);
                 w.line("return (int) (" + o.code + ");");
+            } else if (rt == null && ctx.lambdaReturnsVoid) {
+                // `return voidCall();` in a closure bound to a void slot: Dart allows it, Java
+                // does not, so run the expression for its effect and return bare.
+                emitDiscardedValue(r.value, ctx);
+                if (!(stripParens(r.value) instanceof ThrowExpr)) {
+                    w.line("return;");
+                }
             } else {
                 Out o = emitExpr(r.value, rt, ctx);
                 if (rt == null && ctx.lambdaReturns != null) {
@@ -15067,6 +15074,9 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             ctx.asyncLambda = true;
             ctx.importClass("dart.async.Future");
         }
+        boolean savedLambdaVoid = ctx.lambdaReturnsVoid;
+        ctx.lambdaReturnsVoid = !l.isAsync && sigTypes != null && sigTypes.length > 0
+                && sigTypes[sigTypes.length - 1] != null && sigTypes[sigTypes.length - 1].is("void");
         ctx.methodReturnType = lambdaReturn;
         ctx.narrowReturnToInt = false;
         // A break/continue cannot target a loop/switch outside the lambda body.
@@ -15200,6 +15210,14 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 // (List.sort's comparator) cannot box; widen it to Dart's int first.
                 o = new Out("((long) " + o.code + ")", o.type);
             }
+            if (lambdaReturn != null && lambdaReturn.is("Iterable") && o.type != null
+                    && (o.type.is("List") || o.type.is("Set"))) {
+                // `(e) => [e, e * 10]` into an `Iterable<T> Function(E)` slot: the runtime
+                // List/Set is no DartIterable, so the arrow body returns its live view. The
+                // element is left to the SAM when the slot names a type variable this code
+                // cannot spell (the callee's own T).
+                o = new Out(paren(o.code) + ".asIterable()", lambdaReturn);
+            }
             String lifted = ctx.popWriter();
             exprType = o.type;
             lastLambdaVoid = o.type != null && o.type.is("void");
@@ -15245,6 +15263,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         ctx.bareReturnIsNull = outerBareNull;
         ctx.asyncLambda = outerAsyncLambda;
         ctx.methodReturnType = outerReturn;
+        ctx.lambdaReturnsVoid = savedLambdaVoid;
         ctx.narrowReturnToInt = outerNarrowInt;
         // Last, so a lambda nested in this one cannot overwrite what this one yields.
         lastLambdaExprType = exprType;
@@ -16222,8 +16241,22 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                     if (numeric != null) {
                         return numeric;
                     }
-                    return stubCallOut(m, c, stubSimpleName(cls, ctx) + "." + n, ctx,
+                    factoryWitness = null;
+                    factoryWitnessPartial = false;
+                    Ast.MethodDecl boundM = bindStaticFactoryParams(m, sc, c, ctx);
+                    String witness = factoryWitness == null ? "" : factoryWitness;
+                    factoryWitness = null;
+                    boolean raw = factoryWitnessPartial;
+                    factoryWitnessPartial = false;
+                    Out fo = stubCallOut(boundM, c, stubSimpleName(cls, ctx) + "." + witness + n, ctx,
                             bindStaticClassTypeParams(m, sc, c, ctx));
+                    if (raw && !witness.isEmpty()) {
+                        // A variable the context left open was witnessed as Object; seen raw,
+                        // the enclosing generic call infers its own from its target again
+                        // (`transform`'s R from the `Stream<List<T>>` it returns).
+                        fo = new Out("((" + stubSimpleName(cls, ctx) + ") " + fo.code + ")", fo.type);
+                    }
+                    return fo;
                 }
             }
             ClassDecl pc = program.classes.get(cls);
@@ -16651,7 +16684,10 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             return true;
         }
         if (isTypeVariable(t, ctx)) {
-            boolean own = ctx.currentClass != null && ctx.currentClass.typeParams.contains(t.name);
+            boolean own = ctx.currentClass != null && ctx.currentClass.typeParams.contains(t.name)
+                    // an extension member is a static Java method generic in the
+                    // extension's variables too (`static <T> pairs(Stream<T> $self)`)
+                    || ctx.currentExtension != null && ctx.currentExtension.typeParams.contains(t.name);
             return own || (ctx.methodTypeParams != null && ctx.methodTypeParams.contains(t.name));
         }
         for (TypeRef a : t.args) {
@@ -18450,6 +18486,13 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 posArgs.append(zeroValue(p.type));
             }
         }
+        if (ct != null && ct.isFactory && args.named.isEmpty()) {
+            // An unnamed `external factory` on a stub whose Java side is an interface
+            // (StreamTransformer(onListen)): Java cannot `new` it, so the runtime provides
+            // the factory as a static `$create`, the name program factories use.
+            return new Out(simple + "." + ("<>".equals(diamond) ? "" : diamond) + "$create(" + posArgs + ")",
+                    stubResultType);
+        }
         if (args.named.isEmpty()) {
             String created = "new " + simple + diamond + "(" + posArgs + ")";
             String token = actsOnTypeArgument(className) ? providedTypeToken(typeArgs, ctx) : null;
@@ -19516,8 +19559,26 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 continue;
             }
             TypeRef seen = asSeenFrom(p.type, m, m.typeParams, pc, tt);
+            if (seen != null && !m.typeParams.isEmpty() && !typeVarsInScope(seen, ctx)
+                    // only when the receiver bound something: `T Function(String)` of
+                    // `each<T>` keeps its T, which a void arrow body is matched against
+                    && seen.funcParams != null && p.type.funcParams != null
+                    && !String.valueOf(seen.funcParams).equals(String.valueOf(p.type.funcParams))) {
+                // `Iterable<T> Function(E)` of `List<T> flat<T>(...)` on a Box<int>: the
+                // method's own T is the callee's, not the caller's, and must not throw
+                // away the receiver's E = int with it (a closure parameter would read as
+                // the unbound E). The callee's variables read as dynamic; javac infers
+                // them from the argument.
+                java.util.Map<String, TypeRef> own = new java.util.HashMap<String, TypeRef>();
+                for (String tp : m.typeParams) {
+                    own.put(tp, TypeRef.DYNAMIC);
+                }
+                seen = substTypeVars(seen, own);
+            }
+            // A function type prints as plain "Function", so its text says nothing about
+            // whether the substitution changed its parameters.
             if (seen == null || seen == p.type || !typeVarsInScope(seen, ctx)
-                    || seen.toString().equals(p.type.toString())) {
+                    || p.type.funcParams == null && seen.toString().equals(p.type.toString())) {
                 continue;
             }
             if (out == null) {
@@ -19954,6 +20015,110 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
      */
     private TypeRef bindStaticClassTypeParams(Ast.MethodDecl m, Ast.ClassDecl sc, Call c, Ctx ctx) {
         return bindStaticClassTypeParams(m, sc, null, c.args, ctx);
+    }
+
+    /**
+     * A static stub factory whose parameters name its class's type variables, read with
+     * them bound: {@code StreamTransformer.fromHandlers(handleData: (data, sink) {..})}
+     * passed to {@code stream.transform(..)} of a {@code Stream<T>}. Nothing in the
+     * arguments binds S there -- the closure's parameters are untyped -- so the call's
+     * expected type does, as Dart infers it downwards; without it the closure's
+     * {@code data} read as Object where the caller needs T. Answers {@code m} itself
+     * when nothing is bound.
+     */
+    /** The explicit Java type arguments bindStaticFactoryParams found the call needs. */
+    private String factoryWitness;
+    private boolean factoryWitnessPartial;
+
+    private Ast.MethodDecl bindStaticFactoryParams(Ast.MethodDecl m, Ast.ClassDecl sc, Call c, Ctx ctx) {
+        if (sc == null || sc.typeParams.isEmpty() || m.params.isEmpty()) {
+            return m;
+        }
+        TypeRef expected = null;
+        boolean expectedRead = false;
+        java.util.Map<String, TypeRef> subst = new java.util.HashMap<String, TypeRef>();
+        for (String p : sc.typeParams) {
+            if (m.typeParams.contains(p)) {
+                continue;
+            }
+            TypeRef b = cArgsTypeParam(p, sc, null, m, c.args, ctx);
+            if (b == null) {
+                if (!expectedRead) {
+                    expected = callExpected(c, ctx);
+                    expectedRead = true;
+                }
+                b = unifyTypeParam(p, m.returnType, expected);
+            }
+            if (b != null && !isDynamicType(b) && !b.is("var") && typeVarsInScope(b, ctx)) {
+                subst.put(p, b);
+            }
+        }
+        if (subst.isEmpty()) {
+            return m;
+        }
+        boolean fromExpected = expectedRead;
+        for (String p : sc.typeParams) {
+            // What stays unbound (`transform`'s own R) is dynamic, never the class's
+            // variable leaking into the caller, where it names nothing.
+            if (!m.typeParams.contains(p) && !subst.containsKey(p)) {
+                subst.put(p, TypeRef.DYNAMIC);
+                factoryWitnessPartial = true;
+            }
+        }
+        if (fromExpected && m.typeParams.isEmpty() && mentionsAnyTypeParam(m.returnType, sc.typeParams)) {
+            // Bound only by the context, javac cannot do the same: an untyped closure
+            // argument is not pertinent to its inference, and the target is itself a
+            // generic call's parameter. The runtime static declares the class's
+            // variables as its own, in order (`static <S, T> fromHandlers`).
+            StringBuilder w = new StringBuilder("<");
+            for (int i = 0; i < sc.typeParams.size(); i++) {
+                if (i > 0) {
+                    w.append(", ");
+                }
+                w.append(javaType(subst.get(sc.typeParams.get(i)), true, ctx));
+            }
+            factoryWitness = w.append('>').toString();
+        }
+        Ast.MethodDecl q = new Ast.MethodDecl();
+        q.file = m.file;
+        q.line = m.line;
+        q.col = m.col;
+        q.unapplied = m.unapplied;
+        q.returnType = m.returnType;
+        q.name = m.name;
+        q.typeParams = m.typeParams;
+        q.typeParamBounds = m.typeParamBounds;
+        q.isStatic = m.isStatic;
+        q.isGetter = m.isGetter;
+        q.isSetter = m.isSetter;
+        q.isOverride = m.isOverride;
+        q.isAbstract = m.isAbstract;
+        q.isAsync = m.isAsync;
+        q.isSyncStar = m.isSyncStar;
+        q.isAsyncStar = m.isAsyncStar;
+        q.body = m.body;
+        q.exprBody = m.exprBody;
+        q.params = new ArrayList<Param>();
+        for (Param p : m.params) {
+            if (p.type == null) {
+                q.params.add(p);
+                continue;
+            }
+            Param r = new Param();
+            r.type = substTypeVars(p.type, subst);
+            r.name = p.name;
+            r.named = p.named;
+            r.required = p.required;
+            r.optional = p.optional;
+            r.isThis = p.isThis;
+            r.isSuper = p.isSuper;
+            r.defaultValue = p.defaultValue;
+            r.file = p.file;
+            r.line = p.line;
+            r.col = p.col;
+            q.params.add(r);
+        }
+        return q;
     }
 
     private TypeRef cArgsTypeParam(String p, Ast.ClassDecl sc, List<TypeRef> explicit, Ast.MethodDecl m,
@@ -24021,6 +24186,9 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         List<TypeRef> lambdaReturns;
         private final java.util.Set<String> boxedActive = new HashSet<String>();
         TypeRef methodReturnType;
+        /// The closure being emitted is bound to a void-returning slot (its SAM is a VoidFunc),
+        /// so a `return expr;` in it must run the expression and return bare.
+        boolean lambdaReturnsVoid;
         TypeRef extensionSelfType;
         /** The extension whose body is being emitted; its own members resolve first. */
         ClassDecl currentExtension;

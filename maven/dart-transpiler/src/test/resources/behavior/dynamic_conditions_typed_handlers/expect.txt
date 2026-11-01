@@ -2,5 +2,5 @@ if matched
 while ran 3
 ternary no
 [ab1, ab2]
-[error boom trace true]
 hey:3 8
+[error boom trace true]

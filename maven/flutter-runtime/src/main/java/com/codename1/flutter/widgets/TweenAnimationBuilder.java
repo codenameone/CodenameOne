@@ -37,7 +37,7 @@ import dart.runtime.Funcs;
  * from the tween's begin to its end when first built, and from wherever it is to the new end
  * whenever the tween's end changes, over {@code duration} along {@code curve}.
  */
-public class TweenAnimationBuilder extends StatefulWidget {
+public class TweenAnimationBuilder<T> extends StatefulWidget {
     private Tween<?> tween;
     private Duration duration;
     private Curve curve;
@@ -45,13 +45,13 @@ public class TweenAnimationBuilder extends StatefulWidget {
     private Widget child;
     private Funcs.Func3<BuildContext, Object, Widget, Widget> builder;
 
-    public void tween(Tween<?> v) { this.tween = v; }
+    public void tween(Tween<? extends T> v) { this.tween = v; }
     public void duration(Duration v) { this.duration = v; }
     public void curve(Curve v) { this.curve = v; }
     public void onEnd(dart.runtime.Funcs.VoidFunc0 v) { this.onEnd = v; }
     public void child(Widget v) { this.child = v; }
     @SuppressWarnings("unchecked")
-    public void builder(Funcs.Func3<?, ?, ?, ?> v) {
+    public void builder(Funcs.Func3<BuildContext, T, Widget, Widget> v) {
         this.builder = (Funcs.Func3<BuildContext, Object, Widget, Widget>) v;
     }
 
@@ -60,7 +60,7 @@ public class TweenAnimationBuilder extends StatefulWidget {
         return new S();
     }
 
-    private static final class S extends State<TweenAnimationBuilder> {
+    private static final class S extends State<TweenAnimationBuilder<?>> {
         private ImplicitTween value;
 
         @Override
@@ -73,7 +73,7 @@ public class TweenAnimationBuilder extends StatefulWidget {
 
         @Override
         public Widget build(BuildContext context) {
-            TweenAnimationBuilder w = widget();
+            TweenAnimationBuilder<?> w = widget();
             value.lerpWith(w.tween);
             value.onEnd(w.onEnd);
             value.retarget(w.tween == null ? null : w.tween.end(), w.duration, w.curve);

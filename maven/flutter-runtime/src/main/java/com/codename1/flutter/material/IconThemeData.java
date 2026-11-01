@@ -106,8 +106,12 @@ public class IconThemeData {
         return opticalSize;
     }
 
-    public Object shadows() {
-        return shadows;
+    /// Typed as Flutter declares it (List<Shadow>?): an untyped getter left
+    /// `theme.shadows?.length` with nothing to call `length` on.
+    @SuppressWarnings("unchecked")
+    public dart.core.DartList<com.codename1.flutter.painting.Shadow> shadows() {
+        return shadows instanceof dart.core.DartList
+                ? (dart.core.DartList<com.codename1.flutter.painting.Shadow>) shadows : null;
     }
 
     public Boolean applyTextScaling() {

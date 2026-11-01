@@ -209,10 +209,16 @@ public final class AsyncStar {
                         // quiet source would then hold main() forever, so it gets a
                         // frame of its own; what it yields still reaches the listener
                         // through the microtask queue.
+                        Microtasks.frameStarted();
                         new Thread(new Runnable() {
                             @Override
                             public void run() {
-                                AsyncStar.run(body, sink);
+                                Microtasks.enterFrame();
+                                try {
+                                    AsyncStar.run(body, sink);
+                                } finally {
+                                    Microtasks.frameEnded();
+                                }
                             }
                         }, "dart-async-star").start();
                     }

@@ -29,7 +29,6 @@ void main() async {
   print(items);
 
   var log = <String>[];
-  var done = Completer<void>();
   StreamSubscription<int>? sub;
   sub = Stream<int>.error('boom').listen((v) {
     log.add('value $v');
@@ -37,9 +36,7 @@ void main() async {
     log.add(describe(error, stackTrace));
     print(log);
     sub?.cancel();
-    done.complete();
   });
-  await done.future;
 
   String joined = apply('hey', (s, len) => '$s:$len');
   int doubled = apply('four', (s, len) => len * 2);

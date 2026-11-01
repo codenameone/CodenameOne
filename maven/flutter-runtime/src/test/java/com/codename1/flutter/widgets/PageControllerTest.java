@@ -35,7 +35,6 @@ import com.codename1.flutter.testsupport.ProbeBox;
 
 import dart.core.DartList;
 import dart.runtime.Funcs;
-import dart.runtime.RefLong;
 
 import org.junit.jupiter.api.Test;
 
@@ -63,7 +62,7 @@ class PageControllerTest {
     private RenderHost host;
 
     private PageView carousel(PageController controller, int pages, Boolean snapping,
-                              Funcs.VoidFunc1<RefLong> onPageChanged) {
+                              Funcs.VoidFunc1<Long> onPageChanged) {
         DartList<Widget> children = new DartList<Widget>();
         for (int i = 0; i < pages; i++) {
             children.add(new ProbeBox(10, 10));
@@ -193,10 +192,10 @@ class PageControllerTest {
         final List<Long> reported = new ArrayList<Long>();
         PageController c = new PageController();
         c.viewportFraction(0.8);
-        mountAndLayout(carousel(c, 6, null, new Funcs.VoidFunc1<RefLong>() {
+        mountAndLayout(carousel(c, 6, null, new Funcs.VoidFunc1<Long>() {
             @Override
-            public void call(RefLong v) {
-                reported.add(v.v);
+            public void call(Long v) {
+                reported.add(v);
             }
         }), 500, 200);
 
@@ -210,10 +209,10 @@ class PageControllerTest {
         PageController c = new PageController();
         c.initialPage(3);
         c.viewportFraction(0.8);
-        mountAndLayout(carousel(c, 6, null, new Funcs.VoidFunc1<RefLong>() {
+        mountAndLayout(carousel(c, 6, null, new Funcs.VoidFunc1<Long>() {
             @Override
-            public void call(RefLong v) {
-                reported.add(v.v);
+            public void call(Long v) {
+                reported.add(v);
             }
         }), 500, 200);
 
@@ -272,10 +271,10 @@ class PageControllerTest {
         assertFalse(c.hasClients(), "nothing to attach to yet");
 
         final List<Long> reported = new ArrayList<Long>();
-        mountAndLayout(carousel(c, 6, null, new Funcs.VoidFunc1<RefLong>() {
+        mountAndLayout(carousel(c, 6, null, new Funcs.VoidFunc1<Long>() {
             @Override
-            public void call(RefLong v) {
-                reported.add(v.v);
+            public void call(Long v) {
+                reported.add(v);
             }
         }), 500, 200);
 

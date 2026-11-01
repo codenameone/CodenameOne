@@ -2748,7 +2748,7 @@ class Positioned extends Widget {
 
 @JavaName('com.codename1.flutter.widgets.Align')
 class Align extends Widget {
-  external Align({Key? key, Alignment? alignment, Widget? child});
+  external Align({Key? key, AlignmentGeometry? alignment, Widget? child});
 }
 
 @JavaName('com.codename1.flutter.widgets.ConstrainedBox')

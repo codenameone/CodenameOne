@@ -50,6 +50,27 @@ public class Matrix4 {
     private Matrix4() {
     }
 
+    /// vector_math's 16-value constructor: the values are in COLUMN-major order, so
+    /// argument i lands in storage[i] (a0..a3 are the first column).
+    public Matrix4(double a0, double a1, double a2, double a3, double a4, double a5, double a6, double a7, double a8, double a9, double a10, double a11, double a12, double a13, double a14, double a15) {
+        set(0, a0);
+        set(1, a1);
+        set(2, a2);
+        set(3, a3);
+        set(4, a4);
+        set(5, a5);
+        set(6, a6);
+        set(7, a7);
+        set(8, a8);
+        set(9, a9);
+        set(10, a10);
+        set(11, a11);
+        set(12, a12);
+        set(13, a13);
+        set(14, a14);
+        set(15, a15);
+    }
+
     private static Matrix4 zero() {
         return new Matrix4();
     }

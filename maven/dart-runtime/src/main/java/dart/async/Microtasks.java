@@ -91,6 +91,34 @@ final class Microtasks {
     /// exit while one is pending, so neither does {@link #runUntilIdle()}.
     private static int pendingTimers;
 
+    /// async* bodies running headless on a frame of their own (see AsyncStar) that are
+    /// not parked in an await: main() cannot exit while one may still yield, which is
+    /// how a bare {@code Stream.error(e).listen(...)} at the end of main() lost its
+    /// event. A frame parked in an await does not count, so a body waiting on a quiet
+    /// source does not keep the program alive -- as in Dart.
+    private static int runningFrames;
+
+    private static final ThreadLocal<Boolean> BACKGROUND_FRAME = new ThreadLocal<Boolean>();
+
+    /// Called on the starting thread, before the frame's thread starts.
+    static void frameStarted() {
+        synchronized (LOCK) {
+            runningFrames++;
+        }
+    }
+
+    /// Called on the frame's own thread when it starts running.
+    static void enterFrame() {
+        BACKGROUND_FRAME.set(Boolean.TRUE);
+    }
+
+    static void frameEnded() {
+        synchronized (LOCK) {
+            runningFrames--;
+            LOCK.notifyAll();
+        }
+    }
+
     static void timerStarted() {
         synchronized (LOCK) {
             pendingTimers++;
@@ -177,6 +205,20 @@ final class Microtasks {
 
     /// Headless park of an awaiting frame: runs the event loop until f completes.
     static void parkUntil(Future<?> f) {
+        boolean frame = BACKGROUND_FRAME.get() != null;
+        if (frame) {
+            frameEnded();
+        }
+        try {
+            parkUntilImpl(f);
+        } finally {
+            if (frame) {
+                frameStarted();
+            }
+        }
+    }
+
+    private static void parkUntilImpl(Future<?> f) {
         while (!f.isDone()) {
             drain();
             synchronized (LOCK) {
@@ -205,7 +247,7 @@ final class Microtasks {
             drain();
             synchronized (LOCK) {
                 if (idleLocked()) {
-                    if (pendingTimers <= 0) {
+                    if (pendingTimers <= 0 && runningFrames <= 0) {
                         return;
                     }
                     try {
