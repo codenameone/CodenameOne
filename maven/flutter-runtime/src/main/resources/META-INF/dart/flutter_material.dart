@@ -2681,7 +2681,7 @@ class TextTheme {
 }
 
 @JavaName('com.codename1.flutter.material.Theme')
-abstract class Theme {
+abstract class Theme extends InheritedWidget {
   external static ThemeData of(BuildContext context);
   external static Brightness brightnessOf(BuildContext context);
 }
@@ -2946,7 +2946,7 @@ class SnackBar extends Widget {
 }
 
 @JavaName('com.codename1.flutter.material.ScaffoldMessenger')
-abstract class ScaffoldMessenger {
+abstract class ScaffoldMessenger extends Widget {
   external static ScaffoldMessengerState of(BuildContext context);
   external static ScaffoldMessengerState? maybeOf(BuildContext context);
 }
@@ -2993,7 +2993,7 @@ enum ThemeMode { system, light, dark }
 enum Brightness { light, dark }
 
 @JavaName('com.codename1.flutter.MediaQuery')
-abstract class MediaQuery {
+abstract class MediaQuery extends InheritedWidget {
   external static MediaQueryData of(BuildContext context);
   // Targeted inherited-lookup helpers that depend only on one MediaQueryData
   // aspect — Flutter's `MediaQuery.sizeOf` / `paddingOf` / `viewInsetsOf`.

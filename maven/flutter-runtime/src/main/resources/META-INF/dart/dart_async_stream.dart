@@ -214,7 +214,7 @@ external R? runZonedGuarded<R>(R Function() body, void Function(Object error, St
     {Map<Object?, Object?>? zoneValues, Object? zoneSpecification});
 
 @JavaName('dart.async.StreamController')
-class StreamController<T> {
+class StreamController<T> implements StreamSink<T> {
   external StreamController(
       {Object? onListen, Object? onPause, Object? onResume, Object? onCancel, bool? sync});
   // Dart's `StreamController<T>.broadcast(...)` named constructor, declared

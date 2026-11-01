@@ -165,6 +165,7 @@ public final class Program {
             libraries.add(part);
             register(part, part);
         }
+        restoreShadowedAliases();
         // `extends Iterable<E>` is `extends IterableBase<E>`: dart:core's Iterable is an
         // abstract base whose only abstract member is `iterator`, exactly IterableBase. The
         // Java dart.core.DartIterable is a concrete wrapper over a java.lang.Iterable, not a
@@ -279,12 +280,53 @@ public final class Program {
         return part.partOfName != null && part.partOfName.equals(owner.libraryName);
     }
 
+    /**
+     * The parser reads an unprefixed {@code Queue} (or another dart:collection name) as the
+     * built-in collection it aliases. A program class of that name declared in the library,
+     * or imported into it without a prefix, is what Dart resolves the name to instead, so
+     * {@code o is Queue} must test that class, never any List.
+     */
+    private void restoreShadowedAliases() {
+        for (Ast.Library lib : libraries) {
+            for (Ast.TypeRef t : lib.aliasedTypes) {
+                if (t.aliasedFrom != null && !t.runtimeOnly && visibleUnprefixed(t.aliasedFrom, lib)) {
+                    t.name = t.aliasedFrom;
+                }
+            }
+        }
+    }
+
+    private boolean visibleUnprefixed(String name, Ast.Library lib) {
+        List<Ast.ClassDecl> byName = classesByName.get(name);
+        if (byName == null) {
+            return false;
+        }
+        for (Ast.ClassDecl c : byName) {
+            if (c.ownerLibrary == lib) {
+                return true;
+            }
+        }
+        for (Ast.Directive d : lib.importDirectives) {
+            Ast.Library target = d.admits(name) && d.prefix == null
+                    ? resolveImportedLibrary(lib, d.uri) : null;
+            if (target != null) {
+                for (Ast.ClassDecl c : byName) {
+                    if (provides(target, name, c.ownerLibrary)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
     private void mergePart(Ast.Library owner, Ast.Library part) {
         owner.classes.addAll(part.classes);
         owner.enums.addAll(part.enums);
         owner.functions.addAll(part.functions);
         owner.topLevelVars.addAll(part.topLevelVars);
         owner.typedefs.addAll(part.typedefs);
+        owner.aliasedTypes.addAll(part.aliasedTypes);
         register(owner, part);
     }
 

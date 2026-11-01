@@ -204,7 +204,7 @@ mixin MapBase<K, V> {
 }
 
 @JavaName('dart.collection.UnmodifiableMapBase')
-mixin UnmodifiableMapBase<K, V> {
+mixin UnmodifiableMapBase<K, V> implements MapBase<K, V> {
   V? operator [](Object? key);
   void operator []=(K key, V value);
   Iterable<K> get keys;

@@ -75,7 +75,7 @@ class Consumer<T> extends StatelessWidget {
 // --- scoped_model package ---------------------------------------------
 
 @JavaName('com.codename1.flutter.scopedmodel.Model')
-class Model {
+class Model extends ChangeNotifier {
   external Model();
   external void addListener(VoidCallback listener);
   external void removeListener(VoidCallback listener);

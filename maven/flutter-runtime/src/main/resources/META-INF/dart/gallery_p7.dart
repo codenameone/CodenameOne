@@ -246,7 +246,7 @@ class InteractiveViewer extends Widget {
 // Controls the visible page of a PageView — Flutter's `PageController`. The home
 // carousel reads `page` and `position.haveDimensions`.
 @JavaName('com.codename1.flutter.widgets.PageController')
-class PageController {
+class PageController implements Listenable {
   external PageController({int? initialPage, bool? keepPage, double? viewportFraction});
   external double? get page;
   external int get initialPage;
@@ -283,7 +283,7 @@ class PageView extends Widget {
 // The State of a Form, driving validation/save across its fields — Flutter's
 // `FormState`.
 @JavaName('com.codename1.flutter.widgets.FormState')
-class FormState {
+class FormState extends State<Form> {
   external bool validate();
   external void save();
   external void reset();
@@ -292,7 +292,7 @@ class FormState {
 // The State of a single FormField — Flutter's `FormFieldState<T>`. The text-field
 // demo reads/writes `value` and calls didChange/validate/save/reset.
 @JavaName('com.codename1.flutter.widgets.FormFieldState')
-class FormFieldState<T> {
+class FormFieldState<T> extends State<Widget> {
   external T? get value;
   external bool get hasError;
   external bool get isValid;
@@ -396,7 +396,7 @@ class PreferredSizeWidget extends Widget {
 // Adapts its child to a PreferredSizeWidget of the given size — Flutter's
 // `PreferredSize`.
 @JavaName('com.codename1.flutter.widgets.PreferredSize')
-class PreferredSize extends Widget {
+class PreferredSize extends Widget implements PreferredSizeWidget {
   external PreferredSize({Key? key, Size preferredSize, Widget child});
   external Size get preferredSize;
 }
@@ -909,7 +909,7 @@ class Selector<A, S> extends StatelessWidget {
 // The localizations delegate contributing translated locale/country names — the
 // `flutter_localized_countries` package's `LocaleNamesLocalizationsDelegate`.
 @JavaName('com.codename1.flutter.l10n.LocaleNamesLocalizationsDelegate')
-class LocaleNamesLocalizationsDelegate {
+class LocaleNamesLocalizationsDelegate extends LocalizationsDelegate<Object?> {
   external LocaleNamesLocalizationsDelegate();
   // The map of locale-code -> native display name — the
   // `flutter_localized_countries` package's static `nativeLocaleNames`.
@@ -962,7 +962,7 @@ external int compareAsciiUpperCase(String a, String b);
 // A Future that is already complete and calls its listeners synchronously —
 // Flutter foundation's `SynchronousFuture<T>`.
 @JavaName('com.codename1.flutter.foundation.SynchronousFuture')
-class SynchronousFuture<T> {
+class SynchronousFuture<T> implements Future<T> {
   external SynchronousFuture(T value);
   external Object then(Object onValue, {Object? onError});
   external Object whenComplete(dynamic Function() action);

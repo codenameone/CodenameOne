@@ -12,10 +12,10 @@
 abstract class TickerProvider {}
 
 @JavaName('com.codename1.flutter.animation.SingleTickerProviderStateMixin')
-mixin SingleTickerProviderStateMixin {}
+mixin SingleTickerProviderStateMixin implements TickerProvider {}
 
 @JavaName('com.codename1.flutter.animation.TickerProviderStateMixin')
-mixin TickerProviderStateMixin {}
+mixin TickerProviderStateMixin implements TickerProvider {}
 
 // --- status -----------------------------------------------------------
 
@@ -43,7 +43,7 @@ enum AnimationBehavior { normal, preserve }
 // --- animation / animatable core --------------------------------------
 
 @JavaName('com.codename1.flutter.animation.Animation')
-abstract class Animation<T> {
+abstract class Animation<T> extends Listenable {
   external double get value;
   external AnimationStatus get status;
   external bool get isCompleted;

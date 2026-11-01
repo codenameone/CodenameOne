@@ -51,6 +51,8 @@ public final class AstBuilder {
     private String file;
     /** The `import ... as p` prefixes of the library being built (imports come first). */
     private List<String> importPrefixes = new ArrayList<String>();
+    /// The library being built, which collects the types aliased to built-in collections.
+    private Library currentLib;
     private java.util.Map<String, String> prefixImports = new java.util.HashMap<String, String>();
 
     public AstBuilder(Diagnostics diags) {
@@ -79,6 +81,7 @@ public final class AstBuilder {
         Dart2Parser.CompilationUnitContext unit = parser.compilationUnit();
         Library lib = new Library();
         lib.fileName = fileName;
+        currentLib = lib;
         importPrefixes = lib.importPrefixes;
         prefixImports = lib.prefixImports;
         pos(lib, unit);
@@ -1254,7 +1257,14 @@ public final class AstBuilder {
             pos(t, ctx);
             return t;
         }
-        TypeRef t = new TypeRef(collectionAlias(ctx.typeName().getText()));
+        String writtenName = ctx.typeName().getText();
+        TypeRef t = new TypeRef(collectionAlias(writtenName));
+        if (!t.name.equals(writtenName) && currentLib != null) {
+            // A program class named Queue may shadow the alias; decided once every
+            // library is known (Program.restoreShadowedAliases).
+            t.aliasedFrom = writtenName;
+            currentLib.aliasedTypes.add(t);
+        }
         pos(t, ctx);
         if (ctx.typeArguments() != null) {
             for (Dart2Parser.TypeContext a : ctx.typeArguments().typeList().type()) {

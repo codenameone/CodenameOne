@@ -19,7 +19,7 @@
 // ======================================================================
 
 @JavaName('com.codename1.flutter.material.TabController')
-class TabController {
+class TabController extends ChangeNotifier {
   external TabController({int? initialIndex, required int length, Duration? animationDuration, TickerProvider? vsync});
   external int get index;
   external set index(int value);

@@ -25,14 +25,14 @@ class JsonCodec extends Codec<Object?, String> {
 }
 
 @JavaName('dart.convert.JsonEncoder')
-class JsonEncoder {
+class JsonEncoder extends Converter<Object?, String> {
   external JsonEncoder([Object? toEncodable]);
   external static JsonEncoder withIndent(String? indent, [Object? toEncodable]);
   external String convert(Object? object);
 }
 
 @JavaName('dart.convert.JsonDecoder')
-class JsonDecoder {
+class JsonDecoder extends Converter<String, Object?> {
   external JsonDecoder([Object? reviver]);
   external dynamic convert(String input);
 }
@@ -67,7 +67,7 @@ abstract class Encoding extends Codec<String, List<int>> {
 }
 
 @JavaName('dart.convert.Converter')
-abstract class Converter<S, T> {
+abstract class Converter<S, T> implements StreamTransformer<S, T> {
   external Converter();
   external T convert(S input);
   external dynamic startChunkedConversion(dynamic sink);
@@ -153,7 +153,7 @@ abstract class Base64Codec extends Encoding {
 }
 
 @JavaName('dart.convert.LineSplitter')
-class LineSplitter {
+class LineSplitter implements StreamTransformer<String, String> {
   external LineSplitter();
   external static List<String> split(String lines);
   external List<String> convert(String data);

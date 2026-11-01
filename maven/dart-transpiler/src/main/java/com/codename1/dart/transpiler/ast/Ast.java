@@ -73,6 +73,10 @@ public final class Ast {
         /// of that name: it is the runtime type, even where a program class of the same
         /// simple name is in scope.
         public boolean runtimeOnly;
+        /// The name as written when the parser aliased it to a built-in collection
+        /// (`Queue` to List); null otherwise. A program class of that name visible in the
+        /// library wins over the alias (Program.restoreShadowedAliases).
+        public String aliasedFrom;
         // For an inline function type (name == "Function", e.g. `void Function(int)`):
         // the parsed signature so codegen can render a real Funcs.* SAM instead of Object.
         public List<TypeRef> funcParams;          // non-null iff this is an inline function type
@@ -148,6 +152,8 @@ public final class Ast {
         public List<FunctionDecl> functions = new ArrayList<FunctionDecl>();
         public List<FieldDecl> topLevelVars = new ArrayList<FieldDecl>();
         public List<TypedefDecl> typedefs = new ArrayList<TypedefDecl>();
+        /// Every unprefixed type annotation the parser aliased to a built-in collection.
+        public List<TypeRef> aliasedTypes = new ArrayList<TypeRef>();
         /** Every import with its show/hide combinators, in source order. */
         public List<Directive> importDirectives = new ArrayList<Directive>();
         /** Every export with its show/hide combinators, in source order. */

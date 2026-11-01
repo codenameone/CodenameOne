@@ -676,10 +676,21 @@ public final class JavaEmitter {
      * accessors of their own and are left as they are.
      */
     private static boolean isLateChecked(FieldDecl f, ClassDecl owner) {
-        return f.isLate && f.initializer == null && !f.isConst && owner != null && !owner.isMixin;
+        return f.isLate && !f.isConst && owner != null && !owner.isMixin
+                && (f.initializer == null || !f.isStatic);
+    }
+
+    /** An instance {@code late x = init;}: Dart runs {@code init} on the first read, after
+     * the constructor -- it may read {@code this} -- never at construction. */
+    private static boolean isLateLazyInstance(FieldDecl f, ClassDecl owner) {
+        return isLateChecked(f, owner) && f.initializer != null;
     }
 
     private static String emitLateAccessors(FieldDecl f, String jt) {
+        return emitLateAccessors(f, jt, null, null);
+    }
+
+    private static String emitLateAccessors(FieldDecl f, String jt, String initLifted, String initCode) {
         String st = f.isStatic ? "static " : "";
         String vis = f.isStatic && f.name.startsWith("_") ? "    " : "    public ";
         String flag = f.name + "$late";
@@ -687,11 +698,22 @@ public final class JavaEmitter {
         StringBuilder b = new StringBuilder();
         b.append("    private ").append(st).append("boolean ").append(flag).append(";\n");
         b.append(vis).append(st).append(jt).append(" get$").append(f.name).append("() {\n")
-                .append("        if (!").append(flag).append(") {\n")
-                .append("            throw dart.core.LateInitializationError.notInitialized(\"")
-                .append(f.name).append("\");\n        }\n")
-                .append("        return ").append(self).append(f.name).append(";\n    }\n");
-        b.append(vis).append(st).append(jt).append(" set$").append(f.name).append("(").append(jt).append(" v) {\n");
+                .append("        if (!").append(flag).append(") {\n");
+        if (initCode != null) {
+            // Lazy initializer: computed once, on the first read that finds it unset.
+            b.append(initLifted)
+                    .append("            ").append(self).append(f.name).append(" = ").append(initCode).append(";\n")
+                    .append("            ").append(flag).append(" = true;\n        }\n");
+        } else {
+            b.append("            throw dart.core.LateInitializationError.notInitialized(\"")
+                    .append(f.name).append("\");\n        }\n");
+        }
+        b.append("        return ").append(self).append(f.name).append(";\n    }\n");
+        // An instance setter is void like every other field's set$: a class implementing an
+        // interface's `late bool x;` with a plain `bool x = false;` overrides this one, and
+        // javac refuses the pair when the return types differ. Statics keep the value.
+        String rt = f.isStatic ? jt : "void";
+        b.append(vis).append(st).append(rt).append(" set$").append(f.name).append("(").append(jt).append(" v) {\n");
         if (f.isFinal) {
             b.append("        if (").append(flag).append(") {\n")
                     .append("            throw dart.core.LateInitializationError.alreadyInitialized(\"")
@@ -699,7 +721,7 @@ public final class JavaEmitter {
         }
         b.append("        ").append(flag).append(" = true;\n")
                 .append("        ").append(self).append(f.name).append(" = v;\n")
-                .append("        return v;\n    }\n");
+                .append(f.isStatic ? "        return v;\n" : "").append("    }\n");
         return b.toString();
     }
 
@@ -1192,11 +1214,20 @@ public final class JavaEmitter {
             } else {
                 body.append("    private ");
             }
-            if ((f.isFinal || f.isConst) && f.initializer != null) {
+            boolean lazyInit = isLateLazyInstance(f, c);
+            if ((f.isFinal || f.isConst) && f.initializer != null && !lazyInit) {
                 body.append("final ");
             }
             body.append(jt).append(' ').append(f.name);
-            if (f.initializer != null) {
+            if (lazyInit) {
+                ctx.pushWriter(3);
+                Out init = emitExpr(f.initializer, ft, ctx);
+                String lifted = ctx.popWriter();
+                body.append(";\n");
+                body.append(emitLateAccessors(f, jt, lifted, coerce(init, ft, ctx)));
+                body.append('\n');
+                continue;
+            } else if (f.initializer != null) {
                 ctx.pushWriter(2);
                 Out init = emitExpr(f.initializer, ft, ctx);
                 String lifted = ctx.popWriter();
@@ -1263,7 +1294,9 @@ public final class JavaEmitter {
                 // which a class with no Dart constructor still needs.
                 body.append("    public ").append(javaClassName(c)).append("() {\n    }\n\n");
             }
-            if (isSuperOfMarker(c)) {
+            // A named constructor redirecting to the unnamed one (`C.from(x) : this(x)`) runs
+            // it as $init$ too, on the instance its own marker chain built.
+            if (isSuperOfMarker(c) || redirectsToUnnamed(c)) {
                 body.append(emitUnnamedInit(c, ctx));
             }
         }
@@ -3574,6 +3607,16 @@ public final class JavaEmitter {
      */
     private boolean needsMarker(ClassDecl c) {
         return markerClasses().contains(c);
+    }
+
+    /** Whether a named, non-factory constructor of {@code c} redirects to its unnamed one. */
+    private static boolean redirectsToUnnamed(ClassDecl c) {
+        for (CtorDecl ct : c.ctors) {
+            if (ct.name != null && !ct.isFactory && ct.redirect != null && ct.redirect.namedCtor == null) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Whether some program class with a marker chain extends {@code c} directly. */
@@ -5897,6 +5940,16 @@ public final class JavaEmitter {
         } else if (s instanceof ForInStmt) {
             ForInStmt f = (ForInStmt) s;
             Out iter = emitExpr(f.iterable, null, ctx);
+            TypeRef iterBound = classTypeVarBound(iter.type, ctx);
+            if (iterBound != null && (iterBound.is("List") || iterBound.is("Iterable") || iterBound.is("Set"))) {
+                // `T extends Iterable<E>`: the Java type variable carries no bound, so the
+                // value is walked as the bound it is declared under.
+                // Every dart:core collection (a primitive-backed list included) is a
+                // java.lang.Iterable, while not every one is a DartIterable.
+                TypeRef boundElem = iterBound.arg(0) != null ? iterBound.arg(0) : TypeRef.DYNAMIC;
+                iter = new Out("((java.lang.Iterable<" + javaType(boundElem, true, ctx) + ">) (Object) "
+                        + iter.code + ")", iterBound);
+            }
             if (f.iterable instanceof ThisExpr && ctx.currentClass != null && ctx.extensionSelfType == null) {
                 // `for (e in this)` inside `mixin M on Iterable<E>`: the mixin is a Java
                 // interface, so `this` is iterated as the core collection it is applied to.
@@ -13442,6 +13495,12 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         boolean catchAll = false;
         for (CatchClause cc : catches) {
             TypeRef on = cc.onType;
+            if (on != null && on.name != null && on.name.indexOf('.') > 0) {
+                // `on io.WebSocketException`: resolved through the prefix's library first
+                // (javaType strips the prefix and marks a runtime type), as every other
+                // type position is, so the tests below see the base name.
+                javaType(on, true, ctx);
+            }
             String test;
             String bindType;
             String bindValue;
@@ -13535,18 +13594,20 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
      */
     private boolean isThrowableType(TypeRef t) {
         java.util.Set<String> seen = new java.util.HashSet<String>();
-        String n = t.name;
-        while (n != null && seen.add(n)) {
-            if (CORE_ERRORS.containsKey(n) || n.equals("Error") || n.equals("Exception")
-                    || n.endsWith("Error") && stubs.isStubClass(n)
-                    || n.endsWith("Exception") && stubs.isStubClass(n)) {
-                return true;
+        TypeRef cur = t;
+        while (cur != null && cur.name != null && seen.add(cur.name)) {
+            String n = cur.name;
+            // A program class wins over a runtime type of the same simple name, unless the
+            // name came through a dart: prefix: an own `class TimeoutException {}` caught by
+            // `on TimeoutException` is a plain object in a DartThrown, never a Throwable.
+            ClassDecl c = cur.runtimeOnly ? null
+                    : cur.resolved != null ? cur.resolved : program.classes.get(n);
+            if (c == null) {
+                return CORE_ERRORS.containsKey(n) || n.equals("Error") || n.equals("Exception")
+                        || n.endsWith("Error") && stubs.isStubClass(n)
+                        || n.endsWith("Exception") && stubs.isStubClass(n);
             }
-            ClassDecl c = program.classes.get(n);
-            if (c == null || c.superclass == null) {
-                return false;
-            }
-            n = c.superclass.name;
+            cur = c.superclass;
         }
         return false;
     }
@@ -15464,7 +15525,19 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                     ta = fromCtx;
                 }
             }
-            return emitCtorCall(n, ta, c.args, c, ctx);
+            if ((ta == null || ta.isEmpty()) && expected != null && expected.is(n)
+                    && !pc.typeParams.isEmpty() && expected.args.size() == pc.typeParams.size()
+                    && typeVarsInScope(expected, ctx)) {
+                // `Chan<T> f() => Chan(s, StreamController(sync: true))`: the diamond stays, but
+                // the arguments are emitted against the parameters bound by the return context,
+                // so a hoisted argument (the StreamController above) gets StreamSink<T>.
+                ctx.ctorContextArgs = expected.args;
+            }
+            try {
+                return emitCtorCall(n, ta, c.args, c, ctx);
+            } finally {
+                ctx.ctorContextArgs = null;
+            }
         }
         // constructor of stub class
         if (stubs.isStubClass(n)) {
@@ -15476,6 +15549,15 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                     && !stubDecl.typeParams.isEmpty() && expected.args.size() == stubDecl.typeParams.size()
                     && typeVarsInScope(expected, ctx)) {
                 stubArgs = expected.args;
+            } else if (stubArgs.isEmpty() && !c.args.named.isEmpty() && stubDecl != null
+                    && !stubDecl.typeParams.isEmpty()) {
+                // `Chan(s, StreamController(sync: true))` into a StreamSink<T>: the named
+                // arguments hoist the instance into a `var`, where a diamond has no target and
+                // javac picks Object. Dart takes the arguments from the context supertype.
+                List<TypeRef> fromCtx = typeArgsFromSupertypeContext(stubDecl, expected, ctx);
+                if (fromCtx != null) {
+                    stubArgs = fromCtx;
+                }
             }
             return emitCtorCall(n, stubArgs, c.args, c, ctx);
         }
@@ -17269,7 +17351,11 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             return new Out(cls + witness + "from" + sfx + "(" + src
                     + (growable != null ? ", " + growable : "") + ")", listType);
         }
-        String len = emitExpr(pos.get(0), TypeRef.INT, ctx).code;
+        // Coerced to a primitive long: a promoted `int?` (`n ??= 3`) is still a boxed Long,
+        // and a Long length makes DartLongList.filled ambiguous with DartList's generic one.
+        // The cast unboxes whatever the Java local is declared as; `(long)` of a long is
+        // a no-op, so the static type the promotion reports cannot mislead it.
+        String len = "(long) " + paren(coerce(emitExpr(pos.get(0), TypeRef.INT, ctx), TypeRef.INT, ctx));
         if (cc.ctorName.equals("filled")) {
             Out fillOut = emitExpr(pos.get(1), elem, ctx);
             String fill = pk == null ? boxIfPrimitive(fillOut, ctx) : coerce(fillOut, elem, ctx);
@@ -17979,7 +18065,15 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             }
             ClassDecl savedOwner = ctx.ctorTypeOwner;
             java.util.Map<String, TypeRef> savedSubst = ctx.ctorTypeSubst;
-            if (!constructed.args.isEmpty()) {
+            List<TypeRef> contextArgs = ctx.ctorContextArgs;
+            ctx.ctorContextArgs = null;
+            if (constructed.args.isEmpty() && contextArgs != null && contextArgs.size() == pc.typeParams.size()) {
+                ctx.ctorTypeOwner = pc;
+                ctx.ctorTypeSubst = new java.util.HashMap<String, TypeRef>();
+                for (int i = 0; i < pc.typeParams.size(); i++) {
+                    ctx.ctorTypeSubst.put(pc.typeParams.get(i), contextArgs.get(i));
+                }
+            } else if (!constructed.args.isEmpty()) {
                 // `Sorted<int>((a, b) => a.compareTo(b))`: the closure's parameters are the
                 // written type argument, not the class's unbound K.
                 ctx.ctorTypeOwner = pc;
@@ -20860,12 +20954,57 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             if (constructed != null) {
                 return constructed;
             }
+            // `final _sep = wide ? '|' : ',';` on an INSTANCE field: both arms name one
+            // type, so the field has it. Left dynamic, `s.endsWith(_sep)` passed an Object
+            // to a String parameter. Static fields get the same answer from the emission.
+            TypeRef arms = conditionalArmsType(f.initializer, ctx, 0);
+            if (arms != null) {
+                return arms;
+            }
             TypeRef emitted = staticInitializerType(f);
             if (emitted != null) {
                 return emitted;
             }
         }
         return TypeRef.DYNAMIC;
+    }
+
+    /**
+     * The type both arms of a (possibly nested) conditional initializer agree on, read
+     * from literals and constructor calls only; null when they disagree or either arm
+     * needs real inference.
+     */
+    private TypeRef conditionalArmsType(Expr e, Ctx ctx, int depth) {
+        while (e instanceof ParenExpr) {
+            e = ((ParenExpr) e).inner;
+        }
+        if (depth > 0) {
+            if (e instanceof IntLit) {
+                return TypeRef.INT;
+            }
+            if (e instanceof DoubleLit) {
+                return TypeRef.DOUBLE;
+            }
+            if (e instanceof BoolLit) {
+                return TypeRef.BOOL;
+            }
+            if (e instanceof StringLit) {
+                return TypeRef.STRING;
+            }
+        }
+        if (!(e instanceof Conditional)) {
+            return depth > 0 ? constructedType(e, ctx) : null;
+        }
+        if (depth > 4) {
+            return null;
+        }
+        Conditional c = (Conditional) e;
+        TypeRef a = conditionalArmsType(c.thenExpr, ctx, depth + 1);
+        TypeRef b = conditionalArmsType(c.elseExpr, ctx, depth + 1);
+        if (a == null || b == null || !a.toString().equals(b.toString())) {
+            return null;
+        }
+        return a;
     }
 
     /** Inferred types of untyped top-level and static variables, by declaration. */
@@ -22751,6 +22890,12 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             // ternaries etc. are not valid statements; assign to a discard temp. A call on a
             // parenthesized receiver -- ((F) f).call(..) -- is already a statement, and may be
             // void, which `var` cannot hold.
+            java.util.regex.Matcher nullAware = NULL_AWARE_STATEMENT.matcher(code);
+            if (nullAware.matches() && !nullAware.group(2).contains(" ? ")) {
+                // `x?.sink.add(v);` -- the call may be void, so a discard temp cannot hold the
+                // ternary; guard the call instead, which is what the statement means.
+                return "if (" + nullAware.group(1) + " != null) " + nullAware.group(2);
+            }
             return "var $unused" + (unusedCounter++) + " = " + code;
         }
         return code;
@@ -22773,6 +22918,10 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
     }
 
     private int unusedCounter;
+
+    /// A null-aware member access emitted as `(t == null ? null : t.rest)`.
+    private static final java.util.regex.Pattern NULL_AWARE_STATEMENT = java.util.regex.Pattern.compile(
+            "\\(([A-Za-z_$][A-Za-z0-9_$]*) == null \\? null : (\\1[.].*)\\)", java.util.regex.Pattern.DOTALL);
 
     private boolean isStateSubclass(ClassDecl c) {
         return c.superclass != null && c.superclass.is("State");
@@ -23401,6 +23550,8 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         /** The class being constructed with written type arguments, and their binding. */
         ClassDecl ctorTypeOwner;
         java.util.Map<String, TypeRef> ctorTypeSubst;
+        /** The context type's arguments for the next program constructor call written without any. */
+        List<TypeRef> ctorContextArgs;
         /** Method type parameters dropped from the Java signature; each reads as Object. */
         java.util.Set<String> erasedMethodTypeVars;
         boolean inAsyncBody;

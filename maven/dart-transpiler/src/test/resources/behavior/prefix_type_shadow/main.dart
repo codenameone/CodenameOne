@@ -8,6 +8,22 @@ class Queue {
   String describe() => 'own queue $name';
 }
 
+class TimeoutException {
+  final String why;
+  TimeoutException(this.why);
+}
+
+String guard(void Function() body) {
+  try {
+    body();
+    return 'ok';
+  } on async.TimeoutException catch (e) {
+    return 'runtime timeout ${e.message} ${e.duration}';
+  } on TimeoutException catch (e) {
+    return 'own timeout ${e.why}';
+  }
+}
+
 class Timer {
   String describe() => 'own timer';
 }
@@ -47,6 +63,18 @@ Future<void> main() async {
   print(many.map(drain).toList());
   Object o = col.Queue<int>();
   print(o is col.Queue);
+  print(o is Queue);
+  final Queue typed = own;
+  print(typed.name);
+  Object ownAsObject = own;
+  print(ownAsObject is Queue);
+  print((ownAsObject as Queue).describe());
+  print(guard(() => throw async.TimeoutException('slow', const Duration(seconds: 2))));
+  print(guard(() => throw TimeoutException('mine')));
+  Object te = async.TimeoutException('late');
+  print(te is async.TimeoutException);
+  print(te is TimeoutException);
+  print((te as async.TimeoutException).message);
   print(o is Timer);
   Object ot = async.Timer(Duration.zero, () {});
   print(ot is Timer);

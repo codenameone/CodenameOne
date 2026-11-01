@@ -133,7 +133,7 @@ public class WebSocket extends Stream<Object> {
                         ws.closeCode = Long.valueOf(statusCode);
                         ws.closeReason = reason;
                         if (!result.isCompleted()) {
-                            result.completeError(new SocketException("WebSocket closed during connect: " + reason));
+                            result.completeError(new WebSocketException("WebSocket closed during connect: " + reason));
                         }
                         ws.finish();
                     }

@@ -245,7 +245,7 @@ class TextTheme {
 }
 
 @JavaName('com.codename1.flutter.material.Theme')
-abstract class Theme {
+abstract class Theme extends Widget {
   external static ThemeData of(BuildContext context);
 }
 
@@ -408,7 +408,7 @@ class MaterialPageRoute {
 }
 
 @JavaName('com.codename1.flutter.navigation.Navigator')
-abstract class Navigator {
+abstract class Navigator extends Widget {
   // push completes with the value the route is popped with, as Flutter's does
   // (and as the runtime stub -- com.codename1.flutter.navigation.Navigator --
   // declares it); a void return here makes `final r = await Navigator.push(...)`
@@ -431,7 +431,7 @@ class SnackBar extends Widget {
 }
 
 @JavaName('com.codename1.flutter.material.ScaffoldMessenger')
-abstract class ScaffoldMessenger {
+abstract class ScaffoldMessenger extends Widget {
   external static ScaffoldMessengerState of(BuildContext context);
 }
 
@@ -469,7 +469,7 @@ enum ThemeMode { system, light, dark }
 enum Brightness { light, dark }
 
 @JavaName('com.codename1.flutter.MediaQuery')
-abstract class MediaQuery {
+abstract class MediaQuery extends Widget {
   external static MediaQueryData of(BuildContext context);
 }
 

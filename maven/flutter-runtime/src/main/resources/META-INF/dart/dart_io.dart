@@ -67,6 +67,12 @@ class HandshakeException extends TlsException {
   external HandshakeException([String message]);
 }
 
+@JavaName('dart.io.WebSocketException')
+class WebSocketException extends IOException {
+  external WebSocketException([String message = ""]);
+  external String get message;
+}
+
 @JavaName('dart.io.HttpException')
 class HttpException extends IOException {
   external HttpException(String message, {Uri? uri});
