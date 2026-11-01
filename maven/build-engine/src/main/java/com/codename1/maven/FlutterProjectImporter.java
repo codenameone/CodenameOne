@@ -1277,13 +1277,21 @@ public final class FlutterProjectImporter {
             b.append("\n        implements ").append(implementsList);
         }
         b.append(" {\n");
+        // WidgetsBindingObserver.didChangeAppLifecycleState is fed from here: resumed after
+        // every start (the first one runs main() inside super.start()), paused before stop.
+        b.append("    @Override\n")
+                .append("    public void start() {\n");
         if (links) {
-            b.append("    @Override\n")
-                    .append("    public void start() {\n")
-                    .append("        com.codename1.flutter.plugins.applinks.AppLinks.appStarted();\n")
-                    .append("        super.start();\n")
-                    .append("    }\n\n");
+            b.append("        com.codename1.flutter.plugins.applinks.AppLinks.appStarted();\n");
         }
+        b.append("        super.start();\n")
+                .append("        com.codename1.flutter.widgets.WidgetsBinding.instance.appStarted();\n")
+                .append("    }\n\n")
+                .append("    @Override\n")
+                .append("    public void stop() {\n")
+                .append("        com.codename1.flutter.widgets.WidgetsBinding.instance.appStopped();\n")
+                .append("        super.stop();\n")
+                .append("    }\n\n");
         b.append("    @Override\n")
                 .append("    public void runApp() {\n");
         if (push) {
