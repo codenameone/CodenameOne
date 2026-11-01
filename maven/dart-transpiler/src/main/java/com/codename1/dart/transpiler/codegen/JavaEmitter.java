@@ -1856,6 +1856,20 @@ public final class JavaEmitter {
     }
 
     /** True when c (or a superclass in the program) applies a dart:collection mixin or base. */
+    /** Whether {@code c} (or a program superclass) is {@code implements Map<K, V>}: a DartMap subclass. */
+    private boolean extendsRuntimeMap(ClassDecl c) {
+        java.util.Set<ClassDecl> seen = new java.util.HashSet<ClassDecl>();
+        while (c != null && seen.add(c)) {
+            for (TypeRef itf : c.interfaces) {
+                if (itf.is("Map") && !program.classes.containsKey("Map")) {
+                    return c.superclass == null;
+                }
+            }
+            c = c.superclass == null ? null : program.classes.get(c.superclass.name);
+        }
+        return false;
+    }
+
     /** The runtime Future's protocol methods a program Future subclass renames. */
     private static final java.util.Set<String> FUTURE_PROTOCOL = new java.util.HashSet<String>(
             java.util.Arrays.asList("then", "catchError", "whenComplete", "timeout"));
@@ -3739,6 +3753,19 @@ public final class JavaEmitter {
     }
 
     private String emitMethodLikeBody(Method m, Ctx ctx, boolean classIsAbstract) {
+        if (ctx.currentClass != null && m.isGetter && !m.isStatic && "values".equals(m.name)
+                && extendsRuntimeMap(ctx.currentClass)) {
+            // `Iterable<V> get values` on a class extending the runtime DartMap (a
+            // LinkedHashMap) clashes with Java's Collection<V> values(); Map-typed call
+            // sites read valuesIterable(), which is what this declaration overrides.
+            String saved = m.name;
+            m.name = "valuesIterable";
+            try {
+                return emitMethodLikeBody(m, ctx, classIsAbstract);
+            } finally {
+                m.name = saved;
+            }
+        }
         if (ctx.currentClass != null && implementsRuntimeFuture(ctx.currentClass) && !m.isStatic
                 && !m.isGetter && !m.isSetter && FUTURE_PROTOCOL.contains(m.name)) {
             // `class C<T> implements Future<T>` extends the runtime Future, whose then /
@@ -6689,7 +6716,24 @@ public final class JavaEmitter {
                 // none: whether it answered correctly would depend on how the list happened
                 // to be built (a List<int> from map().toList() is a boxed DartList), so the
                 // same test would flip between call sites. emitAsCast shares this model.
-                check = subject + " instanceof " + erasedJavaType(t.type, ctx);
+                //
+                // List<int>/List<double> are the one exception, because there the storage
+                // class alone already flipped: generic code (`List<E>.of(..)` with E bound
+                // to int) builds a boxed DartList, so `x is List<int>` answered false on a
+                // list Dart calls a List<int>. Those two test the elements instead
+                // (DartLongList.isLongs), which answers the same however the list was built,
+                // and the promoted reads view it (viewLongs) rather than cast it.
+                String erased = erasedJavaType(t.type, ctx);
+                String pk = t.type.is("List") ? primitiveListKind(t.type) : null;
+                if (pk != null) {
+                    check = "dart.core.Dart" + pk + "List.is" + pk + "s(" + subject + ")";
+                } else if (isCoreSet(t.type)) {
+                    // A program SetBase/SetMixin class is a Set in Dart, though its Java class
+                    // cannot extend DartSet: SetMixin is the marker the test also accepts.
+                    check = "dart.core.SetMixinView.isSet(" + subject + ")";
+                } else {
+                    check = subject + " instanceof " + erased;
+                }
             }
             return new Out(t.negated ? "!(" + check + ")" : "(" + check + ")", TypeRef.BOOL);
         }
@@ -7709,6 +7753,12 @@ public final class JavaEmitter {
             return new Out("((" + jt + ") " + o.code + ")", c.type);
         }
         ctx.importClass("dart.runtime.DartRuntime");
+        if (isCoreSet(target) && (o.type == null || !o.type.is("Set"))) {
+            // `x as Set<T>` accepts a program SetBase/SetMixin object, viewed live as a Set.
+            String v = target.nullable ? o.code
+                    : "DartRuntime.as(" + o.code + ", Object.class, false, " + quote(target.toString()) + ")";
+            return new Out("dart.core.SetMixinView." + (target.args.isEmpty() ? "" : "<" + javaType(target.arg(0), true, ctx) + ">") + "asSet(" + v + ")", c.type);
+        }
         String erased = erasedJavaType(target, ctx);
         String operand = o.code;
         if (o.type != null && !o.type.nullable
@@ -8419,6 +8469,16 @@ public final class JavaEmitter {
                 if (iterableAsList(local, promo)) {
                     // promoted by `is List` from an Iterable: read the list behind the view
                     base = "dart.core.DartIterable.listBehind(" + base + ")";
+                }
+                if (isCoreSet(promo) && !local.is("Set")) {
+                    // Promoted by `is Set`, which holds for a program SetBase object too.
+                    return new Out("dart.core.SetMixinView." + (promo.args.isEmpty() ? "" : "<" + javaType(promo.arg(0), true, ctx) + ">") + "asSet(" + base + ")", promo);
+                }
+                String pk = promo.is("List") ? primitiveListKind(promo) : null;
+                if (pk != null && primitiveListKind(local) == null) {
+                    // Promoted by `is List<int>`, which holds for a boxed DartList of ints
+                    // too (DartLongList.isLongs): read through the live view, not a cast.
+                    return new Out("dart.core.Dart" + pk + "List.view" + pk + "s(" + base + ")", promo);
                 }
                 return new Out("((" + javaType(promo, true, ctx) + ") " + base + ")", promo);
             }
@@ -9486,6 +9546,11 @@ public final class JavaEmitter {
                 return new Out(target.code + ".reversedIterable()", TypeRef.of("Iterable", elem));
             }
         }
+        if (name.equals("values") && program.classes.get(tt.name) != null
+                && extendsRuntimeMap(program.classes.get(tt.name))) {
+            // A program Map subclass declares `values` as valuesIterable() (see emitMethodLikeBody).
+            return new Out(target.code + ".valuesIterable()", TypeRef.of("Iterable", TypeRef.DYNAMIC));
+        }
         if (tt.is("Map")) {
             if (name.equals("length")) {
                 return new Out(target.code + ".length()", TypeRef.INT);
@@ -9826,6 +9891,11 @@ public final class JavaEmitter {
             return TypeRef.DOUBLE;
         }
         return null;
+    }
+
+    /** dart:core's Set itself (not a program class of that name). */
+    private boolean isCoreSet(TypeRef t) {
+        return t != null && t.is("Set") && !program.classes.containsKey("Set");
     }
 
     private static String primitiveListKind(TypeRef tt) {

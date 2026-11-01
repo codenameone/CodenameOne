@@ -110,6 +110,29 @@ public class DartLongList extends DartList<Long> {
         return new DartLongList(grown.a, grown.len, growable);
     }
 
+    /// `value is List<int>`. The primitive-backed list always is one; a boxed DartList is
+    /// one when every element is an int. Generic code (`List<E>.of(..)` with E bound to
+    /// int at the use site) builds the boxed form, and type arguments are erased here, so
+    /// the elements are the only witness the runtime has of the argument. An empty boxed list
+    /// answers true, as an erased `is List<String>` does.
+    public static boolean isLongs(Object value) {
+        if (value instanceof DartLongList) {
+            return true;
+        }
+        if (!(value instanceof DartList)) {
+            return false;
+        }
+        DartList<?> l = (DartList<?>) value;
+        int n = l.size();
+        for (int i = 0; i < n; i++) {
+            Object e = l.get(i);
+            if (!(e instanceof Long || e instanceof Integer || e instanceof Short || e instanceof Byte)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /// A List<int> value held as the primitive-backed list its static type promises:
     /// the value itself when it already is one, otherwise a copy. A generic runtime
     /// method (`Stream<int>.toList()`) builds a boxed DartList, which a local typed

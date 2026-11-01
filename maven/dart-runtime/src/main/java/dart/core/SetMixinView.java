@@ -39,6 +39,29 @@ public final class SetMixinView<E> extends DartSet<E> implements MixinView {
         this.src = src;
     }
 
+    /// Dart's `value is Set`: a runtime set, or a program object applying SetMixin/SetBase,
+    /// which is a Set in Dart but whose Java class cannot extend DartSet (the runtime set
+    /// keeps private storage). SetMixin is the marker; MixinSelf.set views such an object
+    /// as the DartSet a Set-typed slot holds.
+    public static boolean isSet(Object value) {
+        return value instanceof DartSet || value instanceof SetMixin;
+    }
+
+    /// Dart's `value as Set<E>` (and a read promoted by `is Set`): the runtime set itself, a
+    /// live view of a program SetMixin/SetBase object, null for null; anything else is
+    /// Dart's TypeError.
+    @SuppressWarnings("unchecked")
+    public static <E> DartSet<E> asSet(Object value) {
+        if (value == null || value instanceof DartSet) {
+            return (DartSet<E>) value;
+        }
+        if (value instanceof SetMixin) {
+            return new SetMixinView<E>((SetMixin<E>) value);
+        }
+        throw new TypeError("type '" + value.getClass().getSimpleName()
+                + "' is not a subtype of type 'Set'");
+    }
+
     @Override
     public Object source() {
         return src;

@@ -113,6 +113,12 @@ mixin SetMixin<E> {
   bool any(bool Function(E element) test);
   bool every(bool Function(E element) test);
   String join([String separator = '']);
+  List<E> toList({bool growable = true});
+  Iterable<E> where(bool Function(E element) test);
+  Iterable<T> map<T>(T Function(E e) toElement);
+  Iterable<E> skip(int count);
+  Iterable<E> take(int count);
+  T fold<T>(T initialValue, T Function(T previousValue, E element) combine);
 }
 
 // dart:collection's *Base classes, declared as mixins so a class extending one takes the
@@ -223,4 +229,10 @@ mixin SetBase<E> {
   bool any(bool Function(E element) test);
   bool every(bool Function(E element) test);
   String join([String separator = '']);
+  List<E> toList({bool growable = true});
+  Iterable<E> where(bool Function(E element) test);
+  Iterable<T> map<T>(T Function(E e) toElement);
+  Iterable<E> skip(int count);
+  Iterable<E> take(int count);
+  T fold<T>(T initialValue, T Function(T previousValue, E element) combine);
 }

@@ -52,7 +52,34 @@ public class Future<T> {
     private Throwable error;
     private List<Runnable> listeners;
 
-    Future() {
+    /// Set once cn1Drive() has run, so a program subclass is driven at most once.
+    private boolean driven;
+
+    /// Also the constructor of a program class declared {@code implements Future<T>}:
+    /// it extends this class, and its inherited state is completed by {@link #cn1Drive}.
+    protected Future() {
+    }
+
+    /// Completes a program subclass's inherited state from its own then(); see
+    /// {@code JavaEmitter.implementsRuntimeFuture}. The runtime's futures complete
+    /// themselves, so the default does nothing.
+    protected void cn1Drive() {
+    }
+
+    /// Adopts {@code source}'s value or error, for {@link #cn1Drive} overrides.
+    protected final void cn1Adopt(Future<?> source) {
+        adopt(source);
+    }
+
+    /// Runs cn1Drive() the first time this future is listened to or awaited.
+    final void driveOnce() {
+        synchronized (lock) {
+            if (driven || done || adopting) {
+                return;
+            }
+            driven = true;
+        }
+        cn1Drive();
     }
 
     /**
@@ -307,7 +334,8 @@ public class Future<T> {
     }
 
     /** Registers a completion callback (fires immediately if already done). */
-    public Future<Object> then(final Funcs.Func1<T, Object> onValue) {
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public <S> Future<S> then(final Funcs.Func1<T, Object> onValue) {
         final Future<Object> next = new Future<Object>();
         onComplete(new Runnable() {
             @Override
@@ -323,7 +351,7 @@ public class Future<T> {
                 }
             }
         });
-        return next;
+        return (Future<S>) (Future) next;
     }
 
     /**
@@ -333,9 +361,10 @@ public class Future<T> {
      * a failure skipped the handler and the chain stayed failed. The handler may take
      * the error, or the error and a stack trace, and may return a value or nothing.
      */
-    public Future<Object> then(final Funcs.Func1<T, Object> onValue, final Object onError) {
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public <S> Future<S> then(final Funcs.Func1<T, Object> onValue, final Object onError) {
         if (onError == null) {
-            return then(onValue);
+            return (Future<S>) (Future) then(onValue);
         }
         final Future<Object> next = new Future<Object>();
         onComplete(new Runnable() {
@@ -356,12 +385,13 @@ public class Future<T> {
                 }
             }
         });
-        return next;
+        return (Future<S>) (Future) next;
     }
 
     /** {@link #then(Funcs.Func1, Object)} with a void onValue body. */
-    public Future<Object> then(final Funcs.VoidFunc1<T> onValue, final Object onError) {
-        return then(new Funcs.Func1<T, Object>() {
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public <S> Future<S> then(final Funcs.VoidFunc1<T> onValue, final Object onError) {
+        return (Future<S>) (Future) then(new Funcs.Func1<T, Object>() {
             @Override
             public Object call(T v) {
                 onValue.call(v);
@@ -442,8 +472,9 @@ public class Future<T> {
      * {@link Funcs.VoidFunc1}. Mirrors {@link #then(Funcs.Func1)} but discards
      * the (absent) callback result.
      */
-    public Future<Object> then(final Funcs.VoidFunc1<T> onValue) {
-        return then(new Funcs.Func1<T, Object>() {
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public <S> Future<S> then(final Funcs.VoidFunc1<T> onValue) {
+        return (Future<S>) (Future) then(new Funcs.Func1<T, Object>() {
             @Override
             public Object call(T v) {
                 onValue.call(v);
@@ -547,7 +578,7 @@ public class Future<T> {
     }
 
     public Future<Object> catchError(final Funcs.Func2<Object, ? super dart.core.StackTrace, ?> onError) {
-        return catchError(onError, null);
+        return catchError(onError, (Object) null);
     }
 
     /// {@code catchError((e, st) { ... })} with a void handler.
@@ -562,7 +593,7 @@ public class Future<T> {
     }
 
     public Future<T> catchError(final Funcs.VoidFunc2<Object, ? super dart.core.StackTrace> onError) {
-        return catchError(onError, null);
+        return catchError(onError, (Object) null);
     }
 
     /** {@code catchError(onError, test: ...)} -- value-handler form. */
@@ -710,6 +741,7 @@ public class Future<T> {
      * this model rather than patching it.</p>
      */
     void onComplete(Runnable r) {
+        driveOnce();
         boolean immediate;
         synchronized (lock) {
             immediate = done;

@@ -61,12 +61,26 @@ void main() {
   final Bag<int> asBag = lb;
   final it = asBag.snapshot();
   print(it.length);
+  print(it is List<int>);
+  print(it is List<double>);
+  if (it is List<int>) {
+    it.add(7);
+    print(it.last + 1);
+    print(it.fold<int>(0, (a, b) => a + b));
+  }
+  final Object boxed = Box<double>([0.5, 2.0]).copy();
+  print(boxed is List<double>);
+  print(boxed is List<int>);
+  if (boxed is List<double>) {
+    print(boxed.first * 4);
+  }
   final sl = ListBag<String>(['c', 'a', 'b']);
   final List<String> ls = sl.snapshot();
   ls.add('z');
   print(ls);
   final Bag<String> sAsBag = sl;
   print(sAsBag.snapshot() is List<String>);
+  print(sAsBag.snapshot() is List<int>);
   final sb = SetBag<String>({'a', 'b', 'a'});
   final Set<String> s = sb.snapshot();
   s.add('c');

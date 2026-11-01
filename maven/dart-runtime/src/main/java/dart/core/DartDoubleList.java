@@ -118,6 +118,29 @@ public class DartDoubleList extends DartList<Double> {
         return new DartDoubleList(grown.a, grown.len, growable);
     }
 
+    /// `value is List<double>`. The primitive-backed list always is one; a boxed DartList is
+    /// one when every element is a double. Generic code (`List<E>.of(..)` with E bound to
+    /// double at the use site) builds the boxed form, and type arguments are erased here, so
+    /// the elements are the only witness the runtime has of the argument. An empty boxed list
+    /// answers true, as an erased `is List<String>` does.
+    public static boolean isDoubles(Object value) {
+        if (value instanceof DartDoubleList) {
+            return true;
+        }
+        if (!(value instanceof DartList)) {
+            return false;
+        }
+        DartList<?> l = (DartList<?>) value;
+        int n = l.size();
+        for (int i = 0; i < n; i++) {
+            Object e = l.get(i);
+            if (!(e instanceof Double || e instanceof Float)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /// A List<double> value held as the primitive-backed list its static type promises:
     /// the value itself when it already is one, otherwise a copy. A generic runtime
     /// method (`Stream<int>.toList()`) builds a boxed DartList, which a local typed

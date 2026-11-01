@@ -51,6 +51,7 @@ public final class Await {
         if (f == null) {
             throw new dart.core.TypeError("await on null Future");
         }
+        f.driveOnce();
         if (f.isDone()) {
             return f.valueOrThrow();
         }
