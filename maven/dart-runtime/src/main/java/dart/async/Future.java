@@ -197,6 +197,8 @@ public class Future<T> {
                 } catch (Throwable t) {
                     f.completeError(t);
                 }
+                // The end of a timer turn (see Microtasks).
+                Microtasks.drain();
             }
         });
         if (com.codename1.ui.Display.isInitialized()) {

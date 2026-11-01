@@ -148,6 +148,7 @@ public class BehaviorTest {
         TestSupport.write(runner, "public class Runner {\n"
                 + "    public static void main(String[] args) {\n"
                 + "        " + TestSupport.PKG + ".MainLib.main$();\n"
+                + "        dart.async.Async.runMicrotasks();\n"
                 + "    }\n"
                 + "}\n");
         javacArgs.add(runner.getAbsolutePath());

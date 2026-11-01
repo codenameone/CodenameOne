@@ -35,11 +35,25 @@ public final class Async {
     public static void unawaited(Object future) {
     }
 
-    /// {@code scheduleMicrotask(callback)}. This runtime has no microtask queue (see
-    /// Future), so the callback runs from a zero-delay timer: after the current
-    /// synchronous code, as in Dart, but possibly after other ready futures.
-    public static void scheduleMicrotask(Funcs.VoidFunc0 callback) {
-        new Timer(null, callback);
+    /// {@code scheduleMicrotask(callback)}: queued with controller deliveries, run once
+    /// the current synchronous code ends (see Microtasks).
+    public static void scheduleMicrotask(final Funcs.VoidFunc0 callback) {
+        if (callback == null) {
+            throw new dart.core.ArgumentError("scheduleMicrotask: callback must not be null");
+        }
+        Microtasks.schedule(new Runnable() {
+            @Override
+            public void run() {
+                callback.call();
+            }
+        });
+    }
+
+    /// Runs every queued microtask now, on the calling thread: what the end of main()
+    /// is to Dart. FlutterRegistry calls it after main, and so do the headless runners
+    /// and tests. Off the EDT of a live Display it does nothing (the EDT drains).
+    public static void runMicrotasks() {
+        Microtasks.drain();
     }
 
     /// {@code runZoned(body)}: runs the body in a child of the current zone that holds

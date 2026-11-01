@@ -58,7 +58,13 @@ public final class Timer {
                 Funcs.VoidFunc0 cb = Timer.this.callback;
                 Timer.this.callback = null;
                 if (cb != null) {
-                    cb.call();
+                    try {
+                        cb.call();
+                    } finally {
+                        // A timer callback is a turn of Dart's event loop: the
+                        // microtasks it queued run before the next one.
+                        Microtasks.drain();
+                    }
                 }
             }
         });

@@ -107,5 +107,5 @@ Future<void> main() async {
   m.raw.c.add([7, 'z']);
   m.raw.c.add([8.9]);
   await Future<void>.delayed(Duration.zero);
-  print(m.seen..sort());
+  print(m.seen);
 }

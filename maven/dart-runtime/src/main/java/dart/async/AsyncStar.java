@@ -179,6 +179,13 @@ public final class AsyncStar {
     /// derived stream subscribes to its source there, so an event the source emits right
     /// after the downstream listen() is buffered rather than lost to a broadcast stream.
     static <T> Stream<T> asyncStar(final Funcs.VoidFunc1<Sink<T>> body, final Funcs.VoidFunc0 onListen) {
+        return asyncStar(body, onListen, false);
+    }
+
+    /// {@code neverSuspends}: the body never awaits (Stream.fromIterable), so it may
+    /// run inside its microtask on any thread.
+    static <T> Stream<T> asyncStar(final Funcs.VoidFunc1<Sink<T>> body, final Funcs.VoidFunc0 onListen,
+            final boolean neverSuspends) {
         final Sink<T> sink = new Sink<T>();
         sink.controller.onListen(new Funcs.VoidFunc0() {
             @Override
@@ -186,11 +193,28 @@ public final class AsyncStar {
                 if (onListen != null) {
                     onListen.call();
                 }
-                // Started from a timer, never inside listen() itself, as Dart does.
-                new Timer(dart.core.Duration.zero, new Funcs.VoidFunc0() {
+                // Started in a microtask, never inside listen() itself, as Dart does,
+                // in order with the deliveries already queued.
+                Microtasks.schedule(new Runnable() {
                     @Override
-                    public void call() {
-                        run(body, sink);
+                    public void run() {
+                        if (neverSuspends || com.codename1.ui.Display.isInitialized()) {
+                            // On the EDT an await inside the body nests through
+                            // invokeAndBlock, which keeps the EDT turning.
+                            AsyncStar.run(body, sink);
+                            return;
+                        }
+                        // Headless an await parks its thread, and this one is the
+                        // drainer's -- the awaiting main() itself. A body waiting on a
+                        // quiet source would then hold main() forever, so it gets a
+                        // frame of its own; what it yields still reaches the listener
+                        // through the microtask queue.
+                        new Thread(new Runnable() {
+                            @Override
+                            public void run() {
+                                AsyncStar.run(body, sink);
+                            }
+                        }, "dart-async-star").start();
                     }
                 });
             }

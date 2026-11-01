@@ -36,8 +36,14 @@ package dart.async;
  * constructor here; it exists only so {@code StreamController<T>.broadcast()}
  * call sites compile. All four handlers are called: onListen on the first
  * listener, onCancel when the last one leaves, onPause/onResume as the stream's
- * pause state changes. Each is also readable as a getter, as in Dart. {@code sync} is accepted and ignored -- delivery here is
- * always synchronous on the calling thread.</p>
+ * pause state changes. Each is also readable as a getter, as in Dart.</p>
+ *
+ * <p>Delivery follows Dart's: a {@code sync: true} controller hands an event to its
+ * listeners inside add(); any other queues it and delivers it later, ONE event per
+ * microtask (see {@link Microtasks}), so two controllers fed back to back interleave
+ * exactly as they do on the Dart VM. A controller that is not broadcast keeps what was
+ * added before anyone listened and delivers it to the first listener, as Dart's
+ * single-subscription controller does.</p>
  */
 public final class StreamController<T> implements StreamSink<T> {
 
@@ -50,6 +56,7 @@ public final class StreamController<T> implements StreamSink<T> {
         @Override
         protected void onFirstListener() {
             Stream.deliverVoid(onListenHandler);
+            schedulePump();
         }
 
         @Override
@@ -74,13 +81,94 @@ public final class StreamController<T> implements StreamSink<T> {
     private Object onResumeHandler;
     private boolean paused;
     private final Completer<Object> doneCompleter = new Completer<Object>();
+    private boolean sync;
+    private boolean broadcast;
+    /// Events add()/addError()/close() queued for delivery. Headless, an async* body
+    /// adds from a thread of its own while the isolate's thread delivers, so the queue
+    /// and pumpScheduled are only touched under the lock; delivery runs outside it.
+    private final java.util.ArrayDeque<Object[]> outbox = new java.util.ArrayDeque<Object[]>();
+    private final Object outboxLock = new Object();
+    private boolean pumpScheduled;
+    private static final Integer DATA = Integer.valueOf(0);
+    private static final Integer ERROR = Integer.valueOf(1);
+    private static final Integer DONE = Integer.valueOf(2);
+
+    private void enqueue(Integer kind, Object value) {
+        synchronized (outboxLock) {
+            outbox.addLast(new Object[] {kind, value});
+        }
+        schedulePump();
+    }
+
+    private boolean outboxEmpty() {
+        synchronized (outboxLock) {
+            return outbox.isEmpty();
+        }
+    }
+
+    private void schedulePump() {
+        if (!broadcast && !theStream.hasListeners()) {
+            // Single subscription: held for the first listener (onFirstListener).
+            return;
+        }
+        synchronized (outboxLock) {
+            if (pumpScheduled || outbox.isEmpty()) {
+                return;
+            }
+            pumpScheduled = true;
+        }
+        Microtasks.schedule(new Runnable() {
+            @Override
+            public void run() {
+                synchronized (outboxLock) {
+                    pumpScheduled = false;
+                }
+                pumpOne();
+            }
+        });
+    }
+
+    /// Delivers the oldest queued event, then queues itself again behind whatever
+    /// else is waiting -- one event per microtask, as Dart delivers them.
+    @SuppressWarnings("unchecked")
+    private void pumpOne() {
+        if (!broadcast && !theStream.hasListeners()) {
+            return;
+        }
+        Object[] e;
+        synchronized (outboxLock) {
+            e = outbox.pollFirst();
+        }
+        if (e == null) {
+            return;
+        }
+        if (e[0] == DATA) {
+            theStream.emit((T) e[1]);
+        } else if (e[0] == ERROR) {
+            theStream.emitError(e[1]);
+        } else {
+            final Future<Object> pending = (Future<Object>) e[1];
+            Future<Object> delivered = theStream.emitDone();
+            delivered.onComplete(new Runnable() {
+                @Override
+                public void run() {
+                    if (!pending.isDone()) {
+                        pending.complete(null);
+                    }
+                }
+            });
+        }
+        schedulePump();
+    }
 
     public StreamController() {
     }
 
     /** Same as the plain constructor -- see the class comment. */
     public static <T> StreamController<T> broadcast() {
-        return new StreamController<T>();
+        StreamController<T> c = new StreamController<T>();
+        c.broadcast = true;
+        return c;
     }
 
     /**
@@ -94,6 +182,8 @@ public final class StreamController<T> implements StreamSink<T> {
      */
     public static <T> StreamController<T> broadcast(Object onListen, Object onCancel, Boolean sync) {
         StreamController<T> c = new StreamController<T>();
+        c.broadcast = true;
+        c.sync = sync != null && sync.booleanValue();
         c.onListen(onListen);
         c.onCancel(onCancel);
         return c;
@@ -170,8 +260,9 @@ public final class StreamController<T> implements StreamSink<T> {
         };
     }
 
-    /** Accepted for source compatibility; ignored (see the class comment). */
+    /// {@code sync: true}: deliver inside add() rather than in a later microtask.
     public void sync(boolean v) {
+        this.sync = v;
     }
 
     public Stream<T> stream() {
@@ -191,7 +282,11 @@ public final class StreamController<T> implements StreamSink<T> {
         if (closed) {
             throw new dart.core.StateError("Cannot add event after closing");
         }
-        theStream.emit(event);
+        if (sync) {
+            theStream.emit(event);
+        } else {
+            enqueue(DATA, event);
+        }
     }
 
     /// Dart's {@code addError(error, stackTrace)}: the trace travels with the error.
@@ -203,7 +298,11 @@ public final class StreamController<T> implements StreamSink<T> {
         if (closed) {
             throw new dart.core.StateError("Cannot add event after closing");
         }
-        theStream.emitError(error);
+        if (sync) {
+            theStream.emitError(error);
+        } else {
+            enqueue(ERROR, error);
+        }
     }
 
     /**
@@ -217,7 +316,15 @@ public final class StreamController<T> implements StreamSink<T> {
     public Future<Object> close() {
         if (!closed) {
             closed = true;
-            closeFuture = theStream.emitDone();
+            if (sync || outboxEmpty()
+                    || (!broadcast && !theStream.hasListeners())) {
+                // Nothing waits ahead of done (or nobody is listening to receive what
+                // does): done is delivered now, as before.
+                closeFuture = theStream.emitDone();
+            } else {
+                closeFuture = new Future<Object>();
+                enqueue(DONE, closeFuture);
+            }
             closeFuture.onComplete(new Runnable() {
                 @Override
                 public void run() {
