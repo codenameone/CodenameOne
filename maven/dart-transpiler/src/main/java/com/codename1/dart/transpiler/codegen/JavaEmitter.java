@@ -5424,7 +5424,16 @@ public final class JavaEmitter {
                 return new Out(isDynamicType(inner) ? v : "((" + javaType(inner, true, ctx) + ") " + v + ")", inner);
             }
             if (o.type != null && o.type.is("Future")) {
-                return new Out("Await.await$(" + o.code + ")", boxType(o.type.arg(0)));
+                TypeRef awaited = boxType(o.type.arg(0));
+                String pk = o.type.args.isEmpty() ? null : primitiveListKind(awaited);
+                if (pk != null) {
+                    // A Future<List<int>> from a generic runtime method completes with a
+                    // boxed DartList; the List<int> it is typed as is a DartLongList.
+                    ctx.importClass("dart.core.Dart" + pk + "List");
+                    return new Out("Dart" + pk + "List.as" + pk + "s(Await.awaitAny(" + o.code + "))",
+                            awaited);
+                }
+                return new Out("Await.await$(" + o.code + ")", awaited);
             }
             if (o.type == null || isDynamicType(o.type) || o.type.is("FutureOr")) {
                 // Might be a Future, might be a value: decided at run time.
@@ -5504,7 +5513,9 @@ public final class JavaEmitter {
                         if (token != null) {
                             call += ".providedType(" + token + ")";
                         }
-                        return new Out(call, m.returnType);
+                        // `Stream.fromIterable([1, 2])` is a Stream<int>, not the bare Stream<T>.
+                        TypeRef bound = bindStaticClassTypeParams(m, sc, cc.type.args, cc.args, ctx);
+                        return new Out(call, bound != null ? bound : m.returnType);
                     }
                 }
                 String en = cc.type.name;
@@ -10999,7 +11010,9 @@ public final class JavaEmitter {
                     return new Out("this." + n + "(" + witnessArgs(sm, c, ctx) + ")", sm.returnType);
                 }
                 if (sm != null) {
-                    return new Out("this." + n + "(" + stubMethodArgs(sm, c.args, ctx) + ")", sm.returnType);
+                    TypeRef rt = inheritedStubMemberReturnType(cc, n, false);
+                    return new Out("this." + n + "(" + stubMethodArgs(sm, c.args, ctx) + ")",
+                            rt != null ? rt : sm.returnType);
                 }
             }
             // members contributed by an applied stub mixin (e.g. RestorationMixin's
@@ -11290,7 +11303,8 @@ public final class JavaEmitter {
                     if (numeric != null) {
                         return numeric;
                     }
-                    return stubCallOut(m, c, stubSimpleName(cls, ctx) + "." + n, ctx);
+                    return stubCallOut(m, c, stubSimpleName(cls, ctx) + "." + n, ctx,
+                            bindStaticClassTypeParams(m, sc, c, ctx));
                 }
             }
             ClassDecl pc = program.classes.get(cls);
@@ -11380,7 +11394,10 @@ public final class JavaEmitter {
             if (stubSuper != null) {
                 Ast.MethodDecl sm = stubs.findMethod(stubSuper, n, false);
                 if (sm != null) {
-                    return stubCallOut(sm, c, target.code + "." + n, ctx);
+                    // `class V extends StreamView<int>`: the inherited `toList()` returns a
+                    // Future<List<int>>, not the stub's bare Future<List<T>>.
+                    return stubCallOut(sm, c, target.code + "." + n, ctx,
+                            inheritedStubMemberReturnType(pc, n, false, tt));
                 }
             }
             // a stub mixin applied by this class or by any program superclass
@@ -13896,6 +13913,11 @@ public final class JavaEmitter {
         for (int i = 0; i < m.typeParams.size(); i++) {
             TypeRef bound = i < c.typeArgs.size() ? c.typeArgs.get(i) : null;
             if (bound == null) {
+                // `Stream.fromIterable<T>(Iterable<T>)` called with a List<int>: T is
+                // what the matching argument's static type carries in that position.
+                bound = inferTypeParamFromArgs(m.typeParams.get(i), m, c.args, ctx);
+            }
+            if (bound == null) {
                 if (!triedClosure) {
                     fromClosure = inferClosureArgReturnType(c);
                     triedClosure = true;
@@ -13905,6 +13927,103 @@ public final class JavaEmitter {
             subst.put(m.typeParams.get(i), bound);
         }
         return substTypeVars(t, subst);
+    }
+
+    /**
+     * A generic method's type parameter {@code p} recovered from the positional
+     * arguments: the first parameter typed {@code p} or {@code G<..p..>} whose argument's
+     * static type has the same shape (an Iterable parameter also matches a List or Set
+     * argument, whose first type argument is the element). Null when none says.
+     */
+    private TypeRef inferTypeParamFromArgs(String p, Ast.MethodDecl m, Args args, Ctx ctx) {
+        int pi = 0;
+        for (Ast.Param prm : m.params) {
+            if (prm.named) {
+                continue;
+            }
+            if (pi >= args.positional.size()) {
+                break;
+            }
+            Expr arg = args.positional.get(pi++);
+            if (prm.type == null || !mentionsAnyTypeParam(prm.type, java.util.Collections.singletonList(p))
+                    || arg instanceof Lambda) {
+                continue;
+            }
+            Expr bare = arg;
+            while (bare instanceof ParenExpr) {
+                bare = ((ParenExpr) bare).inner;
+            }
+            TypeRef at = bare instanceof ListLit && ((ListLit) bare).elementType != null
+                    ? TypeRef.of("List", ((ListLit) bare).elementType)
+                    : bare instanceof ListLit || bare instanceof SetLit ? untypedLiteralType(bare, ctx)
+                    : inferExprTypeQuiet(bare, ctx);
+            TypeRef found = unifyTypeParam(p, prm.type, at);
+            if (found != null && !isDynamicType(found) && !found.is("var")) {
+                return found;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * A static stub factory spelled with its class's type variable
+     * ({@code Stream<T> fromIterable(Iterable<T>)} on {@code Stream<T>}): T is bound from
+     * the call's explicit class arguments or its arguments; null leaves the return as is.
+     */
+    private TypeRef bindStaticClassTypeParams(Ast.MethodDecl m, Ast.ClassDecl sc, Call c, Ctx ctx) {
+        return bindStaticClassTypeParams(m, sc, null, c.args, ctx);
+    }
+
+    private TypeRef cArgsTypeParam(String p, Ast.ClassDecl sc, List<TypeRef> explicit, Ast.MethodDecl m,
+                                   Args args, Ctx ctx) {
+        int i = sc.typeParams.indexOf(p);
+        if (explicit != null && explicit.size() == sc.typeParams.size()) {
+            return explicit.get(i);
+        }
+        return inferTypeParamFromArgs(p, m, args, ctx);
+    }
+
+    private TypeRef bindStaticClassTypeParams(Ast.MethodDecl m, Ast.ClassDecl sc, List<TypeRef> explicit,
+                                              Args args, Ctx ctx) {
+        if (sc == null || sc.typeParams.isEmpty() || m.returnType == null
+                || !mentionsAnyTypeParam(m.returnType, sc.typeParams)) {
+            return null;
+        }
+        java.util.Map<String, TypeRef> subst = new java.util.HashMap<String, TypeRef>();
+        for (String p : sc.typeParams) {
+            if (m.typeParams.contains(p)) {
+                continue;
+            }
+            TypeRef b = cArgsTypeParam(p, sc, explicit, m, args, ctx);
+            if (b != null) {
+                subst.put(p, b);
+            }
+        }
+        return subst.isEmpty() ? null : substTypeVars(m.returnType, subst);
+    }
+
+    private static final java.util.Set<String> ITERABLE_LIKE =
+            new java.util.HashSet<String>(java.util.Arrays.asList("Iterable", "List", "Set", "Queue"));
+
+    private static TypeRef unifyTypeParam(String p, TypeRef formal, TypeRef actual) {
+        if (formal == null || actual == null) {
+            return null;
+        }
+        if (formal.args.isEmpty() && formal.funcParams == null && formal.name.equals(p)) {
+            return actual;
+        }
+        boolean sameHead = formal.name.equals(actual.name)
+                || (formal.is("Iterable") && ITERABLE_LIKE.contains(actual.name));
+        if (!sameHead || formal.args.size() != actual.args.size()) {
+            return null;
+        }
+        for (int i = 0; i < formal.args.size(); i++) {
+            TypeRef r = unifyTypeParam(p, formal.args.get(i), actual.args.get(i));
+            if (r != null) {
+                return r;
+            }
+        }
+        return null;
     }
 
     /** Whether {@code t} names one of {@code params} anywhere in its (possibly nested) type arguments. */
@@ -16419,8 +16538,18 @@ public final class JavaEmitter {
             return null;
         }
         Ast.ClassDecl c = stubs.classes.get(receiver.name);
+        java.util.List<TypeRef> recvArgs = receiver.args;
+        if (c != null && recvArgs.isEmpty() && !c.typeParams.isEmpty()) {
+            // A raw receiver (a stub factory declared `static Stream fromIterable(..)`)
+            // is the class instantiated to dynamic, as Dart reads it: its `toList()` is
+            // a Future<List<dynamic>>, never one naming a T the Java code cannot see.
+            recvArgs = new java.util.ArrayList<TypeRef>();
+            for (int i = 0; i < c.typeParams.size(); i++) {
+                recvArgs.add(TypeRef.DYNAMIC);
+            }
+        }
         java.util.Map<String, TypeRef> subst =
-                paramMap(c == null ? null : c.typeParams, receiver.args);
+                paramMap(c == null ? null : c.typeParams, recvArgs);
         while (c != null) {
             for (Ast.MethodDecl m : c.methods) {
                 if (m.name.equals(member) && m.isGetter == getter && !m.isSetter) {
@@ -16452,7 +16581,20 @@ public final class JavaEmitter {
      * is not found on a stub ancestor.
      */
     private TypeRef inheritedStubMemberReturnType(ClassDecl pc, String member, boolean getter) {
+        return inheritedStubMemberReturnType(pc, member, getter, null);
+    }
+
+    /**
+     * As above, seen through a receiver typed {@code receiver}: the program class's own
+     * type variables take the receiver's arguments first ({@code Wrap<int>} of
+     * {@code class Wrap<E> extends StreamView<E>}).
+     */
+    private TypeRef inheritedStubMemberReturnType(ClassDecl pc, String member, boolean getter,
+                                                  TypeRef receiver) {
         java.util.Map<String, TypeRef> subst = new java.util.HashMap<String, TypeRef>();
+        if (receiver != null && receiver.args.size() == pc.typeParams.size()) {
+            subst.putAll(paramMap(pc.typeParams, receiver.args));
+        }
         TypeRef sup = pc.superclass;
         while (sup != null) {
             java.util.List<TypeRef> superArgs = new java.util.ArrayList<TypeRef>();

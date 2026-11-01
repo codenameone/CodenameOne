@@ -110,6 +110,18 @@ public class DartLongList extends DartList<Long> {
         return new DartLongList(grown.a, grown.len, growable);
     }
 
+    /// A List<int> value held as the primitive-backed list its static type promises:
+    /// the value itself when it already is one, otherwise a copy. A generic runtime
+    /// method (`Stream<int>.toList()`) builds a boxed DartList, which a local typed
+    /// List<int> cannot hold.
+    @SuppressWarnings("unchecked")
+    public static DartLongList asLongs(Object value) {
+        if (value == null || value instanceof DartLongList) {
+            return (DartLongList) value;
+        }
+        return fromLongs((Iterable<? extends Number>) value);
+    }
+
     public static DartLongList fromLongs(Iterable<? extends Number> elements) {
         DartLongList l = new DartLongList();
         for (Number e : elements) {

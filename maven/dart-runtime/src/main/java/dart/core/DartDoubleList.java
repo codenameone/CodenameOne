@@ -118,6 +118,18 @@ public class DartDoubleList extends DartList<Double> {
         return new DartDoubleList(grown.a, grown.len, growable);
     }
 
+    /// A List<double> value held as the primitive-backed list its static type promises:
+    /// the value itself when it already is one, otherwise a copy. A generic runtime
+    /// method (`Stream<int>.toList()`) builds a boxed DartList, which a local typed
+    /// List<double> cannot hold.
+    @SuppressWarnings("unchecked")
+    public static DartDoubleList asDoubles(Object value) {
+        if (value == null || value instanceof DartDoubleList) {
+            return (DartDoubleList) value;
+        }
+        return fromDoubles((Iterable<? extends Number>) value);
+    }
+
     public static DartDoubleList fromDoubles(Iterable<? extends Number> elements) {
         DartDoubleList l = new DartDoubleList();
         for (Number e : elements) {
