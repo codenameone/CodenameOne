@@ -44,6 +44,57 @@ abstract class Comparable<T> {
   external int compareTo(T other);
 }
 
+// --- dart:core : BigInt ----------------------------------------------------
+
+// Arbitrary-precision integers, implemented in dart.core.BigInt (no
+// java.math.BigInteger on the device). Operators map to the runtime's mangled
+// names; binary minus is declared before unary minus (both are $minus).
+@JavaName('dart.core.BigInt')
+class BigInt implements Comparable<BigInt> {
+  external static BigInt get zero;
+  external static BigInt get one;
+  external static BigInt get two;
+  external static BigInt parse(String source, {int? radix});
+  external static BigInt? tryParse(String source, {int? radix});
+  external static BigInt from(num value);
+  external BigInt operator +(BigInt other);
+  external BigInt operator -(BigInt other);
+  external BigInt operator -();
+  external BigInt operator *(BigInt other);
+  external double operator /(BigInt other);
+  external BigInt operator ~/(BigInt other);
+  external BigInt operator %(BigInt other);
+  external BigInt operator &(BigInt other);
+  external BigInt operator |(BigInt other);
+  external BigInt operator ^(BigInt other);
+  external BigInt operator ~();
+  external BigInt operator <<(int shiftAmount);
+  external BigInt operator >>(int shiftAmount);
+  external bool operator <(BigInt other);
+  external bool operator <=(BigInt other);
+  external bool operator >(BigInt other);
+  external bool operator >=(BigInt other);
+  external BigInt remainder(BigInt other);
+  external int compareTo(BigInt other);
+  external BigInt abs();
+  external int get sign;
+  external int get bitLength;
+  external bool get isEven;
+  external bool get isOdd;
+  external bool get isNegative;
+  external bool get isValidInt;
+  external int toInt();
+  external double toDouble();
+  external String toRadixString(int radix);
+  external String toString();
+  external BigInt pow(int exponent);
+  external BigInt modPow(BigInt exponent, BigInt modulus);
+  external BigInt modInverse(BigInt modulus);
+  external BigInt gcd(BigInt other);
+  external BigInt toUnsigned(int width);
+  external BigInt toSigned(int width);
+}
+
 // --- dart:core : DateTime --------------------------------------------------
 
 @JavaName('dart.core.DateTime')
