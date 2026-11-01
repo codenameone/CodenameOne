@@ -755,6 +755,7 @@ public final class AstBuilder {
                 m.returnType = tmp.returnType;
                 m.params = tmp.params;
                 m.typeParams = tmp.typeParams;
+                m.typeParamBounds = tmp.typeParamBounds;
             } else if (d.getterSignature() != null) {
                 m.isGetter = true;
                 m.name = d.getterSignature().identifier().getText();
@@ -888,6 +889,7 @@ public final class AstBuilder {
             m.returnType = tmp.returnType;
             m.params = tmp.params;
             m.typeParams = tmp.typeParams;
+                m.typeParamBounds = tmp.typeParamBounds;
         } else if (sig.getterSignature() != null) {
             m.isGetter = true;
             m.name = sig.getterSignature().identifier().getText();
@@ -942,6 +944,9 @@ public final class AstBuilder {
             for (Dart2Parser.TypeParameterContext tp
                     : sig.formalParameterPart().typeParameters().typeParameter()) {
                 fn.typeParams.add(tp.identifier().getText());
+                if (tp.typeNotVoid() != null) {
+                    fn.typeParamBounds.put(tp.identifier().getText(), buildTypeNotVoid(tp.typeNotVoid()));
+                }
             }
         }
         buildParams(sig.formalParameterPart().formalParameterList(), fn.params);
@@ -3037,10 +3042,18 @@ public final class AstBuilder {
                         lit.parts.add(cur.toString());
                         cur.setLength(0);
                     }
-                    Ident id = new Ident();
-                    id.at(file, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
-                    id.name = body.substring(i + 1, j);
-                    lit.parts.add(id);
+                    String simpleName = body.substring(i + 1, j);
+                    if ("this".equals(simpleName)) {
+                        // `$this` is the receiver itself, never an identifier lookup
+                        ThisExpr te = new ThisExpr();
+                        te.at(file, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+                        lit.parts.add(te);
+                    } else {
+                        Ident id = new Ident();
+                        id.at(file, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+                        id.name = simpleName;
+                        lit.parts.add(id);
+                    }
                     i = j;
                     continue;
                 }

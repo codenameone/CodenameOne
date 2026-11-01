@@ -489,6 +489,7 @@ public final class JavaEmitter {
             mm.returnType = m.returnType;
             mm.params = m.params;
             mm.typeParams = m.typeParams;
+            mm.typeParamBounds = m.typeParamBounds;
             mm.body = m.body;
             mm.exprBody = m.exprBody;
             body.append(emitMethodLike(mm, ctx, false));
@@ -827,6 +828,7 @@ public final class JavaEmitter {
             m.returnType = f.returnType;
             m.params = f.params;
             m.typeParams = f.typeParams;
+            m.typeParamBounds = f.typeParamBounds;
             m.body = f.body;
             m.exprBody = f.exprBody;
             body.append(emitMethodLike(m, ctx, false));
@@ -1148,6 +1150,7 @@ public final class JavaEmitter {
             }
             mm.params = m.params;
             mm.typeParams = m.typeParams;
+            mm.typeParamBounds = m.typeParamBounds;
             mm.body = m.body;
             mm.exprBody = m.exprBody;
             if (!c.isMixin) {
@@ -1281,6 +1284,8 @@ public final class JavaEmitter {
                     mm.returnType = m.returnType == null ? TypeRef.DYNAMIC : m.returnType;
                     mm.params = m.params;
                     mm.typeParams = m.typeParams;
+                    mm.typeParamBounds = m.typeParamBounds;
+            mm.typeParamBounds = m.typeParamBounds;
                     mm.body = m.body;
                     mm.exprBody = m.exprBody;
                     body.append(emitMethodLike(mm, ctx, false));
@@ -2665,6 +2670,7 @@ public final class JavaEmitter {
         /** The Java return type when it must differ from the Dart one's (see interfaceBridges). */
         String javaReturn;
         List<String> typeParams = new ArrayList<String>();
+        java.util.Map<String, TypeRef> typeParamBounds = new java.util.HashMap<String, TypeRef>();
         List<Param> params = new ArrayList<Param>();
         Block body;
         Expr exprBody;
@@ -3015,6 +3021,16 @@ public final class JavaEmitter {
     }
 
     private String emitMethodLike(Method m, Ctx ctx, boolean classIsAbstract) {
+        java.util.Map<String, TypeRef> savedBounds = ctx.methodTypeParamBounds;
+        ctx.methodTypeParamBounds = m.typeParamBounds;
+        try {
+            return emitMethodLikeBody(m, ctx, classIsAbstract);
+        } finally {
+            ctx.methodTypeParamBounds = savedBounds;
+        }
+    }
+
+    private String emitMethodLikeBody(Method m, Ctx ctx, boolean classIsAbstract) {
         StringBuilder sb = new StringBuilder();
         TypeRef rt = m.returnType == null || m.returnType.is("var") ? TypeRef.DYNAMIC : m.returnType;
         // Dart's `int get hashCode` / `int compareTo(...)` map to Java's Object.hashCode /
@@ -3731,15 +3747,28 @@ public final class JavaEmitter {
             restorePromotions(undo, ctx);
             ctx.popScope();
             ctx.indent(-1);
+            // `x is! T` false in the else branch, and after the if when the then branch
+            // always leaves (`if (x is! T) return ...;`): x is a T from there on.
+            boolean thenLeaves = stmtTerminates(i.thenStmt);
             if (i.elseStmt != null) {
                 w.line("} else {");
                 ctx.indent(1);
                 ctx.pushScope();
+                List<Object[]> neg = new ArrayList<Object[]>();
+                collectNegativePromotions(i.condition, ctx, neg);
                 emitStatement(unwrapBlock(i.elseStmt), ctx);
+                restorePromotions(neg, ctx);
                 ctx.popScope();
                 ctx.indent(-1);
             }
             w.line("}");
+            if (thenLeaves && i.elseStmt == null) {
+                List<Object[]> neg = new ArrayList<Object[]>();
+                collectNegativePromotions(i.condition, ctx, neg);
+                if (!ctx.promoteForScope(neg)) {
+                    restorePromotions(neg, ctx);
+                }
+            }
         } else if (s instanceof WhileStmt) {
             WhileStmt wh = (WhileStmt) s;
             Lazy c = emitLazyOperand(wh.condition, TypeRef.BOOL, ctx, 1);
@@ -7350,7 +7379,8 @@ public final class JavaEmitter {
                 if (stubs.isStubClass(mixRef.name)) {
                     Ast.MethodDecl sg = stubs.findMethod(mixRef.name, name, true);
                     if (sg != null) {
-                        return new Out(target.code + "." + name + "()", sg.returnType);
+                        return new Out(target.code + "." + name + "()",
+                                substMixinMember(sg.returnType, mixRef, pc, tt));
                     }
                 }
             }
@@ -8212,7 +8242,51 @@ public final class JavaEmitter {
             return expected;
         }
         TypeRef anc = commonAncestor(a.name, b.name);
+        if (anc == null || anc.is("Object")) {
+            // `cond ? this : other` in a mixin that implements other's type: the superclass
+            // chains meet only at Object, but one arm already is the other's interface type.
+            if (implementsName(a.name, b.name)) {
+                return b;
+            }
+            if (implementsName(b.name, a.name)) {
+                return a;
+            }
+        }
         return anc != null ? anc : new TypeRef("Object");
+    }
+
+    /** Whether {@code sub} reaches {@code sup} through superclasses, interfaces or mixins. */
+    private boolean implementsName(String sub, String sup) {
+        if (sub == null || sup == null) {
+            return false;
+        }
+        java.util.ArrayDeque<String> queue = new java.util.ArrayDeque<String>();
+        java.util.Set<String> seen = new java.util.HashSet<String>();
+        queue.add(sub);
+        seen.add(sub);
+        while (!queue.isEmpty()) {
+            String cur = queue.poll();
+            if (cur.equals(sup)) {
+                return true;
+            }
+            ClassDecl pc = program.classes.get(cur);
+            Ast.ClassDecl sc = pc != null ? pc : stubs.classes.get(cur);
+            if (sc == null) {
+                continue;
+            }
+            java.util.List<TypeRef> edges = new java.util.ArrayList<TypeRef>();
+            if (sc.superclass != null) {
+                edges.add(sc.superclass);
+            }
+            edges.addAll(sc.interfaces);
+            edges.addAll(sc.mixins);
+            for (TypeRef t : edges) {
+                if (t != null && seen.add(t.name)) {
+                    queue.add(t.name);
+                }
+            }
+        }
+        return false;
     }
 
     /** Nearest common ancestor class name of two types (program or stub), or null. */
@@ -13250,6 +13324,26 @@ public final class JavaEmitter {
         return null;
     }
 
+    /**
+     * A stub mixin member's type seen through {@code class C<E> with M<E>} on a receiver
+     * typed {@code C<X>}: the mixin's parameters become the with-clause arguments, and
+     * those the receiver's (`QueueList<Result<T>>.first` is a Result<T>, not an E).
+     */
+    private TypeRef substMixinMember(TypeRef t, TypeRef mixRef, ClassDecl pc, TypeRef receiver) {
+        if (t == null) {
+            return null;
+        }
+        Ast.ClassDecl mx = stubs.classes.get(mixRef.name);
+        if (mx == null || mx.typeParams.isEmpty() || mixRef.args.size() != mx.typeParams.size()) {
+            return t;
+        }
+        TypeRef r = substituteTypeParam(t, mx.typeParams, mixRef.args);
+        if (receiver != null && receiver.args.size() == pc.typeParams.size() && !pc.typeParams.isEmpty()) {
+            r = substituteTypeParam(r, pc.typeParams, receiver.args);
+        }
+        return r;
+    }
+
     /** {@code types} with each occurrence of {@code params[i]} replaced by {@code args[i]}. */
     private List<TypeRef> substituteTypeParams(List<TypeRef> types, List<String> params, List<TypeRef> args) {
         List<TypeRef> out = new ArrayList<TypeRef>();
@@ -15126,13 +15220,31 @@ public final class JavaEmitter {
     private Out typeParamBoundView(Out target, Ctx ctx) {
         TypeRef tt = target.type;
         ClassDecl cc = ctx.currentClass;
-        if (tt == null || tt.name == null || !tt.args.isEmpty() || tt.funcReturn != null || cc == null
-                || cc.typeParamBounds == null || !cc.typeParams.contains(tt.name)) {
+        if (tt == null || tt.name == null || !tt.args.isEmpty() || tt.funcReturn != null) {
             return null;
         }
-        TypeRef bound = cc.typeParamBounds.get(tt.name);
+        TypeRef bound = null;
+        java.util.Map<String, TypeRef> mb = ctx.methodTypeParamBounds;
+        if (mb != null && mb.containsKey(tt.name)) {
+            // a method's own type parameter shadows the class's
+            bound = mb.get(tt.name);
+            if (bound != null && (mb.containsKey(bound.name)
+                    || (cc != null && cc.typeParams.contains(bound.name)))) {
+                return null;
+            }
+        } else {
+            if (cc == null || cc.typeParamBounds == null || !cc.typeParams.contains(tt.name)) {
+                return null;
+            }
+            bound = cc.typeParamBounds.get(tt.name);
+            if (bound != null && cc.typeParams.contains(bound.name)) {
+                return null;
+            }
+        }
+        // Comparable bounds keep the type-variable compareTo path (DartComparable.compare,
+        // answering Dart's int), never java.lang.Comparable's int-returning compareTo.
         if (bound == null || bound.name == null || bound.name.equals(tt.name)
-                || cc.typeParams.contains(bound.name)) {
+                || bound.name.equals("Comparable")) {
             return null;
         }
         if (programClass(bound.name, ctx) == null && !stubs.isStubClass(bound.name)) {
@@ -15487,6 +15599,8 @@ public final class JavaEmitter {
     // ==================================================================
 
     private final class Ctx {
+        /// Declared bounds of the type parameters of the method being emitted (`m<T extends B>`).
+        java.util.Map<String, TypeRef> methodTypeParamBounds;
         /**
          * The Java temp holding what the innermost enclosing catch clause caught, which
          * {@code rethrow;} throws again as it is -- the same object, so its stack trace and
@@ -15606,14 +15720,33 @@ public final class JavaEmitter {
         final List<Map<String, String>> renameScopes = new ArrayList<Map<String, String>>();
         private int shadowCounter;
 
+        /// Promotions that hold until the scope ends (`if (x is! T) return;`), one list per scope.
+        final List<List<Object[]>> scopePromotions = new ArrayList<List<Object[]>>();
+
         void pushScope() {
             scopes.add(new LinkedHashMap<String, TypeRef>());
             renameScopes.add(new LinkedHashMap<String, String>());
+            scopePromotions.add(new ArrayList<Object[]>());
         }
 
         void popScope() {
             scopes.remove(scopes.size() - 1);
             renameScopes.remove(renameScopes.size() - 1);
+            if (!scopePromotions.isEmpty()) {
+                List<Object[]> undo = scopePromotions.remove(scopePromotions.size() - 1);
+                for (int i = undo.size() - 1; i >= 0; i--) {
+                    restorePromotion((String) undo.get(i)[0], (TypeRef) undo.get(i)[1]);
+                }
+            }
+        }
+
+        /// Records promotions to undo when the innermost scope ends; false when there is none.
+        boolean promoteForScope(List<Object[]> undo) {
+            if (scopePromotions.isEmpty()) {
+                return false;
+            }
+            scopePromotions.get(scopePromotions.size() - 1).addAll(undo);
+            return true;
         }
 
         void declare(String name, TypeRef type) {

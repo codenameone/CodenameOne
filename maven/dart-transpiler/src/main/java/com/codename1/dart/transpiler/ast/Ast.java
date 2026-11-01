@@ -355,6 +355,7 @@ public final class Ast {
         public TypeRef returnType;                // may be VAR (=> inferred) or VOID
         public String name;
         public List<String> typeParams = new ArrayList<String>();  // generic method: m<T>(...)
+        public java.util.Map<String, TypeRef> typeParamBounds = new java.util.HashMap<String, TypeRef>();
         public List<Param> params = new ArrayList<Param>();
         public boolean isStatic;
         public boolean isGetter;
@@ -379,6 +380,7 @@ public final class Ast {
         public boolean isGetter;                  // top-level `T get x => ...`
         public boolean isSetter;                  // top-level `set x(v) { ... }`
         public List<String> typeParams = new ArrayList<String>();  // generic function: fn<T>(...)
+        public java.util.Map<String, TypeRef> typeParamBounds = new java.util.HashMap<String, TypeRef>();
         public List<Param> params = new ArrayList<Param>();
         public Block body;
         public Expr exprBody;
