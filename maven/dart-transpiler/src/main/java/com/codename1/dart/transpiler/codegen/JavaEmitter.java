@@ -5728,7 +5728,8 @@ public final class JavaEmitter {
     private Out resolveTopLevel(String n, String prefix, Ctx ctx) {
         if (program.classes.containsKey(n) || program.enums.containsKey(n)
                 || stubs.isStubClass(n) || stubs.isStubEnum(n)
-                || n.equals("Future") || n.equals("Duration") || n.equals("Iterable")) {
+                || n.equals("Future") || n.equals("Duration") || n.equals("Iterable")
+                || CORE_STATIC_RECEIVERS.contains(n)) {
             return new Out(n, classRef(n));
         }
         if (program.topLevelVars.containsKey(n)) {
@@ -6060,6 +6061,22 @@ public final class JavaEmitter {
                     return new Out(cls + (isLazyStatic(f) || isLateChecked(f, pc) ? ".get$" + name + "()" : "." + name),
                             fieldType(f, ctx));
                 }
+            }
+            if (cls.equals("DateTime") && pc == null) {
+                int dc = java.util.Arrays.asList("monday", "tuesday", "wednesday", "thursday", "friday",
+                        "saturday", "sunday").indexOf(name);
+                int mc = java.util.Arrays.asList("january", "february", "march", "april", "may", "june", "july",
+                        "august", "september", "october", "november", "december").indexOf(name);
+                if (name.equals("daysPerWeek") || name.equals("monthsPerYear")) {
+                    return new Out(name.equals("daysPerWeek") ? "7L" : "12L", TypeRef.INT);
+                }
+                if (dc >= 0 || mc >= 0) {
+                    return new Out((dc >= 0 ? dc + 1 : mc + 1) + "L", TypeRef.INT);
+                }
+            }
+            if (CORE_STATIC_RECEIVERS.contains(cls) && pc == null) {
+                diags.error(posNode, "E0131", "static member " + name + " of core type " + cls + " is not implemented");
+                return new Out("null", TypeRef.DYNAMIC, true);
             }
             diags.error(posNode, "E0131", "Cannot resolve static member '" + name + "' on " + cls);
             return new Out("null", TypeRef.DYNAMIC, true);
@@ -7995,6 +8012,7 @@ public final class JavaEmitter {
         CORE_ERRORS.put("ConcurrentModificationError", "dart.core.ConcurrentModificationError");
         CORE_ERRORS.put("TypeError", "dart.core.TypeError");
         CORE_ERRORS.put("NoSuchMethodError", "dart.core.NoSuchMethodError");
+        CORE_ERRORS.put("AssertionError", "dart.core.AssertionError");
     }
 
     /**
@@ -8765,6 +8783,15 @@ public final class JavaEmitter {
         if (n.equals("Duration")) {
             return emitDurationOf(c.args, ctx);
         }
+        Out collection = emitCollectionClassCtor(c, n, ctx);
+        if (collection != null) {
+            return collection;
+        }
+        if (n.equals("identityHashCode") && c.args.positional.size() == 1 && resolveTopLevel(n, ctx) == null) {
+            ctx.importClass("dart.core.CoreStatics");
+            return new Out("CoreStatics.identityHashCode(" + emitExpr(c.args.positional.get(0), null, ctx).code + ")",
+                    TypeRef.INT);
+        }
         // dart:core exception constructors
         String coreError = CORE_ERRORS.get(n);
         if (coreError != null) {
@@ -9002,8 +9029,26 @@ public final class JavaEmitter {
                 return new Out("DartIterable.<Object>generate(" + count + gen + ")",
                         TypeRef.of("Iterable", TypeRef.DYNAMIC));
             }
+            Out coreStatic = emitCoreStaticCall(cls, c, ctx);
+            if (coreStatic != null) {
+                return coreStatic;
+            }
             if (cls.equals("Future")) {
                 ctx.importClass("dart.async.Future");
+                if (n.equals("sync") || n.equals("microtask")) {
+                    Out f = emitExpr(c.args.positional.get(0), inlineFuncType0(TypeRef.DYNAMIC), ctx);
+                    if (n.equals("microtask")) {
+                        ctx.importClass("dart.core.Duration");
+                        return new Out("Future.delayed(Duration.zero, (dart.runtime.Funcs.Func0<Object>) "
+                                + paren(f.code) + ")", TypeRef.of("Future", TypeRef.DYNAMIC));
+                    }
+                    ctx.importClass("dart.core.CoreStatics");
+                    return new Out("CoreStatics.futureSync(" + f.code + ")", TypeRef.of("Future", TypeRef.DYNAMIC));
+                }
+                if (n.equals("error")) {
+                    return new Out("Future.error(" + emitExpr(c.args.positional.get(0), null, ctx).code + ")",
+                            TypeRef.of("Future", TypeRef.DYNAMIC));
+                }
                 if (n.equals("delayed")) {
                     String dur = emitExpr(c.args.positional.get(0), new TypeRef("Duration"), ctx).code;
                     String comp = c.args.positional.size() > 1
@@ -9483,6 +9528,25 @@ public final class JavaEmitter {
             if (n.equals("addAll")) {
                 return new Out(target.code + ".addAllIterable(" + emitExpr(pos.get(0), null, ctx).code + ")", TypeRef.VOID);
             }
+            // dart:collection's Queue is a List here (AstBuilder.collectionAlias); its own
+            // end operations are the List ones at index 0 / the end.
+            if (tt.is("List") && (n.equals("addLast") || n.equals("addFirst")) && pos.size() == 1) {
+                if (n.equals("addFirst")) {
+                    return new Out(target.code + ".insert(0L, " + coerce(emitExpr(pos.get(0), elem, ctx), elem, ctx) + ")",
+                            TypeRef.VOID);
+                }
+                Call add = new Call();
+                add.file = c.file;
+                add.line = c.line;
+                add.col = c.col;
+                add.target = c.target;
+                add.name = "add";
+                add.args = c.args;
+                return emitMethodCallOn(target, add, ctx);
+            }
+            if (tt.is("List") && n.equals("removeFirst") && pos.isEmpty()) {
+                return new Out(target.code + ".removeAt(0L)", elem);
+            }
             if (n.equals("insert")) {
                 return new Out(target.code + ".insert(" + emitExpr(pos.get(0), TypeRef.INT, ctx).code
                         + ", " + emitExpr(pos.get(1), elem, ctx).code + ")", TypeRef.VOID);
@@ -9692,7 +9756,10 @@ public final class JavaEmitter {
                 return new Out(unboxPrimitiveResult(call, elem), elem);
             }
             if (n.equals("reduce")) {
-                String call = target.code + ".reduce(" + emitExpr(pos.get(0), null, ctx).code + ")";
+                // The combiner is (E, E) -> E: typed so `(a, b) => a + b` on a List<int> adds
+                // longs rather than dispatching dynamically into an Object result.
+                TypeRef combine = elem == null || isDynamicType(elem) ? null : inlineFuncType2(elem, elem, elem);
+                String call = target.code + ".reduce(" + emitExpr(pos.get(0), combine, ctx).code + ")";
                 return new Out(unboxPrimitiveResult(call, elem), elem);
             }
             if (n.equals("expand")) {
@@ -10015,6 +10082,239 @@ public final class JavaEmitter {
         if (ctor.equals("error")) {
             return new Out("Future.error(" + emitExpr(pos.get(0), null, ctx).code + ")",
                     TypeRef.of("Future", TypeRef.DYNAMIC));
+        }
+        return null;
+    }
+
+    /**
+     * dart:collection's concrete collection constructors ({@code HashMap<K, V>()},
+     * {@code SplayTreeSet<E>(compare)}, {@code Queue<E>()}, {@code UnmodifiableListView(src)})
+     * built as the built-in Map/Set/List they alias (see AstBuilder.collectionAlias), so the
+     * result has every built-in member. Null when {@code n} is not one of them, or names a
+     * class of the program.
+     */
+    private Out emitCollectionClassCtor(Call c, String n, Ctx ctx) {
+        String alias = com.codename1.dart.transpiler.parser.AstBuilder.collectionAlias(n);
+        if (alias.equals(n) || program.classes.containsKey(n) || stubs.isStubClass(n)) {
+            return null;
+        }
+        List<TypeRef> ta = c.typeArgs;
+        boolean isMap = alias.equals("Map");
+        TypeRef a0 = ta.isEmpty() ? TypeRef.DYNAMIC : ta.get(0);
+        TypeRef a1 = ta.size() < 2 ? TypeRef.DYNAMIC : ta.get(1);
+        TypeRef type = isMap ? TypeRef.of("Map", a0, a1) : TypeRef.of(alias, a0);
+        List<Expr> pos = c.args.positional;
+        if (n.startsWith("SplayTree")) {
+            ctx.importClass("dart.collection." + n);
+            String witness = isMap ? "<" + javaType(a0, true, ctx) + ", " + javaType(a1, true, ctx) + ">"
+                    : "<" + javaType(a0, true, ctx) + ">";
+            String cmp = "";
+            Expr cmpE = pos.isEmpty() ? null : pos.get(0);
+            for (NamedArg na : c.args.named) {
+                if (na.name.equals("compare")) {
+                    cmpE = na.value;
+                }
+            }
+            if (cmpE != null) {
+                String j = javaType(a0, true, ctx);
+                cmp = "(dart.runtime.Funcs.Func2<" + j + ", " + j + ", Long>) "
+                        + paren(emitExpr(cmpE, inlineFuncType2(a0, a0, TypeRef.INT), ctx).code);
+            }
+            return new Out("new " + n + witness + "(" + cmp + ")", type);
+        }
+        if (!pos.isEmpty()) {
+            // UnmodifiableListView(src) / UnmodifiableMapView(map): a copy through the
+            // existing factories (unmodifiable for the views).
+            CtorCall cc = new CtorCall();
+            cc.file = c.file;
+            cc.line = c.line;
+            cc.col = c.col;
+            cc.type = type;
+            cc.ctorName = n.startsWith("Unmodifiable") && !isMap ? "unmodifiable" : "from";
+            cc.args.positional.add(pos.get(0));
+            return emitExpr(cc, type, ctx);
+        }
+        if (isMap) {
+            MapLit m = new MapLit();
+            m.keyType = a0;
+            m.valueType = a1;
+            m.file = c.file;
+            m.line = c.line;
+            m.col = c.col;
+            return emitExpr(m, type, ctx);
+        }
+        if (alias.equals("Set")) {
+            SetLit sl = new SetLit();
+            sl.elementType = a0;
+            sl.file = c.file;
+            sl.line = c.line;
+            sl.col = c.col;
+            return emitExpr(sl, type, ctx);
+        }
+        ListLit l = new ListLit();
+        l.elementType = a0;
+        l.file = c.file;
+        l.line = c.line;
+        l.col = c.col;
+        return emitExpr(l, type, ctx);
+    }
+
+    /** dart:core type names that only ever appear as the receiver of a static member here. */
+    private static final java.util.Set<String> CORE_STATIC_RECEIVERS = new java.util.HashSet<String>(
+            java.util.Arrays.asList("List", "Map", "Set", "String", "bool", "int", "double", "num",
+                    "RangeError", "ArgumentError"));
+
+    private String posArg(Call c, int i, TypeRef t, Ctx ctx) {
+        return i < c.args.positional.size() ? emitExpr(c.args.positional.get(i), t, ctx).code : "null";
+    }
+
+    private Expr namedArg(Call c, String name) {
+        for (NamedArg na : c.args.named) {
+            if (na.name.equals(name)) {
+                return na.value;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Static members of dart:core types called on the type name: {@code List.of(x)},
+     * {@code String.fromCharCode(65)}, {@code RangeError.checkNotNegative(n)},
+     * {@code Uri.encodeComponent(s)}. The collection factories route through the same
+     * code as their constructor-call form ({@code List<int>.of(x)}). Null for any other
+     * class; a core type with an unknown member is reported here, by name.
+     */
+    private Out emitCoreStaticCall(String cls, Call c, Ctx ctx) {
+        if (program.classes.containsKey(cls)) {
+            return null;
+        }
+        String n = c.name;
+        List<Expr> pos = c.args.positional;
+        if (cls.equals("List") || cls.equals("Map") || cls.equals("Set")
+                || (cls.equals("Iterable") && n.equals("empty"))) {
+            if (n.equals("empty")) {
+                ListLit l = new ListLit();
+                l.file = c.file;
+                l.line = c.line;
+                l.col = c.col;
+                l.elementType = TypeRef.DYNAMIC;
+                return emitExpr(l, null, ctx);
+            }
+            if (c.typeArgs.isEmpty() && (cls.equals("List") || cls.equals("Set"))
+                    && (n.equals("of") || n.equals("from")) && pos.size() == 1 && c.args.named.isEmpty()) {
+                // No type argument: a List<dynamic> copy, whatever the source's element type.
+                String rt = cls.equals("List") ? "DartList" : "DartSet";
+                ctx.importClass("dart.core." + rt);
+                Out src = emitExpr(pos.get(0), null, ctx);
+                String code = paren(src.code);
+                return new Out(rt + ".<Object>from((Iterable<Object>) (Iterable<?>) " + code + ")",
+                        TypeRef.of(cls, TypeRef.DYNAMIC));
+            }
+            CtorCall cc = new CtorCall();
+            cc.file = c.file;
+            cc.line = c.line;
+            cc.col = c.col;
+            cc.type = new TypeRef(cls);
+            cc.type.args.addAll(c.typeArgs);
+            cc.ctorName = cls.equals("List") && n.equals("of") ? "from" : n;
+            cc.args = c.args;
+            if (cls.equals("Map") && n.equals("unmodifiable")) {
+                cc.ctorName = "from";
+            }
+            Out o = emitExpr(cc, null, ctx);
+            return o;
+        }
+        if (cls.equals("String") || cls.equals("bool") || cls.equals("int")) {
+            if (n.equals("fromEnvironment")) {
+                Expr dv = namedArg(c, "defaultValue");
+                TypeRef t = cls.equals("String") ? TypeRef.STRING : cls.equals("bool") ? TypeRef.BOOL : TypeRef.INT;
+                if (dv != null) {
+                    return emitExpr(dv, t, ctx);
+                }
+                return new Out(cls.equals("String") ? "\"\"" : cls.equals("bool") ? "false" : "0L", t);
+            }
+            if (cls.equals("bool") && n.equals("hasEnvironment")) {
+                return new Out("false", TypeRef.BOOL);
+            }
+        }
+        if (cls.equals("String") && (n.equals("fromCharCode") || n.equals("fromCharCodes"))) {
+            ctx.importClass("dart.core.CoreStatics");
+            return new Out("CoreStatics." + n + "(" + posArg(c, 0, n.equals("fromCharCode") ? TypeRef.INT : null, ctx) + ")",
+                    TypeRef.STRING);
+        }
+        if (cls.equals("Uri")) {
+            if (n.equals("encodeComponent") || n.equals("encodeQueryComponent") || n.equals("decodeQueryComponent")) {
+                ctx.importClass("dart.core.CoreStatics");
+                return new Out("CoreStatics." + n + "(" + posArg(c, 0, TypeRef.STRING, ctx) + ")", TypeRef.STRING);
+            }
+            if (n.equals("decodeComponent")) {
+                ctx.importClass("dart.core.DartUri");
+                return new Out("DartUri.decodeComponent(" + posArg(c, 0, TypeRef.STRING, ctx) + ")", TypeRef.STRING);
+            }
+            return null;
+        }
+        if (cls.equals("RangeError")) {
+            ctx.importClass("dart.core.RangeError");
+            TypeRef nl = new TypeRef("int");
+            nl.nullable = true;
+            String a0 = posArg(c, 0, TypeRef.INT, ctx);
+            if (n.equals("checkValidRange") && pos.size() >= 3) {
+                return new Out("RangeError.checkValidRange(" + a0 + ", (Long) " + paren(posArg(c, 1, nl, ctx))
+                        + ", " + posArg(c, 2, TypeRef.INT, ctx) + ")", TypeRef.INT);
+            }
+            if (n.equals("checkNotNegative")) {
+                return new Out("RangeError.checkNotNegative(" + a0 + ", (String) " + paren(posArg(c, 1, TypeRef.STRING, ctx))
+                        + ")", TypeRef.INT);
+            }
+            if (n.equals("checkValueInInterval")) {
+                return new Out("RangeError.checkValueInInterval(" + a0 + ", " + posArg(c, 1, TypeRef.INT, ctx) + ", "
+                        + posArg(c, 2, TypeRef.INT, ctx) + ", (String) " + paren(posArg(c, 3, TypeRef.STRING, ctx)) + ")",
+                        TypeRef.INT);
+            }
+            if (n.equals("checkValidIndex")) {
+                return new Out("RangeError.checkValidIndex(" + a0 + ", (Object) " + paren(posArg(c, 1, null, ctx))
+                        + ", (String) " + paren(posArg(c, 2, TypeRef.STRING, ctx)) + ", (Long) "
+                        + paren(posArg(c, 3, nl, ctx)) + ")", TypeRef.INT);
+            }
+            if (n.equals("range")) {
+                return new Out("RangeError.range(" + a0 + ", (Long) " + paren(posArg(c, 1, nl, ctx)) + ", (Long) "
+                        + paren(posArg(c, 2, nl, ctx)) + ", (String) " + paren(posArg(c, 3, TypeRef.STRING, ctx))
+                        + ", (String) " + paren(posArg(c, 4, TypeRef.STRING, ctx)) + ")", new TypeRef("RangeError"));
+            }
+            if (n.equals("value")) {
+                return new Out("RangeError.value(" + a0 + ", (String) " + paren(posArg(c, 1, TypeRef.STRING, ctx))
+                        + ", (String) " + paren(posArg(c, 2, TypeRef.STRING, ctx)) + ")", new TypeRef("RangeError"));
+            }
+            if (n.equals("index")) {
+                return new Out("RangeError.index(" + a0 + ", (Object) " + paren(posArg(c, 1, null, ctx))
+                        + ", (String) " + paren(posArg(c, 2, TypeRef.STRING, ctx)) + ", (String) "
+                        + paren(posArg(c, 3, TypeRef.STRING, ctx)) + ", (Long) " + paren(posArg(c, 4, nl, ctx)) + ")",
+                        new TypeRef("RangeError"));
+            }
+        }
+        if (cls.equals("ArgumentError")) {
+            if (n.equals("checkNotNull")) {
+                ctx.importClass("dart.core.CoreStatics");
+                Out v = emitExpr(pos.get(0), null, ctx);
+                return new Out("CoreStatics.checkNotNull(" + boxIfPrimitive(v, ctx) + ", (String) "
+                        + paren(posArg(c, 1, TypeRef.STRING, ctx)) + ")", v.type);
+            }
+            if (n.equals("notNull")) {
+                ctx.importClass("dart.core.CoreStatics");
+                return new Out("CoreStatics.notNull(" + posArg(c, 0, TypeRef.STRING, ctx) + ")",
+                        new TypeRef("ArgumentError"));
+            }
+            if (n.equals("value")) {
+                ctx.importClass("dart.core.ArgumentError");
+                Out v = pos.isEmpty() ? new Out("null", TypeRef.NULL) : emitExpr(pos.get(0), null, ctx);
+                return new Out("ArgumentError.value(" + boxIfPrimitive(v, ctx) + ", (String) "
+                        + paren(posArg(c, 1, TypeRef.STRING, ctx)) + ", (String) "
+                        + paren(posArg(c, 2, TypeRef.STRING, ctx)) + ")", new TypeRef("ArgumentError"));
+            }
+        }
+        if (CORE_STATIC_RECEIVERS.contains(cls) && !stubs.isStubClass(cls)) {
+            diags.error(c, "E0129", "static member " + n + " of core type " + cls + " is not implemented");
+            return new Out("null", TypeRef.DYNAMIC, true);
         }
         return null;
     }
@@ -11652,6 +11952,22 @@ public final class JavaEmitter {
     }
 
     /** An inline single-parameter function type {@code (param) -> ret}, for typing a lambda arg. */
+    private TypeRef inlineFuncType2(TypeRef p1, TypeRef p2, TypeRef ret) {
+        TypeRef t = new TypeRef("Function");
+        t.funcParams = new ArrayList<TypeRef>();
+        t.funcParams.add(p1 != null ? p1 : TypeRef.DYNAMIC);
+        t.funcParams.add(p2 != null ? p2 : TypeRef.DYNAMIC);
+        t.funcReturn = ret != null ? ret : TypeRef.DYNAMIC;
+        return t;
+    }
+
+    private TypeRef inlineFuncType0(TypeRef ret) {
+        TypeRef t = new TypeRef("Function");
+        t.funcParams = new ArrayList<TypeRef>();
+        t.funcReturn = ret;
+        return t;
+    }
+
     private TypeRef inlineFuncType(TypeRef param, TypeRef ret) {
         TypeRef t = new TypeRef("Function");
         t.funcParams = new ArrayList<TypeRef>();
@@ -12704,6 +13020,12 @@ public final class JavaEmitter {
         // A Dart List/Set flowing into an Iterable target: the runtime List/Set is not a
         // DartIterable, so bridge with asIterable().
         if (target.is("Iterable") && o.type != null && (o.type.is("List") || o.type.is("Set"))) {
+            // `Iterable<int?> x = [1, null, 2]` built the list as List<Object>: the element
+            // Java types differ, so the bridged view is retyped through Object.
+            if (!target.args.isEmpty() && !o.type.args.isEmpty() && isFullyConcrete(target)
+                    && !javaType(target.arg(0), true, ctx).equals(javaType(o.type.arg(0), true, ctx))) {
+                return "((" + javaType(target, false, ctx) + ") (Object) " + paren(o.code) + ".asIterable())";
+            }
             return paren(o.code) + ".asIterable()";
         }
         // A concrete generic target whose value is a proper subtype with different type arguments

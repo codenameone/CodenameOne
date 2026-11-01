@@ -1088,6 +1088,27 @@ public final class AstBuilder {
         return buildTypeNotVoidNotFunction(ctx.typeNotVoidNotFunction());
     }
 
+    /**
+     * dart:collection's concrete collections, as a type annotation, are the built-in Map,
+     * Set and List: they are emitted as those (SplayTree* as sorted subclasses of them), so
+     * every member the emitter knows on the built-in types works on a variable declared
+     * with one of these names.
+     */
+    public static String collectionAlias(String name) {
+        if (name.equals("HashMap") || name.equals("LinkedHashMap") || name.equals("SplayTreeMap")
+                || name.equals("UnmodifiableMapView") || name.equals("MapView")) {
+            return "Map";
+        }
+        if (name.equals("HashSet") || name.equals("LinkedHashSet") || name.equals("SplayTreeSet")) {
+            return "Set";
+        }
+        if (name.equals("Queue") || name.equals("ListQueue") || name.equals("DoubleLinkedQueue")
+                || name.equals("UnmodifiableListView")) {
+            return "List";
+        }
+        return name;
+    }
+
     private TypeRef buildTypeNotVoidNotFunction(Dart2Parser.TypeNotVoidNotFunctionContext ctx) {
         if (ctx == null) {
             // Error recovery (a syntax the grammar lacks, e.g. a record type after `as`)
@@ -1104,7 +1125,7 @@ public final class AstBuilder {
             pos(t, ctx);
             return t;
         }
-        TypeRef t = new TypeRef(ctx.typeName().getText());
+        TypeRef t = new TypeRef(collectionAlias(ctx.typeName().getText()));
         pos(t, ctx);
         if (ctx.typeArguments() != null) {
             for (Dart2Parser.TypeContext a : ctx.typeArguments().typeList().type()) {
