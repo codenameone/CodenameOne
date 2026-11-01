@@ -33,7 +33,7 @@ import dart.runtime.Funcs;
  * {@link #addLong(long)}) never box; the inherited Dart/Java list surface still works (boxing only at
  * that generic boundary) because {@link DartList} routes through the overridden {@code get/set/size/add}.
  */
-public final class DartLongList extends DartList<Long> {
+public class DartLongList extends DartList<Long> {
 
     private long[] a;
     private int len;
@@ -41,6 +41,12 @@ public final class DartLongList extends DartList<Long> {
     public DartLongList() {
         super(true);
         a = new long[8];
+    }
+
+    /// For a typed-data view (dart.typed_data) that keeps its own storage: fixed
+    /// length, and every storage accessor overridden by the subclass.
+    protected DartLongList(boolean fixedLength) {
+        super(!fixedLength, false);
     }
 
     private DartLongList(long[] a, int len, boolean growable) {

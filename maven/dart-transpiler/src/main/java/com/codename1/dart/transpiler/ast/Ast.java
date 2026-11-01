@@ -389,6 +389,10 @@ public final class Ast {
         public List<Stmt> statements = new ArrayList<Stmt>();
     }
 
+    /** {@code rethrow;} -- throws again what the enclosing catch clause caught. */
+    public static class RethrowStmt extends Stmt {
+    }
+
     public static class ExprStmt extends Stmt {
         public Expr expr;
     }

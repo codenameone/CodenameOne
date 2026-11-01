@@ -33,7 +33,7 @@ import dart.runtime.Funcs;
  * {@link #addDouble(double)}) never box; the inherited list surface still works (boxing only at that
  * generic boundary) because {@link DartList} routes through the overridden {@code get/set/size/add}.
  */
-public final class DartDoubleList extends DartList<Double> {
+public class DartDoubleList extends DartList<Double> {
 
     private double[] a;
     private int len;
@@ -41,6 +41,12 @@ public final class DartDoubleList extends DartList<Double> {
     public DartDoubleList() {
         super(true);
         a = new double[8];
+    }
+
+    /// For a typed-data view (dart.typed_data) that keeps its own storage: fixed
+    /// length, and every storage accessor overridden by the subclass.
+    protected DartDoubleList(boolean fixedLength) {
+        super(!fixedLength, false);
     }
 
     private DartDoubleList(double[] a, int len, boolean growable) {

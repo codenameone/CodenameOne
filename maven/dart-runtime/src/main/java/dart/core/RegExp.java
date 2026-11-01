@@ -246,6 +246,10 @@ public final class RegExp {
      * existing behaviour); there is then no length to range-check {@code
      * start} against, so only a negative {@code start} is rejected.</p>
      */
+    public DartIterable<RegExpMatch> allMatches(String input, long start) {
+        return allMatches(input, (int) start);
+    }
+
     public DartIterable<RegExpMatch> allMatches(final String input, final int start) {
         if (input != null) {
             RangeError.checkValueInInterval(start, 0, input.length(), "start");

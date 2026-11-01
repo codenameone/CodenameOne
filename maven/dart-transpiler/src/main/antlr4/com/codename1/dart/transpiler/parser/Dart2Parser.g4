@@ -46,6 +46,14 @@ additiveOperator
 argumentList
     : namedArgument (C namedArgument)*
     | expressionList ( C namedArgument)*
+    // Dart 2.17: named arguments anywhere, so a named one may precede a positional one.
+    // Only reached when neither form above matches; positional order is kept as written.
+    | mixedArgument (C mixedArgument)*
+    ;
+
+mixedArgument
+    : namedArgument
+    | expr
     ;
 
 argumentPart
@@ -592,7 +600,9 @@ libraryImport
     ;
 
 libraryName
-    : metadata LIBRARY_ dottedIdentifierList SC
+    // The name is optional since Dart 2.19 (`library;`), which only anchors doc
+    // comments and annotations.
+    : metadata LIBRARY_ dottedIdentifierList? SC
     ;
 
 listLiteral

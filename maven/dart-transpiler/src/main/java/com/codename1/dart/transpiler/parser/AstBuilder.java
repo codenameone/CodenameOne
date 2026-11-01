@@ -163,7 +163,10 @@ public final class AstBuilder {
             }
         }
         if (ctx.libraryName() != null) {
-            lib.libraryName = ctx.libraryName().dottedIdentifierList().getText();
+            // `library;` (Dart 2.19) has no name; it only carries doc comments and metadata.
+            if (ctx.libraryName().dottedIdentifierList() != null) {
+                lib.libraryName = ctx.libraryName().dottedIdentifierList().getText();
+            }
         }
         for (Dart2Parser.PartDirectiveContext pd : ctx.partDirective()) {
             lib.partUris.add(stripQuotes(pd.uri().getText()));
@@ -830,8 +833,10 @@ public final class AstBuilder {
                 Dart2Parser.InitializerExpressionContext ie = e.fieldInitializer().initializerExpression();
                 if (ie.conditionalExpression() != null) {
                     fi.value = buildConditional(ie.conditionalExpression());
+                } else if (ie.cascade() != null) {
+                    fi.value = buildCascade(ie.cascade());
                 } else {
-                    unsupported(ie, "E0110", "Cascades in initializer lists are not supported");
+                    fi.value = errExpr(ie);
                 }
                 ctor.fieldInits.add(fi);
             } else if (e.SUPER_() != null) {
@@ -1064,6 +1069,9 @@ public final class AstBuilder {
     }
 
     private TypeRef buildTypeNotFunction(Dart2Parser.TypeNotFunctionContext ctx) {
+        if (ctx == null) {
+            return TypeRef.DYNAMIC;
+        }
         if (ctx.VOID_() != null) {
             return TypeRef.VOID;
         }
@@ -1081,6 +1089,11 @@ public final class AstBuilder {
     }
 
     private TypeRef buildTypeNotVoidNotFunction(Dart2Parser.TypeNotVoidNotFunctionContext ctx) {
+        if (ctx == null) {
+            // Error recovery (a syntax the grammar lacks, e.g. a record type after `as`)
+            // can leave the type node out; the parser's E0001 already reports it.
+            return TypeRef.DYNAMIC;
+        }
         if (ctx.typeName() == null) {
             TypeRef t = new TypeRef("Function");
             pos(t, ctx);
@@ -1253,6 +1266,11 @@ public final class AstBuilder {
         }
         if (s.localFunctionDeclaration() != null) {
             return buildLocalFunction(s.localFunctionDeclaration());
+        }
+        if (s.rethrowStatement() != null) {
+            RethrowStmt r = new RethrowStmt();
+            pos(r, s);
+            return r;
         }
         unsupported(s, "E0115", "Unsupported statement: " + snippet(s));
         return null;
@@ -1896,8 +1914,11 @@ public final class AstBuilder {
 
     private Expr buildEquality(Dart2Parser.EqualityExpressionContext ctx) {
         if (ctx.SUPER_() != null) {
-            unsupported(ctx, "E0120", "super == is not supported");
-            return errExpr(ctx);
+            // `super == other`: the emitter calls the superclass's equals.
+            SuperExpr sup = new SuperExpr();
+            pos(sup, ctx);
+            return binary(ctx, sup, ctx.equalityOperator().getText(),
+                    buildRelational(ctx.relationalExpression(0)));
         }
         Expr left = buildRelational(ctx.relationalExpression(0));
         if (ctx.equalityOperator() != null) {
@@ -2130,6 +2151,19 @@ public final class AstBuilder {
             return;
         }
         Dart2Parser.ArgumentListContext list = ctx.argumentList();
+        // Named arguments written before positional ones (Dart 2.17): positional order is
+        // the written order, and every argument keeps its source position, which the
+        // emitter's left-to-right evaluation ordering reads.
+        for (Dart2Parser.MixedArgumentContext m : list.mixedArgument()) {
+            if (m.namedArgument() != null) {
+                NamedArg na = new NamedArg();
+                na.name = m.namedArgument().label().identifier().getText();
+                na.value = buildExpr(m.namedArgument().expr());
+                out.named.add(na);
+            } else {
+                out.positional.add(buildExpr(m.expr()));
+            }
+        }
         if (list.expressionList() != null) {
             for (Dart2Parser.ExprContext e : list.expressionList().expr()) {
                 out.positional.add(buildExpr(e));
@@ -2412,6 +2446,17 @@ public final class AstBuilder {
         }
         if (ctx.setOrMapLiteral() != null) {
             return buildSetOrMapLiteral(ctx.setOrMapLiteral());
+        }
+        if (ctx.symbolLiteral() != null) {
+            // #name: the runtime has no Symbol class, so the literal is the string its
+            // toString answers, Symbol("name"). That keeps what programs do with a symbol --
+            // compare it, hash it, key a map or set with it, print it -- exactly Dart's.
+            // Only a comparison against that very string, or an `is Symbol` test, differs.
+            StringLit sl = new StringLit();
+            pos(sl, ctx);
+            String name = ctx.symbolLiteral().getText().substring(1);
+            sl.parts.add("Symbol(\"" + name + "\")");
+            return sl;
         }
         unsupported(ctx, "E0124", "Unsupported literal: " + snippet(ctx));
         return errExpr(ctx);

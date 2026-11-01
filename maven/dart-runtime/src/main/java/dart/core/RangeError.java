@@ -83,6 +83,63 @@ public class RangeError extends ArgumentError {
         return value;
     }
 
+    /// Dart's `RangeError.checkValidRange(start, end, length)`: `0 <= start <= length`
+    /// and, when given, `start <= end <= length`. Answers the effective end.
+    public static long checkValidRange(long start, Long end, long length) {
+        if (start < 0 || start > length) {
+            throw new RangeError("RangeError (start): Invalid value: Not in inclusive range 0.."
+                    + length + ": " + start);
+        }
+        if (end == null) {
+            return length;
+        }
+        long e = end.longValue();
+        if (e < start || e > length) {
+            throw new RangeError("RangeError (end): Invalid value: Not in inclusive range "
+                    + start + ".." + length + ": " + e);
+        }
+        return e;
+    }
+
+    public static long checkValidRange(long start, long end, long length) {
+        return checkValidRange(start, Long.valueOf(end), length);
+    }
+
+    public static long checkNotNegative(long value) {
+        return checkNotNegative(value, null);
+    }
+
+    public static long checkValidIndex(long index, Object indexable, String name, Long length) {
+        long len = length != null ? length.longValue()
+                : indexable instanceof java.util.Collection ? ((java.util.Collection<?>) indexable).size()
+                : indexable instanceof String ? ((String) indexable).length() : 0;
+        return checkValidIndex(index, len);
+    }
+
+    /// Dart's `RangeError.range(value, min, max, [name, message])`.
+    public static RangeError range(long value, Long min, Long max, String name, String message) {
+        return new RangeError("RangeError" + (name == null ? "" : " (" + name + ")") + ": "
+                + (message == null ? "Invalid value: Not in inclusive range " + min + ".." + max
+                        : message) + ": " + value);
+    }
+
+    public static RangeError range(long value, Long min, Long max) {
+        return range(value, min, max, null, null);
+    }
+
+    /// Dart's `RangeError.value(value, [name, message])`.
+    public static RangeError value(long value, String name, String message) {
+        return new RangeError("RangeError" + (name == null ? "" : " (" + name + ")") + ": "
+                + (message == null ? "Value not in range" : message) + ": " + value);
+    }
+
+    public static RangeError index(long index, Object indexable, String name, String message, Long length) {
+        long len = length != null ? length.longValue()
+                : indexable instanceof java.util.Collection ? ((java.util.Collection<?>) indexable).size() : 0;
+        return new RangeError("RangeError (" + (name == null ? "index" : name)
+                + "): Invalid value: Not in inclusive range 0.." + (len - 1) + ": " + index);
+    }
+
     @Override
     public String toString() {
         return getMessage();

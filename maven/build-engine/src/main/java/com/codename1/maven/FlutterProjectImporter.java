@@ -62,7 +62,7 @@ public final class FlutterProjectImporter {
 
     static {
         COVERED.put("flutter", "Material and Cupertino widget stubs (codenameone-flutter-runtime)");
-        COVERED.put("flutter_localizations", "localization delegate scaffolding only; strings are not translated");
+        COVERED.put("flutter_localizations", "Material and Cupertino strings for en, es and he (RTL); any other locale falls back to English");
         COVERED.put("cupertino_icons", "CupertinoIcons constants (flutter-runtime stub); "
                 + "the font file itself still needs its own pubspec.yaml fonts: entry to be copied");
         // The rest are verified against the actual stub sources (maven/flutter-runtime's

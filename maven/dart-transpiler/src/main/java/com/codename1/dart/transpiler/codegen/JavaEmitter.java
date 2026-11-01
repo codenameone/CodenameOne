@@ -2891,6 +2891,13 @@ public final class JavaEmitter {
                 }
                 w.line("return " + (rt != null ? coerce(o, rt, ctx) : o.code) + ";");
             }
+        } else if (s instanceof RethrowStmt) {
+            if (ctx.rethrowTarget == null) {
+                diags.error(s, "E0115", "rethrow is only allowed inside a catch clause");
+            } else {
+                ctx.importClass("dart.runtime.DartRuntime");
+                w.line("throw DartRuntime.rethrow(" + ctx.rethrowTarget + ");");
+            }
         } else if (s instanceof TryStmt) {
             TryStmt t = (TryStmt) s;
             w.line("try {");
@@ -3493,14 +3500,29 @@ public final class JavaEmitter {
         List<SwitchCase> all = new ArrayList<SwitchCase>(pending);
         all.add(last);
         boolean lastBinds = patternBinds(last.pattern);
+        // Dart lets the shared body use a variable only when every case declares it (with
+        // one type). Such variables are hoisted: declared once before the tests, assigned
+        // by whichever case matched, and visible to the body under their Dart name.
+        Map<String, String> hoisted = new LinkedHashMap<String, String>();
+        Map<String, TypeRef> hoistedTypes = new LinkedHashMap<String, TypeRef>();
         for (int i = 0; i < all.size(); i++) {
             SwitchCase c = all.get(i);
-            if (lastBinds && c != last && patternBinds(c.pattern)) {
-                diags.error(c, "E0436", "Variables shared by fall-through cases are not supported");
-            }
             ctx.pushScope();
             List<String> binds = new ArrayList<String>();
             String cond = patternTest(c.pattern, s, subjType, ctx, binds);
+            Map<String, TypeRef> caseVars = new LinkedHashMap<String, TypeRef>(
+                    ctx.scopes.get(ctx.scopes.size() - 1));
+            if (i == 0 && lastBinds) {
+                for (Map.Entry<String, TypeRef> v : caseVars.entrySet()) {
+                    String hn = javaIdent(v.getKey()) + "$shared" + (ctx.shadowCounter++);
+                    TypeRef vt = v.getValue() == null ? TypeRef.DYNAMIC : v.getValue();
+                    w.line(javaType(vt, false, ctx) + " " + hn + " = " + zeroValue(vt) + ";");
+                    hoisted.put(v.getKey(), hn);
+                    hoistedTypes.put(v.getKey(), vt);
+                }
+            }
+            // A variable some case lacks is not in scope in the body (Dart's analyzer
+            // rejects a use of it), so a case without one simply leaves it unassigned.
             String test = "true".equals(cond) ? ""
                     : cond.indexOf("||") >= 0 || cond.indexOf('?') >= 0 ? "(" + cond + ")" : cond;
             if (i > 0) {
@@ -3519,6 +3541,11 @@ public final class JavaEmitter {
             } else {
                 w.line(m + " = true;");
             }
+            for (Map.Entry<String, String> h : hoisted.entrySet()) {
+                if (caseVars.containsKey(h.getKey())) {
+                    w.line(h.getValue() + " = " + ctx.javaNameOf(h.getKey()) + ";");
+                }
+            }
             ctx.indent(-1);
             w.line("}");
             ctx.popScope();
@@ -3526,6 +3553,10 @@ public final class JavaEmitter {
         w.line("if (" + m + ") {");
         ctx.indent(1);
         ctx.pushScope();
+        for (Map.Entry<String, String> h : hoisted.entrySet()) {
+            ctx.declare(h.getKey(), hoistedTypes.get(h.getKey()));
+            ctx.renameScopes.get(ctx.renameScopes.size() - 1).put(h.getKey(), h.getValue());
+        }
         for (Stmt bs : last.body) {
             emitStatement(bs, ctx);
         }
@@ -3554,7 +3585,8 @@ public final class JavaEmitter {
      * is recognized as terminating and doesn't get a second, unreachable break.
      */
     private boolean stmtTerminates(Stmt last) {
-        if (last instanceof ReturnStmt || last instanceof BreakStmt || last instanceof ContinueStmt) {
+        if (last instanceof ReturnStmt || last instanceof BreakStmt || last instanceof ContinueStmt
+                || last instanceof RethrowStmt) {
             return true;
         }
         if (last instanceof ExprStmt && ((ExprStmt) last).expr instanceof ThrowExpr) {
@@ -4307,6 +4339,11 @@ public final class JavaEmitter {
     }
 
     private Out emitExprRaw(Expr e, TypeRef expected, Ctx ctx) {
+        if (e == null) {
+            // The front end leaves a hole where it reported an error; the diagnostic is
+            // already recorded, so emit a placeholder rather than crash the whole run.
+            return new Out("null", TypeRef.DYNAMIC, true);
+        }
         if (e instanceof IntLit) {
             long v = ((IntLit) e).value;
             if (expected != null && expected.is("double")) {
@@ -7439,6 +7476,14 @@ public final class JavaEmitter {
     }
 
     private Out emitBinary(Binary b, Ctx ctx) {
+        if (b.left instanceof SuperExpr && (b.op.equals("==") || b.op.equals("!="))) {
+            // `super == other` invokes the superclass's operator ==, which every class
+            // emits as equals(Object); Object's own is identity, as Dart's is. Dart answers
+            // false for a null operand without calling the operator, and so does equals.
+            Out r = emitExpr(b.right, null, ctx);
+            String eq = "super.equals(" + boxIfPrimitive(r, ctx) + ")";
+            return new Out(b.op.equals("==") ? eq : "!" + eq, TypeRef.BOOL);
+        }
         if (b.op.equals("??")) {
             // Peephole: (m[k] ?? literal) on a primitive Map<int,int> -> getLongOr(k, literal),
             // eliminating the boxed read. Only for a side-effect-free literal default, so eager
@@ -7775,7 +7820,10 @@ public final class JavaEmitter {
                 String stackJn = ctx.declareShadowSafe(cc.stackVar, TypeRef.DYNAMIC);
                 w.line("Object " + stackJn + " = null;");
             }
+            String outerRethrow = ctx.rethrowTarget;
+            ctx.rethrowTarget = caught;
             emitStatements(cc.body, ctx);
+            ctx.rethrowTarget = outerRethrow;
             ctx.popScope();
             ctx.indent(-1);
             if (catchAll) {
@@ -12795,6 +12843,12 @@ public final class JavaEmitter {
     // ==================================================================
 
     private final class Ctx {
+        /**
+         * The Java temp holding what the innermost enclosing catch clause caught, which
+         * {@code rethrow;} throws again as it is -- the same object, so its stack trace and
+         * identity survive. Null outside a catch body.
+         */
+        String rethrowTarget;
         /// The import prefix of the `prefix.Name(...)` call being lowered to a bare call,
         /// until the class or function resolution consumes it (see takeCallPrefix).
         String callPrefix;
