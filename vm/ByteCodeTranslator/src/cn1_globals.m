@@ -9360,10 +9360,9 @@ static void cn1GcRsetScan(struct ThreadLocalData* d, JAVA_BOOLEAN trace) {
 // thread only: the cycle begins and the sweep that adapts the trigger both run there.
 static long long cn1GcCycleStartNs = 0;
 static long long cn1GcPrevCycleStartNs = 0;
+// cn1MonotonicNanos, which is also correct on the clang-cl Windows target.
 static long long cn1GcDutyClockNs(void) {
-    struct timespec t;
-    clock_gettime(CLOCK_MONOTONIC, &t);
-    return (long long)t.tv_sec * 1000000000LL + (long long)t.tv_nsec;
+    return cn1MonotonicNanos();
 }
 
 void cn1BibopBeginGcCycle(void) {
