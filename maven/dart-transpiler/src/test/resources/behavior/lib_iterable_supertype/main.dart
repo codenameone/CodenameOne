@@ -39,6 +39,7 @@ void main() {
   print(c.length);
   print(c.map((x) => x * 10).join(','));
   print(c.where((x) => x != 3).toList());
+  print(c.where((x) => x.isEven).toList());
   print(c.first);
   print(c.contains(3));
   final s = Summing();

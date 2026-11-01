@@ -115,6 +115,22 @@ public class DartLongList extends DartList<Long> {
     /// method (`Stream<int>.toList()`) builds a boxed DartList, which a local typed
     /// List<int> cannot hold.
     @SuppressWarnings("unchecked")
+    /// A value a List<int> is statically typed as, as the DartLongList that type is held in:
+    /// itself when it already is one, else a live LongListView over the boxed DartList that
+    /// generic code built (`List<E>.of(..)` with E bound to int at the use site). Unlike
+    /// asLongs this never copies, so writes through either side reach the same list.
+    @SuppressWarnings("unchecked")
+    public static DartLongList viewLongs(Object value) {
+        if (value == null || value instanceof DartLongList) {
+            return (DartLongList) value;
+        }
+        if (value instanceof DartList) {
+            return new LongListView((DartList<Long>) value);
+        }
+        throw new TypeError("type '" + value.getClass().getSimpleName()
+                + "' is not a subtype of type 'List<int>'");
+    }
+
     public static DartLongList asLongs(Object value) {
         if (value == null || value instanceof DartLongList) {
             return (DartLongList) value;

@@ -1,0 +1,13 @@
+true
+true
+true
+true
+2
+42
+got
+Symbol("answer") get=false set=false method=true pos=[] named=0
+Symbol("colour") get=true set=false method=false pos=[] named=0
+Symbol("colour=") get=false set=true method=false pos=[red] named=0
+Symbol("paint") get=false set=false method=true pos=[1, two] named=1
+true
+Symbol("answer")

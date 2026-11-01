@@ -123,6 +123,22 @@ public class DartDoubleList extends DartList<Double> {
     /// method (`Stream<int>.toList()`) builds a boxed DartList, which a local typed
     /// List<double> cannot hold.
     @SuppressWarnings("unchecked")
+    /// A value a List<double> is statically typed as, as the DartDoubleList that type is held in:
+    /// itself when it already is one, else a live DoubleListView over the boxed DartList that
+    /// generic code built (`List<E>.of(..)` with E bound to double at the use site). Unlike
+    /// asDoubles this never copies, so writes through either side reach the same list.
+    @SuppressWarnings("unchecked")
+    public static DartDoubleList viewDoubles(Object value) {
+        if (value == null || value instanceof DartDoubleList) {
+            return (DartDoubleList) value;
+        }
+        if (value instanceof DartList) {
+            return new DoubleListView((DartList<Double>) value);
+        }
+        throw new TypeError("type '" + value.getClass().getSimpleName()
+                + "' is not a subtype of type 'List<double>'");
+    }
+
     public static DartDoubleList asDoubles(Object value) {
         if (value == null || value instanceof DartDoubleList) {
             return (DartDoubleList) value;

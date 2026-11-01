@@ -9,6 +9,10 @@ class Builders<T> {
   String Function(int) get shout => (int n) => 'n=$n';
 }
 
+class LoudBuilders extends Builders<String> {
+  LoudBuilders() : super(tag: 'loud');
+}
+
 class Cell {
   final Builders builders;
   final dynamic locale;
@@ -16,13 +20,15 @@ class Cell {
   Cell(this.builders, this.locale, {Labeler? labeler})
       : labeler = labeler ?? ((String _, [String? __]) => null);
 
+  int Function(int) get twin => (int n) => n * 2;
+
   String describe(int d) {
     final built = builders.primary?.call(d, 7);
     final first = builders.names.first;
-    final shout = builders.shout;
-    final loud = shout(d);
+    final loud = builders.shout(d);
+    final twice = twin(d);
     final label = labeler('x');
-    return '$built $first $loud $label ${greet(locale)}';
+    return '$built $first $loud $twice $label ${greet(locale)}';
   }
 }
 
@@ -34,4 +40,5 @@ void main() {
   final c2 = Cell(Builders(), 'fr', labeler: (n, [s]) => '$n${s ?? '!'}');
   print(c2.describe(5));
   print(c2.builders.tag);
+  print(LoudBuilders().shout(9));
 }

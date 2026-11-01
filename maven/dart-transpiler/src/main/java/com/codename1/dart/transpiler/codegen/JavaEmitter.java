@@ -1335,6 +1335,22 @@ public final class JavaEmitter {
                     mm.returnType = over;
                 }
             }
+            // `Set<T> cast()` overriding a program `Iterable<T> cast()`: in Dart List and Set
+            // ARE Iterables, so the narrowing is a valid covariant override. In Java they are
+            // not -- DartList extends AbstractList and DartSet extends LinkedHashSet (they must,
+            // to be java.util collections every Java API accepts), while dart:core's Iterable is
+            // the DartIterable class, and Java has no multiple class inheritance. The runtime's
+            // design is therefore that a List or Set travels through an Iterable-typed slot as
+            // its DartIterable.wrap view, which `is List`/`is Set` and `as` look through
+            // (DartIterable.listBehind). The override keeps the member's Iterable return, so
+            // it overrides in Java too; the return statement wraps the collection, and a call
+            // through the narrower static type unwraps it again (narrowedCollectionReturn).
+            if (!m.isStatic && !m.isSetter && isCoreListOrSet(m.returnType)) {
+                TypeRef over = overriddenIterableReturn(c, m, new HashSet<String>());
+                if (over != null) {
+                    mm.returnType = over;
+                }
+            }
             mm.params = m.params;
             mm.typeParams = m.typeParams;
             mm.typeParamBounds = m.typeParamBounds;
@@ -3095,6 +3111,54 @@ public final class JavaEmitter {
             }
         }
         return null;
+    }
+
+    /**
+     * The dart:core {@code Iterable} return, in {@code c}'s type variables, of a program
+     * member {@code m} overrides anywhere above {@code c}, or null. Not just the nearest
+     * declaration: a {@code List} override of a {@code List} override of an {@code Iterable}
+     * member is pinned to the Iterable too, since its Java supertype's method already is.
+     */
+    private TypeRef overriddenIterableReturn(ClassDecl c, MethodDecl m, java.util.Set<String> seen) {
+        if (c == null || !seen.add(c.name) || program.classes.containsKey("Iterable")) {
+            return null;
+        }
+        List<TypeRef> supers = new ArrayList<TypeRef>();
+        if (c.superclass != null) {
+            supers.add(c.superclass);
+        }
+        supers.addAll(c.interfaces);
+        supers.addAll(c.mixins);
+        for (TypeRef st : supers) {
+            ClassDecl sp = superDeclOf(c, st);
+            if (sp == null) {
+                continue;
+            }
+            MethodDecl sm = m.isGetter ? sp.getter(m.name) : sp.method(m.name);
+            TypeRef found = null;
+            if (sm != null && sm.isGetter == m.isGetter && !sm.isSetter && sm.returnType != null
+                    && sm.returnType.is("Iterable")) {
+                found = sm.returnType;
+            } else {
+                found = overriddenIterableReturn(sp, m, seen);
+            }
+            if (found != null) {
+                return st.args.size() == sp.typeParams.size() && !st.args.isEmpty()
+                        ? substTypeParams(found, sp.typeParams, st.args) : found;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Whether a call to {@code m} through a receiver of program class {@code pc} returns, in
+     * Java, the DartIterable view its List/Set-typed Dart return was pinned to (see the
+     * covariant-collection note where methods are emitted); the call site then reads the
+     * collection behind the view.
+     */
+    private boolean narrowedCollectionReturn(ClassDecl pc, MethodDecl m) {
+        return pc != null && m != null && !m.isStatic && !m.isSetter && isCoreListOrSet(m.returnType)
+                && overriddenIterableReturn(pc, m, new HashSet<String>()) != null;
     }
 
     /**
@@ -6169,6 +6233,16 @@ public final class JavaEmitter {
             return emitPropertyGet((PropertyGet) e, ctx);
         }
         if (e instanceof Call) {
+            if (((Call) e).target instanceof SuperExpr && "noSuchMethod".equals(((Call) e).name)
+                    && ((Call) e).args.positional.size() == 1 && ((Call) e).args.named.isEmpty()
+                    && !programSuperDeclares(ctx.currentClass, "noSuchMethod")) {
+                // `super.noSuchMethod(i)` reaching Object's member: Dart's default throws
+                // NoSuchMethodError. No Java supertype declares the method, so a plain
+                // `super.noSuchMethod(i)` was a call to nothing; the runtime throws for it.
+                Out inv = emitExpr(((Call) e).args.positional.get(0), TypeRef.DYNAMIC, ctx);
+                return new Out("dart.core.NoSuchMethodError.fromObject(this, " + inv.code + ")",
+                        TypeRef.DYNAMIC);
+            }
             if (((Call) e).target instanceof SuperExpr) {
                 Out bridged = onMixinSuperBridge(((Call) e).name, false, ((Call) e).args, ctx);
                 if (bridged != null) {
@@ -6983,6 +7057,32 @@ public final class JavaEmitter {
      * otherwise resolve to {@code k} itself; a class never names itself as a supertype, so a
      * same-named declaration from another library is the one meant.
      */
+    /** Whether a program superclass of {@code c} (transitively) declares method {@code name}. */
+    private boolean programSuperDeclares(ClassDecl c, String name) {
+        java.util.Set<String> seen = new HashSet<String>();
+        ClassDecl p = c;
+        while (p != null && seen.add(p.name)) {
+            for (TypeRef mx : p.mixins) {
+                ClassDecl md = superDeclOf(p, mx);
+                if (md != null && md.method(name) != null) {
+                    return true;
+                }
+            }
+            if (p.superclass == null) {
+                return false;
+            }
+            ClassDecl sp = superDeclOf(p, p.superclass);
+            if (sp == null) {
+                return false;
+            }
+            if (sp.method(name) != null) {
+                return true;
+            }
+            p = sp;
+        }
+        return false;
+    }
+
     private ClassDecl superDeclOf(ClassDecl k, TypeRef t) {
         String tn = t.name;
         int dot = tn.lastIndexOf('.');
@@ -8221,7 +8321,7 @@ public final class JavaEmitter {
     /** An `is`/promotion from a declared Iterable to List, which the view must be looked through for. */
     private static boolean iterableAsList(TypeRef from, TypeRef to) {
         return from != null && to != null && from.name != null && to.name != null
-                && from.name.equals("Iterable") && to.name.equals("List");
+                && from.name.equals("Iterable") && (to.name.equals("List") || to.name.equals("Set"));
     }
 
     private Out emitIdent(Ident id, TypeRef expected, Ctx ctx) {
@@ -9004,6 +9104,25 @@ public final class JavaEmitter {
     }
 
     /**
+     * A member read through a generic class's type variable (`List<E> copy()` on a
+     * `Box<int>`) is a boxed DartList: the generic body built it without knowing E is int.
+     * The caller's static type List&lt;int&gt; is held in a DartLongList, so the value is
+     * viewed as one (DartLongList.viewLongs: itself when it already is one, else a live
+     * view over the same list) rather than cast, which threw ClassCastException.
+     * A declaration that names the element type itself already returns the primitive class.
+     */
+    private String primitiveListSeen(String code, TypeRef declared, TypeRef seen, Ctx ctx) {
+        if (declared == null || seen == null || !declared.is("List") || !seen.is("List")) {
+            return code;
+        }
+        String pk = primitiveListKind(seen);
+        if (pk == null || primitiveListKind(declared) != null) {
+            return code;
+        }
+        return "dart.core.Dart" + pk + "List.view" + pk + "s(" + code + ")";
+    }
+
+    /**
      * `this` in a mixin on a core List/Iterable/Set, as that collection. The applying class
      * may be a runtime collection or a program ListBase/IterableBase/SetBase subclass that is
      * not one in Java, so dart.core.MixinSelf picks the object itself or its live view; a
@@ -9382,13 +9501,15 @@ public final class JavaEmitter {
                 if (target.code.equals("this") && !isLateChecked(f, pc)) {
                     return new Out("this." + name, fieldType(f, ctx));
                 }
-                return new Out(rawReceiver(target.code, pc, tt, fieldType(f, ctx), ctx) + ".get$" + name + "()",
-                        asSeenFrom(fieldType(f, ctx), f, null, pc, tt));
+                TypeRef fSeen = asSeenFrom(fieldType(f, ctx), f, null, pc, tt);
+                return new Out(primitiveListSeen(rawReceiver(target.code, pc, tt, fieldType(f, ctx), ctx)
+                        + ".get$" + name + "()", fieldType(f, ctx), fSeen, ctx), fSeen);
             }
             MethodDecl g = pc.getter(name);
             if (g != null) {
-                return new Out(rawReceiver(target.code, pc, tt, g.returnType, ctx) + "." + name + "()",
-                        asSeenFrom(g.returnType, g, null, pc, tt));
+                TypeRef gSeen = asSeenFrom(g.returnType, g, null, pc, tt);
+                return new Out(primitiveListSeen(rawReceiver(target.code, pc, tt, g.returnType, ctx)
+                        + "." + name + "()", g.returnType, gSeen, ctx), gSeen);
             }
             Object mixF = findMixinMember(pc, name, true);
             if (mixF instanceof FieldDecl) {
@@ -9403,12 +9524,15 @@ public final class JavaEmitter {
             // field/getter inherited from a program superclass
             FieldDecl inhF = findInheritedField(pc, name);
             if (inhF != null && inheritedFieldVisible(pc, name)) {
-                return new Out(target.code + ".get$" + name + "()",
-                        asSeenFrom(fieldType(inhF, ctx), inhF, null, pc, tt));
+                TypeRef ifSeen = asSeenFrom(fieldType(inhF, ctx), inhF, null, pc, tt);
+                return new Out(primitiveListSeen(target.code + ".get$" + name + "()", fieldType(inhF, ctx),
+                        ifSeen, ctx), ifSeen);
             }
             MethodDecl inhG = findInheritedGetter(pc, name);
             if (inhG != null) {
-                return new Out(target.code + "." + name + "()", asSeenFrom(inhG.returnType, inhG, null, pc, tt));
+                TypeRef igSeen = asSeenFrom(inhG.returnType, inhG, null, pc, tt);
+                return new Out(primitiveListSeen(target.code + "." + name + "()", inhG.returnType, igSeen, ctx),
+                        igSeen);
             }
             // method tear-off on an instance: `obj.method` as a function value (method reference)
             MethodDecl tm = pc.method(name);
@@ -13142,7 +13266,16 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         }
         // constructor of stub class
         if (stubs.isStubClass(n)) {
-            return emitCtorCall(n, c.typeArgs, c.args, c, ctx);
+            // `() => MapEntry(key, v)` where a MapEntry<K, V> is expected: Dart takes the
+            // missing type arguments from the context type, so the Java instance does too.
+            List<TypeRef> stubArgs = c.typeArgs;
+            Ast.ClassDecl stubDecl = stubs.classes.get(n);
+            if (stubArgs.isEmpty() && expected != null && expected.is(n) && stubDecl != null
+                    && !stubDecl.typeParams.isEmpty() && expected.args.size() == stubDecl.typeParams.size()
+                    && typeVarsInScope(expected, ctx)) {
+                stubArgs = expected.args;
+            }
+            return emitCtorCall(n, stubArgs, c.args, c, ctx);
         }
         // method of current class / inherited stub method
         ClassDecl cc = ctx.currentClass;
@@ -13178,6 +13311,11 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 // after the arguments are emitted: the closure's return type is read from it.
                 TypeRef rt = m.returnType == null || m.returnType.is("var") ? TypeRef.DYNAMIC
                         : bindMethodTypeParams(m.returnType, m, c, ctx);
+                if (narrowedCollectionReturn(ctx.currentClass, m) || narrowedCollectionReturn(cc, m)) {
+                    String behind = "dart.core.DartIterable.listBehind(" + code + ")";
+                    String viewed = primitiveListSeen(behind, TypeRef.of("List", TypeRef.DYNAMIC), rt, ctx);
+                    code = !viewed.equals(behind) ? viewed : "((" + javaType(rt, true, ctx) + ") " + behind + ")";
+                }
                 return new Out(code, rt);
             }
             String stubSuper = nearestStubSuper(cc);
@@ -13217,6 +13355,13 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                         new TypeRef(cc.name)), n, c, ctx);
                 return new Out(fnCall(fieldRead.code, ff.type, c.args, ctx),
                         funcResultType(ff.type));
+            }
+            MethodDecl fg = functionValuedGetter(cc, n);
+            if (fg != null) {
+                Out getterRead = emitMemberGet(new Out(fg.isStatic ? cc.name : "this",
+                        new TypeRef(cc.name)), n, c, ctx);
+                return new Out(fnCall(getterRead.code, fg.returnType, c.args, ctx),
+                        funcResultType(fg.returnType));
             }
         }
         if (cc != null) {
@@ -13599,6 +13744,12 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                         castTo = substTypeParams(seen, m.typeParams, dyn);
                     }
                     callCode = "((" + javaType(castTo, true, ctx) + ") (Object) " + callCode + ")";
+                } else if (narrowedCollectionReturn(pc, m)) {
+                    String behind = "dart.core.DartIterable.listBehind(" + callCode + ")";
+                    String viewed = primitiveListSeen(behind, TypeRef.of("List", TypeRef.DYNAMIC), seen, ctx);
+                    callCode = !viewed.equals(behind) ? viewed : "((" + javaType(seen, true, ctx) + ") " + behind + ")";
+                } else {
+                    callCode = primitiveListSeen(callCode, m.returnType, seen, ctx);
                 }
                 return new Out(callCode, seen);
             }
@@ -13608,6 +13759,9 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             if (stubSuper != null) {
                 Ast.MethodDecl sm = stubs.findMethod(stubSuper, n, false);
                 if (sm != null) {
+                    // `class C extends Iterable<int>`: the inherited `where` hands its
+                    // callback an int, not the stub's unbound E, so `(x) => x.isEven` types.
+                    sm = withReceiverCallbackTypes(sm, stubSuperAsSeen(pc, stubSuper, tt));
                     // `class V extends StreamView<int>`: the inherited `toList()` returns a
                     // Future<List<int>>, not the stub's bare Future<List<T>>.
                     return stubCallOut(sm, c, target.code + "." + n, ctx,
@@ -13623,6 +13777,11 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                     if (stubs.isStubClass(mixRef.name)) {
                         Ast.MethodDecl sm = stubs.findMethod(mixRef.name, n, false);
                         if (sm != null) {
+                            // `class C extends Iterable<int>` (an IterableBase<int> mixin here):
+                            // `where`'s callback takes an int, not the stub's unbound E.
+                            TypeRef seenMix = mc == pc && tt != null && tt.args.size() == pc.typeParams.size()
+                                    ? substTypeVars(mixRef, paramMap(pc.typeParams, tt.args)) : mixRef;
+                            sm = withReceiverCallbackTypes(sm, seenMix);
                             // QueueList<Result<T>> mixing ListMixin<E>: elementAt answers Result<T>
                             return stubCallOut(sm, c, target.code + "." + n, ctx,
                                     substMixinMember(sm.returnType, mixRef, mc, mc == pc ? tt : null));
@@ -13640,6 +13799,14 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 Out fieldRead = emitMemberGet(target, n, c, ctx);
                 return new Out(fnCall(fieldRead.code, ff.type, c.args, ctx),
                         funcResultType(ff.type));
+            }
+            // invocation of a function-typed getter: `obj.shout(d)` where shout is
+            // `String Function(int) get shout` -- read the getter, then invoke its SAM.
+            MethodDecl fg = functionValuedGetter(pc, n);
+            if (fg != null) {
+                Out getterRead = emitMemberGet(target, n, c, ctx);
+                return new Out(fnCall(getterRead.code, fg.returnType, c.args, ctx),
+                        funcResultType(fg.returnType));
             }
         }
         // SAM invocation on a function-typed value: `f.call(args)` / `f?.call(args)`
@@ -13788,6 +13955,133 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         diags.error(c, "E0137", "Cannot resolve method '" + n + "' on type " + tt
                 + ". Confirm the file passes `dart analyze`, or the API is not yet implemented in the Codename One runtime.");
         return new Out(target.code + "." + n + "(" + plainArgs(c.args, ctx) + ")", TypeRef.DYNAMIC, true);
+    }
+
+    /**
+     * The getter named {@code n} declared by {@code cls} or a program superclass whose
+     * declared type is a function type, or null. Only consulted after no method of that
+     * name resolved, so `obj.g(args)` reads the getter and invokes the closure it returns.
+     */
+    private MethodDecl functionValuedGetter(ClassDecl cls, String n) {
+        java.util.Set<String> seen = new java.util.HashSet<String>();
+        for (ClassDecl k = cls; k != null && seen.add(k.name);
+                k = k.superclass != null ? superDeclOf(k, k.superclass) : null) {
+            MethodDecl g = k.getter(n);
+            if (g != null) {
+                return g.returnType != null && isFunctionValued(g.returnType) ? g : null;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The type arguments of a raw generic stub constructor call recovered from its
+     * positional arguments, or null unless every one is an enclosing type variable.
+     */
+    private List<TypeRef> inferCtorTypeVars(Ast.ClassDecl sc, Args args, Ctx ctx) {
+        Ast.CtorDecl ct = sc.defaultCtor();
+        if (ct == null) {
+            return null;
+        }
+        java.util.Map<String, TypeRef> found = new java.util.HashMap<String, TypeRef>();
+        int pi = 0;
+        for (Ast.Param prm : ct.params) {
+            if (prm.named || pi >= args.positional.size()) {
+                continue;
+            }
+            Expr arg = args.positional.get(pi++);
+            if (prm.type != null && prm.type.args.isEmpty() && sc.typeParams.contains(prm.type.name)) {
+                TypeRef at = typeVarTypedQuiet(arg, ctx);
+                if (at != null) {
+                    found.put(prm.type.name, at);
+                }
+            }
+        }
+        List<TypeRef> out = new ArrayList<TypeRef>();
+        for (String tp : sc.typeParams) {
+            TypeRef a = found.get(tp);
+            if (a == null) {
+                return null;
+            }
+            out.add(a);
+        }
+        return out;
+    }
+
+    /**
+     * The static type of {@code e} when it is an enclosing type variable, read without
+     * emitting: a local, or `.key` / `.value` of a MapEntry-typed local (`e.value.key` on a
+     * MapEntry<C, MapEntry<K, V>> is K). Null for anything else.
+     */
+    private TypeRef typeVarTypedQuiet(Expr e, Ctx ctx) {
+        TypeRef t = staticTypeQuiet(e, ctx, 0);
+        return t != null && t.args.isEmpty() && isTypeVariable(t, ctx) && typeVarsInScope(t, ctx)
+                ? new TypeRef(t.name) : null;
+    }
+
+    /**
+     * False when {@code t} names a type variable the code being emitted does not declare --
+     * an unbound {@code K2} of a generic stub method's signature, which as a Java type
+     * argument is "cannot find symbol".
+     */
+    private boolean typeVarsInScope(TypeRef t, Ctx ctx) {
+        if (t == null) {
+            return true;
+        }
+        if (isTypeVariable(t, ctx)) {
+            boolean own = ctx.currentClass != null && ctx.currentClass.typeParams.contains(t.name);
+            return own || (ctx.methodTypeParams != null && ctx.methodTypeParams.contains(t.name));
+        }
+        for (TypeRef a : t.args) {
+            if (!typeVarsInScope(a, ctx)) {
+                return false;
+            }
+        }
+        if (t.funcParams != null) {
+            for (TypeRef a : t.funcParams) {
+                if (!typeVarsInScope(a, ctx)) {
+                    return false;
+                }
+            }
+        }
+        return typeVarsInScope(t.funcReturn, ctx);
+    }
+
+    private TypeRef staticTypeQuiet(Expr e, Ctx ctx, int depth) {
+        while (e instanceof ParenExpr) {
+            e = ((ParenExpr) e).inner;
+        }
+        if (depth > 4) {
+            return null;
+        }
+        if (e instanceof Ident) {
+            return inferExprTypeQuiet(e, ctx);
+        }
+        if (e instanceof PropertyGet && !((PropertyGet) e).nullAware) {
+            PropertyGet pg = (PropertyGet) e;
+            TypeRef recv = staticTypeQuiet(pg.target, ctx, depth + 1);
+            if (recv != null && recv.is("MapEntry") && recv.args.size() == 2 && !recv.nullable) {
+                return pg.name.equals("key") ? recv.arg(0) : pg.name.equals("value") ? recv.arg(1) : null;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The {@code R Function(K key, V value)} a Map's forEach / removeWhere callback is, so
+     * an untyped closure's parameters take the map's key and value types instead of dynamic
+     * (which made `pair.key` a reflective read typed Object). Null for a raw map.
+     */
+    private TypeRef mapEntryCallbackType(TypeRef map, TypeRef ret) {
+        if (map.args.size() != 2 || map.arg(0) == null || map.arg(1) == null) {
+            return null;
+        }
+        TypeRef fn = new TypeRef("Function");
+        fn.funcParams = new ArrayList<TypeRef>();
+        fn.funcParams.add(map.arg(0));
+        fn.funcParams.add(map.arg(1));
+        fn.funcReturn = ret;
+        return fn;
     }
 
     /** Core-type method table (String / List / Map / int / double). */
@@ -14362,7 +14656,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 return new Out(target.code + ".removeDart(" + boxIfPrimitive(v, ctx) + ")", boxType(tt.arg(1)));
             }
             if (n.equals("forEach")) {
-                Out f = emitExpr(pos.get(0), null, ctx);
+                Out f = emitExpr(pos.get(0), mapEntryCallbackType(tt, TypeRef.VOID), ctx);
                 return new Out(target.code + ".forEachDart(" + f.code + ")", TypeRef.VOID);
             }
             if (n.equals("putIfAbsent")) {
@@ -14386,7 +14680,8 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 return new Out(target.code + ".addEntries(" + emitExpr(pos.get(0), null, ctx).code + ")", TypeRef.VOID);
             }
             if (n.equals("removeWhere")) {
-                return new Out(target.code + ".removeWhere(" + emitExpr(pos.get(0), null, ctx).code + ")", TypeRef.VOID);
+                return new Out(target.code + ".removeWhere("
+                        + emitExpr(pos.get(0), mapEntryCallbackType(tt, TypeRef.BOOL), ctx).code + ")", TypeRef.VOID);
             }
             if (n.equals("update")) {
                 Out k = emitExpr(pos.get(0), null, ctx);
@@ -15173,8 +15468,20 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 typeSubst = new LinkedHashMap<String, TypeRef>();
             }
             StringBuilder d = new StringBuilder("<");
+            // No written type arguments: recover each from the constructor's positional
+            // arguments, as Dart infers them -- `MapEntry(key, value)` inside a class over
+            // <K, V> is a MapEntry<K, V>, not the MapEntry<Object, Object> a filled-in
+            // diamond would make, which then fails to go into a Map<C, MapEntry<K, V>>.
+            // Only when every argument is an in-scope type variable: a concrete inferred type
+            // (MapEntry<String, Integer>) would be narrower than an expected
+            // MapEntry<String, Object>, which Java's invariance then rejects, where the
+            // context-free Object fill is accepted.
+            List<TypeRef> inferred = typeArgs.isEmpty() ? inferCtorTypeVars(sc, args, ctx) : null;
             for (int i = 0; i < sc.typeParams.size(); i++) {
                 TypeRef arg = i < typeArgs.size() ? typeArgs.get(i) : null;
+                if (arg == null && inferred != null) {
+                    arg = inferred.get(i);
+                }
                 if (typeSubst != null && arg != null) {
                     typeSubst.put(sc.typeParams.get(i), arg);
                 }
@@ -17956,6 +18263,11 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
     }
 
     /** True for dart:core's Never (not a program class of that name). */
+    private boolean isCoreListOrSet(TypeRef t) {
+        return t != null && ((t.is("List") && !program.classes.containsKey("List"))
+                || (t.is("Set") && !program.classes.containsKey("Set")));
+    }
+
     private boolean isCoreNever(TypeRef t) {
         return t != null && t.is("Never") && !program.classes.containsKey("Never");
     }
@@ -18110,6 +18422,11 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         if (t.is("Stopwatch")) {
             ctx.importClass("dart.core.Stopwatch");
             return "Stopwatch";
+        }
+        if (t.is("Invocation") && !program.classes.containsKey("Invocation")) {
+            // noSuchMethod's parameter. Its members are not modelled; the value is only
+            // passed on (to super.noSuchMethod), so it travels as Object.
+            return "Object";
         }
         // user typedef that plainly aliases another type: resolve through to the target
         Ast.TypedefDecl userTd = typedefDecl(t.name);
@@ -18907,6 +19224,16 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                     && !javaType(target.arg(0), true, ctx).equals(javaType(o.type.arg(0), true, ctx))) {
                 return "((" + javaType(target, false, ctx) + ") (Object) " + paren(o.code) + ".asIterable())";
             }
+            if (target.args.size() == 1 && (classTypeVarInScope(target.arg(0), ctx)
+                    || (ctx.methodTypeParams != null && target.arg(0).args.isEmpty()
+                            && ctx.methodTypeParams.contains(target.arg(0).name)))
+                    && o.code.contains("(")) {
+                // `Iterable<T> f<T>() => list.cast<T>()`: `.asIterable()` on a generic call
+                // gives javac no target to infer T from (it reads DartList<Object>); wrap with
+                // the element type spelled so the argument is inferred against Iterable<T>.
+                return "dart.core.DartIterable.<" + javaType(target.arg(0), true, ctx) + ">wrap("
+                        + o.code + ")";
+            }
             return paren(o.code) + ".asIterable()";
         }
         // A concrete generic target whose value is a proper subtype with different type arguments
@@ -19547,6 +19874,33 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
      * type variables take the receiver's arguments first ({@code Wrap<int>} of
      * {@code class Wrap<E> extends StreamView<E>}).
      */
+    /**
+     * The stub superclass {@code stubName} of program class {@code pc} as a receiver typed
+     * {@code receiver} sees it: {@code IterableBase<int>} for {@code class C extends
+     * Iterable<int>}. Null when the chain does not reach it through program classes.
+     */
+    private TypeRef stubSuperAsSeen(ClassDecl pc, String stubName, TypeRef receiver) {
+        java.util.Map<String, TypeRef> subst = new java.util.HashMap<String, TypeRef>();
+        if (receiver != null && receiver.args.size() == pc.typeParams.size()) {
+            subst.putAll(paramMap(pc.typeParams, receiver.args));
+        }
+        java.util.Set<String> seen = new java.util.HashSet<String>();
+        TypeRef sup = pc.superclass;
+        while (sup != null && seen.add(sup.name)) {
+            TypeRef seenSup = substTypeVars(sup, subst);
+            if (sup.name.equals(stubName)) {
+                return seenSup;
+            }
+            ClassDecl superProg = program.classes.get(sup.name);
+            if (superProg == null) {
+                return null;
+            }
+            subst = paramMap(superProg.typeParams, seenSup.args);
+            sup = superProg.superclass;
+        }
+        return null;
+    }
+
     private TypeRef inheritedStubMemberReturnType(ClassDecl pc, String member, boolean getter,
                                                   TypeRef receiver) {
         java.util.Map<String, TypeRef> subst = new java.util.HashMap<String, TypeRef>();

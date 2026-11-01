@@ -98,12 +98,22 @@ public class DartIterable<E> implements Iterable<E> {
         }
     }
 
-    /// The Dart list this iterable is the plain view of ({@link #wrap} of a
-    /// {@link DartList}), or null. A List passed where an Iterable is expected travels
-    /// as that view, and is still that List in Dart: `it is List` looks through it.
+    /// The Dart list or set this iterable is the plain view of ({@link #wrap} of a
+    /// {@link DartList} or {@link DartSet}), else the value itself. A List or Set passed
+    /// where an Iterable is expected travels as that view, and is still that List or Set
+    /// in Dart: `it is List` / `it is Set` look through it.
+    ///
+    /// This is the runtime's answer to Dart's `List<E> implements Iterable<E>`. Java
+    /// cannot say it: DartList must extend AbstractList and DartSet LinkedHashSet to be
+    /// the java.util collections Java APIs take, and dart:core's Iterable is this class,
+    /// so neither can also extend it. The transpiler therefore emits a program override
+    /// that narrows an Iterable return to List or Set (`Set<T> cast()` over
+    /// `Iterable<T> cast()`) with the member's Iterable return, returning this view, and
+    /// a call through the narrower static type reads the collection back through here.
     public static Object listBehind(Object value) {
         if (value != null && value.getClass() == DartIterable.class
-                && ((DartIterable<?>) value).source instanceof DartList) {
+                && (((DartIterable<?>) value).source instanceof DartList
+                        || ((DartIterable<?>) value).source instanceof DartSet)) {
             return ((DartIterable<?>) value).source;
         }
         return value;
