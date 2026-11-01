@@ -75,6 +75,31 @@ public final class JavaEmitter {
         this.diags = diags;
         this.pkg = pkg;
         program.finishParts();
+        superclassMixinsToMixins();
+    }
+
+    /**
+     * {@code class X extends ListMixin<int>} (or {@code extends M} for any mixin, program or
+     * stub, including an {@code abstract mixin class}) is {@code class X with M}: Object is
+     * the superclass and M is applied to it. A mixin maps to a Java interface, which no
+     * class can extend, so the superclass is moved to the front of the mixin list.
+     */
+    private void superclassMixinsToMixins() {
+        for (Ast.Library lib : program.libraries) {
+            for (Ast.ClassDecl c : lib.classes) {
+                if (c.superclass == null || c.isMixin || c.extensionOn != null) {
+                    continue;
+                }
+                Ast.ClassDecl sup = program.classes.get(c.superclass.name);
+                if (sup == null) {
+                    sup = stubs.classes.get(c.superclass.name);
+                }
+                if (sup != null && sup.isMixin) {
+                    c.mixins.add(0, c.superclass);
+                    c.superclass = null;
+                }
+            }
+        }
     }
 
     // ==================================================================
@@ -966,7 +991,24 @@ public final class JavaEmitter {
         }
         for (MethodDecl m : mx.methods) {
             if (m.isStatic) {
-                diags.error(m, "E0401", "Static mixin members are not supported yet");
+                // A Java interface takes static methods as they are (an `abstract mixin
+                // class` with a private static helper is the common case).
+                Method sm = new Method();
+                sm.name = m.name;
+                sm.isStatic = true;
+                sm.isGetter = m.isGetter;
+                sm.isSetter = m.isSetter;
+                sm.isAsync = m.isAsync;
+                sm.isSyncStar = m.isSyncStar;
+                sm.isAsyncStar = m.isAsyncStar;
+                sm.returnType = m.returnType;
+                sm.params = m.params;
+                sm.typeParams = m.typeParams;
+                sm.typeParamBounds = m.typeParamBounds;
+                sm.body = m.body;
+                sm.exprBody = m.exprBody;
+                sm.witnesses = methodWitnesses(m);
+                body.append(emitMethodLike(sm, ctx, false));
                 continue;
             }
             ctx.pushScope();
@@ -1215,6 +1257,7 @@ public final class JavaEmitter {
                     }
                     impls.append(javaType(mixRef, false, ctx));
                     emitChangeNotifierState(mixRef, body);
+                    emitMixinToString(c, mixRef, body);
                     continue;
                 }
                 diags.error(c, "E0402", "Unknown mixin: " + mixRef.name);
@@ -1494,6 +1537,12 @@ public final class JavaEmitter {
                 return javaType(t, false, ctx);
             }
             String outer = javaType(new TypeRef(t.name), false, ctx);
+            // A bare core collection name maps with default arguments (Iterable ->
+            // DartIterable<Object>); only its class name is wanted before t's own.
+            int lt = outer.indexOf('<');
+            if (lt > 0) {
+                outer = outer.substring(0, lt);
+            }
             classRefMode = saved;
             return outer + genericSuffix(t, ctx);
         } finally {
@@ -3077,6 +3126,9 @@ public final class JavaEmitter {
         ctx.staticMember = m.isStatic;
         java.util.Set<String> savedWl = ctx.witnessLocals;
         ctx.witnessLocals = m.witnesses.isEmpty() ? null : new HashSet<String>(m.witnesses);
+        if (isWhereTypeOverride(m)) {
+            ctx.witnessLocals = new HashSet<String>(m.typeParams);
+        }
         try {
             return emitMethodLikeBody(m, ctx, classIsAbstract);
         } finally {
@@ -3134,6 +3186,16 @@ public final class JavaEmitter {
         // The Java parameter list and names, kept for a sync* body's helper method.
         StringBuilder paramDecls = new StringBuilder();
         StringBuilder paramNames = new StringBuilder();
+        boolean whereTypeOverride = isWhereTypeOverride(m);
+        if (whereTypeOverride) {
+            // The runtime's whereType(Class, boolean) shape (see isWhereTypeOverride); the
+            // body reads T's witness from the local rebuilt from the two below.
+            String tw = m.typeParams.get(0);
+            sb.append("java.lang.Class<").append(tw).append("> $twc$").append(tw)
+                    .append(", boolean $twn$").append(tw);
+            paramDecls.append(", dart.runtime.TypeWitness $tw$").append(tw);
+            paramNames.append(", $tw$").append(tw);
+        }
         for (String tw : m.witnesses) {
             sb.append("dart.runtime.TypeWitness $tw$").append(tw).append(m.params.isEmpty() ? "" : ", ");
             paramDecls.append(", dart.runtime.TypeWitness $tw$").append(tw);
@@ -3158,6 +3220,12 @@ public final class JavaEmitter {
             return sb.toString();
         }
         sb.append(" {\n");
+        if (whereTypeOverride) {
+            String tw = m.typeParams.get(0);
+            sb.append("        dart.runtime.TypeWitness $tw$").append(tw)
+                    .append(" = dart.runtime.TypeWitness.of($twc$").append(tw).append(", $twn$")
+                    .append(tw).append(");\n");
+        }
         ctx.pushWriter(2);
         ctx.methodReturnType = rt;
         ctx.inAsyncBody = m.isAsync;
@@ -6346,6 +6414,9 @@ public final class JavaEmitter {
      */
     private String methodWitnessCall(Object decl, Call c, TypeRef expected, Ctx ctx) {
         List<String> ws = methodWitnesses(decl);
+        if (decl instanceof MethodDecl && ws.isEmpty() && isWhereTypeOverride((MethodDecl) decl)) {
+            return whereTypeArgs(c.typeArgs.isEmpty() ? null : c.typeArgs.get(0), c, ctx) + ", ";
+        }
         if (ws.isEmpty()) {
             return "";
         }
@@ -6467,6 +6538,42 @@ public final class JavaEmitter {
     }
 
     /** The Java expression of the witness of type parameter {@code n} here, or null. */
+    /**
+     * A program override of {@code Iterable.whereType<T>()} (a delegating wrapper's
+     * {@code whereType<T>() => _base.whereType<T>()}). The runtime method is
+     * {@code whereType(Class, boolean)} -- T's class and whether it admits null -- and every
+     * call site passes those whatever the receiver, so the override takes the same two and
+     * rebuilds T's witness from them: inside, T is a real type to filter by, not E0142.
+     */
+    private static boolean isWhereTypeOverride(MethodDecl m) {
+        return "whereType".equals(m.name) && !m.isStatic && !m.isGetter && !m.isSetter
+                && m.params.isEmpty() && m.typeParams != null && m.typeParams.size() == 1;
+    }
+
+    /**
+     * The two arguments of the runtime's {@code whereType(Class, boolean)} for
+     * {@code whereType<sub>()} called on a program override: T's class and whether it
+     * admits null, from a witness when {@code sub} is a witnessed type parameter.
+     */
+    private String whereTypeArgs(TypeRef sub, Node pos, Ctx ctx) {
+        String subW = sub != null && sub.args.isEmpty() ? witnessFor(sub.name, ctx) : null;
+        if (subW != null) {
+            return "(java.lang.Class) " + subW + ".type(), " + (sub.nullable ? "true" : subW + ".test(null)");
+        }
+        if (sub != null && reportTypeVariableWitness(pos, sub, ctx, "'whereType<" + sub.name + ">()'")) {
+            return "null, true";
+        }
+        String token = sub != null ? javaType(sub, true, ctx) + ".class" : "null";
+        boolean admitsNull = sub == null || sub.nullable || sub.is("dynamic") || sub.is("var");
+        return "(java.lang.Class) " + token + ", " + admitsNull;
+    }
+
+    private static boolean isWhereTypeOverride(Method m) {
+        return "whereType".equals(m.name) && !m.isStatic && !m.isGetter && !m.isSetter
+                && m.params.isEmpty() && m.typeParams != null && m.typeParams.size() == 1
+                && m.witnesses.isEmpty();
+    }
+
     private String witnessFor(String n, Ctx ctx) {
         if (n == null) {
             return null;
@@ -10027,6 +10134,33 @@ public final class JavaEmitter {
                 .append("    @Override\n")
                 .append("    public java.util.List<dart.runtime.Funcs.VoidFunc0> changeNotifierListeners$() {\n")
                 .append("        return changeNotifierListeners;\n    }\n\n");
+    }
+
+    /**
+     * Dart's {@code ListMixin} and {@code IterableMixin} declare {@code toString()}
+     * ({@code [1, 2]} and {@code (1, 2)}). The stubs map to Java interfaces, which cannot
+     * supply it, so the applying class gets one unless it declares its own.
+     */
+    private void emitMixinToString(ClassDecl c, TypeRef mixin, StringBuilder body) {
+        Ast.ClassDecl sc = stubs.classes.get(mixin.name);
+        String open;
+        String close;
+        if (sc != null && "dart.collection.ListMixin".equals(sc.javaName)) {
+            open = "[";
+            close = "]";
+        } else if (sc != null && "dart.collection.IterableMixin".equals(sc.javaName)) {
+            open = "(";
+            close = ")";
+        } else {
+            return;
+        }
+        for (MethodDecl m : c.methods) {
+            if ("toString".equals(m.name) && !m.isStatic) {
+                return;
+            }
+        }
+        body.append("    @Override\n    public String toString() {\n        return $mixinToString(\"")
+                .append(open).append("\", \"").append(close).append("\");\n    }\n\n");
     }
 
     /** dart:core error constructors -> dart-runtime classes. */
@@ -13995,9 +14129,10 @@ public final class JavaEmitter {
                 continue;
             }
             TypeRef b = cArgsTypeParam(p, sc, explicit, m, args, ctx);
-            if (b != null) {
-                subst.put(p, b);
-            }
+            // Nothing binds it (`Stream.periodic(d, f)`, `Stream.empty()`): dynamic, as
+            // Dart instantiates to bounds, never the class's own T leaking into a local's
+            // declared Java type.
+            subst.put(p, b != null ? b : TypeRef.DYNAMIC);
         }
         return subst.isEmpty() ? null : substTypeVars(m.returnType, subst);
     }

@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
 
-class Bag with ListMixin<int> {
+class Bag extends ListMixin<int> {
   final List<int?> _items = [];
   @override
   int get length => _items.length;
@@ -40,9 +40,10 @@ Future<void> main() async {
   print('tail ${tail.toList()}');
   print('head ${head.toList()}');
   bag.setAll(1, [7, 8]);
-  print('setAll ${bag.toList()}');
+  print('setAll $bag');
   bag.setRange(0, 2, [9, 10, 11], 1);
   print('setRange ${bag.toList()}');
+  print('bag $bag');
 
   final log = <String>[];
   final c = StreamController<int>(onListen: () => log.add('listen'));

@@ -545,6 +545,15 @@ public final class AstBuilder {
         for (int i = 0; i < members.size(); i++) {
             buildMember(members.get(i), metas.size() > i ? metas.get(i) : null, cd);
         }
+        // `abstract mixin class M implements List<E>` with no superclass and no constructor is,
+        // for every use but `extends M`, exactly `mixin M`: it can never be instantiated, and a
+        // class applies it `with M` on top of its own superclass. Treated as a mixin, it gets
+        // the mixin emission (an interface with default methods) that such an application
+        // needs; `extends M` is normalized to `with M` by Program.
+        if (cd.isAbstract && ctx.MIXIN_() != null && cd.superclass == null && cd.mixins.isEmpty()
+                && cd.ctors.isEmpty()) {
+            cd.isMixin = true;
+        }
         return cd;
     }
 

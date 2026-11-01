@@ -4,6 +4,7 @@ tail [2, 4, 6]
 head [1, 2]
 setAll [1, 7, 8, 6]
 setRange [10, 11, 8, 6]
+bag [10, 11, 8, 6]
 has onListen true
 has onCancel false
 has onCancel now true

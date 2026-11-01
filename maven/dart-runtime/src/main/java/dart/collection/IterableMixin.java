@@ -172,6 +172,28 @@ public interface IterableMixin<E> {
         return sb.toString();
     }
 
+    /**
+     * The elements as Dart prints them, between {@code open} and {@code close}. A Java
+     * interface cannot supply {@code toString()}, so a class applying this mixin (or
+     * {@code ListMixin}) gets a transpiler-emitted {@code toString()} that calls this:
+     * Dart's {@code IterableMixin} prints {@code (1, 2)}, {@code ListMixin} {@code [1, 2]}.
+     * Dart elides the middle of an iterable past 100 elements; this prints them all.
+     */
+    default String $mixinToString(String open, String close) {
+        StringBuilder sb = new StringBuilder(open);
+        Iterator<E> it = iterator();
+        boolean firstElement = true;
+        while (it.moveNext()) {
+            if (!firstElement) {
+                sb.append(", ");
+            }
+            E e = it.current();
+            sb.append(e == this ? (open + "..." + close) : dart.runtime.DartRuntime.str(e));
+            firstElement = false;
+        }
+        return sb.append(close).toString();
+    }
+
     /** Dart's {@code Iterable.join()} with no separator. */
     default String join() {
         return join("");

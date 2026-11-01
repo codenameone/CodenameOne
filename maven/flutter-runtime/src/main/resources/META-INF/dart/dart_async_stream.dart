@@ -59,14 +59,17 @@ abstract class Stream<T> {
       {Object? onError, void Function()? onDone, bool? cancelOnError});
   external Stream<R> map<R>(R Function(T event) transform);
   external Stream<T> where(bool Function(T event) test);
-  // Named constructors, as static factories with a raw return (see broadcast below).
-  external static Stream fromIterable(Iterable elements);
-  external static Stream value(Object? value);
-  external static Stream empty();
-  external static Stream error(Object error);
-  external static Stream fromFuture(Future future);
-  external static Stream fromFutures(Iterable futures);
-  external static Stream periodic(Duration period, [Object? computation]);
+  // Named constructors, as static factories spelled with the class's own T: the emitter
+  // binds it from the call's arguments (bindStaticClassTypeParams), so
+  // `Stream.fromIterable([1, 2])` is a Stream<int>, as Dart's constructor infers. A raw
+  // return made every element dynamic. Never `fromIterable<T>`: a method T is not bound.
+  external static Stream<T> fromIterable(Iterable<T> elements);
+  external static Stream<T> value(T value);
+  external static Stream<T> empty();
+  external static Stream<T> error(Object error);
+  external static Stream<T> fromFuture(Future<T> future);
+  external static Stream<T> fromFutures(Iterable<Future<T>> futures);
+  external static Stream<T> periodic(Duration period, [Object? computation]);
   external Stream<R> expand<R>(Object convert);
   external Stream<R> asyncMap<R>(Object convert);
   external Stream<T> take(int count);
