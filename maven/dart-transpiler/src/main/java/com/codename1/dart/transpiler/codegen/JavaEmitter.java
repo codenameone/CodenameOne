@@ -5642,7 +5642,7 @@ public final class JavaEmitter {
                 boolean voidArms = (thenO.type != null && thenO.type.is("void"))
                         || (elseO.type != null && elseO.type.is("void"));
                 if (voidArms) {
-                    Out cond = emitExpr(c.condition, TypeRef.BOOL, ctx);
+                    Out cond = dynCondition(emitExpr(c.condition, TypeRef.BOOL, ctx), ctx);
                     w.line("if (" + cond.code + ") {");
                     w.raw(thenL.lifted);
                     ctx.indent(1);
@@ -5770,7 +5770,7 @@ public final class JavaEmitter {
             emitIfCaseStmt((IfStmt) s, ctx);
         } else if (s instanceof IfStmt) {
             IfStmt i = (IfStmt) s;
-            Out c = emitExpr(i.condition, TypeRef.BOOL, ctx);
+            Out c = dynCondition(emitExpr(i.condition, TypeRef.BOOL, ctx), ctx);
             w.line("if (" + c.code + ") {");
             ctx.indent(1);
             ctx.pushScope();
@@ -6754,6 +6754,11 @@ public final class JavaEmitter {
     }
 
     private TypeRef inferExprTypeQuiet(Expr e, Ctx ctx) {
+        // `this` in an extension is the on-type (`Iterable<T>`): a generic call such as
+        // `lastBy(this, key)` binds its type parameter from it rather than to Object.
+        if (e instanceof ThisExpr && ctx.extensionSelfType != null) {
+            return ctx.extensionSelfType;
+        }
         if (e instanceof Ident) {
             String nm = ((Ident) e).name;
             TypeRef local = ctx.lookup(nm);
@@ -7865,7 +7870,7 @@ public final class JavaEmitter {
         }
         if (e instanceof Conditional) {
             Conditional c = (Conditional) e;
-            Out cond = emitExpr(c.condition, TypeRef.BOOL, ctx);
+            Out cond = dynCondition(emitExpr(c.condition, TypeRef.BOOL, ctx), ctx);
             // `x is T ? x.member : ...` promotes x to T in the then-branch.
             List<Object[]> undo = applyGuardPromotions(c.condition, ctx);
             Lazy la = emitLazyOperand(c.thenExpr, expected, ctx, 1);
@@ -9797,7 +9802,7 @@ public final class JavaEmitter {
         }
         if (e instanceof IfElement) {
             IfElement i = (IfElement) e;
-            Out cond = emitExpr(i.condition, TypeRef.BOOL, ctx);
+            Out cond = dynCondition(emitExpr(i.condition, TypeRef.BOOL, ctx), ctx);
             w.line("if (" + cond.code + ") {");
             ctx.indent(1);
             emitListElementInto(list, i.thenElement, elem, ctx);
@@ -9946,7 +9951,7 @@ public final class JavaEmitter {
         }
         if (e instanceof IfElement) {
             IfElement i = (IfElement) e;
-            Out cond = emitExpr(i.condition, TypeRef.BOOL, ctx);
+            Out cond = dynCondition(emitExpr(i.condition, TypeRef.BOOL, ctx), ctx);
             w.line("if (" + cond.code + ") {");
             ctx.indent(1);
             emitSetElementInto(set, i.thenElement, elem, ctx);
@@ -10180,7 +10185,7 @@ public final class JavaEmitter {
         }
         if (e instanceof IfElement) {
             IfElement i = (IfElement) e;
-            Out cond = emitExpr(i.condition, TypeRef.BOOL, ctx);
+            Out cond = dynCondition(emitExpr(i.condition, TypeRef.BOOL, ctx), ctx);
             w.line("if (" + cond.code + ") {");
             ctx.indent(1);
             emitMapElementInto(map, i.thenElement, kt, vt, ctx);
@@ -13093,6 +13098,9 @@ public final class JavaEmitter {
     private Lazy emitLazyOperand(Expr e, TypeRef expected, Ctx ctx, int depth) {
         ctx.pushWriter(ctx.currentIndent() + depth);
         Out o = emitExpr(e, expected, ctx);
+        if (expected == TypeRef.BOOL) {
+            o = dynCondition(o, ctx);
+        }
         String lifted = ctx.popWriter();
         if (!lifted.isEmpty() && onlyTempDeclarations(lifted)) {
             // A bare `T $t3;` runs nothing; it only gives the operand's expression a
@@ -13767,6 +13775,17 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
      * does. Emitted as is it was `Object && boolean`, which javac rejects. Java's && and
      * || still short-circuit, so the right operand is evaluated only when Dart would.
      */
+    /// A condition (`if`, `while`, `?:`, a collection `if`) that is `dynamic` -- the result
+    /// of a call on a dynamic receiver -- is checked to be a bool at run time, as Dart
+    /// does; javac rejects an Object where a boolean condition is required.
+    private Out dynCondition(Out o, Ctx ctx) {
+        if (o == null || o.type == null || !isDynamicType(o.type)) {
+            return o;
+        }
+        ctx.importClass("dart.runtime.DartRuntime");
+        return new Out("DartRuntime.dynBool(" + o.code + ")", TypeRef.BOOL);
+    }
+
     private String logicalOperand(Out o, Ctx ctx) {
         if (o.type == null || isDynamicType(o.type) || (o.type.is("bool") && o.type.nullable)) {
             ctx.importClass("dart.runtime.DartRuntime");
@@ -14394,7 +14413,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 }
                 String key = (m.isSetter ? "set$" : m.isGetter ? "get$" : "") + m.name;
                 if (!own.contains(key) && (superChainHas(sup, m) || earlierMixinHas(c, mi, m, ctx)
-                        || earlierStubMixinDeclares(c, mi, m))) {
+                        || earlierStubMixinDeclares(c, mi, m) || implementedTypeDeclares(c, mx, m, ctx))) {
                     return true;
                 }
             }
@@ -14431,7 +14450,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 }
                 String key = (m.isSetter ? "set$" : m.isGetter ? "get$" : "") + m.name;
                 if (done.contains(key) || !(superChainHas(sup, m) || earlierMixinHas(c, mi, m, ctx)
-                        || earlierStubMixinDeclares(c, mi, m))) {
+                        || earlierStubMixinDeclares(c, mi, m) || implementedTypeDeclares(c, mx, m, ctx))) {
                     continue;
                 }
                 done.add(key);
@@ -14551,7 +14570,57 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
     private boolean earlierStubMixinDeclares(ClassDecl c, int mi, MethodDecl m) {
         for (int i = 0; i < mi; i++) {
             ClassDecl o = stubs.classes.get(c.mixins.get(i).name);
-            if (o != null && declaresLike(o, m)) {
+            if (o != null && graphDeclares(o, m, new HashSet<ClassDecl>(), null)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Whether a type c `implements` (or anything above it) declares m. Its Java interface
+    /// can carry a default of its own for m (`UnmodifiableSetView` gets `clear()` from
+    /// `DelegatingSet`), and Java rejects a class that inherits that and the mixin's default
+    /// unless it names one -- so the mixin's, which Dart picks, is forwarded explicitly.
+    private boolean implementedTypeDeclares(ClassDecl c, ClassDecl mx, MethodDecl m, Ctx ctx) {
+        // A raw `with M` has no arguments to substitute into the forwarder's signature,
+        // which would then clash with the mixin's own erasure instead of overriding it.
+        for (TypeRef mref : c.mixins) {
+            if (program.resolveClass(mref.name, ctx.library()) == mx
+                    && mref.args.size() != mx.typeParams.size()) {
+                return false;
+            }
+        }
+        for (TypeRef t : c.interfaces) {
+            ClassDecl o = program.resolveClass(t.name, ctx.library());
+            if (o == null) {
+                o = stubs.classes.get(t.name);
+            }
+            if (o != null && o != mx && graphDeclares(o, m, new HashSet<ClassDecl>(), ctx)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// declaresLike over o and every supertype, mixin and interface above it.
+    private boolean graphDeclares(ClassDecl o, MethodDecl m, java.util.Set<ClassDecl> seen, Ctx ctx) {
+        if (o == null || !seen.add(o) || seen.size() > 64) {
+            return false;
+        }
+        if (declaresLike(o, m)) {
+            return true;
+        }
+        java.util.List<TypeRef> ups = new ArrayList<TypeRef>(o.interfaces);
+        ups.addAll(o.mixins);
+        if (o.superclass != null) {
+            ups.add(o.superclass);
+        }
+        for (TypeRef t : ups) {
+            ClassDecl u = ctx != null ? program.resolveClass(t.name, ctx.library()) : null;
+            if (u == null) {
+                u = stubs.classes.get(t.name);
+            }
+            if (graphDeclares(u, m, seen, ctx)) {
                 return true;
             }
         }
@@ -18824,7 +18893,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                     // way Future.then's onError: is pinned (pinnedHandler), rather than
                     // leaving it a bare lambda a plain Object parameter cannot accept.
                     // See dart.async.Stream's class comment.
-                    sb.append(pinnedErrorHandler((Lambda) match.value, emitExpr(match.value, null, ctx)));
+                    sb.append(pinnedErrorHandler((Lambda) match.value, emitExpr(match.value, null, ctx), ctx));
                 } else if (match != null) {
                     String handler = isStubFunctionSlot(ct, pt) ? objectHandlerSlot(match.value, ctx) : null;
                     if (handler != null) {
@@ -18893,11 +18962,25 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
      * site's comment and {@code dart.async.Stream}'s class comment for why this
      * cannot instead be an overload.
      */
-    private String pinnedErrorHandler(Lambda src, Out o) {
+    private String pinnedErrorHandler(Lambda src, Out o, Ctx ctx) {
+        // A parameter the closure types itself (`(Object error, StackTrace stackTrace)`)
+        // keeps that type in the SAM: the body reads it as one, and the runtime only ever
+        // hands the error and its StackTrace. Untyped ones stay Object.
         String type = src.params.size() >= 2
-                ? "dart.runtime.Funcs.VoidFunc2<Object, Object>"
-                : "dart.runtime.Funcs.VoidFunc1<Object>";
+                ? "dart.runtime.Funcs.VoidFunc2<" + errorHandlerParam(src.params.get(0), ctx) + ", "
+                        + errorHandlerParam(src.params.get(1), ctx) + ">"
+                : "dart.runtime.Funcs.VoidFunc1<"
+                        + (src.params.isEmpty() ? "Object" : errorHandlerParam(src.params.get(0), ctx)) + ">";
         return "(" + type + ") " + paren(o.code);
+    }
+
+    private String errorHandlerParam(Param p, Ctx ctx) {
+        TypeRef t = p.type;
+        if (t == null || t.name == null || t.is("var") || isDynamicType(t) || t.is("Object")
+                || t.funcParams != null || !t.args.isEmpty()) {
+            return "Object";
+        }
+        return javaType(copyNonNull(t), true, ctx);
     }
 
     /**
@@ -23237,7 +23320,10 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
 
     private String paren(String code) {
         // parenthesize composite expressions to preserve precedence
-        if (code.matches("[A-Za-z0-9_$.()\\[\\]\"]+") || code.startsWith("(")) {
+        // `(a) & (b)` starts with '(' but is not enclosed by it: Dart's `a & b != 0` would
+        // otherwise come out as Java's `(a) & (b) != 0`, where != binds first.
+        if (code.matches("[A-Za-z0-9_$.()\\[\\]\"]+")
+                || (code.startsWith("(") && outerParenEnclosesAll(code))) {
             return code;
         }
         return "(" + code + ")";

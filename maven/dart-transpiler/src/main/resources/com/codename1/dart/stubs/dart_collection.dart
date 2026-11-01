@@ -34,7 +34,7 @@ mixin IterableMixin<E> {
 
 // List protocol: adds indexed access on top of the Iterable surface.
 @JavaName('dart.collection.ListMixin')
-mixin ListMixin<E> {
+mixin ListMixin<E> implements IterableMixin<E> {
   int get length;
   set length(int newLength);
   E operator [](int index);

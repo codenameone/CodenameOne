@@ -911,7 +911,7 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
         return asIterable().reduce(combine);
     }
 
-    public <R> DartIterable<R> expand(Funcs.Func1<E, Iterable<R>> f) {
+    public <R> DartIterable<R> expand(Funcs.Func1<E, ? extends Iterable<R>> f) {
         return asIterable().expand(f);
     }
 

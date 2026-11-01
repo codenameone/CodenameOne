@@ -434,7 +434,7 @@ public class DartIterable<E> implements Iterable<E> {
     }
 
     /** Dart's {@code Iterable.expand(f)} — flat-maps each element to an iterable. */
-    public <R> DartIterable<R> expand(Funcs.Func1<E, Iterable<R>> f) {
+    public <R> DartIterable<R> expand(Funcs.Func1<E, ? extends Iterable<R>> f) {
         Iterable<E> src = this;
         return new DartIterable<>(() -> new Iterator<R>() {
             private final Iterator<E> outer = src.iterator();
