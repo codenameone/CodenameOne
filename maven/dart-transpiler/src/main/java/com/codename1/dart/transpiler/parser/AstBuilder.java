@@ -608,6 +608,12 @@ public final class AstBuilder {
             // (`material('...')`) or a named ctor (`x.named(...)`); we keep only the
             // constant's own name. The first identifier is the constant.
             ed.entries.add(e.identifier(0).getText());
+            Args entryArgs = null;
+            if (e.arguments() != null && e.identifier().size() == 1) {
+                entryArgs = new Args();
+                buildArgs(e.arguments(), entryArgs);
+            }
+            ed.entryArgs.add(entryArgs);
         }
         // Enhanced-enum body: methods / getters, fields and constructors declared after the
         // trailing `;`. These share the class-member grammar, so build them into a throwaway

@@ -1,0 +1,9 @@
+start 0 begins/1 begins 1
+middle 1 carries on/2 carries on 2
+finish 2 ends/3 ends 3
+alpha A 0
+beta B 5
+type literal is a Type
+true
+position 7
+through interface 7

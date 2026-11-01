@@ -36,5 +36,15 @@ public interface StreamSink<S> extends StreamConsumer<S> {
         addError(stackTrace == null ? error : dart.core.StackTrace.carry(error, stackTrace));
     }
 
-    Future<Object> done();
+    /// Dart's {@code done}. Every Dart StreamSink declares it; the default is for a Dart
+    /// EventSink, which is this interface in Java and has no {@code done} to give.
+    default Future<Object> done() {
+        throw new dart.core.UnsupportedError("An EventSink has no done future");
+    }
+
+    /// Dart's {@code addStream}, defaulted for the same reason as {@link #done()}.
+    @Override
+    default Future<Object> addStream(Stream<S> stream) {
+        throw new dart.core.UnsupportedError("An EventSink has no addStream");
+    }
 }

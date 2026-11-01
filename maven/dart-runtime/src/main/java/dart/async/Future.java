@@ -197,7 +197,7 @@ public class Future<T> {
      * {@code Future.wait(fs).catchError(...)} never got a future to install
      * its handler on.
      */
-    public static Future<DartList<Object>> wait(Iterable<? extends Future<?>> futures) {
+    public static Future<DartList<Object>> wait(Iterable<?> futures) {
         return wait(futures, false, null);
     }
 
@@ -209,14 +209,20 @@ public class Future<T> {
      * every non-null successful value: the ones already in and the ones that arrive
      * later, as Dart hands them over.
      */
-    public static Future<DartList<Object>> wait(Iterable<? extends Future<?>> futures,
+    /// Takes any Iterable: a Dart {@code List<Future>} built from dynamic values is a
+    /// {@code DartList<Object>} in Java. An element that is not a future fails the result
+    /// with a TypeError, as Dart's cast does.
+    public static Future<DartList<Object>> wait(Iterable<?> futures,
                                                 final boolean eagerError,
                                                 final Funcs.VoidFunc1<Object> cleanUp) {
         final Future<DartList<Object>> result = new Future<DartList<Object>>();
         final List<Future<?>> inputs = new ArrayList<Future<?>>();
         try {
-            for (Future<?> f : futures) {
-                inputs.add(f);
+            for (Object f : futures) {
+                if (!(f instanceof Future)) {
+                    throw new dart.core.TypeError("Future.wait element " + f + " is not a Future");
+                }
+                inputs.add((Future<?>) f);
             }
         } catch (Throwable t) {
             // Dart returns a future failed with the traversal's error; letting it escape

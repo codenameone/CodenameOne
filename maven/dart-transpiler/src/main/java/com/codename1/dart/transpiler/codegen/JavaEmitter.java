@@ -206,6 +206,7 @@ public final class JavaEmitter {
     }
 
     private List<GeneratedFile> emitAll() {
+        superclassesAsMixins();
         List<GeneratedFile> out = new ArrayList<GeneratedFile>();
         // Every library with a top-level main(), collected in source order (which is itself
         // sorted by path -- see DartTranspiler.transpile -- not necessarily the order a
@@ -498,8 +499,18 @@ public final class JavaEmitter {
                         .append("() {\n        return ").append(f.name).append(";\n    }\n");
             }
         }
+        CtorDecl entryCtor = null;
         for (CtorDecl ct : e.ctors) {
-            body.append(emitCtor(syn, ct, ctx));
+            String ctor = emitCtor(syn, ct, ctx);
+            // A Java enum constructor may not be public; the constants are its only callers.
+            String pub = "    public " + enumJava + "(";
+            if (ctor.startsWith(pub)) {
+                ctor = "    private " + enumJava + "(" + ctor.substring(pub.length());
+            }
+            body.append(ctor);
+            if (ct.name == null && !ct.isFactory) {
+                entryCtor = ct;
+            }
         }
         for (MethodDecl m : e.methods) {
             Method mm = new Method();
@@ -522,6 +533,16 @@ public final class JavaEmitter {
             mm.exprBody = m.exprBody;
             body.append(emitMethodLike(mm, ctx, false));
         }
+        // `boundary('boundary')`: the entry's arguments go to the enum's constructor, in the
+        // constructor's own (canonical) parameter order. Emitted before the imports are
+        // written, since an argument may need one.
+        String[] entryArgCode = new String[e.entries.size()];
+        for (int i = 0; i < entryArgCode.length; i++) {
+            Args entryArgs = i < e.entryArgs.size() ? e.entryArgs.get(i) : null;
+            if (entryArgs != null && entryCtor != null) {
+                entryArgCode[i] = "(" + canonicalArgs(entryCtor, syn, entryArgs, ctx) + ")";
+            }
+        }
         for (String imp : ctx.imports.values()) {
             sb.append("import ").append(imp).append(";\n");
         }
@@ -537,6 +558,9 @@ public final class JavaEmitter {
                 names.append(", ");
             }
             sb.append(e.entries.get(i));
+            if (entryArgCode[i] != null) {
+                sb.append(entryArgCode[i]);
+            }
             // the constant's simple name (enhanced enums carry `name(args)`)
             String entry = e.entries.get(i);
             int paren = entry.indexOf('(');
@@ -1299,6 +1323,11 @@ public final class JavaEmitter {
         TypeRef mixinClassAsSuper = null;
         for (TypeRef mixRef : c.mixins) {
             ClassDecl mx = program.classes.get(mixRef.name);
+            if (mx != null && stubs.isStubClass(mixRef.name) && !classVisibleFrom(mx, c.ownerLibrary)) {
+                // An unrelated package class that shares a runtime mixin's name (a package's
+                // own ChangeNotifier) is not the one this library mixes in.
+                mx = null;
+            }
             if (mx != null && !mx.isMixin && c.superclass == null && mixinClassAsSuper == null
                     && mixRef == c.mixins.get(0) && mx.superclass == null && mx.mixins.isEmpty()) {
                 // `class S with M` where M is a `mixin class` (or any class with no
@@ -1546,6 +1575,7 @@ public final class JavaEmitter {
             impls.append("dart.runtime.DynamicObject");
         }
         body.append(emitStubGetterBridges(c, ctx));
+        body.append(emitSinkAddErrorBridges(c, ctx));
         // Dart 3 sealed → Java sealed: a sealed class with subtypes lists them in a permits clause and
         // its direct subtypes are marked non-sealed. Falls back to a plain abstract class when the
         // hierarchy has no subtypes (a permits-less sealed class is illegal in Java).
@@ -2910,6 +2940,10 @@ public final class JavaEmitter {
         if (!m.isOverride) {
             return false;
         }
+        if (isSinkAddErrorWithTrace(c, m)) {
+            // Bridged by emitSinkAddErrorBridges: the runtime's addError takes an Object trace.
+            return false;
+        }
         if (m.isStatic || m.isGetter || m.isSetter) {
             return true;
         }
@@ -3196,6 +3230,94 @@ public final class JavaEmitter {
         return null;
     }
 
+    /**
+     * Whether m is a sink's {@code addError(Object error, [StackTrace? stackTrace])} in a class
+     * that is a Dart EventSink or StreamSink -- both {@code dart.async.StreamSink} in Java, whose
+     * addError is {@code (Object)} plus a default {@code (Object, Object)}. The emitted
+     * {@code (Object, StackTrace)} is an overload of neither, so a caller holding the
+     * interface would never reach it.
+     */
+    /** A program class's {@code void close()} that implements Dart's EventSink.close. */
+    private boolean isEventSinkVoidClose(Method m, Ctx ctx) {
+        if (m.isStatic || m.isGetter || m.isSetter || !"close".equals(m.name) || !m.params.isEmpty()
+                || m.returnType == null || !m.returnType.is("void") || ctx.currentClass == null
+                || ctx.currentClass.isMixin) {
+            return false;
+        }
+        return reachesStubJavaName(ctx.currentClass, "dart.async.StreamSink");
+    }
+
+    private boolean isSinkAddErrorWithTrace(ClassDecl c, MethodDecl m) {
+        if (m.isStatic || m.isGetter || m.isSetter || !"addError".equals(m.name) || m.params.size() != 2
+                || m.params.get(1).type == null || !m.params.get(1).type.is("StackTrace")) {
+            return false;
+        }
+        return reachesStubJavaName(c, "dart.async.StreamSink");
+    }
+
+    /** Whether program class c reaches, through supers, interfaces or mixins, a stub with that Java name. */
+    private boolean reachesStubJavaName(ClassDecl c, String javaName) {
+        java.util.ArrayDeque<TypeRef> todo = new java.util.ArrayDeque<TypeRef>();
+        Set<String> seen = new HashSet<String>();
+        ClassDecl cur = c;
+        for (int guard = 0; guard < 256; guard++) {
+            if (cur != null && seen.add("p:" + cur.name)) {
+                if (cur.superclass != null) {
+                    todo.add(cur.superclass);
+                }
+                todo.addAll(cur.interfaces);
+                todo.addAll(cur.mixins);
+            }
+            cur = null;
+            if (todo.isEmpty()) {
+                return false;
+            }
+            TypeRef t = todo.poll();
+            if (t == null || t.name == null) {
+                continue;
+            }
+            ClassDecl pc = program.classes.get(t.name);
+            if (pc != null) {
+                cur = pc;
+                continue;
+            }
+            Ast.ClassDecl sc = stubs.classes.get(t.name);
+            if (sc != null && seen.add("s:" + t.name)) {
+                if (javaName.equals(sc.javaName)) {
+                    return true;
+                }
+                if (sc.superclass != null) {
+                    todo.add(sc.superclass);
+                }
+                todo.addAll(sc.interfaces);
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The interface members that reach a sink's {@code addError(Object, StackTrace)}: the
+     * runtime's {@code addError(Object)} and {@code addError(Object, Object)}. Without them the
+     * one-argument form stayed abstract, and a two-argument call through the interface took
+     * the runtime default, which skipped the class's own handling entirely.
+     */
+    private String emitSinkAddErrorBridges(ClassDecl c, Ctx ctx) {
+        if (c.isMixin) {
+            return "";
+        }
+        for (MethodDecl m : c.methods) {
+            if (m.isOverride && isSinkAddErrorWithTrace(c, m) && !m.isAbstract) {
+                String st = "dart.core.StackTrace";
+                return "    @Override\n    public void addError(Object error) {\n"
+                        + "        this.addError(error, (" + st + ") null);\n    }\n\n"
+                        + "    @Override\n    public void addError(Object error, Object stackTrace) {\n"
+                        + "        this.addError(error, stackTrace instanceof " + st + " ? (" + st + ") stackTrace : null);\n"
+                        + "    }\n\n";
+            }
+        }
+        return "";
+    }
+
     private boolean stubSigMatches(String stubClassName, MethodDecl m) {
         Ast.ClassDecl sc = stubs.classes.get(stubClassName);
         while (sc != null) {
@@ -3348,6 +3470,29 @@ public final class JavaEmitter {
     }
 
     private String emitMethodLikeBody(Method m, Ctx ctx, boolean classIsAbstract) {
+        if (isEventSinkVoidClose(m, ctx)) {
+            // Dart's EventSink.close() is void; in Java an EventSink is a dart.async.StreamSink,
+            // whose close() answers a Future. The body goes into a method of this class's own
+            // name -- never a shared one, or a subclass's super.close() would dispatch back
+            // into the subclass -- and close() runs it and answers a completed future.
+            String own = "close$" + ctx.currentClass.name;
+            String saved = m.name;
+            boolean savedOverride = m.isOverride;
+            m.name = own;
+            m.isOverride = false;
+            String inner;
+            try {
+                inner = emitMethodLikeBody(m, ctx, classIsAbstract);
+            } finally {
+                m.name = saved;
+                m.isOverride = savedOverride;
+            }
+            if (m.isAbstract) {
+                return inner;
+            }
+            return "    @Override\n    public dart.async.Future<Object> close() {\n        this." + own
+                    + "();\n        return dart.async.Future.value(null);\n    }\n\n" + inner;
+        }
         StringBuilder sb = new StringBuilder();
         TypeRef rt = m.returnType == null || m.returnType.is("var") ? TypeRef.DYNAMIC : m.returnType;
         // Dart's `int get hashCode` / `int compareTo(...)` map to Java's Object.hashCode /
@@ -6096,6 +6241,12 @@ public final class JavaEmitter {
                     && (o.type.is("int") || o.type.is("double") || o.type.is("bool"))) {
                 // A primitive operand cannot be tested with instanceof; the cast boxes it,
                 // so `min(1, 2) is int` tests the Long it is.
+                subject = "((Object) " + paren(o.code) + ")";
+            } else if (o.type != null && o.type.is("Type")) {
+                // `V is String` with V a type parameter or literal tests the Type object
+                // itself (false, unless the test is `is Object`/`is Type`). The operand is a
+                // java.lang.Class here, which is final, so javac refuses an instanceof
+                // against any unrelated class; tested as an Object it gives Dart's answer.
                 subject = "((Object) " + paren(o.code) + ")";
             } else if (o.type != null && o.type.name != null && t.type.name != null) {
                 // `bin is LazyBin` where Bin is a class LazyBin is unrelated to: Dart allows the
@@ -8963,6 +9114,15 @@ public final class JavaEmitter {
                 return new Out(target.code + "." + name + "()",
                         eg.returnType == null || eg.returnType.is("var") ? TypeRef.DYNAMIC : eg.returnType);
             }
+            // enhanced-enum instance field (`final String label;`): emitEnum gives a public
+            // one a get$ accessor and keeps a private one as the bare field.
+            for (FieldDecl ef : ed.fields) {
+                if (!ef.isStatic && ef.name.equals(name)) {
+                    TypeRef eft = ef.type == null || ef.type.is("var") ? TypeRef.DYNAMIC : ef.type;
+                    return new Out(ef.name.startsWith("_") ? target.code + "." + name
+                            : target.code + ".get$" + name + "()", eft);
+                }
+            }
         }
         // program class member
         ClassDecl pc = programClass(tt.name, ctx);
@@ -9887,6 +10047,17 @@ public final class JavaEmitter {
             if (lcode.endsWith(acc) && !acc.startsWith(".get$")) {
                 String recv = lcode.substring(0, lcode.length() - acc.length());
                 return voidSetterWrite(a, recv + "." + ((PropertyGet) a.lhs).name,
+                        a.op.equals("=") ? null : lcode, lhs.type, ctx);
+            }
+        }
+        // `position = v` inside a subclass, where the inherited getter reads as the accessor
+        // `this.position()` (an implemented interface declares the getter alone): the write
+        // is the setter overload `this.position(v)`, never an assignment to a call.
+        if (a.lhs instanceof Ident && !a.op.equals("??=")) {
+            String nm = ((Ident) a.lhs).name;
+            String acc = "." + nm + "()";
+            if (lcode.equals("this" + acc) || lcode.equals(nm + "()")) {
+                return voidSetterWrite(a, lcode.substring(0, lcode.length() - 2),
                         a.op.equals("=") ? null : lcode, lhs.type, ctx);
             }
         }
@@ -10988,6 +11159,37 @@ public final class JavaEmitter {
      * the notifier is held strongly there and leads back to the key, so a model with such a
      * listener could never be collected unless someone called dispose.
      */
+    /**
+     * Runtime types that Dart code may extend but that the runtime implements as a Java
+     * interface, because Dart code also mixes them in. {@code class C extends ChangeNotifier}
+     * is then exactly {@code class C with ChangeNotifier}: the stub declares no state a
+     * superclass constructor could take, so rewriting the clause before emission lets the
+     * mixin path (own listener list, interface super calls) handle both spellings.
+     */
+    private static final java.util.Set<String> INTERFACE_SUPERCLASSES =
+            new java.util.HashSet<String>(java.util.Arrays.asList(
+                    "com.codename1.flutter.foundation.ChangeNotifier"));
+
+    private void superclassesAsMixins() {
+        for (Library lib : program.libraries) {
+            stubs.viewFrom(importedPackages(lib), program.classes.keySet());
+            for (ClassDecl c : lib.classes) {
+                if (c.superclass == null || c.isMixin) {
+                    continue;
+                }
+                ClassDecl app = program.resolveClass(c.superclass.name, lib);
+                if (app != null && classVisibleFrom(app, lib)) {
+                    continue;
+                }
+                Ast.ClassDecl sc = stubs.classes.get(c.superclass.name);
+                if (sc != null && INTERFACE_SUPERCLASSES.contains(sc.javaName)) {
+                    c.mixins.add(0, c.superclass);
+                    c.superclass = null;
+                }
+            }
+        }
+    }
+
     private void emitChangeNotifierState(TypeRef mixin, StringBuilder body) {
         Ast.ClassDecl sc = stubs.classes.get(mixin.name);
         if (sc == null || !"com.codename1.flutter.foundation.ChangeNotifier".equals(sc.javaName)) {
@@ -11795,6 +11997,9 @@ public final class JavaEmitter {
         for (int i = c.mixins.size() - 1; i >= 0; i--) {
             TypeRef mixRef = c.mixins.get(i);
             ClassDecl mx = program.classes.get(mixRef.name);
+            if (mx != null && stubs.isStubClass(mixRef.name) && !classVisibleFrom(mx, c.ownerLibrary)) {
+                mx = null;
+            }
             if (mx == null) {
                 // A runtime mixin (ListMixin, MapMixin...) is a Java interface too.
                 if (stubs.findMethod(mixRef.name, member, false) != null
@@ -13871,8 +14076,11 @@ public final class JavaEmitter {
                 // the future's value type, as Dart infers it, so members of a runtime class
                 // resolve statically -- through dynamic dispatch they could not resolve.
                 TypeRef valueType = tt.args.size() == 1 ? tt.arg(0) : null;
-                Expr cbExpr = pos.get(0);
-                boolean typedCb = valueType != null && !isDynamicType(valueType) && isFullyConcrete(valueType)
+                // A tear-off onValue (`then(completer.complete)`) is a Java method reference
+                // both then overloads accept, which javac reports as ambiguous.
+                Expr cbExpr = tearOffAsLambda(pos.get(0), 1, ctx);
+                boolean typedCb = valueType != null && !isDynamicType(valueType)
+                        && (isFullyConcrete(valueType) || classTypeVarInScope(valueType, ctx))
                         && !valueType.is("int") && !valueType.is("double") && !valueType.is("bool")
                         && !valueType.is("num") && !valueType.is("void") && !valueType.is("Null")
                         && cbExpr instanceof Lambda && ((Lambda) cbExpr).params.size() == 1
@@ -13889,9 +14097,13 @@ public final class JavaEmitter {
                 // skipped it and the chain stayed failed.
                 for (NamedArg na : c.args.named) {
                     if (na.name.equals("onError")) {
+                        // A tear-off (`completer.completeError`) became a bare Java method
+                        // reference, which an Object parameter cannot take: call it from a
+                        // closure of the handler's own arity instead.
+                        Expr onErr = tearOffAsErrorLambda(na.value, ctx);
                         // (error, stackTrace) handlers take the two-argument shapes.
-                        boolean two = na.value instanceof Lambda && ((Lambda) na.value).params.size() == 2;
-                        String handler = pinnedHandler(na.value, emitExpr(na.value, null, ctx), true,
+                        boolean two = onErr instanceof Lambda && ((Lambda) onErr).params.size() == 2;
+                        String handler = pinnedHandler(onErr, emitExpr(onErr, null, ctx), true,
                                 two ? "dart.runtime.Funcs.Func2<Object, Object, Object>"
                                         : "dart.runtime.Funcs.Func1<Object, Object>",
                                 two ? "dart.runtime.Funcs.VoidFunc2<Object, Object>"
@@ -16348,6 +16560,68 @@ public final class JavaEmitter {
      * lambda too (an Object parameter); otherwise only an ambiguous one is cast and javac
      * resolves the rest as it always has. Anything that is not a lambda passes as is.
      */
+    /**
+     * An error-handler tear-off ({@code completer.completeError}, {@code sink.addError},
+     * {@code _onError}) rewritten as the closure Dart calls it as: {@code (e, s) => f(e, s)}
+     * when f takes a second positional argument, else {@code (e) => f(e)}. Only a receiver
+     * whose re-evaluation is free (a name, {@code this}) is rewritten, since the closure
+     * reads it per call where the tear-off read it once. Any other expression is returned
+     * as it is.
+     */
+    private Expr tearOffAsErrorLambda(Expr e, Ctx ctx) {
+        return tearOffAsLambda(e, -1, ctx);
+    }
+
+    /** As {@link #tearOffAsErrorLambda}, with a fixed arity when {@code fixedArity > 0}. */
+    private Expr tearOffAsLambda(Expr e, int fixedArity, Ctx ctx) {
+        Expr recv = null;
+        String name;
+        if (e instanceof PropertyGet && !((PropertyGet) e).nullAware) {
+            recv = ((PropertyGet) e).target;
+            name = ((PropertyGet) e).name;
+            if (!(recv instanceof Ident || recv instanceof ThisExpr)) {
+                return e;
+            }
+        } else if (e instanceof Ident && ((Ident) e).typeArgs == null) {
+            name = ((Ident) e).name;
+        } else {
+            return e;
+        }
+        int arity;
+        TypeRef ft = fixedArity > 0 ? null : emitExpr(e, null, ctx).type;
+        if (fixedArity > 0 && !emitExpr(e, null, ctx).code.contains("::")) {
+            return e;
+        } else if (fixedArity > 0) {
+            arity = fixedArity;
+        } else if (ft != null && ft.funcParams != null) {
+            arity = ft.funcParams.size();
+        } else if ("completeError".equals(name) || "addError".equals(name)) {
+            // Completer.completeError / EventSink.addError: (Object error, [StackTrace? st]).
+            arity = 2;
+        } else {
+            return e;
+        }
+        if (arity < 1 || arity > 2) {
+            return e;
+        }
+        Lambda l = new Lambda();
+        Call call = new Call();
+        call.target = recv;
+        call.name = name;
+        String[] names = {"$onErrE", "$onErrS"};
+        for (int i = 0; i < arity; i++) {
+            Param p = new Param();
+            p.name = names[i];
+            p.type = TypeRef.DYNAMIC;
+            l.params.add(p);
+            Ident arg = new Ident();
+            arg.name = names[i];
+            call.args.positional.add(arg);
+        }
+        l.exprBody = call;
+        return l;
+    }
+
     private String pinnedHandler(Expr src, Out o, boolean forceCast, String asValue, String asVoid) {
         if (!(src instanceof Lambda)) {
             return o.code;
@@ -18073,12 +18347,17 @@ public final class JavaEmitter {
         // downcast. A class type variable is in scope only in an instance member.
         if (o.type != null && o.type.is("FutureOr") && !isDynamicType(target) && !target.is("void")
                 && !target.is("Future") && target.funcReturn == null
-                && (isFullyConcrete(target) || (!ctx.staticMember && ctx.currentClass != null
-                        && ctx.currentClass.typeParams != null && target.args.isEmpty()
-                        && ctx.currentClass.typeParams.contains(target.name)))) {
+                && (isFullyConcrete(target) || classTypeVarInScope(target, ctx))) {
             return "(" + javaType(boxType(copyNonNull(target)), true, ctx) + ") (Object) " + paren(o.code);
         }
         return o.code;
+    }
+
+    /** {@code T} of the enclosing class, which Java has in scope only in an instance member. */
+    private boolean classTypeVarInScope(TypeRef t, Ctx ctx) {
+        return t != null && t.args.isEmpty() && t.funcReturn == null && !ctx.staticMember
+                && ctx.currentClass != null && ctx.currentClass.typeParams != null
+                && ctx.currentClass.typeParams.contains(t.name);
     }
 
     private String boxIfPrimitive(Out o, Ctx ctx) {
