@@ -2664,13 +2664,29 @@ public final class JavaEmitter {
                 // Nothing may precede super(...), so its arguments cannot be sequenced
                 // through lifted temps; they keep the parameter order.
                 inSuperInitializer = true;
+                ClassDecl savedOwner = ctx.ctorTypeOwner;
+                java.util.Map<String, TypeRef> savedSubst = ctx.ctorTypeSubst;
+                if (c.superclass.args != null && c.superclass.args.size() == progSuper.typeParams.size()
+                        && !progSuper.typeParams.isEmpty()) {
+                    // `extends Folded<String, String, V>` with `super((k) => k.toLowerCase())`:
+                    // the closure's parameters are the superclass's written type arguments,
+                    // exactly as for `Folded<String, String, V>((k) => ...)`.
+                    ctx.ctorTypeOwner = progSuper;
+                    ctx.ctorTypeSubst = new java.util.HashMap<String, TypeRef>();
+                    for (int i = 0; i < progSuper.typeParams.size(); i++) {
+                        ctx.ctorTypeSubst.put(progSuper.typeParams.get(i), c.superclass.args.get(i));
+                    }
+                }
                 try {
-                    String superCanon = canonicalArgs(superCtor, superArgs, ctx);
+                    String superCanon = canonicalArgs(superCtor,
+                            ctx.ctorTypeOwner == progSuper ? progSuper : null, superArgs, ctx);
                     String superTw = witnessArgs(progSuper, c.superclass.args, ct, ctx);
                     w.line("super(" + (superCanon.isEmpty() ? stripTrailingComma(superTw)
                             : superTw + superCanon) + ");");
                 } finally {
                     inSuperInitializer = false;
+                    ctx.ctorTypeOwner = savedOwner;
+                    ctx.ctorTypeSubst = savedSubst;
                 }
             }
         } else if (ct.superInit != null && ct.superInit.args != null
@@ -3752,7 +3768,29 @@ public final class JavaEmitter {
         return false;
     }
 
+    private boolean inMapForEachBridge;
+
     private String emitMethodLikeBody(Method m, Ctx ctx, boolean classIsAbstract) {
+        if (!inMapForEachBridge && ctx.currentClass != null && !m.isGetter && !m.isSetter && !m.isStatic
+                && "forEach".equals(m.name) && m.params.size() == 1
+                && extendsRuntimeMap(ctx.currentClass)) {
+            // `void forEach(void Function(K, V) f)` on a class extending the runtime DartMap:
+            // Map-typed call sites (and MapBase.mapToString) call forEachDart, which this
+            // declaration does not override by its Dart name; forward it here.
+            inMapForEachBridge = true;
+            String body;
+            try {
+                body = emitMethodLikeBody(m, ctx, classIsAbstract);
+            } finally {
+                inMapForEachBridge = false;
+            }
+            String fj = javaType(m.params.get(0).type, false, ctx);
+            if (fj == null || !fj.contains("VoidFunc2")) {
+                return body;
+            }
+            return body + "    @Override\n    public void forEachDart(" + fj + " f) {\n"
+                    + "        forEach(f);\n    }\n";
+        }
         if (ctx.currentClass != null && m.isGetter && !m.isStatic && "values".equals(m.name)
                 && extendsRuntimeMap(ctx.currentClass)) {
             // `Iterable<V> get values` on a class extending the runtime DartMap (a
@@ -7851,7 +7889,11 @@ public final class JavaEmitter {
     private Out emitListLit(ListLit l, TypeRef expected, Ctx ctx) {
         ctx.importClass("dart.core.DartList");
         TypeRef elem = l.elementType;
-        if (elem == null && expected != null && expected.is("List") && !expected.args.isEmpty()) {
+        // An Iterable context types the literal too (`addEntries([MapEntry('n', 1)])` into
+        // an Iterable<MapEntry<String, Object>> is a List<MapEntry<String, Object>>).
+        if (elem == null && expected != null && (expected.is("List") || expected.is("Iterable"))
+                && expected.args.size() == 1 && !isDynamicType(expected.arg(0))
+                && typeVarsInScope(expected.arg(0), ctx)) {
             elem = expected.arg(0);
         }
         boolean structured = false;
@@ -9891,6 +9933,19 @@ public final class JavaEmitter {
             return TypeRef.DOUBLE;
         }
         return null;
+    }
+
+    /**
+     * The argument of a Set operation (union, containsAll, ...): a program SetBase/SetMixin
+     * object bridged to its live view; any other value as it is, since the generic
+     * coercion to Set&lt;dynamic&gt; would cast away the element type javac checks.
+     */
+    private String mixinSetArg(Out a, String kind, Ctx ctx) {
+        if (a.type != null && a.type.name != null && program.classes.containsKey(a.type.name)
+                && appliedCollectionMixin(a.type.name) != null) {
+            return coerce(a, TypeRef.of(kind, TypeRef.DYNAMIC), ctx);
+        }
+        return a.code;
     }
 
     /** dart:core's Set itself (not a program class of that name). */
@@ -13879,7 +13934,8 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             }
             if (m != null) {
                 String callCode = target.code + "." + n + "(" + withWitnesses(methodWitnessCall(m, c,
-                        callExpected(c, ctx), ctx), methodArgs(m.params, c.args, ctx)) + ")";
+                        callExpected(c, ctx), ctx), methodArgs(collectionParamsSeenFrom(m, pc, tt, ctx),
+                        c.args, ctx)) + ")";
                 TypeRef seen = m.returnType == null || m.returnType.is("var") ? TypeRef.DYNAMIC
                         : asSeenFrom(m.returnType, m, m.typeParams, pc, tt);
                 if (!m.typeParams.isEmpty() && c.typeArgs.size() == m.typeParams.size()) {
@@ -14772,22 +14828,22 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 return new Out(target.code + ".toSet()", TypeRef.of("Set", elem));
             }
             if (tt.is("Set") && n.equals("difference")) {
-                return new Out(target.code + ".difference(" + emitExpr(pos.get(0), null, ctx).code + ")", tt);
+                return new Out(target.code + ".difference(" + mixinSetArg(emitExpr(pos.get(0), null, ctx), "Set", ctx) + ")", tt);
             }
             if (tt.is("Set") && n.equals("intersection")) {
-                return new Out(target.code + ".intersection(" + emitExpr(pos.get(0), null, ctx).code + ")", tt);
+                return new Out(target.code + ".intersection(" + mixinSetArg(emitExpr(pos.get(0), null, ctx), "Set", ctx) + ")", tt);
             }
             if (tt.is("Set") && n.equals("union")) {
-                return new Out(target.code + ".union(" + emitExpr(pos.get(0), null, ctx).code + ")", tt);
+                return new Out(target.code + ".union(" + mixinSetArg(emitExpr(pos.get(0), null, ctx), "Set", ctx) + ")", tt);
             }
             if (tt.is("Set") && n.equals("containsAll")) {
-                return new Out(target.code + ".containsAll(" + emitExpr(pos.get(0), null, ctx).code + ")",
+                return new Out(target.code + ".containsAll(" + mixinSetArg(emitExpr(pos.get(0), null, ctx), "Set", ctx) + ")",
                         TypeRef.BOOL);
             }
             if (tt.is("Set") && n.equals("removeAll")) {
                 // DartSet.removeAll(Iterable) already existed; only this table lacked a
                 // case for it, so the call fell through to the generic E0137 error.
-                return new Out(target.code + ".removeAll(" + emitExpr(pos.get(0), null, ctx).code + ")",
+                return new Out(target.code + ".removeAll(" + mixinSetArg(emitExpr(pos.get(0), null, ctx), "Iterable", ctx) + ")",
                         TypeRef.VOID);
             }
             if (tt.is("Set") && n.equals("retainAll")) {
@@ -14832,7 +14888,11 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 return new Out(target.code + ".addAll(" + emitExpr(pos.get(0), null, ctx).code + ")", TypeRef.VOID);
             }
             if (n.equals("addEntries")) {
-                return new Out(target.code + ".addEntries(" + emitExpr(pos.get(0), null, ctx).code + ")", TypeRef.VOID);
+                // `[MapEntry('n', 1), MapEntry('s', 'x')]` into a Map<String, Object> is an
+                // Iterable<MapEntry<String, Object>>, as Dart types the literal from context.
+                TypeRef entriesType = tt.args.size() == 2 && typeVarsInScope(tt, ctx)
+                        ? TypeRef.of("Iterable", TypeRef.of("MapEntry", tt.arg(0), tt.arg(1))) : null;
+                return new Out(target.code + ".addEntries(" + emitExpr(pos.get(0), entriesType, ctx).code + ")", TypeRef.VOID);
             }
             if (n.equals("removeWhere")) {
                 return new Out(target.code + ".removeWhere("
@@ -14840,11 +14900,26 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             }
             if (n.equals("update")) {
                 Out k = emitExpr(pos.get(0), null, ctx);
-                Out upd = emitExpr(pos.get(1), null, ctx);
+                // `V Function(V)` and `V Function()`: the closures' parameters are the map's
+                // value type, so `(e) => MapEntry(key, f(e.value))` reads e's members.
+                TypeRef vt = tt.args.size() == 2 && typeVarsInScope(tt.arg(1), ctx)
+                        && !isDynamicType(tt.arg(1)) ? tt.arg(1) : null;
+                TypeRef updType = null;
+                TypeRef absentType = null;
+                if (vt != null) {
+                    updType = new TypeRef("Function");
+                    updType.funcParams = new ArrayList<TypeRef>();
+                    updType.funcParams.add(vt);
+                    updType.funcReturn = vt;
+                    absentType = new TypeRef("Function");
+                    absentType.funcParams = new ArrayList<TypeRef>();
+                    absentType.funcReturn = vt;
+                }
+                Out upd = emitExpr(pos.get(1), updType, ctx);
                 String ifAbsent = "null";
                 for (NamedArg na : c.args.named) {
                     if (na.name.equals("ifAbsent")) {
-                        ifAbsent = emitExpr(na.value, null, ctx).code;
+                        ifAbsent = emitExpr(na.value, absentType, ctx).code;
                     }
                 }
                 return new Out(target.code + ".update(" + boxIfPrimitive(k, ctx) + ", " + upd.code
@@ -15015,12 +15090,13 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         }
         if (cc.ctorName.equals("unmodifiable")) {
             // A read-only copy; unresolved before, so any use failed the build.
-            String src = emitExpr(pos.get(0), null, ctx).code;
+            String src = mixinIterableCode(emitExpr(pos.get(0), null, ctx));
             return new Out(cls + witness + (pk == null ? "unmodifiable" : "unmodifiable" + sfx) + "(" + src + ")",
                     listType);
         }
         if (cc.ctorName.equals("from")) {
-            String src = emitExpr(pos.get(0), null, ctx).code;
+            // A program IterableBase/SetBase object is no Java Iterable: its live bridge.
+            String src = mixinIterableCode(emitExpr(pos.get(0), null, ctx));
             // Each element is checked against a concrete element type, as Dart does
             // (the primitive lists check their own); dynamic, Object and type variables
             // accept anything and keep the plain copy.
@@ -15401,7 +15477,8 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 return new Out("DartSet" + witness + "identity()", cc.type);
             }
             if (ctor.equals("of") || ctor.equals("from")) {
-                String src = emitExpr(pos.get(0), null, ctx).code;
+                // `Set<T>.of(this)` in a program SetBase class: the object's live bridge.
+                String src = mixinIterableCode(emitExpr(pos.get(0), null, ctx));
                 return new Out("DartSet" + witness + "from(" + src + ")", cc.type);
             }
             if (ctor.equals("castFrom") && !pos.isEmpty()) {
@@ -15656,6 +15733,14 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             }
             d.append('>');
             diamond = d.toString();
+            // Nothing written and nothing recovered from the arguments: let javac infer the
+            // arguments from the target (`entries.map((e) => MapEntry(f(e.key), e))` into a
+            // Map<C, MapEntry<K, V>>, or a callback returning MapEntry<K, V>). An Object fill
+            // is a MapEntry<Object, Object>, which Java's invariance rejects at every one of
+            // those targets, where Dart infers the type from the context.
+            if (typeArgs.isEmpty() && (inferred == null || inferred.contains(null))) {
+                diamond = "<>";
+            }
         }
         // The instance type carries the (diamond-filled) type arguments so a later assignment into
         // a differently-parameterized target can bridge the Dart-covariance/Java-invariance gap.
@@ -16577,6 +16662,45 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
     }
 
     /** Program method calls: positional plus named-in-declared-order. */
+    /**
+     * {@code m}'s parameters with each List/Iterable one read through the receiver's type
+     * arguments: {@code addEntries(Iterable<MapEntry<K, V>>)} on a {@code NoCaseMap<int>}
+     * (which extends {@code Folded<String, String, V>}) takes an
+     * {@code Iterable<MapEntry<String, int>>}, so a literal argument is built as that, not
+     * as the {@code List<MapEntry<dynamic, dynamic>>} its elements alone would make.
+     */
+    private List<Param> collectionParamsSeenFrom(MethodDecl m, ClassDecl pc, TypeRef tt, Ctx ctx) {
+        List<Param> out = null;
+        for (int i = 0; i < m.params.size(); i++) {
+            Param p = m.params.get(i);
+            if (p.type == null || p.type.args.isEmpty() || !(p.type.is("Iterable") || p.type.is("List"))) {
+                continue;
+            }
+            TypeRef seen = asSeenFrom(p.type, m, m.typeParams, pc, tt);
+            if (seen == null || seen == p.type || !typeVarsInScope(seen, ctx)
+                    || seen.toString().equals(p.type.toString())) {
+                continue;
+            }
+            if (out == null) {
+                out = new ArrayList<Param>(m.params);
+            }
+            Param q = new Param();
+            q.type = seen;
+            q.name = p.name;
+            q.named = p.named;
+            q.required = p.required;
+            q.optional = p.optional;
+            q.isThis = p.isThis;
+            q.isSuper = p.isSuper;
+            q.defaultValue = p.defaultValue;
+            q.file = p.file;
+            q.line = p.line;
+            q.col = p.col;
+            out.set(i, q);
+        }
+        return out == null ? m.params : out;
+    }
+
     private String methodArgs(List<Param> params, Args args, Ctx ctx) {
         CtorDecl fake = new CtorDecl();
         fake.params = params;

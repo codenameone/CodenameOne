@@ -110,7 +110,26 @@ public interface MapMixin<K, V> {
 
     /// {@code MapBase.mapToString(map)}: {@code {k: v, k2: v2}}.
     static String mapToString(java.util.Map<?, ?> m) {
-        StringBuilder sb = new StringBuilder("{");
+        final StringBuilder sb = new StringBuilder("{");
+        if (m instanceof dart.core.DartMap) {
+            // A program class implementing Map over a DartMap keeps its entries elsewhere
+            // (its own backing map) and overrides forEach; the inherited java.util.Map
+            // storage is empty, so read it the Dart way.
+            final boolean[] firstEntry = {true};
+            dart.runtime.Funcs.VoidFunc2<Object, Object> each = new dart.runtime.Funcs.VoidFunc2<Object, Object>() {
+                @Override
+                public void call(Object k, Object v) {
+                    if (!firstEntry[0]) {
+                        sb.append(", ");
+                    }
+                    firstEntry[0] = false;
+                    sb.append(dart.runtime.DartRuntime.str(k)).append(": ").append(dart.runtime.DartRuntime.str(v));
+                }
+            };
+            // The transpiler forwards a program class's own forEach override to forEachDart.
+            ((dart.core.DartMap<Object, Object>) m).forEachDart(each);
+            return sb.append('}').toString();
+        }
         boolean first = true;
         for (java.util.Map.Entry<?, ?> e : m.entrySet()) {
             if (!first) {
