@@ -1334,6 +1334,42 @@ public final class JavaEmitter {
             impls.append(javaType(itf, false, ctx));
             emitChangeNotifierState(itf, body);
         }
+        // `class C with M` where `mixin class M implements I` and C's field implements I's
+        // abstract getter: M calls I's getter spelling (label()), C's field answers get$label,
+        // so C needs the same bridge it would get from implementing I itself.
+        if (!c.isMixin) {
+            java.util.List<TypeRef> ancestors = new java.util.ArrayList<TypeRef>(c.mixins);
+            if (c.superclass != null) {
+                ancestors.add(c.superclass);
+            }
+            java.util.Set<String> visited = new java.util.HashSet<String>();
+            for (int ai = 0; ai < ancestors.size(); ai++) {
+                ClassDecl anc = program.classes.get(ancestors.get(ai).name);
+                if (anc == null || !visited.add(anc.name)) {
+                    continue;
+                }
+                if (anc.superclass != null) {
+                    ancestors.add(anc.superclass);
+                }
+                ancestors.addAll(anc.mixins);
+                for (TypeRef aitf : anc.interfaces) {
+                    ClassDecl ai2 = program.classes.get(aitf.name);
+                    if (ai2 == null || ai2.isMixin) {
+                        continue;
+                    }
+                    for (String chunk : implementerBridges(c, ai2, ctx).split("\n\n")) {
+                        String head = chunk.trim();
+                        if (head.isEmpty()) {
+                            continue;
+                        }
+                        String sig = head.substring(0, head.indexOf('\n') < 0 ? head.length() : head.indexOf('\n'));
+                        if (body.indexOf(sig) < 0) {
+                            body.append(chunk).append("\n\n");
+                        }
+                    }
+                }
+            }
+        }
         // jsonEncode calls toJson() on what it cannot encode itself; Dart does that
         // dynamically, the runtime through this interface.
         MethodDecl toJson = c.method("toJson");
@@ -5917,9 +5953,41 @@ public final class JavaEmitter {
         return common;
     }
 
+    /**
+     * {@code p.items} where {@code p} is a local of a program class type written with type
+     * arguments: the field's declared type with the class's type parameters bound to them
+     * ({@code SimplePipe<int>.items} is a {@code List<int>}, not a {@code List<T>}). Null
+     * for anything else.
+     */
+    private TypeRef fieldOfTypedReceiverQuiet(Expr x, Ctx ctx) {
+        if (!(x instanceof PropertyGet) || !(((PropertyGet) x).target instanceof Ident)) {
+            return null;
+        }
+        PropertyGet pg = (PropertyGet) x;
+        TypeRef recv = ctx.lookup(((Ident) pg.target).name);
+        if (recv == null || recv.args.isEmpty()) {
+            return null;
+        }
+        ClassDecl pc = program.resolveClass(recv.name, ctx.library());
+        if (pc == null || pc.typeParams.size() != recv.args.size()) {
+            return null;
+        }
+        FieldDecl f = pc.field(pg.name);
+        if (f == null) {
+            f = findInheritedField(pc, pg.name);
+        }
+        if (f == null) {
+            return null;
+        }
+        return substituteTypeParams(fieldType(f, ctx), paramMap(pc.typeParams, recv.args));
+    }
+
     private TypeRef elementTypeQuiet(Expr e, Ctx ctx) {
         if (e instanceof SpreadElement) {
             TypeRef st = inferExprTypeQuiet(((SpreadElement) e).expr, ctx);
+            if (st == null) {
+                st = fieldOfTypedReceiverQuiet(((SpreadElement) e).expr, ctx);
+            }
             if (st != null && (st.is("List") || st.is("Set") || st.is("Iterable")) && st.args.size() == 1) {
                 return st.arg(0);
             }
@@ -13847,8 +13915,22 @@ public final class JavaEmitter {
     /** {@link #paramType}, with the constructed class's written type arguments bound. */
     private TypeRef boundParamType(ClassDecl owner, Param p, Ctx ctx) {
         TypeRef t = paramType(owner, p, ctx);
+        boolean valueOfOwnTypeParam = owner != null && t != null && t.funcParams == null
+                && !owner.typeParams.isEmpty() && !t.args.isEmpty()
+                && mentionsAnyTypeParam(t, owner.typeParams);
         if (owner == null || owner != ctx.ctorTypeOwner || ctx.ctorTypeSubst == null || t == null) {
+            // `SimplePipe('x', [1, 2])` with the type arguments inferred: a `List<T>`
+            // parameter would hand the literal a T that is not in scope at the call site.
+            // With no context the literal infers its own element type, which is what Dart
+            // infers T from.
+            if (valueOfOwnTypeParam && owner != ctx.currentClass) {
+                return null;
+            }
             return t;
+        }
+        if (valueOfOwnTypeParam) {
+            // `SimplePipe<int>('x', [1, 2])`: the literal is a List<int>, not a List<T>.
+            return substituteTypeParams(t, ctx.ctorTypeSubst);
         }
         // Only a callback is retyped: a value argument keeps its declared (erased) type.
         if (t.funcParams != null) {
@@ -14805,14 +14887,44 @@ public final class JavaEmitter {
         return "(" + code + ")";
     }
 
+    /** Whether the '(' at index 0 of {@code code} closes at its last character. */
+    private static boolean outerParenEnclosesAll(String code) {
+        int depth = 0;
+        boolean inStr = false;
+        for (int i = 0; i < code.length(); i++) {
+            char c = code.charAt(i);
+            if (inStr) {
+                if (c == '\\') {
+                    i++;
+                } else if (c == '"') {
+                    inStr = false;
+                }
+                continue;
+            }
+            if (c == '"') {
+                inStr = true;
+            } else if (c == '(') {
+                depth++;
+            } else if (c == ')') {
+                depth--;
+                if (depth == 0) {
+                    return i == code.length() - 1;
+                }
+            }
+        }
+        return true;
+    }
+
     /** Turns an expression emission into a valid Java statement expression. */
     private String statementize(String code) {
         if (code.matches("[A-Za-z_$][A-Za-z0-9_$]*")) {
             // a bare temp/identifier (e.g. a cascade's receiver) — no-op statement
             return "";
         }
-        if (code.startsWith("(") && code.endsWith(")")) {
-            // ternaries etc. are not valid statements; assign to a discard temp
+        if (code.startsWith("(") && code.endsWith(")") && outerParenEnclosesAll(code)) {
+            // ternaries etc. are not valid statements; assign to a discard temp. A call on a
+            // parenthesized receiver -- ((F) f).call(..) -- is already a statement, and may be
+            // void, which `var` cannot hold.
             return "var $unused" + (unusedCounter++) + " = " + code;
         }
         return code;
