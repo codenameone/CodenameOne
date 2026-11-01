@@ -1851,6 +1851,28 @@ public final class JavaEmitter {
                 ext.append(ext.length() > 0 ? ", " : "").append(javaType(itf, false, ctx));
             }
         }
+        // `class QueueList<E> extends Object with ListMixin<E>`: its interface carries what
+        // the mixin gives it (isEmpty, first, elementAt...), which a QueueList-typed local
+        // calls. The runtime mixins are Java interfaces, so X$I extends the applied one.
+        java.util.List<TypeRef> applied = new java.util.ArrayList<TypeRef>(c.mixins);
+        if (c.superclass != null) {
+            applied.add(c.superclass);
+        }
+        for (TypeRef mix : applied) {
+            Ast.ClassDecl sc = mix.name == null || program.classes.containsKey(mix.name)
+                    ? null : stubs.classes.get(mix.name);
+            String jn = sc != null ? sc.javaName : null;
+            if (("dart.collection.ListMixin".equals(jn) || "dart.collection.SetMixin".equals(jn)
+                    || "dart.collection.IterableMixin".equals(jn))
+                    && mix.args.size() == sc.typeParams.size() && !mix.args.isEmpty()) {
+                StringBuilder ta = new StringBuilder(jn).append('<');
+                for (int i = 0; i < mix.args.size(); i++) {
+                    ta.append(i > 0 ? ", " : "").append(javaType(mix.args.get(i), true, ctx));
+                }
+                ext.append(ext.length() > 0 ? ", " : "").append(ta.append('>'));
+                break;
+            }
+        }
         return finishClassFile(jname + "$I", "public interface " + jname + "$I" + typeParams,
                 ext.length() == 0 ? null : ext.toString(), null, body, ctx, c.file);
     }
@@ -7891,7 +7913,10 @@ public final class JavaEmitter {
         TypeRef elem = l.elementType;
         // An Iterable context types the literal too (`addEntries([MapEntry('n', 1)])` into
         // an Iterable<MapEntry<String, Object>> is a List<MapEntry<String, Object>>).
-        if (elem == null && expected != null && (expected.is("List") || expected.is("Iterable"))
+        if (elem == null && expected != null && expected.is("List") && !expected.args.isEmpty()) {
+            elem = expected.arg(0);
+        }
+        if (elem == null && expected != null && expected.is("Iterable")
                 && expected.args.size() == 1 && !isDynamicType(expected.arg(0))
                 && typeVarsInScope(expected.arg(0), ctx)) {
             elem = expected.arg(0);
@@ -9514,7 +9539,10 @@ public final class JavaEmitter {
             if (pc != null) {
                 FieldDecl f = pc.field(name);
                 if (f != null && f.isStatic) {
-                    return new Out(cls + (isLazyStatic(f) || isLateChecked(f, pc) ? ".get$" + name + "()" : "." + name),
+                    // The Java name: library-prefixed when another library has a class of the
+                    // same name (hive's CollectionBox beside its stub's).
+                    return new Out(javaClassName(pc) + (isLazyStatic(f) || isLateChecked(f, pc)
+                            ? ".get$" + name + "()" : "." + name),
                             fieldType(f, ctx));
                 }
                 // A static getter (`static String get mode => ...`) is a static no-arg method.
@@ -13888,8 +13916,14 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                     String tw = witnessArgs(pc, inferredWitnessTypeArgs(pc, c.typeArgs, callExpected(c, ctx)),
                             c, ctx);
                     String na = canonicalArgs(named, c.args, ctx);
+                    // `Transformer<Object, String>.fromHandlers(...)` is a Transformer<Object,
+                    // String>: members read through it (bind's StreamSink<S>) see the arguments.
+                    List<TypeRef> written = c.target instanceof Ident && ((Ident) c.target).typeArgs != null
+                            ? ((Ident) c.target).typeArgs : c.typeArgs;
+                    TypeRef made = written.size() == pc.typeParams.size() && !written.isEmpty()
+                            ? TypeRef.of(cls, written.toArray(new TypeRef[0])) : new TypeRef(cls);
                     return new Out(jcls + "." + javaIdent(n) + "(" + (na.isEmpty() ? stripTrailingComma(tw)
-                            : tw + na) + ")", new TypeRef(cls));
+                            : tw + na) + ")", made);
                 }
                 if (n.equals("new")) {
                     // `Foo.new(args)`: the unnamed constructor called through its tear-off name
