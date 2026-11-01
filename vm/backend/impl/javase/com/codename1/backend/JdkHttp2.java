@@ -29,7 +29,6 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -74,10 +73,11 @@ final class JdkHttp2 {
                     // close() exists from JDK 21; before it the client's
                     // connections idle out on their own.
                     try {
-                        Method m = clients[iter].getClass().getMethod("shutdownNow");
-                        m.setAccessible(true);
+                        // Looked up on the public type: the instance's own class
+                        // is internal to java.net.http.
+                        Method m = type("HttpClient").getMethod("shutdownNow");
                         m.invoke(clients[iter]);
-                    } catch (ReflectiveOperationException | RuntimeException ignored) {
+                    } catch (ReflectiveOperationException | IOException | RuntimeException ignored) {
                         // Not on this JDK.
                     }
                     clients[iter] = null;
@@ -107,12 +107,12 @@ final class JdkHttp2 {
             }
             if (cause instanceof InterruptedException) {
                 Thread.currentThread().interrupt();
-                throw new IOException("The HTTP/2 request was interrupted", cause);
+                throw new IOException("The HTTP/2 request was interrupted", err);
             }
             if (cause instanceof RuntimeException) {
                 throw (RuntimeException) cause;
             }
-            throw new IOException(String.valueOf(cause), cause);
+            throw new IOException(String.valueOf(cause), err);
         } catch (ReflectiveOperationException err) {
             throw new IOException("java.net.http has no " + owner.getName() + "." + name, err);
         }
@@ -245,8 +245,8 @@ final class JdkHttp2 {
             Object httpHeaders = call(response, responseType, "headers", new Class[0]);
             Map all = (Map) call(httpHeaders, type("HttpHeaders"), "map", new Class[0]);
             Map values = new LinkedHashMap();
-            for (Iterator it = all.entrySet().iterator(); it.hasNext();) {
-                Map.Entry e = (Map.Entry) it.next();
+            for (Object entry : all.entrySet()) {
+                Map.Entry e = (Map.Entry) entry;
                 String name = String.valueOf(e.getKey());
                 if (name.startsWith(":")) {
                     continue;   // a pseudo-header, not a field

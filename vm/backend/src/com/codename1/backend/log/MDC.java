@@ -22,7 +22,6 @@
  */
 package com.codename1.backend.log;
 
-import java.util.Iterator;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -96,8 +95,7 @@ public final class MDC {
         }
         out.append(" {");
         boolean first = true;
-        for (Iterator<Map.Entry<String, String>> it = map.entrySet().iterator(); it.hasNext();) {
-            Map.Entry<String, String> e = it.next();
+        for (Map.Entry<String, String> e : map.entrySet()) {
             if (!first) {
                 out.append(", ");
             }

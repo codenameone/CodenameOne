@@ -35,10 +35,9 @@ public enum Level {
             return null;
         }
         String v = value.trim();
-        Level[] all = values();
-        for (int i = 0; i < all.length; i++) {
-            if (all[i].name().equalsIgnoreCase(v)) {
-                return all[i];
+        for (Level level : values()) {
+            if (level.name().equalsIgnoreCase(v)) {
+                return level;
             }
         }
         // Spring Boot also accepts these two names for the extremes.

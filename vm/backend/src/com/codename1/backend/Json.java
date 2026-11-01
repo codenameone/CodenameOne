@@ -107,8 +107,8 @@ public final class Json {
         }
         List in = (List) tree;
         List<T> out = new ArrayList<T>(in.size());
-        for (int iter = 0 ; iter < in.size() ; iter++) {
-            out.add(convert(in.get(iter), element));
+        for (Object item : in) {
+            out.add(convert(item, element));
         }
         return out;
     }
@@ -551,7 +551,7 @@ public final class Json {
                 try {
                     out.append(new String(sink.bytes(), 0, sink.length(), "UTF-8"));
                 } catch (java.io.UnsupportedEncodingException never) {
-                    throw new IllegalStateException(never.getMessage());
+                    throw new IllegalStateException(never.toString(), never);
                 }
                 return;
             }

@@ -920,9 +920,9 @@ public final class Backend {
         /// for the reject, the preflight and the response headers alike, so the
         /// three never disagree about which policy a request is under.
         Cors corsFor(HttpServer.Request request) {
-            for (int i = 0 ; i < chain.length ; i++) {
-                if (chain[i] instanceof com.codename1.backend.web.CorsRoutes) {
-                    Cors own = ((com.codename1.backend.web.CorsRoutes) chain[i]).corsPolicy(request);
+            for (Object route : chain) {
+                if (route instanceof com.codename1.backend.web.CorsRoutes) {
+                    Cors own = ((com.codename1.backend.web.CorsRoutes) route).corsPolicy(request);
                     if (own != null) {
                         return own;
                     }

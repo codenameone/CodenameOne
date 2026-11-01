@@ -140,8 +140,8 @@ public final class Cors {
     public static Cors policy(String[] origins, String[] methods, String[] headers, String[] exposed,
                               boolean credentials, int maxAge) {
         List listed = new ArrayList();
-        for (int i = 0; i < origins.length; i++) {
-            String origin = origins[i].trim();
+        for (String named : origins) {
+            String origin = named.trim();
             if ("*".equals(origin)) {
                 listed.add(origin);
             } else if (isOrigin(origin)) {
