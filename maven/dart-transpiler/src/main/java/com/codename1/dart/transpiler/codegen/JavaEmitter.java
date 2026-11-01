@@ -1110,7 +1110,7 @@ public final class JavaEmitter {
             body.append("    }\n\n");
         }
         for (java.util.Map.Entry<String, Integer> sb : onMixinSupers(mx).entrySet()) {
-            body.append("    Object ").append(superBridgeSignature(sb.getKey(), sb.getValue())).append(";\n\n");
+            body.append("    Object ").append(superBridgeSignature(mx, sb.getKey(), sb.getValue())).append(";\n\n");
         }
         String typeParams = mx.typeParams.isEmpty() ? "" : "<" + String.join(", ", mx.typeParams) + ">";
         StringBuilder mext = new StringBuilder();
@@ -1399,7 +1399,10 @@ public final class JavaEmitter {
                 }
             }
             for (Map.Entry<String, MethodDecl> en : lastImpl.entrySet()) {
-                if (declaredBy.get(en.getKey()) > 1 && c.method(en.getKey()) == null) {
+                if (declaredBy.get(en.getKey()) > 1 && c.method(en.getKey()) == null
+                        && !usesSuper(en.getValue())) {
+                    // a body calling super must stay in its mixin, where super reaches the
+                    // mixin before it (emitMixinForwarders delegates to it instead)
                     MethodDecl m = en.getValue();
                     Method mm = new Method();
                     mm.name = m.name;
@@ -3303,6 +3306,47 @@ public final class JavaEmitter {
         }
     }
 
+    /**
+     * Whether member n overrides a superclass or interface member whose declared return type is
+     * one of that class's own type parameters (`E get defaultValue` in `Buf<E>`): erased to
+     * Object there, so an override for `E = int` must return Long, never long.
+     */
+    private boolean overridesTypeVarReturn(ClassDecl c, String n, boolean getter, Ctx ctx) {
+        if (c == null) {
+            return false;
+        }
+        java.util.ArrayDeque<TypeRef> todo = new java.util.ArrayDeque<TypeRef>();
+        java.util.Set<ClassDecl> seen = new HashSet<ClassDecl>();
+        seen.add(c);
+        ClassDecl cur = c;
+        for (int guard = 0; guard < 64; guard++) {
+            if (cur != c) {
+                MethodDecl d = getter ? cur.getter(n) : cur.method(n);
+                TypeRef t = d != null ? d.returnType : null;
+                if (t == null && getter && cur.field(n) != null) {
+                    t = cur.field(n).type;
+                }
+                if (t != null && t.name != null && t.args.isEmpty() && cur.typeParams.contains(t.name)) {
+                    return true;
+                }
+            }
+            if (cur.superclass != null) {
+                todo.add(cur.superclass);
+            }
+            todo.addAll(cur.interfaces);
+            todo.addAll(cur.mixins);
+            cur = null;
+            while (cur == null && !todo.isEmpty()) {
+                ClassDecl k = program.resolveClass(todo.poll().name, ctx.library());
+                cur = k != null && seen.add(k) ? k : null;
+            }
+            if (cur == null) {
+                return false;
+            }
+        }
+        return false;
+    }
+
     private String emitMethodLikeBody(Method m, Ctx ctx, boolean classIsAbstract) {
         StringBuilder sb = new StringBuilder();
         TypeRef rt = m.returnType == null || m.returnType.is("var") ? TypeRef.DYNAMIC : m.returnType;
@@ -3359,7 +3403,8 @@ public final class JavaEmitter {
         boolean boxCollAllParams = mapFam && "$indexSet".equals(m.name);
         boolean boxCollFirstParam = setFam && "add".equals(m.name) && m.params.size() == 1;
         String rjt = m.isSetter ? "void" : m.javaReturn != null ? m.javaReturn
-                : (forceIntReturn ? "int" : javaType(rt, (boxListMixinOp && "$index".equals(m.name)) || boxCollReturn, ctx));
+                : (forceIntReturn ? "int" : javaType(rt, (boxListMixinOp && "$index".equals(m.name)) || boxCollReturn
+                        || (!m.isStatic && overridesTypeVarReturn(ctx.currentClass, m.name, m.isGetter, ctx)), ctx));
         sb.append(rjt).append(' ').append(m.name).append('(');
         // The Java parameter list and names, kept for a sync* body's helper method.
         StringBuilder paramDecls = new StringBuilder();
@@ -6070,6 +6115,10 @@ public final class JavaEmitter {
                 // runtime collection: s may be the live view the coercion made of a Bag, which
                 // is that Bag in Dart. The test looks through the view (DartRuntime.unview).
                 subject = "dart.runtime.DartRuntime.unview(" + o.code + ")";
+            } else if (iterableAsList(o.type, t.type)) {
+                // `it is List<int>` on an Iterable: a List handed over as an Iterable travels
+                // as its DartIterable view, which javac will not even test against DartList.
+                subject = "dart.core.DartIterable.listBehind(" + o.code + ")";
             }
             String check;
             String tw = t.type.args.isEmpty() && t.type.funcReturn == null
@@ -7786,6 +7835,12 @@ public final class JavaEmitter {
         diags.error(e, "E0205", "Unsupported map-literal element in emitter");
     }
 
+    /** An `is`/promotion from a declared Iterable to List, which the view must be looked through for. */
+    private static boolean iterableAsList(TypeRef from, TypeRef to) {
+        return from != null && to != null && from.name != null && to.name != null
+                && from.name.equals("Iterable") && to.name.equals("List");
+    }
+
     private Out emitIdent(Ident id, TypeRef expected, Ctx ctx) {
         String n = id.name;
         TypeRef local = ctx.lookup(n);
@@ -7802,6 +7857,10 @@ public final class JavaEmitter {
                     // collection type: the value may be the view a coercion made of it, so the
                     // cast looks through the view, as the `is` test that promoted it did.
                     base = "dart.runtime.DartRuntime.unview(" + base + ")";
+                }
+                if (iterableAsList(local, promo)) {
+                    // promoted by `is List` from an Iterable: read the list behind the view
+                    base = "dart.core.DartIterable.listBehind(" + base + ")";
                 }
                 return new Out("((" + javaType(promo, true, ctx) + ") " + base + ")", promo);
             }
@@ -8478,13 +8537,73 @@ public final class JavaEmitter {
 
     /** The core List/Iterable/Set a mixin is declared {@code on}, or null. */
     private TypeRef coreCollectionOn(ClassDecl cc) {
-        if (cc == null || !cc.isMixin) {
+        if (cc == null) {
             return null;
         }
-        for (TypeRef on : cc.mixinOn) {
-            if (program.classes.get(on.name) == null && !stubs.isStubClass(on.name)
-                    && (on.is("List") || on.is("Iterable") || on.is("Set"))) {
-                return on;
+        if (cc.isMixin) {
+            for (TypeRef on : cc.mixinOn) {
+                TypeRef core = coreCollectionVia(on, new java.util.HashSet<ClassDecl>());
+                if (core != null) {
+                    return core;
+                }
+            }
+        }
+        // A class with no runtime superclass that only IMPLEMENTS a collection
+        // through a program interface (`abstract class M<E> implements Coll<E>`, where
+        // `Coll<E> implements List<E>`), used as a mixin by a class that also applies
+        // ListMixin: its bare `first` and `for (x in this)` are the applier's, reached the
+        // same way as in a mixin `on List<E>`.
+        // The same holds for a class extending a program IterableBase/ListBase subclass,
+        // whose Java type is the mixin interface and not the collection.
+        if (nearestStubSuper(cc) == null) {
+            TypeRef self = new TypeRef(cc.name);
+            for (String tp : cc.typeParams) {
+                self.args.add(new TypeRef(tp));
+            }
+            return coreCollectionVia(self, new java.util.HashSet<ClassDecl>());
+        }
+        return null;
+    }
+
+    /**
+     * The core List/Iterable/Set that type t is or reaches through program supertypes, with
+     * t's type arguments substituted along the way; null when it reaches none.
+     */
+    private TypeRef coreCollectionVia(TypeRef t, java.util.Set<ClassDecl> seen) {
+        if (t == null) {
+            return null;
+        }
+        ClassDecl pc = program.classes.get(t.name);
+        if (pc == null) {
+            if (!stubs.isStubClass(t.name) && (t.is("List") || t.is("Iterable") || t.is("Set"))) {
+                return t;
+            }
+            // dart:collection's base classes and mixins are the collection they implement.
+            String core = t.is("IterableBase") || t.is("IterableMixin") ? "Iterable"
+                    : t.is("ListBase") || t.is("ListMixin") ? "List"
+                    : t.is("SetBase") || t.is("SetMixin") ? "Set" : null;
+            if (core == null) {
+                return null;
+            }
+            TypeRef r = new TypeRef(core);
+            r.args.addAll(t.args);
+            return r;
+        }
+        if (!seen.add(pc)) {
+            return null;
+        }
+        List<TypeRef> sups = new ArrayList<TypeRef>();
+        if (pc.superclass != null) {
+            sups.add(pc.superclass);
+        }
+        // A collection base class may be recorded as a mixin (`extends IterableBase<int>`).
+        sups.addAll(pc.mixins);
+        sups.addAll(pc.interfaces);
+        sups.addAll(pc.mixinOn);
+        for (TypeRef s : sups) {
+            TypeRef core = coreCollectionVia(s, seen);
+            if (core != null) {
+                return substituteTypeParam(core, pc.typeParams, t.args);
             }
         }
         return null;
@@ -8510,10 +8629,19 @@ public final class JavaEmitter {
     }
 
     private Out mixinOnSelf(ClassDecl cc, String n, boolean getter, Ctx ctx) {
+        TypeRef coreOn = coreCollectionOn(cc);
         if (!cc.isMixin || cc.mixinOn.isEmpty()) {
+            if (coreOn != null && (getter ? CORE_COLLECTION_GETTERS : CORE_COLLECTION_METHODS).contains(n)) {
+                return coreSelf(coreOn, ctx);
+            }
             return null;
         }
-        TypeRef coreOn = coreCollectionOn(cc);
+        // A member the `on` program class declares itself wins over the core one.
+        for (TypeRef on : cc.mixinOn) {
+            if (program.classes.get(on.name) != null && hasMember(on.name, n, getter, ctx)) {
+                return new Out("((" + javaType(on, false, ctx) + ") this)", on);
+            }
+        }
         if (coreOn != null && (getter ? CORE_COLLECTION_GETTERS : CORE_COLLECTION_METHODS).contains(n)) {
             // `mixin M on Iterable<E>` reading a bare `first`: the member is the core
             // collection's, reached through the type the mixin is applied to.
@@ -9117,10 +9245,44 @@ public final class JavaEmitter {
             }
             return emitIndexGetOn(raw, ig, ctx);
         }
+        if (ig.target instanceof ThisExpr && ctx.currentClass != null && ctx.extensionSelfType == null
+                && ctx.currentClass.method("$index") == null) {
+            // `this[i]` in a mixin on a core List (directly or through a program
+            // interface): the Java type is not the list, the applier is.
+            TypeRef coreOn = coreCollectionOn(ctx.currentClass);
+            if (coreOn != null && coreOn.is("List")) {
+                return emitIndexGetOn(coreSelf(coreOn, ctx), ig, ctx);
+            }
+        }
         return emitIndexGetOn(emitExpr(ig.target, null, ctx), ig, ctx);
     }
 
+    /**
+     * A receiver typed as a bounded type variable (`L extends List<E>`, `items[i]`): its
+     * operators are the bound's, and the receiver is cast to the bound so the Java member
+     * resolves even where the Java type variable carries no bound. Otherwise unchanged.
+     */
+    private Out throughTypeVarBound(Out target, Ctx ctx) {
+        TypeRef tt = target.type;
+        if (tt == null || tt.name == null || !tt.args.isEmpty() || tt.funcReturn != null) {
+            return target;
+        }
+        TypeRef bound = ctx.methodTypeParamBounds != null ? ctx.methodTypeParamBounds.get(tt.name) : null;
+        ClassDecl cc = ctx.currentClass;
+        if (bound == null && cc != null && cc.typeParams.contains(tt.name)) {
+            bound = cc.typeParamBounds.get(tt.name);
+        }
+        if (bound == null || bound.name == null || bound.name.equals(tt.name) || bound.funcReturn != null) {
+            return target;
+        }
+        if (cc != null && cc.typeParams.contains(bound.name)) {
+            return target;
+        }
+        return new Out("((" + javaType(bound, true, ctx) + ") " + target.code + ")", bound, target.fromError);
+    }
+
     private Out emitIndexGetOn(Out target, IndexGet ig, Ctx ctx) {
+        target = throughTypeVarBound(target, ctx);
         Out idx = emitExpr(ig.index, null, ctx);
         TypeRef tt = target.type;
         ClassDecl opClass = program.classes.get(tt.name);
@@ -9500,6 +9662,10 @@ public final class JavaEmitter {
             }
             return emitNullAwareAssignValue(a, ctx);
         }
+        Out superSet = onMixinSuperSet(a, ctx);
+        if (superSet != null) {
+            return superSet;
+        }
         Out dynWrite = emitDynamicMemberAssign(a, ctx);
         if (dynWrite != null) {
             return dynWrite;
@@ -9543,7 +9709,7 @@ public final class JavaEmitter {
         }
         if (a.lhs instanceof IndexGet) {
             IndexGet ig = (IndexGet) a.lhs;
-            Out target = emitExpr(ig.target, null, ctx);
+            Out target = throughTypeVarBound(emitExpr(ig.target, null, ctx), ctx);
             if (target.type.is("dynamic") && !target.fromError) {
                 // `f()[k] += 1` where f returns dynamic: inference did not see it, the
                 // emitted receiver does. Index through Dyn, not a typed `.idx`.
@@ -11199,6 +11365,19 @@ public final class JavaEmitter {
         if (!node.getClass().getName().startsWith(Ast.class.getName())) {
             return;
         }
+        if (node instanceof Assign && ((Assign) node).lhs instanceof PropertyGet
+                && ((PropertyGet) ((Assign) node).lhs).target instanceof SuperExpr
+                && !"??=".equals(((Assign) node).op)) {
+            // `super.x = v` (or `super.x += v`): a setter bridge, `set$x`, taking the value.
+            // Only a compound assignment reads the getter as well.
+            Assign as = (Assign) node;
+            out.put("set$" + ((PropertyGet) as.lhs).name, 1);
+            if (!"=".equals(as.op)) {
+                out.put("get$" + ((PropertyGet) as.lhs).name, -1);
+            }
+            collectSuperUses(as.rhs, out, seen);
+            return;
+        }
         if (node instanceof PropertyGet && ((PropertyGet) node).target instanceof SuperExpr) {
             out.put("get$" + ((PropertyGet) node).name, -1);
         } else if (node instanceof Call && ((Call) node).target instanceof SuperExpr
@@ -11221,8 +11400,23 @@ public final class JavaEmitter {
         }
     }
 
-    private static String superBridgeSignature(String key, int argc) {
-        StringBuilder sb = new StringBuilder("$super$").append(key.replace('$', '_')).append('(');
+    /**
+     * Named per mixin ({@code $super$Loud$m}): with {@code extends B with M1, M2} both `on B`,
+     * M2's super.m is M1.m while M1's is B.m, so one shared bridge could not answer both.
+     */
+    private static String superBridgeName(ClassDecl mx, String key) {
+        return "$super$" + mx.name.replace('$', '_') + "$" + key.replace('$', '_');
+    }
+
+    private static boolean usesSuper(MethodDecl m) {
+        LinkedHashMap<String, Integer> found = new LinkedHashMap<String, Integer>();
+        collectSuperUses(m, found, java.util.Collections.newSetFromMap(
+                new java.util.IdentityHashMap<Object, Boolean>()));
+        return !found.isEmpty();
+    }
+
+    private static String superBridgeSignature(ClassDecl mx, String key, int argc) {
+        StringBuilder sb = new StringBuilder(superBridgeName(mx, key)).append('(');
         for (int i = 0; i < argc; i++) {
             sb.append(i > 0 ? ", " : "").append("Object $a").append(i);
         }
@@ -11239,7 +11433,7 @@ public final class JavaEmitter {
         if (argc == null) {
             return null;
         }
-        StringBuilder sb = new StringBuilder("this.$super$").append(key.replace('$', '_')).append('(');
+        StringBuilder sb = new StringBuilder("this.").append(superBridgeName(mx, key)).append('(');
         for (int i = 0; i < argc; i++) {
             Out a = emitExpr(args.positional.get(i), null, ctx);
             sb.append(i > 0 ? ", " : "").append(a.code);
@@ -11250,6 +11444,40 @@ public final class JavaEmitter {
             return new Out("((" + javaType(rt, true, ctx) + ") " + raw.code + ")", rt);
         }
         return raw;
+    }
+
+    /**
+     * `super.x = v` (or a compound `super.x += v`) inside {@code mixin M on Base}: the value
+     * is computed here and handed to the {@code set$x} bridge, which the applying class
+     * implements as the real super assignment. The expression's value is the value assigned.
+     */
+    private Out onMixinSuperSet(Assign a, Ctx ctx) {
+        ClassDecl mx = ctx.currentClass;
+        if (!(a.lhs instanceof PropertyGet) || !(((PropertyGet) a.lhs).target instanceof SuperExpr)
+                || mx == null || !mx.isMixin || mx.mixinOn.isEmpty() || ctx.extensionSelfType != null
+                || "??=".equals(a.op)) {
+            return null;
+        }
+        String name = ((PropertyGet) a.lhs).name;
+        String key = "set$" + name;
+        if (onMixinSupers(mx).get(key) == null) {
+            return null;
+        }
+        TypeRef vt = onSuperMemberType(mx, name, true, -1, ctx);
+        Expr value = a.rhs;
+        if (!"=".equals(a.op)) {
+            Binary b = new Binary();
+            b.left = a.lhs;
+            b.op = a.op.substring(0, a.op.length() - 1);
+            b.right = a.rhs;
+            value = b;
+        }
+        Out v = emitExpr(value, vt, ctx);
+        String code = "this." + superBridgeName(mx, key) + "(" + v.code + ")";
+        if (vt != null && !vt.is("void") && !vt.is("dynamic") && !vt.is("var")) {
+            return new Out("((" + javaType(vt, true, ctx) + ") " + code + ")", vt);
+        }
+        return new Out(code, v.type);
     }
 
     /**
@@ -11288,8 +11516,7 @@ public final class JavaEmitter {
      * mixin) also has, and C does not declare itself, C gets an override forwarding to
      * {@code M.super.greet(...)}. Mixins are walked last first, so the last one wins, and
      * a pair of mixins declaring one member no longer leaves Java with conflicting defaults.
-     * Only positional, non-generic, non-setter members are forwarded; the rest keep the
-     * superclass's (or Java's) resolution.
+     * Named and optional parameters, generic methods and setters are forwarded too.
      */
     private void emitMixinForwarders(ClassDecl c, StringBuilder body, Ctx ctx) {
         if (c.isMixin || c.mixins.isEmpty()) {
@@ -11310,24 +11537,21 @@ public final class JavaEmitter {
                 continue;
             }
             for (MethodDecl m : mx.methods) {
-                if (m.isStatic || m.isSetter || m.isAbstract || !m.typeParams.isEmpty() || m.name.startsWith("$")
-                        || !methodWitnesses(m).isEmpty()) {
+                if (m.isStatic || m.isAbstract || m.name.startsWith("$") || !methodWitnesses(m).isEmpty()) {
                     continue;
                 }
-                boolean positional = true;
-                for (Param p : m.params) {
-                    positional &= !p.named && p.defaultValue == null;
-                }
-                String key = (m.isGetter ? "get$" : "") + m.name;
-                if (!positional || done.contains(key)
-                        || !(superChainHas(sup, m) || earlierMixinHas(c, mi, m, ctx))) {
+                String key = (m.isSetter ? "set$" : m.isGetter ? "get$" : "") + m.name;
+                if (done.contains(key) || !(superChainHas(sup, m) || earlierMixinHas(c, mi, m, ctx))) {
                     continue;
                 }
                 done.add(key);
                 Method mm = new Method();
                 mm.name = m.name;
                 mm.isGetter = m.isGetter;
+                mm.isSetter = m.isSetter;
                 mm.isOverride = true;
+                mm.typeParams.addAll(m.typeParams);
+                mm.typeParamBounds.putAll(m.typeParamBounds);
                 mm.returnType = m.returnType == null ? null
                         : substTypeParams(m.returnType, mx.typeParams, mref.args);
                 Expr call;
@@ -11341,15 +11565,42 @@ public final class JavaEmitter {
                     cl.target = new SuperExpr();
                     cl.name = m.name;
                     for (Param p : m.params) {
+                        // named and optional parameters keep the mixin's own defaults: the
+                        // forwarder is the class's override, and in Dart the mixin's
+                        // declaration (defaults included) is the one the class has
                         Param np = new Param();
                         np.name = p.name;
+                        np.named = p.named;
+                        np.optional = p.optional;
+                        np.required = p.required;
+                        np.defaultValue = p.defaultValue;
                         np.type = p.type == null ? null : substTypeParams(p.type, mx.typeParams, mref.args);
                         mm.params.add(np);
                         Ident id = new Ident();
                         id.name = p.name;
-                        cl.args.positional.add(id);
+                        if (p.named) {
+                            NamedArg na = new NamedArg();
+                            na.name = p.name;
+                            na.value = id;
+                            cl.args.named.add(na);
+                        } else {
+                            cl.args.positional.add(id);
+                        }
                     }
                     call = cl;
+                    if (m.isSetter && m.params.size() == 1) {
+                        // `set v(x)`: the forwarder assigns through the mixin's setter
+                        PropertyGet pg = new PropertyGet();
+                        pg.target = new SuperExpr();
+                        pg.name = m.name;
+                        Assign as = new Assign();
+                        as.lhs = pg;
+                        as.op = "=";
+                        as.rhs = cl.args.positional.get(0);
+                        call = as;
+                    } else if (m.isSetter) {
+                        continue;
+                    }
                 }
                 mm.exprBody = call;
                 String code = emitMethodLike(mm, ctx, false);
@@ -11363,15 +11614,35 @@ public final class JavaEmitter {
                 String raw = javaClassType(mref, ctx);
                 int lt = raw.indexOf('<');
                 raw = lt > 0 ? raw.substring(0, lt) : raw;
-                // the body was emitted as a plain super call; aim it at the mixin's default
-                body.append(code.replace("super." + m.name + "(", raw + ".super." + m.name + "("));
+                // the body was emitted as a plain super access; aim it at the mixin's default
+                int sp = he < 0 ? -1 : code.indexOf("super.", he);
+                if (sp < 0) {
+                    continue;
+                }
+                body.append(code, 0, sp).append(raw).append('.').append(code.substring(sp));
             }
         }
     }
 
+    /** Whether class k declares a member of m's kind (method, getter or setter) and name. */
+    private static boolean declaresLike(ClassDecl k, MethodDecl m) {
+        if (m.isGetter || m.isSetter) {
+            if (k.field(m.name) != null) {
+                return true;
+            }
+            for (MethodDecl d : k.methods) {
+                if (d.name.equals(m.name) && d.isGetter == m.isGetter && d.isSetter == m.isSetter) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        return k.method(m.name) != null;
+    }
+
     private boolean superChainHas(ClassDecl sup, MethodDecl m) {
         for (int guard = 0; sup != null && guard < 64; guard++) {
-            if (m.isGetter ? sup.getter(m.name) != null || sup.field(m.name) != null : sup.method(m.name) != null) {
+            if (declaresLike(sup, m)) {
                 return true;
             }
             sup = sup.superclass != null ? superDeclOf(sup, sup.superclass) : null;
@@ -11382,11 +11653,34 @@ public final class JavaEmitter {
     private boolean earlierMixinHas(ClassDecl c, int mi, MethodDecl m, Ctx ctx) {
         for (int i = 0; i < mi; i++) {
             ClassDecl o = program.resolveClass(c.mixins.get(i).name, ctx.library());
-            if (o != null && o.isMixin && (m.isGetter ? o.getter(m.name) != null : o.method(m.name) != null)) {
+            if (o != null && o.isMixin && declaresLike(o, m)) {
                 return true;
             }
         }
         return false;
+    }
+
+    /**
+     * The Java name of the nearest mixin before index mi in c's `with` list that declares a
+     * concrete member for bridge key (`get$x` or a method name), or null when the super
+     * access reaches the superclass.
+     */
+    private String previousMixinDeclaring(ClassDecl c, int mi, String key, Ctx ctx) {
+        boolean getter = key.startsWith("get$");
+        String n = getter ? key.substring(4) : key;
+        for (int j = mi - 1; j >= 0; j--) {
+            ClassDecl o = program.resolveClass(c.mixins.get(j).name, ctx.library());
+            if (o == null || !o.isMixin) {
+                continue;
+            }
+            MethodDecl d = getter ? o.getter(n) : o.method(n);
+            if (d != null && !d.isAbstract && !d.isStatic) {
+                String raw = javaClassType(c.mixins.get(j), ctx);
+                int lt = raw.indexOf('<');
+                return lt > 0 ? raw.substring(0, lt) : raw;
+            }
+        }
+        return null;
     }
 
     /** Implements, in class c, the super bridges of every `on` mixin it applies. */
@@ -11395,24 +11689,55 @@ public final class JavaEmitter {
             return;
         }
         java.util.Set<String> done = new HashSet<String>();
-        for (TypeRef m : c.mixins) {
-            ClassDecl mx = program.resolveClass(m.name, ctx.library());
+        for (int mi = 0; mi < c.mixins.size(); mi++) {
+            ClassDecl mx = program.resolveClass(c.mixins.get(mi).name, ctx.library());
             if (mx == null || !mx.isMixin) {
                 continue;
             }
             for (java.util.Map.Entry<String, Integer> e : onMixinSupers(mx).entrySet()) {
-                String sig = superBridgeSignature(e.getKey(), e.getValue());
+                String sig = superBridgeSignature(mx, e.getKey(), e.getValue());
+                String prev = previousMixinDeclaring(c, mi, e.getKey(), ctx);
                 if (!done.add(sig)) {
                     continue;
                 }
                 ctx.pushScope();
                 ctx.pushWriter(2);
                 Expr call;
+                boolean setter = e.getKey().startsWith("set$") && e.getValue() == 1;
                 if (e.getValue() < 0) {
                     PropertyGet pg = new PropertyGet();
                     pg.target = new SuperExpr();
                     pg.name = e.getKey().substring(4);
                     call = pg;
+                } else if (setter) {
+                    // `super.x = v`: the bridge assigns the superclass's setter and answers v
+                    String sn = e.getKey().substring(4);
+                    TypeRef pt = onSuperMemberType(mx, sn, true, -1, ctx);
+                    Ident id = new Ident();
+                    if (pt != null && !pt.is("dynamic") && !pt.is("var")) {
+                        ctx.writer().line(javaType(pt, true, ctx) + " $b0 = (" + javaType(pt, true, ctx) + ") $a0;");
+                        ctx.declare("$b0", pt);
+                        id.name = "$b0";
+                    } else {
+                        ctx.declare("$a0", TypeRef.DYNAMIC);
+                        id.name = "$a0";
+                    }
+                    PropertyGet pg = new PropertyGet();
+                    pg.target = new SuperExpr();
+                    pg.name = sn;
+                    Assign as = new Assign();
+                    as.lhs = pg;
+                    as.op = "=";
+                    as.rhs = id;
+                    ExprStmt st = new ExprStmt();
+                    st.expr = as;
+                    emitStatement(st, ctx);
+                    ctx.writer().line("return " + id.name + ";");
+                    String inner = ctx.popWriter();
+                    ctx.popScope();
+                    body.append("    @Override\n    public Object ").append(sig).append(" {\n")
+                            .append(inner).append("    }\n\n");
+                    continue;
                 } else {
                     Call cl = new Call();
                     cl.target = new SuperExpr();
@@ -11435,6 +11760,11 @@ public final class JavaEmitter {
                     call = cl;
                 }
                 Out o = emitExpr(call, null, ctx);
+                int sp = prev == null ? -1 : o.code.indexOf("super.");
+                if (sp >= 0) {
+                    // Dart's linearization: the mixin applied before this one is the super
+                    o = new Out(o.code.substring(0, sp) + prev + "." + o.code.substring(sp), o.type, o.fromError);
+                }
                 if (o.type != null && o.type.is("void")) {
                     ctx.writer().line(o.code + ";");
                     ctx.writer().line("return null;");
@@ -11795,6 +12125,12 @@ public final class JavaEmitter {
                 // `(a, b) => a.compareTo(b)` on erased operands answers a dynamic value where
                 // the SAM returns an int: Dart checks that at run time, and so does the cast.
                 o = new Out("((" + javaType(lambdaReturn, true, ctx) + ") (Object) " + o.code + ")", lambdaReturn);
+            }
+            if (lambdaReturn != null && lambdaReturn.is("int") && !lambdaReturn.nullable && o.type != null
+                    && o.type.is("int") && o.code.endsWith(")") && o.code.contains(".compareTo(")) {
+                // A Comparable's compareTo is Java's int, which a Long-returning SAM
+                // (List.sort's comparator) cannot box; widen it to Dart's int first.
+                o = new Out("((long) " + o.code + ")", o.type);
             }
             String lifted = ctx.popWriter();
             exprType = o.type;
@@ -15722,8 +16058,8 @@ public final class JavaEmitter {
      * The static type of {@code a ?? b}: the left side made non-null, unless the default
      * is of a type the left can never be -- a String default for a {@code Uri?}
      * ({@code url ?? 'unknown'}) is an Object in Dart, and so in Java. Only the sealed
-     * core types are compared, as nothing else can implement them; int and double meet
-     * at num.
+     * core types are compared, as nothing else can implement them; numbers keep the
+     * left side's type.
      */
     private TypeRef ifNullType(TypeRef lt, TypeRef rt) {
         TypeRef base = copyNonNull(lt);
@@ -15739,7 +16075,9 @@ public final class JavaEmitter {
         }
         if ((lt.is("int") || lt.is("double")) && (rt.is("int") || rt.is("double") || rt.is("num"))
                 || (rt.is("int") || rt.is("double")) && lt.is("num")) {
-            return lt.is("num") ? base : TypeRef.of("num");
+            // Kept as the left's type: an int literal default of a double (`size ?? -1`)
+            // is a double in Dart, and the numeric coercions already reconcile the rest.
+            return base;
         }
         String other = ls ? rt.name : lt.name;
         if (other.equals("Object") || other.equals("Comparable") || other.equals("Pattern")
@@ -16947,7 +17285,13 @@ public final class JavaEmitter {
             ctx.importClass("dart.core.DartIterable");
             return "DartIterable<" + javaType(t.arg(0), true, ctx) + ">";
         }
-        if (t.is("Future") || t.is("FutureOr")) {
+        if (t.is("FutureOr")) {
+            // FutureOr<T> is a union of a T and a Future<T>; Java has no union, so it is an
+            // Object decided at run time (Await.awaitAny, an instanceof Future test), the way
+            // a dynamic value is. Mapping it to Future<T> rejected every plain T passed in.
+            return "Object";
+        }
+        if (t.is("Future")) {
             ctx.importClass("dart.async.Future");
             TypeRef a = t.args.isEmpty() ? TypeRef.DYNAMIC : t.arg(0);
             if (a.is("void") || a.is("Null")) {
@@ -17550,7 +17894,7 @@ public final class JavaEmitter {
 
     /** Whether a Dart type erases to Java Object (untyped/dynamic value). */
     private boolean isDynamicType(TypeRef t) {
-        return t == null || t.is("var") || t.is("dynamic") || t.is("Object");
+        return t == null || t.is("var") || t.is("dynamic") || t.is("Object") || t.is("FutureOr");
     }
 
     /**
@@ -17723,6 +18067,16 @@ public final class JavaEmitter {
         if (o.type != null && isDynamicType(o.type) && !isDynamicType(target) && isFullyConcrete(target)
                 && !target.is("void") && o.code.startsWith("Dyn.")) {
             return "(" + javaType(copyNonNull(target), false, ctx) + ") " + paren(o.code);
+        }
+        // A FutureOr<T> is an Object in Java; reaching a T slot (after an `is! Future` test
+        // returned early, or a value Dart already knows is not a Future) it is Dart's implicit
+        // downcast. A class type variable is in scope only in an instance member.
+        if (o.type != null && o.type.is("FutureOr") && !isDynamicType(target) && !target.is("void")
+                && !target.is("Future") && target.funcReturn == null
+                && (isFullyConcrete(target) || (!ctx.staticMember && ctx.currentClass != null
+                        && ctx.currentClass.typeParams != null && target.args.isEmpty()
+                        && ctx.currentClass.typeParams.contains(target.name)))) {
+            return "(" + javaType(boxType(copyNonNull(target)), true, ctx) + ") (Object) " + paren(o.code);
         }
         return o.code;
     }
@@ -17937,6 +18291,14 @@ public final class JavaEmitter {
             MethodDecl m = c.method(name);
             if (m != null) {
                 return m;
+            }
+            // Dart's linearization puts the mixins above the superclass, the last one first
+            for (int i = c.mixins.size() - 1; i >= 0; i--) {
+                ClassDecl mx = program.classes.get(c.mixins.get(i).name);
+                MethodDecl mm = mx != null && mx.isMixin ? mx.method(name) : null;
+                if (mm != null && !mm.isAbstract) {
+                    return mm;
+                }
             }
             chain.add(c);
             c = c.superclass != null ? superDeclOf(c, c.superclass) : null;

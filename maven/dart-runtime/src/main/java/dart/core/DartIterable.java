@@ -98,6 +98,17 @@ public class DartIterable<E> implements Iterable<E> {
         }
     }
 
+    /// The Dart list this iterable is the plain view of ({@link #wrap} of a
+    /// {@link DartList}), or null. A List passed where an Iterable is expected travels
+    /// as that view, and is still that List in Dart: `it is List` looks through it.
+    public static Object listBehind(Object value) {
+        if (value != null && value.getClass() == DartIterable.class
+                && ((DartIterable<?>) value).source instanceof DartList) {
+            return ((DartIterable<?>) value).source;
+        }
+        return value;
+    }
+
     public static <E> DartIterable<E> wrap(Iterable<E> source) {
         return source instanceof DartIterable<E> di ? di : new DartIterable<>(source);
     }

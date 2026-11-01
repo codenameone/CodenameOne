@@ -6,10 +6,12 @@ Map<T, List<S>> groupIt<S, T>(Iterable<S> values, T Function(S) key) {
   return map;
 }
 
-class Item {
+class Item implements Comparable<Item> {
   final String name;
   final int size;
   Item(this.name, this.size);
+  @override
+  int compareTo(Item other) => name.compareTo(other.name);
 }
 
 void main() {
@@ -31,4 +33,6 @@ void main() {
     return names;
   }).toList();
   print(out);
+  items.sort((x, y) => y.compareTo(x));
+  print(items.map((i) => i.name).join(' '));
 }

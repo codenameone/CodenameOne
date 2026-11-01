@@ -45,4 +45,12 @@ public interface TypedDataList<E> extends TypedData {
     void fillRange(long start, long end);
 
     void fillRange(long start, long end, E value);
+
+    /// Dart's `list[i]`. Every typed list is a DartList, which implements it; it is declared
+    /// here so a value typed only as a TypedDataList (a generic `L extends TypedDataList<E>`
+    /// field) can be indexed.
+    E idx(long index);
+
+    /// Dart's `list[i] = v`, declared here for the same reason as {@link #idx(long)}.
+    E idxSet(long index, E value);
 }
