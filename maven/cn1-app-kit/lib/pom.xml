@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.codenameone</groupId>
+        <artifactId>cn1-app-kit</artifactId>
+        <version>8.0-SNAPSHOT</version>
+    </parent>
+    <artifactId>cn1-app-kit-lib</artifactId>
+    <packaging>pom</packaging>
+    <name>Codename One App Kit: library</name>
+    <!-- What an application's common module depends on, as a cn1lib's lib pom.
+         The server half is a separate dependency of the backend module:
+         cn1-app-kit-backend. -->
+    <dependencies>
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>cn1-app-kit-common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+    </dependencies>
+</project>

@@ -202,7 +202,8 @@ jobs:
           for artifact in codenameone-core codenameone-maven-plugin codenameone-platform-feature-catalog \
                           codenameone-build-hint-catalog codenameone-build-hint-tools \
                           codenameone-cil-translator codenameone-unity-compat \
-                          cn1app-archetype cn1lib-archetype; do
+                          cn1app-archetype cn1lib-archetype \
+                          cn1-app-kit-common cn1-app-kit-backend cn1-app-kit-lib; do
             url="${R2_BASE_URL}/com/codenameone/${artifact}/${GITHUB_REF_NAME}/${artifact}-${GITHUB_REF_NAME}.pom?cb=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
             code=$(curl -s -o /dev/null -w "%{http_code}" "$url")
             if [ "$code" != "200" ]; then

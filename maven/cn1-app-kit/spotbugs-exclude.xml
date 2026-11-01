@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Intentional exceptions for the app kit, each scoped and explained. -->
+<FindBugsFilter>
+    <!-- Grants keeps the beans it is constructed with: the shared data source
+         and authorization service are what it works through, not state of its
+         own to copy. -->
+    <Match>
+        <Class name="com.codename1.appkit.server.Grants"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <!-- A test reads the notification that was sent, the very object. -->
+    <Match>
+        <Class name="com.codename1.appkit.server.push.RecordingPushSender$Sent"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+    <!-- The bars vary in a cycle of three and of two on purpose (iter % 3 * 7):
+         the multiple of a remainder is the pattern, not a mistaken shift. -->
+    <Match>
+        <Class name="com.codename1.appkit.Skeleton"/>
+        <Method name="paint"/>
+        <Bug pattern="IM_MULTIPLYING_RESULT_OF_IREM"/>
+    </Match>
+</FindBugsFilter>
