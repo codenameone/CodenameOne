@@ -133,22 +133,19 @@ public final class EventHandlerManager implements EventDispatcher {
         remove(filters, type, filter);
     }
 
-    /// Returns whether anything here listens for a mouse press, release or
-    /// click.
+    /// Returns whether a handler here sees a mouse press, release or click.
+    /// Filters do not count: a filter on every mouse event is how a
+    /// container tracks hovering or dragging, not a sign it can be pressed.
     public boolean handlesClicks() {
-        EventType<?>[] types = {MouseEvent.ANY, MouseEvent.MOUSE_PRESSED, MouseEvent.MOUSE_RELEASED,
-            MouseEvent.MOUSE_CLICKED};
-        for (EventType<?> t : types) {
-            if (listens(handlers, t) || listens(filters, t) || (slots != null && getSlot(t) != null)) {
-                return true;
+        if (handlers != null) {
+            for (java.util.Map.Entry<EventType<?>, ArrayList<EventHandler<?>>> e : handlers.entrySet()) {
+                if (!e.getValue().isEmpty() && Activation.seesClicks(e.getKey())) {
+                    return true;
+                }
             }
         }
-        return false;
-    }
-
-    private static boolean listens(HashMap<EventType<?>, ArrayList<EventHandler<?>>> map, EventType<?> type) {
-        ArrayList<EventHandler<?>> list = map == null ? null : map.get(type);
-        return list != null && !list.isEmpty();
+        return slots != null && (getSlot(MouseEvent.MOUSE_CLICKED) != null
+                || getSlot(MouseEvent.MOUSE_PRESSED) != null || getSlot(MouseEvent.MOUSE_RELEASED) != null);
     }
 
     /// Returns the property behind a convenience handler such as

@@ -27,6 +27,7 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.Transform;
+import com.codename1.ui.accessibility.AccessibilityAction;
 import com.codename1.ui.accessibility.AccessibilityNode;
 import com.codename1.ui.events.WheelEvent;
 import com.codename1.ui.geom.Dimension;
@@ -64,9 +65,12 @@ public class ParentPeer extends Container implements FxPeer {
         setFocusable(false);
     }
 
+    /// The activate action [Activation] added, if any.
+    private final AccessibilityAction[] tap = new AccessibilityAction[1];
+
     @Override
     public AccessibilityNode getSemantics() {
-        return Activation.sync(this, node, super.getSemantics());
+        return Activation.sync(node, super.getSemantics(), tap);
     }
 
     @Override

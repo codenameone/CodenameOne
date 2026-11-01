@@ -83,11 +83,16 @@ public class ActivationTest {
         return null;
     }
 
-    @Test
-    public void aClickHandlerMakesTheNodeActivatableAndActivatingItClicksIt() {
+    private Pane card;
+    private Component peer;
+    private final java.util.List<String> seen = new java.util.ArrayList<String>();
+
+    /// A 100x60 card in the middle of a 200x200 scene, holding `child` (if
+    /// any) over its centre.
+    private void show(javafx.scene.Node child) {
         StackPane root = new StackPane();
         root.setMinSize(200, 200);
-        Pane card = new Pane();
+        card = child == null ? new Pane() : new StackPane(child);
         card.setMinSize(100, 60);
         card.setMaxSize(100, 60);
         root.getChildren().add(card);
@@ -96,23 +101,70 @@ public class ActivationTest {
         stage.setScene(new Scene(root));
         stage.show();
         ((StageForm) stage.cn1Host()).revalidate();
+        peer = card.cn1Peer();
+    }
 
-        Component peer = card.cn1Peer();
-        assertEquals("a pane nobody clicks offers no action", null, activate(peer));
-
-        final int[] clicks = {0};
-        card.setOnMouseClicked(new EventHandler<MouseEvent>() {
+    private EventHandler<MouseEvent> log(final String who) {
+        return new EventHandler<MouseEvent>() {
             @Override
             public void handle(MouseEvent event) {
-                clicks[0]++;
+                seen.add(who + ":" + event.getEventType().getName()
+                        + (event.isStillSincePress() ? "" : "(moved)"));
             }
-        });
+        };
+    }
+
+    @Test
+    public void aClickHandlerMakesTheNodeActivatableAndActivatingItClicksIt() {
+        show(null);
+        assertEquals("a pane nobody clicks offers no action", null, activate(peer));
+
+        card.setOnMouseClicked(log("card"));
+        card.setOnMousePressed(log("card"));
+        card.setOnMouseReleased(log("card"));
         AccessibilityAction action = activate(peer);
         assertTrue("a click handler adds the action", action != null);
         assertTrue(action.perform(peer, null));
-        assertEquals("activating delivers one click to the node", 1, clicks[0]);
+        assertEquals("[card:MOUSE_PRESSED, card:MOUSE_RELEASED, card:MOUSE_CLICKED]", seen.toString());
 
         card.setOnMouseClicked(null);
-        assertFalse("removing the handler takes the action away", activate(peer) != null);
+        card.setOnMousePressed(null);
+        card.setOnMouseReleased(null);
+        assertFalse("removing the handlers takes the action away", activate(peer) != null);
+    }
+
+    @Test
+    public void aChildOverTheCentreDoesNotTakeTheParentsActivation() {
+        Pane inner = new Pane();
+        inner.setMinSize(40, 40);
+        inner.setMaxSize(40, 40);
+        inner.setOnMouseClicked(log("inner"));
+        show(inner);
+        card.setOnMouseClicked(log("card"));
+        assertTrue(activate(peer).perform(peer, null));
+        assertEquals("[card:MOUSE_CLICKED]", seen.toString());
+    }
+
+    @Test
+    public void aHandlerForEveryEventCountsAndAFilterDoesNot() {
+        show(null);
+        card.addEventFilter(MouseEvent.ANY, log("filter"));
+        assertEquals("a filter tracking the mouse is no click handler", null, activate(peer));
+        card.addEventHandler(javafx.event.Event.ANY, new EventHandler<javafx.event.Event>() {
+            @Override
+            public void handle(javafx.event.Event event) {
+            }
+        });
+        assertTrue("a handler for every event sees clicks", activate(peer) != null);
+    }
+
+    @Test
+    public void aDisabledNodeOffersNoAction() {
+        show(null);
+        card.setOnMouseClicked(log("card"));
+        card.setDisable(true);
+        assertEquals(null, activate(peer));
+        card.setDisable(false);
+        assertTrue(activate(peer) != null);
     }
 }
