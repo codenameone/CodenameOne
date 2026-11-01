@@ -148,6 +148,16 @@ class Zone {
   external static Zone get root;
   external Zone? get parent;
   external dynamic operator [](Object? key);
+  external R Function() bindCallback<R>(R Function() callback);
+  external R Function(T) bindUnaryCallback<R, T>(R Function(T) callback);
+  external R Function(T1, T2) bindBinaryCallback<R, T1, T2>(R Function(T1, T2) callback);
+  external R run<R>(R Function() body);
+}
+
+// Dart's StreamView: forwards every event of the stream it wraps.
+@JavaName('dart.async.StreamView')
+class StreamView<T> extends Stream<T> {
+  external StreamView(Stream<T> stream);
 }
 
 @JavaName('dart.async.Async.unawaited')
@@ -182,4 +192,12 @@ class StreamController<T> {
   external bool get isPaused;
   external Future get done;
   external Future addStream(Stream<T> source);
+  external void Function()? get onListen;
+  external set onListen(void Function()? handler);
+  external void Function()? get onCancel;
+  external set onCancel(Object? handler);
+  external void Function()? get onPause;
+  external set onPause(void Function()? handler);
+  external void Function()? get onResume;
+  external set onResume(void Function()? handler);
 }

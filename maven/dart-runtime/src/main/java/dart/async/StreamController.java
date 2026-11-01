@@ -34,10 +34,9 @@ package dart.async;
  * <p>{@link #stream()} always behaves as broadcast (see {@link Stream}'s
  * class comment), so {@link #broadcast()} is the same as the plain
  * constructor here; it exists only so {@code StreamController<T>.broadcast()}
- * call sites compile. {@code onPause}/{@code onResume} are accepted for
- * source compatibility but never invoked: this controller has no concept
- * of "the whole stream is paused", only a per-subscription pause (see
- * {@link Stream}). {@code sync} is accepted and ignored -- delivery here is
+ * call sites compile. All four handlers are called: onListen on the first
+ * listener, onCancel when the last one leaves, onPause/onResume as the stream's
+ * pause state changes. Each is also readable as a getter, as in Dart. {@code sync} is accepted and ignored -- delivery here is
  * always synchronous on the calling thread.</p>
  */
 public final class StreamController<T> implements StreamSink<T> {
@@ -118,7 +117,6 @@ public final class StreamController<T> implements StreamSink<T> {
         this.onCancelHandler = handler;
     }
 
-    /** Accepted for source compatibility; never invoked (see the class comment). */
     /// The closure form, so a Dart closure literal has a functional interface to land on.
     public void onPause(dart.runtime.Funcs.VoidFunc0 handler) {
         onPause((Object) handler);
@@ -128,7 +126,6 @@ public final class StreamController<T> implements StreamSink<T> {
         this.onPauseHandler = handler;
     }
 
-    /** Accepted for source compatibility; never invoked (see the class comment). */
     /// The closure form, so a Dart closure literal has a functional interface to land on.
     public void onResume(dart.runtime.Funcs.VoidFunc0 handler) {
         onResume((Object) handler);
@@ -136,6 +133,41 @@ public final class StreamController<T> implements StreamSink<T> {
 
     public void onResume(Object handler) {
         this.onResumeHandler = handler;
+    }
+
+    /// Dart's {@code onListen} getter: the handler set last, or null.
+    public dart.runtime.Funcs.VoidFunc0 onListen() {
+        return asVoidFunc(onListenHandler);
+    }
+
+    /// Dart's {@code onCancel} getter: the handler set last, or null.
+    public dart.runtime.Funcs.VoidFunc0 onCancel() {
+        return asVoidFunc(onCancelHandler);
+    }
+
+    /// Dart's {@code onPause} getter: the handler set last, or null.
+    public dart.runtime.Funcs.VoidFunc0 onPause() {
+        return asVoidFunc(onPauseHandler);
+    }
+
+    /// Dart's {@code onResume} getter: the handler set last, or null.
+    public dart.runtime.Funcs.VoidFunc0 onResume() {
+        return asVoidFunc(onResumeHandler);
+    }
+
+    private static dart.runtime.Funcs.VoidFunc0 asVoidFunc(final Object handler) {
+        if (handler == null) {
+            return null;
+        }
+        if (handler instanceof dart.runtime.Funcs.VoidFunc0) {
+            return (dart.runtime.Funcs.VoidFunc0) handler;
+        }
+        return new dart.runtime.Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+                Stream.deliverVoid(handler);
+            }
+        };
     }
 
     /** Accepted for source compatibility; ignored (see the class comment). */

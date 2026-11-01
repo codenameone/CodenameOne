@@ -24,7 +24,7 @@
 package dart.convert;
 
 /** {@code JsonDecoder}. */
-public final class JsonDecoder implements dart.async.StreamTransformer<String, Object> {
+public final class JsonDecoder implements dart.async.StreamTransformer<String, Object>, CodecConverter {
     private final Object reviver;
 
     public JsonDecoder() {
@@ -33,6 +33,12 @@ public final class JsonDecoder implements dart.async.StreamTransformer<String, O
 
     public JsonDecoder(Object reviver) {
         this.reviver = reviver;
+    }
+
+    /** {@link CodecConverter}'s form, for a decoder reached through a Codec. */
+    @Override
+    public Object convert(Object input) {
+        return convert((String) input);
     }
 
     public Object convert(String input) {

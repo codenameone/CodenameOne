@@ -42,8 +42,8 @@ public interface Codec<S, T> {
     Object decode(Object encoded);
 
     /** Dart's {@code Codec.encoder}. */
-    ByteCodec encoder();
+    CodecConverter encoder();
 
     /** Dart's {@code Codec.decoder}. */
-    ByteCodec decoder();
+    CodecConverter decoder();
 }

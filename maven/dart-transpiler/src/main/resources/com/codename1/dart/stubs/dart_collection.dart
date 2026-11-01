@@ -43,6 +43,8 @@ mixin ListMixin<E> {
   E removeLast();
   void clear();
   void fillRange(int start, int end, [E? fill]);
+  void setAll(int index, Iterable<E> iterable);
+  void setRange(int start, int end, Iterable<E> iterable, [int skipCount = 0]);
   bool contains(Object? element);
   void forEach(void Function(E element) action);
   E elementAt(int index);

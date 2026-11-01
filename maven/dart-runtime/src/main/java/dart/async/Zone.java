@@ -45,4 +45,22 @@ public final class Zone {
     public Object $index(Object key) {
         return null;
     }
+
+    /// {@code bindCallback}: the root zone runs a callback as it is.
+    public <R> dart.runtime.Funcs.Func0<R> bindCallback(dart.runtime.Funcs.Func0<R> callback) {
+        return callback;
+    }
+
+    public <R, A> dart.runtime.Funcs.Func1<A, R> bindUnaryCallback(dart.runtime.Funcs.Func1<A, R> callback) {
+        return callback;
+    }
+
+    public <R, A, B> dart.runtime.Funcs.Func2<A, B, R> bindBinaryCallback(dart.runtime.Funcs.Func2<A, B, R> callback) {
+        return callback;
+    }
+
+    /// {@code run}: the root zone calls the body directly.
+    public <R> R run(dart.runtime.Funcs.Func0<R> body) {
+        return body.call();
+    }
 }

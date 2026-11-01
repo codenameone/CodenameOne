@@ -13,7 +13,7 @@
 // returns a Uint8List, base64.encode the reverse.
 
 @JavaName('dart.convert.JsonCodec')
-class JsonCodec {
+class JsonCodec extends Codec<Object?, String> {
   external JsonCodec({Object? reviver, Object? toEncodable});
   external dynamic decode(String source, {Object? reviver});
   external String encode(Object? value, {Object? toEncodable});
@@ -45,8 +45,14 @@ class JsonUnsupportedObjectError {
 abstract class Codec<S, T> {
   external dynamic encode(dynamic input);
   external dynamic decode(dynamic encoded);
-  external Encoding get encoder;
-  external Encoding get decoder;
+  external CodecConverter get encoder;
+  external CodecConverter get decoder;
+}
+
+// What a Codec's encoder and decoder answer (the Java side's common type).
+@JavaName('dart.convert.CodecConverter')
+abstract class CodecConverter {
+  external dynamic convert(dynamic input);
 }
 
 @JavaName('dart.convert.ByteCodec')

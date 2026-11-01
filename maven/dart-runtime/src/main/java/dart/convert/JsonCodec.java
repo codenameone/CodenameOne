@@ -38,7 +38,7 @@ import java.util.Map;
  * iterables, strings, numbers, booleans and null, and calls {@code toJson()} on anything
  * else (see {@link JsonEncodable}).
  */
-public final class JsonCodec {
+public final class JsonCodec implements Codec<Object, String> {
 
     private final Object reviver;
     private final Object toEncodable;
@@ -64,6 +64,13 @@ public final class JsonCodec {
         return v;
     }
 
+    /** {@link Codec}'s {@code decode}, for a JsonCodec held as a Codec. */
+    @Override
+    public Object decode(Object encoded) {
+        return decode((String) encoded, reviver);
+    }
+
+    @Override
     public String encode(Object value) {
         return encode(value, toEncodable);
     }
@@ -74,10 +81,12 @@ public final class JsonCodec {
         return sb.toString();
     }
 
+    @Override
     public JsonEncoder encoder() {
         return new JsonEncoder(toEncodable);
     }
 
+    @Override
     public JsonDecoder decoder() {
         return new JsonDecoder(reviver);
     }

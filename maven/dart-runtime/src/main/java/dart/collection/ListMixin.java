@@ -35,10 +35,9 @@ import dart.runtime.Funcs;
  * surface is reached here as defaults built on those four, as Dart's mixin is.
  *
  * <p>The Iterable-shaped members that return a lazy view ({@code where},
- * {@code map}, {@code skip}, {@code take}) operate on a snapshot taken by
- * {@link #toList()}. Dart's views read the list on every iteration; a caller that
- * mutates the list between building the view and walking it sees the old
- * elements here.</p>
+ * {@code map}, {@code skip}, {@code take}) walk {@link #liveView()}, which reads
+ * {@code length} and {@code [index]} on every step, so a list mutated between
+ * building the view and walking it is seen as it is then, as in Dart.</p>
  *
  * @param <E> the element type
  */
@@ -148,6 +147,39 @@ public interface ListMixin<E> extends IterableMixin<E> {
         }
     }
 
+    /** Dart's {@code setAll(index, iterable)}. */
+    default void setAll(long index, Iterable<? extends E> from) {
+        long i = index;
+        for (E e : from) {
+            if (i < 0 || i >= length()) {
+                throw new dart.core.RangeError("RangeError (index): Index out of range: " + i);
+            }
+            $indexSet(i++, e);
+        }
+    }
+
+    /** Dart's {@code setRange(start, end, iterable)}. */
+    default void setRange(long start, long end, Iterable<? extends E> from) {
+        setRange(start, end, from, 0);
+    }
+
+    /** Dart's {@code setRange(start, end, iterable, skipCount)}. */
+    default void setRange(long start, long end, Iterable<? extends E> from, long skipCount) {
+        if (start < 0 || end < start || end > length()) {
+            throw new dart.core.RangeError("RangeError: Invalid range " + start + ".." + end + " for length " + length());
+        }
+        java.util.ArrayList<E> buf = new java.util.ArrayList<E>();
+        for (E e : from) {
+            buf.add(e);
+        }
+        if (skipCount + (end - start) > buf.size()) {
+            throw new dart.core.StateError("Too few elements");
+        }
+        for (long i = start; i < end; i++) {
+            $indexSet(i, buf.get((int) (skipCount + i - start)));
+        }
+    }
+
     /** Dart's {@code indexOf(element)}. */
     default long indexOf(Object element) {
         return indexOf(element, 0);
@@ -207,24 +239,53 @@ public interface ListMixin<E> extends IterableMixin<E> {
         return sublist(start, length());
     }
 
-    /** Dart's {@code where(test)}, over a snapshot (see the class comment). */
+    /**
+     * A view that re-reads {@code length()} and {@code [index]} on every step, so
+     * where/map/skip/take see later changes to the list, as Dart's lazy iterables do.
+     */
+    default DartIterable<E> liveView() {
+        final ListMixin<E> self = this;
+        return DartIterable.wrap(new java.lang.Iterable<E>() {
+            @Override
+            public java.util.Iterator<E> iterator() {
+                return new java.util.Iterator<E>() {
+                    private long i;
+
+                    @Override
+                    public boolean hasNext() {
+                        return i < self.length();
+                    }
+
+                    @Override
+                    public E next() {
+                        if (i >= self.length()) {
+                            throw new java.util.NoSuchElementException();
+                        }
+                        return self.$index(i++);
+                    }
+                };
+            }
+        });
+    }
+
+    /** Dart's {@code where(test)}, a lazy view that reads the list as it is when iterated. */
     default DartIterable<E> where(Funcs.Func1<E, Boolean> test) {
-        return toList().where(test);
+        return liveView().where(test);
     }
 
-    /** Dart's {@code map(f)}, over a snapshot (see the class comment). */
+    /** Dart's {@code map(f)}, a lazy view that reads the list as it is when iterated. */
     default <R> DartIterable<R> map(Funcs.Func1<E, R> f) {
-        return toList().map(f);
+        return liveView().map(f);
     }
 
-    /** Dart's {@code skip(count)}, over a snapshot. */
+    /** Dart's {@code skip(count)}, a lazy live view. */
     default DartIterable<E> skip(long count) {
-        return toList().skip(count);
+        return liveView().skip(count);
     }
 
-    /** Dart's {@code take(count)}, over a snapshot. */
+    /** Dart's {@code take(count)}, a lazy live view. */
     default DartIterable<E> take(long count) {
-        return toList().take(count);
+        return liveView().take(count);
     }
 
     /** Dart's {@code fold(initial, combine)}. */
