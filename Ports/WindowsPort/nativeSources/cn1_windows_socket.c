@@ -76,7 +76,8 @@ JAVA_LONG com_codename1_impl_windows_WindowsNative_socketConnect___java_lang_Str
     }
     cn1SockEnsureStartup();
     host = stringToUTF8(threadStateData, __cn1Arg1);
-    wsprintfA(portStr, "%d", (int) __cn1Arg2);
+    /* snprintf, not wsprintfA: user32 is not in the UWP app partition. */
+    snprintf(portStr, sizeof(portStr), "%d", (int) __cn1Arg2);
 
     ZeroMemory(&hints, sizeof(hints));
     hints.ai_family = AF_UNSPEC;
