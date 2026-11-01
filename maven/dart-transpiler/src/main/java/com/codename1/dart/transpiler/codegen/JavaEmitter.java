@@ -1093,6 +1093,12 @@ public final class JavaEmitter {
             body.append('\n');
         }
 
+        for (String tw : witnessParams(c)) {
+            body.append("    public dart.runtime.TypeWitness ").append(witnessField(c, tw)).append(";\n");
+        }
+        ClassDecl twSuper = c.superclass != null ? program.classes.get(c.superclass.name) : null;
+        boolean implicitWitnessCtor = c.ctors.isEmpty()
+                && (!witnessParams(c).isEmpty() || (twSuper != null && !witnessParams(twSuper).isEmpty()));
         // constructors
         if (needsMarker(c)) {
             body.append("    /** Marker distinguishing named-constructor instantiation. */\n");
@@ -1107,7 +1113,7 @@ public final class JavaEmitter {
                 body.append("        super((").append(javaClassName(markerSuper)).append(".$NamedCtor) null);\n");
             }
             body.append("    }\n\n");
-            if (c.ctors.isEmpty()) {
+            if (c.ctors.isEmpty() && !implicitWitnessCtor) {
                 // Declaring the marker constructor removes Java's implicit default one,
                 // which a class with no Dart constructor still needs.
                 body.append("    public ").append(javaClassName(c)).append("() {\n    }\n\n");
@@ -1118,6 +1124,21 @@ public final class JavaEmitter {
         }
         for (CtorDecl ct : c.ctors) {
             body.append(emitCtor(c, ct, ctx));
+        }
+        if (implicitWitnessCtor) {
+            // The implicit constructor, which takes (and passes on) the hidden witnesses.
+            body.append("    public ").append(javaClassName(c)).append('(')
+                    .append(stripTrailingComma(witnessParamDecls(c))).append(") {\n");
+            java.util.Set<String> savedLocals = ctx.witnessLocals;
+            ctx.witnessLocals = new HashSet<String>(witnessParams(c));
+            Ctx.Writer iw = ctx.pushWriter(2);
+            if (twSuper != null && !witnessParams(twSuper).isEmpty()) {
+                iw.line("super(" + stripTrailingComma(witnessArgs(twSuper, c.superclass.args, c, ctx)) + ");");
+            }
+            storeWitnesses(c, "this", true, false, iw, ctx);
+            body.append(ctx.popWriter());
+            ctx.witnessLocals = savedLocals;
+            body.append("    }\n\n");
         }
 
         // Dart operator== ($eq) overrides Java equals via a bridge
@@ -2300,6 +2321,10 @@ public final class JavaEmitter {
         sb.append("    public ").append(javaClassName(c)).append('(');
         ctx.pushScope();
         List<Param> params = ct.params;
+        String twDecls = witnessParamDecls(c);
+        sb.append(params.isEmpty() ? stripTrailingComma(twDecls) : twDecls);
+        java.util.Set<String> savedWitnessLocals = ctx.witnessLocals;
+        ctx.witnessLocals = new HashSet<String>(witnessParams(c));
         for (int i = 0; i < params.size(); i++) {
             Param p = params.get(i);
             TypeRef pt = paramType(c, p, ctx);
@@ -2332,7 +2357,10 @@ public final class JavaEmitter {
                 // through lifted temps; they keep the parameter order.
                 inSuperInitializer = true;
                 try {
-                    w.line("super(" + canonicalArgs(superCtor, superArgs, ctx) + ");");
+                    String superCanon = canonicalArgs(superCtor, superArgs, ctx);
+                    String superTw = witnessArgs(progSuper, c.superclass.args, ct, ctx);
+                    w.line("super(" + (superCanon.isEmpty() ? stripTrailingComma(superTw)
+                            : superTw + superCanon) + ");");
                 } finally {
                     inSuperInitializer = false;
                 }
@@ -2366,6 +2394,7 @@ public final class JavaEmitter {
                 w.line("this." + na.name + "(" + v.code + ");");
             }
         }
+        storeWitnesses(c, "this", true, superNamedInit != null, w, ctx);
         // super.x params against stub superclasses -> inherited setters
         if (progSuper == null) {
             for (Param p : params) {
@@ -2391,6 +2420,7 @@ public final class JavaEmitter {
         if (ct.body != null) {
             emitStatements(ct.body, ctx);
         }
+        ctx.witnessLocals = savedWitnessLocals;
         sb.append(ctx.popWriter());
         ctx.popScope();
         sb.append("    }\n\n");
@@ -2428,13 +2458,21 @@ public final class JavaEmitter {
         sb.append("    public static ").append(staticTypeParams(c)).append(javaClassName(c))
                 .append(interfacedClasses().contains(c) ? "$I" : "")
                 .append(staticTypeArgs(c)).append(' ').append(name).append('(');
+        String twDecls = witnessParamDecls(c);
+        sb.append(ct.params.isEmpty() ? stripTrailingComma(twDecls) : twDecls);
         appendParams(sb, c, ct.params, ctx);
         sb.append(") {\n");
         ctx.pushWriter(2);
         ctx.methodReturnType = new TypeRef(c.name);
+        java.util.Set<String> savedWitnessLocals = ctx.witnessLocals;
+        boolean savedStatic = ctx.staticMember;
+        ctx.witnessLocals = new HashSet<String>(witnessParams(c));
+        ctx.staticMember = true;
         if (ct.body != null) {
             emitStatements(ct.body, ctx);
         }
+        ctx.witnessLocals = savedWitnessLocals;
+        ctx.staticMember = savedStatic;
         sb.append(ctx.popWriter());
         ctx.methodReturnType = null;
         ctx.popScope();
@@ -2466,7 +2504,8 @@ public final class JavaEmitter {
         }
         sb.append("    public static ").append(staticTypeParams(c)).append(javaClassName(c))
                 .append(staticTypeArgs(c)).append(' ').append(javaIdent(ct.name))
-                .append('(').append(paramSig).append(") {\n");
+                .append('(').append(paramSig.length() == 0 ? stripTrailingComma(witnessParamDecls(c))
+                        : witnessParamDecls(c) + paramSig).append(") {\n");
         if (c.isAbstract) {
             // `abstract class A { A._(..); }` is reached only as a subclass's `super._(..)`
             // (the $init$ below); Java cannot instantiate the abstract class here.
@@ -2474,6 +2513,9 @@ public final class JavaEmitter {
                     .append(c.name).append("\");\n    }\n\n");
         } else {
             sb.append("        ").append(javaClassName(c)).append(" $self = new ").append(javaClassName(c)).append("(($NamedCtor) null);\n");
+            for (String tw : witnessParams(c)) {
+                sb.append("        $self.").append(witnessField(c, tw)).append(" = $tw$").append(tw).append(";\n");
+            }
             sb.append("        $self.$init$").append(ct.name).append('(').append(argList).append(");\n");
             sb.append("        return $self;\n    }\n\n");
         }
@@ -2552,6 +2594,7 @@ public final class JavaEmitter {
             Args superArgs = superArgsOf(ct);
             String target = ct.superInit != null ? ct.superInit.namedCtor : null;
             CtorDecl superCtor = target != null ? progSuper.namedCtor(target) : progSuper.defaultCtor();
+            storeWitnesses(c, "this", false, true, w, ctx);
             w.line("super.$init$" + (target != null ? target : "") + "("
                     + canonicalArgs(superCtor, superArgs, ctx) + ");");
         } else if (stubClassOf(c.superclass) != null) {
@@ -3023,10 +3066,16 @@ public final class JavaEmitter {
     private String emitMethodLike(Method m, Ctx ctx, boolean classIsAbstract) {
         java.util.Map<String, TypeRef> savedBounds = ctx.methodTypeParamBounds;
         ctx.methodTypeParamBounds = m.typeParamBounds;
+        java.util.Set<String> savedTps = ctx.methodTypeParams;
+        boolean savedStatic = ctx.staticMember;
+        ctx.methodTypeParams = m.typeParams == null ? null : new HashSet<String>(m.typeParams);
+        ctx.staticMember = m.isStatic;
         try {
             return emitMethodLikeBody(m, ctx, classIsAbstract);
         } finally {
             ctx.methodTypeParamBounds = savedBounds;
+            ctx.methodTypeParams = savedTps;
+            ctx.staticMember = savedStatic;
         }
     }
 
@@ -5409,8 +5458,10 @@ public final class JavaEmitter {
                 }
                 ClassDecl pc = program.classes.get(cc.type.name);
                 if (pc != null && pc.namedCtor(cc.ctorName) != null) {
+                    String tw = witnessArgs(pc, cc.type.args, cc, ctx);
+                    String na = canonicalArgs(pc.namedCtor(cc.ctorName), cc.args, ctx);
                     return new Out(javaClassName(pc) + "." + javaIdent(cc.ctorName) + "("
-                            + canonicalArgs(pc.namedCtor(cc.ctorName), cc.args, ctx) + ")",
+                            + (na.isEmpty() ? stripTrailingComma(tw) : tw + na) + ")",
                             new TypeRef(cc.type.name));
                 }
                 Ast.ClassDecl sc = stubs.classes.get(cc.type.name);
@@ -5449,7 +5500,8 @@ public final class JavaEmitter {
                 diags.error(e, "E0126", "Cannot resolve named constructor " + cc.type.name + "." + cc.ctorName);
                 return new Out("null", TypeRef.DYNAMIC);
             }
-            return emitCtorCall(cc.type.name, cc.type.args, cc.args, e, ctx);
+            return emitCtorCall(cc.type.name, inferredWitnessTypeArgs(
+                    program.classes.get(cc.type.name), cc.type.args, expected), cc.args, e, ctx);
         }
         if (e instanceof IndexGet) {
             return emitIndexGet((IndexGet) e, ctx);
@@ -5637,9 +5689,15 @@ public final class JavaEmitter {
                 subject = "((Object) " + paren(o.code) + ")";
             }
             String check;
+            String tw = t.type.args.isEmpty() && t.type.funcReturn == null
+                    ? witnessFor(t.type.name, ctx) : null;
             if (t.type.is("Null")) {
                 // `x is Null` holds only for null; it mapped to Object, which is the opposite.
                 check = subject + " == null";
+            } else if (tw != null) {
+                // `x is T` for a T the class keeps a witness of.
+                check = (t.type.nullable ? "dart.runtime.TypeWitness.nullable(" + tw + ")" : tw)
+                        + ".test(" + subject + ")";
             } else if (reportTypeVariableWitness(t, t.type, ctx,
                     "'" + (t.negated ? "is! " : "is ") + t.type.name + "'")) {
                 // `instanceof T`/`DartRuntime.isOrNull(x, T.class)` for a bare type-variable
@@ -5740,6 +5798,236 @@ public final class JavaEmitter {
         }
         String jt = javaType(t, true, ctx);
         return jt.equals(n);
+    }
+
+    // ---- reified type witnesses -------------------------------------------------------
+    //
+    // A program class whose body uses one of its type parameters as a value (`x is T`,
+    // `T == int`, `Type get t => T`, `'$T'`) keeps a dart.runtime.TypeWitness per such
+    // parameter in a field. Every constructor takes them as leading hidden parameters, from
+    // the type arguments its caller wrote (or its own witnesses, for a subclass passing its
+    // parameters on). Only those classes pay for it; a construction that cannot name its
+    // type arguments is an error, never a guessed witness.
+
+    private final java.util.Map<ClassDecl, List<String>> witnessCache =
+            new java.util.IdentityHashMap<ClassDecl, List<String>>();
+
+    /** The type parameters of {@code c} that need a witness, in declaration order. */
+    List<String> witnessParams(ClassDecl c) {
+        if (c == null || c.typeParams.isEmpty() || c.isMixin || c.extensionOn != null
+                || c.enumOf != null || !isProgramClassDecl(c)) {
+            return java.util.Collections.emptyList();
+        }
+        List<String> cached = witnessCache.get(c);
+        if (cached != null) {
+            return cached;
+        }
+        witnessCache.put(c, java.util.Collections.<String>emptyList());
+        java.util.Set<String> used = new HashSet<String>();
+        java.util.Set<String> tps = new HashSet<String>(c.typeParams);
+        java.util.Set<Object> seen = java.util.Collections.newSetFromMap(
+                new java.util.IdentityHashMap<Object, Boolean>());
+        for (FieldDecl f : c.fields) {
+            scanTypeValueUses(f, tps, used, seen);
+        }
+        for (CtorDecl ct : c.ctors) {
+            if (!ct.isFactory) {
+                scanTypeValueUses(ct, tps, used, seen);
+            }
+        }
+        for (MethodDecl m : c.methods) {
+            if (!m.isStatic) {
+                scanTypeValueUses(m, tps, used, seen);
+            }
+        }
+        ClassDecl sup = c.superclass != null ? program.classes.get(c.superclass.name) : null;
+        if (sup != null) {
+            List<String> sw = witnessParams(sup);
+            for (String n : sw) {
+                int i = sup.typeParams.indexOf(n);
+                TypeRef a = i < c.superclass.args.size() ? c.superclass.args.get(i) : null;
+                if (a != null && a.args.isEmpty() && tps.contains(a.name)) {
+                    used.add(a.name);
+                }
+            }
+        }
+        List<String> out = new ArrayList<String>();
+        for (String n : c.typeParams) {
+            if (used.contains(n)) {
+                out.add(n);
+            }
+        }
+        witnessCache.put(c, out);
+        return out;
+    }
+
+    /**
+     * The type arguments of an unannotated construction of a class that keeps witnesses,
+     * inferred from the type the context expects ({@code final Box<int> b = Box();}), as
+     * Dart infers them. Anything else keeps what was written.
+     */
+    private List<TypeRef> inferredWitnessTypeArgs(ClassDecl pc, List<TypeRef> written, TypeRef expected) {
+        if (pc == null || (written != null && !written.isEmpty()) || expected == null
+                || witnessParams(pc).isEmpty() || !pc.name.equals(expected.name)
+                || expected.args.size() != pc.typeParams.size()) {
+            return written;
+        }
+        return expected.args;
+    }
+
+    private boolean isProgramClassDecl(ClassDecl c) {
+        List<ClassDecl> same = program.classesByName.get(c.name);
+        return program.classes.get(c.name) == c || (same != null && same.contains(c));
+    }
+
+    private void scanTypeValueUses(Object o, java.util.Set<String> tps, java.util.Set<String> used,
+            java.util.Set<Object> seen) {
+        if (o == null || !seen.add(o)) {
+            return;
+        }
+        if (o instanceof List) {
+            for (Object e : (List<?>) o) {
+                scanTypeValueUses(e, tps, used, seen);
+            }
+            return;
+        }
+        if (!(o instanceof Node) || o instanceof ClassDecl || o instanceof Library) {
+            return;
+        }
+        if (o instanceof Ident && tps.contains(((Ident) o).name)) {
+            used.add(((Ident) o).name);
+        }
+        if (o instanceof IsTest) {
+            TypeRef t = ((IsTest) o).type;
+            if (t != null && t.args.isEmpty() && tps.contains(t.name)) {
+                used.add(t.name);
+            }
+        }
+        java.util.Set<String> inner = tps;
+        List<String> shadow = o instanceof MethodDecl ? ((MethodDecl) o).typeParams
+                : o instanceof FunctionDecl ? ((FunctionDecl) o).typeParams
+                : o instanceof Lambda ? ((Lambda) o).typeParams : null;
+        if (shadow != null && !shadow.isEmpty()) {
+            inner = new HashSet<String>(tps);
+            inner.removeAll(shadow);
+        }
+        for (java.lang.reflect.Field f : o.getClass().getFields()) {
+            if (java.lang.reflect.Modifier.isStatic(f.getModifiers())) {
+                continue;
+            }
+            Class<?> ft = f.getType();
+            if (Node.class.isAssignableFrom(ft) || List.class.isAssignableFrom(ft)) {
+                try {
+                    scanTypeValueUses(f.get(o), inner, used, seen);
+                } catch (IllegalAccessException e) {
+                    throw new IllegalStateException(e);
+                }
+            }
+        }
+    }
+
+    private static String witnessField(ClassDecl owner, String tp) {
+        return "$tw$" + owner.name.replace('.', '_') + "$" + tp;
+    }
+
+    /** The Java expression of the witness of type parameter {@code n} here, or null. */
+    private String witnessFor(String n, Ctx ctx) {
+        if (n == null || (ctx.methodTypeParams != null && ctx.methodTypeParams.contains(n))) {
+            return null;
+        }
+        if (ctx.witnessLocals != null && ctx.witnessLocals.contains(n)) {
+            return "$tw$" + n;
+        }
+        ClassDecl c = ctx.currentClass;
+        if (c == null || ctx.staticMember || !witnessParams(c).contains(n)) {
+            return null;
+        }
+        return "this." + witnessField(c, n);
+    }
+
+    /** The witness of the type {@code t} written at a construction site, or null. */
+    private String witnessOf(TypeRef t, Ctx ctx) {
+        if (t == null) {
+            return null;
+        }
+        if (t.args.isEmpty() && t.funcReturn == null) {
+            String w = witnessFor(t.name, ctx);
+            if (w != null) {
+                return t.nullable ? "dart.runtime.TypeWitness.nullable(" + w + ")" : w;
+            }
+        }
+        if (isTypeVariable(t, ctx)) {
+            return null;
+        }
+        boolean nullable = t.nullable || t.is("dynamic") || t.is("var") || t.is("Null")
+                || t.is("void");
+        return "dart.runtime.TypeWitness.of(" + erasedJavaType(t, ctx) + ".class, " + nullable + ")";
+    }
+
+    /**
+     * The leading witness arguments for constructing {@code pc} with {@code typeArgs}, each
+     * followed by ", " -- or "" when {@code pc} keeps none. Reports an error when a witness
+     * cannot be formed.
+     */
+    private String witnessArgs(ClassDecl pc, List<TypeRef> typeArgs, Node pos, Ctx ctx) {
+        StringBuilder sb = new StringBuilder();
+        for (String w : witnessArgList(pc, typeArgs, pos, ctx)) {
+            sb.append(w).append(", ");
+        }
+        return sb.toString();
+    }
+
+    private List<String> witnessArgList(ClassDecl pc, List<TypeRef> typeArgs, Node pos, Ctx ctx) {
+        List<String> sb = new ArrayList<String>();
+        for (String n : witnessParams(pc)) {
+            int i = pc.typeParams.indexOf(n);
+            TypeRef a = typeArgs != null && typeArgs.size() == pc.typeParams.size() ? typeArgs.get(i) : null;
+            String w = witnessOf(a, ctx);
+            if (w == null) {
+                diags.error(pos, "E0142", "Constructing " + pc.name + " needs its type argument '" + n
+                        + "' at run time (its body uses " + n + " as a value), and none is "
+                        + (a == null ? "written here" : "available for '" + a.name + "'")
+                        + ". Write the type argument explicitly at this construction.");
+                w = "null";
+            }
+            sb.add(w);
+        }
+        return sb;
+    }
+
+    /** Hidden witness parameter declarations, each followed by ", ". */
+    private String witnessParamDecls(ClassDecl c) {
+        StringBuilder sb = new StringBuilder();
+        for (String n : witnessParams(c)) {
+            sb.append("dart.runtime.TypeWitness $tw$").append(n).append(", ");
+        }
+        return sb.toString();
+    }
+
+    private static String stripTrailingComma(String s) {
+        return s.endsWith(", ") ? s.substring(0, s.length() - 2) : s;
+    }
+
+    /**
+     * Stores this class's witnesses from the hidden parameters, and -- when
+     * {@code parentToo} -- the program superclass's from this class's superclass arguments
+     * (for a super chain that does not pass them through a Java constructor).
+     */
+    private void storeWitnesses(ClassDecl c, String self, boolean own, boolean parentToo, Ctx.Writer w,
+            Ctx ctx) {
+        for (String n : own ? witnessParams(c) : java.util.Collections.<String>emptyList()) {
+            w.line(self + "." + witnessField(c, n) + " = $tw$" + n + ";");
+        }
+        if (parentToo) {
+            ClassDecl sup = c.superclass != null ? program.classes.get(c.superclass.name) : null;
+            if (sup != null && !witnessParams(sup).isEmpty()) {
+                List<String> parts = witnessArgList(sup, c.superclass.args, c, ctx);
+                List<String> sw = witnessParams(sup);
+                for (int i = 0; i < sw.size(); i++) {
+                    w.line(self + "." + witnessField(sup, sw.get(i)) + " = " + parts.get(i) + ";");
+                }
+            }
+        }
     }
 
     /**
@@ -6651,6 +6939,11 @@ public final class JavaEmitter {
         Out top = resolveTopLevel(n, ctx);
         if (top != null) {
             return top;
+        }
+        // A type parameter used as a value (`Type get type => T`, `T == int`): its witness.
+        String tw = witnessFor(n, ctx);
+        if (tw != null) {
+            return new Out(tw + ".type()", new TypeRef("Type"));
         }
         diags.error(id, "E0129", "Cannot resolve identifier '" + n
                 + "'. Confirm the file passes `dart analyze`, or the API is not yet implemented in the Codename One runtime.");
@@ -8097,6 +8390,18 @@ public final class JavaEmitter {
         }
         Out lhs = lhsOnce != null ? lhsOnce : emitExpr(a.lhs, null, ctx);
         String lcode = lhs.code;
+        // A member read through an accessor method (`list.length()`, a runtime getter) is
+        // written through its setter overload, `list.length(v)`: as an expression-bodied
+        // setter (`set length(int v) => _items.length = v;`) it fell through to
+        // `this._items.length() = v`, which is not Java.
+        if (a.lhs instanceof PropertyGet && !a.op.equals("??=")) {
+            String acc = "." + ((PropertyGet) a.lhs).name + "()";
+            if (lcode.endsWith(acc) && !lcode.contains(".get$")) {
+                String recv = lcode.substring(0, lcode.length() - acc.length());
+                return voidSetterWrite(a, recv + "." + ((PropertyGet) a.lhs).name,
+                        a.op.equals("=") ? null : lcode, lhs.type, ctx);
+            }
+        }
         // setters through accessors: x.get$f() as assignment target -> x.set$f(v)
         if (lcode.endsWith("()") && lcode.contains(".get$")) {
             String base = lcode.substring(0, lcode.lastIndexOf(".get$"));
@@ -9880,7 +10185,7 @@ public final class JavaEmitter {
             return new Out(fnCall(target.code, target.type, c.args, ctx), TypeRef.DYNAMIC);
         }
         if (c.target == null) {
-            return emitBareCall(c, ctx);
+            return emitBareCall(c, expected, ctx);
         }
         // deferred import: `m.loadLibrary()` — AOT, so the library is already loaded;
         // hand back an already-completed future.
@@ -9907,7 +10212,7 @@ public final class JavaEmitter {
             String outer = ctx.callPrefix;
             ctx.callPrefix = ((Ident) c.target).name;
             try {
-                return emitBareCall(bare, ctx);
+                return emitBareCall(bare, expected, ctx);
             } finally {
                 ctx.callPrefix = outer;
             }
@@ -10023,7 +10328,7 @@ public final class JavaEmitter {
         return new Out("DString." + fn + "(" + arg + ")", t);
     }
 
-    private Out emitBareCall(Call c, Ctx ctx) {
+    private Out emitBareCall(Call c, TypeRef expected, Ctx ctx) {
         String n = c.name;
         // dart:core print
         if (n.equals("print")) {
@@ -10109,7 +10414,7 @@ public final class JavaEmitter {
         // constructor of program class
         ClassDecl pc = program.classes.get(n);
         if (pc != null) {
-            return emitCtorCall(n, c.typeArgs, c.args, c, ctx);
+            return emitCtorCall(n, inferredWitnessTypeArgs(pc, c.typeArgs, expected), c.args, c, ctx);
         }
         // constructor of stub class
         if (stubs.isStubClass(n)) {
@@ -10450,8 +10755,10 @@ public final class JavaEmitter {
                 CtorDecl named = pc.namedCtor(n);
                 if (named != null) {
                     // named (or named factory) constructor -> static factory
-                    return new Out(jcls + "." + javaIdent(n) + "(" + canonicalArgs(named, c.args, ctx) + ")",
-                            new TypeRef(cls));
+                    String tw = witnessArgs(pc, null, c, ctx);
+                    String na = canonicalArgs(named, c.args, ctx);
+                    return new Out(jcls + "." + javaIdent(n) + "(" + (na.isEmpty() ? stripTrailingComma(tw)
+                            : tw + na) + ")", new TypeRef(cls));
                 }
                 if (n.equals("new")) {
                     // `Foo.new(args)`: the unnamed constructor called through its tear-off name
@@ -11930,8 +12237,10 @@ public final class JavaEmitter {
             TypeRef constructed = typeArgs != null && !typeArgs.isEmpty()
                     && typeArgs.size() == pc.typeParams.size()
                     ? TypeRef.of(className, typeArgs.toArray(new TypeRef[0])) : new TypeRef(className);
+            String twArgs = witnessArgs(pc, typeArgs, posNode, ctx);
             if (ct != null && ct.isFactory) {
-                return new Out(jn + ".$create(" + canonicalArgs(ct, pc, args, ctx) + ")",
+                String fa = canonicalArgs(ct, pc, args, ctx);
+                return new Out(jn + ".$create(" + (fa.isEmpty() ? stripTrailingComma(twArgs) : twArgs + fa) + ")",
                         constructed);
             }
             // A generic program class constructed raw (`new Foo(...)`) erases the generics on ALL
@@ -11959,8 +12268,9 @@ public final class JavaEmitter {
                 }
             }
             try {
-                return new Out("new " + jn + diamond + "(" + canonicalArgs(ct, pc, args, ctx) + ")",
-                        constructed);
+                String ca = canonicalArgs(ct, pc, args, ctx);
+                return new Out("new " + jn + diamond + "(" + (ca.isEmpty() ? stripTrailingComma(twArgs)
+                        : twArgs + ca) + ")", constructed);
             } finally {
                 ctx.ctorTypeOwner = savedOwner;
                 ctx.ctorTypeSubst = savedSubst;
@@ -15612,6 +15922,13 @@ public final class JavaEmitter {
         String callPrefix;
 
         ClassDecl currentClass;
+        /// Type parameters of the enclosing generic method; they shadow the class's.
+        java.util.Set<String> methodTypeParams;
+        /// Type parameters whose witness is the local `$tw$<name>` here (a constructor's
+        /// hidden parameter), rather than the instance field.
+        java.util.Set<String> witnessLocals;
+        /// True in a static member, where the class's witness fields are out of reach.
+        boolean staticMember;
         /** The library whose top-level (lib-class) body is being emitted; set only when currentClass is null. */
         Library currentLibrary;
         final Map<String, String> imports = new TreeMap<String, String>();
