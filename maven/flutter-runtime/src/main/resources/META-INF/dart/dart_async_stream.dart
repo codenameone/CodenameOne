@@ -42,9 +42,9 @@ class TimeoutException implements Exception {
 @JavaName('dart.async.StreamSubscription')
 abstract class StreamSubscription<T> {
   external Future<void> cancel();
-  external void onData(Object? handleData);
-  external void onError(Object? handleError);
-  external void onDone(Object? handleDone);
+  external void onData(Function? handleData);
+  external void onError(Function? handleError);
+  external void onDone(Function? handleDone);
   external void pause();
   external void resume();
   external bool get isPaused;
@@ -56,7 +56,7 @@ abstract class Stream<T> {
   external static Stream<T> eventTransformed<T>(Stream source, dynamic Function(dynamic) mapSink);
   external Future pipe(StreamConsumer<T> streamConsumer);
   external StreamSubscription<T> listen(void Function(T event)? onData,
-      {Object? onError, void Function()? onDone, bool? cancelOnError});
+      {Function? onError, void Function()? onDone, bool? cancelOnError});
   external Stream<R> map<R>(R Function(T event) transform);
   external Stream<T> where(bool Function(T event) test);
   // Named constructors, as static factories spelled with the class's own T: the emitter
@@ -77,7 +77,7 @@ abstract class Stream<T> {
   external Stream<T> takeWhile(bool Function(T element) test);
   external Stream<T> skipWhile(bool Function(T element) test);
   external Stream<T> distinct([Object? equals]);
-  external Stream<T> handleError(Object onError, {Object? test});
+  external Stream<T> handleError(Function onError, {Object? test});
   external Stream<R> transform<R>(Object streamTransformer);
   external Stream<R> cast<R>();
   external Stream<T> asBroadcastStream({Object? onListen, Object? onCancel});
@@ -104,7 +104,7 @@ abstract class Stream<T> {
 abstract class StreamTransformer<S, T> {
   external Stream<T> bind(Stream<S> stream);
   external static StreamTransformer fromHandlers(
-      {void Function(dynamic, EventSink<dynamic>)? handleData, Object? handleError,
+      {void Function(dynamic, EventSink<dynamic>)? handleData, Function? handleError,
       void Function(EventSink<dynamic>)? handleDone});
 }
 

@@ -3458,6 +3458,11 @@ public final class JavaEmitter {
     }
 
     private String paramTypeName(Param p) {
+        // A signature-typed function (`void Function(T)?`, a Funcs SAM in Java) is not the
+        // bare `Function` a stub declares for an Object handler slot: the two need a bridge.
+        if (p.type != null && (p.type.funcParams != null || p.type.funcReturn != null)) {
+            return "Function()";
+        }
         return p.type == null || p.type.is("var") ? "dynamic" : p.type.name;
     }
 
@@ -15313,8 +15318,7 @@ public final class JavaEmitter {
                     boolean runtimeFnSlot = arg instanceof Lambda && ct.file == STUB_ARGS
                             && pt != null && pt.funcParams == null && pt.funcReturn == null
                             && (pt.is("Object") || isDynamicType(pt));
-                    String handler = runtimeFnSlot || (ct.file == STUB_ARGS && pt != null && pt.is("Object"))
-                            ? objectHandlerSlot(p.name, arg, ctx) : null;
+                    String handler = isStubFunctionSlot(ct, pt) ? objectHandlerSlot(arg, ctx) : null;
                     if (handler != null) {
                         sb.append(handler);
                     } else {
@@ -15349,8 +15353,7 @@ public final class JavaEmitter {
                     // See dart.async.Stream's class comment.
                     sb.append(pinnedErrorHandler((Lambda) match.value, emitExpr(match.value, null, ctx)));
                 } else if (match != null) {
-                    String handler = ct.file == STUB_ARGS && pt != null && pt.is("Object")
-                            ? objectHandlerSlot(p.name, match.value, ctx) : null;
+                    String handler = isStubFunctionSlot(ct, pt) ? objectHandlerSlot(match.value, ctx) : null;
                     if (handler != null) {
                         sb.append(handler);
                     } else {
@@ -15385,8 +15388,8 @@ public final class JavaEmitter {
 
     /**
      * A closure (or a tear-off) passed to a stub parameter the runtime declares as a
-     * plain {@code Object} handler slot -- {@code StreamSubscription.onData/onError/onDone}'s
-     * {@code handleX}, {@code listen}'s {@code onError}. Dart types these as an untyped
+     * bare {@code Function} handler slot -- {@code StreamSubscription.onData/onError/onDone},
+     * {@code listen}'s {@code onError}. Dart types these as an untyped
      * {@code Function}, which accepts a handler of any arity, and the runtime dispatches on
      * the Funcs type it is handed; a bare Java lambda or method reference has no target
      * type there ("Object is not a functional interface"). The closure is bound to the
@@ -15449,18 +15452,32 @@ public final class JavaEmitter {
         return l;
     }
 
-    private String objectHandlerSlot(String name, Expr arg, Ctx ctx) {
-        if (name == null || !(name.startsWith("handle") || name.equals("onError"))) {
-            return null;
-        }
-        Expr e = name.endsWith("rror") ? tearOffAsErrorLambda(arg, ctx) : arg;
+    /**
+     * A stub parameter declared as Dart's bare {@code Function} (no signature): the
+     * runtime's Java slot for it is a plain Object that dispatches on the Funcs arity it
+     * is handed. A stub parameter declared {@code Object} is a typed Funcs SAM in Java
+     * ({@code Stream.fold}'s combine) and keeps the default emission.
+     */
+    private boolean isStubFunctionSlot(CtorDecl ct, TypeRef pt) {
+        return ct.file == STUB_ARGS && pt != null && pt.is("Function")
+                && pt.funcParams == null && pt.funcReturn == null;
+    }
+
+    private String objectHandlerSlot(Expr arg, Ctx ctx) {
+        // A tear-off takes the arity of its own function type (tearOffAsErrorLambda reads
+        // it); a method of an application class, the arity of its declaration.
+        Expr e = arg;
         if (!(e instanceof Lambda)) {
-            // A method tear-off (`sub.onData(this._onData)`): call it from a closure of
-            // the method's own positional arity, read from its declaration.
-            e = tearOffWithOwnArity(e, ctx);
-            if (!(e instanceof Lambda)) {
-                return null;
+            e = tearOffWithOwnArity(arg, ctx);
+            // A method reference into a runtime class (`completer.completeError`): a
+            // closure of the arity its own function type gives. A function-typed VALUE
+            // (a variable or parameter) is already a Funcs object and passes as it is.
+            if (!(e instanceof Lambda) && emitExpr(arg, null, ctx).code.contains("::")) {
+                e = tearOffAsErrorLambda(arg, ctx);
             }
+        }
+        if (!(e instanceof Lambda)) {
+            return null;
         }
         Lambda l = (Lambda) e;
         int n = l.params.size();
