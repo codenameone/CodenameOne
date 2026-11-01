@@ -61,7 +61,18 @@ public class SelectableText extends StatelessWidget {
     public static SelectableText rich(TextSpan textSpan, Key key, TextStyle style,
                                       TextAlign textAlign, Long maxLines,
                                       Object textDirection) {
+        return rich(textSpan, key, style, textAlign, maxLines, textDirection, null, null, null, null);
+    }
+
+    /// The full {@code SelectableText.rich}: textScaler, onSelectionChanged, onTap and showCursor too.
+    public static SelectableText rich(TextSpan textSpan, Key key, TextStyle style,
+                                      TextAlign textAlign, Long maxLines,
+                                      Object textDirection, Object textScaler,
+                                      Object onSelectionChanged, Object onTap, Boolean showCursor) {
         SelectableText t = new SelectableText(null);
+        t.textScaler = textScaler;
+        t.onSelectionChanged = onSelectionChanged;
+        t.onTap = onTap;
         t.key(key);
         t.textSpan = textSpan;
         t.style = style;
@@ -117,18 +128,24 @@ public class SelectableText extends StatelessWidget {
         return sb.length();
     }
 
-    /// Changes the selection and reports it to onSelectionChanged, with a null
-    /// cause (there is no SelectionChangedCause type here). A long press selects the
-    /// whole text; a tap collapses the selection at its start, and calls onTap.
-    @SuppressWarnings("unchecked")
+    /// Changes the selection and reports it to onSelectionChanged with a null cause.
     public void select(long base, long extent) {
+        select(base, extent, null);
+    }
+
+    /// Changes the selection and reports it to onSelectionChanged with its
+    /// SelectionChangedCause. A long press selects the whole text
+    /// (`longPress`); a tap collapses the selection at its start (`tap`), and
+    /// calls onTap.
+    @SuppressWarnings("unchecked")
+    public void select(long base, long extent, com.codename1.flutter.SelectionChangedCause cause) {
         TextSelection sel = new TextSelection();
         sel.baseOffset(base);
         sel.extentOffset(extent);
         if (onSelectionChanged instanceof Funcs.VoidFunc2) {
-            ((Funcs.VoidFunc2<Object, Object>) onSelectionChanged).call(sel, null);
+            ((Funcs.VoidFunc2<Object, Object>) onSelectionChanged).call(sel, cause);
         } else if (onSelectionChanged instanceof Funcs.Func2) {
-            ((Funcs.Func2<Object, Object, Object>) onSelectionChanged).call(sel, null);
+            ((Funcs.Func2<Object, Object, Object>) onSelectionChanged).call(sel, cause);
         }
     }
 
@@ -158,9 +175,9 @@ public class SelectableText extends StatelessWidget {
             return shown;
         }
         GestureDetector g = new GestureDetector();
-        g.onLongPress(() -> select(0, length()));
+        g.onLongPress(() -> select(0, length(), com.codename1.flutter.SelectionChangedCause.longPress));
         g.onTap(() -> {
-            select(0, 0);
+            select(0, 0, com.codename1.flutter.SelectionChangedCause.tap);
             if (onTap instanceof Funcs.VoidFunc0) {
                 ((Funcs.VoidFunc0) onTap).call();
             }

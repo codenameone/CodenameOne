@@ -236,7 +236,9 @@ class TextStyle {
   external double? get height;
   external TextStyle copyWith({bool? inherit, Color? color, Color? backgroundColor, String? fontFamily,
       double? fontSize, FontWeight? fontWeight, dynamic fontStyle, double? letterSpacing,
-      double? wordSpacing, double? height, dynamic background, dynamic foreground, dynamic decoration});
+      double? wordSpacing, double? height, dynamic background, dynamic foreground, dynamic decoration,
+      List<Shadow>? shadows, List<FontFeature>? fontFeatures, List<FontVariation>? fontVariations,
+      Color? decorationColor, dynamic decorationStyle, double? decorationThickness});
   external TextStyle apply({Color? color, Color? backgroundColor, String? fontFamily,
       double? fontSizeFactor, double? fontSizeDelta, dynamic decoration});
 }
@@ -2436,14 +2438,30 @@ abstract class Icons {
 @JavaName('com.codename1.flutter.widgets.Text')
 class Text extends Widget {
   external Text(String data, {Key? key, TextStyle? style, TextAlign? textAlign, TextScaler? textScaler});
-  external static Text rich(InlineSpan textSpan, {Key? key, TextStyle? style, TextAlign? textAlign});
+  external static Text rich(InlineSpan textSpan, {Key? key, TextStyle? style, TextAlign? textAlign, TextScaler? textScaler});
   external InlineSpan? get textSpan;
   external String? get data;
 }
 
 @JavaName('com.codename1.flutter.widgets.Icon')
 class Icon extends Widget {
-  external Icon(IconData icon, {Key? key, double? size, Color? color});
+  external Icon(IconData? icon, {Key? key, double? size, double? fill, double? weight,
+      double? grade, double? opticalSize, Color? color, List<Shadow>? shadows,
+      String? semanticLabel, TextDirection? textDirection, bool? applyTextScaling,
+      BlendMode? blendMode, FontWeight? fontWeight});
+  external IconData? get icon;
+  external double? get size;
+  external double? get fill;
+  external double? get weight;
+  external double? get grade;
+  external double? get opticalSize;
+  external Color? get color;
+  external List<Shadow>? get shadows;
+  external String? get semanticLabel;
+  external TextDirection? get textDirection;
+  external bool? get applyTextScaling;
+  external BlendMode? get blendMode;
+  external FontWeight? get fontWeight;
 }
 
 @JavaName('com.codename1.flutter.widgets.Column')

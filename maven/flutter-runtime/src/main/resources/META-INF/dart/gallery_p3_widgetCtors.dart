@@ -217,6 +217,20 @@ class FontVariation {
   external double get value;
 }
 
+// dart:ui's OpenType feature setting; recorded on a TextStyle, not applied.
+@JavaName('com.codename1.flutter.FontFeature')
+class FontFeature {
+  external FontFeature(String feature, [int value]);
+  external static FontFeature enable(String feature);
+  external static FontFeature disable(String feature);
+  external static FontFeature tabularFigures();
+  external static FontFeature proportionalFigures();
+  external static FontFeature superscripts();
+  external static FontFeature subscripts();
+  external String get feature;
+  external int get value;
+}
+
 @JavaName('com.codename1.flutter.TextLeadingDistribution')
 enum TextLeadingDistribution { proportional, even }
 

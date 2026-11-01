@@ -281,7 +281,24 @@ public class TextStyle {
                               Double fontSize, FontWeight fontWeight, Object fontStyle, Double letterSpacing,
                               Double wordSpacing, Double height, Object background, Object foreground,
                               Object decoration) {
+        return copyWith(inherit, color, backgroundColor, fontFamily, fontSize, fontWeight, fontStyle,
+                letterSpacing, wordSpacing, height, background, foreground, decoration,
+                null, null, null, null, null, null);
+    }
+
+    /** The full Flutter {@code copyWith}: shadows, font features/variations and decoration details too. */
+    public TextStyle copyWith(Boolean inherit, Color color, Color backgroundColor, String fontFamily,
+                              Double fontSize, FontWeight fontWeight, Object fontStyle, Double letterSpacing,
+                              Double wordSpacing, Double height, Object background, Object foreground,
+                              Object decoration, Object shadows, Object fontFeatures, Object fontVariations,
+                              Color decorationColor, Object decorationStyle, Double decorationThickness) {
         TextStyle t = shallowClone();
+        if (shadows != null) t.shadows(shadows);
+        if (fontFeatures != null) t.fontFeatures(fontFeatures);
+        if (fontVariations != null) t.fontVariations(fontVariations);
+        if (decorationColor != null) t.decorationColor(decorationColor);
+        if (decorationStyle instanceof TextDecorationStyle) t.decorationStyle((TextDecorationStyle) decorationStyle);
+        if (decorationThickness != null) t.decorationThickness(decorationThickness);
         if (color != null) t.color = color;
         if (fontFamily != null) t.fontFamily = fontFamily;
         if (fontSize != null) t.fontSize = fontSize;

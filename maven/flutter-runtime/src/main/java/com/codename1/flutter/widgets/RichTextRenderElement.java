@@ -85,7 +85,7 @@ public class RichTextRenderElement extends RenderElement {
     private void applyContent(RichTextComponent c) {
         c.clear();
         for (Run run : flatten(richText().getText())) {
-            c.append(run.text, toEditorStyle(com.codename1.flutter.TextScaler.applyTo(richText().getTextScaler(), run.style)));
+            c.append(run.text, toEditorStyle(com.codename1.flutter.TextScaler.applyTo(richText().getTextScaler(), run.style, this)));
         }
         c.setTextAlign(cn1Align());
     }

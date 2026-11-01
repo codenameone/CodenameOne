@@ -202,8 +202,14 @@ class Tooltip extends Widget {
 class SelectableText extends Widget {
   external SelectableText(String data, {Key? key, TextStyle? style, TextAlign? textAlign, int? maxLines, double? textScaleFactor, bool? showCursor, Object? cursorColor, Object? onTap, Object? focusNode, Object? scrollPhysics, Object? onSelectionChanged, TextScaler? textScaler});
   external TextSpan? get textSpan;
-  external static SelectableText rich(TextSpan textSpan, {Key? key, TextStyle? style, TextAlign? textAlign, int? maxLines, TextDirection? textDirection});
+  external static SelectableText rich(TextSpan textSpan, {Key? key, TextStyle? style, TextAlign? textAlign, int? maxLines, TextDirection? textDirection, TextScaler? textScaler, SelectionChangedCallback? onSelectionChanged, VoidCallback? onTap, bool? showCursor});
 }
+
+// What made a text selection change; passed to onSelectionChanged.
+@JavaName('com.codename1.flutter.SelectionChangedCause')
+enum SelectionChangedCause { tap, doubleTap, longPress, forcePress, keyboard, toolbar, drag, scribble }
+
+typedef SelectionChangedCallback = void Function(TextSelection selection, SelectionChangedCause? cause);
 
 // --- popup menus ------------------------------------------------------
 

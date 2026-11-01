@@ -58,6 +58,16 @@ public final class TextScaler {
                 null, null, null, null, null, null, null, null);
     }
 
+    /// {@link #applyTo} for a text widget: its own scaler when it set one, else the
+    /// ambient {@code MediaQuery.textScalerOf(context)}, as Flutter's Text/RichText do
+    /// -- so {@code MediaQuery.withClampedTextScaling} reaches the text below it.
+    public static TextStyle applyTo(Object scaler, TextStyle style, BuildContext context) {
+        if (scaler == null && context != null) {
+            scaler = MediaQuery.textScalerOf(context);
+        }
+        return applyTo(scaler, style);
+    }
+
     public double textScaleFactor() {
         return factor;
     }

@@ -76,7 +76,7 @@ public final class FlutterProjectImporter {
         COVERED.put("url_launcher", "launchUrl/launchUrlString/canLaunchUrl; LaunchMode.inAppWebView and "
                 + "inAppBrowserView open an in-app BrowserComponent, the others the system handler");
         COVERED.put("scoped_model", "ScopedModel/ScopedModelDescendant stubs");
-        COVERED.put("vector_math", "Matrix4/Vector3 stubs");
+        COVERED.put("vector_math", "Matrix4, Vector2 and Vector3 stubs, radians/degrees");
         COVERED.put("flutter_localized_locales", "LocaleNames/LocaleNamesLocalizationsDelegate stubs");
         COVERED.put("adaptive_breakpoints", "AdaptiveBreakpoints.getWindowType only; "
                 + "isDisplayDesktop/isDisplaySmallDesktop/isDisplayMobile are not stubbed");

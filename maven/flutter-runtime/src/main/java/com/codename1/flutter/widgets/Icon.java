@@ -38,6 +38,15 @@ public class Icon extends Widget {
     private Double size;
     private Color color;
     private String semanticLabel;
+    private Double fill;
+    private Double weight;
+    private Double grade;
+    private Double opticalSize;
+    private Object shadows;
+    private com.codename1.flutter.TextDirection textDirection;
+    private Boolean applyTextScaling;
+    private com.codename1.flutter.BlendMode blendMode;
+    private com.codename1.flutter.FontWeight fontWeight;
 
     public Icon(IconData icon) {
         this.icon = icon;
@@ -69,6 +78,98 @@ public class Icon extends Widget {
 
     public Color getColor() {
         return color;
+    }
+
+    public void fill(double v) {
+        this.fill = v;
+    }
+
+    public Double fill() {
+        return fill;
+    }
+
+    public void weight(double v) {
+        this.weight = v;
+    }
+
+    public Double weight() {
+        return weight;
+    }
+
+    public void grade(double v) {
+        this.grade = v;
+    }
+
+    public Double grade() {
+        return grade;
+    }
+
+    public void opticalSize(double v) {
+        this.opticalSize = v;
+    }
+
+    public Double opticalSize() {
+        return opticalSize;
+    }
+
+    public void shadows(Object v) {
+        this.shadows = v;
+    }
+
+    public Object shadows() {
+        return shadows;
+    }
+
+    public void textDirection(com.codename1.flutter.TextDirection v) {
+        this.textDirection = v;
+    }
+
+    public com.codename1.flutter.TextDirection textDirection() {
+        return textDirection;
+    }
+
+    public void applyTextScaling(boolean v) {
+        this.applyTextScaling = v;
+    }
+
+    public Boolean applyTextScaling() {
+        return applyTextScaling;
+    }
+
+    public void blendMode(com.codename1.flutter.BlendMode v) {
+        this.blendMode = v;
+    }
+
+    public com.codename1.flutter.BlendMode blendMode() {
+        return blendMode;
+    }
+
+    public void fontWeight(com.codename1.flutter.FontWeight v) {
+        this.fontWeight = v;
+    }
+
+    public com.codename1.flutter.FontWeight fontWeight() {
+        return fontWeight;
+    }
+
+    /** Dart's {@code icon} getter (the glyph, or null for an empty square). */
+    public IconData icon() {
+        return icon;
+    }
+
+    /** Dart's {@code size} getter: the explicit size, or null to follow IconTheme. */
+    public Double size() {
+        return size;
+    }
+
+    /** Dart's {@code color} getter. */
+    public Color color() {
+        return color;
+    }
+
+    /** Dart's {@code semanticLabel} getter. */
+    public String semanticLabel() {
+        return semanticLabel;
     }
 
     @Override

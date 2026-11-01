@@ -54,11 +54,20 @@ public class Text extends Widget {
      */
     public static Text rich(TextSpan textSpan, com.codename1.flutter.Key key, TextStyle style,
                             TextAlign textAlign) {
+        return rich(textSpan, key, style, textAlign, null);
+    }
+
+    /** {@code Text.rich} with a {@code textScaler} (null follows MediaQuery's). */
+    public static Text rich(TextSpan textSpan, com.codename1.flutter.Key key, TextStyle style,
+                            TextAlign textAlign, Object textScaler) {
         Text t = new Text(textSpan == null ? "" : textSpan.toPlainText());
         t.key(key);
         t.textSpan = textSpan;
         t.style = style;
         t.textAlign = textAlign;
+        if (textScaler != null) {
+            t.textScaler(textScaler);
+        }
         return t;
     }
 
