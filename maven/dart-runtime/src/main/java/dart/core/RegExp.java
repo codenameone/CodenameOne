@@ -419,7 +419,7 @@ public final class RegExp {
      * counts correctly comes back as an unmatched group rather than stale
      * data from an earlier match.</p>
      */
-    private static RegExpMatch snapshot(RE re, String input, int declaredGroupCount, String[] names) {
+    private RegExpMatch snapshot(RE re, String input, int declaredGroupCount, String[] names) {
         int count = Math.max(declaredGroupCount + 1, re.getParenCount());
         String[] groups = new String[count];
         int[] starts = new int[count];
@@ -429,7 +429,9 @@ public final class RegExp {
             starts[i] = re.getParenStart(i);
             ends[i] = re.getParenEnd(i);
         }
-        return new RegExpMatch(groups, starts, ends, input, names);
+        RegExpMatch m = new RegExpMatch(groups, starts, ends, input, names);
+        m.pattern = this;
+        return m;
     }
 
     @Override

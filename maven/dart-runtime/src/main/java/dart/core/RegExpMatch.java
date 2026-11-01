@@ -43,6 +43,10 @@ public final class RegExpMatch {
 
     private final String[] names;
 
+    /// The Pattern that produced this match: the RegExp, or the String of a
+    /// literal String.allMatches. Set once by the producer.
+    Object pattern;
+
     RegExpMatch(String[] groups, int[] starts, int[] ends, String input) {
         this(groups, starts, ends, input, null);
     }
@@ -100,6 +104,11 @@ public final class RegExpMatch {
     }
 
     /** Dart's {@code Match.groupCount} getter — number of capturing groups. */
+    /// Dart's {@code operator []} under the transpiler's operator name.
+    public String $index(long index) {
+        return group(index);
+    }
+
     public long groupCount() {
         return groups.length - 1;
     }
@@ -115,6 +124,11 @@ public final class RegExpMatch {
     }
 
     /** Dart's {@code Match.input} getter. */
+    /// Dart's {@code Match.pattern}.
+    public Object pattern() {
+        return pattern;
+    }
+
     public String input() {
         return input;
     }

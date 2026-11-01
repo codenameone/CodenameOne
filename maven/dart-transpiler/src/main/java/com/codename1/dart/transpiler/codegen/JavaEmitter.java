@@ -5326,6 +5326,23 @@ public final class JavaEmitter {
                         return new Out(call, m.returnType);
                     }
                 }
+                String en = cc.type.name;
+                if ((en.equals("String") || en.equals("bool") || en.equals("int"))
+                        && (cc.ctorName.equals("fromEnvironment") || cc.ctorName.equals("hasEnvironment"))) {
+                    // `const bool.fromEnvironment('x')` arrives as a constructor call
+                    // (the `const` keyword), not the static-call shape handled in
+                    // emitCall. There is no compile-time environment: the default.
+                    TypeRef t = en.equals("String") ? TypeRef.STRING : en.equals("bool") ? TypeRef.BOOL : TypeRef.INT;
+                    if (cc.ctorName.equals("hasEnvironment")) {
+                        return new Out("false", TypeRef.BOOL);
+                    }
+                    for (NamedArg na : cc.args.named) {
+                        if (na.name.equals("defaultValue")) {
+                            return emitExpr(na.value, t, ctx);
+                        }
+                    }
+                    return new Out(en.equals("String") ? "\"\"" : en.equals("bool") ? "false" : "0L", t);
+                }
                 diags.error(e, "E0126", "Cannot resolve named constructor " + cc.type.name + "." + cc.ctorName);
                 return new Out("null", TypeRef.DYNAMIC);
             }
@@ -6474,6 +6491,13 @@ public final class JavaEmitter {
             if (onSelf != null) {
                 return emitMemberGet(onSelf, n, id, ctx);
             }
+            // An abstract getter only an implemented interface declares: a mixin
+            // `implements Channel<T>` reading `stream` that the applying class provides.
+            // The Java type implements the interface, so `this` reads it as that type.
+            TypeRef iface = interfaceDeclaring(cc, n, ctx, new java.util.HashSet<String>());
+            if (iface != null) {
+                return emitMemberGet(new Out("this", iface), n, id, ctx);
+            }
         }
         // A bare name in an extension body is first the extension's own getter: several
         // extensions on one type (`on Iterable<int>`, `on Iterable<num>`) may each declare
@@ -6760,6 +6784,28 @@ public final class JavaEmitter {
                     "Map.entries", "Map.isEmpty", "Map.isNotEmpty", "String.length", "String.isEmpty",
                     "String.isNotEmpty", "String.codeUnits"));
 
+    /** The implemented interface (program class) of {@code cc} or its supertypes declaring getter or field n. */
+    private TypeRef interfaceDeclaring(ClassDecl cc, String n, Ctx ctx, java.util.Set<String> seen) {
+        if (cc == null || !seen.add(cc.name)) {
+            return null;
+        }
+        for (TypeRef i : cc.interfaces) {
+            ClassDecl ic = program.resolveClass(i.name, ctx.library());
+            if (ic == null) {
+                continue;
+            }
+            if (ic.getter(n) != null || ic.field(n) != null) {
+                return i;
+            }
+            TypeRef deeper = interfaceDeclaring(ic, n, ctx, seen);
+            if (deeper != null) {
+                return deeper;
+            }
+        }
+        ClassDecl sup = cc.superclass != null ? program.resolveClass(cc.superclass.name, ctx.library()) : null;
+        return interfaceDeclaring(sup, n, ctx, seen);
+    }
+
     private Out mixinOnSelf(ClassDecl cc, String n, boolean getter, Ctx ctx) {
         if (!cc.isMixin || cc.mixinOn.isEmpty()) {
             return null;
@@ -6916,6 +6962,12 @@ public final class JavaEmitter {
                 if (dc >= 0 || mc >= 0) {
                     return new Out((dc >= 0 ? dc + 1 : mc + 1) + "L", TypeRef.INT);
                 }
+            }
+            if (cls.equals("Uri") && name.equals("base") && pc == null) {
+                // An application has no working directory to resolve against; the
+                // file-system root is the base every relative path then joins.
+                ctx.importClass("dart.core.DartUri");
+                return new Out("DartUri.parse(\"file:///\")", new TypeRef("Uri"));
             }
             if (CORE_STATIC_RECEIVERS.contains(cls) && pc == null) {
                 diags.error(posNode, "E0131", "static member " + name + " of core type " + cls + " is not implemented");
@@ -7275,6 +7327,16 @@ public final class JavaEmitter {
         String pk = primitiveListKind(tt);
         if (pk != null) {
             return new Out(target.code + ".get" + pk + "(" + idx.code + ")", tt.arg(0));
+        }
+        if (tt.args.isEmpty()) {
+            // A non-generic stub type declaring `operator []` (Match, RegExpMatch,
+            // HttpHeaders): the runtime class answers it as idx, and the stub's
+            // declared return type is the value's type -- tt.arg(0) would be dynamic,
+            // which made `m[1] ?? ''` an Object where a String was needed.
+            TypeRef sr = stubMemberReturnType(tt, "$index", false);
+            if (sr != null && !sr.is("var")) {
+                return new Out(target.code + ".idx(" + idx.code + ")", sr);
+            }
         }
         return new Out(target.code + ".idx(" + idx.code + ")", tt.arg(0), target.fromError && tt.is("dynamic"));
     }
@@ -11265,6 +11327,17 @@ public final class JavaEmitter {
                 ctx.importClass("dart.core.DartUri");
                 return new Out("DartUri.decodeComponent(" + posArg(c, 0, TypeRef.STRING, ctx) + ")", TypeRef.STRING);
             }
+            if (n.equals("encodeFull") || n.equals("decodeFull")) {
+                ctx.importClass("dart.core.DartUri");
+                return new Out("DartUri." + n + "(" + posArg(c, 0, TypeRef.STRING, ctx) + ")", TypeRef.STRING);
+            }
+            if (n.equals("splitQueryString")) {
+                ctx.importClass("dart.core.DartUri");
+                TypeRef mt = new TypeRef("Map");
+                mt.args.add(TypeRef.STRING);
+                mt.args.add(TypeRef.STRING);
+                return new Out("DartUri.splitQueryString(" + posArg(c, 0, TypeRef.STRING, ctx) + ")", mt);
+            }
             return null;
         }
         if (cls.equals("RangeError")) {
@@ -13801,6 +13874,11 @@ public final class JavaEmitter {
     /** Maps a Dart type to Java source. boxed=true forces reference types. */
     private String javaType(TypeRef t, boolean boxed, Ctx ctx) {
         if (t == null || t.is("var") || t.is("dynamic") || t.is("Object") || t.is("Null")) {
+            return "Object";
+        }
+        if (t.is("Pattern") && !program.classes.containsKey("Pattern") && !stubs.classes.containsKey("Pattern")) {
+            // dart:core Pattern: a String or a RegExp at run time, which share no
+            // Java supertype; CoreExt dispatches on the receiver.
             return "Object";
         }
         // A type written with an import prefix (`intl.DateFormat`, `ui.Size`) carries the

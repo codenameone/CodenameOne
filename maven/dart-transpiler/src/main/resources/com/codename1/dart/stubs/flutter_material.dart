@@ -66,17 +66,31 @@ class Color {
   external Color(int value);
 }
 
+@JavaName('com.codename1.generated.flutter.MaterialColor')
+class MaterialColor extends Color {
+  external Color get shade50;
+  external Color get shade100;
+  external Color get shade200;
+  external Color get shade300;
+  external Color get shade400;
+  external Color get shade500;
+  external Color get shade600;
+  external Color get shade700;
+  external Color get shade800;
+  external Color get shade900;
+}
+
 @JavaName('com.codename1.flutter.Colors')
 abstract class Colors {
-  external static Color get deepPurple;
-  external static Color get blue;
-  external static Color get red;
-  external static Color get green;
-  external static Color get orange;
-  external static Color get purple;
+  external static MaterialColor get deepPurple;
+  external static MaterialColor get blue;
+  external static MaterialColor get red;
+  external static MaterialColor get green;
+  external static MaterialColor get orange;
+  external static MaterialColor get purple;
   external static Color get white;
   external static Color get black;
-  external static Color get grey;
+  external static MaterialColor get grey;
   external static Color get transparent;
 }
 

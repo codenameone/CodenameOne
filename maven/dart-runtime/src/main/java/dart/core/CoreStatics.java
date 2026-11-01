@@ -48,6 +48,10 @@ public final class CoreStatics {
         return DartUri.decodeComponent(s.replace('+', ' '));
     }
 
+    static String encodeKeeping(String s, String keep) {
+        return encode(s, keep, false);
+    }
+
     private static String encode(String s, String keep, boolean plus) {
         StringBuilder sb = new StringBuilder();
         byte[] bytes;

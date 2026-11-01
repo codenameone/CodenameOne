@@ -308,7 +308,9 @@ public final class CoreExt {
     }
 
     private static RegExpMatch literal(String p, int at, String input) {
-        return new RegExpMatch(new String[] {p}, new int[] {at}, new int[] {at + p.length()}, input);
+        RegExpMatch m = new RegExpMatch(new String[] {p}, new int[] {at}, new int[] {at + p.length()}, input);
+        m.pattern = p;
+        return m;
     }
 
     public static RegExpMatch matchAsPrefix(Object pattern, String input) {

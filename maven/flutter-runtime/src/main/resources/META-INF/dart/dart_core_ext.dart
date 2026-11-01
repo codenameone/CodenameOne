@@ -74,3 +74,10 @@ extension DartCoreIteratorExt<E> on Iterator<E> {
   external bool moveNext();
   external E get current;
 }
+
+// Pattern is String or RegExp at run time; CoreExt dispatches on the receiver.
+@JavaName('dart.core.CoreExt')
+extension DartCorePatternExt on Pattern {
+  external Iterable<Match> allMatches(String string, [int start = 0]);
+  external Match? matchAsPrefix(String string, [int start = 0]);
+}

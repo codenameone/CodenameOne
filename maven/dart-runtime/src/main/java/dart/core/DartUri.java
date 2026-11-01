@@ -815,6 +815,12 @@ public final class DartUri {
 
     /** Dart's {@code Uri.queryParameters} — insertion-ordered, decoded. */
     public DartMap<String, String> queryParameters() {
+        return splitQueryString(query);
+    }
+
+    /// Dart's static {@code Uri.splitQueryString}: the decoded, insertion-ordered
+    /// pairs of a query string, read-only.
+    public static DartMap<String, String> splitQueryString(String query) {
         DartMap<String, String> out = new DartMap<>();
         if (!query.isEmpty()) {
             for (String pair : query.split("&", -1)) {
@@ -838,6 +844,18 @@ public final class DartUri {
         // Unmodifiable, as Dart's is: a write to it changed nothing about the URI, so
         // code that "added a parameter" went on as if it had.
         return new DartUnmodifiableMap<String, String>(out);
+    }
+
+    /// Dart's {@code Uri.encodeFull}: percent-encodes everything except the
+    /// unreserved characters and those reserved ones that delimit a URI, so a
+    /// whole URI stays a URI.
+    public static String encodeFull(String s) {
+        return CoreStatics.encodeKeeping(s, "-_.!~*'()#$&+,/:;=?@[]");
+    }
+
+    /// Dart's {@code Uri.decodeFull}.
+    public static String decodeFull(String s) {
+        return percentDecode(s, false);
     }
 
     /// Dart's {@code Uri.decodeComponent}, for path segments: a {@code +} is a

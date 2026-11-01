@@ -107,13 +107,30 @@ class RegExp {
   external String get pattern;
 }
 
+// Match is the supertype Pattern.allMatches/matchAsPrefix declare; the only
+// runtime implementation is RegExpMatch, so both name the same Java class.
 @JavaName('dart.core.RegExpMatch')
-class RegExpMatch {
+abstract class Match {
   external String? group(int group);
+  external String? operator [](int group);
+  external List<String?> groups(List<int> groupIndices);
   external int get groupCount;
   external int get start;
   external int get end;
   external String get input;
+  external Pattern get pattern;
+}
+
+@JavaName('dart.core.RegExpMatch')
+class RegExpMatch extends Match {
+  external String? group(int group);
+  external String? operator [](int group);
+  external List<String?> groups(List<int> groupIndices);
+  external int get groupCount;
+  external int get start;
+  external int get end;
+  external String get input;
+  external RegExp get pattern;
   external String? namedGroup(String name);
   external Iterable<String> get groupNames;
 }
