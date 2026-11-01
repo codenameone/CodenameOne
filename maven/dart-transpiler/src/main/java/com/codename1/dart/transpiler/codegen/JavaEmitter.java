@@ -2426,9 +2426,16 @@ public final class JavaEmitter {
         sb.append("    public static ").append(staticTypeParams(c)).append(javaClassName(c))
                 .append(staticTypeArgs(c)).append(' ').append(javaIdent(ct.name))
                 .append('(').append(paramSig).append(") {\n");
-        sb.append("        ").append(javaClassName(c)).append(" $self = new ").append(javaClassName(c)).append("(($NamedCtor) null);\n");
-        sb.append("        $self.$init$").append(ct.name).append('(').append(argList).append(");\n");
-        sb.append("        return $self;\n    }\n\n");
+        if (c.isAbstract) {
+            // `abstract class A { A._(..); }` is reached only as a subclass's `super._(..)`
+            // (the $init$ below); Java cannot instantiate the abstract class here.
+            sb.append("        throw new UnsupportedOperationException(\"abstract ")
+                    .append(c.name).append("\");\n    }\n\n");
+        } else {
+            sb.append("        ").append(javaClassName(c)).append(" $self = new ").append(javaClassName(c)).append("(($NamedCtor) null);\n");
+            sb.append("        $self.$init$").append(ct.name).append('(').append(argList).append(");\n");
+            sb.append("        return $self;\n    }\n\n");
+        }
         sb.append("    void $init$").append(ct.name).append('(').append(paramSig).append(") {\n");
         ctx.pushWriter(2);
         emitInitBody(c, ct, ctx);
@@ -6417,7 +6424,7 @@ public final class JavaEmitter {
             // private in the superclass, so reads route through its public get$ accessor;
             // a getter is a public zero-arg method.
             FieldDecl inhF = findInheritedField(cc, n);
-            if (inhF != null && !inhF.isStatic && !inhF.name.startsWith("_")) {
+            if (inhF != null && !inhF.isStatic && inheritedFieldVisible(cc, n)) {
                 return new Out("this.get$" + n + "()", fieldType(inhF, ctx));
             }
             if (!cc.isMixin) {
@@ -6652,6 +6659,35 @@ public final class JavaEmitter {
             s = s.superclass != null ? program.classes.get(s.superclass.name) : null;
         }
         return null;
+    }
+
+    /**
+     * Whether an inherited field is in scope by its bare name. Every instance field has a
+     * public get$/set$ pair, so a library-private `_x` is reachable too -- but only from the
+     * library that declares it: Dart privacy is per library, and a subclass elsewhere that
+     * says `_x` means something of its own.
+     */
+    private boolean inheritedFieldVisible(ClassDecl c, String name) {
+        if (!name.startsWith("_")) {
+            return true;
+        }
+        ClassDecl s = c.superclass != null ? program.classes.get(c.superclass.name) : null;
+        while (s != null) {
+            if (s.field(name) != null) {
+                return sameLibrary(s, c);
+            }
+            s = s.superclass != null ? program.classes.get(s.superclass.name) : null;
+        }
+        return false;
+    }
+
+    private static boolean sameLibrary(ClassDecl a, ClassDecl b) {
+        if (a.ownerLibrary != null || b.ownerLibrary != null) {
+            return a.ownerLibrary == b.ownerLibrary;
+        }
+        // Package libraries carry no owner: the code passed the analyzer, so a private
+        // name it reaches through a superclass is that library's (its parts share it).
+        return true;
     }
 
     private MethodDecl findInheritedGetter(ClassDecl c, String name) {
@@ -7088,7 +7124,7 @@ public final class JavaEmitter {
             }
             // field/getter inherited from a program superclass
             FieldDecl inhF = findInheritedField(pc, name);
-            if (inhF != null && !inhF.name.startsWith("_")) {
+            if (inhF != null && inheritedFieldVisible(pc, name)) {
                 return new Out(target.code + ".get$" + name + "()",
                         asSeenFrom(fieldType(inhF, ctx), inhF, null, pc, tt));
             }
@@ -10234,11 +10270,17 @@ public final class JavaEmitter {
                     return stubCallOut(sm, c, target.code + "." + n, ctx);
                 }
             }
-            for (TypeRef mixRef : pc.mixins) {
-                if (stubs.isStubClass(mixRef.name)) {
-                    Ast.MethodDecl sm = stubs.findMethod(mixRef.name, n, false);
-                    if (sm != null) {
-                        return stubCallOut(sm, c, target.code + "." + n, ctx);
+            // a stub mixin applied by this class or by any program superclass
+            // (`class B extends A` where `A with ListMixin<bool>` reaching `toList()`)
+            java.util.Set<String> mixSeen = new java.util.HashSet<String>();
+            for (ClassDecl mc = pc; mc != null && mixSeen.add(mc.name);
+                    mc = mc.superclass != null ? program.classes.get(mc.superclass.name) : null) {
+                for (TypeRef mixRef : mc.mixins) {
+                    if (stubs.isStubClass(mixRef.name)) {
+                        Ast.MethodDecl sm = stubs.findMethod(mixRef.name, n, false);
+                        if (sm != null) {
+                            return stubCallOut(sm, c, target.code + "." + n, ctx);
+                        }
                     }
                 }
             }
@@ -13818,6 +13860,25 @@ public final class JavaEmitter {
         return t;
     }
 
+    /** Index of {@code p} among its constructor's positional super parameters, or -1. */
+    private static int positionalSuperIndex(ClassDecl c, Param p) {
+        if (p.named) {
+            return -1;
+        }
+        for (Ast.CtorDecl k : c.ctors) {
+            int i = 0;
+            for (Param q : k.params) {
+                if (q == p) {
+                    return i;
+                }
+                if (q.isSuper && !q.named) {
+                    i++;
+                }
+            }
+        }
+        return -1;
+    }
+
     private TypeRef paramType(ClassDecl c, Param p, Ctx ctx) {
         // A `this.x`/`super.x` initializing formal often carries no written type (parsed as
         // `dynamic`); fall through to resolve it from the field / super constructor instead of
@@ -13835,6 +13896,20 @@ public final class JavaEmitter {
             // super.x forwards to the super constructor's parameter named x; resolve its
             // type against the program (app) super chain first, then the stub super chain.
             ClassDecl progCur = program.classes.get(c.superclass.name);
+            // A positional super parameter forwards by POSITION, not by name:
+            // `B(super.count)` against `A(this._count)` is A's first positional.
+            int superPos = positionalSuperIndex(c, p);
+            if (progCur != null && superPos >= 0 && progCur.defaultCtor() != null) {
+                int i = 0;
+                for (Ast.Param sp : progCur.defaultCtor().params) {
+                    if (!sp.named && i++ == superPos) {
+                        TypeRef rt = paramType(progCur, sp, ctx);
+                        if (rt != null && !rt.is("dynamic")) {
+                            return rt;
+                        }
+                    }
+                }
+            }
             while (progCur != null) {
                 Ast.CtorDecl sct = progCur.defaultCtor();
                 if (sct != null) {
