@@ -307,6 +307,41 @@ final class CaptureScan {
             walkExpr(((ThrowExpr) e).value);
         } else if (e instanceof SetLit) {
             walkExprs(((SetLit) e).elements);
+        } else if (e instanceof Cascade) {
+            // `_buffer..write(text)` in a closure reads `text`: each section is walked,
+            // or a reassigned parameter read only through a cascade is never boxed.
+            walkExpr(((Cascade) e).target);
+            walkExprs(((Cascade) e).sections);
+        } else if (e instanceof SpreadElement) {
+            walkExpr(((SpreadElement) e).expr);
+        } else if (e instanceof MapEntry) {
+            walkExpr(((MapEntry) e).key);
+            walkExpr(((MapEntry) e).value);
+        } else if (e instanceof IfElement) {
+            IfElement ie = (IfElement) e;
+            walkExpr(ie.condition);
+            walkExpr(ie.thenElement);
+            walkExpr(ie.elseElement);
+        } else if (e instanceof ForElement) {
+            ForElement fe = (ForElement) e;
+            if (fe.init != null) {
+                walkStmt(fe.init);
+            }
+            walkExpr(fe.iterable);
+            walkExpr(fe.condition);
+            walkExprs(fe.updates);
+            walkExpr(fe.body);
+        } else if (e instanceof SwitchExpr) {
+            SwitchExpr se = (SwitchExpr) e;
+            walkExpr(se.subject);
+            for (SwitchExprCase c : se.cases) {
+                walkExpr(c.guard);
+                walkExpr(c.value);
+            }
+        } else if (e instanceof RecordLit) {
+            for (RecordField f : ((RecordLit) e).fields) {
+                walkExpr(f.value);
+            }
         }
     }
 }

@@ -268,19 +268,31 @@ public final class CoreExt {
         return out;
     }
 
-    /// {@code String.runes}: the Unicode code points, a surrogate pair read as one.
-    public static DartLongList runes(String s) {
-        DartLongList out = new DartLongList();
-        for (int i = 0; i < s.length(); i++) {
-            char c = s.charAt(i);
-            if (Character.isHighSurrogate(c) && i + 1 < s.length() && Character.isLowSurrogate(s.charAt(i + 1))) {
-                out.addLong(Character.toCodePoint(c, s.charAt(i + 1)));
-                i++;
-            } else {
-                out.addLong(c);
+    /// {@code String.runes}: Dart's {@code Runes}, an {@code Iterable<int>} (not a List) of
+    /// the Unicode code points, a well-formed surrogate pair read as one code point and a
+    /// lone surrogate as itself. Lazy like Dart's: each iteration walks the string afresh,
+    /// so {@code runes.first} decodes one code point, and it prints as an Iterable does.
+    public static DartIterable<Long> runes(final String s) {
+        return new DartIterable<Long>(() -> new java.util.Iterator<Long>() {
+            private int i;
+
+            @Override
+            public boolean hasNext() {
+                return i < s.length();
             }
-        }
-        return out;
+
+            @Override
+            public Long next() {
+                if (i >= s.length()) {
+                    throw new java.util.NoSuchElementException();
+                }
+                char c = s.charAt(i++);
+                if (Character.isHighSurrogate(c) && i < s.length() && Character.isLowSurrogate(s.charAt(i))) {
+                    return Long.valueOf(Character.toCodePoint(c, s.charAt(i++)));
+                }
+                return Long.valueOf(c);
+            }
+        });
     }
 
     public static String trimLeft(String s) {

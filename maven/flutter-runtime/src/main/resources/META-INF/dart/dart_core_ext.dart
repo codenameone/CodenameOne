@@ -8,6 +8,8 @@
 @JavaName('dart.core.CoreExt')
 extension DartCoreStringExt on String {
   external List<int> get codeUnits;
+  // dart:core's Runes is an Iterable<int>; the runtime answers exactly that.
+  external Iterable<int> get runes;
   external String trimLeft();
   external String trimRight();
   external String replaceRange(int start, int? end, String replacement);
