@@ -82,6 +82,57 @@ extension on Journal {
   }
 }
 
+
+// 6. A field initialised from a dart:collection constructor keeps its element type, so
+// an index read promotes to the value class, not to an unrelated `is` interface.
+abstract class Tagged {}
+
+class Bin {
+  final String label;
+  Type get valueType => int;
+  Bin(this.label);
+}
+
+class Rack {
+  final _bins = HashMap<String, Bin>();
+  final _seen = LinkedHashSet<String>();
+  void put(String n) {
+    _bins[n] = Bin(n);
+    _seen.add(n);
+  }
+  String find(String n) {
+    var bin = _bins[n];
+    if (bin != null) {
+      return bin is Tagged ? 'tagged ${bin.valueType}' : '${bin.label} ${bin.valueType}';
+    }
+    return 'none ${_seen.length}';
+  }
+}
+
+// 7. A generic async method whose type argument comes from the assignment target.
+abstract class Vessel<E> {}
+
+class Jar<E> implements Vessel<E> {
+  bool holds(Object? o) => o is E;
+}
+
+abstract class PantryApi {
+  Future<Jar<E>> openJar<E>();
+}
+
+class Pantry implements PantryApi {
+  @override
+  Future<Jar<E>> openJar<E>() async => Jar<E>();
+}
+
+// ignore: non_constant_identifier_names
+PantryApi Store2 = Pantry();
+
+class Holder {
+  Vessel? cached;
+  Jar<String>? strings;
+}
+
 Future<void> main() async {
   print(await exerciseShelf());
   print(Doubler().bind(ListPipe<int>([1, 2])).items);
@@ -98,4 +149,13 @@ Future<void> main() async {
   // 5. A tear-off of jsonDecode held in a local and called with a named reviver.
   final decode = jsonDecode;
   print(decode('{"a":1,"b":[2]}', reviver: (k, v) => v is int ? v + 10 : v));
+  final sh = Rack();
+  sh.put('k');
+  print(sh.find('k'));
+  print(sh.find('q'));
+  final h = Holder();
+  h.cached = await Store2.openJar();
+  print((h.cached as Jar).holds(3));
+  h.strings = await Store2.openJar();
+  print(h.strings!.holds(3));
 }

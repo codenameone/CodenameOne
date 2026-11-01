@@ -7,3 +7,7 @@ Lazy<int>
 Plain<String>
 [rec one]
 {a: 11, b: [12]}
+k int
+none 1
+true
+false

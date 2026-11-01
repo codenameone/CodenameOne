@@ -4330,7 +4330,16 @@ public final class JavaEmitter {
     private TypeRef funcTypeRef(TypeRef ret, List<Param> params) {
         // Not a registered typedef name, but emitLambda only reads typedefSig(expected.name);
         // an unregistered name yields null there, which is fine -- params carry their own types.
-        return new TypeRef("Function");
+        // The signature is spelled out: a BARE Function target is an Object-erased slot to
+        // emitLambda, which would bind the closure to an all-dynamic Func SAM that the local's
+        // declared VoidFunc/Func type does not accept.
+        TypeRef t = new TypeRef("Function");
+        t.funcParams = new ArrayList<TypeRef>();
+        for (Param p : params) {
+            t.funcParams.add(paramValueType(p));
+        }
+        t.funcReturn = ret != null && !ret.is("var") ? ret : TypeRef.DYNAMIC;
+        return t;
     }
 
     private static TypeRef paramValueType(Param p) {
@@ -6682,12 +6691,27 @@ public final class JavaEmitter {
             if (expected != null && ret != null) {
                 TypeRef r = ret;
                 TypeRef e = expected;
-                if (r.is("Future") && r.args.size() == 1 && !e.is("Future")) {
+                if (r.is("Future") && r.args.size() == 1 && e.is("Future") && e.args.size() == 1) {
+                    // `f = await open()`: the awaited types relate through their supertypes
+                    // (Jar<E> to a Vessel field), which unifying Future<..> with Future<..> misses.
+                    r = r.args.get(0);
+                    e = e.args.get(0);
+                } else if (r.is("Future") && r.args.size() == 1 && !e.is("Future")) {
                     r = r.args.get(0);
                 } else if (e.is("Future") && e.args.size() == 1 && !r.is("Future")) {
                     e = e.args.get(0);
                 }
-                unifyTypeVars(asSuper(r, e.name, 0), e, tps, m);
+                TypeRef sup = asSuper(r, e.name, 0);
+                unifyTypeVars(sup, e, tps, m);
+                if (sup != null && e.args.isEmpty() && sup.name != null && sup.name.equals(e.name)) {
+                    // A raw generic context, `BoxBase? f; f = await open();`: the type is
+                    // BoxBase<dynamic>, so Dart infers dynamic for what it leaves open.
+                    for (TypeRef sa : sup.args) {
+                        if (sa != null && sa.args.isEmpty() && tps.contains(sa.name) && !m.containsKey(sa.name)) {
+                            m.put(sa.name, TypeRef.DYNAMIC);
+                        }
+                    }
+                }
             }
         }
         StringBuilder sb = new StringBuilder();
@@ -14012,7 +14036,16 @@ public final class JavaEmitter {
             TypeRef pt = boundParamType(owner, p, ctx);
             if (!p.named) {
                 if (posIdx < args.positional.size()) {
-                    Out o = emitExpr(args.positional.get(posIdx++), pt, ctx);
+                    Expr arg = args.positional.get(posIdx++);
+                    // A closure for an untyped parameter of a RUNTIME (stub) class method
+                    // (`Stream.fold(0, (a, b) => a + b)`): the Java parameter is a typed
+                    // Funcs SAM, so the lambda is left for javac to type. Binding it to an
+                    // all-dynamic SAM (what an Object-erased program slot needs) does not
+                    // convert to Func2<R, T, Object>.
+                    boolean runtimeFnSlot = arg instanceof Lambda && ct.file == STUB_ARGS
+                            && pt != null && pt.funcParams == null && pt.funcReturn == null
+                            && (pt.is("Object") || isDynamicType(pt));
+                    Out o = emitExpr(arg, runtimeFnSlot ? null : pt, ctx);
                     sb.append(coerce(o, pt, ctx));
                 } else if (p.defaultValue != null) {
                     sb.append(coerce(emitDefaultValue(p, pt, owner, ctx), pt, ctx));
@@ -14501,10 +14534,14 @@ public final class JavaEmitter {
         }
     }
 
+    /** Marks the synthetic decl {@link #stubMethodArgs} builds, compared by identity. */
+    private static final String STUB_ARGS = new String("<stub-method-args>");
+
     private String stubMethodArgs(Ast.MethodDecl m, Args args, Ctx ctx) {
         warnUnapplied(m.unapplied, m.name, args);
         CtorDecl fake = new CtorDecl();
         fake.params = m.params;
+        fake.file = STUB_ARGS;
         return canonicalArgs(fake, args, ctx);
     }
 
@@ -15950,6 +15987,19 @@ public final class JavaEmitter {
             }
         } else {
             return null;
+        }
+        // dart:collection's concrete maps and sets, `final _bins = HashMap<String, Bin>()`:
+        // typed as the core interface they implement, so `_bins[n]` is a Bin? and not
+        // dynamic. Only with written type arguments; inferring them is not attempted.
+        if (cls != null && typeArgs != null && !program.classes.containsKey(cls)) {
+            if (typeArgs.size() == 2 && (cls.equals("HashMap") || cls.equals("LinkedHashMap")
+                    || cls.equals("SplayTreeMap"))) {
+                return TypeRef.of("Map", typeArgs.get(0), typeArgs.get(1));
+            }
+            if (typeArgs.size() == 1 && (cls.equals("HashSet") || cls.equals("LinkedHashSet")
+                    || cls.equals("SplayTreeSet"))) {
+                return TypeRef.of("Set", typeArgs.get(0));
+            }
         }
         if (cls == null || INTRINSIC_CONSTRUCTED.contains(cls)
                 || (!program.classes.containsKey(cls) && !stubs.classes.containsKey(cls))) {
