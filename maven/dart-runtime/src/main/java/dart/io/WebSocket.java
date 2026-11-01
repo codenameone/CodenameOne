@@ -60,6 +60,14 @@ public class WebSocket extends Stream<Object> {
         return connect(url, null, null, null);
     }
 
+    /// `WebSocket.connect(url, protocols:, headers:, compression:, customClient:)`. A custom
+    /// `HttpClient` cannot route the upgrade here: the socket is the platform's own, so the
+    /// client is accepted for source compatibility and not consulted.
+    public static Future<WebSocket> connect(String url, Object protocols, Object headers, Object compression,
+            Object customClient) {
+        return connect(url, protocols, headers, compression);
+    }
+
     /** {@code WebSocket.connect(url, protocols:, headers:, compression:)}. */
     public static Future<WebSocket> connect(String url, Object protocols, Object headers, Object compression) {
         final Completer<WebSocket> result = new Completer<WebSocket>();

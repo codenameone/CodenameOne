@@ -7707,6 +7707,48 @@ public final class JavaEmitter {
         // Dart top-level `pi` / `timeDilation` / `defaultTargetPlatform` to a
         // fully-qualified Java static field). Both reads and writes route here.
         FieldDecl stubVar = stubs.topLevelVars.get(n);
+        // A stub top-level function torn off as a value (`stream.map(jsonDecode)`): a
+        // lambda over every parameter, an adapter restoring the omitted optional ones.
+        FunctionDecl sfn = stubVar != null ? null : libraryStubFunction(n, ctx);
+        if (sfn == null && stubVar == null) {
+            sfn = stubs.functions.get(n);
+        }
+        if (sfn != null && sfn.javaName != null && !sfn.isGetter && sfn.params.size() <= 5) {
+            int dot = sfn.javaName.lastIndexOf('.');
+            String cls = sfn.javaName.substring(0, dot);
+            ctx.importClass(cls);
+            final String target = cls.substring(cls.lastIndexOf('.') + 1) + "." + sfn.javaName.substring(dot + 1);
+            List<TypeRef> ptypes = new ArrayList<TypeRef>();
+            for (Param fp : sfn.params) {
+                TypeRef pt = paramValueType(fp);
+                ptypes.add(sfn.typeParams.isEmpty() ? pt
+                        : substTypeParams(pt, sfn.typeParams, java.util.Collections.<TypeRef>emptyList()));
+            }
+            TypeRef ret = sfn.returnType == null || sfn.returnType.is("var") ? TypeRef.DYNAMIC
+                    : sfn.typeParams.isEmpty() ? sfn.returnType
+                    : substTypeParams(sfn.returnType, sfn.typeParams, java.util.Collections.<TypeRef>emptyList());
+            // The value takes the required parameters; an optional one is passed as null,
+            // which every stub default is (`jsonDecode(s, {reviver})`), so the value fits
+            // the one-argument function a `map` or `where` expects.
+            List<TypeRef> req = new ArrayList<TypeRef>();
+            List<String> names = new ArrayList<String>();
+            List<String> callArgs = new ArrayList<String>();
+            for (int i = 0; i < sfn.params.size(); i++) {
+                Param fp = sfn.params.get(i);
+                if (fp.named || fp.optional || fp.defaultValue != null) {
+                    callArgs.add("null");
+                } else {
+                    req.add(ptypes.get(i));
+                    names.add("$a" + i);
+                    callArgs.add("$a" + i);
+                }
+            }
+            TypeRef ft = new TypeRef("Function");
+            ft.funcParams = req;
+            ft.funcReturn = ret;
+            return new Out("((" + javaType(ft, false, ctx) + ") (" + String.join(", ", names) + ") -> "
+                    + target + "(" + String.join(", ", callArgs) + "))", ft);
+        }
         if (stubVar != null) {
             return new Out(stubVar.javaName, fieldType(stubVar, ctx));
         }
@@ -8095,7 +8137,12 @@ public final class JavaEmitter {
                     return new Out("null", TypeRef.DYNAMIC);
                 }
             }
-            ClassDecl pc = program.classes.get(cls);
+            // The class this library sees by that name: a conditional export can leave two
+            // same-named classes in the program (a platform stub and the real one).
+            ClassDecl pc = program.resolveClass(cls, ctx.library());
+            if (pc == null) {
+                pc = program.classes.get(cls);
+            }
             if (pc != null) {
                 FieldDecl f = pc.field(name);
                 if (f != null && f.isStatic) {
@@ -8476,8 +8523,13 @@ public final class JavaEmitter {
         if (opClass != null) {
             MethodDecl om = findMethodInHierarchy(opClass, "$index");
             if (om != null) {
-                return new Out(target.code + ".$index(" + idx.code + ")",
-                        om.returnType == null || om.returnType.is("var") ? TypeRef.DYNAMIC : om.returnType);
+                TypeRef rt = om.returnType == null || om.returnType.is("var") ? TypeRef.DYNAMIC : om.returnType;
+                if (opClass.methods.contains(om) && !opClass.typeParams.isEmpty()
+                        && tt.args.size() == opClass.typeParams.size()) {
+                    // `QueueList<Result<T>>[i]` reads a Result<T>, not the declared E
+                    rt = substituteTypeParam(rt, opClass.typeParams, tt.args);
+                }
+                return new Out(target.code + ".$index(" + idx.code + ")", rt);
             }
         }
         if (tt.is("dynamic") && !target.fromError) {
@@ -11561,7 +11613,9 @@ public final class JavaEmitter {
                     if (stubs.isStubClass(mixRef.name)) {
                         Ast.MethodDecl sm = stubs.findMethod(mixRef.name, n, false);
                         if (sm != null) {
-                            return stubCallOut(sm, c, target.code + "." + n, ctx);
+                            // QueueList<Result<T>> mixing ListMixin<E>: elementAt answers Result<T>
+                            return stubCallOut(sm, c, target.code + "." + n, ctx,
+                                    substMixinMember(sm.returnType, mixRef, mc, mc == pc ? tt : null));
                         }
                     }
                 }

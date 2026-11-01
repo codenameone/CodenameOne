@@ -361,7 +361,8 @@ abstract class WebSocket extends Stream<dynamic> {
   external static int get closing;
   external static int get closed;
   external static Future<WebSocket> connect(String url,
-      {Iterable<String>? protocols, Map<String, dynamic>? headers, Object? compression});
+      {Iterable<String>? protocols, Map<String, dynamic>? headers, Object? compression,
+      HttpClient? customClient});
   external void add(Object? data);
   external void addUtf8Text(List<int> bytes);
   external Future addStream(Stream stream);
