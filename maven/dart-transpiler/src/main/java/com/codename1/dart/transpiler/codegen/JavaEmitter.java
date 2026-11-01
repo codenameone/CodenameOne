@@ -396,7 +396,7 @@ public final class JavaEmitter {
             args.append(boxIfPrimitive(o, ctx));
             t.args.add(boxType(o.type));
         }
-        return new Out("new " + cn + "<>(" + args + ")", t);
+        return new Out("new " + cn + (r.fields.isEmpty() ? "(" : "<>(") + args + ")", t);
     }
 
     /** The static type of a record component accessed by name (`$1`, `$2`, or a named field). */
@@ -6538,19 +6538,68 @@ public final class JavaEmitter {
             String ref = Program.libClassName(owner.fileName) + "::" + n;
             TypeRef ft = new TypeRef("Function");
             ft.funcParams = new ArrayList<TypeRef>();
-            boolean simple = fn.params.size() <= 5 && fn.typeParams.isEmpty()
+            // A generic function's tear-off (`identity<int>` instantiates it, and Java
+            // erases that) is typed with its type parameters as dynamic.
+            boolean simple = fn.params.size() <= 5
                     && fn.returnType != null && !fn.returnType.is("var") && !fn.isAsync;
-            for (Param fp : fn.params) {
-                if (fp.named || fp.optional || fp.type == null || fp.type.is("var")) {
-                    simple = false;
+            boolean defaults = false;
+            List<Param> ordered = new ArrayList<Param>();
+            for (int pass = 0; pass < 3; pass++) {
+                for (Param fp : fn.params) {
+                    int kind = fp.named ? 2 : fp.optional || fp.defaultValue != null ? 1 : 0;
+                    if (kind == pass) {
+                        ordered.add(fp);
+                    }
                 }
-                ft.funcParams.add(fp.type);
+                if (pass == 0 && ordered.size() < fn.params.size()) {
+                    ft.funcRequired = ordered.size();
+                }
+            }
+            for (Param fp : ordered) {
+                if (fp.named) {
+                    if (ft.funcNamed == null) {
+                        ft.funcNamed = new ArrayList<String>();
+                    }
+                    ft.funcNamed.add(fp.name);
+                }
+                if (fp.defaultValue != null) {
+                    defaults = true;
+                }
+                TypeRef pt = paramValueType(fp);
+                ft.funcParams.add(fn.typeParams.isEmpty() ? pt
+                        : substTypeParams(pt, fn.typeParams, java.util.Collections.<TypeRef>emptyList()));
             }
             if (simple) {
+                ft.funcReturn = fn.typeParams.isEmpty() ? fn.returnType
+                        : substTypeParams(fn.returnType, fn.typeParams, java.util.Collections.<TypeRef>emptyList());
+                String sam = javaType(ft, false, ctx);
+                if (defaults) {
+                    // The SAM passes null for an omitted optional; the adapter puts the
+                    // declared default back, since a direct call fills defaults at the call site.
+                    StringBuilder lp = new StringBuilder();
+                    StringBuilder call = new StringBuilder();
+                    for (int i = 0; i < ordered.size(); i++) {
+                        Param fp = ordered.get(i);
+                        String pn = "p$" + i;
+                        lp.append(i > 0 ? ", " : "").append(pn);
+                        String a = pn;
+                        if (fp.defaultValue != null) {
+                            a = "(" + pn + " == null ? "
+                                    + emitExpr(fp.defaultValue, fp.type, ctx).code + " : " + pn + ")";
+                        }
+                        call.append(i > 0 ? ", " : "").append(a);
+                    }
+                    String body = Program.libClassName(owner.fileName) + "." + n + "(" + call + ")";
+                    return new Out("((" + sam + ") (" + lp + ") -> " + body + ")", ft);
+                }
                 // A typed SAM cast makes the tear-off a standalone expression: a list
                 // element or a `??` operand gives a bare method reference no target type.
-                ft.funcReturn = fn.returnType;
-                return new Out("((" + javaType(ft, false, ctx) + ") " + ref + ")", ft);
+                if (!fn.typeParams.isEmpty()) {
+                    // A cast would pin the erased Func<Object..>; a bare reference takes
+                    // whatever instantiation the context names, and ft types a local.
+                    return new Out(ref, ft);
+                }
+                return new Out("((" + sam + ") " + ref + ")", ft);
             }
             return new Out(ref, new TypeRef("Function"));
         }
@@ -6787,7 +6836,13 @@ public final class JavaEmitter {
         // static access through a class reference
         if (isClassRef(tt)) {
             String cls = tt.arg(0).name;
-            Out tear = staticTearOff(cls, tt.arg(0).args, name, posNode, ctx);
+            List<TypeRef> clsArgs = tt.arg(0).args;
+            if (clsArgs.isEmpty() && posNode instanceof PropertyGet
+                    && ((PropertyGet) posNode).target instanceof Ident
+                    && ((Ident) ((PropertyGet) posNode).target).typeArgs != null) {
+                clsArgs = ((Ident) ((PropertyGet) posNode).target).typeArgs;
+            }
+            Out tear = staticTearOff(cls, clsArgs, name, posNode, ctx);
             if (tear != null) {
                 return tear;
             }
@@ -9396,7 +9451,7 @@ public final class JavaEmitter {
                 return new Out("Dyn.invoke(" + target.code + (a.isEmpty() ? "" : ", " + a) + ")",
                         TypeRef.DYNAMIC);
             }
-            return new Out(target.code + ".call(" + plainArgs(c.args, ctx) + ")", TypeRef.DYNAMIC);
+            return new Out(target.code + ".call(" + valueArgs(target.type, c.args, ctx) + ")", TypeRef.DYNAMIC);
         }
         if (c.target == null) {
             return emitBareCall(c, ctx);
@@ -9563,7 +9618,7 @@ public final class JavaEmitter {
             Ident callee = new Ident();
             callee.name = n;
             String recv = emitIdent(callee, null, ctx).code;
-            return new Out(recv + ".call(" + plainArgs(c.args, ctx) + ")", ret);
+            return new Out(recv + ".call(" + valueArgs(local, c.args, ctx) + ")", ret);
         }
         // inside an extension body, bare calls probe the receiver first
         if (ctx.extensionSelfType != null) {
@@ -9668,7 +9723,7 @@ public final class JavaEmitter {
             if (ff != null && isFunctionValued(ff.type)) {
                 Out fieldRead = emitMemberGet(new Out(ff.isStatic ? cc.name : "this",
                         new TypeRef(cc.name)), n, c, ctx);
-                return new Out(fieldRead.code + ".call(" + plainArgs(c.args, ctx) + ")",
+                return new Out(fieldRead.code + ".call(" + valueArgs(ff.type, c.args, ctx) + ")",
                         funcResultType(ff.type));
             }
         }
@@ -9936,6 +9991,14 @@ public final class JavaEmitter {
                     return new Out(jcls + "." + javaIdent(n) + "(" + canonicalArgs(named, c.args, ctx) + ")",
                             new TypeRef(cls));
                 }
+                if (n.equals("new")) {
+                    // `Foo.new(args)`: the unnamed constructor called through its tear-off name
+                    Call plain = new Call().at(c.file, c.line, c.col);
+                    plain.name = cls;
+                    plain.typeArgs.addAll(c.typeArgs);
+                    plain.args = c.args;
+                    return emitExpr(plain, null, ctx);
+                }
                 diags.error(c, "E0136", "Cannot resolve static member or constructor '" + cls + "." + n + "'");
                 return new Out("null", TypeRef.DYNAMIC, true);
             }
@@ -10004,7 +10067,7 @@ public final class JavaEmitter {
             }
             if (ff != null && isFunctionValued(ff.type)) {
                 Out fieldRead = emitMemberGet(target, n, c, ctx);
-                return new Out(fieldRead.code + ".call(" + plainArgs(c.args, ctx) + ")",
+                return new Out(fieldRead.code + ".call(" + valueArgs(ff.type, c.args, ctx) + ")",
                         funcResultType(ff.type));
             }
         }
@@ -10017,7 +10080,7 @@ public final class JavaEmitter {
             if (c.nullAware && target.code.equals(ctx.nullCheckedTemp)) {
                 // Typed as the guarded form below would be: a void (or erased-void)
                 // callback stays a statement, which the caller's guard wraps.
-                String call = target.code + ".call(" + plainArgs(c.args, ctx) + ")";
+                String call = target.code + ".call(" + valueArgs(tt, c.args, ctx) + ")";
                 return new Out(call, ret.is("void") || ret.is("dynamic") ? TypeRef.VOID : ret);
             }
             if (c.nullAware) {
@@ -10026,7 +10089,7 @@ public final class JavaEmitter {
                 // Arguments run only for a non-null callback; what they lift goes
                 // inside the guard.
                 ctx.pushWriter(ctx.currentIndent() + 1);
-                String args = plainArgs(c.args, ctx);
+                String args = valueArgs(tt, c.args, ctx);
                 String lifted = ctx.popWriter();
                 // A void (or untyped-`Function`, whose void return was erased) callback is
                 // fire-and-forget in statement position: guard with an `if` so a void SAM
@@ -10048,7 +10111,7 @@ public final class JavaEmitter {
                 return new Out("(" + tmp + " == null ? null : " + tmp + ".call("
                         + args + "))", boxType(ret));
             }
-            return new Out(target.code + ".call(" + plainArgs(c.args, ctx) + ")", ret);
+            return new Out(target.code + ".call(" + valueArgs(tt, c.args, ctx) + ")", ret);
         }
         // stub instance method
         String stubName = stubs.isStubClass(tt.name) ? tt.name : null;
@@ -10116,6 +10179,14 @@ public final class JavaEmitter {
         if (n.equals("toString") && c.args.positional.isEmpty()) {
             ctx.importClass("dart.runtime.DartRuntime");
             return new Out("DartRuntime.str(" + target.code + ")", TypeRef.STRING);
+        }
+        if (n.equals("compareTo") && c.args.positional.size() == 1 && c.args.named.isEmpty()
+                && isTypeVariable(tt, ctx)) {
+            // `a.compareTo(b)` on a type variable bounded by Comparable (`E extends
+            // Comparable<E>`): the erased receiver is an Object, so compare at run time.
+            ctx.importClass("dart.core.DartComparable");
+            return new Out("DartComparable.compare(" + target.code + ", "
+                    + emitExpr(c.args.positional.get(0), null, ctx).code + ")", TypeRef.INT);
         }
         diags.error(c, "E0137", "Cannot resolve method '" + n + "' on type " + tt
                 + ". Confirm the file passes `dart analyze`, or the API is not yet implemented in the Codename One runtime.");
@@ -12998,6 +13069,61 @@ public final class JavaEmitter {
                         .append(boxIfPrimitive(emitExpr(na.value, null, ctx), ctx));
             }
             sb.append(")");
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Arguments for invoking a function VALUE through its Funcs SAM. A function type with
+     * optional or named parameters is a SAM of its full arity (required, optional
+     * positional, then named), so an omitted optional is passed as null and a named
+     * argument goes to its slot. Without such a shape this is {@link #plainArgs}.
+     */
+    private String valueArgs(TypeRef fnType, Args args, Ctx ctx) {
+        int arity;
+        int required;
+        List<String> named;
+        if (fnType == null) {
+            return plainArgs(args, ctx);
+        }
+        if (fnType.funcParams != null) {
+            arity = fnType.funcParams.size();
+            required = fnType.funcRequired;
+            named = fnType.funcNamed;
+        } else {
+            Ast.TypedefDecl td = program.typedefs.get(fnType.name);
+            if (td == null || td.paramTypes == null) {
+                return plainArgs(args, ctx);
+            }
+            arity = td.paramTypes.size();
+            required = td.funcRequired;
+            named = td.funcNamed;
+        }
+        if (required < 0) {
+            return plainArgs(args, ctx);
+        }
+        int positionalSlots = arity - (named == null ? 0 : named.size());
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < positionalSlots; i++) {
+            if (i > 0) {
+                sb.append(", ");
+            }
+            sb.append(i < args.positional.size()
+                    ? emitExpr(args.positional.get(i), null, ctx).code : "null");
+        }
+        if (named != null) {
+            for (String nm : named) {
+                if (sb.length() > 0) {
+                    sb.append(", ");
+                }
+                Expr v = null;
+                for (int i = 0; i < args.named.size(); i++) {
+                    if (args.named.get(i).name.equals(nm)) {
+                        v = args.named.get(i).value;
+                    }
+                }
+                sb.append(v == null ? "null" : emitExpr(v, null, ctx).code);
+            }
         }
         return sb.toString();
     }

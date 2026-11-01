@@ -856,12 +856,14 @@ primary
     | switchExpression
     | functionExpression
     | literal
+    // before `identifier`: with the instantiation selector `identifier typeArguments`
+    // also matches `Foo<T>.named(...)`, and the lower alternative wins the ambiguity
+    | constructorInvocation
+    | genericTearOff
     | identifier
     | newExpression
     | constObjectExpression
-    | constructorInvocation
     | recordLiteral
-    | genericTearOff
     | OP expr CP
     ;
 
@@ -877,6 +879,7 @@ recordLiteral
     : CONST_? OP recordField C (recordField (C recordField)* C?)? CP
     | CONST_? OP identifier CO expr (C recordField)* C? CP
     | CONST_? OP recordField C CP
+    | CONST_? OP CP   // the empty record `()`
     ;
 
 recordField
@@ -956,6 +959,7 @@ selector
     : NOT
     | assignableSelector
     | argumentPart
+    | typeArguments   // `identity<int>` / `obj.m<T>`: explicit generic instantiation (Dart 2.15)
     ;
 
 setOrMapLiteral
@@ -1211,7 +1215,8 @@ typeNotVoidNotFunction
 // Dart 3 record types -- CN1 addition. A single positional field needs a
 // trailing comma, so `(T)` is never read as a record type.
 recordType
-    : OP recordTypeField C CP
+    : OP CP   // the empty record type `()`
+    | OP recordTypeField C CP
     | OP recordTypeField (C recordTypeField)+ C? CP
     | OP recordTypeField (C recordTypeField)* C recordTypeNamedFields CP
     | OP recordTypeNamedFields CP

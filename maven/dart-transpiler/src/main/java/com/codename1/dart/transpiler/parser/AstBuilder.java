@@ -392,9 +392,9 @@ public final class AstBuilder {
                     && fta.formalParameterPart().formalParameterList() != null) {
                 java.util.List<Param> ps = new java.util.ArrayList<Param>();
                 buildParams(fta.formalParameterPart().formalParameterList(), ps);
-                for (Param p : ps) {
-                    td.paramTypes.add(p.type == null ? TypeRef.DYNAMIC : p.type);
-                }
+                int[] req = {-1};
+                td.funcNamed = shapeFromParams(ps, td.paramTypes, req);
+                td.funcRequired = req[0];
             }
             return td;
         }
@@ -421,24 +421,84 @@ public final class AstBuilder {
         td.returnType = ft.typeNotFunction() != null
                 ? buildTypeNotFunction(ft.typeNotFunction()) : TypeRef.DYNAMIC;
         td.paramTypes = new java.util.ArrayList<TypeRef>();
+        int[] req = {-1};
+        td.funcNamed = parameterTypeShape(ft, td.paramTypes, req);
+        td.funcRequired = req[0];
+    }
+
+    /**
+     * Collects every parameter type of a {@code Ret Function(...)} type into {@code out}:
+     * required positional, then optional positional, then named. {@code required[0]} gets
+     * the required count (-1 when nothing is optional); the named names are returned.
+     */
+    private List<String> parameterTypeShape(Dart2Parser.FunctionTypeContext ft, List<TypeRef> out,
+            int[] required) {
         Dart2Parser.FunctionTypeTailsContext tails = ft.functionTypeTails();
         if (tails == null || tails.functionTypeTail() == null) {
-            return;
+            return null;
         }
         Dart2Parser.ParameterTypeListContext ptl = tails.functionTypeTail().parameterTypeList();
-        if (ptl == null || ptl.normalParameterTypes() == null) {
-            return;
+        if (ptl == null) {
+            return null;
         }
-        for (Dart2Parser.NormalParameterTypeContext npt
-                : ptl.normalParameterTypes().normalParameterType()) {
+        if (ptl.normalParameterTypes() != null) {
+            addNormalParameterTypes(ptl.normalParameterTypes(), out);
+        }
+        Dart2Parser.OptionalParameterTypesContext opt = ptl.optionalParameterTypes();
+        if (opt == null) {
+            return null;
+        }
+        required[0] = out.size();
+        if (opt.optionalPositionalParameterTypes() != null) {
+            addNormalParameterTypes(opt.optionalPositionalParameterTypes().normalParameterTypes(), out);
+            return null;
+        }
+        List<String> names = new ArrayList<String>();
+        for (Dart2Parser.NamedParameterTypeContext n : opt.namedParameterTypes().namedParameterType()) {
+            Dart2Parser.TypedIdentifierContext ti = n.typedIdentifier();
+            out.add(ti.type() != null ? buildType(ti.type()) : TypeRef.DYNAMIC);
+            names.add(ti.identifier().getText());
+        }
+        return names;
+    }
+
+    private void addNormalParameterTypes(Dart2Parser.NormalParameterTypesContext npts, List<TypeRef> out) {
+        for (Dart2Parser.NormalParameterTypeContext npt : npts.normalParameterType()) {
             if (npt.type() != null) {
-                td.paramTypes.add(buildType(npt.type()));
+                out.add(buildType(npt.type()));
             } else if (npt.typedIdentifier() != null && npt.typedIdentifier().type() != null) {
-                td.paramTypes.add(buildType(npt.typedIdentifier().type()));
+                out.add(buildType(npt.typedIdentifier().type()));
             } else {
-                td.paramTypes.add(TypeRef.DYNAMIC);
+                out.add(TypeRef.DYNAMIC);
             }
         }
+    }
+
+    /** The same shape as {@link #parameterTypeShape} from a declared parameter list. */
+    private static List<String> shapeFromParams(List<Param> ps, List<TypeRef> out, int[] required) {
+        List<String> names = null;
+        for (Param p : ps) {
+            if (!p.named && !p.optional && p.defaultValue == null) {
+                out.add(p.type == null || p.type == TypeRef.VAR ? TypeRef.DYNAMIC : p.type);
+            }
+        }
+        int req = out.size();
+        for (Param p : ps) {
+            if (!p.named && (p.optional || p.defaultValue != null)) {
+                out.add(p.type == null || p.type == TypeRef.VAR ? TypeRef.DYNAMIC : p.type);
+            }
+        }
+        for (Param p : ps) {
+            if (p.named) {
+                out.add(p.type == null || p.type == TypeRef.VAR ? TypeRef.DYNAMIC : p.type);
+                if (names == null) {
+                    names = new ArrayList<String>();
+                }
+                names.add(p.name);
+            }
+        }
+        required[0] = req == out.size() ? -1 : req;
+        return names;
     }
 
     private ClassDecl buildClass(Dart2Parser.ClassDeclarationContext ctx) {
@@ -1020,11 +1080,9 @@ public final class AstBuilder {
         t.funcParams = new java.util.ArrayList<TypeRef>();
         List<Param> params = new ArrayList<Param>();
         buildParams(part.formalParameterList(), params);
-        for (Param p : params) {
-            if (!p.named && p.defaultValue == null) {
-                t.funcParams.add(p.type == null || p.type == TypeRef.VAR ? TypeRef.DYNAMIC : p.type);
-            }
-        }
+        int[] req = {-1};
+        t.funcNamed = shapeFromParams(params, t.funcParams, req);
+        t.funcRequired = req[0];
         return t;
     }
 
@@ -1060,24 +1118,9 @@ public final class AstBuilder {
         t.funcReturn = ft.typeNotFunction() != null
                 ? buildTypeNotFunction(ft.typeNotFunction()) : TypeRef.DYNAMIC;
         t.funcParams = new java.util.ArrayList<TypeRef>();
-        Dart2Parser.FunctionTypeTailsContext tails = ft.functionTypeTails();
-        if (tails == null || tails.functionTypeTail() == null) {
-            return;
-        }
-        Dart2Parser.ParameterTypeListContext ptl = tails.functionTypeTail().parameterTypeList();
-        if (ptl == null || ptl.normalParameterTypes() == null) {
-            return;
-        }
-        for (Dart2Parser.NormalParameterTypeContext npt
-                : ptl.normalParameterTypes().normalParameterType()) {
-            if (npt.type() != null) {
-                t.funcParams.add(buildType(npt.type()));
-            } else if (npt.typedIdentifier() != null && npt.typedIdentifier().type() != null) {
-                t.funcParams.add(buildType(npt.typedIdentifier().type()));
-            } else {
-                t.funcParams.add(TypeRef.DYNAMIC);
-            }
-        }
+        int[] req = {-1};
+        t.funcNamed = parameterTypeShape(ft, t.funcParams, req);
+        t.funcRequired = req[0];
     }
 
     private TypeRef buildTypeNotFunction(Dart2Parser.TypeNotFunctionContext ctx) {
@@ -2218,6 +2261,19 @@ public final class AstBuilder {
             }
             return call;
         }
+        if (s.assignableSelector() == null) {
+            // `f<int>` without a call: an explicit instantiation. Java erases the type
+            // arguments, so the instantiated tear-off is the plain tear-off -- except on a
+            // class name, where `Cell<int>.new` keeps them for the constructor tear-off.
+            if (base instanceof Ident && ((Ident) base).typeArgs == null) {
+                Ident id = (Ident) base;
+                id.typeArgs = new ArrayList<TypeRef>();
+                for (Dart2Parser.TypeContext t : s.typeArguments().typeList().type()) {
+                    id.typeArgs.add(buildType(t));
+                }
+            }
+            return base;
+        }
         return applyAssignableSelector(base, s.assignableSelector());
     }
 
@@ -2352,6 +2408,10 @@ public final class AstBuilder {
             Ident cls = new Ident();
             pos(cls, gt);
             cls.name = gt.typeIdentifier().getText();
+            cls.typeArgs = new ArrayList<TypeRef>();
+            for (Dart2Parser.TypeContext t : gt.typeArguments().typeList().type()) {
+                cls.typeArgs.add(buildType(t));
+            }
             PropertyGet pg = new PropertyGet();
             pos(pg, gt);
             pg.target = cls;

@@ -69,6 +69,10 @@ public final class Ast {
         // the parsed signature so codegen can render a real Funcs.* SAM instead of Object.
         public List<TypeRef> funcParams;          // non-null iff this is an inline function type
         public TypeRef funcReturn;                // return type of the inline function type
+        // How many of funcParams are required positional; -1 when all are. The optional
+        // positional ones follow, then the named ones (names in funcNamed, in order).
+        public int funcRequired = -1;
+        public List<String> funcNamed;
 
         public TypeRef(String name) {
             this.name = name;
@@ -296,6 +300,8 @@ public final class Ast {
         public List<TypeRef> paramTypes;          // non-null for a function-type alias
         public TypeRef returnType;                // non-null for a function-type alias
         public TypeRef aliased;                   // non-null for a plain (non-function) alias
+        public int funcRequired = -1;             // see TypeRef.funcRequired
+        public List<String> funcNamed;            // see TypeRef.funcNamed
     }
 
     public static class FieldDecl extends Node {
@@ -541,6 +547,8 @@ public final class Ast {
 
     public static class Ident extends Expr {
         public String name;
+        // `Cell<int>` in the constructor tear-off `Cell<int>.new`; null otherwise
+        public List<TypeRef> typeArgs;
     }
 
     public static class ThisExpr extends Expr {
