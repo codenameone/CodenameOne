@@ -165,6 +165,41 @@ public final class Program {
             libraries.add(part);
             register(part, part);
         }
+        // `extends Iterable<E>` is `extends IterableBase<E>`: dart:core's Iterable is an
+        // abstract base whose only abstract member is `iterator`, exactly IterableBase. The
+        // Java dart.core.DartIterable is a concrete wrapper over a java.lang.Iterable, not a
+        // base to extend (its iterator() is java.util's, it has no no-arg constructor), so
+        // the class takes the dart.collection.IterableMixin protocol IterableBase maps to.
+        for (Ast.Library lib : libraries) {
+            for (Ast.ClassDecl c : lib.classes) {
+                if (c.superclass != null && "Iterable".equals(c.superclass.name)
+                        && c.superclass.resolved == null
+                        && resolveClass("Iterable", c.ownerLibrary) == null) {
+                    c.superclass.name = "IterableBase";
+                }
+                // `implements Iterable<E>` likewise: the class supplies every member itself,
+                // and the IterableMixin interface is what a Java class can implement. A class
+                // that already takes that interface (`with IterableMixin`, `extends
+                // IterableBase`) would then repeat it, so the clause is dropped there.
+                boolean applied = c.superclass != null && ("IterableBase".equals(c.superclass.name)
+                        || "IterableMixin".equals(c.superclass.name));
+                for (Ast.TypeRef m : c.mixins) {
+                    applied |= "IterableMixin".equals(m.name) || "IterableBase".equals(m.name);
+                }
+                for (java.util.Iterator<Ast.TypeRef> it = c.interfaces.iterator(); it.hasNext();) {
+                    Ast.TypeRef i = it.next();
+                    if ("Iterable".equals(i.name) && i.resolved == null
+                            && resolveClass("Iterable", c.ownerLibrary) == null) {
+                        if (applied) {
+                            it.remove();
+                        } else {
+                            i.name = "IterableBase";
+                            applied = true;
+                        }
+                    }
+                }
+            }
+        }
         Set<Ast.ClassDecl> done = new HashSet<Ast.ClassDecl>();
         for (Ast.Library lib : libraries) {
             for (Ast.ClassDecl c : lib.classes) {

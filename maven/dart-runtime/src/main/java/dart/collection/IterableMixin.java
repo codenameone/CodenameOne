@@ -221,4 +221,48 @@ public interface IterableMixin<E> {
     static String iterableToFullString(Iterable<?> it, String left) {
         return iterableToFullString(it, left, ")");
     }
+
+    // The rest of the Iterable protocol a class extending or implementing Iterable (or
+    // IterableBase) is called with from outside: each reads through a live DartIterable
+    // view of this object.
+
+    /** Dart's {@code toList()}: a growable copy. */
+    default dart.core.DartList<E> toList() {
+        return dart.core.DartIterable.ofMixin(this).toList();
+    }
+
+    /** Dart's {@code toList(growable: ...)}. */
+    default dart.core.DartList<E> toList(boolean growable) {
+        return dart.core.DartIterable.ofMixin(this).toList(growable);
+    }
+
+    /** Dart's {@code toSet()}. */
+    default dart.core.DartSet<E> toSet() {
+        return dart.core.DartIterable.ofMixin(this).toSet();
+    }
+
+    /** Dart's {@code where(test)}, a lazy view. */
+    default dart.core.DartIterable<E> where(Funcs.Func1<E, Boolean> test) {
+        return dart.core.DartIterable.ofMixin(this).where(test);
+    }
+
+    /** Dart's {@code map(f)}, a lazy view. */
+    default <R> dart.core.DartIterable<R> map(Funcs.Func1<E, R> f) {
+        return dart.core.DartIterable.ofMixin(this).map(f);
+    }
+
+    /** Dart's {@code skip(count)}, a lazy view. */
+    default dart.core.DartIterable<E> skip(long count) {
+        return dart.core.DartIterable.ofMixin(this).skip(count);
+    }
+
+    /** Dart's {@code take(count)}, a lazy view. */
+    default dart.core.DartIterable<E> take(long count) {
+        return dart.core.DartIterable.ofMixin(this).take(count);
+    }
+
+    /** Dart's {@code fold(initial, combine)}. */
+    default <R> R fold(R initialValue, Funcs.Func2<R, E, R> combine) {
+        return dart.core.DartIterable.ofMixin(this).fold(initialValue, combine);
+    }
 }

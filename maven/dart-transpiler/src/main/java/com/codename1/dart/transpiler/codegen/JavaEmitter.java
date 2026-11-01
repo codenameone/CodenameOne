@@ -9382,12 +9382,13 @@ public final class JavaEmitter {
                 if (target.code.equals("this") && !isLateChecked(f, pc)) {
                     return new Out("this." + name, fieldType(f, ctx));
                 }
-                return new Out(target.code + ".get$" + name + "()",
+                return new Out(rawReceiver(target.code, pc, tt, fieldType(f, ctx), ctx) + ".get$" + name + "()",
                         asSeenFrom(fieldType(f, ctx), f, null, pc, tt));
             }
             MethodDecl g = pc.getter(name);
             if (g != null) {
-                return new Out(target.code + "." + name + "()", asSeenFrom(g.returnType, g, null, pc, tt));
+                return new Out(rawReceiver(target.code, pc, tt, g.returnType, ctx) + "." + name + "()",
+                        asSeenFrom(g.returnType, g, null, pc, tt));
             }
             Object mixF = findMixinMember(pc, name, true);
             if (mixF instanceof FieldDecl) {
@@ -17266,6 +17267,14 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         final List<Param> ordered = orderedParams(l.params);
         List<TypeRef> exp = expected != null && expected.funcParams != null
                 && expected.funcParams.size() == ordered.size() ? expected.funcParams : null;
+        if (exp == null && expected != null && expected.funcParams == null) {
+            // `labeler: (n, [s]) => ...` into a `typedef Labeler = ...`: untyped parameters
+            // take the alias's, as they take an inline function type's above.
+            TypeRef[] sig = typedefSig(expected.name);
+            if (sig != null && sig.length - 1 == ordered.size()) {
+                exp = java.util.Arrays.asList(sig).subList(0, ordered.size());
+            }
+        }
         final Lambda inner = new Lambda();
         inner.line = l.line;
         inner.col = l.col;
@@ -17286,7 +17295,15 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             inner.params.add(q);
             innerFt.funcParams.add(q.type);
         }
-        TypeRef ret = expected != null && expected.funcReturn != null ? expected.funcReturn : TypeRef.DYNAMIC;
+        // `linkResolver ?? ((String _, [String? _]) => null)` against `typedef Resolver =
+        // Node? Function(...)`: the alias names the return the slot holds, which the
+        // closure's own `null` body does not.
+        TypeRef ret = expected != null && expected.funcReturn != null ? expected.funcReturn
+                : expected != null && expected.funcParams == null && typedefSig(expected.name) != null
+                ? funcResultType(expected) : TypeRef.DYNAMIC;
+        if (ret.is("void") && (expected == null || expected.funcParams == null)) {
+            ret = TypeRef.DYNAMIC;
+        }
         innerFt.funcReturn = ret;
         return tearOffAdapter(l.params, types, ret, names -> {
             String fn = emitExpr(inner, innerFt, ctx).code;
@@ -18186,6 +18203,54 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         return t.name + (t.args.isEmpty() ? "" : genericSuffix(t, ctx));
     }
 
+    /**
+     * The receiver of a member read on a generic program class held raw ({@code CalendarBuilders
+     * builders;} for {@code class CalendarBuilders<T>}). Dart instantiates such a type to its
+     * bounds, so a member whose type never names T keeps its full type; Java's raw type erases
+     * the generics of EVERY member instead, and a {@code Func3<..., Widget>} field reads as a
+     * raw Func3 whose call answers Object. A member type with generics of its own therefore
+     * reads through the receiver cast to the class instantiated to bounds.
+     */
+    private String rawReceiver(String code, ClassDecl pc, TypeRef tt, TypeRef memberType, Ctx ctx) {
+        if (pc.typeParams.isEmpty() || !tt.args.isEmpty() || code.equals("this") || code.equals("super")
+                || memberType == null || mentionsTypeParam(memberType, pc.typeParams)
+                || javaType(memberType, false, ctx).indexOf('<') < 0) {
+            // A member type naming T stays raw: its value converts unchecked to whatever
+            // instantiation the reader wants, where one at bounds would not.
+            return code;
+        }
+        TypeRef[] bounds = new TypeRef[pc.typeParams.size()];
+        for (int i = 0; i < bounds.length; i++) {
+            TypeRef b = pc.typeParamBounds.get(pc.typeParams.get(i));
+            bounds[i] = b == null || mentionsTypeParam(b, pc.typeParams) ? TypeRef.DYNAMIC : b;
+        }
+        TypeRef inst = TypeRef.of(tt.name, bounds);
+        inst.resolved = tt.resolved;
+        return "((" + javaType(inst, false, ctx) + ") " + paren(code) + ")";
+    }
+
+    private static boolean mentionsTypeParam(TypeRef t, List<String> params) {
+        if (t == null) {
+            return false;
+        }
+        if (t.args.isEmpty() && params.contains(t.name)) {
+            return true;
+        }
+        for (TypeRef a : t.args) {
+            if (mentionsTypeParam(a, params)) {
+                return true;
+            }
+        }
+        if (t.funcParams != null) {
+            for (TypeRef a : t.funcParams) {
+                if (mentionsTypeParam(a, params)) {
+                    return true;
+                }
+            }
+        }
+        return mentionsTypeParam(t.funcReturn, params);
+    }
+
     private String genericSuffix(TypeRef t, Ctx ctx) {
         StringBuilder sb = new StringBuilder("<");
         for (int i = 0; i < t.args.size(); i++) {
@@ -18883,10 +18948,11 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         // The same implicit downcast for a dynamic local or parameter (a closure's untyped
         // `(error, stackTrace)` handed on to `completeError(Object, StackTrace)`): its Java
         // type is Object, which javac will not narrow by itself. Only a bare name of an
-        // Object-typed local, and only into a program or core class type with no type
+        // Object-typed local (or of the class's own field, `this.locale`, which reads the
+        // same way), and only into a program or core class type with no type
         // arguments, so no primitive or generic slot is touched.
         if (o.type != null && (o.type.is("dynamic") || o.type.is("var") || o.type.is("Object"))
-                && o.code.matches("[A-Za-z_$][A-Za-z0-9_$]*") && target.args.isEmpty()
+                && o.code.matches("(this\\.)?[A-Za-z_$][A-Za-z0-9_$]*") && target.args.isEmpty()
                 && target.funcParams == null && target.funcReturn == null && !isDynamicType(target)
                 && !target.is("void") && !target.is("int") && !target.is("double") && !target.is("bool")
                 && !target.is("num") && !target.is("Null") && isFullyConcrete(target)

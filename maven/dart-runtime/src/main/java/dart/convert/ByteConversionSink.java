@@ -29,13 +29,16 @@ import dart.runtime.Funcs;
 /// collects every chunk and hands the callback all of them once closed.
 public abstract class ByteConversionSink {
 
-    public abstract void add(Object chunk);
+    // add and addSlice take the List<int> the stub declares, as DartLongList, so that a
+    // transpiled subclass's override (typed from the Dart source) matches them.
+
+    public abstract void add(dart.core.DartLongList chunk);
 
     public abstract void close();
 
     /// {@code addSlice(chunk, start, end, isLast)}: adds the slice, then closes when
     /// it is the last, as Dart's default does.
-    public void addSlice(Object chunk, long start, long end, boolean isLast) {
+    public void addSlice(dart.core.DartLongList chunk, long start, long end, boolean isLast) {
         byte[] b = ByteCodec.bytesOf(chunk);
         dart.core.RangeError.checkValueInInterval(start, 0, b.length, "start");
         dart.core.RangeError.checkValueInInterval(end, start, b.length, "end");
@@ -53,7 +56,7 @@ public abstract class ByteConversionSink {
             private boolean closed;
 
             @Override
-            public void add(Object chunk) {
+            public void add(dart.core.DartLongList chunk) {
                 byte[] b = ByteCodec.bytesOf(chunk);
                 all.write(b, 0, b.length);
             }

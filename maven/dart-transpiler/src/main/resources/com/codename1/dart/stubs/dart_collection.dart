@@ -23,6 +23,13 @@ mixin IterableMixin<E> {
   bool any(bool Function(E element) test);
   bool every(bool Function(E element) test);
   String join([String separator = '']);
+  List<E> toList({bool growable = true});
+  Set<E> toSet();
+  Iterable<E> where(bool Function(E element) test);
+  Iterable<T> map<T>(T Function(E e) toElement);
+  Iterable<E> skip(int count);
+  Iterable<E> take(int count);
+  T fold<T>(T initialValue, T Function(T previousValue, E element) combine);
 }
 
 // List protocol: adds indexed access on top of the Iterable surface.
@@ -127,6 +134,13 @@ mixin IterableBase<E> {
   bool any(bool Function(E element) test);
   bool every(bool Function(E element) test);
   String join([String separator = '']);
+  List<E> toList({bool growable = true});
+  Set<E> toSet();
+  Iterable<E> where(bool Function(E element) test);
+  Iterable<T> map<T>(T Function(E e) toElement);
+  Iterable<E> skip(int count);
+  Iterable<E> take(int count);
+  T fold<T>(T initialValue, T Function(T previousValue, E element) combine);
 }
 
 @JavaName('dart.collection.ListMixin')

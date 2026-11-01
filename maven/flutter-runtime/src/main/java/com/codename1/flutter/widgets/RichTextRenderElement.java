@@ -67,7 +67,7 @@ public class RichTextRenderElement extends RenderElement {
             // headless unit tests: no CN1 components can exist
             return null;
         }
-        RichTextComponent c = new RichTextComponent();
+        JustifiedRichTextComponent c = new JustifiedRichTextComponent();
         c.setUIID("FlutterRichText");
         stylesToSet(c).setPadding(0, 0, 0, 0);
         stylesToSet(c).setMargin(0, 0, 0, 0);
@@ -78,28 +78,26 @@ public class RichTextRenderElement extends RenderElement {
 
     @Override
     protected void updateComponent(Component comp) {
-        applyContent((RichTextComponent) comp);
+        applyContent((JustifiedRichTextComponent) comp);
     }
 
     /** Rebuilds the component's content from the current span tree and alignment. */
-    private void applyContent(RichTextComponent c) {
+    private void applyContent(JustifiedRichTextComponent c) {
         c.clear();
+        c.clearRuns();
         for (Run run : flatten(richText().getText())) {
             c.append(run.text, toEditorStyle(com.codename1.flutter.TextScaler.applyTo(richText().getTextScaler(), run.style, this)));
         }
         c.setTextAlign(cn1Align());
+        c.setJustify(richText().getTextAlign() == TextAlign.justify, isRtl());
     }
 
     private int cn1Align() {
         TextAlign a = richText().getTextAlign();
         boolean rtl = isRtl();
         if (a == null || a == TextAlign.justify) {
-            // Justify is laid out from the start edge here (where Flutter puts a justified
-            // paragraph's last line). Plain Text justifies for real in TextRenderElement's
-            // own painter; a RichText's runs are broken into lines and painted by the core
-            // RichTextComponent, whose setTextAlign takes only LEFT, CENTER and RIGHT and
-            // which exposes no per-line gap to stretch, so justifying spans needs that
-            // core component to learn it rather than a change in this runtime.
+            // Justify: JustifiedRichTextComponent lays the runs out itself and stretches the
+            // gaps; the start edge given here is what the core layout would use otherwise.
             a = TextAlign.start;
         }
         switch (a) {
