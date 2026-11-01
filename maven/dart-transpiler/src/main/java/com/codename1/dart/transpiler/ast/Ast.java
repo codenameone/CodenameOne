@@ -65,6 +65,10 @@ public final class Ast {
         public String name;                       // "int", "String", "List", "Widget", "MyApp", "void", "var", "dynamic"
         public List<TypeRef> args = new ArrayList<TypeRef>();
         public boolean nullable;
+        /// The program class a prefixed name (`md.Text`) resolved to, kept once the
+        /// prefix is stripped from {@link #name}: a bare name may mean a different
+        /// type (a stub of the same name) in the library that reads it.
+        public ClassDecl resolved;
         // For an inline function type (name == "Function", e.g. `void Function(int)`):
         // the parsed signature so codegen can render a real Funcs.* SAM instead of Object.
         public List<TypeRef> funcParams;          // non-null iff this is an inline function type

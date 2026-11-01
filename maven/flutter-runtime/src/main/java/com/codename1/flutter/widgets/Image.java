@@ -174,7 +174,7 @@ public class Image extends Widget {
     }
 
     /// Image(errorBuilder:): what to show instead of a picture that failed to load.
-    Funcs.Func3<BuildContext, Object, Object, Widget> errorBuilder;
+    Funcs.Func3<BuildContext, Object, ? super dart.core.StackTrace, Widget> errorBuilder;
     /// Image(loadingBuilder:): wraps the picture while its bytes are arriving.
     Funcs.Func3<BuildContext, Widget, ImageChunkEvent, Widget> loadingBuilder;
     /// Set by ImageBuildersElement just before it hands this same widget on as its
@@ -183,7 +183,7 @@ public class Image extends Widget {
     /// The builders' element listening for this picture's load outcome.
     ImageBuildersElement listener;
 
-    public void errorBuilder(Funcs.Func3<BuildContext, Object, Object, Widget> v) {
+    public void errorBuilder(Funcs.Func3<BuildContext, Object, ? super dart.core.StackTrace, Widget> v) {
         this.errorBuilder = v;
     }
 
@@ -200,7 +200,7 @@ public class Image extends Widget {
                               String packageName, Boolean excludeFromSemantics,
                               Boolean gaplessPlayback, Long cacheWidth, Long cacheHeight,
                               com.codename1.flutter.Color color, Object colorBlendMode,
-                              Object alignment, String semanticLabel, Funcs.Func4<BuildContext, Widget, Long, Boolean, Widget> frameBuilder, Funcs.Func3<BuildContext, Object, Object, Widget> errorBuilder) {
+                              Object alignment, String semanticLabel, Funcs.Func4<BuildContext, Widget, Long, Boolean, Widget> frameBuilder, Funcs.Func3<BuildContext, Object, ? super dart.core.StackTrace, Widget> errorBuilder) {
         Image i = asset(name, key, width, height, fit, packageName, excludeFromSemantics, gaplessPlayback,
                 cacheWidth, cacheHeight, color, colorBlendMode, alignment, semanticLabel);
         return i.builders(frameBuilder, null, errorBuilder);
@@ -208,23 +208,23 @@ public class Image extends Widget {
 
     /// Image.network with its builders.
     public static Image network(String src, Key key, Double width, Double height, BoxFit fit,
-                                Funcs.Func4<BuildContext, Widget, Long, Boolean, Widget> frameBuilder, Funcs.Func3<BuildContext, Widget, ImageChunkEvent, Widget> loadingBuilder, Funcs.Func3<BuildContext, Object, Object, Widget> errorBuilder) {
+                                Funcs.Func4<BuildContext, Widget, Long, Boolean, Widget> frameBuilder, Funcs.Func3<BuildContext, Widget, ImageChunkEvent, Widget> loadingBuilder, Funcs.Func3<BuildContext, Object, ? super dart.core.StackTrace, Widget> errorBuilder) {
         return network(src, key, width, height, fit).builders(frameBuilder, loadingBuilder, errorBuilder);
     }
 
     /// Image.file with its builders.
     public static Image file(Object file, Key key, Double scale, Double width, Double height, BoxFit fit,
-                             Funcs.Func4<BuildContext, Widget, Long, Boolean, Widget> frameBuilder, Funcs.Func3<BuildContext, Object, Object, Widget> errorBuilder) {
+                             Funcs.Func4<BuildContext, Widget, Long, Boolean, Widget> frameBuilder, Funcs.Func3<BuildContext, Object, ? super dart.core.StackTrace, Widget> errorBuilder) {
         return file(file, key, scale, width, height, fit).builders(frameBuilder, null, errorBuilder);
     }
 
     /// Image.memory with its builders.
     public static Image memory(dart.typed_data.Uint8List bytes, Key key, Double scale, Double width,
-                               Double height, BoxFit fit, Funcs.Func4<BuildContext, Widget, Long, Boolean, Widget> frameBuilder, Funcs.Func3<BuildContext, Object, Object, Widget> errorBuilder) {
+                               Double height, BoxFit fit, Funcs.Func4<BuildContext, Widget, Long, Boolean, Widget> frameBuilder, Funcs.Func3<BuildContext, Object, ? super dart.core.StackTrace, Widget> errorBuilder) {
         return memory(bytes, key, scale, width, height, fit).builders(frameBuilder, null, errorBuilder);
     }
 
-    private Image builders(Funcs.Func4<BuildContext, Widget, Long, Boolean, Widget> f, Funcs.Func3<BuildContext, Widget, ImageChunkEvent, Widget> l, Funcs.Func3<BuildContext, Object, Object, Widget> e) {
+    private Image builders(Funcs.Func4<BuildContext, Widget, Long, Boolean, Widget> f, Funcs.Func3<BuildContext, Widget, ImageChunkEvent, Widget> l, Funcs.Func3<BuildContext, Object, ? super dart.core.StackTrace, Widget> e) {
         this.frameBuilder = f;
         this.loadingBuilder = l;
         this.errorBuilder = e;

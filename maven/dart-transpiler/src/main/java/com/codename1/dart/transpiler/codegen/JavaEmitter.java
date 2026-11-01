@@ -3172,7 +3172,18 @@ public final class JavaEmitter {
                 call.append("$b").append(i).append('.').append(prim).append("Value()");
                 continue;
             }
-            String wideJava = javaType(TypeRef.of(wide.name), false, ctx);
+            // The base's parameter type is named in the BASE's library: a `Text` declared
+            // beside the visitor interface is that class, even where a bare `Text` here
+            // would be a stub of the same name.
+            TypeRef wideRef = TypeRef.of(wide.name);
+            ClassDecl baseOwner = found.length > 2 ? (ClassDecl) found[2] : null;
+            if (baseOwner != null && baseOwner.ownerLibrary != null) {
+                ClassDecl wc = program.resolveClass(wide.name, baseOwner.ownerLibrary);
+                if (wc != null && classVisibleFrom(wc, baseOwner.ownerLibrary)) {
+                    wideRef.resolved = wc;
+                }
+            }
+            String wideJava = javaType(wideRef, false, ctx);
             String narrowJava = javaType(narrow, false, ctx);
             if (isJavaPrimitive(wideJava) || isJavaPrimitive(narrowJava)) {
                 return "";
@@ -3238,7 +3249,7 @@ public final class JavaEmitter {
             MethodDecl sm = sp.method(m.name);
             if (sm != null && !sm.isGetter && !sm.isSetter && !sm.isStatic) {
                 if (sm.params.size() == m.params.size() && !sameParamTypes(sm.params, m.params)) {
-                    return new Object[] {sm, sp.typeParams};
+                    return new Object[] {sm, sp.typeParams, sp};
                 }
                 return null;
             }
@@ -3712,6 +3723,7 @@ public final class JavaEmitter {
         ctx.methodReturnType = rt;
         ctx.inAsyncBody = m.isAsync;
         ctx.boxedLocals.clear();
+        ctx.clearBoxed();
         ctx.boxedLocals.addAll(m.body != null
                 ? CaptureScan.boxedLocals(m.body) : CaptureScan.boxedLocals(m.exprBody));
         ctx.valueCalledLocals.clear();
@@ -4176,7 +4188,7 @@ public final class JavaEmitter {
             }
             String jn = ctx.declareShadowSafe(v.name, t);
             if (ctx.boxedLocals.contains(v.name)) {
-                ctx.markBoxed(v.name);
+                ctx.markBoxed(jn);
                 String holder = refHolder(t, ctx);
                 String initCode = init != null ? coerce(init, t, ctx) : zeroValue(t);
                 w.line("final " + holder + " " + jn + " = new " + holder.split("<")[0]
@@ -8142,7 +8154,7 @@ public final class JavaEmitter {
         TypeRef local = ctx.lookup(n);
         if (local != null) {
             String jn = ctx.javaNameOf(n);
-            String base = ctx.isLate(jn) ? jn + ".get$v()" : ctx.isBoxed(n) ? jn + ".v" : jn;
+            String base = ctx.isLate(jn) ? jn + ".get$v()" : ctx.isBoxed(jn) ? jn + ".v" : jn;
             // Flow-promoted by an `is` guard: read as the narrowed type via a cast.
             TypeRef promo = ctx.promotedType(n);
             if (promo != null) {
@@ -9502,7 +9514,30 @@ public final class JavaEmitter {
      * primitive-list kind ("Long"/"Double") whose getLong/setLong/addLong methods avoid boxing;
      * null for any other list (which uses the boxed {@code DartList}).
      */
+    /// The element type of a dart:typed_data list (Uint8List is a List<int> with no
+    /// type arguments of its own), or null for any other type.
+    private static TypeRef typedDataListElem(TypeRef tt) {
+        if (tt == null || tt.name == null || tt.nullable || !tt.args.isEmpty()) {
+            return null;
+        }
+        String n = tt.name;
+        if (n.equals("Uint8List") || n.equals("Int8List") || n.equals("Uint8ClampedList")
+                || n.equals("Uint16List") || n.equals("Int16List") || n.equals("Uint32List")
+                || n.equals("Int32List") || n.equals("Uint64List") || n.equals("Int64List")) {
+            return TypeRef.INT;
+        }
+        if (n.equals("Float32List") || n.equals("Float64List")) {
+            return TypeRef.DOUBLE;
+        }
+        return null;
+    }
+
     private static String primitiveListKind(TypeRef tt) {
+        TypeRef td = typedDataListElem(tt);
+        if (td != null) {
+            // The runtime classes extend DartLongList / DartDoubleList.
+            return td.is("int") ? "Long" : "Double";
+        }
         if (tt == null || !tt.is("List") || tt.args.isEmpty()) {
             return null;
         }
@@ -9633,7 +9668,8 @@ public final class JavaEmitter {
         }
         String pk = primitiveListKind(tt);
         if (pk != null) {
-            return new Out(target.code + ".get" + pk + "(" + idx.code + ")", tt.arg(0));
+            TypeRef td = typedDataListElem(tt);
+            return new Out(target.code + ".get" + pk + "(" + idx.code + ")", td != null ? td : tt.arg(0));
         }
         if (tt.args.isEmpty()) {
             // A non-generic stub type declaring `operator []` (Match, RegExpMatch,
@@ -10109,6 +10145,9 @@ public final class JavaEmitter {
             }
             TypeRef vt = target.type.is("Map") ? target.type.arg(1) : target.type.arg(0);
             String pk = primitiveListKind(target.type);
+            if (typedDataListElem(target.type) != null) {
+                vt = typedDataListElem(target.type);
+            }
             if (pk != null) {
                 if (postfixValue(a, ctx)) {
                     final String tc = target.code, ic = idx.code;
@@ -10341,6 +10380,10 @@ public final class JavaEmitter {
     }
 
     private void collectPromotions(Expr cond, Ctx ctx, List<Object[]> undo) {
+        // `(a && x is T) ? x : ...`: the parentheses promote exactly as the bare test.
+        while (cond instanceof ParenExpr) {
+            cond = ((ParenExpr) cond).inner;
+        }
         if (cond instanceof Binary && "&&".equals(((Binary) cond).op)) {
             collectPromotions(((Binary) cond).left, ctx, undo);
             collectPromotions(((Binary) cond).right, ctx, undo);
@@ -14952,11 +14995,15 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         // Resolve against the referencing library's imports (not the flat simple-name map),
         // so a name shared by several files (`Backdrop` in pages/ vs studies/shrine/) binds to
         // the one this library actually imports.
-        ClassDecl pc = program.resolveClass(className, ctx.library(), takeCallPrefix(ctx));
+        String ctorPrefix = takeCallPrefix(ctx);
+        ClassDecl pc = program.resolveClass(className, ctx.library(), ctorPrefix);
         // An app class may share a name with a stub type (new_gallery's routes.dart `Path`
         // vs dart:ui `Path`). Prefer the app class only when it is actually visible to the
         // current library (declared or imported); otherwise fall through to the stub.
-        if (pc != null && stubs.isStubClass(className) && !classVisibleFrom(pc, ctx.library())) {
+        // `p.Name(...)` through a prefix whose library provides the app class names that
+        // class, whatever an unprefixed `Name` would mean here.
+        if (pc != null && stubs.isStubClass(className) && !prefixProvides(ctx.library(), ctorPrefix, pc)
+                && !classVisibleFrom(pc, ctx.library())) {
             pc = null;
         }
         if (pc != null) {
@@ -14968,6 +15015,9 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             TypeRef constructed = typeArgs != null && !typeArgs.isEmpty()
                     && typeArgs.size() == pc.typeParams.size()
                     ? TypeRef.of(className, typeArgs.toArray(new TypeRef[0])) : new TypeRef(className);
+            if (prefixProvides(ctx.library(), ctorPrefix, pc)) {
+                constructed.resolved = pc;
+            }
             String twArgs = witnessArgs(pc, typeArgs, posNode, ctx);
             if (ct != null && ct.isFactory) {
                 String fa = canonicalArgs(ct, pc, args, ctx);
@@ -15161,7 +15211,24 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 return true;
             }
         }
+        // An unprefixed import of a library that re-exports the class (a package's
+        // barrel file, `export 'src/ast.dart'`) makes it visible by its bare name too.
+        for (Ast.Directive d : from.importDirectives) {
+            if (d.prefix == null && d.admits(pc.name)
+                    && program.provides(program.resolveImportedLibrary(from, d.uri), pc.name, pc.ownerLibrary)) {
+                return true;
+            }
+        }
         return false;
+    }
+
+    /** Whether {@code import '...' as prefix} in {@code from} provides {@code pc}. */
+    private boolean prefixProvides(Library from, String prefix, ClassDecl pc) {
+        if (from == null || prefix == null || pc.ownerLibrary == null) {
+            return false;
+        }
+        String uri = from.prefixImports.get(prefix);
+        return uri != null && program.provides(program.resolveImportedLibrary(from, uri), pc.name, pc.ownerLibrary);
     }
 
     /** Recursively replaces type-parameter names (e.g. {@code T}, {@code A}) with concrete args. */
@@ -17807,9 +17874,13 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                         : program.resolveImportedLibrary(from, from.prefixImports.get(pfx));
                 List<ClassDecl> same = program.classesByName.get(stripped);
                 t.name = stripped;
-                if (target != null && same != null && same.size() > 1) {
+                // Also when the only other `stripped` is a stub type: `md.Text` is the
+                // markdown package's Text even in a file whose bare `Text` is the widget.
+                if (target != null && same != null
+                        && (same.size() > 1 || stubs.isStubClass(stripped) || stubs.isStubEnum(stripped))) {
                     for (ClassDecl pc : same) {
                         if (program.provides(target, stripped, pc.ownerLibrary)) {
+                            t.resolved = pc;
                             String jn = javaClassName(pc);
                             if (!classRefMode && interfacedClasses().contains(pc)) {
                                 jn = jn + "$I";
@@ -17954,8 +18025,10 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             return "Object";
         }
         // app class (preferred when visible) — a disambiguated name resolves a collision with
-        // another app class or a stub type of the same simple name.
-        String appName = resolveAppClassName(t.name, ctx.library(), ctx);
+        // another app class or a stub type of the same simple name. A type that came from a
+        // prefixed name keeps the class the prefix chose.
+        String appName = t.resolved != null && t.name.equals(t.resolved.name)
+                ? javaClassName(t.resolved) : resolveAppClassName(t.name, ctx.library(), ctx);
         if (appName != null) {
             if (!classRefMode) {
                 ClassDecl pcl = program.resolveClass(t.name, ctx.library());
@@ -19408,12 +19481,19 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         TypeRef syncStarElem;                 // element type yielded by the enclosing sync* body
         private int tempCounter;
 
-        void markBoxed(String name) {
-            boxedActive.add(name);
+        /// Keyed by the JAVA name, never the Dart one: a closure parameter or an inner
+        /// local that shadows a boxed local is a different variable (renamed `x$1`),
+        /// and a later method's same-named plain local must not inherit the box.
+        void markBoxed(String javaName) {
+            boxedActive.add(javaName);
         }
 
-        boolean isBoxed(String name) {
-            return boxedActive.contains(name);
+        boolean isBoxed(String javaName) {
+            return boxedActive.contains(javaName);
+        }
+
+        void clearBoxed() {
+            boxedActive.clear();
         }
 
         private final List<Out> cascadeTargets = new ArrayList<Out>();
@@ -19517,6 +19597,9 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 javaName = javaName + "$" + (shadowCounter++);
             }
             declare(name, type);
+            // A fresh declaration is unboxed until its caller marks it (sibling scopes
+            // reuse a Java name).
+            boxedActive.remove(javaName);
             if (!javaName.equals(name) && !renameScopes.isEmpty()) {
                 renameScopes.get(renameScopes.size() - 1).put(name, javaName);
             }

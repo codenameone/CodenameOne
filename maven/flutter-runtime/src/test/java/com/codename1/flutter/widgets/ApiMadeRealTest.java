@@ -159,13 +159,19 @@ class ApiMadeRealTest {
         return t;
     }
 
+    private static Text tall(String s, double size, double height) {
+        Text t = sized(s, size);
+        t.getStyle().height(height);
+        return t;
+    }
+
     @Test
     void baselineAlignmentLinesUpTextBaselines() {
         RasterDisplay.install();
         try {
             Row row = new Row();
             row.crossAxisAlignment(CrossAxisAlignment.baseline);
-            row.children(DartList.of((Widget) sized("small", 10), sized("BIG", 40)));
+            row.children(DartList.of((Widget) sized("small", 10), tall("BIG", 40, 2)));
             RenderElement r = mountAndLayout(row, BoxConstraints.loose(400, 400));
             RenderElement small = r.renderChildren().get(0);
             RenderElement big = r.renderChildren().get(1);
@@ -179,42 +185,40 @@ class ApiMadeRealTest {
         }
     }
 
-    /** The right-most ink column in the first text line of a painted Text. */
-    private static int firstLineRightInk(TextAlign align) {
+    /** How far right the first painted line of a wrapped Text reaches, and the box width. */
+    private static int[] firstLineReach(TextAlign align) {
         Text t = sized("aa bb cc dd ee ff gg hh ii jj kk ll mm nn oo pp qq rr ss tt", 14);
         t.textAlign(align);
-        RenderElement r = mountAndLayout(t, BoxConstraints.loose(120, 1000));
-        r.position(0, 0);
+        RenderElement r = mountAndLayout(t, BoxConstraints.tight(123, 400));
         Component c = r.component();
-        int w = (int) Math.ceil(r.size().width());
-        int h = (int) Math.ceil(r.size().height());
         c.setX(0);
         c.setY(0);
-        c.setWidth(w);
-        c.setHeight(h);
-        Image img = Image.createImage(w, h, 0xffffffff);
-        Graphics g = img.getGraphics();
-        c.paint(g);
-        int[] rgb = img.getRGB();
-        int lineH = h / 4;
-        int right = -1;
-        for (int y = 0; y < Math.max(1, lineH); y++) {
-            for (int x = 0; x < w; x++) {
-                if ((rgb[y * w + x] & 0xffffff) != 0xffffff && x > right) {
-                    right = x;
-                }
+        c.setWidth(123);
+        c.setHeight(400);
+        Image img = Image.createImage(123, 400, 0xffffffff);
+        RasterDisplay.DRAWN_TEXT.clear();
+        c.paint(img.getGraphics());
+        int firstY = Integer.MAX_VALUE;
+        for (int[] d : RasterDisplay.DRAWN_TEXT) {
+            firstY = Math.min(firstY, d[1]);
+        }
+        int reach = -1;
+        for (int[] d : RasterDisplay.DRAWN_TEXT) {
+            if (d[1] == firstY) {
+                reach = Math.max(reach, d[0] + d[2]);
             }
         }
-        return right;
+        return new int[] {reach, c.getWidth()};
     }
 
     @Test
     void justifiedLinesReachTheRightEdge() {
         RasterDisplay.install();
         try {
-            int start = firstLineRightInk(TextAlign.start);
-            int justified = firstLineRightInk(TextAlign.justify);
-            assertTrue(justified > start, "justify stretches the first line: " + start + " vs " + justified);
+            int[] start = firstLineReach(TextAlign.start);
+            int[] justified = firstLineReach(TextAlign.justify);
+            assertTrue(start[0] > 0 && start[0] < start[1] - 8, "a ragged first line: " + start[0]);
+            assertEquals(justified[1], justified[0], 2, "justify stretches the first line to the edge");
         } finally {
             RasterDisplay.uninstall();
         }

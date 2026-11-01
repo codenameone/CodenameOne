@@ -64,6 +64,18 @@ public class SelectableText extends StatelessWidget {
         return rich(textSpan, key, style, textAlign, maxLines, textDirection, null, null, null, null);
     }
 
+    /// The full {@code rich} below
+    /// with a typed selection callback, so a Dart closure literal handed straight to
+    /// {@code onSelectionChanged:} (a lambda needs a functional target type) compiles.
+    public static SelectableText rich(TextSpan textSpan, Key key, TextStyle style,
+                                      TextAlign textAlign, Long maxLines,
+                                      Object textDirection, Object textScaler,
+                                      Funcs.VoidFunc2<com.codename1.flutter.TextSelection, com.codename1.flutter.SelectionChangedCause> onSelectionChanged,
+                                      Object onTap, Boolean showCursor) {
+        return rich(textSpan, key, style, textAlign, maxLines, textDirection, textScaler,
+                (Object) onSelectionChanged, onTap, showCursor);
+    }
+
     /// The full {@code SelectableText.rich}: textScaler, onSelectionChanged, onTap and showCursor too.
     public static SelectableText rich(TextSpan textSpan, Key key, TextStyle style,
                                       TextAlign textAlign, Long maxLines,

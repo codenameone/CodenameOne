@@ -494,7 +494,12 @@ public final class RasterDisplay extends CodenameOneImplementation {
 
     @Override
     public void drawString(Object graphics, String str, int x, int y) {
+        DRAWN_TEXT.add(new int[] {x, y, str == null ? 0 : str.length() * 8});
     }
+
+    /// Every string drawn since the last clear, as {x, y, width}: glyphs are not
+    /// rasterised, so this is how a test sees where text was placed.
+    public static final java.util.List<int[]> DRAWN_TEXT = new java.util.ArrayList<int[]>();
 
     @Override
     public void drawImage(Object graphics, Object img, int x, int y) {
