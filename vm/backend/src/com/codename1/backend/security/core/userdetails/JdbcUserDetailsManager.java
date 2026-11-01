@@ -87,12 +87,12 @@ public class JdbcUserDetailsManager implements UserDetailsManager, UserDetailsPa
         List authorities;
         try {
             row = dataSource.queryOne("SELECT username, password, enabled, account_non_expired, "
-                    + "account_non_locked, credentials_non_expired FROM cn1_users WHERE "
+                    + "account_non_locked, credentials_non_expired FROM " + SecuritySchema.table("cn1_users") + " WHERE "
                     + "username_key = ?", new Object[] {key});
             if (row == null) {
                 throw new UsernameNotFoundException(username);
             }
-            authorities = dataSource.query("SELECT authority FROM cn1_authorities WHERE "
+            authorities = dataSource.query("SELECT authority FROM " + SecuritySchema.table("cn1_authorities") + " WHERE "
                     + "username_key = ?", new Object[] {key});
         } catch (java.io.IOException err) {
             throw failed("load the user", err);
@@ -120,7 +120,7 @@ public class JdbcUserDetailsManager implements UserDetailsManager, UserDetailsPa
             String name = authority.getAuthority();
             if (name != null && !seen.contains(name)) {
                 seen.add(name);
-                db.execute("INSERT INTO cn1_authorities (username_key, authority) VALUES (?, ?)",
+                db.execute("INSERT INTO " + SecuritySchema.table("cn1_authorities") + " (username_key, authority) VALUES (?, ?)",
                         new Object[] {key, name});
             }
         }
@@ -174,11 +174,11 @@ public class JdbcUserDetailsManager implements UserDetailsManager, UserDetailsPa
         @Override
         public Object run(Database db) throws Exception {
             if (kind == CREATE) {
-                if (db.queryOne("SELECT username_key FROM cn1_users WHERE username_key = ?",
+                if (db.queryOne("SELECT username_key FROM " + SecuritySchema.table("cn1_users") + " WHERE username_key = ?",
                         new Object[] {key}) != null) {
                     throw new IllegalArgumentException("user should not exist");
                 }
-                db.execute("INSERT INTO cn1_users (username_key, username, password, enabled, "
+                db.execute("INSERT INTO " + SecuritySchema.table("cn1_users") + " (username_key, username, password, enabled, "
                         + "account_non_expired, account_non_locked, credentials_non_expired) "
                         + "VALUES (?, ?, ?, ?, ?, ?, ?)", new Object[] {key, user.getUsername(),
                             user.getPassword(), flag(user.isEnabled()),
@@ -188,7 +188,7 @@ public class JdbcUserDetailsManager implements UserDetailsManager, UserDetailsPa
                 return null;
             }
             if (kind == UPDATE) {
-                int changed = db.execute("UPDATE cn1_users SET username = ?, password = ?, "
+                int changed = db.execute("UPDATE " + SecuritySchema.table("cn1_users") + " SET username = ?, password = ?, "
                         + "enabled = ?, account_non_expired = ?, account_non_locked = ?, "
                         + "credentials_non_expired = ? WHERE username_key = ?",
                         new Object[] {user.getUsername(), user.getPassword(),
@@ -198,45 +198,45 @@ public class JdbcUserDetailsManager implements UserDetailsManager, UserDetailsPa
                 if (changed != 1) {
                     throw new IllegalArgumentException("user should exist");
                 }
-                db.execute("DELETE FROM cn1_authorities WHERE username_key = ?",
+                db.execute("DELETE FROM " + SecuritySchema.table("cn1_authorities") + " WHERE username_key = ?",
                         new Object[] {key});
                 insertAuthorities(db, key, user);
                 return null;
             }
             deleteCredentials(db, key);
-            db.execute("DELETE FROM cn1_authorities WHERE username_key = ?", new Object[] {key});
-            db.execute("DELETE FROM cn1_users WHERE username_key = ?", new Object[] {key});
+            db.execute("DELETE FROM " + SecuritySchema.table("cn1_authorities") + " WHERE username_key = ?", new Object[] {key});
+            db.execute("DELETE FROM " + SecuritySchema.table("cn1_users") + " WHERE username_key = ?", new Object[] {key});
             return null;
         }
 
         /// These rows must disappear in the same transaction as the account. Otherwise
         /// reusing a username lets the old account's durable credentials sign in again.
         private static void deleteCredentials(Database db, String key) throws java.io.IOException {
-            db.execute("DELETE FROM cn1_persistent_logins WHERE username_key = ?", new Object[] {key});
-            db.execute("DELETE FROM cn1_mfa_totp WHERE username_key = ?", new Object[] {key});
-            db.execute("DELETE FROM cn1_mfa_recovery_code WHERE username_key = ?", new Object[] {key});
-            db.execute("DELETE FROM cn1_federated_identity WHERE username_key = ?", new Object[] {key});
-            db.execute("DELETE FROM cn1_webauthn_credential WHERE user_id IN "
-                    + "(SELECT user_id FROM cn1_webauthn_user WHERE username_key = ?)", new Object[] {key});
-            db.execute("DELETE FROM cn1_webauthn_user WHERE username_key = ?", new Object[] {key});
+            db.execute("DELETE FROM " + SecuritySchema.table("cn1_persistent_logins") + " WHERE username_key = ?", new Object[] {key});
+            db.execute("DELETE FROM " + SecuritySchema.table("cn1_mfa_totp") + " WHERE username_key = ?", new Object[] {key});
+            db.execute("DELETE FROM " + SecuritySchema.table("cn1_mfa_recovery_code") + " WHERE username_key = ?", new Object[] {key});
+            db.execute("DELETE FROM " + SecuritySchema.table("cn1_federated_identity") + " WHERE username_key = ?", new Object[] {key});
+            db.execute("DELETE FROM " + SecuritySchema.table("cn1_webauthn_credential") + " WHERE user_id IN "
+                    + "(SELECT user_id FROM " + SecuritySchema.table("cn1_webauthn_user") + " WHERE username_key = ?)", new Object[] {key});
+            db.execute("DELETE FROM " + SecuritySchema.table("cn1_webauthn_user") + " WHERE username_key = ?", new Object[] {key});
             // These two stores retain the principal's original spelling rather than
             // username_key. Use the same ASCII-only fold as the user store, independent
             // of the database's locale and collation. Client-credentials grants name a
             // client rather than a user and must survive a user with the same name.
-            for (Object row : db.query("SELECT key_hash, owner FROM cn1_api_key", null)) {
+            for (Object row : db.query("SELECT key_hash, owner FROM " + SecuritySchema.table("cn1_api_key"), null)) {
                 Map values = (Map) row;
                 if (key.equals(SecuritySchema.usernameKey((String) values.get("owner")))) {
-                    db.execute("DELETE FROM cn1_api_key WHERE key_hash = ?",
+                    db.execute("DELETE FROM " + SecuritySchema.table("cn1_api_key") + " WHERE key_hash = ?",
                             new Object[] {values.get("key_hash")});
                 }
             }
-            for (Object row : db.query("SELECT id, principal_name FROM cn1_oauth2_authorization "
+            for (Object row : db.query("SELECT id, principal_name FROM " + SecuritySchema.table("cn1_oauth2_authorization") + " "
                     + "WHERE grant_type <> 'client_credentials'", null)) {
                 Map values = (Map) row;
                 if (key.equals(SecuritySchema.usernameKey((String) values.get("principal_name")))) {
                     Object[] id = {values.get("id")};
-                    db.execute("DELETE FROM cn1_oauth2_token WHERE authorization_id = ?", id);
-                    db.execute("DELETE FROM cn1_oauth2_authorization WHERE id = ?", id);
+                    db.execute("DELETE FROM " + SecuritySchema.table("cn1_oauth2_token") + " WHERE authorization_id = ?", id);
+                    db.execute("DELETE FROM " + SecuritySchema.table("cn1_oauth2_authorization") + " WHERE id = ?", id);
                 }
             }
         }
@@ -245,7 +245,7 @@ public class JdbcUserDetailsManager implements UserDetailsManager, UserDetailsPa
     @Override
     public boolean userExists(String username) {
         try {
-            return dataSource.queryOne("SELECT username_key FROM cn1_users WHERE username_key = ?",
+            return dataSource.queryOne("SELECT username_key FROM " + SecuritySchema.table("cn1_users") + " WHERE username_key = ?",
                     new Object[] {SecuritySchema.usernameKey(username)}) != null;
         } catch (java.io.IOException err) {
             throw failed("look the user up", err);
@@ -268,7 +268,7 @@ public class JdbcUserDetailsManager implements UserDetailsManager, UserDetailsPa
 
     private boolean setPassword(String username, String password) {
         try {
-            return dataSource.execute("UPDATE cn1_users SET password = ? WHERE username_key = ?",
+            return dataSource.execute("UPDATE " + SecuritySchema.table("cn1_users") + " SET password = ? WHERE username_key = ?",
                     new Object[] {password, SecuritySchema.usernameKey(username)}) == 1;
         } catch (java.io.IOException err) {
             throw failed("store the password", err);

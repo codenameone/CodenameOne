@@ -26,6 +26,8 @@ import com.codename1.backend.DataSource;
 import com.codename1.backend.security.AuthenticationServiceException;
 import com.codename1.backend.security.SecuritySchema;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 /// Remembered sign-ins kept in the server's database, in the
@@ -56,11 +58,13 @@ public final class JdbcTokenRepository implements PersistentTokenRepository {
     @Override
     public void createNewToken(PersistentRememberMeToken token) {
         try {
-            dataSource.execute("INSERT INTO cn1_persistent_logins (series, username_key, "
-                    + "username, token_hash, last_used, previous_token_hash) VALUES (?, ?, ?, ?, ?, ?)", new Object[] {
+            dataSource.execute("INSERT INTO " + SecuritySchema.table("cn1_persistent_logins") + " (series, username_key, "
+                    + "username, token_hash, last_used, previous_token_hash, user_agent, ip_address) "
+                    + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)", new Object[] {
                         token.getSeries(), SecuritySchema.usernameKey(token.getUsername()),
                         token.getUsername(), token.getTokenHash(),
-                        Long.valueOf(token.getLastUsed()), token.getPreviousTokenHash()});
+                        Long.valueOf(token.getLastUsed()), token.getPreviousTokenHash(),
+                        token.getUserAgent(), token.getIpAddress()});
         } catch (IOException err) {
             throw failed(err);
         }
@@ -70,7 +74,7 @@ public final class JdbcTokenRepository implements PersistentTokenRepository {
     public boolean updateToken(String series, String expectedTokenHash, String newTokenHash,
                                long lastUsed) {
         try {
-            return dataSource.execute("UPDATE cn1_persistent_logins SET previous_token_hash = ?, "
+            return dataSource.execute("UPDATE " + SecuritySchema.table("cn1_persistent_logins") + " SET previous_token_hash = ?, "
                     + "token_hash = ?, last_used = ? WHERE series = ? AND token_hash = ?", new Object[] {
                         expectedTokenHash, newTokenHash, Long.valueOf(lastUsed), series, expectedTokenHash}) == 1;
         } catch (IOException err) {
@@ -84,16 +88,13 @@ public final class JdbcTokenRepository implements PersistentTokenRepository {
             return null;
         }
         try {
-            Map row = dataSource.queryOne("SELECT username, token_hash, last_used, previous_token_hash FROM "
-                    + "cn1_persistent_logins WHERE series = ?", new Object[] {series});
+            Map row = dataSource.queryOne("SELECT username, token_hash, last_used, previous_token_hash, user_agent, "
+                    + "ip_address FROM "
+                    + SecuritySchema.table("cn1_persistent_logins") + " WHERE series = ?", new Object[] {series});
             if (row == null) {
                 return null;
             }
-            Object used = row.get("last_used");
-            return new PersistentRememberMeToken(String.valueOf(row.get("username")), series,
-                    String.valueOf(row.get("token_hash")),
-                    used instanceof Number ? ((Number) used).longValue() : 0L,
-                    (String) row.get("previous_token_hash"));
+            return token(row, series);
         } catch (IOException err) {
             throw failed(err);
         }
@@ -102,7 +103,7 @@ public final class JdbcTokenRepository implements PersistentTokenRepository {
     @Override
     public void removeToken(String series) {
         try {
-            dataSource.execute("DELETE FROM cn1_persistent_logins WHERE series = ?",
+            dataSource.execute("DELETE FROM " + SecuritySchema.table("cn1_persistent_logins") + " WHERE series = ?",
                     new Object[] {series});
         } catch (IOException err) {
             throw failed(err);
@@ -112,7 +113,7 @@ public final class JdbcTokenRepository implements PersistentTokenRepository {
     @Override
     public void removeUserTokens(String username) {
         try {
-            dataSource.execute("DELETE FROM cn1_persistent_logins WHERE username_key = ?",
+            dataSource.execute("DELETE FROM " + SecuritySchema.table("cn1_persistent_logins") + " WHERE username_key = ?",
                     new Object[] {SecuritySchema.usernameKey(username)});
         } catch (IOException err) {
             throw failed(err);
@@ -124,8 +125,58 @@ public final class JdbcTokenRepository implements PersistentTokenRepository {
     ///
     /// @param now epoch milliseconds
     /// @return how many were deleted
+    private static PersistentRememberMeToken token(Map row, String series) {
+        Object used = row.get("last_used");
+        return new PersistentRememberMeToken(String.valueOf(row.get("username")), series,
+                String.valueOf(row.get("token_hash")),
+                used instanceof Number ? ((Number) used).longValue() : 0L,
+                text(row.get("previous_token_hash")), text(row.get("user_agent")),
+                text(row.get("ip_address")));
+    }
+
+    private static String text(Object value) {
+        return value instanceof String ? (String) value : null;
+    }
+
+    /// Every series of a user, most recently used first.
+    @Override
+    public List<PersistentRememberMeToken> getTokensForUser(String username) {
+        List<PersistentRememberMeToken> out = new ArrayList<PersistentRememberMeToken>();
+        if (username == null) {
+            return out;
+        }
+        try {
+            for (Object row : dataSource.query("SELECT series, username, token_hash, last_used, "
+                    + "previous_token_hash, user_agent, ip_address FROM "
+                    + SecuritySchema.table("cn1_persistent_logins") + " WHERE username_key = ? "
+                    + "ORDER BY last_used DESC", new Object[] {SecuritySchema.usernameKey(username)})) {
+                Map map = (Map) row;
+                out.add(token(map, String.valueOf(map.get("series"))));
+            }
+            return out;
+        } catch (IOException err) {
+            throw failed(err);
+        }
+    }
+
+    /// Removes the series in one statement that names its owner, so it cannot
+    /// remove another user's.
+    @Override
+    public boolean removeUserToken(String username, String series) {
+        if (username == null || series == null) {
+            return false;
+        }
+        try {
+            return dataSource.execute("DELETE FROM " + SecuritySchema.table("cn1_persistent_logins")
+                    + " WHERE series = ? AND username_key = ?", new Object[] {series,
+                        SecuritySchema.usernameKey(username)}) == 1;
+        } catch (IOException err) {
+            throw failed(err);
+        }
+    }
+
     public int deleteExpired(long now, long olderThanSeconds) throws IOException {
-        return dataSource.execute("DELETE FROM cn1_persistent_logins WHERE last_used < ?",
+        return dataSource.execute("DELETE FROM " + SecuritySchema.table("cn1_persistent_logins") + " WHERE last_used < ?",
                 new Object[] {Long.valueOf(now - olderThanSeconds * 1000L)});
     }
 }

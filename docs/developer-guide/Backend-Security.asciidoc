@@ -1347,6 +1347,13 @@ Show them to the user once. The server keeps a hash of each and can't show
 them again. Each code works once, in place of a one-time code at sign-in, and
 generating again replaces whatever was left.
 
+New codes are hashed with PBKDF2 and stored as `{pbkdf2-sha256}...`. A stored
+hash says which scheme made it, the way a password does, so codes another
+system issued can be imported without asking every user for new ones: store
+the hexadecimal SHA-256 of each code as `{sha256}<hex>`, hashed from the code in
+lower case without its dashes or spaces. To verify another scheme, pass your
+own `PasswordEncoder` to `new RecoveryCodeService(repository, encoder)`.
+
 ==== The encryption key
 
 `JdbcTotpRepository` seals each authenticator secret with AES-GCM before it
@@ -1506,6 +1513,11 @@ On a chain with `mfa`, the cookie of a user who has a second factor works only
 if the sign-in that issued it passed that factor. The server records which
 kind each cookie is.
 
+Each token records the `User-Agent` and client address of the sign-in that
+issued it. `PersistentTokenRepository.getTokensForUser` lists a user's tokens
+for a "signed-in devices" page, and `removeUserToken(username, series)` signs
+one of them out. It refuses a series that belongs to someone else.
+
 Without a `tokenRepository` or a `PersistentTokenRepository` bean, the tokens
 are kept in memory. They're then forgotten when the server restarts, and
 they're no use to a deployment of several instances.
@@ -1606,7 +1618,26 @@ are the same on SQLite, PostgreSQL, and MySQL.
 | 11
 | `cn1_persistent_logins.previous_token_hash`
 | A brief grace period for parallel uses of a remembered sign-in after token rotation.
+
+| 12
+| `cn1_persistent_logins.user_agent`, `cn1_persistent_logins.ip_address`
+| The device each remembered sign-in came from.
 |===
+
+To use tables you already have, give their names in `application.properties`.
+A per-table setting names one table, and a prefix replaces the `cn1_` in front
+of all of them. The per-table setting wins:
+
+[source,properties]
+----
+cn1.security.table-prefix=auth_
+cn1.security.table.cn1_users=app_users
+----
+
+A name must be letters, digits and `_`, optionally after one schema name and a
+dot (`auth.users`). The server refuses to start with anything else. An adopted
+table must have the columns this chapter's stores use. Every store and every
+schema version uses the configured names.
 
 The key creates the tables. It doesn't choose the stores. Each store is still
 a bean you declare, or an object you hand to a chain, as the examples in this
