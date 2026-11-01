@@ -66,7 +66,12 @@ public class RichText extends Widget {
 
     private Object textScaler;
 
+    /// RichText.textScaler: every span's font size is scaled by it.
     public void textScaler(Object v) {
         this.textScaler = v;
+    }
+
+    public Object getTextScaler() {
+        return textScaler;
     }
 }

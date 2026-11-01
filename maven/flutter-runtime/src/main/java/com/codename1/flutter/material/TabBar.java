@@ -276,8 +276,9 @@ public class TabBar extends StatelessWidget {
         return col;
     }
 
-    /// Flutter's {@code TabBar.preferredSize}: as wide as it is given, 46 high,
-    /// or 72 when a tab shows both an icon and text.
+    /// Flutter's {@code TabBar.preferredSize}: as wide as it is given, and as high
+    /// as its tallest tab (46, or 72 when a tab shows both an icon and text) plus
+    /// the indicator weight.
     public com.codename1.flutter.rendering.Size preferredSize() {
         double h = 46.0;
         if (tabs != null) {
@@ -288,6 +289,7 @@ public class TabBar extends StatelessWidget {
                 }
             }
         }
+        h += indicatorWeight != null ? indicatorWeight.doubleValue() : 2.0;
         return new com.codename1.flutter.rendering.Size(Double.POSITIVE_INFINITY, h);
     }
 }

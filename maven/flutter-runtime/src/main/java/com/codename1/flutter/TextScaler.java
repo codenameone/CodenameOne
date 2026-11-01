@@ -45,6 +45,19 @@ public final class TextScaler {
     }
 
     /** Flutter's (deprecated, still common) {@code textScaleFactor}. */
+    /// The style a text with this scaler draws with: the font size (14 when the style
+    /// names none, Flutter's default) scaled. Anything but a TextScaler, or no
+    /// scaling, answers the style unchanged.
+    public static TextStyle applyTo(Object scaler, TextStyle style) {
+        if (!(scaler instanceof TextScaler) || ((TextScaler) scaler).textScaleFactor() == 1.0) {
+            return style;
+        }
+        TextStyle base = style != null ? style : new TextStyle();
+        double size = base.getFontSize() != null ? base.getFontSize().doubleValue() : 14.0;
+        return base.copyWith(null, null, null, null, ((TextScaler) scaler).scale(size),
+                null, null, null, null, null, null, null, null);
+    }
+
     public double textScaleFactor() {
         return factor;
     }

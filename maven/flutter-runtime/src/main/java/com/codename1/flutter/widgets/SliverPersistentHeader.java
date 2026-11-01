@@ -30,11 +30,10 @@ import com.codename1.flutter.Widget;
 /// Flutter's {@code SliverPersistentHeader}: a header among slivers built by its
 /// delegate.
 ///
-/// The header is built at its full extent, with a shrinkOffset of 0 and nothing
-/// under it: the sliver scroll views here lay slivers out as boxes and report no
-/// scroll offset to a sliver, so a pinned or floating header scrolls away with
-/// the content instead of shrinking. pinned and floating are kept for
-/// isPinned()/isFloating().
+/// Inside a {@link CustomScrollView} the view drives it: the scroll offset becomes
+/// the shrinkOffset, a pinned header shrinks to minExtent and stays, a floating one
+/// returns on reverse scrolling (see CustomScrollView for the one case it cannot
+/// place). Built on its own, as here, it is at full extent with a shrinkOffset of 0.
 public class SliverPersistentHeader extends StatelessWidget {
 
     private SliverPersistentHeaderDelegate delegate;

@@ -45,9 +45,24 @@ class SliverOverlapInjector extends Widget {
   external SliverOverlapInjector({Key? key, required SliverOverlapAbsorberHandle handle, Widget? sliver});
 }
 
+@JavaName('com.codename1.flutter.widgets.DraggableScrollableController')
+class DraggableScrollableController {
+  external DraggableScrollableController();
+  external bool get isAttached;
+  external double get size;
+  external double get pixels;
+  external double sizeToPixels(double size);
+  external double pixelsToSize(double pixels);
+  external void jumpTo(double size);
+  external Future<void> animateTo(double size, {required Duration duration, required Curve curve});
+  external void addListener(VoidCallback listener);
+  external void removeListener(VoidCallback listener);
+  external void dispose();
+}
+
 @JavaName('com.codename1.flutter.widgets.DraggableScrollableSheet')
 class DraggableScrollableSheet extends Widget {
-  external DraggableScrollableSheet({Key? key, double? initialChildSize, double? minChildSize, double? maxChildSize, bool? expand, bool? snap, required Widget Function(BuildContext, ScrollController) builder});
+  external DraggableScrollableSheet({Key? key, double? initialChildSize, double? minChildSize, double? maxChildSize, bool? expand, bool? snap, List<double>? snapSizes, DraggableScrollableController? controller, bool? shouldCloseOnMinExtent, required Widget Function(BuildContext, ScrollController) builder});
 }
 
 @JavaName('com.codename1.flutter.material.Autocomplete')

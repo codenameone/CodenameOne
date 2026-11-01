@@ -114,7 +114,7 @@ public class TextRenderElement extends RenderElement {
     }
 
     private void applyStyle(Label l) {
-        TextStyle ts = effectiveStyle();
+        TextStyle ts = com.codename1.flutter.TextScaler.applyTo(text().textScaler(), effectiveStyle());
         if (l instanceof WrappedLabel) {
             double sp = ts == null || ts.getLetterSpacing() == null
                     ? 0 : Dp.px(ts.getLetterSpacing().doubleValue());

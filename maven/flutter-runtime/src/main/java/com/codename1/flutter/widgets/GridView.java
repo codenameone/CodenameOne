@@ -131,8 +131,8 @@ public class GridView extends Widget {
 
     private Object scrollDirection;
 
-    /// GridView.builder with its scroll direction. The direction is recorded
-    /// (getScrollDirection); the grid itself is laid out vertically.
+    /// GridView.builder with its scroll direction; Axis.horizontal scrolls and lays
+    /// the grid out horizontally.
     public static GridView builder(Key key, Long itemCount,
                                    Funcs.Func2<BuildContext, Long, Widget> itemBuilder,
                                    Object gridDelegate, EdgeInsets padding, Boolean shrinkWrap,
@@ -151,6 +151,10 @@ public class GridView extends Widget {
                 mainAxisSpacing, crossAxisSpacing, padding, children);
         g.scrollDirection = scrollDirection;
         return g;
+    }
+
+    public void scrollDirection(Object v) {
+        this.scrollDirection = v;
     }
 
     public Object getScrollDirection() {

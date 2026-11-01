@@ -315,7 +315,11 @@ public class TextStyle {
 
     private Object fontFeatures;
 
-    /// TextStyle.fontFeatures, recorded; OpenType features are not applied.
+    /// TextStyle.fontFeatures, recorded and not applied. Codename One's Font draws a
+    /// face's default glyphs and exposes no OpenType feature selection (no GSUB/GPOS
+    /// access), so FontFeature.tabularFigures() cannot switch a proportional face to
+    /// its tabular digits; a face whose digits are tabular by default (most UI fonts'
+    /// are) already lines numbers up. Use a monospaced family where alignment matters.
     public void fontFeatures(Object v) {
         this.fontFeatures = v;
     }

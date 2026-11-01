@@ -15,8 +15,8 @@ Iterable<String> filter(TextEditingValue v) {
 void main() {
   final m = Matrix4.identity();
   final s = m.storage;
-  s[12] = 5;
-  s[13] = 7;
+  s[12] = 5.0;
+  s[13] = 7.0;
   print('translation: ${m.storage[12]} ${m.storage[13]}');
   final t = Matrix4.translationValues(1, 2, 3);
   print('translation storage: ${t.storage[12]} ${t.storage[13]} ${t.storage[14]}');

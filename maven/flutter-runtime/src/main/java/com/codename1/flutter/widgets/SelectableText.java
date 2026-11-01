@@ -27,8 +27,10 @@ import com.codename1.flutter.BuildContext;
 import com.codename1.flutter.Key;
 import com.codename1.flutter.StatelessWidget;
 import com.codename1.flutter.TextAlign;
+import com.codename1.flutter.TextSelection;
 import com.codename1.flutter.TextStyle;
 import com.codename1.flutter.Widget;
+import dart.runtime.Funcs;
 
 /**
  * Selectable, non-editable text — Flutter's {@code SelectableText}. Text
@@ -78,7 +80,10 @@ public class SelectableText extends StatelessWidget {
     public void maxLines(long v) {
     }
 
+    private Object onTap;
+
     public void textScaleFactor(double v) {
+        this.textScaler = com.codename1.flutter.TextScaler.linear(v);
     }
 
     public void showCursor(boolean v) {
@@ -91,6 +96,7 @@ public class SelectableText extends StatelessWidget {
     }
 
     public void onTap(Object v) {
+        this.onTap = v;
     }
 
     public void focusNode(Object v) {
@@ -99,31 +105,74 @@ public class SelectableText extends StatelessWidget {
     public void scrollPhysics(Object v) {
     }
 
+    /// The text's length in UTF-16 units, the offsets a selection is counted in.
+    private long length() {
+        if (data != null) {
+            return data.length();
+        }
+        StringBuilder sb = new StringBuilder();
+        for (RichTextRenderElement.Run r : RichTextRenderElement.flatten(textSpan)) {
+            sb.append(r.text);
+        }
+        return sb.length();
+    }
+
+    /// Changes the selection and reports it to onSelectionChanged, with a null
+    /// cause (there is no SelectionChangedCause type here). A long press selects the
+    /// whole text; a tap collapses the selection at its start, and calls onTap.
+    @SuppressWarnings("unchecked")
+    public void select(long base, long extent) {
+        TextSelection sel = new TextSelection();
+        sel.baseOffset(base);
+        sel.extentOffset(extent);
+        if (onSelectionChanged instanceof Funcs.VoidFunc2) {
+            ((Funcs.VoidFunc2<Object, Object>) onSelectionChanged).call(sel, null);
+        } else if (onSelectionChanged instanceof Funcs.Func2) {
+            ((Funcs.Func2<Object, Object, Object>) onSelectionChanged).call(sel, null);
+        }
+    }
+
     @Override
     public Widget build(BuildContext context) {
+        Widget shown;
         if (textSpan != null) {
             RichText r = new RichText();
             r.text(textSpan);
             if (textAlign != null) {
                 r.textAlign(textAlign);
             }
-            return r;
+            r.textScaler(textScaler);
+            shown = r;
+        } else {
+            Text t = new Text(data);
+            if (style != null) {
+                t.style(style);
+            }
+            if (textAlign != null) {
+                t.textAlign(textAlign);
+            }
+            t.textScaler(textScaler);
+            shown = t;
         }
-        Text t = new Text(data);
-        if (style != null) {
-            t.style(style);
+        if (onSelectionChanged == null && onTap == null) {
+            return shown;
         }
-        if (textAlign != null) {
-            t.textAlign(textAlign);
-        }
-        return t;
+        GestureDetector g = new GestureDetector();
+        g.onLongPress(() -> select(0, length()));
+        g.onTap(() -> {
+            select(0, 0);
+            if (onTap instanceof Funcs.VoidFunc0) {
+                ((Funcs.VoidFunc0) onTap).call();
+            }
+        });
+        g.child(shown);
+        return g;
     }
 
     private Object onSelectionChanged;
     private Object textScaler;
 
-    /// SelectableText.onSelectionChanged, recorded: selection here is the
-    /// platform's own and reports no changes.
+    /// SelectableText.onSelectionChanged: called with each selection change.
     public void onSelectionChanged(Object v) {
         this.onSelectionChanged = v;
     }

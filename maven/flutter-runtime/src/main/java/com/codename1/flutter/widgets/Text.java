@@ -128,6 +128,7 @@ public class Text extends Widget {
             if (textAlign != null) {
                 rt.textAlign(textAlign);
             }
+            rt.textScaler(textScaler);
             return rt.createElement();
         }
         return new TextRenderElement(this);
@@ -140,7 +141,7 @@ public class Text extends Widget {
 
     private Object textScaler;
 
-    /// Text.textScaler, recorded; the text is drawn at the font's own scale.
+    /// Text.textScaler: the font size is scaled by it (see TextScaler.applyTo).
     public void textScaler(Object v) {
         this.textScaler = v;
     }
