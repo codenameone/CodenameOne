@@ -57,4 +57,9 @@ public class Completer<T> {
     public boolean isCompleted() {
         return future.isCompletedOrAdopting();
     }
+
+    /// {@code Completer.sync()}: completion here is already synchronous.
+    public static <T> Completer<T> sync() {
+        return new Completer<T>();
+    }
 }

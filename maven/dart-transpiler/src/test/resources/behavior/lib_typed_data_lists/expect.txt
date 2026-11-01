@@ -1,0 +1,19 @@
+u32 4294967295 4294967295 7 len=4 bytes=16 es=4
+i8 127 -128 -1 -1
+clamped 255 0 42
+16 -25536 65535 0
+32/64 -2147483648 -2 123456789012
+floats false 1.1000 2.5 -0.25
+view 4 3 2 1 n=2
+partial 205 171 off=2 len=2
+asInt32List 2 16909060
+ops [9, 8, 7, -1, -1, 42]
+sub [100, 7, -1] 8 Int32List
+asList 6 9 42
+fixed length
+u8 ops [0, 1, 2, 3, 9]
+bd 3.75 0.5 18 52
+bd2 305411090 13330 3.75
+bdview 4 12 18
+builder 4 [1, 2, 3, 4]
+taken [1, 2, 3, 4] true

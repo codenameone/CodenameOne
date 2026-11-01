@@ -31,6 +31,8 @@ package dart.typed_data;
 public final class ByteData {
 
     private final byte[] buffer;
+    private final int off;
+    private final int len;
 
     public ByteData(long length) {
         dart.core.RangeError.checkNotNegative(length, "length");
@@ -38,10 +40,39 @@ public final class ByteData {
         // buffer instead of failing, as the list constructors already refuse to.
         dart.core.RangeError.checkAllocatable(length);
         this.buffer = new byte[(int) length];
+        this.off = 0;
+        this.len = (int) length;
     }
 
     private ByteData(byte[] buffer) {
+        this(buffer, 0, buffer.length);
+    }
+
+    private ByteData(byte[] buffer, int off, int len) {
         this.buffer = buffer;
+        this.off = off;
+        this.len = len;
+    }
+
+    public static ByteData view(ByteBuffer buffer) {
+        return view(buffer, 0, null);
+    }
+
+    public static ByteData view(ByteBuffer buffer, long offsetInBytes) {
+        return view(buffer, offsetInBytes, null);
+    }
+
+    public static ByteData view(ByteBuffer buffer, long offsetInBytes, Long length) {
+        int n = Bytes.viewLength(buffer, offsetInBytes, length, 1);
+        return new ByteData(buffer.bytes(), (int) offsetInBytes, n);
+    }
+
+    public long offsetInBytes() {
+        return off;
+    }
+
+    public long elementSizeInBytes() {
+        return 1;
     }
 
     /// A ByteData holding {@code bytes} itself: how a Java encoder's output crosses into
@@ -65,15 +96,15 @@ public final class ByteData {
         // Against length - width, never offset + width: near Long.MAX_VALUE the sum
         // overflowed negative, passed, and the narrowed index threw Java's
         // ArrayIndexOutOfBoundsException instead of Dart's RangeError.
-        if (byteOffset < 0 || byteOffset > buffer.length - width) {
+        if (byteOffset < 0 || byteOffset > len - width) {
             throw new dart.core.RangeError("Invalid value: Not in inclusive range 0.."
-                    + (buffer.length - width) + ": " + byteOffset + " (byteOffset)");
+                    + (len - width) + ": " + byteOffset + " (byteOffset)");
         }
-        return (int) byteOffset;
+        return off + (int) byteOffset;
     }
 
     public long lengthInBytes() {
-        return buffer.length;
+        return len;
     }
 
     public long getUint8(long byteOffset) {
@@ -98,5 +129,133 @@ public final class ByteData {
         buffer[o + 1] = (byte) (value >> 16);
         buffer[o + 2] = (byte) (value >> 8);
         buffer[o + 3] = (byte) value;
+    }
+
+    public long getInt8(long byteOffset) {
+        return (byte) buffer[at(byteOffset, 1)];
+    }
+
+    public void setInt8(long byteOffset, long value) {
+        buffer[at(byteOffset, 1)] = (byte) value;
+    }
+
+    public long getUint16(long byteOffset) {
+        return getUint16(byteOffset, null);
+    }
+
+    public long getUint16(long byteOffset, Endian endian) {
+        return Bytes.read(buffer, at(byteOffset, 2), 2, Endian.little(endian));
+    }
+
+    public void setUint16(long byteOffset, long value) {
+        setUint16(byteOffset, value, null);
+    }
+
+    public void setUint16(long byteOffset, long value, Endian endian) {
+        Bytes.write(buffer, at(byteOffset, 2), 2, Endian.little(endian), value);
+    }
+
+    public long getInt16(long byteOffset) {
+        return getInt16(byteOffset, null);
+    }
+
+    public long getInt16(long byteOffset, Endian endian) {
+        return Bytes.signExtend(Bytes.read(buffer, at(byteOffset, 2), 2, Endian.little(endian)), 2);
+    }
+
+    public void setInt16(long byteOffset, long value) {
+        setInt16(byteOffset, value, null);
+    }
+
+    public void setInt16(long byteOffset, long value, Endian endian) {
+        Bytes.write(buffer, at(byteOffset, 2), 2, Endian.little(endian), value);
+    }
+
+    public long getUint32(long byteOffset) {
+        return getUint32(byteOffset, null);
+    }
+
+    public long getUint32(long byteOffset, Endian endian) {
+        return Bytes.read(buffer, at(byteOffset, 4), 4, Endian.little(endian));
+    }
+
+    public void setUint32(long byteOffset, long value) {
+        setUint32(byteOffset, value, null);
+    }
+
+    public void setUint32(long byteOffset, long value, Endian endian) {
+        Bytes.write(buffer, at(byteOffset, 4), 4, Endian.little(endian), value);
+    }
+
+    public long getInt64(long byteOffset) {
+        return getInt64(byteOffset, null);
+    }
+
+    public long getInt64(long byteOffset, Endian endian) {
+        return Bytes.read(buffer, at(byteOffset, 8), 8, Endian.little(endian));
+    }
+
+    public void setInt64(long byteOffset, long value) {
+        setInt64(byteOffset, value, null);
+    }
+
+    public void setInt64(long byteOffset, long value, Endian endian) {
+        Bytes.write(buffer, at(byteOffset, 8), 8, Endian.little(endian), value);
+    }
+
+    public long getUint64(long byteOffset) {
+        return getUint64(byteOffset, null);
+    }
+
+    public long getUint64(long byteOffset, Endian endian) {
+        return Bytes.read(buffer, at(byteOffset, 8), 8, Endian.little(endian));
+    }
+
+    public void setUint64(long byteOffset, long value) {
+        setUint64(byteOffset, value, null);
+    }
+
+    public void setUint64(long byteOffset, long value, Endian endian) {
+        Bytes.write(buffer, at(byteOffset, 8), 8, Endian.little(endian), value);
+    }
+
+    public long getInt32(long byteOffset, Endian endian) {
+        return Bytes.signExtend(Bytes.read(buffer, at(byteOffset, 4), 4, Endian.little(endian)), 4);
+    }
+
+    public void setInt32(long byteOffset, long value, Endian endian) {
+        Bytes.write(buffer, at(byteOffset, 4), 4, Endian.little(endian), value);
+    }
+
+    public double getFloat32(long byteOffset) {
+        return getFloat32(byteOffset, null);
+    }
+
+    public double getFloat32(long byteOffset, Endian endian) {
+        return Float.intBitsToFloat((int) Bytes.read(buffer, at(byteOffset, 4), 4, Endian.little(endian)));
+    }
+
+    public void setFloat32(long byteOffset, double value) {
+        setFloat32(byteOffset, value, null);
+    }
+
+    public void setFloat32(long byteOffset, double value, Endian endian) {
+        Bytes.write(buffer, at(byteOffset, 4), 4, Endian.little(endian), Float.floatToRawIntBits((float) value));
+    }
+
+    public double getFloat64(long byteOffset) {
+        return getFloat64(byteOffset, null);
+    }
+
+    public double getFloat64(long byteOffset, Endian endian) {
+        return Double.longBitsToDouble(Bytes.read(buffer, at(byteOffset, 8), 8, Endian.little(endian)));
+    }
+
+    public void setFloat64(long byteOffset, double value) {
+        setFloat64(byteOffset, value, null);
+    }
+
+    public void setFloat64(long byteOffset, double value, Endian endian) {
+        Bytes.write(buffer, at(byteOffset, 8), 8, Endian.little(endian), Double.doubleToRawLongBits(value));
     }
 }

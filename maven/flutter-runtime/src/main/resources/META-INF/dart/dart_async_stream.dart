@@ -48,10 +48,12 @@ abstract class StreamSubscription<T> {
   external void pause();
   external void resume();
   external bool get isPaused;
+  external Future<E> asFuture<E>([E? futureValue]);
 }
 
 @JavaName('dart.async.Stream')
 abstract class Stream<T> {
+  external Future pipe(StreamConsumer<T> streamConsumer);
   external StreamSubscription<T> listen(void Function(T event)? onData,
       {Object? onError, void Function()? onDone, bool? cancelOnError});
   external Stream<R> map<R>(R Function(T event) transform);
@@ -97,7 +99,64 @@ abstract class Stream<T> {
 @JavaName('dart.async.StreamTransformer')
 abstract class StreamTransformer<S, T> {
   external Stream<T> bind(Stream<S> stream);
+  external static StreamTransformer fromHandlers(
+      {void Function(dynamic, EventSink<dynamic>)? handleData, Object? handleError,
+      void Function(EventSink<dynamic>)? handleDone});
 }
+
+
+@JavaName('dart.async.StreamConsumer')
+abstract class StreamConsumer<S> {
+  external Future addStream(Stream<S> stream);
+  external Future close();
+}
+
+@JavaName('dart.async.StreamSink')
+abstract class StreamSink<S> implements StreamConsumer<S> {
+  external void add(S event);
+  external void addError(Object error, [StackTrace? stackTrace]);
+  external Future addStream(Stream<S> stream);
+  external Future close();
+  external Future get done;
+}
+
+@JavaName('dart.async.StreamSink')
+abstract class EventSink<T> {
+  external void add(T event);
+  external void addError(Object error, [StackTrace? stackTrace]);
+  external void close();
+}
+
+@JavaName('dart.async.StreamSink')
+abstract class Sink<T> {
+  external void add(T data);
+  external void close();
+}
+
+@JavaName('dart.async.StreamIterator')
+class StreamIterator<T> {
+  external StreamIterator(Stream<T> stream);
+  external T get current;
+  external Future<bool> moveNext();
+  external Future cancel();
+}
+
+@JavaName('dart.async.Zone')
+class Zone {
+  external static Zone get current;
+  external static Zone get root;
+  external Zone? get parent;
+  external dynamic operator [](Object? key);
+}
+
+@JavaName('dart.async.Async.unawaited')
+external void unawaited(Future<void>? future);
+
+@JavaName('dart.async.Async.scheduleMicrotask')
+external void scheduleMicrotask(void Function() callback);
+
+@JavaName('dart.async.Async.runZoned')
+external R runZoned<R>(R Function() body, {Map<Object?, Object?>? zoneValues, Object? zoneSpecification});
 
 @JavaName('dart.async.StreamController')
 class StreamController<T> {
@@ -118,4 +177,8 @@ class StreamController<T> {
   external void add(T event);
   external void addError(Object error);
   external Future<void> close();
+  external StreamSink<T> get sink;
+  external bool get isPaused;
+  external Future get done;
+  external Future addStream(Stream<T> source);
 }

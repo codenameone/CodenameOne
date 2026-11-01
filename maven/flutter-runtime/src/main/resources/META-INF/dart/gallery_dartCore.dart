@@ -148,6 +148,8 @@ class Timer {
   external Timer(Duration duration, VoidCallback callback);
   external void cancel();
   external bool get isActive;
+  external int get tick;
+  external static Timer periodic(Duration duration, void Function(Timer timer) callback);
 }
 
 // dart.async.Completer existed in the runtime with nothing declaring it, so Dart code
@@ -155,6 +157,7 @@ class Timer {
 @JavaName('dart.async.Completer')
 class Completer<T> {
   external Completer();
+  external static Completer sync();
   external Future<T> get future;
   external void complete([T? value]);
   external void completeError(Object error);
@@ -170,40 +173,14 @@ abstract class Future<T> {
   external Future then(Object onValue, {Object? onError});
   external Future catchError(Object onError, {Object? test});
   external Future whenComplete(Object action);
+  external Future<T> timeout(Duration timeLimit, {dynamic Function()? onTimeout});
+  external Stream<T> asStream();
+  external void ignore();
 }
 
 // --- dart:typed_data -------------------------------------------------------
 
-@JavaName('dart.typed_data.Uint8List')
-class Uint8List {
-  external Uint8List(int length);
-  external static Uint8List fromList(List<int> elements);
-  external int get length;
-  external int operator [](int index);
-  external void operator []=(int index, int value);
-  external List<int> toList();
-  external Uint8List sublist(int start, [int? end]);
-  external bool get isEmpty;
-  external bool get isNotEmpty;
-}
-
-@JavaName('dart.typed_data.ByteData')
-class ByteData {
-  external ByteData(int length);
-  external int get lengthInBytes;
-  external int getUint8(int byteOffset);
-  external void setUint8(int byteOffset, int value);
-  external int getInt32(int byteOffset);
-  external void setInt32(int byteOffset, int value);
-  external ByteBuffer get buffer;
-}
-
-@JavaName('dart.typed_data.ByteBuffer')
-class ByteBuffer {
-  external int get lengthInBytes;
-  external Uint8List asUint8List();
-  external ByteData asByteData();
-}
+// dart:typed_data lives in dart_typed_data.dart.
 
 // --- dart:math -------------------------------------------------------------
 // `math` is the import-prefix stub (import 'dart:math' as math;).
@@ -258,6 +235,7 @@ external double log(double x);
 @JavaName('dart.math.DartMath.DartRandom')
 class Random {
   external Random([int seed]);
+  external static Random secure();
   external int nextInt(int max);
   external double nextDouble();
   external bool nextBool();

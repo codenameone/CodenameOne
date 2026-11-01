@@ -30,4 +30,11 @@ package dart.async;
  */
 public interface StreamTransformer<S, T> {
     Stream<T> bind(Stream<S> stream);
+
+    /// {@code StreamTransformer.fromHandlers(handleData:, handleError:, handleDone:)}.
+    static <S, T> StreamTransformer<S, T> fromHandlers(
+            dart.runtime.Funcs.VoidFunc2<S, StreamSink<T>> handleData, Object handleError,
+            dart.runtime.Funcs.VoidFunc1<StreamSink<T>> handleDone) {
+        return new SinkTransformer<S, T>(handleData, handleError, handleDone);
+    }
 }

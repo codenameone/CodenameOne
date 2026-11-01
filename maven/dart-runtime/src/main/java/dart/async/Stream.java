@@ -182,6 +182,24 @@ public class Stream<T> {
      * event channel overrides this to call the platform
      * {@code StreamHandler.onCancel}.
      */
+    /** Hook: a subscription went from running to paused (StreamController's onPause). */
+    protected void onPaused() {
+    }
+
+    /** Hook: a paused subscription is running again (StreamController's onResume). */
+    protected void onResumed() {
+    }
+
+    /// {@code stream.pipe(consumer)}: hands this stream to the consumer, then closes it.
+    public final Future<Object> pipe(final StreamConsumer<T> consumer) {
+        return consumer.addStream(this).then(new Funcs.Func1<Object, Object>() {
+            @Override
+            public Object call(Object ignored) {
+                return consumer.close();
+            }
+        });
+    }
+
     protected void onNoListeners() {
     }
 
@@ -656,6 +674,33 @@ public class Stream<T> {
         @Override
         public void pause() {
             sub.pauseCount++;
+            if (sub.pauseCount == 1) {
+                onPaused();
+            }
+        }
+
+        @Override
+        public Future<Object> asFuture() {
+            return asFuture(null);
+        }
+
+        @Override
+        public Future<Object> asFuture(final Object futureValue) {
+            final Future<Object> f = new Future<Object>();
+            sub.onDone = new Funcs.VoidFunc0() {
+                @Override
+                public void call() {
+                    f.complete(futureValue);
+                }
+            };
+            sub.onError = new Funcs.VoidFunc1<Object>() {
+                @Override
+                public void call(Object e) {
+                    cancelSub(sub);
+                    f.completeError(e);
+                }
+            };
+            return f;
         }
 
         @Override
@@ -672,6 +717,7 @@ public class Stream<T> {
             }
             sub.pauseCount--;
             if (sub.pauseCount == 0) {
+                onResumed();
                 drain(sub);
             }
         }

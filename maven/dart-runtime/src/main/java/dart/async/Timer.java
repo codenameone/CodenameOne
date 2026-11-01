@@ -86,6 +86,11 @@ public final class Timer {
 
     public void cancel() {
         cancelled = true;
+        Timer n = next;
+        next = null;
+        if (n != null) {
+            n.cancel();
+        }
         callback = null;
         Timers.Handle h = handle;
         handle = null;
@@ -104,5 +109,40 @@ public final class Timer {
 
     public boolean isActive() {
         return !cancelled && !fired;
+    }
+
+    private Timer next;
+    private long tick;
+
+    private Timer() {
+    }
+
+    /// {@code Timer.periodic(period, callback)}: a chain of one-shot timers, each
+    /// scheduled when the previous fires, so a slow callback delays the next tick.
+    public static Timer periodic(final Duration period, final Funcs.VoidFunc1<Timer> callback) {
+        final Timer t = new Timer();
+        t.scheduleTick(period, callback);
+        return t;
+    }
+
+    private void scheduleTick(final Duration period, final Funcs.VoidFunc1<Timer> callback) {
+        next = new Timer(period, new Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+                if (cancelled) {
+                    return;
+                }
+                tick++;
+                callback.call(Timer.this);
+                if (!cancelled) {
+                    scheduleTick(period, callback);
+                }
+            }
+        });
+    }
+
+    /// The number of periods that have fired; 0 for a one-shot timer until it fires.
+    public long tick() {
+        return next != null || tick > 0 ? tick : (fired ? 1 : 0);
     }
 }

@@ -1,0 +1,17 @@
+timed out
+timeout onTimeout 9
+asStream [3]
+completer.sync done
+order [sync, micro]
+periodic 3
+zoned z
+zone parent true
+isPaused true
+events [listen, v1, pause, resume, v2, v3, v4, cancel]
+sink [10, 11]
+pipe [1, 2, 3, -1]
+fromHandlers [2, 4]
+iterator [a, b]
+secure true
+tls true true false
+caught nope

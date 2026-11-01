@@ -47,7 +47,19 @@ abstract class Encoding {
   external Encoding get encoder;
   external Encoding get decoder;
   external dynamic convert(dynamic input);
+  external static Encoding? getByName(String? name);
+  external Future<String> decodeStream(Stream<List<int>> byteStream);
+  external Stream bind(Stream stream);
 }
+
+@JavaName('dart.convert.HtmlEscape')
+class HtmlEscape {
+  external HtmlEscape();
+  external String convert(String text);
+}
+
+@JavaName('dart.convert.Convert.htmlEscape')
+HtmlEscape htmlEscape = HtmlEscape();
 
 @JavaName('dart.convert.ByteCodec')
 abstract class Utf8Codec extends Encoding {

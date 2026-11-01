@@ -40,7 +40,7 @@ package dart.async;
  * {@link Stream}). {@code sync} is accepted and ignored -- delivery here is
  * always synchronous on the calling thread.</p>
  */
-public final class StreamController<T> {
+public final class StreamController<T> implements StreamSink<T> {
 
     private Object onListenHandler;
     private Object onCancelHandler;
@@ -57,7 +57,24 @@ public final class StreamController<T> {
         protected void onNoListeners() {
             Stream.deliverVoid(onCancelHandler);
         }
+
+        @Override
+        protected void onPaused() {
+            paused = true;
+            Stream.deliverVoid(onPauseHandler);
+        }
+
+        @Override
+        protected void onResumed() {
+            paused = false;
+            Stream.deliverVoid(onResumeHandler);
+        }
     };
+
+    private Object onPauseHandler;
+    private Object onResumeHandler;
+    private boolean paused;
+    private final Completer<Object> doneCompleter = new Completer<Object>();
 
     public StreamController() {
     }
@@ -83,8 +100,18 @@ public final class StreamController<T> {
         return c;
     }
 
+    /// The closure form, so a Dart closure literal has a functional interface to land on.
+    public void onListen(dart.runtime.Funcs.VoidFunc0 handler) {
+        onListen((Object) handler);
+    }
+
     public void onListen(Object handler) {
         this.onListenHandler = handler;
+    }
+
+    /// The closure form, so a Dart closure literal has a functional interface to land on.
+    public void onCancel(dart.runtime.Funcs.VoidFunc0 handler) {
+        onCancel((Object) handler);
     }
 
     public void onCancel(Object handler) {
@@ -92,11 +119,23 @@ public final class StreamController<T> {
     }
 
     /** Accepted for source compatibility; never invoked (see the class comment). */
+    /// The closure form, so a Dart closure literal has a functional interface to land on.
+    public void onPause(dart.runtime.Funcs.VoidFunc0 handler) {
+        onPause((Object) handler);
+    }
+
     public void onPause(Object handler) {
+        this.onPauseHandler = handler;
     }
 
     /** Accepted for source compatibility; never invoked (see the class comment). */
+    /// The closure form, so a Dart closure literal has a functional interface to land on.
+    public void onResume(dart.runtime.Funcs.VoidFunc0 handler) {
+        onResume((Object) handler);
+    }
+
     public void onResume(Object handler) {
+        this.onResumeHandler = handler;
     }
 
     /** Accepted for source compatibility; ignored (see the class comment). */
@@ -142,7 +181,55 @@ public final class StreamController<T> {
         if (!closed) {
             closed = true;
             closeFuture = theStream.emitDone();
+            closeFuture.onComplete(new Runnable() {
+                @Override
+                public void run() {
+                    if (!doneCompleter.isCompleted()) {
+                        doneCompleter.complete(null);
+                    }
+                }
+            });
         }
         return closeFuture;
+    }
+
+    /// {@code controller.sink}: the controller itself, as Dart's write-only view.
+    public StreamSink<T> sink() {
+        return this;
+    }
+
+    /// {@code controller.isPaused}: the subscription is paused (or there is none yet).
+    public boolean isPaused() {
+        return paused || !theStream.hasListeners();
+    }
+
+    /// {@code controller.done}: completes once close() has delivered the done event.
+    @Override
+    public Future<Object> done() {
+        return doneCompleter.future();
+    }
+
+    /// {@code controller.addStream(source)}: forwards every event of source; the future
+    /// completes when source is done.
+    @Override
+    public Future<Object> addStream(Stream<T> source) {
+        final Future<Object> f = new Future<Object>();
+        source.listen(new dart.runtime.Funcs.VoidFunc1<T>() {
+            @Override
+            public void call(T v) {
+                add(v);
+            }
+        }, new dart.runtime.Funcs.VoidFunc1<Object>() {
+            @Override
+            public void call(Object e) {
+                addError(e);
+            }
+        }, new dart.runtime.Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+                f.complete(null);
+            }
+        });
+        return f;
     }
 }

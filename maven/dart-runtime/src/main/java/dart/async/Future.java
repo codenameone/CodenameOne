@@ -789,4 +789,99 @@ public class Future<T> {
         });
         return f;
     }
+
+    /// {@code future.timeout(limit)}: a TimeoutException when this has not completed in time.
+    public Future<T> timeout(dart.core.Duration limit) {
+        return timeout(limit, null);
+    }
+
+    /// {@code future.timeout(limit, onTimeout: f)}: f's value (or the future it returns)
+    /// when this has not completed in time.
+    @SuppressWarnings("unchecked")
+    public Future<T> timeout(final dart.core.Duration limit, final Funcs.Func0<Object> onTimeout) {
+        final Future<T> out = new Future<T>();
+        final boolean[] settled = new boolean[1];
+        final Timer timer = new Timer(limit, new Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+                if (settled[0]) {
+                    return;
+                }
+                settled[0] = true;
+                if (onTimeout == null) {
+                    out.completeError(new TimeoutException("Future not completed", limit));
+                    return;
+                }
+                Object v;
+                try {
+                    v = onTimeout.call();
+                } catch (Throwable t) {
+                    out.completeError(t);
+                    return;
+                }
+                if (v instanceof Future) {
+                    final Future<T> f = (Future<T>) v;
+                    f.onComplete(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (f.completedError() != null) {
+                                out.completeError(f.completedError());
+                            } else {
+                                out.complete(f.completedValue());
+                            }
+                        }
+                    });
+                } else {
+                    out.complete((T) v);
+                }
+            }
+        });
+        onComplete(new Runnable() {
+            @Override
+            public void run() {
+                if (settled[0]) {
+                    return;
+                }
+                settled[0] = true;
+                timer.cancel();
+                if (completedError() != null) {
+                    out.completeError(completedError());
+                } else {
+                    out.complete(completedValue());
+                }
+            }
+        });
+        return out;
+    }
+
+    /// {@code future.ignore()}: its error, if any, is dropped rather than reported.
+    public void ignore() {
+        onComplete(new Runnable() {
+            @Override
+            public void run() {
+            }
+        });
+    }
+
+    /// {@code future.asStream()}: a single-subscription stream of this one value (or error).
+    public Stream<T> asStream() {
+        final StreamController<T> c = new StreamController<T>();
+        c.onListen(new Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+                onComplete(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (completedError() != null) {
+                            c.addError(completedError());
+                        } else {
+                            c.add(completedValue());
+                        }
+                        c.close();
+                    }
+                });
+            }
+        });
+        return c.stream();
+    }
 }

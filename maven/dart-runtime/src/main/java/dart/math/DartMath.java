@@ -192,6 +192,14 @@ public final class DartMath {
             impl = new Random(seed);
         }
 
+        /// {@code Random.secure()}. The device class library has no
+        /// java.security.SecureRandom, so this is the platform generator seeded from
+        /// the clock -- NOT cryptographically secure. Code that needs real
+        /// randomness for keys must use com.codename1.security instead.
+        public static DartRandom secure() {
+            return new DartRandom();
+        }
+
         /// Dart's {@code Random.nextInt}, whose bound runs to {@code 1 << 32}
         /// INCLUSIVE -- the whole unsigned 32-bit range, which is what a random
         /// ARGB colour or a 32-bit identifier asks for. Java's nextInt(int) stops

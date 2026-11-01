@@ -443,4 +443,54 @@ public final class ByteCodec implements dart.async.StreamTransformer<Object, Obj
         }
         return out;
     }
+
+    /// {@code Encoding.getByName(name)}: the codecs this runtime has, by their IANA
+    /// names and common aliases (case-insensitive, ASCII folded); null otherwise.
+    public static ByteCodec getByName(String name) {
+        if (name == null) {
+            return null;
+        }
+        if (name.equalsIgnoreCase("utf-8") || name.equalsIgnoreCase("utf8")) {
+            return Convert.utf8;
+        }
+        if (name.equalsIgnoreCase("us-ascii") || name.equalsIgnoreCase("ascii")
+                || name.equalsIgnoreCase("iso646-us")) {
+            return Convert.ascii;
+        }
+        if (name.equalsIgnoreCase("iso-8859-1") || name.equalsIgnoreCase("latin1")
+                || name.equalsIgnoreCase("l1") || name.equalsIgnoreCase("iso_8859-1")) {
+            return Convert.latin1;
+        }
+        return null;
+    }
+
+    /// {@code encoding.decodeStream(byteStream)}: every chunk joined, then decoded.
+    public dart.async.Future<String> decodeStream(Object byteStream) {
+        final java.io.ByteArrayOutputStream all = new java.io.ByteArrayOutputStream();
+        final dart.async.Completer<String> c = new dart.async.Completer<String>();
+        @SuppressWarnings("unchecked")
+        dart.async.Stream<Object> s = (dart.async.Stream<Object>) byteStream;
+        s.listen(new dart.runtime.Funcs.VoidFunc1<Object>() {
+            @Override
+            public void call(Object chunk) {
+                byte[] b = bytesOf(chunk);
+                all.write(b, 0, b.length);
+            }
+        }, new dart.runtime.Funcs.VoidFunc1<Object>() {
+            @Override
+            public void call(Object e) {
+                c.completeError(e);
+            }
+        }, new dart.runtime.Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+                try {
+                    c.complete(String.valueOf(decode(dart.typed_data.Uint8List.fromBytes(all.toByteArray()))));
+                } catch (RuntimeException e) {
+                    c.completeError(e);
+                }
+            }
+        });
+        return c.future();
+    }
 }

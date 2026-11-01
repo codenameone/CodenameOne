@@ -65,4 +65,10 @@ public interface StreamSubscription<T> {
     void resume();
 
     boolean isPaused();
+
+    /// {@code asFuture([futureValue])}: completes with futureValue when the stream is
+    /// done, or with the first error.
+    Future<Object> asFuture();
+
+    Future<Object> asFuture(Object futureValue);
 }

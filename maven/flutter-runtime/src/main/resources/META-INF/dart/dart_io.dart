@@ -30,6 +30,17 @@ class SocketException extends IOException {
   external SocketException(String message);
 }
 
+@JavaName('dart.io.TlsException')
+class TlsException extends IOException {
+  external TlsException([String message]);
+  external String get message;
+}
+
+@JavaName('dart.io.HandshakeException')
+class HandshakeException extends TlsException {
+  external HandshakeException([String message]);
+}
+
 @JavaName('dart.io.HttpException')
 class HttpException extends IOException {
   external HttpException(String message, {Uri? uri});

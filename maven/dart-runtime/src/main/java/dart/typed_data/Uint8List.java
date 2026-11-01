@@ -96,6 +96,11 @@ public final class Uint8List {
         return bytes[(int) index] & 0xff;
     }
 
+    /// The index operator as the transpiler spells it on a receiver it types as a list.
+    public long idx(long index) {
+        return $index(index);
+    }
+
     public void $indexSet(long index, long value) {
         dart.core.RangeError.checkValidIndex(index, bytes.length);
         bytes[(int) index] = (byte) value;
@@ -147,5 +152,87 @@ public final class Uint8List {
             sb.append(bytes[i] & 0xff);
         }
         return sb.append(']').toString();
+    }
+
+    public ByteBuffer buffer() {
+        return new ByteBuffer(bytes);
+    }
+
+    public long lengthInBytes() {
+        return bytes.length;
+    }
+
+    public long offsetInBytes() {
+        return 0;
+    }
+
+    public long elementSizeInBytes() {
+        return 1;
+    }
+
+    public static Uint8List view(ByteBuffer buffer) {
+        return view(buffer, 0, null);
+    }
+
+    public static Uint8List view(ByteBuffer buffer, long offsetInBytes) {
+        return view(buffer, offsetInBytes, null);
+    }
+
+    /// A view over the whole buffer shares its bytes. This class keeps no offset, so a
+    /// view of part of the buffer is a copy of that part: writes through it do not reach
+    /// the buffer. Use ByteData.view or another typed list for a shared partial view.
+    public static Uint8List view(ByteBuffer buffer, long offsetInBytes, Long length) {
+        int n = Bytes.viewLength(buffer, offsetInBytes, length, 1);
+        byte[] b = buffer.bytes();
+        if (offsetInBytes == 0 && n == b.length) {
+            return new Uint8List(b);
+        }
+        byte[] c = new byte[n];
+        System.arraycopy(b, (int) offsetInBytes, c, 0, n);
+        return new Uint8List(c);
+    }
+
+    public void setRange(long start, long end, Object from) {
+        setRange(start, end, from, 0);
+    }
+
+    public void setRange(long start, long end, Object from, long skipCount) {
+        dart.core.RangeError.checkValueInInterval(start, 0, bytes.length, "start");
+        dart.core.RangeError.checkValueInInterval(end, start, bytes.length, "end");
+        if (from instanceof Uint8List) {
+            byte[] src = ((Uint8List) from).bytes;
+            if (skipCount + (end - start) > src.length) {
+                throw new dart.core.StateError("Too few elements");
+            }
+            System.arraycopy(src, (int) skipCount, bytes, (int) start, (int) (end - start));
+            return;
+        }
+        java.util.Iterator<?> it = ((Iterable<?>) from).iterator();
+        for (long i = 0; i < skipCount && it.hasNext(); i++) {
+            it.next();
+        }
+        for (long i = start; i < end; i++) {
+            if (!it.hasNext()) {
+                throw new dart.core.StateError("Too few elements");
+            }
+            bytes[(int) i] = (byte) ((Number) it.next()).longValue();
+        }
+    }
+
+    public void setAll(long index, Object from) {
+        int i = (int) index;
+        for (Object o : (from instanceof Uint8List ? ((Uint8List) from).toList() : (Iterable<?>) from)) {
+            $indexSet(i++, ((Number) o).longValue());
+        }
+    }
+
+    public void fillRange(long start, long end) {
+        fillRange(start, end, null);
+    }
+
+    public void fillRange(long start, long end, Long value) {
+        dart.core.RangeError.checkValueInInterval(start, 0, bytes.length, "start");
+        dart.core.RangeError.checkValueInInterval(end, start, bytes.length, "end");
+        java.util.Arrays.fill(bytes, (int) start, (int) end, (byte) (value == null ? 0 : value.longValue()));
     }
 }

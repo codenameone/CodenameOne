@@ -33,6 +33,7 @@ public final class Convert {
     }
 
     public static final JsonCodec json = new JsonCodec();
+    public static final HtmlEscape htmlEscape = new HtmlEscape();
     public static final ByteCodec utf8 = new ByteCodec(ByteCodec.UTF8);
     public static final ByteCodec ascii = new ByteCodec(ByteCodec.ASCII);
     public static final ByteCodec latin1 = new ByteCodec(ByteCodec.LATIN1);
