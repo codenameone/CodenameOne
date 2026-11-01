@@ -254,23 +254,41 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
         return impl.set(index, element);
     }
 
+    /// The reified element type, where the transpiler knew it when the list was made
+    /// (a literal, List.filled/of/from/generate, a toList() copy): Dart reifies type
+    /// arguments, so `<Object>['a'] is List<String>` and `<String>[] is List<bool>` are
+    /// both false whatever the elements are. Null means unknown -- a list built by
+    /// generic code, decoded JSON -- and the test falls back to the elements
+    /// ({@link #isListOf}). Two fields per list and no per-element cost.
+    private Class<?> elemClass;
+    /// Whether the witnessed element type is nullable (`List<String?>`).
+    private boolean elemNullable;
+
+    /// Records the element type {@code type} (nullable when {@code nullable}) on
+    /// {@code list} and answers it, so an emitted constructor expression stays an
+    /// expression.
+    public static <L extends DartList<?>> L typed(L list, Class<?> type, boolean nullable) {
+        DartList<?> l = list;
+        l.elemClass = type;
+        l.elemNullable = nullable;
+        return list;
+    }
+
     /// `value is List<X>` for an element type X that is a plain class (bool, String,
-    /// num): true when value is a list whose every element is an X (or null, when the
-    /// element type is nullable).
-    ///
-    /// A list carries no witness of its type argument -- generic code builds a boxed
-    /// DartList whatever the argument was (see the IsTest note in the transpiler's
-    /// JavaEmitter) -- so the elements are what can be checked, as DartLongList.isLongs
-    /// does for List<int>. The answer is sound for every read the test promotes: no
-    /// element of another type can reach a read typed X. Where it differs from Dart is
-    /// a list whose elements all happen to be X but whose argument is wider (an empty
-    /// List<String>, or `<Object>['a']`), which Dart answers false and this answers
-    /// true. Answering false for those would need a witness on every list.
-    public static boolean allInstances(Object value, Class<?> type, boolean nullable) {
+    /// num). With a witness the answer is Dart's subtype test on the type argument,
+    /// covariant as Dart's generics are (a List<String> is a List<Object>; a
+    /// List<String?> is no List<String>). Without one it is true when every element is
+    /// an X (or null, when X is nullable): sound for every read the test promotes, and
+    /// different from Dart only for a list of unknown argument whose elements all happen
+    /// to be X.
+    public static boolean isListOf(Object value, Class<?> type, boolean nullable) {
         if (!(value instanceof DartList)) {
             return false;
         }
         DartList<?> l = (DartList<?>) value;
+        if (l.elemClass != null) {
+            return type.isAssignableFrom(l.elemClass) && (nullable || !l.elemNullable);
+        }
         int n = l.size();
         for (int i = 0; i < n; i++) {
             Object e = l.get(i);
@@ -468,6 +486,17 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
             throw new StateError("No element");
         }
         return get(size() - 1);
+    }
+
+    /// Dart's {@code list.first = v}, the setter beside {@link #first()}: {@code list[0] = v},
+    /// so an empty list throws a RangeError as Dart's does.
+    public void first(E value) {
+        idxSet(0, value);
+    }
+
+    /// Dart's {@code list.last = v}: {@code list[length - 1] = v}.
+    public void last(E value) {
+        idxSet(size() - 1, value);
     }
 
     public void insert(long index, E element) {
@@ -996,12 +1025,28 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
     }
 
     /** Dart's {@code toList(growable: ...)}: a fixed-length copy when growable is false. */
+    /// A copy keeps the element type: `l.toList()` of a List<String> is a List<String>.
     public DartList<E> toList(boolean growable) {
-        return growable ? toList() : DartList.from(this, false);
+        return growable ? toList() : copyWitness(DartList.from(this, false));
     }
 
     public DartList<E> toList() {
-        return DartList.from(this);
+        return copyWitness(DartList.from(this));
+    }
+
+    private <L extends DartList<?>> L copyWitness(L copy) {
+        return elemClass == null ? copy : typed(copy, elemClass, elemNullable);
+    }
+
+    /// `value as List<X>` for a plain class X (see {@link #isListOf}); {@code dartType}
+    /// names the target in the TypeError.
+    public static Object asListOf(Object value, Class<?> type, boolean nullable, boolean listNullable,
+                                  String dartType) {
+        if (value == null ? listNullable : isListOf(value, type, nullable)) {
+            return value;
+        }
+        throw new TypeError("type '" + DartRuntime.typeName(value) + "' is not a subtype of type '"
+                + dartType + "' in type cast");
     }
 
     public DartSet<E> toSet() {

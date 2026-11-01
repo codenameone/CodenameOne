@@ -670,7 +670,7 @@ public final class DartRuntime {
                 + " List operators at run time. Give the operand a static type.");
     }
 
-    private static String typeName(Object o) {
+    public static String typeName(Object o) {
         if (o == null) {
             return "Null";
         }

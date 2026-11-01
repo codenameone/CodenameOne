@@ -47,7 +47,7 @@ public class AsyncError extends RuntimeException {
     }
 
     /// The trace an error carries (its own frames for a thrown error), else StackTrace.empty.
-    public static Object defaultStackTrace(Object error) {
+    public static dart.core.StackTrace defaultStackTrace(Object error) {
         return dart.core.StackTrace.forError(error);
     }
 
