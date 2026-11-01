@@ -236,7 +236,8 @@ public final class AccountSecurity {
     /// forwards it unchanged lets the client choose.
     public static String here(String issuer) {
         if (issuer != null && issuer.length() > 0) {
-            return issuer;
+            // "https://x/" and "https://x" are one server; paths are appended.
+            return issuer.endsWith("/") ? issuer.substring(0, issuer.length() - 1) : issuer;
         }
         SecurityExchange exchange = SecurityExchange.current();
         String host = exchange == null ? null : exchange.getRequest().getHeader("Host");
