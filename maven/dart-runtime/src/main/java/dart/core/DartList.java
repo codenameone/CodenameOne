@@ -493,6 +493,31 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
         return false;
     }
 
+    /// {@code List<int> + List<int>}: the result is a List<int> again, so it stays primitive
+    /// (a field typed List<int> is a DartLongList and the generic overload cannot reach it).
+    public static DartLongList concat(DartLongList a, DartLongList b) {
+        DartLongList r = DartLongList.ofLongs();
+        if (a != null) {
+            r.addAll(a);
+        }
+        if (b != null) {
+            r.addAll(b);
+        }
+        return r;
+    }
+
+    /// {@code List<double> + List<double>}, kept primitive like the int overload.
+    public static DartDoubleList concat(DartDoubleList a, DartDoubleList b) {
+        DartDoubleList r = DartDoubleList.fromDoubles(new java.util.ArrayList<Double>());
+        if (a != null) {
+            r.addAll(a);
+        }
+        if (b != null) {
+            r.addAll(b);
+        }
+        return r;
+    }
+
     /** Dart's {@code List + List}: a new list with the elements of {@code a} then {@code b}. */
     public static <E> DartList<E> concat(java.util.List<? extends E> a, java.util.List<? extends E> b) {
         DartList<E> r = new DartList<E>();

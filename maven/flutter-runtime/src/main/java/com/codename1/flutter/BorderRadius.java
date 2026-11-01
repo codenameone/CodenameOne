@@ -120,4 +120,10 @@ public final class BorderRadius extends BorderRadiusGeometry {
                 Radius.lerp(a.bottomLeft, b.bottomLeft, t),
                 Radius.lerp(a.bottomRight, b.bottomRight, t));
     }
+
+    /// Already absolute: every text direction resolves to this radius.
+    @Override
+    public BorderRadius resolve(TextDirection direction) {
+        return this;
+    }
 }

@@ -120,7 +120,7 @@ public class BoxDecoration extends Decoration {
     }
 
     /// BoxDecoration.borderRadius as given, or null.
-    public Object borderRadius() {
-        return getBorderRadius();
+    public BorderRadiusGeometry borderRadius() {
+        return borderRadius instanceof BorderRadiusGeometry ? (BorderRadiusGeometry) borderRadius : null;
     }
 }

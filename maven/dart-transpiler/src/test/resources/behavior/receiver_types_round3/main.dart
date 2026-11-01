@@ -90,7 +90,7 @@ class Line<E> extends Object with ListMixin<E> {
   @override
   int get length => _items.length;
   @override
-  set length(int v) => throw UnsupportedError("fixed");
+  set length(int v) => _items.length = v;
   @override
   E operator [](int i) => _items[i];
   @override

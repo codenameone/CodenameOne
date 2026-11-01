@@ -8396,7 +8396,9 @@ public final class JavaEmitter {
         // `this._items.length() = v`, which is not Java.
         if (a.lhs instanceof PropertyGet && !a.op.equals("??=")) {
             String acc = "." + ((PropertyGet) a.lhs).name + "()";
-            if (lcode.endsWith(acc) && !lcode.contains(".get$")) {
+            // Only the trailing accessor matters: `bag.get$items().length()` is the list's
+            // length setter on whatever the accessor returns, not a `set$items` write.
+            if (lcode.endsWith(acc) && !acc.startsWith(".get$")) {
                 String recv = lcode.substring(0, lcode.length() - acc.length());
                 return voidSetterWrite(a, recv + "." + ((PropertyGet) a.lhs).name,
                         a.op.equals("=") ? null : lcode, lhs.type, ctx);
@@ -9205,6 +9207,13 @@ public final class JavaEmitter {
                 return new Out(paren(l.code) + " " + b.op + " " + paren(r.code), TypeRef.BOOL);
             }
             ctx.importClass("dart.runtime.DartRuntime");
+            // `T == String`: a type literal operand compares as its class.
+            if (l.type != null && isClassRef(l.type)) {
+                l = new Out(classLiteral(l, ctx), new TypeRef("Type"));
+            }
+            if (r.type != null && isClassRef(r.type)) {
+                r = new Out(classLiteral(r, ctx), new TypeRef("Type"));
+            }
             String eq = "DartRuntime.eq(" + l.code + ", " + boxIfPrimitive(r, ctx) + ")";
             return new Out(b.op.equals("==") ? eq : "!" + eq, TypeRef.BOOL);
         }
@@ -11541,7 +11550,15 @@ public final class JavaEmitter {
             }
             if (n.equals("putIfAbsent")) {
                 Out k = emitExpr(pos.get(0), null, ctx);
-                Out f = emitExpr(pos.get(1), null, ctx);
+                // `V Function()`: the closure's literal builds the map's value type, so
+                // `() => []` on a Map<K, List<int>> makes a DartLongList.
+                TypeRef ifAbsentType = null;
+                if (tt.args.size() == 2 && tt.arg(1) != null && !isTypeVariable(tt.arg(1), ctx)) {
+                    ifAbsentType = new TypeRef("Function");
+                    ifAbsentType.funcParams = new ArrayList<TypeRef>();
+                    ifAbsentType.funcReturn = tt.arg(1);
+                }
+                Out f = emitExpr(pos.get(1), ifAbsentType, ctx);
                 return new Out(target.code + ".putIfAbsentDart(" + boxIfPrimitive(k, ctx) + ", " + f.code + ")",
                         boxType(tt.arg(1)));
             }
@@ -12052,7 +12069,14 @@ public final class JavaEmitter {
                 return new Out("DartMap" + witness + "identity()", cc.type);
             }
             if (ctor.equals("fromEntries")) {
-                String src = emitExpr(pos.get(0), null, ctx).code;
+                // The entries are typed by the map's arguments, so a literal mixing a
+                // `MapEntry(k, v)` with a call returning MapEntry<String, int> is one list.
+                TypeRef entries = new TypeRef("List");
+                TypeRef entry = new TypeRef("MapEntry");
+                entry.args.add(kt);
+                entry.args.add(vt);
+                entries.args.add(entry);
+                String src = emitExpr(pos.get(0), entries, ctx).code;
                 return new Out("DartMap" + witness + "fromEntries(" + src + ")", cc.type);
             }
             if (ctor.equals("fromIterable")) {
@@ -14614,6 +14638,11 @@ public final class JavaEmitter {
         if (t.is("num")) {
             return "Number";
         }
+        if (t.is("Type") && !program.classes.containsKey("Type") && !stubs.classes.containsKey("Type")) {
+            // dart:core Type: a reified type is its Java class at run time (`T` through its
+            // witness, `x.runtimeType`, a type literal), so a declared Type is a Class<?>.
+            return "Class<?>";
+        }
         if (t.is("List")) {
             String pk = primitiveListKind(t);
             if (pk != null) {
@@ -14958,6 +14987,20 @@ public final class JavaEmitter {
     }
 
     /** Pseudo-type marking a reference to a class itself (for static access). */
+    /**
+     * The Java class literal a Dart type literal denotes: `int` is the boxed Long the
+     * witnesses and runtimeType answer, never the primitive `long.class`.
+     */
+    private String classLiteral(Out o, Ctx ctx) {
+        String dartName = o.type != null && !o.type.args.isEmpty() ? o.type.arg(0).name : null;
+        if (dartName == null) {
+            return o.code + ".class";
+        }
+        String jt = javaType(new TypeRef(dartName), true, ctx);
+        int lt = jt.indexOf('<');
+        return (lt >= 0 ? jt.substring(0, lt) : jt) + ".class";
+    }
+
     private TypeRef classRef(String className) {
         TypeRef t = new TypeRef("$class");
         t.args.add(new TypeRef(className));
@@ -15284,7 +15327,7 @@ public final class JavaEmitter {
         // A Dart type literal (a bare class name used as a value, e.g. `GalleryLocalizations`
         // passed as a `Type` argument) becomes a Java class literal.
         if (o.type != null && isClassRef(o.type) && !isClassRef(target)) {
-            return o.code + ".class";
+            return classLiteral(o, ctx);
         }
         // dart:typed_data's TypedDataList is a Java interface beside the list classes, while
         // Dart has it implement List: every implementation is a typed list, so it casts.

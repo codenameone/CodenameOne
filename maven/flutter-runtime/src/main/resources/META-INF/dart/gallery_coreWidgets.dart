@@ -56,8 +56,8 @@ abstract class Decoration {}
 
 @JavaName('com.codename1.flutter.BoxDecoration')
 class BoxDecoration extends Decoration {
-  external BoxDecoration({Color? color, Object? image, Object? border, Object? borderRadius, Object? boxShadow, Object? gradient, Object? backgroundBlendMode, BoxShape? shape});
-  external Object? get borderRadius;
+  external BoxDecoration({Color? color, Object? image, Object? border, BorderRadiusGeometry? borderRadius, Object? boxShadow, Object? gradient, Object? backgroundBlendMode, BoxShape? shape});
+  external BorderRadiusGeometry? get borderRadius;
 }
 
 @JavaName('com.codename1.flutter.ImageProvider')
@@ -112,7 +112,7 @@ class SafeArea extends Widget {
 
 @JavaName('com.codename1.flutter.material.Material')
 class Material extends Widget {
-  external Material({Key? key, Object? type, double? elevation, Color? color, Color? shadowColor, Color? surfaceTintColor, TextStyle? textStyle, Object? borderRadius, Object? shape, bool? borderOnForeground, Clip? clipBehavior, Widget? child});
+  external Material({Key? key, Object? type, double? elevation, Color? color, Color? shadowColor, Color? surfaceTintColor, TextStyle? textStyle, BorderRadiusGeometry? borderRadius, Object? shape, bool? borderOnForeground, Clip? clipBehavior, Widget? child});
 }
 
 @JavaName('com.codename1.flutter.widgets.Flexible')
@@ -171,7 +171,7 @@ class MouseRegion extends Widget {
 
 @JavaName('com.codename1.flutter.widgets.ClipRRect')
 class ClipRRect extends Widget {
-  external ClipRRect({Key? key, Object? borderRadius, Object? clipper, Clip? clipBehavior, Widget? child});
+  external ClipRRect({Key? key, BorderRadiusGeometry? borderRadius, Object? clipper, Clip? clipBehavior, Widget? child});
 }
 
 @JavaName('com.codename1.flutter.widgets.ClipRect')

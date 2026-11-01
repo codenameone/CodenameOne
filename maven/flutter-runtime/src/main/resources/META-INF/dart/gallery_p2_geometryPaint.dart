@@ -267,7 +267,9 @@ class EdgeInsetsDirectional extends EdgeInsets {
 // --- border radii -----------------------------------------------------
 
 @JavaName('com.codename1.flutter.BorderRadiusGeometry')
-abstract class BorderRadiusGeometry {}
+abstract class BorderRadiusGeometry {
+  external BorderRadius resolve(TextDirection? direction);
+}
 
 @JavaName('com.codename1.flutter.BorderRadius')
 class BorderRadius extends BorderRadiusGeometry {
@@ -286,6 +288,7 @@ class BorderRadius extends BorderRadiusGeometry {
   external Radius get topRight;
   external Radius get bottomLeft;
   external Radius get bottomRight;
+  external BorderRadius resolve(TextDirection? direction);
 }
 
 @JavaName('com.codename1.flutter.BorderRadiusDirectional')
@@ -296,6 +299,7 @@ class BorderRadiusDirectional extends BorderRadiusGeometry {
   external static BorderRadiusDirectional vertical({Radius top = Radius.zero, Radius bottom = Radius.zero});
   external static BorderRadiusDirectional horizontal({Radius start = Radius.zero, Radius end = Radius.zero});
   external static BorderRadiusDirectional get zero;
+  external BorderRadius resolve(TextDirection? direction);
 }
 
 // --- borders (ShapeBorder family) -------------------------------------
