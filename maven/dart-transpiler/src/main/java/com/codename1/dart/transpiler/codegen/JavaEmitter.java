@@ -1578,6 +1578,21 @@ public final class JavaEmitter {
                 }
                 continue;
             }
+            String itfRuntime = runtimeFqcn(itfRaw, ctx);
+            if (itfRuntime != null && !RUNTIME_INTERFACES.contains(itfRuntime)
+                    && !program.classes.containsKey(itf.name)) {
+                // Any other dart-runtime type is a Java class too (Timer, FormatException,
+                // SocketException), and gets the same treatment as List or Future: a class
+                // with no superclass of its own extends it, so its overrides line up and it
+                // is assignable where the type is expected. One that already extends
+                // something cannot also extend the runtime class; it keeps the members and
+                // loses only the Java subtype edge.
+                if (!appliesCollectionMixin(c) && c.superclass == null && implementedAsSuper == null
+                        && mixinClassAsSuper == null) {
+                    implementedAsSuper = itf;
+                }
+                continue;
+            }
             if (impls.length() > 0) {
                 impls.append(", ");
             }
@@ -1687,6 +1702,14 @@ public final class JavaEmitter {
         String ext = null;
         if (c.superclass != null) {
             ext = javaClassType(c.superclass, ctx);
+            String extRaw = ext.indexOf('<') < 0 ? ext : ext.substring(0, ext.indexOf('<'));
+            String extRuntime = program.classes.containsKey(c.superclass.name) ? null : runtimeFqcn(extRaw, ctx);
+            if (extRuntime != null && RUNTIME_INTERFACES.contains(extRuntime)) {
+                // `extends Codec<S, T>`: a Dart abstract class the runtime declares as a Java
+                // interface (its shared members are default methods), so it is implemented.
+                impls.insert(0, impls.length() > 0 ? ext + ", " : ext);
+                ext = null;
+            }
         } else if (mixinClassAsSuper != null) {
             ext = javaClassType(mixinClassAsSuper, ctx);
         } else if (implementedAsSuper != null) {
@@ -1984,6 +2007,25 @@ public final class JavaEmitter {
             c = c.superclass == null ? null : program.classes.get(c.superclass.name);
         }
         return false;
+    }
+
+    /**
+     * The dart-runtime types that are Java interfaces. Every other {@code dart.*} runtime type
+     * is a Java class, which a Java {@code implements} cannot name and a Java
+     * {@code extends} must. RuntimeKindsTest holds this list to the runtime's classes.
+     */
+    static final java.util.Set<String> RUNTIME_INTERFACES = new java.util.HashSet<String>(java.util.Arrays.asList(
+            "dart.async.Sink", "dart.async.StreamConsumer", "dart.async.StreamSubscription",
+            "dart.async.StreamTransformer", "dart.async.StreamSink", "dart.collection.IterableMixin",
+            "dart.collection.ListMixin", "dart.collection.MapMixin", "dart.collection.SetMixin",
+            "dart.collection.Iterator", "dart.collection.UnmodifiableMapBase", "dart.convert.CodecConverter",
+            "dart.convert.Codec", "dart.convert.JsonEncodable", "dart.core.MixinView",
+            "dart.runtime.DynamicObject", "dart.typed_data.TypedData", "dart.typed_data.TypedDataList"));
+
+    /** The fully qualified dart-runtime class a rendered Java type name refers to, or null. */
+    private static String runtimeFqcn(String javaRaw, Ctx ctx) {
+        String fq = javaRaw.indexOf('.') >= 0 ? javaRaw : ctx.imports.get(javaRaw);
+        return fq != null && fq.startsWith("dart.") ? fq : null;
     }
 
     /** The runtime Future's protocol methods a program Future subclass renames. */
@@ -3289,6 +3331,13 @@ public final class JavaEmitter {
                 return false;
             }
         }
+        if ((m.isGetter || m.isSetter) && !m.isStatic && droppedRuntimeSupertype(c)
+                && !declaredInProgramAncestors(c, m.name, m.isSetter, new java.util.HashSet<ClassDecl>())) {
+            // `class DelegatingList<E> extends _Base<E> implements List<E>`: the runtime List
+            // could not be extended (there is a superclass), so a setter only List declares
+            // overrides nothing Java can see. @Override is optional; it is left off.
+            return false;
+        }
         if (m.isStatic || m.isGetter || m.isSetter) {
             return true;
         }
@@ -3319,6 +3368,60 @@ public final class JavaEmitter {
             }
             // superclass is a stub (or unknown): walk the stub chain
             return stubSigMatches(p.superclass.name, m);
+        }
+        return false;
+    }
+
+    /** Whether c or a program superclass implements a runtime type it could not extend. */
+    private boolean droppedRuntimeSupertype(ClassDecl c) {
+        java.util.Set<ClassDecl> seen = new java.util.HashSet<ClassDecl>();
+        for (ClassDecl k = c; k != null && seen.add(k);
+             k = k.superclass != null ? superDeclOf(k, k.superclass) : null) {
+            if (k.superclass == null) {
+                break;
+            }
+            for (TypeRef itf : k.interfaces) {
+                if (!program.classes.containsKey(itf.name)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** Whether a program class above c (or c's chain top's own superclass) declares the member. */
+    private boolean declaredInProgramAncestors(ClassDecl c, String name, boolean setter,
+                                               java.util.Set<ClassDecl> seen) {
+        java.util.List<TypeRef> ups = new java.util.ArrayList<TypeRef>(c.interfaces);
+        ups.addAll(c.mixins);
+        if (c.superclass != null) {
+            ups.add(c.superclass);
+        }
+        for (TypeRef u : ups) {
+            ClassDecl k = superDeclOf(c, u);
+            if (k == null) {
+                if (u == c.superclass) {
+                    // a stub or runtime superclass may well declare it
+                    return true;
+                }
+                continue;
+            }
+            if (!seen.add(k)) {
+                continue;
+            }
+            for (MethodDecl md : k.methods) {
+                if (!md.isStatic && md.name.equals(name) && (setter ? md.isSetter : !md.isSetter)) {
+                    return true;
+                }
+            }
+            for (FieldDecl f : k.fields) {
+                if (!f.isStatic && f.name.equals(name) && !(setter && f.isFinal)) {
+                    return true;
+                }
+            }
+            if (declaredInProgramAncestors(k, name, setter, seen)) {
+                return true;
+            }
         }
         return false;
     }
@@ -4039,6 +4142,12 @@ public final class JavaEmitter {
                     t = cur.field(n).type;
                 }
                 if (t != null && t.name != null && t.args.isEmpty() && cur.typeParams.contains(t.name)) {
+                    return true;
+                }
+                // `int? get length` overridden by `int get length`: Dart narrows covariantly,
+                // Java's long does not override Long, so the override stays boxed as well.
+                if (t != null && t.nullable && t.args.isEmpty()
+                        && (t.is("int") || t.is("double") || t.is("bool"))) {
                     return true;
                 }
             }
@@ -7045,6 +7154,37 @@ public final class JavaEmitter {
             // and narrowing the dynamic arm to the other arm's type would be wrong.
             aCode = downcastArm(a, aCode, expected, ctx);
             bCode = downcastArm(b, bCode, expected, ctx);
+            // `growable ? _createBuffer(n) : _createList(n)` with `L extends List<E>`: the
+            // class type variable is erased (Object) in Java, so the arms meet only at
+            // Object. Dart's static type is the bound's upper bound with the other arm, and
+            // the variable arm is cast to it, as the bound promises.
+            TypeRef aBound = classTypeVarBound(a.type, ctx);
+            TypeRef bBound = classTypeVarBound(b.type, ctx);
+            if ((aBound != null) != (bBound != null) && t != null && t.is("Object")
+                    && (expected == null || expected.is("var") || expected.is("dynamic"))) {
+                TypeRef nt = conditionalType(aBound != null ? aBound : a.type, bBound != null ? bBound : b.type, null);
+                TypeRef bound = aBound != null ? aBound : bBound;
+                TypeRef other = aBound != null ? b.type : a.type;
+                if ((nt == null || nt.is("Object")) && other != null
+                        && (implementsName(other.name, bound.name) || appliesListFamily(other.name, bound.name))) {
+                    // `TypedDataBuffer<E>` and `L extends List<E>`: the buffer is a List<E>.
+                    nt = bound;
+                }
+                if (nt != null && !nt.is("Object") && !nt.is("dynamic")) {
+                    String jt = javaType(nt, true, ctx);
+                    // The other arm is converted as any value of its type is (a ListMixin
+                    // class becomes a live List view), never cast: on ParparVM a cast is
+                    // unchecked and would hand on the wrong object.
+                    if (aBound != null) {
+                        aCode = "((" + jt + ") (Object) " + paren(aCode) + ")";
+                        bCode = coerce(new Out(bCode, b.type), nt, ctx);
+                    } else {
+                        bCode = "((" + jt + ") (Object) " + paren(bCode) + ")";
+                        aCode = coerce(new Out(aCode, a.type), nt, ctx);
+                    }
+                    t = nt;
+                }
+            }
             return new Out("(" + cond.code + " ? " + aCode + " : " + bCode + ")", t);
         }
         if (e instanceof NotNullAssert) {
@@ -10411,6 +10551,16 @@ public final class JavaEmitter {
             rt = stubExtensionSubst(stubExt, tt, rt);
             return new Out(extSimple + "." + name + "(" + target.code + ")", rt);
         }
+        // FormatException's members go through its virtual readers: a program class that
+        // `implements FormatException` extends it and overrides message()/offset()/source(),
+        // and getMessage() would answer the superclass's empty message instead.
+        if (tt.is("FormatException") && !program.classes.containsKey("FormatException")
+                && (name.equals("message") || name.equals("source") || name.equals("offset"))) {
+            TypeRef rt = name.equals("message") ? new TypeRef("String")
+                    : name.equals("offset") ? new TypeRef("int") : new TypeRef("Object");
+            rt.nullable = !name.equals("message");
+            return new Out(target.code + "." + name + "()", rt);
+        }
         // `e.message` on dart:core's errors that declare one. Each maps to a Java exception
         // built from its message, so getMessage() is that field.
         if (name.equals("message") && CORE_ERRORS.containsKey(tt.name) && !tt.is("Exception")
@@ -11415,6 +11565,35 @@ public final class JavaEmitter {
      * otherwise the nearest common ancestor, falling back to {@code Object} (never
      * {@code dynamic}, so ordinary members still resolve where the common type has them).
      */
+    /** Whether program class {@code sub} is a dart:core {@code List} through a ListBase/ListMixin ancestor. */
+    private boolean appliesListFamily(String sub, String family) {
+        ClassDecl k = sub == null ? null : program.classes.get(sub);
+        if (k == null || !"List".equals(family)) {
+            return false;
+        }
+        for (; k != null; k = k.superclass != null ? superDeclOf(k, k.superclass) : null) {
+            java.util.List<TypeRef> refs = new java.util.ArrayList<TypeRef>(k.mixins);
+            if (k.superclass != null) {
+                refs.add(k.superclass);
+            }
+            for (TypeRef r : refs) {
+                if (("ListBase".equals(r.name) || "ListMixin".equals(r.name)) && !program.classes.containsKey(r.name)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** The declared bound of a current-class type variable {@code t}, or null. */
+    private TypeRef classTypeVarBound(TypeRef t, Ctx ctx) {
+        if (t == null || t.name == null || !t.args.isEmpty() || ctx.currentClass == null
+                || !ctx.currentClass.typeParams.contains(t.name)) {
+            return null;
+        }
+        return ctx.currentClass.typeParamBounds.get(t.name);
+    }
+
     private TypeRef conditionalType(TypeRef a, TypeRef b, TypeRef expected) {
         if (a == null || a.is("dynamic") || a.is("Null")) {
             return b == null ? TypeRef.DYNAMIC : boxType(b);
@@ -19606,6 +19785,11 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             // type argument (`Result<Never>`, `Future<Never>`) Object is the erasure that
             // stays assignable wherever the Dart subtype is.
             return "Object";
+        }
+        if (ctx != null && t.name != null && !t.is("Exception") && CORE_ERRORS.containsKey(t.name)
+                && !program.classes.containsKey(t.name) && !stubs.classes.containsKey(t.name)) {
+            // `FormatException fe = ...` as a declared type: the runtime class, imported.
+            ctx.importClass(CORE_ERRORS.get(t.name));
         }
         if (t.is("Pattern") && !program.classes.containsKey("Pattern") && !stubs.classes.containsKey("Pattern")) {
             // dart:core Pattern: a String or a RegExp at run time, which share no

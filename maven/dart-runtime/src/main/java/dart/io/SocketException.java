@@ -31,6 +31,11 @@ public class SocketException extends IOException {
     private InternetAddress address;
     private Long port;
 
+    /// For a program class that `implements SocketException` and so extends it.
+    protected SocketException() {
+        this("");
+    }
+
     public SocketException(String message) {
         this(message, null, null, null);
     }

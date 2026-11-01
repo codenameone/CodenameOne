@@ -32,7 +32,7 @@ import dart.runtime.Funcs;
  * {@code CN.setTimeout}; headless (tests, plain JVM) it falls back to a
  * short-lived thread. {@link #cancel()} prevents a not-yet-fired callback.
  */
-public final class Timer {
+public class Timer {
 
     private volatile boolean cancelled;
     private volatile boolean fired;
@@ -120,7 +120,7 @@ public final class Timer {
     private Timer next;
     private long tick;
 
-    private Timer() {
+    protected Timer() {
     }
 
     /// {@code Timer.periodic(period, callback)}: a chain of one-shot timers, each

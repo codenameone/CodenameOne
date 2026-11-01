@@ -1,0 +1,13 @@
+true
+false
+false
+nope 3
+socket: down 8080 null
+7
+own setRange 1 3
+[9]
+[1, 7, 8, 4]
+[1]
+4
+own setRange 0 1
+[5, 7, 8, 4]

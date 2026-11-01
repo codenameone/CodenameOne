@@ -194,6 +194,20 @@ public interface ListMixin<E> extends IterableMixin<E> {
 
     /** Dart's {@code setRange(start, end, iterable, skipCount)}. */
     default void setRange(long start, long end, Iterable<? extends E> from, long skipCount) {
+        setRange(start, end, DartIterable.wrap(readOnly(from)), skipCount);
+    }
+
+    /// The Iterable view Dart's own typing gives an argument: a read-only view is safe to
+    /// treat as an {@code Iterable<E>}.
+    @SuppressWarnings("unchecked")
+    static <E> Iterable<E> readOnly(Iterable<? extends E> from) {
+        return (Iterable<E>) from;
+    }
+
+    /// {@code setRange} in the shape a translated override declares it -- Dart's
+    /// {@code Iterable<E>} is a DartIterable -- so a program class applying ListMixin
+    /// overrides this, and every call through the mixin reaches that override.
+    default void setRange(long start, long end, DartIterable<E> from, long skipCount) {
         if (start < 0 || end < start || end > length()) {
             throw new dart.core.RangeError("RangeError: Invalid range " + start + ".." + end + " for length " + length());
         }

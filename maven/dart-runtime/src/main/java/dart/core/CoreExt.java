@@ -88,6 +88,14 @@ public final class CoreExt {
 
     public static <E> void setRange(java.util.List<E> l, long start, long end, Iterable<? extends E> from,
             long skipCount) {
+        if (l instanceof MixinView && ((MixinView) l).source() instanceof dart.collection.ListMixin) {
+            // A List-typed call on a program ListMixin class reaches the class's own
+            // setRange, as Dart's dynamic dispatch would.
+            @SuppressWarnings("unchecked")
+            dart.collection.ListMixin<E> m = (dart.collection.ListMixin<E>) ((MixinView) l).source();
+            m.setRange(start, end, from, skipCount);
+            return;
+        }
         checkRange(l, start, end);
         ArrayList<E> src = new ArrayList<E>();
         for (E e : from) {
