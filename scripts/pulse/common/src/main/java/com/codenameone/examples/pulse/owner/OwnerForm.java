@@ -40,6 +40,7 @@ import com.codenameone.examples.pulse.api.SessionDto;
 import com.codenameone.examples.pulse.net.Api;
 import com.codenameone.examples.pulse.net.Net;
 import com.codenameone.examples.pulse.ui.Lang;
+import com.codenameone.examples.pulse.ui.Layouts;
 import com.codenameone.examples.pulse.ui.Menu;
 import com.codenameone.examples.pulse.ui.Nav;
 import com.codenameone.examples.pulse.ui.StatRow;
@@ -59,7 +60,7 @@ public class OwnerForm implements Nav.Home {
     private final Form form = Ui.home("Owner");
     private final Menu menu = new Menu(form, Nav.OWNER);
     private final Container page = Ui.page();
-    private final StatRow stats = Ui.stats(2);
+    private final StatRow stats = Ui.stats(Layouts.wide() ? 4 : 2);
 
     @Override
     public Form form() {
@@ -92,6 +93,7 @@ public class OwnerForm implements Nav.Home {
         bar.add(BorderLayout.WEST, menu.flatButton());
         bar.add(BorderLayout.CENTER, Ui.label("Studio", "SvTitle"));
         page.setName("owner");
+        Layouts.broaden(page);
         page.setScrollableY(true);
         Ui.pull(page, this::load);
         Container shell = new Container(new BorderLayout());
@@ -115,52 +117,57 @@ public class OwnerForm implements Nav.Home {
                 .stat(String.valueOf(board.atRisk()), "At risk", "atRisk");
         page.add(stats);
         // The rest of the month at a glance, as tiles rather than a sentence.
-        StatRow month = Ui.stats(2);
+        StatRow month = Ui.stats(Layouts.wide() ? 4 : 2);
         month.stat(String.valueOf(board.newMembers30()), "Joined in 30 days", "joined")
                 .stat(String.valueOf(board.churned30()), "Left in 30 days", "left")
                 .stat(String.valueOf(board.checkIns7()), "Visits this week", "checkIns7")
                 .stat(String.valueOf(board.pastDue()), "Invoices past due", "pastDue");
         page.add(month);
+        // On a wide window the money and the classes sit side by side; on a
+        // phone both halves are the page itself, one under the other.
+        Container[] halves = Layouts.halves(page);
+        Container money = halves[0];
+        Container links = halves[1];
         // The deeper screens, each from the figure that sends an owner there.
-        page.add(Ui.tap(Ui.row(FontImage.MATERIAL_QUERY_STATS, Lang.tr("Insights"),
+        links.add(Ui.tap(Ui.row(FontImage.MATERIAL_QUERY_STATS, Lang.tr("Insights"),
                 Lang.tr("Busy hours, growth, classes and coaches"), null), "insightsButton",
                 e -> InsightsForm.show(form)));
-        page.add(Ui.tap(Ui.row(FontImage.MATERIAL_GROUP, Lang.tr("Members"),
+        links.add(Ui.tap(Ui.row(FontImage.MATERIAL_GROUP, Lang.tr("Members"),
                 Lang.tr("{0} at risk", Integer.valueOf(board.atRisk())), null), "membersButton",
                 e -> MembersForm.show(form)));
-        page.add(Ui.tap(Ui.row(FontImage.MATERIAL_RECEIPT_LONG, Lang.tr("Billing"),
+        links.add(Ui.tap(Ui.row(FontImage.MATERIAL_RECEIPT_LONG, Lang.tr("Billing"),
                 Lang.tr("{0} invoices past due", Integer.valueOf(board.pastDue())),
                 board.pastDue() > 0 ? Ui.badge(String.valueOf(board.pastDue()), "SvBadgeBad")
                 : null), "billingButton", e -> BillingForm.show(form)));
 
         // Takings: everything paid, packs and drop-ins too, which is why it
         // is not the recurring figure above.
-        Ui.section(page, "Takings");
-        page.add(Ui.text(Lang.tr("{0} in the last 30 days", Ui.moneyShort(board.revenue30Cents(), null)),
+        Ui.section(money, "Takings");
+        money.add(Ui.text(Lang.tr("{0} in the last 30 days", Ui.moneyShort(board.revenue30Cents(), null)),
                 "SvMuted"));
-        page.add(sized(revenue(board.revenueByDay()), "revenueChart"));
+        money.add(sized(revenue(board.revenueByDay()), "revenueChart"));
 
-        Ui.section(page, "Popular classes");
+        Ui.section(money, "Popular classes");
         if (board.popularClasses() == null || board.popularClasses().isEmpty()) {
-            page.add(Ui.text("No bookings in the last month.", "SvMuted"));
+            money.add(Ui.text("No bookings in the last month.", "SvMuted"));
         } else {
-            page.add(popular(board.popularClasses()));
+            money.add(popular(board.popularClasses()));
         }
 
-        Ui.section(page, "Under-filled this week");
+        Ui.section(links, "Under-filled this week");
         List<SessionDto> under = board.underfilled();
         for (int iter = 0; under != null && iter < under.size(); iter++) {
             final SessionDto session = under.get(iter);
-            page.add(Ui.tap(Ui.row(FontImage.MATERIAL_TRENDING_DOWN, session.name(),
+            links.add(Ui.tap(Ui.row(FontImage.MATERIAL_TRENDING_DOWN, session.name(),
                     Ui.when(session.startsAt()), Ui.badge(session.booked() + "/"
                     + session.capacity(), "SvBadgeWarn")), "under-" + iter,
                     e -> CampaignsForm.compose(form, session)));
         }
         if (under == null || under.isEmpty()) {
-            page.add(Ui.text("Every class is filling up.", "SvMuted"));
+            links.add(Ui.text("Every class is filling up.", "SvMuted"));
         }
         if (board.atRisk() > 0) {
-            page.add(Ui.secondary(board.atRisk() == 1 ? Lang.tr("Win back a lapsing member")
+            links.add(Ui.secondary(board.atRisk() == 1 ? Lang.tr("Win back a lapsing member")
                     : Lang.tr("Win back {0} lapsing members",
                     Integer.valueOf(board.atRisk())), "winBack",
                     e -> CampaignsForm.compose(form, null)));

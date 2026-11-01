@@ -201,6 +201,7 @@ public final class Classes {
         glyph.getAllStyles().setFgColor(color);
         glyph.setIcon(FontImage.createMaterial(glyph(session.category()),
                 glyph.getUnselectedStyle(), 3.2f));
+        glyph.setGap(0);
         time.add(glyph);
         Label stripe = new Label("", "SvClassStripe");
         stripe.getAllStyles().setBgColor(color);
@@ -298,6 +299,8 @@ public final class Classes {
         Label tile = new Label("", "SvClassTile");
         tile.getAllStyles().setFgColor(color);
         tile.setIcon(FontImage.createMaterial(glyph(category), tile.getUnselectedStyle(), 3.4f));
+        // No words beside the icon, so no gap to throw it off the middle.
+        tile.setGap(0);
         tile.getAllStyles().setAlignment(Label.CENTER);
         int wash = mix(color, 0xffffff, 0.84f);
         tile.getAllStyles().setBorder(com.codename1.ui.plaf.RoundBorder.create().color(wash)

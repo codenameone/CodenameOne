@@ -47,14 +47,27 @@ public final class MemberDetailForm {
         final Form form = Ui.form("Member", "OwnerMember");
         Ui.back(form, previous);
         final Container page = Ui.page();
-        page.setName("member");
-        page.add(new Skeleton(6));
-        final Runnable[] load = new Runnable[1];
-        load[0] = () -> Api.owner().member(id, Net.to(found -> fill(form, page, found, load[0]),
-                Ui.failed(page, load[0])));
-        Ui.pull(page, load[0]);
         form.add(BorderLayout.CENTER, page);
         form.show();
+        into(form, page, id);
+    }
+
+    /// Draws the member `id` into `page`, which is on `form`: a screen of its
+    /// own on a phone, the right of the members list on a wide window.
+    public static void into(final Form form, final Container page, final String id) {
+        page.setName("member");
+        page.removeAll();
+        page.add(new Skeleton(6));
+        page.revalidate();
+        final Runnable[] load = new Runnable[1];
+        load[0] = () -> Api.owner().member(id, Net.to(found -> {
+            // Another member picked while this one was on its way wins.
+            if (id.equals(page.getClientProperty("showing"))) {
+                fill(form, page, found, load[0]);
+            }
+        }, Ui.failed(page, load[0])));
+        page.putClientProperty("showing", id);
+        Ui.pull(page, load[0]);
         load[0].run();
     }
 

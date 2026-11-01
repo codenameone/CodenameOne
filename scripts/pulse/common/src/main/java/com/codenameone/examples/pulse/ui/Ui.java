@@ -65,7 +65,7 @@ public final class Ui {
     ///
     /// @param name what a test waits for; the title is for people and changes
     public static Form form(String title, String name) {
-        Form form = new Form(title, new BorderLayout());
+        Form form = new Screen(title);
         form.setUIID("SvForm");
         form.getContentPane().setUIID("SvForm");
         form.setName(name);
@@ -118,7 +118,11 @@ public final class Ui {
     /// between it and the label's words: without one the two touch.
     public static void icon(Label label, char icon, float size) {
         FontImage.setMaterialIcon(label, icon, size);
-        label.setGap(CN.convertToPixels(ICON_GAP));
+        // An icon with no words gets no gap: the gap counts in the centring
+        // even with nothing beside it, which pushes a lone icon off the middle
+        // of its circle.
+        String text = label.getText();
+        label.setGap(text == null || text.length() == 0 ? 0 : CN.convertToPixels(ICON_GAP));
     }
 
     /// The space between an icon and the words beside it, in millimetres.

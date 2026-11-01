@@ -41,6 +41,8 @@ The account's roles decide which screens a person sees. The same client project 
 ![Pulse accounts administration](/developer-guide/img/pulse-accounts.png)
 ![Pulse account with roles and moderation](/developer-guide/img/pulse-account.png)
 ![Pulse staff rota](/developer-guide/img/pulse-owner-shifts.png)
+![Pulse owner dashboard on a desktop with the menu docked](/developer-guide/img/pulse-desktop-owner.png)
+![Pulse members list and detail side by side on a desktop](/developer-guide/img/pulse-desktop-members.png)
 ![Pulse watch next class](/developer-guide/img/pulse-watch.png)
 ![Pulse watch week with level ring and streak](/developer-guide/img/pulse-watch-week.png)
 ![Pulse watch coaching page](/developer-guide/img/pulse-watch-coach.png)

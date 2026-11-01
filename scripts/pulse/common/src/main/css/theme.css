@@ -1173,6 +1173,32 @@ SvMenuItem.pressed {
     background-color: var(--surface-alt);
 }
 
+/* The right half of a page of figures on a wide window, set off from the left. */
+SvBroadRight {
+    background-color: transparent;
+    padding: 0 0 0 4mm;
+    margin: 0;
+}
+
+/* The menu docked down the side of a wide window. */
+SvMenuDock {
+    background-color: var(--surface);
+    border-right: 1px solid var(--line);
+    padding: 0;
+    margin: 0;
+}
+
+/* The place that is open, in the docked menu. */
+SvMenuItemPicked {
+    color: var(--brand);
+    background-color: var(--brand-tint);
+    font-family: "native:MainBold";
+    font-size: 2.9mm;
+    text-align: left;
+    padding: 2.6mm 4mm 2.6mm 4mm;
+    margin: 0;
+}
+
 SvMenuBottom {
     background-color: transparent;
     border-top: 1px solid var(--line);
@@ -1697,6 +1723,8 @@ SvWelcomeFeatureText { background-color: transparent; font-size: 3.1mm; color: v
     SvMenuLabel { color: var(--text-muted-dark); }
     SvMenuItem { color: var(--text-dark); }
     SvMenuItem.pressed { background-color: var(--surface-alt-dark); }
+    SvMenuDock { background-color: var(--surface-dark); border-right: 1px solid var(--line-dark); }
+    SvMenuItemPicked { background-color: var(--brand-tint-dark); }
     SvMenuBottom { border-top: 1px solid var(--line-dark); }
     SvHomeBar { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
     SvSection { color: var(--text-dark); }

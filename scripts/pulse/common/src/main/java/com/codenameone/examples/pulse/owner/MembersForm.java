@@ -32,7 +32,9 @@ import com.codenameone.examples.pulse.api.OwnerMemberDto;
 import com.codenameone.examples.pulse.net.Api;
 import com.codenameone.examples.pulse.net.Net;
 import com.codenameone.examples.pulse.ui.Lang;
+import com.codenameone.examples.pulse.ui.Layouts;
 import com.codenameone.examples.pulse.ui.Skeleton;
+import com.codenameone.examples.pulse.ui.Split;
 import com.codenameone.examples.pulse.ui.Ui;
 import java.util.List;
 
@@ -52,6 +54,10 @@ public final class MembersForm {
     private final TextField search = new TextField("", Lang.tr("Search by name"), 20,
             TextField.ANY);
     private String filter = "";
+    /// The list and the member picked side by side, on a wide window; null on a phone.
+    private Split split;
+    /// The member open beside the list, kept while the list is searched.
+    private String opened;
     private List<OwnerMemberDto> members;
 
     private MembersForm() {
@@ -83,8 +89,12 @@ public final class MembersForm {
             list.revalidate();
             load();
         }));
-        form.add(BorderLayout.NORTH, top);
-        form.add(BorderLayout.CENTER, list);
+        if (Layouts.wide()) {
+            split = new Split(form, top, list);
+        } else {
+            form.add(BorderLayout.NORTH, top);
+            form.add(BorderLayout.CENTER, list);
+        }
         Ui.pull(list, this::load);
         form.show();
         // The list is what an owner came for; the search waits to be tapped
@@ -110,6 +120,9 @@ public final class MembersForm {
             return;
         }
         list.removeAll();
+        if (split != null) {
+            split.clear();
+        }
         String wanted = search.getText().trim();
         int shown = 0;
         for (int iter = 0; iter < members.size(); iter++) {
@@ -120,8 +133,14 @@ public final class MembersForm {
             String detail = (member.planName() == null ? "" : member.planName() + Ui.DOT)
                     + lastVisit(member.lastVisit()) + Ui.DOT
                     + Lang.tr("{0} in 30 days", Integer.valueOf(member.visits30()));
-            list.add(Ui.tap(person(member.name(), detail, state(member)), "memberRow" + shown,
-                    e -> MemberDetailForm.show(form, member.id())));
+            final Container row = person(member.name(), detail, state(member));
+            list.add(Ui.tap(row, "memberRow" + shown, e -> open(row, member)));
+            if (split != null && member.id().equals(opened)) {
+                split.pick(row);
+            } else if (split != null && opened == null && shown == 0) {
+                // Beside the list there is always someone: the first, to begin with.
+                open(row, member);
+            }
             shown++;
         }
         if (shown == 0) {
@@ -130,6 +149,18 @@ public final class MembersForm {
                     Lang.tr("Try another filter.")));
         }
         Ui.refresh(form);
+    }
+
+    /// Opens `member`: beside the list on a wide window, on a screen of its
+    /// own on a phone.
+    private void open(Container row, OwnerMemberDto member) {
+        if (split == null) {
+            MemberDetailForm.show(form, member.id());
+            return;
+        }
+        opened = member.id();
+        split.pick(row);
+        MemberDetailForm.into(form, split.detail(), member.id());
     }
 
     /// Whether `text` has `part` in it, whatever the case: compared a

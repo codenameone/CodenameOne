@@ -70,6 +70,18 @@ class AccessTest {
         mvc.perform(as(get("/api/desk/today?location=loc-downtown"), owner)).andExpect(status().isOk());
     }
 
+    /// Every account the owner's list shows opens, the demo crowd's included.
+    @Test
+    void everyListedAccountOpens() throws Exception {
+        String owner = SignIn.token(mvc, DemoAccounts.OWNER, DemoAccounts.PASSWORD);
+        java.util.List<com.codenameone.examples.pulse.api.UserDto> users = accounts.all();
+        for (int iter = 0; iter < users.size(); iter++) {
+            String username = users.get(iter).username();
+            mvc.perform(as(get("/api/admin/users/" + username), owner)).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.user.username").value(username));
+        }
+    }
+
     @Test
     void aRoleGrantedOrAnAccountSuspendedTakesEffectOnTheTokenInHand() throws Exception {
         String username = People.account(accounts, "promoted", false);

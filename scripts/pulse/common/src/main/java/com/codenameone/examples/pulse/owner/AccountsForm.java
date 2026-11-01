@@ -39,7 +39,9 @@ import com.codenameone.examples.pulse.net.Api;
 import com.codenameone.examples.pulse.net.Net;
 import com.codenameone.examples.pulse.net.Session;
 import com.codenameone.examples.pulse.ui.Lang;
+import com.codenameone.examples.pulse.ui.Layouts;
 import com.codenameone.examples.pulse.ui.Skeleton;
+import com.codenameone.examples.pulse.ui.Split;
 import com.codenameone.examples.pulse.ui.StatRow;
 import com.codenameone.examples.pulse.ui.Ui;
 import java.util.List;
@@ -58,6 +60,11 @@ public final class AccountsForm {
             TextField.ANY);
     private String filter = "ALL";
     private List<UserDto> users;
+    /// The list and the account picked side by side, on a wide window; null on a phone.
+    private Split split;
+    /// The account open beside the list, kept across a reload so that what was
+    /// done to it shows without losing the place.
+    private String opened;
 
     private AccountsForm() {
     }
@@ -84,8 +91,12 @@ public final class AccountsForm {
             filter = value;
             fill();
         }));
-        form.add(BorderLayout.NORTH, top);
-        form.add(BorderLayout.CENTER, list);
+        if (Layouts.wide()) {
+            split = new Split(form, top, list);
+        } else {
+            form.add(BorderLayout.NORTH, top);
+            form.add(BorderLayout.CENTER, list);
+        }
         list.add(new Skeleton(6));
         Ui.pull(list, this::load);
         // Back from an account, whatever was done to it shows in the list.
@@ -106,17 +117,34 @@ public final class AccountsForm {
             return;
         }
         list.removeAll();
+        if (split != null) {
+            split.clear();
+        }
         String wanted = search.getText().trim();
         int shown = 0;
+        Container first = null;
+        String firstName = null;
         for (int iter = 0; iter < users.size(); iter++) {
             final UserDto user = users.get(iter);
             if (!matches(user, filter) || !MembersForm.contains(user.displayName(), wanted)
                     && !MembersForm.contains(user.username(), wanted)) {
                 continue;
             }
-            list.add(Ui.tap(MembersForm.person(name(user), user.username(), state(user)),
-                    "accountRow" + shown, e -> showAccount(form, user.username())));
+            final Container row = MembersForm.person(name(user), user.username(), state(user));
+            list.add(Ui.tap(row, "accountRow" + shown, e -> open(row, user.username())));
+            if (split != null && user.username().equals(opened)) {
+                split.pick(row);
+            }
+            if (first == null) {
+                first = row;
+                firstName = user.username();
+            }
             shown++;
+        }
+        // Beside the list there is always an account: the one that was open
+        // while it is still listed, or the first.
+        if (split != null && !split.hasPick() && first != null) {
+            open(first, firstName);
         }
         if (shown == 0) {
             list.add(Ui.empty(FontImage.MATERIAL_MANAGE_ACCOUNTS, Lang.tr("No accounts here"),
@@ -172,14 +200,38 @@ public final class AccountsForm {
         final Form form = Ui.form("Account", "OwnerAccount");
         Ui.back(form, previous);
         final Container page = Ui.page();
-        page.setName("account");
-        page.add(new Skeleton(6));
-        final Runnable[] load = new Runnable[1];
-        load[0] = () -> Api.admin().user(username, Net.to(found -> fillAccount(form, page,
-                found, load[0]), Ui.failed(page, load[0])));
-        Ui.pull(page, load[0]);
         form.add(BorderLayout.CENTER, page);
         form.show();
+        into(form, page, username);
+    }
+
+    /// Opens the account `username`: beside the list on a wide window, on a
+    /// screen of its own on a phone.
+    private void open(Container row, String username) {
+        if (split == null) {
+            showAccount(form, username);
+            return;
+        }
+        opened = username;
+        split.pick(row);
+        into(form, split.detail(), username);
+    }
+
+    /// Draws the account `username` into `page`, which is on `form`.
+    private static void into(final Form form, final Container page, final String username) {
+        page.setName("account");
+        page.removeAll();
+        page.add(new Skeleton(6));
+        page.revalidate();
+        page.putClientProperty("showing", username);
+        final Runnable[] load = new Runnable[1];
+        load[0] = () -> Api.admin().user(username, Net.to(found -> {
+            // Another account picked while this one was on its way wins.
+            if (username.equals(page.getClientProperty("showing"))) {
+                fillAccount(form, page, found, load[0]);
+            }
+        }, Ui.failed(page, load[0])));
+        Ui.pull(page, load[0]);
         load[0].run();
     }
 

@@ -25,6 +25,8 @@ import com.codename1.ui.Container;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import java.util.HashMap;
@@ -82,6 +84,39 @@ public final class Layouts {
     /// Whether there is room to lay a screen out side by side.
     public static boolean wide() {
         return CN.getDisplayWidth() >= CN.convertToPixels(WIDE_MM);
+    }
+
+    /// The client property that lets a page of figures grow to [#broad()].
+    private static final String BROAD = "pulse.broad";
+    /// The widest a page of figures side by side is left to grow.
+    private static final float BROAD_MM = 270f;
+
+    /// Lets `page` grow to [#broad()] rather than [#column()]: for a page of
+    /// figures laid out side by side on a wide window, where a column of
+    /// reading width would leave most of the window empty.
+    public static void broaden(Container page) {
+        page.putClientProperty(BROAD, Boolean.TRUE);
+    }
+
+    /// The widest a page of figures is drawn, in pixels.
+    public static int broad() {
+        return CN.convertToPixels(BROAD_MM);
+    }
+
+    /// Two halves of `page` side by side on a wide window, the right one set
+    /// off from the left; on anything narrower both are `page` itself, so
+    /// what goes in the second simply follows what went in the first.
+    public static Container[] halves(Container page) {
+        if (!wide()) {
+            return new Container[] {page, page};
+        }
+        Container left = new Container(BoxLayout.y());
+        Container right = new Container(BoxLayout.y());
+        right.setUIID("SvBroadRight");
+        Container both = new Container(new GridLayout(1, 2));
+        both.add(left).add(right);
+        page.add(both);
+        return new Container[] {left, right};
     }
 
     /// The widest a single column of content is drawn, in pixels.
@@ -172,7 +207,8 @@ public final class Layouts {
     ///
     /// @param margin the side padding of the page's own style, in pixels
     static void centre(Container page, int margin) {
-        int side = Math.max(margin, (page.getWidth() - column()) / 2);
+        int widest = Boolean.TRUE.equals(page.getClientProperty(BROAD)) ? broad() : column();
+        int side = Math.max(margin, (page.getWidth() - widest) / 2);
         Style style = page.getAllStyles();
         Style now = page.getUnselectedStyle();
         if (now.getPaddingLeftNoRTL() != side || now.getPaddingRightNoRTL() != side) {

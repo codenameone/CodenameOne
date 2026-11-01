@@ -29,6 +29,8 @@ import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codenameone.examples.pulse.api.UserDto;
 import com.codenameone.examples.pulse.net.Session;
+import java.util.ArrayList;
+import java.util.List;
 
 /// The menu of a home screen: who is signed in, which of the app's four modes
 /// this is, the places that mode has, and the way to another mode.
@@ -42,9 +44,26 @@ import com.codenameone.examples.pulse.net.Session;
 /// It slides in over the screen as a layer of the screen's own, not as the
 /// title bar's side menu: the home screens have no title bar, and on a desktop
 /// the title bar's menu is handed to the window's.
+///
+/// On a wide window -- a tablet on its side, a desktop, a browser -- there is
+/// room to keep it in view, so it is docked down the side of the home screen
+/// and of every screen opened from it, with the place that is open marked, and
+/// the button that opens it is not shown. See [Layouts#wide()].
 public final class Menu {
+    /// The menu of the home screen showing on a wide window, which every
+    /// screen opened from it docks beside its own content; null on a phone
+    /// and while nobody is signed in.
+    private static Menu docked;
+    /// The width of the docked menu, in millimetres.
+    private static final float SIDE_MM = 58f;
+    /// The name of the place last opened from the docked menu.
+    private static String picked;
+    /// The client property that marks a screen whose menu is docked.
+    private static final String DOCKED = "pulse.docked";
     private final Form form;
     private final String mode;
+    /// The mode's places as they were added: icon, words, name and what each does.
+    private final List<Object[]> items = new ArrayList<Object[]>();
     private final Container layer = new Container(new BorderLayout());
     private final Container places = new Container(BoxLayout.y());
     private final Container panel;
@@ -67,7 +86,7 @@ public final class Menu {
         panel.setSafeArea(true);
         panel.setGrabsPointerEvents(true);
         panel.setName("menu");
-        build();
+        build(panel, places);
         // What is left of the screen beside the menu: dimmed, and a tap on it
         // puts the menu away.
         Button dim = new Button("", "SvScrim");
@@ -82,7 +101,90 @@ public final class Menu {
     /// Adds the menu to the screen, closed, as its top layer. Call it after
     /// the screen's own content has been added.
     public void install() {
+        if (Layouts.wide()) {
+            docked = this;
+            picked = items.isEmpty() ? null : (String) items.get(0)[2];
+            dock(form);
+            return;
+        }
         form.add(layer);
+    }
+
+    /// Docks the menu of the home screen down the side of `screen`, on a wide
+    /// window while someone is signed in; does nothing anywhere else. A
+    /// screen whose content is laid out in borders gets it as its west, any
+    /// other has its content moved beside it.
+    public static void dock(Form screen) {
+        if (docked == null || !Layouts.wide()
+                || Boolean.TRUE.equals(screen.getClientProperty(DOCKED))) {
+            return;
+        }
+        screen.putClientProperty(DOCKED, Boolean.TRUE);
+        // A screen that is one of the places marks it; one opened from a
+        // place -- a member, an account -- keeps the place it came from.
+        for (int iter = 0; iter < docked.items.size(); iter++) {
+            Object[] item = docked.items.get(iter);
+            if (Lang.tr((String) item[1]).equals(screen.getTitle())) {
+                picked = (String) item[2];
+            }
+        }
+        Container side = docked.side();
+        if (screen instanceof Screen) {
+            ((Screen) screen).dockBeside(side);
+            return;
+        }
+        // A home screen: its content is layered, and built once.
+        Container content = screen.getContentPane();
+        Container rest = new Container(new com.codename1.ui.layouts.LayeredLayout());
+        while (content.getComponentCount() > 0) {
+            com.codename1.ui.Component child = content.getComponentAt(0);
+            content.removeComponent(child);
+            rest.add(child);
+        }
+        Container both = new Container(new BorderLayout());
+        both.add(BorderLayout.WEST, side);
+        both.add(BorderLayout.CENTER, rest);
+        content.add(both);
+    }
+
+    /// Forgets the docked menu: nobody is signed in any more.
+    public static void undock() {
+        docked = null;
+        picked = null;
+    }
+
+    /// A fresh copy of the menu for the side of a screen, with the place that
+    /// is open marked.
+    private Container side() {
+        Container dock = new Container(new BorderLayout()) {
+            @Override
+            protected Dimension calcPreferredSize() {
+                // As wide on every screen, whatever its longest entry.
+                Dimension size = super.calcPreferredSize();
+                size.setWidth(CN.convertToPixels(SIDE_MM));
+                return size;
+            }
+        };
+        dock.setUIID("SvMenuDock");
+        dock.setName("menu");
+        Container docks = new Container(BoxLayout.y());
+        for (int iter = 0; iter < items.size(); iter++) {
+            Object[] item = items.get(iter);
+            final String name = (String) item[2];
+            final Runnable go = (Runnable) item[3];
+            // Marked before the place opens, so that its screen docks with it marked.
+            Button entry = entry(((Character) item[0]).charValue(), (String) item[1],
+                    "menu-" + name, () -> {
+                        picked = name;
+                        go.run();
+                    });
+            if (name.equals(picked)) {
+                entry.setUIID("SvMenuItemPicked");
+            }
+            docks.add(entry);
+        }
+        build(dock, docks);
+        return dock;
     }
 
     /// The round button that opens the menu, for the screen to place.
@@ -94,7 +196,10 @@ public final class Menu {
 
     /// The button that opens the menu, for a screen with a bar and no map.
     public Button flatButton() {
-        return Ui.flat(FontImage.MATERIAL_MENU, "Menu", "menu-open", e -> open());
+        Button button = Ui.flat(FontImage.MATERIAL_MENU, "Menu", "menu-open", e -> open());
+        // Docked, the menu is in view and there is nothing to open.
+        button.setHidden(Layouts.wide());
+        return button;
     }
 
     /// Adds one of the mode's own places.
@@ -102,6 +207,7 @@ public final class Menu {
     /// @param name the button's name is `menu-` and this
     public Menu item(char icon, String text, String name, final Runnable go) {
         places.add(entry(icon, text, "menu-" + name, go));
+        items.add(new Object[] {Character.valueOf(icon), text, name, go});
         return this;
     }
 
@@ -127,7 +233,7 @@ public final class Menu {
         form.getContentPane().revalidate();
     }
 
-    private void build() {
+    private void build(Container panel, Container places) {
         UserDto user = Session.user();
         Container top = new Container(BoxLayout.y());
         top.setUIID("SvMenuTop");

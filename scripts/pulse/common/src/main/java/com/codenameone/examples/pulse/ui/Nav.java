@@ -220,6 +220,7 @@ public final class Nav {
     }
 
     private static void leave(final String reason, boolean forgetDevice) {
+        Menu.undock();
         Account.flush();
         Reminders.clear();
         WatchBridge.clear();

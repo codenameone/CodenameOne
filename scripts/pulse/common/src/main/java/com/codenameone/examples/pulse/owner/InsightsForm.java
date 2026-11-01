@@ -31,6 +31,7 @@ import com.codenameone.examples.pulse.api.WeekPointDto;
 import com.codenameone.examples.pulse.net.Api;
 import com.codenameone.examples.pulse.net.Net;
 import com.codenameone.examples.pulse.ui.Lang;
+import com.codenameone.examples.pulse.ui.Layouts;
 import com.codenameone.examples.pulse.ui.Skeleton;
 import com.codenameone.examples.pulse.ui.StatRow;
 import com.codenameone.examples.pulse.ui.Ui;
@@ -49,6 +50,7 @@ public final class InsightsForm {
         Ui.back(form, previous);
         final Container page = Ui.page();
         page.setName("insights");
+        Layouts.broaden(page);
         page.add(new Skeleton(6));
         final Runnable[] load = new Runnable[1];
         load[0] = () -> Api.owner().insights(Net.to(found -> fill(form, page, found),
@@ -61,7 +63,7 @@ public final class InsightsForm {
 
     private static void fill(Form form, Container page, InsightsDto insights) {
         page.removeAll();
-        StatRow tiles = Ui.stats(2);
+        StatRow tiles = Ui.stats(Layouts.wide() ? 4 : 2);
         tiles.stat(insights.retention90() + "%", "Still with us after 90 days", "retention")
                 .stat(Ui.tenths(insights.visitsPerMemberTenths() / 10.0), "Visits a member a week",
                         "visitsPerMember")
@@ -70,22 +72,27 @@ public final class InsightsForm {
                         "revenuePerMember");
         page.add(tiles);
 
-        Ui.section(page, "Busy hours");
-        page.add(Ui.text("Check-ins over the last eight weeks.", "SvMuted"));
-        page.add(new Graphs.Heatmap(insights.firstHour(), insights.lastHour(),
+        // The studio's rhythm on the left, what it sells and who teaches it on
+        // the right, on a wide window.
+        Container[] halves = Layouts.halves(page);
+        Container left = halves[0];
+        Container right = halves[1];
+        Ui.section(left, "Busy hours");
+        left.add(Ui.text("Check-ins over the last eight weeks.", "SvMuted"));
+        left.add(new Graphs.Heatmap(insights.firstHour(), insights.lastHour(),
                 insights.busyHours()));
 
-        Ui.section(page, "Membership");
-        membership(page, insights.weeks());
+        Ui.section(left, "Membership");
+        membership(left, insights.weeks());
 
-        Ui.section(page, "Classes");
-        classes(page, insights.classes());
+        Ui.section(right, "Classes");
+        classes(right, insights.classes());
 
-        Ui.section(page, "Plan mix");
-        plans(page, insights.plans());
+        Ui.section(right, "Plan mix");
+        plans(right, insights.plans());
 
-        Ui.section(page, "Coaches");
-        coaches(page, insights.coaches());
+        Ui.section(right, "Coaches");
+        coaches(right, insights.coaches());
         Ui.refresh(form);
     }
 

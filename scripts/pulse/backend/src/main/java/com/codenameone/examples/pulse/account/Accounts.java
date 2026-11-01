@@ -227,8 +227,14 @@ public class Accounts {
     @Transactional(readOnly = true)
     public UserDto describe(String username) throws IOException {
         Profile profile = profiles.findById(username);
-        if (profile == null || !users.userExists(username)) {
+        if (profile == null) {
             throw new ResponseStatusException(404, "No such account");
+        }
+        // A member the desk signed up who has never signed in to the app has a
+        // profile and no sign-in: described as [#all()] lists them, with no
+        // roles, rather than as an account that does not exist.
+        if (!users.userExists(username)) {
+            return toDto(profile, new ArrayList<String>(), true);
         }
         UserDetails signIn = users.loadUserByUsername(username);
         return toDto(profile, authorities(signIn), signIn.isEnabled());
@@ -565,6 +571,12 @@ public class Accounts {
 
     private UserDetails load(String username) {
         if (username == null || !users.userExists(username)) {
+            // A member with a profile and no sign-in can be looked at, and
+            // has nothing to give roles to or block until they sign in.
+            if (username != null && profiles.findById(username) != null) {
+                throw new ResponseStatusException(409,
+                        "This member has not signed in to the app yet");
+            }
             throw new ResponseStatusException(404, "No such account");
         }
         return users.loadUserByUsername(username);

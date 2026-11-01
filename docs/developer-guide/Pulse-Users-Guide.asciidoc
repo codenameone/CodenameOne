@@ -427,6 +427,32 @@ checking in. Both ask for a reason, which the history keeps.
 
 image::img/pulse-account-block.png["Blocking an account, with the reason the record will keep",scaledwidth=40%]
 
+=== On a desktop
+
+The front office usually runs on a computer, so Pulse rearranges itself on a wide
+window: the desktop app, a tablet, or a browser window wider than a phone. The
+menu stays open down the left edge, with the current screen highlighted, and the
+dashboards spread into two columns.
+
+image::img/pulse-desktop-owner.png["The owner's dashboard on a desktop: the menu docked on the left, eight figures in two rows, takings and popular classes beside the links and the under-filled classes",scaledwidth=90%]
+
+image::img/pulse-desktop-insights.png["Insights on a desktop: busy hours and membership growth on the left, class fill, plan mix and coaches on the right",scaledwidth=90%]
+
+Lists become master and detail. Picking a member or an account opens it next to
+the list rather than on a screen of its own, and the search and filters stay
+where they were.
+
+image::img/pulse-desktop-members.png["Members on a desktop: the searchable list on the left and the member picked, with visits, favourite classes and invoices, on the right",scaledwidth=90%]
+
+image::img/pulse-desktop-accounts.png["Accounts on a desktop: the list on the left and the account picked, with its roles, household and history, on the right",scaledwidth=90%]
+
+The trainer and the member get the same docked menu, with their home centred
+next to it.
+
+image::img/pulse-desktop-trainer.png["The trainer's home on a desktop, with the class on now, the coach's game and the leaderboard",scaledwidth=90%]
+
+image::img/pulse-desktop-member.png["The member's home on a desktop, with the next class, the shortcuts, the level ring and the month",scaledwidth=90%]
+
 === In a browser
 
 The server can host the app itself, so the whole studio can be tried in a browser:
