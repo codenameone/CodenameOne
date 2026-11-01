@@ -3108,6 +3108,23 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-10-31T01:01:14+00:00"
+      },
+      "devto": {
+        "id": 4954240,
+        "url": "https://dev.to/codenameone/skirmish-a-multiplayer-strategy-game-template-in-java-c5d",
+        "syndicated_at": "2026-10-31T18:31:24+00:00"
+      }
+    },
+    "launch-your-own-private-messenger": {
+      "hashnode": {
+        "url": "https://debugagent.com/parley-a-private-messenger-template-you-can-brand",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6ae68f1edeb2d682a93cec1e",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-11-01T01:01:09+00:00"
       }
     }
   }
