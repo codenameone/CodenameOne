@@ -28,15 +28,15 @@ import com.codename1.flutter.Widget;
 public class _DemoPageState extends State<DemoPage> {
 
     private final DartList<String> _items = DartList.<String>of("Alpha", "Beta", "Gamma");
-    DartList<String> get$_items() {
+    public DartList<String> get$_items() {
         return _items;
     }
 
     private long _taps = 0L;
-    long get$_taps() {
+    public long get$_taps() {
         return _taps;
     }
-    void set$_taps(long v) {
+    public void set$_taps(long v) {
         this._taps = v;
     }
 

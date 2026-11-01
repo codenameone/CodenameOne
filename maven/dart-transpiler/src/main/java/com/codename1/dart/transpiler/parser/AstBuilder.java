@@ -1782,6 +1782,16 @@ public final class AstBuilder {
             }
         }
         f.body = buildStatement(ctx.statement());
+        if (f.init instanceof VarDeclGroup) {
+            // `for (var i = 0, j = n - 1; ...)`: the declarations go ahead of the loop, in a
+            // block of their own so their scope still ends with it.
+            Block b = new Block();
+            pos(b, ctx);
+            b.statements.addAll(((VarDeclGroup) f.init).decls);
+            f.init = null;
+            b.statements.add(f);
+            return b;
+        }
         return f;
     }
 

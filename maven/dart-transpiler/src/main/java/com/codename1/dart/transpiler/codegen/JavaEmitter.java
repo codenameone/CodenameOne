@@ -583,7 +583,7 @@ public final class JavaEmitter {
 
     private static String emitLateAccessors(FieldDecl f, String jt) {
         String st = f.isStatic ? "static " : "";
-        String vis = f.name.startsWith("_") ? "    " : "    public ";
+        String vis = f.isStatic && f.name.startsWith("_") ? "    " : "    public ";
         String flag = f.name + "$late";
         String self = f.isStatic ? "" : "this.";
         StringBuilder b = new StringBuilder();
@@ -1068,8 +1068,10 @@ public final class JavaEmitter {
             // package-private (all generated classes share one package) rather than skip it;
             // cross-instance reads compile to `x.get$_field()`.
             if (!f.isStatic) {
-                boolean priv = f.name.startsWith("_");
-                String vis = priv ? "    " : "    public ";
+                // Public even for a library-private `_x`: an implicit interface (X$I) carries
+                // the accessor, so `other._x` reaches it through an interface-typed value,
+                // and an implementer's own `_x` must not assign weaker access.
+                String vis = "    public ";
                 body.append(vis).append(jt).append(" get$").append(f.name).append("() {\n")
                         .append("        return ").append(f.name).append(";\n    }\n");
                 if (!f.isFinal && !f.isConst) {
@@ -1106,7 +1108,6 @@ public final class JavaEmitter {
         for (CtorDecl ct : c.ctors) {
             body.append(emitCtor(c, ct, ctx));
         }
-        body.append(implementerCtor(c));
 
         // Dart operator== ($eq) overrides Java equals via a bridge
         MethodDecl eqOp = c.method("$eq");
@@ -1140,12 +1141,21 @@ public final class JavaEmitter {
             mm.typeParams = m.typeParams;
             mm.body = m.body;
             mm.exprBody = m.exprBody;
+            if (!c.isMixin) {
+                mm.javaReturn = interfacePinnedReturn(c, m, ctx);
+            }
             body.append(emitMethodLike(mm, ctx, c.isAbstract));
+            if (!c.isMixin) {
+                body.append(interfaceBridges(c, m, ctx));
+            }
             if (m.isOverride && !mm.isOverride && !c.isMixin) {
                 body.append(emitCovariantBridge(c, m, mm, ctx));
             }
         }
 
+        if (!c.isMixin) {
+            checkInterfaceCoverage(c);
+        }
         // mixin applications: implement each mixin interface and synthesize
         // the state (field + accessors) the mixin's abstract accessors need
         StringBuilder impls = new StringBuilder();
@@ -1299,7 +1309,7 @@ public final class JavaEmitter {
                 // `implements` would not. Anything else is reported rather than emitted
                 // as Java that does not compile.
                 if (c.superclass == null && implementedAsSuper == null && mixinClassAsSuper == null
-                        && (isPureInterface(implemented) || canImplementAsSuper(implemented))) {
+                        && isPureInterface(implemented)) {
                     implementedAsSuper = itf;
                 } else {
                     diags.error(c, "E0404", "Implementing the class " + itf.name
@@ -1438,7 +1448,12 @@ public final class JavaEmitter {
                     if (k.extensionOn != null) {
                         continue;
                     }
-                    for (TypeRef itf : k.interfaces) {
+                    List<TypeRef> named = new ArrayList<TypeRef>(k.interfaces);
+                    if (k.isMixin) {
+                        // `mixin M on S`: M's code sees `this` as an S, whatever class applies it.
+                        named.addAll(k.mixinOn);
+                    }
+                    for (TypeRef itf : named) {
                         ClassDecl im = program.classes.get(itf.name);
                         if (im != null && !im.isMixin && im.extensionOn == null && im.enumOf == null) {
                             work.add(im);
@@ -1492,7 +1507,9 @@ public final class JavaEmitter {
                 continue; // a constructor
             }
             String name = before.substring(sp + 1);
-            if (name.equals(jname) || name.startsWith("$") && !name.startsWith("$op")) {
+            if (name.equals(jname) || name.startsWith("$") && !name.startsWith("$op")
+                    || "equals".equals(name) || "hashCode".equals(name) || "toString".equals(name)) {
+                // A default method may not override a member of Object.
                 continue;
             }
             if (!seen.add(head.replaceAll("\\s+", " "))) {
@@ -1578,6 +1595,267 @@ public final class JavaEmitter {
             }
         }
         return sb.toString();
+    }
+
+    /** One member of an implicit interface X$I, as Java sees it from an implementer. */
+    private static final class IfaceSig {
+        String owner;
+        String ret;
+        List<String> params = new ArrayList<String>();
+    }
+
+    private static String erase(String t) {
+        int lt = t.indexOf('<');
+        return lt < 0 ? t : t.substring(0, lt);
+    }
+
+    private static String erasedParams(List<String> ps) {
+        StringBuilder sb = new StringBuilder();
+        for (String p : ps) {
+            sb.append(erase(p)).append(',');
+        }
+        return sb.toString();
+    }
+
+    private static boolean bridgeable(MethodDecl m) {
+        if (m.isStatic || m.isSetter || m.name.startsWith("$") || !m.typeParams.isEmpty()
+                || "hashCode".equals(m.name) || "compareTo".equals(m.name) || "toString".equals(m.name)) {
+            return false;
+        }
+        for (Param p : m.params) {
+            if (p.named || p.defaultValue != null) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * The X$I members {@code m} of {@code c} implements, with their Java types as the
+     * implementer's {@code implements} clause specializes them (a bare type variable boxed,
+     * the way Java's generic substitution sees it).
+     */
+    private List<IfaceSig> interfaceSigs(ClassDecl c, MethodDecl m, Ctx ctx) {
+        List<IfaceSig> out = new ArrayList<IfaceSig>();
+        if (m.isStatic || m.isSetter || m.name.startsWith("$")) {
+            return out;
+        }
+        java.util.Set<ClassDecl> seen = new java.util.HashSet<ClassDecl>();
+        for (TypeRef itf : c.interfaces) {
+            collectIfaceSigs(itf, java.util.Collections.<String>emptyList(),
+                    java.util.Collections.<TypeRef>emptyList(), m, ctx, out, seen);
+        }
+        return out;
+    }
+
+    private void collectIfaceSigs(TypeRef itf, List<String> outerNames, List<TypeRef> outerArgs, MethodDecl m,
+                                  Ctx ctx, List<IfaceSig> out, java.util.Set<ClassDecl> seen) {
+        ClassDecl im = program.classes.get(itf.name);
+        if (im == null || !interfacedClasses().contains(im) || !seen.add(im)) {
+            return;
+        }
+        List<TypeRef> args = new ArrayList<TypeRef>();
+        for (TypeRef a : itf.args) {
+            args.add(substTypeParams(a, outerNames, outerArgs));
+        }
+        for (MethodDecl sm : im.methods) {
+            if (sm.isStatic || sm.isSetter || sm.isGetter != m.isGetter || !sm.name.equals(m.name)
+                    || sm.params.size() != m.params.size() || !sm.typeParams.isEmpty()) {
+                continue;
+            }
+            IfaceSig sig = new IfaceSig();
+            sig.owner = im.name;
+            for (Param p : sm.params) {
+                sig.params.add(ifaceJava(p.type, im, args, ctx));
+            }
+            TypeRef rt = sm.returnType == null || sm.returnType.is("var") ? TypeRef.DYNAMIC : sm.returnType;
+            sig.ret = rt.is("void") ? "void" : ifaceJava(rt, im, args, ctx);
+            out.add(sig);
+        }
+        if (im.superclass != null) {
+            collectIfaceSigs(im.superclass, im.typeParams, args, m, ctx, out, seen);
+        }
+        for (TypeRef sup : im.interfaces) {
+            collectIfaceSigs(sup, im.typeParams, args, m, ctx, out, seen);
+        }
+    }
+
+    private String ifaceJava(TypeRef t, ClassDecl im, List<TypeRef> args, Ctx ctx) {
+        TypeRef tt = t == null ? TypeRef.DYNAMIC : t;
+        boolean bareVar = im.typeParams.contains(tt.name) && tt.args.isEmpty();
+        return javaType(substTypeParams(tt, im.typeParams, args), bareVar, ctx);
+    }
+
+    private List<String> implJavaParams(MethodDecl m, Ctx ctx) {
+        List<String> ps = new ArrayList<String>();
+        for (Param p : m.params) {
+            ps.add(javaType(p.type == null ? TypeRef.DYNAMIC : p.type, false, ctx));
+        }
+        return ps;
+    }
+
+    /**
+     * The Java return type {@code m} must declare to override an X$I member whose Java return
+     * cannot be covariantly narrowed to the Dart one: Dart's {@code int weight()} implements
+     * {@code num weight()}, but Java's {@code long} does not implement {@code Number}, nor
+     * {@code long value()} a {@code T value()} specialized to {@code Long}. Null when the
+     * declared type serves.
+     */
+    private String interfacePinnedReturn(ClassDecl c, MethodDecl m, Ctx ctx) {
+        if (!bridgeable(m)) {
+            return null;
+        }
+        TypeRef rt = m.returnType == null || m.returnType.is("var") ? TypeRef.DYNAMIC : m.returnType;
+        String implRet = rt.is("void") ? "void" : javaType(rt, false, ctx);
+        String implParams = erasedParams(implJavaParams(m, ctx));
+        for (IfaceSig sig : interfaceSigs(c, m, ctx)) {
+            if (implParams.equals(erasedParams(sig.params)) && !sig.ret.equals(implRet)
+                    && (isJavaPrimitive(sig.ret) || isJavaPrimitive(implRet)) && !"void".equals(sig.ret)) {
+                return sig.ret;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * At a call site: when the called method's Java return was pinned to an X$I member's
+     * (see interfacePinnedReturn), the boxed Java type of its Dart return, which the caller
+     * casts the result back to; null otherwise.
+     */
+    private String pinnedCallBox(ClassDecl pc, MethodDecl m, Ctx ctx) {
+        for (ClassDecl k = pc; k != null; k = k.superclass != null ? program.classes.get(k.superclass.name) : null) {
+            if (k.methods.contains(m)) {
+                if (k.isMixin || interfacePinnedReturn(k, m, ctx) == null) {
+                    return null;
+                }
+                TypeRef rt = m.returnType == null || m.returnType.is("var") ? TypeRef.DYNAMIC : m.returnType;
+                return javaType(rt, true, ctx);
+            }
+        }
+        return null;
+    }
+
+    private final java.util.Set<String> interfaceBridgesDone = new java.util.HashSet<String>();
+
+    /**
+     * Where the Java signature of an implementer's method differs from the X$I member it
+     * implements -- a covariant parameter, {@code num} against {@code int}, a type variable
+     * specialized to a primitive -- the method is only an overload, and a call through the
+     * interface would reach X$I's throwing default. This emits the member's own signature,
+     * converting each argument and delegating, so the implementer's code is always reached.
+     */
+    private String interfaceBridges(ClassDecl c, MethodDecl m, Ctx ctx) {
+        List<IfaceSig> sigs = interfaceSigs(c, m, ctx);
+        if (sigs.isEmpty()) {
+            return "";
+        }
+        List<String> implParams = implJavaParams(m, ctx);
+        String implErased = erasedParams(implParams);
+        StringBuilder sb = new StringBuilder();
+        for (IfaceSig sig : sigs) {
+            String erased = erasedParams(sig.params);
+            if (erased.equals(implErased)) {
+                continue;
+            }
+            if (!bridgeable(m)) {
+                diags.error(m, "E0405", c.name + "." + m.name + " implements " + sig.owner + "." + m.name
+                        + " with a different signature, which cannot be bridged when the method"
+                        + " has optional, named or type parameters");
+                continue;
+            }
+            if (!interfaceBridgesDone.add(c.name + "#" + m.name + "(" + erased)) {
+                continue;
+            }
+            StringBuilder ps = new StringBuilder();
+            StringBuilder call = new StringBuilder();
+            for (int i = 0; i < sig.params.size(); i++) {
+                if (i > 0) {
+                    ps.append(", ");
+                    call.append(", ");
+                }
+                ps.append(sig.params.get(i)).append(" $b").append(i);
+                call.append("((").append(implParams.get(i)).append(") $b").append(i).append(')');
+            }
+            sb.append("    @SuppressWarnings({\"unchecked\", \"rawtypes\"})\n    public ").append(sig.ret)
+                    .append(' ').append(m.name).append('(').append(ps).append(") {\n        ")
+                    .append("void".equals(sig.ret) ? "" : "return ").append(m.name).append('(').append(call)
+                    .append(");\n    }\n\n");
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Fails translation when a concrete class leaves a member of an implemented program class
+     * to X$I's throwing default: nothing the class or its program superclasses and mixins
+     * declare carries the name. A class with {@code noSuchMethod}, or a superclass outside the
+     * program (whose members cannot be seen here), is not checked.
+     */
+    private void checkInterfaceCoverage(ClassDecl c) {
+        if (c.isAbstract || c.isMixin || c.interfaces.isEmpty()) {
+            return;
+        }
+        java.util.Set<String> have = new java.util.HashSet<String>();
+        for (ClassDecl k = c; k != null; k = k.superclass != null ? program.classes.get(k.superclass.name) : null) {
+            if (k.superclass != null && program.classes.get(k.superclass.name) == null) {
+                return;
+            }
+            List<ClassDecl> parts = new ArrayList<ClassDecl>();
+            parts.add(k);
+            for (TypeRef mx : k.mixins) {
+                ClassDecl md = program.classes.get(mx.name);
+                if (md == null) {
+                    return;
+                }
+                parts.add(md);
+            }
+            for (ClassDecl part : parts) {
+                for (MethodDecl md : part.methods) {
+                    if ("noSuchMethod".equals(md.name)) {
+                        return;
+                    }
+                    have.add(md.name);
+                }
+                for (FieldDecl f : part.fields) {
+                    have.add(f.name);
+                }
+            }
+        }
+        java.util.Set<ClassDecl> seen = new java.util.HashSet<ClassDecl>();
+        List<ClassDecl> work = new ArrayList<ClassDecl>();
+        for (TypeRef itf : c.interfaces) {
+            ClassDecl im = program.classes.get(itf.name);
+            if (im != null && interfacedClasses().contains(im)) {
+                work.add(im);
+            }
+        }
+        while (!work.isEmpty()) {
+            ClassDecl im = work.remove(work.size() - 1);
+            if (!seen.add(im)) {
+                continue;
+            }
+            for (MethodDecl sm : im.methods) {
+                // Object's members (hashCode, toString, ==, noSuchMethod) every class has.
+                if (!sm.isStatic && !sm.name.startsWith("$") && !have.contains(sm.name)
+                        && !"hashCode".equals(sm.name) && !"toString".equals(sm.name)
+                        && !"noSuchMethod".equals(sm.name) && !"runtimeType".equals(sm.name)
+                        // Another library's private member is not part of the interface Dart
+                        // makes an implementer provide.
+                        && !(sm.name.startsWith("_") && !java.util.Objects.equals(c.file, im.file))) {
+                    diags.error(c, "E0405", c.name + " implements " + im.name + " but has no member "
+                            + sm.name + "; a call through " + im.name + " would not reach it");
+                }
+            }
+            List<TypeRef> ups = new ArrayList<TypeRef>(im.interfaces);
+            if (im.superclass != null) {
+                ups.add(im.superclass);
+            }
+            for (TypeRef up : ups) {
+                ClassDecl u = program.classes.get(up.name);
+                if (u != null && interfacedClasses().contains(u)) {
+                    work.add(u);
+                }
+            }
+        }
     }
 
     private FieldDecl findFieldInChain(ClassDecl c, String name) {
@@ -1860,66 +2138,6 @@ public final class JavaEmitter {
      * no superclass or mixins of its own, no instance fields, no member with a body and
      * no constructor that takes or does anything.
      */
-    /**
-     * Whether a concrete program class can stand in as the Java superclass of a class that
-     * {@code implements} it. Dart's implementer overrides every member, so extending is
-     * observably the same as long as no constructor body of the implemented class runs:
-     * the implementer then builds through a no-argument constructor that does nothing but
-     * the field initializers (see {@link #implementedConcreteClasses}). Requires the
-     * implemented class to have no superclass and no mixins, so that constructor needs no
-     * super call of its own.
-     */
-    private boolean canImplementAsSuper(ClassDecl c) {
-        return c.superclass == null && c.mixins.isEmpty() && !c.isMixin && c.extensionOn == null;
-    }
-
-    private java.util.Set<ClassDecl> implementedConcrete;
-
-    /** Concrete program classes some class implements and extends in Java instead. */
-    private java.util.Set<ClassDecl> implementedConcreteClasses() {
-        if (implementedConcrete == null) {
-            java.util.Set<ClassDecl> out = new java.util.HashSet<ClassDecl>();
-            for (List<ClassDecl> same : program.classesByName.values()) {
-                for (ClassDecl k : same) {
-                    if (k.superclass != null) {
-                        continue;
-                    }
-                    for (TypeRef itf : k.interfaces) {
-                        ClassDecl im = program.classes.get(itf.name);
-                        if (im != null && !im.isMixin && !isPureInterface(im) && canImplementAsSuper(im)) {
-                            out.add(im);
-                            break;
-                        }
-                    }
-                }
-            }
-            implementedConcrete = out;
-        }
-        return implementedConcrete;
-    }
-
-    /**
-     * The constructor an implementer of {@code c} builds through, when {@code c} has no
-     * Java constructor without parameters that is safe to run: empty, so no Dart
-     * constructor body or initializer list of {@code c} runs for an implementer.
-     */
-    private String implementerCtor(ClassDecl c) {
-        if (!implementedConcreteClasses().contains(c)) {
-            return "";
-        }
-        if (c.ctors.isEmpty()) {
-            return "";
-        }
-        for (CtorDecl ct : c.ctors) {
-            if (ct.name == null && !ct.isFactory && ct.params.isEmpty()) {
-                // Base() already exists. Running it is harmless only when it does nothing.
-                return "";
-            }
-        }
-        return "    /** For a class that implements this one: runs no constructor body. */\n"
-                + "    protected " + javaClassName(c) + "() {\n    }\n\n";
-    }
-
     private boolean isPureInterface(ClassDecl c) {
         if (!c.isAbstract || c.superclass != null || !c.mixins.isEmpty()) {
             return false;
@@ -2392,6 +2610,8 @@ public final class JavaEmitter {
         boolean isSyncStar;
         boolean isAsyncStar;
         TypeRef returnType;
+        /** The Java return type when it must differ from the Dart one's (see interfaceBridges). */
+        String javaReturn;
         List<String> typeParams = new ArrayList<String>();
         List<Param> params = new ArrayList<Param>();
         Block body;
@@ -2764,7 +2984,8 @@ public final class JavaEmitter {
             }
             sb.append("> ");
         }
-        String rjt = m.isSetter ? "void" : (forceIntReturn ? "int" : javaType(rt, false, ctx));
+        String rjt = m.isSetter ? "void" : m.javaReturn != null ? m.javaReturn
+                : (forceIntReturn ? "int" : javaType(rt, false, ctx));
         sb.append(rjt).append(' ').append(m.name).append('(');
         // The Java parameter list and names, kept for a sync* body's helper method.
         StringBuilder paramDecls = new StringBuilder();
@@ -6241,6 +6462,12 @@ public final class JavaEmitter {
                 return emitMemberGet(onSelf, n, id, ctx);
             }
         }
+        // Inside `extension on List<E>`, a bare `length` is `this.length` on the extended value.
+        if (ctx.extensionSelfType != null && resolveTopLevel(n, ctx) == null
+                && (hasMember(ctx.extensionSelfType.name, n, true, ctx)
+                || EXTENDED_CORE_GETTERS.contains(ctx.extensionSelfType.name + "." + n))) {
+            return emitMemberGet(new Out("$self", ctx.extensionSelfType), n, id, ctx);
+        }
         Out top = resolveTopLevel(n, ctx);
         if (top != null) {
             return top;
@@ -6464,6 +6691,15 @@ public final class JavaEmitter {
      * a Java interface, so it is reached through {@code ((S) this)}. Null when {@code cc} is
      * not such a mixin or no {@code on} type has the member.
      */
+    /** Getters of core collection types a bare identifier in an extension on them may name. */
+    private static final java.util.Set<String> EXTENDED_CORE_GETTERS = new java.util.HashSet<String>(
+            java.util.Arrays.asList("List.length", "List.isEmpty", "List.isNotEmpty", "List.first",
+                    "List.last", "List.reversed", "List.iterator", "Iterable.length", "Iterable.isEmpty",
+                    "Iterable.isNotEmpty", "Iterable.first", "Iterable.last", "Iterable.iterator",
+                    "Set.length", "Set.isEmpty", "Set.isNotEmpty", "Map.length", "Map.keys", "Map.values",
+                    "Map.entries", "Map.isEmpty", "Map.isNotEmpty", "String.length", "String.isEmpty",
+                    "String.isNotEmpty", "String.codeUnits"));
+
     private Out mixinOnSelf(ClassDecl cc, String n, boolean getter, Ctx ctx) {
         if (!cc.isMixin || cc.mixinOn.isEmpty()) {
             return null;
@@ -9707,7 +9943,12 @@ public final class JavaEmitter {
                 }
             }
             if (m != null) {
-                return new Out(target.code + "." + n + "(" + methodArgs(m.params, c.args, ctx) + ")",
+                String callCode = target.code + "." + n + "(" + methodArgs(m.params, c.args, ctx) + ")";
+                String pinned = pinnedCallBox(pc, m, ctx);
+                if (pinned != null) {
+                    callCode = "((" + pinned + ") (Object) " + callCode + ")";
+                }
+                return new Out(callCode,
                         m.returnType == null || m.returnType.is("var") ? TypeRef.DYNAMIC
                                 : asSeenFrom(m.returnType, m, m.typeParams, pc, tt));
             }

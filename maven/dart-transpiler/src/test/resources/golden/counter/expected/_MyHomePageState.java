@@ -20,10 +20,10 @@ import com.codename1.flutter.Widget;
 public class _MyHomePageState extends State<MyHomePage> {
 
     private long _counter = 0L;
-    long get$_counter() {
+    public long get$_counter() {
         return _counter;
     }
-    void set$_counter(long v) {
+    public void set$_counter(long v) {
         this._counter = v;
     }
 
