@@ -40,7 +40,7 @@ public interface Sink<T> {
             Sink<T> same = (Sink<T>) sink;
             return same;
         }
-        if (sink instanceof StreamController) {
+        if (!(sink instanceof StreamSink) && sink instanceof StreamController) {
             return of(((StreamController<?>) sink).sink());
         }
         @SuppressWarnings("unchecked")

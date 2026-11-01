@@ -1415,7 +1415,7 @@ public final class JavaEmitter {
                 }
                 continue;
             }
-            ClassDecl implemented = program.classes.get(itf.name);
+            ClassDecl implemented = superDeclOf(c, itf);
             if (implemented != null && !implemented.isMixin && interfacedClasses().contains(implemented)) {
                 // Every class used in an `implements` clause has a Java interface X$I
                 // (see interfacedClasses); javaType names it for this type position.
@@ -1636,7 +1636,7 @@ public final class JavaEmitter {
                         named.addAll(k.mixinOn);
                     }
                     for (TypeRef itf : named) {
-                        ClassDecl im = program.classes.get(itf.name);
+                        ClassDecl im = superDeclOf(k, itf);
                         if (im != null && !im.isMixin && im.extensionOn == null && im.enumOf == null) {
                             work.add(im);
                         }
@@ -1913,6 +1913,15 @@ public final class JavaEmitter {
         for (IfaceSig sig : interfaceSigs(c, m, ctx)) {
             if (implParams.equals(erasedParams(sig.params)) && !sig.ret.equals(implRet)
                     && (isJavaPrimitive(sig.ret) || isJavaPrimitive(implRet)) && !"void".equals(sig.ret)) {
+                return sig.ret;
+            }
+            // `Future<Crate2<V>> open<V>()` implementing `Future<CrateBase<V>> open<V>()`: Dart's
+            // generics are covariant, Java's are not, so the same raw type with narrower
+            // arguments is no override. The interface's return is declared; callers that know
+            // the implementer cast back through Object (pinnedCallBox).
+            if (implParams.equals(erasedParams(sig.params)) && !sig.ret.equals(implRet)
+                    && sig.ret.indexOf('<') > 0 && implRet.indexOf('<') > 0
+                    && sig.ret.substring(0, sig.ret.indexOf('<')).equals(implRet.substring(0, implRet.indexOf('<')))) {
                 return sig.ret;
             }
         }
@@ -6386,10 +6395,22 @@ public final class JavaEmitter {
      * same-named declaration from another library is the one meant.
      */
     private ClassDecl superDeclOf(ClassDecl k, TypeRef t) {
-        ClassDecl sc = program.resolveClass(t.name, k.ownerLibrary);
-        if (sc == k) {
+        String tn = t.name;
+        int dot = tn.lastIndexOf('.');
+        ClassDecl sc;
+        if (dot > 0) {
+            // `implements impl.ShelfBase`: the prefix names the library to look in.
+            tn = tn.substring(dot + 1);
+            sc = program.resolveClass(tn, k.ownerLibrary, t.name.substring(0, dot));
+            if (sc != null && sc != k && tn.equals(sc.name)) {
+                return sc;
+            }
+        } else {
+            sc = program.resolveClass(tn, k.ownerLibrary);
+        }
+        if (sc == k || (dot > 0 && sc == null)) {
             sc = null;
-            List<ClassDecl> same = program.classesByName.get(t.name);
+            List<ClassDecl> same = program.classesByName.get(tn);
             if (same != null) {
                 for (ClassDecl o : same) {
                     if (o != k) {
@@ -16019,7 +16040,25 @@ public final class JavaEmitter {
         if (t.name != null && t.name.indexOf('.') > 0) {
             String stripped = stripImportPrefix(t.name);
             if (!stripped.equals(t.name)) {
+                // The prefix names the library: `impl.ShelfBase` written in a library that
+                // declares its own ShelfBase is the imported one, never the local one.
+                String pfx = t.name.substring(0, t.name.indexOf('.'));
+                Library from = ctx == null ? null : ctx.library();
+                Library target = from == null ? null
+                        : program.resolveImportedLibrary(from, from.prefixImports.get(pfx));
+                List<ClassDecl> same = program.classesByName.get(stripped);
                 t.name = stripped;
+                if (target != null && same != null && same.size() > 1) {
+                    for (ClassDecl pc : same) {
+                        if (program.provides(target, stripped, pc.ownerLibrary)) {
+                            String jn = javaClassName(pc);
+                            if (!classRefMode && interfacedClasses().contains(pc)) {
+                                jn = jn + "$I";
+                            }
+                            return jn + (t.args.isEmpty() ? "" : genericSuffix(t, ctx));
+                        }
+                    }
+                }
             }
         }
         if (t.name != null && t.name.startsWith("Rec$")) {

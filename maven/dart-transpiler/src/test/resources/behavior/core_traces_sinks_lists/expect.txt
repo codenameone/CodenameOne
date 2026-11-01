@@ -1,0 +1,9 @@
+join 1-2-3 3 p+q
+fixed 2 7 8
+current true true false
+caught nonempty true
+then onError e1 my-trace
+catchError e2 my-trace
+await e3 my-trace
+listen onError e4 my-trace
+sink done

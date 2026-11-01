@@ -528,14 +528,14 @@ public class Future<T> {
         return next;
     }
 
-    /// {@code catchError((e, st) => ...)}: a handler that also takes the trace, which is
-    /// the frameless {@link dart.core.StackTrace#empty} here.
+    /// {@code catchError((e, st) => ...)}: a handler that also takes the trace -- the one
+    /// this future's error carries (the handler runs once it has failed).
     public Future<Object> catchError(final Funcs.Func2<Object, ? super dart.core.StackTrace, ?> onError,
             final Object test) {
         return catchError(new Funcs.Func1<Object, Object>() {
             @Override
             public Object call(Object e) {
-                return onError.call(e, dart.core.StackTrace.empty);
+                return onError.call(e, dart.core.StackTrace.forError(completedError()));
             }
         }, test);
     }
@@ -550,7 +550,7 @@ public class Future<T> {
         return catchError(new Funcs.VoidFunc1<Object>() {
             @Override
             public void call(Object e) {
-                onError.call(e, dart.core.StackTrace.empty);
+                onError.call(e, dart.core.StackTrace.forError(completedError()));
             }
         }, test);
     }
