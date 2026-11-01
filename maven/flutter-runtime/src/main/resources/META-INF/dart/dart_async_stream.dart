@@ -78,7 +78,7 @@ abstract class Stream<T> {
   external Stream<T> skipWhile(bool Function(T element) test);
   external Stream<T> distinct([bool Function(T, T)? equals]);
   external Stream<T> handleError(Function onError, {Object? test});
-  external Stream<R> transform<R>(Object streamTransformer);
+  external Stream<R> transform<R>(StreamTransformer<T, R> streamTransformer);
   external Stream<R> cast<R>();
   external Stream<T> asBroadcastStream({Object? onListen, Object? onCancel});
   external bool get isBroadcast;

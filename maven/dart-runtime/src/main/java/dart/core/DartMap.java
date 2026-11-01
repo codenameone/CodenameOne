@@ -36,6 +36,33 @@ import java.util.Map;
  */
 public class DartMap<K, V> extends LinkedHashMap<K, V> {
 
+    /// The reified key and value types where the program wrote them as `dynamic`
+    /// (`<String, dynamic>{..}`), as DartList's element witness: Object.class for a
+    /// dynamic argument, null for one that is unknown. A Map<String, dynamic> is no
+    /// Map<String, int> whatever its values are (DartRuntime.asMapOf reads it).
+    private Class<?> keyWitness;
+    private Class<?> valueWitness;
+
+    /// Records {@code key}/{@code value} witnesses (either may be null) on {@code map}
+    /// when it is a DartMap and answers it, so an emitted literal stays an expression.
+    public static <M> M typed(M map, Class<?> key, Class<?> value) {
+        if (map instanceof DartMap) {
+            ((DartMap<?, ?>) map).keyWitness = key;
+            ((DartMap<?, ?>) map).valueWitness = value;
+        }
+        return map;
+    }
+
+    /// Whether this map's reified key (or value) type is known to fall outside
+    /// {@code type}: a witnessed argument that is not a subtype of it.
+    public static boolean witnessRefutes(Object map, boolean key, Class<?> type) {
+        if (!(map instanceof DartMap) || type == null) {
+            return false;
+        }
+        Class<?> w = key ? ((DartMap<?, ?>) map).keyWitness : ((DartMap<?, ?>) map).valueWitness;
+        return w != null && !type.isAssignableFrom(w);
+    }
+
     /// Identity, as Dart's own {@code Map} has: {@code [1] == [1]} is false in Dart
     /// unless a type overrides {@code operator ==}. The inherited Java equality is
     /// structural, so two separately built collections compared equal and, used as

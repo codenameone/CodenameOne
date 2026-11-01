@@ -42,6 +42,11 @@ public interface StreamSink<S> extends StreamConsumer<S> {
         throw new dart.core.UnsupportedError("An EventSink has no done future");
     }
 
+    /// A sink's close() future carries nothing, so it stays the {@code Future<Object>}
+    /// every caller and implementation already uses.
+    @Override
+    Future<Object> close();
+
     /// Dart's {@code addStream}, defaulted for the same reason as {@link #done()}.
     @Override
     default Future<Object> addStream(Stream<S> stream) {

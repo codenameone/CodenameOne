@@ -7017,7 +7017,9 @@ public final class JavaEmitter {
             String jt = javaType(o.type, true, ctx);
             String cond = subj + " instanceof " + erasedJavaType(o.type, ctx);
             String cast = "((" + jt + ") " + subj + ")";
-            boolean programType = program.classes.containsKey(o.type.name);
+            // `io.WebSocketException(message: ...)` names the runtime type even where a
+            // program class of that simple name is in scope: read it as the runtime's.
+            boolean programType = !o.type.runtimeOnly && program.classes.containsKey(o.type.name);
             for (PatternField f : o.fields) {
                 String access;
                 TypeRef ft;
@@ -7425,6 +7427,14 @@ public final class JavaEmitter {
         }
         if (e instanceof ListLit) {
             Out o = withListWitness(emitListLit((ListLit) e, expected, ctx), ctx);
+            TypeRef litEl = ((ListLit) e).elementType;
+            if (litEl != null && isDynamicType(litEl) && o.code.indexOf("DartList.typed(") < 0) {
+                // An explicit `<dynamic>[..]` is reified List<dynamic>: no List<int>, whatever
+                // its elements are (DartList.isListOf reads the witness). Only the written
+                // type argument is recorded -- an inferred dynamic may be an inference gap
+                // here where Dart knew better, and an untyped list falls back to its elements.
+                o = new Out("dart.core.DartList.typed(" + o.code + ", Object.class, true)", o.type, o.fromError);
+            }
             return ((ListLit) e).isConst ? constCollection(o, ctx) : o;
         }
         if (e instanceof MapLit) {
@@ -7439,6 +7449,14 @@ public final class JavaEmitter {
                 return sl.isConst ? constCollection(o, ctx) : o;
             }
             Out o = emitMapLit(ml, expected, ctx);
+            boolean dynK = ml.keyType != null && isDynamicType(ml.keyType);
+            boolean dynV = ml.valueType != null && isDynamicType(ml.valueType);
+            if ((dynK || dynV) && !ml.isConst) {
+                // A written `<String, dynamic>{..}` is reified: no Map<String, int>, whatever
+                // its values (DartRuntime.asMapOf reads the witness), as for a list literal.
+                o = new Out("dart.core.DartMap.typed(" + o.code + ", " + (dynK ? "Object.class" : "null") + ", "
+                        + (dynV ? "Object.class" : "null") + ")", o.type, o.fromError);
+            }
             return ((MapLit) e).isConst ? constCollection(o, ctx) : o;
         }
         if (e instanceof SetLit && spreadsOnlyMaps((SetLit) e, expected, ctx)) {
@@ -8152,6 +8170,29 @@ public final class JavaEmitter {
         }
         return new Out("dart.core.DartList.typed(" + o.code + ", " + erasedJavaType(copyNonNull(el), ctx)
                 + ".class, " + el.nullable + ")", t, o.fromError);
+    }
+
+    /// The class literal a runtime collection check tests one type argument against, or
+    /// "null" where no class can test it: dynamic/Object (anything passes), a type
+    /// variable, a function type, a nested generic (its own arguments are not tested).
+    private String elementClassLiteral(TypeRef el, Ctx ctx) {
+        if (el == null || el.name == null || isDynamicType(el) || el.is("Object") || !el.args.isEmpty()
+                || el.funcReturn != null || el.funcParams != null || isTypeVariable(el, ctx)) {
+            return "null";
+        }
+        if (el.is("int")) {
+            return "Long.class";
+        }
+        if (el.is("double")) {
+            return "Double.class";
+        }
+        if (el.is("num")) {
+            return "Number.class";
+        }
+        if (el.is("bool")) {
+            return "Boolean.class";
+        }
+        return erasedJavaType(copyNonNull(el), ctx) + ".class";
     }
 
     private String erasedJavaType(TypeRef t, Ctx ctx) {
@@ -10299,7 +10340,7 @@ public final class JavaEmitter {
                 if (ad != null) {
                     return ad;
                 }
-                return new Out((md.isStatic ? cc.name : "this") + "::" + n, new TypeRef("Function"));
+                return new Out((md.isStatic ? javaClassName(cc) : "this") + "::" + n, new TypeRef("Function"));
             }
             // field/getter inherited from a program superclass. The declared field is
             // private in the superclass, so reads route through its public get$ accessor;
@@ -15670,9 +15711,11 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             }
             return emitCtorCall(n, stubArgs, c.args, c, ctx);
         }
-        // method of current class / inherited stub method
+        // method of current class / inherited stub method -- never for `prefix.n(...)`: the
+        // prefix names another library's top level, and inside a class with a static `n` of
+        // its own (`static connect(..) => connector.connect(..)`) the call recursed into it.
         ClassDecl cc = ctx.currentClass;
-        if (cc != null) {
+        if (cc != null && ctx.callPrefix == null) {
             MethodDecl m = cc.method(n);
             if (m == null && !cc.isMixin) {
                 // a method the class inherits from a program superclass
@@ -15682,7 +15725,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 }
             }
             if (m != null) {
-                String recv = m.isStatic ? cc.name : "this";
+                String recv = m.isStatic ? javaClassName(cc) : "this";
                 // An explicit `thenJob<R>(...)` keeps its type arguments: Java cannot infer
                 // R from a lambda argument whose parameters name it.
                 String targs = "";
@@ -15756,14 +15799,14 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 ff = findInheritedField(cc, n);
             }
             if (ff != null && isFunctionValued(ff.type)) {
-                Out fieldRead = emitMemberGet(new Out(ff.isStatic ? cc.name : "this",
+                Out fieldRead = emitMemberGet(new Out(ff.isStatic ? javaClassName(cc) : "this",
                         new TypeRef(cc.name)), n, c, ctx);
                 return new Out(fnCall(fieldRead.code, ff.type, c.args, ctx),
                         funcResultType(ff.type));
             }
             MethodDecl fg = functionValuedGetter(cc, n);
             if (fg != null) {
-                Out getterRead = emitMemberGet(new Out(fg.isStatic ? cc.name : "this",
+                Out getterRead = emitMemberGet(new Out(fg.isStatic ? javaClassName(cc) : "this",
                         new TypeRef(cc.name)), n, c, ctx);
                 return new Out(fnCall(getterRead.code, fg.returnType, c.args, ctx),
                         funcResultType(fg.returnType));
@@ -15776,6 +15819,14 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             }
         }
         // top-level function (user code)
+        // `prefix.connect(..)` where the library behind the prefix (a conditional import's
+        // chosen branch) declares `const connect = IOWebSocket.connect;` -- a top-level
+        // tear-off of a static, not a function. The other branch's same-named function
+        // (the stub's) took the call, so it ran the stub. Call the static it names.
+        Out viaConst = prefixedConstTearOffCall(c, expected, ctx);
+        if (viaConst != null) {
+            return viaConst;
+        }
         FunctionDecl fn = program.functions.get(n);
         if (fn != null) {
             Library owner = program.resolveFunctionOwner(n, ctx.library(), takeCallPrefix(ctx));
@@ -16085,7 +16136,16 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 diags.error(c, "E0304", "Unsupported Future member: " + n);
                 return new Out("null", TypeRef.DYNAMIC);
             }
-            if (stubs.isStubClass(cls)) {
+            // A program class that shares a runtime class's simple name (package:web_socket's
+            // WebSocket beside dart:io's) owns the call when it is the one the type literal
+            // resolved to, or the one visible here; the stub's static of the same name
+            // (WebSocket.connect) otherwise took the call and named the wrong class.
+            ClassDecl ownApp = tt.arg(0).resolved != null ? tt.arg(0).resolved
+                    : program.classes.containsKey(cls) ? program.resolveClass(cls, ctx.library()) : null;
+            boolean appOwns = ownApp != null && (tt.arg(0).resolved != null
+                    || classVisibleFrom(ownApp, ctx.library()))
+                    && !throughDartPrefix(c.target, ctx);
+            if (!appOwns && stubs.isStubClass(cls)) {
                 Ast.MethodDecl m = stubs.findMethod(cls, n, false);
                 if (m != null && m.isStatic) {
                     Ast.ClassDecl sc = stubs.classes.get(cls);
@@ -22292,6 +22352,78 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
      * Prefer the declaration in the library that owns the code currently being emitted.
      */
     /// The pending call prefix, cleared so the call's own arguments resolve unprefixed.
+    /**
+     * The call {@code prefix.n(args)} when the library behind {@code prefix} provides a
+     * top-level const {@code n} initialised with a static tear-off {@code Cls.m} and no
+     * function {@code n}: emitted as {@code Cls.m(args)}. Null when that is not the case.
+     */
+    private Out prefixedConstTearOffCall(Call c, TypeRef expected, Ctx ctx) {
+        String prefix = ctx.callPrefix;
+        Library from = ctx.library();
+        if (prefix == null || from == null || c.target != null) {
+            return null;
+        }
+        List<Library> owners = program.topLevelVarOwnersByName.get(c.name);
+        Library target = program.resolveImportedLibrary(from, from.prefixImports.get(prefix));
+        if (owners == null || target == null) {
+            return null;
+        }
+        List<Library> fnOwners = program.functionOwnersByName.get(c.name);
+        if (fnOwners != null) {
+            for (Library o : fnOwners) {
+                if (program.provides(target, c.name, o)) {
+                    return null;
+                }
+            }
+        }
+        for (Library o : owners) {
+            if (!program.provides(target, c.name, o)) {
+                continue;
+            }
+            for (FieldDecl f : o.topLevelVars) {
+                if (!f.name.equals(c.name) || !f.isConst || !(f.initializer instanceof PropertyGet)) {
+                    continue;
+                }
+                PropertyGet pg = (PropertyGet) f.initializer;
+                if (!(pg.target instanceof Ident)) {
+                    return null;
+                }
+                ClassDecl cls = program.resolveClass(((Ident) pg.target).name, o);
+                MethodDecl m = cls == null ? null : cls.method(pg.name);
+                if (m == null || !m.isStatic) {
+                    return null;
+                }
+                Ident ref = new Ident();
+                ref.name = cls.name;
+                ref.pinnedClass = cls;
+                ref.file = c.file;
+                ref.line = c.line;
+                ref.col = c.col;
+                Call direct = new Call();
+                direct.file = c.file;
+                direct.line = c.line;
+                direct.col = c.col;
+                direct.target = ref;
+                direct.name = pg.name;
+                direct.args = c.args;
+                direct.typeArgs = c.typeArgs;
+                ctx.callPrefix = null;
+                return emitCall(direct, expected, ctx);
+            }
+        }
+        return null;
+    }
+
+    /** True for a type literal written through a prefix that imports a dart: library: {@code io.WebSocket}. */
+    private boolean throughDartPrefix(Expr target, Ctx ctx) {
+        if (!(target instanceof PropertyGet) || !(((PropertyGet) target).target instanceof Ident)
+                || ctx.library() == null) {
+            return false;
+        }
+        String uri = ctx.library().prefixImports.get(((Ident) ((PropertyGet) target).target).name);
+        return uri != null && uri.startsWith("dart:");
+    }
+
     private static String takeCallPrefix(Ctx ctx) {
         String p = ctx.callPrefix;
         ctx.callPrefix = null;
@@ -22811,6 +22943,37 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             // Java's own inference and must not be pinned by a cast.
             return "(" + javaType(copyNonNull(target), false, ctx) + ") (Object) " + paren(o.code);
         }
+        // A dynamic value landing in a parameterized collection or async slot
+        // (`List<int> xs = d;`, `Future<int> f = d;`) is Dart's checked implicit downcast.
+        // Through a runtime helper, never a bare cast: Dart reifies type arguments, so a
+        // List<dynamic> is no List<int> and the failure is a TypeError -- and a List<int>
+        // slot is a DartLongList, which a boxed DartList that passes is viewed as, not
+        // cast to (the cast was a ClassCastException no `on TypeError` caught). An
+        // Object-typed bare name takes the same path: it reaches here only where the
+        // value's type was not inferred, and the checked form is right either way.
+        if (o.type != null && !target.args.isEmpty() && target.funcParams == null
+                && (target.is("List") || target.is("Map") || target.is("Iterable")
+                    || target.is("Future") || target.is("Stream"))
+                && (o.type.is("dynamic") || o.type.is("var")
+                    || (o.type.is("Object") && o.code.matches("(this\\.)?[A-Za-z_$][A-Za-z0-9_$]*")))
+                && isFullyConcrete(target) && !classTypeVarInScope(target, ctx)) {
+            String jt = javaType(copyNonNull(target), true, ctx);
+            String call;
+            if (target.is("List") && target.args.size() == 1) {
+                TypeRef el = target.arg(0);
+                call = "dart.runtime.DartRuntime.asListOf((Object) " + paren(o.code) + ", "
+                        + elementClassLiteral(el, ctx) + ", " + (el != null && el.nullable) + ", "
+                        + target.nullable + ", " + quote(target.toString()) + ")";
+            } else if (target.is("Map") && target.args.size() == 2) {
+                call = "dart.runtime.DartRuntime.asMapOf((Object) " + paren(o.code) + ", "
+                        + elementClassLiteral(target.arg(0), ctx) + ", " + elementClassLiteral(target.arg(1), ctx)
+                        + ", " + target.nullable + ", " + quote(target.toString()) + ")";
+            } else {
+                call = "dart.runtime.DartRuntime.as((Object) " + paren(o.code) + ", " + erasedJavaType(target, ctx)
+                        + ".class, " + target.nullable + ", " + quote(target.toString()) + ")";
+            }
+            return "((" + jt + ") (Object) " + call + ")";
+        }
         // A dynamic value (a Dyn.get member read) landing in a concrete slot -- a typed
         // local, a switch expression's result temp -- is Dart's implicit downcast. Only for
         // a fully concrete target: a type variable is left to Java's own inference.
@@ -22861,10 +23024,6 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         // arguments, so no primitive or generic slot is touched.
         if (o.type != null && (o.type.is("dynamic") || o.type.is("var") || o.type.is("Object"))
                 && o.code.matches("(this\\.)?[A-Za-z_$][A-Za-z0-9_$]*")
-                // a generic slot only when its Java form is the plain generic class: a
-                // List<int> is a DartLongList, which a boxed DartList value is not
-                && (target.args.isEmpty() || !target.is("List") && !target.is("Map")
-                && !target.is("Iterable") && !target.is("Future") && !target.is("Stream"))
                 && target.funcParams == null && target.funcReturn == null && !isDynamicType(target)
                 && !target.is("void") && !target.is("int") && !target.is("double") && !target.is("bool")
                 && !target.is("num") && !target.is("Null") && isFullyConcrete(target)

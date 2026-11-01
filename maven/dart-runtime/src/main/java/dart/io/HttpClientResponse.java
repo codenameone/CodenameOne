@@ -31,7 +31,7 @@ import dart.typed_data.Uint8List;
  * Dart's {@code HttpClientResponse}: a stream of byte chunks -- here the whole body as
  * one chunk, delivered once someone listens -- plus the status line and headers.
  */
-public class HttpClientResponse extends Stream<Object> {
+public class HttpClientResponse extends Stream<dart.core.DartLongList> {
 
     private final long statusCode;
     private final String reasonPhrase;

@@ -225,6 +225,7 @@ class Timer {
   external bool get isActive;
   external int get tick;
   external static Timer periodic(Duration duration, void Function(Timer timer) callback);
+  external static void run(VoidCallback callback);
 }
 
 // dart.async.Completer existed in the runtime with nothing declaring it, so Dart code

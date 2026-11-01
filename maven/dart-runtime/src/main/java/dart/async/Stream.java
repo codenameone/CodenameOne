@@ -1138,6 +1138,15 @@ public class Stream<T> {
         return out.stream();
     }
 
+    /// Dart's {@code transform} with a transformer whose static type is known: Java infers
+    /// the element type from it, so {@code transform(t).listen(sink::add)} keeps T rather
+    /// than erasing it to Object. Dart's own check (a {@code StreamTransformer<S, T>} on a
+    /// {@code Stream<S>}) happened before translation, hence the wildcard and the cast.
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public final <R> Stream<R> transform(StreamTransformer<?, R> transformer) {
+        return ((StreamTransformer) transformer).bind(this);
+    }
+
     /** Dart's {@code transform}: a converter such as {@code utf8.decoder} or {@code LineSplitter()}. */
     @SuppressWarnings("unchecked")
     public final <R> Stream<R> transform(Object transformer) {

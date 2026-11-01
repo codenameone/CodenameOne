@@ -322,7 +322,7 @@ class HttpClient {
 }
 
 @JavaName('dart.io.HttpClientRequest')
-abstract class HttpClientRequest {
+abstract class HttpClientRequest implements StreamConsumer<List<int>> {
   external String get method;
   external Uri get uri;
   external HttpHeaders get headers;

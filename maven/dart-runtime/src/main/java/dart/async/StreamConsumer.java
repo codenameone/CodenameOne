@@ -27,5 +27,7 @@ package dart.async;
 public interface StreamConsumer<S> {
     Future<Object> addStream(Stream<S> stream);
 
-    Future<Object> close();
+    /// {@code Future<?>} because Dart lets a consumer narrow it: HttpClientRequest's
+    /// close() is a {@code Future<HttpClientResponse>}, and Java generics are invariant.
+    Future<?> close();
 }

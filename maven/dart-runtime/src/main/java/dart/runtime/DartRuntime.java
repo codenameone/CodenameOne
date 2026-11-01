@@ -155,6 +155,72 @@ public final class DartRuntime {
                 + dartType + "' in type cast");
     }
 
+    /// Dart's implicit downcast of a dynamic value to a parameterized List type
+    /// (`List<int> xs = d;`). Type arguments are reified in Dart, so the test is on the
+    /// list's recorded element type where there is one (DartList.isListOf) and on its
+    /// elements otherwise; a failure is a TypeError, never a ClassCastException. A
+    /// List<int> or List<double> slot is held as DartLongList / DartDoubleList, so a
+    /// boxed list that passes is handed over as the live view of itself (writes reach
+    /// the same list). {@code elem} is the erased element class, or null for an element
+    /// type no class can test (a type variable, a function, a nested generic), which is
+    /// then left to the erased check alone.
+    public static Object asListOf(Object value, Class<?> elem, boolean elemNullable, boolean nullable,
+                                  String dartType) {
+        if (value == null) {
+            if (nullable) {
+                return null;
+            }
+        } else if (value instanceof dart.core.MixinView && !(value instanceof java.util.List)) {
+            value = ((dart.core.MixinView) value).source();
+        }
+        if (value != null && (value instanceof java.util.List || value instanceof dart.collection.ListMixin)
+                && (elem == null || dart.core.DartList.isListOf(value, elem, elemNullable))) {
+            if (elem == Long.class && !elemNullable && !(value instanceof dart.core.DartLongList)
+                    && value instanceof dart.core.DartList) {
+                return dart.core.DartLongList.viewLongs(value);
+            }
+            if (elem == Double.class && !elemNullable && !(value instanceof dart.core.DartDoubleList)
+                    && value instanceof dart.core.DartList) {
+                return dart.core.DartDoubleList.viewDoubles(value);
+            }
+            if (value instanceof dart.collection.ListMixin && !(value instanceof java.util.List)) {
+                return as(value, java.util.List.class, nullable, dartType);
+            }
+            return value;
+        }
+        throw new TypeError("type '" + typeName(value) + "' is not a subtype of type '"
+                + dartType + "' in type cast");
+    }
+
+    /// The same downcast to a parameterized Map type. A witnessed `dynamic` key or value
+    /// type refutes a narrower target; an unwitnessed map is tested by its entries.
+    public static Object asMapOf(Object value, Class<?> key, Class<?> val, boolean nullable, String dartType) {
+        if (value == null && nullable) {
+            return null;
+        }
+        if (value instanceof java.util.Map
+                && !dart.core.DartMap.witnessRefutes(value, true, key)
+                && !dart.core.DartMap.witnessRefutes(value, false, val)) {
+            boolean ok = true;
+            for (Object o : ((java.util.Map<?, ?>) value).entrySet()) {
+                java.util.Map.Entry<?, ?> en = (java.util.Map.Entry<?, ?>) o;
+                if ((key != null && en.getKey() != null && !key.isInstance(en.getKey()))
+                        || (val != null && en.getValue() != null && !val.isInstance(en.getValue()))) {
+                    ok = false;
+                    break;
+                }
+            }
+            if (ok) {
+                return value;
+            }
+        }
+        if (value instanceof java.util.Map || value == null) {
+            throw new TypeError("type '" + typeName(value) + "' is not a subtype of type '"
+                    + dartType + "' in type cast");
+        }
+        return as(value, java.util.Map.class, nullable, dartType);
+    }
+
     /**
      * Dart's {@code ==} between reference values: null-safe, delegates to
      * equals (user {@code operator ==} overrides equals).

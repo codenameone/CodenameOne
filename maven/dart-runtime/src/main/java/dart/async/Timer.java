@@ -145,6 +145,12 @@ public class Timer {
     protected Timer() {
     }
 
+    /// {@code Timer.run(callback)}: runs {@code callback} asynchronously, as a zero
+    /// duration timer does -- after the current microtasks, never synchronously.
+    public static void run(Funcs.VoidFunc0 callback) {
+        new Timer(Duration.zero, callback);
+    }
+
     /// {@code Timer.periodic(period, callback)}: a chain of one-shot timers, each
     /// scheduled when the previous fires, so a slow callback delays the next tick.
     public static Timer periodic(final Duration period, final Funcs.VoidFunc1<Timer> callback) {
