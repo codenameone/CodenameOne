@@ -3125,6 +3125,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-11-01T01:01:09+00:00"
+      },
+      "devto": {
+        "id": 4959057,
+        "url": "https://dev.to/codenameone/parley-a-private-messenger-template-you-can-brand-9pi",
+        "syndicated_at": "2026-11-01T20:51:05+00:00"
       }
     }
   }
