@@ -230,6 +230,10 @@ public final class AccountSecurity {
     /// This server's address: the configured issuer, and with none -- a
     /// development profile -- the address the request in hand arrived at. Null
     /// outside a request that says.
+    ///
+    /// Configure the issuer in production. Without one, the trusted origin and
+    /// the web redirect follow the request's `Host` header, which a proxy that
+    /// forwards it unchanged lets the client choose.
     public static String here(String issuer) {
         if (issuer != null && issuer.length() > 0) {
             return issuer;
@@ -325,7 +329,7 @@ public final class AccountSecurity {
         DefaultJwtDecoder decoder = DefaultJwtDecoder.withJwkSource(signingKeys).build();
         decoder.setJwtValidator(JwtValidators.createDefaultWithValidators(
                 new JwtAudienceValidator(audience),
-                issuer.length() > 0 ? new JwtIssuerValidator(issuer)
+                issuer != null && issuer.length() > 0 ? new JwtIssuerValidator(issuer)
                         : new JwtClaimValidator("iss", AccountSecurity::issuedAtThisAddress)));
         return decoder;
     }

@@ -444,6 +444,9 @@ needs, so a project needs no copy of its own:
   and which roles they hold, `Text` validates and trims request fields, and
   `Grants` ends a user's other sessions. `AccountSecurity` builds the password
   encoder, the user store and the registered client a sign-in flow needs.
+  None of these is a bean of its own: the kit wires nothing into a server
+  until the server declares it, so a server that takes only `Text` needs no
+  authorization server.
 * The `push` package sends notifications through `PushSender`. It ships with a
   sender for the push service, one that prints to the console in development,
   one that records what was sent for tests, and one that fails with a clear

@@ -23,7 +23,6 @@
 package com.codename1.appkit.server;
 
 import com.codename1.backend.DataSource;
-import com.codename1.backend.annotations.Component;
 import com.codename1.backend.security.Authentication;
 import com.codename1.backend.security.SecurityContextHolder;
 import com.codename1.backend.security.oauth2.server.authorization.OAuth2AuthorizationService;
@@ -43,7 +42,11 @@ import java.util.Map;
 /// An access token already issued is not recalled by this. It is a signed
 /// token that is checked without the table, and it runs out on its own within
 /// its few minutes; what ends here is the means of getting another.
-@Component
+///
+/// Not a component: a library's components are wired into every server that
+/// depends on it, and only a server running the authorization server has the
+/// [OAuth2AuthorizationService] this needs. Such a server declares it from a
+/// `@Bean` method.
 public class Grants {
     private final DataSource db;
     private final OAuth2AuthorizationService authorizations;

@@ -11,6 +11,9 @@
     <artifactId>cn1-app-kit-lib</artifactId>
     <packaging>pom</packaging>
     <name>Codename One App Kit: library</name>
+    <!-- No cn1css zip and no platform profiles: the kit has no CSS and no
+         native parts. A change that adds either has to add them here as the
+         cn1lib archetype's lib pom does, or they never reach an application. -->
     <!-- What an application's common module depends on, as a cn1lib's lib pom.
          The server half is a separate dependency of the backend module:
          cn1-app-kit-backend. -->
