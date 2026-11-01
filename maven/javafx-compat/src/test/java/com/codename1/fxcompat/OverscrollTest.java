@@ -131,4 +131,34 @@ public class OverscrollTest {
         }
         assertEquals(0, content.getLayoutY(), 0);
     }
+
+    /// A mouse dragging a pannable pane on the desktop pans it and nothing
+    /// more: no stretch past the top, and no glide once the button lifts.
+    @Test
+    public void aDesktopMouseDragNeitherStretchesNorGlides() {
+        HeadlessImplementation.setDesktop(true);
+        try {
+            Pane content = new Pane();
+            content.setPrefSize(200, 4000);
+            ScrollPane pane = new ScrollPane(content);
+            pane.setPannable(true);
+            Scene scene = new Scene(pane, 200, 400);
+            scene.cn1Layout(200, 400);
+            scene.cn1Pointer(MouseEvent.MOUSE_PRESSED, 100, 50, MouseButton.PRIMARY);
+            scene.cn1Pointer(MouseEvent.MOUSE_DRAGGED, 100, 250, MouseButton.PRIMARY);
+            assertEquals(0, content.getLayoutY(), 0);
+            for (int i = 0; i < 10; i++) {
+                FrameClock.advance(5);
+                scene.cn1Pointer(MouseEvent.MOUSE_DRAGGED, 100, 250 - 30 * (i + 1), MouseButton.PRIMARY);
+            }
+            double held = pane.getVvalue();
+            scene.cn1Pointer(MouseEvent.MOUSE_RELEASED, 100, -50, MouseButton.PRIMARY);
+            for (int i = 0; i < 50; i++) {
+                FrameClock.advance(16);
+            }
+            assertEquals(held, pane.getVvalue(), 0);
+        } finally {
+            HeadlessImplementation.setDesktop(false);
+        }
+    }
 }

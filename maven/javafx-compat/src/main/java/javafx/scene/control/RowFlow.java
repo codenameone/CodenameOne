@@ -158,9 +158,11 @@ final class RowFlow extends Region {
                 if (dragging) {
                     double to = pressOffset - moved;
                     scrollTo(to);
-                    double max = maxOffset();
-                    overscroll.drag(to < 0 ? to : (to > max ? to - max : 0), getHeight());
-                    fling.track(to < 0 ? 0 : Math.min(to, max));
+                    if (com.codename1.fxcompat.runtime.Overscroll.touchScreen()) {
+                        double max = maxOffset();
+                        overscroll.drag(to < 0 ? to : (to > max ? to - max : 0), getHeight());
+                        fling.track(to < 0 ? 0 : Math.min(to, max));
+                    }
                 }
             }
         });

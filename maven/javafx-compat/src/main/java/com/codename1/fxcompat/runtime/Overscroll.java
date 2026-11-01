@@ -62,6 +62,14 @@ public final class Overscroll implements FrameClock.Pulse {
         this.target = target;
     }
 
+    /// Whether a drag is a finger on a touch screen. A desktop mouse drag
+    /// neither stretches past an end nor glides on: JavaFX on the desktop
+    /// does neither, so callers feed `drag` and a `Fling` only when this
+    /// answers true.
+    public static boolean touchScreen() {
+        return com.codename1.ui.Display.isInitialized() && !com.codename1.ui.Display.getInstance().isDesktop();
+    }
+
     /// The stretch now, in logical pixels.
     public double value() {
         return value;

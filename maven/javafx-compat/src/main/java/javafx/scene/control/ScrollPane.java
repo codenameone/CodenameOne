@@ -225,7 +225,9 @@ public class ScrollPane extends Control {
                     getScene().cn1CancelPress();
                 }
                 if (panning && panTo(pressX - event.getSceneX(), pressY - event.getSceneY())) {
-                    fling.track(offset(getVvalue(), getVmin(), getVmax(), contentHeight - viewport.getHeight()));
+                    if (com.codename1.fxcompat.runtime.Overscroll.touchScreen()) {
+                        fling.track(offset(getVvalue(), getVmin(), getVmax(), contentHeight - viewport.getHeight()));
+                    }
                     event.consume();
                 }
             }
@@ -348,7 +350,9 @@ public class ScrollPane extends Control {
         if (extentY > 0 && !vvalue.isBound()) {
             double to = offset(pressV, getVmin(), getVmax(), extentY) + pressBeyond + dy;
             setVvalue(valueAt(to, getVmin(), getVmax(), extentY));
-            overscroll.drag(to < 0 ? to : (to > extentY ? to - extentY : 0), viewport.getHeight());
+            if (com.codename1.fxcompat.runtime.Overscroll.touchScreen()) {
+                overscroll.drag(to < 0 ? to : (to > extentY ? to - extentY : 0), viewport.getHeight());
+            }
         }
         return extentX > 0 || extentY > 0;
     }
