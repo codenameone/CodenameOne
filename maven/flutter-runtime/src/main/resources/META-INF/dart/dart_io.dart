@@ -27,7 +27,33 @@ class FileSystemException extends IOException {
 
 @JavaName('dart.io.SocketException')
 class SocketException extends IOException {
-  external SocketException(String message);
+  external SocketException(String message,
+      {OSError? osError, InternetAddress? address, int? port});
+  external static SocketException closed();
+  external String get message;
+  external OSError? get osError;
+  external InternetAddress? get address;
+  external int? get port;
+}
+
+@JavaName('dart.io.OSError')
+class OSError {
+  external static int get noErrorCode;
+  external OSError([String message, int errorCode]);
+  external String get message;
+  external int get errorCode;
+}
+
+@JavaName('dart.io.InternetAddress')
+class InternetAddress {
+  external InternetAddress(String address);
+  external String get address;
+  external String get host;
+}
+
+// A type only: nothing hands one out (see dart.io.Socket).
+@JavaName('dart.io.Socket')
+abstract class Socket extends Stream<List<int>> {
 }
 
 @JavaName('dart.io.TlsException')
@@ -325,6 +351,7 @@ abstract class HttpClientResponse extends Stream<List<int>> {
   external List get redirects;
   external List get cookies;
   external String get compressionState;
+  external Future<Socket> detachSocket();
 }
 
 @JavaName('dart.io.WebSocket')

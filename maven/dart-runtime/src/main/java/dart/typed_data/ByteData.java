@@ -28,7 +28,7 @@ package dart.typed_data;
  * over a byte buffer with typed accessors. Minimal big-endian implementation
  * covering the 8- and 32-bit integer accessors.
  */
-public final class ByteData {
+public final class ByteData implements TypedData {
 
     private final byte[] buffer;
     private final int off;

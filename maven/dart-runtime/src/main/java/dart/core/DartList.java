@@ -93,7 +93,7 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
     }
 
     /** Subclass hook with a read-only flag: the primitive lists' List.unmodifiable. */
-    DartList(boolean growable, boolean readOnly) {
+    protected DartList(boolean growable, boolean readOnly) {
         this.impl = null;
         this.growable = growable && !readOnly;
         this.readOnly = readOnly;
@@ -401,6 +401,28 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
 
     public long length() {
         return size();
+    }
+
+    /// Dart's {@code list.length = n}: a growable list shrinks from the end or grows with
+    /// null; a fixed-length or unmodifiable one throws UnsupportedError, as Dart does.
+    public void length(long newLength) {
+        checkGrowable("change the length of");
+        RangeError.checkNotNegative(newLength, "newLength");
+        setLengthUnchecked((int) newLength);
+    }
+
+    /// The storage half of {@link #length(long)}, overridden by the primitive lists.
+    void setLengthUnchecked(int n) {
+        int size = impl.size();
+        if (n < size) {
+            impl.subList(n, size).clear();
+        } else {
+            impl.ensureCapacity(n);
+            for (int i = size; i < n; i++) {
+                impl.add(null);
+            }
+        }
+        modCount++;
     }
 
     public boolean isNotEmpty() {

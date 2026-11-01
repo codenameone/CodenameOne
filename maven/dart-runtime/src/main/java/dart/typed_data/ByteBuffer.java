@@ -187,4 +187,40 @@ public final class ByteBuffer {
     public Float64List asFloat64List(long offsetInBytes, Long length) {
         return Float64List.view(this, offsetInBytes, length);
     }
+
+    public Int32x4List asInt32x4List() {
+        return Int32x4List.view(this);
+    }
+
+    public Int32x4List asInt32x4List(long offsetInBytes) {
+        return Int32x4List.view(this, offsetInBytes);
+    }
+
+    public Int32x4List asInt32x4List(long offsetInBytes, Long length) {
+        return Int32x4List.view(this, offsetInBytes, length);
+    }
+
+    public Float32x4List asFloat32x4List() {
+        return Float32x4List.view(this);
+    }
+
+    public Float32x4List asFloat32x4List(long offsetInBytes) {
+        return Float32x4List.view(this, offsetInBytes);
+    }
+
+    public Float32x4List asFloat32x4List(long offsetInBytes, Long length) {
+        return Float32x4List.view(this, offsetInBytes, length);
+    }
+
+    public Float64x2List asFloat64x2List() {
+        return Float64x2List.view(this);
+    }
+
+    public Float64x2List asFloat64x2List(long offsetInBytes) {
+        return Float64x2List.view(this, offsetInBytes);
+    }
+
+    public Float64x2List asFloat64x2List(long offsetInBytes, Long length) {
+        return Float64x2List.view(this, offsetInBytes, length);
+    }
 }

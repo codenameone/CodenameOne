@@ -30,17 +30,13 @@ package dart.typed_data;
  *
  * @param <E> the element type, {@code Long} or {@code Double}
  */
-public interface TypedDataList<E> {
+public interface TypedDataList<E> extends TypedData {
 
     long length();
 
-    ByteBuffer buffer();
+    boolean isEmpty();
 
-    long lengthInBytes();
-
-    long offsetInBytes();
-
-    long elementSizeInBytes();
+    boolean isNotEmpty();
 
     void setRange(long start, long end, Iterable<? extends E> from);
 

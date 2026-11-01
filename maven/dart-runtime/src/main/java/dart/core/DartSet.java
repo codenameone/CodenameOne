@@ -590,4 +590,19 @@ public class DartSet<E> extends LinkedHashSet<E> {
             DartRuntime.endFormat(this);
         }
     }
+
+    /// Dart's {@code lookup(object)}: the element equal to {@code object}, or null.
+    public E lookup(Object object) {
+        // Through contains(), so a number looked up matches the way it is stored.
+        if (!contains(object)) {
+            return null;
+        }
+        Object key = storedElement(object);
+        for (E e : this) {
+            if (e == null ? key == null : e.equals(key)) {
+                return e;
+            }
+        }
+        return null;
+    }
 }

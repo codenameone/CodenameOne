@@ -27,12 +27,69 @@ package dart.io;
 public class SocketException extends IOException {
     private static final long serialVersionUID = 1L;
 
+    private OSError osError;
+    private InternetAddress address;
+    private Long port;
+
     public SocketException(String message) {
+        this(message, null, null, null);
+    }
+
+    /// {@code SocketException(message, {osError, address, port})}: the named
+    /// arguments in their declared order.
+    public SocketException(String message, OSError osError, InternetAddress address, Long port) {
         super(message);
+        this.osError = osError;
+        this.address = address;
+        this.port = port;
+    }
+
+    public static SocketException closed() {
+        return new SocketException("Socket has been closed");
+    }
+
+    /// Named constructor arguments arrive as these setter calls on the new instance.
+    public void osError(OSError v) {
+        osError = v;
+    }
+
+    public void address(InternetAddress v) {
+        address = v;
+    }
+
+    public void port(Long v) {
+        port = v;
+    }
+
+    public OSError osError() {
+        return osError;
+    }
+
+    public InternetAddress address() {
+        return address;
+    }
+
+    public Long port() {
+        return port;
     }
 
     @Override
     public String toString() {
-        return "SocketException: " + getMessage();
+        StringBuilder sb = new StringBuilder("SocketException");
+        if (getMessage() != null && getMessage().length() > 0) {
+            sb.append(": ").append(getMessage());
+            if (osError != null) {
+                sb.append(" (").append(osError).append(')');
+            }
+        } else if (osError != null) {
+            sb.append(": ").append(osError);
+        }
+        if (address != null) {
+            sb.append(", address = ").append(address.host());
+        }
+        if (port != null) {
+            sb.append(", port = ").append(port);
+        }
+        return sb.toString();
     }
 }

@@ -123,4 +123,12 @@ public class HttpClientResponse extends Stream<Object> {
     public String compressionState() {
         return "decompressed";
     }
+
+    /// Dart's {@code detachSocket()}. The body arrives through the port's connection
+    /// layer, which owns the connection, so there is no socket to detach; the future
+    /// fails with UnsupportedError.
+    public dart.async.Future<Socket> detachSocket() {
+        return dart.async.Future.error(new dart.core.UnsupportedError(
+                "detachSocket: the platform's connection layer does not expose its socket"));
+    }
 }

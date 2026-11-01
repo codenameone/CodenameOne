@@ -187,6 +187,17 @@ public class DartLongList extends DartList<Long> {
         return len;
     }
 
+    /// Growing a List<int> would fill it with null, which Dart rejects as a TypeError;
+    /// shrinking truncates.
+    @Override
+    void setLengthUnchecked(int n) {
+        if (n > len) {
+            throw new TypeError("type 'Null' is not a subtype of type 'int'");
+        }
+        len = n;
+        modCount++;
+    }
+
     @Override
     public boolean add(Long e) {
         return addLong(e);
