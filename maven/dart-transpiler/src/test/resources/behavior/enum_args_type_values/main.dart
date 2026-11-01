@@ -59,7 +59,19 @@ class Tracker extends Cursor implements HasPosition {
   }
 }
 
+int looseCompare(Object? a, Object? b) => (a as Comparable).compareTo(b);
+
+E smallest<E>(List<E> items, [int Function(E, E)? compare]) {
+  compare ??= looseCompare;
+  var best = items.first;
+  for (final x in items) {
+    if (compare(x, best) < 0) best = x;
+  }
+  return best;
+}
+
 void main() {
+  print('smallest ${smallest(<int>[4, 2, 9])} ${smallest(<String>['b', 'a'], (x, y) => y.compareTo(x))}');
   for (final p in Phase.values) {
     print('${p.name} ${p.index} $p ${p.label} ${p.weight}');
   }

@@ -1,3 +1,4 @@
+smallest 2 b
 start 0 begins/1 begins 1
 middle 1 carries on/2 carries on 2
 finish 2 ends/3 ends 3

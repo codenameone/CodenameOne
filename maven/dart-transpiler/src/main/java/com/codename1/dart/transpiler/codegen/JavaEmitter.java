@@ -3122,8 +3122,25 @@ public final class JavaEmitter {
                 // A type-variable parameter (RestorableProperty<T>.initWithValue(T)): Java's
                 // own generic substitution already makes initWithValue(Set<X>) in a
                 // RestorableProperty<Set<X>> an override, and a bridge taking Object
-                // would clash with it (same erasure).
-                return "";
+                // would clash with it (same erasure). Except when the argument is a
+                // primitive: `implements EventSink<int>` substitutes add(Long) while the
+                // Dart `add(int)` is emitted as add(long), so the boxed spelling is bridged.
+                String prim = javaType(narrow, false, ctx);
+                String boxed = "long".equals(prim) ? "Long" : "double".equals(prim) ? "Double"
+                        : "boolean".equals(prim) ? "Boolean" : null;
+                // A collection-mixin class already emits that element side boxed itself.
+                if (boxed == null || appliesListMixin(c) || appliedCollectionMixin(c.name) != null) {
+                    return "";
+                }
+                differs = true;
+                if (i > 0) {
+                    sig.append(", ");
+                    call.append(", ");
+                }
+                sig.append(boxed).append(" $b").append(i);
+                // Unboxed explicitly: a bare Long argument would pick this bridge again.
+                call.append("$b").append(i).append('.').append(prim).append("Value()");
+                continue;
             }
             String wideJava = javaType(TypeRef.of(wide.name), false, ctx);
             String narrowJava = javaType(narrow, false, ctx);
@@ -3402,11 +3419,72 @@ public final class JavaEmitter {
         return false;
     }
 
+    /**
+     * A program StreamSubscription's {@code Future<E> asFuture<E>([E? futureValue])}: the
+     * runtime interface declares the erased {@code Future<Object> asFuture(Object)}, and a
+     * generic Java method with the same erasure neither overrides nor may coexist with it.
+     * The method type parameter is dropped and read as dynamic throughout the signature.
+     */
+    /** Whether {@code c} directly implements or extends the runtime's StreamSubscription. */
+    private static boolean implementsStreamSubscription(ClassDecl c) {
+        if (c == null) {
+            return false;
+        }
+        for (TypeRef i : c.interfaces) {
+            if ("StreamSubscription".equals(i.name)) {
+                return true;
+            }
+        }
+        return c.superclass != null && "StreamSubscription".equals(c.superclass.name);
+    }
+
+    private List<String> eraseAsFutureOverride(Method m, Ctx ctx) {
+        if (!"asFuture".equals(m.name) || m.isStatic || m.typeParams == null || m.typeParams.size() != 1
+                || m.params.size() > 1 || ctx.currentClass == null) {
+            return null;
+        }
+        if (!implementsStreamSubscription(ctx.currentClass)) {
+            return null;
+        }
+        List<String> tps = m.typeParams;
+        List<TypeRef> none = java.util.Collections.<TypeRef>emptyList();
+        m.returnType = substTypeParams(m.returnType, tps, none);
+        for (Param p : m.params) {
+            p.type = substTypeParams(p.type, tps, none);
+        }
+        m.typeParams = new ArrayList<String>();
+        m.witnesses = java.util.Collections.emptyList();
+        return tps;
+    }
+
     private String paramTypeName(Param p) {
         return p.type == null || p.type.is("var") ? "dynamic" : p.type.name;
     }
 
     private String emitMethodLike(Method m, Ctx ctx, boolean classIsAbstract) {
+        java.util.Set<String> savedErased = ctx.erasedMethodTypeVars;
+        List<String> erased = eraseAsFutureOverride(m, ctx);
+        if (erased != null) {
+            ctx.erasedMethodTypeVars = new HashSet<String>(erased);
+        }
+        try {
+            String out = emitMethodLikeScoped(m, ctx, classIsAbstract);
+            if (m.params.size() == 1 && m.params.get(0).optional && !m.isStatic
+                    && ("asFuture".equals(m.name) || "pause".equals(m.name))
+                    && implementsStreamSubscription(ctx.currentClass)) {
+                // dart.async.StreamSubscription declares the omitted-argument form as its
+                // own overload (asFuture(), pause()); the program class must implement it.
+                out += "asFuture".equals(m.name)
+                        ? "    public Future<Object> asFuture() {\n        return asFuture(null);\n    }\n\n"
+                        : "    public void pause() {\n        pause(null);\n    }\n\n";
+            }
+            return out;
+        } finally {
+            ctx.erasedMethodTypeVars = savedErased;
+        }
+    }
+
+    private String emitMethodLikeScoped(Method m, Ctx ctx, boolean classIsAbstract) {
         java.util.Map<String, TypeRef> savedBounds = ctx.methodTypeParamBounds;
         ctx.methodTypeParamBounds = m.typeParamBounds;
         java.util.Set<String> savedTps = ctx.methodTypeParams;
@@ -8177,6 +8255,17 @@ public final class JavaEmitter {
         if (n.equals("dynamic") && ctx.lookup(n) == null) {
             return new Out("Object.class", new TypeRef("Type"));
         }
+        // dart:core `print` as a value (`list.forEach(print)`): a tear-off of the runtime's
+        // print. Bare, so the call site's parameter supplies the functional interface; the
+        // Object overload accepts any element type.
+        if (n.equals("print") && ctx.lookup(n) == null) {
+            ctx.importClass("dart.runtime.DartRuntime");
+            TypeRef ft = new TypeRef("Function");
+            ft.funcParams = new ArrayList<TypeRef>();
+            ft.funcParams.add(TypeRef.DYNAMIC);
+            ft.funcReturn = TypeRef.VOID;
+            return new Out("DartRuntime::print", ft);
+        }
         diags.error(id, "E0129", "Cannot resolve identifier '" + n
                 + "'. Confirm the file passes `dart analyze`, or the API is not yet implemented in the Codename One runtime.");
         return new Out(n, TypeRef.DYNAMIC, true);
@@ -9810,6 +9899,26 @@ public final class JavaEmitter {
         return new Out(old, t);
     }
 
+    /**
+     * The value of {@code slot ??= value}, coerced to the slot. A function value whose
+     * Java parameterization differs from the slot's (a {@code Func2<Object, Object, Long>}
+     * tear-off of {@code int f(Object?, Object?)} stored into an {@code int Function(E, E)?}
+     * slot -- valid Dart, since parameters are contravariant) goes through the raw
+     * interface, which Java converts unchecked; erasure makes them the same object.
+     */
+    private String nullAwareFuncValue(Out rhs, TypeRef slot, Ctx ctx) {
+        String v = coerce(rhs, slot, ctx);
+        if (slot == null || slot.funcReturn == null || rhs.type == null || rhs.type.funcReturn == null) {
+            return v;
+        }
+        String jt = javaType(slot, false, ctx);
+        int lt = jt.indexOf('<');
+        if (lt <= 0 || jt.equals(javaType(rhs.type, false, ctx))) {
+            return v;
+        }
+        return "(" + jt.substring(0, lt) + ") " + paren(v);
+    }
+
     private Out emitAssign(Assign a, Ctx ctx) {
         Out shorted = emitShortedAssign(a, ctx);
         if (shorted != null) {
@@ -9845,7 +9954,7 @@ public final class JavaEmitter {
                     String prop = lhs.code.substring(lhs.code.lastIndexOf(".get$") + 5, lhs.code.length() - 2);
                     write = base + ".set$" + prop + "(" + coerce(rhs, lhs.type, ctx) + ")";
                 } else {
-                    write = lhs.code + " = " + rhs.code;
+                    write = lhs.code + " = " + coerce(rhs, lhs.type, ctx);
                 }
                 Ctx.Writer w = ctx.writer();
                 w.line("if (" + lhs.code + " == null) {");
@@ -9864,8 +9973,10 @@ public final class JavaEmitter {
                 return new Out("(" + lhs.code + " == null ? " + base + ".set$" + prop + "("
                         + coerce(rhs, lhs.type, ctx) + ") : " + lhs.code + ")", lhs.type);
             }
-            return new Out("(" + lhs.code + " == null ? (" + lhs.code + " = " + rhs.code + ") : " + lhs.code + ")",
-                    lhs.type);
+            // Coerced like a plain write: `compare ??= defaultCompare` stores a
+            // Func2<Object, Object, Long> tear-off into a Func2<E, E, Long> slot.
+            return new Out("(" + lhs.code + " == null ? (" + lhs.code + " = " + nullAwareFuncValue(rhs, lhs.type, ctx)
+                    + ") : " + lhs.code + ")", lhs.type);
         }
         if (a.lhs instanceof IndexGet) {
             IndexGet ig = (IndexGet) a.lhs;
@@ -12862,12 +12973,16 @@ public final class JavaEmitter {
                 }
             }
             // members contributed by an applied stub mixin (e.g. RestorationMixin's
-            // registerForRestoration): resolved as an inherited default method.
-            for (TypeRef mixRef : cc.mixins) {
-                if (stubs.isStubClass(mixRef.name)) {
-                    Ast.MethodDecl sm = stubs.findMethod(mixRef.name, n, false);
-                    if (sm != null) {
-                        return new Out("this." + n + "(" + stubMethodArgs(sm, c.args, ctx) + ")", sm.returnType);
+            // registerForRestoration): resolved as an inherited default method. The mixin may
+            // be applied by a program superclass (`class B extends A` where A extends, hence
+            // mixes in, ChangeNotifier), so the superclass chain is walked too.
+            for (ClassDecl k = cc; k != null; k = k.superclass != null ? superDeclOf(k, k.superclass) : null) {
+                for (TypeRef mixRef : k.mixins) {
+                    if (stubs.isStubClass(mixRef.name)) {
+                        Ast.MethodDecl sm = stubs.findMethod(mixRef.name, n, false);
+                        if (sm != null) {
+                            return new Out("this." + n + "(" + stubMethodArgs(sm, c.args, ctx) + ")", sm.returnType);
+                        }
                     }
                 }
             }
@@ -15198,8 +15313,14 @@ public final class JavaEmitter {
                     boolean runtimeFnSlot = arg instanceof Lambda && ct.file == STUB_ARGS
                             && pt != null && pt.funcParams == null && pt.funcReturn == null
                             && (pt.is("Object") || isDynamicType(pt));
-                    Out o = emitExpr(arg, runtimeFnSlot ? null : pt, ctx);
-                    sb.append(coerce(o, pt, ctx));
+                    String handler = runtimeFnSlot || (ct.file == STUB_ARGS && pt != null && pt.is("Object"))
+                            ? objectHandlerSlot(p.name, arg, ctx) : null;
+                    if (handler != null) {
+                        sb.append(handler);
+                    } else {
+                        Out o = emitExpr(arg, runtimeFnSlot ? null : pt, ctx);
+                        sb.append(coerce(o, pt, ctx));
+                    }
                 } else if (p.defaultValue != null) {
                     sb.append(coerce(emitDefaultValue(p, pt, owner, ctx), pt, ctx));
                 } else {
@@ -15213,7 +15334,10 @@ public final class JavaEmitter {
                         break;
                     }
                 }
-                if (match != null && p.name.equals("onError") && match.value instanceof Lambda) {
+                // A program method's typed `onError` (`FutureOr<R> Function(Object,
+                // StackTrace)?`) is not this case: its lambda takes the declared type below.
+                if (match != null && p.name.equals("onError") && match.value instanceof Lambda
+                        && (ct.file == STUB_ARGS || pt == null || pt.funcParams == null)) {
                     // dart.async.Stream.listen's onError (and any other stub parameter
                     // literally named onError): real Dart's onError takes either a
                     // one- or a two-argument handler, which no single concrete Java
@@ -15225,8 +15349,14 @@ public final class JavaEmitter {
                     // See dart.async.Stream's class comment.
                     sb.append(pinnedErrorHandler((Lambda) match.value, emitExpr(match.value, null, ctx)));
                 } else if (match != null) {
-                    Out o = emitExpr(match.value, pt, ctx);
-                    sb.append(coerce(o, pt, ctx));
+                    String handler = ct.file == STUB_ARGS && pt != null && pt.is("Object")
+                            ? objectHandlerSlot(p.name, match.value, ctx) : null;
+                    if (handler != null) {
+                        sb.append(handler);
+                    } else {
+                        Out o = emitExpr(match.value, pt, ctx);
+                        sb.append(coerce(o, pt, ctx));
+                    }
                 } else if (p.defaultValue != null) {
                     sb.append(coerce(emitDefaultValue(p, pt, owner, ctx), pt, ctx));
                 } else {
@@ -15251,6 +15381,105 @@ public final class JavaEmitter {
                 ? "dart.runtime.Funcs.VoidFunc2<Object, Object>"
                 : "dart.runtime.Funcs.VoidFunc1<Object>";
         return "(" + type + ") " + paren(o.code);
+    }
+
+    /**
+     * A closure (or a tear-off) passed to a stub parameter the runtime declares as a
+     * plain {@code Object} handler slot -- {@code StreamSubscription.onData/onError/onDone}'s
+     * {@code handleX}, {@code listen}'s {@code onError}. Dart types these as an untyped
+     * {@code Function}, which accepts a handler of any arity, and the runtime dispatches on
+     * the Funcs type it is handed; a bare Java lambda or method reference has no target
+     * type there ("Object is not a functional interface"). The closure is bound to the
+     * Funcs SAM of its OWN arity, value- or void-returning as its body is. Answers null for
+     * anything else, which keeps its default emission: other stub parameters declared
+     * Object ({@code Stream.fold}'s combine) are typed Funcs SAMs in Java.
+     */
+    /**
+     * {@code recv.m} / {@code m} naming an instance method of an application class, as
+     * {@code (a, ..) => recv.m(a, ..)} over the method's required positional parameters
+     * (zero to three); anything else is returned as it is. The receiver must be a name
+     * or {@code this}, whose re-evaluation per call is free.
+     */
+    private Expr tearOffWithOwnArity(Expr e, Ctx ctx) {
+        Expr recv;
+        String name;
+        ClassDecl cls;
+        if (e instanceof PropertyGet && !((PropertyGet) e).nullAware
+                && (((PropertyGet) e).target instanceof Ident || ((PropertyGet) e).target instanceof ThisExpr)) {
+            recv = ((PropertyGet) e).target;
+            name = ((PropertyGet) e).name;
+            TypeRef rt = emitExpr(recv, null, ctx).type;
+            cls = rt == null ? null : program.classes.get(rt.name);
+        } else if (e instanceof Ident && ((Ident) e).typeArgs == null && ctx.currentClass != null
+                && ctx.lookup(((Ident) e).name) == null) {
+            recv = null;
+            name = ((Ident) e).name;
+            cls = ctx.currentClass;
+        } else {
+            return e;
+        }
+        MethodDecl m = cls == null ? null : findMethodInHierarchy(cls, name);
+        if (m == null || m.isStatic || m.isGetter || m.isSetter) {
+            return e;
+        }
+        int arity = 0;
+        for (Param p : m.params) {
+            if (p.named || p.optional) {
+                break;
+            }
+            arity++;
+        }
+        if (arity > 3) {
+            return e;
+        }
+        Lambda l = new Lambda();
+        Call call = new Call();
+        call.target = recv;
+        call.name = name;
+        for (int i = 0; i < arity; i++) {
+            Param p = new Param();
+            p.name = "$hArg" + i;
+            p.type = TypeRef.DYNAMIC;
+            l.params.add(p);
+            Ident a = new Ident();
+            a.name = p.name;
+            call.args.positional.add(a);
+        }
+        l.exprBody = call;
+        return l;
+    }
+
+    private String objectHandlerSlot(String name, Expr arg, Ctx ctx) {
+        if (name == null || !(name.startsWith("handle") || name.equals("onError"))) {
+            return null;
+        }
+        Expr e = name.endsWith("rror") ? tearOffAsErrorLambda(arg, ctx) : arg;
+        if (!(e instanceof Lambda)) {
+            // A method tear-off (`sub.onData(this._onData)`): call it from a closure of
+            // the method's own positional arity, read from its declaration.
+            e = tearOffWithOwnArity(e, ctx);
+            if (!(e instanceof Lambda)) {
+                return null;
+            }
+        }
+        Lambda l = (Lambda) e;
+        int n = l.params.size();
+        if (n > 3) {
+            return null;
+        }
+        Out o = emitExpr(l, null, ctx);
+        StringBuilder objs = new StringBuilder();
+        for (int i = 0; i < n; i++) {
+            // A declared parameter type (`(Object e, StackTrace s) { .. }`) is kept: the
+            // body reads it as that type. The runtime calls through the erased SAM.
+            TypeRef pt = l.params.get(i).type;
+            boolean typed = pt != null && !pt.is("var") && !isDynamicType(pt) && pt.funcParams == null
+                    && pt.funcReturn == null && pt.args.isEmpty() && isFullyConcrete(pt);
+            objs.append(i == 0 ? "" : ", ").append(typed ? javaType(boxType(pt), true, ctx) : "Object");
+        }
+        String asValue = "dart.runtime.Funcs.Func" + n + "<" + objs + (n == 0 ? "" : ", ") + "Object>";
+        String asVoid = "dart.runtime.Funcs.VoidFunc" + n + (n == 0 ? "" : "<" + objs + ">");
+        return pinnedHandler(l, o, true, asValue, asVoid);
     }
 
     /** Set while emitting a super(...) initializer, where no statement may come first. */
@@ -17454,6 +17683,11 @@ public final class JavaEmitter {
         if (t == null || t.is("var") || t.is("dynamic") || t.is("Object") || t.is("Null")) {
             return "Object";
         }
+        // A method type parameter erased away (see eraseAsFutureOverride) reads as Object.
+        if (ctx != null && ctx.erasedMethodTypeVars != null && t.args.isEmpty()
+                && ctx.erasedMethodTypeVars.contains(t.name)) {
+            return "Object";
+        }
         if (t.is("Never") && !program.classes.containsKey("Never")) {
             // dart:core Never, the bottom type: no value ever has it. A method declared to
             // return it always throws, so any reference return type is correct, and as a
@@ -18342,6 +18576,19 @@ public final class JavaEmitter {
                 && !target.is("void") && o.code.startsWith("Dyn.")) {
             return "(" + javaType(copyNonNull(target), false, ctx) + ") " + paren(o.code);
         }
+        // The same implicit downcast for a dynamic local or parameter (a closure's untyped
+        // `(error, stackTrace)` handed on to `completeError(Object, StackTrace)`): its Java
+        // type is Object, which javac will not narrow by itself. Only a bare name of an
+        // Object-typed local, and only into a program or core class type with no type
+        // arguments, so no primitive or generic slot is touched.
+        if (o.type != null && (o.type.is("dynamic") || o.type.is("var") || o.type.is("Object"))
+                && o.code.matches("[A-Za-z_$][A-Za-z0-9_$]*") && target.args.isEmpty()
+                && target.funcParams == null && target.funcReturn == null && !isDynamicType(target)
+                && !target.is("void") && !target.is("int") && !target.is("double") && !target.is("bool")
+                && !target.is("num") && !target.is("Null") && isFullyConcrete(target)
+                && !classTypeVarInScope(target, ctx)) {
+            return "(" + javaType(copyNonNull(target), false, ctx) + ") " + o.code;
+        }
         // A FutureOr<T> is an Object in Java; reaching a T slot (after an `is! Future` test
         // returned early, or a value Dart already knows is not a Future) it is Dart's implicit
         // downcast. A class type variable is in scope only in an instance member.
@@ -18976,6 +19223,8 @@ public final class JavaEmitter {
         /** The class being constructed with written type arguments, and their binding. */
         ClassDecl ctorTypeOwner;
         java.util.Map<String, TypeRef> ctorTypeSubst;
+        /** Method type parameters dropped from the Java signature; each reads as Object. */
+        java.util.Set<String> erasedMethodTypeVars;
         boolean inAsyncBody;
         /** Inside an async closure's body, whose Future may be typed Future of dynamic. */
         boolean asyncLambda;
