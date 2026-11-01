@@ -326,6 +326,14 @@ external Future<bool> canLaunchUrlString(String urlString);
 @JavaName('com.codename1.flutter.foundation.FoundationConstants.kIsWeb')
 bool kIsWeb = false;
 
+// package:flutter/foundation build modes: the simulator is a debug build.
+@JavaName('com.codename1.flutter.foundation.FoundationConstants.kDebugMode')
+bool kDebugMode = false;
+@JavaName('com.codename1.flutter.foundation.FoundationConstants.kReleaseMode')
+bool kReleaseMode = false;
+@JavaName('com.codename1.flutter.foundation.FoundationConstants.kProfileMode')
+bool kProfileMode = false;
+
 // package:flutter/material — default AppBar toolbar height (logical pixels).
 @JavaName('com.codename1.flutter.material.MaterialConstants.kToolbarHeight')
 double kToolbarHeight = 56.0;

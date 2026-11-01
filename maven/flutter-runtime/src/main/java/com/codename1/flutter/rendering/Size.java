@@ -42,6 +42,26 @@ public final class Size {
     }
 
     /** {@code Size.fromRadius}: a square that bounds a circle of {@code radius}. */
+    /** Flutter's {@code Size.square}: a size whose width and height are both {@code dimension}. */
+    public static Size square(double dimension) {
+        return new Size(dimension, dimension);
+    }
+
+    /** Flutter's {@code Size.bottomRight}: the bottom-right corner of a rect of this size at {@code origin}. */
+    public com.codename1.flutter.Offset bottomRight(com.codename1.flutter.Offset origin) {
+        return new com.codename1.flutter.Offset(origin.dx() + width, origin.dy() + height);
+    }
+
+    /** Flutter's {@code Size.topRight}. */
+    public com.codename1.flutter.Offset topRight(com.codename1.flutter.Offset origin) {
+        return new com.codename1.flutter.Offset(origin.dx() + width, origin.dy());
+    }
+
+    /** Flutter's {@code Size.bottomLeft}. */
+    public com.codename1.flutter.Offset bottomLeft(com.codename1.flutter.Offset origin) {
+        return new com.codename1.flutter.Offset(origin.dx(), origin.dy() + height);
+    }
+
     public static Size fromRadius(double radius) {
         return new Size(radius * 2, radius * 2);
     }

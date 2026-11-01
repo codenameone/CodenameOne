@@ -852,7 +852,21 @@ class WidgetsBinding {
   external Object get window;
   external void addPostFrameCallback(Object callback);
   external void addObserver(Object observer);
-  external void removeObserver(Object observer);
+  external bool removeObserver(Object observer);
+  external AppLifecycleState? get lifecycleState;
+}
+
+@JavaName('com.codename1.flutter.widgets.AppLifecycleState')
+enum AppLifecycleState { detached, resumed, inactive, hidden, paused }
+
+@JavaName('com.codename1.flutter.widgets.WidgetsBindingObserver')
+mixin WidgetsBindingObserver {
+  void didChangeAppLifecycleState(AppLifecycleState state) {}
+  void didChangeMetrics() {}
+  void didChangePlatformBrightness() {}
+  void didChangeTextScaleFactor() {}
+  void didHaveMemoryPressure() {}
+  void didChangeLocales(List<Object>? locales) {}
 }
 
 // The default height of a BottomNavigationBar — Flutter's top-level const

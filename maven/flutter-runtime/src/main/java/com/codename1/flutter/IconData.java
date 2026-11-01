@@ -45,7 +45,17 @@ public final class IconData {
         this((char) codePoint);
     }
 
-    public char codePoint() {
+    /** Flutter's {@code IconData.codePoint}, as the int Dart sees. */
+    public long codePoint() {
+        return codePoint;
+    }
+
+    /** Flutter's {@code IconData.fontPackage}: icons here come from no package. */
+    public String fontPackage() {
+        return null;
+    }
+
+    public char codePointChar() {
         return codePoint;
     }
 

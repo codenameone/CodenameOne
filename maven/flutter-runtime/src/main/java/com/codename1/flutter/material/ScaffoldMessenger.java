@@ -56,6 +56,11 @@ public class ScaffoldMessenger extends StatelessWidget {
         return child;
     }
 
+    /** Flutter's {@code ScaffoldMessenger.maybeOf}: the app-wide messenger here. */
+    public static ScaffoldMessengerState maybeOf(BuildContext context) {
+        return state;
+    }
+
     public static ScaffoldMessengerState of(BuildContext context) {
         return state;
     }

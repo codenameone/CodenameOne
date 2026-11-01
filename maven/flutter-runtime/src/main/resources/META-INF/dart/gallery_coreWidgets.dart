@@ -200,6 +200,7 @@ class Tooltip extends Widget {
 @JavaName('com.codename1.flutter.widgets.SelectableText')
 class SelectableText extends Widget {
   external SelectableText(String data, {Key? key, TextStyle? style, TextAlign? textAlign, int? maxLines, double? textScaleFactor, bool? showCursor, Object? cursorColor, Object? onTap, Object? focusNode, Object? scrollPhysics});
+  external TextSpan? get textSpan;
   external static SelectableText rich(TextSpan textSpan, {Key? key, TextStyle? style, TextAlign? textAlign, int? maxLines, TextDirection? textDirection});
 }
 

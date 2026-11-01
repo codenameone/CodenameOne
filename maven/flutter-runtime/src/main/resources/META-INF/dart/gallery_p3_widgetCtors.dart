@@ -73,6 +73,7 @@ class FadeInImage extends Widget {
 
 @JavaName('com.codename1.flutter.material.CircularProgressIndicator')
 class CircularProgressIndicator extends Widget {
+  external static CircularProgressIndicator adaptive({Key? key, double? value, Color? backgroundColor, Color? color, Object? valueColor, double? strokeWidth, String? semanticsLabel, String? semanticsValue});
   external CircularProgressIndicator({Key? key, double? value, Color? backgroundColor, Color? color, Object? valueColor, double? strokeWidth, String? semanticsLabel, String? semanticsValue});
 }
 

@@ -265,13 +265,13 @@ public class ButtonRenderElement extends RenderElement {
     public char consumedIconChar() {
         Widget c = contentWidget();
         if (c instanceof Icon && ((Icon) c).getIcon() != null) {
-            return ((Icon) c).getIcon().codePoint();
+            return ((Icon) c).getIcon().codePointChar();
         }
         // ...or the icon a .icon factory put beside the label. See
         // ButtonBase.leadingIcon.
         Widget lead = leadingIconWidget();
         if (lead instanceof Icon && ((Icon) lead).getIcon() != null) {
-            return ((Icon) lead).getIcon().codePoint();
+            return ((Icon) lead).getIcon().codePointChar();
         }
         return 0;
     }
@@ -741,13 +741,28 @@ public class ButtonRenderElement extends RenderElement {
             Widget w0 = widget();
             ButtonStyle st = w0 instanceof ButtonBase ? ((ButtonBase) w0).getStyle() : null;
             Double minSquare = st == null ? null : st.getMinimumSize();
-            if (minSquare != null) {
+            com.codename1.flutter.rendering.Size minWH = st == null ? null : st.getMinimumSizeWH();
+            if (minWH != null) {
+                w = Math.max(w, Dp.px(minWH.width()));
+                h = Math.max(h, Dp.px(minWH.height()));
+            } else if (minSquare != null) {
                 w = Math.max(w, Dp.px(minSquare.doubleValue()));
                 h = Math.max(h, Dp.px(minSquare.doubleValue()));
             } else {
                 // Material 3's button minimum is 64x40, not the 36 of the 2018 spec.
                 w = Math.max(w, Dp.px(64));
                 h = Math.max(h, Dp.px(40));
+            }
+        }
+        Widget wMax = widget();
+        ButtonStyle stMax = wMax instanceof ButtonBase ? ((ButtonBase) wMax).getStyle() : null;
+        com.codename1.flutter.rendering.Size maxWH = stMax == null ? null : stMax.getMaximumSize();
+        if (maxWH != null) {
+            if (!Double.isInfinite(maxWH.width())) {
+                w = Math.min(w, Dp.px(maxWH.width()));
+            }
+            if (!Double.isInfinite(maxWH.height())) {
+                h = Math.min(h, Dp.px(maxWH.height()));
             }
         }
         return constraints.constrain(new Size(w, h));

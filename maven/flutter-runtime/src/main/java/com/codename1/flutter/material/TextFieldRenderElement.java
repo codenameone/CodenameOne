@@ -279,7 +279,7 @@ public class TextFieldRenderElement extends RenderElement {
         glyphStyle.setBgTransparency(0);
         try {
             label.setIcon(com.codename1.ui.FontImage.createMaterial(
-                    icon.getIcon().codePoint(), glyphStyle, Dp.mm(PREFIX_ICON_LP)));
+                    icon.getIcon().codePointChar(), glyphStyle, Dp.mm(PREFIX_ICON_LP)));
         } catch (Exception headlessOrNoFont) {
             // keep whatever glyph is already showing
         }
@@ -313,7 +313,7 @@ public class TextFieldRenderElement extends RenderElement {
             // logical pixels asked for a 24mm glyph and drew an icon taller than
             // the row it sits in.
             label.setIcon(com.codename1.ui.FontImage.createMaterial(
-                    icon.getIcon().codePoint(), glyphStyle, Dp.mm(PREFIX_ICON_LP)));
+                    icon.getIcon().codePointChar(), glyphStyle, Dp.mm(PREFIX_ICON_LP)));
         } catch (Exception headlessOrNoFont) {
             // the row still reserves the space
         }

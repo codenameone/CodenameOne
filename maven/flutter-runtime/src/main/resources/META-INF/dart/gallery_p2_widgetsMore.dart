@@ -367,7 +367,7 @@ class BottomSheet extends Widget {
 }
 
 @JavaName('com.codename1.flutter.material.BottomSheets.showModalBottomSheet')
-external Future<dynamic> showModalBottomSheet({required BuildContext context, required WidgetBuilder builder, Color? backgroundColor, double? elevation, Object? shape, Clip? clipBehavior, Object? constraints, Color? barrierColor, bool? isScrollControlled, bool? useRootNavigator, bool? isDismissible, bool? enableDrag, bool? showDragHandle, Object? routeSettings, Object? transitionAnimationController});
+external Future<dynamic> showModalBottomSheet({required BuildContext context, required WidgetBuilder builder, Color? backgroundColor, double? elevation, Object? shape, Clip? clipBehavior, Object? constraints, Color? barrierColor, bool? isScrollControlled, bool? useRootNavigator, bool? isDismissible, bool? enableDrag, bool? showDragHandle, Object? routeSettings, Object? transitionAnimationController, bool? useSafeArea});
 
 // ======================================================================
 // Hero (minimal: renders child, no flight animation)

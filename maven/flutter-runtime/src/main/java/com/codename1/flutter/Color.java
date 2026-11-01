@@ -91,6 +91,44 @@ public class Color {
      * A copy of this color with the alpha channel replaced so it is {@code
      * opacity} (0..1) of fully opaque; RGB is unchanged.
      */
+    /** Flutter's {@code Color.a}: the alpha channel as a fraction 0..1. */
+    public double a() {
+        return alpha() / 255.0;
+    }
+
+    /** Flutter's {@code Color.r}: the red channel as a fraction 0..1. */
+    public double r() {
+        return red() / 255.0;
+    }
+
+    /** Flutter's {@code Color.g}: the green channel as a fraction 0..1. */
+    public double g() {
+        return green() / 255.0;
+    }
+
+    /** Flutter's {@code Color.b}: the blue channel as a fraction 0..1. */
+    public double b() {
+        return blue() / 255.0;
+    }
+
+    /**
+     * Flutter's {@code Color.withValues}: replaces the given channels, each a fraction
+     * 0..1, keeping the others. Only sRGB exists here, so {@code colorSpace} is accepted
+     * and the result stays sRGB.
+     */
+    public Color withValues(Double alpha, Double red, Double green, Double blue, Object colorSpace) {
+        int na = alpha == null ? alpha() : channel(alpha.doubleValue());
+        int nr = red == null ? red() : channel(red.doubleValue());
+        int ng = green == null ? green() : channel(green.doubleValue());
+        int nb = blue == null ? blue() : channel(blue.doubleValue());
+        return new Color(((long) na << 24) | ((long) nr << 16) | ((long) ng << 8) | nb);
+    }
+
+    private static int channel(double f) {
+        double c = f < 0 ? 0 : f > 1 ? 1 : f;
+        return (int) Math.round(c * 255);
+    }
+
     public Color withOpacity(double opacity) {
         int a = (int) Math.round(Math.max(0, Math.min(1, opacity)) * 255.0);
         return withAlpha(a);

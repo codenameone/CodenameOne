@@ -53,6 +53,47 @@ public class ButtonStyle {
     private Object tapTargetSize;
     private Object visualDensity;
     private Double minimumSize;
+    private com.codename1.flutter.rendering.Size minimumSizeWH;
+    private com.codename1.flutter.rendering.Size maximumSize;
+    private Color disabledForegroundColor;
+    private Color disabledBackgroundColor;
+
+    /**
+     * The full {@code styleFrom}: the flat overrides plus a minimum and maximum size and
+     * the colours used while the button is disabled.
+     */
+    public static ButtonStyle styleFrom(Color foregroundColor, Color backgroundColor, Color shadowColor,
+                                        Double elevation, TextStyle textStyle, EdgeInsets padding,
+                                        Object side, Object shape, Object alignment, Object tapTargetSize,
+                                        Object visualDensity, com.codename1.flutter.rendering.Size minimumSize,
+                                        com.codename1.flutter.rendering.Size maximumSize,
+                                        Color disabledForegroundColor, Color disabledBackgroundColor) {
+        ButtonStyle s = styleFrom(foregroundColor, backgroundColor, shadowColor, elevation, textStyle, padding,
+                side, shape, alignment, tapTargetSize, visualDensity);
+        s.minimumSizeWH = minimumSize;
+        s.maximumSize = maximumSize;
+        s.disabledForegroundColor = disabledForegroundColor;
+        s.disabledBackgroundColor = disabledBackgroundColor;
+        return s;
+    }
+
+    /** The two-dimensional minimum from {@code styleFrom(minimumSize:)}, or null. */
+    public com.codename1.flutter.rendering.Size getMinimumSizeWH() {
+        return minimumSizeWH;
+    }
+
+    /** The maximum from {@code styleFrom(maximumSize:)}, or null. */
+    public com.codename1.flutter.rendering.Size getMaximumSize() {
+        return maximumSize;
+    }
+
+    public Color getDisabledForegroundColor() {
+        return disabledForegroundColor;
+    }
+
+    public Color getDisabledBackgroundColor() {
+        return disabledBackgroundColor;
+    }
 
     /**
      * Builds a ButtonStyle from the flat overrides. Parameter order matches the

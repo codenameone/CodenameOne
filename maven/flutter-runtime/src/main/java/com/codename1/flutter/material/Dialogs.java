@@ -74,6 +74,59 @@ public final class Dialogs {
     }
 
     /**
+     * The full {@code showDialog}: {@code barrierDismissible} (Flutter's default true)
+     * closes it on a touch outside. The dialog is always a root of its own, so
+     * {@code useRootNavigator} and {@code useSafeArea} hold by construction; the barrier
+     * is Codename One's dialog tint, and its label is the accessibility text Codename
+     * One has no slot for.
+     */
+    public static dart.async.Future<Object> showDialog(BuildContext context, Funcs.Func1<BuildContext, Widget> builder,
+            Boolean barrierDismissible, com.codename1.flutter.Color barrierColor, String barrierLabel,
+            Boolean useSafeArea, Boolean useRootNavigator, Object routeSettings) {
+        applyBarrier(barrierColor);
+        return present(context, builder, BorderLayout.CENTER,
+                barrierDismissible == null || barrierDismissible.booleanValue());
+    }
+
+    /** {@code showAdaptiveDialog}: the Material dialog on every platform here. */
+    public static dart.async.Future<Object> showAdaptiveDialog(BuildContext context, Funcs.Func1<BuildContext, Widget> builder,
+            Boolean barrierDismissible, com.codename1.flutter.Color barrierColor, String barrierLabel,
+            Boolean useSafeArea, Boolean useRootNavigator, Object routeSettings) {
+        return showDialog(context, builder, barrierDismissible, barrierColor, barrierLabel, useSafeArea,
+                useRootNavigator, routeSettings);
+    }
+
+    /**
+     * {@code showGeneralDialog}: the page builder's widget, centred. Flutter's default
+     * {@code barrierDismissible} is false here. The animations handed to the builder
+     * are complete ones: the dialog appears with Codename One's own transition.
+     */
+    public static dart.async.Future<Object> showGeneralDialog(BuildContext context,
+            final Funcs.Func3<BuildContext, Object, Object, Widget> pageBuilder, Boolean barrierDismissible,
+            String barrierLabel, com.codename1.flutter.Color barrierColor, Object transitionDuration,
+            Object transitionBuilder, Boolean useRootNavigator, Object routeSettings) {
+        applyBarrier(barrierColor);
+        final Object done = new com.codename1.flutter.animation.AlwaysStoppedAnimation(Double.valueOf(1.0));
+        return present(context, new Funcs.Func1<BuildContext, Widget>() {
+            @Override
+            public Widget call(BuildContext c) {
+                return pageBuilder.call(c, done, done);
+            }
+        }, BorderLayout.CENTER, barrierDismissible != null && barrierDismissible.booleanValue());
+    }
+
+    private static void applyBarrier(com.codename1.flutter.Color barrierColor) {
+        if (barrierColor != null && Display.isInitialized() && Display.getInstance().getCurrent() != null) {
+            Display.getInstance().getCurrent().setTintColor(barrierColor.argb());
+        }
+    }
+
+    static dart.async.Future<Object> presentSheet(BuildContext context, Funcs.Func1<BuildContext, Widget> builder,
+            boolean dismissible) {
+        return present(context, builder, BorderLayout.SOUTH, dismissible, true);
+    }
+
+    /**
      * A sheet that rises from the bottom edge, full width -- the shape of a modal popup
      * rather than of a dialog.
      *

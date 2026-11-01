@@ -110,7 +110,7 @@ public class TextRenderElement extends RenderElement {
         // "the nearer style wins field by field".
         return ambient.copyWith(null, own.getColor(), null, own.getFontFamily(),
                 own.getFontSize(), own.getFontWeight(), null, own.getLetterSpacing(),
-                null, own.height(), null, null, null);
+                null, own.height(), null, null, null).withDecorationFrom(own);
     }
 
     private void applyStyle(Label l) {
@@ -188,6 +188,13 @@ public class TextRenderElement extends RenderElement {
             }
             if (ts.getColor() != null) {
                 stylesToSet(l).setFgColor(ts.getColor().rgb());
+            }
+            com.codename1.flutter.TextDecoration deco = ts.decoration();
+            if (deco != null) {
+                // Codename One draws underline and strike-through in the text colour;
+                // the decoration's own colour, style and thickness have no equivalent.
+                stylesToSet(l).setUnderline(deco.hasUnderline());
+                stylesToSet(l).setStrikeThru(deco.hasLineThrough());
             }
         }
         TextAlign a = text().getTextAlign();

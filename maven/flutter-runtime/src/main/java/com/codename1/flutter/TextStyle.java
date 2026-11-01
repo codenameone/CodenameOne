@@ -38,6 +38,81 @@ public class TextStyle {
     private String fontFamily;
     private Double letterSpacing;
     private Double height;
+    private TextDecoration decoration;
+    private Color decorationColor;
+    private TextDecorationStyle decorationStyle;
+    private Double decorationThickness;
+    private Object shadows;
+    private Color backgroundColor;
+
+    public void decoration(TextDecoration v) {
+        this.decoration = v;
+    }
+
+    public void decorationColor(Color v) {
+        this.decorationColor = v;
+    }
+
+    public void decorationStyle(TextDecorationStyle v) {
+        this.decorationStyle = v;
+    }
+
+    public void decorationThickness(double v) {
+        this.decorationThickness = v;
+    }
+
+    public void shadows(Object v) {
+        this.shadows = v;
+    }
+
+    public void backgroundColor(Color v) {
+        this.backgroundColor = v;
+    }
+
+    public TextDecoration decoration() {
+        return decoration;
+    }
+
+    public Color decorationColor() {
+        return decorationColor;
+    }
+
+    public TextDecorationStyle decorationStyle() {
+        return decorationStyle;
+    }
+
+    public Double decorationThickness() {
+        return decorationThickness;
+    }
+
+    public Object shadows() {
+        return shadows;
+    }
+
+    public Color backgroundColor() {
+        return backgroundColor;
+    }
+
+    /** This style with {@code other}'s decoration properties laid over it, when it sets them. */
+    public TextStyle withDecorationFrom(TextStyle other) {
+        if (other == null || (other.decoration == null && other.decorationColor == null
+                && other.decorationStyle == null && other.decorationThickness == null
+                && other.shadows == null && other.backgroundColor == null)) {
+            return this;
+        }
+        TextStyle t = shallowClone();
+        t.overlayDecoration(other);
+        return t;
+    }
+
+    private void overlayDecoration(TextStyle o) {
+        if (o.decoration != null) decoration = o.decoration;
+        if (o.decorationColor != null) decorationColor = o.decorationColor;
+        if (o.decorationStyle != null) decorationStyle = o.decorationStyle;
+        if (o.decorationThickness != null) decorationThickness = o.decorationThickness;
+        if (o.shadows != null) shadows = o.shadows;
+        if (o.backgroundColor != null) backgroundColor = o.backgroundColor;
+    }
 
     public void fontSize(double v) {
         this.fontSize = v;
@@ -126,6 +201,12 @@ public class TextStyle {
         t.fontFamily = fontFamily;
         t.letterSpacing = letterSpacing;
         t.height = height;
+        t.decoration = decoration;
+        t.decorationColor = decorationColor;
+        t.decorationStyle = decorationStyle;
+        t.decorationThickness = decorationThickness;
+        t.shadows = shadows;
+        t.backgroundColor = backgroundColor;
         return t;
     }
 
@@ -162,6 +243,7 @@ public class TextStyle {
         if (other.height != null) {
             t.height = other.height;
         }
+        t.overlayDecoration(other);
         return t;
     }
 
@@ -176,6 +258,8 @@ public class TextStyle {
         if (fontWeight != null) t.fontWeight = fontWeight;
         if (letterSpacing != null) t.letterSpacing = letterSpacing;
         if (height != null) t.height = height;
+        if (backgroundColor != null) t.backgroundColor = backgroundColor;
+        if (decoration instanceof TextDecoration) t.decoration = (TextDecoration) decoration;
         return t;
     }
 
@@ -194,6 +278,8 @@ public class TextStyle {
             double delta = fontSizeDelta != null ? fontSizeDelta : 0.0;
             t.fontSize = t.fontSize * factor + delta;
         }
+        if (backgroundColor != null) t.backgroundColor = backgroundColor;
+        if (decoration instanceof TextDecoration) t.decoration = (TextDecoration) decoration;
         return t;
     }
 }

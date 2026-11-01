@@ -51,6 +51,11 @@ public class SelectableText extends StatelessWidget {
      * Dart's {@code SelectableText.rich} named constructor in canonical
      * positional form.
      */
+    /** Flutter's {@code SelectableText.textSpan}: the span of a rich one, else null. */
+    public TextSpan textSpan() {
+        return textSpan;
+    }
+
     public static SelectableText rich(TextSpan textSpan, Key key, TextStyle style,
                                       TextAlign textAlign, Long maxLines,
                                       Object textDirection) {

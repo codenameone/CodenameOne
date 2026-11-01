@@ -39,4 +39,22 @@ public final class FoundationConstants {
      * {@code false}; the app uses it to gate web-only code paths.
      */
     public static final boolean kIsWeb = false;
+
+    /**
+     * Flutter's {@code kDebugMode}. Codename One has no separate debug VM, so the build
+     * kind decides it: the simulator (and any JavaSE desktop run of the simulator) is a
+     * debug build, a device or packaged build is a release build.
+     */
+    public static final boolean kDebugMode = detectDebug();
+
+    /** Flutter's {@code kReleaseMode}: every build that is not the simulator. */
+    public static final boolean kReleaseMode = !kDebugMode;
+
+    /** Flutter's {@code kProfileMode}: Codename One produces no profile builds. */
+    public static final boolean kProfileMode = false;
+
+    private static boolean detectDebug() {
+        return com.codename1.ui.Display.isInitialized()
+                && com.codename1.ui.Display.getInstance().isSimulator();
+    }
 }

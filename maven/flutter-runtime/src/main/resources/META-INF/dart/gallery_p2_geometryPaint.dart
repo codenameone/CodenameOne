@@ -279,6 +279,7 @@ class BorderRadius extends BorderRadiusGeometry {
   // `BorderRadius.lerp(a, b, t)`. Returns null only when both inputs are null.
   external static BorderRadius? lerp(BorderRadius? a, BorderRadius? b, double t);
   external RRect toRRect(Rect rect);
+  external BorderRadius copyWith({Radius? topLeft, Radius? topRight, Radius? bottomLeft, Radius? bottomRight});
 }
 
 @JavaName('com.codename1.flutter.BorderRadiusDirectional')
@@ -330,6 +331,7 @@ class BorderSide {
 class Border extends BoxBorder {
   external Border({BorderSide top, BorderSide right, BorderSide bottom, BorderSide left});
   external static Border all({Color? color, double width = 1.0, BorderStyle style = BorderStyle.solid, double? strokeAlign});
+  external static Border fromBorderSide(BorderSide side);
   external static Border symmetric({BorderSide vertical, BorderSide horizontal});
   external BorderSide get top;
   external BorderSide get right;
@@ -378,3 +380,31 @@ class OutlineInputBorder extends InputBorder {
 class UnderlineInputBorder extends InputBorder {
   external UnderlineInputBorder({BorderSide borderSide, Object? borderRadius});
 }
+
+// Shadows -- Flutter's `Shadow` (TextStyle.shadows) and `BoxShadow` (BoxDecoration.boxShadow).
+@JavaName('com.codename1.flutter.painting.Shadow')
+class Shadow {
+  external Shadow({Color color, Offset offset, double blurRadius});
+  external Color get color;
+  external Offset get offset;
+  external double get blurRadius;
+}
+
+@JavaName('com.codename1.flutter.painting.BoxShadow')
+class BoxShadow extends Shadow {
+  external BoxShadow({Color color, Offset offset, double blurRadius, double spreadRadius, dynamic blurStyle});
+  external double get spreadRadius;
+}
+
+@JavaName('com.codename1.flutter.TextDecoration')
+class TextDecoration {
+  external static TextDecoration get none;
+  external static TextDecoration get underline;
+  external static TextDecoration get overline;
+  external static TextDecoration get lineThrough;
+  external static TextDecoration combine(List<TextDecoration> decorations);
+  external bool contains(TextDecoration other);
+}
+
+@JavaName('com.codename1.flutter.TextDecorationStyle')
+enum TextDecorationStyle { solid, double, dotted, dashed, wavy }

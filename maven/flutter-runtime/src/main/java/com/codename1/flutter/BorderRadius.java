@@ -65,6 +65,12 @@ public final class BorderRadius extends BorderRadiusGeometry {
         return null;
     }
 
+    /** Flutter's {@code BorderRadius.copyWith}: this radius with the given corners replaced. */
+    public BorderRadius copyWith(Radius topLeft, Radius topRight, Radius bottomLeft, Radius bottomRight) {
+        return new BorderRadius(topLeft != null ? topLeft : this.topLeft, topRight != null ? topRight : this.topRight,
+                bottomLeft != null ? bottomLeft : this.bottomLeft, bottomRight != null ? bottomRight : this.bottomRight);
+    }
+
     public static BorderRadius only(Radius topLeft, Radius topRight,
                                     Radius bottomLeft, Radius bottomRight) {
         return new BorderRadius(topLeft, topRight, bottomLeft, bottomRight);
