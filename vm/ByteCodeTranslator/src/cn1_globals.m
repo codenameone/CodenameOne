@@ -10765,6 +10765,15 @@ static JAVA_BOOLEAN cn1PacingVolumeOk(long procHeadroom) {
 // been admitted to dirty, still covers this block plus the margin. Test and claim must be
 // one step: a plain check followed by a separate add lets every waiter observe the same
 // pre-claim total and admit together, which is the whole failure this guards.
+static long long cn1PacingHeadroomMargin(long procHeadroom) {
+    long long footprint = cn1PacingFootprintNow();
+    if(footprint <= 0) {
+        return CN1_PACING_HEADROOM_MARGIN;
+    }
+    long long quarter = (footprint + (long long)procHeadroom) >> 2;
+    return quarter < CN1_PACING_HEADROOM_MARGIN ? quarter : CN1_PACING_HEADROOM_MARGIN;
+}
+
 static JAVA_BOOLEAN cn1PacingTryAdmit(long headroom, long long need, long long pendingBytes) {
     long long claimed = atomic_load_explicit(&cn1PacingClaimed, memory_order_relaxed);
     for(;;) {
@@ -10937,7 +10946,15 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
     // earlier block has been written and the kernel has counted it, so holding the claim
     // any longer would double-charge it.
     cn1PacingExpireThreadClaim();
-    long long need = pendingBytes + CN1_PACING_HEADROOM_MARGIN;
+    // THE MARGIN SCALES DOWN WITH A SMALL BUDGET. A fixed 64MB was sized against
+    // ceilings of a gigabyte or more, and below about 256MB it is no longer a margin but
+    // most of the budget: under 128MB a process was refused everything past 64MB, so a
+    // server holding 60MB parked its request threads in a 1ms sleep loop and fell from
+    // ~22k to under 500 requests per second with half its budget unused -- and an app
+    // extension, whose limit can be below 128MB, is in the same place. A quarter of the
+    // budget keeps the same proportion the 64MB had at 256MB, so every budget of 256MB
+    // or more is admitted exactly as before.
+    long long need = pendingBytes + cn1PacingHeadroomMargin(procHeadroom);
     if(cn1PacingTraceOn()) {
         atomic_fetch_add_explicit(&cn1PacingBoundedChecks, 1, memory_order_relaxed);
         long seen = atomic_load_explicit(&cn1PacingMinHeadroom, memory_order_relaxed);
@@ -12458,7 +12475,21 @@ static int cn1GcLastDutyPercent = 0;   // GC thread only; reported by the instru
 static int cn1BibopGrowSurvivalPercent(void) {
     int tight = CN1_BIBOP_TIGHT_SURVIVAL_PERCENT;
     int loose = CN1_BIBOP_TRIGGER_SURVIVAL_PERCENT;
-    if(tight <= loose || cn1GcPrevCycleStartNs == 0) {
+    if(tight <= loose) {
+        return loose;
+    }
+    // A PROCESS WITH A MEMORY BUDGET HAS NO MEMORY TO TRADE. The duty-cycle rule below
+    // spends memory for speed because, without a ceiling, unused memory is worth
+    // nothing; under one (an iOS per-process limit, or the simulated limit the tests
+    // and benchmarks impose) every byte the heap grows by is a byte closer to being
+    // killed, and the pacing clamp will park the mutators before that happens anyway.
+    // So the heap is held tight however busy the collector is: the program pays in
+    // collections rather than in parks against the budget.
+    if(cn1ProcessHeadroom() >= 0) {
+        cn1GcLastDutyPercent = -1;
+        return tight;
+    }
+    if(cn1GcPrevCycleStartNs == 0) {
         return loose;
     }
     long long now = cn1GcDutyClockNs();

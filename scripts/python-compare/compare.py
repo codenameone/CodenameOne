@@ -28,15 +28,31 @@ PORT = 8080
 CN1 = "Codename One Python"
 
 
-def timed(cmd, cwd=None):
-    """Runs cmd under /usr/bin/time -l; answers (stdout, wall s, peak RSS MB)."""
+def timed(cmd, cwd=None, env=None):
+    """Runs cmd under /usr/bin/time -l; answers (stdout, wall s, peak memory MB).
+
+    Peak memory is the PHYSICAL FOOTPRINT where the OS reports one (macOS): it is what
+    the kernel meters a process by and what a per-process budget is measured in, so it
+    is the number the budgeted rows below are held to. Elsewhere it is peak RSS."""
     t0 = time.perf_counter()
-    p = subprocess.run(["/usr/bin/time", "-l"] + cmd, cwd=cwd, capture_output=True, text=True)
+    p = subprocess.run(["/usr/bin/time", "-l"] + cmd, cwd=cwd, capture_output=True, text=True, env=env)
     wall = time.perf_counter() - t0
     if p.returncode != 0:
         raise RuntimeError("%s failed: %s" % (cmd, p.stderr[-500:]))
-    m = re.search(r"(\d+)\s+maximum resident set size", p.stderr)
+    m = re.search(r"(\d+)\s+peak memory footprint", p.stderr) \
+        or re.search(r"(\d+)\s+maximum resident set size", p.stderr)
     return p.stdout, wall, int(m.group(1)) / (1024.0 * 1024.0)
+
+
+def budget_env(mb):
+    """The environment that gives a Codename One binary a per-process memory budget.
+
+    CN1_SIMULATE_PROC_MEMORY_LIMIT is the VM's own budget input -- the same code path an
+    iOS per-process limit drives -- so the budgeted rows measure what the VM does when it
+    knows memory is scarce, not a different build."""
+    env = dict(os.environ)
+    env["CN1_SIMULATE_PROC_MEMORY_LIMIT"] = str(int(mb) * 1024 * 1024)
+    return env
 
 
 def du_mb(path):
@@ -69,7 +85,7 @@ def flask_size(exe):
     return sum(du_mb(d) for d in out)
 
 
-def kernel_rows(arms, cn1_dir):
+def kernel_rows(arms, cn1_dir, budget):
     rows = []
     for k in KERNEL_NAMES:
         row = {"kernel": k}
@@ -78,8 +94,14 @@ def kernel_rows(arms, cn1_dir):
             row[name] = (best_ms(out), rss)
         out, wall, rss = timed([os.path.join(cn1_dir, k, k)])
         row[CN1] = (best_ms(out), rss)
+        out, wall, rss = timed([os.path.join(cn1_dir, k, k)], env=budget_env(budget))
+        row[cn1_budgeted(budget)] = (best_ms(out), rss)
         rows.append(row)
     return rows
+
+
+def cn1_budgeted(mb):
+    return "%s, %d MB budget" % (CN1, mb)
 
 
 def best_ms(out):
@@ -97,12 +119,38 @@ def wait_up(url, deadline):
     return False
 
 
+def footprint_of(pid):
+    """(current, peak) physical footprint in MB from vmmap on macOS; RSS twice elsewhere."""
+    out = subprocess.run(["vmmap", "-summary", str(pid)], capture_output=True, text=True).stdout \
+        if shutil.which("vmmap") else ""
+
+    def mb(label):
+        m = re.search(label + r":\s+([\d.]+)([KMG])", out)
+        if not m:
+            return None
+        return float(m.group(1)) * {"K": 1 / 1024.0, "M": 1.0, "G": 1024.0}[m.group(2)]
+    cur, peak = mb(r"Physical footprint"), mb(r"Physical footprint \(peak\)")
+    if cur is None:
+        cur = peak = rss_of(pid)
+    return cur, peak
+
+
 def rss_of(pid):
     out = subprocess.run(["ps", "-o", "rss=", "-p", str(pid)], capture_output=True, text=True).stdout
     return int(out.strip() or 0) / 1024.0
 
 
+LOAD_SECONDS = 30
+SETTLE_SECONDS = 5
+FLASK_KEYS = ("first_ms", "idle_mb", "loaded_mb", "settled_mb", "peak_mb", "loaded_rss_mb", "rps", "p99_ms")
+
+
 def server_row(cmd, env=None):
+    """One server under the same fixed DURATION of full load, not the same request count.
+
+    A fixed count finishes in under a second on a fast server and in half a minute on a
+    slow one, so the fast one is measured before its collector has settled and the slow
+    one after; the same thirty seconds of load is the same question asked of both."""
     url = "http://127.0.0.1:%d/todos" % PORT
     t0 = time.perf_counter()
     p = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env)
@@ -110,16 +158,21 @@ def server_row(cmd, env=None):
         if not wait_up(url, t0 + 60):
             raise RuntimeError("server did not start: %s" % cmd)
         first = time.perf_counter() - t0
-        idle = rss_of(p.pid)
-        # Warm up, then the measured run; one connection at a time per
-        # client, keep-alive off, the same for every server.
-        ab = ["ab", "-q", "-n", "20000", "-c", "8", "http://127.0.0.1:%d/fib/30" % PORT]
-        subprocess.run(ab[:2] + ["-n", "2000"] + ab[4:], capture_output=True)
-        out = subprocess.run(ab, capture_output=True, text=True).stdout
+        idle = footprint_of(p.pid)[0]
+        # Warm up, then the measured run; one connection at a time per client,
+        # keep-alive off, the same for every server.
+        target = "http://127.0.0.1:%d/fib/30" % PORT
+        subprocess.run(["ab", "-q", "-n", "2000", "-c", "8", target], capture_output=True)
+        out = subprocess.run(["ab", "-q", "-s", "30", "-t", str(LOAD_SECONDS), "-n", "100000000",
+                              "-c", "8", target], capture_output=True, text=True).stdout
         rps = float(re.search(r"Requests per second:\s+([\d.]+)", out).group(1))
         p99 = re.search(r"\s99%\s+(\d+)", out)
-        loaded = rss_of(p.pid)
-        return first * 1000.0, idle, loaded, rps, int(p99.group(1)) if p99 else None
+        loaded_rss = rss_of(p.pid)
+        loaded, peak = footprint_of(p.pid)
+        time.sleep(SETTLE_SECONDS)
+        settled = footprint_of(p.pid)[0]
+        return (first * 1000.0, idle, loaded, settled, peak, loaded_rss, rps,
+                int(p99.group(1)) if p99 else None)
     finally:
         p.terminate()
         try:
@@ -136,6 +189,8 @@ def main():
     ap.add_argument("--cn1-kernels", required=True)
     ap.add_argument("--cn1-hello", help="native binary of hello.py, for the startup row")
     ap.add_argument("--cn1-server", required=True)
+    ap.add_argument("--budget-mb", type=int, default=128,
+                    help="per-process memory budget for the second Codename One arm")
     ap.add_argument("--out")
     ap.add_argument("--json", help="the measurements, for render_charts.py --compare")
     a = ap.parse_args()
@@ -144,7 +199,8 @@ def main():
         arms.append(("PyPy", a.pypy))
     if a.graalpy:
         arms.append(("GraalPy", a.graalpy))
-    names = [n for n, _ in arms] + [CN1]
+    CN1B = cn1_budgeted(a.budget_mb)
+    names = [n for n, _ in arms] + [CN1, CN1B]
     lines = []
     w = lines.append
     w("# Codename One Python vs %s\n" % ", ".join(n for n, _ in arms))
@@ -173,31 +229,56 @@ def main():
         w("| %s | %.1f | %.1f |" % (n, ms, mb))
     w("")
 
-    w("## CPU kernels (fastest of the kernel's rounds, ms; peak RSS MB)\n")
+    w("## Two ways to run the same binary\n")
+    w("Every Codename One row appears twice. **%s** is the binary as it ships, on a "
+      "machine with memory to spare. Its collector is adaptive: while it has CPU to spare "
+      "it holds the heap near the live set, and when collecting starts to cost the "
+      "program throughput it lets the heap grow instead, because unused memory buys "
+      "nothing and the speed it pays for is real. **%s** is the same binary given a "
+      "per-process memory budget, the way iOS limits every app and a container limits a "
+      "server. Then memory is the scarce resource and the trade flips: the heap is held "
+      "tight however busy the collector is, and the program pays in collections, not "
+      "memory.\n" % (CN1, CN1B))
+    w("Memory is **physical footprint**, what the kernel meters a process by and what a "
+      "budget is measured in, for every runtime alike.\n")
+    w("## CPU kernels (fastest of the kernel's rounds, ms; peak footprint MB)\n")
     w("| kernel | " + " | ".join("%s ms | %s MB" % (n, n) for n in names) + " |")
     w("|---|" + "---:|---:|" * len(names))
-    for r in kernel_rows(arms, a.cn1_kernels):
+    for r in kernel_rows(arms, a.cn1_kernels, a.budget_mb):
         data["kernels"][r["kernel"]] = {n: {"ms": r[n][0], "rss_mb": r[n][1]} for n in names}
         w("| %s | " % r["kernel"] + " | ".join("%.1f | %.1f" % r[n] for n in names) + " |")
     w("")
 
     w("## Flask JSON API (`scripts/python-backend/samples/flask-todo`)\n")
-    w("`ab -n 20000 -c 8 /fib/30` after a 2000-request warm-up. CPython, PyPy and "
-      "GraalPy serve with `app.run()` (Werkzeug's threaded server), Codename One "
-      "with the same call, which it lowers onto the native backend HTTP server.\n")
-    w("| | first response ms | idle RSS MB | RSS after load MB | req/s | p99 ms |")
-    w("|---|---:|---:|---:|---:|---:|")
+    w("Thirty seconds of `ab -c 8 /fib/30` after a 2000-request warm-up -- the same "
+      "length of load for every server, not the same request count, so a fast server is "
+      "not measured before its collector settles. Footprint is read as the load ends, "
+      "again %d seconds later, and at its peak. CPython, PyPy and GraalPy serve with "
+      "`app.run()` (Werkzeug's threaded server), Codename One with the same call, which "
+      "it lowers onto the native backend HTTP server.\n" % SETTLE_SECONDS)
+    w("| | first response ms | idle MB | after load MB | %ds later MB | peak MB | RSS after load MB | req/s | p99 ms |"
+      % SETTLE_SECONDS)
+    w("|---|---:|---:|---:|---:|---:|---:|---:|---:|")
+    servers = [(n, [exe, SERVER_APP], None) for n, exe in arms if has_flask(exe)]
+    servers += [(CN1, [a.cn1_server], None), (CN1B, [a.cn1_server], budget_env(a.budget_mb))]
     for n, exe in arms:
         if not has_flask(exe):
-            w("| %s | (Flask not installed) | | | | |" % n)
-            continue
-        r = server_row([exe, SERVER_APP])
-        data["flask"][n] = dict(zip(("first_ms", "idle_mb", "loaded_mb", "rps", "p99_ms"), r))
-        w("| %s | %.0f | %.1f | %.1f | %.0f | %s |" % ((n,) + r))
-    r = server_row([a.cn1_server])
-    data["flask"][CN1] = dict(zip(("first_ms", "idle_mb", "loaded_mb", "rps", "p99_ms"), r))
-    w("| " + CN1 + " | %.0f | %.1f | %.1f | %.0f | %s |" % (r[0], r[1], r[2], r[3], r[4]))
+            w("| %s | (Flask not installed) | | | | | | | |" % n)
+    for n, cmd, env in servers:
+        r = server_row(cmd, env)
+        data["flask"][n] = dict(zip(FLASK_KEYS, r))
+        w("| %s | %.0f | %.1f | %.1f | %.1f | %.1f | %.1f | %.0f | %s |" % ((n,) + r))
     w("")
+    fl = data["flask"]
+    if "CPython" in fl:
+        free, held, cp = fl[CN1], fl[CN1B], fl["CPython"]
+        w("Unconstrained, the server spends memory for speed: %.0f MB after load at "
+          "%.0f requests a second. Under the %d MB budget it gives that speed back for "
+          "memory, %.0f MB at %.0f requests a second -- %.0f%% of the unconstrained "
+          "throughput and still %.0f times CPython's, which serves %.0f a second in "
+          "%.0f MB.\n" % (free["loaded_mb"], free["rps"], a.budget_mb, held["loaded_mb"],
+                          held["rps"], 100.0 * held["rps"] / free["rps"],
+                          held["rps"] / cp["rps"], cp["rps"], cp["loaded_mb"]))
 
     w("## What you deploy\n")
     w("| | size MB | what |")
@@ -210,7 +291,7 @@ def main():
           % (n, du_mb(home) + extra, home, extra))
     w("| " + CN1 + " | %.1f | one self-contained executable, Flask included |" % du_mb(a.cn1_server))
     w("")
-    data["deploy"][CN1] = du_mb(a.cn1_server)
+    data["deploy"][CN1] = data["deploy"][CN1B] = du_mb(a.cn1_server)
     if a.json:
         import json
         with open(a.json, "w") as f:
