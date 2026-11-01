@@ -46,6 +46,90 @@ final class Meshes {
     private Meshes() {
     }
 
+    /// An empty builder, for a part assembled from several [#loft] pieces
+    /// and turned into one mesh by [#done].
+    static Meshes builder() {
+        return new Meshes();
+    }
+
+    /// The mesh of everything added to this builder so far.
+    Mesh done() {
+        return build();
+    }
+
+    /// Adds a hard-surface piece lofted along Y through `ys.length` rings:
+    /// ring `i` is an octagon at height `ys[i]`, `hw[i]` wide and `hd[i]`
+    /// deep either side of its centre `(cx, cz + fz[i])`, with flat sides
+    /// facing +-x and +-z. Every face carries its own normal, so the light
+    /// breaks across the panels in steps -- the cut, machined look of a
+    /// low-poly athlete -- rather than sliding round a balloon. The ends are
+    /// capped unless a ring there has no width. Returns this builder.
+    Meshes loft(float cx, float cz, float[] ys, float[] hw, float[] hd, float[] fz) {
+        int sides = 8;
+        int n = ys.length;
+        float k = 1f / (float) Math.cos(Math.PI / sides);
+        float[] px = new float[n * sides];
+        float[] pz = new float[n * sides];
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < sides; j++) {
+                double a = Math.PI / sides + 2 * Math.PI * j / sides;
+                px[i * sides + j] = cx + hw[i] * k * (float) Math.cos(a);
+                pz[i * sides + j] = cz + fz[i] + hd[i] * k * (float) Math.sin(a);
+            }
+        }
+        for (int i = 0; i < n - 1; i++) {
+            float midZ = cz + (fz[i] + fz[i + 1]) / 2f;
+            for (int j = 0; j < sides; j++) {
+                int a = i * sides + j;
+                int b = i * sides + (j + 1) % sides;
+                int c = b + sides;
+                int d = a + sides;
+                float ux = px[c] - px[a];
+                float uy = ys[i + 1] - ys[i];
+                float uz = pz[c] - pz[a];
+                float wx = px[d] - px[b];
+                float wy = uy;
+                float wz = pz[d] - pz[b];
+                float nx = uy * wz - uz * wy;
+                float ny = uz * wx - ux * wz;
+                float nz = ux * wy - uy * wx;
+                float ox = (px[a] + px[b] + px[c] + px[d]) / 4f - cx;
+                float oz = (pz[a] + pz[b] + pz[c] + pz[d]) / 4f - midZ;
+                if (nx * ox + nz * oz < 0f) {
+                    nx = -nx;
+                    ny = -ny;
+                    nz = -nz;
+                }
+                int v0 = vert(px[a], ys[i], pz[a], nx, ny, nz, 0f, 0f);
+                int v1 = vert(px[b], ys[i], pz[b], nx, ny, nz, 1f, 0f);
+                int v2 = vert(px[c], ys[i + 1], pz[c], nx, ny, nz, 1f, 1f);
+                int v3 = vert(px[d], ys[i + 1], pz[d], nx, ny, nz, 0f, 1f);
+                tri(v0, v1, v2);
+                tri(v0, v2, v3);
+            }
+        }
+        for (int e = 0; e < 2; e++) {
+            int i = e == 0 ? 0 : n - 1;
+            if (hw[i] <= 0f || hd[i] <= 0f) {
+                continue;
+            }
+            float ny = ys[n - 1] > ys[0] == (e == 1) ? 1f : -1f;
+            int c0 = vert(cx, ys[i], cz + fz[i], 0f, ny, 0f, 0.5f, 0.5f);
+            for (int j = 0; j < sides; j++) {
+                int a = vert(px[i * sides + j], ys[i], pz[i * sides + j], 0f, ny, 0f, 0f, 0f);
+                int jb = i * sides + (j + 1) % sides;
+                int b = vert(px[jb], ys[i], pz[jb], 0f, ny, 0f, 1f, 0f);
+                tri(c0, a, b);
+            }
+        }
+        return this;
+    }
+
+    /// [#loft] with every ring centred on the same axis.
+    Meshes loft(float cx, float cz, float[] ys, float[] hw, float[] hd) {
+        return loft(cx, cz, ys, hw, hd, new float[ys.length]);
+    }
+
     /// A capsule along Y: a cylinder `length` long with a hemisphere of
     /// `radius` on each end, so `length + 2 * radius` tall overall.
     static Mesh capsule(float radius, float length, int rings, int segs) {

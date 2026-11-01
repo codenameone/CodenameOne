@@ -22,19 +22,23 @@ import com.codename1.gaming.GameView;
 import com.codename1.gaming.Model;
 import com.codename1.gpu.Material;
 import com.codename1.gpu.Mesh;
-import com.codename1.gpu.Primitives;
 
-/// A runner's body, built from capsules, rounded boxes and spheres and posed
-/// by code: no model files, no animation clips. Each joint is an angle, the
-/// pose is the angle set for what the runner is doing -- running, in the
-/// air, sliding, down, or celebrating -- and the body eases towards it every
-/// frame, so one move flows into the next.
+/// A runner's body -- a sleek low-poly android athlete -- built in code
+/// and posed by code: no model files, no animation clips. Each joint is an
+/// angle, the pose is the angle set for what the runner is doing -- running,
+/// in the air, sliding, down, or celebrating -- and the body eases towards
+/// it every frame, so one move flows into the next.
 ///
-/// The proportions are an athlete's: long legs, a chest that tapers to a
-/// narrow waist, a small streamlined helmet with a visor that wraps round it,
-/// trainers and a slim pack with a light strip. The suit is matte and the
-/// trim glows -- a stripe down each leg and arm -- so the body reads as one
-/// sleek shape at speed rather than a stack of glossy balls.
+/// Every segment is lofted from octagonal cross sections ([Meshes]'s `loft`)
+/// with one normal per face, so the light breaks across it in machined
+/// panels instead of sliding round a balloon. The torso is a real torso:
+/// hips, a narrow waist, a chest that widens to the shoulders and a neck,
+/// with a chest plate and a back pack over it. Arms and legs are tapered
+/// upper and lower segments meeting at armoured elbows and knees, ending in
+/// fists and trainers with soles; the head is a faceted helmet with a face
+/// plate. Each segment is up to three meshes sharing one origin at its joint
+/// -- the suit, the dark armour shell and the glowing trim -- so an [Outfit]
+/// recolours the whole body.
 ///
 /// Angles are in degrees in the runner's side plane: 0 hangs straight down
 /// (a limb) or stands straight up (the torso), and a positive angle swings
@@ -55,103 +59,214 @@ final class Rig {
     private static final float THIGH = 0.5f;
     private static final float SHIN = 0.48f;
     private static final float TORSO = 0.54f;
-    private static final float UPPER_ARM = 0.31f;
-    private static final float FOREARM = 0.29f;
+    private static final float UPPER_ARM = 0.3f;
     private static final float STAND = 1.02f;
-    private static final float HEAD = 0.17f;
 
-    /// The meshes every runner shares, built once per run.
+    /// The meshes every runner shares, built once per run. Each has its
+    /// origin at the joint it hangs from -- the torso at the hip, the head at
+    /// the neck, a limb at its upper joint -- and runs along -Y (+Y for the
+    /// torso and head), with forward at -z.
     static final class Kit {
-        final Mesh thigh = Meshes.capsule(0.075f, THIGH - 0.075f, 4, 12);
-        final Mesh shin = Meshes.capsule(0.058f, SHIN - 0.058f, 4, 12);
-        final Mesh arm = Meshes.capsule(0.05f, UPPER_ARM - 0.05f, 4, 10);
-        final Mesh fore = Meshes.capsule(0.045f, FOREARM - 0.045f, 4, 10);
-        final Mesh chest = Meshes.roundedBox(0.42f, 0.3f, 0.24f, 0.1f, 4);
-        final Mesh torso = Meshes.capsule(0.13f, 0.14f, 6, 16);
-        final Mesh pelvis = Meshes.roundedBox(0.3f, 0.16f, 0.2f, 0.07f, 3);
-        final Mesh band = Meshes.torus(0.135f, 0.018f, 8, 20);
-        final Mesh ball = Primitives.sphere(0.5f, 14, 20, false);
-        final Mesh visor = Meshes.band(HEAD + 0.012f, 0.07f, 170f, 16);
-        final Mesh pack = Meshes.roundedBox(0.24f, 0.28f, 0.08f, 0.035f, 3);
-        final Mesh strip = Meshes.capsule(0.016f, 0.2f, 3, 8);
-        final Mesh stripe = Meshes.capsule(0.012f, 0.3f, 3, 6);
-        final Mesh shoe = Meshes.roundedBox(0.12f, 0.085f, 0.3f, 0.04f, 3);
-        final Mesh sole = Meshes.roundedBox(0.13f, 0.03f, 0.31f, 0.014f, 2);
+        final Mesh torsoSuit;
+        final Mesh torsoShell;
+        final Mesh torsoGlow;
+        final Mesh headShell;
+        final Mesh headSuit;
+        final Mesh headGlow;
+        final Mesh armSuit;
+        final Mesh armShell;
+        final Mesh foreSuit;
+        final Mesh foreShell;
+        final Mesh foreGlow;
+        final Mesh thighSuit;
+        final Mesh thighShell;
+        final Mesh thighGlow;
+        final Mesh shinSuit;
+        final Mesh shinShell;
+        final Mesh shoe;
+        final Mesh sole;
         final Mesh quad;
         final Material shadow;
 
         Kit(Mesh quad, Glow glow) {
             this.quad = quad;
             shadow = Glow.blended(glow.shadow, 0x99000000);
+            // Hips, a waist narrower than both, the rib cage widening to
+            // the shoulders, then the trapezius sloping into the neck.
+            torsoSuit = Meshes.builder()
+                    .loft(0f, 0f, f(-0.07f, 0.04f, 0.15f, 0.27f, 0.38f, 0.46f, 0.51f, 0.55f),
+                            f(0.125f, 0.14f, 0.112f, 0.15f, 0.205f, 0.22f, 0.16f, 0.085f),
+                            f(0.085f, 0.09f, 0.078f, 0.095f, 0.11f, 0.105f, 0.085f, 0.065f),
+                            f(0f, 0f, 0f, -0.008f, -0.016f, -0.008f, 0.005f, 0.01f))
+                    .loft(0f, 0.012f, f(0.53f, 0.64f), f(0.045f, 0.04f), f(0.045f, 0.04f))
+                    .done();
+            torsoShell = Meshes.builder()
+                    // Hip guard, chest plate, back pack and shoulder caps.
+                    .loft(0f, 0f, f(-0.09f, -0.06f, 0.07f, 0.1f), f(0.12f, 0.145f, 0.152f, 0.125f),
+                            f(0.08f, 0.1f, 0.102f, 0.085f))
+                    .loft(0f, -0.118f, f(0.29f, 0.33f, 0.44f, 0.47f), f(0.1f, 0.14f, 0.165f, 0.12f),
+                            f(0.018f, 0.025f, 0.025f, 0.015f))
+                    .loft(0f, 0.15f, f(0.2f, 0.23f, 0.46f, 0.49f), f(0.09f, 0.12f, 0.12f, 0.09f),
+                            f(0.03f, 0.045f, 0.045f, 0.03f))
+                    .loft(-0.225f, 0f, f(0.4f, 0.45f, 0.51f, 0.535f), f(0.055f, 0.074f, 0.072f, 0.045f),
+                            f(0.065f, 0.082f, 0.077f, 0.05f))
+                    .loft(0.225f, 0f, f(0.4f, 0.45f, 0.51f, 0.535f), f(0.055f, 0.074f, 0.072f, 0.045f),
+                            f(0.065f, 0.082f, 0.077f, 0.05f))
+                    .done();
+            torsoGlow = Meshes.builder()
+                    // The belt line, the seam under the rib cage, the light
+                    // down the chest plate and the strip on the pack.
+                    .loft(0f, 0f, f(0.0f, 0.025f), f(0.155f, 0.155f), f(0.104f, 0.104f))
+                    .loft(0f, 0f, f(0.235f, 0.25f), f(0.142f, 0.144f), f(0.094f, 0.095f), f(-0.006f, -0.007f))
+                    .loft(0f, -0.145f, f(0.31f, 0.45f), f(0.016f, 0.016f), f(0.006f, 0.006f))
+                    .loft(0f, 0.198f, f(0.25f, 0.44f), f(0.022f, 0.022f), f(0.005f, 0.005f))
+                    .done();
+            // A faceted helmet: a narrow jaw, wide temples, a crown.
+            headShell = Meshes.builder()
+                    .loft(0f, -0.005f, f(0.02f, 0.06f, 0.15f, 0.22f, 0.27f, 0.295f),
+                            f(0.06f, 0.088f, 0.1f, 0.098f, 0.08f, 0.04f),
+                            f(0.07f, 0.1f, 0.115f, 0.112f, 0.09f, 0.045f),
+                            f(-0.012f, -0.008f, 0f, 0.004f, 0.008f, 0.01f))
+                    .done();
+            headSuit = Meshes.builder()
+                    // Ear pods and the chin guard.
+                    .loft(-0.1f, 0.01f, f(0.09f, 0.11f, 0.17f, 0.19f), f(0.012f, 0.02f, 0.02f, 0.012f),
+                            f(0.03f, 0.042f, 0.042f, 0.03f))
+                    .loft(0.1f, 0.01f, f(0.09f, 0.11f, 0.17f, 0.19f), f(0.012f, 0.02f, 0.02f, 0.012f),
+                            f(0.03f, 0.042f, 0.042f, 0.03f))
+                    .loft(0f, -0.085f, f(0.025f, 0.05f, 0.085f), f(0.045f, 0.06f, 0.07f), f(0.018f, 0.025f, 0.02f))
+                    .done();
+            headGlow = Meshes.builder()
+                    // The face plate, wrapping a little round the sides, and
+                    // a crest along the crown.
+                    .loft(0f, -0.105f, f(0.1f, 0.115f, 0.175f, 0.19f), f(0.07f, 0.092f, 0.09f, 0.072f),
+                            f(0.015f, 0.026f, 0.026f, 0.015f), f(0.006f, 0f, 0f, 0.006f))
+                    .loft(0f, 0f, f(0.25f, 0.305f), f(0.014f, 0.01f), f(0.1f, 0.06f), f(-0.005f, 0.01f))
+                    .done();
+            armSuit = Meshes.builder()
+                    .loft(0f, 0f, f(0.02f, -0.05f, -0.2f, -0.29f), f(0.055f, 0.062f, 0.05f, 0.04f),
+                            f(0.055f, 0.065f, 0.052f, 0.042f))
+                    .done();
+            armShell = Meshes.builder()
+                    // The elbow guard.
+                    .loft(0f, 0f, f(-0.27f, -0.295f, -0.33f), f(0.045f, 0.052f, 0.04f), f(0.045f, 0.055f, 0.045f))
+                    .done();
+            foreSuit = Meshes.builder()
+                    .loft(0f, 0f, f(0f, -0.08f, -0.27f), f(0.042f, 0.046f, 0.032f), f(0.044f, 0.05f, 0.034f))
+                    .done();
+            foreShell = Meshes.builder()
+                    // The bracer and the fist.
+                    .loft(0f, 0f, f(-0.05f, -0.08f, -0.2f, -0.23f), f(0.044f, 0.052f, 0.045f, 0.036f),
+                            f(0.048f, 0.056f, 0.048f, 0.038f))
+                    .loft(0f, -0.005f, f(-0.255f, -0.28f, -0.33f, -0.36f), f(0.028f, 0.034f, 0.034f, 0.026f),
+                            f(0.032f, 0.045f, 0.046f, 0.034f))
+                    .done();
+            foreGlow = Meshes.builder()
+                    .loft(0f, 0f, f(-0.12f, -0.14f), f(0.053f, 0.052f), f(0.058f, 0.057f))
+                    .done();
+            thighSuit = Meshes.builder()
+                    .loft(0f, 0f, f(0.04f, -0.08f, -0.3f, -0.45f, -0.52f), f(0.08f, 0.09f, 0.075f, 0.058f, 0.05f),
+                            f(0.085f, 0.098f, 0.085f, 0.062f, 0.055f), f(0f, -0.006f, -0.004f, 0f, 0f))
+                    .done();
+            thighShell = Meshes.builder()
+                    // The knee guard.
+                    .loft(0f, -0.045f, f(-0.43f, -0.46f, -0.53f, -0.56f), f(0.045f, 0.06f, 0.058f, 0.04f),
+                            f(0.02f, 0.032f, 0.032f, 0.018f))
+                    .done();
+            thighGlow = Meshes.builder()
+                    .loft(0f, 0f, f(-0.06f, -0.34f), f(0.014f, 0.012f), f(0.008f, 0.008f), f(-0.1f, -0.088f))
+                    .done();
+            shinSuit = Meshes.builder()
+                    .loft(0f, 0f, f(0f, -0.13f, -0.3f, -0.42f, -0.48f), f(0.052f, 0.06f, 0.048f, 0.036f, 0.034f),
+                            f(0.056f, 0.07f, 0.055f, 0.04f, 0.038f), f(0f, 0.01f, 0.006f, 0f, 0f))
+                    .done();
+            shinShell = Meshes.builder()
+                    // The shin guard down the front.
+                    .loft(0f, 0f, f(-0.05f, -0.09f, -0.33f, -0.38f), f(0.035f, 0.048f, 0.04f, 0.03f),
+                            f(0.012f, 0.018f, 0.016f, 0.01f), f(-0.058f, -0.066f, -0.05f, -0.042f))
+                    .done();
+            // A trainer from the ankle forwards: a low toe, a raised heel
+            // collar, and a sole that runs a little proud of the upper.
+            shoe = Meshes.builder()
+                    .loft(0f, 0f, f(-0.075f, -0.035f, 0.005f, 0.045f), f(0.056f, 0.058f, 0.05f, 0.04f),
+                            f(0.15f, 0.148f, 0.105f, 0.055f), f(-0.065f, -0.065f, -0.035f, 0f))
+                    .done();
+            sole = Meshes.builder()
+                    .loft(0f, 0f, f(-0.1f, -0.075f), f(0.062f, 0.062f), f(0.16f, 0.16f), f(-0.066f, -0.066f))
+                    .done();
+        }
+
+        private static float[] f(float... v) {
+            return v;
         }
     }
 
-    private final Model pelvis;
-    private final Model torso;
-    private final Model chest;
-    private final Model band;
-    private final Model head;
-    private final Model visor;
-    private final Model pack;
-    private final Model strip;
-    private final Model[] thigh = new Model[2];
-    private final Model[] shin = new Model[2];
-    private final Model[] shoe = new Model[2];
-    private final Model[] sole = new Model[2];
-    private final Model[] arm = new Model[2];
-    private final Model[] fore = new Model[2];
-    private final Model[] hand = new Model[2];
-    private final Model[] legStripe = new Model[2];
-    private final Model[] armStripe = new Model[2];
+    private final Model[] torso = new Model[3];
+    private final Model[] head = new Model[3];
+    private final Model[][] arm = new Model[2][2];
+    private final Model[][] fore = new Model[2][3];
+    private final Model[][] thigh = new Model[2][3];
+    private final Model[][] shin = new Model[2][2];
+    private final Model[][] foot = new Model[2][2];
     private final Model shadow;
     private final Model[] all;
     private final float[] pose = new float[JOINTS];
     private final float[] want = new float[JOINTS];
     private final float[] end = new float[2];
+    private int count;
     private float phase;
 
     Rig(Kit k, Outfit o) {
-        // A matte suit, so the light does not pool into highlights that make
-        // every rounded part read as a balloon; the gloss is kept for the
-        // helmet alone.
-        Material suit = new Material(Material.Type.PHONG).setColor(o.suit).setShininess(8f);
-        Material shell = new Material(Material.Type.PHONG).setColor(o.shell).setShininess(20f);
-        Material helmet = new Material(Material.Type.PHONG).setColor(o.shell).setShininess(120f);
-        Material kicks = new Material(Material.Type.PHONG).setColor(Outfit.mix(o.shell, 0xffffffff, 0.78f))
-                .setShininess(70f);
+        // A matte suit and satin armour, flat shaded, so each panel takes
+        // the light as one tone; the gloss is kept for the helmet.
+        Material suit = new Material(Material.Type.PHONG).setColor(o.suit).setShininess(10f);
+        Material shell = new Material(Material.Type.PHONG).setColor(o.shell).setShininess(40f);
+        Material helmet = new Material(Material.Type.PHONG).setColor(Outfit.mix(o.shell, o.suit, 0.3f))
+                .setShininess(90f);
+        Material kicks = new Material(Material.Type.PHONG).setColor(Outfit.mix(o.shell, 0xffffffff, 0.8f))
+                .setShininess(50f);
         Material glow = new Material(Material.Type.UNLIT).setColor(o.trim);
-        pelvis = part(k.pelvis, shell, 1f, 1f, 1f);
-        torso = part(k.torso, suit, 1f, 1f, 0.8f);
-        chest = part(k.chest, suit, 1f, 1f, 1f);
-        band = part(k.band, glow, 1f, 1f, 0.8f);
-        head = part(k.ball, helmet, HEAD * 2f, HEAD * 2f * 1.08f, HEAD * 2f * 1.12f);
-        visor = part(k.visor, glow, 1f, 1f, 1f);
-        pack = part(k.pack, shell, 1f, 1f, 1f);
-        strip = part(k.strip, glow, 1f, 1f, 1f);
+        torso[0] = new Model(k.torsoSuit, suit);
+        torso[1] = new Model(k.torsoShell, shell);
+        torso[2] = new Model(k.torsoGlow, glow);
+        head[0] = new Model(k.headShell, helmet);
+        head[1] = new Model(k.headSuit, suit);
+        head[2] = new Model(k.headGlow, glow);
         for (int s = 0; s < 2; s++) {
-            thigh[s] = part(k.thigh, suit, 1f, 1f, 1f);
-            shin[s] = part(k.shin, suit, 1f, 1f, 1f);
-            shoe[s] = part(k.shoe, kicks, 1f, 1f, 1f);
-            sole[s] = part(k.sole, glow, 1f, 1f, 1f);
-            arm[s] = part(k.arm, suit, 1f, 1f, 1f);
-            fore[s] = part(k.fore, shell, 1f, 1f, 1f);
-            hand[s] = part(k.ball, shell, 0.1f, 0.11f, 0.1f);
-            legStripe[s] = part(k.stripe, glow, 1f, 1f, 1f);
-            armStripe[s] = part(k.stripe, glow, 1f, 0.8f, 1f);
+            arm[s][0] = new Model(k.armSuit, suit);
+            arm[s][1] = new Model(k.armShell, shell);
+            fore[s][0] = new Model(k.foreSuit, suit);
+            fore[s][1] = new Model(k.foreShell, shell);
+            fore[s][2] = new Model(k.foreGlow, glow);
+            thigh[s][0] = new Model(k.thighSuit, suit);
+            thigh[s][1] = new Model(k.thighShell, shell);
+            thigh[s][2] = new Model(k.thighGlow, glow);
+            shin[s][0] = new Model(k.shinSuit, suit);
+            shin[s][1] = new Model(k.shinShell, shell);
+            foot[s][0] = new Model(k.shoe, kicks);
+            foot[s][1] = new Model(k.sole, glow);
         }
         shadow = new Model(k.quad, k.shadow);
         shadow.setRotation(-90f, 0f, 0f);
-        all = new Model[] {shadow, pelvis, torso, chest, band, pack, strip, head, visor, thigh[0], thigh[1],
-            shin[0], shin[1], shoe[0], shoe[1], sole[0], sole[1], arm[0], arm[1], fore[0], fore[1],
-            hand[0], hand[1], legStripe[0], legStripe[1], armStripe[0], armStripe[1]};
+        all = new Model[1 + 6 + 2 * 12];
+        all[count++] = shadow;
+        add(torso);
+        add(head);
+        for (int s = 0; s < 2; s++) {
+            add(arm[s]);
+            add(fore[s]);
+            add(thigh[s]);
+            add(shin[s]);
+            add(foot[s]);
+        }
         running(0f);
         System.arraycopy(want, 0, pose, 0, JOINTS);
     }
 
-    private static Model part(Mesh mesh, Material mat, float sx, float sy, float sz) {
-        Model m = new Model(mesh, mat);
-        m.setScale(sx, sy, sz);
-        return m;
+    private void add(Model[] parts) {
+        for (int i = 0; i < parts.length; i++) {
+            all[count++] = parts[i];
+        }
     }
 
     void addTo(GameView view) {
@@ -165,6 +280,7 @@ final class Rig {
             all[i].setVisible(v);
         }
     }
+
 
     /// Poses the body standing at `x, y, z` (feet on the ground plane at
     /// `y`), facing down the track, for one frame of `dt` seconds.
@@ -248,70 +364,52 @@ final class Rig {
 
     // The body is solved in the runner's side plane -- height and distance
     // forward -- and turned into world space at the end: forward is -z.
+    // Every part hangs from its joint, so placing one is a position and a
+    // pitch.
     private void place(float x, float y, float z) {
         float hipY = y + pose[HIP];
         float lean = pose[LEAN];
         float sinL = sin(lean);
         float cosL = cos(lean);
-        put(pelvis, x, hipY, z, -lean);
-        // Torso: from the hip, up and leaning forward.
-        float midY = hipY + cosL * TORSO / 2f;
-        float midF = sinL * TORSO / 2f;
-        put(torso, x, midY - cosL * 0.06f, z - (midF - sinL * 0.06f), -lean);
-        // The chest, broader than the waist under it.
-        float chestUp = TORSO * 0.72f;
-        put(chest, x, hipY + cosL * chestUp, z - sinL * chestUp, -lean);
-        put(band, x, hipY + cosL * TORSO * 0.3f, z - sinL * TORSO * 0.3f, -lean);
-        // The pack sits on the back, square to the torso.
-        float back = 0.15f;
-        midY = hipY + cosL * chestUp;
-        midF = sinL * chestUp;
-        put(pack, x, midY + sinL * back, z - (midF - cosL * back), -lean);
-        float glowBack = back + 0.045f;
-        put(strip, x, midY + sinL * glowBack, z - (midF - cosL * glowBack), -lean);
-        float topY = hipY + cosL * TORSO;
-        float topF = sinL * TORSO;
-        float headY = topY + cosL * (HEAD - 0.02f);
-        float headF = topF + sinL * (HEAD - 0.02f);
-        put(head, x, headY, z - headF, -lean);
-        put(visor, x, headY + cosL * 0.02f, z - (headF + sinL * 0.02f), -lean);
-        float shY = topY - cosL * 0.06f;
-        float shF = topF - sinL * 0.06f;
+        put(torso, x, hipY, z, -lean);
+        // The head rides on the neck and lifts against the lean, so the
+        // face plate looks down the track.
+        float neck = TORSO + 0.05f;
+        put(head, x, hipY + cosL * neck, z - sinL * neck, -lean * 0.45f);
+        float sh = TORSO - 0.065f;
+        float shY = hipY + cosL * sh;
+        float shF = sinL * sh;
         for (int s = 0; s < 2; s++) {
             float side = s == 0 ? -1f : 1f;
-            float lx = x + side * 0.1f;
+            float lx = x + side * 0.095f;
             float ta = pose[s == 0 ? THIGH_L : THIGH_R];
-            limb(thigh[s], lx, hipY, z, 0f, ta, THIGH);
-            // The stripe down the outside of the thigh.
-            put(legStripe[s], lx + side * 0.07f, (hipY + end[0]) / 2f, z - end[1] / 2f, ta);
+            put(thigh[s], lx, hipY, z, ta);
+            reach(hipY, 0f, ta, THIGH);
+            float sa = pose[s == 0 ? SHIN_L : SHIN_R];
             float kneeY = end[0];
             float kneeF = end[1];
-            limb(shin[s], lx, kneeY, z, kneeF, pose[s == 0 ? SHIN_L : SHIN_R], SHIN);
-            float sa = pose[s == 0 ? SHIN_L : SHIN_R];
-            put(shoe[s], lx, end[0] - 0.02f, z - (end[1] + 0.06f), sa * 0.3f);
-            put(sole[s], lx, end[0] - 0.07f, z - (end[1] + 0.06f), sa * 0.3f);
-            float ax = x + side * 0.25f;
+            put(shin[s], lx, kneeY, z - kneeF, sa);
+            reach(kneeY, kneeF, sa, SHIN);
+            put(foot[s], lx, end[0], z - end[1], sa * 0.3f);
+            float ax = x + side * 0.235f;
             float aa = pose[s == 0 ? ARM_L : ARM_R] + lean * 0.3f;
-            limb(arm[s], ax, shY, z, shF, aa, UPPER_ARM);
-            put(armStripe[s], ax + side * 0.048f, (shY + end[0]) / 2f, z - (shF + end[1]) / 2f, aa);
-            limb(fore[s], ax, end[0], z, end[1], pose[s == 0 ? FORE_L : FORE_R] + lean * 0.3f, FOREARM);
-            hand[s].setPosition(ax, end[0], z - end[1]);
+            put(arm[s], ax, shY, z - shF, aa);
+            reach(shY, shF, aa, UPPER_ARM);
+            put(fore[s], ax, end[0], z - end[1], pose[s == 0 ? FORE_L : FORE_R] + lean * 0.3f);
         }
     }
 
-    /// A limb hanging from `(y, f)` at angle `a`; places its capsule and
-    /// leaves where it ends in `end`.
-    private void limb(Model m, float x, float y, float z, float f, float a, float len) {
-        float c = cos(a);
-        float s = sin(a);
-        put(m, x, y - c * len / 2f, z - (f + s * len / 2f), a);
-        end[0] = y - c * len;
-        end[1] = f + s * len;
+    /// Where a limb hanging from `(y, f)` at angle `a` ends, left in `end`.
+    private void reach(float y, float f, float a, float len) {
+        end[0] = y - cos(a) * len;
+        end[1] = f + sin(a) * len;
     }
 
-    private static void put(Model m, float x, float y, float z, float rotX) {
-        m.setPosition(x, y, z);
-        m.setRotation(rotX, 0f, 0f);
+    private static void put(Model[] parts, float x, float y, float z, float rotX) {
+        for (int i = 0; i < parts.length; i++) {
+            parts[i].setPosition(x, y, z);
+            parts[i].setRotation(rotX, 0f, 0f);
+        }
     }
 
     private static float sin(float deg) {

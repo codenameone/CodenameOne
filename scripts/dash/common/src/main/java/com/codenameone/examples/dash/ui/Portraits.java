@@ -73,32 +73,37 @@ public final class Portraits {
             g.fillRoundRect(w * 2 / 100, y, len, Math.max(2, h / 70), h / 70, h / 70);
         }
         g.setAlpha(255);
-        int back = shade(o.suit, 0.62f);
-        // Far limbs first, in shadow.
-        bone(g, back, w, h, 38, 52, 30, 70, 7);
-        bone(g, back, w, h, 30, 70, 14, 79, 6);
-        bone(g, shade(o.trim, 0.7f), w, h, 10, 78, 18, 83, 5);
-        bone(g, back, w, h, 46, 29, 34, 41, 5);
-        bone(g, shade(o.shell, 0.7f), w, h, 34, 41, 25, 49, 4);
-        // The torso, its glowing band, and the helmet.
-        bone(g, o.suit, w, h, 39, 51, 47, 28, 14);
-        bone(g, o.trim, w, h, 40, 44, 45, 33, 3);
-        bone(g, o.shell, w, h, 37, 53, 41, 51, 9);
-        g.setColor(o.shell);
-        int hr = h * 9 / 100;
-        g.fillArc(w * 51 / 100 - hr, h * 15 / 100 - hr, hr * 2, hr * 2, 0, 360);
-        g.setColor(o.trim);
-        g.fillRoundRect(w * 51 / 100, h * 13 / 100, hr + hr / 3, hr * 2 / 3, hr / 2, hr / 2);
-        g.setColor(0xffffff);
-        g.setAlpha(90);
-        g.fillArc(w * 51 / 100 - hr * 2 / 3, h * 15 / 100 - hr * 4 / 5, hr, hr * 2 / 3, 30, 120);
-        g.setAlpha(255);
+        // The same faceted android the run draws: tapered segments whose
+        // two halves are lit and shaded like flat panels, armour at the
+        // joints, a chest wider than the waist and a helmet with a face
+        // plate. Far limbs first, in shadow.
+        float dim = 0.6f;
+        leg(g, o, w, h, dim, 40, 53, 29, 67, 15, 76);
+        arm(g, o, w, h, dim, 45, 31, 36, 41, 28, 49);
+        // The torso: hips, a narrow waist, the rib cage, shoulders, neck.
+        panel(g, o.suit, w, h, new float[] {35, 57, 46, 56, 46.5f, 46, 54, 37, 52, 29, 51.5f, 21, 47, 21,
+            41, 29, 38.5f, 37, 37, 46}, 0.78f);
+        // The pack on the back with its light, the chest plate and its
+        // light, the hip guard and its belt line, the shoulder cap.
+        panel(g, o.shell, w, h, new float[] {35.5f, 31, 40.5f, 30, 40, 44, 35, 43}, 0.7f);
+        panel(g, o.trim, w, h, new float[] {35.5f, 33, 36.5f, 33, 36, 41, 35, 41}, 1f);
+        panel(g, o.shell, w, h, new float[] {48, 32, 53.5f, 34.5f, 52, 41, 47, 40}, 0.7f);
+        panel(g, o.trim, w, h, new float[] {51, 34.5f, 52, 35, 50.5f, 40.5f, 49.5f, 40.5f}, 1f);
+        panel(g, o.trim, w, h, new float[] {37.5f, 43.5f, 47, 42.5f, 47, 44, 37.5f, 45}, 1f);
+        panel(g, o.shell, w, h, new float[] {34.5f, 51, 46.5f, 50, 47, 57, 35, 58}, 0.7f);
+        panel(g, o.trim, w, h, new float[] {34.5f, 52, 46.5f, 51, 46.5f, 52.3f, 34.5f, 53.3f}, 1f);
+        // The helmet: an octagon, wider at the temples than the jaw, a
+        // face plate wrapping round the front and a crest over the crown.
+        int helmet = blend(o.shell, o.suit, 0.3f);
+        panel(g, helmet, w, h, new float[] {47, 21, 46, 15, 47.5f, 9, 52, 6.5f, 57, 8, 59.5f, 13,
+            58.5f, 19, 53, 22.5f}, 0.72f);
+        panel(g, shade(o.shell, 0.8f), w, h, new float[] {48.5f, 12, 51.5f, 11.5f, 52, 17, 49, 17.5f}, 1f);
+        panel(g, o.trim, w, h, new float[] {54.5f, 10.5f, 60, 11.5f, 60, 16, 55, 16.5f}, 1f);
+        panel(g, o.trim, w, h, new float[] {48.5f, 7.5f, 52, 5.8f, 56.5f, 7, 52, 7.3f}, 1f);
+        panel(g, shade(o.shell, 1f), w, h, new float[] {41, 27.5f, 46, 26.5f, 47, 32, 42, 33}, 0.7f);
         // Near limbs.
-        bone(g, o.suit, w, h, 39, 52, 56, 67, 8);
-        bone(g, o.suit, w, h, 56, 67, 52, 87, 7);
-        bone(g, o.trim, w, h, 52, 88, 64, 89, 5);
-        bone(g, o.suit, w, h, 47, 30, 58, 39, 5);
-        bone(g, o.shell, w, h, 58, 39, 68, 30, 4);
+        leg(g, o, w, h, 1f, 41, 54, 56, 66, 52, 85);
+        arm(g, o, w, h, 1f, 46, 31, 57, 41, 66, 32);
         CACHE.put(key, img);
         return img;
     }
@@ -118,18 +123,15 @@ public final class Portraits {
         g.setColor(o.trim);
         g.fillArc(0, 0, size - 1, size - 1, 0, 360);
         g.fillRadialGradient(0x2a2f55, 0x0d1022, 2, 2, size - 5, size - 5);
-        int r = size * 30 / 100;
-        int cx = size / 2;
-        int cy = size * 54 / 100;
-        g.setColor(o.suit);
-        g.fillArc(cx - r * 3 / 2, size * 78 / 100, r * 3, r * 2, 0, 180);
-        g.setColor(o.shell);
-        g.fillArc(cx - r, cy - r, r * 2, r * 2, 0, 360);
-        g.setColor(o.trim);
-        g.fillRoundRect(cx - r * 4 / 5, cy - r / 4, r * 8 / 5, r * 3 / 5, r / 2, r / 2);
-        g.setColor(0xffffff);
-        g.setAlpha(110);
-        g.fillArc(cx - r * 2 / 3, cy - r * 9 / 10, r, r * 3 / 5, 30, 120);
+        // Shoulders and neck, then the faceted helmet front on: a jaw
+        // narrower than the temples, the face plate across it, a crest.
+        panel(g, o.suit, size, size, new float[] {14, 100, 22, 84, 40, 78, 60, 78, 78, 84, 86, 100}, 0.75f);
+        panel(g, o.shell, size, size, new float[] {16, 92, 24, 82, 38, 80, 34, 92}, 0.7f);
+        panel(g, o.shell, size, size, new float[] {84, 92, 76, 82, 62, 80, 66, 92}, 0.7f);
+        panel(g, blend(o.shell, o.suit, 0.3f), size, size, new float[] {38, 80, 26, 66, 24, 44, 33, 26, 50, 20,
+            67, 26, 76, 44, 74, 66, 62, 80}, 0.72f);
+        panel(g, o.trim, size, size, new float[] {27, 46, 50, 42, 73, 46, 72, 58, 50, 62, 28, 58}, 1f);
+        panel(g, o.trim, size, size, new float[] {47, 21, 53, 21, 52, 34, 48, 34}, 1f);
         g.setAlpha(255);
         CACHE.put(key, img);
         return img;
@@ -179,29 +181,104 @@ public final class Portraits {
         return img;
     }
 
-    /// A limb or the torso: a rounded bar from one point to another, both
-    /// in percent of the image, `t` percent of its height thick.
-    private static void bone(Graphics g, int color, int w, int h, int x1, int y1, int x2, int y2, int t) {
+    /// A leg from the hip through the knee to the ankle: a tapered thigh
+    /// with its stripe, a knee guard, a shin, and a trainer with a sole.
+    private static void leg(Graphics g, Outfit o, int w, int h, float dim, float hx, float hy, float kx,
+            float ky, float ax, float ay) {
+        int suit = shade(o.suit, dim);
+        seg(g, suit, w, h, hx, hy, kx, ky, 9f, 6f);
+        seg(g, shade(o.trim, dim), w, h, hx + (kx - hx) * 0.15f, hy + (ky - hy) * 0.15f - 1.5f,
+                hx + (kx - hx) * 0.7f, hy + (ky - hy) * 0.7f - 1.5f, 1.2f, 1f);
+        seg(g, suit, w, h, kx, ky, ax, ay, 6f, 3.8f);
+        seg(g, shade(o.shell, dim), w, h, kx + (ax - kx) * 0.15f, ky + (ay - ky) * 0.15f,
+                kx + (ax - kx) * 0.7f, ky + (ay - ky) * 0.7f, 3.4f, 2.4f);
+        seg(g, shade(o.shell, dim), w, h, kx - (ax - kx) * 0.08f, ky - (ay - ky) * 0.08f,
+                kx + (ax - kx) * 0.08f, ky + (ay - ky) * 0.08f, 7f, 7f);
+        int kicks = shade(blend(o.shell, 0xffffff, 0.8f), dim);
+        panel(g, kicks, w, h, new float[] {ax - 3, ay - 2.5f, ax + 1.5f, ay - 3, ax + 10, ay + 0.5f,
+            ax + 11, ay + 3, ax - 3.5f, ay + 3}, 0.8f);
+        panel(g, shade(o.trim, dim), w, h, new float[] {ax - 3.5f, ay + 3, ax + 11.5f, ay + 3,
+            ax + 11, ay + 4.6f, ax - 3.5f, ay + 4.6f}, 1f);
+    }
+
+    /// An arm from the shoulder through the elbow to the fist: a tapered
+    /// upper arm, an elbow guard, an armoured bracer with a light band.
+    private static void arm(Graphics g, Outfit o, int w, int h, float dim, float sx, float sy, float ex,
+            float ey, float fx, float fy) {
+        int shell = shade(o.shell, dim);
+        seg(g, shade(o.suit, dim), w, h, sx, sy, ex, ey, 5.5f, 4.2f);
+        seg(g, shell, w, h, ex, ey, fx, fy, 4.6f, 3.4f);
+        seg(g, shade(o.trim, dim), w, h, ex + (fx - ex) * 0.4f, ey + (fy - ey) * 0.4f,
+                ex + (fx - ex) * 0.5f, ey + (fy - ey) * 0.5f, 4.9f, 4.7f);
+        seg(g, shell, w, h, ex - (fx - ex) * 0.1f, ey - (fy - ey) * 0.1f, ex + (fx - ex) * 0.1f,
+                ey + (fy - ey) * 0.1f, 5.2f, 5.2f);
+        seg(g, shell, w, h, fx - (fx - ex) * 0.05f, fy - (fy - ey) * 0.05f, fx + (fx - ex) * 0.3f,
+                fy + (fy - ey) * 0.3f, 4.4f, 3.6f);
+    }
+
+    /// A tapered segment from one point to another, `t1` and `t2` percent
+    /// of the image height thick at either end, with flat ends.
+    private static void seg(Graphics g, int color, int w, int h, float x1, float y1, float x2, float y2, float t1,
+            float t2) {
         float ax = w * x1 / 100f;
         float ay = h * y1 / 100f;
         float bx = w * x2 / 100f;
         float by = h * y2 / 100f;
-        float r = h * t / 200f;
         float dx = bx - ax;
         float dy = by - ay;
         float len = (float) Math.sqrt(dx * dx + dy * dy);
         if (len < 0.5f) {
             len = 0.5f;
         }
-        float nx = -dy / len * r;
-        float ny = dx / len * r;
-        int[] xs = {Math.round(ax + nx), Math.round(bx + nx), Math.round(bx - nx), Math.round(ax - nx)};
-        int[] ys = {Math.round(ay + ny), Math.round(by + ny), Math.round(by - ny), Math.round(ay - ny)};
+        // Half the thickness per unit of t, in percent of each axis.
+        float nx = -dy / len * h / (2f * w);
+        float ny = dx / len / 2f;
+        float[] p = {x1 + nx * t1, y1 + ny * t1, x2 + nx * t2, y2 + ny * t2, x2 - nx * t2, y2 - ny * t2,
+            x1 - nx * t1, y1 - ny * t1};
+        panel(g, color, w, h, p, 0.72f);
+    }
+
+    /// A flat-shaded panel: the polygon `pts` (x, y pairs in percent of the
+    /// image) in `color`, with every edge that faces away from a light at
+    /// the top right darkened to `k` from the centre out, so a shape reads
+    /// as cut facets the way the run's flat-shaded meshes do.
+    private static void panel(Graphics g, int color, int w, int h, float[] pts, float k) {
+        int n = pts.length / 2;
+        int[] xs = new int[n];
+        int[] ys = new int[n];
+        float cx = 0;
+        float cy = 0;
+        for (int i = 0; i < n; i++) {
+            xs[i] = Math.round(w * pts[i * 2] / 100f);
+            ys[i] = Math.round(h * pts[i * 2 + 1] / 100f);
+            cx += xs[i];
+            cy += ys[i];
+        }
+        cx /= n;
+        cy /= n;
         g.setColor(color);
-        g.fillPolygon(xs, ys, 4);
-        int d = Math.max(1, Math.round(r * 2));
-        g.fillArc(Math.round(ax - r), Math.round(ay - r), d, d, 0, 360);
-        g.fillArc(Math.round(bx - r), Math.round(by - r), d, d, 0, 360);
+        g.fillPolygon(xs, ys, n);
+        if (k >= 1f) {
+            return;
+        }
+        g.setColor(shade(color, k));
+        for (int i = 0; i < n; i++) {
+            int j = (i + 1) % n;
+            float mx = (xs[i] + xs[j]) / 2f - cx;
+            float my = (ys[i] + ys[j]) / 2f - cy;
+            // Away from the light: the edge's middle lies left of or below
+            // the centre.
+            if (mx * 0.6f - my * 0.8f < 0f) {
+                g.fillTriangle(Math.round(cx), Math.round(cy), xs[i], ys[i], xs[j], ys[j]);
+            }
+        }
+    }
+
+    private static int blend(int a, int b, float k) {
+        int r = (int) (((a >> 16) & 0xff) * (1 - k) + ((b >> 16) & 0xff) * k);
+        int gr = (int) (((a >> 8) & 0xff) * (1 - k) + ((b >> 8) & 0xff) * k);
+        int bl = (int) ((a & 0xff) * (1 - k) + (b & 0xff) * k);
+        return (r << 16) | (gr << 8) | bl;
     }
 
     private static int shade(int argb, float k) {
