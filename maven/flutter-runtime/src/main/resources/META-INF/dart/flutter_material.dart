@@ -2366,6 +2366,7 @@ abstract class Icons {
   external static IconData get check;
   external static IconData get check_circle;
   external static IconData get check_circle_outline;
+  external static IconData get chevron_left;
   external static IconData get chevron_right;
   external static IconData get close;
   external static IconData get code;
@@ -2694,9 +2695,11 @@ class SingleChildScrollView extends Widget {
 
 @JavaName('com.codename1.flutter.widgets.Image')
 class Image extends Widget {
-  external Image({Key? key, ImageProvider? image, double? width, double? height, BoxFit? fit, bool? excludeFromSemantics, Object? frameBuilder});
-  external static Image asset(String name, {Key? key, double? width, double? height, BoxFit? fit, String? package, bool? excludeFromSemantics, bool? gaplessPlayback, int? cacheWidth, int? cacheHeight, Color? color, Object? colorBlendMode, Object? alignment, Object? semanticLabel});
-  external static Image network(String src, {Key? key, double? width, double? height, BoxFit? fit});
+  external Image({Key? key, ImageProvider? image, double? width, double? height, BoxFit? fit, bool? excludeFromSemantics, Widget Function(BuildContext context, Widget child, int? frame, bool wasSynchronouslyLoaded)? frameBuilder, Widget Function(BuildContext context, Widget child, ImageChunkEvent? loadingProgress)? loadingBuilder, Widget Function(BuildContext context, Object error, Object? stackTrace)? errorBuilder});
+  external static Image file(Object file, {Key? key, double? scale, double? width, double? height, BoxFit? fit, Widget Function(BuildContext context, Widget child, int? frame, bool wasSynchronouslyLoaded)? frameBuilder, Widget Function(BuildContext context, Object error, Object? stackTrace)? errorBuilder});
+  external static Image memory(Uint8List bytes, {Key? key, double? scale, double? width, double? height, BoxFit? fit, Widget Function(BuildContext context, Widget child, int? frame, bool wasSynchronouslyLoaded)? frameBuilder, Widget Function(BuildContext context, Object error, Object? stackTrace)? errorBuilder});
+  external static Image asset(String name, {Key? key, double? width, double? height, BoxFit? fit, String? package, bool? excludeFromSemantics, bool? gaplessPlayback, int? cacheWidth, int? cacheHeight, Color? color, Object? colorBlendMode, Object? alignment, Object? semanticLabel, Widget Function(BuildContext context, Widget child, int? frame, bool wasSynchronouslyLoaded)? frameBuilder, Widget Function(BuildContext context, Object error, Object? stackTrace)? errorBuilder});
+  external static Image network(String src, {Key? key, double? width, double? height, BoxFit? fit, Widget Function(BuildContext context, Widget child, int? frame, bool wasSynchronouslyLoaded)? frameBuilder, Widget Function(BuildContext context, Widget child, ImageChunkEvent? loadingProgress)? loadingBuilder, Widget Function(BuildContext context, Object error, Object? stackTrace)? errorBuilder});
 }
 
 @JavaName('com.codename1.flutter.widgets.Stack')
@@ -2791,7 +2794,7 @@ class IconButton extends Widget {
 
 @JavaName('com.codename1.flutter.widgets.GestureDetector')
 class GestureDetector extends Widget {
-  external GestureDetector({Key? key, VoidCallback? onTap, VoidCallback? onLongPress, Widget? child});
+  external GestureDetector({Key? key, VoidCallback? onTap, VoidCallback? onLongPress, VoidCallback? onDoubleTap, void Function(ScaleStartDetails details)? onScaleStart, void Function(ScaleUpdateDetails details)? onScaleUpdate, void Function(ScaleEndDetails details)? onScaleEnd, Widget? child});
 }
 
 @JavaName('com.codename1.flutter.material.InkWell')

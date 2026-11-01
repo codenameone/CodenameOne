@@ -34,8 +34,27 @@ public abstract class SystemChrome {
     private SystemChrome() {
     }
 
+    private static SystemUiOverlayStyle current;
+
+    /// Records the style, and hands the status bar's icon brightness to the port as
+    /// the Display property "statusBarStyle" ("light" or "dark" icons). Codename One
+    /// has no portable status bar API, so a port that reads no such property simply
+    /// keeps its own bar; the style is still answered by currentStyle().
     public static void setSystemUIOverlayStyle(SystemUiOverlayStyle style) {
-        // no-op
+        current = style;
+        if (style == null) {
+            return;
+        }
+        Object icons = style.statusBarIconBrightness();
+        if (icons instanceof com.codename1.flutter.Brightness && com.codename1.ui.Display.isInitialized()) {
+            com.codename1.ui.Display.getInstance().setProperty("statusBarStyle",
+                    icons == com.codename1.flutter.Brightness.light ? "light" : "dark");
+        }
+    }
+
+    /// The style most recently set, or null.
+    public static SystemUiOverlayStyle currentStyle() {
+        return current;
     }
 
     public static void setPreferredOrientations(List<?> orientations) {

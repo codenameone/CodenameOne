@@ -362,7 +362,9 @@ public class TextFieldRenderElement extends RenderElement {
         applying = true;
         try {
             TextField w = textField();
-            tf.setConstraint(w.isObscureText() ? TextArea.PASSWORD : TextArea.ANY);
+            tf.setConstraint(w.isObscureText() ? TextArea.PASSWORD
+                    : w.getKeyboardType() instanceof com.codename1.flutter.services.TextInputType
+                    ? ((com.codename1.flutter.services.TextInputType) w.getKeyboardType()).constraint() : TextArea.ANY);
             // maxLength is a limit, not only a counter: Flutter stops the edit.
             // Zero is a real limit (no characters at all); only null and Flutter's
             // negative noMaxLength mean "unlimited".

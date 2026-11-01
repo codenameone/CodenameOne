@@ -34,6 +34,8 @@ class CupertinoDynamicColor extends Color {
 @JavaName('com.codename1.flutter.cupertino.CupertinoColors')
 abstract class CupertinoColors {
   external static CupertinoDynamicColor get systemBackground;
+  external static CupertinoDynamicColor get separator;
+  external static CupertinoDynamicColor get opaqueSeparator;
   external static CupertinoDynamicColor get label;
   external static CupertinoDynamicColor get inactiveGray;
   external static CupertinoDynamicColor get systemBlue;

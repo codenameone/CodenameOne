@@ -212,6 +212,15 @@ public class Matrix4 {
         scale(x, y, 1.0);
     }
 
+    /// vector_math's scaleByDouble(sx, sy, sz, sw): scales the columns, the
+    /// fourth by sw, as scale(x, y, z) does the first three.
+    public void scaleByDouble(double sx, double sy, double sz, double sw) {
+        scale(sx, sy, sz);
+        for (int i = 0; i < 4; i++) {
+            m[12 + i] *= sw;
+        }
+    }
+
     public void scale(double x, double y, double z) {
         for (int i = 0; i < 4; i++) {
             m[i] *= x;

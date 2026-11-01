@@ -578,6 +578,14 @@ abstract class SystemUiOverlayStyle {
       Brightness? systemNavigationBarIconBrightness, bool? systemNavigationBarContrastEnforced,
       Color? statusBarColor, Brightness? statusBarBrightness, Brightness? statusBarIconBrightness,
       bool? systemStatusBarContrastEnforced});
+  external Color? get systemNavigationBarColor;
+  external Color? get systemNavigationBarDividerColor;
+  external Brightness? get systemNavigationBarIconBrightness;
+  external bool? get systemNavigationBarContrastEnforced;
+  external Color? get statusBarColor;
+  external Brightness? get statusBarBrightness;
+  external Brightness? get statusBarIconBrightness;
+  external bool? get systemStatusBarContrastEnforced;
 }
 
 @JavaName('com.codename1.flutter.services.SystemChrome')

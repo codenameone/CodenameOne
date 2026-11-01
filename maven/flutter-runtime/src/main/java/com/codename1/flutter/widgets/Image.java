@@ -123,6 +123,16 @@ public class Image extends Widget {
                     double scale = ((com.codename1.flutter.NetworkImage) inner).getScale();
                     this.memoryScale = scale > 0 ? scale : 1;
                 }
+            } else if (inner instanceof com.codename1.flutter.FileImage) {
+                com.codename1.flutter.FileImage f = (com.codename1.flutter.FileImage) inner;
+                this.memoryBytes = f.readBytes();
+                this.memoryKey = key;
+                this.memoryScale = f.getScale() > 0 ? f.getScale() : 1;
+                if (this.memoryBytes == null) {
+                    // An unreadable file: an empty buffer fails to decode, which is
+                    // what reaches the errorBuilder.
+                    this.memoryBytes = new byte[0];
+                }
             } else if (inner instanceof com.codename1.flutter.MemoryImage) {
                 // The bytes are already here, so there is nothing to resolve: the
                 // render element decodes them directly. This branch used to report
@@ -161,6 +171,96 @@ public class Image extends Widget {
 
     public void frameBuilder(Funcs.Func4<BuildContext, Widget, Long, Boolean, Widget> v) {
         this.frameBuilder = v;
+    }
+
+    /// Image(errorBuilder:): what to show instead of a picture that failed to load.
+    Funcs.Func3<BuildContext, Object, Object, Widget> errorBuilder;
+    /// Image(loadingBuilder:): wraps the picture while its bytes are arriving.
+    Funcs.Func3<BuildContext, Widget, ImageChunkEvent, Widget> loadingBuilder;
+    /// Set by ImageBuildersElement just before it hands this same widget on as its
+    /// child, so that one createElement answers the plain render element.
+    boolean innerPass;
+    /// The builders' element listening for this picture's load outcome.
+    ImageBuildersElement listener;
+
+    public void errorBuilder(Funcs.Func3<BuildContext, Object, Object, Widget> v) {
+        this.errorBuilder = v;
+    }
+
+    public void loadingBuilder(Funcs.Func3<BuildContext, Widget, ImageChunkEvent, Widget> v) {
+        this.loadingBuilder = v;
+    }
+
+    Funcs.Func4<BuildContext, Widget, Long, Boolean, Widget> getFrameBuilder() {
+        return frameBuilder;
+    }
+
+    /// Image.asset with its builders, as Dart passes them after semanticLabel.
+    public static Image asset(String name, Key key, Double width, Double height, BoxFit fit,
+                              String packageName, Boolean excludeFromSemantics,
+                              Boolean gaplessPlayback, Long cacheWidth, Long cacheHeight,
+                              com.codename1.flutter.Color color, Object colorBlendMode,
+                              Object alignment, String semanticLabel, Funcs.Func4<BuildContext, Widget, Long, Boolean, Widget> frameBuilder, Funcs.Func3<BuildContext, Object, Object, Widget> errorBuilder) {
+        Image i = asset(name, key, width, height, fit, packageName, excludeFromSemantics, gaplessPlayback,
+                cacheWidth, cacheHeight, color, colorBlendMode, alignment, semanticLabel);
+        return i.builders(frameBuilder, null, errorBuilder);
+    }
+
+    /// Image.network with its builders.
+    public static Image network(String src, Key key, Double width, Double height, BoxFit fit,
+                                Funcs.Func4<BuildContext, Widget, Long, Boolean, Widget> frameBuilder, Funcs.Func3<BuildContext, Widget, ImageChunkEvent, Widget> loadingBuilder, Funcs.Func3<BuildContext, Object, Object, Widget> errorBuilder) {
+        return network(src, key, width, height, fit).builders(frameBuilder, loadingBuilder, errorBuilder);
+    }
+
+    /// Image.file with its builders.
+    public static Image file(Object file, Key key, Double scale, Double width, Double height, BoxFit fit,
+                             Funcs.Func4<BuildContext, Widget, Long, Boolean, Widget> frameBuilder, Funcs.Func3<BuildContext, Object, Object, Widget> errorBuilder) {
+        return file(file, key, scale, width, height, fit).builders(frameBuilder, null, errorBuilder);
+    }
+
+    /// Image.memory with its builders.
+    public static Image memory(dart.typed_data.Uint8List bytes, Key key, Double scale, Double width,
+                               Double height, BoxFit fit, Funcs.Func4<BuildContext, Widget, Long, Boolean, Widget> frameBuilder, Funcs.Func3<BuildContext, Object, Object, Widget> errorBuilder) {
+        return memory(bytes, key, scale, width, height, fit).builders(frameBuilder, null, errorBuilder);
+    }
+
+    private Image builders(Funcs.Func4<BuildContext, Widget, Long, Boolean, Widget> f, Funcs.Func3<BuildContext, Widget, ImageChunkEvent, Widget> l, Funcs.Func3<BuildContext, Object, Object, Widget> e) {
+        this.frameBuilder = f;
+        this.loadingBuilder = l;
+        this.errorBuilder = e;
+        return this;
+    }
+
+    /// Dart's Image.file(File) in canonical positional form: the bytes are read
+    /// through FileSystemStorage and drawn as a memory image.
+    public static Image file(Object file, Key key, Double scale, Double width, Double height, BoxFit fit) {
+        Image i = new Image();
+        i.key(key);
+        com.codename1.flutter.FileImage p = new com.codename1.flutter.FileImage(file);
+        if (scale != null) {
+            p.scale(scale.doubleValue());
+        }
+        i.image(p);
+        i.width = width;
+        i.height = height;
+        i.fit = fit;
+        return i;
+    }
+
+    /// Dart's Image.memory(Uint8List) in canonical positional form.
+    public static Image memory(dart.typed_data.Uint8List bytes, Key key, Double scale, Double width,
+            Double height, BoxFit fit) {
+        Image i = new Image();
+        i.key(key);
+        com.codename1.flutter.MemoryImage p = new com.codename1.flutter.MemoryImage(bytes);
+        if (scale != null) {
+            p.scale(scale.doubleValue());
+        }
+        i.image(p);
+        i.width = width;
+        i.height = height;
+        i.fit = fit;
+        return i;
     }
 
     /**
@@ -311,6 +411,10 @@ public class Image extends Widget {
 
     @Override
     public Element createElement() {
+        if (!innerPass && (frameBuilder != null || errorBuilder != null || loadingBuilder != null)) {
+            return new ImageBuildersElement(this);
+        }
+        innerPass = false;
         return new ImageRenderElement(this);
     }
 }

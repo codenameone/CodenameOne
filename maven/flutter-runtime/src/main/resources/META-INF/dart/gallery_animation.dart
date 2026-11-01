@@ -252,7 +252,7 @@ class AnimatedPadding extends Widget {
 
 @JavaName('com.codename1.flutter.animation.AnimatedSize')
 class AnimatedSize extends Widget {
-  external AnimatedSize({Key? key, Duration duration, Curve? curve, Alignment? alignment, Widget? child});
+  external AnimatedSize({Key? key, required Duration duration, Duration? reverseDuration, Curve? curve, Object? alignment, Clip? clipBehavior, VoidCallback? onEnd, Widget? child});
 }
 
 @JavaName('com.codename1.flutter.animation.AnimatedSwitcher')

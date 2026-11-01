@@ -54,8 +54,41 @@ public class AnimatedSwitcher extends StatefulWidget {
     public void reverseDuration(Duration v) { this.reverseDuration = v; }
     public void switchInCurve(Curve v) { this.switchInCurve = v; }
     public void switchOutCurve(Curve v) { this.switchOutCurve = v; }
-    public void transitionBuilder(Object v) { }
-    public void layoutBuilder(Object v) { }
+    private dart.runtime.Funcs.Func2<Widget, Animation<Double>, Widget> transitionBuilder;
+    private dart.runtime.Funcs.Func2<Widget, java.util.List<Widget>, Widget> layoutBuilder;
+    public void transitionBuilder(dart.runtime.Funcs.Func2<Widget, Animation<Double>, Widget> v) { this.transitionBuilder = v; }
+    public void layoutBuilder(dart.runtime.Funcs.Func2<Widget, java.util.List<Widget>, Widget> v) { this.layoutBuilder = v; }
+
+    /// The child wrapped in its transition at animation value t: the given
+    /// transitionBuilder, or Flutter's default, a fade.
+    private Widget transition(Widget c, double t) {
+        double v = Math.max(0, Math.min(1, t));
+        if (transitionBuilder != null) {
+            return transitionBuilder.call(c, new AlwaysStoppedAnimation<Double>(Double.valueOf(v)));
+        }
+        Opacity o = new Opacity();
+        o.opacity(v);
+        o.child(c);
+        return o;
+    }
+
+    /// Lays the incoming child over the outgoing ones: the given layoutBuilder,
+    /// or Flutter's default, a centred Stack with the current child on top.
+    private Widget layout(Widget current, java.util.List<Widget> previous) {
+        if (layoutBuilder != null) {
+            dart.core.DartList<Widget> l = new dart.core.DartList<Widget>();
+            l.addAll(previous);
+            return layoutBuilder.call(current, l);
+        }
+        java.util.List<Widget> all = new java.util.ArrayList<Widget>(previous);
+        if (current != null) {
+            all.add(current);
+        }
+        Stack s = new Stack();
+        s.alignment(Alignment.center);
+        s.children(Kit.list(all.toArray(new Widget[0])));
+        return s;
+    }
 
     @Override
     public State<? extends StatefulWidget> createState() {
@@ -92,21 +125,12 @@ public class AnimatedSwitcher extends StatefulWidget {
             double t = fade.value() - (switches - 1);
             if (switches == 0 || previous == null || t >= 1 || !fade.isAnimating()) {
                 previous = null;
-                return current == null ? new Stack() : current;
+                Widget settled = current == null ? null : w.transition(current, 1);
+                return w.layout(settled, new java.util.ArrayList<Widget>());
             }
-            Opacity out = new Opacity();
-            out.opacity(Math.max(0, Math.min(1, 1 - t)));
-            out.child(previous);
-            if (current == null) {
-                return out;
-            }
-            Opacity in = new Opacity();
-            in.opacity(Math.max(0, Math.min(1, t)));
-            in.child(current);
-            Stack s = new Stack();
-            s.alignment(Alignment.center);
-            s.children(Kit.list(out, in));
-            return s;
+            java.util.List<Widget> prev = new java.util.ArrayList<Widget>();
+            prev.add(w.transition(previous, 1 - t));
+            return w.layout(current == null ? null : w.transition(current, t), prev);
         }
 
         @Override

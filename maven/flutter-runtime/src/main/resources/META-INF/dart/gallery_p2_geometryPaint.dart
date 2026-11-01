@@ -190,6 +190,8 @@ class Path {
   external void reset();
   external bool contains(Offset point);
   external Path shift(Offset offset);
+  external Path transform(Float64List matrix4);
+  external Rect getBounds();
 }
 
 @JavaName('com.codename1.flutter.RRect')

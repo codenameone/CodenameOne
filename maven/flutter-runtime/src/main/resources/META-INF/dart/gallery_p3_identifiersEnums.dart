@@ -42,9 +42,23 @@ enum TextInputAction {
 }
 
 @JavaName('com.codename1.flutter.services.TextInputType')
-enum TextInputType {
-  text, multiline, number, phone, datetime, emailAddress, url,
-  visiblePassword, name, streetAddress, none
+// A class with static values, not an enum: numberWithOptions makes values of its own.
+class TextInputType {
+  external static TextInputType get text;
+  external static TextInputType get multiline;
+  external static TextInputType get number;
+  external static TextInputType get phone;
+  external static TextInputType get datetime;
+  external static TextInputType get emailAddress;
+  external static TextInputType get url;
+  external static TextInputType get visiblePassword;
+  external static TextInputType get name;
+  external static TextInputType get streetAddress;
+  external static TextInputType get none;
+  external static TextInputType numberWithOptions({bool? signed, bool? decimal});
+  external int get index;
+  external bool? get signed;
+  external bool? get decimal;
 }
 
 @JavaName('com.codename1.flutter.services.TextCapitalization')

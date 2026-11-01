@@ -281,6 +281,7 @@ class Matrix4 {
   external Matrix4 clone();
   external void translate(double x, [double y, double z]);
   external void scale(double x, [double? y, double? z]);
+  external void scaleByDouble(double sx, double sy, double sz, double sw);
   external void setEntry(int row, int col, double value);
   external void setRotationZ(double radians);
 }

@@ -753,9 +753,10 @@ class ExactAssetImage extends ImageProvider {
 // Recognizes single taps, wired to link spans in the about page — Flutter's
 // `TapGestureRecognizer`.
 @JavaName('com.codename1.flutter.gestures.TapGestureRecognizer')
-class TapGestureRecognizer {
+class TapGestureRecognizer extends GestureRecognizer {
   external TapGestureRecognizer({Object? debugOwner});
   external set onTap(VoidCallback? handler);
+  external VoidCallback? get onTap;
   external void dispose();
 }
 
