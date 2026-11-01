@@ -242,9 +242,10 @@ public class Stream<T> {
             return target.listen(onData, onError, onDone, cancelOnError);
         }
         Sub sub = new Sub();
-        sub.onData = onData;
-        sub.onError = onError;
-        sub.onDone = onDone;
+        // Listener callbacks run in the zone listen() was called in.
+        sub.onData = (Funcs.VoidFunc1<T>) Zone.bindAny(onData);
+        sub.onError = Zone.bindAny(onError);
+        sub.onDone = (Funcs.VoidFunc0) Zone.bindAny(onDone);
         sub.cancelOnError = cancelOnError != null && cancelOnError.booleanValue();
         if (closed) {
             // The stream already finished (emitDone() already ran, from
@@ -635,6 +636,12 @@ public class Stream<T> {
      * that would be exactly the failure this method exists to prevent.</p>
      */
     static void reportUncaught(Throwable t) {
+        if (Zone.current != Zone.root) {
+            // A listener runs in its own zone, whose handler (runZonedGuarded's
+            // onError, a ZoneSpecification's handleUncaughtError) gets it.
+            Zone.current.handleUncaughtError(dart.runtime.DartRuntime.caught(t), Zone.stackOf(t));
+            return;
+        }
         try {
             com.codename1.io.Log.e(t);
         } catch (Throwable loggingFailed) {

@@ -23,11 +23,60 @@
  */
 package dart.async;
 
-/// dart:async's ZoneSpecification. Code names it as the type of runZoned's
-/// zoneSpecification argument; the handlers it would carry (print, error, timer
-/// interception) are not modelled, so a zone forked with one behaves like its parent
-/// apart from its zoneValues.
+/// dart:async's ZoneSpecification: the handlers a forked zone overrides. Each is a
+/// Dart function value (a Funcs lambda) taking (self, parent delegate, zone, ...), or
+/// null to defer to the parent zone. Modelled: handleUncaughtError, print, run and
+/// registerCallback; the timer and microtask interceptors are not.
 public final class ZoneSpecification {
+    Object handleUncaughtError;
+    Object print;
+    Object run;
+    Object registerCallback;
+
     public ZoneSpecification() {
+        this(null, null, null, null);
+    }
+
+    public ZoneSpecification(Object handleUncaughtError, Object print, Object run, Object registerCallback) {
+        this.handleUncaughtError = handleUncaughtError;
+        this.print = print;
+        this.run = run;
+        this.registerCallback = registerCallback;
+    }
+
+    // The transpiler builds an external class's named constructor arguments as a
+    // no-argument construction followed by one call per argument named after it.
+    public ZoneSpecification handleUncaughtError(Object handler) {
+        this.handleUncaughtError = handler;
+        return this;
+    }
+
+    public ZoneSpecification print(Object handler) {
+        this.print = handler;
+        return this;
+    }
+
+    public ZoneSpecification run(Object handler) {
+        this.run = handler;
+        return this;
+    }
+
+    public ZoneSpecification registerCallback(Object handler) {
+        this.registerCallback = handler;
+        return this;
+    }
+
+    /// {@code ZoneSpecification.from(other, handleUncaughtError: ...)}: other with the
+    /// given handlers replacing its own.
+    public static ZoneSpecification from(ZoneSpecification other, Object handleUncaughtError, Object print,
+            Object run, Object registerCallback) {
+        if (other == null) {
+            return new ZoneSpecification(handleUncaughtError, print, run, registerCallback);
+        }
+        return new ZoneSpecification(
+                handleUncaughtError != null ? handleUncaughtError : other.handleUncaughtError,
+                print != null ? print : other.print,
+                run != null ? run : other.run,
+                registerCallback != null ? registerCallback : other.registerCallback);
     }
 }

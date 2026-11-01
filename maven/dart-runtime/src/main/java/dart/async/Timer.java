@@ -48,7 +48,7 @@ public final class Timer {
         // the headless thread die in Thread.sleep -- a timer that stayed active
         // and never called back.
         long ms = duration == null ? 0 : Math.max(0L, duration.inMilliseconds());
-        final Runnable r = new Runnable() {
+        final Runnable r = Zone.captureGuarded(new Runnable() {
             @Override
             public void run() {
                 if (cancelled) {
@@ -61,7 +61,7 @@ public final class Timer {
                     cb.call();
                 }
             }
-        };
+        });
         if (com.codename1.ui.Display.isInitialized()) {
             handle = Timers.schedule(ms, r);
         } else {

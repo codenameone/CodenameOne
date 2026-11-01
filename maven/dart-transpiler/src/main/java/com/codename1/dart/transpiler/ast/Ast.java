@@ -563,6 +563,9 @@ public final class Ast {
         public String name;
         // `Cell<int>` in the constructor tear-off `Cell<int>.new`; null otherwise
         public List<TypeRef> typeArgs;
+        // A class reference the emitter built itself (a static tear-off's call) and had
+        // already resolved -- through an import prefix the synthetic name no longer carries.
+        public ClassDecl pinnedClass;
     }
 
     public static class ThisExpr extends Expr {

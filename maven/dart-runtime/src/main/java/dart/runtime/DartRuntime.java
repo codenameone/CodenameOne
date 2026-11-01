@@ -1083,6 +1083,18 @@ public final class DartRuntime {
      */
     public static void print(Object v) {
         String s = str(v);
+        dart.async.Zone z = dart.async.Zone.current;
+        if (z != dart.async.Zone.root) {
+            // A zone may override print (ZoneSpecification.print); the root's own
+            // implementation, which every chain ends in, is printRaw.
+            z.print(s);
+            return;
+        }
+        printRaw(s);
+    }
+
+    /// The root zone's print: the pluggable sink, else standard output.
+    public static void printRaw(String s) {
         Funcs.VoidFunc1<String> sink = printSink;
         if (sink != null) {
             sink.call(s);

@@ -414,7 +414,10 @@ public final class Program {
             for (Ast.Directive d : fromLibrary.importDirectives) {
                 // Honour show/hide: `import 'a.dart' hide Foo; import 'b.dart' show Foo;`
                 // is b's Foo even though a.dart comes first.
-                Ast.Library target = d.admits(name) ? resolveImportedLibrary(fromLibrary, d.uri) : null;
+                // A prefixed import provides only `prefix.Name`, never the bare name: a
+                // library wrapping `io.WebSocket` in its own WebSocket means its own.
+                Ast.Library target = d.admits(name) && d.prefix == null
+                        ? resolveImportedLibrary(fromLibrary, d.uri) : null;
                 if (target != null) {
                     for (Ast.ClassDecl c : byName) {
                         if (provides(target, name, c.ownerLibrary)) {

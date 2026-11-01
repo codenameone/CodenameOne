@@ -51,6 +51,11 @@ public class Future<T> {
     private T value;
     private Throwable error;
     private List<Runnable> listeners;
+    /// The zone this future was created in: an error nothing listens for is its
+    /// uncaught error, as Dart reports it.
+    private final Zone zone = Zone.current;
+    /// Set once anything listened to, awaited or read this future's outcome.
+    private boolean errorHandled;
 
     /// Set once cn1Drive() has run, so a program subclass is driven at most once.
     private boolean driven;
@@ -124,6 +129,7 @@ public class Future<T> {
     /** The error of a future that has already failed, else null (Java side only). */
     public Throwable completedError() {
         synchronized (lock) {
+            errorHandled = true;
             return done ? error : null;
         }
     }
@@ -183,7 +189,7 @@ public class Future<T> {
         // without completing and an await on the result hung forever; Timer
         // rejects it the same way on the Display path.
         long ms = duration == null ? 0 : Math.max(0L, duration.inMilliseconds());
-        final Runnable complete = new Runnable() {
+        final Runnable complete = Zone.capture(new Runnable() {
             @Override
             public void run() {
                 try {
@@ -192,7 +198,7 @@ public class Future<T> {
                     f.completeError(t);
                 }
             }
-        };
+        });
         if (com.codename1.ui.Display.isInitialized()) {
             Timers.schedule(ms, complete);
         } else {
@@ -741,10 +747,14 @@ public class Future<T> {
      * this model rather than patching it.</p>
      */
     void onComplete(Runnable r) {
+        // A listener runs in the zone it was registered in, not the one that
+        // happens to complete the future.
+        r = Zone.capture(r);
         driveOnce();
         boolean immediate;
         synchronized (lock) {
             immediate = done;
+            errorHandled = true;
             if (!done) {
                 if (listeners == null) {
                     listeners = new ArrayList<Runnable>();
@@ -852,6 +862,37 @@ public class Future<T> {
             lock.notifyAll();
         }
         runAll(toRun);
+        if (toRun == null && zone != Zone.root) {
+            reportIfUnhandled();
+        }
+    }
+
+    /// Dart hands an error no one has listened for by the next turn of the event loop to
+    /// the future's zone. Only a zone with its own handler is told: the root zone's
+    /// report would be a log line for every future this runtime's blocking await
+    /// model reads without listening.
+    private void reportIfUnhandled() {
+        final Zone z = zone;
+        new Timer(null, new Funcs.VoidFunc0() {
+            @Override
+            public void call() {
+                Throwable e;
+                synchronized (lock) {
+                    if (errorHandled) {
+                        return;
+                    }
+                    errorHandled = true;
+                    e = error;
+                }
+                z.handleUncaughtError(DartRuntime.caught(e), Zone.stackOf(e));
+            }
+        });
+    }
+
+    void markHandled() {
+        synchronized (lock) {
+            errorHandled = true;
+        }
     }
 
     private void runAll(List<Runnable> rs) {

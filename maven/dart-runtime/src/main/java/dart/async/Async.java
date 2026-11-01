@@ -23,6 +23,7 @@
  */
 package dart.async;
 
+import dart.runtime.DartRuntime;
 import dart.runtime.Funcs;
 
 /// dart:async's top-level functions: unawaited, scheduleMicrotask, runZoned.
@@ -54,5 +55,37 @@ public final class Async {
 
     public static <R> R runZoned(Funcs.Func0<R> body, Object zoneValues, Object zoneSpecification) {
         return Zone.current.fork(zoneSpecification, zoneValues).run(body);
+    }
+
+    /// {@code runZonedGuarded(body, onError)}: body in a child zone whose uncaught
+    /// errors -- thrown synchronously, from a timer, a listener, or an unhandled
+    /// future -- go to onError(error, stackTrace). Answers null when body throws.
+    public static <R> R runZonedGuarded(Funcs.Func0<R> body, Funcs.VoidFunc2<Object, dart.core.StackTrace> onError) {
+        return runZonedGuarded(body, onError, null, null);
+    }
+
+    public static <R> R runZonedGuarded(Funcs.Func0<R> body, Funcs.VoidFunc2<Object, dart.core.StackTrace> onError, Object zoneValues) {
+        return runZonedGuarded(body, onError, zoneValues, null);
+    }
+
+    public static <R> R runZonedGuarded(Funcs.Func0<R> body, final Funcs.VoidFunc2<Object, dart.core.StackTrace> onError, Object zoneValues,
+            Object zoneSpecification) {
+        Funcs.VoidFunc5<Object, Object, Object, Object, Object> handler =
+                new Funcs.VoidFunc5<Object, Object, Object, Object, Object>() {
+            @Override
+            public void call(Object self, Object parent, Object zone, Object error, Object stackTrace) {
+                onError.call(error, stackTrace instanceof dart.core.StackTrace
+                        ? (dart.core.StackTrace) stackTrace : dart.core.StackTrace.empty);
+            }
+        };
+        ZoneSpecification given = zoneSpecification instanceof ZoneSpecification
+                ? (ZoneSpecification) zoneSpecification : null;
+        Zone zone = Zone.current.fork(ZoneSpecification.from(given, handler, null, null, null), zoneValues);
+        try {
+            return zone.run(body);
+        } catch (Throwable t) {
+            zone.handleUncaughtError(DartRuntime.caught(t), Zone.stackOf(t));
+            return null;
+        }
     }
 }

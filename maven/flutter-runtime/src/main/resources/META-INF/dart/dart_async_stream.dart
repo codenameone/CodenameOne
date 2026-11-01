@@ -162,16 +162,36 @@ class Zone {
   external static Zone get root;
   external Zone? get parent;
   external dynamic operator [](Object? key);
+  external Zone fork({ZoneSpecification? specification, Map<Object?, Object?>? zoneValues});
+  external R Function() registerCallback<R>(R Function() callback);
   external R Function() bindCallback<R>(R Function() callback);
   external R Function(T) bindUnaryCallback<R, T>(R Function(T) callback);
   external R Function(T1, T2) bindBinaryCallback<R, T1, T2>(R Function(T1, T2) callback);
   external R run<R>(R Function() body);
+  external R runUnary<R, T>(R Function(T) body, T argument);
+  external void runGuarded(void Function() body);
+  external void handleUncaughtError(Object error, StackTrace stackTrace);
+  external void print(String line);
+  external bool inSameErrorZone(Zone otherZone);
 }
 
-// The type of runZoned's zoneSpecification; its handlers are not modelled.
+// What a ZoneSpecification handler calls to defer to the zones above it.
+@JavaName('dart.async.ZoneDelegate')
+class ZoneDelegate {
+  external R run<R>(Zone zone, R Function() f);
+  external R Function() registerCallback<R>(Zone zone, R Function() f);
+  external void print(Zone zone, String line);
+  external void handleUncaughtError(Zone zone, Object error, StackTrace stackTrace);
+}
+
+// A forked zone's handlers. handleUncaughtError, print, run and registerCallback
+// are modelled; the timer and microtask interceptors are not.
 @JavaName('dart.async.ZoneSpecification')
 class ZoneSpecification {
-  external ZoneSpecification();
+  external ZoneSpecification(
+      {Object? handleUncaughtError, Object? print, Object? run, Object? registerCallback});
+  external static ZoneSpecification from(ZoneSpecification other,
+      {Object? handleUncaughtError, Object? print, Object? run, Object? registerCallback});
 }
 
 // Dart's StreamView: forwards every event of the stream it wraps.
@@ -188,6 +208,10 @@ external void scheduleMicrotask(void Function() callback);
 
 @JavaName('dart.async.Async.runZoned')
 external R runZoned<R>(R Function() body, {Map<Object?, Object?>? zoneValues, Object? zoneSpecification});
+
+@JavaName('dart.async.Async.runZonedGuarded')
+external R? runZonedGuarded<R>(R Function() body, void Function(Object error, StackTrace stack) onError,
+    {Map<Object?, Object?>? zoneValues, Object? zoneSpecification});
 
 @JavaName('dart.async.StreamController')
 class StreamController<T> {

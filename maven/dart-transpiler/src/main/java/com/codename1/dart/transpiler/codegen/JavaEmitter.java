@@ -6212,22 +6212,45 @@ public final class JavaEmitter {
     /// for `get(key, {defaultValue})`. Such a value is wrapped in a SAM of the expected arity
     /// that passes the absent marker for every slot it does not have.
     private Out narrowFullArityValue(Expr e, Out o, TypeRef expected, Ctx ctx) {
-        if (o == null || e instanceof Lambda || expected == null || expected.funcParams == null
+        if (o == null || e instanceof Lambda || expected == null
                 || o.type == null || o.type.funcParams == null || o.type.funcRequired < 0) {
             return o;
         }
+        if (expected.funcParams == null) {
+            // A function typedef (`typedef OnValue = void Function(String)`, a field's
+            // type with `this.onValue = _noOp` as default) narrows the same way as the
+            // spelled-out function type it aliases.
+            expected = expandFunctionTypedef(expected);
+            if (expected == null) {
+                return o;
+            }
+        }
         int want = expected.funcParams.size();
         int have = o.type.funcParams.size();
-        if (want >= have || want < o.type.funcRequired || expected.funcNamed != null) {
+        // Equal arity is narrowed too when the SAMs differ only in their type arguments:
+        // `_noOp([a, b])` is a VoidFunc2<Object, Object>, and a `void Function(int, int)`
+        // slot wants a VoidFunc2<Long, Long>, which Java will not convert.
+        if (want > have || want < o.type.funcRequired || expected.funcNamed != null) {
             return o;
         }
         String fullSam = javaType(o.type, false, ctx);
         int lt = fullSam.indexOf('<');
         String fullRaw = lt > 0 ? fullSam.substring(0, lt) : fullSam;
         TypeRef nt = new TypeRef("Function");
-        nt.funcParams = new ArrayList<TypeRef>(o.type.funcParams.subList(0, want));
-        nt.funcReturn = o.type.funcReturn;
+        // The narrowed SAM takes the EXPECTED parameter types (VoidFunc1<Long> for a
+        // `void Function(int)` slot), not the tear-off's own: each is handed on to the
+        // full-arity SAM, whose parameters are at least as wide.
+        nt.funcParams = new ArrayList<TypeRef>(want);
+        for (int i = 0; i < want; i++) {
+            TypeRef ep = expected.funcParams.get(i);
+            nt.funcParams.add(ep != null ? ep : o.type.funcParams.get(i));
+        }
+        nt.funcReturn = expected.funcReturn != null && expected.funcReturn.is("void")
+                ? expected.funcReturn : o.type.funcReturn;
         String sam = javaType(nt, false, ctx);
+        if (want == have && sam.equals(fullSam)) {
+            return o;
+        }
         int lt2 = sam.indexOf('<');
         String raw = lt2 > 0 ? sam.substring(0, lt2) : sam;
         boolean isVoid = fullRaw.contains("VoidFunc");
@@ -8614,6 +8637,11 @@ public final class JavaEmitter {
     }
 
     private Out emitIdent(Ident id, TypeRef expected, Ctx ctx) {
+        if (id.pinnedClass != null) {
+            TypeRef ref = classRef(id.name);
+            ref.args.get(0).resolved = id.pinnedClass;
+            return new Out(id.name, ref);
+        }
         String n = id.name;
         TypeRef local = ctx.lookup(n);
         if (local != null) {
@@ -8869,7 +8897,13 @@ public final class JavaEmitter {
                 || stubs.isStubClass(n) || stubs.isStubEnum(n)
                 || n.equals("Future") || n.equals("Duration") || n.equals("Iterable")
                 || CORE_STATIC_RECEIVERS.contains(n)) {
-            return new Out(n, classRef(n));
+            TypeRef ref = classRef(n);
+            if (prefix != null && program.classes.containsKey(n)) {
+                // `base.Channel` names the class base's import provides, which may not be
+                // the one a bare `Channel` means here; static access follows this pin.
+                ref.args.get(0).resolved = program.resolveClass(n, ctx.library(), prefix);
+            }
+            return new Out(n, ref);
         }
         if (program.topLevelVars.containsKey(n)) {
             Library owner = program.resolveTopLevelVarOwner(n, ctx.library(), prefix);
@@ -9564,7 +9598,7 @@ public final class JavaEmitter {
                     && ((Ident) ((PropertyGet) posNode).target).typeArgs != null) {
                 clsArgs = ((Ident) ((PropertyGet) posNode).target).typeArgs;
             }
-            Out tear = staticTearOff(cls, clsArgs, name, posNode, ctx);
+            Out tear = staticTearOff(cls, tt.arg(0).resolved, clsArgs, name, posNode, ctx);
             if (tear != null) {
                 return tear;
             }
@@ -9629,7 +9663,7 @@ public final class JavaEmitter {
             }
             // The class this library sees by that name: a conditional export can leave two
             // same-named classes in the program (a platform stub and the real one).
-            ClassDecl pc = program.resolveClass(cls, ctx.library());
+            ClassDecl pc = tt.arg(0).resolved != null ? tt.arg(0).resolved : program.resolveClass(cls, ctx.library());
             if (pc == null) {
                 pc = program.classes.get(cls);
             }
@@ -11722,6 +11756,18 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             ctx.importClass("dart.core.DartList");
             return new Out("DartList.concat(" + l.code + ", " + r.code + ")", l.type);
         }
+        // A typed-data list on either side (`utf8.encode(a) + bytes`): Uint8List's `+`
+        // answers a plain List<int> (List<double> for the float lists), and the runtime
+        // classes extend DartLongList / DartDoubleList, so the same concat applies.
+        TypeRef lTd = typedDataListElem(l.type);
+        TypeRef rTd = typedDataListElem(r.type);
+        if (b.op.equals("+") && (lTd != null || rTd != null)
+                && (lTd != null || (l.type != null && l.type.is("List")))
+                && (rTd != null || (r.type != null && r.type.is("List")))) {
+            ctx.importClass("dart.core.DartList");
+            TypeRef elem = lTd != null ? lTd : rTd;
+            return new Out("DartList.concat(" + l.code + ", " + r.code + ")", TypeRef.of("List", elem));
+        }
         if (b.op.equals("+") && (l.type.is("String") || r.type.is("String"))) {
             // Keep string-concatenation chains flat so javac fuses them into ONE StringBuilder. A left
             // operand that is itself a `+` concatenation needs no parens (same precedence, left-assoc);
@@ -12101,6 +12147,24 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             }
         }
         return out;
+    }
+
+    /// A non-generic function typedef with only positional parameters, as the function
+    /// type it aliases; null for anything else.
+    private TypeRef expandFunctionTypedef(TypeRef t) {
+        if (t == null || t.name == null || !t.args.isEmpty()) {
+            return null;
+        }
+        Ast.TypedefDecl td = typedefDecl(t.name);
+        if (td == null || td.paramTypes == null || td.returnType == null || !td.typeParams.isEmpty()
+                || td.funcNamed != null) {
+            return null;
+        }
+        TypeRef ft = new TypeRef("Function");
+        ft.funcParams = new ArrayList<TypeRef>(td.paramTypes);
+        ft.funcReturn = td.returnType;
+        ft.funcRequired = td.funcRequired;
+        return ft;
     }
 
     /** A user typedef by name, else a stub library's function typedef. */
@@ -12514,11 +12578,17 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 continue;
             }
             for (MethodDecl m : mx.methods) {
-                if (m.isStatic || m.isAbstract || m.name.startsWith("$") || !methodWitnesses(m).isEmpty()) {
+                // `operator []` / `[]=` are forwarded too: a stub mixin before this one
+                // (ListMixin) declares them abstract, and Java will not let a later
+                // interface's default satisfy an abstract method of an unrelated one.
+                boolean indexOp = "$index".equals(m.name) || "$indexSet".equals(m.name);
+                if (m.isStatic || m.isAbstract || (m.name.startsWith("$") && !indexOp)
+                        || !methodWitnesses(m).isEmpty()) {
                     continue;
                 }
                 String key = (m.isSetter ? "set$" : m.isGetter ? "get$" : "") + m.name;
-                if (done.contains(key) || !(superChainHas(sup, m) || earlierMixinHas(c, mi, m, ctx))) {
+                if (done.contains(key) || !(superChainHas(sup, m) || earlierMixinHas(c, mi, m, ctx)
+                        || earlierStubMixinDeclares(c, mi, m))) {
                     continue;
                 }
                 done.add(key);
@@ -12596,6 +12666,11 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 if (sp < 0) {
                     continue;
                 }
+                if (code.startsWith(raw + ".", sp - raw.length() - 1)) {
+                    // the super access already names the mixin (`M.super.$index(i)`)
+                    body.append(code);
+                    continue;
+                }
                 body.append(code, 0, sp).append(raw).append('.').append(code.substring(sp));
             }
         }
@@ -12623,6 +12698,19 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 return true;
             }
             sup = sup.superclass != null ? superDeclOf(sup, sup.superclass) : null;
+        }
+        return false;
+    }
+
+    /// Whether a stub mixin (dart:collection's ListMixin) before index mi in c's `with`
+    /// list declares a member of m's kind and name -- abstract there (`length`,
+    /// `operator []`), so the later mixin's default has to be named in the class.
+    private boolean earlierStubMixinDeclares(ClassDecl c, int mi, MethodDecl m) {
+        for (int i = 0; i < mi; i++) {
+            ClassDecl o = stubs.classes.get(c.mixins.get(i).name);
+            if (o != null && declaresLike(o, m)) {
+                return true;
+            }
         }
         return false;
     }
@@ -13878,6 +13966,11 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 // comparator over erased elements still returns the SAM's Long.
                 return new Out("((Long) " + dc + ")", TypeRef.INT);
             }
+            if (n.equals("toString") && c.args.positional.isEmpty() && c.args.named.isEmpty()) {
+                // Object.toString answers a String whatever the receiver (null included),
+                // so `Uri.decodeComponent(k.toString())` on a dynamic key compiles.
+                return new Out("((String) " + dc + ")", TypeRef.STRING);
+            }
             return new Out(dc, TypeRef.DYNAMIC);
         }
         // static method on a class reference
@@ -13996,7 +14089,8 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 // The Java name, which is library-prefixed when the class shares its name
                 // with a stub (an app's own User beside firebase_auth's): the raw Dart name
                 // then named the stub, or nothing at all.
-                ClassDecl visible = program.resolveClass(cls, ctx.library());
+                ClassDecl visible = tt.arg(0).resolved != null ? tt.arg(0).resolved
+                        : program.resolveClass(cls, ctx.library());
                 if (visible != null) {
                     pc = visible;
                 }
@@ -14064,7 +14158,11 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 }
             }
             if (m != null) {
-                String callCode = target.code + "." + n + "(" + withWitnesses(methodWitnessCall(m, c,
+                // A raw receiver (`final Store store;` for `class Store<E>`) would erase the
+                // generics of the result too (`Stream<Event> watch()` reads as a raw Stream,
+                // and a listen callback's parameter as Object); rawReceiver reads it at bounds.
+                String recvCode = m.isStatic ? target.code : rawReceiver(target.code, pc, tt, m.returnType, ctx);
+                String callCode = recvCode + "." + n + "(" + withWitnesses(methodWitnessCall(m, c,
                         callExpected(c, ctx), ctx), methodArgs(collectionParamsSeenFrom(m, pc, tt, ctx),
                         c.args, ctx)) + ")";
                 TypeRef seen = m.returnType == null || m.returnType.is("var") ? TypeRef.DYNAMIC
@@ -19318,8 +19416,17 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
      * omitted keeps its default, which a forwarded null would not. Null when `name` is
      * not such a member, so the caller's resolution carries on.
      */
-    private Out staticTearOff(String cls, List<TypeRef> typeArgs, String name, Node posNode, Ctx ctx) {
-        ClassDecl pc = program.classes.get(cls);
+    /// @param pinned the class an import prefix named ({@code base.Channel.open}), or null
+    ///               to resolve cls as this library sees it.
+    private Out staticTearOff(String cls, ClassDecl pinned, List<TypeRef> typeArgs, String name, Node posNode,
+            Ctx ctx) {
+        ClassDecl pc = pinned;
+        if (pc == null) {
+            pc = program.resolveClass(cls, ctx.library());
+        }
+        if (pc == null) {
+            pc = program.classes.get(cls);
+        }
         List<Param> params = null;
         Expr body = null;
         List<String> tps = pc != null ? pc.typeParams : java.util.Collections.<String>emptyList();
@@ -19350,6 +19457,22 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                     params = md.params;
                     body = staticCallNode(cls, name);
                     tearOffReturn = md.returnType;
+                    if (pinned != null) {
+                        ((Ident) ((Call) body).target).pinnedClass = pc;
+                        // Its return type is named in ITS library: `base.Channel.open`
+                        // answers base's Channel even where a bare Channel is another.
+                        TypeRef rt = md.returnType;
+                        if (rt != null && rt.resolved == null && rt.args.isEmpty() && rt.funcParams == null
+                                && program.classes.containsKey(rt.name)) {
+                            ClassDecl owned = program.resolveClass(rt.name, pc.ownerLibrary);
+                            if (owned != null) {
+                                TypeRef pinnedRt = new TypeRef(rt.name);
+                                pinnedRt.nullable = rt.nullable;
+                                pinnedRt.resolved = owned;
+                                tearOffReturn = pinnedRt;
+                            }
+                        }
+                    }
                     tps = java.util.Collections.<String>emptyList();
                 }
             }
