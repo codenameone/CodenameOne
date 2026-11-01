@@ -3477,6 +3477,13 @@ public final class JavaEmitter {
             }
             ct = new CtorDecl();
         }
+        if (ct.isFactory) {
+            // An unnamed factory is a static method and no subclass can name it as
+            // its super constructor (Dart forbids super() to a factory), so there is
+            // no initializer to emit -- and its body returns a value, which a void
+            // $init$ cannot.
+            return "";
+        }
         StringBuilder sb = new StringBuilder();
         ctx.pushScope();
         sb.append("    void $init$(");
@@ -7300,6 +7307,18 @@ public final class JavaEmitter {
      * instead, so the guard propagates until the chain ends.
      */
     private Out emitExpr(Expr e, TypeRef expected, Ctx ctx) {
+        if (programFnSlot && expected != null && expected.funcParams != null && expected.funcReturn != null
+                && expected.funcReturn.is("dynamic") && (e instanceof Ident || e instanceof PropertyGet)
+                && isVoidMethodTearOff(e, ctx)) {
+            // `Dispatcher(onFrame: _onFrame)` with `void _onFrame(String)` into a declared
+            // `Function(String)` slot (dynamic result): the slot is a value-returning FuncN,
+            // which a void method reference cannot satisfy, so it is the closure
+            // `(a) => _onFrame(a)`, whose void body emitLambda follows with `return null`.
+            Expr l = tearOffWithOwnArity(e, ctx);
+            if (l instanceof Lambda && ((Lambda) l).params.size() == expected.funcParams.size()) {
+                return emitExpr(l, expected, ctx);
+            }
+        }
         return narrowFullArityValue(e, materializeShort(emitExprRaw(e, expected, ctx)), expected, ctx);
     }
 
@@ -9977,6 +9996,13 @@ public final class JavaEmitter {
         if (m.structured) {
             // Collection if/for/spread in a map literal: build into a DartMap with conditional/looped put().
             ctx.importClass("dart.core.DartMap");
+            if (k == null) {
+                TypeRef[] kv = structuredMapTypes(m, ctx);
+                if (kv != null) {
+                    k = kv[0];
+                    v = kv[1];
+                }
+            }
             TypeRef kt = k == null ? TypeRef.DYNAMIC : k;
             TypeRef vt = v == null ? TypeRef.DYNAMIC : v;
             String tmp = ctx.newTemp();
@@ -10041,6 +10067,51 @@ public final class JavaEmitter {
     }
 
     /** Lowers one map-literal element (entry / spread / if / for) to put()/putAll() on the builder map. */
+    /// `{...?headers, 'id': id}` with no declared or expected type: Dart infers the map's
+    /// key and value types from its entries and the spread maps' own. Answered only when
+    /// every top-level element is an entry of a plain literal key/value or a spread of a
+    /// Map and all of them agree on simple (non-generic) types; otherwise null, and the
+    /// map stays dynamic as before.
+    private TypeRef[] structuredMapTypes(MapLit m, Ctx ctx) {
+        TypeRef k = null;
+        TypeRef v = null;
+        for (Expr e : m.elements) {
+            TypeRef ek;
+            TypeRef ev;
+            if (e instanceof MapEntry) {
+                ek = literalElementType(((MapEntry) e).key, ctx);
+                if (ek == null) {
+                    ek = inferExprTypeQuiet(((MapEntry) e).key, ctx);
+                }
+                ev = literalElementType(((MapEntry) e).value, ctx);
+                if (ev == null) {
+                    ev = inferExprTypeQuiet(((MapEntry) e).value, ctx);
+                }
+            } else if (e instanceof SpreadElement) {
+                TypeRef t = inferExprTypeQuiet(((SpreadElement) e).expr, ctx);
+                if (t == null || !t.is("Map") || t.args.size() != 2) {
+                    return null;
+                }
+                ek = t.arg(0);
+                ev = t.arg(1);
+            } else {
+                return null;
+            }
+            if (ek == null || ev == null || ek.name == null || ev.name == null
+                    || !ek.args.isEmpty() || !ev.args.isEmpty() || ek.funcParams != null || ev.funcParams != null
+                    || isDynamicType(ek) || isDynamicType(ev)) {
+                return null;
+            }
+            if (k == null) {
+                k = copyNonNull(ek);
+                v = copyNonNull(ev);
+            } else if (!k.name.equals(ek.name) || !v.name.equals(ev.name)) {
+                return null;
+            }
+        }
+        return k == null ? null : new TypeRef[] {k, v};
+    }
+
     private void emitMapElementInto(String map, Expr e, TypeRef kt, TypeRef vt, Ctx ctx) {
         Ctx.Writer w = ctx.writer();
         if (e instanceof MapEntry) {
@@ -10351,7 +10422,7 @@ public final class JavaEmitter {
         Out top = resolveTopLevel(n, ctx);
         tearOffKeepAll = false;
         if (top != null) {
-            return top;
+            return retargetTearOff(top, expected, ctx);
         }
         // A type parameter used as a value (`Type get type => T`, `T == int`): its witness.
         String tw = witnessFor(n, ctx);
@@ -10399,6 +10470,44 @@ public final class JavaEmitter {
      * library function that is NOT imported (dart:math's `log` with no import) is not in
      * scope, so `log.add(..)` reaches the extended class's `log` field, as in Dart.
      */
+    /**
+     * A top-level function torn off where a function type is expected takes that type
+     * for its cast. The tear-off's own SAM is its declared signature, and Java has no
+     * variance between two instantiations of one SAM: `comparison ?? defaultCompare`
+     * with `defaultCompare(Object?, Object?)` cast to Func2&lt;Object,Object,Long&gt;
+     * cannot become the Func2&lt;E,E,Long&gt; the field holds, while the method
+     * reference itself converts to it (each E is an Object). Only parameters the
+     * function declares as Object (dynamic / Object?) or exactly as expected are
+     * accepted, and the return type must name the same Java type.
+     */
+    private Out retargetTearOff(Out top, TypeRef expected, Ctx ctx) {
+        if (expected == null || expected.funcParams == null || top.type == null
+                || top.type.funcParams == null || !top.code.startsWith("((")
+                || !top.code.endsWith(")") || top.code.indexOf("::") < 0
+                || expected.funcParams.size() != top.type.funcParams.size()
+                || expected.funcNamed != null || top.type.funcNamed != null
+                || expected.funcReturn == null || top.type.funcReturn == null) {
+            return top;
+        }
+        String want = javaType(expected, false, ctx);
+        String have = javaType(top.type, false, ctx);
+        if (want.equals(have)
+                || !javaType(expected.funcReturn, true, ctx).equals(javaType(top.type.funcReturn, true, ctx))) {
+            return top;
+        }
+        for (int i = 0; i < expected.funcParams.size(); i++) {
+            String hp = javaType(top.type.funcParams.get(i), true, ctx);
+            if (!"Object".equals(hp) && !hp.equals(javaType(expected.funcParams.get(i), true, ctx))) {
+                return top;
+            }
+        }
+        int close = top.code.indexOf(") ", 2);
+        if (close < 0 || !top.code.substring(2, close).equals(have)) {
+            return top;
+        }
+        return new Out("((" + want + ")" + top.code.substring(close + 1), expected);
+    }
+
     private boolean lexicalTopLevel(String n, Ctx ctx) {
         if (resolveTopLevel(n, ctx) == null) {
             return false;
@@ -16003,7 +16112,12 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 if (m != null && m.isStatic) {
                     return new Out(jcls + "." + n + "(" + withWitnesses(methodWitnessCall(m, c,
                             callExpected(c, ctx), ctx), methodArgs(m.params, c.args, ctx)) + ")",
-                            m.returnType == null ? TypeRef.DYNAMIC : m.returnType);
+                            // `Result.capture(f)` with `capture<T>(Future<T>)`: the method's
+                            // own T is bound from the call, or the result names a type
+                            // variable the caller does not declare and its uses see Object.
+                            m.returnType == null || m.returnType.is("var") ? TypeRef.DYNAMIC
+                                    : m.typeParams == null || m.typeParams.isEmpty() ? m.returnType
+                                    : bindMethodTypeParams(m.returnType, m, c, ctx));
                 }
                 CtorDecl named = pc.namedCtor(n);
                 if (named != null) {
@@ -17136,7 +17250,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 // both then overloads accept, which javac reports as ambiguous.
                 Expr cbExpr = tearOffAsLambda(pos.get(0), 1, ctx);
                 boolean typedCb = valueType != null && !isDynamicType(valueType)
-                        && (isFullyConcrete(valueType) || classTypeVarInScope(valueType, ctx))
+                        && nameableHere(valueType, ctx)
                         && !valueType.is("int") && !valueType.is("double") && !valueType.is("bool")
                         && !valueType.is("num") && !valueType.is("void") && !valueType.is("Null")
                         && cbExpr instanceof Lambda && ((Lambda) cbExpr).params.size() == 1
@@ -18542,6 +18656,48 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
     }
 
     private String canonicalArgs(CtorDecl ct, ClassDecl owner, Args args, Ctx ctx) {
+        // A program class's constructor declares its function-typed parameters itself, as
+        // Java FuncN types: a `Function(String)` field (no declared return, so dynamic) is a
+        // value SAM, and `onFrame: (f) => _onFrame(f)` must return null after the call.
+        // The same program-slot rule as a top-level function's arguments (programFnSlot).
+        boolean programOwner = owner != null && program.classes.get(owner.name) == owner
+                && !stubs.isStubClass(owner.name) && ct != null && hasFunctionParam(ct.params);
+        if (!programOwner) {
+            return canonicalArgs0(ct, owner, args, ctx);
+        }
+        boolean savedSlot = programFnSlot;
+        programFnSlot = true;
+        try {
+            String out = canonicalArgs0(ct, owner, args, ctx);
+            if (ct != null && ct.name == null && !ct.isFactory && ct.params.size() == 1
+                    && "null".equals(out.trim()) && needsMarker(owner)) {
+                // `Ordered<E>([cmp])` called with nothing passes one null, and a class built
+                // through the marker chain also has `Ordered($NamedCtor)`: javac cannot pick
+                // between the two. The parameter's own type names the constructor.
+                // Raw: the parameter's type names the class's own variables, which the
+                // calling code does not declare.
+                String pj = javaType(paramType(owner, ct.params.get(0), ctx), true, ctx);
+                int lt = pj.indexOf('<');
+                return "(" + (lt < 0 ? pj : pj.substring(0, lt)) + ") null";
+            }
+            return out;
+        } finally {
+            programFnSlot = savedSlot;
+        }
+    }
+
+    private static boolean hasFunctionParam(List<Param> params) {
+        if (params != null) {
+            for (Param p : params) {
+                if (p.type != null && p.type.funcParams != null) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private String canonicalArgs0(CtorDecl ct, ClassDecl owner, Args args, Ctx ctx) {
         StringBuilder sb = new StringBuilder();
         if (ct == null) {
             for (int i = 0; i < args.positional.size(); i++) {
@@ -18701,6 +18857,27 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
      * (zero to three); anything else is returned as it is. The receiver must be a name
      * or {@code this}, whose re-evaluation per call is free.
      */
+    /// Whether `e` (`m` or `recv.m`) tears off an instance method of an application
+    /// class that is declared to return void.
+    private boolean isVoidMethodTearOff(Expr e, Ctx ctx) {
+        ClassDecl cls;
+        String name;
+        if (e instanceof PropertyGet && !((PropertyGet) e).nullAware
+                && (((PropertyGet) e).target instanceof Ident || ((PropertyGet) e).target instanceof ThisExpr)) {
+            TypeRef rt = emitExpr(((PropertyGet) e).target, null, ctx).type;
+            cls = rt == null ? null : program.classes.get(rt.name);
+            name = ((PropertyGet) e).name;
+        } else if (e instanceof Ident && ctx.currentClass != null && ctx.lookup(((Ident) e).name) == null) {
+            cls = ctx.currentClass;
+            name = ((Ident) e).name;
+        } else {
+            return false;
+        }
+        MethodDecl m = cls == null ? null : findMethodInHierarchy(cls, name);
+        return m != null && !m.isStatic && !m.isGetter && !m.isSetter && m.returnType != null
+                && m.returnType.is("void");
+    }
+
     private Expr tearOffWithOwnArity(Expr e, Ctx ctx) {
         Expr recv;
         String name;
@@ -20639,7 +20816,11 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         TypeRef ret = expected != null && expected.funcReturn != null ? expected.funcReturn
                 : expected != null && expected.funcParams == null && typedefSig(expected.name) != null
                 ? funcResultType(expected) : TypeRef.DYNAMIC;
-        if (ret.is("void") && (expected == null || expected.funcParams == null)) {
+        if (ret.is("void") && (expected == null || expected.funcParams == null)
+                // `typedef Stop = void Function({Map? extra})` names a Java VoidFuncN, so a
+                // closure returned or passed as one must stay void to fit it.
+                && !(expected != null && typedefSig(expected.name) != null
+                && javaType(expected, false, ctx).contains("Funcs.VoidFunc"))) {
             ret = TypeRef.DYNAMIC;
         }
         innerFt.funcReturn = ret;
@@ -22637,6 +22818,21 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 && !target.is("void") && o.code.startsWith("Dyn.")) {
             return "(" + javaType(copyNonNull(target), false, ctx) + ") " + paren(o.code);
         }
+        // `c = v ?? c` with a dynamic `v` (an untyped closure parameter of a
+        // `void Function(dynamic)` callback): Dart types the `??` dynamic and downcasts it
+        // implicitly, while Java's conditional over Object and Court is just Object.
+        if (o.type != null && o.type.is("dynamic") && !isDynamicType(target) && isFullyConcrete(target)
+                && !target.is("void") && !target.is("Object") && !target.is("int") && !target.is("double")
+                && !target.is("num") && !target.is("bool") && !target.is("Null") && target.funcParams == null
+                && target.funcReturn == null && o.code.startsWith("(") && o.code.endsWith(")")
+                && o.code.contains(" != null ? ") && !classTypeVarInScope(target, ctx)) {
+            ctx.importClass("dart.runtime.DartRuntime");
+            String jt = javaType(copyNonNull(target), true, ctx);
+            String erased = erasedJavaType(target, ctx);
+            String as = "DartRuntime.as(" + o.code + ", " + erased + ".class, " + target.nullable + ", "
+                    + quote(target.toString()) + ")";
+            return jt.equals(erased) ? as : "((" + jt + ") " + as + ")";
+        }
         // The same implicit downcast for a call whose declared result is dynamic -- a
         // runtime stub method the Java side returns as Object (`Encoding.decode`, which
         // also serves base64) -- returned or passed where Dart's static type is precise:
@@ -22664,12 +22860,20 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         // same way), and only into a program or core class type with no type
         // arguments, so no primitive or generic slot is touched.
         if (o.type != null && (o.type.is("dynamic") || o.type.is("var") || o.type.is("Object"))
-                && o.code.matches("(this\\.)?[A-Za-z_$][A-Za-z0-9_$]*") && target.args.isEmpty()
+                && o.code.matches("(this\\.)?[A-Za-z_$][A-Za-z0-9_$]*")
+                // a generic slot only when its Java form is the plain generic class: a
+                // List<int> is a DartLongList, which a boxed DartList value is not
+                && (target.args.isEmpty() || !target.is("List") && !target.is("Map")
+                && !target.is("Iterable") && !target.is("Future") && !target.is("Stream"))
                 && target.funcParams == null && target.funcReturn == null && !isDynamicType(target)
                 && !target.is("void") && !target.is("int") && !target.is("double") && !target.is("bool")
                 && !target.is("num") && !target.is("Null") && isFullyConcrete(target)
                 && !classTypeVarInScope(target, ctx)) {
-            return "(" + javaType(copyNonNull(target), false, ctx) + ") " + o.code;
+            // A generic slot (`_courts = s` into a Set<Court>, s a dynamic callback
+            // argument) goes through Object: javac rejects Object to DartSet<Court> as an
+            // unchecked narrowing only when it is direct.
+            return "(" + javaType(copyNonNull(target), false, ctx) + ") "
+                    + (target.args.isEmpty() ? "" : "(Object) ") + o.code;
         }
         // A function value whose SAM differs from an Object-returning function slot of the
         // same arity (`Func0<Future<Object>>` into a `FutureOr Function()` slot, `Func0<Object>`):
@@ -22793,6 +22997,34 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             }
         }
         return null;
+    }
+
+    /**
+     * Whether Java can spell {@code t} at this point: a concrete type, or one whose
+     * type-variable leaves are all in scope -- the enclosing class's (in an instance
+     * member) or the enclosing generic method's own, which a static method declares too.
+     * `Result.capture(f).then((r) => ..)` in a {@code Holder<T>} gives r the type
+     * {@code Result<T>}; `f.then((v) => ..)` inside {@code capture<T>} gives v the T.
+     */
+    private boolean nameableHere(TypeRef t, Ctx ctx) {
+        if (t == null || t.funcReturn != null || t.funcParams != null) {
+            return false;
+        }
+        if (isFullyConcrete(t) || classTypeVarInScope(t, ctx)) {
+            return true;
+        }
+        if (t.args.isEmpty()) {
+            return ctx.methodTypeParams != null && ctx.methodTypeParams.contains(t.name);
+        }
+        if (!isFullyConcrete(new TypeRef(t.name))) {
+            return false;
+        }
+        for (TypeRef a : t.args) {
+            if (!nameableHere(a, ctx)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /** {@code T} of the enclosing class, which Java has in scope only in an instance member. */

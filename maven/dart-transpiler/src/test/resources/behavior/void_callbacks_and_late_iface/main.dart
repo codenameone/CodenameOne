@@ -53,7 +53,8 @@ class Handler {
     codec = PlainCodec();
     codec.escape = true;
     log.add(codec.encode('a:b'));
-    Dispatcher(onFrame: (f) { _onFrame(f); }, onDone: _onDone).feed('x');
+    Dispatcher(onFrame: (f) => _onFrame(f), onDone: _onDone).feed('x');
+    Dispatcher(onFrame: _onFrame, onDone: _onDone).feed('y');
     channel?.sink.add('skipped');
     channel = Channel();
     channel?.sink.add('kept');

@@ -1,6 +1,8 @@
 a\cb
 frame x
 done
+frame y
+done
 kept
 got v
 watchers 0
