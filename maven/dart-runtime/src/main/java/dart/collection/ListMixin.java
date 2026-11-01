@@ -106,6 +106,35 @@ public interface ListMixin<E> extends IterableMixin<E> {
         return $index(length() - 1);
     }
 
+    /**
+     * Dart's {@code reversed}: a lazy view walking the list from the end. Named like
+     * DartList's, since java.util.List (JDK 21) claims {@code reversed()} with a List result.
+     */
+    default dart.core.DartIterable<E> reversedIterable() {
+        final ListMixin<E> self = this;
+        return dart.core.DartIterable.wrap(new Iterable<E>() {
+            @Override
+            public java.util.Iterator<E> iterator() {
+                return new java.util.Iterator<E>() {
+                    private long i = self.length() - 1;
+
+                    @Override
+                    public boolean hasNext() {
+                        return i >= 0 && i < self.length();
+                    }
+
+                    @Override
+                    public E next() {
+                        if (!hasNext()) {
+                            throw new java.util.NoSuchElementException();
+                        }
+                        return self.$index(i--);
+                    }
+                };
+            }
+        });
+    }
+
     @Override
     default E elementAt(long index) {
         return $index(index);

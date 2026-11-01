@@ -271,6 +271,21 @@ public final class DartRuntime {
      * are values, not objects, in Dart, so two boxes of the same int (or of the same
      * double bits, or the same bool) are identical even when Java allocated them apart.
      */
+    /**
+     * The receiver of a library-private member read through an implicit interface:
+     * {@code other._x} where {@code other} may be an implementer from another library,
+     * which does not have that member. Dart answers NoSuchMethodError, as this does;
+     * an instance of the declaring class is returned unchanged for the caller to cast.
+     */
+    public static Object privateReceiver(Object target, Class<?> declaring, String member) {
+        if (declaring.isInstance(target)) {
+            return target;
+        }
+        throw new dart.core.NoSuchMethodError("Class '"
+                + (target == null ? "Null" : target.getClass().getSimpleName())
+                + "' has no instance getter '" + member + "'.");
+    }
+
     public static boolean identical(Object a, Object b) {
         if (a == b) {
             return true;
