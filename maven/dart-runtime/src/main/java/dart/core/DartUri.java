@@ -256,6 +256,84 @@ public final class DartUri {
         }
     }
 
+    /// Dart's {@code Uri(scheme:, userInfo:, host:, port:, path:, pathSegments:,
+    /// query:, queryParameters:, fragment:)}, a null for an omitted part. The parts
+    /// are encoded as Dart's constructor encodes them and the text is then parsed,
+    /// so the result normalizes and prints like one from {@code Uri.parse}.
+    public static DartUri of(Object scheme, Object userInfo, Object host, Object port, Object path,
+            Object pathSegments, Object query, Object queryParameters, Object fragment) {
+        StringBuilder sb = new StringBuilder();
+        String sch = scheme == null ? "" : asciiLower(String.valueOf(scheme));
+        if (sch.length() > 0) {
+            sb.append(sch).append(':');
+        }
+        boolean isFile = "file".equals(sch);
+        String ui = userInfo == null ? "" : String.valueOf(userInfo);
+        String h = host == null ? null : String.valueOf(host);
+        if (h == null && (ui.length() > 0 || port != null || isFile)) {
+            h = "";
+        }
+        boolean hasAuthority = h != null;
+        if (hasAuthority) {
+            sb.append("//");
+            if (ui.length() > 0) {
+                sb.append(CoreStatics.encodeKeeping(ui, "-_.~!$&'()*+,;=:")).append('@');
+            }
+            sb.append(h);
+            if (port != null) {
+                long pn = ((Number) port).longValue();
+                boolean dflt = ("http".equals(sch) && pn == 80) || ("https".equals(sch) && pn == 443);
+                if (!dflt) {
+                    sb.append(':').append(pn);
+                }
+            }
+        }
+        StringBuilder p = new StringBuilder();
+        if (path != null) {
+            p.append(CoreStatics.encodeKeeping(String.valueOf(path), "-_.~!$&'()*+,;=:@/%"));
+        } else if (pathSegments instanceof Iterable) {
+            boolean first = true;
+            for (Object seg : (Iterable<?>) pathSegments) {
+                if (!first) {
+                    p.append('/');
+                }
+                first = false;
+                p.append(CoreStatics.encodeKeeping(String.valueOf(seg), "-_.~!$&'()*+,;=:@"));
+            }
+        }
+        if ((isFile || hasAuthority) && p.length() > 0 && p.charAt(0) != '/') {
+            p.insert(0, '/');
+        }
+        sb.append(p);
+        if (query != null) {
+            sb.append('?').append(CoreStatics.encodeKeeping(String.valueOf(query), "-_.~!$&'()*+,;=:@/?%"));
+        } else if (queryParameters instanceof java.util.Map) {
+            sb.append('?');
+            boolean first = true;
+            for (java.util.Map.Entry<?, ?> e : ((java.util.Map<?, ?>) queryParameters).entrySet()) {
+                String k = CoreStatics.encodeQueryComponent(String.valueOf(e.getKey()));
+                Object v = e.getValue();
+                if (v instanceof Iterable) {
+                    for (Object one : (Iterable<?>) v) {
+                        sb.append(first ? "" : "&").append(k).append('=')
+                                .append(CoreStatics.encodeQueryComponent(String.valueOf(one)));
+                        first = false;
+                    }
+                } else {
+                    sb.append(first ? "" : "&").append(k);
+                    if (v != null) {
+                        sb.append('=').append(CoreStatics.encodeQueryComponent(String.valueOf(v)));
+                    }
+                    first = false;
+                }
+            }
+        }
+        if (fragment != null) {
+            sb.append('#').append(CoreStatics.encodeKeeping(String.valueOf(fragment), "-_.~!$&'()*+,;=:@/?%"));
+        }
+        return parse(sb.toString());
+    }
+
     /** Dart's {@code Uri.parse}. */
     public static DartUri parse(String uri) {
         String text = uri == null ? "" : uri;
