@@ -35,6 +35,29 @@ import dart.core.TypeError;
  */
 public final class DartRuntime {
 
+    /// The value a function VALUE is called with for an optional parameter the caller left
+    /// out. A Dart call through a function type fills no defaults -- the callee does -- and a
+    /// caller may pass `null` explicitly, which must arrive as null and not as the default.
+    /// Distinct from every Dart value; only tear-off and closure adapters ever see it.
+    private static final Object ABSENT = new Object();
+
+    /// The omitted-argument marker, typed for the slot it is passed to (never cast to it).
+    @SuppressWarnings("unchecked")
+    public static <T> T absent() {
+        return (T) ABSENT;
+    }
+
+    /// True when an adapter's raw argument is the omitted-argument marker.
+    public static boolean isAbsent(Object o) {
+        return o == ABSENT;
+    }
+
+    /// True for the marker or null: a non-nullable optional slot is passed null when omitted.
+    public static boolean isAbsentOrNull(Object o) {
+        return o == null || o == ABSENT;
+    }
+
+
     private DartRuntime() {
     }
 

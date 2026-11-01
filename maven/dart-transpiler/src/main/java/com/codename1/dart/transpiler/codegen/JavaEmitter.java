@@ -6390,6 +6390,10 @@ public final class JavaEmitter {
             // (a static method tears off through the class name, never `this`)
             MethodDecl md = cc.method(n);
             if (md != null) {
+                Out ad = methodTearOffAdapter(md, md.isStatic ? cc.name : null, n, id, ctx);
+                if (ad != null) {
+                    return ad;
+                }
                 return new Out((md.isStatic ? cc.name : "this") + "::" + n, new TypeRef("Function"));
             }
             // field/getter inherited from a program superclass. The declared field is
@@ -6573,24 +6577,14 @@ public final class JavaEmitter {
                 ft.funcReturn = fn.typeParams.isEmpty() ? fn.returnType
                         : substTypeParams(fn.returnType, fn.typeParams, java.util.Collections.<TypeRef>emptyList());
                 String sam = javaType(ft, false, ctx);
-                if (defaults) {
-                    // The SAM passes null for an omitted optional; the adapter puts the
-                    // declared default back, since a direct call fills defaults at the call site.
-                    StringBuilder lp = new StringBuilder();
-                    StringBuilder call = new StringBuilder();
-                    for (int i = 0; i < ordered.size(); i++) {
-                        Param fp = ordered.get(i);
-                        String pn = "p$" + i;
-                        lp.append(i > 0 ? ", " : "").append(pn);
-                        String a = pn;
-                        if (fp.defaultValue != null) {
-                            a = "(" + pn + " == null ? "
-                                    + emitExpr(fp.defaultValue, fp.type, ctx).code + " : " + pn + ")";
-                        }
-                        call.append(i > 0 ? ", " : "").append(a);
+                if (ft.funcRequired >= 0 && ft.funcRequired < ordered.size()) {
+                    // Optional parameters: an adapter restores defaults (see tearOffAdapter).
+                    final String lib = Program.libClassName(owner.fileName) + "." + n;
+                    Out ad = tearOffAdapter(ordered, ft.funcParams, ft.funcReturn,
+                            names -> lib + "(" + String.join(", ", names) + ")", ctx);
+                    if (ad != null) {
+                        return ad;
                     }
-                    String body = Program.libClassName(owner.fileName) + "." + n + "(" + call + ")";
-                    return new Out("((" + sam + ") (" + lp + ") -> " + body + ")", ft);
                 }
                 // A typed SAM cast makes the tear-off a standalone expression: a list
                 // element or a `??` operand gives a bare method reference no target type.
@@ -7056,6 +7050,17 @@ public final class JavaEmitter {
                 tm = findMethodInHierarchy(pc, name);
             }
             if (tm != null && !tm.isStatic) {
+                if (hasOptionalParam(tm)) {
+                    // Dart evaluates the receiver once, at the tear-off; the adapter captures it.
+                    String rt = ctx.newTemp();
+                    ctx.writer().line("final " + javaType(tt, true, ctx) + " " + rt + " = " + target.code + ";");
+                    ctx.declare(rt, tt);
+                    Out ad = methodTearOffAdapter(tm, rt, name, posNode, ctx);
+                    if (ad != null) {
+                        return ad;
+                    }
+                    return new Out(rt + "::" + name, new TypeRef("Function"));
+                }
                 return new Out(target.code + "::" + name, new TypeRef("Function"));
             }
         }
@@ -9019,7 +9024,95 @@ public final class JavaEmitter {
             }
         }
         c.funcReturn = substTypeParams(t.funcReturn, names, args);
+        c.funcRequired = t.funcRequired;
+        c.funcNamed = t.funcNamed;
         return c;
+    }
+
+    /**
+     * The parameters of a call to a generic function with its type parameters bound -- to
+     * the call's type arguments, else to what the arguments' static types imply, else
+     * dynamic -- so a list literal or a closure argument is typed against the caller's
+     * scope instead of naming the callee's type variables. {@code bound} receives the
+     * bindings (null where nothing was inferred).
+     */
+    private List<Param> bindGenericParams(List<String> tps, List<Param> params, Call c, List<TypeRef> bound, Ctx ctx) {
+        Map<String, TypeRef> m = new LinkedHashMap<String, TypeRef>();
+        for (int i = 0; i < tps.size() && i < c.typeArgs.size(); i++) {
+            m.put(tps.get(i), c.typeArgs.get(i));
+        }
+        if (m.isEmpty()) {
+            int pos = 0;
+            for (Param p : params) {
+                if (p.named) {
+                    continue;
+                }
+                if (pos >= c.args.positional.size()) {
+                    break;
+                }
+                Expr a = c.args.positional.get(pos++);
+                if (a instanceof Lambda && p.type != null && p.type.funcParams != null) {
+                    Lambda l = (Lambda) a;
+                    for (int i = 0; i < l.params.size() && i < p.type.funcParams.size(); i++) {
+                        TypeRef lt = l.params.get(i).type;
+                        if (lt != null && !lt.is("var")) {
+                            unifyTypeVars(p.type.funcParams.get(i), lt, tps, m);
+                        }
+                    }
+                } else if (a instanceof ListLit && ((ListLit) a).elementType == null) {
+                    TypeRef el = ((ListLit) a).elements.isEmpty() ? null
+                            : structuredElementTypeQuiet(((ListLit) a).elements, ctx);
+                    if (el != null) {
+                        unifyTypeVars(p.type, TypeRef.of("List", el), tps, m);
+                    }
+                } else if (!(a instanceof Lambda)) {
+                    unifyTypeVars(p.type, inferExprTypeQuiet(a, ctx), tps, m);
+                }
+            }
+        }
+        List<TypeRef> args = new ArrayList<TypeRef>();
+        for (String tp : tps) {
+            bound.add(m.get(tp));
+            args.add(m.containsKey(tp) ? m.get(tp) : TypeRef.DYNAMIC);
+        }
+        List<Param> out = new ArrayList<Param>();
+        for (Param p : params) {
+            Param q = new Param();
+            q.name = p.name;
+            q.named = p.named;
+            q.optional = p.optional;
+            q.required = p.required;
+            q.defaultValue = p.defaultValue;
+            q.isThis = p.isThis;
+            q.isSuper = p.isSuper;
+            q.type = substTypeParams(p.type, tps, args);
+            out.add(q);
+        }
+        return out;
+    }
+
+    private static void unifyTypeVars(TypeRef p, TypeRef a, List<String> tps, Map<String, TypeRef> m) {
+        if (p == null || a == null || a.is("dynamic") || a.is("Null") || a.is("var")) {
+            return;
+        }
+        if (tps.contains(p.name) && p.args.isEmpty()) {
+            if (!m.containsKey(p.name)) {
+                TypeRef b = new TypeRef(a.name);
+                b.args.addAll(a.args);
+                b.funcParams = a.funcParams;
+                b.funcReturn = a.funcReturn;
+                m.put(p.name, b);
+            }
+            return;
+        }
+        if (p.name != null && p.name.equals(a.name) && p.args.size() == a.args.size()) {
+            for (int i = 0; i < p.args.size(); i++) {
+                unifyTypeVars(p.args.get(i), a.args.get(i), tps, m);
+            }
+        } else if ((p.is("Iterable") || p.is("List")) && p.args.size() == 1
+                && (a.is("List") || a.is("Set") || a.is("Iterable")) && a.args.size() == 1) {
+            unifyTypeVars(p.args.get(0), a.args.get(0), tps, m);
+        }
     }
 
     /** Whether {@code name} is a function-type typedef (built-in or user-declared). */
@@ -9128,6 +9221,10 @@ public final class JavaEmitter {
     private boolean lastLambdaExprIsStatementShaped;
 
     private Out emitLambda(Lambda l, TypeRef expected, Ctx ctx) {
+        Out adapted = optionalParamLambda(l, expected, ctx);
+        if (adapted != null) {
+            return adapted;
+        }
         lastLambdaVoid = false;
         lastLambdaNullTail = false;
         lastLambdaExprIsStatementShaped = false;
@@ -9288,6 +9385,13 @@ public final class JavaEmitter {
                 // num arithmetic is a Number; a lambda typed to return a double or int
                 // (fold's combiner, a double-returning builder) needs that primitive.
                 o = new Out(coerce(o, lambdaReturn, ctx), lambdaReturn);
+            }
+            if (lambdaReturn != null && o.type != null && o.type.is("dynamic") && !lambdaReturn.nullable
+                    && (lambdaReturn.is("int") || lambdaReturn.is("double") || lambdaReturn.is("bool")
+                    || lambdaReturn.is("String"))) {
+                // `(a, b) => a.compareTo(b)` on erased operands answers a dynamic value where
+                // the SAM returns an int: Dart checks that at run time, and so does the cast.
+                o = new Out("((" + javaType(lambdaReturn, true, ctx) + ") (Object) " + o.code + ")", lambdaReturn);
             }
             String lifted = ctx.popWriter();
             exprType = o.type;
@@ -9451,7 +9555,7 @@ public final class JavaEmitter {
                 return new Out("Dyn.invoke(" + target.code + (a.isEmpty() ? "" : ", " + a) + ")",
                         TypeRef.DYNAMIC);
             }
-            return new Out(target.code + ".call(" + valueArgs(target.type, c.args, ctx) + ")", TypeRef.DYNAMIC);
+            return new Out(fnCall(target.code, target.type, c.args, ctx), TypeRef.DYNAMIC);
         }
         if (c.target == null) {
             return emitBareCall(c, ctx);
@@ -9618,7 +9722,7 @@ public final class JavaEmitter {
             Ident callee = new Ident();
             callee.name = n;
             String recv = emitIdent(callee, null, ctx).code;
-            return new Out(recv + ".call(" + valueArgs(local, c.args, ctx) + ")", ret);
+            return new Out(fnCall(recv, local, c.args, ctx), ret);
         }
         // inside an extension body, bare calls probe the receiver first
         if (ctx.extensionSelfType != null) {
@@ -9723,7 +9827,7 @@ public final class JavaEmitter {
             if (ff != null && isFunctionValued(ff.type)) {
                 Out fieldRead = emitMemberGet(new Out(ff.isStatic ? cc.name : "this",
                         new TypeRef(cc.name)), n, c, ctx);
-                return new Out(fieldRead.code + ".call(" + valueArgs(ff.type, c.args, ctx) + ")",
+                return new Out(fnCall(fieldRead.code, ff.type, c.args, ctx),
                         funcResultType(ff.type));
             }
         }
@@ -9746,8 +9850,20 @@ public final class JavaEmitter {
             }
             String cls = Program.libClassName(owner.fileName);
             String jn = n.equals("main") ? "main$" : n;
-            return new Out(cls + "." + jn + "(" + methodArgs(fn.params, c.args, ctx) + ")",
-                    fn.returnType == null || fn.returnType.is("var") ? TypeRef.DYNAMIC : fn.returnType);
+            TypeRef rt = fn.returnType == null || fn.returnType.is("var") ? TypeRef.DYNAMIC : fn.returnType;
+            List<Param> ps = fn.params;
+            if (!fn.typeParams.isEmpty()) {
+                List<TypeRef> bound = new ArrayList<TypeRef>();
+                ps = bindGenericParams(fn.typeParams, fn.params, c, bound, ctx);
+                boolean all = true;
+                for (TypeRef b : bound) {
+                    all &= b != null;
+                }
+                if (all) {
+                    rt = substTypeParams(rt, fn.typeParams, bound);
+                }
+            }
+            return new Out(cls + "." + jn + "(" + methodArgs(ps, c.args, ctx) + ")", rt);
         }
         // dart:core identical(a, b): unresolved before, so any use failed the build.
         if (n.equals("identical") && c.args.positional.size() == 2 && !program.functions.containsKey(n)) {
@@ -9860,8 +9976,13 @@ public final class JavaEmitter {
         if (tt != null && tt.is("dynamic")) {
             ctx.importClass("dart.runtime.Dyn");
             dynNames.add(n);
-            return new Out("Dyn.call(" + target.code + ", \"" + n + "\", " + dynArgs(c.args, ctx) + ")",
-                    TypeRef.DYNAMIC);
+            String dc = "Dyn.call(" + target.code + ", \"" + n + "\", " + dynArgs(c.args, ctx) + ")";
+            if (n.equals("compareTo") && c.args.positional.size() == 1 && c.args.named.isEmpty()) {
+                // Comparable.compareTo answers an int whatever the receiver: a sort
+                // comparator over erased elements still returns the SAM's Long.
+                return new Out("((Long) " + dc + ")", TypeRef.INT);
+            }
+            return new Out(dc, TypeRef.DYNAMIC);
         }
         // static method on a class reference
         if (isClassRef(tt)) {
@@ -10067,7 +10188,7 @@ public final class JavaEmitter {
             }
             if (ff != null && isFunctionValued(ff.type)) {
                 Out fieldRead = emitMemberGet(target, n, c, ctx);
-                return new Out(fieldRead.code + ".call(" + valueArgs(ff.type, c.args, ctx) + ")",
+                return new Out(fnCall(fieldRead.code, ff.type, c.args, ctx),
                         funcResultType(ff.type));
             }
         }
@@ -10080,7 +10201,7 @@ public final class JavaEmitter {
             if (c.nullAware && target.code.equals(ctx.nullCheckedTemp)) {
                 // Typed as the guarded form below would be: a void (or erased-void)
                 // callback stays a statement, which the caller's guard wraps.
-                String call = target.code + ".call(" + valueArgs(tt, c.args, ctx) + ")";
+                String call = fnCall(target.code, tt, c.args, ctx);
                 return new Out(call, ret.is("void") || ret.is("dynamic") ? TypeRef.VOID : ret);
             }
             if (c.nullAware) {
@@ -10089,29 +10210,27 @@ public final class JavaEmitter {
                 // Arguments run only for a non-null callback; what they lift goes
                 // inside the guard.
                 ctx.pushWriter(ctx.currentIndent() + 1);
-                String args = valueArgs(tt, c.args, ctx);
+                String callExpr = fnCall(tmp, tt, c.args, ctx);
                 String lifted = ctx.popWriter();
                 // A void (or untyped-`Function`, whose void return was erased) callback is
                 // fire-and-forget in statement position: guard with an `if` so a void SAM
                 // isn't illegally used as a ternary value.
                 if (ret.is("void") || ret.is("dynamic")) {
                     if (!lifted.isEmpty()) {
-                        return guardLifted(tmp, lifted, new Out(tmp + ".call(" + args + ")", TypeRef.VOID), ctx);
+                        return guardLifted(tmp, lifted, new Out(callExpr, TypeRef.VOID), ctx);
                     }
-                    ctx.writer().line("if (" + tmp + " != null) { " + tmp + ".call("
-                            + args + "); }");
+                    ctx.writer().line("if (" + tmp + " != null) { " + callExpr + "; }");
                     return new Out("", TypeRef.VOID);
                 }
                 if (!lifted.isEmpty()) {
-                    Out guarded = guardLifted(tmp, lifted, new Out(tmp + ".call(" + args + ")", ret), ctx);
+                    Out guarded = guardLifted(tmp, lifted, new Out(callExpr, ret), ctx);
                     if (guarded != null) {
                         return materializeShort(guarded);
                     }
                 }
-                return new Out("(" + tmp + " == null ? null : " + tmp + ".call("
-                        + args + "))", boxType(ret));
+                return new Out("(" + tmp + " == null ? null : " + callExpr + ")", boxType(ret));
             }
-            return new Out(target.code + ".call(" + valueArgs(tt, c.args, ctx) + ")", ret);
+            return new Out(fnCall(target.code, tt, c.args, ctx), ret);
         }
         // stub instance method
         String stubName = stubs.isStubClass(tt.name) ? tt.name : null;
@@ -13073,6 +13192,246 @@ public final class JavaEmitter {
         return sb.toString();
     }
 
+    private static boolean hasOptionalParam(MethodDecl md) {
+        for (Param p : md.params) {
+            if (p.optional || p.named || p.defaultValue != null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * A method tear-off with optional parameters: the adapter calls {@code recv.name(...)}
+     * (a bare call when {@code recv} is null) through the ordinary call path, so named
+     * arguments and defaults land where a direct call puts them.
+     */
+    private Out methodTearOffAdapter(MethodDecl md, final String recv, final String name, final Node pos, Ctx ctx) {
+        if (!hasOptionalParam(md) || !md.typeParams.isEmpty() || md.returnType == null) {
+            return null;
+        }
+        List<TypeRef> types = new ArrayList<TypeRef>();
+        for (Param p : md.params) {
+            types.add(paramValueType(p));
+        }
+        final List<Param> ordered = orderedParams(md.params);
+        final Ctx c = ctx;
+        return tearOffAdapter(md.params, types, md.returnType, names -> {
+            Call call = new Call().at(pos.file, pos.line, pos.col);
+            call.name = name;
+            if (recv != null) {
+                Ident t = new Ident();
+                t.name = recv;
+                t.line = pos.line;
+                t.col = pos.col;
+                call.target = t;
+            }
+            for (int i = 0; i < ordered.size(); i++) {
+                Ident ref = new Ident();
+                ref.name = names.get(i);
+                ref.line = pos.line;
+                ref.col = pos.col;
+                if (ordered.get(i).named) {
+                    NamedArg na = new NamedArg();
+                    na.name = ordered.get(i).name;
+                    na.value = ref;
+                    call.args.named.add(na);
+                } else {
+                    call.args.positional.add(ref);
+                }
+            }
+            return emitExpr(call, null, c).code;
+        }, ctx);
+    }
+
+    /**
+     * A closure declaring optional or named parameters ({@code ([x = 1]) => ...}): the
+     * same closure with every parameter required, behind a {@link #tearOffAdapter} that
+     * restores what the caller omitted. Null for a closure with none.
+     */
+    private Out optionalParamLambda(final Lambda l, TypeRef expected, final Ctx ctx) {
+        boolean opt = false;
+        for (Param p : l.params) {
+            opt |= p.optional || p.named;
+        }
+        if (!opt || l.params.size() > 5 || l.isAsync || l.isAsyncStar || l.isSyncStar) {
+            return null;
+        }
+        final List<Param> ordered = orderedParams(l.params);
+        List<TypeRef> exp = expected != null && expected.funcParams != null
+                && expected.funcParams.size() == ordered.size() ? expected.funcParams : null;
+        final Lambda inner = new Lambda();
+        inner.line = l.line;
+        inner.col = l.col;
+        inner.body = l.body;
+        inner.exprBody = l.exprBody;
+        final TypeRef innerFt = new TypeRef("Function");
+        innerFt.funcParams = new ArrayList<TypeRef>();
+        List<TypeRef> types = new ArrayList<TypeRef>();
+        for (Param p : l.params) {
+            int at = ordered.indexOf(p);
+            TypeRef pt = p.type == null || p.type.is("var") ? (exp != null ? exp.get(at) : TypeRef.DYNAMIC) : p.type;
+            types.add(pt);
+        }
+        for (Param p : ordered) {
+            Param q = new Param();
+            q.name = p.name;
+            q.type = types.get(l.params.indexOf(p));
+            inner.params.add(q);
+            innerFt.funcParams.add(q.type);
+        }
+        TypeRef ret = expected != null && expected.funcReturn != null ? expected.funcReturn : TypeRef.DYNAMIC;
+        innerFt.funcReturn = ret;
+        return tearOffAdapter(l.params, types, ret, names -> {
+            String fn = emitExpr(inner, innerFt, ctx).code;
+            return "((" + javaType(innerFt, false, ctx) + ") " + fn + ").call(" + String.join(", ", names) + ")";
+        }, ctx);
+    }
+
+    /** Parameters in SAM order: required positional, optional positional, then named. */
+    private static List<Param> orderedParams(List<Param> params) {
+        List<Param> ordered = new ArrayList<Param>();
+        for (int pass = 0; pass < 3; pass++) {
+            for (Param fp : params) {
+                int kind = fp.named ? 2 : fp.optional || fp.defaultValue != null ? 1 : 0;
+                if (kind == pass) {
+                    ordered.add(fp);
+                }
+            }
+        }
+        return ordered;
+    }
+
+    /** Whether an omitted argument for a slot of this type is passed as the absent marker. */
+    private static boolean absentSlot(TypeRef t) {
+        return t == null || t.nullable || t.is("dynamic") || t.is("var") || t.is("Object") || t.is("Null");
+    }
+
+    /**
+     * A tear-off (or closure) whose function type has optional or named parameters, as a
+     * SAM of its full arity: required, optional positional, then named. A caller through a
+     * function value fills no defaults, so it passes {@code DartRuntime.absent()} for an
+     * omitted nullable slot (null for a non-nullable one) and the adapter restores the
+     * declared default -- while an explicit null still arrives as null. The lambda takes
+     * raw Object parameters (through the raw SAM) so the marker never meets a bridge cast.
+     * {@code call} receives the Dart names of the adapted locals, in SAM order, already
+     * declared in scope, and returns the Java code of the call. Null when nothing is
+     * optional or the arity is past the Funcs shapes.
+     */
+    private Out tearOffAdapter(List<Param> params, List<TypeRef> types, TypeRef ret,
+            java.util.function.Function<List<String>, String> call, Ctx ctx) {
+        List<Param> ordered = new ArrayList<Param>();
+        List<TypeRef> otypes = new ArrayList<TypeRef>();
+        int required = 0;
+        boolean optional = false;
+        for (int pass = 0; pass < 3; pass++) {
+            for (int i = 0; i < params.size(); i++) {
+                Param fp = params.get(i);
+                int kind = fp.named ? 2 : fp.optional || fp.defaultValue != null ? 1 : 0;
+                if (kind == pass) {
+                    ordered.add(fp);
+                    otypes.add(types.get(i));
+                }
+            }
+            if (pass == 0) {
+                required = ordered.size();
+            }
+        }
+        optional = required < ordered.size();
+        if (!optional || ordered.size() > 5) {
+            return null;
+        }
+        ctx.importClass("dart.runtime.DartRuntime");
+        TypeRef ft = new TypeRef("Function");
+        ft.funcParams = new ArrayList<TypeRef>(otypes);
+        ft.funcRequired = required;
+        for (Param fp : ordered) {
+            if (fp.named) {
+                if (ft.funcNamed == null) {
+                    ft.funcNamed = new ArrayList<String>();
+                }
+                ft.funcNamed.add(fp.name);
+            }
+        }
+        ft.funcReturn = ret != null && !ret.is("var") ? ret : TypeRef.DYNAMIC;
+        String sam = javaType(ft, false, ctx);
+        int lt = sam.indexOf('<');
+        String raw = lt > 0 ? sam.substring(0, lt) : sam;
+        boolean isVoid = raw.contains("VoidFunc");
+        String tag = ctx.newTemp();
+        StringBuilder lp = new StringBuilder();
+        StringBuilder pro = new StringBuilder();
+        List<String> names = new ArrayList<String>();
+        ctx.pushScope();
+        String ind = indentStr(ctx.currentIndent() + 1);
+        for (int i = 0; i < ordered.size(); i++) {
+            Param fp = ordered.get(i);
+            TypeRef pt = otypes.get(i) != null ? otypes.get(i) : TypeRef.DYNAMIC;
+            String rn = tag + "$r" + i;
+            lp.append(i > 0 ? ", " : "").append(rn);
+            String dn = tag + "$p" + i;
+            String jn = ctx.declareShadowSafe(dn, pt);
+            names.add(dn);
+            String jt = javaType(pt, true, ctx);
+            String cast = jt.equals("Object") ? rn : "(" + jt + ") " + rn;
+            String v;
+            if (i < required || (fp.named && fp.required)) {
+                v = cast;
+            } else {
+                String def = fp.defaultValue != null ? emitExpr(fp.defaultValue, pt, ctx).code : "null";
+                v = (absentSlot(pt) ? "DartRuntime.isAbsent(" : "DartRuntime.isAbsentOrNull(") + rn + ") ? "
+                        + (jt.equals("Object") || def.equals("null") ? def : "(" + jt + ") " + def) + " : " + cast;
+            }
+            pro.append(ind).append(jt).append(' ').append(jn).append(" = ").append(v).append(";\n");
+        }
+        ctx.pushWriter(ctx.currentIndent() + 1);
+        String body = call.apply(names);
+        String lifted = ctx.popWriter();
+        ctx.popScope();
+        String code = "((" + sam + ") (" + raw + ") (" + lp + ") -> {\n" + pro + lifted + ind
+                + (isVoid ? statementize(body) + ";" : "return " + body + ";") + "\n"
+                + indentStr(ctx.currentIndent()) + "})";
+        return new Out(code, ft);
+    }
+
+    /** An omitted optional argument to a function value: see {@link #tearOffAdapter}. */
+    private String omittedArg(List<TypeRef> slotTypes, int i, Ctx ctx) {
+        TypeRef t = slotTypes != null && i < slotTypes.size() ? slotTypes.get(i) : null;
+        if (!absentSlot(t)) {
+            return "null";
+        }
+        ctx.importClass("dart.runtime.DartRuntime");
+        valueArgsAbsent = true;
+        return "DartRuntime.absent()";
+    }
+
+    /** Set when the last {@link #valueArgs} passed the absent marker. */
+    private boolean valueArgsAbsent;
+
+    /**
+     * {@code recv.call(args)} for a function value. When an argument is the absent marker
+     * the call goes through the raw SAM: javac casts a generic argument to the slot's
+     * instantiated type, and the marker is an Object. The result is cast back.
+     */
+    private String fnCall(String recv, TypeRef fnType, Args args, Ctx ctx) {
+        valueArgsAbsent = false;
+        String a = valueArgs(fnType, args, ctx);
+        if (!valueArgsAbsent) {
+            return recv + ".call(" + a + ")";
+        }
+        valueArgsAbsent = false;
+        String sam = javaType(fnType, false, ctx);
+        int lt = sam.indexOf('<');
+        String raw = lt > 0 ? sam.substring(0, lt) : sam;
+        String rawCall = "((" + raw + ") " + recv + ").call(" + a + ")";
+        TypeRef ret = funcResultType(fnType);
+        if (raw.contains("VoidFunc") || ret == null || ret.is("void")) {
+            return rawCall;
+        }
+        String jt = javaType(ret, true, ctx);
+        return jt.equals("Object") ? rawCall : "((" + jt + ") " + rawCall + ")";
+    }
+
     /**
      * Arguments for invoking a function VALUE through its Funcs SAM. A function type with
      * optional or named parameters is a SAM of its full arity (required, optional
@@ -13080,6 +13439,7 @@ public final class JavaEmitter {
      * argument goes to its slot. Without such a shape this is {@link #plainArgs}.
      */
     private String valueArgs(TypeRef fnType, Args args, Ctx ctx) {
+        List<TypeRef> slotTypes;
         int arity;
         int required;
         List<String> named;
@@ -13088,6 +13448,7 @@ public final class JavaEmitter {
         }
         if (fnType.funcParams != null) {
             arity = fnType.funcParams.size();
+            slotTypes = fnType.funcParams;
             required = fnType.funcRequired;
             named = fnType.funcNamed;
         } else {
@@ -13096,6 +13457,7 @@ public final class JavaEmitter {
                 return plainArgs(args, ctx);
             }
             arity = td.paramTypes.size();
+            slotTypes = td.paramTypes;
             required = td.funcRequired;
             named = td.funcNamed;
         }
@@ -13109,7 +13471,8 @@ public final class JavaEmitter {
                 sb.append(", ");
             }
             sb.append(i < args.positional.size()
-                    ? emitExpr(args.positional.get(i), null, ctx).code : "null");
+                    ? emitExpr(args.positional.get(i), null, ctx).code
+                    : omittedArg(slotTypes, i, ctx));
         }
         if (named != null) {
             for (String nm : named) {
@@ -13122,7 +13485,8 @@ public final class JavaEmitter {
                         v = args.named.get(i).value;
                     }
                 }
-                sb.append(v == null ? "null" : emitExpr(v, null, ctx).code);
+                sb.append(v == null ? omittedArg(slotTypes, positionalSlots + named.indexOf(nm), ctx)
+                        : emitExpr(v, null, ctx).code);
             }
         }
         return sb.toString();
@@ -13926,10 +14290,57 @@ public final class JavaEmitter {
 
     private Out emitTearOffLambda(ClassDecl owner, List<Param> params, List<String> tps, List<TypeRef> typeArgs,
             Expr body, Node posNode, Ctx ctx) {
+        final Args args = body instanceof CtorCall ? ((CtorCall) body).args : ((Call) body).args;
+        boolean hasOptional = false;
+        List<TypeRef> ptypes = new ArrayList<TypeRef>();
+        for (Param p : params) {
+            hasOptional |= p.optional || p.named;
+            TypeRef pt = paramValueType(p);
+            if ((p.type == null || p.type.is("var")) && (p.isThis || p.isSuper) && owner != null) {
+                FieldDecl f = owner.field(p.name);
+                pt = f != null ? f.type : pt;
+            }
+            if (pt != null && tps.contains(pt.name)) {
+                int at = tps.indexOf(pt.name);
+                pt = at < typeArgs.size() ? typeArgs.get(at) : TypeRef.DYNAMIC;
+            }
+            ptypes.add(pt);
+        }
+        if (hasOptional && (tps.isEmpty() || !typeArgs.isEmpty())) {
+            // Optional parameters of any kind: the adapter passes what the caller gave,
+            // the declared default for what it omitted (see tearOffAdapter).
+            final List<Param> ordered = orderedParams(params);
+            final Expr callBody = body;
+            final Node pos = posNode;
+            TypeRef ret = body instanceof CtorCall ? ((CtorCall) body).type
+                    : tearOffReturn != null ? tearOffReturn : TypeRef.DYNAMIC;
+            Out ad = tearOffAdapter(params, ptypes, ret, names -> {
+                for (int i = 0; i < ordered.size(); i++) {
+                    Ident ref = new Ident();
+                    ref.name = names.get(i);
+                    ref.line = pos.line;
+                    ref.col = pos.col;
+                    if (ordered.get(i).named) {
+                        NamedArg na = new NamedArg();
+                        na.name = ordered.get(i).name;
+                        na.value = ref;
+                        args.named.add(na);
+                    } else {
+                        args.positional.add(ref);
+                    }
+                }
+                callBody.line = pos.line;
+                callBody.col = pos.col;
+                return emitExpr(callBody, null, ctx).code;
+            }, ctx);
+            if (ad != null) {
+                tearOffReturn = null;
+                return ad;
+            }
+        }
         Lambda l = new Lambda();
         l.line = posNode.line;
         l.col = posNode.col;
-        Args args = body instanceof CtorCall ? ((CtorCall) body).args : ((Call) body).args;
         for (Param p : params) {
             if (p.optional) {
                 continue;
