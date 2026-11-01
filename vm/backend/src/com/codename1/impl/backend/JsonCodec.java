@@ -27,6 +27,7 @@ import com.codename1.backend.Base64;
 import com.codename1.backend.ByteSink;
 
 import java.util.Date;
+import java.util.concurrent.atomic.AtomicReference;
 
 /// What the JSON codecs the build generates call: typed reads that refuse a
 /// value with a message naming where it was, and the date form.
@@ -53,6 +54,34 @@ public final class JsonCodec {
     private static int maxDepth = MAX_DEPTH;
 
     private JsonCodec() {
+    }
+
+    private static final AtomicReference<Registry> REGISTRY = new AtomicReference<Registry>();
+
+    /// The codecs `Json.read(String, Class)` and `Json.write(Object)` reach a
+    /// class of the application's through. The build generates the one
+    /// implementation, `cn1app.JsonCodecs`, over every class it wrote a codec
+    /// for, and the generated entry point installs it: nothing is found by name.
+    public interface Registry {
+        /// `json`, a parsed document, read into `type`. Throws
+        /// `IllegalArgumentException` naming where the document does not fit,
+        /// and `IllegalStateException` when the build wrote no codec for `type`.
+        Object read(Class type, Object json);
+
+        /// Writes `value` when the build wrote a codec for its class, and
+        /// answers whether it did.
+        boolean write(Object value, ByteSink out);
+    }
+
+    /// Installs the build's registry; the generated entry point calls it once,
+    /// before the server starts.
+    public static void install(Registry registry) {
+        REGISTRY.set(registry);
+    }
+
+    /// The installed registry, or null in a binary whose build wrote none.
+    public static Registry registry() {
+        return REGISTRY.get();
     }
 
     /// How deep the codecs follow one object into another: [#MAX_DEPTH] unless

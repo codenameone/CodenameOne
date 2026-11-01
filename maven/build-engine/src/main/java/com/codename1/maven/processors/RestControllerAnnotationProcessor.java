@@ -1665,6 +1665,12 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                     + "would replace it. Rename that class.");
             return;
         }
+        // Json.read(body, Release.class) in the application's own code: each class
+        // it names gets a codec, as a route's body does.
+        JsonCallSites.scan(ctx, codecs(ctx));
+        if (ctx.hasErrors()) {
+            return;
+        }
         // The shared set, not only this processor's: the bean processor's tools
         // may have added classes, and the dispatcher compiled last must know them.
         if (codecs != null || ctx.getAttribute("cn1.backend.jsonCodecs") != null) {
@@ -3402,6 +3408,12 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 sb.append("        cn1Access.serviceName(cn1Builder, ")
                   .append(quote(telemetryServiceName)).append(");\n");
             }
+        }
+        if (codecs != null && codecs.hasRegistry()) {
+            // The ONLY reference to the registry: Json.read(body, Release.class)
+            // reaches the application's codecs through it, and nothing else does.
+            sb.append("        com.codename1.impl.backend.JsonCodec.install(new ")
+              .append(BackendJsonCodecs.REGISTRY).append("());\n");
         }
         sb.append("        cn1Access.application(cn1Builder, new ")
           .append(qualify(packageName, BackendWiringWriter.CLASS_NAME)).append("());\n");

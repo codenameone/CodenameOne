@@ -238,6 +238,34 @@ final class BackendJsonCodecs {
         return check(javaType, true, new HashSet<String>());
     }
 
+    /// The generated class `Json.read(String, Class)`, `Json.convert` and
+    /// `Json.write(Object)` reach the application's codecs through. Generated
+    /// only for a build whose code calls one of them.
+    static final String REGISTRY = "cn1app.JsonCodecs";
+
+    /// Whether the application's code calls the typed `Json` methods.
+    private boolean registryWanted;
+
+    /// A typed `Json` call in the application's code: `type`, a binary name or
+    /// null when the call site does not say, is read (`read`) or written by it.
+    /// Answers null, or why the build cannot write that codec.
+    String typedUse(String type, boolean read) {
+        registryWanted = true;
+        String t = type == null ? null : strip(type);
+        if (t == null || kindOf(t) != Kind.DTO) {
+            // A JDK type Json reads by itself, or one the call site does not
+            // name; only an application class needs a codec.
+            return null;
+        }
+        return read ? checkRead(t) : checkWrite(t);
+    }
+
+    /// Whether [#sources] includes [#REGISTRY], for the entry point that has to
+    /// install it.
+    boolean hasRegistry() {
+        return registryWanted;
+    }
+
     /// Whether any codec is needed at all.
     boolean isEmpty() {
         return dtos.isEmpty();
@@ -1681,6 +1709,10 @@ final class BackendJsonCodecs {
             owners.put(codec, dto.key);
             out.put(codec, codecSource(dto));
         }
+        if (registryWanted) {
+            valuesUsed = true;
+            out.put(REGISTRY, registrySource());
+        }
         if (valuesUsed) {
             out.put(VALUES, valuesSource());
         }
@@ -1688,6 +1720,57 @@ final class BackendJsonCodecs {
             out.put(ADAPTERS, adaptersSource());
         }
         return out;
+    }
+
+    /// `cn1app.JsonCodecs`: [#REGISTRY]. Reads by `==` on the class asked for and
+    /// writes through `cn1app.JsonValues`, so a value written by `Json.write`
+    /// has the form a route answering with it has.
+    private String registrySource() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("package cn1app;\n\n");
+        sb.append("// Generated: the codecs Json reaches by class. Do not edit.\n");
+        sb.append("@com.codename1.backend.annotations.Generated\n");
+        sb.append("public final class JsonCodecs implements ").append(CODEC)
+          .append(".Registry {\n\n");
+        sb.append("    @Override\n");
+        sb.append("    public Object read(Class type, Object json) {\n");
+        StringBuilder writes = new StringBuilder();
+        // A copy: reading a class can ask for the codecs of the classes it holds.
+        for (Dto dto : new ArrayList<Dto>(dtos.values())) {
+            // A generic class has a codec per use, and a Class names none of them.
+            if (dto.problem != null || !dto.key.equals(dto.binary)) {
+                continue;
+            }
+            String type = source(dto.binary);
+            if (dto.read && dto.readProblem == null) {
+                sb.append("        if (type == ").append(type).append(".class) {\n");
+                sb.append("            ").append(type).append(" r;\n");
+                sb.append(readStatements(dto.binary, "json", CODEC + ".Path.ROOT", "null", "-1",
+                        "0", "r", "            "));
+                sb.append("            return r;\n");
+                sb.append("        }\n");
+            }
+            if (dto.write) {
+                writes.append(writes.length() == 0 ? "" : "\n                || ")
+                      .append("v instanceof ").append(type);
+            }
+        }
+        sb.append("        throw new IllegalStateException(\"No JSON codec for \" + type.getName()\n");
+        sb.append("                + \": the build writes one for a class passed literally to \"\n");
+        sb.append("                + \"Json.read, Json.readList or Json.convert, or used by a route.\");\n");
+        sb.append("    }\n\n");
+        sb.append("    @Override\n");
+        sb.append("    public boolean write(Object v, ").append(SINK).append(" out) {\n");
+        if (writes.length() > 0) {
+            sb.append("        if (").append(writes).append(") {\n");
+            sb.append("            JsonValues.write(v, out, 0);\n");
+            sb.append("            return true;\n");
+            sb.append("        }\n");
+        }
+        sb.append("        return false;\n");
+        sb.append("    }\n");
+        sb.append("}\n");
+        return sb.toString();
     }
 
     /// `cn1app.JsonValues`: writes a value by its run-time class. Each of the

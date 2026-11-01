@@ -1555,6 +1555,67 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
+    public void jsonReadAndWriteReachTheCodecOfAClassNamedInCode() throws Exception {
+        // Release is used by no route: only the Json.read call names it, and the
+        // build has to find that call to write its codec.
+        Map<String, String> sources = new LinkedHashMap<String, String>();
+        sources.put("com.example.Release",
+                "package com.example;\n"
+                + "public class Release {\n"
+                + "    public String name;\n"
+                + "    public int build;\n"
+                + "}\n");
+        sources.put("com.example.Feed",
+                "package com.example;\n"
+                + "import com.codename1.backend.Json;\n"
+                + "public class Feed {\n"
+                + "    public static String roundTrip(String body) throws java.io.IOException {\n"
+                + "        Release r = Json.read(body, Release.class);\n"
+                + "        r.build++;\n"
+                + "        return Json.write(r);\n"
+                + "    }\n"
+                + "    public static int count(String body) throws java.io.IOException {\n"
+                + "        return Json.readList(body, Release.class).size();\n"
+                + "    }\n"
+                + "}\n");
+        sources.put("com.example.Notes",
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @GetMapping(\"/n\")\n"
+                + "    public String n() { return \"n\"; }\n"
+                + "}\n");
+        File classes = tmp.newFolder();
+        JavaSourceCompiler.compile(sources, classes, backendClasspath());
+        ProcessorContext ctx = run(classes);
+        assertFalse(ctx.getErrors().toString(), ctx.hasErrors());
+        URLClassLoader loader = new URLClassLoader(new URL[]{ classes.toURI().toURL() },
+                getClass().getClassLoader());
+        com.codename1.impl.backend.JsonCodec.install((com.codename1.impl.backend.JsonCodec.Registry)
+                loader.loadClass("cn1app.JsonCodecs").newInstance());
+        try {
+            Class<?> feed = loader.loadClass("com.example.Feed");
+            assertEquals("{\"name\":\"v1\",\"build\":8}", feed.getMethod("roundTrip",
+                    String.class).invoke(null, "{\"name\":\"v1\",\"build\":7}"));
+            assertEquals(2, feed.getMethod("count", String.class).invoke(null,
+                    "[{\"name\":\"a\"},{\"name\":\"b\"}]"));
+            try {
+                feed.getMethod("roundTrip", String.class).invoke(null, "{\"build\":\"x\"}");
+                fail("a string where the class has an int must be refused");
+            } catch (java.lang.reflect.InvocationTargetException e) {
+                assertTrue(String.valueOf(e.getCause()),
+                        e.getCause() instanceof IllegalArgumentException
+                        && e.getCause().getMessage().indexOf("build") >= 0);
+            }
+            assertEquals(Long.valueOf(3), com.codename1.backend.Json.read("3", Long.class));
+            assertEquals(Integer.valueOf(3), com.codename1.backend.Json.read("3", Integer.class));
+        } finally {
+            com.codename1.impl.backend.JsonCodec.install(null);
+        }
+    }
+
+    @Test
     public void aParameterWithTwoBindingAnnotationsIsRefused() throws Exception {
         // The binding chain is priority-ordered, so this used to bind the header
         // and ignore the @RequestParam without a word. For an authentication input
