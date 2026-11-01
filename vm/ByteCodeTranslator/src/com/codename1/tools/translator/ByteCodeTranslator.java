@@ -605,6 +605,8 @@ public class ByteCodeTranslator {
         // The kernel bus and pin access the Linux port and the backend both wrap
         // (com.codename1.impl.KernelHardware). Only their wrappers include it.
         copyRuntimeResource(srcRoot, "cn1_hardware_impl.h");
+        // The scheduling half of com.codename1.realtime, wrapped the same way.
+        copyRuntimeResource(srcRoot, "cn1_realtime_impl.h");
         // The multicast DNS socket behind com.codename1.impl.MdnsEngine, wrapped the same way.
         copyRuntimeResource(srcRoot, "cn1_mdns_impl.h");
         emitBundledSqlite(srcRoot);
@@ -618,6 +620,7 @@ public class ByteCodeTranslator {
         copyRuntimeResource(srcRoot, "cn1_win_compat.c");
 
         Parser.writeOutput(srcRoot);
+        enableRealtimeIfPresent(cn1Globals);
 
         File javaIoFileHeader = new File(srcRoot, "java_io_File.h");
         if (javaIoFileHeader.exists()) {
@@ -1010,12 +1013,15 @@ public class ByteCodeTranslator {
         // The kernel bus and pin access the Linux port and the backend both wrap
         // (com.codename1.impl.KernelHardware). Only their wrappers include it.
         copyRuntimeResource(srcRoot, "cn1_hardware_impl.h");
+        // The scheduling half of com.codename1.realtime, wrapped the same way.
+        copyRuntimeResource(srcRoot, "cn1_realtime_impl.h");
         // The multicast DNS socket behind com.codename1.impl.MdnsEngine, wrapped the same way.
         copyRuntimeResource(srcRoot, "cn1_mdns_impl.h");
         emitBundledSqlite(srcRoot);
         emitCryptoKernels(srcRoot, true);
 
         Parser.writeOutput(srcRoot);
+        enableRealtimeIfPresent(cn1Globals);
 
         File templateInfoPlist = new File(srcRoot, appName + "-Info.plist");
         copy(ByteCodeTranslator.class.getResourceAsStream(templateRoot + "/template/template-Info.plist"), new FileOutputStream(templateInfoPlist));
@@ -2001,6 +2007,19 @@ public class ByteCodeTranslator {
      * aborts a cross-stack longjmp under _FORTIFY_SOURCE and musl has no
      * makecontext, so neither portable route survives every target we ship.
      */
+    /// Turns on CN1_REALTIME when the class that runs real-time tasks survived
+    /// translation, so the scheduler and the clocks cost nothing in an application
+    /// that has no use for them. Called after Parser.writeOutput, which is what prunes
+    /// the class list.
+    private static void enableRealtimeIfPresent(File cn1Globals) throws IOException {
+        for (ByteCodeClass cls : Parser.getClasses()) {
+            if ("com_codename1_realtime_RealtimeThread".equals(cls.getClsName())) {
+                replaceInFile(cn1Globals, "//#define CN1_REALTIME", "#define CN1_REALTIME");
+                return;
+            }
+        }
+    }
+
     private static void emitVirtualThreadRuntime(File srcRoot) throws IOException {
         String[] names = { "cn1_virtual_thread.h", "cn1_virtual_thread.c", "cn1_virtual_thread_asm.S" };
         for (String name : names) {

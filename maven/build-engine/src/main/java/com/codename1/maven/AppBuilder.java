@@ -2998,6 +2998,7 @@ public class AppBuilder {
             }
         }
         applyHardeningRequestArgs(r);
+        applyBoardShortcut(r, props);
         r.setIncludeSource(true);
 
         try {
@@ -3010,7 +3011,19 @@ public class AppBuilder {
                 throw new BuildExecutionException("Linux native build failed");
             }
             if (e.getLinuxExecutable() != null) {
-                getLog().info("Built native Linux executable: " + e.getLinuxExecutable().getAbsolutePath());
+                // The builder's result directory is a temporary one that cleanup()
+                // deletes, so the executable is kept where deploy-device looks for it.
+                File out = new File(host.buildDirectory(), "linux-native");
+                out.mkdirs();
+                File kept = new File(out, e.getLinuxExecutable().getName());
+                try {
+                    java.nio.file.Files.copy(e.getLinuxExecutable().toPath(), kept.toPath(),
+                            java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                } catch (java.io.IOException ioe) {
+                    throw new BuildExecutionException("Could not copy the Linux executable to " + out, ioe);
+                }
+                kept.setExecutable(true);
+                getLog().info("Built native Linux executable: " + kept.getAbsolutePath());
             }
         } catch (com.codename1.builders.BuildException hardeningEx) {
             throw new BuildExecutionException(hardeningEx.getMessage(), hardeningEx);
@@ -3022,6 +3035,25 @@ public class AppBuilder {
             throw new BuildExecutionException("Failed to build Linux app", ex);
         } finally {
             e.cleanup();
+        }
+    }
+
+    /// `-Dcn1.board=rpi5` is the whole of an embedded build: it turns on
+    /// `linux.embedded` and names the board, whose profile picks the architecture
+    /// and the display defaults. An explicit `linux.embedded` hint is left alone.
+    /// The settings file has no shortcut: there both `linux.embedded=true` and
+    /// `linux.embedded.board` are written out, as the guide says.
+    private void applyBoardShortcut(BuildRequest r, Properties props) {
+        String board = System.getProperty("cn1.board");
+        if (board == null || board.trim().isEmpty()) {
+            board = props.getProperty("cn1.board");
+        }
+        if (board == null || board.trim().isEmpty()) {
+            return;
+        }
+        r.putArgument("linux.embedded.board", board.trim());
+        if (r.getArg("linux.embedded", null) == null) {
+            r.putArgument("linux.embedded", "true");
         }
     }
 

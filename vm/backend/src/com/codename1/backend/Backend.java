@@ -1817,6 +1817,7 @@ public final class Backend {
             claimProcess();
             // Before the application's started() callback, which may open a pin.
             BoardHardware.install();
+            BoardRealtime.install();
             Backend running = null;
             try {
                 running = startOnce();
