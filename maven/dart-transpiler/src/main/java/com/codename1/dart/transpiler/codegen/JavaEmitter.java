@@ -6306,6 +6306,29 @@ public final class JavaEmitter {
         return changed;
     }
 
+    /**
+     * The declaration a supertype reference of {@code k} names. The type reference has lost
+     * its import prefix, so {@code class BoxCollection implements impl.BoxCollection} would
+     * otherwise resolve to {@code k} itself; a class never names itself as a supertype, so a
+     * same-named declaration from another library is the one meant.
+     */
+    private ClassDecl superDeclOf(ClassDecl k, TypeRef t) {
+        ClassDecl sc = program.resolveClass(t.name, k.ownerLibrary);
+        if (sc == k) {
+            sc = null;
+            List<ClassDecl> same = program.classesByName.get(t.name);
+            if (same != null) {
+                for (ClassDecl o : same) {
+                    if (o != k) {
+                        sc = o;
+                        break;
+                    }
+                }
+            }
+        }
+        return sc;
+    }
+
     /** Whether program class {@code sub} is {@code sup} or reaches it through program supertypes. */
     private boolean isProgramSubtype(ClassDecl sub, ClassDecl sup) {
         if (sub == null || sup == null) {
@@ -6329,7 +6352,7 @@ public final class JavaEmitter {
                 sups.add(k.superclass);
             }
             for (TypeRef t : sups) {
-                ClassDecl sc = program.classes.get(t.name);
+                ClassDecl sc = superDeclOf(k, t);
                 if (sc != null) {
                     work.add(sc);
                 }
@@ -6361,7 +6384,7 @@ public final class JavaEmitter {
                 sups.add(k.superclass);
             }
             for (TypeRef t : sups) {
-                ClassDecl sc = program.classes.get(t.name);
+                ClassDecl sc = superDeclOf(k, t);
                 if (sc != null) {
                     work.add(sc);
                 }
@@ -6675,6 +6698,14 @@ public final class JavaEmitter {
         for (String n : witnessParams(pc)) {
             int i = pc.typeParams.indexOf(n);
             TypeRef a = typeArgs != null && typeArgs.size() == pc.typeParams.size() ? typeArgs.get(i) : null;
+            if (a == null && (typeArgs == null || typeArgs.isEmpty())) {
+                // Nothing written and nothing inferred from context: Dart instantiates to
+                // bound (`final g = FutureGroup();` is a FutureGroup<dynamic>), so the witness
+                // is the bound's, or dynamic's for an unbounded parameter.
+                TypeRef bound = pc.typeParamBounds.get(n);
+                a = bound != null && bound.funcReturn == null && bound.args.isEmpty()
+                        && !pc.typeParams.contains(bound.name) ? bound : new TypeRef("dynamic");
+            }
             String w = witnessOf(a, ctx);
             if (w == null) {
                 diags.error(pos, "E0142", "Constructing " + pc.name + " needs its type argument '" + n
@@ -8522,6 +8553,46 @@ public final class JavaEmitter {
             return new Out(extCls.name + "." + name + "(" + self + ")",
                     eg.returnType == null || eg.returnType.is("var") ? TypeRef.DYNAMIC : eg.returnType);
         }
+        // An extension METHOD torn off (`f.catchError(completer.completeErrorIfPending)`):
+        // the closure calls the extension's static form with the receiver. The receiver
+        // expression is re-read per call, which is exact for the final fields and locals
+        // this form is torn off from.
+        ClassDecl extM = mostSpecificExtension(findUserExtension(tt.name, name, false, ctx), tt, name, false);
+        if (extM != null && extM.method(name) != null && extM.method(name).typeParams.isEmpty()
+                && extM.method(name).returnType != null) {
+            final MethodDecl em = extM.method(name);
+            final String self = extensionSelf(target, tt, extM, ctx);
+            final String recvTemp = self;
+            final String extName = extM.name;
+            List<TypeRef> types = new ArrayList<TypeRef>();
+            for (Param p : em.params) {
+                types.add(paramValueType(p));
+            }
+            boolean anyOptional = false;
+            for (Param p : em.params) {
+                anyOptional |= p.named || p.optional || p.defaultValue != null;
+            }
+            if (!anyOptional) {
+                // All required: a plain lambda; each argument is cast to its parameter's
+                // erased type, since the target functional interface may take Objects.
+                StringBuilder ps = new StringBuilder();
+                StringBuilder as = new StringBuilder();
+                for (int i = 0; i < em.params.size(); i++) {
+                    String a = "$ta" + i;
+                    ps.append(i > 0 ? ", " : "").append(a);
+                    as.append(", (").append(javaType(types.get(i), true, ctx)).append(") ").append(a);
+                }
+                return new Out("(" + ps + ") -> " + extName + "." + name + "(" + recvTemp + as + ")",
+                        new TypeRef("Function"));
+            }
+            return tearOffAdapter(em.params, types, em.returnType, names -> {
+                StringBuilder sb = new StringBuilder(extName + "." + name + "(" + recvTemp);
+                for (String a : names) {
+                    sb.append(", ").append(a);
+                }
+                return sb.append(")").toString();
+            }, ctx);
+        }
         // extension getter contributed by a stub (`extension AnimationStatusExtensions on
         // AnimationStatus { bool get isAnimating; }`). The stub extension is emitted as a
         // static-method class (its @JavaName); dispatch `status.isAnimating` to
@@ -9327,6 +9398,28 @@ public final class JavaEmitter {
         return undo;
     }
 
+    /**
+     * Whether {@code x is T} promotes x. Dart promotes only to a subtype of x's current type:
+     * a BoxBaseImpl tested {@code is LazyBox} (an interface the class does not implement)
+     * stays a BoxBaseImpl, and its members are still the ones read. Decided only when both
+     * are program classes; otherwise the promotion is kept as before.
+     */
+    private boolean promotesTo(Ctx ctx, String name, TypeRef to) {
+        TypeRef cur = ctx.promotedType(name);
+        if (cur == null) {
+            cur = ctx.lookup(name);
+        }
+        if (cur == null || to == null || cur.name == null || cur.name.equals(to.name)) {
+            return true;
+        }
+        ClassDecl a = program.resolveClass(to.name, ctx.library());
+        ClassDecl b = program.resolveClass(cur.name, ctx.library());
+        if (a == null || b == null || !isProgramClassDecl(a) || !isProgramClassDecl(b)) {
+            return true;
+        }
+        return isProgramSubtype(a, b);
+    }
+
     private void collectPromotions(Expr cond, Ctx ctx, List<Object[]> undo) {
         if (cond instanceof Binary && "&&".equals(((Binary) cond).op)) {
             collectPromotions(((Binary) cond).left, ctx, undo);
@@ -9336,7 +9429,8 @@ public final class JavaEmitter {
         if (cond instanceof IsTest) {
             IsTest t = (IsTest) cond;
             if (!t.negated && t.operand instanceof Ident && t.type != null
-                    && ctx.lookup(((Ident) t.operand).name) != null) {
+                    && ctx.lookup(((Ident) t.operand).name) != null
+                    && promotesTo(ctx, ((Ident) t.operand).name, t.type)) {
                 String name = ((Ident) t.operand).name;
                 TypeRef prev = ctx.pushPromotion(name, t.type);
                 undo.add(new Object[] {name, prev});

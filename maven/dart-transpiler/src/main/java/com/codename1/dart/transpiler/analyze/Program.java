@@ -171,6 +171,23 @@ public final class Program {
                 forwardSuperCtors(c, done);
             }
         }
+        // Dart 2 let any class with no superclass, no mixins and no constructors be mixed
+        // in (`class C with ListMixin<E>, DelegatingView<E>` where DelegatingView is an
+        // `abstract class`). Such a class is used as a mixin, so it is emitted as one; it
+        // must also be abstract, so nothing constructs it.
+        for (Ast.Library lib : libraries) {
+            for (Ast.ClassDecl c : lib.classes) {
+                for (Ast.TypeRef m : c.mixins) {
+                    Ast.ClassDecl mx = resolveClass(m.name, c.ownerLibrary);
+                    if (mx != null && !mx.isMixin && mx.isAbstract && mx.superclass == null
+                            && mx.mixins.isEmpty() && mx.ctors.isEmpty() && mx.extensionOn == null
+                            && mx != c && (c.superclass != null || m != c.mixins.get(0))) {
+                        // (In first place with no superclass the emitter already extends it.)
+                        mx.isMixin = true;
+                    }
+                }
+            }
+        }
     }
 
     /**
