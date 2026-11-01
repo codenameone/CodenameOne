@@ -1837,6 +1837,9 @@ public final class Backend {
                 config = Config.load();
             }
             config = config.withCompiledDefaults(compiledSettings);
+            // Before anything logs: the logging.level.* settings decide what the
+            // rest of the start-up writes.
+            com.codename1.backend.log.Logging.configure(config);
             // Before anything is opened: a setting only the build could have
             // acted on is refused here rather than silently doing nothing.
             BuildTimeSettings.require(config, managementRoute != null || testApplication,
