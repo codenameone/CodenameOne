@@ -1192,7 +1192,58 @@ public final class JavaEmitter {
         // Dart `implements X` clauses (c.interfaces): the runtime interface the class satisfies
         // (e.g. `implements Iterator<T>` / `PreferredSizeWidget`). Emitted as Java `implements`.
         TypeRef implementedAsSuper = null;
+        // `with A, B` where both mixins implement the same method: Java rejects a class that
+        // inherits two default methods with one signature, and Dart takes the last mixin's.
+        // The last one's declaration is emitted into the applying class itself.
+        if (!c.isMixin) {
+            Map<String, MethodDecl> lastImpl = new LinkedHashMap<String, MethodDecl>();
+            Map<String, Integer> declaredBy = new LinkedHashMap<String, Integer>();
+            for (TypeRef mixRef : c.mixins) {
+                ClassDecl mx = program.classes.get(mixRef.name);
+                if (mx == null || !mx.isMixin || !mixRef.args.isEmpty()) {
+                    continue;
+                }
+                for (MethodDecl m : mx.methods) {
+                    if (m.isStatic || m.isGetter || m.isSetter || m.name.startsWith("$")
+                            || (m.body == null && m.exprBody == null)) {
+                        continue;
+                    }
+                    Integer k = declaredBy.get(m.name);
+                    declaredBy.put(m.name, k == null ? 1 : k + 1);
+                    lastImpl.put(m.name, m);
+                }
+            }
+            for (Map.Entry<String, MethodDecl> en : lastImpl.entrySet()) {
+                if (declaredBy.get(en.getKey()) > 1 && c.method(en.getKey()) == null) {
+                    MethodDecl m = en.getValue();
+                    Method mm = new Method();
+                    mm.name = m.name;
+                    mm.isOverride = true;
+                    mm.isAsync = m.isAsync;
+                    mm.isSyncStar = m.isSyncStar;
+                    mm.isAsyncStar = m.isAsyncStar;
+                    mm.returnType = m.returnType == null ? TypeRef.DYNAMIC : m.returnType;
+                    mm.params = m.params;
+                    mm.typeParams = m.typeParams;
+                    mm.body = m.body;
+                    mm.exprBody = m.exprBody;
+                    body.append(emitMethodLike(mm, ctx, false));
+                }
+            }
+        }
         for (TypeRef itf : c.interfaces) {
+            // `implements Exception` / `implements Error`: dart:core's are Java classes here.
+            // With no superclass of its own the class extends it (which is what makes it
+            // throwable); otherwise the clause adds nothing a Java class can express.
+            if ((itf.is("Exception") || itf.is("Error")) && !program.classes.containsKey(itf.name)) {
+                String jc = CORE_ERRORS.get(itf.name);
+                if (jc != null && c.superclass == null && implementedAsSuper == null
+                        && mixinClassAsSuper == null) {
+                    ctx.importClass(jc);
+                    implementedAsSuper = new TypeRef(jc.substring(jc.lastIndexOf('.') + 1));
+                }
+                continue;
+            }
             ClassDecl implemented = program.classes.get(itf.name);
             if (implemented != null && !implemented.isMixin) {
                 // A program class is a Java class, which `implements` cannot name. One
@@ -4719,6 +4770,11 @@ public final class JavaEmitter {
         if (e instanceof CtorCall) {
             CtorCall cc = (CtorCall) e;
             if (cc.ctorName != null) {
+                // `List<E>.of(src)` parsed as a constructor call (explicit type arguments):
+                // the same copy as List<E>.from, typed by E.
+                if (cc.type.name.equals("List") && cc.ctorName.equals("of")) {
+                    cc.ctorName = "from";
+                }
                 // List<E>.generate / .filled / .from — dart:core intrinsic factories,
                 // routed to the primitive Dart*List when E is a non-nullable int/double.
                 if (cc.type.name.equals("List")
@@ -6458,10 +6514,11 @@ public final class JavaEmitter {
         if ((tt.is("State") || tt.is("BuildContext")) && name.equals("mounted")) {
             return new Out(target.code + ".mounted()", TypeRef.BOOL);
         }
-        ClassDecl extCls = program.findExtension(tt.name, name, true, ctx.library());
+        ClassDecl extCls = findUserExtension(tt.name, name, true, ctx);
         if (extCls != null) {
             MethodDecl eg = extCls.getter(name);
-            return new Out(extCls.name + "." + name + "(" + target.code + ")",
+            String self = extensionSelf(target, tt, extCls, ctx);
+            return new Out(extCls.name + "." + name + "(" + self + ")",
                     eg.returnType == null || eg.returnType.is("var") ? TypeRef.DYNAMIC : eg.returnType);
         }
         // extension getter contributed by a stub (`extension AnimationStatusExtensions on
@@ -8962,7 +9019,7 @@ public final class JavaEmitter {
             if (sm != null) {
                 return new Out("$self." + n + "(" + stubMethodArgs(sm, c.args, ctx) + ")", sm.returnType);
             }
-            ClassDecl extCls = program.findExtension(ctx.extensionSelfType.name, n, false, ctx.library());
+            ClassDecl extCls = findUserExtension(ctx.extensionSelfType.name, n, false, ctx);
             if (extCls != null) {
                 MethodDecl em = extCls.method(n);
                 return new Out(extCls.name + "." + n + "($self"
@@ -9440,11 +9497,12 @@ public final class JavaEmitter {
             return new Out(target.code + "." + n + "(" + plainArgs(c.args, ctx) + ")", TypeRef.VOID);
         }
         // extension methods
-        ClassDecl extCls = program.findExtension(tt.name, n, false, ctx.library());
+        ClassDecl extCls = findUserExtension(tt.name, n, false, ctx);
         if (extCls != null) {
             MethodDecl em = extCls.method(n);
             String rest = methodArgs(em.params, c.args, ctx);
-            return new Out(extCls.name + "." + n + "(" + target.code
+            String self = extensionSelf(target, tt, extCls, ctx);
+            return new Out(extCls.name + "." + n + "(" + self
                     + (rest.isEmpty() ? "" : ", " + rest) + ")",
                     em.returnType == null || em.returnType.is("var") ? TypeRef.DYNAMIC : em.returnType);
         }
@@ -10327,7 +10385,7 @@ public final class JavaEmitter {
             cc.line = c.line;
             cc.col = c.col;
             cc.type = type;
-            cc.ctorName = n.startsWith("Unmodifiable") && !isMap ? "unmodifiable" : "from";
+            cc.ctorName = n.startsWith("Unmodifiable") ? "unmodifiable" : "from";
             cc.args.positional.add(pos.get(0));
             return emitExpr(cc, type, ctx);
         }
@@ -10415,9 +10473,7 @@ public final class JavaEmitter {
             cc.type.args.addAll(c.typeArgs);
             cc.ctorName = cls.equals("List") && n.equals("of") ? "from" : n;
             cc.args = c.args;
-            if (cls.equals("Map") && n.equals("unmodifiable")) {
-                cc.ctorName = "from";
-            }
+
             Out o = emitExpr(cc, null, ctx);
             return o;
         }
@@ -10525,7 +10581,12 @@ public final class JavaEmitter {
             TypeRef kt = cc.type.args.isEmpty() ? TypeRef.DYNAMIC : cc.type.arg(0);
             TypeRef vt = cc.type.args.size() < 2 ? TypeRef.DYNAMIC : cc.type.arg(1);
             String witness = ".<" + javaType(kt, true, ctx) + ", " + javaType(vt, true, ctx) + ">";
-            if (ctor.equals("of") || ctor.equals("from")) {
+            if (ctor.equals("unmodifiable") && !isPrimitiveLongMap(cc.type)) {
+                // Map.unmodifiable / UnmodifiableMapView: every write throws UnsupportedError.
+                String src = emitExpr(pos.get(0), null, ctx).code;
+                return new Out("DartMap" + witness + "unmodifiable(" + src + ")", cc.type);
+            }
+            if (ctor.equals("of") || ctor.equals("from") || ctor.equals("unmodifiable")) {
                 String src = emitExpr(pos.get(0), null, ctx).code;
                 if (isPrimitiveLongMap(cc.type)) {
                     ctx.importClass("dart.core.DartLongMap");
@@ -11894,6 +11955,82 @@ public final class JavaEmitter {
     /** Runtime superclasses whose subclasses are plain model data (see emitDynamicMembers). */
     private static final java.util.Set<String> MODEL_BASES =
             new java.util.HashSet<String>(java.util.Arrays.asList("Equatable"));
+
+    /**
+     * A user extension member applicable to a receiver of type {@code typeName}: one declared
+     * on the type itself, or else on one of its supertypes, nearest first. Dart applies
+     * {@code extension on List<int>} to a {@code Uint8List} and {@code extension on Iterable<T>}
+     * to any list or set, so the lookup walks the superclass, interface and mixin edges of the
+     * program and stub hierarchies, and the core collection edges the stubs leave implicit.
+     */
+    /**
+     * The receiver as the extension's {@code $self} parameter takes it. An extension found on
+     * a supertype takes the supertype: a list (a typed list among them) reaching an
+     * {@code extension on Iterable<T>} is passed as its iterable view.
+     */
+    private String extensionSelf(Out target, TypeRef tt, ClassDecl ext, Ctx ctx) {
+        if (ext.extensionOn == null || ext.extensionOn.name.equals(tt.name)) {
+            return target.code;
+        }
+        if (ext.extensionOn.is("Iterable") && (tt.is("List") || findUserExtensionChainHasList(tt.name))) {
+            return paren(target.code) + ".asIterable()";
+        }
+        return coerce(target, ext.extensionOn, ctx);
+    }
+
+    private boolean findUserExtensionChainHasList(String name) {
+        Ast.ClassDecl sc = stubs.classes.get(name);
+        if (sc == null) {
+            return false;
+        }
+        for (TypeRef t : sc.interfaces) {
+            if (t.is("List")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private ClassDecl findUserExtension(String typeName, String member, boolean getter, Ctx ctx) {
+        ClassDecl direct = program.findExtension(typeName, member, getter, ctx.library());
+        if (direct != null || typeName == null) {
+            return direct;
+        }
+        java.util.ArrayDeque<String> queue = new java.util.ArrayDeque<String>();
+        java.util.Set<String> seen = new java.util.HashSet<String>();
+        seen.add(typeName);
+        queue.add(typeName);
+        while (!queue.isEmpty()) {
+            String cur = queue.poll();
+            if (!cur.equals(typeName)) {
+                ClassDecl e = program.findExtension(cur, member, getter, ctx.library());
+                if (e != null) {
+                    return e;
+                }
+            }
+            java.util.List<TypeRef> edges = new java.util.ArrayList<TypeRef>();
+            ClassDecl pc = program.classes.get(cur);
+            Ast.ClassDecl sc = pc != null ? pc : stubs.classes.get(cur);
+            if (sc != null) {
+                if (sc.superclass != null) {
+                    edges.add(sc.superclass);
+                }
+                edges.addAll(sc.interfaces);
+                edges.addAll(sc.mixins);
+            }
+            for (TypeRef t : edges) {
+                if (t != null && seen.add(t.name)) {
+                    queue.add(t.name);
+                }
+            }
+            String implicit = "List".equals(cur) || "Set".equals(cur) || "Queue".equals(cur)
+                    ? "Iterable" : null;
+            if (implicit != null && seen.add(implicit)) {
+                queue.add(implicit);
+            }
+        }
+        return seen.add("Object") ? program.findExtension("Object", member, getter, ctx.library()) : null;
+    }
 
     private boolean isSubtypeName(String sub, String sup) {
         if (sub == null || sup == null) {

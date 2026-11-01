@@ -265,6 +265,12 @@ public class DartMap<K, V> extends LinkedHashMap<K, V> {
         return m;
     }
 
+    /// Dart's {@code Map.unmodifiable(other)} and {@code UnmodifiableMapView(other)}: a
+    /// copy every write to which throws UnsupportedError, as Dart's does.
+    public static <K, V> DartMap<K, V> unmodifiable(Map<?, ?> other) {
+        return new DartUnmodifiableMap<K, V>(DartMap.<K, V>from(other));
+    }
+
     /**
      * Dart's {@code Map.fromIterable(iterable, {key, value})}. When {@code key} or
      * {@code value} is null the element itself is used (Dart's identity default).
