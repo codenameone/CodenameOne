@@ -8,3 +8,10 @@ keys 2 true [1, 2]
 2
 [1, 2, 7]
 [2]
+none 0 false true
+none cast 0 true
+none removeAll: read-only
+none add: read-only
+[4, 5]
+view 2 2
+view clear: read-only

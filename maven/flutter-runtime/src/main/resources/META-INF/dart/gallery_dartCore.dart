@@ -233,7 +233,7 @@ class Timer {
 @JavaName('dart.async.Completer')
 class Completer<T> {
   external Completer();
-  external static Completer sync();
+  external static Completer<S> sync<S>();
   external Future<T> get future;
   external void complete([T? value]);
   external void completeError(Object error, [StackTrace? stackTrace]);

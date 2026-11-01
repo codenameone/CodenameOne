@@ -187,4 +187,123 @@ void main() {
   print(keys.union({7}).toList());
   final Set<int> asSet = keys;
   print(asSet.difference({1}).toList());
+  noneMain();
+}
+
+// A set wrapper, a read-only mixin, a view applying it, and an always-empty set
+// that extends IterableBase, applies the mixin and implements the view.
+class Fwd<E> extends Iterable<E> implements Set<E> {
+  final Set<E> _inner;
+  Fwd(this._inner);
+  @override
+  Iterator<E> get iterator => _inner.iterator;
+  @override
+  int get length => _inner.length;
+  @override
+  bool contains(Object? o) => _inner.contains(o);
+  @override
+  bool add(E v) => _inner.add(v);
+  @override
+  void addAll(Iterable<E> v) => _inner.addAll(v);
+  @override
+  Set<T> cast<T>() => Fwd<T>(_inner.cast<T>());
+  @override
+  void clear() => _inner.clear();
+  @override
+  bool containsAll(Iterable<Object?> o) => _inner.containsAll(o);
+  @override
+  Set<E> difference(Set<Object?> o) => _inner.difference(o);
+  @override
+  Set<E> intersection(Set<Object?> o) => _inner.intersection(o);
+  @override
+  E? lookup(Object? o) => _inner.lookup(o);
+  @override
+  bool remove(Object? v) => _inner.remove(v);
+  @override
+  void removeAll(Iterable<Object?> v) => _inner.removeAll(v);
+  @override
+  void removeWhere(bool Function(E) t) => _inner.removeWhere(t);
+  @override
+  void retainAll(Iterable<Object?> v) => _inner.retainAll(v);
+  @override
+  void retainWhere(bool Function(E) t) => _inner.retainWhere(t);
+  @override
+  Set<E> union(Set<E> o) => _inner.union(o);
+  @override
+  Set<E> toSet() => _inner.toSet();
+}
+
+mixin NoWrites<E> implements Set<E> {
+  static Never _no() => throw UnsupportedError('read-only');
+  @override
+  bool add(E v) => _no();
+  @override
+  void addAll(Iterable<E> v) => _no();
+  @override
+  bool remove(Object? v) => _no();
+  @override
+  void removeAll(Iterable<Object?> v) => _no();
+  @override
+  void retainAll(Iterable<Object?> v) => _no();
+  @override
+  void removeWhere(bool Function(E) t) => _no();
+  @override
+  void retainWhere(bool Function(E) t) => _no();
+  @override
+  void clear() => _no();
+}
+
+class FwdView<E> extends Fwd<E> with NoWrites<E> {
+  FwdView(Set<E> s) : super(s);
+}
+
+class NoneSet<E> extends IterableBase<E> with NoWrites<E> implements FwdView<E> {
+  const NoneSet();
+  @override
+  Set<E> get _inner => <E>{};
+  @override
+  Iterator<E> get iterator => <E>[].iterator;
+  @override
+  int get length => 0;
+  @override
+  NoneSet<T> cast<T>() => NoneSet<T>();
+  @override
+  bool contains(Object? o) => false;
+  @override
+  bool containsAll(Iterable<Object?> o) => o.isEmpty;
+  @override
+  E? lookup(Object? o) => null;
+  @override
+  Set<E> toSet() => <E>{};
+  @override
+  Set<E> union(Set<E> o) => Set.of(o);
+  @override
+  Set<E> intersection(Set<Object?> o) => <E>{};
+  @override
+  Set<E> difference(Set<Object?> o) => <E>{};
+}
+
+void noneMain() {
+  const NoneSet<int> n = NoneSet<int>();
+  print('none ${n.length} ${n.contains(1)} ${n.isEmpty}');
+  final Set<num> c = n.cast<num>();
+  print('none cast ${c.length} ${c.isEmpty}');
+  try {
+    n.removeAll([1]);
+  } on UnsupportedError catch (e) {
+    print('none removeAll: ${e.message}');
+  }
+  try {
+    n.add(3);
+  } on UnsupportedError catch (e) {
+    print('none add: ${e.message}');
+  }
+  print(n.union({4, 5}).toList());
+  final FwdView<int> v = FwdView<int>({1, 2});
+  print('view ${v.length} ${v.cast<num>().length}');
+  try {
+    v.clear();
+  } on UnsupportedError catch (e) {
+    print('view clear: ${e.message}');
+  }
 }
