@@ -184,8 +184,49 @@ public class Icon extends Widget {
         return semanticLabel;
     }
 
+    /**
+     * Flutter's {@code Icon} is a {@code StatelessWidget}, so a subclass may override
+     * {@code build} to draw itself some other way (an icon font package's own icon class
+     * does exactly that). The exact class keeps its direct render element; a subclass is
+     * hosted by a composed element that calls {@link #build}, whose default is the glyph.
+     */
     @Override
     public Element createElement() {
-        return new IconRenderElement(this);
+        if (getClass() == Icon.class) {
+            return new IconRenderElement(this);
+        }
+        return new SubclassElement(this);
+    }
+
+    /**
+     * The default build: this icon's glyph, drawn by {@link IconRenderElement}. A
+     * subclass that overrides {@code build} may still call {@code super.build(context)}.
+     */
+    public Widget build(com.codename1.flutter.BuildContext context) {
+        Icon glyph = new Icon(icon);
+        glyph.size = size;
+        glyph.color = color;
+        glyph.semanticLabel = semanticLabel;
+        glyph.fill = fill;
+        glyph.weight = weight;
+        glyph.grade = grade;
+        glyph.opticalSize = opticalSize;
+        glyph.shadows = shadows;
+        glyph.textDirection = textDirection;
+        glyph.applyTextScaling = applyTextScaling;
+        glyph.blendMode = blendMode;
+        glyph.fontWeight = fontWeight;
+        return glyph;
+    }
+
+    private static final class SubclassElement extends com.codename1.flutter.ComposedElement {
+        SubclassElement(Icon widget) {
+            super(widget);
+        }
+
+        @Override
+        protected Widget build() {
+            return ((Icon) widget()).build(this);
+        }
     }
 }

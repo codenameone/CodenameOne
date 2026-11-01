@@ -94,8 +94,12 @@ public class RichTextRenderElement extends RenderElement {
         TextAlign a = richText().getTextAlign();
         boolean rtl = isRtl();
         if (a == null || a == TextAlign.justify) {
-            // A label cannot stretch its words; justified text is laid out from the start,
-            // which is where Flutter places a justified paragraph's last line too.
+            // Justify is laid out from the start edge here (where Flutter puts a justified
+            // paragraph's last line). Plain Text justifies for real in TextRenderElement's
+            // own painter; a RichText's runs are broken into lines and painted by the core
+            // RichTextComponent, whose setTextAlign takes only LEFT, CENTER and RIGHT and
+            // which exposes no per-line gap to stretch, so justifying spans needs that
+            // core component to learn it rather than a change in this runtime.
             a = TextAlign.start;
         }
         switch (a) {

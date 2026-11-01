@@ -91,10 +91,12 @@ public class FlexRenderElement extends RenderElement {
         boolean vertical = flex().isVertical();
         MainAxisAlignment mainAlign = flex().getMainAxisAlignment();
         CrossAxisAlignment crossAlign = flex().getCrossAxisAlignment();
+        // Baseline alignment lines a Row's children up on their first text baseline
+        // (RenderElement.distanceToBaseline). Flutter rejects it for a Column only when
+        // no textBaseline is given; a vertical flex has no cross-axis baseline to share,
+        // so it is laid out as start, as RenderFlex does.
+        boolean baseline = crossAlign == CrossAxisAlignment.baseline && !vertical;
         if (crossAlign == CrossAxisAlignment.baseline) {
-            // Baseline alignment lines children up on their first text baseline. The
-            // peers expose no baseline, so children are placed at the start, which is the
-            // same line for the common case of one font size in the row.
             crossAlign = CrossAxisAlignment.start;
         }
         MainAxisSize mainSizeMode = flex().getMainAxisSize();
@@ -182,6 +184,22 @@ public class FlexRenderElement extends RenderElement {
             }
         }
 
+        // Baseline: a child with a baseline sits so that baseline lands on the
+        // highest one; the cross size must then hold what hangs above and below it.
+        double maxAboveBaseline = 0;
+        if (baseline) {
+            double maxBelowBaseline = 0;
+            for (RenderElement child : renderChildren) {
+                Size cs = child.size();
+                double b = cs == null ? -1 : child.distanceToBaseline();
+                if (b >= 0) {
+                    maxAboveBaseline = Math.max(maxAboveBaseline, b);
+                    maxBelowBaseline = Math.max(maxBelowBaseline, cs.height() - b);
+                }
+            }
+            maxChildCross = Math.max(maxChildCross, maxAboveBaseline + maxBelowBaseline);
+        }
+
         // Own size.
         double mainSize = (mainSizeMode == MainAxisSize.max && boundedMain) ? maxMain : allocatedMain;
         mainSize = vertical ? constraints.constrainHeight(mainSize) : constraints.constrainWidth(mainSize);
@@ -221,7 +239,10 @@ public class FlexRenderElement extends RenderElement {
             Size cs = child.size();
             double childCross = crossOf(cs, vertical);
             double crossPos;
-            switch (crossAlign) {
+            double childBaseline = baseline ? child.distanceToBaseline() : -1;
+            if (childBaseline >= 0) {
+                crossPos = maxAboveBaseline - childBaseline;
+            } else switch (crossAlign) {
                 case start:
                 case stretch:
                     crossPos = 0;

@@ -220,8 +220,12 @@ public class TextRenderElement extends RenderElement {
         TextAlign a = text().getTextAlign();
         // Flutter's default is TextAlign.start, the right edge under right-to-left text.
         boolean rtl = isRtl();
+        // Justified text is laid out from the start edge; WrappedLabel.paint then
+        // stretches every line but a paragraph's last across the full width.
+        if (l instanceof WrappedLabel) {
+            ((WrappedLabel) l).justify = a == TextAlign.justify;
+        }
         if ((a == null && rtl) || a == TextAlign.justify) {
-            // A label cannot stretch its words; justified text is laid out from the start.
             a = TextAlign.start;
         }
         if (a != null) {
@@ -245,6 +249,22 @@ public class TextRenderElement extends RenderElement {
             }
             stylesToSet(l).setAlignment(cn1Align);
         }
+    }
+
+    /** The first line's baseline: where {@link WrappedLabel#paint} draws its glyphs. */
+    @Override
+    public double distanceToBaseline() {
+        Component c = component();
+        if (!(c instanceof WrappedLabel)) {
+            return -1;
+        }
+        WrappedLabel l = (WrappedLabel) c;
+        Font f = font(l);
+        if (f == null) {
+            return -1;
+        }
+        int lh = (int) Math.round(l.lineHeight(f));
+        return Math.max(0, (lh - f.getHeight()) / 2) + f.getAscent();
     }
 
     @Override
@@ -275,6 +295,7 @@ public class TextRenderElement extends RenderElement {
         if (!isDryPass()) {
             // Only a real pass may hand the painter its lines; see isDryPass().
             l.lines = lines;
+            l.lineEnds = paragraphEndsAfter;
         }
         double w = 0;
         for (String line : lines) {
@@ -625,6 +646,10 @@ public class TextRenderElement extends RenderElement {
         }
 
         List<String> lines;
+        /** Per line of {@link #lines}: whether a paragraph ends after it. */
+        List<Boolean> lineEnds;
+        /** {@code TextAlign.justify}: stretch the inter-word gaps of non-final lines. */
+        boolean justify;
         /** Flutter's TextStyle.letterSpacing, in device pixels. */
         double spacingPx;
         /// Flutter's {@code TextStyle.height} MULTIPLIED BY the font size, in device
@@ -715,8 +740,23 @@ public class TextRenderElement extends RenderElement {
                 }
                 return;
             }
+            int lineIndex = -1;
             for (String line : toPaint) {
+                lineIndex++;
                 int lineW = (int) Math.ceil(spacedWidth(f, line, spacingPx));
+                // Flutter justifies every line except the last of each paragraph; the
+                // slack goes evenly into that line's spaces.
+                int spaces = 0;
+                if (justify && multiLine && lineIndex < toPaint.size() - 1
+                        && !(lineEnds != null && lineIndex < lineEnds.size()
+                                && Boolean.TRUE.equals(lineEnds.get(lineIndex)))) {
+                    for (int i = 0; i < line.length(); i++) {
+                        if (line.charAt(i) == ' ') {
+                            spaces++;
+                        }
+                    }
+                }
+                double gapExtra = spaces > 0 ? Math.max(0, getWidth() - lineW) / (double) spaces : 0;
                 int x = getX();
                 if (align == Component.CENTER) {
                     x += (getWidth() - lineW) / 2;
@@ -734,8 +774,21 @@ public class TextRenderElement extends RenderElement {
                     }
                     g.setColor(s.getFgColor());
                 }
-                paintDecorations(g, f, x, y + glyphOffset, lineW, s.getFgColor());
-                if (spacingPx == 0) {
+                if (gapExtra <= 0) {
+                    paintDecorations(g, f, x, y + glyphOffset, lineW, s.getFgColor());
+                }
+                if (gapExtra > 0) {
+                    paintDecorations(g, f, x, y + glyphOffset, getWidth(), s.getFgColor());
+                    double scale = trackingScale(f, line);
+                    double cursor = x;
+                    for (int i = 0; i < line.length(); i++) {
+                        char ch = line.charAt(i);
+                        if (ch != ' ') {
+                            g.drawString(line.substring(i, i + 1), (int) Math.round(cursor), y + glyphOffset);
+                        }
+                        cursor += f.charWidth(ch) * scale + spacingPx + (ch == ' ' ? gapExtra : 0);
+                    }
+                } else if (spacingPx == 0) {
                     g.drawString(line, x, y + glyphOffset);
                 } else {
                     // One glyph at a time: the only way to add tracking, since Codename One

@@ -6361,11 +6361,10 @@ public final class JavaEmitter {
             // FutureOr) in a conditional whose slot is a concrete reference type: javac types
             // the ternary by its arms ("bad type in conditional expression"), so the arm takes
             // Dart's implicit downcast to the slot here.
-            // With no slot (`final n = last ? chunk.length : 0`) the local is declared with
-            // the conditional's own type, which is then the slot.
-            TypeRef slot = expected != null ? expected : t;
-            aCode = downcastArm(a, aCode, slot, ctx);
-            bCode = downcastArm(b, bCode, slot, ctx);
+            // Only a real slot: with none, Dart types `v is int ? v + 10 : v` as dynamic,
+            // and narrowing the dynamic arm to the other arm's type would be wrong.
+            aCode = downcastArm(a, aCode, expected, ctx);
+            bCode = downcastArm(b, bCode, expected, ctx);
             return new Out("(" + cond.code + " ? " + aCode + " : " + bCode + ")", t);
         }
         if (e instanceof NotNullAssert) {
@@ -10968,14 +10967,8 @@ public final class JavaEmitter {
                 }
                 ctx.writer().raw(rl.lifted);
                 right = rl.out;
-                // `_court = v ?? _court` with v an untyped closure parameter: its arm takes
-                // the implicit downcast to the slot (see downcastArm).
-                TypeRef nt = ifNullType(left.type, right.type);
-                // Dart types `dynamic ?? Court` as dynamic; javac types the ternary by its arms,
-                // so the dynamic arm is narrowed to the default's type (where it is assigned).
-                TypeRef slot = nt != null && isDynamicType(nt) && right.type != null ? right.type : nt;
-                return new Out("(" + left.code + " != null ? " + downcastArm(left, left.code, slot, ctx) + " : "
-                        + downcastArm(right, right.code, slot, ctx) + ")", nt);
+return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code + ")",
+                        ifNullType(left.type, right.type));
             }
             String tmp = ctx.newTemp();
             if (jt == null) {

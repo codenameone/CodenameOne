@@ -234,7 +234,15 @@ public class TextStyle {
         return fontWeight;
     }
 
+    /**
+     * Flutter's getter: with a {@code package} set, the family is
+     * {@code packages/<package>/<fontFamily>}, which is also what font lookup
+     * resolves against the package's bundled assets.
+     */
     public String fontFamily() {
+        if (fontFamily != null && fontPackage != null && !fontFamily.startsWith("packages/")) {
+            return "packages/" + fontPackage + "/" + fontFamily;
+        }
         return fontFamily;
     }
 
@@ -269,7 +277,7 @@ public class TextStyle {
     }
 
     public String getFontFamily() {
-        return fontFamily;
+        return fontFamily();
     }
 
     private TextStyle shallowClone() {
@@ -319,6 +327,7 @@ public class TextStyle {
         }
         if (other.fontFamily != null) {
             t.fontFamily = other.fontFamily;
+            t.fontPackage = other.fontPackage;
         }
         if (other.letterSpacing != null) {
             t.letterSpacing = other.letterSpacing;
@@ -353,7 +362,7 @@ public class TextStyle {
         if (decorationStyle instanceof TextDecorationStyle) t.decorationStyle((TextDecorationStyle) decorationStyle);
         if (decorationThickness != null) t.decorationThickness(decorationThickness);
         if (color != null) t.color = color;
-        if (fontFamily != null) t.fontFamily = fontFamily;
+        if (fontFamily != null) { t.fontFamily = fontFamily; t.fontPackage = null; }
         if (fontSize != null) t.fontSize = fontSize;
         if (fontWeight != null) t.fontWeight = fontWeight;
         if (letterSpacing != null) t.letterSpacing = letterSpacing;
@@ -372,7 +381,7 @@ public class TextStyle {
                            Double fontSizeFactor, Double fontSizeDelta, Object decoration) {
         TextStyle t = shallowClone();
         if (color != null) t.color = color;
-        if (fontFamily != null) t.fontFamily = fontFamily;
+        if (fontFamily != null) { t.fontFamily = fontFamily; t.fontPackage = null; }
         if (t.fontSize != null) {
             double factor = fontSizeFactor != null ? fontSizeFactor : 1.0;
             double delta = fontSizeDelta != null ? fontSizeDelta : 0.0;
