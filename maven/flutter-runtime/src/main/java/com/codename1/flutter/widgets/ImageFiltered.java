@@ -23,22 +23,19 @@
  */
 package com.codename1.flutter.widgets;
 
-import com.codename1.flutter.BuildContext;
-import com.codename1.flutter.StatelessWidget;
+import com.codename1.flutter.Element;
 import com.codename1.flutter.Widget;
-import com.codename1.flutter.widgets.Kit;
-import dart.core.DartList;
-import dart.runtime.Funcs;
 
-/** Flutter's {@code ImageFiltered}: the filter is not applied: Codename One cannot blur or matrix-filter a live subtree, so the child paints as is. */
-public class ImageFiltered extends StatelessWidget {
+/** Flutter's {@code ImageFiltered}: the child painted through {@code imageFilter} (a blur). */
+public class ImageFiltered extends Widget implements HasChild {
+    Object imageFilter;
+    Boolean enabled;
     private Widget child;
+    public void imageFilter(Object v) { this.imageFilter = v; }
+    public void enabled(Boolean v) { this.enabled = v; }
     public void child(Widget v) { this.child = v; }
-    public void shaderCallback(Object v) { }
-    public void blendMode(Object v) { }
-    public void filter(Object v) { }
-    public void imageFilter(Object v) { }
-    public void enabled(boolean v) { }
     @Override
-    public Widget build(BuildContext context) { return child; }
+    public Widget getChild() { return child; }
+    @Override
+    public Element createElement() { return new ImageFilteredRenderElement(this); }
 }

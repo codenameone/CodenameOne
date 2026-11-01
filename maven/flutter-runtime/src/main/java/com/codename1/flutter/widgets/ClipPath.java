@@ -23,27 +23,19 @@
  */
 package com.codename1.flutter.widgets;
 
-import com.codename1.flutter.BuildContext;
-import com.codename1.flutter.StatelessWidget;
+import com.codename1.flutter.Element;
 import com.codename1.flutter.Widget;
-import com.codename1.flutter.widgets.Kit;
-import dart.core.DartList;
-import dart.runtime.Funcs;
 
-/**
- * Flutter's {@code ClipPath}: the child clipped to its bounds. The clipper's path is
- * not honoured -- Codename One clips to rectangles and rounded rectangles only -- so a
- * shaped clip paints as {@link ClipRect}.
- */
-public class ClipPath extends StatelessWidget {
+/** Flutter's {@code ClipPath}: the child clipped to the path its {@code clipper} returns for the child's size, or to its bounds without one. */
+public class ClipPath extends Widget implements HasChild {
+    Object clipper;
+    Object clipBehavior;
     private Widget child;
+    public void clipper(Object v) { this.clipper = v; }
+    public void clipBehavior(Object v) { this.clipBehavior = v; }
     public void child(Widget v) { this.child = v; }
-    public void clipper(Object v) { }
-    public void clipBehavior(Object v) { }
     @Override
-    public Widget build(BuildContext context) {
-        ClipRect r = new ClipRect();
-        r.child(child);
-        return r;
-    }
+    public Widget getChild() { return child; }
+    @Override
+    public Element createElement() { return new ClipPathRenderElement(this); }
 }

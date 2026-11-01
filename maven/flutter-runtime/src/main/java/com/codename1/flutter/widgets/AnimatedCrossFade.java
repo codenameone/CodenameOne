@@ -23,34 +23,84 @@
  */
 package com.codename1.flutter.widgets;
 
+import com.codename1.flutter.Alignment;
 import com.codename1.flutter.BuildContext;
-import com.codename1.flutter.StatelessWidget;
+import com.codename1.flutter.State;
+import com.codename1.flutter.StatefulWidget;
 import com.codename1.flutter.Widget;
-import com.codename1.flutter.widgets.Kit;
-import dart.core.DartList;
-import dart.runtime.Funcs;
+import com.codename1.flutter.animation.Curve;
+import dart.core.Duration;
 
 /**
- * Flutter's {@code AnimatedCrossFade}: {@code firstChild} or {@code secondChild},
- * as {@code crossFadeState} says. The switch is immediate; the fade is not animated.
+ * Flutter's {@code AnimatedCrossFade}: {@code firstChild} or {@code secondChild}, as
+ * {@code crossFadeState} says. A change fades one out and the other in over
+ * {@code duration}, both stacked while the fade runs; at rest only the shown child is
+ * laid out, so the widget takes its size.
  */
-public class AnimatedCrossFade extends StatelessWidget {
+public class AnimatedCrossFade extends StatefulWidget {
     private Widget firstChild;
     private Widget secondChild;
     private CrossFadeState crossFadeState = CrossFadeState.showFirst;
+    private Duration duration;
+    private Duration reverseDuration;
+    private Curve sizeCurve;
+    private Object alignment;
     public void firstChild(Widget v) { this.firstChild = v; }
     public void secondChild(Widget v) { this.secondChild = v; }
     public void crossFadeState(CrossFadeState v) { if (v != null) { this.crossFadeState = v; } }
-    public void duration(Object v) { }
-    public void reverseDuration(Object v) { }
+    public void duration(Duration v) { this.duration = v; }
+    public void reverseDuration(Duration v) { this.reverseDuration = v; }
     public void firstCurve(Object v) { }
     public void secondCurve(Object v) { }
-    public void sizeCurve(Object v) { }
-    public void alignment(Object v) { }
+    public void sizeCurve(Curve v) { this.sizeCurve = v; }
+    public void alignment(Object v) { this.alignment = v; }
     public void layoutBuilder(Object v) { }
     public void excludeBottomFocus(boolean v) { }
+
     @Override
-    public Widget build(BuildContext context) {
-        return crossFadeState == CrossFadeState.showSecond ? secondChild : firstChild;
+    public State<? extends StatefulWidget> createState() {
+        return new FadeState();
+    }
+
+    private static final class FadeState extends State<AnimatedCrossFade> {
+        private ImplicitValue value;
+
+        private static double target(AnimatedCrossFade w) {
+            return w.crossFadeState == CrossFadeState.showSecond ? 1 : 0;
+        }
+
+        @Override
+        public void initState() {
+            super.initState();
+            value = new ImplicitValue(target(widget()), this);
+        }
+
+        @Override
+        public Widget build(BuildContext context) {
+            AnimatedCrossFade w = widget();
+            double t = target(w);
+            Duration d = t == 0 && w.reverseDuration != null ? w.reverseDuration : w.duration;
+            value.retarget(t, d, w.sizeCurve);
+            double v = value.value();
+            if (!value.isAnimating() || v <= 0 || v >= 1) {
+                return v >= 0.5 ? w.secondChild : w.firstChild;
+            }
+            Opacity first = new Opacity();
+            first.opacity(1 - v);
+            first.child(w.firstChild);
+            Opacity second = new Opacity();
+            second.opacity(v);
+            second.child(w.secondChild);
+            Stack s = new Stack();
+            s.alignment(w.alignment instanceof Alignment ? (Alignment) w.alignment : Alignment.topCenter);
+            s.children(Kit.list(first, second));
+            return s;
+        }
+
+        @Override
+        public void dispose() {
+            value.dispose();
+            super.dispose();
+        }
     }
 }

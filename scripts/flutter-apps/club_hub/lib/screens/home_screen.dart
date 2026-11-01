@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'effects_lab_screen.dart';
 import 'forms_lab_screen.dart';
 import 'packages_lab_screen.dart';
 import 'style_lab_screen.dart';
@@ -12,6 +13,11 @@ class HomeScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Club Hub')),
       persistentFooterButtons: [
+        TextButton(
+          onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const EffectsLabScreen())),
+          child: const Text('Effects'),
+        ),
         TextButton(
           onPressed: () => Navigator.of(context).push(
               MaterialPageRoute<void>(builder: (_) => const FormsLabScreen())),

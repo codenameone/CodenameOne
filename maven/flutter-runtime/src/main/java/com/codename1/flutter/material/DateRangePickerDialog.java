@@ -24,48 +24,62 @@
 package com.codename1.flutter.material;
 
 import com.codename1.flutter.BuildContext;
-import com.codename1.flutter.StatelessWidget;
+import com.codename1.flutter.Color;
+import com.codename1.flutter.CrossAxisAlignment;
+import com.codename1.flutter.FontWeight;
+import com.codename1.flutter.MainAxisAlignment;
+import com.codename1.flutter.State;
+import com.codename1.flutter.StatefulWidget;
+import com.codename1.flutter.TextStyle;
 import com.codename1.flutter.Widget;
-import com.codename1.flutter.widgets.Container;
-
+import com.codename1.flutter.navigation.Navigator;
+import com.codename1.flutter.widgets.Center;
+import com.codename1.flutter.widgets.Kit;
 import dart.async.Future;
 import dart.core.DateTime;
+import dart.runtime.Funcs;
 
-/**
- * A material date-range-picker dialog — Flutter's {@code DateRangePickerDialog}.
- * This milestone renders a placeholder surface; the range calendar and
- * confirm/cancel flow land in a later pass. The configured bounds are retained.
- */
-public class DateRangePickerDialog extends StatelessWidget {
-
-    private String restorationId;
+/** Flutter's Material {@code DateRangePickerDialog}: two taps choose a start and an end. */
+public class DateRangePickerDialog extends StatefulWidget {
     private DateTime firstDate;
     private DateTime lastDate;
-    private DateTime currentDate;
+    private Object initialDateRange;
+    private String helpText;
+    private String cancelText;
+    private String saveText;
 
-    public void restorationId(String v) {
-        this.restorationId = v;
-    }
-
-    public void firstDate(DateTime v) {
-        this.firstDate = v;
-    }
-
-    public void lastDate(DateTime v) {
-        this.lastDate = v;
-    }
-
-    public void currentDate(DateTime v) {
-        this.currentDate = v;
-    }
+    public void restorationId(Object v) { }
+    public void firstDate(DateTime v) { this.firstDate = v; }
+    public void lastDate(DateTime v) { this.lastDate = v; }
+    public void currentDate(DateTime v) { }
+    public void initialDateRange(Object v) { this.initialDateRange = v; }
+    public void helpText(String v) { this.helpText = v; }
+    public void cancelText(String v) { this.cancelText = v; }
+    public void saveText(String v) { this.saveText = v; }
 
     @Override
-    public Widget build(BuildContext context) {
-        return new Container();
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public State<? extends StatefulWidget> createState() {
+        DateTime s = null;
+        DateTime e = null;
+        if (initialDateRange instanceof dart.core.DateTimeRange) {
+            s = ((dart.core.DateTimeRange) initialDateRange).start();
+            e = ((dart.core.DateTimeRange) initialDateRange).end();
+        }
+        return (State) new CalendarPickerState(true, s, e, firstDate, lastDate, helpText, cancelText,
+                saveText == null ? "Save" : saveText);
     }
 
-    /** Top-level {@code showDateRangePicker(...)} — shows the dialog and completes with the chosen range. */
-    public static Future<Object> show(BuildContext context, DateTime firstDate, DateTime lastDate) {
-        return null;
+    /** Top-level {@code showDateRangePicker(...)}: completes with the range, or null when cancelled. */
+    public static Future<Object> show(BuildContext context, DateTime firstDate, DateTime lastDate,
+            Object initialDateRange, DateTime currentDate, String helpText, String cancelText, String saveText) {
+        DateRangePickerDialog d = new DateRangePickerDialog();
+        d.firstDate(firstDate);
+        d.lastDate(lastDate);
+        d.initialDateRange(initialDateRange);
+        d.helpText(helpText);
+        d.cancelText(cancelText);
+        d.saveText(saveText);
+        return PickerKit.show(context, d);
     }
 }

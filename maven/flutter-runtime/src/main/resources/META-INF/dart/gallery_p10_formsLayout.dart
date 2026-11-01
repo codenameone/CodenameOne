@@ -111,7 +111,7 @@ class ListBody extends Widget {
 @JavaName('com.codename1.flutter.widgets.AnimatedScale')
 class AnimatedScale extends Widget {
   external AnimatedScale({Key? key, required double scale, required Duration duration, Widget? child,
-      Object? alignment, Object? curve, Object? onEnd, Object? filterQuality});
+      Object? alignment, Curve? curve, Object? onEnd, Object? filterQuality});
 }
 
 @JavaName('com.codename1.flutter.widgets.CrossFadeState')
@@ -121,29 +121,60 @@ enum CrossFadeState { showFirst, showSecond }
 class AnimatedCrossFade extends Widget {
   external AnimatedCrossFade({Key? key, required Widget firstChild, required Widget secondChild,
       required CrossFadeState crossFadeState, required Duration duration, Duration? reverseDuration,
-      Object? firstCurve, Object? secondCurve, Object? sizeCurve, Object? alignment, Object? layoutBuilder,
+      Object? firstCurve, Object? secondCurve, Curve? sizeCurve, Object? alignment, Object? layoutBuilder,
       bool? excludeBottomFocus});
+}
+
+// dart:ui's ImageFilter; blur is the filter the runtime renders.
+@JavaName('com.codename1.flutter.ImageFilter')
+class ImageFilter {
+  external static ImageFilter blur({double? sigmaX, double? sigmaY, TileMode? tileMode});
+}
+
+// Flutter's CustomClipper: subclass it and return the clip for the child's size.
+@JavaName('com.codename1.flutter.rendering.CustomClipper')
+abstract class CustomClipper<T> {
+  external CustomClipper({Object? reclip});
+  T getClip(Size size);
+  bool shouldReclip(covariant CustomClipper<T> oldClipper);
 }
 
 @JavaName('com.codename1.flutter.widgets.ShaderMask')
 class ShaderMask extends Widget {
-  external ShaderMask({Key? key, required Object shaderCallback, Object? blendMode, Widget? child});
+  external ShaderMask({Key? key, required Shader Function(Rect bounds) shaderCallback, BlendMode? blendMode,
+      Widget? child});
 }
 
 @JavaName('com.codename1.flutter.widgets.BackdropFilter')
 class BackdropFilter extends Widget {
-  external BackdropFilter({Key? key, required Object filter, Widget? child, Object? blendMode, bool? enabled});
+  external BackdropFilter({Key? key, required ImageFilter filter, Widget? child, BlendMode? blendMode,
+      bool? enabled});
 }
 
 @JavaName('com.codename1.flutter.widgets.ImageFiltered')
 class ImageFiltered extends Widget {
-  external ImageFiltered({Key? key, required Object imageFilter, Widget? child, bool? enabled});
+  external ImageFiltered({Key? key, required ImageFilter imageFilter, Widget? child, bool? enabled});
 }
 
 @JavaName('com.codename1.flutter.widgets.ClipPath')
 class ClipPath extends Widget {
-  external ClipPath({Key? key, Object? clipper, Object? clipBehavior, Widget? child});
+  external ClipPath({Key? key, CustomClipper<Path>? clipper, Object? clipBehavior, Widget? child});
 }
+
+// The Material picker dialogs: each completes with the choice, or null when cancelled.
+@JavaName('com.codename1.flutter.material.DatePickerDialog.show')
+external Future<DateTime?> showDatePicker({required BuildContext context, DateTime? initialDate,
+    required DateTime firstDate, required DateTime lastDate, DateTime? currentDate, String? helpText,
+    String? cancelText, String? confirmText});
+
+@JavaName('com.codename1.flutter.material.TimePickerDialog.show')
+external Future<TimeOfDay?> showTimePicker({required BuildContext context, required TimeOfDay initialTime,
+    String? helpText, String? cancelText, String? confirmText});
+
+@JavaName('com.codename1.flutter.material.DateRangePickerDialog.show')
+external Future<DateTimeRange?> showDateRangePicker({required BuildContext context, required DateTime firstDate,
+    required DateTime lastDate, DateTimeRange? initialDateRange, DateTime? currentDate, String? helpText,
+    String? cancelText, String? saveText});
 
 @JavaName('com.codename1.flutter.widgets.TableColumnWidth')
 abstract class TableColumnWidth {}

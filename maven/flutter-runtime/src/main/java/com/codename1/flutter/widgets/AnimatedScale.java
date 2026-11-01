@@ -24,31 +24,59 @@
 package com.codename1.flutter.widgets;
 
 import com.codename1.flutter.BuildContext;
-import com.codename1.flutter.StatelessWidget;
+import com.codename1.flutter.State;
+import com.codename1.flutter.StatefulWidget;
 import com.codename1.flutter.Widget;
-import com.codename1.flutter.widgets.Kit;
-import dart.core.DartList;
-import dart.runtime.Funcs;
+import com.codename1.flutter.animation.Curve;
+import dart.core.Duration;
 
 /**
  * Flutter's {@code AnimatedScale}: the child scaled by {@code scale} about
- * {@code alignment}. The new scale is applied at once; the tween is not animated.
+ * {@code alignment}; a new scale is animated to over {@code duration} along {@code curve}.
  */
-public class AnimatedScale extends StatelessWidget {
+public class AnimatedScale extends StatefulWidget {
     private double scale = 1;
     private Widget child;
     private Object alignment;
+    private Duration duration;
+    private Curve curve;
+    private Object onEnd;
     public void scale(double v) { this.scale = v; }
     public void child(Widget v) { this.child = v; }
     public void alignment(Object v) { this.alignment = v; }
-    public void duration(Object v) { }
-    public void curve(Object v) { }
-    public void onEnd(Object v) { }
+    public void duration(Duration v) { this.duration = v; }
+    public void curve(Curve v) { this.curve = v; }
+    public void onEnd(Object v) { this.onEnd = v; }
     public void filterQuality(Object v) { }
+
     @Override
-    public Widget build(BuildContext context) {
-        Transform t = Transform.scale(null, Double.valueOf(scale), null, null, null,
-                alignment == null ? com.codename1.flutter.Alignment.center : alignment, null, null, child);
-        return t;
+    public State<? extends StatefulWidget> createState() {
+        return new ScaleState();
+    }
+
+    private static final class ScaleState extends State<AnimatedScale> {
+        private ImplicitValue value;
+
+        @Override
+        public void initState() {
+            super.initState();
+            value = new ImplicitValue(widget().scale, this);
+        }
+
+        @Override
+        public Widget build(BuildContext context) {
+            AnimatedScale w = widget();
+            value.onEnd(w.onEnd);
+            value.retarget(w.scale, w.duration, w.curve);
+            return Transform.scale(null, Double.valueOf(value.value()), null, null, null,
+                    w.alignment == null ? com.codename1.flutter.Alignment.center : w.alignment,
+                    null, null, w.child);
+        }
+
+        @Override
+        public void dispose() {
+            value.dispose();
+            super.dispose();
+        }
     }
 }

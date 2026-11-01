@@ -23,22 +23,21 @@
  */
 package com.codename1.flutter.widgets;
 
-import com.codename1.flutter.BuildContext;
-import com.codename1.flutter.StatelessWidget;
+import com.codename1.flutter.Element;
 import com.codename1.flutter.Widget;
-import com.codename1.flutter.widgets.Kit;
-import dart.core.DartList;
-import dart.runtime.Funcs;
 
-/** Flutter's {@code BackdropFilter}: the filter is not applied: blurring what is already painted behind a widget has no Codename One equivalent, so only the child paints. */
-public class BackdropFilter extends StatelessWidget {
+/** Flutter's {@code BackdropFilter}: what is already painted under the widget is blurred by {@code filter}, then the child paints over it. */
+public class BackdropFilter extends Widget implements HasChild {
+    Object filter;
+    Object blendMode;
+    Boolean enabled;
     private Widget child;
+    public void filter(Object v) { this.filter = v; }
+    public void blendMode(Object v) { this.blendMode = v; }
+    public void enabled(Boolean v) { this.enabled = v; }
     public void child(Widget v) { this.child = v; }
-    public void shaderCallback(Object v) { }
-    public void blendMode(Object v) { }
-    public void filter(Object v) { }
-    public void imageFilter(Object v) { }
-    public void enabled(boolean v) { }
     @Override
-    public Widget build(BuildContext context) { return child; }
+    public Widget getChild() { return child; }
+    @Override
+    public Element createElement() { return new BackdropFilterRenderElement(this); }
 }

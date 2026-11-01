@@ -84,7 +84,9 @@ public final class Dialogs {
             Boolean barrierDismissible, com.codename1.flutter.Color barrierColor, String barrierLabel,
             Boolean useSafeArea, Boolean useRootNavigator, Object routeSettings) {
         applyBarrier(barrierColor);
-        if (useSafeArea != null && useSafeArea.booleanValue()) {
+        // useSafeArea defaults to true in Flutter: only an explicit false lets the dialog
+        // reach under the system insets.
+        if (useSafeArea == null || useSafeArea.booleanValue()) {
             // Flutter wraps the dialog in a SafeArea, so it never reaches under a notch
             // or the system bars.
             final Funcs.Func1<BuildContext, Widget> inner = builder;

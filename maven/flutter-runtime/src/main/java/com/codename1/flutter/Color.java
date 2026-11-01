@@ -30,6 +30,9 @@ package com.codename1.flutter;
 public class Color {
 
     private final int value;
+    /// The channels as given to {@code withValues}, which Flutter keeps as floats: 0.5
+    /// alpha reads back as 0.5, not as 128 / 255. The packed value stays 8-bit.
+    private double[] exact;
 
     public Color(long argb) {
         // Dart `int` maps to Java `long` in the transpiler, and opaque ARGB
@@ -93,22 +96,22 @@ public class Color {
      */
     /** Flutter's {@code Color.a}: the alpha channel as a fraction 0..1. */
     public double a() {
-        return alpha() / 255.0;
+        return exact != null ? exact[0] : alpha() / 255.0;
     }
 
     /** Flutter's {@code Color.r}: the red channel as a fraction 0..1. */
     public double r() {
-        return red() / 255.0;
+        return exact != null ? exact[1] : red() / 255.0;
     }
 
     /** Flutter's {@code Color.g}: the green channel as a fraction 0..1. */
     public double g() {
-        return green() / 255.0;
+        return exact != null ? exact[2] : green() / 255.0;
     }
 
     /** Flutter's {@code Color.b}: the blue channel as a fraction 0..1. */
     public double b() {
-        return blue() / 255.0;
+        return exact != null ? exact[3] : blue() / 255.0;
     }
 
     /**
@@ -121,7 +124,17 @@ public class Color {
         int nr = red == null ? red() : channel(red.doubleValue());
         int ng = green == null ? green() : channel(green.doubleValue());
         int nb = blue == null ? blue() : channel(blue.doubleValue());
-        return new Color(((long) na << 24) | ((long) nr << 16) | ((long) ng << 8) | nb);
+        Color c = new Color(((long) na << 24) | ((long) nr << 16) | ((long) ng << 8) | nb);
+        c.exact = new double[] {
+            alpha == null ? a() : clamp01(alpha.doubleValue()),
+            red == null ? r() : clamp01(red.doubleValue()),
+            green == null ? g() : clamp01(green.doubleValue()),
+            blue == null ? b() : clamp01(blue.doubleValue())};
+        return c;
+    }
+
+    private static double clamp01(double f) {
+        return f < 0 ? 0 : f > 1 ? 1 : f;
     }
 
     private static int channel(double f) {

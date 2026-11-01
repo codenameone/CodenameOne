@@ -103,7 +103,7 @@ public class NotchedSurfaceRenderElement extends EffectRenderElement {
     /// surface uses from the same kind of element -- paints. Only the verbs a notched
     /// outline uses are handled; anything else closes the subpath so a partial outline
     /// never leaks into the fill.
-    private static com.codename1.ui.geom.GeneralPath toGeneralPath(
+    public static com.codename1.ui.geom.GeneralPath toGeneralPath(
             com.codename1.flutter.Path path, int ox, int oy, double dpr) {
         com.codename1.ui.geom.GeneralPath out = new com.codename1.ui.geom.GeneralPath();
         double cx = 0;

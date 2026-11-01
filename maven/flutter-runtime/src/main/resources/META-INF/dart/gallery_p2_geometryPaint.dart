@@ -280,6 +280,10 @@ class BorderRadius extends BorderRadiusGeometry {
   external static BorderRadius? lerp(BorderRadius? a, BorderRadius? b, double t);
   external RRect toRRect(Rect rect);
   external BorderRadius copyWith({Radius? topLeft, Radius? topRight, Radius? bottomLeft, Radius? bottomRight});
+  external Radius get topLeft;
+  external Radius get topRight;
+  external Radius get bottomLeft;
+  external Radius get bottomRight;
 }
 
 @JavaName('com.codename1.flutter.BorderRadiusDirectional')

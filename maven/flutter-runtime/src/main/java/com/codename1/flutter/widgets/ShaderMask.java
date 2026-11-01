@@ -23,22 +23,19 @@
  */
 package com.codename1.flutter.widgets;
 
-import com.codename1.flutter.BuildContext;
-import com.codename1.flutter.StatelessWidget;
+import com.codename1.flutter.Element;
 import com.codename1.flutter.Widget;
-import com.codename1.flutter.widgets.Kit;
-import dart.core.DartList;
-import dart.runtime.Funcs;
 
-/** Flutter's {@code ShaderMask}: the shader is not applied: Codename One has no per-pixel shader blend for a subtree, so the child paints unmasked. */
-public class ShaderMask extends StatelessWidget {
+/** Flutter's {@code ShaderMask}: the child composited with the shader {@code shaderCallback} makes for its bounds, under {@code blendMode} (modulate by default). */
+public class ShaderMask extends Widget implements HasChild {
+    Object shaderCallback;
+    com.codename1.flutter.BlendMode blendMode;
     private Widget child;
+    public void shaderCallback(Object v) { this.shaderCallback = v; }
+    public void blendMode(com.codename1.flutter.BlendMode v) { this.blendMode = v; }
     public void child(Widget v) { this.child = v; }
-    public void shaderCallback(Object v) { }
-    public void blendMode(Object v) { }
-    public void filter(Object v) { }
-    public void imageFilter(Object v) { }
-    public void enabled(boolean v) { }
     @Override
-    public Widget build(BuildContext context) { return child; }
+    public Widget getChild() { return child; }
+    @Override
+    public Element createElement() { return new ShaderMaskRenderElement(this); }
 }
