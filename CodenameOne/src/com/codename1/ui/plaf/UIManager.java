@@ -563,9 +563,10 @@ public class UIManager {
     /// where we would be out of options if something like that happens. Effectively this is the same as writing:
     ///
     /// ```java
+    /// String resourceFile = "/theme";
     /// Resources theme = null;
     /// try {
-    ///     theme = Resources.openLayered(resourceFile);
+    ///     theme = Resources.openLayered("/theme");
     ///     UIManager.getInstance().setThemeMap(theme.getThemeMap(theme.getThemeResourceNames()[0]));
     /// } catch (IOException e) {
     ///     Log.e(e);

@@ -118,9 +118,9 @@ public final class Audience {
     private int value(Profile p, String field) {
         switch (field) {
             case "daysAway":
-                return days(now - p.getLastSeen());
+                return days(now - p.getLastSeen().toEpochMilli());
             case "daysSinceJoin":
-                return days(now - p.getCreatedAt());
+                return days(now - p.getCreatedAt().toEpochMilli());
             case "trophies":
                 return p.getTrophies();
             case "battles":

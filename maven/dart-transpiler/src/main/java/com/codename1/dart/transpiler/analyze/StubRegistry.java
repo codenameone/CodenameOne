@@ -48,6 +48,15 @@ public final class StubRegistry {
     public final Map<String, Ast.EnumDecl> enums = new LinkedHashMap<String, Ast.EnumDecl>();
     public final Map<String, Ast.FunctionDecl> functions = new LinkedHashMap<String, Ast.FunctionDecl>();
     public final Map<String, Ast.FieldDecl> topLevelVars = new LinkedHashMap<String, Ast.FieldDecl>();
+    /**
+     * Top-level functions of a {@code dart:} library whose names collide with another
+     * library's: {@code dart:developer}'s {@code log} is not {@code dart:math}'s. They are
+     * declared in a stub file named {@code dartlib_<library>.dart}, kept out of
+     * {@link #functions}, and resolved only through an import of {@code dart:<library>}.
+     * Its classes and enums are global like any other stub's.
+     */
+    public final Map<String, Map<String, Ast.FunctionDecl>> libraryFunctions =
+            new LinkedHashMap<String, Map<String, Ast.FunctionDecl>>();
     /** Stub extension declarations (`extension X on T { ... }`), keyed via their {@code on} type. */
     public final List<Ast.ClassDecl> extensions = new ArrayList<Ast.ClassDecl>();
 
@@ -147,24 +156,107 @@ public final class StubRegistry {
     public void load(String name, String source, Diagnostics diags) {
         AstBuilder builder = new AstBuilder(diags);
         Ast.Library lib = builder.parse(name, source);
+        java.util.regex.Matcher pm = PACKAGE_LINE.matcher(source);
+        String pkg = pm.find() ? pm.group(1) : null;
         for (Ast.ClassDecl c : lib.classes) {
             if (c.extensionOn != null) {
                 extensions.add(c);
             } else {
                 classes.put(c.name, c);
+                variant(c.name, pkg, c);
             }
         }
         for (Ast.EnumDecl e : lib.enums) {
             enums.put(e.name, e);
+            variant(e.name, pkg, e);
         }
+        String scoped = scopedLibrary(name);
         for (Ast.FunctionDecl f : lib.functions) {
-            functions.put(f.name, f);
+            if (scoped == null) {
+                functions.put(f.name, f);
+            } else {
+                Map<String, Ast.FunctionDecl> m = libraryFunctions.get(scoped);
+                if (m == null) {
+                    m = new LinkedHashMap<String, Ast.FunctionDecl>();
+                    libraryFunctions.put(scoped, m);
+                }
+                m.put(f.name, f);
+            }
         }
         for (Ast.FieldDecl v : lib.topLevelVars) {
             if (v.javaName != null) {
                 topLevelVars.put(v.name, v);
             }
         }
+    }
+
+    /// `// cn1:package firebase_app_check` at the top of a stub file: the pub package whose
+    /// API the file declares.
+    private static final java.util.regex.Pattern PACKAGE_LINE =
+            java.util.regex.Pattern.compile("(?m)^//\\s*cn1:package\\s+([A-Za-z0-9_]+)");
+
+    /// A type name and every stub file's declaration of it, with the package that file
+    /// declares. Stubs share one namespace, but two pub packages can both export a name:
+    /// firebase_app_check's `AppleProvider` enum and firebase_ui_oauth_apple's
+    /// `AppleProvider` class. Dart keeps them apart by what a file imports, and so does
+    /// [#viewFrom].
+    private final Map<String, List<Object[]>> variants = new LinkedHashMap<String, List<Object[]>>();
+
+    private void variant(String name, String pkg, Object decl) {
+        List<Object[]> l = variants.get(name);
+        if (l == null) {
+            l = new java.util.ArrayList<Object[]>();
+            variants.put(name, l);
+        }
+        l.add(new Object[] {pkg, decl});
+    }
+
+    /// Makes every type name more than one package declares resolve to the declaration of
+    /// the package `importedPackages` contains, for the library about to be emitted. A
+    /// library importing neither sees the one loaded last.
+    public void viewFrom(java.util.Collection<String> importedPackages) {
+        viewFrom(importedPackages, java.util.Collections.<String>emptySet());
+    }
+
+    /// As [#viewFrom(java.util.Collection)], and a type the program itself declares in
+    /// `programTypes` hides a stub of a package the library does not import: emoji_picker's
+    /// `Config` must not shadow an application's own `Config`.
+    public void viewFrom(java.util.Collection<String> importedPackages, java.util.Set<String> programTypes) {
+        // Rebuilt from the loaded declarations on every call, never from what the previous
+        // library's view left behind: a choice or a removal made for one library must not
+        // carry over to the next.
+        for (Map.Entry<String, List<Object[]>> e : variants.entrySet()) {
+            List<Object[]> l = e.getValue();
+            Object[] chosen = l.get(l.size() - 1);
+            for (Object[] v : l) {
+                if (v[0] != null && importedPackages.contains(v[0])) {
+                    chosen = v;
+                    break;
+                }
+            }
+            String name = e.getKey();
+            classes.remove(name);
+            enums.remove(name);
+            boolean visible = chosen[0] == null || importedPackages.contains(chosen[0]);
+            if (!visible && programTypes.contains(name)) {
+                continue;
+            }
+            if (chosen[1] instanceof Ast.ClassDecl) {
+                classes.put(name, (Ast.ClassDecl) chosen[1]);
+            } else {
+                enums.put(name, (Ast.EnumDecl) chosen[1]);
+            }
+        }
+    }
+
+    /** {@code developer} for {@code .../dartlib_developer.dart}, else null. */
+    static String scopedLibrary(String stubName) {
+        String base = stubName.replace('\\', '/');
+        base = base.substring(base.lastIndexOf('/') + 1);
+        if (base.startsWith("dartlib_") && base.endsWith(".dart")) {
+            return base.substring("dartlib_".length(), base.length() - ".dart".length());
+        }
+        return null;
     }
 
     public boolean isStubClass(String dartName) {

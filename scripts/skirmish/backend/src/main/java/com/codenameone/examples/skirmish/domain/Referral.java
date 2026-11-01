@@ -21,6 +21,7 @@ package com.codenameone.examples.skirmish.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
+import java.time.Instant;
 
 /// A player who joined through someone's invite, keyed by that player: one
 /// inviter each, for good.
@@ -52,10 +53,10 @@ public class Referral {
     private boolean rewarded;
 
     @Column(nullable = false)
-    private long joinedAt;
+    private Instant joinedAt = Instant.EPOCH;
 
     @Column(nullable = false)
-    private long playedAt;
+    private Instant playedAt = Instant.EPOCH;
 
     public Referral() {
     }
@@ -124,19 +125,19 @@ public class Referral {
         this.rewarded = rewarded;
     }
 
-    public long getJoinedAt() {
+    public Instant getJoinedAt() {
         return joinedAt;
     }
 
-    public void setJoinedAt(long joinedAt) {
+    public void setJoinedAt(Instant joinedAt) {
         this.joinedAt = joinedAt;
     }
 
-    public long getPlayedAt() {
+    public Instant getPlayedAt() {
         return playedAt;
     }
 
-    public void setPlayedAt(long playedAt) {
+    public void setPlayedAt(Instant playedAt) {
         this.playedAt = playedAt;
     }
 }

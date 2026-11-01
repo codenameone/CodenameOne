@@ -45,6 +45,7 @@ import com.codenameone.examples.wayline.repository.ProfileRepository;
 import com.codenameone.examples.wayline.ride.Fares;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -254,7 +255,7 @@ public class Applications {
         // looked at the one it replaced.
         hold(username);
         editable(username);
-        long now = System.currentTimeMillis();
+        Instant now = Instant.now();
         // Replaced with a statement where there is one already, so the picture
         // it held is not read only to be overwritten.
         if (documents.replace(username, kind, type, "uploaded", now, data) == 0) {
@@ -325,7 +326,7 @@ public class Applications {
             throw new ResponseStatusException(400, what.toString());
         }
         // Held to the status it was read in: handed in twice, it is handed in once.
-        applications.submit(username, was, PENDING, System.currentTimeMillis());
+        applications.submit(username, was, PENDING, Instant.now());
         return get(username);
     }
 
@@ -439,7 +440,7 @@ public class Applications {
             applications.insert(blank(username, APPROVED, "", ""));
             return;
         }
-        applications.approveUnlessApproved(username, APPROVED, System.currentTimeMillis(), by);
+        applications.approveUnlessApproved(username, APPROVED, Instant.now(), by);
     }
 
     /// Takes the approval back, when an admin withdraws the DRIVER role. The
@@ -447,7 +448,7 @@ public class Applications {
     @Transactional
     public void withdraw(String by, String username) throws IOException {
         applications.move(username, APPROVED, REJECTED, "Driving was withdrawn by an admin",
-                System.currentTimeMillis(), by);
+                Instant.now(), by);
     }
 
     /// Everything kept about an account's application, for an account being
@@ -468,7 +469,7 @@ public class Applications {
         if (find(username) == null) {
             throw new ResponseStatusException(404, "No such application");
         }
-        if (applications.move(username, PENDING, to, reason, System.currentTimeMillis(), by)
+        if (applications.move(username, PENDING, to, reason, Instant.now(), by)
                 != 1) {
             throw new ResponseStatusException(409, "That application is not waiting for an answer");
         }
@@ -543,7 +544,7 @@ public class Applications {
     /// moment it was made.
     private static DriverApplication blank(String username, String status, String vehicle,
             String plate) {
-        long now = System.currentTimeMillis();
+        Instant now = Instant.now();
         DriverApplication application = new DriverApplication();
         application.setUsername(username);
         application.setStatus(status);
@@ -552,7 +553,7 @@ public class Applications {
         application.setVehicleSeats(4);
         application.setProduct(Fares.STANDARD);
         application.setCreatedAt(now);
-        application.setReviewedAt(APPROVED.equals(status) ? now : 0L);
+        application.setReviewedAt(APPROVED.equals(status) ? now : Instant.EPOCH);
         return application;
     }
 
@@ -584,7 +585,10 @@ public class Applications {
                 if (KINDS[kind].equals(stored[from])) {
                     status = (String) stored[from + 1];
                     Object at = stored[from + 2];
-                    uploadedAt = at instanceof Number ? ((Number) at).longValue() : 0L;
+                    if (!(at instanceof Instant)) {
+                        throw new IllegalStateException("Not a time: " + at);
+                    }
+                    uploadedAt = ((Instant) at).toEpochMilli();
                 }
             }
             listed.add(new DocumentDto(KINDS[kind], status, uploadedAt));
@@ -599,8 +603,8 @@ public class Applications {
                 row.getVehicleMake(), row.getVehicleModel(), row.getVehicleYear(),
                 row.getVehicleColor(), row.getVehiclePlate(), row.getVehicleSeats(),
                 row.getProduct(), row.isWheelchair(), row.isPets(), listed,
-                row.getRejectionReason(), row.getSubmittedAt(), row.getReviewedAt(),
-                row.getReviewedBy());
+                row.getRejectionReason(), row.getSubmittedAt().toEpochMilli(),
+                row.getReviewedAt().toEpochMilli(), row.getReviewedBy());
     }
 
     /// Width and height from a PNG's header chunk, or null without one.

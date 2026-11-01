@@ -21,6 +21,7 @@ package com.codenameone.examples.skirmish.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
+import java.time.Instant;
 
 /// An uploaded model or image, stored once under the SHA-256 of its bytes.
 @Entity
@@ -51,7 +52,7 @@ public class ForgeAsset {
     private String data = "";
 
     @Column(nullable = false)
-    private long createdAt;
+    private Instant createdAt = Instant.EPOCH;
 
     public ForgeAsset() {
     }
@@ -120,11 +121,11 @@ public class ForgeAsset {
         this.data = data;
     }
 
-    public long getCreatedAt() {
+    public Instant getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(long createdAt) {
+    public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
     }
 }

@@ -1,0 +1,9 @@
+// Generated from docs/developer-guide source blocks. Edit the guide snippets here, not inline.
+
+// tag::flutter-import-report-json-001[]
+{"package": "ui_kit", "status": "unsupported",
+ "note": "depends on vector_graphics_compiler, which needs dart:ffi",
+ "cause": "needs dart:ffi",
+ "chain": ["ui_kit", "vector_graphics_compiler"],
+ "reachedFrom": ["lib/login/login_screen.dart"]}
+// end::flutter-import-report-json-001[]

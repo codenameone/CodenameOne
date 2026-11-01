@@ -30,6 +30,7 @@ import com.codenameone.examples.parley.domain.MediaBlob;
 import com.codenameone.examples.parley.repository.MediaBlobRepository;
 
 import java.io.IOException;
+import java.time.Instant;
 
 /// Encrypted attachments.
 ///
@@ -68,7 +69,7 @@ public class Media {
         // day's bytes are capped as well, well past what anyone sharing
         // photos and voice notes uploads.
         long now = System.currentTimeMillis();
-        Long stored = blobs.storedSince(username, now - DAY_MILLIS);
+        Long stored = blobs.storedSince(username, Instant.ofEpochMilli(now - DAY_MILLIS));
         if ((stored == null ? 0L : stored.longValue()) + data.length > DAILY_BYTES) {
             throw new ResponseStatusException(429, "You have uploaded too much today");
         }
@@ -76,7 +77,7 @@ public class Media {
         row.setId(Ids.next());
         row.setOwner(username);
         row.setSize(data.length);
-        row.setCreatedAt(now);
+        row.setCreatedAt(Instant.ofEpochMilli(now));
         row.setData(data);
         blobs.insert(row);
         return new MediaRefDto(row.getId(), data.length);

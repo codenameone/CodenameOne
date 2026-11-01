@@ -99,6 +99,28 @@ app.show();</code></pre>
           <a href="/skirmish/" data-cn1-conversion="home-skirmish">Explore Skirmish →</a>
         </div>
       </article>
+      <article class="cn1-home-template">
+        <a class="cn1-home-template__screen" href="/bastion/" data-cn1-conversion="home-bastion" aria-label="Explore Bastion, the virtual banking template">
+          <img src="/developer-guide/img/bastion-dashboard.png" alt="Bastion account balances and dashboard" width="420" height="860" loading="lazy">
+        </a>
+        <div class="cn1-home-template__body">
+          <p class="cn1-eyebrow">Virtual banking</p>
+          <h3>Bastion</h3>
+          <p>Customer accounts, transfers and a staff console, with a Java backend and double-entry ledger. Money and markets are simulated.</p>
+          <a href="/bastion/" data-cn1-conversion="home-bastion">Explore Bastion →</a>
+        </div>
+      </article>
+      <article class="cn1-home-template">
+        <a class="cn1-home-template__screen" href="/developer-guide/reel-users-guide/" data-cn1-conversion="home-reel" aria-label="Explore Reel, the streaming and courses template">
+          <img src="/developer-guide/img/reel-viewer-home.png" alt="Reel streaming catalog and continue-watching screen" width="1080" height="1920" loading="lazy">
+        </a>
+        <div class="cn1-home-template__body">
+          <p class="cn1-eyebrow">Streaming and courses</p>
+          <h3>Reel</h3>
+          <p>A viewer app, creator studio, moderation and admin screens, with a Java backend for subscriptions, rentals and courses.</p>
+          <a href="/developer-guide/reel-users-guide/" data-cn1-conversion="home-reel">Explore Reel →</a>
+        </div>
+      </article>
     </div>
   </section>
 
@@ -129,10 +151,10 @@ app.show();</code></pre>
       <article class="cn1-home-story cn1-home-story--reverse">
         <div>
           <h3>Your Android app on more platforms</h3>
-          <p>Bring Java or Kotlin activities, XML layouts and resources to iOS, desktop and the web.</p>
-          <p class="cn1-home-caveat">Check your dependencies against the supported Android and AndroidX APIs.</p>
+          <p>Bring Java or Kotlin activities, XML layouts and resources to iOS, desktop and the web. Reuse supported Room DAOs, WorkManager jobs, location, sensors, foreground services and document pickers.</p>
+          <p class="cn1-home-caveat">Room and background work have documented limits. Imported keystore keys do not preserve hardware-backed or user-authentication guarantees.</p>
           <a href="/developer-guide/android-interop/" data-cn1-conversion="home-android-import">Explore Android compatibility →</a>
-          <p class="cn1-home-caveat">Experimental imports: <a href="/developer-guide/flutter-interop/" data-cn1-conversion="home-flutter-import">Flutter screens</a> and <a href="/developer-guide/unity-interop/" data-cn1-conversion="home-unity-import">Unity 2D games</a>. Check the documented API and behavior limits before porting.</p>
+          <p class="cn1-home-caveat">The Android port also <a href="/developer-guide/android-without-google-play/" data-cn1-conversion="home-android-aosp">runs without Google Play Services</a>, with runtime fallbacks and optional UnifiedPush. Play-dependent features still require their services.</p>
         </div>
         <figure class="cn1-home-visual cn1-home-gallery">
           <div class="cn1-home-gallery__screens">
@@ -154,6 +176,44 @@ app.show();</code></pre>
         </figure>
       </article>
     </div>
+  </section>
+
+  <section class="cn1-v2-section" id="compatibility">
+    <div class="cn1-v2-section__intro">
+      <p class="cn1-eyebrow">Bring your existing code</p>
+      <h2>Flutter, Swing, JavaFX and Compose. More places to run.</h2>
+      <p>Compile supported application code into Codename One apps. Keep the screens you have, call the same platform and backend APIs, and add Java components alongside them.</p>
+    </div>
+    <div class="cn1-v2-ownership__grid">
+      <article class="cn1-v2-feature">
+        <h3>Flutter from Dart source</h3>
+        <p>Compile Dart to Java with Maven or Gradle and debug the original Dart. Supported widgets render through Codename One.</p>
+        <div class="cn1-home-chart"><h4>Gallery cold start <small>Android emulator · ms · lower is better</small></h4><div class="cn1-home-bar"><span>CN1 <b>395</b></span><i style="--bar:31.68%"></i></div><div class="cn1-home-bar cn1-home-bar--reference"><span>Flutter <b>1,247</b></span><i style="--bar:100%"></i></div></div>
+        <p>The same Dart source in matched release builds; idle memory was 46 vs 79 MB. October 29 measurements, not phone measurements.</p>
+        <p class="cn1-home-caveat">Experimental: some callbacks and parameters are ignored. Test your app's interactions. iOS startup and memory are unmeasured.</p>
+        <p><a href="/developer-guide/flutter-interop/" data-cn1-conversion="home-flutter-import">Import Flutter code →</a></p>
+        <a href="/blog/flutter-better-in-java/" data-cn1-conversion="home-performance-flutter">Compare all platforms and workloads →</a>
+      </article>
+      <article class="cn1-v2-feature">
+        <h3>Swing and JavaFX beyond desktop</h3>
+        <p>Bring supported Swing, SwingX and JavaFX source to phones, desktop and web. FXML and JavaFX CSS compile at build time.</p>
+        <div class="cn1-home-chart"><h4>SwingSet2 download <small>Linux · zipped MB · lower is better</small></h4><div class="cn1-home-bar"><span>CN1 native <b>8.2</b></span><i style="--bar:24.05%"></i></div><div class="cn1-home-bar cn1-home-bar--reference"><span>App + jlink JVM <b>34.1</b></span><i style="--bar:100%"></i></div></div>
+        <p>The JavaFX gallery downloads at 7.1 vs 39.1 MB. Same app sources; shared system libraries excluded. Its first paint takes 116 ms native vs 422 ms on a tuned JVM: median of seven Linux launches on a software framebuffer.</p>
+        <p class="cn1-home-caveat">Supported API subsets. Third-party desktop JARs and runtime reflection need porting; unsupported calls fail the build.</p>
+        <p><a href="/developer-guide/desktop-interop/" data-cn1-conversion="home-desktop-import">Import Swing or JavaFX code →</a></p>
+        <a href="/developer-guide/desktop-interop/#desktop-interop-benchmarks" data-cn1-conversion="home-performance-desktop">Compare size, startup and memory →</a>
+      </article>
+      <article class="cn1-v2-feature">
+        <h3>Kotlin Multiplatform and Compose</h3>
+        <p>Keep shared <code>commonMain</code> code and supported composables. Use the real Compose runtime over Codename One components, alongside Java.</p>
+        <div class="cn1-home-chart"><h4>State change to drawn <small>Keynote app · ms · lower is better</small></h4><div class="cn1-home-bar"><span>CN1 Compose <b>4.58</b></span><i style="--bar:23.80%"></i></div><div class="cn1-home-bar cn1-home-bar--reference"><span>Compose Multiplatform <b>19.24</b></span><i style="--bar:100%"></i></div></div>
+        <p>Same Kotlin source, iPhone 17 Pro simulator, Xcode 27 on Apple silicon, five release runs. The separate imperative Java version takes 1.49 ms.</p>
+        <p class="cn1-home-caveat">Simulator CPU work, not device frame rates. Check the supported composables and modifiers before porting.</p>
+        <p><a href="/developer-guide/kotlin-multiplatform-interop/" data-cn1-conversion="home-kmp-import">Import Kotlin and Compose code →</a></p>
+        <a href="/developer-guide/kotlin-multiplatform-interop/#_motivation_2" data-cn1-conversion="home-performance-kmp">Inspect the benchmark and harness →</a>
+      </article>
+    </div>
+    <p class="cn1-home-caveat">Also available: experimental <a href="/developer-guide/unity-interop/" data-cn1-conversion="home-unity-import">Unity 2D compatibility</a>, with documented API and behavior limits.</p>
   </section>
 
   <section class="cn1-v2-section" id="performance">
@@ -178,6 +238,28 @@ app.show();</code></pre>
         <div class="cn1-home-chart"><h4>Plaintext requests / second <small>Separate Go comparison · higher is better</small></h4><div class="cn1-home-bar"><span>CN1 native musl <b>595,610</b></span><i style="--bar:100%"></i></div><div class="cn1-home-bar cn1-home-bar--reference"><span>Go fasthttp <b>496,293</b></span><i style="--bar:83.32%"></i></div></div><h3>Compare with Go</h3>
         <p>Two pinned cores, 64 connections, medians of three interleaved runs. Go used less memory and a smaller binary.</p>
         <a href="/developer-guide/backend-operations/" data-cn1-conversion="home-performance-go">Compare throughput, startup and memory</a>
+      </article>
+    </div>
+  </section>
+
+  <section class="cn1-v2-section" id="crypto">
+    <div class="cn1-v2-section__intro">
+      <p class="cn1-eyebrow">Crypto in the app and server</p>
+      <h2>Wallet APIs. Native kernels. Parallel verification.</h2>
+      <p>Build Ethereum/EVM, Bitcoin and Solana wallets with shared Java APIs for key derivation, transaction signing and node access.</p>
+    </div>
+    <div class="cn1-home-stories">
+      <article class="cn1-home-story">
+        <div>
+          <h3>Use the CPU cores and GPU</h3>
+          <p>Native kernels accelerate signatures and hashes. CryptoBatch distributes verification across CPU cores, with Metal, Vulkan or WebGPU batches on supported devices. GPU work uses public data, never private keys.</p>
+          <p>On an ARM64 API 36 Android emulator, native ECDSA verification measured 6.00× BouncyCastle. GPU gains vary with the device and batch size; portable Java paths cover other environments.</p>
+          <a href="/developer-guide/crypto-wallets/" data-cn1-conversion="home-crypto-wallets">Explore wallets and async crypto APIs →</a>
+        </div>
+        <figure class="cn1-home-visual">
+          <div class="cn1-home-chart"><h4>Ed25519 verifications / second <small>Single-operation native test · higher is better</small></h4><div class="cn1-home-bar"><span>CN1 native <b>39,129</b></span><i style="--bar:100%"></i></div><div class="cn1-home-bar cn1-home-bar--reference"><span>OpenSSL 3.6.3 <b>17,521</b></span><i style="--bar:44.78%"></i></div></div>
+          <figcaption>M4 Max, matched compiler flags: 2.23× for this operation. Some hash workloads favor the reference. Multi-core batch ratios use a serial reference and are not single-core speedups. <a href="/developer-guide/crypto-wallets/#_performance_2" data-cn1-conversion="home-performance-crypto">All kernels, GPU results and reproduction commands →</a></figcaption>
+        </figure>
       </article>
     </div>
   </section>

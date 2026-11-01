@@ -1103,8 +1103,10 @@ public final class GradleConversion {
             // version, together with the translator of that version: a
             // declaration carried over from the pom could name another one.
             "codenameone-unity-compat",
-            // Likewise for a project with src/main/kmp.
-            "codenameone-compose-compat"));
+            // Likewise for a project with src/main/kmp,
+            "codenameone-compose-compat",
+            // and for one with src/main/flutter.
+            "codenameone-flutter-runtime"));
 
     /// `build.gradle.kts` lines for the dependencies a module's pom declares
     /// itself, leaving out the framework, which the plugin adds. A dependency of

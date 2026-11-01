@@ -26,6 +26,7 @@ import com.codename1.orm.repository.Query;
 import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.savor.domain.Payment;
 
+import java.time.Instant;
 import java.util.List;
 
 /// What each delivery was charged, keyed by the delivery.
@@ -45,5 +46,5 @@ public interface PaymentRepository extends CrudRepository<Payment, String> {
     @Query("update Payment p set p.status = :status, p.refundedAt = :at "
             + "where p.deliveryId = :id and p.status = 'REFUND_PENDING'")
     int endRefund(@Param("id") String deliveryId, @Param("status") String status,
-            @Param("at") long at);
+            @Param("at") Instant at);
 }

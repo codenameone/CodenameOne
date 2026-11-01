@@ -21,6 +21,7 @@ package com.codenameone.examples.skirmish.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
+import java.time.Instant;
 
 /// An engagement pipeline: a query over the players and what to do for each
 /// one who matches. See `social.Pipelines`.
@@ -61,7 +62,7 @@ public class Pipeline {
     private int reached;
 
     @Column(nullable = false)
-    private long lastRun;
+    private Instant lastRun = Instant.EPOCH;
 
     @Column(nullable = false, type = "VARCHAR(190)")
     private String createdBy = "";
@@ -154,11 +155,11 @@ public class Pipeline {
         this.reached = reached;
     }
 
-    public long getLastRun() {
+    public Instant getLastRun() {
         return lastRun;
     }
 
-    public void setLastRun(long lastRun) {
+    public void setLastRun(Instant lastRun) {
         this.lastRun = lastRun;
     }
 

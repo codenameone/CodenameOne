@@ -40,6 +40,7 @@ import com.codenameone.examples.parley.repository.ProfileRepository;
 import com.codenameone.examples.parley.repository.ReportRepository;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -93,8 +94,8 @@ public class Statistics {
                 (int) conversations.count(),
                 (int) (conversations.countByKind(Conversations.GROUP)
                         + conversations.countByKind(Conversations.CHANNEL)),
-                (int) messages.countBySentAtGreaterThanEqual(today),
-                (int) calls.countByStartedAtGreaterThanEqual(today),
+                (int) messages.countBySentAtGreaterThanEqual(Instant.ofEpochMilli(today)),
+                (int) calls.countByStartedAtGreaterThanEqual(Instant.ofEpochMilli(today)),
                 (int) reports.countByStatus(OPEN), (int) bridges.count());
     }
 
@@ -113,8 +114,8 @@ public class Statistics {
             active.add(new HashSet<>());
         }
         int[] byHour = new int[24];
-        for (Object[] row : messages.since(since)) {
-            long at = Rows.number(row[0]);
+        for (Object[] row : messages.since(Instant.ofEpochMilli(since))) {
+            long at = Rows.millis(row[0]);
             byHour[(int) (at % Days.MILLIS / 3600000L)]++;
             int index = index(at, since, span);
             if (index >= 0) {
@@ -122,14 +123,14 @@ public class Statistics {
                 active.get(index).add(Rows.text(row[1]));
             }
         }
-        for (Long at : calls.startedSince(since)) {
-            int index = index(Rows.number(at), since, span);
+        for (Instant at : calls.startedSince(Instant.ofEpochMilli(since))) {
+            int index = index(Rows.millis(at), since, span);
             if (index >= 0) {
                 dayCalls[index]++;
             }
         }
-        for (Long at : profiles.signUps(since)) {
-            int index = index(Rows.number(at), since, span);
+        for (Instant at : profiles.signUps(Instant.ofEpochMilli(since))) {
+            int index = index(Rows.millis(at), since, span);
             if (index >= 0) {
                 dayUsers[index]++;
             }

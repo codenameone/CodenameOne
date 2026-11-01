@@ -118,6 +118,10 @@ The simulator adds tools of its own, prefixed `sim_`, that exist only on the des
 * Android in resize mode: the application gets `sizeChanged` with the height above the keyboard.
 * Android in pan mode: the size stays the same and the whole screen shifts up until the field clears the keyboard.
 
+The recording below was made by an agent through these tools: it turned the iOS keyboard on, started a recording, tapped the email field, typed into both fields, moved between them with *Next* and *Done*, and stopped the recording.
+
+image::img/simulator-virtual-keyboard.gif[The simulated iOS keyboard sliding up while a sign up form scrolls its email and password fields into view,scaledwidth=40%]
+
 By default Android chooses between resize and pan for each field, the same way the Android port does. The *Android: Resize* and *Android: Pan* items, or `androidSoftInput`, force one mode. Virtual keyboard listeners fire on show and hide in both cases.
 
 *Touches.* `sim_tap` and `sim_drag` press the screen through the same path as a mouse click, so they reach the simulated keyboard and appear as touch indicators, which `ui_activate` doesn't. `sim_touch_indicators` sets the style (`none`, `dot` or `ripple`), color, size and drag trails. *Simulate > Show Touches* also draws them in the simulator window.

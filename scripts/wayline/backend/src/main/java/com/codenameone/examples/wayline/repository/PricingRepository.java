@@ -24,6 +24,7 @@ import com.codename1.orm.repository.Param;
 import com.codename1.orm.repository.Query;
 import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.wayline.domain.Pricing;
+import java.time.Instant;
 
 /// The admin's prices: one row, whose key is [#ONLY]. A migration creates it,
 /// with an `updatedAt` of 0 while the prices are still the settings'.
@@ -47,5 +48,5 @@ public interface PricingRepository extends CrudRepository<Pricing, Integer> {
             @Param("perMinute") long perMinute, @Param("minimum") long minimum,
             @Param("fee") double fee, @Param("commission") double commission,
             @Param("surge") double surge, @Param("comfort") double comfort,
-            @Param("xl") double xl, @Param("at") long at, @Param("by") String by);
+            @Param("xl") double xl, @Param("at") Instant at, @Param("by") String by);
 }

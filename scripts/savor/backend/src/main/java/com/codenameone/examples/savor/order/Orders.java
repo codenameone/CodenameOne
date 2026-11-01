@@ -53,6 +53,7 @@ import com.codenameone.examples.savor.repository.PromoUseRepository;
 import com.codenameone.examples.savor.repository.RestaurantRepository;
 import com.codenameone.examples.savor.repository.RestaurantStaffRepository;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -299,8 +300,8 @@ public class Orders {
         order.setAuthorizationRef(hold);
         order.setPaymentStatus(Payments.CASH.equals(hold) ? Payments.PENDING : Payments.AUTHORIZED);
         order.setPrepMinutes(priced.restaurant.getPrepMinutes());
-        order.setPlacedAt(now);
-        order.setUpdatedAt(now);
+        order.setPlacedAt(Instant.ofEpochMilli(now));
+        order.setUpdatedAt(Instant.ofEpochMilli(now));
         order.setReason("");
         orders.insert(order);
         for (int iter = 0; iter < priced.lines.size(); iter++) {
@@ -401,7 +402,7 @@ public class Orders {
     @Transactional
     private Void end(String id, OrderState to, String actor, String reason) throws IOException {
         if (orders.end(id, OrderStateMachine.sources(to), to, reason,
-                System.currentTimeMillis()) != 1) {
+                Instant.now()) != 1) {
             CustomerOrder now = find(id);
             throw new ResponseStatusException(409, "That order is "
                     + (now == null ? "gone" : describe(now.getState())));
@@ -426,7 +427,7 @@ public class Orders {
         if (OrderState.DELIVERED != order.getState()) {
             throw new ResponseStatusException(409, "Only a delivered order can be rated");
         }
-        if (orders.rate(id, customer, stars, System.currentTimeMillis()) != 1) {
+        if (orders.rate(id, customer, stars, Instant.now()) != 1) {
             throw new ResponseStatusException(409, "That order is already rated");
         }
         restaurants.addRating(order.getRestaurantId(), stars);
@@ -501,7 +502,7 @@ public class Orders {
             throws IOException {
         CustomerOrder order = kitchens(restaurantId, id);
         if (orders.accept(id, OrderStateMachine.sources(OrderState.ACCEPTED),
-                OrderState.ACCEPTED, prepMinutes, System.currentTimeMillis()) != 1) {
+                OrderState.ACCEPTED, prepMinutes, Instant.now()) != 1) {
             throw new ResponseStatusException(409, "That order is "
                     + describe(order.getState()));
         }
@@ -531,7 +532,7 @@ public class Orders {
     private Void readied(String actor, String restaurantId, String id) throws IOException {
         CustomerOrder order = kitchens(restaurantId, id);
         if (orders.ready(id, OrderStateMachine.sources(OrderState.READY), OrderState.READY,
-                System.currentTimeMillis()) != 1) {
+                Instant.now()) != 1) {
             throw new ResponseStatusException(409, "That order is "
                     + describe(order.getState()));
         }
@@ -544,7 +545,7 @@ public class Orders {
     /// kitchen.
     @Scheduled(fixedDelay = 15000, initialDelay = 15000, lock = "savor-kitchen")
     public void sweep() throws IOException {
-        List<CustomerOrder> late = late(System.currentTimeMillis() - answerMillis);
+        List<CustomerOrder> late = late(Instant.now().minusMillis(answerMillis));
         for (int iter = 0; iter < late.size(); iter++) {
             String id = late.get(iter).getId();
             try {
@@ -562,7 +563,7 @@ public class Orders {
         // still held, and asking to end it again is refused: it has ended.
         // Releasing is safe to repeat -- see Payments.release -- so this
         // finishes what was left, for every way an order ends short of the door.
-        List<CustomerOrder> held = unreleased(System.currentTimeMillis() - UNRELEASED_MILLIS);
+        List<CustomerOrder> held = unreleased(Instant.now().minusMillis(UNRELEASED_MILLIS));
         for (int iter = 0; iter < held.size(); iter++) {
             payments.release(held.get(iter).getId());
         }
@@ -576,12 +577,12 @@ public class Orders {
         OrderState.CANCELLED_BY_CUSTOMER, OrderState.CANCELLED_BY_ADMIN, OrderState.NO_COURIERS};
 
     @Transactional(readOnly = true)
-    private List<CustomerOrder> late(long before) {
+    private List<CustomerOrder> late(Instant before) {
         return orders.findByStateAndPlacedAtLessThan(OrderState.PLACED, before);
     }
 
     @Transactional(readOnly = true)
-    private List<CustomerOrder> unreleased(long before) {
+    private List<CustomerOrder> unreleased(Instant before) {
         return orders.unreleased(ENDED_SHORT,
                 new String[] {Payments.AUTHORIZED, Payments.PENDING}, before,
                 new PageRequest(0, 50));
@@ -716,8 +717,8 @@ public class Orders {
             if (OrderState.PICKED_UP == state && delivery != null && delivery.etaMinutes() > 0) {
                 eta = delivery.etaMinutes();
             } else {
-                long cooked = (order.getAcceptedAt() == 0L ? order.getPlacedAt()
-                        : order.getAcceptedAt()) + order.getPrepMinutes() * 60000L;
+                long cooked = (order.getAcceptedAt().toEpochMilli() == 0L ? order.getPlacedAt().toEpochMilli()
+                        : order.getAcceptedAt().toEpochMilli()) + order.getPrepMinutes() * 60000L;
                 int left = (int) Math.max(0L, (cooked - System.currentTimeMillis()) / 60000L);
                 eta = left + ride;
             }
@@ -734,8 +735,9 @@ public class Orders {
                 order.getDiscountCents(), order.getTipCents(), order.getTotalCents(),
                 order.getCurrency(), order.getDropoffLat(), order.getDropoffLng(),
                 order.getDropoffAddress(), order.getNote(), order.getMethodLabel(),
-                order.getPaymentStatus(), order.getPrepMinutes(), order.getPlacedAt(),
-                order.getAcceptedAt(), order.getReadyAt(), order.getDeliveredAt(), eta,
+                order.getPaymentStatus(), order.getPrepMinutes(), order.getPlacedAt().toEpochMilli(),
+                order.getAcceptedAt().toEpochMilli(), order.getReadyAt().toEpochMilli(),
+                order.getDeliveredAt().toEpochMilli(), eta,
                 order.getReason(), order.getStars(), delivery);
     }
 

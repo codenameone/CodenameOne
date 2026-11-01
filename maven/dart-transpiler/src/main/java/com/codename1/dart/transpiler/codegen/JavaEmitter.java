@@ -134,8 +134,47 @@ public final class JavaEmitter {
         return pruned;
     }
 
+    /// The Dart file each generated Java file was emitted from, by its relative path.
+    private final Map<String, String> dartFileOf = new java.util.HashMap<String, String>();
+
     public List<GeneratedFile> emit() {
-        return pruneDynamicCases(emitAll());
+        List<GeneratedFile> pruned = pruneDynamicCases(emitAll());
+        // After the pruning, which drops lines: the table pairs final Java lines.
+        List<GeneratedFile> mapped = new ArrayList<GeneratedFile>(pruned.size());
+        for (GeneratedFile g : pruned) {
+            String dart = g == null ? null : dartFileOf.get(g.relativePath);
+            mapped.add(dart == null ? g : new GeneratedFile(g.relativePath, DartLineTable.apply(g.content, dart)));
+        }
+        return mapped;
+    }
+
+    /// The pub packages `lib` imports, `firebase_app_check` for
+    /// `package:firebase_app_check/firebase_app_check.dart`.
+    private static java.util.Set<String> importedPackages(Library lib) {
+        java.util.Set<String> out = new java.util.HashSet<String>();
+        for (String uri : lib.imports) {
+            if (uri != null && uri.startsWith("package:")) {
+                int slash = uri.indexOf('/');
+                out.add(slash < 0 ? uri.substring(8) : uri.substring(8, slash));
+            }
+        }
+        return out;
+    }
+
+    /// Adds `g` to `out`, remembering the Dart file it came from for its line table.
+    private void addMapped(List<GeneratedFile> out, GeneratedFile g, String dartFile) {
+        out.add(g);
+        if (g != null && dartFile != null) {
+            dartFileOf.put(g.relativePath, dartFile);
+        }
+    }
+
+    /// Writes the line mark ahead of what `n` lowers to (see DartLineTable).
+    private void lineMark(Node n, Ctx ctx) {
+        String mark = n == null ? null : DartLineTable.mark(n.file, n.line);
+        if (mark != null) {
+            ctx.writer().line(mark);
+        }
     }
 
     private List<GeneratedFile> emitAll() {
@@ -149,14 +188,16 @@ public final class JavaEmitter {
         // of the two sorts last, silently, with no diagnostic.
         List<Library> mainCandidates = new ArrayList<Library>();
         for (Library lib : program.libraries) {
+            stubs.viewFrom(importedPackages(lib), program.classes.keySet());
             for (ClassDecl c : lib.classes) {
                 try {
+                    String dart = c.file != null ? c.file : lib.fileName;
                     if (c.extensionOn != null) {
-                        out.add(emitExtension(c));
+                        addMapped(out, emitExtension(c), dart);
                     } else if (c.isMixin) {
-                        out.add(emitMixin(c));
+                        addMapped(out, emitMixin(c), dart);
                     } else {
-                        out.add(emitClass(c));
+                        addMapped(out, emitClass(c), dart);
                     }
                 } catch (RuntimeException | StackOverflowError ex) {
                     emitCrash(lib, "class " + c.name, ex);
@@ -164,14 +205,14 @@ public final class JavaEmitter {
             }
             for (EnumDecl e : lib.enums) {
                 try {
-                    out.add(emitEnum(e));
+                    addMapped(out, emitEnum(e), e.file != null ? e.file : lib.fileName);
                 } catch (RuntimeException | StackOverflowError ex) {
                     emitCrash(lib, "enum " + e.name, ex);
                 }
             }
             if (!lib.functions.isEmpty() || !lib.topLevelVars.isEmpty()) {
                 try {
-                    out.add(emitLibClass(lib));
+                    addMapped(out, emitLibClass(lib), lib.fileName);
                 } catch (RuntimeException | StackOverflowError ex) {
                     emitCrash(lib, "library " + lib.fileName, ex);
                 }
@@ -182,6 +223,8 @@ public final class JavaEmitter {
                 }
             }
         }
+        // What is emitted from here on belongs to no one library: the loaded-last view.
+        stubs.viewFrom(java.util.Collections.<String>emptySet(), java.util.Collections.<String>emptySet());
         String mainLib = resolveMainLib(mainCandidates);
         if (mainLib != null) {
             out.add(emitRegistry(mainLib));
@@ -2421,6 +2464,7 @@ public final class JavaEmitter {
                 ctx.writer().line("return Future.value(null);");
             }
         } else if (m.exprBody != null) {
+            lineMark(m.exprBody, ctx);
             if (asyncFuture) {
                 Out o = emitExpr(m.exprBody, null, ctx);
                 ctx.importClass("dart.async.Future");
@@ -2517,6 +2561,9 @@ public final class JavaEmitter {
     }
 
     private void emitStatement(Stmt s, Ctx ctx) {
+        if (s != null && !(s instanceof Block)) {
+            lineMark(s, ctx);
+        }
         if (s != null && s.labels != null && !isLoop(s)) {
             // A labeled non-loop statement is a labeled Java block, which `break label;`
             // leaves. A loop carries its label on its own header (loopLabel), where
@@ -7153,7 +7200,7 @@ public final class JavaEmitter {
             // break-loop for no change in behaviour.
             Ctx.Writer w = ctx.writer();
             for (String line : lifted.split("\n")) {
-                if (!line.trim().isEmpty()) {
+                if (!line.trim().isEmpty() && !DartLineTable.isMark(line)) {
                     w.line(line.trim());
                 }
             }
@@ -7170,7 +7217,7 @@ public final class JavaEmitter {
     private static boolean onlyTempDeclarations(String lifted) {
         for (String line : lifted.split("\n")) {
             String t = line.trim();
-            if (!t.isEmpty() && !TEMP_DECLARATION.matcher(t).matches()) {
+            if (!t.isEmpty() && !DartLineTable.isMark(t) && !TEMP_DECLARATION.matcher(t).matches()) {
                 return false;
             }
         }
@@ -8338,7 +8385,8 @@ public final class JavaEmitter {
         // is globally addressable, so dispatch it as a bare (unqualified) call.
         if (c.name != null && isImportPrefix(c.target, ctx)
                 && (program.functions.containsKey(c.name) || program.classes.containsKey(c.name)
-                    || stubs.isStubClass(c.name) || stubs.functions.containsKey(c.name))) {
+                    || stubs.isStubClass(c.name) || stubs.functions.containsKey(c.name)
+                    || prefixedLibraryFunction(((Ident) c.target).name, c.name, ctx))) {
             Call bare = new Call();
             bare.file = c.file;
             bare.line = c.line;
@@ -8610,8 +8658,13 @@ public final class JavaEmitter {
             // Object parameters: a primitive long/double/bool argument autoboxes.
             return new Out("DartRuntime.identical(" + a.code + ", " + b.code + ")", TypeRef.BOOL);
         }
-        // stub top-level function (e.g. runApp)
-        Ast.FunctionDecl sf = stubs.functions.get(n);
+        // stub top-level function (e.g. runApp); a dart: library's own, when its name
+        // collides with another's (dart:developer's log is not dart:math's), only
+        // through that library's import
+        Ast.FunctionDecl sf = libraryStubFunction(n, ctx);
+        if (sf == null) {
+            sf = stubs.functions.get(n);
+        }
         if (sf != null && sf.javaName != null) {
             int dot = sf.javaName.lastIndexOf('.');
             String cls = sf.javaName.substring(0, dot);
@@ -8644,6 +8697,48 @@ public final class JavaEmitter {
         diags.error(c, "E0135", "Cannot resolve function or constructor '" + n
                 + "'. Confirm the file passes `dart analyze`, or the API may be unsupported in M1.");
         return new Out("null", TypeRef.DYNAMIC, true);
+    }
+
+    /**
+     * The {@code dartlib_<lib>.dart} stub function {@code n} this call reaches: through
+     * its prefix when the call is {@code prefix.n(...)} and the prefix imports
+     * {@code dart:<lib>}, else through an unprefixed import of {@code dart:<lib>} that
+     * admits {@code n}. Null when the call reaches no such function.
+     */
+    private Ast.FunctionDecl libraryStubFunction(String n, Ctx ctx) {
+        if (stubs.libraryFunctions.isEmpty()) {
+            return null;
+        }
+        Ast.Library lib = ctx.library();
+        if (lib == null) {
+            return null;
+        }
+        String prefix = ctx.callPrefix;
+        if (prefix != null) {
+            String uri = lib.prefixImports.get(prefix);
+            return uri != null && uri.startsWith("dart:") ? libraryFunction(uri.substring(5), n) : null;
+        }
+        for (Ast.Directive d : lib.importDirectives) {
+            if (d.uri == null || !d.uri.startsWith("dart:") || !d.admits(n) || d.prefix != null) {
+                continue;
+            }
+            Ast.FunctionDecl f = libraryFunction(d.uri.substring(5), n);
+            if (f != null) {
+                return f;
+            }
+        }
+        return null;
+    }
+
+    private boolean prefixedLibraryFunction(String prefix, String n, Ctx ctx) {
+        Ast.Library lib = ctx.library();
+        String uri = lib == null ? null : lib.prefixImports.get(prefix);
+        return uri != null && uri.startsWith("dart:") && libraryFunction(uri.substring(5), n) != null;
+    }
+
+    private Ast.FunctionDecl libraryFunction(String library, String n) {
+        Map<String, Ast.FunctionDecl> m = stubs.libraryFunctions.get(library);
+        return m == null ? null : m.get(n);
     }
 
     private Out emitMethodCallOn(Out target, Call c, Ctx ctx) {
@@ -9876,6 +9971,17 @@ public final class JavaEmitter {
                 || className.equals("BlocProvider") || className.equals("RepositoryProvider");
     }
 
+    /**
+     * Stub classes whose behaviour depends on their type argument and that are made with
+     * positional arguments only: firebase_ui_auth's {@code AuthStateChangeAction<SignedIn>(cb)}
+     * must run its callback for a SignedIn and never hand it a UserCreated, which the erased
+     * callback would read as the wrong class. They get {@code .providedType(A.class)}, which
+     * answers the object itself.
+     */
+    private static boolean actsOnTypeArgument(String className) {
+        return className.equals("AuthStateChangeAction");
+    }
+
     /** {@code A.class} for the first type argument when it is a plain class, else null. */
     private String providedTypeToken(List<TypeRef> typeArgs, Ctx ctx) {
         if (typeArgs == null || typeArgs.isEmpty() || typeArgs.get(0) == null) {
@@ -9982,6 +10088,7 @@ public final class JavaEmitter {
                 ? new TypeRef(className)
                 : TypeRef.of(className, resultArgs.toArray(new TypeRef[0]));
         Ast.CtorDecl ct = sc.defaultCtor();
+        warnUnapplied(ct == null ? null : ct.unapplied, className, args);
         // positional args -> Java constructor arguments
         StringBuilder posArgs = new StringBuilder();
         List<Ast.Param> positionalParams = new ArrayList<Ast.Param>();
@@ -10023,7 +10130,9 @@ public final class JavaEmitter {
             }
         }
         if (args.named.isEmpty()) {
-            return new Out("new " + simple + diamond + "(" + posArgs + ")", stubResultType);
+            String created = "new " + simple + diamond + "(" + posArgs + ")";
+            String token = actsOnTypeArgument(className) ? providedTypeToken(typeArgs, ctx) : null;
+            return new Out(token == null ? created : created + ".providedType(" + token + ")", stubResultType);
         }
         // allocate-then-setters (ANF)
         String tmp = ctx.newTemp();
@@ -10720,7 +10829,26 @@ public final class JavaEmitter {
         return args.isEmpty() ? token : args + ", " + token;
     }
 
+    /**
+     * W0002: the call passes a named argument the stub declares {@code @Unapplied} -- one
+     * the runtime accepts so the program compiles, and then does nothing with
+     * ({@code memCacheWidth}, a progress callback a transport cannot report). Reported at
+     * the argument, so the build log names the line that expects more than it will get.
+     */
+    private void warnUnapplied(java.util.Set<String> unapplied, String owner, Args args) {
+        if (unapplied == null || args == null) {
+            return;
+        }
+        for (Ast.NamedArg a : args.named) {
+            if (unapplied.contains(a.name)) {
+                diags.warn(a.value, "W0002", "'" + a.name + "' of " + owner
+                        + " is accepted but not applied on Codename One");
+            }
+        }
+    }
+
     private String stubMethodArgs(Ast.MethodDecl m, Args args, Ctx ctx) {
+        warnUnapplied(m.unapplied, m.name, args);
         CtorDecl fake = new CtorDecl();
         fake.params = m.params;
         return canonicalArgs(fake, args, ctx);
@@ -12019,10 +12147,32 @@ public final class JavaEmitter {
         if (name != null) {
             int dot = name.indexOf('.');
             if (dot > 0 && program.importPrefixes.contains(name.substring(0, dot))) {
-                return name.substring(dot + 1);
+                String base = name.substring(dot + 1);
+                // dart:ui's Image is UiImage in the stubs, since `Image` is the widget.
+                if ("Image".equals(base) && dartUiPrefixes().contains(name.substring(0, dot))) {
+                    return "UiImage";
+                }
+                return base;
             }
         }
         return name;
+    }
+
+    private java.util.Set<String> dartUiPrefixes;
+
+    /// Every `import 'dart:ui' as p` prefix in the program.
+    private java.util.Set<String> dartUiPrefixes() {
+        if (dartUiPrefixes == null) {
+            dartUiPrefixes = new java.util.HashSet<String>();
+            for (Library l : program.libraries) {
+                for (Ast.Directive d : l.importDirectives) {
+                    if ("dart:ui".equals(d.uri) && d.prefix != null) {
+                        dartUiPrefixes.add(d.prefix);
+                    }
+                }
+            }
+        }
+        return dartUiPrefixes;
     }
 
     /** Pseudo-type marking a reference to a class itself (for static access). */

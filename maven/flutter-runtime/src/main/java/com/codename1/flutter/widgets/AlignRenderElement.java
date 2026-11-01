@@ -85,7 +85,8 @@ public class AlignRenderElement extends SingleChildRenderElement {
         Size self = constraints.constrain(new Size(w, h));
         Alignment a = alignment();
         setChildOffset(child,
-                Alignment.along(a.x(), self.width(), cs.width()),
+                Alignment.along(com.codename1.flutter.AlignmentDirectional.xFor(a, isRtl()),
+                        self.width(), cs.width()),
                 Alignment.along(a.y(), self.height(), cs.height()));
         return self;
     }

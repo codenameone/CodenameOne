@@ -41,6 +41,7 @@ import com.codenameone.examples.savor.repository.PromoRepository;
 import com.codenameone.examples.savor.repository.PromoUseRepository;
 import com.codenameone.examples.savor.repository.RestaurantRepository;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
@@ -119,7 +120,7 @@ public class Quotes {
     }
 
     private PricingDto toDto(Pricing row) {
-        if (row == null || row.getUpdatedAt() == 0L) {
+        if (row == null || Instant.EPOCH.equals(row.getUpdatedAt())) {
             return defaults;
         }
         return new PricingDto(defaults.currency(), row.getBaseCents(), row.getPerKmCents(),
@@ -143,7 +144,7 @@ public class Quotes {
         if (prices.change(PricingRepository.ONLY.intValue(), wanted.baseCents(),
                 wanted.perKmCents(), wanted.surge(), wanted.smallOrderCents(),
                 wanted.smallOrderFeeCents(), wanted.serviceFeePercent(), wanted.taxPercent(),
-                wanted.commissionPercent(), System.currentTimeMillis(), by) == 0) {
+                wanted.commissionPercent(), Instant.now(), by) == 0) {
             throw new IllegalStateException("The pricing row is missing; the V6 migration "
                     + "creates it");
         }

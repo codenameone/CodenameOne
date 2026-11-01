@@ -21,6 +21,7 @@ package com.codenameone.examples.parley.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
+import java.time.Instant;
 
 /// A code that lets whoever holds it join a group.
 @Entity
@@ -36,10 +37,10 @@ public class InviteLink {
     private String createdBy = "";
 
     @Column(nullable = false)
-    private long createdAt;
+    private Instant createdAt = Instant.EPOCH;
 
     @Column(nullable = false)
-    private long expiresAt;
+    private Instant expiresAt = Instant.EPOCH;
 
     public InviteLink() {
     }
@@ -68,19 +69,19 @@ public class InviteLink {
         this.createdBy = createdBy;
     }
 
-    public long getCreatedAt() {
+    public Instant getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(long createdAt) {
+    public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
     }
 
-    public long getExpiresAt() {
+    public Instant getExpiresAt() {
         return expiresAt;
     }
 
-    public void setExpiresAt(long expiresAt) {
+    public void setExpiresAt(Instant expiresAt) {
         this.expiresAt = expiresAt;
     }
 }

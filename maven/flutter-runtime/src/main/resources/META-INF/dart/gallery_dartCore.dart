@@ -195,6 +195,14 @@ class ByteData {
   external void setUint8(int byteOffset, int value);
   external int getInt32(int byteOffset);
   external void setInt32(int byteOffset, int value);
+  external ByteBuffer get buffer;
+}
+
+@JavaName('dart.typed_data.ByteBuffer')
+class ByteBuffer {
+  external int get lengthInBytes;
+  external Uint8List asUint8List();
+  external ByteData asByteData();
 }
 
 // --- dart:math -------------------------------------------------------------
@@ -404,30 +412,75 @@ external bool debugCheckHasDirectionality(BuildContext context);
 
 @JavaName('com.codename1.flutter.l10n.LocalizationsDelegate')
 class LocalizationsDelegate<T> {
+  external Future<T> load(Locale locale);
   external bool shouldReload(LocalizationsDelegate<T> old);
 }
 
 @JavaName('com.codename1.flutter.l10n.MaterialLocalizations')
 abstract class MaterialLocalizations {
   external static MaterialLocalizations of(BuildContext context);
-  external static LocalizationsDelegate get delegate;
+  external static LocalizationsDelegate<MaterialLocalizations> get delegate;
+  external String get okButtonLabel;
+  external String get cancelButtonLabel;
+  external String get closeButtonLabel;
+  external String get continueButtonLabel;
+  external String get copyButtonLabel;
+  external String get cutButtonLabel;
+  external String get pasteButtonLabel;
+  external String get selectAllButtonLabel;
+  external String get searchFieldLabel;
   external String get backButtonTooltip;
   external String get closeButtonTooltip;
-  external String get closeButtonLabel;
-  external String get viewLicensesButtonLabel;
+  external String get deleteButtonTooltip;
+  external String get moreButtonTooltip;
   external String get nextPageTooltip;
   external String get previousPageTooltip;
   external String get openAppDrawerTooltip;
+  external String get showMenuTooltip;
+  external String get drawerLabel;
+  external String get popupMenuLabel;
+  external String get dialogLabel;
+  external String get alertDialogLabel;
+  external String get datePickerHelpText;
+  external String get dateHelpText;
+  external String get timePickerDialHelpText;
+  external String get refreshIndicatorSemanticLabel;
+  external String get modalBarrierDismissLabel;
+  external String get viewLicensesButtonLabel;
+  external String get licensesPageTitle;
+  external String formatMediumDate(DateTime date);
+  external String formatFullDate(DateTime date);
+  external String formatMonthYear(DateTime date);
+  external List<String> get narrowWeekdays;
+  external int get firstDayOfWeekIndex;
+}
+
+@JavaName('com.codename1.flutter.l10n.CupertinoLocalizations')
+abstract class CupertinoLocalizations {
+  external static CupertinoLocalizations of(BuildContext context);
+  external static LocalizationsDelegate<CupertinoLocalizations> get delegate;
+  external String get alertDialogLabel;
+  external String get anteMeridiemAbbreviation;
+  external String get postMeridiemAbbreviation;
+  external String get copyButtonLabel;
+  external String get cutButtonLabel;
+  external String get pasteButtonLabel;
+  external String get selectAllButtonLabel;
+  external String get searchTextFieldPlaceholderLabel;
+  external String get modalBarrierDismissLabel;
+  external String get todayLabel;
+  external String get cancelButtonLabel;
+  external String get backButtonLabel;
 }
 
 @JavaName('com.codename1.flutter.l10n.GlobalMaterialLocalizations')
 abstract class GlobalMaterialLocalizations {
-  external static LocalizationsDelegate get delegate;
+  external static LocalizationsDelegate<MaterialLocalizations> get delegate;
 }
 
 @JavaName('com.codename1.flutter.l10n.GlobalCupertinoLocalizations')
 abstract class GlobalCupertinoLocalizations {
-  external static LocalizationsDelegate get delegate;
+  external static LocalizationsDelegate<CupertinoLocalizations> get delegate;
 }
 
 @JavaName('com.codename1.flutter.l10n.GlobalWidgetsLocalizations')

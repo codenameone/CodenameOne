@@ -36,6 +36,17 @@ import dart.runtime.Funcs;
  * push key once {@code Display.registerPush} has run. Messages reach the Dart streams
  * through {@link #deliver}, which the app's {@code PushCallback.push} forwards to;
  * a message that arrives while the app is not running is not replayed.
+ *
+ * <p>A payload that is a JSON object is a data message: its entries are the message's
+ * {@code data} (a {@code notification} object, or {@code title}/{@code body} entries,
+ * make its {@code notification}; without them it is data-only and {@code notification}
+ * is null). Any other payload is the notification body, with the text under
+ * {@code data['payload']}. The {@code onBackgroundMessage} handler is called for a push
+ * that arrives while the app is minimized or not yet showing a form; there is no
+ * background isolate, so it runs on the app's thread before the message is delivered.
+ * {@code requestPermission} answers {@code provisional} when provisional was asked for
+ * and {@code authorized} otherwise (Codename One reports no denial); the other
+ * permission flags are accepted and not applied.
  */
 public class FirebaseMessaging {
     /** {@code FirebaseMessaging.instance}. */
@@ -105,7 +116,24 @@ public class FirebaseMessaging {
                 }
             }
         }
-        deliver(payload, cold || com.codename1.ui.Display.getInstance().isMinimized());
+        boolean opened = cold || com.codename1.ui.Display.getInstance().isMinimized();
+        if (opened) {
+            background(payload);
+        }
+        deliver(payload, opened);
+    }
+
+    private static Funcs.Func1<RemoteMessage, ?> backgroundHandler;
+
+    /// Runs the onBackgroundMessage handler, if one is set, for a push received while
+    /// the app was in the background. Answers whether a handler ran.
+    public static boolean background(String payload) {
+        Funcs.Func1<RemoteMessage, ?> h = backgroundHandler;
+        if (h == null) {
+            return false;
+        }
+        h.call(message(payload));
+        return true;
     }
 
     private static final java.util.List<String> HELD = new java.util.ArrayList<String>();
@@ -115,6 +143,39 @@ public class FirebaseMessaging {
     private static RemoteMessage message(String payload) {
         received++;
         DartMap<String, Object> data = new DartMap<String, Object>();
+        String trimmed = payload == null ? "" : payload.trim();
+        if (trimmed.startsWith("{")) {
+            java.util.Map<String, Object> json = null;
+            try {
+                json = new com.codename1.io.JSONParser().parseJSON(new java.io.StringReader(trimmed));
+            } catch (java.io.IOException e) {
+                json = null;
+            }
+            if (json != null && !json.isEmpty()) {
+                String title = null;
+                String body = null;
+                Object n = json.get("notification");
+                if (n instanceof java.util.Map) {
+                    Object t = ((java.util.Map<?, ?>) n).get("title");
+                    Object b = ((java.util.Map<?, ?>) n).get("body");
+                    title = t == null ? null : t.toString();
+                    body = b == null ? null : b.toString();
+                } else {
+                    Object t = json.get("title");
+                    Object b = json.get("body");
+                    title = t == null ? null : t.toString();
+                    body = b == null ? null : b.toString();
+                }
+                Object id = json.get("messageId");
+                for (java.util.Map.Entry<String, Object> e : json.entrySet()) {
+                    if (!"notification".equals(e.getKey())) {
+                        data.put(e.getKey(), e.getValue());
+                    }
+                }
+                RemoteNotification rn = title == null && body == null ? null : new RemoteNotification(title, body);
+                return new RemoteMessage(id instanceof String ? (String) id : "cn1-" + received, data, rn);
+            }
+        }
         data.put("payload", payload);
         return new RemoteMessage("cn1-" + received, data, new RemoteNotification(null, payload));
     }
@@ -157,7 +218,8 @@ public class FirebaseMessaging {
     }
 
     public static void onBackgroundMessage(Funcs.Func1<RemoteMessage, ?> handler) {
-        // background isolates do not exist here; foreground delivery uses onMessage
+        // No background isolate: the handler runs on the app's thread (see background).
+        backgroundHandler = handler;
     }
 
     /// Where getToken reads the push key from, installed by the import-generated entry
@@ -209,11 +271,16 @@ public class FirebaseMessaging {
         if (Display.isInitialized()) {
             Display.getInstance().registerPush();
         }
-        return Future.value(new NotificationSettings(AuthorizationStatus.authorized));
+        lastStatus = Boolean.TRUE.equals(provisional) ? AuthorizationStatus.provisional
+                : AuthorizationStatus.authorized;
+        return Future.value(new NotificationSettings(lastStatus));
     }
 
+    private static AuthorizationStatus lastStatus;
+
     public Future<NotificationSettings> getNotificationSettings() {
-        return Future.value(new NotificationSettings(AuthorizationStatus.authorized));
+        AuthorizationStatus st = lastStatus;
+        return Future.value(new NotificationSettings(st == null ? AuthorizationStatus.notDetermined : st));
     }
 
     /** The message whose tap launched the app, once; null afterwards, as on Flutter. */

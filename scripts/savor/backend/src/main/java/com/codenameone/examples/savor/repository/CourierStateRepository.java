@@ -26,6 +26,7 @@ import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.savor.api.DeliveryState;
 import com.codenameone.examples.savor.domain.CourierState;
 
+import java.time.Instant;
 import java.util.List;
 
 /// Couriers' live state: whether each is on line, where the car is, and the
@@ -55,7 +56,7 @@ public interface CourierStateRepository extends CrudRepository<CourierState, Str
             + "where a.status = :approved) "
             + "and d.username in (select p.username from Profile p) "
             + "and d.username not in (select r.courier from Delivery r where r.state in :withDelivery)")
-    List<CourierState> freeInBox(@Param("fresh") long fresh, @Param("south") double south,
+    List<CourierState> freeInBox(@Param("fresh") Instant fresh, @Param("south") double south,
             @Param("north") double north, @Param("west") double west,
             @Param("east") double east, @Param("approved") String approved,
             @Param("withDelivery") DeliveryState[] withDelivery);
@@ -85,7 +86,7 @@ public interface CourierStateRepository extends CrudRepository<CourierState, Str
     int takeOffLine(@Param("username") String username);
 
     /// The couriers on line who reported in at or after `seenSince`.
-    long countByOnlineTrueAndLastSeenGreaterThanEqual(long seenSince);
+    long countByOnlineTrueAndLastSeenGreaterThanEqual(Instant seenSince);
 
     int deleteByUsername(String username);
 }

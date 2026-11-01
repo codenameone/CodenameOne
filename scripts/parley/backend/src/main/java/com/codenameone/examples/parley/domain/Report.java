@@ -21,6 +21,7 @@ package com.codenameone.examples.parley.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
+import java.time.Instant;
 
 /// An abuse report, and what the admins did about it.
 @Entity
@@ -45,7 +46,7 @@ public class Report {
     private String evidence = "";
 
     @Column(nullable = false)
-    private long createdAt;
+    private Instant createdAt = Instant.EPOCH;
 
     @Column(nullable = false, type = "VARCHAR(16)")
     private String status = "";
@@ -107,11 +108,11 @@ public class Report {
         this.evidence = evidence;
     }
 
-    public long getCreatedAt() {
+    public Instant getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(long createdAt) {
+    public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
     }
 

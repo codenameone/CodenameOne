@@ -24,19 +24,20 @@ import com.codename1.orm.repository.Query;
 import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.parley.domain.MessageLog;
 
+import java.time.Instant;
 import java.util.List;
 
 /// That messages were sent, never what they said.
 @Repository(entity = MessageLog.class, key = String.class)
 public interface MessageLogRepository extends CrudRepository<MessageLog, String> {
-    long countBySentAtGreaterThanEqual(long since);
+    long countBySentAtGreaterThanEqual(Instant since);
 
     long countBySender(String sender);
 
     @Query("select m.sentAt, m.sender from MessageLog m where m.sentAt >= :since and m.kind = 'MESSAGE'")
-    List<Object[]> since(@Param("since") long since);
+    List<Object[]> since(@Param("since") Instant since);
 
     int deleteBySender(String sender);
 
-    int deleteBySentAtLessThan(long before);
+    int deleteBySentAtLessThan(Instant before);
 }

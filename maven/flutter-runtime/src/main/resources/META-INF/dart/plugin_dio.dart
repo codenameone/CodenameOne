@@ -132,6 +132,7 @@ class DioError extends DioException {
 class CancelToken {
   external CancelToken();
   external bool get isCancelled;
+  external static bool isCancel(DioException e);
   external void cancel([Object? reason]);
 }
 
@@ -202,6 +203,8 @@ class FormData {
   external FormData();
   external static FormData fromMap(Map<String, dynamic> map, [Object? collectionFormat, bool camelCaseContentDisposition = false]);
   external int get length;
+  external List<MapEntry<String, String>> get fields;
+  external List<MapEntry<String, MultipartFile>> get files;
 }
 
 @JavaName('com.codename1.flutter.plugins.dio.Dio')
@@ -212,18 +215,21 @@ class Dio {
   external Interceptors get interceptors;
   external void close({bool force});
   external Future<Response<T>> get<T>(String path, {Object? data, Map<String, dynamic>? queryParameters,
-      Options? options, CancelToken? cancelToken, Object? onReceiveProgress});
+      Options? options, CancelToken? cancelToken, void Function(int count, int total)? onReceiveProgress});
   external Future<Response<T>> post<T>(String path, {Object? data, Map<String, dynamic>? queryParameters,
-      Options? options, CancelToken? cancelToken, Object? onSendProgress, Object? onReceiveProgress});
+      Options? options, CancelToken? cancelToken, void Function(int count, int total)? onSendProgress, void Function(int count, int total)? onReceiveProgress});
   external Future<Response<T>> put<T>(String path, {Object? data, Map<String, dynamic>? queryParameters,
-      Options? options, CancelToken? cancelToken, Object? onSendProgress, Object? onReceiveProgress});
+      Options? options, CancelToken? cancelToken, void Function(int count, int total)? onSendProgress, void Function(int count, int total)? onReceiveProgress});
   external Future<Response<T>> patch<T>(String path, {Object? data, Map<String, dynamic>? queryParameters,
-      Options? options, CancelToken? cancelToken, Object? onSendProgress, Object? onReceiveProgress});
+      Options? options, CancelToken? cancelToken, void Function(int count, int total)? onSendProgress, void Function(int count, int total)? onReceiveProgress});
   external Future<Response<T>> delete<T>(String path, {Object? data, Map<String, dynamic>? queryParameters,
       Options? options, CancelToken? cancelToken});
   external Future<Response<T>> head<T>(String path, {Object? data, Map<String, dynamic>? queryParameters,
       Options? options, CancelToken? cancelToken});
   external Future<Response<T>> request<T>(String path, {Object? data, Map<String, dynamic>? queryParameters,
-      CancelToken? cancelToken, Options? options, Object? onSendProgress, Object? onReceiveProgress});
+      CancelToken? cancelToken, Options? options, void Function(int count, int total)? onSendProgress, void Function(int count, int total)? onReceiveProgress});
+  external Future<Response<dynamic>> download(String urlPath, dynamic savePath, {void Function(int count, int total)? onReceiveProgress,
+      Map<String, dynamic>? queryParameters, CancelToken? cancelToken, bool? deleteOnError,
+      Object? fileAccessMode, String? lengthHeader, Object? data, Options? options});
   external Future<Response<T>> fetch<T>(RequestOptions requestOptions);
 }

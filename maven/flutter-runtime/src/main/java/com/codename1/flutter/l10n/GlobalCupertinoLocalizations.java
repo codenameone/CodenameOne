@@ -30,7 +30,7 @@ package com.codename1.flutter.l10n;
 public abstract class GlobalCupertinoLocalizations {
 
     /** Static getter -> static field. */
-    public static final LocalizationsDelegate delegate = new LocalizationsDelegate();
+    public static final LocalizationsDelegate<CupertinoLocalizations> delegate = CupertinoLocalizations.delegate;
 
     private GlobalCupertinoLocalizations() {
     }

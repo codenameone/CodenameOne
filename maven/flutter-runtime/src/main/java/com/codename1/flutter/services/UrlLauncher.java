@@ -36,8 +36,16 @@ import dart.runtime.Funcs;
  *
  * <p>Each returns an already-completed {@link Future} so a non-awaited call
  * transpiles and runs to completion; {@code launchUrl} additionally fires the
- * native open. The {@code mode}/{@code webOnlyWindowName} options are accepted
- * for API shape.</p>
+ * native open.</p>
+ *
+ * <p>{@code LaunchMode.inAppWebView} and {@code inAppBrowserView} open an http(s)
+ * URL in a {@link com.codename1.ui.BrowserComponent} on a form of its own, whose
+ * back command returns to the previous form; Codename One has no in-app browser
+ * tab, so both get the same web view. Any other scheme in those modes, and
+ * {@code platformDefault}, {@code externalApplication} and
+ * {@code externalNonBrowserApplication}, go to {@link Display#execute(String)}:
+ * the core cannot force the OS to skip the browser for the last one.
+ * {@code webOnlyWindowName} is accepted and ignored.</p>
  */
 public final class UrlLauncher {
 
@@ -60,6 +68,10 @@ public final class UrlLauncher {
             return Future.value(false);
         }
         final Display d = Display.getInstance();
+        if ((mode == LaunchMode.inAppWebView || mode == LaunchMode.inAppBrowserView) && isWeb(urlString)) {
+            openInApp(urlString);
+            return Future.value(true);
+        }
         return Future.value(launch(urlString, new Funcs.Func1<String, Boolean>() {
             @Override
             public Boolean call(String u) {
@@ -71,6 +83,37 @@ public final class UrlLauncher {
                 d.execute(u);
             }
         }));
+    }
+
+    static boolean isWeb(String u) {
+        return u.regionMatches(true, 0, "http:", 0, 5) || u.regionMatches(true, 0, "https:", 0, 6);
+    }
+
+    private static void openInApp(final String url) {
+        Runnable r = new Runnable() {
+            @Override
+            public void run() {
+                final com.codename1.ui.Form back = Display.getInstance().getCurrent();
+                com.codename1.ui.Form f = new com.codename1.ui.Form(new com.codename1.ui.layouts.BorderLayout());
+                com.codename1.ui.BrowserComponent b = new com.codename1.ui.BrowserComponent();
+                b.setURL(url);
+                f.add(com.codename1.ui.layouts.BorderLayout.CENTER, b);
+                if (back != null) {
+                    f.setBackCommand(new com.codename1.ui.Command("Back") {
+                        @Override
+                        public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                            back.showBack();
+                        }
+                    });
+                }
+                f.show();
+            }
+        };
+        if (Display.getInstance().isEdt()) {
+            r.run();
+        } else {
+            Display.getInstance().callSerially(r);
+        }
     }
 
     /**

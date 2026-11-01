@@ -66,8 +66,58 @@ public class FormData {
         }
     }
 
-    /// `formData.fields.add(MapEntry(k, v))` and `formData.files.add(MapEntry(k, file))`
-    /// go through these.
+    private dart.core.DartList<MapEntry<String, String>> liveFields;
+    private dart.core.DartList<MapEntry<String, MultipartFile>> liveFiles;
+
+    /// `formData.fields`: the text fields, as a live list -- an app's
+    /// `formData.fields.add(MapEntry(k, v))` is read back by encode and length.
+    public dart.core.DartList<MapEntry<String, String>> fields() {
+        if (liveFields == null) {
+            liveFields = new dart.core.DartList<MapEntry<String, String>>();
+            for (String[] f : fields) {
+                liveFields.add(new MapEntry<String, String>(f[0], f[1]));
+            }
+        }
+        return liveFields;
+    }
+
+    /// Folds the live lists, when an app took them, back into the parts.
+    private void sync() {
+        if (liveFields != null) {
+            fields.clear();
+            for (MapEntry<String, String> e : liveFields) {
+                if (liveFields != null) {
+            liveFields.add(e);
+        } else {
+            fields.add(new String[] {e.key(), e.value()});
+        }
+            }
+        }
+        if (liveFiles != null) {
+            files.clear();
+            for (MapEntry<String, MultipartFile> e : liveFiles) {
+                if (liveFiles != null) {
+            liveFiles.add(e);
+        } else {
+            files.add(new Object[] {e.key(), e.value()});
+        }
+            }
+        }
+    }
+
+    /// `formData.files`: the file parts, as a live list (see {@link #fields}).
+    public dart.core.DartList<MapEntry<String, MultipartFile>> files() {
+        if (liveFiles == null) {
+            liveFiles = new dart.core.DartList<MapEntry<String, MultipartFile>>();
+            for (Object[] f : files) {
+                if (f[1] instanceof MultipartFile && f[0] instanceof String) {
+                    liveFiles.add(new MapEntry<String, MultipartFile>((String) f[0], (MultipartFile) f[1]));
+                }
+            }
+        }
+        return liveFiles;
+    }
+
     public void addField(MapEntry<String, String> e) {
         fields.add(new String[] {e.key(), e.value()});
     }
@@ -81,6 +131,7 @@ public class FormData {
     }
 
     byte[] encode() {
+        sync();
         try {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             for (String[] f : fields) {
@@ -107,6 +158,7 @@ public class FormData {
     }
 
     public long length() {
+        sync();
         return encode().length;
     }
 }

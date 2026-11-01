@@ -796,6 +796,24 @@ public abstract class RenderElement extends Element {
         }
     }
 
+    /**
+     * Whether the nearest enclosing {@code Directionality} is right-to-left. Layouts that
+     * place children along a start/end axis mirror under it, as Flutter's do.
+     */
+    protected final boolean isRtl() {
+        return com.codename1.flutter.widgets.Directionality.of(this) == TextDirection.rtl;
+    }
+
+    /**
+     * Mirrors the x offset {@code child} was given in a box {@code width} wide, so a
+     * layout written for left-to-right places the child at the mirrored position.
+     */
+    protected final void mirrorChildX(RenderElement child, double width) {
+        if (child != null && child.size() != null) {
+            child.relX = width - child.relX - child.size().width();
+        }
+    }
+
     protected void setChildOffset(RenderElement child, double dx, double dy) {
         child.relX = dx;
         child.relY = dy;

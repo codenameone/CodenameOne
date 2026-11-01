@@ -27,6 +27,7 @@ import com.codename1.builders.BuildException;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
@@ -72,7 +73,8 @@ public final class FlutterProjectImporter {
         COVERED.put("animations", "OpenContainer/PageTransitionSwitcher/SharedAxisTransition stubs");
         COVERED.put("intl", "DateFormat/NumberFormat/Intl stubs");
         COVERED.put("google_fonts", "GoogleFonts stub (bundled/asset fonts only, no network fetch)");
-        COVERED.put("url_launcher", "launchUrl/launchUrlString stubs");
+        COVERED.put("url_launcher", "launchUrl/launchUrlString/canLaunchUrl; LaunchMode.inAppWebView and "
+                + "inAppBrowserView open an in-app BrowserComponent, the others the system handler");
         COVERED.put("scoped_model", "ScopedModel/ScopedModelDescendant stubs");
         COVERED.put("vector_math", "Matrix4/Vector3 stubs");
         COVERED.put("flutter_localized_locales", "LocaleNames/LocaleNamesLocalizationsDelegate stubs");
@@ -95,7 +97,7 @@ public final class FlutterProjectImporter {
         COVERED.put("go_router", "GoRouter/GoRoute/ShellRoute/GoRouterState and the context.go/push/pop "
                 + "extension; MaterialApp.router (plugins.gorouter)");
         COVERED.put("cached_network_image", "CachedNetworkImage/CachedNetworkImageProvider over "
-                + "Image.network (plugins.cachednetworkimage)");
+                + "ConnectionRequest with placeholder, progress and error widgets (plugins.cachednetworkimage)");
         COVERED.put("cross_file", "XFile over FileSystemStorage or in-memory bytes (plugins.crossfile)");
         COVERED.put("share_plus", "SharePlus.instance.share and the static Share API over Display.share "
                 + "(plugins.share)");
@@ -107,20 +109,71 @@ public final class FlutterProjectImporter {
         COVERED.put("geolocator", "Geolocator positions, permissions and distance/bearing over "
                 + "LocationManager (plugins.geolocator)");
         COVERED.put("image_picker", "ImagePicker pickImage/pickVideo/pickMedia/pickMultiImage over Capture and "
-                + "the gallery (plugins.imagepicker)");
+                + "the gallery, with maxWidth/maxHeight resizing and imageQuality (plugins.imagepicker)");
         COVERED.put("app_links", "AppLinks initial link and link streams from the AppArg launch property "
                 + "(plugins.applinks)");
         COVERED.put("flutter_local_notifications", "show/periodicallyShow/zonedSchedule/cancel and tap "
-                + "callbacks over LocalNotification (plugins.notifications)");
+                + "callbacks over LocalNotification, background tap callback, Android channels and raw "
+                + "sounds (plugins.notifications)");
         COVERED.put("firebase_core", "Firebase.initializeApp/FirebaseOptions (plugins.firebase)");
-        COVERED.put("firebase_auth", "FirebaseAuth email/password and anonymous accounts over the Identity "
-                + "Toolkit REST API (plugins.firebase)");
+        COVERED.put("firebase_auth", "FirebaseAuth email/password, anonymous and federated credentials "
+                + "(Google, Apple, OAuthProvider tokens through signInWithIdp) over the Identity Toolkit REST "
+                + "API; signInWithProvider for Google and Apple (plugins.firebase, firebasegoogle, firebaseapple)");
+        COVERED.put("google_sign_in", "GoogleSignIn signIn/signOut/currentUser/onCurrentUserChanged over "
+                + "GoogleConnect's OIDC sign-in; signInSilently answers this run's account only (plugins.googlesignin)");
         COVERED.put("firebase_analytics", "FirebaseAnalytics events logged, screen views to AnalyticsService "
                 + "(plugins.firebase)");
-        COVERED.put("firebase_messaging", "FirebaseMessaging token and foreground onMessage over Codename One "
-                + "push (plugins.firebase)");
-        COVERED.put("google_maps_flutter", "GoogleMap widget with markers, camera and taps over MapView "
+        COVERED.put("firebase_messaging", "FirebaseMessaging token, onMessage, onBackgroundMessage and "
+                + "provisional permission over Codename One push (plugins.firebase)");
+        COVERED.put("firebase_ai", "FirebaseAI googleAI/vertexAI, generateContent, countTokens and chat over "
+                + "the Firebase AI Logic REST API with App Check and auth headers; streams are one-shot and "
+                + "function calling is not run (plugins.firebaseai)");
+        COVERED.put("firebase_app_check", "FirebaseAppCheck activate/getToken; only the debug provider yields "
+                + "a token, the attestation providers are accepted (plugins.firebase)");
+        COVERED.put("firebase_ui_auth", "SignInScreen, ProfileScreen, auth state actions and "
+                + "FirebaseUIAuth.configureProviders over firebase_auth (plugins.firebaseui)");
+        COVERED.put("firebase_ui_oauth", "OAuthProviderButton over the configured providers (plugins.firebaseui)");
+        COVERED.put("firebase_ui_oauth_google", "GoogleProvider over GoogleConnect (plugins.firebaseuigoogle)");
+        COVERED.put("firebase_ui_oauth_apple", "AppleProvider over AppleSignIn (plugins.firebaseuiapple)");
+        COVERED.put("google_maps_flutter", "GoogleMap widget with markers, polylines, circles, hued and byte marker icons, camera "
+                + "and taps over MapView "
                 + "(plugins.googlemaps)");
+        COVERED.put("flutter_timezone", "local zone id and available zones from java.util.TimeZone "
+                + "(plugins.timezone)");
+        COVERED.put("app_settings", "openAppSettings/openAppSettingsPanel through Display.execute "
+                + "(plugins.appsettings)");
+        COVERED.put("android_play_install_referrer", "API only; installReferrer always fails with "
+                + "UnsupportedError (plugins.installreferrer)");
+        COVERED.put("geocoding", "placemarkFromCoordinates/locationFromAddress over the Google Geocoding REST "
+                + "API, key in the google.geocoding.key Display property (plugins.geocoding)");
+        COVERED.put("file_picker", "FilePicker.platform pickFiles/saveFile/getDirectoryPath over the native "
+                + "file dialogs (plugins.filepicker)");
+        COVERED.put("audioplayers", "AudioPlayer with asset/url/file/bytes sources and its streams over "
+                + "MediaManager (plugins.audioplayers)");
+        COVERED.put("mixpanel_flutter", "track/identify/alias/super properties/People/flush over the Mixpanel "
+                + "HTTP API, setServerURL for EU residency (plugins.mixpanel)");
+        COVERED.put("flutter_web_auth_2", "authenticate through an in-app browser; cancel is a CANCELED "
+                + "PlatformException (plugins.webauth)");
+        COVERED.put("flutter_image_compress", "compressWithFile/List/AndGetFile/AssetImage over Image and "
+                + "ImageIO, JPEG and PNG (plugins.imagecompress)");
+        COVERED.put("image_picker_platform_interface", "ImagePickerPlatform.instance and getImageFromSource "
+                + "(plugins.imagepicker)");
+        COVERED.put("image_picker_android", "ImagePickerAndroid.registerWith; useAndroidPhotoPicker accepted "
+                + "with no effect (plugins.imagepicker)");
+        COVERED.put("webview_flutter", "WebViewController/NavigationDelegate/WebViewWidget over BrowserComponent; "
+                + "a POST is sent as a GET (plugins.webview)");
+        COVERED.put("video_player", "VideoPlayerController/VideoPlayer/VideoProgressIndicator over MediaManager; "
+                + "no captions, speed or headers (plugins.videoplayer)");
+        COVERED.put("video_thumbnail", "API only; every call fails with UnsupportedError, core extracts no "
+                + "frames (plugins.videothumbnail)");
+        COVERED.put("video_compress", "API only; compressVideo answers the ORIGINAL file uncompressed with a "
+                + "warning (plugins.videocompress)");
+        COVERED.put("camera", "availableCameras/CameraController/CameraPreview over com.codename1.camera "
+                + "(plugins.camera)");
+        COVERED.put("emoji_picker_flutter", "EmojiPicker as a tabbed grid of built-in emoji with recents and "
+                + "search; Config ignored except height (plugins.emojipicker)");
+        COVERED.put("flutter_svg", "SvgPicture.asset/network/string/file/memory through Image.createSVG where "
+                + "the port renders SVG, otherwise a sized empty box (plugins.svg)");
         // NOT covered, checked and confirmed absent: "collection" (no ListEquality/MapEquality/
         // SetEquality stub -- the one hit on that name is a comment, not an implementation),
         // "flutter_staggered_grid_view" and "nested" (provider's internal composition helper,
@@ -172,10 +225,94 @@ public final class FlutterProjectImporter {
         /// the reason: a platform plugin, or a library that needs dart:ffi, dart:html
         /// or dart:mirrors. These are what an import of this app cannot provide.
         public final Map<String, String> unsupportedPackages = new TreeMap<String, String>();
+        /// A plugin with no Android or iOS implementation, transpiled as Dart (see
+        /// [#isForeignPlatformPlugin]), with the platforms it does implement.
+        public final Map<String, String> foreignPlugins = new TreeMap<String, String>();
+        /// For an unsupported package, the packages its verdict came through, ending with
+        /// the one that is unsupported itself: `[firebase_ui_oauth, flutter_svg,
+        /// vector_graphics_compiler]` when vector_graphics_compiler needs dart:ffi.
+        public final Map<String, List<String>> unsupportedChains = new TreeMap<String, List<String>>();
+        /// Every package the import reached, with the app's own `lib/` files that reach
+        /// it, directly or through other packages.
+        public final Map<String, Set<String>> reachedFrom = new TreeMap<String, Set<String>>();
+        /// The Google Fonts families the app's own files name (`GoogleFonts.openSans(...)`,
+        /// `GoogleFonts.latoTextTheme()`, `GoogleFonts.getFont('Rubik')`). The stub draws
+        /// only fonts bundled with the app, so these are the ones to add as assets.
+        public final Set<String> googleFonts = new java.util.TreeSet<String>();
         public String appName;
         public String appVersion;
         public int copiedFiles;
         public int copiedAssets;
+
+        /// The report as JSON, for a tool or a CI step to read: every package with its
+        /// status (`covered`, `unsupported`), the note or reason, the chain an
+        /// unsupported verdict came through, and the app files that reach it.
+        public String toJson() {
+            StringBuilder b = new StringBuilder("{\n");
+            b.append("  \"app\": ").append(jsonString(appName)).append(",\n");
+            b.append("  \"version\": ").append(jsonString(appVersion)).append(",\n");
+            b.append("  \"packages\": [");
+            boolean first = true;
+            for (int pass = 0; pass < 2; pass++) {
+                for (String entry : pass == 0 ? covered : uncovered) {
+                    int paren = entry.indexOf(" (");
+                    String name = paren < 0 ? entry : entry.substring(0, paren);
+                    String note = paren < 0 ? null : entry.substring(paren + 2, entry.length() - 1);
+                    b.append(first ? "\n" : ",\n");
+                    first = false;
+                    b.append("    {\"package\": ").append(jsonString(name));
+                    b.append(", \"status\": \"").append(pass == 0 ? "covered" : "unsupported").append('"');
+                    if (note != null) {
+                        b.append(", \"note\": ").append(jsonString(note));
+                    }
+                    List<String> chain = unsupportedChains.get(name);
+                    if (pass == 1 && chain != null) {
+                        b.append(", \"cause\": ").append(jsonString(unsupportedPackages.get(chain.get(chain.size() - 1))));
+                        b.append(", \"chain\": ").append(jsonArray(chain));
+                    }
+                    Set<String> from = reachedFrom.get(name);
+                    if (from != null) {
+                        b.append(", \"reachedFrom\": ").append(jsonArray(from));
+                    }
+                    b.append('}');
+                }
+            }
+            b.append("\n  ],\n");
+            b.append("  \"missingAssets\": ").append(jsonArray(missingAssets)).append(",\n");
+            b.append("  \"unresolvedPackages\": ").append(jsonArray(unresolvedPackages)).append(",\n");
+            b.append("  \"assetCollisions\": ").append(jsonArray(assetCollisions)).append(",\n");
+            b.append("  \"googleFonts\": ").append(jsonArray(googleFonts)).append("\n");
+            return b.append("}\n").toString();
+        }
+
+        private static String jsonArray(java.util.Collection<String> items) {
+            StringBuilder b = new StringBuilder("[");
+            for (String i : items) {
+                if (b.length() > 1) {
+                    b.append(", ");
+                }
+                b.append(jsonString(i));
+            }
+            return b.append(']').toString();
+        }
+
+        private static String jsonString(String v) {
+            if (v == null) {
+                return "null";
+            }
+            StringBuilder b = new StringBuilder("\"");
+            for (int i = 0; i < v.length(); i++) {
+                char c = v.charAt(i);
+                if (c == '"' || c == '\\') {
+                    b.append('\\').append(c);
+                } else if (c < 0x20) {
+                    b.append(String.format("\\u%04x", (int) c));
+                } else {
+                    b.append(c);
+                }
+            }
+            return b.append('"').toString();
+        }
     }
 
     private final Log log;
@@ -193,6 +330,84 @@ public final class FlutterProjectImporter {
     /// only when the project has not overridden `cn1.flutter.package`. A
     /// caller that can see that configuration (`ImportFlutterProjectMojo`)
     /// must use the five-argument overload instead.
+    /// [#COVERED] plus what the stub packs of this import declare.
+    private final Map<String, String> coverage = new LinkedHashMap<String, String>();
+    private final List<File> stubPacks = new ArrayList<File>();
+
+    /// Stub packs beyond the Flutter runtime's own -- jars, or class/resource directories,
+    /// with `META-INF/dart/*.dart` stubs -- whose `// cn1:covers` lines (see
+    /// [#declaredCoverage]) count as covered. The application's own
+    /// `common/src/main/resources` is always read.
+    public FlutterProjectImporter withStubPacks(java.util.Collection<File> packs) {
+        stubPacks.addAll(packs);
+        return this;
+    }
+
+    private static final Pattern COVERS = Pattern.compile("(?m)^//\\s*cn1:covers\\s+([A-Za-z0-9_]+)\\s*(.*)$");
+
+    /// A stub file declares the pub packages it stands in for, one line each, so a third-party
+    /// pack is reported -- and its package not followed into -- like a built-in one:
+    ///
+    /// ```
+    /// // cn1:covers lottie Lottie.asset/network over a Codename One animation
+    /// ```
+    static void declaredCoverage(List<File> packs, Map<String, String> out) {
+        for (File pack : packs) {
+            try {
+                if (pack.isDirectory()) {
+                    File[] stubs = new File(pack, "META-INF/dart").listFiles();
+                    if (stubs != null) {
+                        for (File f : stubs) {
+                            if (f.isFile() && f.getName().endsWith(".dart")) {
+                                covers(new String(Files.readAllBytes(f.toPath()), Charset.forName("UTF-8")), out);
+                            }
+                        }
+                    }
+                } else if (pack.isFile()) {
+                    java.util.zip.ZipFile z = new java.util.zip.ZipFile(pack);
+                    try {
+                        java.util.Enumeration<? extends java.util.zip.ZipEntry> e = z.entries();
+                        while (e.hasMoreElements()) {
+                            java.util.zip.ZipEntry ze = e.nextElement();
+                            String n = ze.getName();
+                            if (!ze.isDirectory() && n.startsWith("META-INF/dart/") && n.endsWith(".dart")
+                                    && n.indexOf('/', "META-INF/dart/".length()) < 0) {
+                                InputStream in = z.getInputStream(ze);
+                                try {
+                                    covers(new String(readAll(in), Charset.forName("UTF-8")), out);
+                                } finally {
+                                    in.close();
+                                }
+                            }
+                        }
+                    } finally {
+                        z.close();
+                    }
+                }
+            } catch (IOException ex) {
+                // An unreadable pack declares nothing; the import reports its packages as it would without it.
+            }
+        }
+    }
+
+    private static void covers(String stub, Map<String, String> out) {
+        Matcher m = COVERS.matcher(stub);
+        while (m.find()) {
+            String note = m.group(2).trim();
+            out.put(m.group(1), note.isEmpty() ? "a stub pack on the class path" : note);
+        }
+    }
+
+    private static byte[] readAll(InputStream in) throws IOException {
+        java.io.ByteArrayOutputStream b = new java.io.ByteArrayOutputStream();
+        byte[] buf = new byte[8192];
+        int n;
+        while ((n = in.read(buf)) > 0) {
+            b.write(buf, 0, n);
+        }
+        return b.toByteArray();
+    }
+
     public Result importProject(File source, File commonDir, String mainPackage, String mainClass)
             throws BuildException {
         return importProject(source, commonDir, mainPackage, mainClass, DEFAULT_FLUTTER_PACKAGE);
@@ -209,6 +424,11 @@ public final class FlutterProjectImporter {
     public Result importProject(File source, File commonDir, String mainPackage, String mainClass,
             String flutterPackage) throws BuildException {
         String entryPointPackage = flutterPackage == null ? DEFAULT_FLUTTER_PACKAGE : flutterPackage;
+        coverage.clear();
+        coverage.putAll(COVERED);
+        List<File> packs = new ArrayList<File>(stubPacks);
+        packs.add(new File(commonDir, "src/main/resources"));
+        declaredCoverage(packs, coverage);
         File pubspecFile = new File(source, "pubspec.yaml");
         File libDir = new File(source, "lib");
         if (!pubspecFile.isFile()) {
@@ -364,7 +584,7 @@ public final class FlutterProjectImporter {
             // API package, which is only covered when flutter-runtime actually stubs its classes.
             Map<String, String> assetOnlyCovered = new LinkedHashMap<String, String>();
             for (String pkgName : packagesWithCopiedAssets) {
-                if (COVERED.containsKey(pkgName)) {
+                if (coverage.containsKey(pkgName)) {
                     continue;
                 }
                 File pkgLibDir = resolvedPackageLibDirs.get(pkgName);
@@ -385,9 +605,16 @@ public final class FlutterProjectImporter {
                 if (ignored) {
                     continue;
                 }
-                String note = COVERED.get(dep);
+                String note = coverage.get(dep);
                 if (note == null) {
                     note = assetOnlyCovered.get(dep);
+                }
+                if ("google_fonts".equals(dep) && note != null && !r.googleFonts.isEmpty()) {
+                    note += "; bundle these families as assets: " + String.join(", ", r.googleFonts);
+                }
+                if (note == null && r.foreignPlugins.containsKey(dep) && r.transpiledPackages.containsKey(dep)) {
+                    note = "a " + r.foreignPlugins.get(dep) + "-only plugin, transpiled as Dart; its platform "
+                            + "calls throw MissingPluginException";
                 }
                 if (note == null && r.transpiledPackages.containsKey(dep)) {
                     note = "transpiled from its sources, " + r.transpiledPackages.get(dep) + " file(s)";
@@ -424,7 +651,49 @@ public final class FlutterProjectImporter {
     /// test answers true for exactly these, and the walk below follows the same
     /// alternative it will pick.
     static final Set<String> SUPPORTED_DART_LIBRARIES = new HashSet<String>(java.util.Arrays.asList(
-            "core", "async", "collection", "convert", "io", "math", "typed_data", "ui"));
+            "core", "async", "collection", "convert", "developer", "io", "math", "typed_data", "ui"));
+
+    private static final Pattern GOOGLE_FONT = Pattern.compile(
+            "GoogleFonts\\s*\\.\\s*([a-z][A-Za-z0-9]*)\\s*\\(\\s*(?:['\"]([^'\"]+)['\"])?");
+
+    /// google_fonts' members that are not a family.
+    private static final Set<String> GOOGLE_FONTS_API = new java.util.HashSet<String>(java.util.Arrays.asList(
+            "getFont", "getTextTheme", "asMap", "pendingFonts", "config"));
+
+    /// Adds the families `source` names through google_fonts: a family method is the
+    /// family in lower camel case (`notoSansHebrew` is Noto Sans Hebrew, `baloo2` is
+    /// Baloo 2), and its `TextTheme` variant names the same one.
+    static void googleFontFamilies(String source, Set<String> out) {
+        Matcher m = GOOGLE_FONT.matcher(source);
+        while (m.find()) {
+            String member = m.group(1);
+            if ("getFont".equals(member) || "getTextTheme".equals(member)) {
+                if (m.group(2) != null) {
+                    out.add(m.group(2));
+                }
+                continue;
+            }
+            if (GOOGLE_FONTS_API.contains(member)) {
+                continue;
+            }
+            if (member.endsWith("TextTheme") && member.length() > "TextTheme".length()) {
+                member = member.substring(0, member.length() - "TextTheme".length());
+            }
+            StringBuilder family = new StringBuilder();
+            for (int i = 0; i < member.length(); i++) {
+                char c = member.charAt(i);
+                boolean digit = c >= '0' && c <= '9';
+                boolean upper = c >= 'A' && c <= 'Z';
+                char prev = i == 0 ? ' ' : member.charAt(i - 1);
+                boolean prevDigit = prev >= '0' && prev <= '9';
+                if (i > 0 && (upper || (digit && !prevDigit))) {
+                    family.append(' ');
+                }
+                family.append(i == 0 && c >= 'a' && c <= 'z' ? (char) (c - 'a' + 'A') : c);
+            }
+            out.add(family.toString());
+        }
+    }
 
     private static final Pattern DIRECTIVE = Pattern.compile(
             "(?m)^\\s*(import|export|part)\\s+(?!of\\b)(['\"])([^'\"]+)\\2([^;]*);");
@@ -465,7 +734,8 @@ public final class FlutterProjectImporter {
         Map<String, File> libDirs = new HashMap<String, File>();
         Map<String, Integer> counts = new TreeMap<String, Integer>();
         Map<String, Set<String>> importers = new HashMap<String, Set<String>>();
-        Map<String, Boolean> pluginCache = new HashMap<String, Boolean>();
+        // package -> the app's own lib/ files that import it directly
+        Map<String, Set<String>> ownImporters = new HashMap<String, Set<String>>();
         int copied = 0;
         while (!work.isEmpty()) {
             String[] item = work.poll();
@@ -484,6 +754,9 @@ public final class FlutterProjectImporter {
                 packageSources.add(dest);
                 Integer c = counts.get(pkg);
                 counts.put(pkg, Integer.valueOf(c == null ? 1 : c.intValue() + 1));
+            }
+            if (pkg == null) {
+                googleFontFamilies(stripComments(text), r.googleFonts);
             }
             Matcher m = DIRECTIVE.matcher(stripComments(text));
             while (m.find()) {
@@ -521,6 +794,14 @@ public final class FlutterProjectImporter {
                 }
                 if (nextPkg != null) {
                     lastReachedPackages.add(nextPkg);
+                    if (pkg == null) {
+                        Set<String> files = ownImporters.get(nextPkg);
+                        if (files == null) {
+                            files = new TreeSet<String>();
+                            ownImporters.put(nextPkg, files);
+                        }
+                        files.add(rel);
+                    }
                     if (pkg != null && !pkg.equals(nextPkg)) {
                         Set<String> by = importers.get(nextPkg);
                         if (by == null) {
@@ -529,7 +810,7 @@ public final class FlutterProjectImporter {
                         }
                         by.add(pkg);
                     }
-                    if (SDK_PACKAGES.contains(nextPkg) || COVERED.containsKey(nextPkg)
+                    if (SDK_PACKAGES.contains(nextPkg) || coverage.containsKey(nextPkg)
                             || r.unsupportedPackages.containsKey(nextPkg)) {
                         continue;
                     }
@@ -545,12 +826,11 @@ public final class FlutterProjectImporter {
                             r.unsupportedPackages.put(nextPkg, "sources not found; run `flutter pub get`");
                             continue;
                         }
-                        Boolean plugin = pluginCache.get(nextPkg);
-                        if (plugin == null) {
-                            plugin = Boolean.valueOf(isPlatformPlugin(dir));
-                            pluginCache.put(nextPkg, plugin);
-                        }
-                        if (plugin.booleanValue()) {
+                        Set<String> platforms = pluginPlatforms(dir);
+                        if (isForeignPlatformPlugin(platforms)) {
+                            r.foreignPlugins.put(nextPkg, platforms.isEmpty() ? "no platform"
+                                    : String.join("/", platforms));
+                        } else if (platforms != null) {
                             r.unsupportedPackages.put(nextPkg, "a platform plugin with no Codename One stub");
                             continue;
                         }
@@ -575,9 +855,42 @@ public final class FlutterProjectImporter {
             for (String p : by) {
                 if (!r.unsupportedPackages.containsKey(p)) {
                     r.unsupportedPackages.put(p, "depends on " + dep + ", which is unsupported");
+                    List<String> chain = new ArrayList<String>();
+                    chain.add(p);
+                    List<String> rest = r.unsupportedChains.get(dep);
+                    chain.addAll(rest == null ? java.util.Collections.singletonList(dep) : rest);
+                    r.unsupportedChains.put(p, chain);
                     verdicts.add(p);
                 }
             }
+        }
+        for (String u : r.unsupportedPackages.keySet()) {
+            if (!r.unsupportedChains.containsKey(u)) {
+                r.unsupportedChains.put(u, java.util.Collections.singletonList(u));
+            }
+        }
+        // The app files behind each package: its own importers, and those of every
+        // package that imports it, transitively.
+        for (String reached : lastReachedPackages) {
+            Set<String> files = new TreeSet<String>();
+            Set<String> visited = new HashSet<String>();
+            java.util.ArrayDeque<String> up = new java.util.ArrayDeque<String>();
+            up.add(reached);
+            while (!up.isEmpty()) {
+                String q = up.poll();
+                if (!visited.add(q)) {
+                    continue;
+                }
+                Set<String> direct = ownImporters.get(q);
+                if (direct != null) {
+                    files.addAll(direct);
+                }
+                Set<String> by = importers.get(q);
+                if (by != null) {
+                    up.addAll(by);
+                }
+            }
+            r.reachedFrom.put(reached, files);
         }
         // A package found unsupported after some of its files were copied is not
         // transpiled: drop what was copied, so the build does not compile half of it.
@@ -622,28 +935,87 @@ public final class FlutterProjectImporter {
     /// Whether a package's pubspec declares `flutter: plugin:` -- a federated or
     /// classic platform plugin, whose Dart side calls into native code.
     static boolean isPlatformPlugin(File packageLibDir) {
+        return pluginPlatforms(packageLibDir) != null;
+    }
+
+    /// The platforms a plugin's pubspec lists under `flutter: plugin: platforms:`,
+    /// null for a package that is not a plugin. A plugin in the format that predates
+    /// `platforms:` (`androidPackage`/`pluginClass` directly under `plugin:`) served
+    /// Android and iOS, and answers those two.
+    static Set<String> pluginPlatforms(File packageLibDir) {
         File pubspec = new File(packageLibDir.getParentFile(), "pubspec.yaml");
         if (!pubspec.isFile()) {
-            return false;
+            return null;
         }
         try {
             boolean inFlutter = false;
+            int pluginIndent = -1;
+            int platformsIndent = -1;
+            int keyIndent = -1;
+            Set<String> platforms = null;
             for (String line : Files.readAllLines(pubspec.toPath(), Charset.forName("UTF-8"))) {
-                if (line.trim().isEmpty() || line.trim().startsWith("#")) {
+                String t = line.trim();
+                if (t.isEmpty() || t.startsWith("#")) {
                     continue;
                 }
-                if (!line.startsWith(" ")) {
+                int indent = line.length() - line.replaceAll("^\\s+", "").length();
+                if (indent == 0) {
+                    if (pluginIndent >= 0) {
+                        break;
+                    }
                     inFlutter = line.startsWith("flutter:");
                     continue;
                 }
-                if (inFlutter && line.trim().startsWith("plugin:")) {
-                    return true;
+                if (!inFlutter) {
+                    continue;
+                }
+                if (pluginIndent < 0) {
+                    if (t.startsWith("plugin:")) {
+                        pluginIndent = indent;
+                    }
+                    continue;
+                }
+                if (indent <= pluginIndent) {
+                    break;
+                }
+                if (platformsIndent < 0) {
+                    if (t.startsWith("platforms:")) {
+                        platformsIndent = indent;
+                        platforms = new TreeSet<String>();
+                    }
+                    continue;
+                }
+                if (indent <= platformsIndent) {
+                    break;
+                }
+                if (keyIndent < 0) {
+                    keyIndent = indent;
+                }
+                int colon = t.indexOf(':');
+                if (indent == keyIndent && colon > 0) {
+                    platforms.add(t.substring(0, colon).trim());
                 }
             }
+            if (pluginIndent < 0) {
+                return null;
+            }
+            if (platforms == null) {
+                return new TreeSet<String>(java.util.Arrays.asList("android", "ios"));
+            }
+            return platforms;
         } catch (IOException e) {
-            return false;
+            return null;
         }
-        return false;
+    }
+
+    /// A plugin with no Android or iOS implementation: what it does natively happens only
+    /// on a desktop or the web, platforms Codename One does not build for. A mobile Flutter
+    /// app reaches one only behind a platform check (`firebase_ui_oauth` depends on
+    /// `desktop_webview_auth` for its desktop sign-in), so the plugin's Dart is
+    /// transpiled like any pure-Dart package and its method-channel calls throw
+    /// MissingPluginException, as they do on a platform the plugin does not implement.
+    static boolean isForeignPlatformPlugin(Set<String> platforms) {
+        return platforms != null && !platforms.contains("android") && !platforms.contains("ios");
     }
 
     /// Removes `//` and `/* */` comments, keeping string literals intact enough for

@@ -28,13 +28,16 @@ public class _MyHomePageState extends State<MyHomePage> {
     }
 
     void _incrementCounter() {
+        //@dart:36 main.dart
         this.setState(() -> {
+            //@dart:37 main.dart
             this._counter++;
         });
     }
 
     @Override
     public Widget build(BuildContext context) {
+        //@dart:43 main.dart
         var $t0 = new Scaffold();
         var $t1 = new AppBar();
         $t1.backgroundColor(Theme.of(context).colorScheme().inversePrimary());
@@ -56,4 +59,5 @@ public class _MyHomePageState extends State<MyHomePage> {
         return $t0;
     }
 
+    static final String $cn1DartLines = "main.dart\n32:36,34:37,41:43";
 }

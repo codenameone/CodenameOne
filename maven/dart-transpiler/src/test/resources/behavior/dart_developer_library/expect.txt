@@ -1,0 +1,7 @@
+[app] hello
+[app] bad
+Bad state: x
+0
+42
+seen
+false

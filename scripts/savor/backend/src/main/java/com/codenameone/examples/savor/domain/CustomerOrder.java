@@ -23,6 +23,7 @@ import com.codenameone.examples.savor.api.OrderState;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
+import java.time.Instant;
 
 /// An order: what a customer bought from one restaurant, what it cost, and where
 /// it stands. Its lines, prices and address are copied in when it is placed, so a
@@ -107,19 +108,19 @@ public class CustomerOrder {
     private int prepMinutes;
 
     @Column(nullable = false)
-    private long placedAt;
+    private Instant placedAt = Instant.EPOCH;
 
     @Column(nullable = false)
-    private long acceptedAt;
+    private Instant acceptedAt = Instant.EPOCH;
 
     @Column(nullable = false)
-    private long readyAt;
+    private Instant readyAt = Instant.EPOCH;
 
     @Column(nullable = false)
-    private long deliveredAt;
+    private Instant deliveredAt = Instant.EPOCH;
 
     @Column(nullable = false)
-    private long updatedAt;
+    private Instant updatedAt = Instant.EPOCH;
 
     @Column(nullable = false, type = "VARCHAR(255)")
     private String reason = "";
@@ -330,43 +331,43 @@ public class CustomerOrder {
         this.prepMinutes = prepMinutes;
     }
 
-    public long getPlacedAt() {
+    public Instant getPlacedAt() {
         return placedAt;
     }
 
-    public void setPlacedAt(long placedAt) {
+    public void setPlacedAt(Instant placedAt) {
         this.placedAt = placedAt;
     }
 
-    public long getAcceptedAt() {
+    public Instant getAcceptedAt() {
         return acceptedAt;
     }
 
-    public void setAcceptedAt(long acceptedAt) {
+    public void setAcceptedAt(Instant acceptedAt) {
         this.acceptedAt = acceptedAt;
     }
 
-    public long getReadyAt() {
+    public Instant getReadyAt() {
         return readyAt;
     }
 
-    public void setReadyAt(long readyAt) {
+    public void setReadyAt(Instant readyAt) {
         this.readyAt = readyAt;
     }
 
-    public long getDeliveredAt() {
+    public Instant getDeliveredAt() {
         return deliveredAt;
     }
 
-    public void setDeliveredAt(long deliveredAt) {
+    public void setDeliveredAt(Instant deliveredAt) {
         this.deliveredAt = deliveredAt;
     }
 
-    public long getUpdatedAt() {
+    public Instant getUpdatedAt() {
         return updatedAt;
     }
 
-    public void setUpdatedAt(long updatedAt) {
+    public void setUpdatedAt(Instant updatedAt) {
         this.updatedAt = updatedAt;
     }
 

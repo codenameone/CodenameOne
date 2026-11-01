@@ -21,6 +21,7 @@ package com.codenameone.examples.savor.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
+import java.time.Instant;
 
 /// What a completed delivery was charged, and what was given back.
 @Entity
@@ -42,7 +43,7 @@ public class Payment {
     private String providerRef = "";
 
     @Column(nullable = false)
-    private long createdAt;
+    private Instant createdAt = Instant.EPOCH;
 
     @Column(nullable = false, type = "VARCHAR(64)")
     private String tipRef = "";
@@ -57,7 +58,7 @@ public class Payment {
     private String refundReason = "";
 
     @Column(nullable = false)
-    private long refundedAt;
+    private Instant refundedAt = Instant.EPOCH;
 
     public Payment() {
     }
@@ -102,11 +103,11 @@ public class Payment {
         this.providerRef = providerRef;
     }
 
-    public long getCreatedAt() {
+    public Instant getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(long createdAt) {
+    public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
     }
 
@@ -142,11 +143,11 @@ public class Payment {
         this.refundReason = refundReason;
     }
 
-    public long getRefundedAt() {
+    public Instant getRefundedAt() {
         return refundedAt;
     }
 
-    public void setRefundedAt(long refundedAt) {
+    public void setRefundedAt(Instant refundedAt) {
         this.refundedAt = refundedAt;
     }
 }

@@ -48,6 +48,14 @@ public class AlignmentDirectional extends Alignment {
         super(start, y);
     }
 
+    /**
+     * The horizontal coordinate {@code a} resolves to: a directional alignment's start
+     * is the right edge under right-to-left text, a plain {@link Alignment} never moves.
+     */
+    public static double xFor(Alignment a, boolean rtl) {
+        return rtl && a instanceof AlignmentDirectional ? -a.x() : a.x();
+    }
+
     public double start() {
         return x();
     }

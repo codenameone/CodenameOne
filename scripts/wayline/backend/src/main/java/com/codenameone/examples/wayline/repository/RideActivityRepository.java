@@ -26,6 +26,7 @@ import com.codename1.orm.repository.Query;
 import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.wayline.domain.RideActivity;
 
+import java.time.Instant;
 import java.util.List;
 
 /// The Live Activities riders follow their rides in, by ride.
@@ -40,23 +41,26 @@ public interface RideActivityRepository extends CrudRepository<RideActivity, Str
     @Modifying
     @Query("update RideActivity a set a.sentAt = :now "
             + "where a.rideId = :rideId and a.sentAt < :before")
-    int claim(@Param("rideId") String rideId, @Param("now") long now,
-            @Param("before") long before);
+    int claim(@Param("rideId") String rideId, @Param("now") Instant now,
+            @Param("before") Instant before);
 
     /// Records that the ride ended at `now`, unless that is already recorded.
+    /// `none` is the epoch, which an end not yet recorded holds.
     @Modifying
     @Query("update RideActivity a set a.endedAt = :now "
-            + "where a.rideId = :rideId and a.endedAt = 0")
-    int markEnded(@Param("rideId") String rideId, @Param("now") long now);
+            + "where a.rideId = :rideId and a.endedAt = :none")
+    int markEnded(@Param("rideId") String rideId, @Param("now") Instant now,
+            @Param("none") Instant none);
 
     /// The activities whose ride ended before `before` and that are still
     /// here, because the phone was not told: oldest first.
-    @Query("select a from RideActivity a where a.endedAt > 0 and a.endedAt < :before "
+    @Query("select a from RideActivity a where a.endedAt > :none and a.endedAt < :before "
             + "order by a.endedAt")
-    List<RideActivity> leftBehind(@Param("before") long before, PageRequest page);
+    List<RideActivity> leftBehind(@Param("before") Instant before, @Param("none") Instant none,
+            PageRequest page);
 
     /// Forgets the activities whose ride ended before `before`.
     @Modifying
-    @Query("delete from RideActivity a where a.endedAt > 0 and a.endedAt < :before")
-    int dropEndedBefore(@Param("before") long before);
+    @Query("delete from RideActivity a where a.endedAt > :none and a.endedAt < :before")
+    int dropEndedBefore(@Param("before") Instant before, @Param("none") Instant none);
 }

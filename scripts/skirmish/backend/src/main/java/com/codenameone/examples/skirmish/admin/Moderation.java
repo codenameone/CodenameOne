@@ -37,6 +37,7 @@ import com.codenameone.examples.skirmish.repository.AdminActionRepository;
 import com.codenameone.examples.skirmish.repository.ProfileRepository;
 import com.codenameone.examples.skirmish.shop.Catalog;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -101,7 +102,7 @@ public class Moderation {
             if (days < 1 || days > 365) {
                 throw new ResponseStatusException(400, "Suspend for 1 to 365 days");
             }
-            p.setSuspendedUntil(Clock.now() + days * Clock.DAY);
+            p.setSuspendedUntil(Instant.now().plusMillis(days * Clock.DAY));
             accounts.setEnabled(username, false);
             closes = true;
         } else if (BAN.equals(action)) {
@@ -110,7 +111,7 @@ public class Moderation {
             closes = true;
         } else if (UNBAN.equals(action)) {
             p.setBanned(false);
-            p.setSuspendedUntil(0);
+            p.setSuspendedUntil(Instant.EPOCH);
             accounts.setEnabled(username, true);
         } else if (RESET_TROPHIES.equals(action)) {
             p.setTrophies(0);
@@ -125,7 +126,7 @@ public class Moderation {
         a.setUsername(username);
         a.setAction(SUSPEND.equals(action) ? SUSPEND + " " + days + "d" : action);
         a.setReason(reason);
-        a.setCreatedAt(Clock.now());
+        a.setCreatedAt(Instant.now());
         audit.insert(a);
         return closes;
     }
@@ -140,8 +141,9 @@ public class Moderation {
     public int lift(long now) {
         int lifted = 0;
         for (Profile p : profiles.findAll()) {
-            if (!p.isBanned() && p.getSuspendedUntil() > 0 && p.getSuspendedUntil() <= now) {
-                p.setSuspendedUntil(0);
+            if (!p.isBanned() && p.getSuspendedUntil().isAfter(Instant.EPOCH)
+                    && p.getSuspendedUntil().toEpochMilli() <= now) {
+                p.setSuspendedUntil(Instant.EPOCH);
                 profiles.save(p);
                 accounts.setEnabled(p.getUsername(), true);
                 lifted++;
@@ -164,7 +166,7 @@ public class Moderation {
         List<AuditDto> out = new ArrayList<AuditDto>();
         for (AdminAction a : rows) {
             out.add(new AuditDto(a.getId(), a.getAdmin(), a.getUsername(), a.getAction(), a.getReason(),
-                    a.getCreatedAt()));
+                    a.getCreatedAt().toEpochMilli()));
         }
         return out;
     }

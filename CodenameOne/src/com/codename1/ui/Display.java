@@ -667,6 +667,7 @@ public final class Display extends CN1Constants {
             }
             impl.postInit();
             com.codename1.hardware.Hardware.install(impl.getHardware());
+            com.codename1.realtime.Realtime.install(impl.getRealtime());
             INSTANCE.setCommandBehavior(commandBehaviour);
         } else {
             impl.confirmControlView();

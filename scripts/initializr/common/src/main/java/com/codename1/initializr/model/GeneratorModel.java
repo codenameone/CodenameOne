@@ -45,7 +45,7 @@ import java.util.Map;
 import static com.codename1.ui.CN.*;
 
 public class GeneratorModel {
-    private static final String CN1_PLUGIN_VERSION = "7.0.279";
+    private static final String CN1_PLUGIN_VERSION = "7.0.280";
     /// Whether the Codename One Gradle plugin is published at [CN1_PLUGIN_VERSION].
     /// A Gradle download resolves the plugin by that version, so until a release
     /// carrying the plugin is what the initializr generates against, a Gradle
@@ -92,10 +92,16 @@ public class GeneratorModel {
     /// generated there.
     static final String BASTION_SINCE = "7.0.280";
 
+    /// The first release whose ORM maps `java.time.Instant` entity fields, which
+    /// every other full-stack template's server stores its timestamps in. Against
+    /// an older release its backend does not compile, so it is neither offered nor
+    /// generated there.
+    static final String JAVA_TIME_ENTITIES_SINCE = "7.0.280";
+
     /// The first release a template can be generated against.
     static String templateSince(Template template) {
         return template == Template.BASTION ? BASTION_SINCE
-                : template == Template.REEL ? REEL_SINCE : FULL_STACK_SINCE;
+                : template == Template.REEL ? REEL_SINCE : JAVA_TIME_ENTITIES_SINCE;
     }
 
     /// The brand colour of the full-stack template as it ships: the `--brand` its
@@ -555,16 +561,23 @@ public class GeneratorModel {
 
     /// build.bat with the launch report just before it jumps to the target, and
     /// the exit report in its :finish block, which every target falls through to.
-    String withBatchTelemetry(String script) throws IOException {
+    /// The launcher ships with CRLF endings and so does the result: cmd.exe finds a
+    /// goto label by re-reading the file in 512-byte blocks and, in an LF-only file,
+    /// can miss one that straddles a block boundary and run the wrong target. The
+    /// markers are matched on LF, so the script is folded to LF, filled, and widened
+    /// back -- the telemetry resources included, whatever endings they carry.
+    String withBatchTelemetry(String original) throws IOException {
+        String script = StringUtil.replaceAll(original, "\r\n", "\n");
         int jump = script.indexOf(BAT_GOTO_LINE);
         int finish = script.lastIndexOf(BAT_FINISH_BLOCK);
         if (jump < 0 || finish < jump || finish + BAT_FINISH_BLOCK.length() != script.length()) {
-            return script;
+            return original;
         }
-        return script.substring(0, jump + 1)
+        String filled = script.substring(0, jump + 1)
                 + fillTelemetryTokens(readResourceToString(LAUNCHER_TELEMETRY_BAT_START))
                 + script.substring(jump + 1, finish)
                 + fillTelemetryTokens(readResourceToString(LAUNCHER_TELEMETRY_BAT_FINISH));
+        return StringUtil.replaceAll(StringUtil.replaceAll(filled, "\r\n", "\n"), "\n", "\r\n");
     }
 
     /// The root pom with the same reporting for builds the launchers never see: the

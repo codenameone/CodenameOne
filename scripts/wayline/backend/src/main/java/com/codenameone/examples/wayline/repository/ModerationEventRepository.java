@@ -24,6 +24,7 @@ import com.codename1.orm.repository.Query;
 import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.wayline.domain.ModerationEvent;
 
+import java.time.Instant;
 import java.util.List;
 
 /// The record of what the admins did to each account.
@@ -32,7 +33,7 @@ public interface ModerationEventRepository extends CrudRepository<ModerationEven
     /// When the newest event of an account was written, or null when it has
     /// none.
     @Query("select max(e.createdAt) from ModerationEvent e where e.username = :username")
-    Long newest(@Param("username") String username);
+    Instant newest(@Param("username") String username);
 
     /// An account's last hundred events, newest first.
     List<ModerationEvent> findTop100ByUsernameOrderByCreatedAtDescIdAsc(String username);

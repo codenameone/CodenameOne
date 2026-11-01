@@ -40,6 +40,7 @@ import com.codenameone.examples.skirmish.repository.ProfileRepository;
 import com.codenameone.examples.skirmish.repository.ReferralRepository;
 import com.codenameone.examples.skirmish.repository.SpotlightRepository;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -121,7 +122,7 @@ public class Promotion {
             sent.add(dto(b));
         }
         return new PromoteDto((int) profiles.count(),
-                profiles.audienceSize(Long.MAX_VALUE, now - 7 * Clock.DAY).intValue(),
+                profiles.audienceSize(Instant.ofEpochMilli(Long.MAX_VALUE), Instant.ofEpochMilli(now - 7 * Clock.DAY)).intValue(),
                 (int) referrals.count(), referrals.inState(Referrals.PLAYED).intValue(), top, sent, spotlightOf());
     }
 
@@ -138,7 +139,7 @@ public class Promotion {
     public BroadcastDto broadcast(String admin, BroadcastDto b) throws IOException {
         check(b, true);
         long now = Clock.now();
-        if (broadcasts.countBySentAtGreaterThan(now - Clock.DAY) >= MAX_BROADCASTS_PER_DAY) {
+        if (broadcasts.countBySentAtGreaterThan(Instant.ofEpochMilli(now - Clock.DAY)) >= MAX_BROADCASTS_PER_DAY) {
             throw new ResponseStatusException(429, "At most " + MAX_BROADCASTS_PER_DAY
                     + " broadcasts a day: players who are pushed too often switch notifications off");
         }
@@ -157,7 +158,7 @@ public class Promotion {
         row.setCampaign(campaign.length() > 40 ? campaign.substring(0, 40) : campaign);
         row.setTargets(reached);
         row.setSentBy(admin);
-        row.setSentAt(now);
+        row.setSentAt(Instant.ofEpochMilli(now));
         broadcasts.insert(row);
         record(admin, "BROADCAST", b.segment() + ": " + b.title().trim());
         return dto(row);
@@ -185,7 +186,7 @@ public class Promotion {
         row.setPackId(s.packId() == null ? "" : s.packId().trim());
         row.setScreen(screen(s.screen()));
         row.setUpdatedBy(admin);
-        row.setUpdatedAt(Clock.now());
+        row.setUpdatedAt(Instant.now());
         if (fresh) {
             spotlights.insert(row);
         } else {
@@ -198,7 +199,7 @@ public class Promotion {
     private SpotlightDto spotlightOf() {
         Spotlight s = spotlights.findById(HOME);
         return s == null ? new SpotlightDto("", "", "", 0)
-                : new SpotlightDto(s.getMessage(), s.getPackId(), s.getScreen(), s.getUpdatedAt());
+                : new SpotlightDto(s.getMessage(), s.getPackId(), s.getScreen(), s.getUpdatedAt().toEpochMilli());
     }
 
     private List<String> audienceOf(BroadcastDto b) {
@@ -216,8 +217,8 @@ public class Promotion {
             return out;
         }
         long now = Clock.now();
-        long seen = LAPSED.equals(b.segment()) ? now - b.days() * Clock.DAY : Long.MAX_VALUE;
-        long joined = NEW.equals(b.segment()) ? now - b.days() * Clock.DAY : Long.MIN_VALUE;
+        Instant seen = Instant.ofEpochMilli(LAPSED.equals(b.segment()) ? now - b.days() * Clock.DAY : Long.MAX_VALUE);
+        Instant joined = Instant.ofEpochMilli(NEW.equals(b.segment()) ? now - b.days() * Clock.DAY : Long.MIN_VALUE);
         for (int page = 0; out.size() < MAX_AUDIENCE; page++) {
             List<Profile> rows = profiles.audience(seen, joined, new PageRequest(page, PAGE));
             for (Profile p : rows) {
@@ -268,7 +269,7 @@ public class Promotion {
 
     private static BroadcastDto dto(Broadcast b) {
         return new BroadcastDto(b.getId(), b.getSegment(), b.getDays(), b.getTitle(), b.getBody(), b.getScreen(),
-                b.getCampaign(), b.getTargets(), b.getSentBy(), b.getSentAt());
+                b.getCampaign(), b.getTargets(), b.getSentBy(), b.getSentAt().toEpochMilli());
     }
 
     private void record(String admin, String action, String reason) throws IOException {
@@ -278,7 +279,7 @@ public class Promotion {
         a.setUsername("promote");
         a.setAction(action);
         a.setReason(reason.length() > 255 ? reason.substring(0, 255) : reason);
-        a.setCreatedAt(Clock.now());
+        a.setCreatedAt(Instant.now());
         audit.insert(a);
     }
 }

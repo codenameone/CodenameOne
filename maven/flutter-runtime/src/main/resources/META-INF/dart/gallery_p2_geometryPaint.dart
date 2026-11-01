@@ -216,6 +216,7 @@ class RRect {
 
 @JavaName('com.codename1.flutter.Canvas')
 class Canvas {
+  external Canvas(PictureRecorder recorder, [Rect? cullRect]);
   external void drawPath(Path path, Paint paint);
   external void drawRect(Rect rect, Paint paint);
   external void drawRRect(RRect rrect, Paint paint);

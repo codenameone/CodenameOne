@@ -9271,15 +9271,19 @@ public final class HttpServer {
         }
 
         if (streamed) {
+            // A bodiless response's writer is closed before the head is written, so
+            // the close happens-before anything the client does after reading the
+            // status. Closing it after the write let the client run ahead of it.
+            if (noBody) {
+                response.discard();
+            }
             try {
                 writeTo(fd, session, conn.out, 0, conn.outLength);
             } catch (IOException | RuntimeException headFailed) {
                 response.discard();
                 throw headFailed;
             }
-            if (noBody) {
-                response.discard();
-            } else {
+            if (!noBody) {
                 ResponseOutput output = new ResponseOutput(fd, session, chunked, null, 0); //NOPMD CloseResource - complete flushes on success; failure must abort and the connection owns the socket.
                 response.bodyWriter.writeTo(output);
                 output.complete();

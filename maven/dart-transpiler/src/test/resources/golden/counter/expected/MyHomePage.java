@@ -19,7 +19,9 @@ public class MyHomePage extends StatefulWidget {
 
     @Override
     public State<MyHomePage> createState() {
+        //@dart:29 main.dart
         return new _MyHomePageState();
     }
 
+    static final String $cn1DartLines = "main.dart\n23:29";
 }

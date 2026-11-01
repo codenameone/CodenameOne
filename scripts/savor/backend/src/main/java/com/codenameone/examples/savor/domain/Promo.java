@@ -21,6 +21,7 @@ package com.codenameone.examples.savor.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
+import java.time.Instant;
 
 /// A code a customer types at checkout: a percentage or an amount off the food,
 /// for an order of at least `minimumCents`, once per account.
@@ -43,7 +44,7 @@ public class Promo {
     private boolean active;
 
     @Column(nullable = false)
-    private long createdAt;
+    private Instant createdAt = Instant.EPOCH;
 
     public Promo() {
     }
@@ -88,11 +89,11 @@ public class Promo {
         this.active = active;
     }
 
-    public long getCreatedAt() {
+    public Instant getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(long createdAt) {
+    public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
     }
 }

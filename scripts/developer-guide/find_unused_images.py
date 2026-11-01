@@ -30,7 +30,8 @@ def iter_text_files(root: Path) -> Iterable[Path]:
             yield path
 
 
-IMAGE_MACRO_PATTERN = re.compile(r"(?:^|[\s(])image::?([^\[\s]+)")
+# A table cell spells an image as `a|image::...`, so `|` may precede the macro too.
+IMAGE_MACRO_PATTERN = re.compile(r"(?:^|[\s(|])image::?([^\[\s]+)")
 
 
 def image_references(doc_root: Path, image_dir: Path) -> Set[str]:

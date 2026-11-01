@@ -282,6 +282,17 @@ public class Image extends Widget {
         return w == null && h == null ? "" : "@" + w + "x" + h;
     }
 
+    /// Sets the decode-width hint (raw pixels), for Java-side wrappers such as
+    /// CachedNetworkImage(memCacheWidth:).
+    public void cacheWidth(Long v) {
+        cacheWidth = v;
+    }
+
+    /// Sets the decode-height hint (raw pixels).
+    public void cacheHeight(Long v) {
+        cacheHeight = v;
+    }
+
     /// Request headers for a network image, or null.
     public java.util.Map<?, ?> getHeaders() {
         return headers;

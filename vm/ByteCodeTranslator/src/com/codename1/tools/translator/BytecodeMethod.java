@@ -190,6 +190,18 @@ public class BytecodeMethod implements SignatureSet {
         return barebone;
     }
 
+    private boolean allocationAllowed;
+
+    /// True when the method carries `@com.codename1.realtime.AllocationAllowed`, which
+    /// exempts it from RealtimeAllocationVerifier.
+    public boolean isAllocationAllowed() {
+        return allocationAllowed;
+    }
+
+    public void setAllocationAllowed(boolean allocationAllowed) {
+        this.allocationAllowed = allocationAllowed;
+    }
+
     public boolean isDisableDebugInfo() {
         return disableDebugInfo;
     }

@@ -1,0 +1,19 @@
+en ok=OK cancel=Cancel
+en back=Back search=Search
+en licenses=Licenses date=Select date
+en first=0 narrow=SMTWTFS
+en monthYear=October 2026
+en cupertino today=Today paste=Paste
+es ok=ACEPTAR cancel=Cancelar
+es back=Atrás search=Buscar
+es licenses=Licencias date=Seleccionar fecha
+es first=1 narrow=DLMXJVS
+es monthYear=octubre de 2026
+es cupertino today=Hoy paste=Pegar
+he ok=אישור cancel=ביטול
+he back=הקודם search=חיפוש
+he licenses=רישיונות date=בחירת תאריך
+he first=0 narrow=אבגדהוש
+he monthYear=אוקטובר 2026
+he cupertino today=היום paste=הדבקה
+fallback ok=OK

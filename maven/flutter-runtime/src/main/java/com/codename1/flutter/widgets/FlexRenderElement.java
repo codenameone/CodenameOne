@@ -207,7 +207,9 @@ public class FlexRenderElement extends RenderElement {
                 break;
         }
 
-        // Position children.
+        // Position children. Under right-to-left text a Row runs from the right edge (so
+        // start and end swap too), and a Column's cross-axis start is its right edge.
+        boolean rtl = isRtl();
         double mainPos = leading;
         for (RenderElement child : renderChildren) {
             Size cs = child.size();
@@ -227,9 +229,9 @@ public class FlexRenderElement extends RenderElement {
                     break;
             }
             if (vertical) {
-                setChildOffset(child, crossPos, mainPos);
+                setChildOffset(child, rtl ? crossSize - childCross - crossPos : crossPos, mainPos);
             } else {
-                setChildOffset(child, mainPos, crossPos);
+                setChildOffset(child, rtl ? mainSize - mainPos - mainOf(cs, false) : mainPos, crossPos);
             }
             mainPos += mainOf(cs, vertical) + between;
         }

@@ -89,6 +89,46 @@ class File extends FileSystemEntity {
   external Future<File> copy(String newPath);
   external File renameSync(String newPath);
   external Future<File> rename(String newPath);
+  external RandomAccessFile openSync({FileMode mode = FileMode.read});
+  external Future<RandomAccessFile> open({FileMode mode = FileMode.read});
+}
+
+@JavaName('dart.io.FileLock')
+enum FileLock { shared, exclusive, blockingShared, blockingExclusive }
+
+// Held in memory while open and written back on flush/close; see
+// dart.io.RandomAccessFile.
+@JavaName('dart.io.RandomAccessFile')
+class RandomAccessFile {
+  external String get path;
+  external int positionSync();
+  external Future<int> position();
+  external void setPositionSync(int position);
+  external Future<RandomAccessFile> setPosition(int position);
+  external int lengthSync();
+  external Future<int> length();
+  external int readByteSync();
+  external Future<int> readByte();
+  external Uint8List readSync(int count);
+  external Future<Uint8List> read(int count);
+  external int readIntoSync(List<int> buffer, [int start = 0, int? end]);
+  external Future<int> readInto(List<int> buffer, [int start = 0, int? end]);
+  external RandomAccessFile writeByteSync(int value);
+  external Future<RandomAccessFile> writeByte(int value);
+  external RandomAccessFile writeFromSync(List<int> buffer, [int start = 0, int? end]);
+  external Future<RandomAccessFile> writeFrom(List<int> buffer, [int start = 0, int? end]);
+  external RandomAccessFile writeStringSync(String string, {Object? encoding});
+  external Future<RandomAccessFile> writeString(String string, {Object? encoding});
+  external RandomAccessFile truncateSync(int length);
+  external Future<RandomAccessFile> truncate(int length);
+  external RandomAccessFile flushSync();
+  external Future<RandomAccessFile> flush();
+  external void closeSync();
+  external Future<void> close();
+  external RandomAccessFile lockSync([FileLock mode = FileLock.exclusive, int start = 0, int end = -1]);
+  external Future<RandomAccessFile> lock([FileLock mode = FileLock.exclusive, int start = 0, int end = -1]);
+  external RandomAccessFile unlockSync([int start = 0, int end = -1]);
+  external Future<RandomAccessFile> unlock([int start = 0, int end = -1]);
 }
 
 @JavaName('dart.io.Directory')
@@ -294,5 +334,6 @@ abstract class WebSocket extends Stream<dynamic> {
   external String? get closeReason;
   external String? get protocol;
   external String get extensions;
+  external Duration? get pingInterval;
   external set pingInterval(Duration? interval);
 }

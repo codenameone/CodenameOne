@@ -79,6 +79,12 @@ final class AppSupport {
     /// `buildJavascriptLocal`, made for a server that is not a servlet container.
     static final String WEB_APP_BUILD_TASK = "buildJavascriptWebApp";
 
+    /// The local native Linux build, which `cn1RunOnDevice` deploys.
+    static final String LINUX_LOCAL_BUILD_TASK = "buildLinuxLocal";
+
+    /// The embedded board of a local Linux build (`-Pcn1.board=rpi5`).
+    static final String BOARD_PROPERTY = "cn1.board";
+
     private AppSupport() {
     }
 
@@ -130,6 +136,7 @@ final class AppSupport {
         // classpath as it is at that moment.
         final TaskProvider<com.codename1.gradle.tasks.CompileUnityTask> unity =
                 registerUnity(project, layout, ext, userProperties, main);
+        registerFlutter(project, layout, ext, userProperties, main);
 
         // The simulator's native-interface implementations: a real source set, so
         // src/javase/java compiles against the application and the JavaSE port and
@@ -357,7 +364,8 @@ final class AppSupport {
                     // The FXML documents are compiled by this action, first:
                     // after javac, so that a document can name a class of
                     // the application, and before the relocation.
-                    .withFxmlSourceDirectory(new File(layout.buildDir(), "generated/cn1-fxml")));
+                    .withFxmlSourceDirectory(new File(layout.buildDir(), "generated/cn1-fxml"))
+                    .withFlutterSourceDirectory(flutterSourceDir(layout)));
             compile.doLast("cn1Compliance", new com.codename1.gradle.tasks.ComplianceAction(layout.rootDir(),
                     layout.projectDir(), compile.getDestinationDirectory().getAsFile(), project.getName(),
                     main.getCompileClasspath(), compileArtifacts, complianceProperties)
@@ -535,6 +543,15 @@ final class AppSupport {
         registerBuild(project, WEB_APP_BUILD_TASK, "javascript", "local-javascript",
                 "Builds the JavaScript port locally for the backend to host (see backendWebApp)",
                 layout, main, javase, framework, ext, hosted, queue);
+        // The native Linux executable, built here; -Pcn1.board=rpi5 makes it an
+        // embedded cross build, as -Dcn1.board does for the Maven goal. Only
+        // codename1.* properties reach the builder, so the board travels as the
+        // hints the Maven shortcut sets.
+        final Provider<String> board = project.getProviders().gradleProperty(BOARD_PROPERTY)
+                .orElse(project.getProviders().systemProperty(BOARD_PROPERTY)).orElse("");
+        registerBuild(project, LINUX_LOCAL_BUILD_TASK, "linux", "local-linux-device",
+                "Builds the native Linux executable locally (-Pcn1.board=rpi5 for an embedded board)",
+                layout, main, javase, framework, ext, userProperties.zip(board, (given, b) -> boardProperties(given, b, settingsFile)), queue);
         // The bundle is found by looking in the build directory, so one an
         // earlier build left there must not be this build's answer.
         final Provider<File> bundle = project.getLayout().getBuildDirectory()
@@ -900,6 +917,70 @@ final class AppSupport {
         return unity;
     }
 
+    /// `src/main/flutter`.
+    static File flutterSourceDir(ProjectLayout layout) {
+        return new File(layout.projectDir(), "src" + File.separator + "main" + File.separator + "flutter");
+    }
+
+    /// `transcodeFlutter`, for an application with `src/main/flutter`: the
+    /// Dart sources become a main source root and their flattened assets a
+    /// directory of the main output. The runtime is an `implementation`
+    /// dependency, added here as it is for Unity, at the plugin's own version.
+    /// The generated package is the `cn1.flutter.package` Gradle property (or
+    /// `-D` system property), as the Maven goal reads it.
+    static void registerFlutter(final Project project, final ProjectLayout layout, final CodenameOneExtension ext,
+            final Provider<Map<String, String>> userProperties, final SourceSet main) {
+        final File flutterDir = flutterSourceDir(layout);
+        final File flutterOut = new File(layout.buildDir(), "generated" + File.separator + "sources"
+                + File.separator + "cn1-flutter");
+        if (com.codename1.maven.FlutterProjectBuilder.isFlutterProject(flutterDir)) {
+            addFramework(project, "implementation", ext.getVersion(),
+                    com.codename1.maven.FlutterProjectBuilder.RUNTIME_ARTIFACT);
+        }
+        // The configuration, not the source set's classpath, which is about to
+        // include this task's own output.
+        final org.gradle.api.file.FileCollection stubs = project.getConfigurations()
+                .getByName(main.getCompileClasspathConfigurationName());
+        TaskProvider<com.codename1.gradle.tasks.TranscodeFlutterTask> flutter = project.getTasks().register(
+                "transcodeFlutter", com.codename1.gradle.tasks.TranscodeFlutterTask.class, t -> {
+                    common(t, project, layout, ext, userProperties);
+                    t.setDescription("Transpiles the Flutter/Dart sources in src/main/flutter to Java");
+                    t.getFlutterDirectory().set(flutterDir);
+                    t.getStubClasspath().from(stubs);
+                    // The application's own Java roots: every root of the main
+                    // source set outside the build directory, and Kotlin's.
+                    // Roots other tasks generate are left out -- reading them
+                    // would need a dependency on each of those tasks, this
+                    // one's own output among them, and generated SVG, GUI or
+                    // Unity code never names a Flutter plugin pack.
+                    t.getJavaSourceRoots().from(project.provider(() -> {
+                        List<File> roots = new ArrayList<File>();
+                        // Canonical: a build directory reached through a symlink
+                        // (/tmp and /private/tmp on macOS) is still the same one.
+                        String build = layout.buildDir().getCanonicalPath() + File.separator;
+                        for (File dir : main.getJava().getSrcDirs()) {
+                            if (!dir.getCanonicalPath().startsWith(build)) {
+                                roots.add(dir);
+                            }
+                        }
+                        roots.add(new File(layout.projectDir(), "src" + File.separator + "main"
+                                + File.separator + "kotlin"));
+                        return roots;
+                    }));
+                    t.getPackageName().set(project.getProviders().gradleProperty("cn1.flutter.package")
+                            .orElse(project.getProviders().systemProperty("cn1.flutter.package"))
+                            .orElse(com.codename1.maven.FlutterProjectBuilder.DEFAULT_PACKAGE));
+                    t.getOutputDirectory().set(flutterOut);
+                    t.getAssetsDirectory().set(new File(layout.buildDir(), "cn1-flutter/resources"));
+                    t.getStateDirectory().set(new File(layout.buildDir(), "cn1-flutter/state"));
+                    // The task itself is asked, through the argument, so the
+                    // spec holds no reference to it for the configuration cache.
+                    t.onlyIf(x -> ((com.codename1.gradle.tasks.TranscodeFlutterTask) x).hasWork());
+                });
+        main.getJava().srcDir(flutter.flatMap(com.codename1.gradle.tasks.TranscodeFlutterTask::getOutputDirectory));
+        main.getOutput().dir(flutter.flatMap(com.codename1.gradle.tasks.TranscodeFlutterTask::getAssetsDirectory));
+    }
+
     /// `generateGuiSources`, whose generated views are a main source root. An
     /// application's and a cn1lib's alike: a library's own views extend the
     /// `Abstract*` classes it generates, exactly as an application's do.
@@ -1164,6 +1245,32 @@ final class AppSupport {
     /// same-origin and never proxied anyway -- so the build is told not to wire
     /// one in, unless the project has chosen for itself: on the command line, in
     /// `codenameone { buildHints }` or in its settings file.
+    /// `given` with the hints `cn1.board` stands for: the board, and
+    /// `linux.embedded` unless the command line or the settings already say.
+    static Map<String, String> boardProperties(Map<String, String> given, String board, File settingsFile) {
+        if (board == null || board.trim().isEmpty()) {
+            return given;
+        }
+        Map<String, String> out = new java.util.LinkedHashMap<String, String>(given);
+        out.put("codename1.arg.linux.embedded.board", board.trim());
+        if (!out.containsKey("codename1.arg.linux.embedded") && !settingsDeclare(settingsFile, "codename1.arg.linux.embedded")) {
+            out.put("codename1.arg.linux.embedded", "true");
+        }
+        return out;
+    }
+
+    private static boolean settingsDeclare(File settingsFile, String key) {
+        java.util.Properties p = new java.util.Properties();
+        if (settingsFile.isFile()) {
+            try (java.io.InputStream in = new java.io.FileInputStream(settingsFile)) {
+                p.load(in);
+            } catch (java.io.IOException ignored) {
+                // An unreadable settings file declares nothing; the build reports it.
+            }
+        }
+        return p.getProperty(key) != null;
+    }
+
     static Map<String, String> hostedProperties(Map<String, String> given, File settingsFile) {
         Map<String, String> out = new java.util.LinkedHashMap<String, String>(given);
         try {

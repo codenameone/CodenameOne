@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 364" width="760" height="364" font-family="Inter,Helvetica,Arial,sans-serif">
+<rect width="760" height="364" fill="#ffffff" rx="12"/>
+<text x="24" y="36" font-size="20" font-weight="700" fill="#1B2333">Cold start to first frame</text>
+<text x="24" y="58" font-size="13" fill="#5B6577">The Flutter Gallery, same Dart source, both release builds. Lower is better.</text>
+<rect x="510" y="24" width="12" height="12" fill="#2F6BFF" rx="2"/><text x="528" y="35" font-size="13" fill="#1B2333">Codename One</text>
+<rect x="632" y="24" width="12" height="12" fill="#9AA3B2" rx="2"/><text x="650" y="35" font-size="13" fill="#1B2333">Flutter</text>
+<text x="98" y="103.0" font-size="14" font-weight="600" fill="#1B2333" text-anchor="end">Android</text>
+<rect x="110" y="78" width="171.1" height="18" fill="#2F6BFF" rx="3"/>
+<text x="289.1" y="92" font-size="12.5" fill="#1B2333">395 ms</text>
+<rect x="110" y="102" width="540.0" height="18" fill="#9AA3B2" rx="3"/>
+<text x="658.0" y="116" font-size="12.5" fill="#1B2333">1247 ms</text>
+<text x="736" y="103.0" font-size="14" font-weight="700" fill="#2F6BFF" text-anchor="end">3.2x</text>
+<text x="98" y="167.0" font-size="14" font-weight="600" fill="#1B2333" text-anchor="end">macOS</text>
+<rect x="110" y="142" width="263.6" height="18" fill="#2F6BFF" rx="3"/>
+<text x="381.6" y="156" font-size="12.5" fill="#1B2333">609 ms</text>
+<rect x="110" y="166" width="312.7" height="18" fill="#9AA3B2" rx="3"/>
+<text x="430.7" y="180" font-size="12.5" fill="#1B2333">722 ms</text>
+<text x="736" y="167.0" font-size="14" font-weight="700" fill="#2F6BFF" text-anchor="end">1.2x</text>
+<text x="98" y="231.0" font-size="14" font-weight="600" fill="#1B2333" text-anchor="end">Windows</text>
+<rect x="110" y="206" width="54.4" height="18" fill="#2F6BFF" rx="3"/>
+<text x="172.4" y="220" font-size="12.5" fill="#1B2333">126 ms</text>
+<rect x="110" y="230" width="88.6" height="18" fill="#9AA3B2" rx="3"/>
+<text x="206.6" y="244" font-size="12.5" fill="#1B2333">205 ms</text>
+<text x="736" y="231.0" font-size="14" font-weight="700" fill="#2F6BFF" text-anchor="end">1.6x</text>
+<text x="98" y="295.0" font-size="14" font-weight="600" fill="#1B2333" text-anchor="end">Linux</text>
+<rect x="110" y="270" width="53.5" height="18" fill="#2F6BFF" rx="3"/>
+<text x="171.5" y="284" font-size="12.5" fill="#1B2333">123 ms</text>
+<rect x="110" y="294" width="85.8" height="18" fill="#9AA3B2" rx="3"/>
+<text x="203.8" y="308" font-size="12.5" fill="#1B2333">198 ms</text>
+<text x="736" y="295.0" font-size="14" font-weight="700" fill="#2F6BFF" text-anchor="end">1.6x</text>
+</svg>

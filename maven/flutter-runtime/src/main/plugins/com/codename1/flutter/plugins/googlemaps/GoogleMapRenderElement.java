@@ -52,6 +52,8 @@ public class GoogleMapRenderElement extends RenderElement {
     private MapView view;
     private CameraPosition camera;
     private final List<com.codename1.maps.Marker> placed = new ArrayList<com.codename1.maps.Marker>();
+    private final List<com.codename1.maps.Polyline> placedLines = new ArrayList<com.codename1.maps.Polyline>();
+    private final List<com.codename1.maps.Circle> placedCircles = new ArrayList<com.codename1.maps.Circle>();
     private boolean created;
 
     public GoogleMapRenderElement(GoogleMap widget) {
@@ -89,6 +91,9 @@ public class GoogleMapRenderElement extends RenderElement {
             view.addTapListener(new MapTapListener() {
                 @Override
                 public void mapTapped(MapSurface m, com.codename1.maps.LatLng at, int x, int y) {
+                    if (overlayConsumed(LatLng.of(at))) {
+                        return;
+                    }
                     Funcs.VoidFunc1<LatLng> h = map().onTap;
                     if (h != null) {
                         h.call(LatLng.of(at));
@@ -130,6 +135,44 @@ public class GoogleMapRenderElement extends RenderElement {
         }
         notifyCreated();
         return view == null ? null : view.asComponent();
+    }
+
+    /// Hit-tests a tap against the widget's circles and polylines (topmost, that is
+    /// last, first) with a tolerance of about 4 mm of screen; answers whether one
+    /// consumed it.
+    private boolean overlayConsumed(LatLng at) {
+        if (at == null) {
+            return false;
+        }
+        double mpp = MapHit.metersPerPixel(at.latitude(), camera().zoom());
+        double tol = mpp * Display.getInstance().convertToPixels(4f);
+        if (map().circles != null) {
+            List<Object> l = new ArrayList<Object>();
+            for (Object o : map().circles) {
+                l.add(o);
+            }
+            for (int i = l.size() - 1; i >= 0; i--) {
+                if (l.get(i) instanceof Circle && ((Circle) l.get(i)).tapAt(at)) {
+                    return true;
+                }
+            }
+        }
+        if (map().polylines != null) {
+            List<Object> l = new ArrayList<Object>();
+            for (Object o : map().polylines) {
+                l.add(o);
+            }
+            for (int i = l.size() - 1; i >= 0; i--) {
+                if (l.get(i) instanceof Polyline) {
+                    Polyline p = (Polyline) l.get(i);
+                    // a stroke wider than the tolerance is hit across its whole width
+                    if (p.tapAt(at, Math.max(tol, mpp * p.width() / 2))) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     private com.codename1.ui.util.UITimer moveTimer;
@@ -237,6 +280,7 @@ public class GoogleMapRenderElement extends RenderElement {
             view.removeMarker(m);
         }
         placed.clear();
+        placeOverlays();
         if (map().markers == null) {
             return;
         }
@@ -252,6 +296,10 @@ public class GoogleMapRenderElement extends RenderElement {
             if (mk.infoWindow() != null) {
                 opts.title(mk.infoWindow().title()).snippet(mk.infoWindow().snippet());
             }
+            com.codename1.ui.EncodedImage icon = mk.icon() == null ? null : mk.icon().toIcon();
+            if (icon != null) {
+                opts.icon(icon);
+            }
             if (mk.tapHandler() != null) {
                 opts.onClick(new ActionListener() {
                     @Override
@@ -261,6 +309,35 @@ public class GoogleMapRenderElement extends RenderElement {
                 });
             }
             placed.add(view.addMarker(opts));
+        }
+    }
+
+    /// The polylines and circles of the widget, replacing those placed before.
+    private void placeOverlays() {
+        for (com.codename1.maps.Polyline p : placedLines) {
+            view.removePolyline(p);
+        }
+        placedLines.clear();
+        for (com.codename1.maps.Circle c : placedCircles) {
+            view.removeCircle(c);
+        }
+        placedCircles.clear();
+        if (map().polylines != null) {
+            for (Object o : map().polylines) {
+                if (o instanceof Polyline && ((Polyline) o).visible()) {
+                    placedLines.add(view.addPolyline(((Polyline) o).toCn1()));
+                }
+            }
+        }
+        if (map().circles != null) {
+            for (Object o : map().circles) {
+                if (o instanceof Circle && ((Circle) o).visible()) {
+                    com.codename1.maps.Circle c = ((Circle) o).toCn1();
+                    if (c != null) {
+                        placedCircles.add(view.addCircle(c));
+                    }
+                }
+            }
         }
     }
 

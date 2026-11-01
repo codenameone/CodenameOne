@@ -36,6 +36,37 @@
         </activatedProfiles>
     </action>
     <action>
+        <actionName>CUSTOM-Linux Local Build</actionName>
+        <displayName>Linux Local Build</displayName>
+        <goals>
+            <goal>cn1:buildLinuxLocal</goal>
+        </goals>
+        <properties>
+            <cn1.board>rpi5</cn1.board>
+        </properties>
+    </action>
+    <action>
+        <actionName>CUSTOM-Run on Device</actionName>
+        <displayName>Run on Device</displayName>
+        <goals>
+            <goal>cn1:runOnDevice</goal>
+        </goals>
+        <properties>
+            <cn1.board>rpi5</cn1.board>
+            <cn1.device.host>raspberrypi.local</cn1.device.host>
+        </properties>
+    </action>
+    <action>
+        <actionName>CUSTOM-Device Logs</actionName>
+        <displayName>Device Logs</displayName>
+        <goals>
+            <goal>cn1:device-logs</goal>
+        </goals>
+        <properties>
+            <cn1.device.host>raspberrypi.local</cn1.device.host>
+        </properties>
+    </action>
+    <action>
         <actionName>CUSTOM-Open Control Center</actionName>
         <displayName>Open Control Center</displayName>
         <goals>

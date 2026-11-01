@@ -24,6 +24,7 @@ import com.codename1.orm.repository.Query;
 import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.wayline.domain.PaymentMethod;
 
+import java.time.Instant;
 import java.util.List;
 
 /// The cards accounts saved.
@@ -42,7 +43,7 @@ public interface PaymentMethodRepository extends CrudRepository<PaymentMethod, S
 
     /// When the newest of an account's cards was added, or null with none.
     @Query("select max(m.createdAt) from PaymentMethod m where m.username = :username")
-    Long newestAt(@Param("username") String username);
+    Instant newestAt(@Param("username") String username);
 
     int deleteByUsername(String username);
 }

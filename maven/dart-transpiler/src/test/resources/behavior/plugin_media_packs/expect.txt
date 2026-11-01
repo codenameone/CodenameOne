@@ -1,0 +1,24 @@
+progress 100
+finished https://example.com/a
+prevent https://blocked.example/b
+progress 100
+finished https://example.com/c
+current https://example.com/c
+progress 100
+finished https://example.com/a
+back https://example.com/a false
+js ran
+js result headless
+video false false 0 1.0 1.0
+looping true notified 1
+init headless true
+thumbnail unsupported
+compress /tmp/v.mp4 [100.0]
+cameras 0
+camera false CameraLensDirection.back
+camera cameraNotAvailable
+emoji 8 Category.SMILEYS Grinning Face
+search 1 Slice Of Pizza
+picker true
+svg 32.0 16.0
+widgets 4

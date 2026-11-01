@@ -13,7 +13,9 @@ public class DemoPage extends StatefulWidget {
 
     @Override
     public State<DemoPage> createState() {
+        //@dart:27 main.dart
         return new _DemoPageState();
     }
 
+    static final String $cn1DartLines = "main.dart\n17:27";
 }

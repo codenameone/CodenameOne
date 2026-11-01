@@ -42,6 +42,7 @@ public class _DemoPageState extends State<DemoPage> {
 
     @Override
     public Widget build(BuildContext context) {
+        //@dart:36 main.dart
         var $t0 = new Scaffold();
         var $t1 = new AppBar();
         $t1.title(new Text("M2 Widgets"));
@@ -59,7 +60,9 @@ public class _DemoPageState extends State<DemoPage> {
         $t6.child(new Text("Clear"));
         var $t7 = new TextButton();
         $t7.onPressed(() -> {
+            //@dart:55 main.dart
             this.setState(() -> {
+                //@dart:56 main.dart
                 this._taps++;
             });
         });
@@ -68,6 +71,7 @@ public class _DemoPageState extends State<DemoPage> {
         $t3.child($t4);
         var $t8 = new Expanded();
         $t8.child(ListView.builder(null, this._items.length(), (context$0, index) -> {
+            //@dart:69 main.dart
             var $t9 = new Card();
             var $t10 = new Padding();
             $t10.padding(EdgeInsets.all(12.0));
@@ -87,16 +91,22 @@ public class _DemoPageState extends State<DemoPage> {
     }
 
     void _addItem() {
+        //@dart:91 main.dart
         this.setState(() -> {
+            //@dart:92 main.dart
             this._items.add("Item " + DartRuntime.str(this._items.length() + 1L));
         });
     }
 
     void _clear() {
+        //@dart:97 main.dart
         this.setState(() -> {
+            //@dart:98 main.dart
             this._items.clear();
+            //@dart:99 main.dart
             this._taps = 0L;
         });
     }
 
+    static final String $cn1DartLines = "main.dart\n46:36,64:55,66:56,75:69,95:91,97:92,103:97,105:98,107:99";
 }

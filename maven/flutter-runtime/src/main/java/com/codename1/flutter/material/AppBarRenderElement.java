@@ -574,6 +574,15 @@ public class AppBarRenderElement extends RenderElement {
             }
             setChildOffset(title, tx, topInset + centreY(titleSize, barHeight));
         }
+        if (isRtl()) {
+            // Leading at the right, the actions flush to the left, the title beside the
+            // leading -- the whole row mirrored, as Flutter's NavigationToolbar does.
+            mirrorChildX(leading, width);
+            for (int i = 0; i < actions.size(); i++) {
+                mirrorChildX(actions.get(i), width);
+            }
+            mirrorChildX(title, width);
+        }
 
         return constraints.constrain(new Size(width, totalHeight));
     }

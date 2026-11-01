@@ -44,6 +44,7 @@ import com.codenameone.examples.wayline.repository.RidePassedRepository;
 import com.codenameone.examples.wayline.repository.RideRepository;
 
 import java.io.IOException;
+import java.time.Instant;
 
 /// Two weeks of rides that were never taken, so that the admin's charts, a
 /// driver's earnings and a rider's receipts have something in them the first
@@ -180,9 +181,9 @@ public class DemoRides {
                 ride.setCurrency(fares.currency());
                 ride.setDistanceMeters(meters);
                 ride.setDurationSeconds(seconds);
-                ride.setRequestedAt(at);
-                ride.setUpdatedAt(ended);
-                ride.setSearchUntil(at + 90000L);
+                ride.setRequestedAt(Instant.ofEpochMilli(at));
+                ride.setUpdatedAt(Instant.ofEpochMilli(ended));
+                ride.setSearchUntil(Instant.ofEpochMilli(at + 90000L));
                 ride.setStars(given);
                 ride.setPaymentStatus(completed ? Payments.PAID : Payments.PENDING);
                 ride.setProduct(products[driverIndex]);
@@ -222,7 +223,7 @@ public class DemoRides {
                         // and for a refund -- once its charge has a reference.
                         payment.setTipRef("sim_ch_tip-" + id);
                     }
-                    payment.setCreatedAt(ended);
+                    payment.setCreatedAt(Instant.ofEpochMilli(ended));
                     paid.insert(payment);
                     lastSeen[driverIndex] = Math.max(lastSeen[driverIndex], ended);
                     if (ended < now - 7L * Days.MILLIS) {
@@ -246,7 +247,7 @@ public class DemoRides {
             }
             car.setLat(real(iter % PLACES.length, 1));
             car.setLng(real(iter % PLACES.length, 2));
-            car.setLastSeen(lastSeen[iter]);
+            car.setLastSeen(Instant.ofEpochMilli(lastSeen[iter]));
             car.setRatingSum(stars[iter]);
             car.setRatingCount(rated[iter]);
             if (first) {
@@ -265,7 +266,7 @@ public class DemoRides {
                 payout.setDriver(drivers[iter]);
                 payout.setAmountCents(earnedEarlier[iter]);
                 payout.setStatus("paid");
-                payout.setCreatedAt(now - 7L * Days.MILLIS);
+                payout.setCreatedAt(Instant.ofEpochMilli(now - 7L * Days.MILLIS));
                 payout.setDestination("Bay Credit Union ****67" + (10 + iter));
                 payouts.insert(payout);
             }
@@ -278,7 +279,7 @@ public class DemoRides {
         event.setRideId(ride);
         event.setState(state);
         event.setActor(actor);
-        event.setCreatedAt(at);
+        event.setCreatedAt(Instant.ofEpochMilli(at));
         events.insert(event);
     }
 

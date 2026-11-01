@@ -55,6 +55,7 @@ public class RemapCompatAction implements Action<Task> {
     private File desktopDir;
     private FileCollection shipWhenEmpty;
     private File fxmlSources;
+    private File flutterSourceDir;
 
     public RemapCompatAction(File classesDir, FileCollection compileClasspath, File onClickNames,
                              boolean relocateOnly, FileCollection handlerDirs) {
@@ -90,6 +91,13 @@ public class RemapCompatAction implements Action<Task> {
     /// pass ships the runtimes and generates what has to be generated -- but
     /// `compileJava` does nothing at all for a module with no Java source,
     /// and then this directory is the only one there is to ship them in.
+    /// `src/main/flutter`: with it, the classes transpiled from Dart are
+    /// mapped to the Dart source (`DartLineMapper`).
+    public RemapCompatAction withFlutterSourceDirectory(File dir) {
+        this.flutterSourceDir = dir;
+        return this;
+    }
+
     public RemapCompatAction shippingWhenEmpty(FileCollection javaSources) {
         this.shipWhenEmpty = javaSources;
         return this;
@@ -97,6 +105,17 @@ public class RemapCompatAction implements Action<Task> {
 
     @Override
     public void execute(Task task) {
+        // Classes transpiled from Dart get the Dart file and lines, so a
+        // debugger and a stack trace show the Dart source. Before the early
+        // return: a Flutter app needs no compatibility layer. Only for a
+        // project with Dart sources, since it reads every class.
+        if (com.codename1.maven.FlutterProjectBuilder.isFlutterProject(flutterSourceDir)) {
+            try {
+                com.codename1.maven.DartLineMapper.apply(classesDir);
+            } catch (java.io.IOException ex) {
+                throw new GradleException("Could not map Dart line numbers in " + classesDir, ex);
+            }
+        }
         Set<File> classpath = compileClasspath.getFiles();
         // By the jars alone, as the first test: with none there is nothing to
         // read the classes for.

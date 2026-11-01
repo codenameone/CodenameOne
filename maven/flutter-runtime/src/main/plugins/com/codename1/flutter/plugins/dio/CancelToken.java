@@ -38,6 +38,11 @@ public class CancelToken {
     public CancelToken() {
     }
 
+    /// `CancelToken.isCancel(e)`: whether a DioException is a cancellation.
+    public static boolean isCancel(Object e) {
+        return e instanceof DioException && ((DioException) e).type() == DioExceptionType.cancel;
+    }
+
     public boolean isCancelled() {
         return cancelled;
     }

@@ -21,6 +21,7 @@ package com.codenameone.examples.skirmish.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
+import java.time.Instant;
 
 /// One published version of a pack, kept for good: replays and mission results
 /// name the version they were played on.
@@ -43,7 +44,7 @@ public class ForgePackVersion {
     private String content = "";
 
     @Column(nullable = false)
-    private long publishedAt;
+    private Instant publishedAt = Instant.EPOCH;
 
     public ForgePackVersion() {
     }
@@ -88,11 +89,11 @@ public class ForgePackVersion {
         this.content = content;
     }
 
-    public long getPublishedAt() {
+    public Instant getPublishedAt() {
         return publishedAt;
     }
 
-    public void setPublishedAt(long publishedAt) {
+    public void setPublishedAt(Instant publishedAt) {
         this.publishedAt = publishedAt;
     }
 }

@@ -26,6 +26,7 @@ import com.codename1.orm.repository.Query;
 import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.wayline.domain.DriverApplication;
 
+import java.time.Instant;
 import java.util.List;
 
 /// Applications to drive, one per account at most, keyed by the account.
@@ -72,7 +73,7 @@ public interface DriverApplicationRepository extends CrudRepository<DriverApplic
             + "a.reviewedAt = :at, a.reviewedBy = :by "
             + "where a.username = :username and a.status = :from")
     int move(@Param("username") String username, @Param("from") String from,
-            @Param("to") String to, @Param("reason") String reason, @Param("at") long at,
+            @Param("to") String to, @Param("reason") String reason, @Param("at") Instant at,
             @Param("by") String by);
 
     /// Marks an application `approved` unless it already is.
@@ -81,7 +82,7 @@ public interface DriverApplicationRepository extends CrudRepository<DriverApplic
             + "a.reviewedAt = :at, a.reviewedBy = :by "
             + "where a.username = :username and a.status <> :to")
     int approveUnlessApproved(@Param("username") String username,
-            @Param("to") String approved, @Param("at") long at, @Param("by") String by);
+            @Param("to") String approved, @Param("at") Instant at, @Param("by") String by);
 
     /// Hands an application in: from the status it was read in to `to`, with
     /// the last rejection's reason cleared.
@@ -89,7 +90,7 @@ public interface DriverApplicationRepository extends CrudRepository<DriverApplic
     @Query("update DriverApplication a set a.status = :to, a.submittedAt = :at, "
             + "a.rejectionReason = '' where a.username = :username and a.status = :from")
     int submit(@Param("username") String username, @Param("from") String from,
-            @Param("to") String to, @Param("at") long at);
+            @Param("to") String to, @Param("at") Instant at);
 
     /// Makes the rest of the transaction wait its turn behind any other that
     /// holds, or moves, the same application.

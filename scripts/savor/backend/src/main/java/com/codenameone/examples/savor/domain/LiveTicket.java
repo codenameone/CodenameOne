@@ -21,6 +21,7 @@ package com.codenameone.examples.savor.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
+import java.time.Instant;
 
 /// A ticket for one connection to the live channel, as its hash.
 @Entity
@@ -33,7 +34,7 @@ public class LiveTicket {
     private String username = "";
 
     @Column(nullable = false)
-    private long expiresAt;
+    private Instant expiresAt = Instant.EPOCH;
 
     public LiveTicket() {
     }
@@ -54,11 +55,11 @@ public class LiveTicket {
         this.username = username;
     }
 
-    public long getExpiresAt() {
+    public Instant getExpiresAt() {
         return expiresAt;
     }
 
-    public void setExpiresAt(long expiresAt) {
+    public void setExpiresAt(Instant expiresAt) {
         this.expiresAt = expiresAt;
     }
 }

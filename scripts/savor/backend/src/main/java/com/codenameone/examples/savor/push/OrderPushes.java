@@ -48,6 +48,7 @@ import com.codenameone.examples.savor.repository.ProfileRepository;
 import com.codenameone.examples.savor.repository.RestaurantStaffRepository;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -182,8 +183,8 @@ public class OrderPushes {
     @Scheduled(fixedDelay = 60000, initialDelay = 50000, lock = "savor-activity-ends")
     public void endLeftBehind() throws IOException {
         long now = System.currentTimeMillis();
-        dropEndedBefore(now - END_RETRY_MILLIS);
-        List<DeliveryActivity> left = leftBehind(now - END_GRACE_MILLIS);
+        dropEndedBefore(Instant.ofEpochMilli(now - END_RETRY_MILLIS));
+        List<DeliveryActivity> left = leftBehind(Instant.ofEpochMilli(now - END_GRACE_MILLIS));
         Exception failed = null;
         for (int iter = 0; iter < left.size(); iter++) {
             String id = left.get(iter).getDeliveryId();
@@ -204,13 +205,13 @@ public class OrderPushes {
     }
 
     @Transactional
-    private void dropEndedBefore(long before) {
-        activities.dropEndedBefore(before);
+    private void dropEndedBefore(Instant before) {
+        activities.dropEndedBefore(Instant.EPOCH, before);
     }
 
     @Transactional(readOnly = true)
-    private List<DeliveryActivity> leftBehind(long before) {
-        return activities.leftBehind(before, new PageRequest(0, 50));
+    private List<DeliveryActivity> leftBehind(Instant before) {
+        return activities.leftBehind(Instant.EPOCH, before, new PageRequest(0, 50));
     }
 
     @Transactional
@@ -280,11 +281,11 @@ public class OrderPushes {
             row.setDeliveryId(orderId);
             row.setUsername(customer);
             row.setActivityId(activityId);
-            row.setSentAt(System.currentTimeMillis());
+            row.setSentAt(Instant.now());
             activities.insert(row);
         } else {
             row.setActivityId(activityId);
-            row.setSentAt(System.currentTimeMillis());
+            row.setSentAt(Instant.now());
         }
         return new DeliveryActivityDto(activityId);
     }
@@ -400,7 +401,7 @@ public class OrderPushes {
         }
         // end::savor-push-messages[]
         if (!state.isActive() && activity != null) {
-            activities.markEnded(id, System.currentTimeMillis());
+            activities.markEnded(id, Instant.now(), Instant.EPOCH);
         }
         if (toCustomer != null && !wants(customer, OrderState.DELIVERED == state)) {
             toCustomer = null;
@@ -485,7 +486,7 @@ public class OrderPushes {
         long now = System.currentTimeMillis();
         // A conditional update, so that two reports arriving together send one
         // update between them.
-        if (activities.claim(orderId, now, now - activityMillis) != 1) {
+        if (activities.claim(orderId, Instant.ofEpochMilli(now), Instant.ofEpochMilli(now - activityMillis)) != 1) {
             return out;
         }
         CustomerOrder order = orders.findById(orderId);

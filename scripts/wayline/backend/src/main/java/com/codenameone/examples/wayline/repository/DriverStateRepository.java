@@ -26,6 +26,7 @@ import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.wayline.api.RideState;
 import com.codenameone.examples.wayline.domain.DriverState;
 
+import java.time.Instant;
 import java.util.List;
 
 /// Drivers' live state: whether each is on line, where the car is, and the
@@ -55,7 +56,7 @@ public interface DriverStateRepository extends CrudRepository<DriverState, Strin
             + "where a.status = :approved) "
             + "and d.username in (select p.username from Profile p) "
             + "and d.username not in (select r.driver from Ride r where r.state in :withRide)")
-    List<DriverState> freeInBox(@Param("fresh") long fresh, @Param("south") double south,
+    List<DriverState> freeInBox(@Param("fresh") Instant fresh, @Param("south") double south,
             @Param("north") double north, @Param("west") double west,
             @Param("east") double east, @Param("approved") String approved,
             @Param("withRide") RideState[] withRide);
@@ -85,7 +86,7 @@ public interface DriverStateRepository extends CrudRepository<DriverState, Strin
     int takeOffLine(@Param("username") String username);
 
     /// The drivers on line who reported in at or after `seenSince`.
-    long countByOnlineTrueAndLastSeenGreaterThanEqual(long seenSince);
+    long countByOnlineTrueAndLastSeenGreaterThanEqual(Instant seenSince);
 
     int deleteByUsername(String username);
 }

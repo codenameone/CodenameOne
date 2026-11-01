@@ -21,6 +21,7 @@ package com.codenameone.examples.skirmish.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
+import java.time.Instant;
 
 /// A push an operator sent to a segment of players, kept as the record of it.
 @Entity
@@ -54,7 +55,7 @@ public class Broadcast {
     private String sentBy = "";
 
     @Column(nullable = false)
-    private long sentAt;
+    private Instant sentAt = Instant.EPOCH;
 
     public Broadcast() {
     }
@@ -131,11 +132,11 @@ public class Broadcast {
         this.sentBy = sentBy;
     }
 
-    public long getSentAt() {
+    public Instant getSentAt() {
         return sentAt;
     }
 
-    public void setSentAt(long sentAt) {
+    public void setSentAt(Instant sentAt) {
         this.sentAt = sentAt;
     }
 }

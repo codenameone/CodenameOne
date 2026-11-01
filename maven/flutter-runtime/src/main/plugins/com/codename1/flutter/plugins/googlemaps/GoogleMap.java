@@ -31,7 +31,10 @@ import dart.runtime.Funcs;
 /**
  * google_maps_flutter's GoogleMap, hosting Codename One's {@code MapView} -- native
  * maps where the platform has them, vector tiles elsewhere. Markers, the camera,
- * taps and camera moves are supported; polylines, polygons, circles and map styles
+ * taps and camera moves are supported, and so are polylines, circles and marker icons
+ * (BitmapDescriptor); myLocationEnabled, myLocationButtonEnabled, zoomControlsEnabled,
+ * mapToolbarEnabled and gestureRecognizers are accepted and not applied (the core map
+ * view has no such controls, and its own gestures always run). Polygons and map styles
  * are accepted and not drawn.
  */
 public class GoogleMap extends Widget {
@@ -79,14 +82,18 @@ public class GoogleMap extends Widget {
         onCameraIdle = v;
     }
 
-    /** Accepted and ignored. */
+    Iterable<?> polylines;
+    Iterable<?> circles;
+
     public void polylines(Object v) {
+        polylines = v instanceof Iterable ? (Iterable<?>) v : null;
     }
 
     public void polygons(Object v) {
     }
 
     public void circles(Object v) {
+        circles = v instanceof Iterable ? (Iterable<?>) v : null;
     }
 
     public void myLocationEnabled(boolean v) {

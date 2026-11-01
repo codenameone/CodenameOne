@@ -139,6 +139,21 @@ public class File extends FileSystemEntity {
         return mode instanceof FileMode && ((FileMode) mode).append_;
     }
 
+    // ----------------------------------------------------------- random access
+
+    /** Dart's {@code openSync({mode})}; see {@link RandomAccessFile}. */
+    public RandomAccessFile openSync(Object mode) {
+        return new RandomAccessFile(path, mode instanceof FileMode ? (FileMode) mode : FileMode.read);
+    }
+
+    public Future<RandomAccessFile> open(Object mode) {
+        try {
+            return Future.value(openSync(mode));
+        } catch (RuntimeException e) {
+            return Future.error(e);
+        }
+    }
+
     public void writeAsBytesSync(Object bytes) {
         writeAsBytesSync(bytes, null, null);
     }

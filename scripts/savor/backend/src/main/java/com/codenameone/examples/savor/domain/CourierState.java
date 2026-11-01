@@ -21,6 +21,7 @@ package com.codenameone.examples.savor.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
+import java.time.Instant;
 
 /// Where a courier's car is, whether they are on line, and what customers made of them.
 @Entity
@@ -42,7 +43,7 @@ public class CourierState {
     private double heading;
 
     @Column(nullable = false)
-    private long lastSeen;
+    private Instant lastSeen = Instant.EPOCH;
 
     @Column(nullable = false)
     private long ratingSum;
@@ -98,11 +99,11 @@ public class CourierState {
         this.heading = heading;
     }
 
-    public long getLastSeen() {
+    public Instant getLastSeen() {
         return lastSeen;
     }
 
-    public void setLastSeen(long lastSeen) {
+    public void setLastSeen(Instant lastSeen) {
         this.lastSeen = lastSeen;
     }
 

@@ -52,6 +52,7 @@ import com.codenameone.examples.parley.chat.Messages;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -173,11 +174,11 @@ public class Calls {
         row.setCallee(callee);
         row.setCalleeDevice("");
         row.setVideo(request.video());
-        row.setStartedAt(now);
+        row.setStartedAt(Instant.ofEpochMilli(now));
         boolean blocked = blocked(username, callee);
         if (busy || lines.findById(callee) != null) {
             row.setState(BUSY);
-            row.setEndedAt(now);
+            row.setEndedAt(Instant.ofEpochMilli(now));
         } else {
             row.setState(RINGING);
         }
@@ -235,7 +236,7 @@ public class Calls {
     /// where it learns who is calling and that the call is still live.
     @Transactional(readOnly = true)
     public void ringDevice(String username, String device) throws IOException {
-        for (CallRecord row : calls.liveOf(username)) {
+        for (CallRecord row : calls.liveOf(username, Instant.EPOCH)) {
             if (username.equals(row.getCallee()) && RINGING.equals(row.getState())
                     && !blocked(row.getCaller(), row.getCallee())) {
                 live.toDevice(device, frame(row, "ring"));
@@ -262,7 +263,7 @@ public class Calls {
         if (signal.payload() != null && signal.payload().length() > MAX_PAYLOAD) {
             throw new ResponseStatusException(413, "That signal is too long");
         }
-        if (row.getEndedAt() != 0) {
+        if (!row.getEndedAt().equals(Instant.EPOCH)) {
             // A late candidate for a call that is over is not an error the
             // app can do anything about.
             return toDto(row);
@@ -291,7 +292,7 @@ public class Calls {
             remember(row, signal.payload(), false);
         } else if (ACCEPT.equals(type) && !caller && RINGING.equals(row.getState())) {
             row.setState(ACCEPTED);
-            row.setAnsweredAt(now);
+            row.setAnsweredAt(Instant.ofEpochMilli(now));
             row.setCalleeDevice(device);
             // The callee's other devices are still ringing.
             String ringId = uuid(row.getId());
@@ -377,14 +378,14 @@ public class Calls {
     @Transactional(rollbackFor = IOException.class)
     public void reap() throws IOException {
         long now = System.currentTimeMillis();
-        for (CallRecord row : calls.openSince(now - RING_MILLIS)) {
+        for (CallRecord row : calls.openSince(Instant.ofEpochMilli(now - RING_MILLIS), Instant.EPOCH)) {
             if (RINGING.equals(row.getState())) {
                 end(row, MISSED, now);
                 Map<String, Object> frame = frame(row, "signal");
                 List<String> to = blocked(row.getCaller(), row.getCallee())
                         ? Arrays.asList(row.getCaller()) : Arrays.asList(row.getCaller(), row.getCallee());
                 afterCommit(() -> live.toUsers(to, frame));
-            } else if (row.getAnsweredAt() < now - STALE_MILLIS) {
+            } else if (row.getAnsweredAt().toEpochMilli() < now - STALE_MILLIS) {
                 end(row, ENDED, now);
                 // Both apps still hold the call; without this they keep it
                 // open and turn every later call away as busy.
@@ -449,7 +450,7 @@ public class Calls {
     private void end(CallRecord row, String state, long now) {
         boolean ringing = RINGING.equals(row.getState());
         row.setState(state);
-        row.setEndedAt(now);
+        row.setEndedAt(Instant.ofEpochMilli(now));
         lines.deleteByCallId(row.getId());
         if (setups.findById(row.getId()) != null) {
             setups.deleteById(row.getId());
@@ -548,7 +549,7 @@ public class Calls {
 
     static CallDto toDto(CallRecord row) {
         return new CallDto(row.getId(), row.getConversationId(), row.getCaller(),
-                row.getCallee(), row.isVideo(), row.getState(), row.getStartedAt(),
-                row.getAnsweredAt(), row.getEndedAt(), uuid(row.getId()));
+                row.getCallee(), row.isVideo(), row.getState(), row.getStartedAt().toEpochMilli(),
+                row.getAnsweredAt().toEpochMilli(), row.getEndedAt().toEpochMilli(), uuid(row.getId()));
     }
 }

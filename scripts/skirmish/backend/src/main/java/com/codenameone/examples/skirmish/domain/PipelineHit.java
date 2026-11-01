@@ -21,6 +21,7 @@ package com.codenameone.examples.skirmish.domain;
 import com.codename1.annotations.Column;
 import com.codename1.annotations.Entity;
 import com.codename1.annotations.Id;
+import java.time.Instant;
 
 /// When a pipeline last acted on a player, so it waits its cool-down before
 /// acting on them again. The id is the pipeline id, a colon and the username.
@@ -37,7 +38,7 @@ public class PipelineHit {
     private String username = "";
 
     @Column(nullable = false)
-    private long hitAt;
+    private Instant hitAt = Instant.EPOCH;
 
     public String getId() {
         return id;
@@ -63,11 +64,11 @@ public class PipelineHit {
         this.username = username;
     }
 
-    public long getHitAt() {
+    public Instant getHitAt() {
         return hitAt;
     }
 
-    public void setHitAt(long hitAt) {
+    public void setHitAt(Instant hitAt) {
         this.hitAt = hitAt;
     }
 }

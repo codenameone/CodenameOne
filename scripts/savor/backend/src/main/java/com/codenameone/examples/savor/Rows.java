@@ -21,6 +21,7 @@ package com.codenameone.examples.savor;
 import com.codenameone.examples.savor.api.DeliveryState;
 import com.codenameone.examples.savor.api.OrderState;
 
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,6 +40,13 @@ public final class Rows {
     /// number.
     public static long number(Object value) {
         return value instanceof Number ? ((Number) value).longValue() : 0L;
+    }
+
+    /// A column holding a point in time as milliseconds since the epoch: the
+    /// `Instant` an entity's time field is read as, or 0 for null or anything
+    /// else.
+    public static long millis(Object value) {
+        return value instanceof Instant ? ((Instant) value).toEpochMilli() : 0L;
     }
 
     /// A column as text; empty for null.

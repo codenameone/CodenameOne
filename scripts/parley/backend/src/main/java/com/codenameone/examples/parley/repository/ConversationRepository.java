@@ -25,6 +25,7 @@ import com.codename1.orm.repository.Query;
 import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.parley.domain.Conversation;
 
+import java.time.Instant;
 import java.util.List;
 
 /// Conversations of every kind.
@@ -48,5 +49,5 @@ public interface ConversationRepository extends CrudRepository<Conversation, Str
 
     @Modifying
     @Query("update Conversation c set c.lastActivityAt = :at where c.id = :id and c.lastActivityAt < :at")
-    int touched(@Param("id") String id, @Param("at") long at);
+    int touched(@Param("id") String id, @Param("at") Instant at);
 }
