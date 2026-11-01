@@ -168,6 +168,12 @@ class Zone {
   external R run<R>(R Function() body);
 }
 
+// The type of runZoned's zoneSpecification; its handlers are not modelled.
+@JavaName('dart.async.ZoneSpecification')
+class ZoneSpecification {
+  external ZoneSpecification();
+}
+
 // Dart's StreamView: forwards every event of the stream it wraps.
 @JavaName('dart.async.StreamView')
 class StreamView<T> extends Stream<T> {

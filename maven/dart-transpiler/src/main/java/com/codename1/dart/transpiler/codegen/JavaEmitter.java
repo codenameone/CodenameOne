@@ -2711,44 +2711,71 @@ public final class JavaEmitter {
                     ctx.ctorTypeSubst = savedSubst;
                 }
             }
-        } else if (ct.superInit != null && ct.superInit.args != null
-                && stubClassOf(c.superclass) != null) {
+        } else if (stubClassOf(c.superclass) != null
+                && (ct.superInit == null || ct.superInit.args != null)) {
             // Positional arguments go to the stub superclass's Java constructor --
             // `class C extends Cubit<int> { C() : super(0); }` -- which a stub declares when
             // its runtime class has no no-arg constructor. Named ones stay setters.
             // Only when the stub declares an unnamed constructor taking positionals: one
             // that declares none (the gallery's BoxPainter) has just Java's no-arg one,
-            // and the Dart super arguments have nowhere to go.
-            if (!ct.superInit.args.positional.isEmpty() && ct.superInit.namedCtor == null
-                    && stubTakesPositionals(stubClassOf(c.superclass))) {
-                StringBuilder sa = new StringBuilder();
-                for (Expr e : ct.superInit.args.positional) {
-                    if (sa.length() > 0) {
-                        sa.append(", ");
-                    }
-                    sa.append(emitExpr(e, null, ctx).code);
+            // and the Dart super arguments have nowhere to go. A positional super
+            // parameter (`DelegatingStream(super.stream)` over StreamView) is one of those
+            // positionals, after the initializer's, as Dart passes it.
+            boolean initPositional = ct.superInit != null && ct.superInit.namedCtor == null
+                    && !ct.superInit.args.positional.isEmpty();
+            boolean superParamsPositional = false;
+            for (Param p : params) {
+                if (p.isSuper && !p.named) {
+                    superParamsPositional = true;
                 }
+            }
+            boolean toCtor = (ct.superInit == null || ct.superInit.namedCtor == null)
+                    && (initPositional || superParamsPositional)
+                    && stubTakesPositionals(stubClassOf(c.superclass));
+            if (toCtor) {
+                StringBuilder sa = new StringBuilder();
                 inSuperInitializer = true;
                 try {
+                    if (ct.superInit != null) {
+                        for (Expr e : ct.superInit.args.positional) {
+                            if (sa.length() > 0) {
+                                sa.append(", ");
+                            }
+                            sa.append(emitExpr(e, null, ctx).code);
+                        }
+                    }
+                    for (Param p : params) {
+                        if (p.isSuper && !p.named) {
+                            if (sa.length() > 0) {
+                                sa.append(", ");
+                            }
+                            sa.append(javaIdent(p.name));
+                        }
+                    }
                     w.line("super(" + sa + ");");
                 } finally {
                     inSuperInitializer = false;
                 }
             }
-            for (NamedArg na : ct.superInit.args.named) {
-                Out v = emitExpr(na.value, null, ctx);
-                w.line("this." + na.name + "(" + v.code + ");");
+            if (ct.superInit != null) {
+                for (NamedArg na : ct.superInit.args.named) {
+                    Out v = emitExpr(na.value, null, ctx);
+                    w.line("this." + na.name + "(" + v.code + ");");
+                }
             }
+            stubSuperParamsToCtor = toCtor;
         }
         storeWitnesses(c, "this", true, superNamedInit != null, w, ctx);
-        // super.x params against stub superclasses -> inherited setters
+        // super.x params against stub superclasses -> inherited setters (a positional one
+        // already went to the stub's constructor above)
         if (progSuper == null) {
             for (Param p : params) {
-                if (p.isSuper) {
+                if (p.isSuper && (p.named || !stubSuperParamsToCtor)) {
                     w.line("this." + p.name + "(" + javaIdent(p.name) + ");");
                 }
             }
         }
+        stubSuperParamsToCtor = false;
         // this.x params
         for (Param p : params) {
             if (p.isThis) {
@@ -3618,6 +3645,11 @@ public final class JavaEmitter {
                 Ast.ClassDecl sc = mix.name == null || program.classes.containsKey(mix.name)
                         ? null : stubs.classes.get(mix.name);
                 String jn = sc != null ? sc.javaName : null;
+                if ("dart.collection.UnmodifiableMapBase".equals(jn)) {
+                    // UnmodifiableMapBase is MapBase with the three mutators supplied (they
+                    // throw), so a class extending it is in the map family all the same.
+                    return "dart.collection.MapMixin";
+                }
                 if ("dart.collection.ListMixin".equals(jn) || "dart.collection.SetMixin".equals(jn)
                         || "dart.collection.MapMixin".equals(jn)) {
                     return jn;
@@ -4442,8 +4474,18 @@ public final class JavaEmitter {
                     ? asyncClosureType((Lambda) v.initializer, v.name, ctx) : null;
             if (v.initializer != null) {
                 tearOffKeepAll = (declared == null || declared.is("var")) && v.initializer instanceof Ident;
-                init = emitExpr(v.initializer, asyncFn != null ? asyncFn
-                        : declared != null && !declared.is("var") ? declared : null, ctx);
+                // In Java a local is in scope in its own initializer, so a closure parameter
+                // of the same name (`var sink = make((data, sink) => ...)`) is a duplicate
+                // there. Dart cannot read the local before its declaration, so the name is
+                // held in a scope of its own while the initializer is emitted: such a
+                // parameter is renamed, and the scope is gone before the local is declared.
+                ctx.holdName(v.name);
+                try {
+                    init = emitExpr(v.initializer, asyncFn != null ? asyncFn
+                            : declared != null && !declared.is("var") ? declared : null, ctx);
+                } finally {
+                    ctx.releaseName(v.name);
+                }
             }
             TypeRef t = asyncFn != null ? asyncFn : declared == null || declared.is("var")
                     ? (init != null ? init.type : TypeRef.DYNAMIC) : declared;
@@ -6162,7 +6204,49 @@ public final class JavaEmitter {
      * instead, so the guard propagates until the chain ends.
      */
     private Out emitExpr(Expr e, TypeRef expected, Ctx ctx) {
-        return materializeShort(emitExprRaw(e, expected, ctx));
+        return narrowFullArityValue(e, materializeShort(emitExprRaw(e, expected, ctx)), expected, ctx);
+    }
+
+    /// A tear-off with optional parameters is a SAM of its full arity (see tearOffAdapter),
+    /// but Dart lets it stand where a function of fewer parameters is expected -- `map(box.get)`
+    /// for `get(key, {defaultValue})`. Such a value is wrapped in a SAM of the expected arity
+    /// that passes the absent marker for every slot it does not have.
+    private Out narrowFullArityValue(Expr e, Out o, TypeRef expected, Ctx ctx) {
+        if (o == null || e instanceof Lambda || expected == null || expected.funcParams == null
+                || o.type == null || o.type.funcParams == null || o.type.funcRequired < 0) {
+            return o;
+        }
+        int want = expected.funcParams.size();
+        int have = o.type.funcParams.size();
+        if (want >= have || want < o.type.funcRequired || expected.funcNamed != null) {
+            return o;
+        }
+        String fullSam = javaType(o.type, false, ctx);
+        int lt = fullSam.indexOf('<');
+        String fullRaw = lt > 0 ? fullSam.substring(0, lt) : fullSam;
+        TypeRef nt = new TypeRef("Function");
+        nt.funcParams = new ArrayList<TypeRef>(o.type.funcParams.subList(0, want));
+        nt.funcReturn = o.type.funcReturn;
+        String sam = javaType(nt, false, ctx);
+        int lt2 = sam.indexOf('<');
+        String raw = lt2 > 0 ? sam.substring(0, lt2) : sam;
+        boolean isVoid = fullRaw.contains("VoidFunc");
+        String tag = ctx.newTemp();
+        StringBuilder lp = new StringBuilder();
+        StringBuilder args = new StringBuilder();
+        for (int i = 0; i < have; i++) {
+            if (i < want) {
+                lp.append(i > 0 ? ", " : "").append(tag).append("$n").append(i);
+                args.append(i > 0 ? ", " : "").append(tag).append("$n").append(i);
+            } else {
+                args.append(i > 0 ? ", " : "").append(omittedArg(o.type.funcParams, i, ctx));
+            }
+        }
+        String fv = tag + "$f";
+        ctx.writer().line("final " + fullRaw + " " + fv + " = (" + fullRaw + ") " + o.code + ";");
+        String call = "((" + fullRaw + ") " + fv + ").call(" + args + ")";
+        String code = "((" + sam + ") (" + raw + ") (" + lp + ") -> " + (isVoid ? "{ " + call + "; }" : call) + ")";
+        return new Out(code, nt);
     }
 
     /** Wraps a guard-carrying Out in its `(guard == null ? null : code)` conditional. */
@@ -6448,9 +6532,22 @@ public final class JavaEmitter {
                 if (pc != null && pc.namedCtor(cc.ctorName) != null) {
                     String tw = witnessArgs(pc, cc.type.args, cc, ctx);
                     String na = canonicalArgs(pc.namedCtor(cc.ctorName), cc.args, ctx);
-                    return new Out(javaClassName(pc) + "." + javaIdent(cc.ctorName) + "("
+                    // `Converting<int, String>.fromFunction(f)`: the explicit type arguments
+                    // type the result (a raw type left `bind`'s Sink<S> unsubstituted) and
+                    // become the static factory's Java type witness, since a lambda
+                    // argument gives javac nothing to infer S and T from.
+                    boolean explicit = !cc.type.args.isEmpty()
+                            && cc.type.args.size() == pc.typeParams.size();
+                    StringBuilder jw = new StringBuilder();
+                    if (explicit) {
+                        for (TypeRef ta : cc.type.args) {
+                            jw.append(jw.length() == 0 ? "<" : ", ").append(javaType(ta, true, ctx));
+                        }
+                        jw.append('>');
+                    }
+                    return new Out(javaClassName(pc) + "." + jw + javaIdent(cc.ctorName) + "("
                             + (na.isEmpty() ? stripTrailingComma(tw) : tw + na) + ")",
-                            new TypeRef(cc.type.name));
+                            explicit ? cc.type : new TypeRef(cc.type.name));
                 }
                 Ast.ClassDecl sc = stubs.classes.get(cc.type.name);
                 if (sc != null) {
@@ -9755,7 +9852,7 @@ public final class JavaEmitter {
                     String rt = ctx.newTemp();
                     ctx.writer().line("final " + javaType(tt, true, ctx) + " " + rt + " = " + target.code + ";");
                     ctx.declare(rt, tt);
-                    Out ad = methodTearOffAdapter(tm, rt, name, posNode, ctx);
+                    Out ad = methodTearOffAdapter(tm, rt, name, posNode, ctx, pc, tt);
                     if (ad != null) {
                         return ad;
                     }
@@ -14334,6 +14431,18 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         TypeRef tt = target.type;
         String n = c.name;
         List<Expr> pos = c.args.positional;
+        if ((tt.is("Iterable") || tt.is("List") || tt.is("Set")) && !tt.nullable && n.equals("cast")
+                && pos.isEmpty() && c.typeArgs.size() == 1 && !c.typeArgs.get(0).is("int")
+                && !c.typeArgs.get(0).is("double") && !c.typeArgs.get(0).is("num")
+                && !c.typeArgs.get(0).is("bool")) {
+            // (a primitive element has its own list classes; left to the general path)
+            // Iterable.cast<R>() is a view of R: typed as one, so a callback over it
+            // (`keys.cast<String>().map((k) => k.length)`) sees R rather than dynamic.
+            TypeRef sub = c.typeArgs.get(0);
+            ctx.importClass("dart.core.CoreExt");
+            return new Out("CoreExt.<" + javaType(sub, true, ctx) + ">cast(" + target.code + ")",
+                    TypeRef.of(tt.name, sub));
+        }
         if (tt.is("Stream") && n.equals("cast") && pos.isEmpty() && c.typeArgs.size() == 1) {
             // Stream.cast<R>() checks each event, so the runtime takes R as a witness the
             // way whereType does; an erased type variable has none and stays unchecked.
@@ -14622,7 +14731,12 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 return new Out(target.code + ".join(" + sep + ")", TypeRef.STRING);
             }
             if (n.equals("map")) {
-                Out f = emitExpr(pos.get(0), elementLambda(elem, TypeRef.DYNAMIC), ctx);
+                TypeRef fx = elementLambda(elem, TypeRef.DYNAMIC);
+                Out f = emitExpr(pos.get(0), fx, ctx);
+                if (fx == null) {
+                    // a dynamic element still takes a one-argument callback
+                    f = narrowFullArityValue(pos.get(0), f, inlineFuncType(TypeRef.DYNAMIC, TypeRef.DYNAMIC), ctx);
+                }
                 return new Out(target.code + ".map(" + f.code + ")", TypeRef.of("Iterable", TypeRef.DYNAMIC));
             }
             if (n.equals("where")) {
@@ -16328,6 +16442,8 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
     }
 
     /** Set while emitting a super(...) initializer, where no statement may come first. */
+    /** The stub-superclass constructor being emitted took its positional super parameters. */
+    private boolean stubSuperParamsToCtor;
     private boolean inSuperInitializer;
 
     /**
@@ -17842,6 +17958,15 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
      * arguments and defaults land where a direct call puts them.
      */
     private Out methodTearOffAdapter(MethodDecl md, final String recv, final String name, final Node pos, Ctx ctx) {
+        return methodTearOffAdapter(md, recv, name, pos, ctx, null, null);
+    }
+
+    /// As above, for an instance tear-off whose receiver is `recvType` (an instance of
+    /// `recvDecl`): the owner's type parameters in the signature are read as seen from the
+    /// receiver, and any left unbound (a raw receiver) erase to `dynamic`, since the
+    /// adapter is emitted outside the owner where those names do not exist.
+    private Out methodTearOffAdapter(MethodDecl md, final String recv, final String name, final Node pos, Ctx ctx,
+                                     ClassDecl recvDecl, TypeRef recvType) {
         if (!hasOptionalParam(md) || !md.typeParams.isEmpty() || md.returnType == null) {
             return null;
         }
@@ -17849,9 +17974,29 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         for (Param p : md.params) {
             types.add(paramValueType(p));
         }
+        TypeRef retType = md.returnType;
+        ClassDecl owner = recvDecl == null ? null : memberOwner(md);
+        if (owner != null && !owner.typeParams.isEmpty()) {
+            Map<String, TypeRef> erase = new LinkedHashMap<String, TypeRef>();
+            for (String tp : owner.typeParams) {
+                if (!(ctx.currentClass != null && ctx.currentClass.typeParams != null
+                        && ctx.currentClass.typeParams.contains(tp))
+                        && !(ctx.methodTypeParams != null && ctx.methodTypeParams.contains(tp))) {
+                    erase.put(tp, new TypeRef("dynamic"));
+                }
+            }
+            for (int i = 0; i < types.size(); i++) {
+                TypeRef seen = asSeenFrom(types.get(i), md, null, recvDecl, recvType);
+                types.set(i, erase.isEmpty() || seen == null ? seen : substituteTypeParams(seen, erase));
+            }
+            retType = asSeenFrom(retType, md, null, recvDecl, recvType);
+            if (!erase.isEmpty() && retType != null) {
+                retType = substituteTypeParams(retType, erase);
+            }
+        }
         final List<Param> ordered = orderedParams(md.params);
         final Ctx c = ctx;
-        return tearOffAdapter(md.params, types, md.returnType, names -> {
+        return tearOffAdapter(md.params, types, retType, names -> {
             Call call = new Call().at(pos.file, pos.line, pos.col);
             call.name = name;
             if (recv != null) {
@@ -19504,8 +19649,9 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         // where Sink's is void, so the interfaces cannot be related and Sink.of adapts.
         if (o.type != null && target.is("Sink") && (o.type.is("StreamSink") || o.type.is("EventSink")
                 || o.type.is("IOSink") || o.type.is("StreamController"))) {
-            ctx.importClass("dart.async.Sink");
-            return "Sink.of(" + o.code + ")";
+            // Qualified: inside a Converter subclass the simple name is the inherited
+            // member type Converter.Sink, which has no of().
+            return "dart.async.Sink.of(" + o.code + ")";
         }
         // A Dart `double` value reaching a Dart `int` target only happens through stub
         // imprecision (e.g. math.max/min typed to return double): Dart itself forbids the
@@ -20437,6 +20583,28 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             scopes.add(new LinkedHashMap<String, TypeRef>());
             renameScopes.add(new LinkedHashMap<String, String>());
             scopePromotions.add(new ArrayList<Object[]>());
+        }
+
+        /// Puts a name in scope, alone, while a local's initializer is emitted (see the
+        /// VarDeclStmt case). Unlike pushScope it records no promotions, so a cast in the
+        /// initializer still promotes for the statements after it.
+        void holdName(String name) {
+            LinkedHashMap<String, TypeRef> held = new LinkedHashMap<String, TypeRef>();
+            held.put(name, TypeRef.DYNAMIC);
+            scopes.add(held);
+            renameScopes.add(new LinkedHashMap<String, String>());
+        }
+
+        /// Ends holdName; anything else the initializer declared stays in the enclosing scope.
+        void releaseName(String name) {
+            Map<String, TypeRef> held = scopes.remove(scopes.size() - 1);
+            Map<String, String> renames = renameScopes.remove(renameScopes.size() - 1);
+            held.remove(name);
+            renames.remove(name);
+            if (!scopes.isEmpty()) {
+                scopes.get(scopes.size() - 1).putAll(held);
+                renameScopes.get(renameScopes.size() - 1).putAll(renames);
+            }
         }
 
         void popScope() {

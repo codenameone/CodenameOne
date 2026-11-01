@@ -203,6 +203,23 @@ mixin MapBase<K, V> {
   void clear();
 }
 
+@JavaName('dart.collection.UnmodifiableMapBase')
+mixin UnmodifiableMapBase<K, V> {
+  V? operator [](Object? key);
+  void operator []=(K key, V value);
+  Iterable<K> get keys;
+  int get length;
+  bool get isEmpty;
+  bool get isNotEmpty;
+  bool containsKey(Object? key);
+  bool containsValue(Object? value);
+  void forEach(void Function(K key, V value) action);
+  void addAll(Map<K, V> other);
+  V putIfAbsent(K key, V Function() ifAbsent);
+  V? remove(Object? key);
+  void clear();
+}
+
 @JavaName('dart.collection.SetMixin')
 mixin SetBase<E> {
   external static String setToString(Set set);

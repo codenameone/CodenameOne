@@ -25,30 +25,67 @@ package dart.async;
 
 /// dart:async's {@code Zone}. Only the root zone exists here.
 public final class Zone {
-    public static final Zone root = new Zone();
+    public static final Zone root = new Zone(null, null);
 
-    /// {@code Zone.current}, read as a static field by transpiled code.
-    public static final Zone current = root;
+    /// The zone the running code was entered in. A Dart program runs on one isolate and
+    /// this runtime on one thread, so runZoned swaps it around its body. Callbacks that
+    /// run later (timers, futures) see the zone that is current when they run, not the
+    /// one they were registered in: bindCallback is the way to carry a zone forward.
+    public static Zone current = root;
 
-    private Zone() {
+    private final Zone parent;
+    private final java.util.Map<Object, Object> values;
+
+    private Zone(Zone parent, java.util.Map<Object, Object> values) {
+        this.parent = parent;
+        this.values = values;
     }
 
     public static Zone current() {
-        return root;
+        return current;
     }
 
-    /// The root zone has no parent.
     public Zone parent() {
-        return null;
+        return parent;
     }
 
+    /// Dart's zone[key]: this zone's value for the key, else its parent's.
     public Object $index(Object key) {
+        for (Zone z = this; z != null; z = z.parent) {
+            if (z.values != null && z.values.containsKey(key)) {
+                return z.values.get(key);
+            }
+        }
         return null;
     }
 
-    /// {@code bindCallback}: the root zone runs a callback as it is.
-    public <R> dart.runtime.Funcs.Func0<R> bindCallback(dart.runtime.Funcs.Func0<R> callback) {
-        return callback;
+    public Object idx(Object key) {
+        return $index(key);
+    }
+
+    /// A child of this zone holding zoneValues (a Dart Map, a java.util.Map, or null).
+    public Zone fork(Object specification, Object zoneValues) {
+        java.util.Map<Object, Object> copy = null;
+        if (zoneValues instanceof dart.core.DartMap) {
+            copy = new java.util.HashMap<>();
+            dart.core.DartMap<?, ?> m = (dart.core.DartMap<?, ?>) zoneValues;
+            for (Object k : m.keys()) {
+                copy.put(k, m.idx(k));
+            }
+        } else if (zoneValues instanceof java.util.Map) {
+            copy = new java.util.HashMap<>((java.util.Map<?, ?>) zoneValues);
+        }
+        return new Zone(this, copy);
+    }
+
+    public <R> dart.runtime.Funcs.Func0<R> bindCallback(final dart.runtime.Funcs.Func0<R> callback) {
+        final Zone zone = this;
+        return new dart.runtime.Funcs.Func0<R>() {
+            @Override
+            public R call() {
+                return zone.run(callback);
+            }
+        };
     }
 
     public <R, A> dart.runtime.Funcs.Func1<A, R> bindUnaryCallback(dart.runtime.Funcs.Func1<A, R> callback) {
@@ -59,8 +96,14 @@ public final class Zone {
         return callback;
     }
 
-    /// {@code run}: the root zone calls the body directly.
+    /// Runs body with this zone current, restoring the previous zone afterwards.
     public <R> R run(dart.runtime.Funcs.Func0<R> body) {
-        return body.call();
+        Zone previous = current;
+        current = this;
+        try {
+            return body.call();
+        } finally {
+            current = previous;
+        }
     }
 }

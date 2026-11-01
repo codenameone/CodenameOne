@@ -41,17 +41,18 @@ public final class Async {
         new Timer(null, callback);
     }
 
-    /// {@code runZoned(body)}. There is a single (root) zone, so this just runs the body;
-    /// zoneValues and zoneSpecification are not modelled.
+    /// {@code runZoned(body)}: runs the body in a child of the current zone that holds
+    /// zoneValues, which Zone.current[key] then reads. A zoneSpecification's handlers are
+    /// not modelled (see ZoneSpecification).
     public static <R> R runZoned(Funcs.Func0<R> body) {
-        return body.call();
+        return runZoned(body, null, null);
     }
 
     public static <R> R runZoned(Funcs.Func0<R> body, Object zoneValues) {
-        return body.call();
+        return runZoned(body, zoneValues, null);
     }
 
     public static <R> R runZoned(Funcs.Func0<R> body, Object zoneValues, Object zoneSpecification) {
-        return body.call();
+        return Zone.current.fork(zoneSpecification, zoneValues).run(body);
     }
 }
