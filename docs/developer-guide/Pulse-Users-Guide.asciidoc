@@ -446,7 +446,7 @@ image::img/pulse-desktop-members.png["Members on a desktop: the searchable list 
 
 image::img/pulse-desktop-accounts.png["Accounts on a desktop: the list on the left and the account picked, with its roles, household and history, on the right",scaledwidth=90%]
 
-The trainer and the member get the same docked menu, with their home centred
+The trainer and the member get the same docked menu, with their home centered
 next to it.
 
 image::img/pulse-desktop-trainer.png["The trainer's home on a desktop, with the class on now, the coach's game and the leaderboard",scaledwidth=90%]
