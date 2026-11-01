@@ -23,33 +23,96 @@
  */
 package com.codename1.flutter.animation;
 
+import com.codename1.flutter.Alignment;
+import com.codename1.flutter.BuildContext;
+import com.codename1.flutter.State;
+import com.codename1.flutter.StatefulWidget;
+import com.codename1.flutter.Widget;
+import com.codename1.flutter.widgets.ImplicitValue;
+import com.codename1.flutter.widgets.Kit;
+import com.codename1.flutter.widgets.Opacity;
+import com.codename1.flutter.widgets.Stack;
 import dart.core.Duration;
 
 /**
- * Cross-fades between successive children over a {@link Duration} — Flutter's
- * {@code AnimatedSwitcher}. This pass shows the current child directly; the
- * in/out transition is deferred.
+ * Flutter's {@code AnimatedSwitcher}: when the child is replaced by one that cannot update
+ * it (a different type or key) the old child fades out while the new one fades in, over
+ * {@code duration} (the outgoing child over {@code reverseDuration} when given) along the
+ * switch curves. A custom {@code transitionBuilder} is accepted and the default fade used.
  */
-public class AnimatedSwitcher extends AnimatedChildWidget {
+public class AnimatedSwitcher extends StatefulWidget {
 
+    private Widget child;
     private Duration duration;
     private Duration reverseDuration;
     private Curve switchInCurve;
     private Curve switchOutCurve;
 
-    public void duration(Duration v) {
-        this.duration = v;
+    public void child(Widget v) { this.child = v; }
+    public Widget getChild() { return child; }
+    public void duration(Duration v) { this.duration = v; }
+    public void reverseDuration(Duration v) { this.reverseDuration = v; }
+    public void switchInCurve(Curve v) { this.switchInCurve = v; }
+    public void switchOutCurve(Curve v) { this.switchOutCurve = v; }
+    public void transitionBuilder(Object v) { }
+    public void layoutBuilder(Object v) { }
+
+    @Override
+    public State<? extends StatefulWidget> createState() {
+        return new S();
     }
 
-    public void reverseDuration(Duration v) {
-        this.reverseDuration = v;
-    }
+    private static final class S extends State<AnimatedSwitcher> {
+        private ImplicitValue fade;
+        private Widget current;
+        private Widget previous;
+        private int switches;
 
-    public void switchInCurve(Curve v) {
-        this.switchInCurve = v;
-    }
+        @Override
+        public void initState() {
+            super.initState();
+            fade = new ImplicitValue(0, this);
+            current = widget().child;
+        }
 
-    public void switchOutCurve(Curve v) {
-        this.switchOutCurve = v;
+        @Override
+        public Widget build(BuildContext context) {
+            AnimatedSwitcher w = widget();
+            Widget next = w.child;
+            if (next != current) {
+                if (current != null && next != null && Widget.canUpdate(current, next)) {
+                    current = next;
+                } else {
+                    previous = current;
+                    current = next;
+                    switches++;
+                    fade.retarget(switches, w.duration, w.switchInCurve);
+                }
+            }
+            double t = fade.value() - (switches - 1);
+            if (switches == 0 || previous == null || t >= 1 || !fade.isAnimating()) {
+                previous = null;
+                return current == null ? new Stack() : current;
+            }
+            Opacity out = new Opacity();
+            out.opacity(Math.max(0, Math.min(1, 1 - t)));
+            out.child(previous);
+            if (current == null) {
+                return out;
+            }
+            Opacity in = new Opacity();
+            in.opacity(Math.max(0, Math.min(1, t)));
+            in.child(current);
+            Stack s = new Stack();
+            s.alignment(Alignment.center);
+            s.children(Kit.list(out, in));
+            return s;
+        }
+
+        @Override
+        public void dispose() {
+            fade.dispose();
+            super.dispose();
+        }
     }
 }

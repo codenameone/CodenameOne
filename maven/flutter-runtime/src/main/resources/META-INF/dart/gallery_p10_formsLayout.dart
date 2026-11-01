@@ -213,3 +213,44 @@ class Table extends Widget {
       TableColumnWidth? defaultColumnWidth, TableBorder? border,
       TableCellVerticalAlignment? defaultVerticalAlignment, Object? textDirection, Object? textBaseline});
 }
+
+// --- implicit animations ------------------------------------------------
+
+@JavaName('com.codename1.flutter.widgets.AnimatedAlign')
+class AnimatedAlign extends Widget {
+  external AnimatedAlign({Key? key, required Object alignment, required Duration duration,
+      Curve? curve, double? widthFactor, double? heightFactor, VoidCallback? onEnd, Widget? child});
+}
+
+@JavaName('com.codename1.flutter.widgets.AnimatedPositioned')
+class AnimatedPositioned extends Widget {
+  external AnimatedPositioned({Key? key, required Duration duration, Curve? curve, double? left,
+      double? top, double? right, double? bottom, double? width, double? height, VoidCallback? onEnd,
+      required Widget child});
+}
+
+@JavaName('com.codename1.flutter.widgets.AnimatedRotation')
+class AnimatedRotation extends Widget {
+  external AnimatedRotation({Key? key, required double turns, required Duration duration, Curve? curve,
+      Alignment? alignment, Object? filterQuality, VoidCallback? onEnd, Widget? child});
+}
+
+@JavaName('com.codename1.flutter.widgets.AnimatedSlide')
+class AnimatedSlide extends Widget {
+  external AnimatedSlide({Key? key, required Offset offset, required Duration duration, Curve? curve,
+      VoidCallback? onEnd, Widget? child});
+}
+
+@JavaName('com.codename1.flutter.widgets.AnimatedDefaultTextStyle')
+class AnimatedDefaultTextStyle extends Widget {
+  external AnimatedDefaultTextStyle({Key? key, required TextStyle style, required Duration duration,
+      Curve? curve, TextAlign? textAlign, bool? softWrap, TextOverflow? overflow, int? maxLines,
+      Object? textWidthBasis, Object? textHeightBehavior, VoidCallback? onEnd, required Widget child});
+}
+
+@JavaName('com.codename1.flutter.widgets.TweenAnimationBuilder')
+class TweenAnimationBuilder<T> extends Widget {
+  external TweenAnimationBuilder({Key? key, required Tween<T> tween, required Duration duration,
+      Curve? curve, required Widget Function(BuildContext context, T value, Widget? child) builder,
+      VoidCallback? onEnd, Widget? child});
+}

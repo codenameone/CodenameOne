@@ -41,6 +41,20 @@ public class BoxDecoration extends Decoration {
     private Object backgroundBlendMode;
     private BoxShape shape = BoxShape.rectangle;
 
+    /** A copy with {@code c} as its color and {@code radius} as its border radius. */
+    public BoxDecoration withColorAndRadius(Color c, Object radius) {
+        BoxDecoration d = new BoxDecoration();
+        d.color = c;
+        d.image = image;
+        d.border = border;
+        d.borderRadius = radius;
+        d.boxShadow = boxShadow;
+        d.gradient = gradient;
+        d.backgroundBlendMode = backgroundBlendMode;
+        d.shape = shape;
+        return d;
+    }
+
     public void color(Color v) {
         this.color = v;
     }

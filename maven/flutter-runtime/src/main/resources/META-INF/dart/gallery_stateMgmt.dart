@@ -112,6 +112,12 @@ class IconThemeData {
   external Color? get color;
   external double? get size;
   external double? get opacity;
+  external double? get fill;
+  external double? get weight;
+  external double? get grade;
+  external double? get opticalSize;
+  external List<Shadow>? get shadows;
+  external bool? get applyTextScaling;
   external IconThemeData copyWith({Color? color, double? size, double? opacity, double? fill,
       double? weight, double? grade, double? opticalSize, dynamic shadows,
       bool? applyTextScaling});

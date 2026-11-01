@@ -90,6 +90,30 @@ public class IconThemeData {
         return opacity;
     }
 
+    public Double fill() {
+        return fill;
+    }
+
+    public Double weight() {
+        return weight;
+    }
+
+    public Double grade() {
+        return grade;
+    }
+
+    public Double opticalSize() {
+        return opticalSize;
+    }
+
+    public Object shadows() {
+        return shadows;
+    }
+
+    public Boolean applyTextScaling() {
+        return applyTextScaling;
+    }
+
     public IconThemeData copyWith(Color color, Double size, Double opacity, Double fill,
                                   Double weight, Double grade, Double opticalSize, Object shadows,
                                   Boolean applyTextScaling) {

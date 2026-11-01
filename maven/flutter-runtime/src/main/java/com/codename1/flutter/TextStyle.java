@@ -114,6 +114,36 @@ public class TextStyle {
         if (o.backgroundColor != null) backgroundColor = o.backgroundColor;
     }
 
+    private Object fontVariations;
+    private Object fontFamilyFallback;
+    private TextLeadingDistribution leadingDistribution;
+
+    public void fontVariations(Object v) {
+        this.fontVariations = v;
+    }
+
+    @SuppressWarnings("unchecked")
+    public dart.core.DartList<FontVariation> fontVariations() {
+        return fontVariations instanceof dart.core.DartList ? (dart.core.DartList<FontVariation>) fontVariations : null;
+    }
+
+    public void fontFamilyFallback(Object v) {
+        this.fontFamilyFallback = v;
+    }
+
+    @SuppressWarnings("unchecked")
+    public dart.core.DartList<String> fontFamilyFallback() {
+        return fontFamilyFallback instanceof dart.core.DartList ? (dart.core.DartList<String>) fontFamilyFallback : null;
+    }
+
+    public void leadingDistribution(TextLeadingDistribution v) {
+        this.leadingDistribution = v;
+    }
+
+    public TextLeadingDistribution leadingDistribution() {
+        return leadingDistribution;
+    }
+
     public void fontSize(double v) {
         this.fontSize = v;
     }

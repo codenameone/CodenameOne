@@ -35,4 +35,19 @@ public abstract class InlineSpan {
      * all descendants, in depth-first order.
      */
     public abstract String toPlainText();
+
+    /** The span's own style; null on the base type. */
+    public com.codename1.flutter.TextStyle style() {
+        return null;
+    }
+
+    /** The span's semantics label; null on the base type. */
+    public String semanticsLabel() {
+        return null;
+    }
+
+    /** The span's gesture recognizer; null on the base type. */
+    public Object recognizer() {
+        return null;
+    }
 }

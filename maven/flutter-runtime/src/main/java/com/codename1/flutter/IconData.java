@@ -46,6 +46,17 @@ public final class IconData {
     }
 
     /** Flutter's {@code IconData.codePoint}, as the int Dart sees. */
+    private boolean matchTextDirection;
+
+    /** Flutter's {@code IconData.matchTextDirection}: mirror the glyph in right-to-left text. */
+    public boolean matchTextDirection() {
+        return matchTextDirection;
+    }
+
+    public void matchTextDirection(boolean v) {
+        this.matchTextDirection = v;
+    }
+
     public long codePoint() {
         return codePoint;
     }

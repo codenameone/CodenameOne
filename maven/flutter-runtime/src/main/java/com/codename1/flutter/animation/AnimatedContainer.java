@@ -23,63 +23,121 @@
  */
 package com.codename1.flutter.animation;
 
-import com.codename1.flutter.Alignment;
-import com.codename1.flutter.Color;
-import com.codename1.flutter.EdgeInsets;
-
+import com.codename1.flutter.*;
+import com.codename1.flutter.animation.Curve;
+import com.codename1.flutter.widgets.*;
 import dart.core.Duration;
 
 /**
- * A Container whose properties animate to new values over a {@link Duration}
- * when the widget rebuilds — Flutter's {@code AnimatedContainer}. This pass
- * stores the properties and hosts the child; the tweened transitions are
- * deferred.
+ * Flutter's {@code AnimatedContainer}: size, color, padding, margin, alignment and decoration color are animated to over {@code duration} along {@code curve}.
  */
-public class AnimatedContainer extends AnimatedChildWidget {
-
+@SuppressWarnings({"unchecked", "rawtypes"})
+public class AnimatedContainer extends StatefulWidget {
+    private Object width;
+    private Object height;
+    private Object color;
+    private Object padding;
+    private Object margin;
+    private Object alignment;
+    private Object decoration;
+    private Object foregroundDecoration;
+    private Object constraints;
+    private Object transform;
+    private Object transformAlignment;
+    private Object clipBehavior;
+    private Widget child;
     private Duration duration;
     private Curve curve;
-    private Double width;
-    private Double height;
-    private Color color;
-    private EdgeInsets padding;
-    private EdgeInsets margin;
-    private Alignment alignment;
-    private Object decoration;
+    private Object onEnd;
+    public void width(double v) { this.width = Double.valueOf(v); }
+    public void height(double v) { this.height = Double.valueOf(v); }
+    public void color(Color v) { this.color = v; }
+    public void padding(Object v) { this.padding = v; }
+    public void margin(Object v) { this.margin = v; }
+    public void alignment(Object v) { this.alignment = v; }
+    public void decoration(Object v) { this.decoration = v; }
+    public void foregroundDecoration(Object v) { this.foregroundDecoration = v; }
+    public void constraints(Object v) { this.constraints = v; }
+    public void transform(Object v) { this.transform = v; }
+    public void transformAlignment(Object v) { this.transformAlignment = v; }
+    public void clipBehavior(Object v) { this.clipBehavior = v; }
+    public void child(Widget v) { this.child = v; }
+    public void duration(Duration v) { this.duration = v; }
+    public void curve(Curve v) { this.curve = v; }
+    public void onEnd(Object v) { this.onEnd = v; }
 
-    public void duration(Duration v) {
-        this.duration = v;
+    @Override
+    public State<? extends StatefulWidget> createState() {
+        return new S();
     }
 
-    public void curve(Curve v) {
-        this.curve = v;
+    private static double d(Object v, double def) {
+        return v instanceof Number ? ((Number) v).doubleValue() : def;
     }
 
-    public void width(double v) {
-        this.width = v;
-    }
+    private static final class S extends State<AnimatedContainer> {
+        private ImplicitTween width;
+        private ImplicitTween height;
+        private ImplicitTween color;
+        private ImplicitTween padding;
+        private ImplicitTween margin;
+        private ImplicitTween alignment;
+        private ImplicitTween decoration;
 
-    public void height(double v) {
-        this.height = v;
-    }
+        @Override
+        public void initState() {
+            super.initState();
+            width = new ImplicitTween(widget().width, this);
+            height = new ImplicitTween(widget().height, this);
+            color = new ImplicitTween(widget().color, this);
+            padding = new ImplicitTween(widget().padding, this);
+            margin = new ImplicitTween(widget().margin, this);
+            alignment = new ImplicitTween(widget().alignment, this);
+            decoration = new ImplicitTween(widget().decoration, this);
+        }
 
-    public void color(Color v) {
-        this.color = v;
-    }
+        @Override
+        public Widget build(BuildContext context) {
+            AnimatedContainer w = widget();
+            width.onEnd(w.onEnd);
+            width.retarget(w.width, w.duration, w.curve);
+            height.retarget(w.height, w.duration, w.curve);
+            color.retarget(w.color, w.duration, w.curve);
+            padding.retarget(w.padding, w.duration, w.curve);
+            margin.retarget(w.margin, w.duration, w.curve);
+            alignment.retarget(w.alignment, w.duration, w.curve);
+            decoration.retarget(w.decoration, w.duration, w.curve);
+            Container c = new Container();
+            Object v = width.value();
+            if (v instanceof Number) { c.width(((Number) v).doubleValue()); }
+            v = height.value();
+            if (v instanceof Number) { c.height(((Number) v).doubleValue()); }
+            v = color.value();
+            if (v instanceof Color) { c.color((Color) v); }
+            c.padding(padding.value());
+            c.margin(margin.value());
+            c.alignment(alignment.value());
+            v = decoration.value();
+            c.decoration(v);
+            c.foregroundDecoration(w.foregroundDecoration);
+            if (w.constraints instanceof com.codename1.flutter.rendering.BoxConstraints) { c.constraints((com.codename1.flutter.rendering.BoxConstraints) w.constraints); }
+            c.transform(w.transform);
+            c.transformAlignment(w.transformAlignment);
+            if (w.clipBehavior instanceof Clip) { c.clipBehavior((Clip) w.clipBehavior); }
+            c.child(w.child);
+            return c;
+        }
 
-    public void padding(EdgeInsets v) {
-        this.padding = v;
-    }
-
-    public void margin(EdgeInsets v) {
-        this.margin = v;
-    }
-
-    public void alignment(Alignment v) {
-        this.alignment = v;
-    }
-
-    public void decoration(Object v) {
-        this.decoration = v;
+        @Override
+        public void dispose() {
+            width.dispose();
+            height.dispose();
+            color.dispose();
+            padding.dispose();
+            margin.dispose();
+            alignment.dispose();
+            decoration.dispose();
+            super.dispose();
+        }
     }
 }

@@ -35,6 +35,7 @@ abstract class BuildContext {
   // Dart <T> witness (dropped from the call) as a trailing Class<T> token and
   // casts the result, so the Java runtime methods take a trailing Class<T>.
   external T dependOnInheritedWidgetOfExactType();
+  external T? getInheritedWidgetOfExactType();
   external T watch();
   external T read();
   // `witness` is filled in with the class of <T>, from the selector's parameter type.
@@ -215,7 +216,11 @@ abstract class FontWeight {
 class TextStyle {
   external TextStyle({double? fontSize, FontWeight? fontWeight, Color? color, String? fontFamily, double? letterSpacing, double? height,
       TextDecoration? decoration, Color? decorationColor, TextDecorationStyle? decorationStyle, double? decorationThickness,
-      List<Shadow>? shadows, Color? backgroundColor});
+      List<Shadow>? shadows, Color? backgroundColor, List<FontVariation>? fontVariations,
+      List<String>? fontFamilyFallback, TextLeadingDistribution? leadingDistribution});
+  external List<FontVariation>? get fontVariations;
+  external List<String>? get fontFamilyFallback;
+  external TextLeadingDistribution? get leadingDistribution;
   external TextDecoration? get decoration;
   external Color? get decorationColor;
   external TextDecorationStyle? get decorationStyle;
@@ -241,6 +246,7 @@ class IconData {
   external int get codePoint;
   external String? get fontFamily;
   external String? get fontPackage;
+  external bool get matchTextDirection;
 }
 
 @JavaName('com.codename1.flutter.Icons')
@@ -2998,6 +3004,7 @@ abstract class MediaQueryData {
 @JavaName('com.codename1.flutter.rendering.Size')
 class Size {
   external Size(double width, double height);
+  external static Size get zero;
   external static Size fromRadius(double radius);
   external static Size square(double dimension);
   external Offset bottomRight(Offset origin);
@@ -3030,6 +3037,9 @@ class RichText extends Widget {
 @JavaName('com.codename1.flutter.widgets.InlineSpan')
 class InlineSpan {
   external String toPlainText();
+  external TextStyle? get style;
+  external String? get semanticsLabel;
+  external Object? get recognizer;
 }
 
 @JavaName('com.codename1.flutter.widgets.TextSpan')

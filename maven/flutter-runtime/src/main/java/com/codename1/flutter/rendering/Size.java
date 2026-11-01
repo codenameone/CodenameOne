@@ -33,6 +33,9 @@ public final class Size {
 
     public static final Size ZERO = new Size(0, 0);
 
+    /** Flutter's {@code Size.zero}. */
+    public static final Size zero = ZERO;
+
     private final double width;
     private final double height;
 

@@ -26,6 +26,9 @@ enum OverlayVisibilityMode { never, editing, notEditing, always }
 class CupertinoDynamicColor extends Color {
   external CupertinoDynamicColor(int value);
   external Color resolveFrom(BuildContext context);
+  external static CupertinoDynamicColor withBrightness({required Color color, required Color darkColor});
+  external Color get color;
+  external Color get darkColor;
 }
 
 @JavaName('com.codename1.flutter.cupertino.CupertinoColors')

@@ -43,6 +43,17 @@ public final class SystemUiOverlayStyle {
         this.name = name;
     }
 
+    /**
+     * Flutter's {@code SystemUiOverlayStyle.copyWith}. Bar colors and icon brightness are
+     * owned by the platform here, so the copy keeps this style's light or dark overlays.
+     */
+    public SystemUiOverlayStyle copyWith(Object systemNavigationBarColor, Object systemNavigationBarDividerColor,
+            Object systemNavigationBarIconBrightness, Object systemNavigationBarContrastEnforced,
+            Object statusBarColor, Object statusBarBrightness, Object statusBarIconBrightness,
+            Object systemStatusBarContrastEnforced) {
+        return this;
+    }
+
     @Override
     public String toString() {
         return "SystemUiOverlayStyle." + name;

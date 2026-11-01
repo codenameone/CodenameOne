@@ -574,6 +574,10 @@ abstract class Clipboard {
 abstract class SystemUiOverlayStyle {
   external static SystemUiOverlayStyle get light;
   external static SystemUiOverlayStyle get dark;
+  external SystemUiOverlayStyle copyWith({Color? systemNavigationBarColor, Color? systemNavigationBarDividerColor,
+      Brightness? systemNavigationBarIconBrightness, bool? systemNavigationBarContrastEnforced,
+      Color? statusBarColor, Brightness? statusBarBrightness, Brightness? statusBarIconBrightness,
+      bool? systemStatusBarContrastEnforced});
 }
 
 @JavaName('com.codename1.flutter.services.SystemChrome')

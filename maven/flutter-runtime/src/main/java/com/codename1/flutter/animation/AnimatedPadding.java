@@ -23,34 +23,62 @@
  */
 package com.codename1.flutter.animation;
 
-import com.codename1.flutter.EdgeInsets;
-
+import com.codename1.flutter.*;
+import com.codename1.flutter.animation.Curve;
+import com.codename1.flutter.widgets.*;
 import dart.core.Duration;
 
 /**
- * Animates changes to its padding over a {@link Duration} — Flutter's
- * {@code AnimatedPadding}. This pass hosts the child; the padding is applied
- * without the tween (final value).
+ * Flutter's {@code AnimatedPadding}: a new padding is moved to over {@code duration} along {@code curve}.
  */
-public class AnimatedPadding extends AnimatedChildWidget {
-
-    private EdgeInsets padding;
+@SuppressWarnings({"unchecked", "rawtypes"})
+public class AnimatedPadding extends StatefulWidget {
+    private Object padding = EdgeInsets.zero;
+    private Widget child;
     private Duration duration;
     private Curve curve;
+    private Object onEnd;
+    public void padding(Object v) { this.padding = v; }
+    public void child(Widget v) { this.child = v; }
+    public void duration(Duration v) { this.duration = v; }
+    public void curve(Curve v) { this.curve = v; }
+    public void onEnd(Object v) { this.onEnd = v; }
+    public EdgeInsets getPadding() { return padding instanceof EdgeInsets ? (EdgeInsets) padding : null; }
 
-    public void padding(EdgeInsets v) {
-        this.padding = v;
+    @Override
+    public State<? extends StatefulWidget> createState() {
+        return new S();
     }
 
-    public void duration(Duration v) {
-        this.duration = v;
+    private static double d(Object v, double def) {
+        return v instanceof Number ? ((Number) v).doubleValue() : def;
     }
 
-    public void curve(Curve v) {
-        this.curve = v;
-    }
+    private static final class S extends State<AnimatedPadding> {
+        private ImplicitTween padding;
 
-    public EdgeInsets getPadding() {
-        return padding;
+        @Override
+        public void initState() {
+            super.initState();
+            padding = new ImplicitTween(widget().padding, this);
+        }
+
+        @Override
+        public Widget build(BuildContext context) {
+            AnimatedPadding w = widget();
+            padding.onEnd(w.onEnd);
+            padding.retarget(w.padding, w.duration, w.curve);
+            Padding p = new Padding();
+            Object v = padding.value();
+            p.padding(v instanceof EdgeInsetsGeometry ? (EdgeInsetsGeometry) v : EdgeInsets.zero);
+            p.child(w.child);
+            return p;
+        }
+
+        @Override
+        public void dispose() {
+            padding.dispose();
+            super.dispose();
+        }
     }
 }

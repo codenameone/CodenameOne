@@ -35,7 +35,7 @@ import dart.runtime.Funcs;
  * value runs from wherever it is now to the new target over the widget's duration and
  * curve, rebuilding its state on every frame, as Flutter's ImplicitlyAnimatedWidget does.
  */
-final class ImplicitValue {
+public final class ImplicitValue {
     private static final Funcs.VoidFunc0 NOOP = new Funcs.VoidFunc0() {
         @Override
         public void call() {
@@ -47,7 +47,7 @@ final class ImplicitValue {
     private Curve curve;
     private Funcs.VoidFunc0 onEnd;
 
-    ImplicitValue(double initial, final State<?> state) {
+    public ImplicitValue(double initial, final State<?> state) {
         from = initial;
         to = initial;
         controller.value(1.0);
@@ -69,12 +69,12 @@ final class ImplicitValue {
         });
     }
 
-    void onEnd(Object callback) {
+    public void onEnd(Object callback) {
         this.onEnd = callback instanceof Funcs.VoidFunc0 ? (Funcs.VoidFunc0) callback : null;
     }
 
     /** Starts a run to {@code target} unless that is already where the value is headed. */
-    void retarget(double target, Duration duration, Curve c) {
+    public void retarget(double target, Duration duration, Curve c) {
         if (target == to) {
             return;
         }
@@ -90,7 +90,7 @@ final class ImplicitValue {
         controller.forward(Double.valueOf(0.0));
     }
 
-    double value() {
+    public double value() {
         Double v = controller.value();
         double t = v == null ? 1.0 : v.doubleValue();
         if (curve != null && t > 0 && t < 1) {
@@ -99,11 +99,11 @@ final class ImplicitValue {
         return from + (to - from) * t;
     }
 
-    boolean isAnimating() {
+    public boolean isAnimating() {
         return controller.status() == AnimationStatus.forward;
     }
 
-    void dispose() {
+    public void dispose() {
         controller.dispose();
     }
 }

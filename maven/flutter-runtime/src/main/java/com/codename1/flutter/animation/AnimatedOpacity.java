@@ -23,28 +23,61 @@
  */
 package com.codename1.flutter.animation;
 
+import com.codename1.flutter.*;
+import com.codename1.flutter.animation.Curve;
+import com.codename1.flutter.widgets.*;
 import dart.core.Duration;
 
 /**
- * Animates its child's opacity to a target value over a {@link Duration} —
- * Flutter's {@code AnimatedOpacity}. This pass hosts the child; opacity
- * compositing is deferred.
+ * Flutter's {@code AnimatedOpacity}: a new opacity is faded to over {@code duration} along {@code curve}.
  */
-public class AnimatedOpacity extends AnimatedChildWidget {
-
-    private double opacity = 1.0;
+@SuppressWarnings({"unchecked", "rawtypes"})
+public class AnimatedOpacity extends StatefulWidget {
+    private Object opacity = Double.valueOf(1.0);
+    private Widget child;
     private Duration duration;
     private Curve curve;
+    private Object onEnd;
+    public void opacity(double v) { this.opacity = Double.valueOf(v); }
+    public void child(Widget v) { this.child = v; }
+    public void duration(Duration v) { this.duration = v; }
+    public void curve(Curve v) { this.curve = v; }
+    public void onEnd(Object v) { this.onEnd = v; }
+    public void alwaysIncludeSemantics(boolean v) { }
 
-    public void opacity(double v) {
-        this.opacity = v;
+    @Override
+    public State<? extends StatefulWidget> createState() {
+        return new S();
     }
 
-    public void duration(Duration v) {
-        this.duration = v;
+    private static double d(Object v, double def) {
+        return v instanceof Number ? ((Number) v).doubleValue() : def;
     }
 
-    public void curve(Curve v) {
-        this.curve = v;
+    private static final class S extends State<AnimatedOpacity> {
+        private ImplicitTween opacity;
+
+        @Override
+        public void initState() {
+            super.initState();
+            opacity = new ImplicitTween(widget().opacity, this);
+        }
+
+        @Override
+        public Widget build(BuildContext context) {
+            AnimatedOpacity w = widget();
+            opacity.onEnd(w.onEnd);
+            opacity.retarget(w.opacity, w.duration, w.curve);
+            Opacity o = new Opacity();
+            o.opacity(Math.max(0, Math.min(1, d(opacity.value(), 1))));
+            o.child(w.child);
+            return o;
+        }
+
+        @Override
+        public void dispose() {
+            opacity.dispose();
+            super.dispose();
+        }
     }
 }

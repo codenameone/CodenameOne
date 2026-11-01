@@ -200,6 +200,26 @@ class ClampingScrollPhysics extends ScrollPhysics {
   external ClampingScrollPhysics({ScrollPhysics? parent});
 }
 
+@JavaName('com.codename1.flutter.widgets.PageScrollPhysics')
+class PageScrollPhysics extends ScrollPhysics {
+  external PageScrollPhysics({ScrollPhysics? parent});
+}
+
+@JavaName('com.codename1.flutter.FontVariation')
+class FontVariation {
+  external FontVariation(String axis, double value);
+  external static FontVariation weight(double value);
+  external static FontVariation width(double value);
+  external static FontVariation slant(double value);
+  external static FontVariation opticalSize(double value);
+  external static FontVariation italic(double value);
+  external String get axis;
+  external double get value;
+}
+
+@JavaName('com.codename1.flutter.TextLeadingDistribution')
+enum TextLeadingDistribution { proportional, even }
+
 @JavaName('com.codename1.flutter.widgets.BouncingScrollPhysics')
 class BouncingScrollPhysics extends ScrollPhysics {
   external BouncingScrollPhysics({ScrollPhysics? parent});
