@@ -357,6 +357,50 @@ public class Future<T> {
         }, onError);
     }
 
+    /**
+     * Dart's {@code onError<E>(handleError, {test})}: like {@code catchError}, but the
+     * handler takes {@code (error, stackTrace)}. E is erased, so every error matches the
+     * type filter; {@code test}, when it is a function, still decides.
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public Future<T> onError(final Object handleError, final Object test) {
+        final Future<T> next = new Future<T>();
+        onComplete(new Runnable() {
+            @Override
+            public void run() {
+                if (error == null) {
+                    next.complete(value);
+                    return;
+                }
+                Object err = DartRuntime.caught(error);
+                try {
+                    if (test instanceof Funcs.Func1 && !Boolean.TRUE.equals(((Funcs.Func1) test).call(err))) {
+                        next.completeError(error);
+                        return;
+                    }
+                    next.complete((T) callErrorHandler(handleError, error));
+                } catch (Throwable t) {
+                    next.completeError(t);
+                }
+            }
+        });
+        return next;
+    }
+
+    /** {@code onError((error, stackTrace) => ...)}: the lambda form of the handler. */
+    public Future<T> onError(final Funcs.Func2<Object, Object, Object> handleError, final Object test) {
+        return onError((Object) handleError, test);
+    }
+
+    public Future<T> onError(final Funcs.Func2<Object, Object, Object> handleError) {
+        return onError((Object) handleError, null);
+    }
+
+    /** {@code onError(handleError)} with no test. */
+    public Future<T> onError(final Object handleError) {
+        return onError(handleError, null);
+    }
+
     /** Invokes an error handler of any shape a Dart handler transpiles to. */
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static Object callErrorHandler(Object handler, Object thrown) {

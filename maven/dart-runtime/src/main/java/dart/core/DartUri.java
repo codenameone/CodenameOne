@@ -853,6 +853,24 @@ public final class DartUri {
         return CoreStatics.encodeKeeping(s, "-_.!~*'()#$&+,/:;=?@[]");
     }
 
+    /// Dart's {@code Uri.encodeComponent}: everything but the unreserved characters
+    /// is percent-encoded (UTF-8), so the result is safe as one path segment or query value.
+    public static String encodeComponent(String s) {
+        return CoreStatics.encodeKeeping(s, "-_.!~*'()");
+    }
+
+    /// Dart's {@code Uri.file(path)} for a POSIX path: an absolute path becomes a
+    /// {@code file:///} URI, a relative one a scheme-less relative reference.
+    public static DartUri file(String path) {
+        String enc = CoreStatics.encodeKeeping(path, "-_.!~*'()/:@&=+$,");
+        return parse(path.startsWith("/") ? "file://" + enc : enc);
+    }
+
+    /// {@code Uri.file(path, windows: ...)}: only the POSIX form is supported.
+    public static DartUri file(String path, Object windows) {
+        return file(path);
+    }
+
     /// Dart's {@code Uri.decodeFull}.
     public static String decodeFull(String s) {
         return percentDecode(s, false);

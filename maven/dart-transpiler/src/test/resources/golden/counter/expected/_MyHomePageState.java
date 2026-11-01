@@ -16,7 +16,7 @@ import com.codename1.flutter.widgets.Text;
 import com.codename1.flutter.material.Theme;
 import com.codename1.flutter.Widget;
 
-// Generated from main.dart — do not edit.
+// Generated from main.dart -- do not edit.
 public class _MyHomePageState extends State<MyHomePage> {
 
     private long _counter = 0L;

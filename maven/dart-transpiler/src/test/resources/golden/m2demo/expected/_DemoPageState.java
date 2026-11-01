@@ -24,7 +24,7 @@ import com.codename1.flutter.widgets.Text;
 import com.codename1.flutter.material.TextButton;
 import com.codename1.flutter.Widget;
 
-// Generated from main.dart — do not edit.
+// Generated from main.dart -- do not edit.
 public class _DemoPageState extends State<DemoPage> {
 
     private final DartList<String> _items = DartList.<String>of("Alpha", "Beta", "Gamma");

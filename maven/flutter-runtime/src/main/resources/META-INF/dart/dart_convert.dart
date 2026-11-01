@@ -98,8 +98,18 @@ class Utf8Decoder extends Converter<List<int>, String> {
 
 @JavaName('dart.convert.HtmlEscape')
 class HtmlEscape {
-  external HtmlEscape();
+  external HtmlEscape([HtmlEscapeMode? mode]);
   external String convert(String text);
+}
+
+@JavaName('dart.convert.HtmlEscapeMode')
+class HtmlEscapeMode {
+  external HtmlEscapeMode({String name = 'custom', bool escapeLtGt = false, bool escapeQuot = false,
+      bool escapeApos = false, bool escapeSlash = false});
+  external static HtmlEscapeMode get unknown;
+  external static HtmlEscapeMode get attribute;
+  external static HtmlEscapeMode get sqAttribute;
+  external static HtmlEscapeMode get element;
 }
 
 @JavaName('dart.convert.Convert.htmlEscape')

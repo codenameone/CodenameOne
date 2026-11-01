@@ -9,7 +9,7 @@ import com.codename1.flutter.StatelessWidget;
 import com.codename1.flutter.material.ThemeData;
 import com.codename1.flutter.Widget;
 
-// Generated from main.dart — do not edit.
+// Generated from main.dart -- do not edit.
 public class MyApp extends StatelessWidget {
 
     public MyApp(Key key) {

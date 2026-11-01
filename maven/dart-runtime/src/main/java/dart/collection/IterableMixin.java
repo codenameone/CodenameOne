@@ -198,4 +198,27 @@ public interface IterableMixin<E> {
     default String join() {
         return join("");
     }
+
+    /// dart:collection's {@code IterableBase.iterableToFullString(it, [left, right])}:
+    /// every element, comma separated, between the delimiters ("(" and ")" by default).
+    static String iterableToFullString(Iterable<?> it, String left, String right) {
+        StringBuilder sb = new StringBuilder(left);
+        boolean first = true;
+        for (Object o : it) {
+            if (!first) {
+                sb.append(", ");
+            }
+            first = false;
+            sb.append(dart.runtime.DartRuntime.str(o));
+        }
+        return sb.append(right).toString();
+    }
+
+    static String iterableToFullString(Iterable<?> it) {
+        return iterableToFullString(it, "(", ")");
+    }
+
+    static String iterableToFullString(Iterable<?> it, String left) {
+        return iterableToFullString(it, left, ")");
+    }
 }

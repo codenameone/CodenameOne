@@ -194,7 +194,7 @@ class StreamController<T> {
   external StreamSink<T> get sink;
   external bool get isPaused;
   external Future get done;
-  external Future addStream(Stream<T> source);
+  external Future addStream(Stream<T> source, {bool? cancelOnError});
   external void Function()? get onListen;
   external set onListen(void Function()? handler);
   external void Function()? get onCancel;
@@ -203,4 +203,12 @@ class StreamController<T> {
   external set onPause(void Function()? handler);
   external void Function()? get onResume;
   external set onResume(void Function()? handler);
+}
+
+@JavaName('dart.async.AsyncError')
+class AsyncError {
+  external AsyncError(Object error, [Object? stackTrace]);
+  external Object get error;
+  external Object get stackTrace;
+  external static Object defaultStackTrace(Object error);
 }

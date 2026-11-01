@@ -27,7 +27,15 @@ package dart.convert;
 /// escapes {@code & < > " ' /}, as Dart's {@code HtmlEscapeMode.unknown} does.
 public final class HtmlEscape {
 
+    private final HtmlEscapeMode mode;
+
     public HtmlEscape() {
+        this(HtmlEscapeMode.unknown);
+    }
+
+    /// {@code HtmlEscape(mode)}: {@code &} is always escaped, the rest as the mode says.
+    public HtmlEscape(HtmlEscapeMode mode) {
+        this.mode = mode == null ? HtmlEscapeMode.unknown : mode;
     }
 
     public String convert(String text) {
@@ -37,11 +45,11 @@ public final class HtmlEscape {
             String r;
             switch (ch) {
                 case '&': r = "&amp;"; break;
-                case '<': r = "&lt;"; break;
-                case '>': r = "&gt;"; break;
-                case '"': r = "&quot;"; break;
-                case '\'': r = "&#39;"; break;
-                case '/': r = "&#47;"; break;
+                case '<': r = mode.escapeLtGt ? "&lt;" : null; break;
+                case '>': r = mode.escapeLtGt ? "&gt;" : null; break;
+                case '"': r = mode.escapeQuot ? "&quot;" : null; break;
+                case '\'': r = mode.escapeApos ? "&#39;" : null; break;
+                case '/': r = mode.escapeSlash ? "&#47;" : null; break;
                 default: r = null;
             }
             if (r != null && sb == null) {

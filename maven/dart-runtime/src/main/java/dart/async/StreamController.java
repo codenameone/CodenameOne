@@ -243,6 +243,12 @@ public final class StreamController<T> implements StreamSink<T> {
 
     /// {@code controller.addStream(source)}: forwards every event of source; the future
     /// completes when source is done.
+    /// {@code addStream(source, cancelOnError: ...)}: the flag only matters for a source
+    /// that errors, and this controller forwards errors and keeps listening either way.
+    public Future<Object> addStream(Stream<T> source, Object cancelOnError) {
+        return addStream(source);
+    }
+
     @Override
     public Future<Object> addStream(Stream<T> source) {
         final Future<Object> f = new Future<Object>();

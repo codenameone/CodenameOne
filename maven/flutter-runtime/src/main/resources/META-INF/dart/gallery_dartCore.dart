@@ -247,6 +247,7 @@ class Completer<T> {
 abstract class Future<T> {
   external Future then(Object onValue, {Object? onError});
   external Future catchError(Object onError, {Object? test});
+  external Future<T> onError<E extends Object>(Object? Function(Object error, StackTrace stackTrace) handleError, {Object? test});
   external Future whenComplete(Object action);
   external Future<T> timeout(Duration timeLimit, {dynamic Function()? onTimeout});
   external Stream<T> asStream();

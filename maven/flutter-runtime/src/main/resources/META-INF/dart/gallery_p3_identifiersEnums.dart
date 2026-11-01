@@ -88,6 +88,11 @@ enum FloatingActionButtonLocation {
 class Uri {
   external static Uri parse(String uri);
   external static Uri? tryParse(String uri);
+  external static String encodeComponent(String component);
+  external static String decodeComponent(String encodedComponent);
+  external static String encodeFull(String uri);
+  external static String decodeFull(String uri);
+  external static Uri file(String path, {bool? windows});
   external String get scheme;
   external String get host;
   external int get port;

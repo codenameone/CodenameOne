@@ -2338,7 +2338,7 @@ public final class JavaEmitter {
         if (!ctx.imports.isEmpty()) {
             sb.append('\n');
         }
-        sb.append("// Generated from ").append(dartFile).append(" — do not edit.\n");
+        sb.append("// Generated from ").append(dartFile).append(" -- do not edit.\n");
         sb.append(decl);
         if (ext != null) {
             sb.append(" extends ").append(ext);
@@ -2354,7 +2354,7 @@ public final class JavaEmitter {
     }
 
     private String dartRef(Node n) {
-        return "// Generated from " + n.file + " — do not edit.";
+        return "// Generated from " + n.file + " -- do not edit.";
     }
 
     // ==================================================================
@@ -2480,7 +2480,7 @@ public final class JavaEmitter {
     }
 
     /**
-     * factory Foo(...) / factory Foo.name(...) — a static method returning
+     * factory Foo(...) / factory Foo.name(...) -- a static method returning
      * the class; unnamed factories become {@code $create} and call sites
      * route through it.
      */
@@ -2533,7 +2533,7 @@ public final class JavaEmitter {
     }
 
     /**
-     * Dart named constructor C.name(...) — a private marker constructor
+     * Dart named constructor C.name(...) -- a private marker constructor
      * (field initializers still run), an instance $init$name carrying the
      * body with normal {@code this} semantics, and a public static factory
      * with the constructor's name that call sites invoke.
@@ -2860,13 +2860,13 @@ public final class JavaEmitter {
      * {@code current()}; a program class's field {@code current} is a private
      * field with {@code get$current()} accessors. A class that satisfies the
      * stub interface with a field therefore does not implement the interface
-     * method at all — Java silently keeps the interface's default.
+     * method at all -- Java silently keeps the interface's default.
      *
      * <p>That is not a compile error and it does not throw. It just answers the
      * default forever: {@code Board with IterableMixin} iterated correctly and
      * handed every element back as null, so the 2D-transformations demo's
-     * painter died on the first {@code boardPoint!} and the entire board — the
-     * only content on that screen — never drew.
+     * painter died on the first {@code boardPoint!} and the entire board -- the
+     * only content on that screen -- never drew.
      */
     private String emitStubGetterBridges(ClassDecl c, Ctx ctx) {
         StringBuilder out = new StringBuilder();
@@ -3724,7 +3724,7 @@ public final class JavaEmitter {
                 w.line("throw DartRuntime.asError(" + v.code + ");");
                 return;
             }
-            // A conditional used as a statement (`cond ? f() : g();`) — when its arms are void
+            // A conditional used as a statement (`cond ? f() : g();`) -- when its arms are void
             // (e.g. controller.reverse()/forward()) the ternary is not a valid Java expression
             // statement, so lower it to an if/else.
             if (ex instanceof Conditional) {
@@ -4030,7 +4030,7 @@ public final class JavaEmitter {
             w.line("}");
         } else if (s instanceof ForInStmt
                 && isIndexedRecordFor(((ForInStmt) s).pattern, ((ForInStmt) s).iterable)) {
-            // `for (final (int i, E e) in xs.indexed)` — Dart's Iterable.indexed pairs each
+            // `for (final (int i, E e) in xs.indexed)` -- Dart's Iterable.indexed pairs each
             // element with its position. There is no runtime `indexed`, so lower to a counted
             // loop that binds the index and element subpatterns directly.
             final ForInStmt f = (ForInStmt) s;
@@ -4188,7 +4188,7 @@ public final class JavaEmitter {
     /** A named typedef-shaped {@link TypeRef} used to give lambda params their real types. */
     private TypeRef funcTypeRef(TypeRef ret, List<Param> params) {
         // Not a registered typedef name, but emitLambda only reads typedefSig(expected.name);
-        // an unregistered name yields null there, which is fine — params carry their own types.
+        // an unregistered name yields null there, which is fine -- params carry their own types.
         return new TypeRef("Function");
     }
 
@@ -4289,7 +4289,7 @@ public final class JavaEmitter {
         SwitchCase defaultCase = null;
         // Tracks whether control can leave the switch block normally (a case that `break`s to
         // after the block rather than returning/throwing). When every case returns and there is
-        // no default, a Dart-exhaustive switch leaves the block unreachable — a trailing throw
+        // no default, a Dart-exhaustive switch leaves the block unreachable -- a trailing throw
         // then keeps a value-returning method/lambda definitely-assigned in Java.
         boolean anyFallThrough = false;
         boolean hasContentCase = false;
@@ -4377,7 +4377,7 @@ public final class JavaEmitter {
         w.line("}");
         // Dart-exhaustive switch (an enum subject, no default) where every arm returns/throws:
         // the post-block fall-through is unreachable in Dart, so emit an unreachable throw to
-        // satisfy Java's definite-return analysis. Only for enum subjects — a String/int switch is
+        // satisfy Java's definite-return analysis. Only for enum subjects -- a String/int switch is
         // never exhaustive and legitimately falls through to code after it.
         boolean enumSubject = subj.type != null
                 && (program.enums.containsKey(subj.type.name) || stubs.isStubEnum(subj.type.name));
@@ -4620,7 +4620,7 @@ public final class JavaEmitter {
         }
         // Static methods of this class: a static field whose initializer calls one of them
         // can transitively read any static field (the method body isn't analyzed here), so it
-        // must initialize only after every other static field — covers the common
+        // must initialize only after every other static field -- covers the common
         // `themeData(colorScheme)` builder that reads sibling `_textTheme`/`_colorScheme` statics.
         java.util.Set<String> staticMethods = new HashSet<String>();
         for (MethodDecl m : c.methods) {
@@ -5538,14 +5538,14 @@ public final class JavaEmitter {
                 if (cc.type.name.equals("List") && cc.ctorName.equals("of")) {
                     cc.ctorName = "from";
                 }
-                // List<E>.generate / .filled / .from — dart:core intrinsic factories,
+                // List<E>.generate / .filled / .from -- dart:core intrinsic factories,
                 // routed to the primitive Dart*List when E is a non-nullable int/double.
                 if (cc.type.name.equals("List")
                         && (cc.ctorName.equals("generate") || cc.ctorName.equals("filled")
                             || cc.ctorName.equals("from") || cc.ctorName.equals("unmodifiable"))) {
                     return emitListFactory(cc, ctx);
                 }
-                // Map/Set/Iterable named factory constructors — dart:core intrinsics
+                // Map/Set/Iterable named factory constructors -- dart:core intrinsics
                 // routed to the existing statics on Dart{Map,Set,Iterable}.
                 Out coreFactory = emitCoreCollectionFactory(cc, ctx);
                 if (coreFactory != null) {
@@ -7582,6 +7582,14 @@ public final class JavaEmitter {
                 || EXTENDED_CORE_GETTERS.contains(ctx.extensionSelfType.name + "." + n))) {
             return emitMemberGet(new Out("$self", ctx.extensionSelfType), n, id, ctx);
         }
+        // `extension on FileSpan` reading `length`, which only an interface FileSpan
+        // implements (SourceSpan) declares: still a member of the extended value.
+        if (ctx.extensionSelfType != null && resolveTopLevel(n, ctx) == null) {
+            ClassDecl onCls = program.resolveClass(ctx.extensionSelfType.name, ctx.library());
+            if (onCls != null && interfaceDeclaring(onCls, n, ctx, new java.util.HashSet<String>()) != null) {
+                return emitMemberGet(new Out("$self", ctx.extensionSelfType), n, id, ctx);
+            }
+        }
         Out top = resolveTopLevel(n, ctx);
         if (top != null) {
             return top;
@@ -7912,6 +7920,11 @@ public final class JavaEmitter {
                     "String.isNotEmpty", "String.codeUnits"));
 
     /** The implemented interface (program class) of {@code cc} or its supertypes declaring getter or field n. */
+    /** Getters every core List/Iterable/Set has, readable as a bare name in an implementor. */
+    private static final java.util.Set<String> CORE_COLLECTION_GETTERS = new java.util.HashSet<String>(
+            java.util.Arrays.asList("first", "last", "length", "isEmpty", "isNotEmpty", "single",
+                    "iterator", "reversed"));
+
     private TypeRef interfaceDeclaring(ClassDecl cc, String n, Ctx ctx, java.util.Set<String> seen) {
         if (cc == null || !seen.add(cc.name)) {
             return null;
@@ -7919,6 +7932,11 @@ public final class JavaEmitter {
         for (TypeRef i : cc.interfaces) {
             ClassDecl ic = program.resolveClass(i.name, ctx.library());
             if (ic == null) {
+                // `abstract class C<E> implements List<E>` reading a bare `first`: the
+                // getter is the core collection's, which the applying class provides.
+                if ((i.is("List") || i.is("Iterable") || i.is("Set")) && CORE_COLLECTION_GETTERS.contains(n)) {
+                    return i;
+                }
                 continue;
             }
             if (ic.getter(n) != null || ic.field(n) != null) {
@@ -12828,9 +12846,24 @@ public final class JavaEmitter {
                 String src = emitExpr(pos.get(0), null, ctx).code;
                 return new Out("DartSet" + witness + "from(" + src + ")", cc.type);
             }
+            if (ctor.equals("castFrom") && !pos.isEmpty()) {
+                // Set.castFrom<S, T>(source) is a view of the same set; type arguments are
+                // erased, so the view is the set itself (a copy would lose writes through it).
+                Out src = emitExpr(pos.get(0), null, ctx);
+                TypeRef target = cc.type.args.size() > 1 ? TypeRef.of("Set", cc.type.arg(1)) : cc.type;
+                return new Out("((" + javaType(target, true, ctx) + ") (Object) " + src.code + ")", target);
+            }
             return null;
         }
         if (name.equals("Iterable")) {
+            if (ctor.equals("empty")) {
+                // const Iterable<E>.empty(): an unmodifiable empty sequence.
+                ctx.importClass("dart.core.DartIterable");
+                TypeRef et = cc.type.args.isEmpty() ? TypeRef.DYNAMIC : cc.type.arg(0);
+                String jt = javaType(et, true, ctx);
+                return new Out("DartIterable.<" + jt + ">wrap(java.util.Collections.<" + jt + ">emptyList())",
+                        TypeRef.of("Iterable", et));
+            }
             if (ctor.equals("generate")) {
                 ctx.importClass("dart.core.DartIterable");
                 TypeRef et = cc.type.args.isEmpty() ? TypeRef.DYNAMIC : cc.type.arg(0);
