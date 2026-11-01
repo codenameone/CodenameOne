@@ -26,7 +26,7 @@ package dart.typed_data;
 /// The integer typed lists (Int8List .. Uint64List, Uint8ClampedList): a
 /// fixed-length {@code List<int>} over a {@link ByteBuffer}'s bytes, little endian.
 /// It is a DartLongList so it goes wherever a {@code List<int>} goes.
-public abstract class TypedIntList extends dart.core.DartLongList {
+public abstract class TypedIntList extends dart.core.DartLongList implements TypedDataList<Long> {
 
     final byte[] buf;
     final int off;

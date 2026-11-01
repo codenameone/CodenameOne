@@ -25,7 +25,7 @@ package dart.typed_data;
 
 /// Float32List and Float64List: a fixed-length {@code List<double>} over a
 /// {@link ByteBuffer}'s bytes, little endian.
-public abstract class TypedFloatList extends dart.core.DartDoubleList {
+public abstract class TypedFloatList extends dart.core.DartDoubleList implements TypedDataList<Double> {
 
     final byte[] buf;
     final int off;

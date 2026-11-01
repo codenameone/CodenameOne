@@ -198,6 +198,10 @@ public final class JavaEmitter {
                         addMapped(out, emitMixin(c), dart);
                     } else {
                         addMapped(out, emitClass(c), dart);
+                        for (GeneratedFile extra : pendingFiles) {
+                            addMapped(out, extra, dart);
+                        }
+                        pendingFiles.clear();
                     }
                 } catch (RuntimeException | StackOverflowError ex) {
                     emitCrash(lib, "class " + c.name, ex);
@@ -955,6 +959,9 @@ public final class JavaEmitter {
             }
             ctx.pushScope();
             TypeRef rt = m.returnType == null || m.returnType.is("var") ? TypeRef.DYNAMIC : m.returnType;
+            // An abstract member the applying class implements -- possibly with a field,
+            // through the bridge implementerBridges writes -- throws if nothing does.
+            boolean abstractMember = m.body == null && m.exprBody == null;
             body.append("    default ").append(m.isSetter ? "void" : javaType(rt, false, ctx))
                     .append(' ').append(m.isGetter ? m.name : m.name).append('(');
             for (int i = 0; i < m.params.size(); i++) {
@@ -970,7 +977,9 @@ public final class JavaEmitter {
             ctx.pushWriter(2);
             ctx.methodReturnType = rt;
             ctx.inAsyncBody = m.isAsync;
-            if (emitInlineGeneratorBody(m, rt, ctx)) {
+            if (abstractMember) {
+                ctx.writer().line("throw new UnsupportedOperationException(\"" + mx.name + "." + m.name + "\");");
+            } else if (emitInlineGeneratorBody(m, rt, ctx)) {
                 // generator: emitted as a lambda
             } else if (m.body != null) {
                 emitStatements(m.body, ctx);
@@ -990,7 +999,18 @@ public final class JavaEmitter {
             body.append("    }\n\n");
         }
         String typeParams = mx.typeParams.isEmpty() ? "" : "<" + String.join(", ", mx.typeParams) + ">";
-        return finishClassFile(mx.name, "public interface " + mx.name + typeParams, null, null, body, ctx, mx.file);
+        StringBuilder mext = new StringBuilder();
+        List<TypeRef> mxSupers = new ArrayList<TypeRef>(mx.interfaces);
+        mxSupers.addAll(mx.mixinOn);
+        for (TypeRef itf : mxSupers) {
+            ClassDecl im = program.classes.get(itf.name);
+            if (im != null && interfacedClasses().contains(im)) {
+                // `mixin M implements Shape`: M's values are Shapes
+                mext.append(mext.length() > 0 ? ", " : "").append(javaType(itf, false, ctx));
+            }
+        }
+        return finishClassFile(mx.name, "public interface " + mx.name + typeParams,
+                mext.length() == 0 ? null : mext.toString(), null, body, ctx, mx.file);
     }
 
     private GeneratedFile emitClass(ClassDecl c) {
@@ -1159,6 +1179,7 @@ public final class JavaEmitter {
                 impls.append(", ");
             }
             impls.append(javaType(mixRef, false, ctx));
+            body.append(implementerBridges(c, mx, ctx));
             // The applying class holds the mixin's state, so a generic mixin's field is
             // declared with the type arguments it is applied with (`with Holder<String>`
             // holds a String); applied raw, with dynamic, as Dart instantiates to bounds.
@@ -1187,6 +1208,22 @@ public final class JavaEmitter {
                         .append("() {\n        return ").append(f.name).append(";\n    }\n");
                 body.append("    public void set$").append(f.name).append('(').append(jt)
                         .append(" v) {\n        this.").append(f.name).append(" = v;\n    }\n\n");
+                if (!mixSubst.isEmpty()) {
+                    // The mixin interface declares set$x over its type parameter, which the
+                    // primitive storage classes (List<int> is a DartLongList) do not match:
+                    // the interface's own spelling, with the arguments substituted, is
+                    // implemented too.
+                    String generic = javaType(fieldType(f, ctx), false, ctx);
+                    for (Map.Entry<String, TypeRef> en : mixSubst.entrySet()) {
+                        generic = generic.replaceAll("\\b" + java.util.regex.Pattern.quote(en.getKey()) + "\\b",
+                                java.util.regex.Matcher.quoteReplacement(javaType(en.getValue(), true, ctx)));
+                    }
+                    if (!generic.equals(jt) && !generic.contains("?")) {
+                        body.append("    public void set$").append(f.name).append('(').append(generic)
+                                .append(" v) {\n        this.").append(f.name).append(" = (").append(jt)
+                                .append(") v;\n    }\n\n");
+                    }
+                }
             }
         }
         // Dart `implements X` clauses (c.interfaces): the runtime interface the class satisfies
@@ -1245,6 +1282,16 @@ public final class JavaEmitter {
                 continue;
             }
             ClassDecl implemented = program.classes.get(itf.name);
+            if (implemented != null && !implemented.isMixin && interfacedClasses().contains(implemented)) {
+                // Every class used in an `implements` clause has a Java interface X$I
+                // (see interfacedClasses); javaType names it for this type position.
+                if (impls.length() > 0) {
+                    impls.append(", ");
+                }
+                impls.append(javaType(itf, false, ctx));
+                body.append(implementerBridges(c, implemented, ctx));
+                continue;
+            }
             if (implemented != null && !implemented.isMixin) {
                 // A program class is a Java class, which `implements` cannot name. One
                 // that is purely an interface -- abstract, no state, no implemented
@@ -1321,11 +1368,14 @@ public final class JavaEmitter {
                 + (c.isAbstract ? "abstract " : "") + "class " + jname + typeParamsSb;
         String ext = null;
         if (c.superclass != null) {
-            ext = javaType(c.superclass, false, ctx);
+            ext = javaClassType(c.superclass, ctx);
         } else if (mixinClassAsSuper != null) {
-            ext = javaType(mixinClassAsSuper, false, ctx);
+            ext = javaClassType(mixinClassAsSuper, ctx);
         } else if (implementedAsSuper != null) {
-            ext = javaType(implementedAsSuper, false, ctx);
+            ext = javaClassType(implementedAsSuper, ctx);
+        }
+        if (interfacedClasses().contains(c)) {
+            impls.append(impls.length() > 0 ? ", " : "").append(jname).append("$I").append(typeParamsSb);
         }
         String permits = null;
         if (sealedSelf) {
@@ -1338,8 +1388,231 @@ public final class JavaEmitter {
             }
             permits = pb.toString();
         }
+        if (interfacedClasses().contains(c)) {
+            pendingFiles.add(emitImplicitInterface(c, jname, typeParamsSb.toString(), body, ctx));
+        }
         return finishClassFile(jname, decl, ext, impls.length() == 0 ? null : impls.toString(),
                 permits, body, ctx, c.file);
+    }
+
+    private final List<GeneratedFile> pendingFiles = new ArrayList<GeneratedFile>();
+
+    /** True while javaType renders a class (extends, constructor) rather than a type. */
+    private boolean classRefMode;
+
+    /** The Java class -- never its implicit interface -- a type names. */
+    private String javaClassType(TypeRef t, Ctx ctx) {
+        boolean saved = classRefMode;
+        classRefMode = true;
+        try {
+            // Only the outer name is the class: type arguments are type positions.
+            if (t.args.isEmpty()) {
+                return javaType(t, false, ctx);
+            }
+            String outer = javaType(new TypeRef(t.name), false, ctx);
+            classRefMode = saved;
+            return outer + genericSuffix(t, ctx);
+        } finally {
+            classRefMode = saved;
+        }
+    }
+
+    private java.util.Set<ClassDecl> interfaced;
+
+    /**
+     * Program classes that serve as a Dart implicit interface: named in an {@code implements}
+     * clause (of a class or a mixin), plus their program superclasses, since a Dart interface
+     * carries every inherited member. Each gets a Java interface {@code X$I} the class itself
+     * implements; type positions name the interface and only constructor calls, statics and
+     * {@code extends} name the class, so an implementer can have a superclass of its own and
+     * implement any number of program classes.
+     */
+    private java.util.Set<ClassDecl> interfacedClasses() {
+        if (interfaced == null) {
+            java.util.Set<ClassDecl> out = new java.util.LinkedHashSet<ClassDecl>();
+            List<ClassDecl> work = new ArrayList<ClassDecl>();
+            List<List<ClassDecl>> groups = new ArrayList<List<ClassDecl>>(program.classesByName.values());
+            groups.add(new ArrayList<ClassDecl>(program.classes.values()));
+            for (List<ClassDecl> same : groups) {
+                for (ClassDecl k : same) {
+                    if (k.extensionOn != null) {
+                        continue;
+                    }
+                    for (TypeRef itf : k.interfaces) {
+                        ClassDecl im = program.classes.get(itf.name);
+                        if (im != null && !im.isMixin && im.extensionOn == null && im.enumOf == null) {
+                            work.add(im);
+                        }
+                    }
+                }
+            }
+            while (!work.isEmpty()) {
+                ClassDecl im = work.remove(work.size() - 1);
+                if (!out.add(im)) {
+                    continue;
+                }
+                ClassDecl sup = im.superclass != null ? program.classes.get(im.superclass.name) : null;
+                if (sup != null && !sup.isMixin && sup.extensionOn == null) {
+                    work.add(sup);
+                }
+            }
+            interfaced = out;
+        }
+        return interfaced;
+    }
+
+    private static final java.util.regex.Pattern PUBLIC_MEMBER = java.util.regex.Pattern.compile(
+            "^    public (?!static )(?:abstract )?(?:final )?(?:synchronized )?(.*?)\\s*(\\{|;)\\s*$");
+
+    /**
+     * {@code X$I}: the implicit interface of {@code c}. Its members are the class's own public
+     * instance members -- field accessors, getters, setters, methods -- read from the emitted
+     * body, so every signature is exactly the one the class declares. They are default
+     * methods that throw: Dart lets an abstract implementer, or one with noSuchMethod, leave
+     * members out, and Java must still accept the class.
+     */
+    private GeneratedFile emitImplicitInterface(ClassDecl c, String jname, String typeParams,
+                                                CharSequence classBody, Ctx ctx) {
+        StringBuilder body = new StringBuilder();
+        java.util.Set<String> seen = new java.util.HashSet<String>();
+        for (String line : classBody.toString().split("\n")) {
+            java.util.regex.Matcher m = PUBLIC_MEMBER.matcher(line);
+            if (!m.matches()) {
+                continue;
+            }
+            String head = m.group(1).trim();
+            int paren = head.indexOf('(');
+            if (paren <= 0 || head.indexOf('=') >= 0 && head.indexOf('=') < paren || !head.endsWith(")")
+                    && !head.contains(") throws ")) {
+                continue;
+            }
+            String before = head.substring(0, paren).trim();
+            int sp = before.lastIndexOf(' ');
+            if (sp < 0) {
+                continue; // a constructor
+            }
+            String name = before.substring(sp + 1);
+            if (name.equals(jname) || name.startsWith("$") && !name.startsWith("$op")) {
+                continue;
+            }
+            if (!seen.add(head.replaceAll("\\s+", " "))) {
+                continue;
+            }
+            body.append("    default ").append(head).append(" {\n")
+                    .append("        throw new UnsupportedOperationException(\"")
+                    .append(c.name).append('.').append(name).append("\");\n    }\n\n");
+        }
+        // A Dart field and a getter/setter implement each other; the Java spellings differ
+        // (get$x/set$x against x()/x(v)), so the interface carries both and an implementer
+        // overrides whichever it declares (implementerBridges forwards to the other).
+        for (FieldDecl f : c.fields) {
+            if (f.isStatic || f.name.startsWith("_") || c.getter(f.name) != null || c.method(f.name) != null) {
+                continue;
+            }
+            String jt = javaType(fieldType(f, ctx), false, ctx);
+            String gh = jt + " " + f.name + "()";
+            if (seen.add(gh)) {
+                body.append("    default ").append(gh).append(" {\n        return get$").append(f.name)
+                        .append("();\n    }\n\n");
+            }
+            String sh = "void " + f.name + "(" + jt + " v)";
+            if (!f.isFinal && seen.add(sh)) {
+                body.append("    default ").append(sh).append(" {\n        set$").append(f.name)
+                        .append("(v);\n    }\n\n");
+            }
+        }
+        StringBuilder ext = new StringBuilder();
+        java.util.Set<ClassDecl> mine = interfacedClasses();
+        ClassDecl sup = c.superclass != null ? program.classes.get(c.superclass.name) : null;
+        if (sup != null && mine.contains(sup)) {
+            ext.append(javaType(c.superclass, false, ctx));
+        }
+        for (TypeRef itf : c.interfaces) {
+            ClassDecl im = program.classes.get(itf.name);
+            if (im != null && mine.contains(im)) {
+                ext.append(ext.length() > 0 ? ", " : "").append(javaType(itf, false, ctx));
+            }
+        }
+        return finishClassFile(jname + "$I", "public interface " + jname + "$I" + typeParams,
+                ext.length() == 0 ? null : ext.toString(), null, body, ctx, c.file);
+    }
+
+    /**
+     * Where Dart lets a getter/setter implement a field of the implemented class (or a field a
+     * getter), the Java names differ -- a field is get$x/set$x, a getter x() -- so the
+     * implementer gets the other spelling as a bridge.
+     */
+    private String implementerBridges(ClassDecl c, ClassDecl implemented, Ctx ctx) {
+        StringBuilder sb = new StringBuilder();
+        java.util.Set<String> done = new java.util.HashSet<String>();
+        for (ClassDecl im = implemented; im != null;
+             im = im.superclass != null ? program.classes.get(im.superclass.name) : null) {
+            for (FieldDecl f : im.fields) {
+                if (f.isStatic || !done.add(f.name) || hasFieldInChain(c, f.name)) {
+                    continue;
+                }
+                MethodDecl g = findGetterInChain(c, f.name);
+                if (g != null) {
+                    TypeRef rt = g.returnType == null ? TypeRef.DYNAMIC : g.returnType;
+                    sb.append("    public ").append(javaType(rt, false, ctx)).append(" get$").append(f.name)
+                            .append("() {\n        return ").append(f.name).append("();\n    }\n\n");
+                }
+                MethodDecl st = findSetterInChain(c, f.name);
+                if (st != null && st.params.size() == 1) {
+                    Param p = st.params.get(0);
+                    TypeRef pt = p.type == null ? TypeRef.DYNAMIC : p.type;
+                    sb.append("    public void set$").append(f.name).append('(').append(javaType(pt, false, ctx))
+                            .append(" v) {\n        ").append(f.name).append("(v);\n    }\n\n");
+                }
+            }
+            for (MethodDecl g : im.methods) {
+                if (!g.isGetter || g.isStatic || !done.add(g.name) || findGetterInChain(c, g.name) != null) {
+                    continue;
+                }
+                FieldDecl f = findFieldInChain(c, g.name);
+                if (f != null) {
+                    sb.append("    public ").append(javaType(fieldType(f, ctx), false, ctx)).append(' ')
+                            .append(g.name).append("() {\n        return get$").append(g.name)
+                            .append("();\n    }\n\n");
+                }
+            }
+        }
+        return sb.toString();
+    }
+
+    private FieldDecl findFieldInChain(ClassDecl c, String name) {
+        for (ClassDecl k = c; k != null; k = k.superclass != null ? program.classes.get(k.superclass.name) : null) {
+            FieldDecl f = k.field(name);
+            if (f != null && !f.isStatic) {
+                return f;
+            }
+        }
+        return null;
+    }
+
+    private boolean hasFieldInChain(ClassDecl c, String name) {
+        return findFieldInChain(c, name) != null;
+    }
+
+    private MethodDecl findGetterInChain(ClassDecl c, String name) {
+        for (ClassDecl k = c; k != null; k = k.superclass != null ? program.classes.get(k.superclass.name) : null) {
+            MethodDecl g = k.getter(name);
+            if (g != null && !g.isStatic) {
+                return g;
+            }
+        }
+        return null;
+    }
+
+    private MethodDecl findSetterInChain(ClassDecl c, String name) {
+        for (ClassDecl k = c; k != null; k = k.superclass != null ? program.classes.get(k.superclass.name) : null) {
+            for (MethodDecl m : k.methods) {
+                if (m.isSetter && !m.isStatic && m.name.equals(name)) {
+                    return m;
+                }
+            }
+        }
+        return null;
     }
 
     /**
@@ -1883,7 +2156,9 @@ public final class JavaEmitter {
         StringBuilder sb = new StringBuilder();
         String name = ct.name == null ? "$create" : javaIdent(ct.name);
         ctx.pushScope();
+        // A factory may return any implementer, so an implicit interface's factory returns it.
         sb.append("    public static ").append(staticTypeParams(c)).append(javaClassName(c))
+                .append(interfacedClasses().contains(c) ? "$I" : "")
                 .append(staticTypeArgs(c)).append(' ').append(name).append('(');
         appendParams(sb, c, ct.params, ctx);
         sb.append(") {\n");
@@ -2462,7 +2737,9 @@ public final class JavaEmitter {
         // result is narrowed with an explicit cast.
         boolean forceIntReturn = ("hashCode".equals(m.name) && m.params.isEmpty() && !m.isSetter)
                 || ("compareTo".equals(m.name) && m.params.size() == 1 && !m.isSetter);
-        if (m.isOverride) {
+        // A private member may override a private FIELD of an implemented class, whose
+        // accessors no interface carries; @Override is optional, so it is left off.
+        if (m.isOverride && !m.name.startsWith("_")) {
             sb.append("    @Override\n");
         }
         // Dart privacy is library-scoped, not class-scoped: a `_name` member is visible to
@@ -5892,6 +6169,24 @@ public final class JavaEmitter {
             if (inhF != null && !inhF.isStatic && !inhF.name.startsWith("_")) {
                 return new Out("this.get$" + n + "()", fieldType(inhF, ctx));
             }
+            if (!cc.isMixin) {
+                // state a mixin contributes: the applying class holds it behind get$/set$
+                for (TypeRef mixRef : cc.mixins) {
+                    ClassDecl mx = program.classes.get(mixRef.name);
+                    FieldDecl mf = mx != null && mx.isMixin ? mx.field(n) : null;
+                    if (mf != null && !mf.isStatic) {
+                        TypeRef ft = fieldType(mf, ctx);
+                        if (mixRef.args.size() == mx.typeParams.size() && !mx.typeParams.isEmpty()) {
+                            Map<String, TypeRef> sub = new LinkedHashMap<String, TypeRef>();
+                            for (int i = 0; i < mx.typeParams.size(); i++) {
+                                sub.put(mx.typeParams.get(i), mixRef.args.get(i));
+                            }
+                            ft = substituteTypeParams(ft, sub);
+                        }
+                        return new Out("this.get$" + n + "()", ft);
+                    }
+                }
+            }
             MethodDecl inhG = findInheritedGetter(cc, n);
             if (inhG != null) {
                 return new Out("this." + n + "()", inhG.returnType);
@@ -9068,6 +9363,13 @@ public final class JavaEmitter {
         ClassDecl cc = ctx.currentClass;
         if (cc != null) {
             MethodDecl m = cc.method(n);
+            if (m == null && !cc.isMixin) {
+                // a method the class inherits from a program superclass
+                MethodDecl inh = findMethodInHierarchy(cc, n);
+                if (inh != null && !inh.isGetter && !inh.isSetter) {
+                    m = inh;
+                }
+            }
             if (m != null) {
                 String recv = m.isStatic ? cc.name : "this";
                 return new Out(recv + "." + n + "("
@@ -12794,6 +13096,12 @@ public final class JavaEmitter {
         // another app class or a stub type of the same simple name.
         String appName = resolveAppClassName(t.name, ctx.library(), ctx);
         if (appName != null) {
+            if (!classRefMode) {
+                ClassDecl pcl = program.resolveClass(t.name, ctx.library());
+                if (pcl != null && interfacedClasses().contains(pcl)) {
+                    appName = appName + "$I";
+                }
+            }
             return appName + (t.args.isEmpty() ? "" : genericSuffix(t, ctx));
         }
         // stub class or enum
@@ -13321,6 +13629,11 @@ public final class JavaEmitter {
         // passed as a `Type` argument) becomes a Java class literal.
         if (o.type != null && isClassRef(o.type) && !isClassRef(target)) {
             return o.code + ".class";
+        }
+        // dart:typed_data's TypedDataList is a Java interface beside the list classes, while
+        // Dart has it implement List: every implementation is a typed list, so it casts.
+        if (o.type != null && o.type.is("TypedDataList") && (target.is("List") || target.is("Iterable"))) {
+            return "((" + javaType(target, false, ctx) + ") (Object) " + paren(o.code) + ")";
         }
         // A Dart `double` value reaching a Dart `int` target only happens through stub
         // imprecision (e.g. math.max/min typed to return double): Dart itself forbids the

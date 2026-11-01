@@ -252,6 +252,12 @@ public final class AstBuilder {
                     cd.mixinOn.add(buildTypeNotVoid(t));
                 }
             }
+            // `mixin M implements Shape`: a value of M is a Shape
+            if (mx.interfaces() != null) {
+                for (Dart2Parser.TypeNotVoidContext t : mx.interfaces().typeNotVoidList().typeNotVoid()) {
+                    cd.interfaces.add(buildTypeNotVoid(t));
+                }
+            }
             // `mixin Holder<H>`: dropped, the interface named an undeclared H and every
             // class applying the mixin failed to compile.
             if (mx.typeParameters() != null) {

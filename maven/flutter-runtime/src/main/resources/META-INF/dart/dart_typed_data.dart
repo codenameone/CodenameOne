@@ -12,8 +12,19 @@ class Endian {
   external static Endian get host;
 }
 
+@JavaName('dart.typed_data.TypedDataList')
+abstract class TypedDataList<E> implements List<E> {
+  external int get length;
+  external ByteBuffer get buffer;
+  external int get lengthInBytes;
+  external int get offsetInBytes;
+  external int get elementSizeInBytes;
+  external void setRange(int start, int end, Iterable<E> from, [int skipCount]);
+  external void fillRange(int start, int end, [E? fillValue]);
+}
+
 @JavaName('dart.typed_data.Uint8List')
-class Uint8List implements List<int> {
+class Uint8List implements TypedDataList<int>, List<int> {
   external Uint8List(int length);
   external static Uint8List fromList(List<int> elements);
   external static Uint8List view(ByteBuffer buffer, [int offsetInBytes, int? length]);
@@ -35,7 +46,7 @@ class Uint8List implements List<int> {
 }
 
 @JavaName('dart.typed_data.Int8List')
-class Int8List implements List<int> {
+class Int8List implements TypedDataList<int>, List<int> {
   external int get length;
   external bool get isEmpty;
   external bool get isNotEmpty;
@@ -71,7 +82,7 @@ class Int8List implements List<int> {
 }
 
 @JavaName('dart.typed_data.Uint8ClampedList')
-class Uint8ClampedList implements List<int> {
+class Uint8ClampedList implements TypedDataList<int>, List<int> {
   external int get length;
   external bool get isEmpty;
   external bool get isNotEmpty;
@@ -107,7 +118,7 @@ class Uint8ClampedList implements List<int> {
 }
 
 @JavaName('dart.typed_data.Int16List')
-class Int16List implements List<int> {
+class Int16List implements TypedDataList<int>, List<int> {
   external int get length;
   external bool get isEmpty;
   external bool get isNotEmpty;
@@ -143,7 +154,7 @@ class Int16List implements List<int> {
 }
 
 @JavaName('dart.typed_data.Uint16List')
-class Uint16List implements List<int> {
+class Uint16List implements TypedDataList<int>, List<int> {
   external int get length;
   external bool get isEmpty;
   external bool get isNotEmpty;
@@ -179,7 +190,7 @@ class Uint16List implements List<int> {
 }
 
 @JavaName('dart.typed_data.Int32List')
-class Int32List implements List<int> {
+class Int32List implements TypedDataList<int>, List<int> {
   external int get length;
   external bool get isEmpty;
   external bool get isNotEmpty;
@@ -215,7 +226,7 @@ class Int32List implements List<int> {
 }
 
 @JavaName('dart.typed_data.Uint32List')
-class Uint32List implements List<int> {
+class Uint32List implements TypedDataList<int>, List<int> {
   external int get length;
   external bool get isEmpty;
   external bool get isNotEmpty;
@@ -251,7 +262,7 @@ class Uint32List implements List<int> {
 }
 
 @JavaName('dart.typed_data.Int64List')
-class Int64List implements List<int> {
+class Int64List implements TypedDataList<int>, List<int> {
   external int get length;
   external bool get isEmpty;
   external bool get isNotEmpty;
@@ -287,7 +298,7 @@ class Int64List implements List<int> {
 }
 
 @JavaName('dart.typed_data.Uint64List')
-class Uint64List implements List<int> {
+class Uint64List implements TypedDataList<int>, List<int> {
   external int get length;
   external bool get isEmpty;
   external bool get isNotEmpty;
@@ -323,7 +334,7 @@ class Uint64List implements List<int> {
 }
 
 @JavaName('dart.typed_data.Float32List')
-class Float32List implements List<double> {
+class Float32List implements TypedDataList<double>, List<double> {
   external int get length;
   external bool get isEmpty;
   external bool get isNotEmpty;
@@ -359,7 +370,7 @@ class Float32List implements List<double> {
 }
 
 @JavaName('dart.typed_data.Float64List')
-class Float64List implements List<double> {
+class Float64List implements TypedDataList<double>, List<double> {
   external int get length;
   external bool get isEmpty;
   external bool get isNotEmpty;
