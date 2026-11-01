@@ -84,6 +84,19 @@ public final class Dialogs {
             Boolean barrierDismissible, com.codename1.flutter.Color barrierColor, String barrierLabel,
             Boolean useSafeArea, Boolean useRootNavigator, Object routeSettings) {
         applyBarrier(barrierColor);
+        if (useSafeArea != null && useSafeArea.booleanValue()) {
+            // Flutter wraps the dialog in a SafeArea, so it never reaches under a notch
+            // or the system bars.
+            final Funcs.Func1<BuildContext, Widget> inner = builder;
+            builder = new Funcs.Func1<BuildContext, Widget>() {
+                @Override
+                public Widget call(BuildContext c) {
+                    com.codename1.flutter.widgets.SafeArea sa = new com.codename1.flutter.widgets.SafeArea();
+                    sa.child(inner.call(c));
+                    return sa;
+                }
+            };
+        }
         return present(context, builder, BorderLayout.CENTER,
                 barrierDismissible == null || barrierDismissible.booleanValue());
     }

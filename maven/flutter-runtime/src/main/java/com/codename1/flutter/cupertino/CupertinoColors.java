@@ -39,6 +39,9 @@ public final class CupertinoColors {
     public static final CupertinoDynamicColor inactiveGray = new CupertinoDynamicColor(0xFF999999L);
     public static final CupertinoDynamicColor systemBlue = new CupertinoDynamicColor(0xFF007AFFL);
     public static final CupertinoDynamicColor systemGrey = new CupertinoDynamicColor(0xFF8E8E93L);
+    public static final CupertinoDynamicColor systemGrey4 = new CupertinoDynamicColor(0xFFD1D1D6L);
+    public static final CupertinoDynamicColor systemGrey6 = new CupertinoDynamicColor(0xFFF2F2F7L);
+    public static final CupertinoDynamicColor link = new CupertinoDynamicColor(0xFF007AFFL);
     public static final CupertinoDynamicColor activeBlue = new CupertinoDynamicColor(0xFF007AFFL);
     public static final CupertinoDynamicColor activeGreen = new CupertinoDynamicColor(0xFF34C759L);
     public static final CupertinoDynamicColor destructiveRed = new CupertinoDynamicColor(0xFFFF3B30L);

@@ -359,7 +359,7 @@ public class ButtonRenderElement extends RenderElement {
         // Material ink instead of its own theme's grey.
         if (explicitForeground() == null) {
             try {
-                applyDisabledInk(b, Theme.of(this).colorScheme());
+                applyDisabledInk(b, Theme.of(this).colorScheme(), widget());
             } catch (Exception noTheme) {
                 // an unthemed button keeps its base look
             }
@@ -543,6 +543,20 @@ public class ButtonRenderElement extends RenderElement {
                 all.setFgColor(tint != null ? tint.rgb() : cs.onSurface().rgb());
                 all.setBorder(Border.createEmpty());
                 clearBackground(all);
+                String variant = w instanceof IconButton ? ((IconButton) w).getVariant() : null;
+                if ("filled".equals(variant) || "tonal".equals(variant)) {
+                    // IconButton.filled / filledTonal: the glyph on a circle of the role colour.
+                    boolean filled = "filled".equals(variant);
+                    com.codename1.flutter.Color bg = filled ? cs.primary() : cs.secondaryContainer();
+                    com.codename1.flutter.Color fg = filled ? cs.onPrimary() : cs.onSecondaryContainer();
+                    all.setBorder(com.codename1.ui.plaf.RoundBorder.create().rectangle(false).color(bg.rgb()));
+                    all.setFgColor((tint != null ? tint : fg).rgb());
+                } else if ("outlined".equals(variant)) {
+                    // IconButton.outlined: a one-pixel ring in the outline role.
+                    all.setBorder(com.codename1.ui.plaf.RoundBorder.create().rectangle(false).opacity(0)
+                            .strokeColor(cs.outline().rgb()).strokeOpacity(255)
+                            .stroke((float) com.codename1.flutter.rendering.Dp.px(1), false));
+                }
             }
             // The consumed Text's OWN colour, last, because it is the most specific
             // thing anyone said about this label.
@@ -574,8 +588,23 @@ public class ButtonRenderElement extends RenderElement {
      * onSurface at 38%, and Codename One's foreground is opaque, so the tint is
      * composited against the surface here.</p>
      */
-    private static void applyDisabledInk(Button b, ColorScheme cs) {
-        if (b.isEnabled() || cs == null || cs.onSurface() == null) {
+    private static void applyDisabledInk(Button b, ColorScheme cs, Widget w) {
+        if (b.isEnabled()) {
+            return;
+        }
+        // ButtonStyle.disabledForegroundColor / disabledBackgroundColor (styleFrom) win
+        // over Material's default 38% onSurface ink.
+        ButtonStyle st = w instanceof ButtonBase ? ((ButtonBase) w).getStyle() : null;
+        if (st != null && st.getDisabledBackgroundColor() != null) {
+            com.codename1.flutter.Color bg = st.getDisabledBackgroundColor();
+            b.getDisabledStyle().setBgColor(bg.rgb());
+            b.getDisabledStyle().setBgTransparency((int) ((bg.value() >>> 24) & 0xff));
+        }
+        if (st != null && st.getDisabledForegroundColor() != null) {
+            b.getDisabledStyle().setFgColor(st.getDisabledForegroundColor().rgb());
+            return;
+        }
+        if (cs == null || cs.onSurface() == null) {
             return;
         }
         com.codename1.flutter.Color ink = cs.onSurface();

@@ -2521,10 +2521,12 @@ class ThemeData {
       dynamic tooltipTheme, dynamic bottomSheetTheme, dynamic floatingActionButtonTheme,
       dynamic elevatedButtonTheme, dynamic textButtonTheme, dynamic outlinedButtonTheme,
       dynamic pageTransitionsTheme, dynamic visualDensity, dynamic typography, dynamic platform,
-      NavigationRailThemeData? navigationRailTheme,
+      NavigationRailThemeData? navigationRailTheme, NavigationBarThemeData? navigationBarTheme,
+      dynamic bottomNavigationBarTheme,
       bool? applyElevationOverlayColor, String? fontFamily});
   external static ThemeData dark({bool? useMaterial3});
   external ColorScheme get colorScheme;
+  external NavigationBarThemeData? get navigationBarTheme;
   external TextTheme get textTheme;
   external TextTheme get primaryTextTheme;
   external Brightness get brightness;

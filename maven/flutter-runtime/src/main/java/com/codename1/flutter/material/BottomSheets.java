@@ -85,8 +85,11 @@ public final class BottomSheets {
                                                       Object routeSettings,
                                                       Object transitionAnimationController,
                                                       final Boolean useSafeArea) {
+        final boolean dragHandle = showDragHandle != null && showDragHandle.booleanValue();
+        final Object sheetShape = shape;
         Funcs.Func1<BuildContext, Widget> b = builder;
-        if (backgroundColor != null || (useSafeArea != null && useSafeArea.booleanValue())) {
+        if (backgroundColor != null || dragHandle || shape != null
+                || (useSafeArea != null && useSafeArea.booleanValue())) {
             b = new Funcs.Func1<BuildContext, Widget>() {
                 @Override
                 public Widget call(BuildContext c) {
@@ -95,6 +98,32 @@ public final class BottomSheets {
                         com.codename1.flutter.widgets.SafeArea sa = new com.codename1.flutter.widgets.SafeArea();
                         sa.child(w);
                         w = sa;
+                    }
+                    if (dragHandle) {
+                        // Material 3's drag handle: 32x4, onSurfaceVariant at 40%, 22 above
+                        // and below.
+                        ColorScheme cs = Theme.of(c).colorScheme();
+                        com.codename1.flutter.BoxDecoration bar = new com.codename1.flutter.BoxDecoration();
+                        bar.color(cs.onSurfaceVariant().withOpacity(0.4));
+                        bar.borderRadius(com.codename1.flutter.BorderRadius.circular(2));
+                        com.codename1.flutter.widgets.Container handle = new com.codename1.flutter.widgets.Container();
+                        handle.width(32);
+                        handle.height(4);
+                        handle.margin(com.codename1.flutter.EdgeInsets.symmetric(0.0, 22.0));
+                        handle.decoration(bar);
+                        com.codename1.flutter.widgets.Column col = new com.codename1.flutter.widgets.Column();
+                        col.mainAxisSize(com.codename1.flutter.MainAxisSize.min);
+                        col.children(dart.core.DartList.of(handle, w));
+                        w = col;
+                    }
+                    if (sheetShape != null) {
+                        Material m = new Material();
+                        m.shape(sheetShape);
+                        m.clipBehavior(Clip.antiAlias);
+                        m.color(backgroundColor != null ? backgroundColor
+                                : Theme.of(c).colorScheme().surfaceContainerLow());
+                        m.child(w);
+                        return m;
                     }
                     if (backgroundColor != null) {
                         com.codename1.flutter.widgets.ColoredBox box = new com.codename1.flutter.widgets.ColoredBox();

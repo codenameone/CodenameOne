@@ -35,6 +35,9 @@ abstract class CupertinoColors {
   external static CupertinoDynamicColor get inactiveGray;
   external static CupertinoDynamicColor get systemBlue;
   external static CupertinoDynamicColor get systemGrey;
+  external static CupertinoDynamicColor get systemGrey4;
+  external static CupertinoDynamicColor get systemGrey6;
+  external static CupertinoDynamicColor get link;
   external static CupertinoDynamicColor get activeBlue;
   external static CupertinoDynamicColor get activeGreen;
   external static CupertinoDynamicColor get destructiveRed;

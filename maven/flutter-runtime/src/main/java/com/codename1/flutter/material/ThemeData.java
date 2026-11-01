@@ -80,6 +80,15 @@ public class ThemeData {
     private SliderThemeData sliderTheme;
     private Object floatingActionButtonTheme;
     private Object elevatedButtonTheme;
+    private NavigationBarThemeData navigationBarTheme;
+    private Object bottomNavigationBarTheme;
+
+    public void navigationBarTheme(NavigationBarThemeData v) { this.navigationBarTheme = v; }
+    public NavigationBarThemeData navigationBarTheme() { return navigationBarTheme; }
+    public void bottomNavigationBarTheme(Object v) { this.bottomNavigationBarTheme = v; }
+    public Object bottomNavigationBarTheme() { return bottomNavigationBarTheme; }
+    /** ThemeData.elevatedButtonTheme / textButtonTheme / outlinedButtonTheme as given. */
+    public Object elevatedButtonTheme() { return elevatedButtonTheme; }
     private Object textButtonTheme;
     private Object outlinedButtonTheme;
     private Object pageTransitionsTheme;
@@ -328,6 +337,8 @@ public class ThemeData {
         c.navigationRailTheme = navigationRailTheme;
         c.snackBarTheme = snackBarTheme;
         c.inputDecorationTheme = inputDecorationTheme;
+        c.navigationBarTheme = navigationBarTheme;
+        c.bottomNavigationBarTheme = bottomNavigationBarTheme;
         c.radioTheme = radioTheme;
         c.switchTheme = switchTheme;
         c.tooltipTheme = tooltipTheme;

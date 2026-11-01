@@ -165,15 +165,28 @@ public class MediaQuery extends com.codename1.flutter.widgets.InheritedWidget {
      */
     public static Widget withClampedTextScaling(com.codename1.flutter.Key key, final Double minScaleFactor,
                                                 final Double maxScaleFactor, final Widget child) {
-        return new StatelessWidget() {
-            @Override
-            public Widget build(BuildContext context) {
-                MediaQueryData d = of(context);
-                double f = TextScaler.linear(d.textScaleFactor()).clamp(minScaleFactor, maxScaleFactor)
-                        .textScaleFactor();
-                return scope(d.copyWith(null, null, Double.valueOf(f), null, null), child);
-            }
-        };
+        return new ClampedTextScaling(minScaleFactor, maxScaleFactor, child);
+    }
+
+    /** The subtree {@link #withClampedTextScaling} returns. */
+    static final class ClampedTextScaling extends StatelessWidget {
+        private final Double minScaleFactor;
+        private final Double maxScaleFactor;
+        private final Widget child;
+
+        ClampedTextScaling(Double minScaleFactor, Double maxScaleFactor, Widget child) {
+            this.minScaleFactor = minScaleFactor;
+            this.maxScaleFactor = maxScaleFactor;
+            this.child = child;
+        }
+
+        @Override
+        public Widget build(BuildContext context) {
+            MediaQueryData d = of(context);
+            double f = TextScaler.linear(d.textScaleFactor()).clamp(minScaleFactor, maxScaleFactor)
+                    .textScaleFactor();
+            return scope(d.copyWith(null, null, Double.valueOf(f), null, null), child);
+        }
     }
 
     /** {@code MediaQuery.paddingOf}: the ambient safe-area padding. */
