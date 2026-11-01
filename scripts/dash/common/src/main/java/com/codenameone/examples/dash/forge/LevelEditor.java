@@ -96,7 +96,7 @@ public final class LevelEditor {
                 + "every stretch. At 0 m the whole level is hand built."));
         for (int s = 0; s < 3; s++) {
             final int star = s;
-            f.add(Fields.stepper("Star " + (s + 1), "levelStar" + s, l.stars[s], 0, 100000, 25, "points",
+            f.add(Fields.stepper("Star " + (s + 1), "levelStar" + s, l.stars[s], 0, 100000, 25, "pts",
                     v -> l.stars[star] = v));
         }
 

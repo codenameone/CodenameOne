@@ -47,7 +47,7 @@ public final class Fields {
         void set(boolean value);
     }
 
-    private static final float LABEL_MM = 20f;
+    private static final float LABEL_MM = 23f;
 
     private Fields() {
     }
@@ -99,7 +99,8 @@ public final class Fields {
     }
 
     private static String show(int v, int scale, String unit) {
-        return (scale == 10 ? v / 10 + "." + v % 10 : String.valueOf(v)) + unit;
+        String n = scale == 10 ? v / 10 + "." + v % 10 : String.valueOf(v);
+        return unit.length() == 0 ? n : n + " " + unit;
     }
 
     private static Container stepper(String label, String name, int value, final int min, final int max,
@@ -131,7 +132,10 @@ public final class Fields {
             shown.getParent().revalidate();
             sink.set(v[0]);
         });
-        return row(label, BoxLayout.encloseX(less, shown, more));
+        // The buttons sit at the two ends of the input column and the value
+        // between them, so every stepper on a form lines up with the next
+        // whatever its unit.
+        return row(label, BorderLayout.centerEastWest(shown, more, less));
     }
 
     public static Container choice(String label, String name, String[] options, int selected, final IntSink sink) {
@@ -140,11 +144,15 @@ public final class Fields {
         p.setStrings(options);
         p.setSelectedString(options[Math.max(0, Math.min(options.length - 1, selected))]);
         p.setName(name);
-        p.setUIID("ForgeField");
-        // A drop-down arrow at the end, so it reads as a choice, not as a
-        // field to type into.
-        p.setMaterialIcon(com.codename1.ui.FontImage.MATERIAL_ARROW_DROP_DOWN, 3.6f);
-        p.setTextPosition(com.codename1.ui.Component.LEFT);
+        p.setUIID("ForgeChoice");
+        // A drop-down arrow at the far end of the field, so it reads as a
+        // choice, not as a field to type into. The field is the picker's lead,
+        // so a tap on the arrow opens it too.
+        Label arrow = new Label("", "ForgeChoiceArrow");
+        arrow.setMaterialIcon(com.codename1.ui.FontImage.MATERIAL_ARROW_DROP_DOWN, 3.6f);
+        Container field = BorderLayout.center(p).add(BorderLayout.EAST, arrow);
+        field.setUIID("ForgeField");
+        field.setLeadComponent(p);
         p.addActionListener(e -> {
             String s = p.getSelectedString();
             for (int i = 0; i < options.length; i++) {
@@ -154,7 +162,7 @@ public final class Fields {
                 }
             }
         });
-        return row(label, p);
+        return row(label, field);
     }
 
     public static CheckBox check(String label, String name, boolean value, final BoolSink sink) {

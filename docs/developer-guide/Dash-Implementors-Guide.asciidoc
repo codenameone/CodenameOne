@@ -51,8 +51,11 @@ include::../demos/common/src/main/snippets/developer-guide/dash.sh[tag=dash-sh-t
 
 A new player is taken straight into *First Steps*, a short level in which a coach
 introduces one move at a time: jump the hurdle, slide under the barrier, change lanes
-around the hauler. Swipes, taps and the keyboard (arrows, WASD and space) all drive
-the same four inputs.
+around the hauler. On a touch screen four buttons sit under the thumbs -- left and
+right on one side, jump over slide on the other -- drawn by the framework's
+`TouchControls`; swipes and taps work anywhere else, and the settings can hide the
+buttons. On a desktop the keyboard (arrows, WASD and space) drives the same four
+inputs.
 
 image::img/dash-tutorial-coach.png["First Steps: the coach calls out the next move above the track",scaledwidth=30%]
 image::img/dash-tutorial-first-visit.png["The first visit: First Steps opens before anything else",scaledwidth=30%]

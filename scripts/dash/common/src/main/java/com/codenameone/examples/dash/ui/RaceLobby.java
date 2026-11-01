@@ -197,16 +197,21 @@ public final class RaceLobby implements GameLink.Listener, Voice.Listener {
                 mic.setMaterialIcon(v.isMuted() ? FontImage.MATERIAL_MIC_OFF : FontImage.MATERIAL_MIC);
             }
         });
-        Container bottom = new Container(new BorderLayout());
+        // The chat line and the buttons share the page's column, so their
+        // edges line up with the code card and the bubbles above them.
+        Container sayRow = new Container(new BorderLayout());
+        sayRow.setUIID("LobbySay");
+        sayRow.add(BorderLayout.CENTER, say);
+        sayRow.add(BorderLayout.EAST, mic);
+        Button leave = Ui.secondary("Leave", "cancel", e -> cancel());
+        // Both buttons in one row from the start: a grid built for one
+        // child grows a second row for the next, not a second column.
+        Container actions = host
+                ? Ui.row(leave, Ui.primary("Start", "goButton", e -> link.send("{\"type\":\""
+                        + GameProtocol.GO + "\",\"level\":" + Json.write(level) + "}")))
+                : Ui.row(leave);
+        Container bottom = Ui.centeredColumn(Ui.column(sayRow, actions));
         bottom.setSafeArea(true);
-        bottom.add(BorderLayout.CENTER, say);
-        bottom.add(BorderLayout.EAST, mic);
-        Container actions = Ui.row(Ui.secondary("Leave", "cancel", e -> cancel()));
-        if (host) {
-            actions.add(Ui.primary("Start the race", "goButton", e -> link.send("{\"type\":\"" + GameProtocol.GO
-                    + "\",\"level\":" + Json.write(level) + "}")));
-        }
-        bottom.add(BorderLayout.SOUTH, actions);
         form.add(BorderLayout.SOUTH, bottom);
         form.show();
         link = GameLink.open(this);
@@ -292,9 +297,14 @@ public final class RaceLobby implements GameLink.Listener, Voice.Listener {
             String u = i < players.length ? players[i] : "";
             boolean me = Session.user() != null && Session.user().username().equals(u);
             String state = me ? "" : contains(talking, u) ? (mutedPeers.contains(u) ? "  (muted)" : "  (voice)") : "";
-            Label l = new Label(names[i] + (i == 0 ? "  - host" : "") + state, "LeaderName");
+            Label l = new Label(names[i] + state, "LobbyMemberName");
             l.setMaterialIcon(FontImage.MATERIAL_DIRECTIONS_RUN);
-            members.add(l);
+            Container row = BorderLayout.center(l);
+            row.setUIID("LobbyMember");
+            if (i == 0) {
+                row.add(BorderLayout.EAST, new Label("HOST", "LobbyHostTag"));
+            }
+            members.add(row);
         }
         form.revalidateLater();
     }

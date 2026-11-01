@@ -23,12 +23,15 @@ import com.codename1.gaming.GameInput;
 import com.codename1.gaming.GameView;
 import com.codename1.gaming.Model;
 import com.codename1.gaming.ParticleEmitter;
+import com.codename1.gaming.TouchControls;
+import com.codename1.gaming.VirtualButton;
 import com.codename1.gpu.GraphicsDevice;
 import com.codename1.gpu.Material;
 import com.codename1.gpu.Mesh;
 import com.codename1.gpu.Primitives;
 import com.codename1.gpu.RenderState;
 import com.codename1.gpu.Texture;
+import com.codename1.io.Preferences;
 import com.codename1.ui.CN;
 import com.codename1.ui.Display;
 import com.codenameone.examples.dash.rules.CityRoute;
@@ -73,6 +76,12 @@ public class RunView extends GameView {
     private static final int SEGMENTS = 16;
     private static final float AHEAD = 90f;
     private static final float BEHIND = 12f;
+    /// How much of the track behind the runner the side camera sees. It
+    /// stands out to the right and looks across, so its frame reaches far
+    /// back along the track -- some sixty metres at the skyline on a wide
+    /// desktop window -- where the chase camera sees nothing behind at all.
+    /// Scenery recycled at BEHIND there vanished from the left of the frame.
+    private static final float SIDE_BEHIND = 75f;
     private static final float RUNNER_HEIGHT = 1.7f;
     private static final int SWIPE = 24;
     private static final int TOWERS = 2;
@@ -106,6 +115,8 @@ public class RunView extends GameView {
     /// city drops away below the track and this face fills the bottom of
     /// the frame, where a bare field of ground would otherwise be.
     private final Model[] decks = new Model[SEGMENTS];
+    /// The metres behind the runner kept in the scene this frame.
+    private float behind = BEHIND;
     private Model ground;
     /// How far the city sinks below the track when seen from the side.
     private static final float DROP = 9f;
@@ -189,6 +200,7 @@ public class RunView extends GameView {
         setClearColor(theme.skyHorizon);
         getLight().setDirection(-0.5f, -1f, -0.35f).setColor(theme.light).setAmbientColor(theme.ambient);
         getCamera().setPerspective(60f, 0.5f, 400f);
+        touchButtons();
         cube = Primitives.cube(d, 1f);
         quad = Primitives.quad(d, 1f);
         sphere = Primitives.sphere(d, 0.5f, 12, 18, false);
@@ -245,10 +257,10 @@ public class RunView extends GameView {
         Material tubeHalo = Glow.additive(glow.streak, (theme.rail & 0x00ffffff) | 0x90000000);
         Material tubeShine = Glow.additive(glow.streak, (theme.rail & 0x00ffffff) | 0x58000000);
         for (int s = 0; s < 2; s++) {
-            neon[s] = box(cube, tube, 0f, 0f, 0f, 0.07f, 0.07f, AHEAD + BEHIND);
-            neon[2 + s] = Glow.sprite(quad, tubeHalo, 0f, 0f, 0f, AHEAD + BEHIND, 0.7f);
+            neon[s] = box(cube, tube, 0f, 0f, 0f, 0.07f, 0.07f, AHEAD + SIDE_BEHIND);
+            neon[2 + s] = Glow.sprite(quad, tubeHalo, 0f, 0f, 0f, AHEAD + SIDE_BEHIND, 0.7f);
             neon[2 + s].setRotation(0f, 90f, 0f);
-            neon[4 + s] = Glow.sprite(quad, tubeShine, 0f, 0f, 0f, AHEAD + BEHIND, 1.5f);
+            neon[4 + s] = Glow.sprite(quad, tubeShine, 0f, 0f, 0f, AHEAD + SIDE_BEHIND, 1.5f);
             neon[4 + s].setRotation(-90f, 90f, 0f);
         }
         for (int i = 0; i < neon.length; i++) {
@@ -539,7 +551,6 @@ public class RunView extends GameView {
         }
         int lanes = Math.max(1, run.level().lanes);
         float half = lanes * LANE_W / 2f + 0.3f;
-        int first = (int) Math.floor((meZ - BEHIND) / SEGMENT);
         boolean side = run.track().viewAt(run.runner(driver.me()).z) == ViewMode.SIDE_2D
                 && run.track().blendAt(run.runner(driver.me()).z) > 500;
         GameCamera cam = getCamera();
@@ -548,6 +559,11 @@ public class RunView extends GameView {
         // strays more than a few metres off centre, so it sees none of it.
         float sink = Math.max(0f, Math.min(1f, (cam.getEyeX() - 6f) / 12f));
         float drop = DROP * sink;
+        // The recycled stretch slides back with the camera: 12 m behind the
+        // runner in the chase view, SIDE_BEHIND seen from the side. Its
+        // SEGMENTS * SEGMENT metres still reach well past the side frame.
+        behind = BEHIND + (SIDE_BEHIND - BEHIND) * sink;
+        int first = (int) Math.floor((meZ - behind) / SEGMENT);
         ground.setPosition(0f, -0.05f - drop, 0f);
         for (int i = 0; i < SEGMENTS; i++) {
             int seg = first + i;
@@ -595,7 +611,7 @@ public class RunView extends GameView {
                 farTowers[i * 2 + f].setPosition(fx, fh / 2f - drop, -(seg * SEGMENT + jitter(seg, 107 + f) * SEGMENT));
             }
         }
-        float mid = -meZ - (AHEAD - BEHIND) / 2f;
+        float mid = -meZ - (AHEAD - SIDE_BEHIND) / 2f;
         for (int s = 0; s < 2; s++) {
             float sx = s == 0 ? -1f : 1f;
             neon[s].setPosition(sx * (half + 0.12f), 0.27f, mid);
@@ -646,7 +662,7 @@ public class RunView extends GameView {
         Track track = run.track();
         while (firstEntry < track.size()) {
             Track.Entry e = track.get(firstEntry);
-            if ((e.z + e.depth) / (float) Track.UNIT < meZ - BEHIND) {
+            if ((e.z + e.depth) / (float) Track.UNIT < meZ - behind) {
                 Model[] gone = entries.remove(Integer.valueOf(firstEntry));
                 if (gone != null) {
                     remove(gone);
@@ -895,8 +911,9 @@ public class RunView extends GameView {
     }
 
     // tag::dash-controls[]
-    /// Swipes and keys become [Input] bits. A tap jumps; a swipe goes the way
-    /// it points. Arrow keys and WASD do the same, Space jumps.
+    /// Swipes, the on-screen buttons and keys become [Input] bits. A tap jumps;
+    /// a swipe goes the way it points. Arrow keys and WASD do the same, Space
+    /// jumps.
     private void input() {
         if (!driver.interactive()) {
             return;
@@ -904,7 +921,8 @@ public class RunView extends GameView {
         GameInput in = getInput();
         int bits = 0;
         if (in.wasPointerPressed()) {
-            pressX = in.getPointerX();
+            boolean button = onButton(in.getPointerX(), in.getPointerY());
+            pressX = button ? -1 : in.getPointerX();
             pressY = in.getPointerY();
         }
         if (in.wasPointerReleased() && pressX >= 0) {
@@ -930,6 +948,56 @@ public class RunView extends GameView {
         }
     }
     // end::dash-controls[]
+
+    /// The preference that hides the on-screen buttons.
+    public static final String BUTTONS_KEY = "dash.touchButtons";
+    private VirtualButton[] buttons = new VirtualButton[0];
+
+    /// On a touch screen the four moves are buttons too, drawn and tracked by
+    /// the framework's [TouchControls]: left and right under the left thumb,
+    /// jump (^) over slide (v) under the right. They press the same game keys the
+    /// arrow keys do, so [#input()] reads them with the keyboard, and swipes
+    /// keep working everywhere else on the screen. A desktop has a keyboard,
+    /// and a player who swipes can turn them off in the settings.
+    private void touchButtons() {
+        if (!driver.interactive() || !Display.getInstance().isTouchScreenDevice() || CN.isDesktop()
+                || !Preferences.get(BUTTONS_KEY, true)) {
+            return;
+        }
+        TouchControls c = getControls();
+        float r = CN.convertToPixels(6.5f);
+        float gap = CN.convertToPixels(3);
+        float step = r * 2 + CN.convertToPixels(2.5f);
+        buttons = new VirtualButton[] {
+            button(c, Display.GAME_LEFT, "<", TouchControls.LEFT, gap, gap + step * 0.5f),
+            button(c, Display.GAME_RIGHT, ">", TouchControls.LEFT, gap + step, gap + step * 0.5f),
+            button(c, Display.GAME_UP, "^", TouchControls.RIGHT, gap, gap + step),
+            button(c, Display.GAME_DOWN, "v", TouchControls.RIGHT, gap, gap)
+        };
+    }
+
+    private static VirtualButton button(TouchControls c, int action, String label, int h, float mx, float my) {
+        VirtualButton b = c.addButton(Display.getInstance().getKeyCode(action), CN.convertToPixels(6.5f),
+                h, TouchControls.BOTTOM, 0);
+        b.setAnchor(h, TouchControls.BOTTOM, mx, my);
+        b.setLabel(label);
+        b.setColor(0x662ee6ff);
+        return b;
+    }
+
+    /// Whether a touch at view-local `x`, `y` lands on one of the buttons, so
+    /// it is not read as a tap or a swipe as well.
+    private boolean onButton(int x, int y) {
+        for (int i = 0; i < buttons.length; i++) {
+            float dx = x - buttons[i].getCenterX();
+            float dy = y - buttons[i].getCenterY();
+            float r = buttons[i].getRadius() * 1.15f;
+            if (dx * dx + dy * dy <= r * r) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     private int edge(int key, boolean down, int bit) {
         boolean was = keyWas[key];

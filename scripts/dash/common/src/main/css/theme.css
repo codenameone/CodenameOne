@@ -523,7 +523,7 @@ SliderFull {
 
 /* Text sits on the panel or backdrop under it: the native theme gives a
    label an opaque ground, which a game screen must not have. */
-Label, SpanLabel, SpanLabelText, Logo, Tagline, SectionTitle, Trophies, Coins, Gems, PlayerName, RunClock, ChallengeUrl, Empty, Warning, ShopItemName, LeaderName, SettingLabel, LeaderRank, Owned, HistoryWin, HistoryLoss, HistoryDraw, MultiLine1, MultiLine2, MultiLine3, AdminDetail, GameTitle, Title, TextHint, ForgeLabel, ForgeHelp, ForgeHelpText, ForgeByline, ForgeValue, InviteCode, SpotlightText, SpotlightIcon, Container {
+Label, SpanLabel, SpanLabelText, Logo, Tagline, SectionTitle, Trophies, Coins, Gems, PlayerName, RunClock, ChallengeUrl, Empty, Warning, ShopItemName, LeaderName, SettingLabel, LeaderRank, Owned, HistoryWin, HistoryLoss, HistoryDraw, MultiLine1, MultiLine2, MultiLine3, AdminDetail, GameTitle, Title, TextHint, ForgeLabel, ForgeHelp, ForgeHelpText, ForgeByline, ForgeValue, ForgeChoiceArrow, LobbyMemberName, LobbyHostTag, LobbySay, InviteCode, SpotlightText, SpotlightIcon, Container {
     background-color: transparent;
 }
 
@@ -923,6 +923,22 @@ ForgeField {
     text-align: left;
     padding: 1.2mm;
     margin: 0.5mm 0;
+}
+
+ForgeChoice {
+    background-color: transparent;
+    color: var(--text);
+    font-size: 3mm;
+    text-align: left;
+    padding: 0;
+    margin: 0;
+}
+
+ForgeChoiceArrow {
+    background-color: transparent;
+    color: var(--text);
+    padding: 0 0 0 1mm;
+    margin: 0;
 }
 
 ForgeStep {
@@ -1416,6 +1432,34 @@ ChatFrom {
     font-size: 2.2mm;
     padding: 0;
     margin: 0;
+}
+
+LobbyMember {
+    background-color: rgba(255, 255, 255, 0.04);
+    border-radius: 2mm;
+    padding: 1mm 2mm;
+    margin: 0.6mm 2mm;
+}
+
+LobbyMemberName {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 3mm;
+    padding: 0;
+    margin: 0;
+}
+
+LobbyHostTag {
+    color: var(--volt);
+    font-family: "native:MainBold";
+    font-size: 2.2mm;
+    padding: 0.3mm 1mm;
+    margin: 0;
+}
+
+LobbySay {
+    padding: 0;
+    margin: 0.6mm 2mm;
 }
 
 ChatBubble {

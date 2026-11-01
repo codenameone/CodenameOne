@@ -28,6 +28,7 @@ import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codenameone.examples.dash.AppConfig;
 import com.codenameone.examples.dash.api.ProfileDto;
+import com.codenameone.examples.dash.run.RunView;
 import com.codenameone.examples.dash.run.Sfx;
 import com.codenameone.examples.dash.engage.Notifications;
 import com.codenameone.examples.dash.engage.Telemetry;
@@ -65,6 +66,8 @@ public final class SettingsForm {
                     Preferences.set(SOUND_KEY, on);
                     Sfx.setMuted(!on);
                 }),
+                toggle("On-screen buttons", "touchButtons", Preferences.get(RunView.BUTTONS_KEY, true),
+                        on -> Preferences.set(RunView.BUTTONS_KEY, on)),
                 toggle("Share anonymous usage", "analytics", Telemetry.allowed(), Telemetry::allow),
                 toggle("Notifications", "push", Notifications.enabled(), Notifications::setEnabled)));
         if (AppConfig.serverSwitchable()) {

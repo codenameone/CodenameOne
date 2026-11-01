@@ -31,6 +31,7 @@ import com.codename1.ui.Label;
 import com.codename1.ui.Tabs;
 import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -104,6 +105,8 @@ public final class AdminConsole {
     private final PipelinesTab pipelines = new PipelinesTab();
     private final PromoteTab promote = new PromoteTab();
     private Tabs tabs;
+    /// The desktop side bar's width.
+    private static final float SIDE_MM = 42f;
 
     private AdminConsole() {
     }
@@ -139,6 +142,12 @@ public final class AdminConsole {
         if (wide()) {
             tabs.setTabPlacement(Component.LEFT);
             tabs.setTabTextPosition(Component.RIGHT);
+            // Tabs lays a side bar out as a grid, which spreads nine tabs over
+            // the full height of a desktop window, and sizes it to its widest
+            // label. A side bar is a list from the top, wide enough to read.
+            Container side = tabs.getTabsContainer();
+            side.setLayout(BoxLayout.y());
+            side.setPreferredW(Math.max(side.getPreferredW(), CN.convertToPixels(SIDE_MM)));
         } else {
             // Nine tabs do not fit across a phone: they scroll sideways.
             tabs.getTabsContainer().setScrollableX(true);
