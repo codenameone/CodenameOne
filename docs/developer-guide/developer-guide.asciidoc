@@ -302,6 +302,8 @@ include::Working-With-Linux.asciidoc[]
 
 include::Embedded-Linux.asciidoc[]
 
+include::Realtime.asciidoc[]
+
 include::Desktop-Integration.asciidoc[]
 
 include::Desktop-Windows.asciidoc[]
@@ -335,6 +337,8 @@ include::Maven-Appendix-API.adoc[]
 include::Maven-Appendix-Control-Center.adoc[]
 
 include::Maven-Appendix-Rich-Properties.adoc[]
+
+include::Gaming-Consoles.asciidoc[]
 
 = Historical reference
 

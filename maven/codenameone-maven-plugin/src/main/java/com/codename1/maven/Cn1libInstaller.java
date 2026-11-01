@@ -423,6 +423,32 @@ public class Cn1libInstaller {
         }
         
         
+        // The server half of the library: compiled classes the application's
+        // backend wires as its own (see BackendLibraries). Marked here whatever
+        // wrote the archive, since a backend.zip is a backend library by
+        // definition.
+        File backendJar = new File(libOutputJars, "backend.zip");
+        if (backendJar.exists()) {
+            File marker = new File(libOutputJars, path("backend-marker", "META-INF", "codenameone",
+                    "backend-library"));
+            marker.getParentFile().mkdirs();
+            try {
+                FileUtils.writeStringToFile(marker, "", "UTF-8");
+            } catch (IOException ex) {
+                throw new MojoExecutionException("Failed to write " + marker, ex);
+            }
+            Zip addMarker = (Zip)antProject.createTask("zip");
+            addMarker.setDestFile(backendJar);
+            addMarker.setUpdate(true);
+            addMarker.setBasedir(new File(libOutputJars, "backend-marker"));
+            addMarker.execute();
+            try {
+                FileUtils.copyFile(backendJar, new File(cn1libJars, backendJar.getName()));
+            } catch (IOException ex) {
+                throw new MojoExecutionException("Failed to copy "+backendJar+" to "+cn1libJars, ex);
+            }
+        }
+
         File cssJar = new File(libOutputJars, "css.zip");
         if (cssJar.exists()) {
             // We can't pass the cssJar as is beause the css directory must
@@ -492,6 +518,7 @@ public class Cn1libInstaller {
                 + (iosJar.exists() ? profileXml("ios", groupId, artifactId, version): "")
                 + (jsJar.exists() ? profileXml("javascript", groupId, artifactId, version) : "")
                 + (winJar.exists() ? profileXml("win", groupId, artifactId, version) : "")
+                + (linuxJar.exists() ? profileXml("linux", groupId, artifactId, version) : "")
                 + "</profiles>\n" +
                 "<build>\n" +
                 "  <plugins>\n" +
@@ -538,6 +565,16 @@ public class Cn1libInstaller {
                         "<file>${basedir}/jars/"+winJar.getName()+"</file>\n" +
                         "<type>jar</type>\n" +
                         "<classifier>win</classifier>\n" +
+                        "</artifact>\n") : "") +
+                (linuxJar.exists() ? ("<artifact>\n" +
+                        "<file>${basedir}/jars/"+linuxJar.getName()+"</file>\n" +
+                        "<type>jar</type>\n" +
+                        "<classifier>linux</classifier>\n" +
+                        "</artifact>\n") : "") +
+                (backendJar.exists() ? ("<artifact>\n" +
+                        "<file>${basedir}/jars/"+backendJar.getName()+"</file>\n" +
+                        "<type>jar</type>\n" +
+                        "<classifier>backend</classifier>\n" +
                         "</artifact>\n") : "") +
                 (cssJar.exists() ? ("<artifact>\n" +
                         "<file>${basedir}/jars/css.zip</file>\n" +
@@ -612,6 +649,10 @@ public class Cn1libInstaller {
                     getLog().info("Successfully injected the dependency into "+projectPom+"\n"+dependencyString);
 
                 }
+            }
+
+            if (backendJar.exists()) {
+                injectBackendDependency(groupId, artifactId, version);
             }
 
             File parentPomFile = new File(cn1libsDirectory, "pom.xml");
@@ -690,6 +731,61 @@ public class Cn1libInstaller {
 
 
     
+    /// Adds the library's server half to the application's backend module, the
+    /// sibling `backend` directory of the common module, when there is one.
+    /// The server depends on the `backend` classifier alone: the library's pom
+    /// brings the client classes and the core with it, which a server has no
+    /// use for.
+    private void injectBackendDependency(String groupId, String artifactId, String version)
+            throws MojoExecutionException {
+        String dependency = "<dependency>\n" +
+                "  <groupId>"+groupId+"</groupId>\n" +
+                "  <artifactId>"+artifactId+"</artifactId>\n" +
+                "  <version>"+version+"</version>\n" +
+                "  <classifier>backend</classifier>\n" +
+                "</dependency>\n";
+        File backendPom = new File(getProjectBasedir().getParentFile(), path("backend", "pom.xml"));
+        if (!backendPom.isFile()) {
+            getLog().info("The cn1lib has a backend part. To use it from a server module, add:\n" + dependency);
+            return;
+        }
+        String contents;
+        try {
+            contents = FileUtils.readFileToString(backendPom, "UTF-8");
+        } catch (IOException ex) {
+            throw new MojoExecutionException("Failed to read " + backendPom, ex);
+        }
+        if (contents.contains("<artifactId>"+artifactId+"</artifactId>")) {
+            getLog().warn("The artifact "+artifactId+" is already referenced in "+backendPom
+                    +". Make sure it is this dependency:\n" + dependency);
+            return;
+        }
+        // The marker when the pom has one, else the end of the module's own
+        // <dependencies>: the first one after any <dependencyManagement>, and
+        // before <build>, whose plugins have dependencies of their own.
+        int at = contents.indexOf("<!-- INJECT DEPENDENCIES -->");
+        if (at < 0) {
+            int from = Math.max(0, contents.indexOf("</dependencyManagement>"));
+            at = contents.indexOf("</dependencies>", from);
+            int build = contents.indexOf("<build>");
+            if (build >= 0 && at > build) {
+                at = -1;
+            }
+        }
+        if (at < 0) {
+            getLog().warn("Could not find where to add the backend dependency in "+backendPom
+                    +". Add it by hand:\n" + dependency);
+            return;
+        }
+        contents = contents.substring(0, at) + dependency + contents.substring(at);
+        try {
+            FileUtils.writeStringToFile(backendPom, contents, "UTF-8");
+        } catch (IOException ex) {
+            throw new MojoExecutionException("Failed to update " + backendPom, ex);
+        }
+        getLog().info("Added the cn1lib's backend part to "+backendPom);
+    }
+
     private String profileXml(String platform, String groupId, String artifactId, String version) {
         return  "  <profile>\n"
                 + "    <id>"+platform+"</id>"

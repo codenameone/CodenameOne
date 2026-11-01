@@ -15,6 +15,10 @@ on:
       - 'vm/**'
       - 'Ports/WindowsPort/**'
       - 'maven/windows/**'
+      - 'scripts/gen-windows-uwp-stubs.py'
+      - 'maven/build-engine/src/main/java/com/codename1/builders/WindowsNativeBuilder.java'
+      - 'maven/build-engine/src/test/java/com/codename1/builders/WindowsNativeBuilderArchTest.java'
+      - 'maven/build-engine/src/test/resources/com/codename1/builders/xbox-smoke-AppxManifest.xml'
       - '!vm/**/README.md'
       - '!vm/**/readme.md'
       - '!vm/**/docs/**'
@@ -25,6 +29,10 @@ on:
       - 'vm/**'
       - 'Ports/WindowsPort/**'
       - 'maven/windows/**'
+      - 'scripts/gen-windows-uwp-stubs.py'
+      - 'maven/build-engine/src/main/java/com/codename1/builders/WindowsNativeBuilder.java'
+      - 'maven/build-engine/src/test/java/com/codename1/builders/WindowsNativeBuilderArchTest.java'
+      - 'maven/build-engine/src/test/resources/com/codename1/builders/xbox-smoke-AppxManifest.xml'
 
 concurrency:
   # Only the latest revision needs validation. PR numbers keep forks isolated;
@@ -155,13 +163,156 @@ jobs:
           test -f core/target/classes/com/codename1/ui/Form.class
           test -f windows/target/classes/com/codename1/impl/windows/WindowsImplementation.class
 
+      # A UWP (Xbox Developer Mode) build compiles the desktop-only natives
+      # out and links generated stubs in their place; a native added to one of
+      # those files without regenerating would fail only the UWP link below.
+      - name: UWP stubs are current
+        run: python3 scripts/gen-windows-uwp-stubs.py --check
+
+      # Builds the desktop exe and the UWP one (app partition, WindowsApp.lib
+      # only, /APPCONTAINER): the UWP link is the gate that every Win32 call the
+      # port makes in that build exists inside the app container.
       - name: Cross-compile the native Windows .exe (clang-cl + xwin)
         env:
           CN1_XWIN_SYSROOT: ${{ runner.temp }}/xwin-sdk
           CN1_CLANG_CL: clang-cl
           CN1_LLVM_RC: llvm-rc
+          CN1_UWP_EXE_OUT: ${{ github.workspace }}/uwp-smoke/app.exe
         run: |
           cd vm
           JAVA_HOME="$JDK_8_HOME" mvn -B -pl tests -am test \
             '-Dtest=CleanTargetIntegrationTest#crossCompilesWindowsExeWithXwin' \
             '-Dsurefire.failIfNoSpecifiedTests=false'
+          test -f "$CN1_UWP_EXE_OUT"
+
+      # The development certificate windows.xbox builds create, made by the
+      # builder's own openssl commands; the Windows job signs with it, so a
+      # certificate Windows refuses fails there.
+      - name: Create the Xbox development certificate (WindowsNativeBuilder)
+        env:
+          CN1_XBOX_DEVCERT_OUT: ${{ github.workspace }}/uwp-smoke/devcert
+          RETRY_ONLY_MATCHING: transient
+          RETRY_ATTEMPTS: '3'
+          RETRY_DELAY_SECONDS: '60'
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.codenameone
+          cp maven/UpdateCodenameOne.jar ~/.codenameone/
+          cd maven
+          JAVA_HOME="$JDK_8_HOME" bash ../scripts/ci/retry.sh mvn -B -pl build-engine -am install \
+            -DskipTests -Dmaven.javadoc.skip=true -Plocal-dev-javase
+          JAVA_HOME="$JDK_8_HOME" mvn -B -pl build-engine test -Plocal-dev-javase \
+            '-Dtest=WindowsNativeBuilderArchTest' -Dsurefire.failIfNoSpecifiedTests=false
+          test -s "$CN1_XBOX_DEVCERT_OUT/dev.pfx"
+          test -s "$CN1_XBOX_DEVCERT_OUT/dev.cer"
+
+      # The manifest is pinned to WindowsNativeBuilder.buildXboxAppxManifest by
+      # WindowsNativeBuilderArchTest, so the run below installs what windows.xbox
+      # builds ship.
+      - name: Upload the UWP smoke app
+        uses: actions/upload-artifact@v4
+        with:
+          name: uwp-smoke
+          path: |
+            uwp-smoke/app.exe
+            uwp-smoke/devcert/dev.pfx
+            uwp-smoke/devcert/dev.cer
+            maven/build-engine/src/test/resources/com/codename1/builders/xbox-smoke-AppxManifest.xml
+          if-no-files-found: error
+          retention-days: 3
+
+  # Phase 1's proof without a console: the cross-built UWP app is packed, signed,
+  # installed and launched as a real UWP activation (app container, CoreWindow,
+  # swap chain) on a Windows runner. The app writes a marker into its package
+  # LocalState once its first form has painted; no marker fails the job.
+  uwp-run:
+    name: install + launch the UWP package (Windows x64)
+    needs: cross-compile
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Download the UWP smoke app
+        uses: actions/download-artifact@v4
+        with:
+          name: uwp-smoke
+          path: uwp-smoke
+
+      - name: Pack, sign and install
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = Resolve-Path uwp-smoke
+          $layout = Join-Path $env:RUNNER_TEMP 'uwp-layout'
+          New-Item -ItemType Directory -Force (Join-Path $layout 'Assets') | Out-Null
+          Copy-Item (Join-Path $root 'uwp-smoke/app.exe') (Join-Path $layout 'app.exe')
+          $manifest = Get-ChildItem -Recurse $root -Filter 'xbox-smoke-AppxManifest.xml' | Select-Object -First 1
+          Copy-Item $manifest.FullName (Join-Path $layout 'AppxManifest.xml')
+          Add-Type -AssemblyName System.Drawing
+          foreach ($logo in 'StoreLogo','Square150x150Logo','Square44x44Logo','SplashScreen') {
+            $bmp = New-Object System.Drawing.Bitmap 150,150
+            $g = [System.Drawing.Graphics]::FromImage($bmp); $g.Clear([System.Drawing.Color]::SteelBlue); $g.Dispose()
+            $bmp.Save((Join-Path $layout "Assets/$logo.png"), [System.Drawing.Imaging.ImageFormat]::Png); $bmp.Dispose()
+          }
+          $kit = Get-ChildItem 'C:/Program Files (x86)/Windows Kits/10/bin/*/x64/makeappx.exe' |
+                 Sort-Object FullName -Descending | Select-Object -First 1
+          $bin = $kit.DirectoryName
+          $msix = Join-Path $env:RUNNER_TEMP 'UwpSmoke.msix'
+          & "$bin/makeappx.exe" pack /o /d $layout /p $msix
+          if ($LASTEXITCODE -ne 0) { throw "makeappx failed" }
+          # Signed with the certificate WindowsNativeBuilder created (subject
+          # CN=UwpSmoke, the manifest Publisher; empty PKCS#12 password).
+          $pfx = Join-Path $root 'uwp-smoke/devcert/dev.pfx'
+          $cer = Join-Path $root 'uwp-smoke/devcert/dev.cer'
+          & "$bin/signtool.exe" sign /fd SHA256 /f $pfx $msix
+          if ($LASTEXITCODE -ne 0) { throw "signtool rejected the builder's development certificate" }
+          Import-Certificate -FilePath $cer -CertStoreLocation 'Cert:/LocalMachine/TrustedPeople' | Out-Null
+          $unlock = 'HKLM:/SOFTWARE/Microsoft/Windows/CurrentVersion/AppModelUnlock'
+          New-Item -Force $unlock | Out-Null
+          Set-ItemProperty $unlock AllowAllTrustedApps 1 -Type DWord
+          Set-ItemProperty $unlock AllowDevelopmentWithoutDevLicense 1 -Type DWord
+          Add-AppxPackage -Path $msix
+          Get-AppxPackage com.codename1.uwpsmoke | Format-List Name,PackageFamilyName,InstallLocation,SignatureKind
+
+      - name: Launch and wait for the first frame
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $pkg = Get-AppxPackage com.codename1.uwpsmoke
+          $pfn = $pkg.PackageFamilyName
+          $state = Join-Path $env:LOCALAPPDATA "Packages/$pfn/LocalState"
+          Start-Process "shell:AppsFolder\$pfn!App"
+          $marker = $null
+          for ($i = 0; $i -lt 90 -and -not $marker; $i++) {
+            Start-Sleep -Seconds 1
+            if (Test-Path $state) {
+              $marker = Get-ChildItem -Recurse $state -Filter 'uwp-smoke.txt' -ErrorAction SilentlyContinue | Select-Object -First 1
+            }
+          }
+          Add-Type -AssemblyName System.Drawing, System.Windows.Forms
+          $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+          $g = [System.Drawing.Graphics]::FromImage($bmp); $g.CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size); $g.Dispose()
+          New-Item -ItemType Directory -Force uwp-run | Out-Null
+          $bmp.Save('uwp-run/desktop.png', [System.Drawing.Imaging.ImageFormat]::Png)
+          Get-Process app -ErrorAction SilentlyContinue | Format-Table Id,ProcessName,StartTime
+          if (-not $marker) {
+            Get-WinEvent -LogName 'Microsoft-Windows-AppModel-Runtime/Admin' -MaxEvents 20 -ErrorAction SilentlyContinue |
+              Format-List TimeCreated,Id,Message
+            Get-WinEvent -FilterHashtable @{LogName='Application'; Id=1000,1001} -MaxEvents 5 -ErrorAction SilentlyContinue |
+              Format-List TimeCreated,Message
+            if (Test-Path $state) { Get-ChildItem -Recurse $state | Format-Table FullName,Length }
+            throw "the UWP app wrote no marker in 90s: it did not reach its first frame"
+          }
+          $text = Get-Content $marker.FullName -Raw
+          Write-Host "marker: $text"
+          if ($text -notmatch '^CN1-UWP-STARTED [1-9][0-9]*x[1-9][0-9]*') { throw "unexpected marker: $text" }
+          Get-Process app -ErrorAction SilentlyContinue | Stop-Process -Force
+
+      - name: Upload the desktop capture
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uwp-run-capture
+          path: uwp-run/
+          if-no-files-found: ignore
+          retention-days: 7

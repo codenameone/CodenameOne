@@ -1205,6 +1205,20 @@ public final class LinuxNative {
     public static native int hwWatchdogKick(int handle);
     public static native void hwClose(int handle, boolean disarm);
 
+    // ---- com.codename1.realtime (cn1_linux_realtime.c). Each acts on the calling
+    // thread and returns a value >= 0 or -errno.
+    public static native int rtFeatures();
+    public static native int rtEnter(int priority, int cpu, boolean isolate);
+    public static native void rtLeave();
+    public static native void rtStartPeriod(long periodNanos);
+    public static native int rtWaitNextPeriod();
+    public static native void rtFreeze(int budget, Object error);
+    public static native void rtThaw();
+    public static native int rtStatistics(long[] out);
+    public static native String rtLastViolation();
+    public static native int rtLockMemory();
+    public static native void rtSetMemoryLimit(long bytes, Object error);
+
     // ---- multicast DNS (cn1_linux_mdns.c), the socket under LinuxMdns. Each
     // returns a value >= 0 or -errno.
     public static native int mdnsOpen();

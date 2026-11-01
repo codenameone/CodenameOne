@@ -86,6 +86,18 @@ final class BackendSupport {
     private BackendSupport() {
     }
 
+    /// A named class rather than a method reference, so the configuration
+    /// cache can serialize the filtered input it belongs to.
+    private static final class IsBackendLibrary implements org.gradle.api.specs.Spec<File>,
+            java.io.Serializable {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public boolean isSatisfiedBy(File element) {
+            return com.codename1.maven.BackendLibraries.isLibrary(element);
+        }
+    }
+
     static void apply(final Project project, final ProjectLayout layout, final CodenameOneExtension ext,
                       final Provider<Map<String, String>> userProperties) {
         AppSupport.addFramework(project, "implementation", ext.getVersion(), "codenameone-backend");
@@ -99,10 +111,19 @@ final class BackendSupport {
         project.getTasks().named(main.getCompileJavaTaskName(), JavaCompile.class, compile -> {
             AppSupport.processingInputs(compile, layout, userProperties);
             backendSettingsInputs(project, compile, layout);
+            // The backend libraries' whole content, not their ABI: compile
+            // avoidance leaves compileJava up to date when a library changes only
+            // a method body, a migration or a resource, and the merge below would
+            // keep serving the old ones until a clean build. Maven's
+            // process-annotations runs every build and never meets this.
+            compile.getInputs().files(compile.getClasspath().filter(new IsBackendLibrary()))
+                    .withPropertyName("cn1BackendLibraries")
+                    .withPathSensitivity(org.gradle.api.tasks.PathSensitivity.NONE);
             compile.doLast("processCn1Annotations", new ProcessAnnotationsAction(
                     compile.getDestinationDirectory().getAsFile(), AppSupport.stubsDir(layout), layout.projectDir(),
                     layout.settingsFile(), project.provider(() -> AppSupport.sourceRoots(main, layout)),
                     "UTF-8", userProperties, compile.getClasspath())
+                    .withBackendLibraries()
                     .withSourceEncoding(AppSupport.javaEncoding(project, main))
                     .withCompilerJdk(compile.getJavaCompiler().map(c -> c.getMetadata().getInstallationPath().getAsFile())));
             compile.doLast("cn1SplitOutputCheck", new com.codename1.gradle.tasks.SplitOutputCheck(

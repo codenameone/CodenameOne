@@ -1389,7 +1389,13 @@ public class GeneratorModelMatrixTest extends AbstractTest {
             assertContains(sh, "CMD=\"jar\"", label + "build.sh keeps the local default");
             assertTrue(sh.startsWith("#!/bin/bash\n"), label + "build.sh keeps its shebang");
 
-            String bat = getText(entries, "build.bat");
+            String rawBat = getText(entries, "build.bat");
+            // Shipped as CRLF: with LF endings cmd.exe can miss a goto label that
+            // straddles one of its 512-byte reads. Checked once, then folded so the
+            // layout assertions below read lines.
+            assertTrue(rawBat.indexOf("\r\n") > 0 && StringUtil.replaceAll(rawBat, "\r\n", "").indexOf('\n') < 0,
+                    label + "build.bat must use CRLF line endings throughout");
+            String bat = StringUtil.replaceAll(rawBat, "\r\n", "\n");
             assertContains(bat, "set \"CN1_PROJECT_ID=" + id + "\"", label + "build.bat should carry the hashed package");
             assertContains(bat, "set \"CN1_MIN_JAVA=" + min + "\"", label + "build.bat should know the Java level");
             assertContains(bat, GeneratorModel.LAUNCHER_EVENTS_URL, label + "build.bat should report to the events URL");

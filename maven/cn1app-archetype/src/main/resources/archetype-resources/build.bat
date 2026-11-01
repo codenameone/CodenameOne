@@ -35,6 +35,26 @@ goto :finish
 call "%MVNW%" package -DskipTests -Dcodename1.platform^=linux -Dcodename1.buildTarget^=linux-device -U -e
 
 goto :finish
+:linux_local
+set "BOARD_ARG="
+if not "%CN1_BOARD%"=="" set BOARD_ARG="-Dcn1.board=%CN1_BOARD%"
+call "%MVNW%" cn1:buildLinuxLocal %BOARD_ARG% -U -e
+
+goto :finish
+:device
+set "BOARD_ARG="
+set "HOST_ARG="
+if not "%CN1_BOARD%"=="" set BOARD_ARG="-Dcn1.board=%CN1_BOARD%"
+if not "%CN1_DEVICE_HOST%"=="" set HOST_ARG="-Dcn1.device.host=%CN1_DEVICE_HOST%"
+call "%MVNW%" cn1:runOnDevice %BOARD_ARG% %HOST_ARG% -U -e
+
+goto :finish
+:device_logs
+set "HOST_ARG="
+if not "%CN1_DEVICE_HOST%"=="" set HOST_ARG="-Dcn1.device.host=%CN1_DEVICE_HOST%"
+call "%MVNW%" cn1:device-logs %HOST_ARG% -e
+
+goto :finish
 :javascript
 call "%MVNW%" package -DskipTests -Dcodename1.platform^=javascript -Dcodename1.buildTarget^=local-javascript -U -e
 
@@ -110,6 +130,12 @@ echo   windows_device
 echo     Builds a native Windows app ^(no JVM^).
 echo   linux_device
 echo     Builds a native Linux app ^(ELF^, no JVM^).
+echo   linux_local
+echo     Builds a native Linux app locally. CN1_BOARD=rpi5 cross builds for an embedded board.
+echo   device
+echo     Builds locally, deploys to CN1_DEVICE_HOST over SSH and follows the log.
+echo   device_logs
+echo     Follows the app's log on CN1_DEVICE_HOST.
 echo   javascript_cloud
 echo     Builds the web app using the build server.
 

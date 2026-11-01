@@ -198,6 +198,15 @@
 // this off and pay no overhead.
 //#define CN1_ON_DEVICE_DEBUG
 
+// Real-time threads (com.codename1.realtime). The translator switches this on when
+// the application's RealtimeThread survives the cull, so an application that never
+// starts one compiles exactly as before. It changes two things: the VM's own mutexes
+// and every Java monitor are created with priority inheritance on Linux, so a
+// real-time thread blocked on a lock a normal thread holds lends that thread its
+// priority instead of waiting behind whatever preempted it; and the cn1Rt* entry
+// points below get their real bodies. See cn1_realtime_impl.h.
+//#define CN1_REALTIME
+
 #ifdef DEBUG_GC_ALLOCATIONS
 #define DEBUG_GC_VARIABLES int line; int className;
 #define DEBUG_GC_INIT 0, 0,
@@ -2169,6 +2178,32 @@ struct ThreadLocalData {
     struct ThreadLocalData* gcDeadNext;
     JAVA_BOOLEAN gcQueuedForDrain;
     JAVA_BOOLEAN gcReleaseRequested;
+
+    // REAL-TIME STATE (com.codename1.realtime), zero for every other thread; the
+    // struct is calloc'd. realtimeThread is raised by cn1RtEnter on the thread itself
+    // and changes how the collector treats it: never part of a stop-the-world cycle,
+    // never force-stopped by signal, released as soon as its own stack is scanned.
+    // rtAllocTrap is raised while a steady-state cycle runs; rtSavedBibopCur holds the
+    // thread's real page array while CN1_BIBOP_CUR points at cn1RtNoPages, which is
+    // what sends every allocation off the inline fast path to the trap. See
+    // cn1RtFreeze in cn1_globals.m.
+    JAVA_BOOLEAN realtimeThread;
+    JAVA_BOOLEAN rtAllocTrap;
+    JAVA_BOOLEAN rtFrozen;          // in the steady state (cn1RtFreeze), trap lifted or not
+    JAVA_INT rtPriority;            // SCHED_FIFO priority rtEnter applied, 0 when none
+    JAVA_INT rtAllocBudget;
+    JAVA_INT rtAllocBudgetLeft;
+    JAVA_LONG rtAllocViolations;
+    struct CN1BibopPage** rtSavedBibopCur;
+    // The RealtimeAllocationError a trapped cycle throws, made by the thread before it
+    // froze and kept reachable by its RealtimeThread.
+    JAVA_OBJECT rtAllocError;
+    // The collection after which this thread was last refused for the memory limit
+    // (cn1RtRefuseOverLimit), plus one so that zero means never. A thread is refused at
+    // most once per collection: the throw itself allocates its stack trace, and the
+    // next refusal waits for a collection that might have brought the process back
+    // under the limit.
+    JAVA_INT rtOomEpoch;
     // THREAD IDENTITY, AND DELIBERATELY OUTSIDE THE CONSERVATIVE-ROOTS GUARD BELOW.
     // These two say "this TLD belongs to a real registered thread", which is a question
     // every configuration asks: CN1_RESUME_THREAD reads gcPthreadValid unconditionally
@@ -3943,6 +3978,23 @@ static inline JAVA_OBJECT cn1FusedInstallPrimArray(JAVA_OBJECT owner, int off, s
 }
 // Register an object referenced only from C globals as a permanent GC root.
 extern void cn1AddImmortalRoot(JAVA_OBJECT o);
+// Real-time threads (com.codename1.realtime); defined at the end of cn1_globals.m, which
+// says what each does. Declared for every build: the collector and the allocator read
+// the state they keep whether or not the application starts a real-time thread.
+extern volatile int cn1RtThreadCount;
+extern volatile int cn1RtOverMemoryLimit;
+extern void cn1RtEnter(CODENAME_ONE_THREAD_STATE);
+extern void cn1RtLeave(CODENAME_ONE_THREAD_STATE);
+extern void cn1RtFreeze(CODENAME_ONE_THREAD_STATE, JAVA_INT budget);
+extern void cn1RtThaw(CODENAME_ONE_THREAD_STATE);
+extern void cn1RtNewPeriod(CODENAME_ONE_THREAD_STATE);
+extern const char* cn1RtLastViolationClass(void);
+extern JAVA_OBJECT cn1RtTrappedAlloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent);
+extern void cn1RtSetMemoryLimit(JAVA_LONG bytes, JAVA_OBJECT error);
+extern int cn1RtMemoryLimitSet(void);
+extern void cn1RtAfterCycle(JAVA_LONG residentBytes);
+extern void cn1RtRefuseOverLimit(CODENAME_ONE_THREAD_STATE);
+extern JAVA_LONG cn1RtThreadAllocViolations(CODENAME_ONE_THREAD_STATE);
 // Flag a BiBOP object's page as holding a native peer (cached NSString etc.):
 // its dead slots then always reach cn1BibopReclaimSlot, which releases the
 // peer -- instead of the O(1) all-dead page reclaim, which would leak it.
@@ -4881,6 +4933,21 @@ extern __thread struct ThreadLocalData* cn1TlsSelf;
 #else
 #define CN1_GC_PARK_CAPTURE(ts) do {} while(0)
 #endif
+
+// A real-time thread parked around its period's sleep (cn1_realtime_impl.h). Macros, like
+// CN1_YIELD_THREAD, so the park capture is taken in the frame that stays live through
+// the wait. The resume differs from CN1_RESUME_THREAD's: that one polls the collector's
+// release in 1ms sleeps, which would be the whole period of a 1kHz loop, where this
+// spins briefly and then waits on the collector's wake condition (CN1_GC_RESUME_ACTIVE).
+// A release comes microseconds after the scan of the thread's own shallow stack.
+#define CN1_RT_PARK(ts) do { \
+        CN1_GC_PARK_CAPTURE(ts); \
+        __atomic_store_n(&(ts)->threadActive, JAVA_FALSE, __ATOMIC_RELEASE); \
+    } while(0)
+#define CN1_RT_UNPARK(ts) do { \
+        CN1_GC_RESUME_ACTIVE(ts); \
+        CN1_GC_PARK_RELEASE(ts); \
+    } while(0)
 
 // Bracket one mutator park so its duration is charged to a cause. Both halves compile to
 // nothing without -DCN1_GC_CONFORM -- including the timestamp variable, which is why the
