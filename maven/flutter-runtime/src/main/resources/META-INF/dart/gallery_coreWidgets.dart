@@ -209,6 +209,12 @@ class SelectableText extends Widget {
 @JavaName('com.codename1.flutter.SelectionChangedCause')
 enum SelectionChangedCause { tap, doubleTap, longPress, forcePress, keyboard, toolbar, drag, scribble }
 
+// Signature of Image.errorBuilder; a variable of this type may be invoked.
+typedef ImageErrorWidgetBuilder = Widget Function(BuildContext context, Object error, StackTrace? stackTrace);
+
+// Builder that receives a value and an optional pre-built child.
+typedef ValueWidgetBuilder<T> = Widget Function(BuildContext context, T value, Widget? child);
+
 typedef SelectionChangedCallback = void Function(TextSelection selection, SelectionChangedCause? cause);
 
 // --- popup menus ------------------------------------------------------

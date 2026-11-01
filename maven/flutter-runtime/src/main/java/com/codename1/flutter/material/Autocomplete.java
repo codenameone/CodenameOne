@@ -241,7 +241,15 @@ public class Autocomplete<T> extends com.codename1.flutter.widgets.RawAutocomple
         private Widget optionsContent(BuildContext ctx) {
             final com.codename1.flutter.widgets.RawAutocomplete<T> w = widget();
             if (w.getOptionsViewBuilder() != null) {
-                return w.getOptionsViewBuilder().call(ctx, this::select, options);
+                // As RawAutocomplete does: the custom view sits under an
+                // AutocompleteHighlightedOption, so it can find the highlight the keys move.
+                com.codename1.flutter.widgets.AutocompleteHighlightedOption h =
+                        new com.codename1.flutter.widgets.AutocompleteHighlightedOption();
+                h.highlightIndex(highlighted);
+                com.codename1.flutter.widgets.Builder b = new com.codename1.flutter.widgets.Builder();
+                b.builder(inner -> w.getOptionsViewBuilder().call(inner, this::select, options));
+                h.child(b);
+                return h;
             }
             return defaultOptions();
         }

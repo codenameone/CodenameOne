@@ -37,6 +37,10 @@ public class TableRow {
     public void children(DartList<Widget> v) { this.children = v == null ? DartList.<Widget>of() : v; }
     public void decoration(Object v) { this.decoration = v; }
     public void key(Object v) { }
+    /** Dart getter {@code children}: the live list, so appends after construction show up in the table. */
+    public DartList<Widget> children() { return children; }
+    /** Dart getter {@code decoration}. */
+    public Object decoration() { return decoration; }
     public DartList<Widget> getChildren() { return children; }
     public Object getDecoration() { return decoration; }
 }

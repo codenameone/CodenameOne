@@ -71,6 +71,12 @@ class RawAutocomplete<T extends Object> extends Widget {
   external static String defaultStringForOption(Object option);
 }
 
+@JavaName('com.codename1.flutter.widgets.AutocompleteHighlightedOption')
+class AutocompleteHighlightedOption extends Widget {
+  external AutocompleteHighlightedOption({Key? key, int? highlightIndex, required Widget child});
+  external static int of(BuildContext context);
+}
+
 @JavaName('com.codename1.flutter.material.Autocomplete')
 class Autocomplete<T extends Object> extends Widget {
   external Autocomplete({Key? key, required Iterable<T> Function(TextEditingValue) optionsBuilder, void Function(T)? onSelected, String Function(T)? displayStringForOption, double? optionsMaxHeight, Widget Function(BuildContext context, TextEditingController textEditingController, FocusNode focusNode, void Function() onFieldSubmitted)? fieldViewBuilder, Widget Function(BuildContext context, void Function(T) onSelected, Iterable<T> options)? optionsViewBuilder});

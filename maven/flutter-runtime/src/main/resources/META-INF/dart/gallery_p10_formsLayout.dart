@@ -192,6 +192,10 @@ class FixedColumnWidth extends TableColumnWidth {
 @JavaName('com.codename1.flutter.widgets.TableRow')
 class TableRow {
   external TableRow({Object? key, Object? decoration, List<Widget>? children});
+  // Live, growable list: builders that assemble a table cell by cell
+  // (markdown renderers among them) append to it after construction.
+  external List<Widget> get children;
+  external Object? get decoration;
 }
 
 enum TableCellVerticalAlignment { top, middle, bottom, baseline, fill, intrinsicHeight }

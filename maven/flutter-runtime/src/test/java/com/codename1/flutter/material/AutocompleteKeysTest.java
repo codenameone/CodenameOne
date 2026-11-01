@@ -157,4 +157,39 @@ class AutocompleteKeysTest {
         assertEquals(List.of("avocado", "banana"), picked);
         assertEquals("banana", field[0].text());
     }
+
+    @Test
+    void customOptionsViewFindsTheHighlightThroughAutocompleteHighlightedOption() {
+        final List<Integer> seen = new ArrayList<Integer>();
+        Autocomplete<String> a = autocomplete(new ArrayList<String>());
+        a.optionsViewBuilder((ctx, select, options) -> {
+            seen.add(com.codename1.flutter.widgets.AutocompleteHighlightedOption.of(ctx));
+            return new SizedBox();
+        });
+        BuildOwner owner = new BuildOwner();
+        Autocomplete.AutocompleteState<String> s = mount(a, owner);
+        s.textController().text("a");
+        owner.flushSync();
+        assertEquals(Integer.valueOf(0), seen.get(seen.size() - 1));
+        assertTrue(s.handleKey(Display.GAME_DOWN));
+        owner.flushSync();
+        assertEquals(Integer.valueOf(1), seen.get(seen.size() - 1), "the view follows the arrow key");
+        assertTrue(s.handleKey(Display.GAME_DOWN));
+        assertTrue(s.handleKey(Display.GAME_DOWN));
+        owner.flushSync();
+        assertEquals(Integer.valueOf(0), seen.get(seen.size() - 1), "and the wrap past the last option");
+        assertEquals(0, com.codename1.flutter.widgets.AutocompleteHighlightedOption.of(null),
+                "no autocomplete above answers 0, as in Flutter");
+    }
+
+    @Test
+    void tableRowChildrenIsTheLiveListCellsAreAppendedTo() {
+        com.codename1.flutter.widgets.TableRow row = new com.codename1.flutter.widgets.TableRow();
+        DartList<Widget> cells = DartList.of();
+        row.children(cells);
+        row.children().add(new SizedBox());
+        row.children().add(new SizedBox());
+        assertSame(cells, row.children());
+        assertEquals(2, row.getChildren().size());
+    }
 }
