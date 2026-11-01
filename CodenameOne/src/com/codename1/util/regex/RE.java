@@ -251,6 +251,7 @@ import java.util.ArrayList;
 /// #### See also
 ///
 /// - RECompiler
+@com.codename1.impl.SharedWithBackend
 public class RE {
 
     /// Specifies normal, case-sensitive matching behaviour.
