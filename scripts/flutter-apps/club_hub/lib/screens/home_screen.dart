@@ -6,6 +6,7 @@ import 'forms_lab_screen.dart';
 import 'packages_lab_screen.dart';
 import 'style_lab_screen.dart';
 import 'surface_lab_screen.dart';
+import 'layout_lab_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -15,6 +16,11 @@ class HomeScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Club Hub')),
       persistentFooterButtons: [
+        TextButton(
+          onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const LayoutLabScreen())),
+          child: const Text('Layout'),
+        ),
         TextButton(
           onPressed: () => Navigator.of(context).push(
               MaterialPageRoute<void>(builder: (_) => const SurfaceLabScreen())),

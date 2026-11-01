@@ -312,4 +312,15 @@ public class TextStyle {
         if (decoration instanceof TextDecoration) t.decoration = (TextDecoration) decoration;
         return t;
     }
+
+    private Object fontFeatures;
+
+    /// TextStyle.fontFeatures, recorded; OpenType features are not applied.
+    public void fontFeatures(Object v) {
+        this.fontFeatures = v;
+    }
+
+    public Object fontFeatures() {
+        return fontFeatures;
+    }
 }

@@ -216,7 +216,7 @@ abstract class FontWeight {
 class TextStyle {
   external TextStyle({double? fontSize, FontWeight? fontWeight, Color? color, String? fontFamily, double? letterSpacing, double? height,
       TextDecoration? decoration, Color? decorationColor, TextDecorationStyle? decorationStyle, double? decorationThickness,
-      List<Shadow>? shadows, Color? backgroundColor, List<FontVariation>? fontVariations,
+      List<Shadow>? shadows, Color? backgroundColor, List<FontVariation>? fontVariations, List<Object>? fontFeatures,
       List<String>? fontFamilyFallback, TextLeadingDistribution? leadingDistribution});
   external List<FontVariation>? get fontVariations;
   external List<String>? get fontFamilyFallback;
@@ -247,6 +247,7 @@ class IconData {
   external String? get fontFamily;
   external String? get fontPackage;
   external bool get matchTextDirection;
+  external List<String>? get fontFamilyFallback;
 }
 
 @JavaName('com.codename1.flutter.Icons')
@@ -2434,9 +2435,10 @@ abstract class Icons {
 
 @JavaName('com.codename1.flutter.widgets.Text')
 class Text extends Widget {
-  external Text(String data, {Key? key, TextStyle? style, TextAlign? textAlign});
+  external Text(String data, {Key? key, TextStyle? style, TextAlign? textAlign, TextScaler? textScaler});
   external static Text rich(InlineSpan textSpan, {Key? key, TextStyle? style, TextAlign? textAlign});
   external InlineSpan? get textSpan;
+  external String? get data;
 }
 
 @JavaName('com.codename1.flutter.widgets.Icon')
@@ -2677,15 +2679,15 @@ abstract class Alignment {
 
 @JavaName('com.codename1.flutter.widgets.ListView')
 class ListView extends Widget {
-  external ListView({Key? key, List<Widget> children, EdgeInsets? padding, bool? shrinkWrap});
+  external ListView({Key? key, List<Widget> children, EdgeInsets? padding, bool? shrinkWrap, Axis? scrollDirection});
   external static ListView builder({Key? key, int? itemCount, IndexedWidgetBuilder itemBuilder, EdgeInsets? padding, bool? shrinkWrap, Object? physics, Object? scrollDirection, Object? controller, String? restorationId, bool? primary, double? itemExtent, bool? reverse});
-  external static ListView separated({Key? key, bool? primary, int? itemCount, IndexedWidgetBuilder itemBuilder, IndexedWidgetBuilder separatorBuilder, EdgeInsets? padding, bool? shrinkWrap});
+  external static ListView separated({Key? key, bool? primary, int? itemCount, IndexedWidgetBuilder itemBuilder, IndexedWidgetBuilder separatorBuilder, EdgeInsets? padding, bool? shrinkWrap, Axis? scrollDirection});
 }
 
 @JavaName('com.codename1.flutter.widgets.GridView')
 class GridView extends Widget {
-  external static GridView count({Key? key, String? restorationId, Object? physics, bool? primary, int crossAxisCount, double? childAspectRatio, double? mainAxisSpacing, double? crossAxisSpacing, EdgeInsets? padding, List<Widget> children});
-  external static GridView builder({Key? key, int? itemCount, IndexedWidgetBuilder itemBuilder, Object? gridDelegate, EdgeInsets? padding, bool? shrinkWrap, Object? physics});
+  external static GridView count({Key? key, String? restorationId, Object? physics, bool? primary, int crossAxisCount, double? childAspectRatio, double? mainAxisSpacing, double? crossAxisSpacing, EdgeInsets? padding, List<Widget> children, Object? scrollDirection});
+  external static GridView builder({Key? key, int? itemCount, IndexedWidgetBuilder itemBuilder, Object? gridDelegate, EdgeInsets? padding, bool? shrinkWrap, Object? physics, Object? scrollDirection});
 }
 
 @JavaName('com.codename1.flutter.widgets.SingleChildScrollView')
@@ -3033,7 +3035,8 @@ class Size {
 
 @JavaName('com.codename1.flutter.widgets.RichText')
 class RichText extends Widget {
-  external RichText({Key? key, TextSpan text, TextAlign? textAlign});
+  external RichText({Key? key, TextSpan text, TextAlign? textAlign, TextScaler? textScaler});
+  external InlineSpan get text;
 }
 
 // The base of the styled-text tree — Flutter's `InlineSpan` (TextSpan's supertype).
@@ -3043,6 +3046,7 @@ class InlineSpan {
   external TextStyle? get style;
   external String? get semanticsLabel;
   external Object? get recognizer;
+  external List<InlineSpan>? get children;
 }
 
 @JavaName('com.codename1.flutter.widgets.TextSpan')

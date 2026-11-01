@@ -87,4 +87,9 @@ public class Tab extends StatelessWidget {
         }
         return new SizedBox();
     }
+
+    /// True when the tab shows an icon and a label, which makes a TabBar taller.
+    boolean hasIconAndText() {
+        return icon != null && (text != null || child != null);
+    }
 }

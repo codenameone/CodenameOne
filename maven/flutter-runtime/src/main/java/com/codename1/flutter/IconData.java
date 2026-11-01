@@ -88,4 +88,9 @@ public final class IconData {
     public int hashCode() {
         return codePoint;
     }
+
+    /// IconData.fontFamilyFallback: none; the icon font is always bundled.
+    public dart.core.DartList<String> fontFamilyFallback() {
+        return null;
+    }
 }

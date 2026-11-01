@@ -275,4 +275,19 @@ public class TabBar extends StatelessWidget {
         col.children(kids);
         return col;
     }
+
+    /// Flutter's {@code TabBar.preferredSize}: as wide as it is given, 46 high,
+    /// or 72 when a tab shows both an icon and text.
+    public com.codename1.flutter.rendering.Size preferredSize() {
+        double h = 46.0;
+        if (tabs != null) {
+            for (int i = 0; i < tabs.size(); i++) {
+                Widget t = tabs.get(i);
+                if (t instanceof Tab && ((Tab) t).hasIconAndText()) {
+                    h = 72.0;
+                }
+            }
+        }
+        return new com.codename1.flutter.rendering.Size(Double.POSITIVE_INFINITY, h);
+    }
 }

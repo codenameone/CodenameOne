@@ -108,6 +108,7 @@ public class SliderThemeData {
     public Color activeTickMarkColor() { return activeTickMarkColor; }
     public Color inactiveTickMarkColor() { return inactiveTickMarkColor; }
     public Color thumbColor() { return thumbColor; }
+    public Object thumbShape() { return thumbShape; }
     public Color disabledThumbColor() { return disabledThumbColor; }
     public Color overlayColor() { return overlayColor; }
     public Color valueIndicatorColor() { return valueIndicatorColor; }

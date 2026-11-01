@@ -89,6 +89,8 @@ public class ThemeData {
     public Object bottomNavigationBarTheme() { return bottomNavigationBarTheme; }
     /** ThemeData.elevatedButtonTheme / textButtonTheme / outlinedButtonTheme as given. */
     public Object elevatedButtonTheme() { return elevatedButtonTheme; }
+    public Object textButtonTheme() { return textButtonTheme; }
+    public Object outlinedButtonTheme() { return outlinedButtonTheme; }
     private Object textButtonTheme;
     private Object outlinedButtonTheme;
     private Object pageTransitionsTheme;

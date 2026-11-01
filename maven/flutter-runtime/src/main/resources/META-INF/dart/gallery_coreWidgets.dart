@@ -57,6 +57,7 @@ abstract class Decoration {}
 @JavaName('com.codename1.flutter.BoxDecoration')
 class BoxDecoration extends Decoration {
   external BoxDecoration({Color? color, Object? image, Object? border, Object? borderRadius, Object? boxShadow, Object? gradient, Object? backgroundBlendMode, BoxShape? shape});
+  external Object? get borderRadius;
 }
 
 @JavaName('com.codename1.flutter.ImageProvider')
@@ -199,7 +200,7 @@ class Tooltip extends Widget {
 
 @JavaName('com.codename1.flutter.widgets.SelectableText')
 class SelectableText extends Widget {
-  external SelectableText(String data, {Key? key, TextStyle? style, TextAlign? textAlign, int? maxLines, double? textScaleFactor, bool? showCursor, Object? cursorColor, Object? onTap, Object? focusNode, Object? scrollPhysics});
+  external SelectableText(String data, {Key? key, TextStyle? style, TextAlign? textAlign, int? maxLines, double? textScaleFactor, bool? showCursor, Object? cursorColor, Object? onTap, Object? focusNode, Object? scrollPhysics, Object? onSelectionChanged, TextScaler? textScaler});
   external TextSpan? get textSpan;
   external static SelectableText rich(TextSpan textSpan, {Key? key, TextStyle? style, TextAlign? textAlign, int? maxLines, TextDirection? textDirection});
 }

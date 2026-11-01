@@ -132,4 +132,20 @@ public class Text extends Widget {
         }
         return new TextRenderElement(this);
     }
+
+    /// Text.data: the string, or null for Text.rich.
+    public String data() {
+        return data;
+    }
+
+    private Object textScaler;
+
+    /// Text.textScaler, recorded; the text is drawn at the font's own scale.
+    public void textScaler(Object v) {
+        this.textScaler = v;
+    }
+
+    public Object textScaler() {
+        return textScaler;
+    }
 }

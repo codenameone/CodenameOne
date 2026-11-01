@@ -398,7 +398,7 @@ public class ButtonRenderElement extends RenderElement {
         if (!(w instanceof ButtonBase)) {
             return null;
         }
-        ButtonStyle st = ((ButtonBase) w).getStyle();
+        ButtonStyle st = styleOf(w);
         return st == null ? null : st.getForegroundColor();
     }
 
@@ -417,7 +417,7 @@ public class ButtonRenderElement extends RenderElement {
      */
     private void applyLabelFont(Button b) {
         Widget w = widget();
-        ButtonStyle st = w instanceof ButtonBase ? ((ButtonBase) w).getStyle() : null;
+        ButtonStyle st = w instanceof ButtonBase ? styleOf(w) : null;
         com.codename1.flutter.TextStyle ts = st == null ? null : st.getTextStyle();
         if (ts == null || ts.getFontSize() == null) {
             return;
@@ -483,7 +483,7 @@ public class ButtonRenderElement extends RenderElement {
                 // and never read, so CupertinoButton.filled, which composes onto this
                 // branch and states both explicitly, kept coming out Material purple
                 // instead of its CupertinoTheme fill.
-                ButtonStyle st = ((ButtonBase) w).getStyle();
+                ButtonStyle st = styleOf(w);
                 int[] elevatedPad = resolvedPadding(st, vpad, hpad);
                 all.setPadding(elevatedPad[0], elevatedPad[1], elevatedPad[2], elevatedPad[3]);
                 // FilledButton shares this shape with its own colours and no resting shadow.
@@ -521,7 +521,7 @@ public class ButtonRenderElement extends RenderElement {
                         .strokeOpacity(160));
                 clearBackground(all);
             } else if (w instanceof TextButton) {
-                ButtonStyle st = ((ButtonBase) w).getStyle();
+                ButtonStyle st = styleOf(w);
                 int[] textPad = resolvedPadding(st, vpad, hpad / 2);
                 all.setPadding(textPad[0], textPad[1], textPad[2], textPad[3]);
                 all.setFgColor(styled(st == null ? null : st.getForegroundColor(), cs.primary()).rgb());
@@ -768,7 +768,7 @@ public class ButtonRenderElement extends RenderElement {
             // not Material 3's 64x40. Nothing else in this runtime states one, so
             // every other button keeps the role default exactly as before.
             Widget w0 = widget();
-            ButtonStyle st = w0 instanceof ButtonBase ? ((ButtonBase) w0).getStyle() : null;
+            ButtonStyle st = w0 instanceof ButtonBase ? styleOf(w0) : null;
             Double minSquare = st == null ? null : st.getMinimumSize();
             com.codename1.flutter.rendering.Size minWH = st == null ? null : st.getMinimumSizeWH();
             if (minWH != null) {
@@ -784,7 +784,7 @@ public class ButtonRenderElement extends RenderElement {
             }
         }
         Widget wMax = widget();
-        ButtonStyle stMax = wMax instanceof ButtonBase ? ((ButtonBase) wMax).getStyle() : null;
+        ButtonStyle stMax = wMax instanceof ButtonBase ? styleOf(wMax) : null;
         com.codename1.flutter.rendering.Size maxWH = stMax == null ? null : stMax.getMaximumSize();
         if (maxWH != null) {
             if (!Double.isInfinite(maxWH.width())) {
@@ -838,7 +838,7 @@ public class ButtonRenderElement extends RenderElement {
      */
     private void applyRequestedShape(Button b, com.codename1.ui.plaf.Style all,
             ColorScheme cs, Widget w, double radiusLp, int vpad, int hpad) {
-        ButtonStyle st = w instanceof ButtonBase ? ((ButtonBase) w).getStyle() : null;
+        ButtonStyle st = w instanceof ButtonBase ? styleOf(w) : null;
         int[] shapedPad = resolvedPadding(st, vpad, hpad);
         all.setPadding(shapedPad[0], shapedPad[1], shapedPad[2], shapedPad[3]);
         com.codename1.flutter.Color fg = styled(st == null ? null : st.getForegroundColor(), cs.primary());
@@ -912,5 +912,27 @@ public class ButtonRenderElement extends RenderElement {
             }
         }
         all.setBorder(border);
+    }
+
+    /// The button's own style merged over its theme's: ThemeData.elevatedButtonTheme,
+    /// textButtonTheme or outlinedButtonTheme by the button's kind.
+    private ButtonStyle styleOf(com.codename1.flutter.Widget w) {
+        ButtonStyle own = ((ButtonBase) w).getStyle();
+        ButtonStyle themed = null;
+        try {
+            ThemeData td = Theme.of(this);
+            Object t = w instanceof ElevatedButton ? td.elevatedButtonTheme()
+                    : w instanceof TextButton ? td.textButtonTheme()
+                    : w instanceof OutlinedButton ? td.outlinedButtonTheme() : null;
+            if (t instanceof ButtonThemeDataBase) {
+                themed = ((ButtonThemeDataBase) t).style();
+            }
+        } catch (Throwable noTheme) {
+            themed = null;
+        }
+        if (own == null) {
+            return themed;
+        }
+        return own.merge(themed);
     }
 }

@@ -71,7 +71,7 @@ class ButtonConsumptionTest {
         b.child(new Icon(Icons.add()));
         ButtonRenderElement el = mount(b);
         assertNull(el.consumedLabel());
-        assertEquals(Icons.add().codePoint(), el.consumedIconChar());
+        assertEquals(Icons.add().codePointChar(), el.consumedIconChar());
     }
 
     @Test
@@ -89,7 +89,7 @@ class ButtonConsumptionTest {
         b.iconSize(32.0);
         ButtonRenderElement el = mount(b);
         assertNull(el.consumedLabel());
-        assertEquals(Icons.settings().codePoint(), el.consumedIconChar());
+        assertEquals(Icons.settings().codePointChar(), el.consumedIconChar());
     }
 
     /**

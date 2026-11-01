@@ -118,4 +118,9 @@ public class BoxDecoration extends Decoration {
     public BoxShape getShape() {
         return shape;
     }
+
+    /// BoxDecoration.borderRadius as given, or null.
+    public Object borderRadius() {
+        return getBorderRadius();
+    }
 }

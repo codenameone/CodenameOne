@@ -58,4 +58,15 @@ public class RichText extends Widget {
     public Element createElement() {
         return new RichTextRenderElement(this);
     }
+
+    /// RichText.text: the span the widget draws.
+    public TextSpan text() {
+        return getText();
+    }
+
+    private Object textScaler;
+
+    public void textScaler(Object v) {
+        this.textScaler = v;
+    }
 }

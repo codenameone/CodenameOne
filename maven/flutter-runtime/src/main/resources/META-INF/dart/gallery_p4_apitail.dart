@@ -277,7 +277,7 @@ class Matrix4 {
   external static Matrix4 rotationZ(double radians);
   external static Matrix4 translationValues(double x, double y, double z);
   external static Matrix4 diagonal3Values(double x, double y, double z);
-  external List<double> get storage;
+  external Float64List get storage;
   external Matrix4 clone();
   external void translate(double x, [double y, double z]);
   external void scale(double x, [double? y, double? z]);

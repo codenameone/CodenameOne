@@ -163,4 +163,33 @@ public class ButtonStyle {
     public void minimumSize(Double v) {
         this.minimumSize = v;
     }
+
+    /**
+     * Flutter's {@code ButtonStyle.merge}: this style, with every property it
+     * leaves null taken from {@code other}. A button's own style merged over its
+     * theme's ({@code ElevatedButtonThemeData.style} and friends).
+     */
+    public ButtonStyle merge(ButtonStyle other) {
+        if (other == null) {
+            return this;
+        }
+        ButtonStyle r = new ButtonStyle();
+        r.foregroundColor = foregroundColor != null ? foregroundColor : other.foregroundColor;
+        r.backgroundColor = backgroundColor != null ? backgroundColor : other.backgroundColor;
+        r.shadowColor = shadowColor != null ? shadowColor : other.shadowColor;
+        r.elevation = elevation != null ? elevation : other.elevation;
+        r.textStyle = textStyle != null ? textStyle : other.textStyle;
+        r.padding = padding != null ? padding : other.padding;
+        r.side = side != null ? side : other.side;
+        r.shape = shape != null ? shape : other.shape;
+        r.alignment = alignment != null ? alignment : other.alignment;
+        r.tapTargetSize = tapTargetSize != null ? tapTargetSize : other.tapTargetSize;
+        r.visualDensity = visualDensity != null ? visualDensity : other.visualDensity;
+        r.minimumSize = minimumSize != null ? minimumSize : other.minimumSize;
+        r.minimumSizeWH = minimumSizeWH != null ? minimumSizeWH : other.minimumSizeWH;
+        r.maximumSize = maximumSize != null ? maximumSize : other.maximumSize;
+        r.disabledForegroundColor = disabledForegroundColor != null ? disabledForegroundColor : other.disabledForegroundColor;
+        r.disabledBackgroundColor = disabledBackgroundColor != null ? disabledBackgroundColor : other.disabledBackgroundColor;
+        return r;
+    }
 }

@@ -42,6 +42,7 @@ class Tab extends Widget {
 @JavaName('com.codename1.flutter.material.TabBar')
 class TabBar extends Widget {
   external TabBar({Key? key, required List<Widget> tabs, TabController? controller, bool? isScrollable, Object? padding, Color? indicatorColor, double? indicatorWeight, Object? indicatorPadding, Object? indicator, Object? indicatorSize, Color? labelColor, TextStyle? labelStyle, Object? labelPadding, Color? unselectedLabelColor, TextStyle? unselectedLabelStyle, Object? dragStartBehavior, Object? mouseCursor, bool? enableFeedback, IntCallback? onTap, Object? physics});
+  external Size get preferredSize;
 }
 
 @JavaName('com.codename1.flutter.material.TabBarView')
@@ -164,6 +165,7 @@ class SliverAppBar extends Widget {
 @JavaName('com.codename1.flutter.widgets.NestedScrollView')
 class NestedScrollView extends Widget {
   external NestedScrollView({Key? key, required Object headerSliverBuilder, required Widget body, Object? controller, Object? scrollDirection, bool? reverse, Object? physics, bool? floatHeaderSlivers});
+  external static SliverOverlapAbsorberHandle sliverOverlapAbsorberHandleFor(BuildContext context);
 }
 
 // ======================================================================

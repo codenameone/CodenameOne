@@ -118,4 +118,17 @@ public class SelectableText extends StatelessWidget {
         }
         return t;
     }
+
+    private Object onSelectionChanged;
+    private Object textScaler;
+
+    /// SelectableText.onSelectionChanged, recorded: selection here is the
+    /// platform's own and reports no changes.
+    public void onSelectionChanged(Object v) {
+        this.onSelectionChanged = v;
+    }
+
+    public void textScaler(Object v) {
+        this.textScaler = v;
+    }
 }

@@ -37,7 +37,15 @@ import dart.core.DartList;
  */
 public class Matrix4 {
 
-    private final double[] m = new double[16];
+    private final dart.typed_data.Float64List m = new dart.typed_data.Float64List(16);
+
+    private double get(int i) {
+        return m.getDouble(i);
+    }
+
+    private void set(int i, double v) {
+        m.setDouble(i, v);
+    }
 
     private Matrix4() {
     }
@@ -49,10 +57,10 @@ public class Matrix4 {
     /** vector_math's {@code Matrix4.identity()}. */
     public static Matrix4 identity() {
         Matrix4 r = new Matrix4();
-        r.m[0] = 1.0;
-        r.m[5] = 1.0;
-        r.m[10] = 1.0;
-        r.m[15] = 1.0;
+        r.set(0, 1.0);
+        r.set(5, 1.0);
+        r.set(10, 1.0);
+        r.set(15, 1.0);
         return r;
     }
 
@@ -61,10 +69,10 @@ public class Matrix4 {
         Matrix4 r = identity();
         double c = Math.cos(radians);
         double s = Math.sin(radians);
-        r.m[5] = c;
-        r.m[6] = s;
-        r.m[9] = -s;
-        r.m[10] = c;
+        r.set(5, c);
+        r.set(6, s);
+        r.set(9, -s);
+        r.set(10, c);
         return r;
     }
 
@@ -73,10 +81,10 @@ public class Matrix4 {
         Matrix4 r = identity();
         double c = Math.cos(radians);
         double s = Math.sin(radians);
-        r.m[0] = c;
-        r.m[2] = -s;
-        r.m[8] = s;
-        r.m[10] = c;
+        r.set(0, c);
+        r.set(2, -s);
+        r.set(8, s);
+        r.set(10, c);
         return r;
     }
 
@@ -85,29 +93,29 @@ public class Matrix4 {
         Matrix4 r = identity();
         double c = Math.cos(radians);
         double s = Math.sin(radians);
-        r.m[0] = c;
-        r.m[1] = s;
-        r.m[4] = -s;
-        r.m[5] = c;
+        r.set(0, c);
+        r.set(1, s);
+        r.set(4, -s);
+        r.set(5, c);
         return r;
     }
 
     /** vector_math's {@code Matrix4.translationValues(x, y, z)}. */
     public static Matrix4 translationValues(double x, double y, double z) {
         Matrix4 r = identity();
-        r.m[12] = x;
-        r.m[13] = y;
-        r.m[14] = z;
+        r.set(12, x);
+        r.set(13, y);
+        r.set(14, z);
         return r;
     }
 
     /** vector_math's {@code Matrix4.diagonal3Values(x, y, z)}. */
     public static Matrix4 diagonal3Values(double x, double y, double z) {
         Matrix4 r = new Matrix4();
-        r.m[0] = x;
-        r.m[5] = y;
-        r.m[10] = z;
-        r.m[15] = 1.0;
+        r.set(0, x);
+        r.set(5, y);
+        r.set(10, z);
+        r.set(15, 1.0);
         return r;
     }
 
@@ -116,14 +124,9 @@ public class Matrix4 {
      * {@code matrix.storage[12] = 20} moves the matrix. It used to build a copy on
      * every call, and writes through it were silently lost.
      */
-    public DartList<Double> storage() {
-        if (storageView == null) {
-            storageView = dart.core.DartDoubleList.view(m);
-        }
-        return storageView;
+    public dart.typed_data.Float64List storage() {
+        return m;
     }
-
-    private DartList<Double> storageView;
 
     /**
      * Component-wise interpolation of two matrices, which is what Flutter's
@@ -145,7 +148,7 @@ public class Matrix4 {
         }
         Matrix4 r = new Matrix4();
         for (int i = 0; i < 16; i++) {
-            r.m[i] = a.m[i] + (b.m[i] - a.m[i]) * t;
+            r.set(i, a.get(i) + (b.get(i) - a.get(i)) * t);
         }
         return r;
     }
@@ -153,13 +156,15 @@ public class Matrix4 {
     /** A copy of this matrix — vector_math's {@code clone()}. */
     public Matrix4 clone() {
         Matrix4 r = new Matrix4();
-        System.arraycopy(m, 0, r.m, 0, m.length);
+        for (int i = 0; i < 16; i++) {
+            r.set(i, get(i));
+        }
         return r;
     }
 
     /** vector_math's {@code setEntry(row, col, value)} (column-major storage). */
     public void setEntry(int row, int col, double value) {
-        m[col * 4 + row] = value;
+        set(col * 4 + row, value);
     }
 
     /**
@@ -171,18 +176,18 @@ public class Matrix4 {
     public void setRotationZ(double radians) {
         double c = Math.cos(radians);
         double s = Math.sin(radians);
-        m[0] = c;
-        m[1] = s;
-        m[2] = 0.0;
-        m[3] = 0.0;
-        m[4] = -s;
-        m[5] = c;
-        m[6] = 0.0;
-        m[7] = 0.0;
-        m[8] = 0.0;
-        m[9] = 0.0;
-        m[10] = 1.0;
-        m[11] = 0.0;
+        set(0, c);
+        set(1, s);
+        set(2, 0.0);
+        set(3, 0.0);
+        set(4, -s);
+        set(5, c);
+        set(6, 0.0);
+        set(7, 0.0);
+        set(8, 0.0);
+        set(9, 0.0);
+        set(10, 1.0);
+        set(11, 0.0);
     }
 
     // vector_math's translate(x, [y, z]) — arity overloads for the transpiler.
@@ -196,10 +201,10 @@ public class Matrix4 {
     }
 
     public void translate(double x, double y, double z) {
-        m[12] += m[0] * x + m[4] * y + m[8] * z;
-        m[13] += m[1] * x + m[5] * y + m[9] * z;
-        m[14] += m[2] * x + m[6] * y + m[10] * z;
-        m[15] += m[3] * x + m[7] * y + m[11] * z;
+        set(12, get(12) + (get(0) * x + get(4) * y + get(8) * z));
+        set(13, get(13) + (get(1) * x + get(5) * y + get(9) * z));
+        set(14, get(14) + (get(2) * x + get(6) * y + get(10) * z));
+        set(15, get(15) + (get(3) * x + get(7) * y + get(11) * z));
     }
 
     // vector_math's scale(x, [y, z]) — arity overloads for the transpiler.
@@ -217,15 +222,15 @@ public class Matrix4 {
     public void scaleByDouble(double sx, double sy, double sz, double sw) {
         scale(sx, sy, sz);
         for (int i = 0; i < 4; i++) {
-            m[12 + i] *= sw;
+            set(12 + i, get(12 + i) * (sw));
         }
     }
 
     public void scale(double x, double y, double z) {
         for (int i = 0; i < 4; i++) {
-            m[i] *= x;
-            m[4 + i] *= y;
-            m[8 + i] *= z;
+            set(i, get(i) * (x));
+            set(4 + i, get(4 + i) * (y));
+            set(8 + i, get(8 + i) * (z));
         }
     }
 }

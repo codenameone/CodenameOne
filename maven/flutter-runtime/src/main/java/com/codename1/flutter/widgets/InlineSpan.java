@@ -28,6 +28,8 @@ package com.codename1.flutter.widgets;
  * supertype of {@link TextSpan} (and, later, {@code WidgetSpan}). Held as
  * configuration consumed by {@link RichText}; not a Widget.
  */
+import dart.core.DartList;
+
 public abstract class InlineSpan {
 
     /**
@@ -48,6 +50,11 @@ public abstract class InlineSpan {
 
     /** The span's gesture recognizer; null on the base type. */
     public Object recognizer() {
+        return null;
+    }
+
+    /// InlineSpan.children: the spans under this one, or null.
+    public DartList<? extends InlineSpan> children() {
         return null;
     }
 }
