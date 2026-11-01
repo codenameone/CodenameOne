@@ -423,16 +423,24 @@ public abstract class Labeled extends Control {
             requestLayout();
         }
         Style base = UIManager.getInstance().getComponentStyle(label.getUIID());
+        // A bare label has none of the theme's padding (cn1SyncNative zeroes
+        // it), so none is counted here either. Counting it put the graphic
+        // that far into the text: on a phone theme that pads a label, the
+        // icon of every titled card was drawn over its first letters.
+        boolean bare = cn1BareText();
+        int baseLeft = bare ? 0 : base.getPaddingLeftNoRTL();
+        int baseRight = bare ? 0 : base.getPaddingRightNoRTL();
+        int baseTop = bare ? 0 : base.getPaddingTop();
+        int baseBottom = bare ? 0 : base.getPaddingBottom();
         Insets in = getInsets();
         // The area the label lays its content out in, less the room made
         // for the graphic: where graphic and text sit together.
         // Less what was given up of the theme's padding (fitPadding).
-        int areaX = Units.toPixels(in.getLeft()) + base.getPaddingLeftNoRTL() - shedLeft;
-        int areaY = Units.toPixels(in.getTop()) + base.getPaddingTop();
-        int areaW = Units.toPixels(getWidth() - in.getLeft() - in.getRight()) - base.getPaddingLeftNoRTL()
-                - base.getPaddingRightNoRTL() + shedLeft + shedRight;
-        int areaH = Units.toPixels(getHeight() - in.getTop() - in.getBottom()) - base.getPaddingTop()
-                - base.getPaddingBottom();
+        int areaX = Units.toPixels(in.getLeft()) + baseLeft - shedLeft;
+        int areaY = Units.toPixels(in.getTop()) + baseTop;
+        int areaW = Units.toPixels(getWidth() - in.getLeft() - in.getRight()) - baseLeft - baseRight + shedLeft
+                + shedRight;
+        int areaH = Units.toPixels(getHeight() - in.getTop() - in.getBottom()) - baseTop - baseBottom;
         int gw = box[4];
         int gh = box[5];
         int gap = box[8];
