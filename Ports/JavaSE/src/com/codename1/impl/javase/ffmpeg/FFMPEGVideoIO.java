@@ -28,10 +28,15 @@ import com.codename1.media.VideoReader;
 import com.codename1.media.VideoWriter;
 import com.codename1.media.VideoWriterBuilder;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /// `com.codename1.media.VideoIO` implementation for the JavaSE simulator backed by the
 /// `ffmpeg`/`ffprobe` executables (resolved by `FFMPEGMedia`, which bundles a binary via
@@ -254,6 +259,100 @@ public class FFMPEGVideoIO extends VideoIO {
             }
         }
         return false;
+    }
+
+    /// Options that make each software encoder work on this host, as probed.
+    /// Shared by every instance: the answer is the machine's, not the writer's.
+    private static final Map<String, List<String>> WORKING_OPTIONS = new HashMap<String, List<String>>();
+
+    /// The extra arguments `encoder` needs to encode on this host, or null when
+    /// it cannot encode here at all.
+    ///
+    /// A listed encoder is not a working one. Ubuntu's libx264 dies with SIGILL
+    /// (exit 132) on arm64 machines with SVE2 -- its hand written assembly uses an
+    /// instruction the CPU does not have -- and ffmpeg's `-cpuflags` does not
+    /// reach it. A recording found that out after its first frames and lost the
+    /// file. So each encoder encodes a few tiny frames first, and libx264 is
+    /// tried again without its assembly (`asm=0`), which is slower but correct.
+    static List<String> workingOptions(String encoder) {
+        synchronized (WORKING_OPTIONS) {
+            if (WORKING_OPTIONS.containsKey(encoder)) {
+                return WORKING_OPTIONS.get(encoder);
+            }
+            List<String> found = null;
+            List<List<String>> candidates = new ArrayList<List<String>>();
+            candidates.add(new ArrayList<String>());
+            if ("libx264".equals(encoder)) {
+                candidates.add(Arrays.asList("-x264-params", "asm=0"));
+            }
+            for (List<String> extra : candidates) {
+                if (encodes(encoder, extra)) {
+                    found = extra;
+                    break;
+                }
+            }
+            WORKING_OPTIONS.put(encoder, found);
+            return found;
+        }
+    }
+
+    /// Whether ffmpeg exits cleanly encoding four small black frames with
+    /// `encoder` and `extra`.
+    private static boolean encodes(String encoder, List<String> extra) {
+        File raw = null;
+        try {
+            raw = File.createTempFile("cn1-encoder-probe", ".rgba");
+            OutputStream out = new FileOutputStream(raw);
+            try {
+                out.write(new byte[64 * 64 * 4 * 4]);
+            } finally {
+                out.close();
+            }
+            List<String> command = new ArrayList<String>();
+            command.add(FFMPEGSupport.ffmpeg());
+            command.add("-y");
+            command.add("-hide_banner");
+            command.add("-loglevel");
+            command.add("error");
+            command.add("-f");
+            command.add("rawvideo");
+            command.add("-pixel_format");
+            command.add("rgba");
+            command.add("-video_size");
+            command.add("64x64");
+            command.add("-framerate");
+            command.add("10");
+            command.add("-i");
+            command.add(raw.getAbsolutePath());
+            command.add("-c:v");
+            command.add(encoder);
+            command.addAll(extra);
+            command.add("-pix_fmt");
+            command.add("yuv420p");
+            command.add("-f");
+            command.add("null");
+            command.add("-");
+            FFMPEGSupport.runChecked(command);
+            return true;
+        } catch (IOException ex) {
+            return false;
+        } finally {
+            if (raw != null && !raw.delete()) {
+                raw.deleteOnExit();
+            }
+        }
+    }
+
+    /// A software encoder of `codecId` other than `failed` that works here, for
+    /// when the one picked does not. Null when there is none.
+    String fallbackEncoder(String codecId, String failed) {
+        for (VideoCodec c : getAvailableEncoders()) {
+            if (codecId.equals(c.getId()) && !c.isHardwareAccelerated()
+                    && !c.getName().equals(failed) && workingOptions(c.getName()) != null) {
+                return c.getName();
+            }
+        }
+        return null;
     }
 
     List<VideoCodec> encoderList() {
