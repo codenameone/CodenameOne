@@ -3666,6 +3666,7 @@ public final class JavaEmitter {
             TypeRef asyncFn = (declared == null || declared.is("var")) && v.initializer instanceof Lambda
                     ? asyncClosureType((Lambda) v.initializer, v.name, ctx) : null;
             if (v.initializer != null) {
+                tearOffKeepAll = (declared == null || declared.is("var")) && v.initializer instanceof Ident;
                 init = emitExpr(v.initializer, asyncFn != null ? asyncFn
                         : declared != null && !declared.is("var") ? declared : null, ctx);
             }
@@ -7591,6 +7592,7 @@ public final class JavaEmitter {
             }
         }
         Out top = resolveTopLevel(n, ctx);
+        tearOffKeepAll = false;
         if (top != null) {
             return top;
         }
@@ -7598,6 +7600,11 @@ public final class JavaEmitter {
         String tw = witnessFor(n, ctx);
         if (tw != null) {
             return new Out(tw + ".type()", new TypeRef("Type"));
+        }
+        // `dynamic` as a value (`T == dynamic`): the class a dynamic witness carries,
+        // which is Object's -- erasure cannot tell `dynamic` from `Object` apart.
+        if (n.equals("dynamic") && ctx.lookup(n) == null) {
+            return new Out("Object.class", new TypeRef("Type"));
         }
         diags.error(id, "E0129", "Cannot resolve identifier '" + n
                 + "'. Confirm the file passes `dart analyze`, or the API is not yet implemented in the Codename One runtime.");
@@ -7611,6 +7618,12 @@ public final class JavaEmitter {
      * Shared by bare-identifier resolution and import-prefix ({@code prefix.name})
      * member access — both denote the same global namespace in the single-package model.
      */
+    /**
+     * Set while an untyped local's initializer is a bare name (`final f = jsonEncode;`):
+     * a stub function torn off there keeps every parameter, as its Dart type does.
+     */
+    private boolean tearOffKeepAll;
+
     private Out resolveTopLevel(String n, Ctx ctx) {
         return resolveTopLevel(n, null, ctx);
     }
@@ -7744,6 +7757,41 @@ public final class JavaEmitter {
                 }
             }
             TypeRef ft = new TypeRef("Function");
+            // Only an untyped local's value (`final f = jsonDecode;`) keeps them all: read
+            // as an argument (`map(jsonDecode)`) it stays a function of the required
+            // arity, the optional ones passed as null, so it fits a one-argument SAM.
+            boolean keepAll = tearOffKeepAll;
+            tearOffKeepAll = false;
+            if (keepAll) {
+                // Optional parameters: a full-arity value, as a user function's tear-off
+                // is, so `f(x, 2)` through the value reaches the stub with its 2 (Dart
+                // semantics); tearOffAdapter restores what a caller omits.
+                List<Param> ordered = new ArrayList<Param>();
+                List<TypeRef> otypes = new ArrayList<TypeRef>();
+                for (int pass = 0; pass < 3; pass++) {
+                    for (int i = 0; i < sfn.params.size(); i++) {
+                        Param fp = sfn.params.get(i);
+                        int kind = fp.named ? 2 : fp.optional || fp.defaultValue != null ? 1 : 0;
+                        if (kind == pass) {
+                            ordered.add(fp);
+                            otypes.add(ptypes.get(i));
+                        }
+                    }
+                }
+                final List<Param> declared = sfn.params;
+                final List<Param> inOrder = ordered;
+                Out ad = tearOffAdapter(ordered, otypes, ret, nm -> {
+                    // back to declaration order for the Java stub method
+                    List<String> a = new ArrayList<String>();
+                    for (Param dp : declared) {
+                        a.add(nm.get(inOrder.indexOf(dp)));
+                    }
+                    return target + "(" + String.join(", ", a) + ")";
+                }, ctx);
+                if (ad != null) {
+                    return ad;
+                }
+            }
             ft.funcParams = req;
             ft.funcReturn = ret;
             return new Out("((" + javaType(ft, false, ctx) + ") (" + String.join(", ", names) + ") -> "
@@ -10332,8 +10380,14 @@ public final class JavaEmitter {
         return out;
     }
 
-    private TypeRef[] typedefSig(String name) {
+    /** A user typedef by name, else a stub library's function typedef. */
+    private Ast.TypedefDecl typedefDecl(String name) {
         Ast.TypedefDecl td = program.typedefs.get(name);
+        return td != null || name == null ? td : stubs.typedefs.get(name);
+    }
+
+    private TypeRef[] typedefSig(String name) {
+        Ast.TypedefDecl td = typedefDecl(name);
         if (td != null && td.returnType != null) {
             TypeRef[] sig = new TypeRef[td.paramTypes.size() + 1];
             for (int i = 0; i < td.paramTypes.size(); i++) {
@@ -10360,7 +10414,7 @@ public final class JavaEmitter {
      * parameter without an argument becomes dynamic. Null when not such a typedef.
      */
     private TypeRef[] userTypedefSig(String name, List<TypeRef> args) {
-        Ast.TypedefDecl td = program.typedefs.get(name);
+        Ast.TypedefDecl td = typedefDecl(name);
         if (td == null || td.returnType == null || td.typeParams.isEmpty()) {
             return null;
         }
@@ -10512,7 +10566,11 @@ public final class JavaEmitter {
             // nothing: the callback ran and its result was dropped.
             return t.funcReturn.is("void") ? TypeRef.VOID : t.funcReturn;
         }
-        TypeRef[] sig = t == null ? null : typedefSig(t.name);
+        TypeRef[] sig = t == null ? null
+                : t.args.isEmpty() ? null : userTypedefSig(t.name, t.args);
+        if (sig == null && t != null) {
+            sig = typedefSig(t.name);
+        }
         if (sig != null) {
             TypeRef r = sig[sig.length - 1];
             return r.is("void") ? TypeRef.VOID : r;
@@ -10610,8 +10668,13 @@ public final class JavaEmitter {
         // typedef-typed target position gives untyped lambda params real types
         // `Comparator<int>` binds the typedef's placeholders, so `(a, b) => a.compareTo(b)`
         // has int parameters and an int result.
-        TypeRef[] sigTypes = expected != null
-                ? substituteTypedefTypeArgs(typedefSig(expected.name), expected.args) : null;
+        // A generic user typedef (`Shaper<T> = String Function(int, T)`) binds its
+        // parameters by name, so `Shaper<List<int>>` gives the lambda a List<int> T.
+        TypeRef[] sigTypes = expected != null && !expected.args.isEmpty()
+                ? userTypedefSig(expected.name, expected.args) : null;
+        if (sigTypes == null && expected != null) {
+            sigTypes = substituteTypedefTypeArgs(typedefSig(expected.name), expected.args);
+        }
         // An inline function type target (`Widget Function(BuildContext, T, Widget?)`,
         // e.g. a generic stub builder whose element type was just substituted) likewise
         // supplies concrete param types: flatten funcParams + funcReturn into a sig.
@@ -11276,6 +11339,23 @@ public final class JavaEmitter {
             }
             return new Out(cls + "." + jn + "(" + withWitnesses(methodWitnessCall(fn, c, callExpected(c, ctx), ctx),
                     methodArgs(ps, c.args, ctx)) + ")", rt);
+        }
+        // A function value held by a top-level variable: `final Labeler fallback = _f;`
+        // then `fallback(x)`. Read through the variable's own Java form, then invoke.
+        if (program.topLevelVars.containsKey(n)) {
+            Ident callee = new Ident();
+            callee.name = n;
+            callee.file = c.file;
+            callee.line = c.line;
+            callee.col = c.col;
+            Out v = emitIdent(callee, null, ctx);
+            if (v.type == null || v.type.is("dynamic") || v.type.is("Object")) {
+                ctx.importClass("dart.runtime.Dyn");
+                String a = plainArgs(c.args, ctx);
+                return new Out("Dyn.invoke(" + v.code + (a.isEmpty() ? "" : ", " + a) + ")", TypeRef.DYNAMIC);
+            }
+            return new Out(fnCall(v.code, v.type, c.args, ctx),
+                    isFunctionValued(v.type) ? funcResultType(v.type) : TypeRef.DYNAMIC);
         }
         // dart:core identical(a, b): unresolved before, so any use failed the build.
         if (n.equals("identical") && c.args.positional.size() == 2 && !program.functions.containsKey(n)) {
@@ -13343,6 +13423,27 @@ public final class JavaEmitter {
     /** Program class declaring each field and method, built on first use. */
     private java.util.IdentityHashMap<Object, ClassDecl> memberOwners;
 
+    private java.util.IdentityHashMap<Param, ClassDecl> paramOwners;
+
+    private ClassDecl paramOwner(Param p) {
+        if (paramOwners == null) {
+            paramOwners = new java.util.IdentityHashMap<Param, ClassDecl>();
+            for (ClassDecl cd : program.classes.values()) {
+                for (MethodDecl m : cd.methods) {
+                    for (Param mp : m.params) {
+                        paramOwners.put(mp, cd);
+                    }
+                }
+                for (CtorDecl ct : cd.ctors) {
+                    for (Param cp : ct.params) {
+                        paramOwners.put(cp, cd);
+                    }
+                }
+            }
+        }
+        return paramOwners.get(p);
+    }
+
     private ClassDecl memberOwner(Object member) {
         if (memberOwners == null) {
             memberOwners = new java.util.IdentityHashMap<Object, ClassDecl>();
@@ -13386,6 +13487,13 @@ public final class JavaEmitter {
      * which the caller's scope cannot see by its simple name.
      */
     private Out emitDefaultValue(Param p, TypeRef pt, ClassDecl owner, Ctx ctx) {
+        // The class whose member declares p: a call through a subclass, or an inherited
+        // or abstract method's default (`[decoder = utf8Decoder]` on an abstract reader),
+        // names the declaring class's static, not the receiver's.
+        ClassDecl declaring = paramOwner(p);
+        if (declaring != null) {
+            owner = declaring;
+        }
         if (owner != null && p.defaultValue instanceof Ident && ctx.lookup(((Ident) p.defaultValue).name) == null) {
             String n = ((Ident) p.defaultValue).name;
             MethodDecl sm = owner.method(n);
@@ -13394,13 +13502,30 @@ public final class JavaEmitter {
                 ClassDecl saved = ctx.currentClass;
                 ctx.currentClass = owner;
                 try {
-                    return emitExpr(p.defaultValue, pt, ctx);
+                    return castDefault(emitExpr(p.defaultValue, pt, ctx), pt, ctx);
                 } finally {
                     ctx.currentClass = saved;
                 }
             }
         }
-        return emitExpr(p.defaultValue, pt, ctx);
+        return castDefault(emitExpr(p.defaultValue, pt, ctx), pt, ctx);
+    }
+
+    /**
+     * `Converter<List<int>, String> decoder = textDecoder`: a default whose class is a
+     * different, generic-erased Java type (the runtime's Utf8Decoder is a Converter of
+     * Object to Object) reaches the parameter's own type through Object.
+     */
+    private Out castDefault(Out d, TypeRef pt, Ctx ctx) {
+        if (pt != null && !pt.args.isEmpty() && pt.funcParams == null && d.type != null
+                && d.type.name != null && !d.type.is(pt.name) && !d.type.is("dynamic") && !d.type.is("Null")
+                && stubs.isStubClass(d.type.name)) {
+            String jt = javaType(pt, false, ctx);
+            if (jt != null && !jt.equals("Object")) {
+                return new Out("((" + jt + ") (Object) " + d.code + ")", pt);
+            }
+        }
+        return d;
     }
 
     /** Program-class calls use canonical positional order with defaults inlined. */
@@ -15094,7 +15219,7 @@ public final class JavaEmitter {
             required = fnType.funcRequired;
             named = fnType.funcNamed;
         } else {
-            Ast.TypedefDecl td = program.typedefs.get(fnType.name);
+            Ast.TypedefDecl td = typedefDecl(fnType.name);
             if (td == null || td.paramTypes == null) {
                 return plainArgs(args, ctx);
             }
@@ -15103,7 +15228,8 @@ public final class JavaEmitter {
             required = td.funcRequired;
             named = td.funcNamed;
         }
-        if (required < 0) {
+        if (required < 0 && (named != null || slotTypes == null || args.positional.size() != arity
+                || !args.named.isEmpty())) {
             return plainArgs(args, ctx);
         }
         int positionalSlots = arity - (named == null ? 0 : named.size());
@@ -15113,7 +15239,7 @@ public final class JavaEmitter {
                 sb.append(", ");
             }
             sb.append(i < args.positional.size()
-                    ? emitExpr(args.positional.get(i), null, ctx).code
+                    ? slotArg(args.positional.get(i), lambdaSlot(args.positional.get(i), slotTypes, i), ctx)
                     : omittedArg(slotTypes, i, ctx));
         }
         if (named != null) {
@@ -15128,10 +15254,34 @@ public final class JavaEmitter {
                     }
                 }
                 sb.append(v == null ? omittedArg(slotTypes, positionalSlots + named.indexOf(nm), ctx)
-                        : emitExpr(v, null, ctx).code);
+                        : slotArg(v, lambdaSlot(v, slotTypes, positionalSlots + named.indexOf(nm)), ctx));
             }
         }
         return sb.toString();
+    }
+
+    /**
+     * A closure argument's target type when invoking a function value: its slot's
+     * function type, so the closure is a typed SAM rather than a bare Java lambda with
+     * no functional interface to land in. Null for any other argument.
+     */
+    private String slotArg(Expr arg, TypeRef slot, Ctx ctx) {
+        String code = emitExpr(arg, slot, ctx).code;
+        if (slot == null || code.startsWith("((")) {
+            return code;
+        }
+        // the SAM's own type arguments erase a function slot to Object
+        return "((" + javaType(slot, false, ctx) + ") " + code + ")";
+    }
+
+    private TypeRef lambdaSlot(Expr arg, List<TypeRef> slotTypes, int i) {
+        if (!(arg instanceof Lambda) || slotTypes == null || i < 0 || i >= slotTypes.size()) {
+            return null;
+        }
+        TypeRef t = slotTypes.get(i);
+        // an Object slot (a stub's `{Object? reviver}`) still needs a functional
+        // interface for the closure: Function gives it the SAM of its arity
+        return t != null && isFunctionValued(t) ? t : new TypeRef("Function");
     }
 
     private String plainArgs(Args args, Ctx ctx) {
@@ -15589,7 +15739,7 @@ public final class JavaEmitter {
             return "Stopwatch";
         }
         // user typedef that plainly aliases another type: resolve through to the target
-        Ast.TypedefDecl userTd = program.typedefs.get(t.name);
+        Ast.TypedefDecl userTd = typedefDecl(t.name);
         if (userTd != null && userTd.aliased != null) {
             return javaType(userTd.aliased, boxed, ctx);
         }

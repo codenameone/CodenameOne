@@ -48,6 +48,9 @@ public final class StubRegistry {
     public final Map<String, Ast.EnumDecl> enums = new LinkedHashMap<String, Ast.EnumDecl>();
     public final Map<String, Ast.FunctionDecl> functions = new LinkedHashMap<String, Ast.FunctionDecl>();
     public final Map<String, Ast.FieldDecl> topLevelVars = new LinkedHashMap<String, Ast.FieldDecl>();
+    /// Function typedefs the stubs declare (`ValueWidgetBuilder<T>`), so a value of one is
+    /// invoked through its signature like a user typedef's.
+    public final Map<String, Ast.TypedefDecl> typedefs = new LinkedHashMap<String, Ast.TypedefDecl>();
     /**
      * Top-level functions of a {@code dart:} library whose names collide with another
      * library's: {@code dart:developer}'s {@code log} is not {@code dart:math}'s. They are
@@ -181,6 +184,11 @@ public final class StubRegistry {
                     libraryFunctions.put(scoped, m);
                 }
                 m.put(f.name, f);
+            }
+        }
+        for (Ast.TypedefDecl t : lib.typedefs) {
+            if (t.returnType != null && t.paramTypes != null) {
+                typedefs.put(t.name, t);
             }
         }
         for (Ast.FieldDecl v : lib.topLevelVars) {
