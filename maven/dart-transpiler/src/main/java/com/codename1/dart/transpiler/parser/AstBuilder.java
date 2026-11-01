@@ -1286,6 +1286,14 @@ public final class AstBuilder {
             w.body = buildStatement(s.whileStatement().statement());
             return w;
         }
+        if (s.doStatement() != null) {
+            WhileStmt w = new WhileStmt();
+            pos(w, s);
+            w.isDo = true;
+            w.condition = buildExpr(s.doStatement().expr());
+            w.body = buildStatement(s.doStatement().statement());
+            return w;
+        }
         if (s.forStatement() != null) {
             return buildFor(s.forStatement());
         }
@@ -2541,15 +2549,16 @@ public final class AstBuilder {
             return buildSetOrMapLiteral(ctx.setOrMapLiteral());
         }
         if (ctx.symbolLiteral() != null) {
-            // #name: the runtime has no Symbol class, so the literal is the string its
-            // toString answers, Symbol("name"). That keeps what programs do with a symbol --
-            // compare it, hash it, key a map or set with it, print it -- exactly Dart's.
-            // Only a comparison against that very string, or an `is Symbol` test, differs.
+            // #name: a dart.core.Symbol (the runtime class: ==, hashCode, toString
+            // Symbol("name")), built as the call Symbol("name") so `is Symbol` holds.
             StringLit sl = new StringLit();
             pos(sl, ctx);
-            String name = ctx.symbolLiteral().getText().substring(1);
-            sl.parts.add("Symbol(\"" + name + "\")");
-            return sl;
+            sl.parts.add(ctx.symbolLiteral().getText().substring(1).replace(" ", ""));
+            Call sym = new Call();
+            pos(sym, ctx);
+            sym.name = "Symbol";
+            sym.args.positional.add(sl);
+            return sym;
         }
         unsupported(ctx, "E0124", "Unsupported literal: " + snippet(ctx));
         return errExpr(ctx);

@@ -433,6 +433,8 @@ public final class Ast {
     public static class WhileStmt extends Stmt {
         public Expr condition;
         public Stmt body;
+        /** {@code do body while (condition);}: the body runs once before the first test. */
+        public boolean isDo;
     }
 
     public static class ForStmt extends Stmt {

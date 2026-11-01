@@ -859,7 +859,9 @@ public final class JavaEmitter {
             body.append(sig);
             ctx.pushWriter(2);
             ctx.methodReturnType = rt;
-            if (m.body != null) {
+            if (emitInlineGeneratorBody(m, rt, ctx)) {
+                // generator: emitted as a lambda
+            } else if (m.body != null) {
                 emitStatements(m.body, ctx);
             } else if (m.exprBody != null) {
                 if (rt.is("void")) {
@@ -876,6 +878,60 @@ public final class JavaEmitter {
             body.append("    }\n\n");
         }
         return finishClassFile(ext.name, "public final class " + ext.name, null, null, body, ctx, ext.file);
+    }
+
+    /**
+     * The body of a {@code sync*} / {@code async*} member emitted where no private helper
+     * method can sit beside it -- an extension's static method, a mixin's default method.
+     * The generator body goes straight into the lambda DartIterable.syncStar /
+     * AsyncStar.asyncStar run; parameters are captured, so the body must not assign them
+     * (a Dart generator that reassigns a parameter is rare; javac reports it plainly).
+     *
+     * @return true when {@code m} is a generator and its body was emitted
+     */
+    private boolean emitInlineGeneratorBody(MethodDecl m, TypeRef rt, Ctx ctx) {
+        if (m.isSetter || m.body == null || (!m.isSyncStar && !m.isAsyncStar)) {
+            return false;
+        }
+        Ctx.Writer w = ctx.writer();
+        String savedList = ctx.syncStarList;
+        String savedSink = ctx.asyncStarSink;
+        TypeRef savedElem = ctx.syncStarElem;
+        boolean savedAsync = ctx.inAsyncBody;
+        TypeRef savedRt = ctx.methodReturnType;
+        String v = ctx.newTemp();
+        if (m.isAsyncStar) {
+            ctx.importClass("dart.async.AsyncStar");
+            TypeRef elem = rt.is("Stream") && !rt.args.isEmpty() ? rt.arg(0) : TypeRef.DYNAMIC;
+            String ej = javaType(elem, true, ctx);
+            w.line("return AsyncStar.<" + ej + ">asyncStar((AsyncStar.Sink<" + ej + "> " + v + ") -> {");
+            ctx.syncStarList = null;
+            ctx.asyncStarSink = v;
+            ctx.syncStarElem = elem;
+            ctx.inAsyncBody = true;
+        } else {
+            ctx.importClass("dart.core.DartList");
+            ctx.importClass("dart.core.DartIterable");
+            TypeRef elem = rt.is("Iterable") && !rt.args.isEmpty() ? rt.arg(0) : TypeRef.DYNAMIC;
+            String ej = javaType(elem, true, ctx);
+            w.line("return DartIterable.syncStar((DartList<" + ej + "> " + v + ") -> {");
+            ctx.syncStarList = v;
+            ctx.asyncStarSink = null;
+            ctx.syncStarElem = elem;
+        }
+        ctx.methodReturnType = TypeRef.VOID;
+        ctx.indent(1);
+        ctx.pushScope();
+        emitStatements(m.body, ctx);
+        ctx.popScope();
+        ctx.indent(-1);
+        w.line("});");
+        ctx.syncStarList = savedList;
+        ctx.asyncStarSink = savedSink;
+        ctx.syncStarElem = savedElem;
+        ctx.inAsyncBody = savedAsync;
+        ctx.methodReturnType = savedRt;
+        return true;
     }
 
     /**
@@ -914,7 +970,9 @@ public final class JavaEmitter {
             ctx.pushWriter(2);
             ctx.methodReturnType = rt;
             ctx.inAsyncBody = m.isAsync;
-            if (m.body != null) {
+            if (emitInlineGeneratorBody(m, rt, ctx)) {
+                // generator: emitted as a lambda
+            } else if (m.body != null) {
                 emitStatements(m.body, ctx);
             } else if (m.exprBody != null) {
                 if (rt.is("void")) {
@@ -1028,6 +1086,7 @@ public final class JavaEmitter {
         for (CtorDecl ct : c.ctors) {
             body.append(emitCtor(c, ct, ctx));
         }
+        body.append(implementerCtor(c));
 
         // Dart operator== ($eq) overrides Java equals via a bridge
         MethodDecl eqOp = c.method("$eq");
@@ -1070,8 +1129,16 @@ public final class JavaEmitter {
         // mixin applications: implement each mixin interface and synthesize
         // the state (field + accessors) the mixin's abstract accessors need
         StringBuilder impls = new StringBuilder();
+        TypeRef mixinClassAsSuper = null;
         for (TypeRef mixRef : c.mixins) {
             ClassDecl mx = program.classes.get(mixRef.name);
+            if (mx != null && !mx.isMixin && c.superclass == null && mixinClassAsSuper == null
+                    && mixRef == c.mixins.get(0) && mx.superclass == null && mx.mixins.isEmpty()) {
+                // `class S with M` where M is a `mixin class` (or any class with no
+                // superclass): Object with M is exactly extending M, so it is the superclass.
+                mixinClassAsSuper = mixRef;
+                continue;
+            }
             if (mx == null || !mx.isMixin) {
                 // A mixin supplied by the hand-written runtime (a stub) maps to a
                 // Java interface (its @JavaName) with default-method behaviour and no
@@ -1133,13 +1200,14 @@ public final class JavaEmitter {
                 // members -- is extended instead, which inherits nothing Dart's
                 // `implements` would not. Anything else is reported rather than emitted
                 // as Java that does not compile.
-                if (c.superclass == null && implementedAsSuper == null && isPureInterface(implemented)) {
+                if (c.superclass == null && implementedAsSuper == null && mixinClassAsSuper == null
+                        && (isPureInterface(implemented) || canImplementAsSuper(implemented))) {
                     implementedAsSuper = itf;
                 } else {
                     diags.error(c, "E0404", "Implementing the class " + itf.name
-                            + " is not supported yet; only an abstract class with no fields"
-                            + " or implemented members can be implemented, once per class"
-                            + " and only by a class with no superclass");
+                            + " is not supported yet; a class can implement one concrete class"
+                            + " only when it has no superclass of its own and the implemented"
+                            + " class has none either");
                 }
                 continue;
             }
@@ -1203,6 +1271,8 @@ public final class JavaEmitter {
         String ext = null;
         if (c.superclass != null) {
             ext = javaType(c.superclass, false, ctx);
+        } else if (mixinClassAsSuper != null) {
+            ext = javaType(mixinClassAsSuper, false, ctx);
         } else if (implementedAsSuper != null) {
             ext = javaType(implementedAsSuper, false, ctx);
         }
@@ -1466,6 +1536,66 @@ public final class JavaEmitter {
      * no superclass or mixins of its own, no instance fields, no member with a body and
      * no constructor that takes or does anything.
      */
+    /**
+     * Whether a concrete program class can stand in as the Java superclass of a class that
+     * {@code implements} it. Dart's implementer overrides every member, so extending is
+     * observably the same as long as no constructor body of the implemented class runs:
+     * the implementer then builds through a no-argument constructor that does nothing but
+     * the field initializers (see {@link #implementedConcreteClasses}). Requires the
+     * implemented class to have no superclass and no mixins, so that constructor needs no
+     * super call of its own.
+     */
+    private boolean canImplementAsSuper(ClassDecl c) {
+        return c.superclass == null && c.mixins.isEmpty() && !c.isMixin && c.extensionOn == null;
+    }
+
+    private java.util.Set<ClassDecl> implementedConcrete;
+
+    /** Concrete program classes some class implements and extends in Java instead. */
+    private java.util.Set<ClassDecl> implementedConcreteClasses() {
+        if (implementedConcrete == null) {
+            java.util.Set<ClassDecl> out = new java.util.HashSet<ClassDecl>();
+            for (List<ClassDecl> same : program.classesByName.values()) {
+                for (ClassDecl k : same) {
+                    if (k.superclass != null) {
+                        continue;
+                    }
+                    for (TypeRef itf : k.interfaces) {
+                        ClassDecl im = program.classes.get(itf.name);
+                        if (im != null && !im.isMixin && !isPureInterface(im) && canImplementAsSuper(im)) {
+                            out.add(im);
+                            break;
+                        }
+                    }
+                }
+            }
+            implementedConcrete = out;
+        }
+        return implementedConcrete;
+    }
+
+    /**
+     * The constructor an implementer of {@code c} builds through, when {@code c} has no
+     * Java constructor without parameters that is safe to run: empty, so no Dart
+     * constructor body or initializer list of {@code c} runs for an implementer.
+     */
+    private String implementerCtor(ClassDecl c) {
+        if (!implementedConcreteClasses().contains(c)) {
+            return "";
+        }
+        if (c.ctors.isEmpty()) {
+            return "";
+        }
+        for (CtorDecl ct : c.ctors) {
+            if (ct.name == null && !ct.isFactory && ct.params.isEmpty()) {
+                // Base() already exists. Running it is harmless only when it does nothing.
+                return "";
+            }
+        }
+        return "    /** For a class that implements this one: runs no constructor body. */\n"
+                + "    protected " + javaClassName(c) + "() {\n    }\n\n";
+    }
+
     private boolean isPureInterface(ClassDecl c) {
         if (!c.isAbstract || c.superclass != null || !c.mixins.isEmpty()) {
             return false;
@@ -2993,7 +3123,22 @@ public final class JavaEmitter {
         } else if (s instanceof WhileStmt) {
             WhileStmt wh = (WhileStmt) s;
             Lazy c = emitLazyOperand(wh.condition, TypeRef.BOOL, ctx, 1);
-            if (!c.lifts()) {
+            if (wh.isDo) {
+                // do/while: skip the test on the first pass only. A flag rather than Java's
+                // do/while keeps `continue` reaching the (possibly lifted) test and the
+                // condition's lifted statements inside the loop.
+                String first = ctx.newTemp();
+                w.line("boolean " + first + " = true;");
+                w.line(loopLabel(s) + "while (true) {");
+                ctx.indent(1);
+                w.line("if (!" + first + ") {");
+                w.raw(c.lifted);
+                w.line("    if (!(" + c.out.code + ")) {");
+                w.line("        break;");
+                w.line("    }");
+                w.line("}");
+                w.line(first + " = false;");
+            } else if (!c.lifts()) {
                 w.line(loopLabel(s) + "while (" + c.out.code + ") {");
                 ctx.indent(1);
             } else {
@@ -4116,9 +4261,21 @@ public final class JavaEmitter {
             String jt = javaType(o.type, true, ctx);
             String cond = subj + " instanceof " + erasedJavaType(o.type, ctx);
             String cast = "((" + jt + ") " + subj + ")";
+            boolean programType = program.classes.containsKey(o.type.name);
             for (PatternField f : o.fields) {
-                String access = cast + "." + fieldAccess(o.type, f.name) + "()";
-                TypeRef ft = fieldTypeOf(o.type, f.name);
+                String access;
+                TypeRef ft;
+                if (programType) {
+                    access = cast + "." + fieldAccess(o.type, f.name) + "()";
+                    ft = fieldTypeOf(o.type, f.name);
+                } else {
+                    // A core or stub type (`String(length: var n)`, `List(isEmpty: true)`):
+                    // its getters are not get$x accessors, so read it the way `x.length`
+                    // on that type is read anywhere else.
+                    Out got = emitMemberGet(new Out(cast, o.type), f.name, p, ctx);
+                    access = got.code;
+                    ft = TypeRef.DYNAMIC;
+                }
                 String[] cached = switchFieldCache == null ? null
                         : switchFieldCache.get(subj + "|" + o.type.name + "." + f.name);
                 cond = joinAnd(cond, fieldPatternMatch(f.pattern, access, ft, cached, ctx, binds));
@@ -4854,6 +5011,20 @@ public final class JavaEmitter {
         return lt < 0 ? jt : jt.substring(0, lt);
     }
 
+    /**
+     * Whether {@code n} is plausibly a declared type parameter rather than a class name the
+     * stubs lack: one of the enclosing class's type parameters, or the short upper-case
+     * spelling ({@code T}, {@code E}, {@code K2}) Dart code uses for method type parameters,
+     * which this emitter does not track per method.
+     */
+    private boolean looksLikeTypeParameter(String n, Ctx ctx) {
+        if (ctx.currentClass != null && ctx.currentClass.typeParams != null
+                && ctx.currentClass.typeParams.contains(n)) {
+            return true;
+        }
+        return n.matches("[A-Z][A-Z0-9]?") || n.matches("T[A-Z][a-z]*");
+    }
+
     /** A type that is a type VARIABLE here ({@code T}): it has no class to test against. */
     private boolean isTypeVariable(TypeRef t, Ctx ctx) {
         if (t == null || !t.args.isEmpty() || t.funcReturn != null || t.name == null
@@ -4910,6 +5081,25 @@ public final class JavaEmitter {
     private boolean reportTypeVariableWitness(Node node, TypeRef t, Ctx ctx, String construct) {
         if (!isTypeVariable(t, ctx)) {
             return false;
+        }
+        if (!looksLikeTypeParameter(t.name, ctx)) {
+            // Not a declared type variable: a class the stubs simply do not have yet.
+            StringBuilder libs = new StringBuilder();
+            Library lib = ctx.library();
+            if (lib != null) {
+                for (String imp : lib.imports) {
+                    if (imp.startsWith("dart:") || imp.startsWith("package:")) {
+                        if (libs.length() > 0) {
+                            libs.append(", ");
+                        }
+                        libs.append(imp);
+                    }
+                }
+            }
+            diags.error(node, "E0142", construct + ": unknown type '" + t.name + "' (not declared in the "
+                    + (libs.length() == 0 ? "dart:core" : libs.toString()) + " stub). Confirm the file "
+                    + "passes `dart analyze`, or the API is not yet implemented in the Codename One runtime.");
+            return true;
         }
         diags.error(node, "E0142", construct + ": '" + t.name + "' is a type parameter here, "
                 + "not a concrete type. Generics are erased, so there is no runtime Class for "
@@ -5705,7 +5895,7 @@ public final class JavaEmitter {
             return top;
         }
         diags.error(id, "E0129", "Cannot resolve identifier '" + n
-                + "'. Confirm the file passes `dart analyze`.");
+                + "'. Confirm the file passes `dart analyze`, or the API is not yet implemented in the Codename One runtime.");
         return new Out(n, TypeRef.DYNAMIC, true);
     }
 
@@ -6314,7 +6504,7 @@ public final class JavaEmitter {
             return new Out("(" + target.code + ")::" + name, new TypeRef("Function"));
         }
         diags.error(posNode, "E0132", "Cannot resolve member '" + name + "' on type " + tt
-                + ". Confirm the file passes `dart analyze`.");
+                + ". Confirm the file passes `dart analyze`, or the API is not yet implemented in the Codename One runtime.");
         return new Out(target.code + "." + name, TypeRef.DYNAMIC, true);
     }
 
@@ -8585,6 +8775,13 @@ public final class JavaEmitter {
         // closure value invocation: f(...) where f is a local of Function type
         if (c.name == null && c.target != null) {
             Out target = emitExpr(c.target, null, ctx);
+            if (target.type == null || target.type.is("dynamic") || target.type.is("Object")) {
+                // `(f)()` on a dynamic value: no functional interface to call through.
+                ctx.importClass("dart.runtime.Dyn");
+                String a = plainArgs(c.args, ctx);
+                return new Out("Dyn.invoke(" + target.code + (a.isEmpty() ? "" : ", " + a) + ")",
+                        TypeRef.DYNAMIC);
+            }
             return new Out(target.code + ".call(" + plainArgs(c.args, ctx) + ")", TypeRef.DYNAMIC);
         }
         if (c.target == null) {
@@ -8920,7 +9117,7 @@ public final class JavaEmitter {
             return new Out(call, sf.returnType);
         }
         diags.error(c, "E0135", "Cannot resolve function or constructor '" + n
-                + "'. Confirm the file passes `dart analyze`, or the API may be unsupported in M1.");
+                + "'. Confirm the file passes `dart analyze`, or the API is not yet implemented in the Codename One runtime.");
         return new Out("null", TypeRef.DYNAMIC, true);
     }
 
@@ -9292,7 +9489,7 @@ public final class JavaEmitter {
             return new Out("DartRuntime.str(" + target.code + ")", TypeRef.STRING);
         }
         diags.error(c, "E0137", "Cannot resolve method '" + n + "' on type " + tt
-                + ". Confirm the file passes `dart analyze`, or the API may be unsupported in M1.");
+                + ". Confirm the file passes `dart analyze`, or the API is not yet implemented in the Codename One runtime.");
         return new Out(target.code + "." + n + "(" + plainArgs(c.args, ctx) + ")", TypeRef.DYNAMIC, true);
     }
 
