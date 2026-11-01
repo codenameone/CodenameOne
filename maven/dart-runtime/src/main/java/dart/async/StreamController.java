@@ -89,6 +89,12 @@ public final class StreamController<T> implements StreamSink<T> {
     private final java.util.ArrayDeque<Object[]> outbox = new java.util.ArrayDeque<Object[]>();
     private final Object outboxLock = new Object();
     private boolean pumpScheduled;
+    /// An event pumpOne() has taken off the outbox and not finished delivering.
+    /// close() from an async* body's own thread (see AsyncStar) read an empty outbox
+    /// while the isolate thread was still between the poll and the emit of the last
+    /// data event, delivered done first, and that event was lost: take(3) over a
+    /// periodic stream answered two elements. Guarded by outboxLock.
+    private boolean delivering;
     private static final Integer DATA = Integer.valueOf(0);
     private static final Integer ERROR = Integer.valueOf(1);
     private static final Integer DONE = Integer.valueOf(2);
@@ -102,7 +108,7 @@ public final class StreamController<T> implements StreamSink<T> {
 
     private boolean outboxEmpty() {
         synchronized (outboxLock) {
-            return outbox.isEmpty();
+            return outbox.isEmpty() && !delivering;
         }
     }
 
@@ -138,10 +144,23 @@ public final class StreamController<T> implements StreamSink<T> {
         Object[] e;
         synchronized (outboxLock) {
             e = outbox.pollFirst();
+            delivering = e != null;
         }
         if (e == null) {
             return;
         }
+        try {
+            deliver(e);
+        } finally {
+            synchronized (outboxLock) {
+                delivering = false;
+            }
+        }
+        schedulePump();
+    }
+
+    @SuppressWarnings("unchecked")
+    private void deliver(Object[] e) {
         if (e[0] == DATA) {
             theStream.emit((T) e[1]);
         } else if (e[0] == ERROR) {
@@ -158,7 +177,6 @@ public final class StreamController<T> implements StreamSink<T> {
                 }
             });
         }
-        schedulePump();
     }
 
     public StreamController() {

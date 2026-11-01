@@ -1346,6 +1346,7 @@ public final class JavaEmitter {
             mm.witnesses = methodWitnesses(m);
             if (!c.isMixin) {
                 mm.javaReturn = interfacePinnedReturn(c, m, ctx);
+                mm.javaParams = pinnedInterfaceParams(c, m, ctx);
             }
             body.append(emitMethodLike(mm, ctx, c.isAbstract));
             if (!c.isMixin) {
@@ -1520,7 +1521,7 @@ public final class JavaEmitter {
                 // Result<T> for every T. Java generics are invariant and have no bottom, so the
                 // raw interface is what stays assignable to each parameterization.
                 impls.append(argsMentionNever(itf) ? javaType(new TypeRef(itf.name), false, ctx)
-                        : javaType(itf, false, ctx));
+                        : withRawSuperArgs(javaType(itf, false, ctx), c, itf));
                 body.append(implementerBridges(c, implemented, ctx));
                 continue;
             }
@@ -1650,6 +1651,7 @@ public final class JavaEmitter {
         }
         body.append(emitStubGetterBridges(c, ctx));
         body.append(emitSinkAddErrorBridges(c, ctx));
+        body.append(defaultDartToString(c));
         // Dart 3 sealed → Java sealed: a sealed class with subtypes lists them in a permits clause and
         // its direct subtypes are marked non-sealed. Falls back to a plain abstract class when the
         // hierarchy has no subtypes (a permits-less sealed class is illegal in Java).
@@ -1686,6 +1688,11 @@ public final class JavaEmitter {
         String ext = null;
         if (c.superclass != null) {
             ext = javaClassType(c.superclass, ctx);
+            // `extends DelegatingStreamSink` with no arguments is Dart's
+            // DelegatingStreamSink<dynamic>. Emitted raw, every inherited member would be
+            // erased, and a member the subclass declares with generic parameter types
+            // (`$dcall(String, Object[], DartMap<String, Object>)`) would clash with it.
+            ext = withRawSuperArgs(ext, c, c.superclass);
             String extRaw = ext.indexOf('<') < 0 ? ext : ext.substring(0, ext.indexOf('<'));
             String extRuntime = program.classes.containsKey(c.superclass.name) ? null : runtimeFqcn(extRaw, ctx);
             if (extRuntime != null && RUNTIME_INTERFACES.contains(extRuntime)) {
@@ -1748,6 +1755,30 @@ public final class JavaEmitter {
         } finally {
             classRefMode = saved;
         }
+    }
+
+    /** {@code <Object, ...>} for an argument-less reference to a generic program class whose
+     *  type parameters are all unbounded; empty otherwise. */
+    private String withRawSuperArgs(String java, ClassDecl owner, TypeRef sup) {
+        return java.indexOf('<') >= 0 ? java : java + rawSuperArgs(owner, sup);
+    }
+
+    private String rawSuperArgs(ClassDecl owner, TypeRef sup) {
+        if (!sup.args.isEmpty()) {
+            return "";
+        }
+        ClassDecl d = superDeclOf(owner, sup);
+        if (d == null || d.typeParams.isEmpty()) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder("<");
+        for (int i = 0; i < d.typeParams.size(); i++) {
+            if (d.typeParamBounds.get(d.typeParams.get(i)) != null) {
+                return "";
+            }
+            sb.append(i > 0 ? ", " : "").append("Object");
+        }
+        return sb.append('>').toString();
     }
 
     private java.util.Set<ClassDecl> interfaced;
@@ -1876,12 +1907,12 @@ public final class JavaEmitter {
         java.util.Set<ClassDecl> mine = interfacedClasses();
         ClassDecl sup = c.superclass != null ? superDeclOf(c, c.superclass) : null;
         if (sup != null && mine.contains(sup)) {
-            ext.append(javaType(c.superclass, false, ctx));
+            ext.append(withRawSuperArgs(javaType(c.superclass, false, ctx), c, c.superclass));
         }
         for (TypeRef itf : c.interfaces) {
             ClassDecl im = superDeclOf(c, itf);
             if (im != null && mine.contains(im)) {
-                ext.append(ext.length() > 0 ? ", " : "").append(javaType(itf, false, ctx));
+                ext.append(ext.length() > 0 ? ", " : "").append(withRawSuperArgs(javaType(itf, false, ctx), c, itf));
             }
         }
         // `abstract class SocketChannel extends ChannelMixin { SocketSink get sink; }`: a
@@ -1898,6 +1929,12 @@ public final class JavaEmitter {
         for (TypeRef st : progSupers) {
             ClassDecl sd = superDeclOf(c, st);
             if (sd == null || !sd.isMixin || mine.contains(sd)) {
+                continue;
+            }
+            if (c.mixins.contains(st) && forwardsThroughMixin(c, sd, ctx)) {
+                // C's forwarders call `M.super.m(...)`, which javac refuses when another
+                // direct superinterface of C (this C$I) is itself a subtype of M
+                // ("redundant interface"). C still implements M directly.
                 continue;
             }
             String spelled = javaType(st, false, ctx);
@@ -2049,6 +2086,50 @@ public final class JavaEmitter {
     }
 
     /**
+     * Object.toString as Dart writes it, {@code Instance of 'Builder'}, under the Dart class
+     * name rather than the Java one (a class named like the generated main library's is
+     * renamed). Emitted in each class whose hierarchy inside the program declares no
+     * toString, and only when the superclass, if any, is a program class: a runtime or
+     * stub superclass keeps its own.
+     */
+    private String defaultDartToString(ClassDecl c) {
+        if (c.isMixin || c.extensionOn != null || c.enumOf != null) {
+            return "";
+        }
+        for (ClassDecl k = c; k != null; ) {
+            List<ClassDecl> parts = new ArrayList<ClassDecl>();
+            parts.add(k);
+            for (TypeRef mx : k.mixins) {
+                ClassDecl md = program.classes.get(mx.name);
+                if (md == null) {
+                    return "";
+                }
+                parts.add(md);
+            }
+            for (ClassDecl part : parts) {
+                for (MethodDecl m : part.methods) {
+                    if ("toString".equals(m.name) && !m.isStatic) {
+                        return "";
+                    }
+                }
+                if (part.field("toString") != null) {
+                    return "";
+                }
+            }
+            if (k.superclass == null) {
+                break;
+            }
+            ClassDecl sup = superDeclOf(k, k.superclass);
+            if (sup == null) {
+                return "";
+            }
+            k = sup;
+        }
+        return "    @Override\n    public String toString() {\n        return \"Instance of '"
+                + c.name.replace("\\", "\\\\").replace("\"", "\\\"") + "'\";\n    }\n\n";
+    }
+
+    /**
      * Where Dart lets a getter/setter implement a field of the implemented class (or a field a
      * getter), the Java names differ -- a field is get$x/set$x, a getter x() -- so the
      * implementer gets the other spelling as a bridge.
@@ -2074,6 +2155,21 @@ public final class JavaEmitter {
                     TypeRef pt = p.type == null ? TypeRef.DYNAMIC : p.type;
                     sb.append("    public void set$").append(f.name).append('(').append(javaType(pt, false, ctx))
                             .append(" v) {\n        ").append(f.name).append("(v);\n    }\n\n");
+                }
+            }
+            for (MethodDecl st : im.methods) {
+                // The setter half: `abstract int level;` in a mixin or interface is a getter
+                // and a setter there, and a mutable field here is set$level -- without this,
+                // an assignment through the member reached the throwing default.
+                if (!st.isSetter || st.isStatic || st.params.size() != 1 || !done.add("=" + st.name)
+                        || findSetterInChain(c, st.name) != null) {
+                    continue;
+                }
+                FieldDecl f = findFieldInChain(c, st.name);
+                if (f != null && !f.isFinal && !f.isConst) {
+                    sb.append("    public void ").append(st.name).append('(')
+                            .append(javaType(fieldType(f, ctx), false, ctx)).append(" v) {\n        set$")
+                            .append(st.name).append("(v);\n    }\n\n");
                 }
             }
             for (MethodDecl g : im.methods) {
@@ -2214,14 +2310,17 @@ public final class JavaEmitter {
         }
         java.util.Set<ClassDecl> seen = new java.util.HashSet<ClassDecl>();
         for (TypeRef itf : c.interfaces) {
+            // `implements Result<Never>` is emitted raw (see the implements clause), so the
+            // members it inherits are erased and only an erased parameter overrides them.
             collectIfaceSigs(c, itf, java.util.Collections.<String>emptyList(),
-                    java.util.Collections.<TypeRef>emptyList(), m, ctx, out, seen);
+                    java.util.Collections.<TypeRef>emptyList(), m, ctx, out, seen, argsMentionNever(itf));
         }
         return out;
     }
 
     private void collectIfaceSigs(ClassDecl owner, TypeRef itf, List<String> outerNames, List<TypeRef> outerArgs,
-                                  MethodDecl m, Ctx ctx, List<IfaceSig> out, java.util.Set<ClassDecl> seen) {
+                                  MethodDecl m, Ctx ctx, List<IfaceSig> out, java.util.Set<ClassDecl> seen,
+                                  boolean raw) {
         // `implements impl.ShelfBase`: the reference may still carry its import prefix.
         ClassDecl im = superDeclOf(owner, itf);
         if (im == null || !interfacedClasses().contains(im) || !seen.add(im)) {
@@ -2238,18 +2337,30 @@ public final class JavaEmitter {
             }
             IfaceSig sig = new IfaceSig();
             sig.owner = im.name;
-            for (Param p : sm.params) {
-                sig.params.add(ifaceJava(p.type, im, args, ctx));
+            boolean namesMatch = true;
+            for (int pi = 0; pi < sm.params.size(); pi++) {
+                Param p = sm.params.get(pi);
+                Param mp = m.params.get(pi);
+                // Named parameters are lowered positionally in declaration order, so the
+                // signatures line up only when both declare the same names in that order.
+                if (p.named != mp.named || (p.named && !p.name.equals(mp.name))) {
+                    namesMatch = false;
+                }
+                String pj = ifaceJava(p.type, im, args, ctx);
+                sig.params.add(raw ? erase(pj) : pj);
+            }
+            if (!namesMatch) {
+                continue;
             }
             TypeRef rt = sm.returnType == null || sm.returnType.is("var") ? TypeRef.DYNAMIC : sm.returnType;
             sig.ret = rt.is("void") ? "void" : ifaceJava(rt, im, args, ctx);
             out.add(sig);
         }
         if (im.superclass != null) {
-            collectIfaceSigs(im, im.superclass, im.typeParams, args, m, ctx, out, seen);
+            collectIfaceSigs(im, im.superclass, im.typeParams, args, m, ctx, out, seen, raw);
         }
         for (TypeRef sup : im.interfaces) {
-            collectIfaceSigs(im, sup, im.typeParams, args, m, ctx, out, seen);
+            collectIfaceSigs(im, sup, im.typeParams, args, m, ctx, out, seen, raw);
         }
     }
 
@@ -2260,15 +2371,91 @@ public final class JavaEmitter {
         // The member's types are named in the INTERFACE's library: markdown's
         // `visitText(Text text)` is its own Text node even when the implementer's file
         // also imports the Text widget. Pinned only where a stub shares the name.
-        if (st != null && st.resolved == null && st.name != null && im.ownerLibrary != null
-                && !im.typeParams.contains(st.name)
+        pinToLibrary(st, im, 0);
+        return javaType(st, bareVar, ctx);
+    }
+
+    /**
+     * Resolves the names in {@code st} -- its type arguments and a function type's parts
+     * too -- in {@code im}'s library, where a stub shares the name. (A program class sharing
+     * the name, as hive's two BoxCollection classes do, would also need its X$I named here.)
+     */
+    private void pinToLibrary(TypeRef st, ClassDecl im, int depth) {
+        if (st == null || depth > 8 || im.ownerLibrary == null) {
+            return;
+        }
+        if (st.resolved == null && st.name != null && !im.typeParams.contains(st.name)
                 && (stubs.isStubClass(st.name) || stubs.isStubEnum(st.name))) {
             ClassDecl wc = program.resolveClass(st.name, im.ownerLibrary);
             if (wc != null && st.name.equals(wc.name) && classVisibleFrom(wc, im.ownerLibrary)) {
                 st.resolved = wc;
             }
         }
-        return javaType(st, bareVar, ctx);
+        for (TypeRef a : st.args) {
+            pinToLibrary(a, im, depth + 1);
+        }
+        if (st.funcParams != null) {
+            for (TypeRef a : st.funcParams) {
+                pinToLibrary(a, im, depth + 1);
+            }
+        }
+        pinToLibrary(st.funcReturn, im, depth + 1);
+    }
+
+    /**
+     * Dart lets an override widen a parameter: {@code bool equals(Object? a, Object? b)}
+     * implements {@code bool equals(E a, E b)}, {@code putAll(Map<dynamic, dynamic>)} a
+     * {@code putAll(Map<K, V>)}. In Java both erase to the same signature, so the override is
+     * neither an override nor a legal overload ("name clash"), and no bridge can be added
+     * beside it. Such a parameter therefore takes the X$I member's Java type in the
+     * signature, and the body sees it under its own type through a local
+     * (emitMethodLikeBody). Null when no parameter needs it.
+     */
+    private List<String> pinnedInterfaceParams(ClassDecl c, MethodDecl m, Ctx ctx) {
+        if (m.isStatic || m.isSetter || m.isGetter || m.name.startsWith("$")) {
+            return null;
+        }
+        List<IfaceSig> sigs = interfaceSigs(c, m, ctx);
+        if (sigs.isEmpty()) {
+            return null;
+        }
+        List<String> impl = implJavaParams(m, ctx);
+        List<String> out = null;
+        for (IfaceSig sig : sigs) {
+            if (sig.params.size() != impl.size()) {
+                continue;
+            }
+            for (int i = 0; i < impl.size(); i++) {
+                String a = impl.get(i);
+                String b = sig.params.get(i);
+                if (a.equals(b) || (out != null && out.get(i) != null)) {
+                    continue;
+                }
+                if (javaErasure(a, c, m).equals(javaErasure(b, c, m))) {
+                    if (out == null) {
+                        out = new ArrayList<String>();
+                        for (int k = 0; k < impl.size(); k++) {
+                            out.add(null);
+                        }
+                    }
+                    out.set(i, b);
+                }
+            }
+        }
+        return out;
+    }
+
+    /** {@link #erase}, with an unbounded type variable of the class or method as Object. */
+    private static String javaErasure(String t, ClassDecl c, MethodDecl m) {
+        String e = erase(t).trim();
+        if ((c.typeParams.contains(e) && c.typeParamBounds.get(e) == null)
+                || (m.typeParams.contains(e) && m.typeParamBounds.get(e) == null)) {
+            return "Object";
+        }
+        if ("java.lang.Object".equals(e)) {
+            return "Object";
+        }
+        return e;
     }
 
     private List<String> implJavaParams(MethodDecl m, Ctx ctx) {
@@ -2287,8 +2474,10 @@ public final class JavaEmitter {
      * declared type serves.
      */
     private String interfacePinnedReturn(ClassDecl c, MethodDecl m, Ctx ctx) {
-        // A generic method is never bridged, but its return can still be pinned.
-        if (!bridgeable(m, true)) {
+        // A generic method is never bridged, but its return can still be pinned; so can that
+        // of a method with optional or named parameters, which interfaceSigs lines up by name.
+        if (m.isStatic || m.isSetter || m.name.startsWith("$") || "hashCode".equals(m.name)
+                || "compareTo".equals(m.name) || "toString".equals(m.name)) {
             return null;
         }
         TypeRef rt = m.returnType == null || m.returnType.is("var") ? TypeRef.DYNAMIC : m.returnType;
@@ -2345,6 +2534,14 @@ public final class JavaEmitter {
             return "";
         }
         List<String> implParams = implJavaParams(m, ctx);
+        List<String> pinned = pinnedInterfaceParams(c, m, ctx);
+        if (pinned != null) {
+            for (int i = 0; i < pinned.size(); i++) {
+                if (pinned.get(i) != null) {
+                    implParams.set(i, pinned.get(i));
+                }
+            }
+        }
         String implErased = erasedParams(implParams);
         StringBuilder sb = new StringBuilder();
         for (IfaceSig sig : sigs) {
@@ -3279,6 +3476,11 @@ public final class JavaEmitter {
         TypeRef returnType;
         /** The Java return type when it must differ from the Dart one's (see interfaceBridges). */
         String javaReturn;
+        /**
+         * Per parameter, the Java type the signature must declare instead of the Dart one's
+         * (null entries keep it): see pinnedInterfaceParams.
+         */
+        List<String> javaParams;
         List<String> typeParams = new ArrayList<String>();
         java.util.Map<String, TypeRef> typeParamBounds = new java.util.HashMap<String, TypeRef>();
         List<Param> params = new ArrayList<Param>();
@@ -4321,6 +4523,7 @@ public final class JavaEmitter {
         // The Java parameter list and names, kept for a sync* body's helper method.
         StringBuilder paramDecls = new StringBuilder();
         StringBuilder paramNames = new StringBuilder();
+        StringBuilder pinnedLocals = new StringBuilder();
         boolean whereTypeOverride = isWhereTypeOverride(m);
         if (whereTypeOverride) {
             // The runtime's whereType(Class, boolean) shape (see isWhereTypeOverride); the
@@ -4345,7 +4548,17 @@ public final class JavaEmitter {
             String jn = ctx.declareShadowSafe(p.name, pt);
             String decl = javaType(pt, (boxListMixinOp && i == ("add".equals(m.name) ? 0 : 1))
                     || boxCollAllParams || (boxCollFirstParam && i == 0), ctx) + ' ' + jn;
-            sb.append(decl);
+            String pinnedType = m.javaParams == null ? null : m.javaParams.get(i);
+            if (pinnedType != null) {
+                // The signature takes the overridden member's type (pinnedInterfaceParams);
+                // the body reads the parameter under its own Dart type.
+                sb.append(pinnedType).append(" $pp").append(i);
+                pinnedLocals.append("        @SuppressWarnings({\"unchecked\", \"rawtypes\"}) ")
+                        .append(decl).append(" = (").append(decl.substring(0, decl.length() - jn.length() - 1))
+                        .append(") (Object) $pp").append(i).append(";\n");
+            } else {
+                sb.append(decl);
+            }
             paramDecls.append(", ").append(decl);
             paramNames.append(", ").append(jn);
         }
@@ -4356,6 +4569,7 @@ public final class JavaEmitter {
             return sb.toString();
         }
         sb.append(" {\n");
+        sb.append(pinnedLocals);
         if (whereTypeOverride) {
             String tw = m.typeParams.get(0);
             sb.append("        dart.runtime.TypeWitness $tw$").append(tw)
@@ -7254,6 +7468,11 @@ public final class JavaEmitter {
                 if (from != null && to != null && from != to && isProgramClassDecl(from) && isProgramClassDecl(to)
                         && !isProgramSubtype(from, to) && !isProgramSubtype(to, from)) {
                     subject = "((Object) " + paren(o.code) + ")";
+                } else if (!o.type.is(t.type.name) && javaType(o.type, true, ctx).indexOf('<') > 0) {
+                    // `list is Uint8List` on a List: the subject's Java type is parameterized
+                    // (DartList<Object>), and javac refuses an instanceof against a class that
+                    // is a DartList of another argument. The test is erased either way.
+                    subject = "((Object) " + paren(o.code) + ")";
                 }
             }
             if (t.type.name != null && program.classes.containsKey(t.type.name)
@@ -7320,6 +7539,15 @@ public final class JavaEmitter {
                     // A program SetBase/SetMixin class is a Set in Dart, though its Java class
                     // cannot extend DartSet: SetMixin is the marker the test also accepts.
                     check = "dart.core.SetMixinView.isSet(" + subject + ")";
+                } else if (scalarListElement(t.type) != null) {
+                    // `x is List<bool>`/`List<String>`/`List<num>`: no list carries a witness
+                    // of its argument, so the raw instanceof answered true for a List<String>
+                    // and the read the test promoted then threw ClassCastException. The
+                    // elements are checked instead, as for List<int> -- see
+                    // DartList.allInstances for where that still differs from Dart.
+                    TypeRef el = scalarListElement(t.type);
+                    check = "dart.core.DartList.allInstances(" + subject + ", "
+                            + erasedJavaType(el, ctx) + ".class, " + el.nullable + ")";
                 } else {
                     check = subject + " instanceof " + erased;
                 }
@@ -7343,6 +7571,21 @@ public final class JavaEmitter {
      * compile). The class itself is kept -- List&lt;int&gt; stays DartLongList -- because
      * that is the class a value of that type is held in, and the one a promoted use casts to.
      */
+    /// The element type of a {@code List<bool|String|num>} test, whose elements
+    /// DartList.allInstances checks; null for any other type. Other element types keep
+    /// the erased test: a program class or a generic argument has no single Java class
+    /// that answers for it (a function type, an interface a mixin view stands in for).
+    private static TypeRef scalarListElement(TypeRef t) {
+        if (t == null || !t.is("List") || t.args.size() != 1) {
+            return null;
+        }
+        TypeRef el = t.args.get(0);
+        if (el == null || !el.args.isEmpty() || el.funcReturn != null) {
+            return null;
+        }
+        return el.is("bool") || el.is("String") || el.is("num") ? el : null;
+    }
+
     private String erasedJavaType(TypeRef t, Ctx ctx) {
         String jt = javaType(t, true, ctx);
         int lt = jt.indexOf('<');
@@ -8621,10 +8864,88 @@ public final class JavaEmitter {
             if (common == null) {
                 common = t;
             } else if (!common.toString().equals(t.toString())) {
-                return null;
+                // `[Text(' '), Element('a', [])]`: Dart's element type is the least upper
+                // bound, here their common program supertype Node.
+                common = programClassLub(common, t);
+                if (common == null) {
+                    return null;
+                }
             }
         }
         return common;
+    }
+
+    /**
+     * The nearest common program supertype of two non-generic program class types, as Dart's
+     * upper bound picks it when it is unique at its depth; null when there is none or the
+     * choice is ambiguous.
+     */
+    private TypeRef programClassLub(TypeRef a, TypeRef b) {
+        if (!a.args.isEmpty() || !b.args.isEmpty() || a.funcParams != null || b.funcParams != null) {
+            return null;
+        }
+        ClassDecl ca = lubClass(a);
+        ClassDecl cb = lubClass(b);
+        if (ca == null || cb == null) {
+            return null;
+        }
+        java.util.Map<ClassDecl, Integer> da = supertypeDepths(ca);
+        java.util.Map<ClassDecl, Integer> db = supertypeDepths(cb);
+        ClassDecl best = null;
+        int bestDepth = -1;
+        boolean tie = false;
+        for (java.util.Map.Entry<ClassDecl, Integer> en : da.entrySet()) {
+            if (!db.containsKey(en.getKey()) || !en.getKey().typeParams.isEmpty()) {
+                continue;
+            }
+            int d = Math.max(en.getValue(), db.get(en.getKey()));
+            int depth = -d;
+            if (best == null || depth > bestDepth) {
+                best = en.getKey();
+                bestDepth = depth;
+                tie = false;
+            } else if (depth == bestDepth) {
+                tie = true;
+            }
+        }
+        if (best == null || tie) {
+            return null;
+        }
+        TypeRef out = new TypeRef(best.name);
+        out.resolved = best;
+        out.nullable = a.nullable || b.nullable;
+        return out;
+    }
+
+    private ClassDecl lubClass(TypeRef t) {
+        if (t.resolved != null) {
+            return t.resolved;
+        }
+        List<ClassDecl> same = program.classesByName.get(t.name);
+        return same != null && same.size() == 1 ? same.get(0) : null;
+    }
+
+    /** {@code c} and its program supertypes, each with its shortest distance from {@code c}. */
+    private java.util.Map<ClassDecl, Integer> supertypeDepths(ClassDecl c) {
+        java.util.Map<ClassDecl, Integer> out = new java.util.LinkedHashMap<ClassDecl, Integer>();
+        List<ClassDecl> work = new ArrayList<ClassDecl>();
+        out.put(c, 0);
+        work.add(c);
+        for (int i = 0; i < work.size() && i < 256; i++) {
+            ClassDecl k = work.get(i);
+            List<TypeRef> sups = new ArrayList<TypeRef>(k.interfaces);
+            if (k.superclass != null) {
+                sups.add(0, k.superclass);
+            }
+            for (TypeRef st : sups) {
+                ClassDecl sc = superDeclOf(k, st);
+                if (sc != null && !out.containsKey(sc)) {
+                    out.put(sc, out.get(k) + 1);
+                    work.add(sc);
+                }
+            }
+        }
+        return out;
     }
 
     /**
@@ -8658,7 +8979,12 @@ public final class JavaEmitter {
 
     private TypeRef elementTypeQuiet(Expr e, Ctx ctx) {
         if (e instanceof SpreadElement) {
-            TypeRef st = inferExprTypeQuiet(((SpreadElement) e).expr, ctx);
+            Expr se = ((SpreadElement) e).expr;
+            if (se instanceof ListLit && ((ListLit) se).elementType == null) {
+                // `...[Text(' '), anchor(i)]`: the inner literal's own element type.
+                return structuredElementTypeQuiet(((ListLit) se).elements, ctx);
+            }
+            TypeRef st = inferExprTypeQuiet(se, ctx);
             if (st == null) {
                 st = fieldOfTypedReceiverQuiet(((SpreadElement) e).expr, ctx);
             }
@@ -8743,6 +9069,13 @@ public final class JavaEmitter {
             } finally {
                 ctx.popScope();
             }
+        }
+        if (e instanceof ForElement && ((ForElement) e).varName == null && ((ForElement) e).pattern == null) {
+            // A classic `for (var i = 0; ...) ...[..]`: what the body yields.
+            return elementTypeQuiet(((ForElement) e).body, ctx);
+        }
+        if (e instanceof ListLit || e instanceof CtorCall || e instanceof Call) {
+            return inferExprTypeQuiet(e, ctx);
         }
         return null;
     }
@@ -9051,7 +9384,12 @@ public final class JavaEmitter {
         // A type witness lets `of` infer K,V from the declared/inferred entry types (the
         // Object... varargs otherwise erase them to Object, breaking downstream `.idx` reads).
         String witness = "";
-        if (k != null && v != null && isConcreteType(k) && isConcreteType(v)) {
+        // A written type variable (`<dynamic, E>{}` in a mixin or generic class) is a
+        // witness too, when it is in scope here.
+        boolean writtenVars = m.keyType != null && m.valueType != null
+                && (isTypeVariable(k, ctx) || isTypeVariable(v, ctx))
+                && typeVarsInScope(k, ctx) && typeVarsInScope(v, ctx);
+        if (k != null && v != null && ((isConcreteType(k) && isConcreteType(v)) || writtenVars)) {
             witness = ".<" + javaType(k, true, ctx) + ", " + javaType(v, true, ctx) + ">";
         }
         StringBuilder sb = new StringBuilder("DartMap").append(witness.isEmpty() ? ".of(" : witness + "of(");
@@ -9217,7 +9555,15 @@ public final class JavaEmitter {
                     // too (DartLongList.isLongs): read through the live view, not a cast.
                     return new Out("dart.core.Dart" + pk + "List.view" + pk + "s(" + base + ")", promo);
                 }
-                return new Out("((" + javaType(promo, true, ctx) + ") " + base + ")", promo);
+                String pj = javaType(promo, true, ctx);
+                String lj = javaType(local, true, ctx);
+                if (lj.indexOf('<') > 0 && !pj.equals(lj)) {
+                    // A List promoted by `is Uint8List` / `is List<bool>`: from the
+                    // parameterized DartList<Object> javac rejects the direct cast to a list of
+                    // another argument; the `is` test that promoted it checked the value.
+                    base = "(Object) " + base;
+                }
+                return new Out("((" + pj + ") " + base + ")", promo);
             }
             return new Out(base, local);
         }
@@ -13169,6 +13515,42 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
      * a pair of mixins declaring one member no longer leaves Java with conflicting defaults.
      * Named and optional parameters, generic methods and setters are forwarded too.
      */
+    /**
+     * Whether {@link #emitMixinForwarders} gives {@code c} at least one
+     * {@code mx.super.m(...)} forwarder: the same test it applies, without emitting.
+     */
+    private boolean forwardsThroughMixin(ClassDecl c, ClassDecl mx, Ctx ctx) {
+        if (c.isMixin || c.mixins.isEmpty() || !mx.isMixin) {
+            return false;
+        }
+        java.util.Set<String> own = new HashSet<String>();
+        for (MethodDecl m : c.methods) {
+            own.add((m.isSetter ? "set$" : m.isGetter ? "get$" : "") + m.name);
+        }
+        for (FieldDecl f : c.fields) {
+            own.add("get$" + f.name);
+        }
+        ClassDecl sup = c.superclass != null ? superDeclOf(c, c.superclass) : null;
+        for (int mi = c.mixins.size() - 1; mi >= 0; mi--) {
+            if (program.resolveClass(c.mixins.get(mi).name, ctx.library()) != mx) {
+                continue;
+            }
+            for (MethodDecl m : mx.methods) {
+                boolean indexOp = "$index".equals(m.name) || "$indexSet".equals(m.name);
+                if (m.isStatic || m.isAbstract || (m.name.startsWith("$") && !indexOp)
+                        || !methodWitnesses(m).isEmpty()) {
+                    continue;
+                }
+                String key = (m.isSetter ? "set$" : m.isGetter ? "get$" : "") + m.name;
+                if (!own.contains(key) && (superChainHas(sup, m) || earlierMixinHas(c, mi, m, ctx)
+                        || earlierStubMixinDeclares(c, mi, m))) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     private void emitMixinForwarders(ClassDecl c, StringBuilder body, Ctx ctx) {
         if (c.isMixin || c.mixins.isEmpty()) {
             return;
@@ -14759,7 +15141,9 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                     // named (or named factory) constructor -> static factory
                     String tw = witnessArgs(pc, inferredWitnessTypeArgs(pc, c.typeArgs, callExpected(c, ctx)),
                             c, ctx);
-                    String na = canonicalArgs(named, c.args, ctx);
+                    // The owner types `this.parts` field formals, so `X._(List.from(parts))`
+                    // gets the field's type as the argument's context.
+                    String na = canonicalArgs(named, pc, c.args, ctx);
                     // `Transformer<Object, String>.fromHandlers(...)` is a Transformer<Object,
                     // String>: members read through it (bind's StreamSink<S>) see the arguments.
                     List<TypeRef> written = c.target instanceof Ident && ((Ident) c.target).typeArgs != null
@@ -15998,7 +16382,7 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             // its fill value's static type. Untyped, the list was a List<dynamic> where a
             // List<int> -- a DartLongList -- was promised.
             TypeRef inferredElem = null;
-            if (expected != null && expected.is("List") && expected.args.size() == 1
+            if (expected != null && (expected.is("List") || expected.is("Iterable")) && expected.args.size() == 1
                     && !isDynamicType(expected.arg(0)) && typeVarsInScope(expected.arg(0), ctx)) {
                 inferredElem = expected.arg(0);
             } else if (listType.args.isEmpty() && cc.ctorName.equals("filled") && cc.args.positional.size() > 1) {
@@ -16067,6 +16451,15 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         if (cc.ctorName.equals("filled")) {
             Out fillOut = emitExpr(pos.get(1), elem, ctx);
             String fill = pk == null ? boxIfPrimitive(fillOut, ctx) : coerce(fillOut, elem, ctx);
+            TypeRef ft = fillOut.type;
+            if (pk == null && listType.args.isEmpty() && ft != null && !isDynamicType(ft) && !ft.is("Null")
+                    && !ft.is("void") && ft.funcParams == null && typeVarsInScope(ft, ctx)
+                    && primitiveListKind(TypeRef.of("List", ft)) == null) {
+                // No context and a fill whose type only its emission reveals
+                // (`List.filled(n, style.separator())`): E is the fill's static type.
+                listType = TypeRef.of("List", ft);
+                witness = ".<" + javaType(ft, true, ctx) + ">";
+            }
             String args = len + ", " + fill + (growable != null ? ", " + growable : "");
             return new Out(cls + witness + "filled(" + args + ")", listType);
         }
@@ -16131,6 +16524,13 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
         }
         List<TypeRef> ta = c.typeArgs;
         boolean isMap = alias.equals("Map");
+        // `headers = LinkedHashMap(equals: ..)`, `final Queue<X> q = ListQueue()`: an omitted
+        // type argument is inferred downwards from the context, as in Dart.
+        TypeRef ctxType = callExpected(c, ctx);
+        if (ta.isEmpty() && ctxType != null && ctxType.is(alias)
+                && ctxType.args.size() == (isMap ? 2 : 1) && typeVarsInScope(ctxType, ctx)) {
+            ta = ctxType.args;
+        }
         TypeRef a0 = ta.isEmpty() ? TypeRef.DYNAMIC : ta.get(0);
         TypeRef a1 = ta.size() < 2 ? TypeRef.DYNAMIC : ta.get(1);
         TypeRef type = isMap ? TypeRef.of("Map", a0, a1) : TypeRef.of(alias, a0);
@@ -16231,6 +16631,29 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 l.elementType = TypeRef.DYNAMIC;
                 return emitExpr(l, null, ctx);
             }
+            // Dart infers an omitted type argument downwards from the context type
+            // (`List<String> f = List.from(src)`, `Map<String, String> m = Map.of({})`),
+            // so the factory goes through the typed path when the context names one.
+            TypeRef ctxType = callExpected(c, ctx);
+            if (c.typeArgs.isEmpty() && ctxType != null && ctxType.is(cls)
+                    && ctxType.args.size() == (cls.equals("Map") ? 2 : 1)
+                    && typeVarsInScope(ctxType, ctx)) {
+                boolean concrete = false;
+                for (TypeRef ta : ctxType.args) {
+                    concrete |= !isDynamicType(ta);
+                }
+                if (concrete) {
+                    CtorCall cc = new CtorCall();
+                    cc.file = c.file;
+                    cc.line = c.line;
+                    cc.col = c.col;
+                    cc.type = new TypeRef(cls);
+                    cc.type.args.addAll(ctxType.args);
+                    cc.ctorName = cls.equals("List") && n.equals("of") ? "from" : n;
+                    cc.args = c.args;
+                    return emitExpr(cc, ctxType, ctx);
+                }
+            }
             if (c.typeArgs.isEmpty() && (cls.equals("List") || cls.equals("Set"))
                     && (n.equals("of") || n.equals("from")) && pos.size() == 1 && c.args.named.isEmpty()) {
                 // No type argument: a List<dynamic> copy, whatever the source's element type.
@@ -16250,8 +16673,8 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             cc.ctorName = cls.equals("List") && n.equals("of") ? "from" : n;
             cc.args = c.args;
 
-            Out o = emitExpr(cc, null, ctx);
-            return o;
+            // The context still decides an omitted type argument (List.filled's fill).
+            return emitExpr(cc, ctxType, ctx);
         }
         if (cls.equals("String") || cls.equals("bool") || cls.equals("int")) {
             if (n.equals("fromEnvironment")) {
@@ -20023,9 +20446,11 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             return "String";
         }
         if (t.is("void")) {
-            // `void` as a type argument (e.g. Dart Route<void>) must box to Void;
-            // Java has no `void` type argument.
-            return box ? "Void" : "void";
+            // `void` as a type argument (e.g. Dart Route<void>, Memo<void>) boxes to
+            // Object, the erasure Future<void> already has: Dart's void slot accepts any
+            // value, and a Future<Void> from a generic Future<T> at T = void did not
+            // convert to the Future<Object> a `Future<void>` method declares.
+            return box ? "Object" : "void";
         }
         if (t.is("num")) {
             return "Number";
@@ -20953,6 +21378,18 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                 && isSubtypeName(o.type.name, target.name)
                 && !inheritsSameInstantiation(o.type, target)) {
             return "(" + javaType(copyNonNull(target), false, ctx) + ") (Object) " + paren(o.code);
+        }
+        // A raw `List`/`Map`/`Set`/`Iterable` slot is List<dynamic> (DartList<Object> in Java),
+        // and Dart lets any List<X> -- a Uint8List too -- into it covariantly.
+        if (target.name != null && target.args.isEmpty() && o.type != null && o.type.name != null
+                && (target.is("List") || target.is("Map") || target.is("Set") || target.is("Iterable"))
+                && (target.name.equals(o.type.name) || isSubtypeName(o.type.name, target.name)
+                    || ((target.is("List") || target.is("Iterable"))
+                        && o.type.name.matches("(Uint|Int|Float)(8|16|32|64)(Clamped)?List")))) {
+            String tj = javaType(copyNonNull(target), false, ctx);
+            if (tj.indexOf('<') > 0 && !tj.equals(javaType(copyNonNull(o.type), false, ctx))) {
+                return "(" + tj + ") (Object) " + paren(o.code);
+            }
         }
         // Covariant generic assignment: Dart lists/maps/futures are covariant in their type
         // arguments, but Java generics are invariant. When value and target are the SAME generic

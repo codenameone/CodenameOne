@@ -37,7 +37,9 @@ public final class Utf8Encoder extends Converter<Object, Object> {
     }
 
     @Override
-    public Object convert(Object input) {
+    // Covariant: Dart's Utf8Encoder.convert answers a Uint8List, so a typed
+    // `List<int> bytes = encoder.convert(s)` receives the list without a cast.
+    public dart.typed_data.Uint8List convert(Object input) {
         return Convert.utf8.encode(input);
     }
 }

@@ -92,8 +92,21 @@ import java.util.List;
  */
 public class Stream<T> {
 
+    /// Headless, an async* body runs on a thread of its own (see AsyncStar), so a
+    /// listen() or cancel() from that thread races the isolate thread delivering
+    /// events. Unguarded, the snapshot copy in emit() read a half-grown ArrayList
+    /// (a null Sub, or the new listener lost) and a periodic stream piped through
+    /// take(3) delivered two elements. Every read and write of subs and closed
+    /// holds subsLock; no listener callback runs under it.
+    private final Object subsLock = new Object();
     private final List<Sub> subs = new ArrayList<Sub>();
     private boolean closed;
+
+    private List<Sub> snapshotSubs() {
+        synchronized (subsLock) {
+            return new ArrayList<Sub>(subs);
+        }
+    }
 
     /** One event buffered by a paused subscription, delivered in order on resume(). */
     private static final class QueuedEvent {
@@ -234,8 +247,13 @@ public class Stream<T> {
      * own arity needs before it ever reaches here (see
      * {@code JavaEmitter}'s {@code onError} handling for {@code Stream.listen},
      * mirroring {@code Future.then}'s).</p>
+     *
+     * <p>Not final: a Dart class that {@code extends Stream<T>} and overrides
+     * {@code listen} (the documented way to implement a stream) is emitted as
+     * an override of exactly this overload. Every operator here subscribes to
+     * its source through it, so the override is what they reach.</p>
      */
-    public final StreamSubscription<T> listen(Funcs.VoidFunc1<T> onData, Object onError, Funcs.VoidFunc0 onDone,
+    public StreamSubscription<T> listen(Funcs.VoidFunc1<T> onData, Object onError, Funcs.VoidFunc0 onDone,
             Boolean cancelOnError) {
         Stream<T> target = perListener();
         if (target != this) {
@@ -247,7 +265,16 @@ public class Stream<T> {
         sub.onError = Zone.bindAny(onError);
         sub.onDone = (Funcs.VoidFunc0) Zone.bindAny(onDone);
         sub.cancelOnError = cancelOnError != null && cancelOnError.booleanValue();
-        if (closed) {
+        boolean wasClosed;
+        boolean first;
+        synchronized (subsLock) {
+            wasClosed = closed;
+            first = !wasClosed && subs.isEmpty();
+            if (!wasClosed) {
+                subs.add(sub);
+            }
+        }
+        if (wasClosed) {
             // The stream already finished (emitDone() already ran, from
             // StreamController#close or an EventSink's endOfStream). subs
             // is empty by now (emitDone() clears it), so treating this
@@ -264,8 +291,6 @@ public class Stream<T> {
             deliverVoid(sub.onDone);
             return new Handle(sub);
         }
-        boolean first = subs.isEmpty();
-        subs.add(sub);
         if (first) {
             onFirstListener();
         }
@@ -274,7 +299,9 @@ public class Stream<T> {
 
     /** True while at least one live (not cancelled) subscription exists. */
     protected final boolean hasListeners() {
-        return !subs.isEmpty();
+        synchronized (subsLock) {
+            return !subs.isEmpty();
+        }
     }
 
     /**
@@ -283,7 +310,7 @@ public class Stream<T> {
      */
     @SuppressWarnings("unchecked")
     protected final void emit(T value) {
-        for (Sub s : new ArrayList<Sub>(subs)) {
+        for (Sub s : snapshotSubs()) {
             if (s.cancelled) {
                 continue;
             }
@@ -302,7 +329,7 @@ public class Stream<T> {
      * cancels it once {@link #drain} actually delivers that error on resume().
      */
     protected final void emitError(Object error) {
-        for (Sub s : new ArrayList<Sub>(subs)) {
+        for (Sub s : snapshotSubs()) {
             if (s.cancelled) {
                 continue;
             }
@@ -332,9 +359,12 @@ public class Stream<T> {
      * matching the old {@code Future.value(null)}.</p>
      */
     protected final Future<Object> emitDone() {
-        closed = true;
-        List<Sub> snapshot = new ArrayList<Sub>(subs);
-        subs.clear();
+        List<Sub> snapshot;
+        synchronized (subsLock) {
+            closed = true;
+            snapshot = new ArrayList<Sub>(subs);
+            subs.clear();
+        }
         PendingClose pendingClose = new PendingClose();
         boolean hadListeners = false;
         for (Sub s : snapshot) {
@@ -382,8 +412,11 @@ public class Stream<T> {
             s.pendingClose.resolve();
             s.pendingClose = null;
         }
-        subs.remove(s);
-        if (subs.isEmpty() && !closed) {
+        boolean none;
+        synchronized (subsLock) {
+            none = subs.remove(s) && subs.isEmpty() && !closed;
+        }
+        if (none) {
             onNoListeners();
         }
     }

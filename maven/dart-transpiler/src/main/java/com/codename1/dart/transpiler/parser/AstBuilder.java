@@ -812,6 +812,36 @@ public final class AstBuilder {
             } else if (d.varOrType() != null && d.varOrType().type() != null) {
                 type = buildType(d.varOrType().type());
             }
+            if (d.initializedIdentifierList() != null && d.ABSTRACT_() != null && !isStatic) {
+                // `abstract final T x;` declares no storage: it is an abstract
+                // getter (plus an abstract setter unless final). Emitting a field
+                // made a mixin's abstract field collide with the implementing
+                // class's real one when the mixin was applied.
+                for (Dart2Parser.InitializedIdentifierContext ii : d.initializedIdentifierList().initializedIdentifier()) {
+                    MethodDecl g = new MethodDecl();
+                    pos(g, ii);
+                    g.isGetter = true;
+                    g.isAbstract = true;
+                    g.name = ii.identifier().getText();
+                    g.returnType = type;
+                    cd.methods.add(g);
+                    if (!isFinal) {
+                        MethodDecl st = new MethodDecl();
+                        pos(st, ii);
+                        st.isSetter = true;
+                        st.isAbstract = true;
+                        st.name = g.name;
+                        st.returnType = TypeRef.VOID;
+                        Param p = new Param();
+                        pos(p, ii);
+                        p.name = "value";
+                        p.type = type;
+                        st.params.add(p);
+                        cd.methods.add(st);
+                    }
+                }
+                return;
+            }
             if (d.initializedIdentifierList() != null) {
                 for (Dart2Parser.InitializedIdentifierContext ii : d.initializedIdentifierList().initializedIdentifier()) {
                     FieldDecl f = new FieldDecl();
@@ -3082,7 +3112,7 @@ public final class AstBuilder {
                     } else {
                         Ident id = new Ident();
                         id.at(file, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
-                        id.name = simpleName;
+                        id.name = Dart2LexerBase.mangleObjectMember(simpleName);
                         lit.parts.add(id);
                     }
                     i = j;

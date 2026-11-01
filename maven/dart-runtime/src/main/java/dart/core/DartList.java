@@ -254,6 +254,33 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
         return impl.set(index, element);
     }
 
+    /// `value is List<X>` for an element type X that is a plain class (bool, String,
+    /// num): true when value is a list whose every element is an X (or null, when the
+    /// element type is nullable).
+    ///
+    /// A list carries no witness of its type argument -- generic code builds a boxed
+    /// DartList whatever the argument was (see the IsTest note in the transpiler's
+    /// JavaEmitter) -- so the elements are what can be checked, as DartLongList.isLongs
+    /// does for List<int>. The answer is sound for every read the test promotes: no
+    /// element of another type can reach a read typed X. Where it differs from Dart is
+    /// a list whose elements all happen to be X but whose argument is wider (an empty
+    /// List<String>, or `<Object>['a']`), which Dart answers false and this answers
+    /// true. Answering false for those would need a witness on every list.
+    public static boolean allInstances(Object value, Class<?> type, boolean nullable) {
+        if (!(value instanceof DartList)) {
+            return false;
+        }
+        DartList<?> l = (DartList<?>) value;
+        int n = l.size();
+        for (int i = 0; i < n; i++) {
+            Object e = l.get(i);
+            if (e == null ? !nullable : !type.isInstance(e)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     @Override
     public int size() {
         return impl.size();
