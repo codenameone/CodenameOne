@@ -51,6 +51,10 @@ public final class Attribute {
     /// itself is TEXT storage through TemporalConverter; this picks the DDL type
     /// and what an existing column may be.
     public final int temporal;
+    /// False for `@Column(insertable = false)`: no INSERT names the column.
+    public final boolean insertable;
+    /// False for `@Column(updatable = false)`: no dirty-checking UPDATE names it.
+    public final boolean updatable;
     /// The kind that decides SQL semantics -- collation, LIKE, the text
     /// functions -- as opposed to [#kind], which decides how a value is bound and
     /// read. A `@Temporal` column exchanges text through its converter but is a
@@ -68,6 +72,12 @@ public final class Attribute {
     }
     public Attribute(String field, String column, int kind, boolean id, boolean generated, boolean nullable,
             boolean version, String declaredType, int temporal) {
+        this(field, column, kind, id, generated, nullable, version, declaredType, temporal, true, true);
+    }
+    public Attribute(String field, String column, int kind, boolean id, boolean generated, boolean nullable,
+            boolean version, String declaredType, int temporal, boolean insertable, boolean updatable) {
+        this.insertable = insertable;
+        this.updatable = updatable;
         this.temporal = temporal;
         this.declaredType = declaredType;
         this.field = field;

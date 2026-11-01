@@ -2899,7 +2899,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             model.set(entry.entity, version, Long.valueOf(0));
         }
         for (int i = 0; i < attrs.length; i++) {
-            if (attrs[i].generated) {
+            if (!inserted(attrs[i])) {
                 continue;
             }
             if (!args.isEmpty()) {
@@ -2948,13 +2948,18 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         entry.snapshot = snapshot(model, entry.entity);
         int arg = 0;
         for (int i = 0; i < attrs.length; i++) {
-            if (!attrs[i].generated) {
+            if (inserted(attrs[i])) {
                 Object value = args.get(arg++);
                 entry.snapshot[i] = value instanceof byte[] ? ((byte[]) value).clone() : value;
             }
         }
         model.lifecycle(entry.entity, 1);
         cascadePersist(entry);
+    }
+    /// Whether an INSERT names the column: not a generated key, and not a
+    /// `@Column(insertable = false)` one, whose row starts at the database default.
+    private static boolean inserted(Attribute a) {
+        return !a.generated && a.insertable;
     }
     private void completeInsert(Entry entry) {
         checkManagedIdentity(entry);
@@ -3067,7 +3072,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         }
         boolean dirty = false;
         for (int i = 0; i < attrs.length; i++) {
-            if (!attrs[i].id && !attrs[i].version && !same(now[i], entry.snapshot[i])) {
+            if (!attrs[i].id && !attrs[i].version && attrs[i].updatable && !same(now[i], entry.snapshot[i])) {
                 dirty = true;
             }
         }
@@ -3098,7 +3103,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         List<Object> args = new ArrayList<Object>();
         StringBuilder set = new StringBuilder();
         for (int i = 0; i < attrs.length; i++) {
-            if (attrs[i].id || attrs[i].version || same(now[i], entry.snapshot[i])) {
+            if (attrs[i].id || attrs[i].version || !attrs[i].updatable || same(now[i], entry.snapshot[i])) {
                 continue;
             }
             if (!args.isEmpty()) {

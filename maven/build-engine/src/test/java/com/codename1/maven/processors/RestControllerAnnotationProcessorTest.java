@@ -178,6 +178,49 @@ public class RestControllerAnnotationProcessorTest {
         assertEquals("{\"body\":\"hi\"}", Router.bodyOf(response));
     }
 
+    /// `consumes` answers 415 to a request outside it, `produces` 406 to one that
+    /// accepts none of it; the class's apply where the method names none.
+    @Test
+    public void consumesAndProducesNegotiate() throws Exception {
+        Router router = generate("package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController @RequestMapping(value = \"/m\", produces = \"application/json\")\n"
+                + "public class Notes {\n"
+                + "  @PostMapping(value = \"/in\", consumes = {\"application/json\", \"text/*\"})\n"
+                + "  public String in(@RequestBody String body) { return \"ok\"; }\n"
+                + "  @GetMapping(value = \"/out\")\n"
+                + "  public String out() { return \"ok\"; }\n"
+                + "}\n");
+        assertEquals(415, Router.statusOf(router.callWith("POST", "/m/in", "x", "Content-Type: application/xml")));
+        assertEquals(415, Router.statusOf(router.callWith("POST", "/m/in", "x")));
+        assertEquals(200, Router.statusOf(router.callWith("POST", "/m/in", "x", "Content-Type: Application/JSON; charset=utf-8")));
+        assertEquals(200, Router.statusOf(router.callWith("POST", "/m/in", "x", "Content-Type: text/plain")));
+        assertEquals(406, Router.statusOf(router.callWith("GET", "/m/out", null, "Accept: text/html")));
+        assertEquals(406, Router.statusOf(router.callWith("GET", "/m/out", null, "Accept: application/json;q=0, text/html")));
+        assertEquals(200, Router.statusOf(router.callWith("GET", "/m/out", null, "Accept: text/html, */*;q=0.1")));
+        assertEquals(200, Router.statusOf(router.callWith("GET", "/m/out", null)));
+    }
+
+    /// A `@CrossOrigin` route reports its own policy, the preflight included, and
+    /// a route without one reports none so the global policy applies.
+    @Test
+    public void crossOriginNamesTheRoutesPolicy() throws Exception {
+        Router router = generate("package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController @RequestMapping(\"/c\")\n"
+                + "public class Notes {\n"
+                + "  @CrossOrigin(origins = \"https://app.example.com\", allowCredentials = true)\n"
+                + "  @GetMapping(\"/items/{id}\") public String item(@PathVariable(\"id\") String id) { return id; }\n"
+                + "  @GetMapping(\"/plain\") public String plain() { return \"p\"; }\n"
+                + "}\n");
+        assertNotNull(router.corsPolicy("GET", "/c/items/7"));
+        assertNotNull("a preflight is matched by the method it asks about",
+                router.corsPolicy("OPTIONS", "/c/items/7", "Origin: https://app.example.com",
+                        "Access-Control-Request-Method: GET"));
+        assertNull(router.corsPolicy("POST", "/c/items/7"));
+        assertNull(router.corsPolicy("GET", "/c/plain"));
+    }
+
     @Test
     public void doesNotMatchWhatItShouldNot() throws Exception {
         Router router = generate(CONTROLLER_SOURCE);
@@ -2044,6 +2087,16 @@ public class RestControllerAnnotationProcessorTest {
             return handle.invoke(instance, request(method, target, body));
         }
 
+        /// A request carrying `headers`, each "Name: value".
+        Object callWith(String method, String target, String body, String... headers) throws Exception {
+            return handle.invoke(instance, request(method, target, body, headers));
+        }
+
+        Object corsPolicy(String method, String target, String... headers) throws Exception {
+            return instance.getClass().getMethod("corsPolicy", HttpServer.Request.class)
+                    .invoke(instance, request(method, target, null, headers));
+        }
+
         String text2(String method, String target, String body) throws Exception {
             Object response = call(method, target, body);
             assertNotNull(method + " " + target + " matched no route", response);
@@ -2071,13 +2124,25 @@ public class RestControllerAnnotationProcessorTest {
             return new String((byte[]) bodyField.get(response), "UTF-8");
         }
 
-        private static HttpServer.Request request(String method, String target, String body)
-                throws Exception {
+        private static HttpServer.Request request(String method, String target, String body,
+                String... headers) throws Exception {
             reflect();
-            byte[] raw = (method + " " + target + " HTTP/1.1\r\nUser-Agent: probe\r\n\r\n")
-                    .getBytes("UTF-8");
+            StringBuilder text = new StringBuilder(method + " " + target + " HTTP/1.1\r\n");
+            int[] slices = new int[headers.length * 4];
+            for (int i = 0; i < headers.length; i++) {
+                int colon = headers[i].indexOf(':');
+                String name = headers[i].substring(0, colon);
+                String value = headers[i].substring(colon + 1).trim();
+                slices[i * 4] = text.length();
+                slices[i * 4 + 1] = name.length();
+                text.append(name).append(": ");
+                slices[i * 4 + 2] = text.length();
+                slices[i * 4 + 3] = value.length();
+                text.append(value).append("\r\n");
+            }
+            byte[] raw = text.append("\r\n").toString().getBytes("UTF-8");
             return (HttpServer.Request) requestCtor.newInstance(method, target, "HTTP/1.1", raw,
-                    new int[0], 0, body, Integer.valueOf(method.length() + 1),
+                    slices, Integer.valueOf(headers.length), body, Integer.valueOf(method.length() + 1),
                     Integer.valueOf(target.getBytes("UTF-8").length));
         }
 

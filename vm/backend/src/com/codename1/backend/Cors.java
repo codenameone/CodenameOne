@@ -37,7 +37,7 @@ import java.util.List;
 /// itself, so an endpoint with an origin policy of its own -- the MCP endpoint --
 /// keeps it. An ordinary response gains the headers only when its handler set no
 /// `Access-Control-Allow-Origin` of its own.
-final class Cors {
+public final class Cors {
     static final String ALLOWED_ORIGINS = "cn1.cors.allowedOrigins";
     static final String ALLOWED_METHODS = "cn1.cors.allowedMethods";
     static final String ALLOWED_HEADERS = "cn1.cors.allowedHeaders";
@@ -66,6 +66,20 @@ final class Cors {
 
     /// Whether the server speaks TLS; set once, before it serves anything.
     private boolean tls;
+
+    /// Whether this is a `@CrossOrigin` route's policy. Those are static objects
+    /// of the generated router, made before the server starts, so they read the
+    /// scheme from [#ROUTES_TLS] rather than from a field the server sets.
+    private boolean route;
+
+    /// Whether the running server speaks TLS, for route policies.
+    private static final java.util.concurrent.atomic.AtomicBoolean ROUTES_TLS =
+            new java.util.concurrent.atomic.AtomicBoolean();
+
+    /// Records, for every route policy, whether the server speaks TLS.
+    static void routesServedOverTls(boolean value) {
+        ROUTES_TLS.set(value);
+    }
 
     /// Records whether requests arrive over TLS, which decides the scheme of the
     /// server's own origin.
@@ -114,6 +128,48 @@ final class Cors {
                 config.get(EXPOSED_HEADERS, ""),
                 credentials,
                 config.getInt(MAX_AGE, 1800));
+    }
+
+    /// The policy of a `@CrossOrigin` route, built once by the generated router.
+    /// An empty `methods` allows every method, since the route already decides
+    /// which one it answers; `origins` follow the same rules as
+    /// `cn1.cors.allowedOrigins`.
+    ///
+    /// @throws IllegalArgumentException for an origin that is not
+    ///         scheme://host[:port], or credentials allowed with `*`
+    public static Cors policy(String[] origins, String[] methods, String[] headers, String[] exposed,
+                              boolean credentials, int maxAge) {
+        List listed = new ArrayList();
+        for (int i = 0; i < origins.length; i++) {
+            String origin = origins[i].trim();
+            if ("*".equals(origin)) {
+                listed.add(origin);
+            } else if (isOrigin(origin)) {
+                listed.add(canonicalOrigin(origin));
+            } else {
+                throw new IllegalArgumentException("@CrossOrigin names \"" + origin
+                        + "\"; an origin is scheme://host[:port], with no path");
+            }
+        }
+        if (credentials && listed.contains("*")) {
+            throw new IllegalArgumentException("@CrossOrigin(allowCredentials = true) needs the origins "
+                    + "listed; a browser refuses credentials with *");
+        }
+        Cors policy = new Cors(listed, methods.length == 0 ? "*" : join(methods), join(headers),
+                join(exposed), credentials, maxAge);
+        policy.route = true;
+        return policy;
+    }
+
+    private static String join(String[] values) {
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < values.length; i++) {
+            if (i > 0) {
+                out.append(", ");
+            }
+            out.append(values[i].trim());
+        }
+        return out.toString();
     }
 
     /// Whether `origin` may read responses.
@@ -197,7 +253,7 @@ final class Cors {
                 return first;
             }
         }
-        return tls ? "https" : "http";
+        return (route ? ROUTES_TLS.get() : tls) ? "https" : "http";
     }
 
     /// Whether `origin` names the server the request was sent to: the same scheme,

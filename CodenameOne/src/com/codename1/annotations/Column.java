@@ -58,4 +58,16 @@ public @interface Column {
     /// engine spells differently (`TEXT`/`VARCHAR`, `REAL`/`DOUBLE PRECISION`,
     /// `BLOB`/`BYTEA`).
     String type() default "";
+    /// When false the column is left out of every `INSERT` the ORM writes, so the
+    /// row starts with the column's database default. The field's value at
+    /// insert time is ignored, not written.
+    boolean insertable() default true;
+    /// When false the column is left out of every `UPDATE` the ORM writes for a
+    /// changed entity, so a save never overwrites it. The column can still be
+    /// written by a query of the application's own -- a `@Modifying @Query` that
+    /// claims a row with a compare-and-swap, for example -- which is what makes
+    /// `insertable = false, updatable = false` a column only that statement owns.
+    /// A change made to the field alone is ignored: it neither writes the column
+    /// nor marks the entity dirty.
+    boolean updatable() default true;
 }

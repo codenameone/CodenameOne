@@ -481,6 +481,12 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                 if(converterClass==null || !hasPublicNoArgConstructor(converterClass)) ctx.error(cls,"Converter requires a public no-arg constructor: "+pf.converter);
                 if(f.getAnnotation(ID_DESC)!=null || pf.version || ec.embeddedId!=null && pf.fieldName.startsWith(ec.embeddedId+".")) ctx.error(cls,"Identifier and version fields cannot declare converters");
             }
+            // @Lob is accepted for a ported JPA entity and changes no column: every
+            // string and byte column is already a large one (see Lob). Only the type is checked.
+            if(f.getAnnotation("Lcom/codename1/annotations/db/Lob;")!=null && !("java.lang.String".equals(pf.javaType)
+                    || "byte[]".equals(pf.javaType) || "char[]".equals(pf.javaType) || pf.converter!=null)) {
+                ctx.error(cls,"@Lob applies to a String, char[] or byte[] field: "+pf.fieldName);
+            }
             AnnotationValues temporal=f.getAnnotation("Lcom/codename1/annotations/db/Temporal;");
             if(temporal!=null) {
                 // A native date or timestamp column, opted into per field. It is
@@ -560,6 +566,11 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
                 colName = col.getString("name");
                 colType = col.getString("type");
                 nullable = col.getBoolOrDefault("nullable", true);
+                pf.insertable = col.getBoolOrDefault("insertable", true);
+                pf.updatable = col.getBoolOrDefault("updatable", true);
+                if ((!pf.insertable || !pf.updatable) && (f.getAnnotation(ID_DESC) != null || pf.version)) {
+                    ctx.error(cls, "@Column(insertable/updatable=false) cannot be used on an @Id or @Version field: " + pf.fieldName);
+                }
             }
             pf.columnName = (colName == null || colName.length() == 0) ? physical(pf.fieldName)
                     : physical(fieldPath.prefix)+colName;
@@ -1535,7 +1546,8 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
               .append(", ").append(f.isId).append(", ").append(f.isId && f.autoIncrement)
               .append(", ").append(f.nullable).append(", ").append(f.version).append(", ")
               .append(f.explicitSqlType==null?"null":"\""+escape(f.explicitSqlType)+"\"")
-              .append(f.temporal==0?"":", "+f.temporal).append(")")
+              .append(f.temporal==0 && f.insertable && f.updatable?"":", "+f.temporal)
+              .append(f.insertable && f.updatable?"":", "+f.insertable+", "+f.updatable).append(")")
               .append(i + 1 < ec.fields.size() ? ",\n" : "\n");
         }
         sb.append("  };\n  public Class<").append(ec.binaryName).append("> type() { return ")
@@ -3165,6 +3177,8 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         boolean autoIncrement;
         boolean version;
         boolean unique;
+        /// @Column(insertable/updatable); both true unless the developer said otherwise.
+        boolean insertable = true, updatable = true;
         RelationField relation;
         int relationPart;
         PropertyTypeKind kind;
