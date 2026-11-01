@@ -36,13 +36,21 @@ import com.codenameone.examples.dash.ui.Nav;
 import com.codenameone.examples.dash.forge.PackEditor;
 import java.io.File;
 
-/// The promotional video: the simulator's own recorder films a tour of the
+/// The promotional videos: the simulator's own recorder films a tour of the
 /// game with captions -- a run, a city route, a live race with chat, the
-/// level editor and the boards. It is not a test of anything the others do
-/// not cover, so it runs only when asked for (`run-e2e.sh --video`, which
-/// names the file in `dash.e2e.video`).
+/// level editor and the boards -- and, when `dash.e2e.clip` names a second
+/// file, a short gameplay clip inside the phone's skin first. It is not a
+/// test of anything the others do not cover, so it runs only when asked for
+/// (`run-e2e.sh --video`, which names the files in `dash.e2e.video` and
+/// `dash.e2e.clip`).
 public class PromoVideoTest extends E2e {
     private SimulatorRecorder recorder;
+
+    /// The clip and the whole tour play in real time, about five minutes.
+    @Override
+    public int getTimeoutMillis() {
+        return 600000;
+    }
 
     @Override
     protected boolean run() throws Exception {
@@ -59,7 +67,11 @@ public class PromoVideoTest extends E2e {
             signIn(PLAYER);
             waitForForm("home");
             waitFor(1500);
-            record(out);
+            String clip = System.getProperty("dash.e2e.clip");
+            if (clip != null && clip.length() > 0) {
+                clip(clip);
+            }
+            record(out, RecordingOptions.Frame.SCREEN, 240);
             caption("Dash -- a runner you can make your own", 2600);
             waitFor(2800);
 
@@ -201,16 +213,43 @@ public class PromoVideoTest extends E2e {
         }
     }
 
-    private void record(String out) throws Exception {
+    /// About forty seconds of play in the phone's skin: one run of the
+    /// causeway from its side-on start through the swing into 3D.
+    private void clip(String out) throws Exception {
+        record(out, RecordingOptions.Frame.SKIN, 90);
+        caption("Dash", 1800);
+        click("runButton");
+        waitForForm("levels");
+        waitFor(900);
+        click("play-" + Content.CAUSEWAY);
+        waitForForm("run");
+        RunView view = track();
+        driveTo(view, 280);
+        caption("2D to 3D, mid-run", 2600);
+        driveTo(view, 420);
+        driveFor(view, 6000);
+        caption("Built with Codename One", 2600);
+        driveFor(view, 2800);
+        finish(view, 60 * 600);
+        collectAll();
+        SimulatorRecorder.Result r = recorder.stop();
+        recorder = null;
+        log("Recorded " + r.file + ": " + r.durationMs + " ms, " + r.frames + " frames"
+                + (r.note == null ? "" : " -- " + r.note));
+        assertTrue(r.frames > 0, "clip frames recorded");
+        home();
+    }
+
+    private void record(String out, RecordingOptions.Frame frame, int maxSeconds) throws Exception {
         recorder = JavaSEPort.instance.getSimulatorRecorder();
         RecordingOptions o = new RecordingOptions();
         o.setPath(new File(out).getAbsolutePath());
         o.setFps(30);
-        o.setScale(0.5f);
-        o.setFrame(RecordingOptions.Frame.SCREEN);
-        o.setTouches(TouchOverlay.Style.NONE);
-        o.setAudio(RecordingOptions.Audio.NONE);
-        o.setMaxSeconds(180);
+        o.setScale(1f);
+        o.setFrame(frame);
+        o.setTouches(TouchOverlay.Style.DOT);
+        o.setAudio(RecordingOptions.Audio.APP);
+        o.setMaxSeconds(maxSeconds);
         recorder.start(o);
     }
 

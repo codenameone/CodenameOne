@@ -10,7 +10,8 @@
 #   run-e2e.sh [--prebuilt] [--video]
 #
 # --video also films the promotional tour (PromoVideoTest) with the
-# simulator's recorder into target/dash-promo.mp4; it needs ffmpeg.
+# simulator's recorder into target/dash-promo.mp4, and a short gameplay clip
+# in the phone skin into target/dash-gameplay.mp4; it needs ffmpeg.
 #
 # On Linux it wraps the simulator in xvfb-run when that is installed.
 set -euo pipefail
@@ -25,7 +26,7 @@ VIDEO=
 for arg in "$@"; do
   case "$arg" in
     --prebuilt) BUILD=0 ;;
-    --video) VIDEO="-Ddash.e2e.video=$HERE/target/dash-promo.mp4" ;;
+    --video) VIDEO="-Ddash.e2e.video=$HERE/target/dash-promo.mp4 -Ddash.e2e.clip=$HERE/target/dash-gameplay.mp4" ;;
     *) echo "[dash-e2e] unknown option: $arg" >&2; exit 2 ;;
   esac
 done

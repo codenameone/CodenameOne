@@ -204,10 +204,9 @@ public abstract class E2e extends AbstractTest {
         return (RunView) findByName("track");
     }
 
-    /// Runs the level with the bot's thumbs: every frame, whatever the bot
-    /// would press goes through the same `input` a swipe reaches. The bot
-    /// decides a frame early now and then, so a test asserts that the run
-    /// ended, never that it was won.
+    /// Runs the level with the bot's thumbs: before every tick, whatever the
+    /// bot would press goes through the same `input` a swipe reaches. A test
+    /// still asserts that the run ended, never that it was won.
     protected void drive(final RunView view, int timeoutMillis) {
         if (!driveFor(view, timeoutMillis)) {
             assertTrue(false, "the run did not end in " + timeoutMillis + " ms");
@@ -221,20 +220,24 @@ public abstract class E2e extends AbstractTest {
         // A race applies an input when the server has stamped it, at least
         // INPUT_DELAY ticks on, so the bot looks that much further ahead.
         final Bot bot = new Bot(7, 90, view.driver() instanceof RaceDriver ? GameProtocol.INPUT_DELAY + 4 : 0);
-        long end = System.currentTimeMillis() + millis;
-        while (System.currentTimeMillis() < end) {
-            final boolean[] over = new boolean[1];
-            onEdt(() -> {
-                Run run = view.driver().run();
-                over[0] = run.over();
-                if (!over[0]) {
-                    view.driver().input(bot.decide(run, view.driver().me()));
-                }
-            });
-            if (over[0]) {
-                return true;
+        onEdt(() -> view.setBeforeTick(() -> {
+            Run run = view.driver().run();
+            if (!run.over()) {
+                view.driver().input(bot.decide(run, view.driver().me()));
             }
-            waitFor(16);
+        }));
+        try {
+            long end = System.currentTimeMillis() + millis;
+            while (System.currentTimeMillis() < end) {
+                final boolean[] over = new boolean[1];
+                onEdt(() -> over[0] = view.driver().run().over());
+                if (over[0]) {
+                    return true;
+                }
+                waitFor(16);
+            }
+        } finally {
+            onEdt(() -> view.setBeforeTick(null));
         }
         return false;
     }

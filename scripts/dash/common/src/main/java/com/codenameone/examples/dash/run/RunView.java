@@ -87,6 +87,7 @@ public class RunView extends GameView {
     private static final int TOWERS = 2;
 
     private final Driver driver;
+    private Runnable beforeTick;
     private Hud hud;
     private GraphicsDevice device;
     private Mesh cube;
@@ -191,6 +192,14 @@ public class RunView extends GameView {
 
     public Driver driver() {
         return driver;
+    }
+
+    /// Runs `hook` on the EDT before every simulation tick, however many
+    /// ticks a slow frame catches up on -- an autopilot that decides per
+    /// tick never misses a jump the way one polling per frame does. The
+    /// tests and the promo recordings steer with it; null removes it.
+    public void setBeforeTick(Runnable hook) {
+        beforeTick = hook;
     }
 
     @Override
@@ -446,6 +455,9 @@ public class RunView extends GameView {
                 break;
             }
             remember();
+            if (beforeTick != null) {
+                beforeTick.run();
+            }
             driver.step();
             events();
             accumulator -= TICK;
