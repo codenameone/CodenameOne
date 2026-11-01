@@ -269,6 +269,10 @@ public final class AstBuilder {
             if (mx.typeParameters() != null) {
                 for (Dart2Parser.TypeParameterContext tp : mx.typeParameters().typeParameter()) {
                     cd.typeParams.add(tp.identifier().getText());
+                    // `mixin M<E extends Item>`: members of E read through the bound
+                    if (tp.typeNotVoid() != null) {
+                        cd.typeParamBounds.put(tp.identifier().getText(), buildTypeNotVoid(tp.typeNotVoid()));
+                    }
                 }
             }
             cd.javaName = javaName;

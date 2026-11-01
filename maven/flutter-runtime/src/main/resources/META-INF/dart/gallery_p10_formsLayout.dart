@@ -200,6 +200,9 @@ class TableRow {
 
 enum TableCellVerticalAlignment { top, middle, bottom, baseline, fill, intrinsicHeight }
 
+@JavaName('com.codename1.flutter.widgets.TableCellVerticalAlignment')
+enum TableCellVerticalAlignment { top, middle, bottom, baseline, fill, intrinsicHeight }
+
 @JavaName('com.codename1.flutter.widgets.TableCell')
 class TableCell extends Widget {
   external TableCell({Key? key, TableCellVerticalAlignment? verticalAlignment, required Widget child});

@@ -245,6 +245,8 @@ class TextStyle {
 
 @JavaName('com.codename1.flutter.IconData')
 class IconData {
+  external const IconData(int codePoint, {String? fontFamily, String? fontPackage,
+      bool matchTextDirection = false, List<String>? fontFamilyFallback});
   external int get codePoint;
   external String? get fontFamily;
   external String? get fontPackage;
@@ -2682,8 +2684,11 @@ abstract class Theme {
 @JavaName('com.codename1.flutter.BoxFit')
 enum BoxFit { fill, contain, cover, fitWidth, fitHeight, none }
 
+@JavaName('com.codename1.flutter.AlignmentGeometry')
+abstract class AlignmentGeometry {}
+
 @JavaName('com.codename1.flutter.Alignment')
-abstract class Alignment {
+abstract class Alignment extends AlignmentGeometry {
   external static Alignment get topLeft;
   external static Alignment get topCenter;
   external static Alignment get topRight;

@@ -109,6 +109,17 @@ abstract class StreamTransformer<S, T> {
 }
 
 
+// Dart's StreamTransformerBase: a transformer that only supplies bind.
+@JavaName('dart.async.StreamTransformerBase')
+abstract class StreamTransformerBase<S, T> implements StreamTransformer<S, T> {
+  external StreamTransformerBase();
+  Stream<T> bind(Stream<S> stream);
+}
+
+typedef ZoneCallback<R> = R Function();
+typedef ZoneUnaryCallback<R, T> = R Function(T);
+typedef ZoneBinaryCallback<R, T1, T2> = R Function(T1, T2);
+
 @JavaName('dart.async.StreamConsumer')
 abstract class StreamConsumer<S> {
   external Future addStream(Stream<S> stream);

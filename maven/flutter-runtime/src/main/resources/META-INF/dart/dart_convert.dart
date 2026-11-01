@@ -86,6 +86,11 @@ abstract class ByteConversionSink {
   external void close();
 }
 
+@JavaName('dart.convert.ByteConversionSinkBase')
+abstract class ByteConversionSinkBase extends ByteConversionSink {
+  external ByteConversionSinkBase();
+}
+
 @JavaName('dart.convert.Utf8Encoder')
 class Utf8Encoder extends Converter<String, List<int>> {
   external Utf8Encoder();

@@ -37,7 +37,7 @@ enum WrapCrossAlignment { start, end, center }
 // --- directional alignment -------------------------------------------
 
 @JavaName('com.codename1.flutter.AlignmentDirectional')
-abstract class AlignmentDirectional {
+abstract class AlignmentDirectional extends AlignmentGeometry {
   external static AlignmentDirectional get topStart;
   external static AlignmentDirectional get topCenter;
   external static AlignmentDirectional get topEnd;

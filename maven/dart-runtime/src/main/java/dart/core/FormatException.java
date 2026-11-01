@@ -25,10 +25,63 @@ package dart.core;
 
 /**
  * Dart's FormatException (int.parse / double.parse failures etc.).
+ *
+ * <p>Dart code may also declare its own format errors with {@code implements
+ * FormatException}; the transpiler makes such a class extend this one, so it is caught
+ * by {@code on FormatException}. Its {@code message}, {@code source} and {@code offset}
+ * getters override these accessors, and {@link #getMessage()} (what {@code e.message}
+ * reads) follows the override.
  */
 public class FormatException extends RuntimeException {
+    private final String message;
+    private final Object source;
+    private final Long offset;
+
+    public FormatException() {
+        this("", null, null);
+    }
+
     public FormatException(String message) {
+        this(message, null, null);
+    }
+
+    public FormatException(String message, Object source, Long offset) {
         super(message);
+        this.message = message;
+        this.source = source;
+        this.offset = offset;
+    }
+
+    public String get$message() {
+        return message;
+    }
+
+    public Object get$source() {
+        return source;
+    }
+
+    public Long get$offset() {
+        return offset;
+    }
+
+    // A subclass's `final String message` field surfaces as an override of get$message(),
+    // an explicit `get source => ...` as an override of source(): each name delegates to
+    // the other, so whichever one the subclass overrides is what every reader sees.
+    public String message() {
+        return get$message();
+    }
+
+    public Object source() {
+        return get$source();
+    }
+
+    public Long offset() {
+        return get$offset();
+    }
+
+    @Override
+    public String getMessage() {
+        return message();
     }
 
     @Override
