@@ -104,6 +104,12 @@ public final class Dyn {
         if (name.equals("runtimeType")) {
             return o == null ? null : o.getClass();
         }
+        if (o instanceof DynamicObject) {
+            Object v = ((DynamicObject) o).noSuchMethod(dart.core.Invocation.getter(name));
+            if (v != NO_MEMBER) {
+                return v;
+            }
+        }
         throw noSuch(o, name);
     }
 
@@ -268,6 +274,10 @@ public final class Dyn {
         if (o instanceof DynamicObject && ((DynamicObject) o).$dset(name, value)) {
             return value;
         }
+        if (o instanceof DynamicObject
+                && ((DynamicObject) o).noSuchMethod(dart.core.Invocation.setter(name, value)) != NO_MEMBER) {
+            return value;
+        }
         throw noSuch(o, name + "=");
     }
 
@@ -340,6 +350,13 @@ public final class Dyn {
             Object f = ((DynamicObject) o).$dget(name);
             if (f != NO_MEMBER && f != null && isFunction(f)) {
                 return invoke(f, args);
+            }
+            if (!(args.length == 0 && name.equals("toString")) && !(args.length == 1 && name.equals("=="))) {
+                // No member: Dart hands the call to noSuchMethod before throwing.
+                Object r = ((DynamicObject) o).noSuchMethod(dart.core.Invocation.method(name, args, named));
+                if (r != NO_MEMBER) {
+                    return r;
+                }
             }
         } else if (name.equals("call") && isFunction(o)) {
             return invoke(o, args);

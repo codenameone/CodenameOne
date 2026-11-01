@@ -127,7 +127,6 @@ public class DartDoubleList extends DartList<Double> {
     /// itself when it already is one, else a live DoubleListView over the boxed DartList that
     /// generic code built (`List<E>.of(..)` with E bound to double at the use site). Unlike
     /// asDoubles this never copies, so writes through either side reach the same list.
-    @SuppressWarnings("unchecked")
     public static DartDoubleList viewDoubles(Object value) {
         if (value == null || value instanceof DartDoubleList) {
             return (DartDoubleList) value;
@@ -139,6 +138,7 @@ public class DartDoubleList extends DartList<Double> {
                 + "' is not a subtype of type 'List<double>'");
     }
 
+    @SuppressWarnings("unchecked")
     public static DartDoubleList asDoubles(Object value) {
         if (value == null || value instanceof DartDoubleList) {
             return (DartDoubleList) value;

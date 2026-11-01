@@ -1558,7 +1558,12 @@ public final class JavaEmitter {
             String itfRaw = itfJava.indexOf('<') < 0 ? itfJava : itfJava.substring(0, itfJava.indexOf('<'));
             String itfSimple = itfRaw.substring(itfRaw.lastIndexOf('.') + 1);
             // The element-specialised forms too: List<int> is DartLongList, Map<int, V> DartLongMap.
-            if (itfSimple.matches("Dart(Long|Double)?(List|Set|Map|Iterable)")) {
+            // dart:async's Future is a runtime class too (`implements Future<T>` in a
+            // delegating wrapper): extended the same way. The runtime drives such a
+            // subclass through its own then() when it is awaited (Future.foreign).
+            if (itfSimple.matches("Dart(Long|Double)?(List|Set|Map|Iterable)")
+                    || (itfRaw.equals("dart.async.Future") || itfRaw.equals("Future"))
+                    && !program.classes.containsKey(itf.name)) {
                 // dart:core's List/Set/Map/Iterable are runtime *classes* here, which a Java
                 // `implements` cannot name. A class applying the family's mixin
                 // (ListMixin, ...) already has the protocol from it; one with no
@@ -1851,6 +1856,23 @@ public final class JavaEmitter {
     }
 
     /** True when c (or a superclass in the program) applies a dart:collection mixin or base. */
+    /** The runtime Future's protocol methods a program Future subclass renames. */
+    private static final java.util.Set<String> FUTURE_PROTOCOL = new java.util.HashSet<String>(
+            java.util.Arrays.asList("then", "catchError", "whenComplete", "timeout"));
+
+    /** Whether {@code c} is {@code implements Future<T>} with no superclass: it extends the runtime Future. */
+    private boolean implementsRuntimeFuture(ClassDecl c) {
+        if (c.superclass != null || program.classes.containsKey("Future")) {
+            return false;
+        }
+        for (TypeRef itf : c.interfaces) {
+            if (itf.is("Future")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private boolean appliesCollectionMixin(ClassDecl c) {
         for (ClassDecl k = c; k != null;
              k = k.superclass != null ? superDeclOf(k, k.superclass) : null) {
@@ -3717,6 +3739,41 @@ public final class JavaEmitter {
     }
 
     private String emitMethodLikeBody(Method m, Ctx ctx, boolean classIsAbstract) {
+        if (ctx.currentClass != null && implementsRuntimeFuture(ctx.currentClass) && !m.isStatic
+                && !m.isGetter && !m.isSetter && FUTURE_PROTOCOL.contains(m.name)) {
+            // `class C<T> implements Future<T>` extends the runtime Future, whose then /
+            // catchError / whenComplete / timeout are overloaded per callback shape and
+            // cannot be overridden by one Dart signature. The declaration keeps its body
+            // under this class's own name; the runtime's methods act on the inherited
+            // state, which cn1Drive() completes through the declared then() the first
+            // time anything listens -- what Dart's await does with a foreign future.
+            String own = m.name + "$" + ctx.currentClass.name;
+            String saved = m.name;
+            boolean savedOverride = m.isOverride;
+            m.name = own;
+            m.isOverride = false;
+            String inner;
+            try {
+                inner = emitMethodLikeBody(m, ctx, classIsAbstract);
+            } finally {
+                m.name = saved;
+                m.isOverride = savedOverride;
+            }
+            if (!"then".equals(saved) || m.isAbstract) {
+                return inner;
+            }
+            StringBuilder drive = new StringBuilder();
+            drive.append("    @Override\n    protected void cn1Drive() {\n        cn1Adopt(this.");
+            if (m.typeParams != null && !m.typeParams.isEmpty()) {
+                drive.append("<Object>");
+            }
+            drive.append(own).append("((v) -> v");
+            for (int i = 1; i < m.params.size(); i++) {
+                drive.append(", null");
+            }
+            drive.append("));\n    }\n\n");
+            return drive + inner;
+        }
         if (isEventSinkVoidClose(m, ctx)) {
             // Dart's EventSink.close() is void; in Java an EventSink is a dart.async.StreamSink,
             // whose close() answers a Future. The body goes into a method of this class's own
@@ -6208,6 +6265,24 @@ public final class JavaEmitter {
                 String v = "Await.awaitAny(" + o.code + ")";
                 return new Out(isDynamicType(inner) ? v : "((" + javaType(boxType(inner), true, ctx) + ") " + v + ")",
                         boxType(inner));
+            }
+            ClassDecl fc = o.type == null ? null : program.classes.get(o.type.name);
+            if (fc != null && implementsRuntimeFuture(fc)) {
+                // `class Relay<T> implements Future<T>`: a Future, awaited as one; the
+                // awaited type is the clause's argument with the class's own substituted.
+                TypeRef awaited = TypeRef.DYNAMIC;
+                for (TypeRef itf : fc.interfaces) {
+                    if (itf.is("Future") && !itf.args.isEmpty()) {
+                        awaited = itf.arg(0);
+                        int k = fc.typeParams.indexOf(awaited.name);
+                        if (k >= 0) {
+                            awaited = k < o.type.args.size() ? o.type.arg(k) : TypeRef.DYNAMIC;
+                        }
+                    }
+                }
+                String v = "Await.awaitAny(" + o.code + ")";
+                return new Out(isDynamicType(awaited) ? v
+                        : "((" + javaType(boxType(awaited), true, ctx) + ") " + v + ")", boxType(awaited));
             }
             // A statically non-Future value: `await 42` is 42.
             return new Out(o.code, o.type);
@@ -9684,6 +9759,16 @@ public final class JavaEmitter {
             TypeRef str = new TypeRef("String");
             str.nullable = true;
             return new Out(target.code + ".getMessage()", str);
+        }
+        if (tt.is("Invocation") && !program.classes.containsKey("Invocation")) {
+            TypeRef rt = name.equals("memberName") ? new TypeRef("Symbol")
+                    : name.equals("positionalArguments") ? TypeRef.of("List", TypeRef.DYNAMIC)
+                    : name.equals("typeArguments") ? TypeRef.of("List", new TypeRef("Type"))
+                    : name.equals("namedArguments") ? TypeRef.of("Map", new TypeRef("Symbol"), TypeRef.DYNAMIC)
+                    : name.startsWith("is") ? TypeRef.BOOL : null;
+            if (rt != null) {
+                return new Out(target.code + "." + name + "()", rt);
+            }
         }
         if (tt.is("Stopwatch")) {
             TypeRef rt = name.equals("isRunning") ? TypeRef.BOOL
@@ -14764,6 +14849,14 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
                     test = pinnedHandler(testExpr, emitExpr(testExpr, null, ctx), true,
                             "dart.runtime.Funcs.Func1<Object, Boolean>", "dart.runtime.Funcs.Func1<Object, Boolean>");
                 }
+                if (!(pos.get(0) instanceof Lambda) && cb.type != null
+                        && (cb.type.is("Function") || cb.type.is("dynamic") || cb.type.is("Object"))) {
+                    // A handler held as a plain Function (a wrapper forwarding its own
+                    // parameter) is an Object in Java, which no typed catchError overload
+                    // takes; onError(Object, Object) resolves its arity at run time.
+                    return new Out(target.code + ".onError((Object) " + paren(cb.code) + ", (Object) "
+                            + paren(test) + ")", tt);
+                }
                 // A handler that returns a value recovers with it, so the runtime answers
                 // a Future<Object>: typed that way, an await of it coerces to the slot.
                 return new Out(target.code + ".catchError(" + cbCode + ", " + test + ")",
@@ -18424,9 +18517,9 @@ return new Out("(" + left.code + " != null ? " + left.code + " : " + right.code 
             return "Stopwatch";
         }
         if (t.is("Invocation") && !program.classes.containsKey("Invocation")) {
-            // noSuchMethod's parameter. Its members are not modelled; the value is only
-            // passed on (to super.noSuchMethod), so it travels as Object.
-            return "Object";
+            // noSuchMethod's parameter: dart.core.Invocation, which the runtime builds for
+            // a dynamic miss (dart.runtime.Dyn) and DynamicObject.noSuchMethod declares.
+            return "dart.core.Invocation";
         }
         // user typedef that plainly aliases another type: resolve through to the target
         Ast.TypedefDecl userTd = typedefDecl(t.name);

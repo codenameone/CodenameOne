@@ -119,7 +119,6 @@ public class DartLongList extends DartList<Long> {
     /// itself when it already is one, else a live LongListView over the boxed DartList that
     /// generic code built (`List<E>.of(..)` with E bound to int at the use site). Unlike
     /// asLongs this never copies, so writes through either side reach the same list.
-    @SuppressWarnings("unchecked")
     public static DartLongList viewLongs(Object value) {
         if (value == null || value instanceof DartLongList) {
             return (DartLongList) value;
@@ -131,6 +130,7 @@ public class DartLongList extends DartList<Long> {
                 + "' is not a subtype of type 'List<int>'");
     }
 
+    @SuppressWarnings("unchecked")
     public static DartLongList asLongs(Object value) {
         if (value == null || value instanceof DartLongList) {
             return (DartLongList) value;
